@@ -1,0 +1,17 @@
+# AutoLabels.io
+
+> The dealer label platform that powers every sticker, addendum, and Buyers Guide. Scan a VIN, build a label, capture a lead, sign a deal.
+
+AutoLabels.io is a SaaS for franchise and independent auto dealers. It generates new-car Monroney addendums, used-car stickers, FTC Buyers Guides (English + Spanish), and digital deal addendums with tamper-evident e-signatures (UETA / E-SIGN). It includes a 50-state disclosure engine, NHTSA recall lookup, VIN decode, dealer-website scraping, prep sign-off compliance gating, and live analytics. Part of the Autocurb family of dealer apps.
+
+## Pages
+
+- [Home](/): Product overview, pricing, FAQ.
+- [About](/about): How the platform works — Decode, Stick, Sign, Close.
+- [Brand](/brand): Brand guidelines and logo usage.
+- [Sign in](/login): Dealer login.
+- [Get started](/onboarding): Standalone signup wizard.
+
+## Optional
+
+- [Scan a VIN](/scan): Public VIN scan entry point for in-store use.
