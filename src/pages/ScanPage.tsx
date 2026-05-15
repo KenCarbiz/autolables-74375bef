@@ -172,6 +172,7 @@ const ScanPage = () => {
 
   return (
     <div className="min-h-screen bg-background">
+      <h1 className="sr-only">Scan a VIN</h1>
       {/* Camera scanner overlay — mounts on top of the whole page when
           the user taps Open camera. Closes itself on a valid 17-char
           VIN detection and auto-decodes via the input's existing effect. */}
