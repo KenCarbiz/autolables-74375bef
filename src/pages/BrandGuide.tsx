@@ -33,10 +33,10 @@ const BrandGuide = () => {
           <h1 className="text-5xl lg:text-6xl font-black tracking-tighter font-display mt-10 leading-none">
             Brand Guidelines
           </h1>
-          <p className="text-xl text-white/60 mt-4 max-w-xl">
+          <p className="text-xl text-white/85 mt-4 max-w-xl">
             The visual and voice system for AutoLabels.io — clear, compliant, consistent labels for every vehicle on the lot.
           </p>
-          <div className="mt-8 flex items-center gap-2 text-xs text-white/40">
+          <div className="mt-8 flex items-center gap-2 text-xs text-white/75">
             <span>v1.0</span>
             <span>·</span>
             <span>Updated {new Date().toLocaleDateString("en-US", { month: "long", year: "numeric" })}</span>
