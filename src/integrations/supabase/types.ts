@@ -14,6 +14,130 @@ export type Database = {
   }
   public: {
     Tables: {
+      addendum_signings: {
+        Row: {
+          acknowledgments: Json
+          addendum_id: string | null
+          canonical_payload: Json | null
+          content_hash: string | null
+          created_at: string
+          deal_token_id: string | null
+          delivery_mileage: number | null
+          esign_consent: Json | null
+          id: string
+          ip_address: string | null
+          prep_sign_off_id: string | null
+          price_overrides: Json | null
+          signature_data: string | null
+          signature_type: string | null
+          signed_at: string
+          signer_email: string | null
+          signer_name: string | null
+          signer_phone: string | null
+          signer_type: string
+          signing_location: Json | null
+          tenant_id: string | null
+          user_agent: string | null
+          vehicle_listing_id: string | null
+          vin: string | null
+        }
+        Insert: {
+          acknowledgments?: Json
+          addendum_id?: string | null
+          canonical_payload?: Json | null
+          content_hash?: string | null
+          created_at?: string
+          deal_token_id?: string | null
+          delivery_mileage?: number | null
+          esign_consent?: Json | null
+          id?: string
+          ip_address?: string | null
+          prep_sign_off_id?: string | null
+          price_overrides?: Json | null
+          signature_data?: string | null
+          signature_type?: string | null
+          signed_at?: string
+          signer_email?: string | null
+          signer_name?: string | null
+          signer_phone?: string | null
+          signer_type: string
+          signing_location?: Json | null
+          tenant_id?: string | null
+          user_agent?: string | null
+          vehicle_listing_id?: string | null
+          vin?: string | null
+        }
+        Update: {
+          acknowledgments?: Json
+          addendum_id?: string | null
+          canonical_payload?: Json | null
+          content_hash?: string | null
+          created_at?: string
+          deal_token_id?: string | null
+          delivery_mileage?: number | null
+          esign_consent?: Json | null
+          id?: string
+          ip_address?: string | null
+          prep_sign_off_id?: string | null
+          price_overrides?: Json | null
+          signature_data?: string | null
+          signature_type?: string | null
+          signed_at?: string
+          signer_email?: string | null
+          signer_name?: string | null
+          signer_phone?: string | null
+          signer_type?: string
+          signing_location?: Json | null
+          tenant_id?: string | null
+          user_agent?: string | null
+          vehicle_listing_id?: string | null
+          vin?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "addendum_signings_addendum_id_fkey"
+            columns: ["addendum_id"]
+            isOneToOne: false
+            referencedRelation: "addendums"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "addendum_signings_deal_token_id_fkey"
+            columns: ["deal_token_id"]
+            isOneToOne: false
+            referencedRelation: "deal_signing_tokens"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "addendum_signings_prep_sign_off_id_fkey"
+            columns: ["prep_sign_off_id"]
+            isOneToOne: false
+            referencedRelation: "prep_sign_offs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "addendum_signings_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenant_summary"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "addendum_signings_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "addendum_signings_vehicle_listing_id_fkey"
+            columns: ["vehicle_listing_id"]
+            isOneToOne: false
+            referencedRelation: "vehicle_listings"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       addendums: {
         Row: {
           addendum_date: string | null
@@ -24,11 +148,13 @@ export type Database = {
           content_hash: string | null
           created_at: string
           created_by: string | null
+          customer_email: string | null
           customer_ip: string | null
           customer_name: string | null
           customer_signature_data: string | null
           customer_signature_type: string | null
           customer_signed_at: string | null
+          dealer_snapshot: Json | null
           delivery_mileage: number | null
           employee_name: string | null
           employee_signature_data: string | null
@@ -49,6 +175,7 @@ export type Database = {
           signing_token: string | null
           status: string
           sticker_match_ack: boolean | null
+          store_id: string | null
           tenant_id: string | null
           total_installed: number | null
           total_with_optional: number | null
@@ -70,11 +197,13 @@ export type Database = {
           content_hash?: string | null
           created_at?: string
           created_by?: string | null
+          customer_email?: string | null
           customer_ip?: string | null
           customer_name?: string | null
           customer_signature_data?: string | null
           customer_signature_type?: string | null
           customer_signed_at?: string | null
+          dealer_snapshot?: Json | null
           delivery_mileage?: number | null
           employee_name?: string | null
           employee_signature_data?: string | null
@@ -95,6 +224,7 @@ export type Database = {
           signing_token?: string | null
           status?: string
           sticker_match_ack?: boolean | null
+          store_id?: string | null
           tenant_id?: string | null
           total_installed?: number | null
           total_with_optional?: number | null
@@ -116,11 +246,13 @@ export type Database = {
           content_hash?: string | null
           created_at?: string
           created_by?: string | null
+          customer_email?: string | null
           customer_ip?: string | null
           customer_name?: string | null
           customer_signature_data?: string | null
           customer_signature_type?: string | null
           customer_signed_at?: string | null
+          dealer_snapshot?: Json | null
           delivery_mileage?: number | null
           employee_name?: string | null
           employee_signature_data?: string | null
@@ -141,6 +273,7 @@ export type Database = {
           signing_token?: string | null
           status?: string
           sticker_match_ack?: boolean | null
+          store_id?: string | null
           tenant_id?: string | null
           total_installed?: number | null
           total_with_optional?: number | null
@@ -246,6 +379,8 @@ export type Database = {
           entity_type: string
           id: string
           ip_address: string | null
+          prev_hash: string | null
+          row_hash: string | null
           store_id: string | null
           user_agent: string | null
           user_email: string | null
@@ -260,6 +395,8 @@ export type Database = {
           entity_type: string
           id?: string
           ip_address?: string | null
+          prev_hash?: string | null
+          row_hash?: string | null
           store_id?: string | null
           user_agent?: string | null
           user_email?: string | null
@@ -274,6 +411,8 @@ export type Database = {
           entity_type?: string
           id?: string
           ip_address?: string | null
+          prev_hash?: string | null
+          row_hash?: string | null
           store_id?: string | null
           user_agent?: string | null
           user_email?: string | null
@@ -399,6 +538,45 @@ export type Database = {
             foreignKeyName: "deal_signing_tokens_tenant_id_fkey"
             columns: ["tenant_id"]
             isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      dealer_profiles: {
+        Row: {
+          created_at: string
+          settings: Json
+          tenant_id: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          created_at?: string
+          settings?: Json
+          tenant_id: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          created_at?: string
+          settings?: Json
+          tenant_id?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "dealer_profiles_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: true
+            referencedRelation: "tenant_summary"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "dealer_profiles_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: true
             referencedRelation: "tenants"
             referencedColumns: ["id"]
           },
@@ -1150,6 +1328,72 @@ export type Database = {
       }
     }
     Views: {
+      addendum_signings_full: {
+        Row: {
+          acknowledgments: Json | null
+          addendum_id: string | null
+          content_hash: string | null
+          deal_token_id: string | null
+          delivery_mileage: number | null
+          id: string | null
+          ip_address: string | null
+          prep_sign_off_id: string | null
+          signature_type: string | null
+          signed_at: string | null
+          signer_email: string | null
+          signer_name: string | null
+          signer_phone: string | null
+          signer_type: string | null
+          tenant_id: string | null
+          tenant_name: string | null
+          vehicle_listing_id: string | null
+          vin: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "addendum_signings_addendum_id_fkey"
+            columns: ["addendum_id"]
+            isOneToOne: false
+            referencedRelation: "addendums"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "addendum_signings_deal_token_id_fkey"
+            columns: ["deal_token_id"]
+            isOneToOne: false
+            referencedRelation: "deal_signing_tokens"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "addendum_signings_prep_sign_off_id_fkey"
+            columns: ["prep_sign_off_id"]
+            isOneToOne: false
+            referencedRelation: "prep_sign_offs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "addendum_signings_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenant_summary"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "addendum_signings_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "addendum_signings_vehicle_listing_id_fkey"
+            columns: ["vehicle_listing_id"]
+            isOneToOne: false
+            referencedRelation: "vehicle_listings"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       tenant_summary: {
         Row: {
           active_apps: number | null
@@ -1197,6 +1441,19 @@ export type Database = {
       }
     }
     Functions: {
+      _audit_chain_payload: {
+        Args: {
+          _action: string
+          _created_at: string
+          _details: Json
+          _entity_id: string
+          _entity_type: string
+          _prev_hash: string
+          _store_id: string
+          _user_email: string
+        }
+        Returns: string
+      }
       admin_create_tenant: {
         Args: {
           _app_slug?: string
@@ -1255,11 +1512,13 @@ export type Database = {
           content_hash: string | null
           created_at: string
           created_by: string | null
+          customer_email: string | null
           customer_ip: string | null
           customer_name: string | null
           customer_signature_data: string | null
           customer_signature_type: string | null
           customer_signed_at: string | null
+          dealer_snapshot: Json | null
           delivery_mileage: number | null
           employee_name: string | null
           employee_signature_data: string | null
@@ -1280,6 +1539,7 @@ export type Database = {
           signing_token: string | null
           status: string
           sticker_match_ack: boolean | null
+          store_id: string | null
           tenant_id: string | null
           total_installed: number | null
           total_with_optional: number | null
@@ -1396,6 +1656,27 @@ export type Database = {
         }
         Returns: string
       }
+      record_customer_signing: {
+        Args: {
+          _acknowledgments: Json
+          _canonical_payload: Json
+          _content_hash: string
+          _delivery_mileage: number
+          _esign_consent: Json
+          _ip_address: string
+          _price_overrides: Json
+          _signature_data: string
+          _signature_type: string
+          _signer_email: string
+          _signer_name: string
+          _signer_phone: string
+          _signer_type: string
+          _signing_location: Json
+          _signing_token: string
+          _user_agent: string
+        }
+        Returns: string
+      }
       sign_deal_token: {
         Args: {
           _content_hash: string
@@ -1406,6 +1687,15 @@ export type Database = {
           _user_agent: string
         }
         Returns: boolean
+      }
+      verify_audit_chain: {
+        Args: { _store_id: string }
+        Returns: {
+          first_break_at: string
+          first_break_id: string
+          total: number
+          verified: number
+        }[]
       }
     }
     Enums: {
