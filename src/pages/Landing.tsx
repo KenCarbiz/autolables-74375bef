@@ -753,7 +753,7 @@ const Landing = () => {
 
   // ─ Footer ─
   const Footer = () => (
-    <footer className="bg-gray-900 text-gray-400 py-16">
+    <footer className="bg-gray-900 text-gray-200 py-16">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-8 mb-8">
           <div>
@@ -790,17 +790,17 @@ const Landing = () => {
             </ul>
           </div>
         </div>
-        <div className="border-t border-gray-800 pt-8 flex flex-col md:flex-row items-center justify-between gap-4">
+        <div className="border-t border-gray-700 pt-8 flex flex-col md:flex-row items-center justify-between gap-4">
           <div className="flex items-center gap-4">
             <Logo variant="full" size={24} />
-            <p className="text-sm text-gray-500">© 2026 AutoLabels.io — Built for the American dealer.</p>
+            <p className="text-sm text-gray-300">© 2026 AutoLabels.io — Built for the American dealer.</p>
           </div>
-          <div className="flex items-center gap-4 text-xs text-gray-500">
-            <a href="mailto:hello@autolabels.io" className="hover:text-gray-300">hello@autolabels.io</a>
-            <span className="text-gray-700">·</span>
+          <div className="flex items-center gap-4 text-xs text-gray-300">
+            <a href="mailto:hello@autolabels.io" className="hover:text-white">hello@autolabels.io</a>
+            <span className="text-gray-500">·</span>
             <button
               onClick={() => navigate("/login?admin=1")}
-              className="hover:text-gray-300"
+              className="hover:text-white"
             >
               Admin
             </button>
