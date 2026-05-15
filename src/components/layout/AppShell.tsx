@@ -36,6 +36,8 @@ import {
   Clock,
   CreditCard,
   RefreshCw,
+  Search,
+  HelpCircle,
 } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
 import { useAuth } from "@/contexts/AuthContext";
@@ -465,30 +467,33 @@ const AppShell = ({ children }: AppShellProps) => {
 
       {/* Main content area */}
       <div className="flex-1 lg:pl-64 flex flex-col min-w-0">
-        {/* Top bar — topbar-navy already has the shimmer-roll animation.
-            vt-topbar stabilises the header across admin tab switches so
-            only the main pane cross-fades. */}
+        {/* Top bar — HarteCash/Autocurb chrome: bordered translucent
+            pills on navy, full-width search bar in the centre, avatar
+            with role-stack on the right. topbar-navy already paints
+            the shimmer-roll animation; vt-topbar stabilises the
+            header across admin tab switches so only the main pane
+            cross-fades. */}
         <header className="sticky top-0 z-20 topbar-navy vt-topbar text-white border-b border-white/10">
-          <div className="flex items-center justify-between h-14 px-4 lg:px-6">
-            <div className="flex items-center gap-3 min-w-0">
+          <div className="flex items-center h-14 px-3 lg:px-5 gap-3">
+            {/* Left: hamburger (mobile) + greeting block */}
+            <div className="flex items-center gap-3 min-w-0 flex-shrink-0">
               <button
                 onClick={() => setMobileOpen(true)}
-                className="lg:hidden p-1.5 rounded-md hover:bg-white/10"
+                className="lg:hidden h-9 w-9 rounded-lg border border-white/15 bg-white/[0.04] hover:bg-white/10 hover:border-white/25 inline-flex items-center justify-center transition-all"
               >
-                <Menu className="w-5 h-5" />
+                <Menu className="w-4 h-4" />
               </button>
-
-              <div className="min-w-0">
+              <div className="min-w-0 hidden sm:block">
                 <p className="text-sm font-semibold text-white truncate leading-tight">
                   {greeting}, {capitalized}
                 </p>
                 <div className="flex items-center gap-1.5 mt-0.5">
-                  <span className="inline-flex items-center gap-1 text-[10px] font-semibold bg-amber-500 text-amber-950 px-1.5 py-0.5 rounded-sm uppercase tracking-wider">
+                  <span className="inline-flex items-center gap-1 text-[9px] font-bold bg-amber-400 text-amber-950 px-1.5 py-0.5 rounded-sm uppercase tracking-[0.12em]">
                     <Sparkles className="w-2.5 h-2.5" />
-                    Admin
+                    {isAdmin ? "Super Admin" : "Admin"}
                   </span>
                   {currentStore?.name && (
-                    <span className="text-[11px] text-white/70 truncate">
+                    <span className="text-[11px] text-white/65 truncate">
                       · {currentStore.name}
                     </span>
                   )}
@@ -496,38 +501,39 @@ const AppShell = ({ children }: AppShellProps) => {
               </div>
             </div>
 
-            <div className="flex items-center gap-1">
-              {/* Command palette trigger — Cmd+K opens a fuzzy-search
-                  over every page + action. Keyboard shortcut hint is
-                  shown on md+ so it reads as a quick-jump affordance. */}
-              <button
-                onClick={() => setPaletteOpen(true)}
-                className="hidden md:inline-flex items-center gap-2 h-9 pl-3 pr-1.5 rounded-md bg-white/10 hover:bg-white/20 text-sm font-medium transition-colors"
-                title="Command palette (⌘K)"
-              >
-                <span className="text-white/70">Search…</span>
-                <kbd className="ml-2 inline-flex items-center gap-0.5 rounded bg-white/10 px-1.5 py-0.5 text-[10px] font-mono text-white/80">
-                  ⌘K
-                </kbd>
-              </button>
+            {/* Centre: command-palette as a full-width search bar */}
+            <button
+              onClick={() => setPaletteOpen(true)}
+              className="hidden md:flex flex-1 min-w-0 max-w-xl items-center gap-2 h-10 px-3.5 rounded-xl border border-white/15 bg-white/[0.06] hover:bg-white/[0.10] hover:border-white/25 text-sm transition-all shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]"
+              title="Command palette (⌘K)"
+            >
+              <Search className="w-4 h-4 text-white/55 flex-shrink-0" />
+              <span className="flex-1 text-left text-white/55 truncate">
+                Search vehicles, VIN, customers…
+              </span>
+              <kbd className="inline-flex items-center justify-center h-5 min-w-[28px] px-1.5 rounded-md bg-white/10 border border-white/10 text-[10px] font-mono text-white/75 tracking-wider">
+                ⌘K
+              </kbd>
+            </button>
 
-              {/* App Switcher — switch between AutoLabels platform products */}
+            {/* Right cluster */}
+            <div className="flex items-center gap-1.5 flex-shrink-0 ml-auto">
+              {/* App switcher */}
               <AppSwitcher currentApp="autolabels" />
 
-              {/* Mobile QR launcher — shows QR code for phone scanning */}
+              {/* Mobile-scan QR launcher */}
               <button
                 onClick={() => setShowMobileQr(true)}
-                className="inline-flex items-center gap-1.5 h-9 px-3 rounded-md bg-white/10 hover:bg-white/20 text-sm font-medium transition-colors"
+                className="h-9 w-9 rounded-lg border border-white/15 bg-white/[0.04] hover:bg-white/10 hover:border-white/25 text-white/85 hover:text-white inline-flex items-center justify-center transition-all"
                 title="Open scanner on your phone"
               >
                 <ScanLine className="w-4 h-4" />
-                <span className="hidden md:inline">Mobile</span>
               </button>
 
               {/* Dark mode toggle */}
               <button
                 onClick={handleToggleDark}
-                className="p-2 rounded-md hover:bg-white/10 text-white/80 hover:text-white transition-colors"
+                className="h-9 w-9 rounded-lg border border-white/15 bg-white/[0.04] hover:bg-white/10 hover:border-white/25 text-white/85 hover:text-white inline-flex items-center justify-center transition-all"
                 title="Toggle dark mode"
               >
                 {darkMode ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
@@ -536,10 +542,13 @@ const AppShell = ({ children }: AppShellProps) => {
               {/* Notifications */}
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <button className="relative p-2 rounded-md hover:bg-white/10 text-white/80 hover:text-white transition-colors">
+                  <button
+                    className="relative h-9 w-9 rounded-lg border border-white/15 bg-white/[0.04] hover:bg-white/10 hover:border-white/25 text-white/85 hover:text-white inline-flex items-center justify-center transition-all"
+                    title="Notifications"
+                  >
                     <Bell className="w-4 h-4" />
                     {recentNotifications.length > 0 && (
-                      <span className="absolute top-1.5 right-1.5 w-1.5 h-1.5 rounded-full bg-amber-400" />
+                      <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-rose-500 ring-2 ring-[#0B2041]" />
                     )}
                   </button>
                 </DropdownMenuTrigger>
@@ -564,20 +573,28 @@ const AppShell = ({ children }: AppShellProps) => {
                 </DropdownMenuContent>
               </DropdownMenu>
 
-              {/* Sign out */}
-              <button
-                onClick={handleSignOut}
-                className="p-2 rounded-md hover:bg-white/10 text-white/80 hover:text-white transition-colors"
-                title="Sign out"
-              >
-                <LogOut className="w-4 h-4" />
-              </button>
+              {/* Admin role pill — only renders for platform admins */}
+              {isAdmin && (
+                <span className="hidden lg:inline-flex items-center gap-1 h-7 px-2.5 rounded-md border border-white/15 bg-white/[0.04] text-[10px] font-bold uppercase tracking-[0.14em] text-white/90">
+                  Admin
+                </span>
+              )}
 
-              {/* User avatar */}
+              {/* Divider */}
+              <div className="hidden lg:block w-px h-6 bg-white/12 mx-0.5" />
+
+              {/* User cluster — avatar + name/role stack */}
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <button className="ml-1 w-8 h-8 rounded-full bg-gradient-to-br from-blue to-action text-white flex items-center justify-center text-xs font-semibold hover:ring-2 hover:ring-white/20 transition-all">
-                    {userInitial}
+                  <button className="inline-flex items-center gap-2 h-10 pl-1 pr-2 rounded-lg hover:bg-white/[0.08] transition-colors group">
+                    <span className="w-8 h-8 rounded-full bg-gradient-to-br from-[#3BB4FF] to-[#1E90FF] text-white flex items-center justify-center text-[11px] font-bold ring-1 ring-white/20 shadow-premium">
+                      {userInitial}
+                    </span>
+                    <span className="hidden md:flex flex-col items-start min-w-0 leading-tight">
+                      <span className="text-xs font-semibold text-white truncate max-w-[110px]">{capitalized}</span>
+                      <span className="text-[10px] text-white/60 truncate">{isAdmin ? "Admin" : "Member"}</span>
+                    </span>
+                    <ChevronDown className="hidden md:inline-block w-3 h-3 text-white/55 group-hover:text-white/80 transition-colors" />
                   </button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-56">
@@ -603,6 +620,32 @@ const AppShell = ({ children }: AppShellProps) => {
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
+
+              {/* Help */}
+              <button
+                onClick={() => window.open("https://autolabels.io/help", "_blank")}
+                className="h-9 w-9 rounded-lg border border-white/15 bg-white/[0.04] hover:bg-white/10 hover:border-white/25 text-white/85 hover:text-white inline-flex items-center justify-center transition-all"
+                title="Help"
+              >
+                <HelpCircle className="w-4 h-4" />
+              </button>
+
+              {/* Logout — explicit text button on md+, icon on mobile */}
+              <button
+                onClick={handleSignOut}
+                className="hidden md:inline-flex items-center gap-1.5 h-9 px-3 rounded-lg border border-white/15 bg-white/[0.04] hover:bg-white/10 hover:border-white/25 text-white/90 hover:text-white text-xs font-semibold transition-all"
+                title="Sign out"
+              >
+                <LogOut className="w-3.5 h-3.5" />
+                Logout
+              </button>
+              <button
+                onClick={handleSignOut}
+                className="md:hidden h-9 w-9 rounded-lg border border-white/15 bg-white/[0.04] hover:bg-white/10 hover:border-white/25 text-white/85 hover:text-white inline-flex items-center justify-center transition-all"
+                title="Sign out"
+              >
+                <LogOut className="w-4 h-4" />
+              </button>
             </div>
           </div>
         </header>
