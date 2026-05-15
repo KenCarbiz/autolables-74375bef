@@ -1,5 +1,6 @@
 import { useNavigate } from "react-router-dom";
 import Logo from "@/components/brand/Logo";
+import Seo from "@/components/Seo";
 import {
   ArrowRight,
   ShieldCheck,
@@ -19,6 +20,11 @@ const About = () => {
 
   return (
     <div className="bg-background">
+      <Seo
+        title="About AutoLabels.io — Decode, Stick, Sign, Close"
+        description="How AutoLabels.io powers every dealer sticker, addendum, and Buyers Guide. Four verbs, one platform — decode, stick, sign, close."
+        path="/about"
+      />
       {/* ─────────── Top Nav ─────────── */}
       <nav className="sticky top-0 z-40 bg-background/80 backdrop-blur-md border-b border-border">
         <div className="max-w-7xl mx-auto px-6 lg:px-8 h-16 flex items-center justify-between">

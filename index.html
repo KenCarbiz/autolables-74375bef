@@ -14,25 +14,58 @@
 
     <!-- Open Graph -->
     <meta property="og:type" content="website" />
-    
-    
-    <meta property="og:image" content="/og-image.png">
+    <meta property="og:title" content="AutoLabels.io — The Dealer Label &amp; Compliance Platform" />
+    <meta property="og:description" content="The dealer label platform that powers every sticker, addendum, and compliance form. Scan a VIN, build a label, capture a lead, sign a deal." />
+    <meta property="og:url" content="https://www.autolabels.io/" />
+    <meta property="og:image" content="https://www.autolabels.io/og-image.png" />
     <meta property="og:site_name" content="AutoLabels.io" />
 
     <!-- Twitter -->
     <meta name="twitter:card" content="summary_large_image" />
-    
-    
-    <meta name="twitter:image" content="/og-image.png">
+    <meta name="twitter:title" content="AutoLabels.io — The Dealer Label &amp; Compliance Platform" />
+    <meta name="twitter:description" content="The dealer label platform that powers every sticker, addendum, and compliance form. Scan a VIN, build a label, capture a lead, sign a deal." />
+    <meta name="twitter:image" content="https://www.autolabels.io/og-image.png" />
 
     <!-- Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <meta property="og:title" content="AutoLabels.io — The Dealer Label &amp; Compliance Platform">
-  <meta name="twitter:title" content="AutoLabels.io — The Dealer Label &amp; Compliance Platform">
-  <meta property="og:description" content="The dealer label platform that powers every sticker, addendum, and compliance form. Scan a VIN, build a label, capture a lead, sign a deal.">
-  <meta name="twitter:description" content="The dealer label platform that powers every sticker, addendum, and compliance form. Scan a VIN, build a label, capture a lead, sign a deal.">
-</head>
+
+    <!-- Structured data: Organization + WebSite -->
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "Organization",
+        "name": "AutoLabels.io",
+        "url": "https://www.autolabels.io",
+        "logo": "https://www.autolabels.io/logo-full.svg",
+        "description": "The dealer label platform that powers every sticker, addendum, and compliance form."
+      }
+    </script>
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "WebSite",
+        "name": "AutoLabels.io",
+        "url": "https://www.autolabels.io"
+      }
+    </script>
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "FAQPage",
+        "mainEntity": [
+          {"@type":"Question","name":"Do you handle the FTC Buyers Guide for used cars?","acceptedAnswer":{"@type":"Answer","text":"Yes — bilingual (English + Spanish), As-Is / Implied / Warranty, 16 CFR 455 compliant."}},
+          {"@type":"Question","name":"What happened to the CARS Rule?","acceptedAnswer":{"@type":"Answer","text":"The 5th Circuit vacated it on January 27, 2025. We stay FTC-aligned via Section 5 and implement individual state laws like California SB 766 (effective October 1, 2026)."}},
+          {"@type":"Question","name":"Is digital signing legally binding?","acceptedAnswer":{"@type":"Answer","text":"Yes. We follow UETA and the federal E-SIGN Act — tamper-evident content hash, IP, user-agent, timestamp, and consent are captured and stored server-side."}},
+          {"@type":"Question","name":"Can the accessory addendum be viewed from our website?","acceptedAnswer":{"@type":"Answer","text":"Yes. Every VIN has a public /v/<slug> URL with WCAG 2.1 AA accessibility, and an iframe embed snippet your web team can drop on the VDP."}},
+          {"@type":"Question","name":"What if the internet drops?","acceptedAnswer":{"@type":"Answer","text":"Draft stickers save to an offline queue and sync when the connection returns."}},
+          {"@type":"Question","name":"Does it print to Zebra?","acceptedAnswer":{"@type":"Answer","text":"Yes — ZPL direct via WebUSB, plus Brother QL, DYMO, and any CUPS/PDF printer."}},
+          {"@type":"Question","name":"What DMS integrations?","acceptedAnswer":{"@type":"Answer","text":"vAuto, VinSolutions, CDK, and Reynolds via webhooks, plus Zapier/Make for the rest."}},
+          {"@type":"Question","name":"Is there a contract?","acceptedAnswer":{"@type":"Answer","text":"Month-to-month. Cancel anytime. No setup fees."}}
+        ]
+      }
+    </script>
+  </head>
 
   <body>
     <div id="root"></div>

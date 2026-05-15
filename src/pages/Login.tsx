@@ -3,6 +3,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useTenant } from "@/contexts/TenantContext";
 import Logo from "@/components/brand/Logo";
+import Seo from "@/components/Seo";
 import { Sparkles, CheckCircle2, ShieldCheck, Zap } from "lucide-react";
 
 const safeNext = (raw: string | null): string => {
@@ -54,6 +55,12 @@ const Login = () => {
 
   return (
     <div className="min-h-screen flex bg-background">
+      <Seo
+        title="Sign in — AutoLabels.io"
+        description="Sign in to AutoLabels.io to manage dealer stickers, addendums, Buyers Guides, and signed deals."
+        path="/login"
+        noindex
+      />
       {/* Left brand panel */}
       <div className="hidden lg:flex lg:w-1/2 shimmer-hero relative overflow-hidden">
         <div className="absolute inset-0 opacity-25 pointer-events-none">

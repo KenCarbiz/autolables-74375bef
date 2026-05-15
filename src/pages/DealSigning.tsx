@@ -337,6 +337,7 @@ const DealSigning = () => {
   // ── Main signing form ──
   return (
     <div className="min-h-screen bg-background pb-8">
+      <h1 className="sr-only">Sign your deal</h1>
       {/* Header */}
       <header className="sticky top-0 z-20 topbar-navy text-white">
         <div className="flex items-center justify-between h-14 px-4">

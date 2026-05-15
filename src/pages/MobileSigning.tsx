@@ -508,6 +508,7 @@ const MobileSigning = () => {
 
   return (
     <div className="min-h-screen bg-white">
+      <h1 className="sr-only">Sign your vehicle addendum</h1>
       {/* Sticky progress — solid slate track, Tesla cadence. Label
           reads as a step count so the customer always knows where
           they are, not a decorative gradient. */}
