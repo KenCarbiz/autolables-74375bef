@@ -209,7 +209,7 @@ const NewCarSticker = () => {
         tenantId: currentStore?.id || null,
         tenantName: currentStore?.name || null,
         vin: vehicle.vin || null,
-        ymm: vehicle.ymm || null,
+        ymm: `${vehicle.year} ${vehicle.make} ${vehicle.model}`.trim() || null,
       });
       pdf.save(`New-Car-Sticker-${vehicle.vin || "draft"}.pdf`);
       persistArchivedPdf(pdf, {
