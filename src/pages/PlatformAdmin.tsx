@@ -66,25 +66,11 @@ const PlatformAdmin = () => {
       </div>
 
       <div className="p-4 lg:p-6 space-y-4">
-        <div className="flex flex-wrap gap-2">
-          {TABS.map(t => {
-            const Icon = t.icon;
-            const active = tab === t.id;
-            return (
-              <button
-                key={t.id}
-                onClick={() => setTab(t.id)}
-                className={`inline-flex items-center gap-1.5 h-9 px-3 rounded-md text-sm font-medium transition-colors ${
-                  active
-                    ? "bg-primary text-primary-foreground"
-                    : "border border-border hover:bg-muted"
-                }`}
-              >
-                <Icon className="w-3.5 h-3.5" />
-                {t.label}
-              </button>
-            );
-          })}
+        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+          <span className="inline-flex items-center gap-1.5 h-7 px-2.5 rounded-full bg-muted font-semibold text-foreground">
+            {TABS.find(t => t.id === tab)?.label || "Section"}
+          </span>
+          <span className="hidden sm:inline">— pick any platform section from the left sidebar to switch.</span>
         </div>
 
         {tab === "tenants"      && <PlatformTenants />}

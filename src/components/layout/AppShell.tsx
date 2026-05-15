@@ -35,6 +35,7 @@ import {
   Award,
   Clock,
   CreditCard,
+  RefreshCw,
 } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
 import { useAuth } from "@/contexts/AuthContext";
@@ -156,10 +157,12 @@ const AppShell = ({ children }: AppShellProps) => {
       title: "PLATFORM",
       defaultOpen: false,
       items: isAdmin ? [
-        { label: "Tenants",        path: "/platform-admin?tab=tenants",      icon: Store },
-        { label: "Members",        path: "/platform-admin?tab=members",      icon: Users },
-        { label: "Entitlements",   path: "/platform-admin?tab=entitlements", icon: Award },
-        { label: "Platform Audit", path: "/platform-admin?tab=audit",        icon: ShieldCheck },
+        { label: "Tenants",            path: "/platform-admin?tab=tenants",      icon: Store },
+        { label: "Members",            path: "/platform-admin?tab=members",      icon: Users },
+        { label: "Entitlements",       path: "/platform-admin?tab=entitlements", icon: Award },
+        { label: "Platform Audit",     path: "/platform-admin?tab=audit",        icon: ShieldCheck },
+        { label: "Recall Refresh",     path: "/platform-admin?tab=recalls",      icon: RefreshCw },
+        { label: "Billing Handshake",  path: "/platform-admin?tab=billing",      icon: CreditCard },
       ] : [],
     },
   };
@@ -247,6 +250,20 @@ const AppShell = ({ children }: AppShellProps) => {
       };
       crumbs.push({ label: sectionMap[tab] || "Admin" });
       crumbs.push({ label: tabLabels[tab] || "Settings" });
+      return crumbs;
+    }
+    if (pathname === "/platform-admin") {
+      const tab = new URLSearchParams(search).get("tab") || "tenants";
+      const tabLabels: Record<string, string> = {
+        tenants:      "Tenants",
+        members:      "Members",
+        entitlements: "Entitlements",
+        audit:        "Platform Audit",
+        recalls:      "Recall Refresh",
+        billing:      "Billing Handshake",
+      };
+      crumbs.push({ label: "Platform" });
+      crumbs.push({ label: tabLabels[tab] || "Platform" });
       return crumbs;
     }
     return crumbs;
