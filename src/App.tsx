@@ -1,6 +1,6 @@
 import { lazy, Suspense } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Route, Routes } from "react-router-dom";
+import { BrowserRouter, Outlet, Route, Routes } from "react-router-dom";
 import { MotionConfig } from "framer-motion";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { Toaster } from "@/components/ui/toaster";
@@ -15,20 +15,29 @@ import ErrorBoundary from "@/components/layout/ErrorBoundary";
 import EntitlementGate from "@/components/layout/EntitlementGate";
 import AdminGate from "@/components/layout/AdminGate";
 
-// Wrap a signed-in route with both the app shell and the AutoLabels
-// entitlement check. Users without an autolabels entitlement hit the
-// ActivatePaywall instead of the page content.
-const Gated = ({ children }: { children: JSX.Element }) => (
+// Layout routes — AppShell mounts ONCE when entering the gated
+// section and stays mounted across navigation between gated
+// routes. Only the <Outlet /> body swaps, so the sidebar,
+// topbar, store selector, breadcrumb, and command palette never
+// remount. Lazy-loaded child chunks are caught by a local
+// Suspense so the loader appears in the body, not full-screen.
+const GatedLayout = () => (
   <EntitlementGate app="autolabels">
-    <AppShell>{children}</AppShell>
+    <AppShell>
+      <Suspense fallback={<BodyLoader />}>
+        <Outlet />
+      </Suspense>
+    </AppShell>
   </EntitlementGate>
 );
 
-// Wrap a platform-admin route — does NOT require a tenant or an app
-// entitlement, only an admin-role auth.users row.
-const AdminOnly = ({ children }: { children: JSX.Element }) => (
+const AdminLayout = () => (
   <AdminGate>
-    <AppShell>{children}</AppShell>
+    <AppShell>
+      <Suspense fallback={<BodyLoader />}>
+        <Outlet />
+      </Suspense>
+    </AppShell>
   </AdminGate>
 );
 
@@ -64,11 +73,23 @@ const NotFound = lazy(() => import("./pages/NotFound"));
 
 const queryClient = new QueryClient();
 
-// Loading fallback — minimal spinner
+// Full-screen loader — used only on the very first chunk load
+// before any layout has mounted.
 const PageLoader = () => (
   <div className="min-h-screen flex items-center justify-center bg-background">
     <div className="flex flex-col items-center gap-3">
       <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+      <p className="text-xs text-muted-foreground">Loading...</p>
+    </div>
+  </div>
+);
+
+// Body-only loader — lands inside AppShell's main slot so the
+// chrome stays visible while the next page's chunk streams in.
+const BodyLoader = () => (
+  <div className="flex items-center justify-center py-24">
+    <div className="flex flex-col items-center gap-3">
+      <div className="w-7 h-7 border-2 border-primary border-t-transparent rounded-full animate-spin" />
       <p className="text-xs text-muted-foreground">Loading...</p>
     </div>
   </div>
@@ -103,7 +124,7 @@ const App = () => (
                       <Route path="/" element={<Landing />} />
                       <Route path="/login" element={<Login />} />
                       <Route path="/sign/:token" element={<MobileSigning />} />
-                      {/* Buyer recovery path: VIN + contact \u2192 email a fresh signing link */}
+                      {/* Buyer recovery path: VIN + contact -> email a fresh signing link */}
                       <Route path="/lookup" element={<SigningLookup />} />
                       <Route path="/onboarding" element={<Onboarding />} />
                       <Route path="/scan" element={<ScanPage />} />
@@ -113,37 +134,40 @@ const App = () => (
                       <Route path="/about" element={<About />} />
                       <Route path="/brand" element={<BrandGuide />} />
 
-                      {/* Signed-in routes — wrapped in AppShell + entitlement gate */}
-                      <Route path="/addendum" element={<Gated><Index /></Gated>} />
-                      {/* /dashboard is the dealer's landing. We now show the
-                          inventory-first view at both /dashboard and
-                          /inventory so the sidebar Dashboard link and the
-                          Inventory link both take you to the same place. */}
-                      <Route path="/dashboard" element={<Gated><Inventory /></Gated>} />
-                      <Route path="/inventory" element={<Gated><Inventory /></Gated>} />
-                      <Route path="/dashboard-legacy" element={<Gated><Dashboard /></Gated>} />
-                      <Route path="/vehicle-file/:id" element={<Gated><VehicleFile /></Gated>} />
-                      {/* /admin is shared by dealer settings (products, rules,
-                          branding, leads, queue, files, audit) AND the
-                          platform-admin surfaces (tenants, members,
-                          entitlements, platform audit). The page renders
-                          behind Gated so any tenant member can reach their
-                          own settings; the platform-admin tabs are rendered
-                          only when isAdmin is true via the tab list itself. */}
-                      <Route path="/admin" element={<Gated><Admin /></Gated>} />
-                      {/* Platform-admin is a separate route gated on
-                          isAdmin role, not on an app entitlement. */}
-                      <Route path="/platform-admin" element={<AdminOnly><PlatformAdmin /></AdminOnly>} />
-                      <Route path="/saved" element={<Gated><SavedAddendums /></Gated>} />
-                      <Route path="/buyers-guide" element={<Gated><BuyersGuide /></Gated>} />
-                      <Route path="/trade-up" element={<Gated><TradeUpSticker /></Gated>} />
-                      <Route path="/used-car-sticker" element={<Gated><UsedCarSticker /></Gated>} />
-                      <Route path="/new-car-sticker" element={<Gated><NewCarSticker /></Gated>} />
-                      <Route path="/cpo-sheet" element={<Gated><CpoSheet /></Gated>} />
-                      <Route path="/compliance" element={<Gated><ComplianceCenter /></Gated>} />
-                      <Route path="/description-writer" element={<Gated><DescriptionWriter /></Gated>} />
-                      <Route path="/add-inventory" element={<Gated><SaveCarInventory /></Gated>} />
-                      <Route path="/prep" element={<Gated><PrepSignOff /></Gated>} />
+                      {/* Gated layout — one AppShell shared across every
+                          dealer route. Only <Outlet /> swaps on navigation,
+                          so the sidebar, topbar, store selector, and command
+                          palette stay mounted and visually still. */}
+                      <Route element={<GatedLayout />}>
+                        <Route path="/addendum" element={<Index />} />
+                        {/* /dashboard and /inventory both land on the
+                            inventory-first view so the sidebar Dashboard
+                            link and the Inventory link converge. */}
+                        <Route path="/dashboard" element={<Inventory />} />
+                        <Route path="/inventory" element={<Inventory />} />
+                        <Route path="/dashboard-legacy" element={<Dashboard />} />
+                        <Route path="/vehicle-file/:id" element={<VehicleFile />} />
+                        {/* /admin hosts dealer settings (products, rules,
+                            branding, leads, queue, files, audit). Tenant
+                            members reach their own settings here. */}
+                        <Route path="/admin" element={<Admin />} />
+                        <Route path="/saved" element={<SavedAddendums />} />
+                        <Route path="/buyers-guide" element={<BuyersGuide />} />
+                        <Route path="/trade-up" element={<TradeUpSticker />} />
+                        <Route path="/used-car-sticker" element={<UsedCarSticker />} />
+                        <Route path="/new-car-sticker" element={<NewCarSticker />} />
+                        <Route path="/cpo-sheet" element={<CpoSheet />} />
+                        <Route path="/compliance" element={<ComplianceCenter />} />
+                        <Route path="/description-writer" element={<DescriptionWriter />} />
+                        <Route path="/add-inventory" element={<SaveCarInventory />} />
+                        <Route path="/prep" element={<PrepSignOff />} />
+                      </Route>
+
+                      {/* Platform-admin layout — gated on isAdmin role, not
+                          on an app entitlement. Same shared-AppShell pattern. */}
+                      <Route element={<AdminLayout />}>
+                        <Route path="/platform-admin" element={<PlatformAdmin />} />
+                      </Route>
 
                     <Route path="*" element={<NotFound />} />
                   </Routes>
