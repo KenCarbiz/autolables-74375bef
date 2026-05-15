@@ -92,7 +92,7 @@ const Login = () => {
             </div>
           </div>
 
-          <div className="text-xs text-white/50">
+          <div className="text-xs text-white/80">
             © {new Date().getFullYear()} {tenant?.name || "AutoLabels.io"}. Clear · Compliant · Consistent.
           </div>
         </div>

@@ -97,7 +97,7 @@ const About = () => {
             </button>
           </div>
 
-          <div className="mt-12 flex items-center justify-center gap-6 text-xs text-white/40 flex-wrap">
+          <div className="mt-12 flex items-center justify-center gap-6 text-xs text-white/80 flex-wrap">
             <span className="flex items-center gap-1.5">
               <Check className="w-3 h-3 text-emerald-400" />
               No credit card required
