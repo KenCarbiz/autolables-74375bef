@@ -30,18 +30,26 @@ export const useViewTransitionNavigate = () => {
   const navigate = useNavigate();
   return useCallback(
     (to: string | number, options?: NavigateOptions) => {
-      if (!hasViewTransitions()) {
+      const doNavigate = () => {
         if (typeof to === "number") navigate(to);
         else navigate(to, options);
+      };
+      if (!hasViewTransitions()) {
+        doNavigate();
         return;
       }
-      const start = (document as unknown as {
-        startViewTransition: StartViewTransition;
-      }).startViewTransition;
-      start(() => {
-        if (typeof to === "number") navigate(to);
-        else navigate(to, options);
-      });
+      // startViewTransition must be called as a method on `document` —
+      // a detached reference throws "Illegal invocation" because the
+      // browser checks `this` binds to a Document. Wrap in try/catch
+      // so an in-flight transition or a future spec quirk can never
+      // strand the user on a dead click.
+      try {
+        (document as unknown as {
+          startViewTransition: StartViewTransition;
+        }).startViewTransition(doNavigate);
+      } catch {
+        doNavigate();
+      }
     },
     [navigate]
   );
