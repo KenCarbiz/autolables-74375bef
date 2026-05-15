@@ -1368,7 +1368,7 @@ const Admin = () => {
                                     const params = new URLSearchParams();
                                     params.set("vin", item.vin);
                                     params.set("stock", item.stock_number || "");
-                                    params.set("ymm", qData?.decoded?.ymm || "");
+                                    params.set("ymm", decoded?.ymm || "");
                                     navigate(`/?${params.toString()}`);
                                     updateQueueItem(item.id, { status: "processing" });
                                   }}

@@ -45,7 +45,8 @@ export interface AuditLogEntry {
     | "inventory_imported"
     | "prep_sign_off_created" | "prep_sign_off_signed"
     | "prep_sign_off_rejected" | "prep_sign_off_overridden"
-    | "listing_published" | "listing_viewed" | "listing_archived";
+    | "listing_published" | "listing_viewed" | "listing_archived"
+    | "compliance_block";
   entity_type: string;           // "addendum", "product", "rule", etc.
   entity_id: string;
   details: Record<string, any>;  // JSON payload of what changed
