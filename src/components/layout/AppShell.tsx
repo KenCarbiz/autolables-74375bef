@@ -673,11 +673,10 @@ const AppShell = ({ children }: AppShellProps) => {
           </div>
         </div>
 
-        {/* Page content */}
-        <main
-          className="flex-1 overflow-y-auto"
-          style={{ viewTransitionName: "main-content" }}
-        >
+        {/* Page content — only this swaps on route change. Chrome
+            above (topbar + breadcrumb) and the sidebar stay
+            mounted and visually still. */}
+        <main className="flex-1 overflow-y-auto">
           {children}
         </main>
       </div>

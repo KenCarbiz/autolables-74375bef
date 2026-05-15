@@ -378,12 +378,14 @@
     z-index: 1;
   }
 
-  /* View-transition helpers — when the Admin tab changes, only the
-     main content should cross-fade. Naming the chrome prevents the
-     default root-fade from washing over the whole page. */
-  .vt-sidebar   { view-transition-name: app-sidebar; }
-  .vt-topbar    { view-transition-name: app-topbar; }
-  .vt-crumbs    { view-transition-name: app-crumbs; }
+  /* View-transition helpers — retired. Sidebar navigation no
+     longer wraps in startViewTransition (see src/lib/navigation.ts);
+     these classes are intentional no-ops kept so existing markup
+     doesn't have to change. The chrome stays still, only the body
+     re-renders. */
+  .vt-sidebar,
+  .vt-topbar,
+  .vt-crumbs { /* no-op */ }
 
   @keyframes shimmer-roll {
     0%   { background-position: 0% 50%; }
@@ -471,16 +473,10 @@
   }
 }
 
-/* View Transitions API baseline. Increment 2.2 wires the router;
-   these styles make the default crossfade feel calm. Browsers
-   without support just no-op. */
-@supports (view-transition-name: none) {
-  ::view-transition-old(root),
-  ::view-transition-new(root) {
-    animation-duration: 220ms;
-    animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
-  }
-}
+/* View Transitions API retired — the router no longer wraps
+   navigation in startViewTransition, so no root cross-fade fires.
+   Left intentionally empty; instant body swap matches the
+   Autocurb single-page-app feel. */
 
 /* Respect user motion preference universally. Keep cross-fades;
    it's movement that causes vestibular issues, not opacity. */
