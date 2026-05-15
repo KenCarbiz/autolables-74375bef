@@ -55,6 +55,12 @@ const Login = () => {
 
   return (
     <div className="min-h-screen flex bg-background">
+      <Seo
+        title="Sign in — AutoLabels.io"
+        description="Sign in to AutoLabels.io to manage dealer stickers, addendums, Buyers Guides, and signed deals."
+        path="/login"
+        noindex
+      />
       {/* Left brand panel */}
       <div className="hidden lg:flex lg:w-1/2 shimmer-hero relative overflow-hidden">
         <div className="absolute inset-0 opacity-25 pointer-events-none">
