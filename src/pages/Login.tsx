@@ -3,6 +3,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useTenant } from "@/contexts/TenantContext";
 import Logo from "@/components/brand/Logo";
+import Seo from "@/components/Seo";
 import { Sparkles, CheckCircle2, ShieldCheck, Zap } from "lucide-react";
 
 const safeNext = (raw: string | null): string => {
