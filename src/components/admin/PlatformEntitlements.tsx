@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { useAdminPlatform, type EntitlementRow } from "@/hooks/useAdminPlatform";
 import { toast } from "sonner";
 import { CreditCard, Search, Zap } from "lucide-react";
+import { SortHeader, TablePagination, useSortAndPaginate, toCsv, downloadCsv } from "./tablePrimitives";
 
 const APP_SLUGS = ["autolabels", "autocurb", "autoframe", "autovideo"] as const;
 const STATUSES: EntitlementRow["status"][] = ["trial", "active", "canceled", "past_due", "paused"];
@@ -45,6 +46,31 @@ export const PlatformEntitlements = () => {
         return tn.includes(lc) || e.plan_tier.toLowerCase().includes(lc) || e.status.includes(lc);
       });
   }, [entitlements.data, appFilter, q, tenantsById]);
+
+  const sortPag = useSortAndPaginate<EntitlementRow>(rows, {
+    defaultSortKey: "tenant",
+    defaultSortDir: "asc",
+    defaultPageSize: 50,
+    getSortValue: (row, key) => {
+      if (key === "tenant") return tenantsById.get(row.tenant_id) || "";
+      return (row as unknown as Record<string, unknown>)[key];
+    },
+  });
+
+  const handleExport = () => {
+    const csv = toCsv<EntitlementRow>(sortPag.sorted, [
+      { header: "Tenant",        get: r => tenantsById.get(r.tenant_id) || "" },
+      { header: "Tenant ID",     get: r => r.tenant_id },
+      { header: "App",           get: r => r.app_slug },
+      { header: "Plan",          get: r => r.plan_tier },
+      { header: "Status",        get: r => r.status },
+      { header: "Trial ends",    get: r => r.trial_ends_at || "" },
+      { header: "Expires",       get: r => r.expires_at || "" },
+      { header: "Seat limit",    get: r => r.seat_limit ?? "" },
+    ]);
+    const stamp = new Date().toISOString().slice(0, 10);
+    downloadCsv(`platform-entitlements-${stamp}.csv`, csv);
+  };
 
   return (
     <div className="space-y-4">
@@ -115,18 +141,18 @@ export const PlatformEntitlements = () => {
           <table className="w-full text-sm">
             <thead className="bg-muted/50 text-[11px] uppercase tracking-wide text-muted-foreground">
               <tr>
-                <th className="text-left px-3 py-2 font-semibold">Tenant</th>
-                <th className="text-left px-3 py-2 font-semibold">App</th>
-                <th className="text-left px-3 py-2 font-semibold">Plan</th>
-                <th className="text-left px-3 py-2 font-semibold">Status</th>
-                <th className="text-left px-3 py-2 font-semibold">Trial ends</th>
-                <th className="text-left px-3 py-2 font-semibold">Expires</th>
-                <th className="text-left px-3 py-2 font-semibold">Seats</th>
-                <th className="text-right px-3 py-2 font-semibold">Override</th>
+                <SortHeader label="Tenant"     sortKey="tenant"        activeKey={sortPag.sortKey} dir={sortPag.sortDir} onToggle={sortPag.toggleSort} />
+                <SortHeader label="App"        sortKey="app_slug"      activeKey={sortPag.sortKey} dir={sortPag.sortDir} onToggle={sortPag.toggleSort} />
+                <SortHeader label="Plan"       sortKey="plan_tier"     activeKey={sortPag.sortKey} dir={sortPag.sortDir} onToggle={sortPag.toggleSort} />
+                <SortHeader label="Status"     sortKey="status"        activeKey={sortPag.sortKey} dir={sortPag.sortDir} onToggle={sortPag.toggleSort} />
+                <SortHeader label="Trial ends" sortKey="trial_ends_at" activeKey={sortPag.sortKey} dir={sortPag.sortDir} onToggle={sortPag.toggleSort} />
+                <SortHeader label="Expires"    sortKey="expires_at"    activeKey={sortPag.sortKey} dir={sortPag.sortDir} onToggle={sortPag.toggleSort} />
+                <SortHeader label="Seats"      sortKey="seat_limit"    activeKey={sortPag.sortKey} dir={sortPag.sortDir} onToggle={sortPag.toggleSort} />
+                <SortHeader label="Override"   activeKey={sortPag.sortKey} dir={sortPag.sortDir} onToggle={sortPag.toggleSort} align="right" />
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
-              {rows.map((e) => (
+              {sortPag.paginated.map((e) => (
                 <EntRow
                   key={e.id}
                   row={e}
@@ -154,6 +180,17 @@ export const PlatformEntitlements = () => {
               ))}
             </tbody>
           </table>
+          <TablePagination
+            page={sortPag.page}
+            totalPages={sortPag.totalPages}
+            pageSize={sortPag.pageSize}
+            totalCount={sortPag.totalCount}
+            visibleCount={sortPag.paginated.length}
+            setPage={sortPag.setPage}
+            setPageSize={sortPag.setPageSize}
+            onExportCsv={handleExport}
+            exportLabel="Export CSV"
+          />
         </div>
       )}
     </div>

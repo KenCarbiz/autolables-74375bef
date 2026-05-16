@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { useAdminPlatform, type TenantSummary } from "@/hooks/useAdminPlatform";
 import { toast } from "sonner";
 import { Building2, Search, Power, PowerOff, Calendar, Users, AppWindow, Plus, X } from "lucide-react";
+import { SortHeader, TablePagination, useSortAndPaginate, toCsv, downloadCsv } from "./tablePrimitives";
 
 const formatDate = (s: string | null) => {
   if (!s) return "—";
@@ -43,6 +44,33 @@ export const PlatformTenants = () => {
     const ok = await setTenantActive(t.id, !t.is_active);
     if (ok) toast.success(`${t.name} ${t.is_active ? "suspended" : "reactivated"}`);
     else toast.error("Action failed");
+  };
+
+  const sortPag = useSortAndPaginate<TenantSummary>(rows, {
+    defaultSortKey: "name",
+    defaultSortDir: "asc",
+    defaultPageSize: 50,
+    getSortValue: (row, key) => {
+      if (key === "status") return row.is_active ? 1 : 0;
+      return (row as unknown as Record<string, unknown>)[key];
+    },
+  });
+
+  const handleExport = () => {
+    const csv = toCsv<TenantSummary>(sortPag.sorted, [
+      { header: "Dealer",        get: r => r.name },
+      { header: "Slug",          get: r => r.slug },
+      { header: "Domain",        get: r => r.domain || "" },
+      { header: "Source",        get: r => r.source },
+      { header: "Active apps",   get: r => r.active_apps },
+      { header: "App slugs",     get: r => r.app_slugs.join("; ") },
+      { header: "Members",       get: r => r.member_count },
+      { header: "Created",       get: r => r.created_at },
+      { header: "Last activity", get: r => r.last_activity || "" },
+      { header: "Status",        get: r => r.is_active ? "active" : "suspended" },
+    ]);
+    const stamp = new Date().toISOString().slice(0, 10);
+    downloadCsv(`platform-tenants-${stamp}.csv`, csv);
   };
 
   return (
@@ -114,17 +142,17 @@ export const PlatformTenants = () => {
           <table className="w-full text-sm">
             <thead className="bg-muted/50 text-[11px] uppercase tracking-wide text-muted-foreground">
               <tr>
-                <th className="text-left px-3 py-2 font-semibold">Dealer</th>
-                <th className="text-left px-3 py-2 font-semibold">Source</th>
-                <th className="text-left px-3 py-2 font-semibold">Apps</th>
-                <th className="text-left px-3 py-2 font-semibold">Members</th>
-                <th className="text-left px-3 py-2 font-semibold">Created</th>
-                <th className="text-left px-3 py-2 font-semibold">Last activity</th>
-                <th className="text-right px-3 py-2 font-semibold">Status</th>
+                <SortHeader label="Dealer"        sortKey="name"          activeKey={sortPag.sortKey} dir={sortPag.sortDir} onToggle={sortPag.toggleSort} />
+                <SortHeader label="Source"        sortKey="source"        activeKey={sortPag.sortKey} dir={sortPag.sortDir} onToggle={sortPag.toggleSort} />
+                <SortHeader label="Apps"          sortKey="active_apps"   activeKey={sortPag.sortKey} dir={sortPag.sortDir} onToggle={sortPag.toggleSort} />
+                <SortHeader label="Members"       sortKey="member_count"  activeKey={sortPag.sortKey} dir={sortPag.sortDir} onToggle={sortPag.toggleSort} />
+                <SortHeader label="Created"       sortKey="created_at"    activeKey={sortPag.sortKey} dir={sortPag.sortDir} onToggle={sortPag.toggleSort} />
+                <SortHeader label="Last activity" sortKey="last_activity" activeKey={sortPag.sortKey} dir={sortPag.sortDir} onToggle={sortPag.toggleSort} />
+                <SortHeader label="Status"        sortKey="status"        activeKey={sortPag.sortKey} dir={sortPag.sortDir} onToggle={sortPag.toggleSort} align="right" />
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
-              {rows.map((t) => (
+              {sortPag.paginated.map((t) => (
                 <tr key={t.id} className={t.is_active ? "" : "opacity-60"}>
                   <td className="px-3 py-2.5">
                     <div className="font-semibold text-foreground">{t.name}</div>
@@ -181,6 +209,17 @@ export const PlatformTenants = () => {
               ))}
             </tbody>
           </table>
+          <TablePagination
+            page={sortPag.page}
+            totalPages={sortPag.totalPages}
+            pageSize={sortPag.pageSize}
+            totalCount={sortPag.totalCount}
+            visibleCount={sortPag.paginated.length}
+            setPage={sortPag.setPage}
+            setPageSize={sortPag.setPageSize}
+            onExportCsv={handleExport}
+            exportLabel="Export CSV"
+          />
         </div>
       )}
     </div>

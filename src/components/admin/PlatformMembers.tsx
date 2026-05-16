@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { useAdminPlatform, type MemberRow } from "@/hooks/useAdminPlatform";
 import { toast } from "sonner";
 import { Users, Search, Trash2 } from "lucide-react";
+import { SortHeader, TablePagination, useSortAndPaginate, toCsv, downloadCsv } from "./tablePrimitives";
 
 const ROLES: MemberRow["role"][] = ["owner", "admin", "manager", "staff"];
 
@@ -52,6 +53,31 @@ export const PlatformMembers = () => {
     else toast.error("Remove failed");
   };
 
+  const sortPag = useSortAndPaginate<MemberRow>(rows, {
+    defaultSortKey: "invited_at",
+    defaultSortDir: "desc",
+    defaultPageSize: 50,
+    getSortValue: (row, key) => {
+      if (key === "tenant") return tenantsById.get(row.tenant_id) || "";
+      if (key === "accepted") return row.accepted_at || "";
+      return (row as unknown as Record<string, unknown>)[key];
+    },
+  });
+
+  const handleExport = () => {
+    const csv = toCsv<MemberRow>(sortPag.sorted, [
+      { header: "Tenant",        get: r => tenantsById.get(r.tenant_id) || "" },
+      { header: "Tenant ID",     get: r => r.tenant_id },
+      { header: "Email",         get: r => r.invited_email || "" },
+      { header: "User ID",       get: r => r.user_id || "" },
+      { header: "Role",          get: r => r.role },
+      { header: "Accepted at",   get: r => r.accepted_at || "" },
+      { header: "Invited at",    get: r => r.invited_at },
+    ]);
+    const stamp = new Date().toISOString().slice(0, 10);
+    downloadCsv(`platform-members-${stamp}.csv`, csv);
+  };
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between gap-3 flex-wrap">
@@ -98,16 +124,16 @@ export const PlatformMembers = () => {
           <table className="w-full text-sm">
             <thead className="bg-muted/50 text-[11px] uppercase tracking-wide text-muted-foreground">
               <tr>
-                <th className="text-left px-3 py-2 font-semibold">Tenant</th>
-                <th className="text-left px-3 py-2 font-semibold">Email</th>
-                <th className="text-left px-3 py-2 font-semibold">Role</th>
-                <th className="text-left px-3 py-2 font-semibold">Accepted</th>
-                <th className="text-left px-3 py-2 font-semibold">Invited</th>
-                <th className="text-right px-3 py-2 font-semibold">Actions</th>
+                <SortHeader label="Tenant"   sortKey="tenant"        activeKey={sortPag.sortKey} dir={sortPag.sortDir} onToggle={sortPag.toggleSort} />
+                <SortHeader label="Email"    sortKey="invited_email" activeKey={sortPag.sortKey} dir={sortPag.sortDir} onToggle={sortPag.toggleSort} />
+                <SortHeader label="Role"     sortKey="role"          activeKey={sortPag.sortKey} dir={sortPag.sortDir} onToggle={sortPag.toggleSort} />
+                <SortHeader label="Accepted" sortKey="accepted"      activeKey={sortPag.sortKey} dir={sortPag.sortDir} onToggle={sortPag.toggleSort} />
+                <SortHeader label="Invited"  sortKey="invited_at"    activeKey={sortPag.sortKey} dir={sortPag.sortDir} onToggle={sortPag.toggleSort} />
+                <SortHeader label="Actions"  activeKey={sortPag.sortKey} dir={sortPag.sortDir} onToggle={sortPag.toggleSort} align="right" />
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
-              {rows.map((m) => (
+              {sortPag.paginated.map((m) => (
                 <tr key={m.id}>
                   <td className="px-3 py-2.5">
                     <span className="font-semibold text-foreground">
@@ -147,6 +173,17 @@ export const PlatformMembers = () => {
               ))}
             </tbody>
           </table>
+          <TablePagination
+            page={sortPag.page}
+            totalPages={sortPag.totalPages}
+            pageSize={sortPag.pageSize}
+            totalCount={sortPag.totalCount}
+            visibleCount={sortPag.paginated.length}
+            setPage={sortPag.setPage}
+            setPageSize={sortPag.setPageSize}
+            onExportCsv={handleExport}
+            exportLabel="Export CSV"
+          />
         </div>
       )}
     </div>
