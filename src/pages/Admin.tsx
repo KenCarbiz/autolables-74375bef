@@ -476,10 +476,20 @@ const Admin = () => {
                   <h3 className="text-sm font-semibold text-foreground">Setup checklist</h3>
                 </div>
                 <div className="space-y-2">
+                  {/* Wave 15.2 — completed items visually retreat
+                      to 60% opacity so the dealer's eye lands on
+                      the open TODOs first. Stripe/Linear pattern:
+                      retired rows recede, action rows lead. The
+                      open rows also get a subtle white card +
+                      slightly stronger shadow so they pop. */}
                   {checklist.map(item => (
                     <div
                       key={item.key}
-                      className="flex items-center justify-between gap-3 px-3 py-2.5 rounded-lg border border-border hover:bg-muted/20 transition-colors"
+                      className={`flex items-center justify-between gap-3 px-3 py-2.5 rounded-lg border transition-all ${
+                        item.done
+                          ? "border-border/60 opacity-60 hover:opacity-90"
+                          : "border-border bg-card shadow-sm hover:bg-muted/20"
+                      }`}
                     >
                       <div className="flex items-center gap-3 min-w-0">
                         {item.done ? (
@@ -487,13 +497,17 @@ const Admin = () => {
                         ) : (
                           <Circle className="w-5 h-5 text-muted-foreground/50 flex-shrink-0" />
                         )}
-                        <span className={`text-sm ${item.done ? "text-muted-foreground line-through" : "text-foreground font-medium"}`}>
+                        <span className={`text-sm ${item.done ? "text-muted-foreground line-through" : "text-foreground font-semibold"}`}>
                           {item.label}
                         </span>
                       </div>
                       <button
                         onClick={item.onClick}
-                        className="inline-flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-md border border-border hover:bg-muted transition-colors flex-shrink-0"
+                        className={`inline-flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-md border transition-colors flex-shrink-0 ${
+                          item.done
+                            ? "border-border text-muted-foreground hover:bg-muted"
+                            : "border-border bg-card hover:bg-muted"
+                        }`}
                       >
                         {item.key === "portal" ? <Copy className="w-3 h-3" /> : <ArrowUpRight className="w-3 h-3" />}
                         {item.cta}

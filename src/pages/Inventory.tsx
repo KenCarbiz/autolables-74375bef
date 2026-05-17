@@ -170,12 +170,21 @@ const Inventory = () => {
       </div>
 
       {/* KPI strip — Stripe/Linear-style 5-card snapshot of the
-          dealer's inventory health. Neutral cards with semantic
-          accent reserved for the status-bearing rows (drafts,
-          published, momentum). */}
+          dealer's inventory health. Wave 15.2: Drafts is the
+          actionable card (each row is a TODO before it can leave
+          the lot) so it gets hero weight — amber tint + larger
+          value + bolder hint copy. Published / momentum / views
+          are retrospective stats and recede to neutral. */}
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
         <Stat icon={Car} label="Total" value={counts.total} hint={counts.archived > 0 ? `${counts.archived} archived` : "in inventory"} />
-        <Stat icon={FileText} label="Drafts" value={counts.draft} accent="amber" hint="needs sticker" />
+        <Stat
+          icon={FileText}
+          label="Drafts"
+          value={counts.draft}
+          accent="amber"
+          hint={counts.draft > 0 ? `${counts.draft === 1 ? "vehicle needs" : "vehicles need"} a sticker` : "all clear"}
+          prominent={counts.draft > 0}
+        />
         <Stat icon={CheckCircle2} label="Published" value={counts.published} accent="emerald" hint="live on shopper portal" />
         <Stat
           icon={Printer}
@@ -417,16 +426,22 @@ const Stat = ({
   value,
   accent,
   hint,
+  prominent = false,
 }: {
   icon?: typeof Car;
   label: string;
   value: number;
   accent?: "amber" | "emerald" | "sky";
   hint?: string;
+  // Hero-weight the card visually. Used for the actionable card
+  // in a KPI strip (the one whose number the dealer is trying to
+  // drive). Bumps value text + tints the card so the eye lands
+  // there first. Wave 15.2 — Stripe/Linear hierarchy discipline.
+  prominent?: boolean;
 }) => {
   const valueColor =
-    accent === "amber"   ? "text-amber-600" :
-    accent === "emerald" ? "text-emerald-600" :
+    accent === "amber"   ? "text-amber-700" :
+    accent === "emerald" ? "text-emerald-700" :
     accent === "sky"     ? "text-[#1E90FF]" :
     "text-foreground";
   const iconBg =
@@ -434,8 +449,17 @@ const Stat = ({
     accent === "emerald" ? "bg-emerald-100 text-emerald-700" :
     accent === "sky"     ? "bg-sky-100 text-[#1E90FF]" :
     "bg-muted text-muted-foreground";
+  // Prominent tint only fires when the card has an accent — a
+  // colourless prominent card has nothing to lean on. The tint
+  // is a subtle 5–8% wash so the card pops against neighbours
+  // without yelling at the dealer.
+  const cardBg =
+    prominent && accent === "amber"   ? "bg-amber-50/70 border-amber-200" :
+    prominent && accent === "emerald" ? "bg-emerald-50/70 border-emerald-200" :
+    prominent && accent === "sky"     ? "bg-sky-50/70 border-sky-200" :
+    "bg-card border-border";
   return (
-    <div className="rounded-xl border border-border bg-card p-4 flex items-start gap-3">
+    <div className={`rounded-xl border ${cardBg} p-4 flex items-start gap-3 transition-colors`}>
       {Icon && (
         <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${iconBg}`}>
           <Icon className="w-4 h-4" strokeWidth={2} />
@@ -443,11 +467,11 @@ const Stat = ({
       )}
       <div className="min-w-0 flex-1">
         <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">{label}</p>
-        <p className={`mt-0.5 font-display text-2xl font-semibold tabular-nums leading-none ${valueColor}`}>
+        <p className={`mt-0.5 font-display ${prominent ? "text-3xl" : "text-2xl"} font-semibold tabular-nums leading-none ${valueColor}`}>
           {value}
         </p>
         {hint && (
-          <p className="text-[10px] text-muted-foreground/80 mt-1 truncate">{hint}</p>
+          <p className={`text-[10px] mt-1 truncate ${prominent ? "text-foreground/80 font-semibold" : "text-muted-foreground/80"}`}>{hint}</p>
         )}
       </div>
     </div>
