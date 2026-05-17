@@ -3,6 +3,7 @@ import type { AuditLogEntry } from "@/types/tenant";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useTenant } from "@/contexts/TenantContext";
+import { useRefreshOnFocus } from "@/hooks/useRefreshOnFocus";
 
 // ──────────────────────────────────────────────────────────────
 // AuditContext — Supabase-only.
@@ -79,6 +80,17 @@ export const AuditProvider = ({ children }: { children: ReactNode }) => {
     loadedKeyRef.current = k;
     load();
   }, [userId, tenantId, load]);
+
+  // Wave 14.6.1 — audit_log is too high-volume to wire to
+  // realtime (every signing / listing / recall check writes to
+  // it). Instead refresh on tab focus so a second device's
+  // writes show up the next time this tab is foregrounded.
+  // Throttled to a 5s gap so a quick alt-tab burst doesn't
+  // stampede the query.
+  useRefreshOnFocus({
+    refresh: load,
+    enabled: !!userId && !!tenantId,
+  });
 
   const log = useCallback(
     (entry: Omit<AuditLogEntry, "id" | "created_at" | "ip_address">) => {
