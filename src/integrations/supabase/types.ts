@@ -1050,6 +1050,76 @@ export type Database = {
           },
         ]
       }
+      product_rules: {
+        Row: {
+          body_styles: string[]
+          condition: string
+          created_at: string
+          id: string
+          makes: string[]
+          mileage_max: number
+          models: string[]
+          product_id: string
+          tenant_id: string
+          trims: string[]
+          updated_at: string
+          year_max: string
+          year_min: string
+        }
+        Insert: {
+          body_styles?: string[]
+          condition?: string
+          created_at?: string
+          id?: string
+          makes?: string[]
+          mileage_max?: number
+          models?: string[]
+          product_id: string
+          tenant_id: string
+          trims?: string[]
+          updated_at?: string
+          year_max?: string
+          year_min?: string
+        }
+        Update: {
+          body_styles?: string[]
+          condition?: string
+          created_at?: string
+          id?: string
+          makes?: string[]
+          mileage_max?: number
+          models?: string[]
+          product_id?: string
+          tenant_id?: string
+          trims?: string[]
+          updated_at?: string
+          year_max?: string
+          year_min?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "product_rules_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "product_rules_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenant_summary"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "product_rules_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       products: {
         Row: {
           badge_type: string
