@@ -305,35 +305,74 @@ const Landing = () => {
   );
 
   // ─ Features ─
-  const Features = () => (
-    <section id="features" className="py-16 bg-white">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <h2 className="font-display text-display font-semibold mb-12 text-center">Features</h2>
-        <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-6">
-          {[
-            { icon: Globe, title: "State-by-state disclosure engine", desc: "All 50 states" },
-            { icon: Scan, title: "VIN decode + Black Book pricing", desc: "Real-time lookup" },
-            { icon: ShieldCheck, title: "NHTSA recall + Takata stop-sale", desc: "Safety compliance" },
-            { icon: FileText, title: "Monroney-grade typography", desc: "FTC standards" },
-            { icon: Sparkles, title: "AI disclosure copilot", desc: "Smart suggestions" },
-            { icon: Lock, title: "UETA/E-SIGN tamper-evident sign-off", desc: "Legal binding" },
-            { icon: Printer, title: "Zebra/Brother/DYMO universal print", desc: "All printers" },
-            { icon: Camera, title: "Prep + install photo workflow", desc: "Documentation" },
-            { icon: QrCode, title: "Public shopper portal + QR", desc: "Mobile-first" },
-            { icon: Wrench, title: "Product rules engine", desc: "Custom logic" },
-            { icon: Languages, title: "Multi-language", desc: "ES/ZH/TL/VI/KO" },
-            { icon: Database, title: "Immutable audit vault", desc: "Compliance trail" },
-          ].map((feature, idx) => (
-            <div key={idx} className="bg-gray-50 p-6 rounded-lg border border-gray-200">
-              <feature.icon size={28} className="text-blue-600 mb-3" />
-              <h3 className="font-semibold text-gray-900 mb-2">{feature.title}</h3>
-              <p className="text-sm text-gray-600">{feature.desc}</p>
-            </div>
-          ))}
+  //
+  // Wave 15.6 — feature reweight. The previous treatment was 12
+  // identical cards in a 4-column grid; the dealer's eye had
+  // nowhere to land and the compliance moat we sell read as
+  // checkbox feature soup. Linear's 2026 refresh teaches the
+  // discipline: hero 4 features that close the deal, demote the
+  // rest as "and also". The 4 heroes carry the navy/gradient
+  // chrome from elsewhere in the app so they feel premium.
+  const Features = () => {
+    const heroFeatures = [
+      { icon: Globe,       title: "50-state disclosure engine",     desc: "Doc fees, addendum format, and Buyers Guide rules pre-loaded for every U.S. state — and updated when a state legislates." },
+      { icon: Lock,        title: "UETA / E-SIGN with hash chain",  desc: "Every customer signature is captured with consent, IP, user-agent, and a SHA-256 of the canonical payload. Defensible in court." },
+      { icon: Database,    title: "Audit-Defense Packet · per VIN", desc: "One click downloads a self-contained HTML packet with chain root, recall snapshot, addendums, signings, prep sign-offs. Hand it to counsel." },
+      { icon: ShieldCheck, title: "California SB 766 ready",        desc: "3-day return window, 400-mile cap, $1/mi over 250, $150 max mileage charge, $600 restocking ceiling — clamped live in the resolve UI." },
+    ];
+    const supportingFeatures = [
+      { icon: Scan,      title: "VIN decode + Black Book",      desc: "NHTSA-backed lookup, sub-second" },
+      { icon: FileText,  title: "Monroney-grade typography",    desc: "FTC standards" },
+      { icon: Sparkles,  title: "AI disclosure copilot",        desc: "State-aware suggestions" },
+      { icon: Printer,   title: "Zebra · Brother · DYMO print", desc: "Universal label support" },
+      { icon: Camera,    title: "Prep + install photo workflow",desc: "Foreman sign-off gate" },
+      { icon: QrCode,    title: "Shopper portal + QR",          desc: "Mobile-first signing" },
+      { icon: Wrench,    title: "Product rules engine",         desc: "Y/M/M/Trim auto-assign" },
+      { icon: Languages, title: "Multi-language Buyers Guide",  desc: "ES / ZH / TL / VI / KO" },
+    ];
+    return (
+      <section id="features" className="py-16 bg-white">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center mb-12">
+            <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-[#1E90FF] mb-2">
+              The four that close the deal
+            </p>
+            <h2 className="font-display text-display font-semibold">Built for the defense narrative.</h2>
+            <p className="text-sm text-gray-600 mt-3 max-w-2xl mx-auto">
+              Every other lot platform sells features. We sell what you say when an AG, the FTC, or counsel asks for the file.
+            </p>
+          </div>
+
+          {/* Hero row — 4 cards, navy-on-card with cyan accent. */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-5 mb-10">
+            {heroFeatures.map((feature, idx) => (
+              <div key={idx} className="relative overflow-hidden bg-card rounded-2xl border border-border shadow-premium p-6 group hover:shadow-lg transition-shadow">
+                <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-[#3BB4FF] to-[#1E90FF] flex items-center justify-center mb-4 shadow-premium">
+                  <feature.icon size={22} className="text-white" strokeWidth={2.25} />
+                </div>
+                <h3 className="font-display font-semibold text-lg text-foreground mb-1.5">{feature.title}</h3>
+                <p className="text-sm text-gray-600 leading-relaxed">{feature.desc}</p>
+              </div>
+            ))}
+          </div>
+
+          {/* And-also row — supporting features demoted to a denser tile grid. */}
+          <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-gray-500 mb-3">
+            And also
+          </p>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            {supportingFeatures.map((feature, idx) => (
+              <div key={idx} className="bg-gray-50 p-4 rounded-xl border border-gray-200">
+                <feature.icon size={20} className="text-[#1E90FF] mb-2" strokeWidth={1.75} />
+                <h3 className="font-semibold text-gray-900 text-sm leading-tight">{feature.title}</h3>
+                <p className="text-xs text-gray-600 mt-0.5">{feature.desc}</p>
+              </div>
+            ))}
+          </div>
         </div>
-      </div>
-    </section>
-  );
+      </section>
+    );
+  };
 
   // ─ ROI Calculator ─
   const ROICalculator = () => {
