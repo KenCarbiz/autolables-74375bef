@@ -4,8 +4,9 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useNavigate } from "react-router-dom";
 import { format } from "date-fns";
-import { Search, FileText, ArrowLeft, Eye, Plus } from "lucide-react";
+import { Search, FileText, ArrowLeft, Eye, Plus, Printer, ShieldCheck, Mail } from "lucide-react";
 import EmptyState from "@/components/ui/empty-state";
+import { toast } from "sonner";
 
 const SavedAddendums = () => {
   const { user } = useAuth();
@@ -123,12 +124,55 @@ const SavedAddendums = () => {
                       <td className="px-4 py-3">{a.total_with_optional != null ? `$${Number(a.total_with_optional).toFixed(2)}` : "—"}</td>
                       <td className="px-4 py-3"><StatusBadge status={a.status} /></td>
                       <td className="px-4 py-3">
-                        <button
-                          onClick={() => navigate(`/?id=${a.id}`)}
-                          className="inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-md bg-primary/10 text-primary hover:bg-primary/20 transition-colors"
-                        >
-                          <Eye className="w-3.5 h-3.5" /> View
-                        </button>
+                        {/* Wave 15.5 — next-action exits. The
+                            "View" only path was a dead end; an
+                            archived signed addendum needs Email,
+                            Print, and Defend exits so dealers
+                            can act on the row without leaving
+                            the page. */}
+                        <div className="inline-flex items-center gap-1">
+                          <button
+                            onClick={() => navigate(`/?id=${a.id}`)}
+                            className="inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1.5 rounded-md bg-primary/10 text-primary hover:bg-primary/20 transition-colors"
+                            title="Open in read-only mode"
+                          >
+                            <Eye className="w-3.5 h-3.5" /> View
+                          </button>
+                          <button
+                            onClick={() => {
+                              const mailto = `mailto:${a.customer_email || ""}?subject=${encodeURIComponent(
+                                `Your addendum from us — ${a.vehicle_ymm || "vehicle"}`
+                              )}&body=${encodeURIComponent(
+                                `${window.location.origin}/?id=${a.id}`
+                              )}`;
+                              window.location.href = mailto;
+                            }}
+                            disabled={!a.customer_email}
+                            className="inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                            title={a.customer_email ? `Email to ${a.customer_email}` : "No customer email on file"}
+                          >
+                            <Mail className="w-3.5 h-3.5" /> Email
+                          </button>
+                          <button
+                            onClick={() => {
+                              const w = window.open(`/?id=${a.id}&print=1`, "_blank");
+                              if (!w) toast.error("Pop-up blocked — allow pop-ups to print");
+                            }}
+                            className="inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+                            title="Open in a new tab for printing / save-as-PDF"
+                          >
+                            <Printer className="w-3.5 h-3.5" /> Print
+                          </button>
+                          {a.vehicle_vin && (
+                            <button
+                              onClick={() => navigate(`/compliance?vin=${encodeURIComponent(a.vehicle_vin)}`)}
+                              className="inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1.5 rounded-md text-emerald-700 hover:bg-emerald-50 transition-colors"
+                              title="Generate the SB 766 / FTC audit-defense packet for this VIN"
+                            >
+                              <ShieldCheck className="w-3.5 h-3.5" /> Defend
+                            </button>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   ))}
