@@ -47,6 +47,42 @@ update.
 - Match existing styling patterns (Tailwind utility classes, shadcn
   primitives, `rounded-2xl`, `shadow-premium`, `font-display`).
 
+## SQL / RLS canonical pattern (Supabase 2026)
+
+Every new RLS policy MUST follow this shape — Supabase's docs are
+explicit that without the `(SELECT auth.uid())` wrap, the planner
+evaluates `auth.uid()` per row instead of caching it as an
+initPlan, which degrades tenant-scoped queries to O(n):
+
+```sql
+CREATE POLICY "<name>"
+  ON public.<table> FOR <SELECT|INSERT|UPDATE|DELETE|ALL>
+  TO authenticated
+  USING (
+    tenant_id IN (
+      SELECT tenant_id FROM public.tenant_members
+      WHERE user_id = (SELECT auth.uid())
+    )
+  )
+  WITH CHECK (...same shape...);   -- for INSERT/UPDATE/ALL
+```
+
+Two non-negotiables:
+
+1. **Always wrap** `auth.uid()` as `(SELECT auth.uid())`. Same for
+   `auth.jwt()` and any other JWT helper.
+2. **Always specify** `TO authenticated` (or whichever specific
+   role applies) so the planner can skip the policy for anon
+   connections.
+
+Source: https://supabase.com/docs/guides/troubleshooting/rls-performance-and-best-practices-Z5Jjwv
+
+The Wave 14.2 migration (`20260518000000_rls_wrap_uid_wave13a.sql`)
+retrofitted this on the Wave 13a tables. A broader sweep of all
+historic migrations is deferred until an RLS regression harness
+lands; do NOT mass-rewrite policies without verifying the change
+doesn't lock dealers out of their own data.
+
 ## Cross-app contract (Autocurb.io ↔ AutoLabels.io)
 
 Autocurb is the mothership. Dealers usually sign up there and pick
