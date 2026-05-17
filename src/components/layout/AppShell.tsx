@@ -22,6 +22,7 @@ import {
   Moon,
   Sun,
   ChevronDown,
+  ChevronLeft,
   ChevronRight,
   Rocket,
   Palette,
@@ -90,6 +91,25 @@ const AppShell = ({ children }: AppShellProps) => {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [showMobileQr, setShowMobileQr] = useState(false);
   const { open: paletteOpen, setOpen: setPaletteOpen } = useCommandPalette();
+  // Wave 14.5.1 — collapsible icon-rail. Persisted per-user so a
+  // pinned-collapsed dealer doesn't have to re-collapse every
+  // session. Mobile (lg:) keeps the existing slide-in behaviour;
+  // collapse only applies to the desktop persistent rail.
+  const [collapsed, setCollapsed] = useState<boolean>(() => {
+    if (typeof window !== "undefined") {
+      return localStorage.getItem("sidebar_collapsed") === "1";
+    }
+    return false;
+  });
+  const toggleCollapsed = () => {
+    setCollapsed(c => {
+      const next = !c;
+      if (typeof window !== "undefined") {
+        localStorage.setItem("sidebar_collapsed", next ? "1" : "0");
+      }
+      return next;
+    });
+  };
   const [darkMode, setDarkMode] = useState(() => {
     if (typeof window !== "undefined") {
       return localStorage.getItem("dark_mode") === "true" ||
@@ -288,17 +308,17 @@ const AppShell = ({ children }: AppShellProps) => {
           vt-sidebar opts into a stable view-transition-name so route
           changes only cross-fade the main content area, not the chrome. */}
       <aside
-        className={`fixed inset-y-0 left-0 z-40 w-64 shimmer-sidebar vt-sidebar border-r border-white/10 flex flex-col transform transition-transform lg:translate-x-0 ${
+        className={`fixed inset-y-0 left-0 z-40 shimmer-sidebar vt-sidebar border-r border-white/10 flex flex-col transform transition-all duration-200 ease-out lg:translate-x-0 ${
           mobileOpen ? "translate-x-0" : "-translate-x-full"
-        }`}
+        } ${collapsed ? "lg:w-16 w-64" : "w-64"}`}
       >
         {/* Sidebar header */}
         <div className="flex items-center justify-between h-16 px-4 border-b border-sidebar-border flex-shrink-0">
           {tenant?.logo_url && tenant.logo_url !== "/logo-mark.svg" ? (
-            <div className="flex items-center gap-2">
-              <img src={tenant.logo_url} alt={tenant.name} className="w-8 h-8 rounded-md object-contain bg-white p-1" />
-              <div>
-                <p className="text-sm font-semibold text-sidebar-foreground leading-none tracking-tight">
+            <div className="flex items-center gap-2 min-w-0">
+              <img src={tenant.logo_url} alt={tenant.name} className="w-8 h-8 rounded-md object-contain bg-white p-1 flex-shrink-0" />
+              <div className={`min-w-0 transition-opacity duration-150 ${collapsed ? "lg:hidden" : ""}`}>
+                <p className="text-sm font-semibold text-sidebar-foreground leading-none tracking-tight truncate">
                   {tenant?.name}
                 </p>
                 <p className="text-[9px] text-sidebar-foreground/55 mt-1 uppercase tracking-[0.18em] font-semibold">
@@ -307,7 +327,7 @@ const AppShell = ({ children }: AppShellProps) => {
               </div>
             </div>
           ) : (
-            <Logo variant="full" size={28} tagline inverted />
+            <Logo variant={collapsed ? "mark" : "full"} size={28} tagline={!collapsed} inverted />
           )}
           <button
             onClick={() => setMobileOpen(false)}
@@ -318,18 +338,19 @@ const AppShell = ({ children }: AppShellProps) => {
         </div>
 
         {/* Primary actions — every workflow starts with adding or
-            scanning a vehicle. Add opens the modal on /inventory.
-            Scan opens the barcode / VIN-plate scanner. */}
-        <div className="px-3 pt-3 flex-shrink-0 grid grid-cols-2 gap-2">
+            scanning a vehicle. Collapsed-rail mode stacks them
+            vertically as icon-only buttons. */}
+        <div className={`px-2 pt-3 flex-shrink-0 grid gap-2 ${collapsed ? "lg:grid-cols-1 grid-cols-2" : "grid-cols-2"}`}>
           <button
             onClick={() => {
               setMobileOpen(false);
               navigate("/inventory?add=1");
             }}
             className="h-12 rounded-xl bg-gradient-to-r from-[#3BB4FF] to-[#1E90FF] text-white inline-flex items-center justify-center gap-1.5 shadow-premium hover:brightness-110 transition-all"
+            title="Add a vehicle to inventory"
           >
             <Car className="w-4 h-4 stroke-[2.5]" />
-            <span className="font-display font-black tracking-tight text-[15px] whitespace-nowrap">Add Vehicle</span>
+            <span className={`font-display font-black tracking-tight text-[15px] whitespace-nowrap ${collapsed ? "lg:hidden" : ""}`}>Add Vehicle</span>
           </button>
           <button
             onClick={() => {
@@ -340,26 +361,29 @@ const AppShell = ({ children }: AppShellProps) => {
             title="Scan a VIN barcode or windshield sticker"
           >
             <ScanLine className="w-4 h-4 stroke-[2.5]" />
-            <span className="font-display font-black tracking-tight text-[15px] whitespace-nowrap">Scan Vehicle</span>
+            <span className={`font-display font-black tracking-tight text-[15px] whitespace-nowrap ${collapsed ? "lg:hidden" : ""}`}>Scan Vehicle</span>
           </button>
         </div>
 
         {/* Store Selector */}
         {stores.length > 0 && (
-          <div className="px-3 py-3 border-b border-sidebar-border flex-shrink-0">
+          <div className={`py-3 border-b border-sidebar-border flex-shrink-0 ${collapsed ? "lg:px-2 px-3" : "px-3"}`}>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <button className="w-full flex items-center gap-2 px-2.5 py-2 rounded-lg bg-sidebar-accent/60 hover:bg-sidebar-accent transition-colors text-left group border border-sidebar-border/50">
+                <button
+                  className={`w-full flex items-center gap-2 rounded-lg bg-sidebar-accent/60 hover:bg-sidebar-accent transition-colors text-left group border border-sidebar-border/50 ${collapsed ? "lg:justify-center lg:px-0 lg:py-2 px-2.5 py-2" : "px-2.5 py-2"}`}
+                  title={collapsed ? `Store: ${currentStore?.name || "No store"}` : undefined}
+                >
                   <div className="w-7 h-7 rounded-md bg-gradient-to-br from-[#3BB4FF] to-[#1E90FF] flex items-center justify-center flex-shrink-0 shadow-premium">
                     <Store className="w-3.5 h-3.5 text-white" />
                   </div>
-                  <div className="flex-1 min-w-0">
+                  <div className={`flex-1 min-w-0 ${collapsed ? "lg:hidden" : ""}`}>
                     <p className="text-[9px] text-sidebar-foreground/70 uppercase tracking-[0.18em] font-bold">Store</p>
                     <p className="text-xs font-semibold text-sidebar-foreground truncate">
                       {currentStore?.name || "No store"}
                     </p>
                   </div>
-                  <ChevronsUpDown className="w-3.5 h-3.5 text-sidebar-foreground/60 flex-shrink-0" />
+                  <ChevronsUpDown className={`w-3.5 h-3.5 text-sidebar-foreground/60 flex-shrink-0 ${collapsed ? "lg:hidden" : ""}`} />
                 </button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="start" className="w-56">
@@ -381,16 +405,19 @@ const AppShell = ({ children }: AppShellProps) => {
         )}
 
         {/* Nav sections */}
-        <nav className="flex-1 overflow-y-auto py-3 px-3 space-y-4">
+        <nav className={`flex-1 overflow-y-auto py-3 space-y-4 ${collapsed ? "lg:px-2 px-3" : "px-3"}`}>
           {Object.entries(sections).map(([key, section]) => {
             const visibleItems = filterItems(section.items);
             if (visibleItems.length === 0) return null;
             const isOpen = openSections[key] !== false;
             return (
               <div key={key}>
+                {/* Section header — hidden when the rail is
+                    collapsed on desktop; on mobile the rail is
+                    full-width so the header stays. */}
                 <button
                   onClick={() => toggleSection(key)}
-                  className="w-full flex items-center justify-between px-2 mb-1.5 group"
+                  className={`w-full flex items-center justify-between px-2 mb-1.5 group ${collapsed ? "lg:hidden" : ""}`}
                 >
                   <span className="text-[10px] font-bold text-sidebar-foreground/70 uppercase tracking-[0.18em]">
                     {section.title}
@@ -401,7 +428,7 @@ const AppShell = ({ children }: AppShellProps) => {
                     <ChevronRight className="w-3 h-3 text-sidebar-foreground/40" />
                   )}
                 </button>
-                {isOpen && (
+                {(isOpen || collapsed) && (
                   <div className="space-y-0.5">
                     {visibleItems.map(item => {
                       const Icon = item.icon;
@@ -413,16 +440,17 @@ const AppShell = ({ children }: AppShellProps) => {
                             navigate(item.path);
                             setMobileOpen(false);
                           }}
-                          className={`w-full flex items-center gap-2.5 px-2.5 py-2 rounded-md text-sm transition-all relative ${
+                          title={collapsed ? item.label : undefined}
+                          className={`w-full flex items-center rounded-md text-sm transition-all relative ${collapsed ? "lg:justify-center lg:px-2 lg:py-2 gap-2.5 px-2.5 py-2" : "gap-2.5 px-2.5 py-2"} ${
                             active
                               ? "bg-sidebar-accent text-sidebar-accent-foreground font-semibold pl-3 before:absolute before:left-0 before:top-1.5 before:bottom-1.5 before:w-0.5 before:bg-gradient-to-b before:from-[#3BB4FF] before:to-[#1E90FF] before:rounded-full"
                               : "text-sidebar-foreground/80 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground"
                           }`}
                         >
                           <Icon className="w-4 h-4 flex-shrink-0" />
-                          <span className="flex-1 text-left truncate">{item.label}</span>
+                          <span className={`flex-1 text-left truncate ${collapsed ? "lg:hidden" : ""}`}>{item.label}</span>
                           {item.badge && (
-                            <span className="text-[10px] font-semibold text-sidebar-foreground/60 tabular-nums">
+                            <span className={`text-[10px] font-semibold text-sidebar-foreground/60 tabular-nums ${collapsed ? "lg:hidden" : ""}`}>
                               {item.badge}
                             </span>
                           )}
@@ -436,17 +464,37 @@ const AppShell = ({ children }: AppShellProps) => {
           })}
         </nav>
 
-        {/* Sidebar footer — Platform Updates + Command Center */}
-        <div className="border-t border-sidebar-border p-3 space-y-1 flex-shrink-0">
-          <button className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-md text-sm text-sidebar-foreground/80 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground transition-colors">
+        {/* Sidebar footer — Platform Updates + Command Center +
+            collapse/expand pin. The collapse toggle is desktop-
+            only (lg:); mobile uses the slide-in close button. */}
+        <div className={`border-t border-sidebar-border space-y-1 flex-shrink-0 ${collapsed ? "lg:px-2 p-3" : "p-3"}`}>
+          <button
+            className={`w-full flex items-center rounded-md text-sm text-sidebar-foreground/80 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground transition-colors ${collapsed ? "lg:justify-center lg:px-2 lg:py-2 gap-2.5 px-2.5 py-2" : "gap-2.5 px-2.5 py-2"}`}
+            title={collapsed ? "Platform Updates" : undefined}
+          >
             <Rocket className="w-4 h-4 flex-shrink-0" />
-            <span className="flex-1 text-left">Platform Updates</span>
+            <span className={`flex-1 text-left ${collapsed ? "lg:hidden" : ""}`}>Platform Updates</span>
           </button>
-          <button className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-md text-sm text-amber-500 hover:bg-amber-500/10 transition-colors">
+          <button
+            className={`w-full flex items-center rounded-md text-sm text-amber-500 hover:bg-amber-500/10 transition-colors ${collapsed ? "lg:justify-center lg:px-2 lg:py-2 gap-2.5 px-2.5 py-2" : "gap-2.5 px-2.5 py-2"}`}
+            title={collapsed ? "Command Center" : undefined}
+          >
             <Tag className="w-4 h-4 flex-shrink-0" />
-            <span className="flex-1 text-left font-medium">Command Center</span>
+            <span className={`flex-1 text-left font-medium ${collapsed ? "lg:hidden" : ""}`}>Command Center</span>
           </button>
-          <div className="pt-2 text-center">
+
+          {/* Collapse / expand pin (desktop only) */}
+          <button
+            onClick={toggleCollapsed}
+            className={`hidden lg:flex w-full items-center rounded-md text-xs text-sidebar-foreground/60 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground transition-colors ${collapsed ? "justify-center px-2 py-2" : "gap-2 px-2.5 py-2"}`}
+            title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+            aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+          >
+            {collapsed ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
+            {!collapsed && <span className="flex-1 text-left">Collapse sidebar</span>}
+          </button>
+
+          <div className={`pt-2 text-center ${collapsed ? "lg:hidden" : ""}`}>
             <p className="text-[9px] text-sidebar-foreground/40 uppercase tracking-[0.2em] font-semibold">
               {tenant?.name?.toUpperCase() || "AUTOLABELS.IO"}
             </p>
@@ -465,8 +513,10 @@ const AppShell = ({ children }: AppShellProps) => {
         />
       )}
 
-      {/* Main content area */}
-      <div className="flex-1 lg:pl-64 flex flex-col min-w-0">
+      {/* Main content area — left padding tracks the rail width
+          on desktop; on mobile (no lg:), the rail overlays as a
+          slide-in so no padding is needed. */}
+      <div className={`flex-1 flex flex-col min-w-0 transition-all duration-200 ease-out ${collapsed ? "lg:pl-16" : "lg:pl-64"}`}>
         {/* Top bar — HarteCash/Autocurb chrome: bordered translucent
             pills on navy, full-width search bar in the centre, avatar
             with role-stack on the right. topbar-navy already paints
