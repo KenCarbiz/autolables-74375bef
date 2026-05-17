@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useAdminPlatform, type AuditRow } from "@/hooks/useAdminPlatform";
 import { ScrollText, Search } from "lucide-react";
 import {
@@ -7,8 +7,11 @@ import {
   useSortAndPaginate,
   toCsv,
   downloadCsv,
+  useTableDensity,
+  DensityToggle,
 } from "./tablePrimitives";
 import { TableEmptyState } from "./TableEmptyState";
+import { useRefreshOnFocus } from "@/hooks/useRefreshOnFocus";
 
 const ACTION_PRESETS = [
   "",
@@ -51,26 +54,39 @@ export const PlatformAudit = () => {
     return m;
   }, [tenants.data]);
 
+  // Stable fetcher used by both the filter-change effect and
+  // the refresh-on-focus listener. Bumped from 200 to 1000 in
+  // Wave 12 now that the client paginates — without that lift
+  // the dropdown was capping what platform admins could even
+  // page through.
+  const fetchAudit = useCallback(async () => {
+    setLoading(true);
+    const res = await searchAudit({
+      tenantId: tenantFilter || undefined,
+      action: actionFilter || undefined,
+      sinceDays,
+      limit: 1000,
+    });
+    setRows(res);
+    setLoading(false);
+  }, [tenantFilter, actionFilter, sinceDays, searchAudit]);
+
   useEffect(() => {
     let cancelled = false;
-    (async () => {
-      setLoading(true);
-      // Bumped from 200 to 1000 now that the client paginates;
-      // the dropdown previously capped what platform admins
-      // could even page through.
-      const res = await searchAudit({
-        tenantId: tenantFilter || undefined,
-        action: actionFilter || undefined,
-        sinceDays,
-        limit: 1000,
-      });
-      if (!cancelled) {
-        setRows(res);
-        setLoading(false);
-      }
+    void (async () => {
+      await fetchAudit();
+      if (cancelled) return;
     })();
     return () => { cancelled = true; };
-  }, [tenantFilter, actionFilter, sinceDays, searchAudit]);
+  }, [fetchAudit]);
+
+  // Wave 14.6.2 — same focus-refresh pattern AuditContext uses.
+  // audit_log is too high-volume for a realtime channel, so
+  // platform admins get fresh data the moment they refocus the
+  // tab. Throttled 5s gap.
+  useRefreshOnFocus({ refresh: fetchAudit });
+
+  const { density, setDensity, rowClass } = useTableDensity();
 
   const filtered = useMemo(() => {
     const lc = q.trim().toLowerCase();
@@ -156,6 +172,7 @@ export const PlatformAudit = () => {
               className="h-9 pl-7 pr-3 rounded-md border border-border bg-background text-sm w-64"
             />
           </div>
+          <DensityToggle density={density} setDensity={setDensity} />
         </div>
       </div>
 
@@ -187,20 +204,20 @@ export const PlatformAudit = () => {
             <tbody className="divide-y divide-border">
               {sortPag.paginated.map((r) => (
                 <tr key={r.id}>
-                  <td className="px-3 py-2 text-muted-foreground whitespace-nowrap">{formatDateTime(r.created_at)}</td>
-                  <td className="px-3 py-2 font-mono text-xs">{r.action}</td>
-                  <td className="px-3 py-2">
+                  <td className={`${rowClass} text-muted-foreground whitespace-nowrap`}>{formatDateTime(r.created_at)}</td>
+                  <td className={`${rowClass} font-mono text-xs`}>{r.action}</td>
+                  <td className={rowClass}>
                     {tenantsById.get(r.store_id || "") ||
                       <span className="text-muted-foreground text-xs">—</span>}
                   </td>
-                  <td className="px-3 py-2 text-muted-foreground text-xs">
+                  <td className={`${rowClass} text-muted-foreground text-xs`}>
                     <span className="uppercase tracking-wider text-[10px]">{r.entity_type}</span>
                     <span className="ml-1 font-mono">{r.entity_id.slice(0, 10)}</span>
                   </td>
-                  <td className="px-3 py-2 text-muted-foreground text-xs font-mono">
+                  <td className={`${rowClass} text-muted-foreground text-xs font-mono`}>
                     {r.user_email || (r.user_id ? r.user_id.slice(0, 8) : "anon")}
                   </td>
-                  <td className="px-3 py-2 text-[11px] text-muted-foreground truncate max-w-xs">
+                  <td className={`${rowClass} text-[11px] text-muted-foreground truncate max-w-xs`}>
                     {JSON.stringify(r.details).slice(0, 120)}
                   </td>
                 </tr>

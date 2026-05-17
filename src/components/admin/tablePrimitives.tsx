@@ -1,7 +1,8 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   ArrowUpDown, ArrowUp, ArrowDown,
   ChevronLeft, ChevronRight, Download,
+  Rows3, Rows4, Rows2,
 } from "lucide-react";
 
 // ──────────────────────────────────────────────────────────────
@@ -238,4 +239,89 @@ export function downloadCsv(filename: string, csv: string) {
   a.click();
   document.body.removeChild(a);
   URL.revokeObjectURL(url);
+}
+
+// ──────────────────────────────────────────────────────────────
+// Density — shared across every admin table. Persisted per-user
+// in localStorage so a dealer who lives at "compact" doesn't get
+// kicked to "normal" on every session.
+// ──────────────────────────────────────────────────────────────
+
+export type TableDensity = "compact" | "normal" | "cozy";
+
+const DENSITY_KEY = "admin_table_density";
+
+export function useTableDensity() {
+  const [density, setDensityState] = useState<TableDensity>(() => {
+    if (typeof window === "undefined") return "normal";
+    const v = localStorage.getItem(DENSITY_KEY);
+    return (v === "compact" || v === "cozy" ? v : "normal") as TableDensity;
+  });
+
+  // Persist on change without going through useEffect every
+  // render — keeps the localStorage write at the user's
+  // intent edge, not on every keystroke or filter change.
+  const setDensity = (d: TableDensity) => {
+    setDensityState(d);
+    if (typeof window !== "undefined") {
+      localStorage.setItem(DENSITY_KEY, d);
+    }
+  };
+
+  // The class consumers slap onto td/th to match the current
+  // density. Standardised so every table looks consistent.
+  const rowClass = useMemo(() =>
+    density === "compact" ? "px-3 py-1"
+    : density === "cozy"  ? "px-3 py-3"
+    :                       "px-3 py-2",
+    [density],
+  );
+
+  return { density, setDensity, rowClass };
+}
+
+interface DensityToggleProps {
+  density: TableDensity;
+  setDensity: (d: TableDensity) => void;
+}
+
+export const DensityToggle = ({ density, setDensity }: DensityToggleProps) => {
+  const options: { value: TableDensity; icon: typeof Rows3; title: string }[] = [
+    { value: "compact", icon: Rows4, title: "Compact rows" },
+    { value: "normal",  icon: Rows3, title: "Normal rows" },
+    { value: "cozy",    icon: Rows2, title: "Cozy rows" },
+  ];
+  return (
+    <div className="inline-flex items-center gap-px rounded-md border border-border bg-card overflow-hidden" role="group" aria-label="Row density">
+      {options.map((o) => {
+        const Icon = o.icon;
+        const active = density === o.value;
+        return (
+          <button
+            key={o.value}
+            onClick={() => setDensity(o.value)}
+            title={o.title}
+            aria-pressed={active}
+            className={`h-7 w-7 inline-flex items-center justify-center transition-colors ${
+              active
+                ? "bg-foreground text-background"
+                : "text-muted-foreground hover:bg-muted hover:text-foreground"
+            }`}
+          >
+            <Icon className="w-3.5 h-3.5" strokeWidth={1.75} />
+          </button>
+        );
+      })}
+    </div>
+  );
+};
+
+// Effect-only persistence — kept for callers who want to opt in
+// without using useTableDensity above (e.g. server-driven
+// density). Most callers should reach for the hook instead.
+export function useEffectDensityPersist(density: TableDensity) {
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    localStorage.setItem(DENSITY_KEY, density);
+  }, [density]);
 }
