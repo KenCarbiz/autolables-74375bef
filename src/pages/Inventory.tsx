@@ -100,11 +100,29 @@ const Inventory = () => {
     });
   }, [rows, q, status, condition]);
 
-  const counts = useMemo(() => ({
-    total: rows.length,
-    draft: rows.filter((r) => r.status === "draft").length,
-    published: rows.filter((r) => r.status === "published").length,
-  }), [rows]);
+  // KPI computations — derived from the already-loaded rows so
+  // the strip lights up instantly with no extra round-trip.
+  // Stripe / Linear pattern: 5 neutral cards, semantic color
+  // reserved for status (amber for drafts, emerald for published,
+  // sky for momentum). The 7-day momentum card is the trend
+  // chip the UI agent flagged as "feels 2026 admin."
+  const counts = useMemo(() => {
+    const sevenDaysAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
+    const publishedRows = rows.filter((r) => r.status === "published");
+    const publishedRecent = publishedRows.filter(
+      (r) => r.published_at && new Date(r.published_at).getTime() >= sevenDaysAgo,
+    );
+    const totalViews = rows.reduce((sum, r) => sum + (r.view_count || 0), 0);
+    const archived = rows.filter((r) => r.status === "archived").length;
+    return {
+      total: rows.length,
+      draft: rows.filter((r) => r.status === "draft").length,
+      published: publishedRows.length,
+      publishedRecent: publishedRecent.length,
+      totalViews,
+      archived,
+    };
+  }, [rows]);
 
   return (
     <div className="p-4 lg:p-6 max-w-[1400px] mx-auto space-y-4">
@@ -151,11 +169,26 @@ const Inventory = () => {
         </div>
       </div>
 
-      {/* KPI strip */}
-      <div className="grid grid-cols-3 gap-3">
-        <Stat label="Total" value={counts.total} />
-        <Stat label="Draft" value={counts.draft} accent="amber" />
-        <Stat label="Published" value={counts.published} accent="emerald" />
+      {/* KPI strip — Stripe/Linear-style 5-card snapshot of the
+          dealer's inventory health. Neutral cards with semantic
+          accent reserved for the status-bearing rows (drafts,
+          published, momentum). */}
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
+        <Stat icon={Car} label="Total" value={counts.total} hint={counts.archived > 0 ? `${counts.archived} archived` : "in inventory"} />
+        <Stat icon={FileText} label="Drafts" value={counts.draft} accent="amber" hint="needs sticker" />
+        <Stat icon={CheckCircle2} label="Published" value={counts.published} accent="emerald" hint="live on shopper portal" />
+        <Stat
+          icon={Printer}
+          label="Published 7d"
+          value={counts.publishedRecent}
+          accent="sky"
+          hint={
+            counts.publishedRecent > 0
+              ? `momentum`
+              : `none this week`
+          }
+        />
+        <Stat icon={Signature} label="Shopper views" value={counts.totalViews} hint="lifetime" />
       </div>
 
       {/* Filters */}
@@ -378,18 +411,48 @@ const InventorySkeleton = () => (
   </div>
 );
 
-const Stat = ({ label, value, accent }: { label: string; value: number; accent?: "amber" | "emerald" }) => (
-  <div className="rounded-xl border border-border bg-card p-4">
-    <p className="text-caption font-bold uppercase tracking-label text-muted-foreground">{label}</p>
-    <p className={`mt-1 font-display text-title font-semibold tabular-nums ${
-      accent === "amber" ? "text-amber-600" :
-      accent === "emerald" ? "text-emerald-600" :
-      "text-foreground"
-    }`}>
-      {value}
-    </p>
-  </div>
-);
+const Stat = ({
+  icon: Icon,
+  label,
+  value,
+  accent,
+  hint,
+}: {
+  icon?: typeof Car;
+  label: string;
+  value: number;
+  accent?: "amber" | "emerald" | "sky";
+  hint?: string;
+}) => {
+  const valueColor =
+    accent === "amber"   ? "text-amber-600" :
+    accent === "emerald" ? "text-emerald-600" :
+    accent === "sky"     ? "text-[#1E90FF]" :
+    "text-foreground";
+  const iconBg =
+    accent === "amber"   ? "bg-amber-100 text-amber-700" :
+    accent === "emerald" ? "bg-emerald-100 text-emerald-700" :
+    accent === "sky"     ? "bg-sky-100 text-[#1E90FF]" :
+    "bg-muted text-muted-foreground";
+  return (
+    <div className="rounded-xl border border-border bg-card p-4 flex items-start gap-3">
+      {Icon && (
+        <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${iconBg}`}>
+          <Icon className="w-4 h-4" strokeWidth={2} />
+        </div>
+      )}
+      <div className="min-w-0 flex-1">
+        <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">{label}</p>
+        <p className={`mt-0.5 font-display text-2xl font-semibold tabular-nums leading-none ${valueColor}`}>
+          {value}
+        </p>
+        {hint && (
+          <p className="text-[10px] text-muted-foreground/80 mt-1 truncate">{hint}</p>
+        )}
+      </div>
+    </div>
+  );
+};
 
 const StatusPill = ({ status }: { status: VehicleRow["status"] }) => {
   const cls =
