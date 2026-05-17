@@ -542,6 +542,13 @@ const AppShell = ({ children }: AppShellProps) => {
                     <Sparkles className="w-2.5 h-2.5" />
                     {isAdmin ? "Super Admin" : "Admin"}
                   </span>
+                  {/* Wave 15.1 — family-positioning tagline. Reads
+                      as "this is one app in a suite", not "this is
+                      a standalone tool". Hides on xs so we don't
+                      crowd the greeting on phones. */}
+                  <span className="hidden lg:inline-flex items-center text-[10px] text-white/55 tracking-[0.08em]">
+                    by <span className="ml-1 font-semibold text-white/75">Autocurb</span>
+                  </span>
                   {currentStore?.name && (
                     <span className="text-[11px] text-white/65 truncate">
                       · {currentStore.name}

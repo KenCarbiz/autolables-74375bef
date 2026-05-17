@@ -20,10 +20,19 @@ export interface PlatformProduct {
   color: string;
 }
 
+// Family-aligned product palette. Each sibling app gets a hue
+// inside the Autocurb family blue range so the AppSwitcher reads
+// as "four siblings", not "four random apps" — Wave 15.1 fixed
+// the previous purple/amber placeholders that fought the navy
+// chrome. AutoLabels keeps the brand primary navy; AutoFrame
+// shifts to sky for the photography read; AutoVideo to indigo
+// for the motion read; AutoCurb (the mothership) keeps the
+// signal-blue accent.
 const ALL_PRODUCTS: PlatformProduct[] = [
-  { id: "autolabels", name: "AutoLabels.io", shortName: "AutoLabels", icon: FileText, url: "/dashboard", description: "Dealer labels, stickers & compliance", color: "bg-primary" },
-  { id: "autoframe", name: "AutoFrame", shortName: "AutoFrame", icon: Camera, url: "https://autoframe.autolabels.io", description: "Vehicle photography & media", color: "bg-purple-600" },
-  { id: "autovideo", name: "AutoVideo", shortName: "AutoVideo", icon: Video, url: "https://autovideo.autolabels.io", description: "Video walkarounds & MPI", color: "bg-amber-600" },
+  { id: "autolabels", name: "AutoLabels.io", shortName: "AutoLabels", icon: FileText, url: "/dashboard",                          description: "Dealer labels, stickers & compliance",  color: "bg-primary" },
+  { id: "autocurb",   name: "Autocurb",      shortName: "Autocurb",   icon: Sparkles, url: "https://autocurb.io",                  description: "Inventory + lead routing (the mothership)", color: "bg-[#1E90FF]" },
+  { id: "autoframe",  name: "AutoFrame",     shortName: "AutoFrame",  icon: Camera,   url: "https://autoframe.autolabels.io",     description: "Vehicle photography & background removal", color: "bg-sky-500" },
+  { id: "autovideo",  name: "AutoVideo",     shortName: "AutoVideo",  icon: Video,    url: "https://autovideo.autolabels.io",     description: "Video walkarounds & MPI",               color: "bg-indigo-600" },
 ];
 
 const SUBSCRIPTION_KEY = "platform_subscriptions";
@@ -66,16 +75,24 @@ const AppSwitcher = ({ currentApp = "autolabels", theme = "dark" }: AppSwitcherP
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <button className={triggerClass}>
+        <button className={triggerClass} title="Switch app · Autocurb Family">
           <div className={`w-5 h-5 rounded ${current.color} flex items-center justify-center`}>
             <CurrentIcon className="w-3 h-3 text-white" />
           </div>
-          <span className="hidden md:inline text-xs">{current.shortName}</span>
+          {/* Mobile sees the shortName too — was hidden md:inline,
+              which made the family switcher feel like a secret
+              menu on phones (Wave 15.1 surfaces the family). */}
+          <span className="text-xs">{current.shortName}</span>
           <ChevronDown className="w-3 h-3 opacity-60" />
         </button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start" className="w-72">
-        <DropdownMenuLabel className="text-xs">AutoLabels Platform</DropdownMenuLabel>
+        <DropdownMenuLabel className="text-xs">
+          Autocurb Family
+          <span className="ml-1.5 text-[10px] font-normal text-muted-foreground">
+            · {ALL_PRODUCTS.length} apps for dealers
+          </span>
+        </DropdownMenuLabel>
         <DropdownMenuSeparator />
 
         {ALL_PRODUCTS.map(product => {
@@ -97,7 +114,7 @@ const AppSwitcher = ({ currentApp = "autolabels", theme = "dark" }: AppSwitcherP
               className={`flex items-center gap-3 py-2.5 ${!hasAccess ? "opacity-50 cursor-not-allowed" : ""} ${isCurrent ? "bg-accent" : ""}`}
               disabled={!hasAccess}
             >
-              <div className={`w-8 h-8 rounded-lg ${current.color === product.color ? product.color : product.color} flex items-center justify-center flex-shrink-0`}>
+              <div className={`w-8 h-8 rounded-lg ${product.color} flex items-center justify-center flex-shrink-0`}>
                 <Icon className="w-4 h-4 text-white" />
               </div>
               <div className="flex-1 min-w-0">
@@ -110,7 +127,13 @@ const AppSwitcher = ({ currentApp = "autolabels", theme = "dark" }: AppSwitcherP
               {hasAccess ? (
                 product.url.startsWith("http") && !isCurrent ? <ExternalLink className="w-3 h-3 text-muted-foreground flex-shrink-0" /> : null
               ) : (
-                <Lock className="w-3.5 h-3.5 text-muted-foreground flex-shrink-0" />
+                <span
+                  className="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-[0.12em] text-muted-foreground bg-muted px-1.5 py-0.5 rounded flex-shrink-0"
+                  title="Upgrade your Autocurb plan to unlock this app"
+                >
+                  <Lock className="w-2.5 h-2.5" />
+                  Add
+                </span>
               )}
             </DropdownMenuItem>
           );
