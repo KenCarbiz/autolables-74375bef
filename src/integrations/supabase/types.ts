@@ -810,6 +810,72 @@ export type Database = {
           },
         ]
       }
+      leads: {
+        Row: {
+          captured_at: string
+          email: string
+          id: string
+          name: string
+          notes: string
+          phone: string
+          signing_url: string
+          source: string
+          status: string
+          store_id: string | null
+          tenant_id: string | null
+          updated_at: string
+          vehicle_interest: string
+          vehicle_vin: string
+        }
+        Insert: {
+          captured_at?: string
+          email?: string
+          id?: string
+          name?: string
+          notes?: string
+          phone?: string
+          signing_url?: string
+          source?: string
+          status?: string
+          store_id?: string | null
+          tenant_id?: string | null
+          updated_at?: string
+          vehicle_interest?: string
+          vehicle_vin?: string
+        }
+        Update: {
+          captured_at?: string
+          email?: string
+          id?: string
+          name?: string
+          notes?: string
+          phone?: string
+          signing_url?: string
+          source?: string
+          status?: string
+          store_id?: string | null
+          tenant_id?: string | null
+          updated_at?: string
+          vehicle_interest?: string
+          vehicle_vin?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "leads_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenant_summary"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "leads_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       onboarding_profiles: {
         Row: {
           billing: Json
@@ -1350,6 +1416,75 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      }
+      trade_in_records: {
+        Row: {
+          customer_name: string
+          deal_vin: string
+          deal_ymm: string
+          id: string
+          notes: string
+          received_at: string
+          status: string
+          store_id: string | null
+          tenant_id: string | null
+          trade_mileage: number
+          trade_value: number
+          trade_vin: string
+          trade_ymm: string
+          updated_at: string
+          vehicle_file_id: string | null
+        }
+        Insert: {
+          customer_name?: string
+          deal_vin?: string
+          deal_ymm?: string
+          id?: string
+          notes?: string
+          received_at?: string
+          status?: string
+          store_id?: string | null
+          tenant_id?: string | null
+          trade_mileage?: number
+          trade_value?: number
+          trade_vin: string
+          trade_ymm?: string
+          updated_at?: string
+          vehicle_file_id?: string | null
+        }
+        Update: {
+          customer_name?: string
+          deal_vin?: string
+          deal_ymm?: string
+          id?: string
+          notes?: string
+          received_at?: string
+          status?: string
+          store_id?: string | null
+          tenant_id?: string | null
+          trade_mileage?: number
+          trade_value?: number
+          trade_vin?: string
+          trade_ymm?: string
+          updated_at?: string
+          vehicle_file_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "trade_in_records_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenant_summary"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "trade_in_records_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       user_roles: {
         Row: {
