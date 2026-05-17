@@ -651,6 +651,111 @@ export type Database = {
         }
         Relationships: []
       }
+      get_ready_records: {
+        Row: {
+          accessories_to_install: Json
+          acquired_date: string | null
+          assigned_technician: string
+          autocurb_inspection_id: string | null
+          condition: string
+          created_at: string
+          created_by: string
+          get_ready_complete_date: string | null
+          get_ready_start_date: string | null
+          id: string
+          inspection_by: string | null
+          inspection_complete: boolean
+          inspection_date: string | null
+          inspection_form_type: string | null
+          inspection_required: boolean
+          inspection_signature_data: string | null
+          inventory_date: string | null
+          items: Json
+          ro_number: string
+          service_advisor: string
+          status: string
+          stock_number: string
+          store_id: string | null
+          tenant_id: string
+          updated_at: string
+          vin: string
+          ymm: string
+        }
+        Insert: {
+          accessories_to_install?: Json
+          acquired_date?: string | null
+          assigned_technician?: string
+          autocurb_inspection_id?: string | null
+          condition?: string
+          created_at?: string
+          created_by?: string
+          get_ready_complete_date?: string | null
+          get_ready_start_date?: string | null
+          id?: string
+          inspection_by?: string | null
+          inspection_complete?: boolean
+          inspection_date?: string | null
+          inspection_form_type?: string | null
+          inspection_required?: boolean
+          inspection_signature_data?: string | null
+          inventory_date?: string | null
+          items?: Json
+          ro_number?: string
+          service_advisor?: string
+          status?: string
+          stock_number?: string
+          store_id?: string | null
+          tenant_id: string
+          updated_at?: string
+          vin: string
+          ymm?: string
+        }
+        Update: {
+          accessories_to_install?: Json
+          acquired_date?: string | null
+          assigned_technician?: string
+          autocurb_inspection_id?: string | null
+          condition?: string
+          created_at?: string
+          created_by?: string
+          get_ready_complete_date?: string | null
+          get_ready_start_date?: string | null
+          id?: string
+          inspection_by?: string | null
+          inspection_complete?: boolean
+          inspection_date?: string | null
+          inspection_form_type?: string | null
+          inspection_required?: boolean
+          inspection_signature_data?: string | null
+          inventory_date?: string | null
+          items?: Json
+          ro_number?: string
+          service_advisor?: string
+          status?: string
+          stock_number?: string
+          store_id?: string | null
+          tenant_id?: string
+          updated_at?: string
+          vin?: string
+          ymm?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "get_ready_records_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenant_summary"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "get_ready_records_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       handoff_tokens: {
         Row: {
           consumed_at: string | null
@@ -938,6 +1043,76 @@ export type Database = {
           },
           {
             foreignKeyName: "prep_sign_offs_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      product_rules: {
+        Row: {
+          body_styles: string[]
+          condition: string
+          created_at: string
+          id: string
+          makes: string[]
+          mileage_max: number
+          models: string[]
+          product_id: string
+          tenant_id: string
+          trims: string[]
+          updated_at: string
+          year_max: string
+          year_min: string
+        }
+        Insert: {
+          body_styles?: string[]
+          condition?: string
+          created_at?: string
+          id?: string
+          makes?: string[]
+          mileage_max?: number
+          models?: string[]
+          product_id: string
+          tenant_id: string
+          trims?: string[]
+          updated_at?: string
+          year_max?: string
+          year_min?: string
+        }
+        Update: {
+          body_styles?: string[]
+          condition?: string
+          created_at?: string
+          id?: string
+          makes?: string[]
+          mileage_max?: number
+          models?: string[]
+          product_id?: string
+          tenant_id?: string
+          trims?: string[]
+          updated_at?: string
+          year_max?: string
+          year_min?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "product_rules_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "product_rules_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenant_summary"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "product_rules_tenant_id_fkey"
             columns: ["tenant_id"]
             isOneToOne: false
             referencedRelation: "tenants"
@@ -1319,6 +1494,138 @@ export type Database = {
           },
           {
             foreignKeyName: "vehicle_listings_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      warranty_records: {
+        Row: {
+          coverage_type: string
+          created_at: string
+          customer_name: string
+          id: string
+          notes: string
+          product_id: string
+          product_name: string
+          provider: string
+          registration_number: string
+          status: string
+          store_id: string | null
+          tenant_id: string
+          updated_at: string
+          vehicle_vin: string
+          vehicle_ymm: string
+          warranty_end: string | null
+          warranty_start: string | null
+        }
+        Insert: {
+          coverage_type?: string
+          created_at?: string
+          customer_name?: string
+          id?: string
+          notes?: string
+          product_id?: string
+          product_name?: string
+          provider?: string
+          registration_number?: string
+          status?: string
+          store_id?: string | null
+          tenant_id: string
+          updated_at?: string
+          vehicle_vin: string
+          vehicle_ymm?: string
+          warranty_end?: string | null
+          warranty_start?: string | null
+        }
+        Update: {
+          coverage_type?: string
+          created_at?: string
+          customer_name?: string
+          id?: string
+          notes?: string
+          product_id?: string
+          product_name?: string
+          provider?: string
+          registration_number?: string
+          status?: string
+          store_id?: string | null
+          tenant_id?: string
+          updated_at?: string
+          vehicle_vin?: string
+          vehicle_ymm?: string
+          warranty_end?: string | null
+          warranty_start?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "warranty_records_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenant_summary"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "warranty_records_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      zebra_print_jobs: {
+        Row: {
+          created_at: string
+          id: string
+          label_type: string
+          printer_name: string
+          status: string
+          stock_number: string
+          store_id: string | null
+          tenant_id: string
+          vin: string
+          ymm: string
+          zpl_content: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          label_type: string
+          printer_name?: string
+          status?: string
+          stock_number?: string
+          store_id?: string | null
+          tenant_id: string
+          vin: string
+          ymm?: string
+          zpl_content: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          label_type?: string
+          printer_name?: string
+          status?: string
+          stock_number?: string
+          store_id?: string | null
+          tenant_id?: string
+          vin?: string
+          ymm?: string
+          zpl_content?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "zebra_print_jobs_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenant_summary"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "zebra_print_jobs_tenant_id_fkey"
             columns: ["tenant_id"]
             isOneToOne: false
             referencedRelation: "tenants"
