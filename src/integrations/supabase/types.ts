@@ -1507,6 +1507,117 @@ export type Database = {
         }
         Relationships: []
       }
+      vehicle_files: {
+        Row: {
+          aftermarket_installs: Json
+          attached_documents: Json
+          cobuyer_email: string
+          cobuyer_name: string
+          cobuyer_phone: string
+          condition: string
+          created_at: string
+          created_by: string | null
+          customer_email: string
+          customer_name: string
+          customer_phone: string
+          deal_qr_token: string
+          deal_status: string
+          factory_equipment: Json
+          id: string
+          make: string
+          market_value: number
+          mileage: number
+          model: string
+          msrp: number
+          signings: Json
+          stickers: Json
+          stock_number: string
+          store_id: string | null
+          tenant_id: string | null
+          trim: string
+          updated_at: string
+          vin: string
+          year: string
+        }
+        Insert: {
+          aftermarket_installs?: Json
+          attached_documents?: Json
+          cobuyer_email?: string
+          cobuyer_name?: string
+          cobuyer_phone?: string
+          condition?: string
+          created_at?: string
+          created_by?: string | null
+          customer_email?: string
+          customer_name?: string
+          customer_phone?: string
+          deal_qr_token?: string
+          deal_status?: string
+          factory_equipment?: Json
+          id?: string
+          make?: string
+          market_value?: number
+          mileage?: number
+          model?: string
+          msrp?: number
+          signings?: Json
+          stickers?: Json
+          stock_number?: string
+          store_id?: string | null
+          tenant_id?: string | null
+          trim?: string
+          updated_at?: string
+          vin: string
+          year?: string
+        }
+        Update: {
+          aftermarket_installs?: Json
+          attached_documents?: Json
+          cobuyer_email?: string
+          cobuyer_name?: string
+          cobuyer_phone?: string
+          condition?: string
+          created_at?: string
+          created_by?: string | null
+          customer_email?: string
+          customer_name?: string
+          customer_phone?: string
+          deal_qr_token?: string
+          deal_status?: string
+          factory_equipment?: Json
+          id?: string
+          make?: string
+          market_value?: number
+          mileage?: number
+          model?: string
+          msrp?: number
+          signings?: Json
+          stickers?: Json
+          stock_number?: string
+          store_id?: string | null
+          tenant_id?: string | null
+          trim?: string
+          updated_at?: string
+          vin?: string
+          year?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "vehicle_files_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenant_summary"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "vehicle_files_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       vehicle_listings: {
         Row: {
           certification: Json | null
@@ -2088,6 +2199,46 @@ export type Database = {
         SetofOptions: {
           from: "*"
           to: "deal_signing_tokens"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
+      get_vehicle_file_by_deal_token: {
+        Args: { _token: string }
+        Returns: {
+          aftermarket_installs: Json
+          attached_documents: Json
+          cobuyer_email: string
+          cobuyer_name: string
+          cobuyer_phone: string
+          condition: string
+          created_at: string
+          created_by: string | null
+          customer_email: string
+          customer_name: string
+          customer_phone: string
+          deal_qr_token: string
+          deal_status: string
+          factory_equipment: Json
+          id: string
+          make: string
+          market_value: number
+          mileage: number
+          model: string
+          msrp: number
+          signings: Json
+          stickers: Json
+          stock_number: string
+          store_id: string | null
+          tenant_id: string | null
+          trim: string
+          updated_at: string
+          vin: string
+          year: string
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "vehicle_files"
           isOneToOne: false
           isSetofReturn: true
         }
