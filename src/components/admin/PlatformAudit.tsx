@@ -8,6 +8,7 @@ import {
   toCsv,
   downloadCsv,
 } from "./tablePrimitives";
+import { TableEmptyState } from "./TableEmptyState";
 
 const ACTION_PRESETS = [
   "",
@@ -161,7 +162,15 @@ export const PlatformAudit = () => {
       {loading ? (
         <div className="py-10 text-center text-sm text-muted-foreground">Loading events…</div>
       ) : filtered.length === 0 ? (
-        <div className="py-10 text-center text-sm text-muted-foreground">No events match.</div>
+        <TableEmptyState
+          icon={ScrollText}
+          title={q || tenantFilter || actionFilter ? "No events match these filters" : `No audit events in the last ${sinceDays} ${sinceDays === 1 ? "day" : "days"}`}
+          description={
+            q || tenantFilter || actionFilter
+              ? "Widen the date range or clear the search to surface older events."
+              : "Every signing, listing, recall check, and tenant action writes a tamper-evident row here as it happens."
+          }
+        />
       ) : (
         <div className="rounded-xl border border-border bg-card overflow-hidden">
           <table className="w-full text-sm">

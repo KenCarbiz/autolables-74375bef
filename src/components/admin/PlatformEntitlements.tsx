@@ -3,6 +3,7 @@ import { useAdminPlatform, type EntitlementRow } from "@/hooks/useAdminPlatform"
 import { toast } from "sonner";
 import { CreditCard, Search, Zap } from "lucide-react";
 import { SortHeader, TablePagination, useSortAndPaginate, toCsv, downloadCsv } from "./tablePrimitives";
+import { TableEmptyState } from "./TableEmptyState";
 
 const APP_SLUGS = ["autolabels", "autocurb", "autoframe", "autovideo"] as const;
 const STATUSES: EntitlementRow["status"][] = ["trial", "active", "canceled", "past_due", "paused"];
@@ -135,7 +136,17 @@ export const PlatformEntitlements = () => {
       {entitlements.isLoading ? (
         <div className="py-10 text-center text-sm text-muted-foreground">Loading entitlements…</div>
       ) : rows.length === 0 ? (
-        <div className="py-10 text-center text-sm text-muted-foreground">No entitlements match.</div>
+        <TableEmptyState
+          icon={CreditCard}
+          title={q || appFilter ? "No entitlements match these filters" : "No entitlements yet"}
+          description={
+            q || appFilter
+              ? "Clear the search or app filter to see every per-tenant subscription on record."
+              : "Entitlement rows are written by Autocurb's stripe-webhook when a dealer subscribes. You can also grant or override one manually."
+          }
+          ctaLabel={q || appFilter ? undefined : "Grant / override"}
+          onCta={q || appFilter ? undefined : () => setQuickNew(true)}
+        />
       ) : (
         <div className="rounded-xl border border-border bg-card overflow-hidden">
           <table className="w-full text-sm">

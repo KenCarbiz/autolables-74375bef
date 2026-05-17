@@ -3,6 +3,7 @@ import { useAdminPlatform, type MemberRow } from "@/hooks/useAdminPlatform";
 import { toast } from "sonner";
 import { Users, Search, Trash2 } from "lucide-react";
 import { SortHeader, TablePagination, useSortAndPaginate, toCsv, downloadCsv } from "./tablePrimitives";
+import { TableEmptyState } from "./TableEmptyState";
 
 const ROLES: MemberRow["role"][] = ["owner", "admin", "manager", "staff"];
 
@@ -118,7 +119,15 @@ export const PlatformMembers = () => {
       {members.isLoading ? (
         <div className="py-10 text-center text-sm text-muted-foreground">Loading members…</div>
       ) : rows.length === 0 ? (
-        <div className="py-10 text-center text-sm text-muted-foreground">No members match.</div>
+        <TableEmptyState
+          icon={Users}
+          title={q || tenantFilter ? "No members match these filters" : "No members yet"}
+          description={
+            q || tenantFilter
+              ? "Clear the search or tenant filter to see all seat assignments."
+              : "Tenant members appear here as owners invite team mates. Invitations live until accepted."
+          }
+        />
       ) : (
         <div className="rounded-xl border border-border bg-card overflow-hidden">
           <table className="w-full text-sm">

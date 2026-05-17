@@ -3,6 +3,7 @@ import { useAdminPlatform, type TenantSummary } from "@/hooks/useAdminPlatform";
 import { toast } from "sonner";
 import { Building2, Search, Power, PowerOff, Calendar, Users, AppWindow, Plus, X } from "lucide-react";
 import { SortHeader, TablePagination, useSortAndPaginate, toCsv, downloadCsv } from "./tablePrimitives";
+import { TableEmptyState } from "./TableEmptyState";
 
 const formatDate = (s: string | null) => {
   if (!s) return "—";
@@ -134,9 +135,17 @@ export const PlatformTenants = () => {
       {tenants.isLoading ? (
         <div className="py-10 text-center text-sm text-muted-foreground">Loading tenants…</div>
       ) : rows.length === 0 ? (
-        <div className="py-10 text-center text-sm text-muted-foreground">
-          No tenants match. {q ? "Try clearing the search." : "New sign-ups will appear here."}
-        </div>
+        <TableEmptyState
+          icon={Building2}
+          title={q || filter !== "all" ? "No tenants match these filters" : "No tenants yet"}
+          description={
+            q || filter !== "all"
+              ? "Try clearing the search or filter. New sign-ups appear here automatically."
+              : "Dealers signing up through Autocurb or AutoLabels appear here automatically. You can also seed one manually."
+          }
+          ctaLabel={q || filter !== "all" ? undefined : "New tenant"}
+          onCta={q || filter !== "all" ? undefined : () => setCreating(true)}
+        />
       ) : (
         <div className="rounded-xl border border-border bg-card overflow-hidden">
           <table className="w-full text-sm">
