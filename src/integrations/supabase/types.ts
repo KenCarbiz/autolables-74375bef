@@ -810,6 +810,72 @@ export type Database = {
           },
         ]
       }
+      leads: {
+        Row: {
+          captured_at: string
+          email: string
+          id: string
+          name: string
+          notes: string
+          phone: string
+          signing_url: string
+          source: string
+          status: string
+          store_id: string | null
+          tenant_id: string | null
+          updated_at: string
+          vehicle_interest: string
+          vehicle_vin: string
+        }
+        Insert: {
+          captured_at?: string
+          email?: string
+          id?: string
+          name?: string
+          notes?: string
+          phone?: string
+          signing_url?: string
+          source?: string
+          status?: string
+          store_id?: string | null
+          tenant_id?: string | null
+          updated_at?: string
+          vehicle_interest?: string
+          vehicle_vin?: string
+        }
+        Update: {
+          captured_at?: string
+          email?: string
+          id?: string
+          name?: string
+          notes?: string
+          phone?: string
+          signing_url?: string
+          source?: string
+          status?: string
+          store_id?: string | null
+          tenant_id?: string | null
+          updated_at?: string
+          vehicle_interest?: string
+          vehicle_vin?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "leads_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenant_summary"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "leads_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       onboarding_profiles: {
         Row: {
           billing: Json
@@ -1351,6 +1417,75 @@ export type Database = {
         }
         Relationships: []
       }
+      trade_in_records: {
+        Row: {
+          customer_name: string
+          deal_vin: string
+          deal_ymm: string
+          id: string
+          notes: string
+          received_at: string
+          status: string
+          store_id: string | null
+          tenant_id: string | null
+          trade_mileage: number
+          trade_value: number
+          trade_vin: string
+          trade_ymm: string
+          updated_at: string
+          vehicle_file_id: string | null
+        }
+        Insert: {
+          customer_name?: string
+          deal_vin?: string
+          deal_ymm?: string
+          id?: string
+          notes?: string
+          received_at?: string
+          status?: string
+          store_id?: string | null
+          tenant_id?: string | null
+          trade_mileage?: number
+          trade_value?: number
+          trade_vin: string
+          trade_ymm?: string
+          updated_at?: string
+          vehicle_file_id?: string | null
+        }
+        Update: {
+          customer_name?: string
+          deal_vin?: string
+          deal_ymm?: string
+          id?: string
+          notes?: string
+          received_at?: string
+          status?: string
+          store_id?: string | null
+          tenant_id?: string | null
+          trade_mileage?: number
+          trade_value?: number
+          trade_vin?: string
+          trade_ymm?: string
+          updated_at?: string
+          vehicle_file_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "trade_in_records_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenant_summary"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "trade_in_records_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       user_roles: {
         Row: {
           created_at: string
@@ -1371,6 +1506,117 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      vehicle_files: {
+        Row: {
+          aftermarket_installs: Json
+          attached_documents: Json
+          cobuyer_email: string
+          cobuyer_name: string
+          cobuyer_phone: string
+          condition: string
+          created_at: string
+          created_by: string | null
+          customer_email: string
+          customer_name: string
+          customer_phone: string
+          deal_qr_token: string
+          deal_status: string
+          factory_equipment: Json
+          id: string
+          make: string
+          market_value: number
+          mileage: number
+          model: string
+          msrp: number
+          signings: Json
+          stickers: Json
+          stock_number: string
+          store_id: string | null
+          tenant_id: string | null
+          trim: string
+          updated_at: string
+          vin: string
+          year: string
+        }
+        Insert: {
+          aftermarket_installs?: Json
+          attached_documents?: Json
+          cobuyer_email?: string
+          cobuyer_name?: string
+          cobuyer_phone?: string
+          condition?: string
+          created_at?: string
+          created_by?: string | null
+          customer_email?: string
+          customer_name?: string
+          customer_phone?: string
+          deal_qr_token?: string
+          deal_status?: string
+          factory_equipment?: Json
+          id?: string
+          make?: string
+          market_value?: number
+          mileage?: number
+          model?: string
+          msrp?: number
+          signings?: Json
+          stickers?: Json
+          stock_number?: string
+          store_id?: string | null
+          tenant_id?: string | null
+          trim?: string
+          updated_at?: string
+          vin: string
+          year?: string
+        }
+        Update: {
+          aftermarket_installs?: Json
+          attached_documents?: Json
+          cobuyer_email?: string
+          cobuyer_name?: string
+          cobuyer_phone?: string
+          condition?: string
+          created_at?: string
+          created_by?: string | null
+          customer_email?: string
+          customer_name?: string
+          customer_phone?: string
+          deal_qr_token?: string
+          deal_status?: string
+          factory_equipment?: Json
+          id?: string
+          make?: string
+          market_value?: number
+          mileage?: number
+          model?: string
+          msrp?: number
+          signings?: Json
+          stickers?: Json
+          stock_number?: string
+          store_id?: string | null
+          tenant_id?: string | null
+          trim?: string
+          updated_at?: string
+          vin?: string
+          year?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "vehicle_files_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenant_summary"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "vehicle_files_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       vehicle_listings: {
         Row: {
@@ -1494,6 +1740,69 @@ export type Database = {
           },
           {
             foreignKeyName: "vehicle_listings_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      vin_queue: {
+        Row: {
+          condition: string | null
+          decoded_data: Json
+          id: string
+          mileage: string
+          notes: string
+          scanned_at: string
+          status: string
+          stock_number: string
+          store_id: string | null
+          tenant_id: string | null
+          updated_at: string
+          user_id: string | null
+          vin: string
+        }
+        Insert: {
+          condition?: string | null
+          decoded_data?: Json
+          id?: string
+          mileage?: string
+          notes?: string
+          scanned_at?: string
+          status?: string
+          stock_number?: string
+          store_id?: string | null
+          tenant_id?: string | null
+          updated_at?: string
+          user_id?: string | null
+          vin: string
+        }
+        Update: {
+          condition?: string | null
+          decoded_data?: Json
+          id?: string
+          mileage?: string
+          notes?: string
+          scanned_at?: string
+          status?: string
+          stock_number?: string
+          store_id?: string | null
+          tenant_id?: string | null
+          updated_at?: string
+          user_id?: string | null
+          vin?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "vin_queue_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenant_summary"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "vin_queue_tenant_id_fkey"
             columns: ["tenant_id"]
             isOneToOne: false
             referencedRelation: "tenants"
@@ -1808,6 +2117,24 @@ export type Database = {
       }
       claim_platform: { Args: never; Returns: Json }
       current_tenant_id: { Args: never; Returns: string }
+      find_abandoned_signings: {
+        Args: {
+          _limit?: number
+          _min_hours_since_open?: number
+          _min_hours_since_retry?: number
+        }
+        Returns: {
+          addendum_id: string
+          customer_email: string
+          dealer_name: string
+          opened_at: string
+          signing_token: string
+          store_id: string
+          tenant_id: string
+          vehicle_vin: string
+          vehicle_ymm: string
+        }[]
+      }
       get_addendum_by_token: {
         Args: { _token: string }
         Returns: {
@@ -1890,6 +2217,54 @@ export type Database = {
         SetofOptions: {
           from: "*"
           to: "deal_signing_tokens"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
+      get_reengage_schedule: {
+        Args: never
+        Returns: {
+          active: boolean
+          jobid: number
+          schedule: string
+        }[]
+      }
+      get_vehicle_file_by_deal_token: {
+        Args: { _token: string }
+        Returns: {
+          aftermarket_installs: Json
+          attached_documents: Json
+          cobuyer_email: string
+          cobuyer_name: string
+          cobuyer_phone: string
+          condition: string
+          created_at: string
+          created_by: string | null
+          customer_email: string
+          customer_name: string
+          customer_phone: string
+          deal_qr_token: string
+          deal_status: string
+          factory_equipment: Json
+          id: string
+          make: string
+          market_value: number
+          mileage: number
+          model: string
+          msrp: number
+          signings: Json
+          stickers: Json
+          stock_number: string
+          store_id: string | null
+          tenant_id: string | null
+          trim: string
+          updated_at: string
+          vin: string
+          year: string
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "vehicle_files"
           isOneToOne: false
           isSetofReturn: true
         }
@@ -1984,6 +2359,18 @@ export type Database = {
         }
         Returns: string
       }
+      record_signing_reengagement: {
+        Args: { _addendum_id: string; _channel?: string; _details?: Json }
+        Returns: undefined
+      }
+      schedule_reengage_abandoned_signings: {
+        Args: {
+          _cron_expr?: string
+          _service_key?: string
+          _supabase_url?: string
+        }
+        Returns: number
+      }
       sign_deal_token: {
         Args: {
           _content_hash: string
@@ -1994,6 +2381,10 @@ export type Database = {
           _user_agent: string
         }
         Returns: boolean
+      }
+      unschedule_reengage_abandoned_signings: {
+        Args: never
+        Returns: undefined
       }
       verify_audit_chain: {
         Args: { _store_id: string }
