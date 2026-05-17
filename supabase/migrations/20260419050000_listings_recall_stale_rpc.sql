@@ -17,7 +17,12 @@ CREATE OR REPLACE FUNCTION public.listings_with_stale_recalls(
 ) RETURNS TABLE (
   id                UUID,
   tenant_id         UUID,
-  store_id          UUID,
+  -- vehicle_listings.store_id is TEXT in this project (legacy
+  -- shape — predates the move to UUID stores). RETURNS column
+  -- type must match or the function fails at CREATE time.
+  -- The frontend caller (RecallRefreshTool.tsx) already types
+  -- it as `string | null`.
+  store_id          TEXT,
   vin               TEXT,
   ymm               TEXT,
   slug              TEXT,
