@@ -1636,6 +1636,69 @@ export type Database = {
           },
         ]
       }
+      vin_queue: {
+        Row: {
+          condition: string | null
+          decoded_data: Json
+          id: string
+          mileage: string
+          notes: string
+          scanned_at: string
+          status: string
+          stock_number: string
+          store_id: string | null
+          tenant_id: string | null
+          updated_at: string
+          user_id: string | null
+          vin: string
+        }
+        Insert: {
+          condition?: string | null
+          decoded_data?: Json
+          id?: string
+          mileage?: string
+          notes?: string
+          scanned_at?: string
+          status?: string
+          stock_number?: string
+          store_id?: string | null
+          tenant_id?: string | null
+          updated_at?: string
+          user_id?: string | null
+          vin: string
+        }
+        Update: {
+          condition?: string | null
+          decoded_data?: Json
+          id?: string
+          mileage?: string
+          notes?: string
+          scanned_at?: string
+          status?: string
+          stock_number?: string
+          store_id?: string | null
+          tenant_id?: string | null
+          updated_at?: string
+          user_id?: string | null
+          vin?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "vin_queue_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenant_summary"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "vin_queue_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       warranty_records: {
         Row: {
           coverage_type: string
