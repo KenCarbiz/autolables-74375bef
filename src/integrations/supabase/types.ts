@@ -2221,6 +2221,14 @@ export type Database = {
           isSetofReturn: true
         }
       }
+      get_reengage_schedule: {
+        Args: never
+        Returns: {
+          active: boolean
+          jobid: number
+          schedule: string
+        }[]
+      }
       get_vehicle_file_by_deal_token: {
         Args: { _token: string }
         Returns: {
@@ -2355,6 +2363,14 @@ export type Database = {
         Args: { _addendum_id: string; _channel?: string; _details?: Json }
         Returns: undefined
       }
+      schedule_reengage_abandoned_signings: {
+        Args: {
+          _cron_expr?: string
+          _service_key?: string
+          _supabase_url?: string
+        }
+        Returns: number
+      }
       sign_deal_token: {
         Args: {
           _content_hash: string
@@ -2365,6 +2381,10 @@ export type Database = {
           _user_agent: string
         }
         Returns: boolean
+      }
+      unschedule_reengage_abandoned_signings: {
+        Args: never
+        Returns: undefined
       }
       verify_audit_chain: {
         Args: { _store_id: string }
