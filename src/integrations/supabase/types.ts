@@ -2117,6 +2117,24 @@ export type Database = {
       }
       claim_platform: { Args: never; Returns: Json }
       current_tenant_id: { Args: never; Returns: string }
+      find_abandoned_signings: {
+        Args: {
+          _limit?: number
+          _min_hours_since_open?: number
+          _min_hours_since_retry?: number
+        }
+        Returns: {
+          addendum_id: string
+          customer_email: string
+          dealer_name: string
+          opened_at: string
+          signing_token: string
+          store_id: string
+          tenant_id: string
+          vehicle_vin: string
+          vehicle_ymm: string
+        }[]
+      }
       get_addendum_by_token: {
         Args: { _token: string }
         Returns: {
@@ -2332,6 +2350,10 @@ export type Database = {
           _user_agent: string
         }
         Returns: string
+      }
+      record_signing_reengagement: {
+        Args: { _addendum_id: string; _channel?: string; _details?: Json }
+        Returns: undefined
       }
       sign_deal_token: {
         Args: {
