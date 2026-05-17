@@ -1,6 +1,7 @@
 import { useCallback, useMemo } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { useRealtimeInvalidate } from "./useRealtimeInvalidate";
 import type {
   VehicleFile,
   StickerRecord,
@@ -83,6 +84,19 @@ export const useVehicleFiles = (storeId: string) => {
     () => qc.invalidateQueries({ queryKey: vehicleFilesKey(storeId) }),
     [qc, storeId],
   );
+
+  // Cross-device sync. When the desktop publishes a sticker or
+  // records a signing, the lot tablet's /admin?tab=files and
+  // /dashboard see the row update without a manual refresh.
+  // RLS scopes the stream to the current tenant; no store-id
+  // filter — vehicle_files.store_id is a UUID column whereas
+  // the storeId arg here is a TEXT (legacy) value, so we just
+  // accept the broader tenant-wide stream and let the local
+  // filter in the queryFn narrow on read.
+  useRealtimeInvalidate({
+    table: "vehicle_files",
+    queryKey: vehicleFilesKey(storeId),
+  });
 
   // Shared read-modify-write helper. All nested-array mutators
   // go through here so they share one concurrency story. Returns

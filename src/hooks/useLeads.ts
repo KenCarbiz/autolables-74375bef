@@ -1,6 +1,7 @@
 import { useCallback, useMemo } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { useRealtimeInvalidate } from "./useRealtimeInvalidate";
 import type { Lead } from "@/types/tenant";
 
 // ──────────────────────────────────────────────────────────────
@@ -38,6 +39,18 @@ export const useLeads = (storeId: string) => {
     () => qc.invalidateQueries({ queryKey: leadsKey(storeId) }),
     [qc, storeId],
   );
+
+  // Cross-device sync: lot tablet / desktop / phone all see new
+  // captures + status edits as they happen. RLS already scopes
+  // the realtime stream to the tenant, and we add a store_id
+  // filter so a multi-store dealer's other stores don't churn
+  // this hook's cache.
+  useRealtimeInvalidate({
+    table: "leads",
+    queryKey: leadsKey(storeId),
+    filter: storeId ? `store_id=eq.${storeId}` : undefined,
+    enabled: !!storeId,
+  });
 
   const addLeadMutation = useMutation({
     mutationFn: async (

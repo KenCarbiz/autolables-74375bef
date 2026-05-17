@@ -1,6 +1,7 @@
 import { useCallback } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { useRealtimeInvalidate } from "./useRealtimeInvalidate";
 import { Product } from "./useProducts";
 
 // ──────────────────────────────────────────────────────────────
@@ -62,6 +63,14 @@ export const useProductRules = () => {
     () => qc.invalidateQueries({ queryKey: productRulesKey }),
     [qc],
   );
+
+  // Cross-device sync — an F&I manager editing rules on desktop
+  // updates the lot tablet's addendum builder in real time. RLS
+  // already scopes the realtime stream to the current tenant.
+  useRealtimeInvalidate({
+    table: "product_rules",
+    queryKey: productRulesKey,
+  });
 
   const addRuleMutation = useMutation({
     mutationFn: async (rule: Omit<ProductRule, "id">): Promise<ProductRule | null> => {
