@@ -1,5 +1,21 @@
-import { useState, useEffect } from "react";
+import { useCallback } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
 import { Product } from "./useProducts";
+
+// ──────────────────────────────────────────────────────────────
+// useProductRules — Supabase-backed, TanStack-Query-wrapped
+// (Wave 13b).
+//
+// Was localStorage-only: a dealer editing rules on desktop
+// wouldn't see them on the lot tablet. Now reads/writes
+// public.product_rules (migration 20260518100000), tenant-scoped
+// via RLS so every device in the tenant sees the same set.
+//
+// Public API is preserved — no args, returns { rules, addRule,
+// updateRule, deleteRule, getMatchingProducts } — so Index.tsx
+// and Admin.tsx need no changes.
+// ──────────────────────────────────────────────────────────────
 
 export interface ProductRule {
   id: string;
@@ -24,62 +40,119 @@ export interface VehicleContext {
   mileage?: number;
 }
 
-const STORAGE_KEY = "product_rules";
+const productRulesKey = ["product_rules"] as const;
 
 export const useProductRules = () => {
-  const [rules, setRules] = useState<ProductRule[]>([]);
+  const qc = useQueryClient();
 
-  useEffect(() => {
-    const saved = localStorage.getItem(STORAGE_KEY);
-    if (saved) {
-      try { setRules(JSON.parse(saved)); } catch { /* ignore */ }
-    }
-  }, []);
+  const q = useQuery({
+    queryKey: productRulesKey,
+    queryFn: async (): Promise<ProductRule[]> => {
+      const { data } = await (supabase as any)
+        .from("product_rules")
+        .select("*")
+        .order("created_at", { ascending: true });
+      return ((data as ProductRule[]) || []);
+    },
+    staleTime: 60_000,
+  });
 
-  const saveRules = (next: ProductRule[]) => {
-    setRules(next);
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
-  };
+  const rules = q.data ?? [];
+  const invalidate = useCallback(
+    () => qc.invalidateQueries({ queryKey: productRulesKey }),
+    [qc],
+  );
 
-  const addRule = (rule: Omit<ProductRule, "id">) => {
-    const newRule: ProductRule = { ...rule, id: crypto.randomUUID() };
-    saveRules([...rules, newRule]);
-    return newRule;
-  };
+  const addRuleMutation = useMutation({
+    mutationFn: async (rule: Omit<ProductRule, "id">): Promise<ProductRule | null> => {
+      const { data: row, error } = await (supabase as any)
+        .from("product_rules")
+        .insert({
+          product_id: rule.product_id,
+          year_min: rule.year_min || "",
+          year_max: rule.year_max || "",
+          makes: rule.makes || [],
+          models: rule.models || [],
+          trims: rule.trims || [],
+          body_styles: rule.body_styles || [],
+          condition: rule.condition || "all",
+          mileage_max: rule.mileage_max || 0,
+        })
+        .select()
+        .single();
+      if (error || !row) return null;
+      return row as ProductRule;
+    },
+    onSuccess: invalidate,
+  });
 
-  const updateRule = (id: string, updates: Partial<ProductRule>) => {
-    saveRules(rules.map(r => r.id === id ? { ...r, ...updates } : r));
-  };
+  const updateRuleMutation = useMutation({
+    mutationFn: async ({ id, updates }: { id: string; updates: Partial<ProductRule> }) => {
+      await (supabase as any)
+        .from("product_rules")
+        .update(updates)
+        .eq("id", id);
+    },
+    onSuccess: invalidate,
+  });
 
-  const deleteRule = (id: string) => {
-    saveRules(rules.filter(r => r.id !== id));
-  };
+  const deleteRuleMutation = useMutation({
+    mutationFn: async (id: string) => {
+      await (supabase as any)
+        .from("product_rules")
+        .delete()
+        .eq("id", id);
+    },
+    onSuccess: invalidate,
+  });
 
-  const getMatchingProducts = (vehicle: VehicleContext, allProducts: Product[]): Product[] => {
-    if (!vehicle.year && !vehicle.make && !vehicle.model) return allProducts;
+  // Existing consumers call addRule(data) / updateRule(id, updates) /
+  // deleteRule(id) without awaiting — keep that fire-and-forget
+  // surface so Admin.tsx doesn't need rewrites. The mutations'
+  // onSuccess invalidations refresh the cache asynchronously.
+  const addRule = useCallback(
+    (rule: Omit<ProductRule, "id">) => addRuleMutation.mutateAsync(rule),
+    [addRuleMutation],
+  );
+  const updateRule = useCallback(
+    (id: string, updates: Partial<ProductRule>) =>
+      updateRuleMutation.mutateAsync({ id, updates }),
+    [updateRuleMutation],
+  );
+  const deleteRule = useCallback(
+    (id: string) => deleteRuleMutation.mutateAsync(id),
+    [deleteRuleMutation],
+  );
 
-    const matchedProductIds = new Set<string>();
+  // Pure predicate — same logic as the localStorage version, now
+  // working over the Supabase-backed rules array.
+  const getMatchingProducts = useCallback(
+    (vehicle: VehicleContext, allProducts: Product[]): Product[] => {
+      if (!vehicle.year && !vehicle.make && !vehicle.model) return allProducts;
 
-    // Products with no rules always show
-    const productsWithRules = new Set(rules.map(r => r.product_id));
+      const matchedProductIds = new Set<string>();
+      const productsWithRules = new Set(rules.map(r => r.product_id));
 
-    allProducts.forEach(p => {
-      if (!productsWithRules.has(p.id)) {
-        matchedProductIds.add(p.id);
+      // Products without ANY rule always show — rules are
+      // "include" filters; absence means "no constraint".
+      allProducts.forEach(p => {
+        if (!productsWithRules.has(p.id)) {
+          matchedProductIds.add(p.id);
+        }
+      });
+
+      for (const rule of rules) {
+        if (matchesRule(rule, vehicle)) {
+          matchedProductIds.add(rule.product_id);
+        }
       }
-    });
 
-    // Check each rule
-    for (const rule of rules) {
-      if (matchesRule(rule, vehicle)) {
-        matchedProductIds.add(rule.product_id);
-      }
-    }
+      return allProducts.filter(p => matchedProductIds.has(p.id));
+    },
+    [rules],
+  );
 
-    return allProducts.filter(p => matchedProductIds.has(p.id));
-  };
-
-  return { rules, addRule, updateRule, deleteRule, getMatchingProducts };
+  return { rules, loading: q.isLoading, addRule, updateRule, deleteRule, getMatchingProducts };
 };
 
 function matchesRule(rule: ProductRule, vehicle: VehicleContext): boolean {
