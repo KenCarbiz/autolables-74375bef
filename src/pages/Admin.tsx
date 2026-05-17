@@ -96,26 +96,34 @@ const emptyRule: Omit<ProductRule, "id"> = {
   mileage_max: 0,
 };
 
-const FEATURE_TOGGLES: { key: keyof DealerSettings; label: string; description: string }[] = [
-  { key: "feature_vin_decode", label: "VIN Decode", description: "Auto-populate vehicle info from VIN using NHTSA database" },
-  { key: "feature_vin_barcode", label: "VIN Barcode", description: "Show scannable VIN barcode on addendum" },
-  { key: "feature_product_icons", label: "Product Icons", description: "Show category icons next to products on the addendum" },
-  { key: "feature_product_rules", label: "Product Rules", description: "Auto-assign products based on vehicle Year/Make/Model/Trim" },
-  { key: "feature_buyers_guide", label: "Buyers Guide", description: "Generate FTC-compliant Buyers Guides (As-Is / Implied / Warranty)" },
-  { key: "feature_spanish_buyers_guide", label: "Spanish Buyers Guide", description: "Enable Spanish language option for Buyers Guides" },
-  { key: "feature_lead_capture", label: "Lead Capture", description: "Capture customer name, phone, and email when sending QR signing links" },
-  { key: "feature_cobuyer_signature", label: "Co-Buyer Signature", description: "Show co-buyer signature pad on the addendum" },
-  { key: "feature_ink_saving", label: "Ink-Saving Mode", description: "Show ink-saving toggle for lighter print output" },
-  { key: "feature_url_scrape", label: "Website URL Import", description: "Paste a vehicle listing URL from your website to auto-fill vehicle details (VIN, stock #, mileage, color, price)" },
-  { key: "feature_custom_branding", label: "Custom Branding", description: "Use custom dealer logo and branding on addendums" },
-  { key: "feature_inventory", label: "Inventory Management", description: "Import and manage vehicle inventory via CSV or manual entry" },
-  { key: "feature_invoicing", label: "Installer Invoicing", description: "Create and manage invoices for product installations with RO/PO numbers" },
-  { key: "feature_warranty", label: "Warranty Tracking", description: "Track product warranty registrations and expirations" },
-  { key: "feature_payroll", label: "Payroll Tracking", description: "Track installer piece-work pay per invoice" },
-  { key: "feature_analytics", label: "Analytics Dashboard", description: "View addendum stats, product acceptance rates, and revenue metrics" },
-  { key: "feature_sms", label: "SMS Delivery", description: "Send signing links via SMS text message (requires Twilio)" },
-  { key: "feature_ai_descriptions", label: "AI Descriptions", description: "Generate vehicle descriptions automatically" },
-  { key: "feature_blackbook", label: "Black Book Data", description: "Pull factory equipment and live market data from Black Book (requires API key)" },
+const FEATURE_TOGGLES: { key: keyof DealerSettings; label: string; description: string; status: "active" | "beta" | "coming_soon" }[] = [
+  { key: "feature_vin_decode", label: "VIN Decode", description: "Auto-populate vehicle info from VIN using NHTSA database", status: "active" },
+  { key: "feature_vin_barcode", label: "VIN Barcode", description: "Show scannable VIN barcode on addendum", status: "active" },
+  { key: "feature_product_icons", label: "Product Icons", description: "Show category icons next to products on the addendum", status: "active" },
+  { key: "feature_product_rules", label: "Product Rules", description: "Auto-assign products based on vehicle Year/Make/Model/Trim", status: "active" },
+  { key: "feature_buyers_guide", label: "Buyers Guide", description: "Generate FTC-compliant Buyers Guides (As-Is / Implied / Warranty)", status: "active" },
+  { key: "feature_spanish_buyers_guide", label: "Spanish Buyers Guide", description: "Enable Spanish language option for Buyers Guides", status: "active" },
+  { key: "feature_lead_capture", label: "Lead Capture", description: "Capture customer name, phone, and email when sending QR signing links", status: "active" },
+  { key: "feature_cobuyer_signature", label: "Co-Buyer Signature", description: "Show co-buyer signature pad on the addendum", status: "active" },
+  { key: "feature_ink_saving", label: "Ink-Saving Mode", description: "Show ink-saving toggle for lighter print output", status: "active" },
+  { key: "feature_url_scrape", label: "Website URL Import", description: "Paste a vehicle listing URL from your website to auto-fill vehicle details (VIN, stock #, mileage, color, price)", status: "active" },
+  { key: "feature_custom_branding", label: "Custom Branding", description: "Use custom dealer logo and branding on addendums", status: "active" },
+  { key: "feature_inventory", label: "Inventory Management", description: "Import and manage vehicle inventory via CSV or manual entry", status: "active" },
+  { key: "feature_invoicing", label: "Installer Invoicing", description: "Create and manage invoices for product installations with RO/PO numbers", status: "active" },
+  { key: "feature_warranty", label: "Warranty Tracking", description: "Track product warranty registrations and expirations", status: "active" },
+  { key: "feature_analytics", label: "Analytics Dashboard", description: "View addendum stats, product acceptance rates, and revenue metrics", status: "active" },
+  // Beta — UI surfaces exist but the underlying integration is partial.
+  // Leave the toggle visible so a dealer can opt in once the secret is
+  // wired, but mark it BETA so nobody thinks it's already live.
+  { key: "feature_sms", label: "SMS Delivery", description: "Send signing links via SMS text message (requires Twilio key — sending pipeline not yet active)", status: "beta" },
+  { key: "feature_blackbook", label: "Black Book Data", description: "Pull factory equipment and live market data from Black Book (requires BLACKBOOK_API_KEY — read-only preview)", status: "beta" },
+  // Coming soon — no functional consumer yet. Hidden from the
+  // Feature Toggles list entirely until the underlying feature
+  // ships, so the panel only shows switches that actually do
+  // something. The settings keys stay on DealerSettings so any
+  // stored values survive untouched.
+  { key: "feature_payroll", label: "Payroll Tracking", description: "Track installer piece-work pay per invoice", status: "coming_soon" },
+  { key: "feature_ai_descriptions", label: "AI Descriptions", description: "Generate vehicle descriptions automatically", status: "coming_soon" },
 ];
 
 const VALID_TABS: AdminTab[] = ["home", "products", "rules", "settings", "branding", "analytics", "leads", "audit", "queue", "files", "getready", "inventory", "invoices", "warranty"];
@@ -972,17 +980,25 @@ const Admin = () => {
               </div>
             </div>
 
-            {/* Feature Toggle list */}
+            {/* Feature Toggle list — coming_soon entries hidden so the
+                panel only shows switches that actually do something. */}
             <div className="space-y-2">
-              {FEATURE_TOGGLES.map((ft) => (
+              {FEATURE_TOGGLES.filter(ft => ft.status !== "coming_soon").map((ft) => (
                 <div key={ft.key} className="bg-card rounded-lg p-4 shadow-sm flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-semibold text-foreground">{ft.label}</p>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-semibold text-foreground inline-flex items-center gap-1.5">
+                      {ft.label}
+                      {ft.status === "beta" && (
+                        <span className="text-[9px] font-bold uppercase tracking-[0.14em] px-1.5 py-0.5 rounded bg-amber-100 text-amber-800">
+                          Beta
+                        </span>
+                      )}
+                    </p>
                     <p className="text-xs text-muted-foreground">{ft.description}</p>
                   </div>
                   <button
                     onClick={() => handleToggleFeature(ft.key)}
-                    className={`relative w-12 h-7 rounded-full transition-colors ${(settings[ft.key] as boolean) ? "bg-teal" : "bg-muted"}`}
+                    className={`relative w-12 h-7 rounded-full transition-colors flex-shrink-0 ml-3 ${(settings[ft.key] as boolean) ? "bg-teal" : "bg-muted"}`}
                   >
                     <span className={`absolute top-1 w-5 h-5 rounded-full bg-card shadow transition-transform ${(settings[ft.key] as boolean) ? "translate-x-6" : "translate-x-1"}`} />
                   </button>
