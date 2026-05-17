@@ -109,17 +109,21 @@ const ActivatePaywall = ({ app, tenant, entitlement }: Props) => {
         <div className="text-center mb-10">
           <div className="inline-flex items-center gap-1.5 bg-[#1E90FF]/10 text-[#1E90FF] px-3 py-1 rounded-full text-xs font-semibold mb-4">
             <Sparkles className="w-3.5 h-3.5" />
-            {tenant.source === "autocurb" ? "Welcome from Autocurb" : `Your ${tenant.name} account is ready`}
+            {tenant.source === "autocurb"
+              ? "Welcome from Autocurb"
+              : `${tenant.name} · Autocurb Family invitation`}
           </div>
           <h1 className="text-3xl lg:text-4xl font-black tracking-tight font-display text-foreground">
             {canceled
               ? `Reactivate ${appName} for ${tenant.name}`
-              : `Activate ${appName} for ${tenant.name}`}
+              : tenant.source === "autocurb"
+                ? `Add ${appName} to your Autocurb stack`
+                : `Join the Autocurb Family with ${appName}`}
           </h1>
           <p className="text-sm text-muted-foreground mt-3 max-w-xl mx-auto">
             {tenant.source === "autocurb"
-              ? `Your dealership profile is already on file from Autocurb. Pick a plan and be running in under 60 seconds — no re-onboarding.`
-              : `Pick a plan. All plans start with a 14-day free trial. Cancel anytime.`}
+              ? `Your dealership profile is already on file from Autocurb. Pick a plan and be running in under 60 seconds — no re-onboarding. AutoFrame and AutoVideo are available from the app switcher whenever you're ready.`
+              : `${appName} is the first app — AutoFrame, AutoVideo, and Autocurb are available from the in-app switcher whenever you're ready. All plans start with a 14-day free trial. Cancel anytime.`}
           </p>
         </div>
 

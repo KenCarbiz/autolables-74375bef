@@ -326,7 +326,15 @@ const Onboarding = () => {
       }
     }
 
-    toast.success("Welcome aboard! Setup complete.");
+    // Wave 15.4 — family-invitation moment. The wizard used to
+    // end with a flat "Welcome aboard" and dump the dealer at a
+    // blank dashboard. Now we land them with a richer toast that
+    // names the Autocurb family they just joined, plus a hint
+    // about the AppSwitcher in the top bar. Same redirect.
+    toast.success("Welcome to the Autocurb Family — AutoLabels is live", {
+      description: "Find AutoFrame · AutoVideo · Autocurb in the app switcher (top bar).",
+      duration: 7000,
+    });
     navigate("/dashboard");
   };
 
@@ -399,7 +407,7 @@ const Onboarding = () => {
             <Section
               icon={Sparkles}
               title="AI Website Auto-Fill"
-              subtitle="Scrape the dealer's website to auto-populate branding, contact info, locations, and more."
+              subtitle="Scrape the dealer's website to auto-populate branding, contact info, and locations. AutoLabels is the first app you're activating in the Autocurb Family — AutoFrame and AutoVideo can be added any time from the top-bar app switcher."
               purple
             >
               <button className="text-xs font-medium text-purple-600 hover:underline mb-3 inline-flex items-center gap-1">
