@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { useAdminPlatform, type MemberRow } from "@/hooks/useAdminPlatform";
 import { toast } from "sonner";
 import { Users, Search, Trash2 } from "lucide-react";
-import { SortHeader, TablePagination, useSortAndPaginate, toCsv, downloadCsv } from "./tablePrimitives";
+import { SortHeader, TablePagination, useSortAndPaginate, toCsv, downloadCsv, useTableDensity, DensityToggle } from "./tablePrimitives";
 import { TableEmptyState } from "./TableEmptyState";
 
 const ROLES: MemberRow["role"][] = ["owner", "admin", "manager", "staff"];
@@ -65,6 +65,8 @@ export const PlatformMembers = () => {
     },
   });
 
+  const { density, setDensity, rowClass } = useTableDensity();
+
   const handleExport = () => {
     const csv = toCsv<MemberRow>(sortPag.sorted, [
       { header: "Tenant",        get: r => tenantsById.get(r.tenant_id) || "" },
@@ -113,6 +115,7 @@ export const PlatformMembers = () => {
               className="h-9 pl-7 pr-3 rounded-md border border-border bg-background text-sm w-64"
             />
           </div>
+          <DensityToggle density={density} setDensity={setDensity} />
         </div>
       </div>
 
@@ -144,15 +147,15 @@ export const PlatformMembers = () => {
             <tbody className="divide-y divide-border">
               {sortPag.paginated.map((m) => (
                 <tr key={m.id}>
-                  <td className="px-3 py-2.5">
+                  <td className={rowClass}>
                     <span className="font-semibold text-foreground">
                       {tenantsById.get(m.tenant_id) || m.tenant_id.slice(0, 8)}
                     </span>
                   </td>
-                  <td className="px-3 py-2.5 font-mono text-xs text-muted-foreground">
+                  <td className={`${rowClass} font-mono text-xs text-muted-foreground`}>
                     {m.invited_email || (m.user_id ? m.user_id.slice(0, 8) + "…" : "—")}
                   </td>
-                  <td className="px-3 py-2.5">
+                  <td className={rowClass}>
                     <select
                       value={m.role}
                       onChange={(e) => handleRoleChange(m, e.target.value as MemberRow["role"])}
@@ -163,13 +166,13 @@ export const PlatformMembers = () => {
                       ))}
                     </select>
                   </td>
-                  <td className="px-3 py-2.5 text-muted-foreground">
+                  <td className={`${rowClass} text-muted-foreground`}>
                     {m.accepted_at ? formatDate(m.accepted_at) : (
                       <span className="text-amber-600 text-[11px] font-semibold">Pending</span>
                     )}
                   </td>
-                  <td className="px-3 py-2.5 text-muted-foreground">{formatDate(m.invited_at)}</td>
-                  <td className="px-3 py-2.5 text-right">
+                  <td className={`${rowClass} text-muted-foreground`}>{formatDate(m.invited_at)}</td>
+                  <td className={`${rowClass} text-right`}>
                     <button
                       onClick={() => handleRemove(m)}
                       className="inline-flex items-center gap-1.5 text-[11px] font-semibold px-2.5 h-7 rounded-md text-destructive hover:bg-destructive/10"

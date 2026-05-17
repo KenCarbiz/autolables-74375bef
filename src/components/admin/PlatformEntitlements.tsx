@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { useAdminPlatform, type EntitlementRow } from "@/hooks/useAdminPlatform";
 import { toast } from "sonner";
 import { CreditCard, Search, Zap } from "lucide-react";
-import { SortHeader, TablePagination, useSortAndPaginate, toCsv, downloadCsv } from "./tablePrimitives";
+import { SortHeader, TablePagination, useSortAndPaginate, toCsv, downloadCsv, useTableDensity, DensityToggle } from "./tablePrimitives";
 import { TableEmptyState } from "./TableEmptyState";
 
 const APP_SLUGS = ["autolabels", "autocurb", "autoframe", "autovideo"] as const;
@@ -57,6 +57,8 @@ export const PlatformEntitlements = () => {
       return (row as unknown as Record<string, unknown>)[key];
     },
   });
+
+  const { density, setDensity, rowClass } = useTableDensity();
 
   const handleExport = () => {
     const csv = toCsv<EntitlementRow>(sortPag.sorted, [
@@ -114,6 +116,7 @@ export const PlatformEntitlements = () => {
               className="h-9 pl-7 pr-3 rounded-md border border-border bg-background text-sm w-64"
             />
           </div>
+          <DensityToggle density={density} setDensity={setDensity} />
         </div>
       </div>
 
@@ -169,6 +172,7 @@ export const PlatformEntitlements = () => {
                   row={e}
                   tenantName={tenantsById.get(e.tenant_id) || e.tenant_id.slice(0, 8)}
                   editing={editing === e.id}
+                  rowClass={rowClass}
                   onEdit={() => setEditing(e.id)}
                   onClose={() => setEditing(null)}
                   onSubmit={async (patch) => {
@@ -212,6 +216,7 @@ interface EntRowProps {
   row: EntitlementRow;
   tenantName: string;
   editing: boolean;
+  rowClass: string;
   onEdit: () => void;
   onClose: () => void;
   onSubmit: (patch: {
@@ -222,7 +227,7 @@ interface EntRowProps {
   }) => Promise<void>;
 }
 
-const EntRow = ({ row, tenantName, editing, onEdit, onClose, onSubmit }: EntRowProps) => {
+const EntRow = ({ row, tenantName, editing, rowClass, onEdit, onClose, onSubmit }: EntRowProps) => {
   const [planTier, setPlanTier] = useState(row.plan_tier);
   const [status, setStatus] = useState<EntitlementRow["status"]>(row.status);
   const [expiresAt, setExpiresAt] = useState<string>(
@@ -235,18 +240,18 @@ const EntRow = ({ row, tenantName, editing, onEdit, onClose, onSubmit }: EntRowP
   if (!editing) {
     return (
       <tr>
-        <td className="px-3 py-2.5 font-semibold text-foreground">{tenantName}</td>
-        <td className="px-3 py-2.5 uppercase text-xs tracking-wider">{row.app_slug}</td>
-        <td className="px-3 py-2.5 capitalize">{row.plan_tier}</td>
-        <td className="px-3 py-2.5">
+        <td className={`${rowClass} font-semibold text-foreground`}>{tenantName}</td>
+        <td className={`${rowClass} uppercase text-xs tracking-wider`}>{row.app_slug}</td>
+        <td className={`${rowClass} capitalize`}>{row.plan_tier}</td>
+        <td className={rowClass}>
           <span className={`text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded ${statusColor(row.status)}`}>
             {row.status}
           </span>
         </td>
-        <td className="px-3 py-2.5 text-muted-foreground">{formatDate(row.trial_ends_at)}</td>
-        <td className="px-3 py-2.5 text-muted-foreground">{formatDate(row.expires_at)}</td>
-        <td className="px-3 py-2.5 text-muted-foreground">{row.seat_limit ?? "∞"}</td>
-        <td className="px-3 py-2.5 text-right">
+        <td className={`${rowClass} text-muted-foreground`}>{formatDate(row.trial_ends_at)}</td>
+        <td className={`${rowClass} text-muted-foreground`}>{formatDate(row.expires_at)}</td>
+        <td className={`${rowClass} text-muted-foreground`}>{row.seat_limit ?? "∞"}</td>
+        <td className={`${rowClass} text-right`}>
           <button
             onClick={onEdit}
             className="text-[11px] font-semibold px-2.5 h-7 rounded-md text-primary hover:bg-primary/10"
@@ -260,20 +265,20 @@ const EntRow = ({ row, tenantName, editing, onEdit, onClose, onSubmit }: EntRowP
 
   return (
     <tr className="bg-muted/20">
-      <td className="px-3 py-2.5 font-semibold text-foreground">{tenantName}</td>
-      <td className="px-3 py-2.5 uppercase text-xs tracking-wider">{row.app_slug}</td>
-      <td className="px-3 py-2.5">
+      <td className={`${rowClass} font-semibold text-foreground`}>{tenantName}</td>
+      <td className={`${rowClass} uppercase text-xs tracking-wider`}>{row.app_slug}</td>
+      <td className={rowClass}>
         <select value={planTier} onChange={(e) => setPlanTier(e.target.value)} className="h-8 px-2 rounded-md border border-border bg-background text-xs">
           {PLAN_TIERS.map((p) => <option key={p} value={p}>{p}</option>)}
         </select>
       </td>
-      <td className="px-3 py-2.5">
+      <td className={rowClass}>
         <select value={status} onChange={(e) => setStatus(e.target.value as EntitlementRow["status"])} className="h-8 px-2 rounded-md border border-border bg-background text-xs">
           {STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}
         </select>
       </td>
-      <td className="px-3 py-2.5 text-muted-foreground">{formatDate(row.trial_ends_at)}</td>
-      <td className="px-3 py-2.5">
+      <td className={`${rowClass} text-muted-foreground`}>{formatDate(row.trial_ends_at)}</td>
+      <td className={rowClass}>
         <input
           type="date"
           value={expiresAt}
@@ -281,7 +286,7 @@ const EntRow = ({ row, tenantName, editing, onEdit, onClose, onSubmit }: EntRowP
           className="h-8 px-2 rounded-md border border-border bg-background text-xs"
         />
       </td>
-      <td className="px-3 py-2.5">
+      <td className={rowClass}>
         <input
           type="number"
           value={seatLimit}
@@ -290,7 +295,7 @@ const EntRow = ({ row, tenantName, editing, onEdit, onClose, onSubmit }: EntRowP
           className="h-8 w-16 px-2 rounded-md border border-border bg-background text-xs"
         />
       </td>
-      <td className="px-3 py-2.5 text-right whitespace-nowrap">
+      <td className={`${rowClass} text-right whitespace-nowrap`}>
         <button
           onClick={() =>
             onSubmit({

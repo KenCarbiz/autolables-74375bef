@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { useAdminPlatform, type TenantSummary } from "@/hooks/useAdminPlatform";
 import { toast } from "sonner";
 import { Building2, Search, Power, PowerOff, Calendar, Users, AppWindow, Plus, X } from "lucide-react";
-import { SortHeader, TablePagination, useSortAndPaginate, toCsv, downloadCsv } from "./tablePrimitives";
+import { SortHeader, TablePagination, useSortAndPaginate, toCsv, downloadCsv, useTableDensity, DensityToggle } from "./tablePrimitives";
 import { TableEmptyState } from "./TableEmptyState";
 
 const formatDate = (s: string | null) => {
@@ -56,6 +56,8 @@ export const PlatformTenants = () => {
       return (row as unknown as Record<string, unknown>)[key];
     },
   });
+
+  const { density, setDensity, rowClass } = useTableDensity();
 
   const handleExport = () => {
     const csv = toCsv<TenantSummary>(sortPag.sorted, [
@@ -114,6 +116,7 @@ export const PlatformTenants = () => {
             <option value="active">Active only</option>
             <option value="inactive">Suspended only</option>
           </select>
+          <DensityToggle density={density} setDensity={setDensity} />
         </div>
       </div>
 
@@ -163,19 +166,19 @@ export const PlatformTenants = () => {
             <tbody className="divide-y divide-border">
               {sortPag.paginated.map((t) => (
                 <tr key={t.id} className={t.is_active ? "" : "opacity-60"}>
-                  <td className="px-3 py-2.5">
+                  <td className={rowClass}>
                     <div className="font-semibold text-foreground">{t.name}</div>
                     <div className="text-[11px] text-muted-foreground font-mono">
                       {t.slug}
                       {t.domain ? ` · ${t.domain}` : ""}
                     </div>
                   </td>
-                  <td className="px-3 py-2.5">
+                  <td className={rowClass}>
                     <span className={`text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded ${sourceBadge(t.source)}`}>
                       {t.source}
                     </span>
                   </td>
-                  <td className="px-3 py-2.5">
+                  <td className={rowClass}>
                     <div className="flex items-center gap-1.5">
                       <AppWindow className="w-3.5 h-3.5 text-muted-foreground" />
                       <span className="font-semibold">{t.active_apps}</span>
@@ -186,22 +189,22 @@ export const PlatformTenants = () => {
                       )}
                     </div>
                   </td>
-                  <td className="px-3 py-2.5">
+                  <td className={rowClass}>
                     <div className="flex items-center gap-1.5">
                       <Users className="w-3.5 h-3.5 text-muted-foreground" />
                       <span className="font-semibold">{t.member_count}</span>
                     </div>
                   </td>
-                  <td className="px-3 py-2.5">
+                  <td className={rowClass}>
                     <div className="flex items-center gap-1.5 text-muted-foreground">
                       <Calendar className="w-3.5 h-3.5" />
                       {formatDate(t.created_at)}
                     </div>
                   </td>
-                  <td className="px-3 py-2.5 text-muted-foreground">
+                  <td className={`${rowClass} text-muted-foreground`}>
                     {formatDate(t.last_activity)}
                   </td>
-                  <td className="px-3 py-2.5 text-right">
+                  <td className={`${rowClass} text-right`}>
                     <button
                       onClick={() => toggle(t)}
                       className={`inline-flex items-center gap-1.5 text-[11px] font-semibold px-2.5 h-7 rounded-md ${
