@@ -1,11 +1,14 @@
 import { useMemo, useState } from "react";
 import { useTenant } from "@/contexts/TenantContext";
 import { useDealerSettings } from "@/contexts/DealerSettingsContext";
+import { useAuth } from "@/contexts/AuthContext";
 import { getStateCompliance, FEDERAL_DISCLOSURES, FTC_BUYERS_GUIDE_SYSTEMS } from "@/data/stateCompliance";
 import { supabase } from "@/integrations/supabase/client";
 import Logo from "@/components/brand/Logo";
 import { toast } from "sonner";
-import { ShieldCheck, FileText, Scale, Building2, AlertTriangle, CheckCircle2, BookOpen, Gavel, Users, Globe, Search, Download, FileSignature, Wrench, Car, ScrollText } from "lucide-react";
+import { ShieldCheck, FileText, Scale, Building2, AlertTriangle, CheckCircle2, BookOpen, Gavel, Users, Globe, Search, Download, FileSignature, Wrench, Car, ScrollText, FileArchive } from "lucide-react";
+import { buildAuditPacket } from "@/lib/auditPacket";
+import { downloadPacketHtml } from "@/lib/auditPacketRenderer";
 
 // ──────────────────────────────────────────────────────────────
 // Compliance packet — the regulator-defense surface. Given a VIN,
@@ -149,6 +152,36 @@ const CompliancePacketPanel = ({
 }) => {
   const [vin, setVin] = useState("");
   const { packet, loading, lookup, download } = useCompliancePacket();
+  const { user } = useAuth();
+  const [buildingAudit, setBuildingAudit] = useState(false);
+  const [chainRoot, setChainRoot] = useState<string | null>(null);
+
+  // Wave 14.1 — Audit-Defense Packet. Pulls the full artifact
+  // set + live NHTSA recall snapshot, hashes every section, and
+  // downloads a self-contained HTML document ready for production
+  // to counsel / AG / FTC. Distinct from the raw JSON export
+  // above (which stays useful for engineering / forensics).
+  const buildAndDownloadAuditPacket = async () => {
+    if (!packet) return;
+    setBuildingAudit(true);
+    setChainRoot(null);
+    try {
+      const built = await buildAuditPacket({
+        supabase: supabase as any,
+        vin: packet.query.vin,
+        tenantId,
+        tenantName,
+        generatedBy: user?.email || null,
+      });
+      setChainRoot(built.manifest.chain_root);
+      downloadPacketHtml(built);
+      toast.success("Audit-defense packet downloaded");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Audit packet build failed");
+    } finally {
+      setBuildingAudit(false);
+    }
+  };
 
   const counts = packet?.summary;
 
@@ -238,14 +271,38 @@ const CompliancePacketPanel = ({
                   Pulled {new Date(packet.query.at).toLocaleString()} · Tenant: {packet.tenant.name || "—"}
                 </p>
               </div>
-              <button
-                onClick={download}
-                className="h-10 px-4 rounded-lg bg-gradient-to-r from-[#3BB4FF] to-[#1E90FF] text-white font-display font-black text-sm inline-flex items-center gap-1.5 shadow-premium hover:brightness-110"
-              >
-                <Download className="w-4 h-4 stroke-[2.5]" />
-                Download JSON
-              </button>
+              <div className="flex items-center gap-2 flex-wrap">
+                <button
+                  onClick={buildAndDownloadAuditPacket}
+                  disabled={buildingAudit}
+                  className="h-10 px-4 rounded-lg bg-gradient-to-r from-[#3BB4FF] to-[#1E90FF] text-white font-display font-black text-sm inline-flex items-center gap-1.5 shadow-premium hover:brightness-110 disabled:opacity-60"
+                  title="Self-contained, hash-chained HTML packet for counsel / AG / FTC"
+                >
+                  <FileArchive className="w-4 h-4 stroke-[2.5]" />
+                  {buildingAudit ? "Building…" : "Audit-Defense Packet (HTML)"}
+                </button>
+                <button
+                  onClick={download}
+                  className="h-10 px-4 rounded-lg border border-border bg-card text-foreground text-sm font-semibold inline-flex items-center gap-1.5 hover:bg-muted"
+                  title="Raw JSON bundle — engineering / forensics use"
+                >
+                  <Download className="w-4 h-4" />
+                  Download JSON
+                </button>
+              </div>
             </div>
+            {chainRoot && (
+              <div className="rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-[11px] text-emerald-900">
+                <p className="font-semibold uppercase tracking-[0.14em] text-[9px] text-emerald-800">
+                  SHA-256 chain root · last audit packet
+                </p>
+                <code className="block mt-0.5 font-mono break-all text-[11px]">{chainRoot}</code>
+                <p className="mt-1 text-[10px] text-emerald-800/80">
+                  Quote this hash verbatim in any production. Any change to any
+                  included artifact changes this root.
+                </p>
+              </div>
+            )}
             <details className="group">
               <summary className="text-xs font-semibold text-muted-foreground cursor-pointer hover:text-foreground">
                 Preview raw packet contents ({Math.round(JSON.stringify(packet).length / 1024)} KB)
