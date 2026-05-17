@@ -2105,6 +2105,26 @@ export type Database = {
         Args: { _active: boolean; _tenant_id: string }
         Returns: boolean
       }
+      autocurb_cancel_subscription: {
+        Args: { p_stripe_subscription_id: string }
+        Returns: number
+      }
+      autocurb_upsert_dealer: {
+        Args: {
+          p_autocurb_tenant_id: string
+          p_autocurb_tier: string
+          p_autolabels_tier?: string
+          p_bundle_autolabels: boolean
+          p_dealer_name: string
+          p_expires_at?: string
+          p_state: string
+          p_stripe_customer_id?: string
+          p_stripe_subscription_id?: string
+          p_user_email: string
+          p_user_id: string
+        }
+        Returns: string
+      }
       bootstrap_tenant: {
         Args: {
           _app_slug?: string
@@ -2324,6 +2344,20 @@ export type Database = {
         Returns: boolean
       }
       increment_listing_view: { Args: { _slug: string }; Returns: undefined }
+      listings_with_stale_recalls: {
+        Args: { p_limit?: number }
+        Returns: {
+          id: string
+          published_at: string
+          recall_checked_at: string
+          slug: string
+          status: string
+          store_id: string
+          tenant_id: string
+          vin: string
+          ymm: string
+        }[]
+      }
       merge_scraped_vdp: {
         Args: {
           _description: string
@@ -2362,6 +2396,10 @@ export type Database = {
       record_signing_reengagement: {
         Args: { _addendum_id: string; _channel?: string; _details?: Json }
         Returns: undefined
+      }
+      request_signing_link_resend: {
+        Args: { _contact: string; _origin?: string; _vin: string }
+        Returns: Json
       }
       schedule_reengage_abandoned_signings: {
         Args: {
