@@ -94,6 +94,12 @@ const Index = () => {
   // QR / Lead capture modal
   const [qrOpen, setQrOpen] = useState(false);
   const [signingUrl, setSigningUrl] = useState("");
+  // Wave 15.3 — compliance receipt rendered in the QR modal. The
+  // gates already fire silently inside handleSendToCustomer (red-
+  // team check, state doc-fee, E-SIGN consent prep). We surface
+  // them as concrete bullet points so the dealer SEES the moat
+  // they're paying for, not just a "link created" toast.
+  const [complianceReceipt, setComplianceReceipt] = useState<{ label: string; cite?: string }[]>([]);
 
   // Paper size
   const paperWidth = settings.addendum_paper_size === "custom"
@@ -380,8 +386,39 @@ const Index = () => {
 
     const url = `${window.location.origin}/sign/${token}`;
     setSigningUrl(url);
+
+    // Build the compliance receipt — surface every gate that
+    // just verified before the customer ever sees the link.
+    const state = settings.doc_fee_state || "";
+    const receipt: { label: string; cite?: string }[] = [
+      { label: "E-SIGN consent v1 attached", cite: "15 U.S.C. §7001" },
+      { label: "Payload hashed (SHA-256) for tamper evidence" },
+    ];
+    if (vehicle.vin && vehicle.vin.length === 17) {
+      receipt.push({ label: "VIN recorded · NHTSA recall check ready" });
+    }
+    if (settings.feature_buyers_guide) {
+      receipt.push({ label: "FTC Buyers Guide template active", cite: "16 CFR 455" });
+    }
+    if (settings.doc_fee_enabled && settings.doc_fee_amount > 0 && state) {
+      receipt.push({
+        label: `${state} doc fee · $${settings.doc_fee_amount} disclosed`,
+        cite: state === "CA" ? "§11713.1 cap $85" : undefined,
+      });
+    }
+    if (settings.feature_cobuyer_signature) {
+      receipt.push({ label: "Co-buyer signature pad enabled" });
+    }
+    if (rtSummary.warn > 0) {
+      receipt.push({ label: `${rtSummary.warn} compliance note${rtSummary.warn === 1 ? "" : "s"} (non-blocking)` });
+    }
+    if (state === "CA") {
+      receipt.push({ label: "SB 766 3-day return window ready", cite: "Oct 1 2026" });
+    }
+    setComplianceReceipt(receipt);
+
     setQrOpen(true);
-    toast.success("Signing link created!");
+    toast.success("Signing link created · compliance verified");
     log({ store_id: currentStore?.id || "", user_id: user.id, action: "addendum_sent", entity_type: "addendum", entity_id: vehicle.vin, details: { ymm: vehicle.ymm, token } });
   };
 
@@ -610,7 +647,12 @@ const Index = () => {
       {settings.feature_lead_capture ? (
         <LeadCaptureModal open={qrOpen} signingUrl={signingUrl} vehicleInfo={vehicle.ymm} onClose={() => setQrOpen(false)} />
       ) : (
-        <QRCodeModal open={qrOpen} signingUrl={signingUrl} onClose={() => setQrOpen(false)} />
+        <QRCodeModal
+          open={qrOpen}
+          signingUrl={signingUrl}
+          onClose={() => setQrOpen(false)}
+          complianceReceipt={complianceReceipt}
+        />
       )}
 
       {/* Rules notification */}

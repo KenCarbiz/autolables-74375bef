@@ -342,6 +342,19 @@ const Inventory = () => {
                           onClick={(e) => { e.stopPropagation(); navigate(`/vehicle-file/${r.id}?tab=labels`); }}
                         />
                       )}
+                      {/* Wave 15.3 — one-click jump to the
+                          Audit-Defense Packet builder pre-
+                          filled with this VIN. Surfaces the
+                          compliance moat from the row, not
+                          buried inside /compliance. */}
+                      <RowAction
+                        label="Defend"
+                        title="Generate the SB 766 / FTC audit-defense packet for this VIN"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          navigate(`/compliance?vin=${encodeURIComponent(r.vin || "")}`);
+                        }}
+                      />
                       <button
                         onClick={(e) => { e.stopPropagation(); navigate(`/vehicle-file/${r.id}`); }}
                         className="text-[11px] font-semibold px-2.5 h-7 rounded-md text-primary hover:bg-primary/10 ml-1"

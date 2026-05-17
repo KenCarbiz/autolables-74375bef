@@ -1,4 +1,5 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { useTenant } from "@/contexts/TenantContext";
 import { useDealerSettings } from "@/contexts/DealerSettingsContext";
 import { useAuth } from "@/contexts/AuthContext";
@@ -150,11 +151,26 @@ const CompliancePacketPanel = ({
   tenantId: string | null;
   tenantName: string | null;
 }) => {
-  const [vin, setVin] = useState("");
+  const [searchParams] = useSearchParams();
+  const [vin, setVin] = useState(() =>
+    (searchParams.get("vin") || "").toUpperCase().replace(/[^A-HJ-NPR-Z0-9]/gi, "").slice(0, 17),
+  );
   const { packet, loading, lookup, download } = useCompliancePacket();
   const { user } = useAuth();
   const [buildingAudit, setBuildingAudit] = useState(false);
   const [chainRoot, setChainRoot] = useState<string | null>(null);
+
+  // Wave 15.3 — when /compliance?vin=<vin> is hit (e.g. from
+  // the Inventory "Defend this VIN" row action), auto-trigger
+  // the packet lookup so the dealer lands on the receipt
+  // instead of a search box. Fires once per matching URL.
+  useEffect(() => {
+    const qVin = (searchParams.get("vin") || "").toUpperCase().replace(/[^A-HJ-NPR-Z0-9]/gi, "");
+    if (qVin && qVin.length >= 11 && !packet && !loading) {
+      lookup(qVin, tenantId, tenantName);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams]);
 
   // Wave 14.1 — Audit-Defense Packet. Pulls the full artifact
   // set + live NHTSA recall snapshot, hashes every section, and
