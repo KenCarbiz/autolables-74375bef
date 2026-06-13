@@ -1189,6 +1189,7 @@ export type Database = {
       products: {
         Row: {
           badge_type: string
+          benefit_justification: string
           created_at: string
           disclosure: string | null
           id: string
@@ -1203,6 +1204,7 @@ export type Database = {
         }
         Insert: {
           badge_type?: string
+          benefit_justification?: string
           created_at?: string
           disclosure?: string | null
           id?: string
@@ -1217,6 +1219,7 @@ export type Database = {
         }
         Update: {
           badge_type?: string
+          benefit_justification?: string
           created_at?: string
           disclosure?: string | null
           id?: string
