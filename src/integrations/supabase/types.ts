@@ -303,6 +303,54 @@ export type Database = {
           },
         ]
       }
+      advertised_prices: {
+        Row: {
+          advertised_price: number
+          captured_at: string
+          captured_by: string | null
+          created_at: string
+          id: string
+          notes: string | null
+          screenshot_url: string | null
+          source_channel: string
+          source_url: string | null
+          store_id: string | null
+          tenant_id: string
+          updated_at: string
+          vin: string
+        }
+        Insert: {
+          advertised_price: number
+          captured_at?: string
+          captured_by?: string | null
+          created_at?: string
+          id?: string
+          notes?: string | null
+          screenshot_url?: string | null
+          source_channel?: string
+          source_url?: string | null
+          store_id?: string | null
+          tenant_id: string
+          updated_at?: string
+          vin: string
+        }
+        Update: {
+          advertised_price?: number
+          captured_at?: string
+          captured_by?: string | null
+          created_at?: string
+          id?: string
+          notes?: string | null
+          screenshot_url?: string | null
+          source_channel?: string
+          source_url?: string | null
+          store_id?: string | null
+          tenant_id?: string
+          updated_at?: string
+          vin?: string
+        }
+        Relationships: []
+      }
       app_entitlements: {
         Row: {
           activated_at: string
