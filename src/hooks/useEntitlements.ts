@@ -75,6 +75,67 @@ export interface EntitlementsState {
   error: string | null;
 }
 
+// Last-verified tenant/entitlement cache. The gate decision (render the
+// app vs. bounce to NoTenantScreen) must survive a transient hiccup —
+// a slow network, a stale JWT that makes RLS return an empty row, an
+// edge-function timeout. We cache the last GOOD result per user and fall
+// back to it on transient failure so a signed-in dealer is never booted
+// over a blip. This only affects the gate's render decision; every actual
+// data query still goes through RLS, so a tampered cache grants no data.
+const CACHE_PREFIX = "al_ent_";
+type CachedEntitlements = Pick<EntitlementsState, "tenant" | "member" | "profile" | "entitlements">;
+
+const readCache = (uid: string): CachedEntitlements | null => {
+  try {
+    const raw = localStorage.getItem(CACHE_PREFIX + uid);
+    return raw ? (JSON.parse(raw) as CachedEntitlements) : null;
+  } catch {
+    return null;
+  }
+};
+const writeCache = (uid: string, v: CachedEntitlements): void => {
+  try {
+    localStorage.setItem(CACHE_PREFIX + uid, JSON.stringify(v));
+  } catch {
+    /* quota / unavailable — cache is best-effort */
+  }
+};
+const clearCache = (uid: string): void => {
+  try {
+    localStorage.removeItem(CACHE_PREFIX + uid);
+  } catch {
+    /* ignore */
+  }
+};
+const clearAllCache = (): void => {
+  try {
+    for (let i = localStorage.length - 1; i >= 0; i--) {
+      const k = localStorage.key(i);
+      if (k && k.startsWith(CACHE_PREFIX)) localStorage.removeItem(k);
+    }
+  } catch {
+    /* ignore */
+  }
+};
+
+// Force a token refresh, bounded so a hung auth server can't freeze the
+// gate. Returns whether we now hold a valid session. A stale/expired JWT
+// is the #1 cause of the "logs in, waits, gets bounced" report: RLS
+// silently returns no tenant for a dealer who plainly has one.
+const refreshSessionSafe = async (): Promise<boolean> => {
+  try {
+    const refreshed = await Promise.race([
+      supabase.auth.refreshSession(),
+      new Promise<{ data: { session: null } }>((resolve) =>
+        setTimeout(() => resolve({ data: { session: null } }), 4000),
+      ),
+    ]);
+    return !!(refreshed as { data?: { session?: unknown } }).data?.session;
+  } catch {
+    return false;
+  }
+};
+
 export const useEntitlements = () => {
   const { user, loading: authLoading } = useAuth();
   const [state, setState] = useState<EntitlementsState>({
@@ -90,6 +151,7 @@ export const useEntitlements = () => {
 
   const load = useCallback(async () => {
     if (!userId) {
+      clearAllCache();
       setState({
         tenant: null, member: null, profile: null, entitlements: [],
         loading: false, error: null,
@@ -103,8 +165,9 @@ export const useEntitlements = () => {
     // leaves the gate stuck on `loading=true`. Tables that don't exist
     // yet (un-applied migration, fresh project) become `error` not a
     // hung spinner.
-    try {
-      const { data: membership, error: memberErr } = await (supabase as any)
+    const cached = readCache(userId);
+    const fetchMembership = () =>
+      (supabase as any)
         .from("tenant_members")
         .select("*")
         .eq("user_id", userId)
@@ -112,7 +175,34 @@ export const useEntitlements = () => {
         .limit(1)
         .maybeSingle();
 
+    try {
+      let { data: membership, error: memberErr } = await fetchMembership();
+
+      // Stale-JWT recovery. Refresh + retry ONCE when the result looks
+      // wrong: a hard error, or an empty row for a user we have a verified
+      // tenant cached for (a dealer doesn't lose their tenant between page
+      // loads — an empty result means the session went stale, not that
+      // access was revoked). Genuine new users / platform admins (no error,
+      // no cache) skip the refresh so they don't churn tokens needlessly.
+      if (memberErr || (!membership && cached)) {
+        const refreshed = await refreshSessionSafe();
+        if (refreshed) {
+          ({ data: membership, error: memberErr } = await fetchMembership());
+        } else if (cached) {
+          // Couldn't reach the auth server — keep the last verified tenant
+          // so a network blip never boots a signed-in dealer.
+          setState({ ...cached, loading: false, error: null });
+          return;
+        }
+      }
+
       if (memberErr) {
+        // Hard error even after a refresh attempt — prefer last-good over
+        // a kick-out; only surface the error when we have nothing cached.
+        if (cached) {
+          setState({ ...cached, loading: false, error: null });
+          return;
+        }
         setState({
           tenant: null, member: null, profile: null, entitlements: [],
           loading: false, error: memberErr.message,
@@ -121,6 +211,9 @@ export const useEntitlements = () => {
       }
 
       if (!membership) {
+        // Empty AFTER a fresh token = genuinely no tenant. Drop any stale
+        // cache so a removed dealer doesn't keep cached access.
+        clearCache(userId);
         setState({
           tenant: null, member: null, profile: null, entitlements: [],
           loading: false, error: null,
@@ -134,15 +227,27 @@ export const useEntitlements = () => {
         (supabase as any).from("app_entitlements").select("*").eq("tenant_id", membership.tenant_id),
       ]);
 
-      setState({
+      const next: CachedEntitlements = {
         tenant: (tenantRes.data as TenantRow) || null,
         member: membership as TenantMemberRow,
         profile: (profileRes.data as OnboardingProfileRow) || null,
         entitlements: (entRes.data as EntitlementRow[]) || [],
+      };
+
+      setState({
+        ...next,
         loading: false,
         error: tenantRes.error?.message || entRes.error?.message || null,
       });
+      // Only cache a fully resolved tenant — never a partial/errored read.
+      if (next.tenant) writeCache(userId, next);
     } catch (err) {
+      // Last resort: a thrown query (network down) should fall back to the
+      // last verified result rather than bounce the dealer to onboarding.
+      if (cached) {
+        setState({ ...cached, loading: false, error: null });
+        return;
+      }
       setState({
         tenant: null, member: null, profile: null, entitlements: [],
         loading: false,

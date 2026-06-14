@@ -51,9 +51,11 @@ const EntitlementGate = ({ app, children }: Props) => {
 
   // Cold pull from Autocurb when the user has no local tenant.
   // Admins skip this entirely — they are platform operators, not
-  // dealership members. The pull is bounded by a hard 2s timeout so
-  // a missing edge function never blocks the gate, and reload() is
-  // bounded by a second 3s timeout so a hung Supabase query can't
+  // dealership members. The pull is bounded by a 5s timeout so a
+  // missing edge function never blocks the gate, but a merely-slow
+  // Autocurb response still lands (the old 2s cap turned a slow-but-
+  // successful pull into a spurious bounce to NoTenantScreen). reload()
+  // is bounded by a second 5s timeout so a hung Supabase query can't
   // freeze the gate forever.
   useEffect(() => {
     if (authLoading || loading || !user || isAdmin) return;
@@ -71,14 +73,14 @@ const EntitlementGate = ({ app, children }: Props) => {
       try {
         const result = await withTimeout(
           supabase.functions.invoke("autocurb-pull", { body: { app_slug: app } }),
-          2000,
+          5000,
           { data: null, error: new Error("autocurb-pull timeout") } as unknown as Awaited<
             ReturnType<typeof supabase.functions.invoke>
           >,
         );
         if (cancelled) return;
         if (!(result as { error?: unknown }).error) {
-          await withTimeout(reload(), 3000, undefined);
+          await withTimeout(reload(), 5000, undefined);
         }
       } catch {
         // best-effort — fall through to NoTenantScreen
@@ -91,14 +93,16 @@ const EntitlementGate = ({ app, children }: Props) => {
     };
   }, [authLoading, loading, user, tenant, app, reload, isAdmin]);
 
-  // Standalone watchdog: if pulling stays true for more than 6s for
+  // Standalone watchdog: if pulling stays true for more than 12s for
   // any reason (hung supabase client, network stall, previous effect
   // didn't fire setPulling(false) before deps changed), unconditionally
-  // clear it. Depends ONLY on `pulling` so it survives re-renders
-  // driven by identity changes in reload/tenant etc.
+  // clear it. Must exceed the pull (5s) + reload (5s) budget so it only
+  // fires as a true stall guard, never cutting a slow-but-live pull short.
+  // Depends ONLY on `pulling` so it survives re-renders driven by
+  // identity changes in reload/tenant etc.
   useEffect(() => {
     if (!pulling) return;
-    const cap = setTimeout(() => setPulling(false), 6000);
+    const cap = setTimeout(() => setPulling(false), 12000);
     return () => clearTimeout(cap);
   }, [pulling]);
 
