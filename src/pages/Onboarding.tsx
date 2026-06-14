@@ -803,7 +803,7 @@ const Section = ({
           <Icon className="w-4 h-4" />
         </div>
       )}
-      <h3 className="text-base font-semibold text-foreground">{title}</h3>
+      <h2 className="text-base font-semibold text-foreground">{title}</h2>
       {subtitle && <p className="text-xs text-muted-foreground mt-1">{subtitle}</p>}
     </div>
     {children}
