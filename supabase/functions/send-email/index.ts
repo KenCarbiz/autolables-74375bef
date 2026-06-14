@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -14,6 +15,31 @@ serve(async (req) => {
   }
 
   try {
+    // ── Auth gate ────────────────────────────────────────────────
+    // Accept either (a) the service-role key (server-to-server
+    // callers like reengage-abandoned-signings), or (b) a valid
+    // user JWT. Never accept anonymous callers — this function
+    // can send arbitrary HTML mail under our domain.
+    const supabaseUrl = Deno.env.get("SUPABASE_URL") || "";
+    const serviceKey  = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
+    const jwt = (req.headers.get("Authorization") || "").replace(/^Bearer\s+/i, "");
+    if (!jwt) {
+      return new Response(JSON.stringify({ error: "missing bearer token" }), {
+        status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+    if (jwt !== serviceKey) {
+      const admin = createClient(supabaseUrl, serviceKey, {
+        auth: { persistSession: false, autoRefreshToken: false },
+      });
+      const { data: userRes, error: userErr } = await admin.auth.getUser(jwt);
+      if (userErr || !userRes?.user) {
+        return new Response(JSON.stringify({ error: "invalid token" }), {
+          status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+    }
+
     const { to, subject, html, from, replyTo, attachments } = await req.json();
 
     if (!to || !subject) {
