@@ -1,0 +1,1 @@
+ALTER TABLE public.products ADD COLUMN IF NOT EXISTS price_in_advertised boolean NOT NULL DEFAULT true;
