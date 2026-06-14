@@ -1,69 +1,22 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 380 100" width="380" height="100" role="img" aria-label="AutoLabels.io">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 340 80" width="340" height="80" role="img" aria-label="AutoLabels.io">
   <defs>
-    <linearGradient id="tagBody" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#5AC8FF"/>
-      <stop offset="55%" stop-color="#1E90FF"/>
-      <stop offset="100%" stop-color="#005FCC"/>
+    <linearGradient id="alLockup" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#2563EB"/>
+      <stop offset="100%" stop-color="#0B2041"/>
     </linearGradient>
-    <linearGradient id="tagShine" x1="0%" y1="0%" x2="0%" y2="100%">
-      <stop offset="0%" stop-color="#FFFFFF" stop-opacity="0.40"/>
-      <stop offset="55%" stop-color="#FFFFFF" stop-opacity="0"/>
-    </linearGradient>
-    <filter id="softShadow" x="-20%" y="-20%" width="140%" height="140%">
-      <feGaussianBlur in="SourceAlpha" stdDeviation="1.6"/>
-      <feOffset dx="0" dy="2" result="offsetblur"/>
-      <feComponentTransfer><feFuncA type="linear" slope="0.28"/></feComponentTransfer>
-      <feMerge><feMergeNode/><feMergeNode in="SourceGraphic"/></feMerge>
-    </filter>
   </defs>
-  <g filter="url(#softShadow)">
-    <!-- Price-tag body: rounded rect with pointed bottom-right corner -->
-    <path d="
-      M 20 18
-      L 62 18
-      Q 72 18 78 24
-      L 86 32
-      Q 92 38 92 48
-      L 92 78
-      Q 92 90 80 90
-      L 20 90
-      Q 8 90 8 78
-      L 8 30
-      Q 8 18 20 18 Z"
-      fill="url(#tagBody)"/>
-    <!-- Subtle shine on top -->
-    <path d="
-      M 20 18
-      L 62 18
-      Q 72 18 78 24
-      L 86 32
-      Q 92 38 92 48
-      L 92 52
-      Q 62 36 8 46
-      L 8 30
-      Q 8 18 20 18 Z"
-      fill="url(#tagShine)"/>
-    <!-- Tag ring hole -->
-    <circle cx="78" cy="32" r="5.8" fill="white"/>
-    <circle cx="78" cy="32" r="2.6" fill="#0B2041"/>
-    <!-- Dollar sign -->
-    <text x="40" y="76"
-      font-family="Inter, system-ui, sans-serif"
-      font-size="54" font-weight="900" fill="white"
-      text-anchor="middle" letter-spacing="-0.04em">$</text>
-    <!-- Compliance checkmark overlay, bottom-right -->
-    <g transform="translate(74 74)">
-      <circle r="13" fill="url(#tagBody)" stroke="white" stroke-width="2.4"/>
-      <path d="M -5.5 0 L -1.5 4 L 5.5 -4.5"
-        stroke="white" stroke-width="3" fill="none"
-        stroke-linecap="round" stroke-linejoin="round"/>
-    </g>
+  <!-- Mark -->
+  <g transform="translate(0 8)">
+    <rect width="64" height="64" rx="14" fill="url(#alLockup)"/>
+    <path d="M 18 48 L 32 16 L 46 48" stroke="white" stroke-width="4.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+    <line x1="24" y1="38" x2="40" y2="38" stroke="white" stroke-width="4.5" stroke-linecap="round"/>
+    <circle cx="32" cy="16" r="3.5" fill="white"/>
   </g>
-  <!-- Wordmark -->
-  <g font-family="Inter, system-ui, sans-serif" letter-spacing="-0.025em">
-    <text x="114" y="58" font-size="40" font-weight="800" font-style="italic" fill="#334155">Auto</text>
-    <text x="200" y="58" font-size="40" font-weight="800" font-style="italic" fill="#1E90FF">Labels.io</text>
-    <!-- Tagline -->
-    <text x="114" y="82" font-size="10.5" font-weight="700" fill="#64748B" letter-spacing="0.26em">CLEAR.  COMPLIANT.  CONSISTENT.</text>
-  </g>
+
+  <!-- Two-tone wordmark: Auto (Label Navy) + Labels (Autocurb blue) -->
+  <text x="84" y="46" font-family="Inter, system-ui, sans-serif" font-size="32" font-weight="800" letter-spacing="-0.02em">
+    <tspan fill="#0B2041">Auto</tspan><tspan fill="#2563EB">Labels</tspan><tspan fill="#2563EB" fill-opacity="0.85">.io</tspan>
+  </text>
+  <!-- Tagline -->
+  <text x="86" y="68" font-family="Inter, system-ui, sans-serif" font-size="10.5" font-weight="700" fill="#64748B" letter-spacing="0.24em">CLEAR.  COMPLIANT.  CONSISTENT.</text>
 </svg>

@@ -1,9 +1,12 @@
-<svg width="240" height="64" viewBox="0 0 240 64" xmlns="http://www.w3.org/2000/svg">
-  <!-- Inverted version — white mark, white wordmark for dark backgrounds -->
+<svg width="320" height="64" viewBox="0 0 320 64" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="AutoLabels.io">
+  <!-- Inverted lockup for dark backgrounds: white tile + navy monogram,
+       white "Auto" + bright-cyan "Labels". -->
   <rect width="64" height="64" rx="14" fill="white"/>
-  <path d="M 18 48 L 32 16 L 46 48" stroke="#0F1E3C" stroke-width="4.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
-  <line x1="24" y1="38" x2="40" y2="38" stroke="#0F1E3C" stroke-width="4.5" stroke-linecap="round"/>
-  <circle cx="32" cy="16" r="3.5" fill="#0F1E3C"/>
-  <text x="80" y="42" font-family="Inter, system-ui, sans-serif" font-size="26" font-weight="800" fill="white" letter-spacing="-0.02em">autocurb</text>
-  <text x="201" y="42" font-family="Inter, system-ui, sans-serif" font-size="26" font-weight="500" fill="#60A5FA" letter-spacing="-0.01em">.io</text>
+  <path d="M 18 48 L 32 16 L 46 48" stroke="#0B2041" stroke-width="4.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+  <line x1="24" y1="38" x2="40" y2="38" stroke="#0B2041" stroke-width="4.5" stroke-linecap="round"/>
+  <circle cx="32" cy="16" r="3.5" fill="#0B2041"/>
+
+  <text x="82" y="42" font-family="Inter, system-ui, sans-serif" font-size="30" font-weight="800" letter-spacing="-0.02em">
+    <tspan fill="#FFFFFF">Auto</tspan><tspan fill="#3BB4FF">Labels</tspan><tspan fill="#3BB4FF" fill-opacity="0.85">.io</tspan>
+  </text>
 </svg>
