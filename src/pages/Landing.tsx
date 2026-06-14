@@ -51,7 +51,7 @@ const Landing = () => {
     <div className="bg-white text-slate-900 antialiased selection:bg-blue-100 selection:text-slate-900">
       <Seo
         title="AutoLabels — Window Stickers, Addendums & Compliance"
-        description="The dealer label platform that catches pricing and disclosure gaps before regulators do. Window stickers, addendums, Buyers Guides, and 50-state compliance."
+        description="One website pricing mistake can trigger an FTC investigation, a complaint, or a lawsuit. auto(LABELS) catches pricing and disclosure gaps before regulators do."
         path="/"
       />
       <Nav user={user} onNav={navigate} />
