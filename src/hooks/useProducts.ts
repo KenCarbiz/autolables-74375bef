@@ -10,6 +10,7 @@ export interface Product {
   price: number;
   price_label: string | null;
   disclosure: string | null;
+  benefit_justification: string | null;
   sort_order: number;
   is_active: boolean;
 }
