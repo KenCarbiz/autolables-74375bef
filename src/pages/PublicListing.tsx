@@ -33,6 +33,8 @@ import Logo from "@/components/brand/Logo";
 import { QRCodeSVG } from "qrcode.react";
 import { useVehicleListing, type VehicleListing } from "@/hooks/useVehicleListing";
 import { supabase } from "@/integrations/supabase/client";
+import { PublicLocaleProvider, usePublicLocale, fmt } from "@/lib/i18n/public";
+import PublicLanguageToggle from "@/components/layout/PublicLanguageToggle";
 
 // ──────────────────────────────────────────────────────────────
 // PublicListing — the shopper-facing window sticker. Mounted at
@@ -42,9 +44,33 @@ import { supabase } from "@/integrations/supabase/client";
 // and signed-in-unnecessary.
 // ──────────────────────────────────────────────────────────────
 
-const PublicListing = () => {
+// The provider is mounted at the top with initial={null} so it is in
+// place for the loading / error states (which also render localized
+// chrome). Once the listing loads, its default_locale is applied as a
+// soft preference: it only overrides when the shopper hasn't already
+// chosen a language this session (localStorage takes precedence inside
+// the provider's seed). See LocaleSeed below.
+const PublicListing = () => (
+  <PublicLocaleProvider initial={null}>
+    <PublicListingBody />
+  </PublicLocaleProvider>
+);
+
+const PublicListingBody = () => {
+  const { L, setLang } = usePublicLocale();
   const { slug } = useParams<{ slug: string }>();
   const { publicUrl } = useVehicleListing("");
+  // Captured during first render, before the provider's persistence
+  // effect writes public_lang — true only when the shopper had an
+  // explicit language choice stored from a previous visit. If they
+  // did, it wins over the dealer's default_locale.
+  const [hadStoredChoice] = useState(() => {
+    try {
+      return localStorage.getItem("public_lang") != null;
+    } catch {
+      return false;
+    }
+  });
   const [listing, setListing] = useState<VehicleListing | null>(null);
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
@@ -81,18 +107,24 @@ const PublicListing = () => {
       }
       setListing(row);
       setLoading(false);
+      // Apply the dealer's default_locale only for first-time visitors
+      // with no previously stored choice — an explicit selection always
+      // wins (see hadStoredChoice).
+      if (!hadStoredChoice && (row.default_locale === "es" || row.default_locale === "en")) {
+        setLang(row.default_locale);
+      }
     })();
     return () => {
       mounted = false;
     };
-  }, [slug]);
+  }, [slug, setLang, hadStoredChoice]);
 
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-slate-50">
         <div className="flex flex-col items-center gap-3">
           <div className="w-8 h-8 border-2 border-[#1E90FF] border-t-transparent rounded-full animate-spin" />
-          <p className="text-xs text-muted-foreground">Loading vehicle details…</p>
+          <p className="text-xs text-muted-foreground">{L.loading_vehicle}</p>
         </div>
       </div>
     );
@@ -103,11 +135,8 @@ const PublicListing = () => {
       <div className="min-h-screen flex items-center justify-center bg-slate-50 px-6">
         <div className="text-center max-w-md">
           <Clock className="w-12 h-12 text-amber-500 mx-auto mb-4" />
-          <h1 className="text-xl font-bold text-foreground">Slow Down a Moment</h1>
-          <p className="text-sm text-muted-foreground mt-2">
-            We've seen a lot of traffic from your network in the last few minutes.
-            Please wait a few minutes and refresh.
-          </p>
+          <h1 className="text-xl font-bold text-foreground">{L.slow_down}</h1>
+          <p className="text-sm text-muted-foreground mt-2">{L.rate_limited_body}</p>
         </div>
       </div>
     );
@@ -118,10 +147,8 @@ const PublicListing = () => {
       <div className="min-h-screen flex items-center justify-center bg-slate-50 px-6">
         <div className="text-center max-w-md">
           <Package className="w-12 h-12 text-muted-foreground/40 mx-auto mb-4" />
-          <h1 className="text-xl font-bold text-foreground">Vehicle Not Available</h1>
-          <p className="text-sm text-muted-foreground mt-2">
-            This listing may have been sold, unpublished, or the link is incorrect.
-          </p>
+          <h1 className="text-xl font-bold text-foreground">{L.vehicle_unavailable}</h1>
+          <p className="text-sm text-muted-foreground mt-2">{L.vehicle_unavailable_body}</p>
           <p className="text-[11px] text-muted-foreground mt-3 font-mono">{slug}</p>
         </div>
       </div>
@@ -208,22 +235,23 @@ const PublicListing = () => {
             <p className="text-[11px] font-semibold text-slate-700 truncate">{dealer.name || ""}</p>
           </div>
           <div className="flex items-center gap-1">
+            <PublicLanguageToggle className="mr-1" />
             {/* Handoff — shopper on desktop opens this on phone, or
                 sales rep hands the iPad to the customer at delivery
                 and the buyer scans it to sign on their own device. */}
             <button
               onClick={() => setHandoffOpen(true)}
               className="w-9 h-9 rounded-full hover:bg-slate-100 flex items-center justify-center text-slate-600"
-              aria-label="Open on another device"
-              title="Open on phone / delivery signing"
+              aria-label={L.open_on_another_device}
+              title={L.open_on_another_device}
             >
               <Smartphone className="w-4 h-4" />
             </button>
             <button
               onClick={handleShare}
               className="w-9 h-9 rounded-full hover:bg-slate-100 flex items-center justify-center text-slate-600"
-              aria-label={copied ? "Link copied" : "Share vehicle"}
-              title={copied ? "Link copied" : "Share"}
+              aria-label={copied ? L.link_copied : L.share_vehicle}
+              title={copied ? L.link_copied : L.share}
             >
               <Share2 className="w-4 h-4" />
             </button>
@@ -271,7 +299,7 @@ const PublicListing = () => {
             filled one in (or the VDP scraper did). */}
         {listing.description && (
           <section className="rounded-2xl border border-border bg-card shadow-premium p-5">
-            <h2 className="text-sm font-semibold text-foreground mb-2">About this vehicle</h2>
+            <h2 className="text-sm font-semibold text-foreground mb-2">{L.about_this_vehicle}</h2>
             <p className="text-[12px] text-slate-700 leading-relaxed whitespace-pre-wrap">
               {listing.description}
             </p>
@@ -297,7 +325,7 @@ const PublicListing = () => {
           <section className="rounded-2xl border border-border bg-card shadow-premium p-5">
             <div className="flex items-center gap-2 mb-3">
               <Play className="w-4 h-4 text-[#1E90FF]" />
-              <h2 className="text-sm font-semibold text-foreground">Video Walkaround</h2>
+              <h2 className="text-sm font-semibold text-foreground">{L.video_walkaround}</h2>
             </div>
             <div className="grid gap-3">
               {listing.videos.map((v) => (
@@ -309,7 +337,7 @@ const PublicListing = () => {
                   className="rounded-lg bg-muted aspect-video flex items-center justify-center hover:bg-muted/80 transition-colors"
                 >
                   <span className="inline-flex items-center gap-2 text-sm font-semibold text-[#1E90FF]">
-                    <Play className="w-4 h-4" /> Watch {v.caption || "video"}
+                    <Play className="w-4 h-4" /> {fmt(L.watch_caption, v.caption || L.video_fallback)}
                   </span>
                 </a>
               ))}
@@ -321,18 +349,16 @@ const PublicListing = () => {
         <section className="rounded-2xl border border-border bg-card shadow-premium p-5">
           <div className="flex items-center gap-2 mb-3">
             <Package className="w-4 h-4 text-[#1E90FF]" />
-            <h2 className="text-sm font-semibold text-foreground">What's On This Vehicle</h2>
+            <h2 className="text-sm font-semibold text-foreground">{L.whats_on_vehicle}</h2>
           </div>
           <p className="text-[11px] text-muted-foreground leading-relaxed mb-4">
-            Below are the dealer-installed products and accessories on this vehicle.
-            Items marked <strong>Pre-Installed</strong> are already on the vehicle and included in the price.
-            Items marked <strong>Optional</strong> can be accepted or declined at no impact to your purchase.
+            {L.whats_on_intro}
           </p>
 
           {installed.length > 0 && (
             <div className="mb-4">
               <p className="text-[10px] font-bold uppercase tracking-label text-[#1E90FF] mb-2">
-                Pre-Installed (Included in Price)
+                {L.preinstalled_included}
               </p>
               <div className="space-y-2">
                 {installed.map((p) => (
@@ -345,7 +371,7 @@ const PublicListing = () => {
           {optional.length > 0 && (
             <div>
               <p className="text-[10px] font-bold uppercase tracking-label text-amber-600 mb-2">
-                Optional (You Choose)
+                {L.optional_you_choose}
               </p>
               <div className="space-y-2">
                 {optional.map((p) => (
@@ -356,7 +382,7 @@ const PublicListing = () => {
           )}
 
           {installed.length === 0 && optional.length === 0 && (
-            <p className="text-xs text-muted-foreground">No additional products on this vehicle.</p>
+            <p className="text-xs text-muted-foreground">{L.no_additional_products}</p>
           )}
         </section>
 
@@ -365,7 +391,7 @@ const PublicListing = () => {
           <section className="rounded-2xl border border-border bg-card shadow-premium p-5">
             <div className="flex items-center gap-2 mb-3">
               <Sparkles className="w-4 h-4 text-amber-500" />
-              <h2 className="text-sm font-semibold text-foreground">Included With Your Purchase</h2>
+              <h2 className="text-sm font-semibold text-foreground">{L.included_with_purchase}</h2>
             </div>
             <div className="space-y-2">
               {listing.value_props.map((vp, i) => (
@@ -390,7 +416,7 @@ const PublicListing = () => {
             features (safety package, tech package, etc.). */}
         {listing.features?.length > 0 && (
           <section className="rounded-2xl border border-border bg-card shadow-premium p-5">
-            <h2 className="text-sm font-semibold text-foreground mb-3">Notable features</h2>
+            <h2 className="text-sm font-semibold text-foreground mb-3">{L.notable_features}</h2>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
               {listing.features.map((f, i) => (
                 <div key={i} className="flex items-start gap-2 p-3 rounded-lg border border-border">
@@ -421,7 +447,7 @@ const PublicListing = () => {
         <footer className="text-center py-6 pb-32 md:pb-6">
           <Logo variant="full" size={22} />
           <p className="text-[10px] text-muted-foreground mt-2">
-            Powered by AutoLabels.io · <Clock className="inline w-2.5 h-2.5 -mt-0.5" /> Published{" "}
+            {L.powered_by} · <Clock className="inline w-2.5 h-2.5 -mt-0.5" /> {L.published}{" "}
             {listing.published_at ? new Date(listing.published_at).toLocaleDateString() : "recently"}
           </p>
         </footer>
@@ -435,18 +461,18 @@ const PublicListing = () => {
             <a
               href={`tel:${dealer.phone}`}
               className="h-12 w-12 md:w-auto md:px-4 rounded-full md:rounded-xl bg-white border border-slate-200 text-slate-800 inline-flex items-center justify-center gap-1.5 hover:bg-slate-50 transition-all flex-shrink-0"
-              title="Call dealership"
-              aria-label="Call dealership"
+              title={L.call_dealership}
+              aria-label={L.call_dealership}
             >
               <Phone className="w-4 h-4 stroke-[2.5]" />
-              <span className="hidden md:inline font-display font-semibold tracking-tight">Call</span>
+              <span className="hidden md:inline font-display font-semibold tracking-tight">{L.call}</span>
             </a>
           )}
           <button
             onClick={() => setInquiryOpen(true)}
             className="flex-1 md:flex-initial h-12 px-6 rounded-xl bg-slate-950 text-white inline-flex items-center justify-center gap-2 hover:bg-slate-900 transition-all whitespace-nowrap"
           >
-            <span className="font-display font-bold tracking-tight text-[15px]">Reserve this vehicle</span>
+            <span className="font-display font-bold tracking-tight text-[15px]">{L.reserve_vehicle}</span>
           </button>
         </div>
       </div>
@@ -484,16 +510,17 @@ interface InquiryModalProps {
 }
 
 const InquiryModal = ({ listing, dealer, onClose, onSent, sent }: InquiryModalProps) => {
+  const { L } = usePublicLocale();
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
-  const [message, setMessage] = useState("I'm interested in this vehicle. Please contact me.");
+  const [message, setMessage] = useState(L.default_inquiry_message);
   const [intent, setIntent] = useState<"info" | "test_drive" | "offer">("info");
   const [submitting, setSubmitting] = useState(false);
 
   const submit = async () => {
     if (!name.trim() || (!email.trim() && !phone.trim())) {
-      toast.error("Name plus email or phone is required.");
+      toast.error(L.inquiry_validation_error);
       return;
     }
     setSubmitting(true);
@@ -560,7 +587,7 @@ const InquiryModal = ({ listing, dealer, onClose, onSent, sent }: InquiryModalPr
 
       onSent();
     } catch {
-      toast.error("Couldn't send your request. Try calling the dealer directly.");
+      toast.error(L.inquiry_send_error);
     } finally {
       setSubmitting(false);
     }
@@ -583,10 +610,10 @@ const InquiryModal = ({ listing, dealer, onClose, onSent, sent }: InquiryModalPr
         <div className="px-5 py-4 border-b border-slate-200 flex items-center justify-between">
           <div>
             <h3 className="text-lg font-black font-display tracking-tight">
-              {sent ? "Reserved" : "Reserve this vehicle"}
+              {sent ? L.reserved : L.reserve_vehicle}
             </h3>
             <p className="text-[11px] text-slate-500 mt-0.5">
-              {sent ? `${dealer.name || "The dealer"} will be in touch shortly.` : listing.ymm || listing.vin}
+              {sent ? fmt(L.reserved_subtitle, dealer.name || L.dealership) : listing.ymm || listing.vin}
             </p>
           </div>
           <button
@@ -602,16 +629,14 @@ const InquiryModal = ({ listing, dealer, onClose, onSent, sent }: InquiryModalPr
             <div className="rounded-xl bg-slate-950 text-white p-5 flex items-start gap-3">
               <CheckCircle2 className="w-5 h-5 mt-0.5 flex-shrink-0 text-emerald-400" />
               <div>
-                <p className="font-bold text-base">Your vehicle is held.</p>
-                <p className="text-xs mt-1 text-white/80">
-                  The dealer has your request time-stamped and hashed into the audit trail. Expect contact shortly during business hours.
-                </p>
+                <p className="font-bold text-base">{L.vehicle_held_title}</p>
+                <p className="text-xs mt-1 text-white/80">{L.vehicle_held_body}</p>
               </div>
             </div>
 
             {(dealer.phone || dealer.address) && (
               <div className="rounded-xl border border-slate-200 p-4 text-xs space-y-1">
-                <p className="font-bold text-slate-900">{dealer.name || "Dealership"}</p>
+                <p className="font-bold text-slate-900">{dealer.name || L.dealership}</p>
                 {dealer.phone && (
                   <a href={`tel:${dealer.phone}`} className="text-slate-600 hover:text-[#1E90FF] block">
                     <Phone className="inline w-3 h-3 mr-1" />
@@ -632,19 +657,19 @@ const InquiryModal = ({ listing, dealer, onClose, onSent, sent }: InquiryModalPr
               onClick={onClose}
               className="w-full h-11 rounded-xl bg-slate-900 text-white font-display font-black text-sm hover:brightness-110"
             >
-              Close
+              {L.close}
             </button>
           </div>
         ) : (
           <div className="p-5 space-y-4">
             <p className="text-[12px] text-slate-600 leading-relaxed">
-              Tell us what you'd like to do next. The dealer will reach out with next steps — no contract, no cost.
+              {L.reserve_intro}
             </p>
             <div className="grid grid-cols-3 gap-2">
               {[
-                { id: "info", label: "Hold for me", icon: ShieldCheck },
-                { id: "test_drive", label: "Test drive", icon: Calendar },
-                { id: "offer", label: "Make an offer", icon: DollarSign },
+                { id: "info", label: L.hold_for_me, icon: ShieldCheck },
+                { id: "test_drive", label: L.test_drive, icon: Calendar },
+                { id: "offer", label: L.make_offer, icon: DollarSign },
               ].map((i) => (
                 <button
                   key={i.id}
@@ -661,13 +686,13 @@ const InquiryModal = ({ listing, dealer, onClose, onSent, sent }: InquiryModalPr
               ))}
             </div>
 
-            <Field label="Your name" value={name} onChange={setName} placeholder="Full name" />
+            <Field label={L.your_name} value={name} onChange={setName} placeholder={L.full_name} />
             <div className="grid grid-cols-2 gap-2">
-              <Field label="Email" value={email} onChange={setEmail} placeholder="you@example.com" type="email" />
-              <Field label="Phone" value={phone} onChange={setPhone} placeholder="(555) 123-4567" type="tel" />
+              <Field label={L.email} value={email} onChange={setEmail} placeholder="you@example.com" type="email" />
+              <Field label={L.phone} value={phone} onChange={setPhone} placeholder="(555) 123-4567" type="tel" />
             </div>
             <div>
-              <label className="text-[10px] font-bold uppercase tracking-label text-slate-500">Message</label>
+              <label className="text-[10px] font-bold uppercase tracking-label text-slate-500">{L.message}</label>
               <textarea
                 value={message}
                 onChange={(e) => setMessage(e.target.value)}
@@ -677,9 +702,7 @@ const InquiryModal = ({ listing, dealer, onClose, onSent, sent }: InquiryModalPr
             </div>
 
             <p className="text-[10px] text-slate-500 leading-relaxed">
-              By sending this you agree we can share your contact with this
-              dealership so they can follow up. Your request is time-stamped
-              and logged to the dealer's audit trail.
+              {L.inquiry_disclaimer}
             </p>
 
             <button
@@ -687,7 +710,7 @@ const InquiryModal = ({ listing, dealer, onClose, onSent, sent }: InquiryModalPr
               disabled={submitting || !name.trim() || (!email.trim() && !phone.trim())}
               className="w-full h-12 rounded-xl bg-slate-950 text-white font-display font-bold text-sm inline-flex items-center justify-center gap-2 disabled:opacity-50 hover:bg-slate-900 transition-colors"
             >
-              {submitting ? "Reserving…" : (<><Send className="w-4 h-4 stroke-[2.5]" /> Reserve now</>)}
+              {submitting ? L.reserving : (<><Send className="w-4 h-4 stroke-[2.5]" /> {L.reserve_now}</>)}
             </button>
           </div>
         )}
@@ -735,7 +758,9 @@ const ProductCard = ({
     benefit_justification?: string | null;
   };
   tone: "installed" | "optional";
-}) => (
+}) => {
+  const { L } = usePublicLocale();
+  return (
   <div
     className={`rounded-lg border p-3 ${
       tone === "installed" ? "border-[#1E90FF]/20 bg-[#1E90FF]/5" : "border-amber-200 bg-amber-50/40"
@@ -764,7 +789,7 @@ const ProductCard = ({
     {p.benefit_justification && p.benefit_justification.trim() && (
       <p className="text-[11px] text-foreground mt-2 leading-relaxed font-medium">
         <span className="text-[9px] uppercase tracking-[0.14em] font-bold text-foreground/60 mr-1">
-          Why this benefits you:
+          {L.why_benefits_you}
         </span>
         {p.benefit_justification}
       </p>
@@ -778,11 +803,12 @@ const ProductCard = ({
         receipt before they scan the QR at delivery. */}
     {tone === "optional" && (
       <p className="text-[9px] text-amber-900 mt-2 leading-snug font-semibold uppercase tracking-[0.08em]">
-        Optional · not a condition of credit approval
+        {L.optional_not_condition}
       </p>
     )}
   </div>
-);
+  );
+};
 
 const TrustItem = ({ text }: { text: string }) => (
   <div className="flex items-start gap-2">
@@ -809,6 +835,7 @@ const HandoffModal = ({
   ymm: string;
   onClose: () => void;
 }) => {
+  const { L } = usePublicLocale();
   const [copied, setCopied] = useState(false);
 
   const copy = async () => {
@@ -836,13 +863,13 @@ const HandoffModal = ({
 
         <div className="px-5 py-4 border-b border-slate-200 flex items-center justify-between">
           <div className="min-w-0">
-            <h3 className="text-base font-black font-display tracking-tight">Open on another device</h3>
+            <h3 className="text-base font-black font-display tracking-tight">{L.open_on_another_device_title}</h3>
             <p className="text-[11px] text-slate-500 mt-0.5 truncate">{ymm}</p>
           </div>
           <button
             onClick={onClose}
             className="w-9 h-9 rounded-full hover:bg-slate-100 flex items-center justify-center"
-            aria-label="Close"
+            aria-label={L.close}
           >
             <X className="w-4 h-4" />
           </button>
@@ -854,10 +881,8 @@ const HandoffModal = ({
           </div>
 
           <div className="space-y-1">
-            <p className="text-sm font-semibold text-slate-900">Scan to continue on your phone</p>
-            <p className="text-[11px] text-slate-600 leading-relaxed">
-              Point your phone camera at the code. At delivery, this is also how the buyer signs on their own device — every signature stays bound to the buyer's hardware.
-            </p>
+            <p className="text-sm font-semibold text-slate-900">{L.scan_to_continue}</p>
+            <p className="text-[11px] text-slate-600 leading-relaxed">{L.scan_to_continue_body}</p>
           </div>
 
           <div className="space-y-1.5">
@@ -869,7 +894,7 @@ const HandoffModal = ({
               className="w-full h-10 rounded-xl border border-slate-200 text-slate-800 text-sm font-semibold hover:bg-slate-50 inline-flex items-center justify-center gap-2"
             >
               <QrCode className="w-3.5 h-3.5" />
-              {copied ? "Link copied" : "Copy link"}
+              {copied ? L.link_copied : L.copy_link}
             </button>
           </div>
         </div>
@@ -895,6 +920,7 @@ interface DealerMini {
 }
 
 const HeroSection = ({ listing, dealer }: { listing: VehicleListing; dealer: DealerMini }) => {
+  const { L } = usePublicLocale();
   const heroPhoto = listing.photos?.find((p) => p.kind === "hero") || listing.photos?.[0];
 
   return (
@@ -910,13 +936,13 @@ const HeroSection = ({ listing, dealer }: { listing: VehicleListing; dealer: Dea
         <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/20 to-black/10" />
         <div className="absolute inset-x-0 bottom-0 p-6 md:p-8 text-white">
           <h1 className="text-3xl md:text-5xl font-black font-display tracking-[-0.03em] leading-[0.95]">
-            {listing.ymm || `Vehicle Details — VIN ${listing.vin.slice(-8)}`}
+            {listing.ymm || fmt(L.vehicle_details_fallback, listing.vin.slice(-8))}
           </h1>
           {listing.trim && (
             <p className="text-base md:text-lg text-white/85 font-display mt-1 tracking-tight">{listing.trim}</p>
           )}
           <div className="mt-3 flex items-center gap-4 text-[11px] text-white/70 font-mono uppercase tracking-wider flex-wrap">
-            {listing.mileage != null && <span>{listing.mileage.toLocaleString()} mi</span>}
+            {listing.mileage != null && <span>{listing.mileage.toLocaleString()} {L.mi_short}</span>}
             <span>VIN · {listing.vin.slice(-8)}</span>
             {dealer.city && dealer.state && (
               <span>{dealer.city}, {dealer.state}</span>
@@ -935,6 +961,7 @@ const AvailabilityBand = ({
   listing: VehicleListing;
   dealer: DealerMini;
 }) => {
+  const { L } = usePublicLocale();
   // Pickup is always "ready" once the listing is published — the
   // prep-gate guaranteed it. Delivery is a soft forward-looking
   // claim, rendered only when the dealer has an address on file.
@@ -943,18 +970,18 @@ const AvailabilityBand = ({
     <section className="rounded-2xl bg-slate-950 text-white p-5 md:p-6">
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div>
-          <p className="text-[10px] uppercase tracking-[0.18em] text-white/50 font-semibold">Pickup</p>
-          <p className="text-lg font-bold font-display mt-1">Ready now</p>
+          <p className="text-[10px] uppercase tracking-[0.18em] text-white/50 font-semibold">{L.pickup}</p>
+          <p className="text-lg font-bold font-display mt-1">{L.ready_now}</p>
           <p className="text-[12px] text-white/70 mt-0.5">
-            {pickupCity ? `Available today at ${dealer.name || "the dealership"} in ${pickupCity}.` : "Available today at the dealership."}
+            {pickupCity
+              ? fmt(L.pickup_available_at, `${dealer.name || L.dealership} · ${pickupCity}`)
+              : L.pickup_available_generic}
           </p>
         </div>
         <div className="sm:border-l sm:border-white/15 sm:pl-4">
-          <p className="text-[10px] uppercase tracking-[0.18em] text-white/50 font-semibold">Delivery</p>
-          <p className="text-lg font-bold font-display mt-1">On request</p>
-          <p className="text-[12px] text-white/70 mt-0.5">
-            Ask about home delivery within the dealer's service area.
-          </p>
+          <p className="text-[10px] uppercase tracking-[0.18em] text-white/50 font-semibold">{L.delivery}</p>
+          <p className="text-lg font-bold font-display mt-1">{L.on_request}</p>
+          <p className="text-[12px] text-white/70 mt-0.5">{L.delivery_ask}</p>
         </div>
       </div>
     </section>
@@ -962,6 +989,7 @@ const AvailabilityBand = ({
 };
 
 const TrustBand = ({ listing }: { listing: VehicleListing }) => {
+  const { L } = usePublicLocale();
   const prepSigned = listing.prep_status?.foreman_signed_at;
   const prepDate = prepSigned ? new Date(prepSigned).toLocaleDateString() : null;
 
@@ -979,27 +1007,25 @@ const TrustBand = ({ listing }: { listing: VehicleListing }) => {
         <Chip
           tone="emerald"
           icon={ShieldCheck}
-          label="Prep-signed"
-          value={prepDate || "Pending"}
-          title={prepSigned ? `Shop foreman signed on ${prepDate}` : "Foreman sign-off required before publish"}
+          label={L.prep_signed}
+          value={prepDate || L.prep_pending}
+          title={prepSigned ? fmt(L.prep_signed_title, prepDate ?? "") : L.prep_required_title}
         />
         {/* Recall status */}
         <Chip
           tone={recallHasOpen ? "amber" : "emerald"}
           icon={recallHasOpen ? AlertTriangle : CheckCircle2}
-          label={recallHasOpen ? `${recallCampaigns} recall${recallCampaigns === 1 ? "" : "s"} open` : "Recalls clear"}
-          value={recallDate ? `as of ${recallDate}` : "Checked"}
-          title={recallHasOpen
-            ? "One or more open NHTSA campaigns. Ask the dealer about remedy status."
-            : `NHTSA campaign check found no open do-not-drive recalls.`}
+          label={recallHasOpen ? fmt(L.recalls_open, recallCampaigns) : L.recalls_clear}
+          value={recallDate ? fmt(L.recalls_as_of, recallDate) : L.prep_checked}
+          title={recallHasOpen ? L.recalls_open_title : L.recalls_clear_title}
         />
         {/* Archive receipt */}
         <Chip
           tone="emerald"
           icon={FileText}
-          label="Archived"
-          value={publishedDate || "Pending"}
-          title="Every signed document for this VIN is retained in a tamper-evident archive for 7 years."
+          label={L.archived}
+          value={publishedDate || L.prep_pending}
+          title={L.archived_title}
         />
       </div>
     </section>
@@ -1035,6 +1061,7 @@ const Chip = ({
 };
 
 const RecallBanner = ({ listing }: { listing: VehicleListing }) => {
+  const { L } = usePublicLocale();
   const recall = listing.recall_check;
   if (!recall || !recall.has_open || !recall.campaigns || recall.campaigns.length === 0) return null;
   return (
@@ -1042,10 +1069,8 @@ const RecallBanner = ({ listing }: { listing: VehicleListing }) => {
       <div className="flex items-start gap-3">
         <AlertTriangle className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
         <div className="min-w-0">
-          <p className="text-sm font-bold text-amber-900">Open NHTSA recall{recall.campaigns.length === 1 ? "" : "s"} on this VIN</p>
-          <p className="text-[11px] text-amber-800 mt-1">
-            The campaigns below are on file with NHTSA. Ask the dealer whether remedies have been applied before purchase.
-          </p>
+          <p className="text-sm font-bold text-amber-900">{L.recall_banner_title}</p>
+          <p className="text-[11px] text-amber-800 mt-1">{L.recall_banner_body}</p>
           <ul className="mt-2 space-y-1.5">
             {recall.campaigns.slice(0, 3).map((c, i) => (
               <li key={i} className="text-[11px] text-amber-900">
@@ -1055,7 +1080,7 @@ const RecallBanner = ({ listing }: { listing: VehicleListing }) => {
               </li>
             ))}
             {recall.campaigns.length > 3 && (
-              <li className="text-[10px] text-amber-700 italic">+ {recall.campaigns.length - 3} more</li>
+              <li className="text-[10px] text-amber-700 italic">{fmt(L.recall_more, recall.campaigns.length - 3)}</li>
             )}
           </ul>
         </div>
@@ -1065,31 +1090,32 @@ const RecallBanner = ({ listing }: { listing: VehicleListing }) => {
 };
 
 const PriceBlock = ({ listing }: { listing: VehicleListing }) => {
+  const { L } = usePublicLocale();
   const [open, setOpen] = useState(false);
   const totals = listing.sticker_snapshot?.totals || {};
   const driveOut = typeof totals.final_price === "number" ? totals.final_price : listing.price;
   if (driveOut == null) return null;
 
   const lines: { label: string; value: number; note?: string }[] = [];
-  if (typeof totals.base_price === "number") lines.push({ label: "Base price", value: totals.base_price });
+  if (typeof totals.base_price === "number") lines.push({ label: L.base_price, value: totals.base_price });
   if (typeof totals.accessories_total === "number" && totals.accessories_total > 0) {
-    lines.push({ label: "Dealer-installed add-ons", value: totals.accessories_total, note: "Included in the total above" });
+    lines.push({ label: L.dealer_installed_addons, value: totals.accessories_total, note: L.addon_included_note });
   }
   if (typeof totals.doc_fee === "number" && totals.doc_fee > 0) {
-    lines.push({ label: "Doc fee", value: totals.doc_fee });
+    lines.push({ label: L.doc_fee, value: totals.doc_fee });
   }
 
   return (
     <section className="rounded-2xl border border-slate-200 bg-white overflow-hidden">
       <div className="p-6 md:p-7">
         <p className="text-[10px] uppercase tracking-[0.2em] text-slate-500 font-semibold">
-          Drive-out price
+          {L.drive_out_price}
         </p>
         <p className="text-5xl md:text-6xl font-black tracking-[-0.03em] font-display tabular-nums text-slate-950 mt-1 leading-none">
           ${driveOut.toLocaleString()}
         </p>
         <p className="text-[12px] text-slate-600 mt-3 leading-relaxed max-w-md">
-          Every mandatory fee is in this number. Tax, tag, and registration are state-set and added at titling.
+          {L.drive_out_disclaimer}
         </p>
       </div>
 
@@ -1099,7 +1125,7 @@ const PriceBlock = ({ listing }: { listing: VehicleListing }) => {
             onClick={() => setOpen((o) => !o)}
             className="w-full flex items-center justify-between px-6 py-3 border-t border-slate-200 text-[12px] font-semibold text-slate-700 hover:bg-slate-50 transition-colors"
           >
-            <span>What's in this price</span>
+            <span>{L.whats_in_price}</span>
             {open ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
           </button>
           {open && (
@@ -1122,21 +1148,22 @@ const PriceBlock = ({ listing }: { listing: VehicleListing }) => {
 };
 
 const KeySpecs = ({ listing }: { listing: VehicleListing }) => {
+  const { L } = usePublicLocale();
   const s = listing.key_specs;
   if (!s) return null;
   const items: { icon: typeof CarIcon; label: string; value?: string | number | null }[] = [
-    { icon: CarIcon, label: "Body", value: s.body_style },
-    { icon: Cog, label: "Drivetrain", value: s.drivetrain },
-    { icon: Gauge, label: "Transmission", value: s.transmission },
-    { icon: Fuel, label: "Fuel", value: s.fuel },
-    { icon: Gauge, label: "MPG", value: s.mpg_combined ? `${s.mpg_combined} comb.` : s.mpg_city && s.mpg_hwy ? `${s.mpg_city}/${s.mpg_hwy}` : null },
-    { icon: Palette, label: "Exterior", value: s.exterior_color },
+    { icon: CarIcon, label: L.body, value: s.body_style },
+    { icon: Cog, label: L.drivetrain, value: s.drivetrain },
+    { icon: Gauge, label: L.transmission, value: s.transmission },
+    { icon: Fuel, label: L.fuel, value: s.fuel },
+    { icon: Gauge, label: L.mpg, value: s.mpg_combined ? `${s.mpg_combined} comb.` : s.mpg_city && s.mpg_hwy ? `${s.mpg_city}/${s.mpg_hwy}` : null },
+    { icon: Palette, label: L.exterior, value: s.exterior_color },
   ];
   const populated = items.filter((i) => i.value != null && i.value !== "");
   if (populated.length === 0) return null;
   return (
     <section className="rounded-2xl border border-border bg-card shadow-premium p-5">
-      <h2 className="text-sm font-semibold text-foreground mb-3">Key specs</h2>
+      <h2 className="text-sm font-semibold text-foreground mb-3">{L.key_specs}</h2>
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
         {populated.map((it, i) => {
           const Icon = it.icon;
@@ -1156,11 +1183,12 @@ const KeySpecs = ({ listing }: { listing: VehicleListing }) => {
 };
 
 const PhotosGallery = ({ listing }: { listing: VehicleListing }) => {
+  const { L } = usePublicLocale();
   const photos = listing.photos || [];
   if (photos.length <= 1) return null; // hero already shown
   return (
     <section className="rounded-2xl border border-border bg-card shadow-premium p-5">
-      <h2 className="text-sm font-semibold text-foreground mb-3">Photos</h2>
+      <h2 className="text-sm font-semibold text-foreground mb-3">{L.photos}</h2>
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
         {photos.slice(0, 9).map((p, i) => (
           <a
@@ -1172,7 +1200,7 @@ const PhotosGallery = ({ listing }: { listing: VehicleListing }) => {
           >
             <img
               src={p.url}
-              alt={p.alt || `Vehicle photo ${i + 1}`}
+              alt={p.alt || fmt(L.photo_alt, i + 1)}
               loading="lazy"
               className="w-full h-full object-cover"
             />
@@ -1180,36 +1208,39 @@ const PhotosGallery = ({ listing }: { listing: VehicleListing }) => {
         ))}
       </div>
       {photos.length > 9 && (
-        <p className="text-[10px] text-muted-foreground mt-2">+ {photos.length - 9} more photos available from the dealership</p>
+        <p className="text-[10px] text-muted-foreground mt-2">{fmt(L.more_photos, photos.length - 9)}</p>
       )}
     </section>
   );
 };
 
-const CertificationCard = ({ cert }: { cert: NonNullable<VehicleListing["certification"]> }) => (
+const CertificationCard = ({ cert }: { cert: NonNullable<VehicleListing["certification"]> }) => {
+  const { L } = usePublicLocale();
+  return (
   <section className="rounded-2xl border border-border bg-card shadow-premium p-5">
     <div className="flex items-center gap-2 mb-2">
       <Award className="w-4 h-4 text-amber-500" />
-      <h2 className="text-sm font-semibold text-foreground">{cert.program_name || "Certified Pre-Owned"}</h2>
+      <h2 className="text-sm font-semibold text-foreground">{cert.program_name || L.certified_preowned}</h2>
     </div>
     <div className="grid grid-cols-3 gap-3 text-center">
       {cert.coverage_months != null && (
-        <Stat label="Warranty" value={`${cert.coverage_months} mo`} />
+        <Stat label={L.warranty} value={`${cert.coverage_months} mo`} />
       )}
       {cert.coverage_miles != null && (
-        <Stat label="Coverage" value={`${cert.coverage_miles.toLocaleString()} mi`} />
+        <Stat label={L.coverage} value={`${cert.coverage_miles.toLocaleString()} ${L.mi_short}`} />
       )}
       {cert.inspection_points != null && (
-        <Stat label="Inspection" value={`${cert.inspection_points} pts`} />
+        <Stat label={L.inspection} value={`${cert.inspection_points} pts`} />
       )}
     </div>
     {cert.url && (
       <a href={cert.url} target="_blank" rel="noopener noreferrer" className="block mt-3 text-[11px] text-[#1E90FF] font-semibold hover:underline">
-        View full program details →
+        {L.view_full_program}
       </a>
     )}
   </section>
-);
+  );
+};
 
 const Stat = ({ label, value }: { label: string; value: string }) => (
   <div className="rounded-lg border border-border p-3">
@@ -1225,6 +1256,7 @@ const PaymentEstimator = ({
   price: number;
   estimate: NonNullable<VehicleListing["payment_estimate"]>;
 }) => {
+  const { L } = usePublicLocale();
   const [apr, setApr] = useState(estimate.default_apr ?? 7.5);
   const [down, setDown] = useState(estimate.default_down ?? Math.round(price * 0.1));
   const [months, setMonths] = useState(estimate.default_term_months ?? 72);
@@ -1238,17 +1270,17 @@ const PaymentEstimator = ({
 
   return (
     <section className="rounded-2xl border border-border bg-card shadow-premium p-5">
-      <h2 className="text-sm font-semibold text-foreground mb-3">Estimated monthly payment</h2>
+      <h2 className="text-sm font-semibold text-foreground mb-3">{L.est_monthly_payment}</h2>
       <p className="text-3xl font-black font-display tabular-nums text-foreground">
-        ${isFinite(monthly) ? Math.round(monthly).toLocaleString() : "—"}<span className="text-sm font-semibold text-muted-foreground">/mo</span>
+        ${isFinite(monthly) ? Math.round(monthly).toLocaleString() : "—"}<span className="text-sm font-semibold text-muted-foreground">{L.per_mo}</span>
       </p>
       <div className="grid grid-cols-3 gap-3 mt-3">
-        <Slider label="APR %" value={apr} min={0} max={20} step={0.1} onChange={setApr} />
-        <Slider label="Down $" value={down} min={0} max={Math.round(price * 0.5)} step={100} onChange={setDown} />
-        <Slider label="Term mo" value={months} min={24} max={84} step={6} onChange={setMonths} />
+        <Slider label={L.apr} value={apr} min={0} max={20} step={0.1} onChange={setApr} />
+        <Slider label={L.down} value={down} min={0} max={Math.round(price * 0.5)} step={100} onChange={setDown} />
+        <Slider label={L.term} value={months} min={24} max={84} step={6} onChange={setMonths} />
       </div>
       <p className="text-[10px] text-muted-foreground mt-3 italic">
-        Estimate only. Your actual rate and payment depend on your credit and the lender's terms.
+        {L.estimate_only}
       </p>
     </section>
   );
@@ -1287,9 +1319,10 @@ const Slider = ({
 );
 
 const ProgramDocuments = ({ listing }: { listing: VehicleListing }) => {
+  const { L } = usePublicLocale();
   const docs: { name: string; url: string; type: string }[] = [];
   if (listing.factory_sticker_url) {
-    docs.push({ name: "Factory Monroney label", url: listing.factory_sticker_url, type: "Monroney PDF" });
+    docs.push({ name: L.factory_monroney, url: listing.factory_sticker_url, type: "Monroney PDF" });
   }
   docs.push(...(listing.documents || []));
   if (docs.length === 0) return null;
@@ -1298,7 +1331,7 @@ const ProgramDocuments = ({ listing }: { listing: VehicleListing }) => {
     <section className="rounded-2xl border border-border bg-card shadow-premium p-5">
       <div className="flex items-center gap-2 mb-3">
         <Package className="w-4 h-4 text-[#1E90FF]" />
-        <h2 className="text-sm font-semibold text-foreground">Program documents</h2>
+        <h2 className="text-sm font-semibold text-foreground">{L.program_documents}</h2>
       </div>
       <div className="space-y-2">
         {docs.map((d, i) => (
@@ -1314,7 +1347,7 @@ const ProgramDocuments = ({ listing }: { listing: VehicleListing }) => {
             </div>
             <div className="min-w-0">
               <p className="text-sm font-medium text-foreground truncate">{d.name}</p>
-              <p className="text-[10px] text-muted-foreground">{d.type} — Tap to view</p>
+              <p className="text-[10px] text-muted-foreground">{d.type} — {L.tap_to_view}</p>
             </div>
           </a>
         ))}

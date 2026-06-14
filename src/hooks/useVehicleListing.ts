@@ -117,6 +117,7 @@ export interface VehicleListing {
   condition: "new" | "used" | "cpo" | null;
   price: number | null;
   vehicle_state?: string | null;
+  default_locale?: "en" | "es" | null;
 
   // Legacy (migration 20260417_platform_expansion)
   sticker_snapshot: StickerSnapshot;
