@@ -316,7 +316,7 @@ const AppShell = ({ children }: AppShellProps) => {
       >
         {/* Sidebar header */}
         <div className="flex items-center justify-between h-16 px-4 border-b border-sidebar-border flex-shrink-0">
-          {tenant?.logo_url && tenant.logo_url !== "/logo-mark.svg" ? (
+          {tenant?.logo_url && !["/logo-mark.svg", "/autolabels-mark.svg", "/autolabels-logo.svg", "/favicon.svg"].includes(tenant.logo_url) ? (
             <div className="flex items-center gap-2 min-w-0">
               <img src={tenant.logo_url} alt={tenant.name} className="w-8 h-8 rounded-md object-contain bg-muted p-1 flex-shrink-0" />
               <div className={`min-w-0 transition-opacity duration-150 ${collapsed ? "lg:hidden" : ""}`}>
@@ -329,7 +329,7 @@ const AppShell = ({ children }: AppShellProps) => {
               </div>
             </div>
           ) : (
-            <Logo variant={collapsed ? "mark" : "full"} size={28} tagline={!collapsed} />
+            <Logo variant={collapsed ? "mark" : "full"} size={30} />
           )}
           <button
             onClick={() => setMobileOpen(false)}
@@ -348,7 +348,7 @@ const AppShell = ({ children }: AppShellProps) => {
               setMobileOpen(false);
               navigate("/inventory?add=1");
             }}
-            className="h-11 rounded-xl bg-[#2563EB] hover:bg-[#1D4ED8] text-white inline-flex items-center justify-center gap-1.5 transition-colors shadow-sm"
+            className="h-10 rounded-lg bg-[#2563EB] hover:bg-[#1D4ED8] text-white inline-flex items-center justify-center gap-1.5 text-sm font-semibold transition-colors"
             title="Add a vehicle to inventory"
           >
             <Car className="w-4 h-4 stroke-[2.25]" />
@@ -359,7 +359,7 @@ const AppShell = ({ children }: AppShellProps) => {
               setMobileOpen(false);
               navigate("/scan");
             }}
-            className="h-11 rounded-xl bg-card hover:bg-muted text-foreground inline-flex items-center justify-center gap-1.5 border border-border transition-colors"
+            className="h-10 rounded-lg bg-card hover:bg-muted text-foreground inline-flex items-center justify-center gap-1.5 text-sm font-semibold border border-border transition-colors"
             title="Scan a VIN barcode or windshield sticker"
           >
             <ScanLine className="w-4 h-4 stroke-[2.25]" />
@@ -630,13 +630,6 @@ const AppShell = ({ children }: AppShellProps) => {
                 </DropdownMenuContent>
               </DropdownMenu>
 
-              {/* Admin role pill — only renders for platform admins */}
-              {isAdmin && (
-                <span className="hidden lg:inline-flex items-center gap-1 h-7 px-2.5 rounded-md border border-border bg-muted text-[10px] font-bold uppercase tracking-[0.14em] text-foreground">
-                  Admin
-                </span>
-              )}
-
               {/* Divider */}
               <div className="hidden lg:block w-px h-6 bg-border mx-0.5" />
 
@@ -670,6 +663,10 @@ const AppShell = ({ children }: AppShellProps) => {
                     <Settings className="w-3.5 h-3.5 mr-2" />
                     Settings
                   </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => window.open("https://autolabels.io/help", "_blank")}>
+                    <HelpCircle className="w-3.5 h-3.5 mr-2" />
+                    Help
+                  </DropdownMenuItem>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem onClick={handleSignOut}>
                     <LogOut className="w-3.5 h-3.5 mr-2" />
@@ -678,31 +675,6 @@ const AppShell = ({ children }: AppShellProps) => {
                 </DropdownMenuContent>
               </DropdownMenu>
 
-              {/* Help */}
-              <button
-                onClick={() => window.open("https://autolabels.io/help", "_blank")}
-                className="h-9 w-9 rounded-lg border border-border bg-card hover:bg-muted text-muted-foreground hover:text-foreground inline-flex items-center justify-center transition-colors"
-                title="Help"
-              >
-                <HelpCircle className="w-4 h-4" />
-              </button>
-
-              {/* Logout — explicit text button on md+, icon on mobile */}
-              <button
-                onClick={handleSignOut}
-                className="hidden md:inline-flex items-center gap-1.5 h-9 px-3 rounded-lg border border-border bg-card hover:bg-muted text-foreground text-xs font-semibold transition-colors"
-                title="Sign out"
-              >
-                <LogOut className="w-3.5 h-3.5" />
-                Logout
-              </button>
-              <button
-                onClick={handleSignOut}
-                className="md:hidden h-9 w-9 rounded-lg border border-border bg-card hover:bg-muted text-muted-foreground hover:text-foreground inline-flex items-center justify-center transition-colors"
-                title="Sign out"
-              >
-                <LogOut className="w-4 h-4" />
-              </button>
             </div>
           </div>
         </header>
