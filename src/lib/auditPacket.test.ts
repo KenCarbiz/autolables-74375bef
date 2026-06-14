@@ -143,6 +143,7 @@ describe("buildAuditPacket — manifest shape", () => {
       "09-archive",
       "10-get-ready",
       "11-advertised-prices",
+      "12-addon-elections",
     ]);
   });
 

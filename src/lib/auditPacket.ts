@@ -155,6 +155,44 @@ export async function buildAuditPacket(args: BuildArgs): Promise<AuditPacket> {
   const getReadyRows = rows(getReady);
   const advertisedPriceRows = rows(advertisedPrices) as Array<{ advertised_price?: number; source_label?: string; snapshot_at?: string }>;
 
+  // Wave 23 — derived Add-On Election Record. For every addendum, we
+  // surface per add-on the proof the customer ELECTED it: the price
+  // shown, whether it was disclosed optional, the benefit text, and
+  // the affirmative selection (optional accept/decline) or initials
+  // captured at signing. Derived from the addendum rows already
+  // fetched — read-only, no extra query, no impact on the deal flow.
+  const addonElections = (addendumRows as Array<Record<string, unknown>>)
+    .map((a) => {
+      const products = Array.isArray(a.products_snapshot) ? (a.products_snapshot as Array<Record<string, unknown>>) : [];
+      const optional = (a.optional_selections ?? {}) as Record<string, string>;
+      const inits = (a.initials ?? {}) as Record<string, string>;
+      const items = products.map((p) => {
+        const id = String(p.id ?? "");
+        const isOptional = p.badge_type === "optional";
+        const initialed = !!(inits[id] && String(inits[id]).trim());
+        const elected = isOptional ? optional[id] === "accept" : initialed;
+        return {
+          product_id: id,
+          name: String(p.name ?? ""),
+          price: typeof p.price === "number" ? p.price : null,
+          disclosed_optional: isOptional,
+          benefit_justification: String((p as { benefit_justification?: string }).benefit_justification ?? ""),
+          elected,
+          acknowledgment: isOptional ? (optional[id] ?? "none") : (initialed ? "initialed" : "none"),
+        };
+      });
+      return {
+        addendum_id: (a.id as string) ?? null,
+        customer_name: (a.customer_name as string) ?? null,
+        signed_at: (a.signed_at as string) ?? null,
+        content_hash: (a.content_hash as string) ?? null,
+        item_count: items.length,
+        elected_count: items.filter((i) => i.elected).length,
+        items,
+      };
+    })
+    .filter((e) => e.item_count > 0);
+
   // Hash each section. Order matters for chain root — keep stable.
   // Wave 22 appends sections 10 + 11; do NOT reorder existing
   // names or every chain root quoted in past correspondence
@@ -171,6 +209,7 @@ export async function buildAuditPacket(args: BuildArgs): Promise<AuditPacket> {
     { name: "09-archive",       data: archiveRows },
     { name: "10-get-ready",     data: getReadyRows },
     { name: "11-advertised-prices", data: advertisedPriceRows },
+    { name: "12-addon-elections", data: addonElections },
   ];
 
   const sections: AuditPacketSection[] = [];
