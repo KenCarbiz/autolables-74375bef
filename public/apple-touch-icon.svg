@@ -1,12 +1,11 @@
-<svg width="180" height="180" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg">
+<svg width="180" height="180" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="AutoLabels">
   <defs>
-    <linearGradient id="acAppleGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+    <linearGradient id="appleA" x1="0%" y1="0%" x2="100%" y2="100%">
       <stop offset="0%" stop-color="#2563EB"/>
-      <stop offset="100%" stop-color="#0F1E3C"/>
+      <stop offset="100%" stop-color="#0B2041"/>
     </linearGradient>
+    <style>@import url('https://fonts.googleapis.com/css2?family=Inter:wght@800&amp;display=swap');</style>
   </defs>
-  <rect width="64" height="64" rx="14" fill="url(#acAppleGrad)"/>
-  <path d="M 18 48 L 32 16 L 46 48" stroke="white" stroke-width="5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
-  <line x1="24" y1="38" x2="40" y2="38" stroke="white" stroke-width="5" stroke-linecap="round"/>
-  <circle cx="32" cy="16" r="4" fill="white"/>
+  <rect width="64" height="64" rx="14" fill="url(#appleA)"/>
+  <text x="32" y="34" fill="#FFFFFF" font-family="Inter, system-ui, -apple-system, sans-serif" font-weight="800" font-size="40" text-anchor="middle" dominant-baseline="central" letter-spacing="-0.02em">a</text>
 </svg>

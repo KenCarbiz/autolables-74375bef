@@ -72,7 +72,7 @@ const Nav = ({ user, onNav }: { user: unknown; onNav: (to: string) => void }) =>
   <nav className="sticky top-0 z-50 border-b border-slate-100 bg-white/80 backdrop-blur-xl">
     <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-6 lg:px-8">
       <button onClick={() => onNav("/")} aria-label="AutoLabels home" className="flex items-center gap-2">
-        <Logo variant="full" size={28} />
+        <Logo variant="full" size={38} />
       </button>
       <div className="hidden items-center gap-8 md:flex">
         <a href="#risk" className="text-sm text-slate-600 hover:text-slate-900 transition-colors">The risk</a>
@@ -136,10 +136,8 @@ const Hero = ({ onPrimary }: { onPrimary: () => void }) => (
           Live website-price monitoring · FTC §5 aligned
         </div>
         <h1 className="font-display text-[40px] font-semibold leading-[1.04] tracking-[-0.03em] text-slate-900 sm:text-5xl lg:text-6xl">
-          The FTC doesn&rsquo;t care
-          <br />
-          if it was an{" "}
-          <span className="bg-gradient-to-r from-blue-600 to-blue-500 bg-clip-text text-transparent">accident.</span>
+          The FTC doesn&rsquo;t care if it was an{" "}
+          <span className="text-blue-600">accident.</span>
         </h1>
         <p className="mt-6 max-w-xl text-base leading-relaxed text-slate-600 sm:text-lg">
           One website pricing mistake can trigger an investigation, customer complaints, chargebacks,
@@ -864,7 +862,7 @@ const Footer = ({ onNav }: { onNav: (to: string) => void }) => (
     <div className="mx-auto max-w-7xl px-6 py-12 lg:px-8">
       <div className="grid gap-10 md:grid-cols-4">
         <div className="md:col-span-2">
-          <Logo variant="full" size={28} />
+          <Logo variant="full" size={38} />
           <p className="mt-4 max-w-sm text-sm leading-relaxed text-slate-600">
             The compliance operating system for franchise and independent dealerships.
             An <span className="font-semibold text-slate-900">Autocurb</span> family product.
