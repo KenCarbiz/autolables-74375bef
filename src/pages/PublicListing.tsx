@@ -28,6 +28,7 @@ import {
   Smartphone,
 } from "lucide-react";
 import { toast } from "sonner";
+import { Helmet } from "react-helmet-async";
 import Logo from "@/components/brand/Logo";
 import { QRCodeSVG } from "qrcode.react";
 import { useVehicleListing, type VehicleListing } from "@/hooks/useVehicleListing";
