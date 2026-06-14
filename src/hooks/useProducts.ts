@@ -18,6 +18,11 @@ export interface Product {
   // team will release a signing link (FTC §5 + CA SB 766
   // §11713.21).
   benefit_justification: string;
+  // True (default) when the accessory's price is already in the
+  // advertised price — itemized for transparency but never charged
+  // again on top. False marks a dealer-installed upcharge above the
+  // advertised price, which is additive and confirmed at signing.
+  price_in_advertised: boolean;
 }
 
 export const useProducts = () => {

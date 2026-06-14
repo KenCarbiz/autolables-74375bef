@@ -149,6 +149,9 @@ const UsedCarSticker = () => {
             // shopper-portal snapshot so the QR landing reads the
             // dealer's per-line "why this benefits the buyer."
             benefit_justification: (p as { benefit_justification?: string }).benefit_justification || "",
+            // Whether this accessory's price is already in the advertised
+            // price (default true) or a dealer-installed upcharge above it.
+            price_in_advertised: (p as { price_in_advertised?: boolean }).price_in_advertised !== false,
           })),
           totals: {
             base_price: marketVal,

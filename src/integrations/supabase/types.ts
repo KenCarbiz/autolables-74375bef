@@ -1283,6 +1283,7 @@ export type Database = {
           is_active: boolean
           name: string
           price: number
+          price_in_advertised: boolean
           price_label: string | null
           sort_order: number
           subtitle: string | null
@@ -1298,6 +1299,7 @@ export type Database = {
           is_active?: boolean
           name: string
           price?: number
+          price_in_advertised?: boolean
           price_label?: string | null
           sort_order?: number
           subtitle?: string | null
@@ -1313,6 +1315,7 @@ export type Database = {
           is_active?: boolean
           name?: string
           price?: number
+          price_in_advertised?: boolean
           price_label?: string | null
           sort_order?: number
           subtitle?: string | null
