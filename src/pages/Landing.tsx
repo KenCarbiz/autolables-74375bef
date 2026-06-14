@@ -46,19 +46,26 @@ const Landing = () => {
 
   return (
     <div className="bg-white text-slate-900 antialiased selection:bg-blue-100 selection:text-slate-900">
+      <Seo
+        title="AutoLabels — Window Stickers, Addendums & Compliance"
+        description="The dealer label platform that catches pricing and disclosure gaps before regulators do. Window stickers, addendums, Buyers Guides, and 50-state compliance."
+        path="/"
+      />
       <Nav user={user} onNav={navigate} />
-      <Hero onPrimary={() => navigate(user ? "/dashboard" : "/onboarding")} />
-      <TrustBand />
-      <Reality />
-      <UpAtNight />
-      <StoryArc />
-      <AppleMoment />
-      <DeepFeatures />
-      <TrustAndSecurity />
-      <Outcomes />
-      <Pricing onSelect={() => navigate("/onboarding")} />
-      <FAQ />
-      <FinalCTA onPrimary={() => navigate(user ? "/dashboard" : "/onboarding")} />
+      <main>
+        <Hero onPrimary={() => navigate(user ? "/dashboard" : "/onboarding")} />
+        <TrustBand />
+        <Reality />
+        <UpAtNight />
+        <StoryArc />
+        <AppleMoment />
+        <DeepFeatures />
+        <TrustAndSecurity />
+        <Outcomes />
+        <Pricing onSelect={() => navigate("/onboarding")} />
+        <FAQ />
+        <FinalCTA onPrimary={() => navigate(user ? "/dashboard" : "/onboarding")} />
+      </main>
       <Footer onNav={navigate} />
     </div>
   );
