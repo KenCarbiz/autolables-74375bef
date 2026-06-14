@@ -7,6 +7,6 @@
   <circle cx="32" cy="16" r="3.5" fill="#0B2041"/>
 
   <text x="82" y="42" font-family="Inter, system-ui, sans-serif" font-size="30" font-weight="800" letter-spacing="-0.02em">
-    <tspan fill="#FFFFFF">Auto</tspan><tspan fill="#3BB4FF">Labels</tspan><tspan fill="#3BB4FF" fill-opacity="0.85">.io</tspan>
+    <tspan fill="#3BB4FF">auto</tspan><tspan fill="#FFFFFF">(LABELS)</tspan>
   </text>
 </svg>

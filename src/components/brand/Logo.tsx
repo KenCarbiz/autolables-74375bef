@@ -71,8 +71,9 @@ const Wordmark = ({
   align: "left" | "center";
 }) => {
   const fontSize = Math.round(size * 0.62);
-  const autoColor = inverted ? "#FFFFFF" : NAVY;
-  const labelsColor = inverted ? CYAN : CURB;
+  // "auto" lowercase in Autocurb blue; "(LABELS)" caps in Label Navy.
+  const autoColor = inverted ? CYAN : CURB;
+  const labelsColor = inverted ? "#FFFFFF" : NAVY;
   return (
     <span
       className="inline-flex flex-col justify-center leading-none"
@@ -82,9 +83,8 @@ const Wordmark = ({
         className="font-display font-extrabold"
         style={{ fontSize, letterSpacing: "-0.02em", lineHeight: 1 }}
       >
-        <span style={{ color: autoColor }}>Auto</span>
-        <span style={{ color: labelsColor }}>Labels</span>
-        <span style={{ color: labelsColor, opacity: 0.85 }}>.io</span>
+        <span style={{ color: autoColor }}>auto</span>
+        <span style={{ color: labelsColor }}>(LABELS)</span>
       </span>
       {tagline && (
         <span
