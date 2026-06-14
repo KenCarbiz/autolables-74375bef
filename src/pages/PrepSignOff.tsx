@@ -14,7 +14,7 @@ import { uploadPhoto } from "@/lib/storage";
 
 const PrepSignOff = () => {
   const { user } = useAuth();
-  const { currentStore } = useTenant();
+  const { currentStore, tenant } = useTenant();
   const { log } = useAudit();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -403,6 +403,7 @@ const PrepSignOff = () => {
                     e.currentTarget.value = "";
                     for (let i = 0; i < files.length; i++) {
                       const uploaded = await uploadPhoto("prep-photos", files[i], {
+                        tenantId: tenant?.id,
                         storeId,
                         vin: newForm.vin,
                       });
