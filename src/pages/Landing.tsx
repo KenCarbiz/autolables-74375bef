@@ -52,7 +52,7 @@ const Landing = () => {
         <Principles />
         <PowerGrid />
         <SocialProof />
-        <PricingTeaser onWaitlist={goWaitlist} />
+        <PricingTeaser onWaitlist={goWaitlist} onDemo={goDemo} />
         <FAQ />
         <FinalCTA onWaitlist={goWaitlist} onDemo={goDemo} />
       </main>
@@ -524,7 +524,13 @@ const TIERS = [
   { name: "Group", body: "Multi-rooftop. SSO, group analytics, custom rules, dedicated success." },
 ];
 
-const PricingTeaser = ({ onWaitlist }: { onWaitlist: () => void }) => (
+const PricingTeaser = ({
+  onWaitlist,
+  onDemo,
+}: {
+  onWaitlist: () => void;
+  onDemo: () => void;
+}) => (
   <section id="pricing" className="border-b border-slate-100 bg-slate-50/40">
     <div className="mx-auto max-w-7xl px-6 py-20 lg:px-8">
       <div className="mx-auto max-w-3xl text-center">
@@ -545,13 +551,26 @@ const PricingTeaser = ({ onWaitlist }: { onWaitlist: () => void }) => (
               t.featured ? "border-[#2563EB] ring-1 ring-[#2563EB]" : "border-slate-200"
             }`}
           >
-            {t.featured && (
-              <p className="mb-2 inline-block rounded-full bg-blue-50 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-blue-700">
-                Most popular
-              </p>
-            )}
             <h3 className="font-display text-xl font-bold tracking-tight text-slate-900">{t.name}</h3>
             <p className="mt-2 text-sm leading-relaxed text-slate-600">{t.body}</p>
+            <div className="mt-5">
+              {t.featured ? (
+                <button
+                  onClick={onWaitlist}
+                  className="inline-flex h-10 w-full items-center justify-center gap-1.5 rounded-full bg-[#0B2041] px-4 text-sm font-semibold text-white hover:bg-[#13315e]"
+                >
+                  Get on the waitlist
+                  <ArrowRight className="h-3.5 w-3.5" />
+                </button>
+              ) : (
+                <button
+                  onClick={onDemo}
+                  className="inline-flex h-10 w-full items-center justify-center gap-1.5 rounded-full border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+                >
+                  Book a demo
+                </button>
+              )}
+            </div>
           </div>
         ))}
       </div>
