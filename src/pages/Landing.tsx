@@ -21,6 +21,9 @@ import {
   Scale,
   AlertTriangle,
   CheckCircle2,
+  Unlock,
+  Tag,
+  BadgeCheck,
 } from "lucide-react";
 
 // ──────────────────────────────────────────────────────────────
@@ -57,6 +60,7 @@ const Landing = () => {
         <TrustBand />
         <Reality />
         <UpAtNight />
+        <TakeThePowerBack onPrimary={() => navigate(user ? "/dashboard" : "/onboarding")} />
         <StoryArc />
         <AppleMoment />
         <DeepFeatures />
@@ -84,6 +88,7 @@ const Nav = ({ user, onNav }: { user: unknown; onNav: (to: string) => void }) =>
       </button>
       <div className="hidden items-center gap-8 md:flex">
         <a href="#risk" className="text-sm text-slate-600 hover:text-slate-900 transition-colors">The risk</a>
+        <a href="#power" className="text-sm text-slate-600 hover:text-slate-900 transition-colors">Take back power</a>
         <a href="#platform" className="text-sm text-slate-600 hover:text-slate-900 transition-colors">How it works</a>
         <a href="#pricing" className="text-sm text-slate-600 hover:text-slate-900 transition-colors">Pricing</a>
         <a href="#faq" className="text-sm text-slate-600 hover:text-slate-900 transition-colors">FAQ</a>
@@ -332,13 +337,13 @@ const Reality = () => (
 
       <div className="mx-auto mt-14 grid max-w-5xl gap-6 sm:grid-cols-3">
         <Stat number="97" label="dealer groups the FTC warned in March 2026 for advertising one price, then charging another" />
-        <Stat number="$1.5M–$10M" label="refunds and penalties in recent FTC cases against dealers who didn't honor advertised prices" />
+        <Stat number="88%" label="of one group's buyers paid MORE than the advertised price — $75M+ in refunds (Lindsay Auto, 2026)" />
         <Stat number="Oct 2026" label="California's CARS Act takes effect: up-front total pricing, no-benefit add-on ban, 24-month records" />
       </div>
 
       <p className="mx-auto mt-10 max-w-2xl text-center text-sm text-slate-500">
-        Sources: FTC press release, Mar 13 2026 · FTC v. Napleton ($10M, 2022), Passport ($3.38M, 2022),
-        Bronx Honda ($1.5M, 2020) · CA SB 766, Chapter 354, Statutes of 2025
+        Sources: FTC warning letters, Mar 13 2026 (97 groups) · FTC + MD AG v. Lindsay Auto
+        ($3.1M penalty + $75M+ refunds, 2026) · FTC v. Napleton ($10M, 2022) · CA SB 766, eff. Oct 1 2026
       </p>
     </div>
   </section>
@@ -396,6 +401,104 @@ const Nightmare = ({ title, consequence }: { title: string; consequence: string 
     </div>
     <h3 className="mt-4 text-base font-semibold leading-snug text-white">{title}</h3>
     <p className="mt-2 text-sm font-medium text-red-300/90">{consequence}</p>
+  </div>
+);
+
+// ──────────────────────────────────────────────────────────────
+// TakeThePowerBack — the pivot. The FTC made dealers play defense;
+// auto(LABELS) hands the power back. Two pillars: provable add-on
+// election (sell F&I without fear) and price integrity (own and
+// prove your price). This is the emotional centerpiece.
+// ──────────────────────────────────────────────────────────────
+
+const TakeThePowerBack = ({ onPrimary }: { onPrimary: () => void }) => (
+  <section id="power" className="relative isolate overflow-hidden">
+    <div
+      aria-hidden
+      className="pointer-events-none absolute inset-0 -z-10 bg-[radial-gradient(60%_50%_at_50%_0%,rgba(37,99,235,0.10),transparent_70%)]"
+    />
+    <div className="mx-auto max-w-7xl px-6 py-24 lg:px-8 lg:py-32">
+      <div className="mx-auto max-w-3xl text-center">
+        <div className="mb-5 inline-flex items-center gap-2 rounded-full border border-blue-200 bg-blue-50 px-3 py-1 text-xs font-semibold uppercase tracking-[0.14em] text-blue-700">
+          <Unlock className="h-3.5 w-3.5" /> Take the power back
+        </div>
+        <h2 className="font-display text-4xl font-semibold tracking-[-0.02em] text-slate-900 sm:text-5xl">
+          The FTC made you play defense.
+          <br className="hidden sm:block" /> Time to take the power back.
+        </h2>
+        <p className="mt-5 text-lg leading-relaxed text-slate-600">
+          Scared of complaints, dealers stopped pitching add-ons and stopped putting a real price in
+          writing. auto(LABELS) flips it: prove the customer chose it, prove you honored the price
+          &mdash; and sell with confidence again.
+        </p>
+      </div>
+
+      <div className="mx-auto mt-16 grid max-w-6xl gap-6 lg:grid-cols-2">
+        <PowerPillar
+          icon={BadgeCheck}
+          eyebrow="Profitable add-on election"
+          title="Sell add-ons without fear."
+          body="F&I is your most profitable revenue — and your most exposed. Managers pull back, afraid a customer will later claim it was jammed down their throat. auto(LABELS) captures per-item, informed election: the customer sees each product's price, sees it's optional, sees the benefit, and signs. Every yes is provable — so you can sell with confidence again."
+          chips={["$2,534 avg F&I gross per vehicle", "Napleton: 83% charged without consent"]}
+          punch="Every yes, provable."
+        />
+        <PowerPillar
+          icon={Tag}
+          eyebrow="Price integrity"
+          title="Own your price. Prove you honored it."
+          body="The FTC reframed your posted price as a binding commitment — and at one group, 88% of buyers paid MORE than the advertised price ($75M+ in refunds). auto(LABELS) locks one price across your site, the lot, and the desk, then seals a tamper-evident record that you honored it."
+          chips={["97 dealer groups warned, Mar 2026", "Buyers pay ~$1,117 to skip the games"]}
+          punch="Priced in ink, not pencil."
+        />
+      </div>
+
+      <div className="mx-auto mt-12 flex max-w-2xl flex-col items-center gap-4 text-center">
+        <p className="text-sm text-slate-500">
+          Tamper-evident, not tamper-proof. auto(LABELS) documents informed election and strengthens
+          your position under FTC Act &sect;5 &mdash; it does not guarantee the outcome of a dispute.
+        </p>
+        <button
+          onClick={onPrimary}
+          className="inline-flex h-12 items-center gap-2 rounded-full bg-slate-900 px-7 text-sm font-medium text-white shadow-sm transition-all hover:bg-slate-800 hover:shadow-md"
+        >
+          Take the power back
+          <ArrowRight className="h-4 w-4" />
+        </button>
+      </div>
+    </div>
+  </section>
+);
+
+const PowerPillar = ({
+  icon: Icon,
+  eyebrow,
+  title,
+  body,
+  chips,
+  punch,
+}: {
+  icon: typeof Tag;
+  eyebrow: string;
+  title: string;
+  body: string;
+  chips: string[];
+  punch: string;
+}) => (
+  <div className="flex flex-col rounded-3xl border border-slate-200 bg-white p-8 shadow-[0_24px_70px_-30px_rgba(15,23,42,0.25)] lg:p-10">
+    <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-blue-600 text-white">
+      <Icon className="h-6 w-6" strokeWidth={2} />
+    </div>
+    <p className="mt-6 text-sm font-medium uppercase tracking-[0.14em] text-blue-600">{eyebrow}</p>
+    <h3 className="mt-2 font-display text-2xl font-semibold tracking-[-0.01em] text-slate-900 sm:text-3xl">{title}</h3>
+    <p className="mt-4 text-base leading-relaxed text-slate-600">{body}</p>
+    <div className="mt-6 flex flex-wrap gap-2">
+      {chips.map((c) => (
+        <span key={c} className="inline-flex items-center gap-1.5 rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-700">
+          <span className="h-1.5 w-1.5 rounded-full bg-blue-500" /> {c}
+        </span>
+      ))}
+    </div>
+    <p className="mt-7 border-t border-slate-100 pt-5 font-display text-lg font-semibold text-slate-900">{punch}</p>
   </div>
 );
 
