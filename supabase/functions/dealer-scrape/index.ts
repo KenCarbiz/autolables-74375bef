@@ -1,6 +1,37 @@
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0'
+
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version',
+}
+
+// SSRF guard: reject hosts that resolve to private / link-local /
+// loopback ranges, plus obvious metadata hostnames. Cheap textual
+// check first — anything that looks like a private IP literal is
+// blocked without DNS. A real DNS-pinning resolver would be ideal
+// but isn't available in the Deno edge runtime, so this is a
+// best-effort layer in front of an authenticated endpoint.
+const BLOCKED_HOST_PATTERNS: RegExp[] = [
+  /^localhost$/i,
+  /^127\./, /^0\./, /^10\./,
+  /^169\.254\./,            // AWS / link-local
+  /^192\.168\./,
+  /^172\.(1[6-9]|2\d|3[0-1])\./,
+  /^::1$/, /^fe80:/i, /^fc[0-9a-f]{2}:/i, /^fd[0-9a-f]{2}:/i,
+  /metadata\.google\.internal$/i,
+  /metadata\.azure\.com$/i,
+]
+
+const isUrlSafe = (raw: string): { ok: true; url: URL } | { ok: false; reason: string } => {
+  let u: URL
+  try { u = new URL(raw) } catch { return { ok: false, reason: 'invalid URL' } }
+  if (u.protocol !== 'http:' && u.protocol !== 'https:') return { ok: false, reason: 'unsupported protocol' }
+  const host = u.hostname
+  if (!host) return { ok: false, reason: 'missing host' }
+  for (const pat of BLOCKED_HOST_PATTERNS) {
+    if (pat.test(host)) return { ok: false, reason: `blocked host (${host})` }
+  }
+  return { ok: true, url: u }
 }
 
 Deno.serve(async (req) => {
@@ -9,6 +40,27 @@ Deno.serve(async (req) => {
   }
 
   try {
+    // ── Auth gate ────────────────────────────────────────────────
+    // Block anonymous callers. Accept either a valid user JWT or
+    // the service-role key (cron jobs invoke this from the DB).
+    const supabaseUrl = Deno.env.get('SUPABASE_URL') || ''
+    const serviceKey  = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || ''
+    const jwt = (req.headers.get('Authorization') || '').replace(/^Bearer\s+/i, '')
+    if (!jwt) {
+      return new Response(JSON.stringify({ success: false, error: 'missing bearer token' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+    }
+    if (jwt !== serviceKey) {
+      const admin = createClient(supabaseUrl, serviceKey, {
+        auth: { persistSession: false, autoRefreshToken: false },
+      })
+      const { data: userRes, error: userErr } = await admin.auth.getUser(jwt)
+      if (userErr || !userRes?.user) {
+        return new Response(JSON.stringify({ success: false, error: 'invalid token' }),
+          { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+      }
+    }
+
     const { url } = await req.json()
     if (!url || typeof url !== 'string') {
       return new Response(
@@ -20,6 +72,14 @@ Deno.serve(async (req) => {
     let formattedUrl = url.trim().replace(/\/+$/, '')
     if (!/^https?:\/\//i.test(formattedUrl)) {
       formattedUrl = `https://${formattedUrl}`
+    }
+
+    const safety = isUrlSafe(formattedUrl)
+    if (!safety.ok) {
+      return new Response(
+        JSON.stringify({ success: false, error: `URL rejected: ${safety.reason}` }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
     }
 
     console.log('Scraping dealer URL:', formattedUrl)
