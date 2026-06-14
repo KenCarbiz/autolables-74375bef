@@ -154,8 +154,47 @@ const PublicListing = () => {
     }
   };
 
+  const pageTitle = `${listing.ymm || `Vehicle ${listing.vin.slice(-8)}`}${listing.trim ? ` ${listing.trim}` : ""} — ${dealer.name || "AutoLabels"}`;
+  const pageDesc = `${listing.ymm || "Vehicle"}${listing.mileage != null ? ` · ${listing.mileage.toLocaleString()} mi` : ""}${dealer.city && dealer.state ? ` · ${dealer.city}, ${dealer.state}` : ""}. View window sticker, pricing, and disclosures.`;
+  const heroImg = listing.photos?.find((p) => p.kind === "hero")?.url || listing.photos?.[0]?.url;
+  const priceVal = (totals as { drive_out_price?: number; out_the_door?: number }).drive_out_price
+    ?? (totals as { drive_out_price?: number; out_the_door?: number }).out_the_door;
+  const productSchema = {
+    "@context": "https://schema.org",
+    "@type": "Product",
+    name: listing.ymm || `Vehicle ${listing.vin}`,
+    description: pageDesc,
+    sku: listing.vin,
+    ...(heroImg ? { image: heroImg } : {}),
+    ...(priceVal
+      ? {
+          offers: {
+            "@type": "Offer",
+            priceCurrency: "USD",
+            price: priceVal,
+            availability: "https://schema.org/InStock",
+            url: viewUrl,
+            ...(dealer.name ? { seller: { "@type": "AutoDealer", name: dealer.name } } : {}),
+          },
+        }
+      : {}),
+  };
+
   return (
     <div className="min-h-screen bg-white">
+      <Helmet>
+        <title>{pageTitle}</title>
+        <meta name="description" content={pageDesc} />
+        <link rel="canonical" href={viewUrl} />
+        <meta property="og:title" content={pageTitle} />
+        <meta property="og:description" content={pageDesc} />
+        <meta property="og:url" content={viewUrl} />
+        <meta property="og:type" content="product" />
+        {heroImg ? <meta property="og:image" content={heroImg} /> : null}
+        <meta name="twitter:title" content={pageTitle} />
+        <meta name="twitter:description" content={pageDesc} />
+        <script type="application/ld+json">{JSON.stringify(productSchema)}</script>
+      </Helmet>
       {/* Slim, Tesla-style top bar: vehicle is hero, dealer is
           secondary. No ornate chrome, no branded gradients. */}
       <header className="bg-white/95 backdrop-blur-md border-b border-slate-200 sticky top-0 z-20">
