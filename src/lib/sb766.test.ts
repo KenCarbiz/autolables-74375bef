@@ -219,6 +219,15 @@ describe("computeMileageCharge", () => {
 // ──────────────────────────────────────────────────────────────
 
 describe("assessReturn", () => {
+  // assessReturn calls isSb766Applicable, which is date-gated on the
+  // 10/1/2026 effective date. Pin the clock past it so these tests
+  // exercise the eligibility math rather than the pre-effective no-op.
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-11-01T00:00:00Z"));
+  });
+  afterEach(() => vi.useRealTimers());
+
   it("approves a clean return: CA, under $50k, day 1, 100 mi", () => {
     const a = assessReturn({ state: "CA", price: 22000, miles_at_return: 100, days_since_purchase: 1 });
     expect(a.eligible).toBe(true);
