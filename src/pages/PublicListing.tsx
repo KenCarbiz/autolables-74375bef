@@ -870,7 +870,7 @@ const HeroSection = ({ listing, dealer }: { listing: VehicleListing; dealer: Dea
         <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/20 to-black/10" />
         <div className="absolute inset-x-0 bottom-0 p-6 md:p-8 text-white">
           <h1 className="text-3xl md:text-5xl font-black font-display tracking-[-0.03em] leading-[0.95]">
-            {listing.ymm || "Vehicle"}
+            {listing.ymm || `Vehicle Details — VIN ${listing.vin.slice(-8)}`}
           </h1>
           {listing.trim && (
             <p className="text-base md:text-lg text-white/85 font-display mt-1 tracking-tight">{listing.trim}</p>
