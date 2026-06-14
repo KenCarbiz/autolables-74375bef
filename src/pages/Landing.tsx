@@ -19,12 +19,13 @@ import {
   ChevronDown,
   BadgeCheck,
   Tag,
+  CheckCircle2,
 } from "lucide-react";
 import { useState } from "react";
 
 // ──────────────────────────────────────────────────────────────
 // Landing — Wave 35. Pre-launch / waitlist positioning.
-// Every CTA is "Get on the waitlist" (primary) or "Book a demo"
+// Every CTA is "Schedule a demo" (primary) or "Book a demo"
 // (secondary). One card system across the whole page.
 // Legal discipline: "FTC-aligned" (CARS Rule was vacated 1/2025),
 // "documents" consent (never "guarantees compliance"),
@@ -42,7 +43,7 @@ const Landing = () => {
     <div className="bg-white text-slate-900 antialiased selection:bg-blue-100">
       <Seo
         title="AutoLabels — Window Stickers, Addendums & Compliance"
-        description="Pre-launch dealer label & compliance platform. Decode any VIN, build FTC-aligned addendums, capture signatures, and stay ahead of state AG audits."
+        description="One website pricing mistake can trigger an FTC investigation, a complaint, or a lawsuit. AutoLabels catches pricing and disclosure gaps before regulators do."
         path="/"
       />
       <Nav user={user} onWaitlist={goWaitlist} onNav={navigate} />
@@ -117,7 +118,7 @@ const Nav = ({
               onClick={onWaitlist}
               className="inline-flex h-9 items-center gap-1.5 rounded-full bg-[#0B2041] px-4 text-sm font-medium text-white hover:bg-[#13315e]"
             >
-              Get on the waitlist <ArrowRight className="h-3.5 w-3.5" />
+              Schedule a demo <ArrowRight className="h-3.5 w-3.5" />
             </button>
           </>
         )}
@@ -130,135 +131,135 @@ const Nav = ({
 // Hero
 // ──────────────────────────────────────────────────────────────
 
-const Hero = ({ onWaitlist, onDemo }: { onWaitlist: () => void; onDemo: () => void }) => (
-  <section className="relative isolate overflow-hidden bg-gradient-to-b from-[#0B2041] via-[#0d2752] to-[#0B2041] text-white">
-    <div aria-hidden className="pointer-events-none absolute inset-0 -z-10">
-      <div className="absolute left-1/4 top-0 h-96 w-96 rounded-full bg-[#3BB4FF]/25 blur-3xl" />
-      <div className="absolute bottom-0 right-1/4 h-96 w-96 rounded-full bg-[#2563EB]/25 blur-3xl" />
+const Hero = ({ onDemo }: { onWaitlist: () => void; onDemo: () => void }) => (
+  <section className="relative isolate overflow-hidden border-b border-slate-100 bg-white">
+    <div
+      aria-hidden
+      className="pointer-events-none absolute inset-x-0 -top-32 -z-10 h-[620px] [mask-image:radial-gradient(60%_60%_at_55%_30%,#000_40%,transparent_85%)]"
+    >
+      <div className="absolute inset-0 bg-[radial-gradient(55%_50%_at_60%_25%,rgba(37,99,235,0.12),transparent_70%)]" />
     </div>
 
-    <div className="mx-auto grid max-w-7xl items-center gap-12 px-6 pb-20 pt-20 lg:grid-cols-2 lg:gap-12 lg:px-8 lg:pb-24 lg:pt-24">
+    <div className="mx-auto grid max-w-7xl items-center gap-12 px-6 pb-20 pt-16 lg:grid-cols-2 lg:gap-12 lg:px-8 lg:pb-24 lg:pt-20">
       <div>
-        <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-3 py-1 text-xs font-medium backdrop-blur-sm">
-          <Sparkles className="h-3 w-3 text-[#3BB4FF]" />
-          The dealer label platform · Pre-launch
-        </div>
-        <h1 className="font-display text-5xl font-black leading-[0.95] tracking-tighter sm:text-6xl lg:text-7xl">
-          Clear.
-          <br />
-          Compliant.
-          <br />
-          <span className="bg-gradient-to-r from-[#3BB4FF] via-[#1E90FF] to-[#3BB4FF] bg-clip-text italic text-transparent">
-            Consistent.
+        <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-medium text-slate-600 shadow-sm">
+          <span className="relative flex h-1.5 w-1.5">
+            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
+            <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-emerald-500" />
           </span>
+          Live website-price monitoring · FTC §5 aligned
+        </div>
+        <h1 className="font-display text-[40px] font-black leading-[1.02] tracking-tighter text-slate-900 sm:text-6xl">
+          The FTC doesn&rsquo;t care if it was an{" "}
+          <span className="text-blue-600">accident.</span>
         </h1>
-        <p className="mt-7 max-w-xl text-base leading-relaxed text-white/70 sm:text-lg">
-          Every sticker, addendum, and Buyers Guide that leaves your lot — perfectly priced, fully
-          disclosed, and ready to sign. Scan a VIN, build a label, capture a lead, close the deal.
+        <p className="mt-6 max-w-xl text-base leading-relaxed text-slate-600 sm:text-lg">
+          One website pricing mistake can trigger an investigation, customer complaints, chargebacks,
+          and a class action. AutoLabels continuously verifies your advertised prices, disclosures,
+          addendums, and customer sign-offs &mdash; before they become problems.
         </p>
-        <div className="mt-9 flex flex-col items-start gap-3 sm:flex-row">
-          <button
-            onClick={onWaitlist}
-            className="inline-flex h-12 items-center gap-2 rounded-full bg-white px-6 text-sm font-semibold text-slate-950 hover:bg-white/90"
-          >
-            Get on the waitlist
-            <ArrowRight className="h-4 w-4" />
-          </button>
+        <div className="mt-8 flex flex-col items-start gap-3 sm:flex-row">
           <button
             onClick={onDemo}
-            className="inline-flex h-12 items-center gap-2 rounded-full border border-white/20 bg-white/5 px-6 text-sm font-semibold text-white hover:bg-white/10"
+            className="inline-flex h-12 items-center gap-2 rounded-full bg-[#0B2041] px-6 text-sm font-semibold text-white hover:bg-[#13315e]"
           >
-            Book a demo
+            Schedule a demo
+            <ArrowRight className="h-4 w-4" />
           </button>
+          <a
+            href="#how"
+            className="inline-flex h-12 items-center gap-1.5 rounded-full border border-slate-200 bg-white px-6 text-sm font-semibold text-slate-700 hover:border-slate-300 hover:bg-slate-50"
+          >
+            See how it works
+          </a>
         </div>
-        <div className="mt-8 flex flex-wrap items-center gap-x-6 gap-y-2 text-xs text-white/80">
-          <span className="flex items-center gap-1.5">
-            <Check className="h-3 w-3 text-emerald-400" />
-            Built for the FTC CARS Rule
-          </span>
-          <span className="flex items-center gap-1.5">
-            <Check className="h-3 w-3 text-emerald-400" />
-            50-state disclosures
-          </span>
-          <span className="flex items-center gap-1.5">
-            <Check className="h-3 w-3 text-emerald-400" />
-            Early-access pricing
-          </span>
+        <div className="mt-8 grid grid-cols-1 gap-x-6 gap-y-2.5 sm:grid-cols-2">
+          <HeroCheck icon={ShieldCheck} label="Website price monitoring" />
+          <HeroCheck icon={FileText} label="FTC-aligned addendums" />
+          <HeroCheck icon={Signature} label="Customer digital signatures" />
+          <HeroCheck icon={BadgeCheck} label="Legal audit trails" />
+          <HeroCheck icon={Building2} label="50-state compliance" />
         </div>
       </div>
 
       <div className="relative">
-        <HeroVisual />
+        <ComplianceStatusCard />
       </div>
     </div>
   </section>
 );
 
-// Phone scanning a VIN that produces a finished window sticker.
-const HeroVisual = () => (
-  <div className="relative mx-auto flex max-w-[540px] items-center justify-center">
-    {/* Phone */}
-    <div className="relative z-20 w-[200px] -rotate-[8deg] rounded-[2rem] border border-white/15 bg-slate-900 p-2 shadow-[0_30px_90px_-20px_rgba(0,0,0,0.6)]">
-      <div className="overflow-hidden rounded-[1.6rem] bg-slate-950">
-        <div className="flex items-center justify-between bg-slate-900/80 px-3 py-1.5 text-[9px] text-white/60">
-          <span>9:41</span>
-          <span>VIN Scan</span>
-        </div>
-        <div className="relative aspect-[9/16] bg-gradient-to-br from-slate-900 via-[#0B2041] to-slate-950">
-          {/* scan frame */}
-          <div className="absolute inset-x-6 top-14 aspect-[4/3] rounded-md border border-[#3BB4FF]/70">
-            <div className="absolute -top-px left-0 h-2 w-4 border-l-2 border-t-2 border-[#3BB4FF]" />
-            <div className="absolute -top-px right-0 h-2 w-4 border-r-2 border-t-2 border-[#3BB4FF]" />
-            <div className="absolute -bottom-px left-0 h-2 w-4 border-b-2 border-l-2 border-[#3BB4FF]" />
-            <div className="absolute -bottom-px right-0 h-2 w-4 border-b-2 border-r-2 border-[#3BB4FF]" />
-            <div className="absolute inset-x-2 top-1/2 h-px bg-[#3BB4FF] shadow-[0_0_8px_#3BB4FF]" />
-            <div className="absolute inset-0 flex items-center justify-center font-mono text-[8px] tracking-[0.18em] text-white/70">
-              1HGCM82633A
-            </div>
-          </div>
-          <div className="absolute inset-x-4 bottom-6 rounded-lg bg-white/10 px-2 py-1.5 text-center text-[9px] font-medium text-white backdrop-blur-sm">
-            Decoding VIN…
-          </div>
-        </div>
-      </div>
-    </div>
+const HeroCheck = ({ icon: Icon, label }: { icon: IconType; label: string }) => (
+  <div className="flex items-center gap-2.5 text-sm text-slate-700">
+    <span className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-blue-50 text-[#2563EB]">
+      <Icon className="h-3.5 w-3.5" />
+    </span>
+    <span className="font-medium">{label}</span>
+  </div>
+);
 
-    {/* Arrow */}
-    <div className="relative z-10 -mx-3 hidden sm:block">
-      <ArrowRight className="h-7 w-7 text-[#3BB4FF]" />
+// Live "mission control" compliance dashboard — green verified rows,
+// then a website scan that surfaces a red advertised-price mismatch.
+const ComplianceStatusCard = () => (
+  <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-[0_30px_90px_-25px_rgba(15,23,42,0.28)]">
+    <div className="flex items-center justify-between border-b border-slate-100 bg-slate-50/70 px-5 py-3.5">
+      <div className="flex items-center gap-2">
+        <ShieldCheck className="h-4 w-4 text-slate-500" />
+        <span className="text-[11px] font-bold uppercase tracking-[0.16em] text-slate-500">Compliance status</span>
+      </div>
+      <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold text-emerald-700">
+        <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" /> Live
+      </span>
     </div>
-
-    {/* Window sticker */}
-    <div className="relative z-10 w-[260px] rotate-[4deg] rounded-xl border border-slate-200 bg-white p-4 text-slate-900 shadow-[0_30px_90px_-20px_rgba(0,0,0,0.5)]">
-      <div className="flex items-center justify-between border-b border-slate-200 pb-2">
-        <div>
-          <p className="text-[7px] font-bold uppercase tracking-[0.2em] text-[#2563EB]">Dealer Addendum</p>
-          <p className="text-[10px] font-bold text-slate-900">2024 Honda Accord EX-L</p>
-        </div>
-        <div className="rounded bg-[#0B2041] px-1.5 py-0.5 text-[7px] font-bold text-white">CERTIFIED</div>
+    <div className="divide-y divide-slate-100">
+      <StatusRow label="Website pricing" sub="142 VINs reconciled to lot price" />
+      <StatusRow label="Required disclosures" sub="50-state engine · current rule set" />
+      <StatusRow label="Doc fee compliance" sub="At or under state cap on every deal" />
+      <StatusRow label="Customer acknowledgements" sub="Signed, hash-sealed, geo-stamped" />
+    </div>
+    <div className="border-t border-slate-100 bg-slate-50/40 px-5 pb-5 pt-4">
+      <div className="mb-3 flex items-center justify-between">
+        <span className="text-[11px] font-bold uppercase tracking-[0.16em] text-slate-500">Website scan</span>
+        <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-semibold text-amber-700">
+          <AlertTriangle className="h-3 w-3" /> 3 issues detected
+        </span>
       </div>
-      <div className="mt-2 space-y-1 text-[8px]">
-        <Row label="MSRP" value="$32,995" />
-        <Row label="Paint protection" value="+$695" />
-        <Row label="Wheel locks" value="+$249" />
-        <Row label="Doc fee (CA cap)" value="+$85" />
-      </div>
-      <div className="mt-2 flex items-end justify-between border-t border-slate-200 pt-2">
-        <div>
-          <p className="text-[7px] uppercase tracking-wider text-slate-500">Total price</p>
-          <p className="font-display text-base font-black tracking-tight text-[#0B2041]">$34,024</p>
-        </div>
-        <div className="flex h-10 w-10 items-center justify-center rounded bg-slate-900 text-white">
-          <QrCode className="h-7 w-7" />
-        </div>
-      </div>
-      <div className="mt-2 rounded bg-emerald-50 px-1.5 py-1 text-[7px] font-medium text-emerald-700">
-        <Check className="mr-0.5 inline h-2 w-2" />
-        FTC-aligned · Signed in audit log
-      </div>
+      <AlertRow tone="red" title="Advertised price mismatch" detail="VIN 1HGCM826… · Lot $34,991 vs Site $32,995" />
+      <AlertRow tone="amber" title="Missing disclosure" detail="2019 F-150 · Buyers Guide not attached" />
+      <AlertRow tone="amber" title="Third-party price drift" detail="Marketplace listing $1,400 below sticker" />
+      <p className="mt-3 flex items-center gap-1.5 text-[11px] text-slate-500">
+        <Scan className="h-3.5 w-3.5 text-[#2563EB]" /> Auto-flagged 02:14 AM &mdash; before a customer did.
+      </p>
     </div>
   </div>
 );
+
+const StatusRow = ({ label, sub }: { label: string; sub: string }) => (
+  <div className="flex items-center justify-between px-5 py-3">
+    <div className="min-w-0">
+      <p className="text-sm font-semibold text-slate-900">{label}</p>
+      <p className="truncate text-xs text-slate-500">{sub}</p>
+    </div>
+    <span className="inline-flex flex-shrink-0 items-center gap-1.5 rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700">
+      <CheckCircle2 className="h-3.5 w-3.5" /> Verified
+    </span>
+  </div>
+);
+
+const AlertRow = ({ tone, title, detail }: { tone: "red" | "amber"; title: string; detail: string }) => {
+  const styles = tone === "red" ? "border-red-200 bg-red-50/70" : "border-amber-200 bg-amber-50/60";
+  const dot = tone === "red" ? "bg-red-500" : "bg-amber-500";
+  const titleColor = tone === "red" ? "text-red-800" : "text-amber-800";
+  return (
+    <div className={`mb-2 flex items-start gap-2.5 rounded-xl border px-3 py-2.5 ${styles}`}>
+      <span className={`mt-1.5 h-1.5 w-1.5 flex-shrink-0 rounded-full ${dot}`} />
+      <div className="min-w-0">
+        <p className={`text-sm font-semibold ${titleColor}`}>{title}</p>
+        <p className="truncate text-xs text-slate-600">{detail}</p>
+      </div>
+    </div>
+  );
+};
 
 const Row = ({ label, value }: { label: string; value: string }) => (
   <div className="flex items-center justify-between text-slate-600">
@@ -509,7 +510,7 @@ const TakeThePowerBack = ({ onWaitlist }: { onWaitlist: () => void }) => (
           onClick={onWaitlist}
           className="inline-flex h-12 items-center gap-2 rounded-full bg-[#0B2041] px-6 text-sm font-semibold text-white hover:bg-[#13315e]"
         >
-          Get on the waitlist
+          Schedule a demo
           <ArrowRight className="h-4 w-4" />
         </button>
       </div>
@@ -631,7 +632,7 @@ const PricingTeaser = ({
           Three tiers. Early-access pricing.
         </h2>
         <p className="mt-5 text-base leading-relaxed text-slate-600">
-          Waitlist members lock in launch pricing. Full pricing publishes at GA.
+          Early dealers lock in launch pricing. Full pricing publishes at GA.
         </p>
       </div>
 
@@ -651,7 +652,7 @@ const PricingTeaser = ({
                   onClick={onWaitlist}
                   className="inline-flex h-10 w-full items-center justify-center gap-1.5 rounded-full bg-[#0B2041] px-4 text-sm font-semibold text-white hover:bg-[#13315e]"
                 >
-                  Get on the waitlist
+                  Schedule a demo
                   <ArrowRight className="h-3.5 w-3.5" />
                 </button>
               ) : (
@@ -672,7 +673,7 @@ const PricingTeaser = ({
           onClick={onWaitlist}
           className="inline-flex h-11 items-center gap-2 rounded-full bg-[#0B2041] px-6 text-sm font-semibold text-white hover:bg-[#13315e]"
         >
-          See pricing &amp; get on the waitlist
+          See pricing &amp; book a demo
           <ArrowRight className="h-4 w-4" />
         </button>
       </div>
@@ -687,7 +688,7 @@ const PricingTeaser = ({
 const FAQS = [
   {
     q: "When does AutoLabels launch?",
-    a: "We're in pilot now with select dealer groups. General availability rolls out through 2026. Waitlist members get first access and locked-in early pricing.",
+    a: "We're in pilot now with select dealer groups. General availability rolls out through 2026. Early-access dealers get first access and locked-in early pricing.",
   },
   {
     q: "Is this CARS Act compliant?",
@@ -751,7 +752,7 @@ const FinalCTA = ({ onWaitlist, onDemo }: { onWaitlist: () => void; onDemo: () =
       </div>
       <div className="relative">
         <h2 className="font-display text-4xl font-black tracking-tighter sm:text-5xl">
-          Get on the waitlist.
+          Schedule a demo.
         </h2>
         <p className="mt-5 text-lg text-white/70">Be first in line · Early-access pricing.</p>
         <div className="mt-9 flex flex-wrap items-center justify-center gap-3">
@@ -759,7 +760,7 @@ const FinalCTA = ({ onWaitlist, onDemo }: { onWaitlist: () => void; onDemo: () =
             onClick={onWaitlist}
             className="inline-flex h-12 items-center gap-2 rounded-full bg-white px-6 text-sm font-semibold text-slate-950 hover:bg-white/90"
           >
-            Get on the waitlist
+            Schedule a demo
             <ArrowRight className="h-4 w-4" />
           </button>
           <button
@@ -793,7 +794,7 @@ const Footer = ({ onNav, onWaitlist }: { onNav: (to: string) => void; onWaitlist
           onClick={onWaitlist}
           className="inline-flex h-8 items-center gap-1.5 rounded-full bg-[#0B2041] px-3 text-xs font-medium text-white hover:bg-[#13315e]"
         >
-          Get on the waitlist
+          Schedule a demo
         </button>
       </div>
       <p className="text-xs text-slate-500">
