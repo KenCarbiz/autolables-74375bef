@@ -169,18 +169,36 @@ export async function buildAuditPacket(args: BuildArgs): Promise<AuditPacket> {
       const items = products.map((p) => {
         const id = String(p.id ?? "");
         const isOptional = p.badge_type === "optional";
+        // An installed accessory priced above the advertised price
+        // (price_in_advertised === false) is electable like an optional
+        // add-on: its proof is the affirmative Accept, not just an initial.
+        // An installed accessory included in the advertised price is
+        // acknowledged with an initial.
+        const priceInAdvertised = (p as { price_in_advertised?: boolean }).price_in_advertised !== false;
+        const aboveAdvertised = p.badge_type === "installed" && !priceInAdvertised;
+        const electable = isOptional || aboveAdvertised;
         const initialed = !!(inits[id] && String(inits[id]).trim());
-        const elected = isOptional ? optional[id] === "accept" : initialed;
+        const accepted = optional[id] === "accept";
+        const elected = electable ? accepted : initialed;
+        const category = isOptional
+          ? "optional"
+          : aboveAdvertised
+            ? "added_above_advertised"
+            : "included_in_advertised";
         return {
           product_id: id,
           name: String(p.name ?? ""),
           price: typeof p.price === "number" ? p.price : null,
+          category,
+          above_advertised: aboveAdvertised,
+          requires_election: electable,
           disclosed_optional: isOptional,
           benefit_justification: String((p as { benefit_justification?: string }).benefit_justification ?? ""),
           elected,
-          acknowledgment: isOptional ? (optional[id] ?? "none") : (initialed ? "initialed" : "none"),
+          acknowledgment: electable ? (optional[id] ?? "none") : (initialed ? "initialed" : "none"),
         };
       });
+      const aboveAdvertisedItems = items.filter((i) => i.above_advertised);
       return {
         addendum_id: (a.id as string) ?? null,
         customer_name: (a.customer_name as string) ?? null,
@@ -188,6 +206,14 @@ export async function buildAuditPacket(args: BuildArgs): Promise<AuditPacket> {
         content_hash: (a.content_hash as string) ?? null,
         item_count: items.length,
         elected_count: items.filter((i) => i.elected).length,
+        // Above-advertised upcharges are the highest-scrutiny lines — a
+        // regulator wants to see each was affirmatively elected, and the
+        // exact dollar amount charged over the advertised price.
+        above_advertised_count: aboveAdvertisedItems.length,
+        above_advertised_elected_count: aboveAdvertisedItems.filter((i) => i.elected).length,
+        above_advertised_elected_total: aboveAdvertisedItems
+          .filter((i) => i.elected)
+          .reduce((s, i) => s + (i.price ?? 0), 0),
         items,
       };
     })

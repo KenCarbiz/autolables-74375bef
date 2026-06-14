@@ -129,11 +129,20 @@ function renderElectionRecord(packet: AuditPacket): string {
     content_hash: string | null;
     elected_count: number;
     item_count: number;
-    items: Array<{ name: string; price: number | null; disclosed_optional: boolean; benefit_justification: string; elected: boolean; acknowledgment: string }>;
+    above_advertised_count?: number;
+    above_advertised_elected_count?: number;
+    above_advertised_elected_total?: number;
+    items: Array<{ name: string; price: number | null; category?: string; above_advertised?: boolean; disclosed_optional: boolean; benefit_justification: string; elected: boolean; acknowledgment: string }>;
   }>) || [];
 
+  const typeLabel = (i: { category?: string; disclosed_optional: boolean }): string => {
+    if (i.category === "added_above_advertised") return '<strong style="color:#B45309;">Above advertised</strong>';
+    if (i.category === "included_in_advertised") return "Included in advertised";
+    return i.disclosed_optional ? "Optional" : "Installed";
+  };
+
   const intro = `<h2>Add-On Election Record</h2>
-    <p class="muted">Per-item proof that the customer reviewed each add-on &mdash; the price shown, whether it was disclosed as optional, and its stated benefit &mdash; then affirmatively elected or declined it. Documents informed election under FTC Act &sect;5; tamper-evident, not a guarantee of outcome.</p>`;
+    <p class="muted">Per-item proof that the customer reviewed each add-on &mdash; the price shown, whether it was already included in the advertised price or added above it, and its stated benefit &mdash; then affirmatively elected or declined it. Every charge above the advertised price requires an affirmative election. Documents informed election under FTC Act &sect;5; tamper-evident, not a guarantee of outcome.</p>`;
 
   if (deals.length === 0) {
     return `<section class="card" id="addon-elections">${intro}<p class="empty">No signed addendums with add-ons on record for this VIN.</p></section>`;
@@ -144,15 +153,20 @@ function renderElectionRecord(packet: AuditPacket): string {
       <tr>
         <td>${escapeHtml(i.name)}</td>
         <td class="num">${i.price != null ? "$" + i.price.toLocaleString() : "&mdash;"}</td>
-        <td>${i.disclosed_optional ? "Optional" : "Installed"}</td>
+        <td>${typeLabel(i)}</td>
         <td>${i.benefit_justification ? escapeHtml(i.benefit_justification) : '<span class="muted">&mdash;</span>'}</td>
         <td>${i.elected ? '<strong style="color:#15803D;">Elected</strong>' : '<span class="muted">Declined</span>'}</td>
         <td>${escapeHtml(i.acknowledgment)}</td>
       </tr>`).join("");
+    const aboveCount = d.above_advertised_count ?? 0;
+    const aboveNote = aboveCount > 0
+      ? `<p class="muted">Above advertised price: ${d.above_advertised_elected_count ?? 0}/${aboveCount} affirmatively elected${(d.above_advertised_elected_total ?? 0) > 0 ? ` &middot; $${(d.above_advertised_elected_total ?? 0).toLocaleString()} charged over advertised, each elected` : ""}.</p>`
+      : "";
     return `
       <div style="margin-top:16px;">
         <h3>${escapeHtml(d.customer_name || "Customer")} &middot; ${escapeHtml(d.signed_at ? fmtDate(d.signed_at) : "unsigned")} &middot; ${d.elected_count}/${d.item_count} elected</h3>
         <p class="muted">Content hash <code>${escapeHtml((d.content_hash || "—").slice(0, 24))}…</code></p>
+        ${aboveNote}
         <table class="manifest-table">
           <thead><tr><th>Add-on</th><th class="num">Price</th><th>Type</th><th>Benefit shown</th><th>Election</th><th>Ack</th></tr></thead>
           <tbody>${rows}</tbody>
