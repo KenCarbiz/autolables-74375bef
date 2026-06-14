@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import {
   getStateRule,
   validateAddendum,
@@ -140,6 +140,15 @@ describe("validateAddendum — mandatory add-ons ban", () => {
 });
 
 describe("validateAddendum — CA SB 766 3-day ack", () => {
+  // The 3-day ack finding is gated on SB 766's 10/1/2026 effective
+  // date. Pin the clock past it so the "post-effective" cases assert
+  // the live behavior instead of the pre-effective no-op.
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-11-01T00:00:00Z"));
+  });
+  afterEach(() => vi.useRealTimers());
+
   it("FAILS when under-$50k CA sale is post-effective and ack is missing", () => {
     const findings = validateAddendum({
       state: "CA",
