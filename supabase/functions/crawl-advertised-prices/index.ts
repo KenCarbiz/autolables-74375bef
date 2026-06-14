@@ -131,6 +131,17 @@ serve(async (req) => {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
+
+  // ── Auth gate ────────────────────────────────────────────────
+  // Service-role only. Cron jobs supply the service key in the
+  // Authorization header; no other caller should reach this.
+  const auth = (req.headers.get("Authorization") || "").replace(/^Bearer\s+/i, "");
+  if (auth !== serviceKey) {
+    return new Response(JSON.stringify({ error: "service-role required" }), {
+      status: 401,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
   const admin = createClient(supabaseUrl, serviceKey, {
     auth: { persistSession: false, autoRefreshToken: false },
   });
