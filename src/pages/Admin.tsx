@@ -13,6 +13,7 @@ import { EmailDistributionPanel } from "@/components/admin/EmailDistributionPane
 import { InventoryFeedHealth } from "@/components/admin/InventoryFeedHealth";
 import { OpenSigningsList } from "@/components/admin/OpenSigningsList";
 import { AddonElectionsPanel } from "@/components/admin/AddonElectionsPanel";
+import { PriceIntegrityPanel } from "@/components/admin/PriceIntegrityPanel";
 import { useEmailDistribution } from "@/hooks/useEmailDistribution";
 import { PRODUCT_ICONS } from "@/components/addendum/ProductRow";
 import { STATE_DOC_FEES } from "@/data/docFees";
@@ -1883,6 +1884,7 @@ const Admin = () => {
         {/* ─── Audit Log Tab ─── */}
         {tab === "audit" && (
           <div className="space-y-4">
+            <PriceIntegrityPanel />
             <div className="flex items-center justify-between flex-wrap gap-2">
               <div>
                 <div className="flex items-center gap-2">
