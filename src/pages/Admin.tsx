@@ -141,7 +141,7 @@ const Admin = () => {
   const { settings, updateSettings } = useDealerSettings();
   const { rules, addRule, updateRule, deleteRule } = useProductRules();
   const { entries: auditEntries, exportCsv: exportAuditCsv } = useAudit();
-  const { currentStore, updateTenant } = useTenant();
+  const { currentStore, updateTenant, tenant } = useTenant();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
 
@@ -1077,7 +1077,8 @@ const Admin = () => {
                         const f = e.target.files?.[0];
                         if (!f) return;
                         setLogoUploading(true);
-                        const result = await uploadPhoto("listing-photos", f, {
+                        const result = await uploadPhoto("dealer-logos", f, {
+                          tenantId: tenant?.id,
                           storeId: currentStore?.id,
                           vin: "brand-logo",
                         });
