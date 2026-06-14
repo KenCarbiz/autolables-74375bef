@@ -12,6 +12,7 @@ import { AccessoryInstallPanel } from "@/components/admin/AccessoryInstallPanel"
 import { EmailDistributionPanel } from "@/components/admin/EmailDistributionPanel";
 import { InventoryFeedHealth } from "@/components/admin/InventoryFeedHealth";
 import { OpenSigningsList } from "@/components/admin/OpenSigningsList";
+import { AddonElectionsPanel } from "@/components/admin/AddonElectionsPanel";
 import { useEmailDistribution } from "@/hooks/useEmailDistribution";
 import { PRODUCT_ICONS } from "@/components/addendum/ProductRow";
 import { STATE_DOC_FEES } from "@/data/docFees";
@@ -1232,6 +1233,7 @@ const Admin = () => {
                 widget. Dealers see WHICH shoppers hold unsigned
                 links + can copy/re-engage/defend per row. */}
             <OpenSigningsList />
+            <AddonElectionsPanel storeId={currentStore?.id || ""} />
           </div>
         )}
 

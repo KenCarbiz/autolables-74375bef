@@ -184,7 +184,7 @@ export async function buildAuditPacket(args: BuildArgs): Promise<AuditPacket> {
       return {
         addendum_id: (a.id as string) ?? null,
         customer_name: (a.customer_name as string) ?? null,
-        signed_at: (a.signed_at as string) ?? null,
+        signed_at: (a.customer_signed_at as string) ?? null,
         content_hash: (a.content_hash as string) ?? null,
         item_count: items.length,
         elected_count: items.filter((i) => i.elected).length,
