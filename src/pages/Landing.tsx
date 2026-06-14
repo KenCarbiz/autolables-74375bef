@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
+import Seo from "@/components/Seo";
 import Logo from "@/components/brand/Logo";
 import {
   ArrowRight,
