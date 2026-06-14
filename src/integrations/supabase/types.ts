@@ -1718,6 +1718,7 @@ export type Database = {
           created_at: string
           created_by: string | null
           dealer_snapshot: Json
+          default_locale: string
           description: string | null
           documents: Json
           factory_sticker_url: string | null
@@ -1755,6 +1756,7 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           dealer_snapshot?: Json
+          default_locale?: string
           description?: string | null
           documents?: Json
           factory_sticker_url?: string | null
@@ -1792,6 +1794,7 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           dealer_snapshot?: Json
+          default_locale?: string
           description?: string | null
           documents?: Json
           factory_sticker_url?: string | null
@@ -2390,6 +2393,7 @@ export type Database = {
           created_at: string
           created_by: string | null
           dealer_snapshot: Json
+          default_locale: string
           description: string | null
           documents: Json
           factory_sticker_url: string | null
