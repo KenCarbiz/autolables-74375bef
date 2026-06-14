@@ -139,6 +139,19 @@ const MobileSigning = () => {
   const products: ProductSnapshot[] = addendum?.products_snapshot || [];
   const installed = products.filter((p) => p.badge_type === "installed");
   const optional = products.filter((p) => p.badge_type === "optional");
+  // An installed accessory whose price is already in the advertised price
+  // is non-elective — the customer agreed to it by buying at the
+  // advertised price, so it's acknowledged with an initial. An installed
+  // accessory priced ABOVE the advertised price is a dealer upcharge the
+  // customer must affirmatively ELECT: same symmetric Accept/Decline as an
+  // optional add-on, plus an initial when kept. Declining means they pay
+  // the advertised price and the upcharge is not billed.
+  const isAddedOn = (p: ProductSnapshot) =>
+    p.badge_type === "installed" && p.price_in_advertised === false;
+  const includedInstalled = installed.filter((p) => p.price_in_advertised !== false);
+  const addedInstalled = installed.filter((p) => p.price_in_advertised === false);
+  // Every item that requires an affirmative Accept/Decline election.
+  const electable = products.filter((p) => p.badge_type === "optional" || isAddedOn(p));
   // Whether this deal is financed. Drives the add-on election language:
   // the "won't change your interest rate" clause only makes sense — and
   // is only defensible — when there's a rate in play.
@@ -166,12 +179,13 @@ const MobileSigning = () => {
   ];
   const requiresStatutoryInitials = (name: string) =>
     STATUTORY_INITIAL_KEYWORDS.some((k) => name.toLowerCase().includes(k));
-  // Installed items always carry a customer initial (the red-team layer
-  // hard-blocks an unsigned installed product). A statutory optional needs
-  // one only when the customer is actually keeping it — declining GAP
-  // shouldn't demand an initial.
+  // Included installed items always carry a customer initial (the red-team
+  // layer hard-blocks an unsigned installed product). An above-advertised
+  // upcharge or a statutory optional needs one only when the customer is
+  // actually keeping it — declining shouldn't demand an initial.
   const needsInitials = (p: ProductSnapshot) =>
-    p.badge_type === "installed" ||
+    (p.badge_type === "installed" && p.price_in_advertised !== false) ||
+    (isAddedOn(p) && optionalSelections[p.id] === "accept") ||
     (p.badge_type === "optional" &&
       requiresStatutoryInitials(p.name) &&
       optionalSelections[p.id] === "accept");
@@ -195,14 +209,10 @@ const MobileSigning = () => {
   // accepted. That additive subtotal is the number the customer confirms,
   // so an elected add-on can't surface as a silent contract line later.
   const effectivePrice = (p: ProductSnapshot) => priceOverrides[p.id] ?? p.price;
-  const includedItems = products.filter(
-    (p) => p.badge_type === "installed" && p.price_in_advertised !== false,
-  );
-  const addedItems = products.filter(
-    (p) =>
-      (p.badge_type === "installed" && p.price_in_advertised === false) ||
-      (p.badge_type === "optional" && optionalSelections[p.id] === "accept"),
-  );
+  const includedItems = includedInstalled;
+  // Only items the customer affirmatively elected roll into the total —
+  // an above-advertised upcharge they declined is never billed.
+  const addedItems = electable.filter((p) => optionalSelections[p.id] === "accept");
   const includedTotal = includedItems.reduce((s, p) => s + effectivePrice(p), 0);
   const addedTotal = addedItems.reduce((s, p) => s + effectivePrice(p), 0);
   // The advertised price is only reliably present on some addendum rows
@@ -233,9 +243,9 @@ const MobileSigning = () => {
       toast.error(`Please initial all ${missingInitials.length} product(s).`);
       return;
     }
-    const missingSelections = optional.filter((p) => !optionalSelections[p.id]);
+    const missingSelections = electable.filter((p) => !optionalSelections[p.id]);
     if (missingSelections.length > 0) {
-      toast.error(`Please accept or decline all optional items.`);
+      toast.error(`Please accept or decline every optional and added item.`);
       return;
     }
     if (!warrantyAck) {
@@ -311,19 +321,28 @@ const MobileSigning = () => {
         p.name.toLowerCase().includes("doc")
       )?.price,
       stickerText: products.map((p) => `${p.name} ${p.disclosure || ""}`).join(" "),
-      products: products.map((p) => ({
-        id: p.id,
-        name: p.name,
-        price: p.price,
-        badge_type: p.badge_type,
-        disclosure: p.disclosure || undefined,
-        // An optional add-on's per-item sign-off is its affirmative
-        // Accept/Decline election; installed items still rely on initials.
-        separate_signoff:
-          p.badge_type === "optional"
+      products: products.map((p) => {
+        const isElectable = p.badge_type === "optional" || isAddedOn(p);
+        // A declined above-advertised upcharge isn't billed, so it isn't a
+        // charged installed line — represent it as optional so the
+        // installed-initials red-team rule doesn't demand an initial on
+        // something the customer turned down.
+        const effBadge =
+          isAddedOn(p) && optionalSelections[p.id] !== "accept" ? "optional" : p.badge_type;
+        return {
+          id: p.id,
+          name: p.name,
+          price: p.price,
+          badge_type: effBadge,
+          disclosure: p.disclosure || undefined,
+          // An electable item's per-item sign-off is its affirmative
+          // Accept/Decline election; non-elective installed items rely on
+          // the initial.
+          separate_signoff: isElectable
             ? !!optionalSelections[p.id]
             : !!initials[p.id]?.trim(),
-      })),
+        };
+      }),
       spanishVersion: consent.language?.startsWith("es") || false,
       threeDayAck: sb766ThreeDayAck,
     };
@@ -601,11 +620,11 @@ const MobileSigning = () => {
   // customer can see how much is left.
   const initialItems = products.filter((p) => needsInitials(p));
   const initialsDoneCount = initialItems.filter((p) => (initials[p.id] || "").trim()).length;
-  const optionalSelectedCount = optional.filter((p) => !!optionalSelections[p.id]).length;
+  const electableSelectedCount = electable.filter((p) => !!optionalSelections[p.id]).length;
   const requirements = [
     { label: "E-SIGN consent",  done: esignConsent },
     { label: "Required initials", done: initialItems.length === 0 || initialsDoneCount === initialItems.length },
-    { label: "Optional items chosen",    done: optional.length === 0 || optionalSelectedCount === optional.length },
+    { label: "Options chosen",    done: electable.length === 0 || electableSelectedCount === electable.length },
     { label: "Warranty acknowledged",    done: warrantyAck },
     { label: "Delivery mileage",         done: deliveryMileage.trim().length > 0 },
     { label: "Sticker match acknowledged", done: stickerMatchAck },
@@ -678,7 +697,7 @@ const MobileSigning = () => {
         <div className="bg-card rounded-xl p-5 shadow-sm space-y-4">
           <h2 className="text-sm font-bold font-barlow-condensed text-foreground">Your package — choose what's included</h2>
 
-          {installed.map((p) => (
+          {includedInstalled.map((p) => (
             <div key={p.id} className="border border-border rounded-lg p-3 space-y-2">
               <div className="flex items-start justify-between">
                 <div>
@@ -699,6 +718,60 @@ const MobileSigning = () => {
               </div>
             </div>
           ))}
+
+          {addedInstalled.length > 0 && (
+            <div className="border-t border-border pt-4 space-y-3">
+              <div className="rounded-lg border border-gold/40 bg-gold/5 p-3">
+                <p className="text-sm font-semibold text-foreground">Dealer-installed — above the advertised price</p>
+                <p className="text-[13px] text-muted-foreground leading-snug mt-1">
+                  These are on the vehicle but priced above the advertised price, so they're yours to accept or decline.
+                  Decline and you pay the advertised price — you won't be charged for these.
+                </p>
+              </div>
+
+              {addedInstalled.map((p) => {
+                const choice = optionalSelections[p.id];
+                return (
+                  <div key={p.id} className="border border-border rounded-lg p-3 space-y-2.5">
+                    <div className="flex items-start justify-between">
+                      <div>
+                        <span className="text-[10px] font-bold bg-gold text-navy px-1.5 py-0.5 rounded">Added above advertised</span>
+                        <p className="text-sm font-semibold text-foreground mt-1">{p.name}</p>
+                        {p.warranty && <p className="text-[10px] text-muted-foreground">{p.warranty}</p>}
+                      </div>
+                      <p className="text-sm font-bold text-foreground">${effectivePrice(p).toFixed(2)}</p>
+                    </div>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => setOptionalSelections((prev) => ({ ...prev, [p.id]: "accept" }))}
+                        className={`flex-1 h-10 rounded-lg text-sm font-bold border-2 ${choice === "accept" ? "border-teal bg-teal text-primary-foreground" : "border-border text-foreground"}`}
+                      >
+                        Add it
+                      </button>
+                      <button
+                        onClick={() => setOptionalSelections((prev) => ({ ...prev, [p.id]: "decline" }))}
+                        className={`flex-1 h-10 rounded-lg text-sm font-bold border-2 ${choice === "decline" ? "border-slate-400 bg-slate-100 text-foreground" : "border-border text-foreground"}`}
+                      >
+                        No thanks
+                      </button>
+                    </div>
+                    {choice === "accept" && (
+                      <div className="flex items-center gap-2">
+                        <span className="text-[10px] font-semibold text-muted-foreground">INITIALS:</span>
+                        <input
+                          value={initials[p.id] || ""}
+                          onChange={(e) => setInitials((prev) => ({ ...prev, [p.id]: e.target.value.toUpperCase() }))}
+                          placeholder="____"
+                          className={`w-20 h-10 border-2 rounded-lg px-2 text-base font-bold text-center uppercase bg-background text-foreground ${initials[p.id]?.trim() ? "border-teal" : "border-action"}`}
+                        />
+                        <span className="text-[10px] text-muted-foreground">Initial to confirm this above-advertised charge.</span>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
 
           {optional.length > 0 && (
             <div className="border-t border-border pt-4 space-y-3">
