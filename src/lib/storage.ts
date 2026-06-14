@@ -20,12 +20,20 @@ export interface UploadedPhoto {
 const safeName = (name: string) =>
   name.replace(/[^a-zA-Z0-9._-]/g, "_").slice(-80);
 
+// Storage RLS on these buckets requires the FIRST path segment to be a
+// tenant_id the caller is a member of. Callers must pass tenantId — uploads
+// without one will be rejected by the policy.
 export const uploadPhoto = async (
   bucket: PhotoBucket,
   file: File,
-  opts: { storeId?: string; vin?: string } = {}
+  opts: { tenantId?: string | null; storeId?: string; vin?: string } = {}
 ): Promise<UploadedPhoto | null> => {
-  const scope = [opts.storeId || "any", opts.vin || "misc"].join("/");
+  if (!opts.tenantId) {
+    // eslint-disable-next-line no-console
+    console.error("uploadPhoto: tenantId is required (RLS path scoping)");
+    return null;
+  }
+  const scope = [opts.tenantId, opts.storeId || "any", opts.vin || "misc"].join("/");
   const stamp = Date.now();
   const random = Math.random().toString(36).slice(2, 8);
   const path = `${scope}/${stamp}-${random}-${safeName(file.name)}`;
@@ -54,7 +62,7 @@ export const uploadPhoto = async (
 export const uploadPhotos = async (
   bucket: PhotoBucket,
   files: File[],
-  opts: { storeId?: string; vin?: string } = {}
+  opts: { tenantId?: string | null; storeId?: string; vin?: string } = {}
 ): Promise<UploadedPhoto[]> => {
   const results = await Promise.all(files.map((f) => uploadPhoto(bucket, f, opts)));
   return results.filter((r): r is UploadedPhoto => r !== null);
