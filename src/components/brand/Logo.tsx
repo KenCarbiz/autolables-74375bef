@@ -1,5 +1,3 @@
-import { useId } from "react";
-
 interface LogoProps {
   variant?: "mark" | "full" | "stacked" | "wordmark";
   inverted?: boolean;
@@ -25,9 +23,10 @@ const CURB = "#2563EB"; // Autocurb blue — "auto"
 const CYAN = "#3BB4FF"; // bright accent — "auto" on dark backgrounds
 const INTER = "'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif";
 
-// Square "a" tile — favicon / app icon. White lowercase "a" on the
-// navy→blue gradient.
-const Mark = ({ size, gradId }: { size: number; gradId: string }) => (
+// Square "a" tile — favicon / app icon. White lowercase "a" on a
+// solid Autocurb-blue (#2563EB) rounded square.
+const GEO = "'Outfit', 'Inter', system-ui, -apple-system, sans-serif";
+const Mark = ({ size }: { size: number }) => (
   <svg
     width={size}
     height={size}
@@ -36,23 +35,16 @@ const Mark = ({ size, gradId }: { size: number; gradId: string }) => (
     aria-hidden="true"
     style={{ flexShrink: 0 }}
   >
-    <defs>
-      <linearGradient id={gradId} x1="0%" y1="0%" x2="100%" y2="100%">
-        <stop offset="0%" stopColor={CURB} />
-        <stop offset="100%" stopColor={NAVY} />
-      </linearGradient>
-    </defs>
-    <rect width="64" height="64" rx="14" fill={`url(#${gradId})`} />
+    <rect width="64" height="64" rx="13" fill={CURB} />
     <text
       x="32"
-      y="34"
+      y="35"
       fill="#FFFFFF"
-      fontFamily={INTER}
-      fontWeight={800}
-      fontSize="40"
+      fontFamily={GEO}
+      fontWeight={700}
+      fontSize="46"
       textAnchor="middle"
       dominantBaseline="central"
-      letterSpacing="-0.02em"
     >
       a
     </text>
@@ -108,12 +100,10 @@ const Logo = ({
   className,
   tagline = false,
 }: LogoProps) => {
-  const gradId = useId();
-
   if (variant === "mark") {
     return (
       <span className={className} aria-label="AutoLabels.io" role="img">
-        <Mark size={size} gradId={gradId} />
+        <Mark size={size} />
       </span>
     );
   }

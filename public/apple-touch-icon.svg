@@ -1,11 +1,7 @@
 <svg width="180" height="180" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="AutoLabels">
   <defs>
-    <linearGradient id="appleA" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#2563EB"/>
-      <stop offset="100%" stop-color="#0B2041"/>
-    </linearGradient>
-    <style>@import url('https://fonts.googleapis.com/css2?family=Inter:wght@800&amp;display=swap');</style>
+    <style>@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@700&amp;display=swap');</style>
   </defs>
-  <rect width="64" height="64" rx="14" fill="url(#appleA)"/>
-  <text x="32" y="34" fill="#FFFFFF" font-family="Inter, system-ui, -apple-system, sans-serif" font-weight="800" font-size="40" text-anchor="middle" dominant-baseline="central" letter-spacing="-0.02em">a</text>
+  <rect width="64" height="64" rx="13" fill="#2563EB"/>
+  <text x="32" y="35" fill="#FFFFFF" font-family="'Outfit', system-ui, -apple-system, sans-serif" font-weight="700" font-size="46" text-anchor="middle" dominant-baseline="central">a</text>
 </svg>
