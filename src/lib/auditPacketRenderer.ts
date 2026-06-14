@@ -117,6 +117,52 @@ const renderSummaryCards = (packet: AuditPacket): string => {
   `).join("");
 };
 
+// Add-On Election Record — per-item proof that the customer reviewed
+// each add-on (price, optional flag, benefit) and affirmatively
+// elected or declined it. Reads the derived "12-addon-elections"
+// section produced by buildAuditPacket.
+function renderElectionRecord(packet: AuditPacket): string {
+  const section = packet.sections.find((s) => s.name === "12-addon-elections");
+  const deals = (section?.data as Array<{
+    customer_name: string | null;
+    signed_at: string | null;
+    content_hash: string | null;
+    elected_count: number;
+    item_count: number;
+    items: Array<{ name: string; price: number | null; disclosed_optional: boolean; benefit_justification: string; elected: boolean; acknowledgment: string }>;
+  }>) || [];
+
+  const intro = `<h2>Add-On Election Record</h2>
+    <p class="muted">Per-item proof that the customer reviewed each add-on &mdash; the price shown, whether it was disclosed as optional, and its stated benefit &mdash; then affirmatively elected or declined it. Documents informed election under FTC Act &sect;5; tamper-evident, not a guarantee of outcome.</p>`;
+
+  if (deals.length === 0) {
+    return `<section class="card" id="addon-elections">${intro}<p class="empty">No signed addendums with add-ons on record for this VIN.</p></section>`;
+  }
+
+  const dealsHtml = deals.map((d) => {
+    const rows = d.items.map((i) => `
+      <tr>
+        <td>${escapeHtml(i.name)}</td>
+        <td class="num">${i.price != null ? "$" + i.price.toLocaleString() : "&mdash;"}</td>
+        <td>${i.disclosed_optional ? "Optional" : "Installed"}</td>
+        <td>${i.benefit_justification ? escapeHtml(i.benefit_justification) : '<span class="muted">&mdash;</span>'}</td>
+        <td>${i.elected ? '<strong style="color:#15803D;">Elected</strong>' : '<span class="muted">Declined</span>'}</td>
+        <td>${escapeHtml(i.acknowledgment)}</td>
+      </tr>`).join("");
+    return `
+      <div style="margin-top:16px;">
+        <h3>${escapeHtml(d.customer_name || "Customer")} &middot; ${escapeHtml(d.signed_at ? fmtDate(d.signed_at) : "unsigned")} &middot; ${d.elected_count}/${d.item_count} elected</h3>
+        <p class="muted">Content hash <code>${escapeHtml((d.content_hash || "—").slice(0, 24))}…</code></p>
+        <table class="manifest-table">
+          <thead><tr><th>Add-on</th><th class="num">Price</th><th>Type</th><th>Benefit shown</th><th>Election</th><th>Ack</th></tr></thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </div>`;
+  }).join("");
+
+  return `<section class="card" id="addon-elections">${intro}${dealsHtml}</section>`;
+}
+
 export function renderPacketHtml(packet: AuditPacket): string {
   const m = packet.manifest;
   const title = `Audit-Defense Packet · ${m.vin}`;
@@ -223,6 +269,8 @@ export function renderPacketHtml(packet: AuditPacket): string {
         ${renderSummaryCards(packet)}
       </div>
     </section>
+
+    ${renderElectionRecord(packet)}
 
     <section class="card" id="manifest">
       <h2>Manifest</h2>
