@@ -170,6 +170,7 @@ const Index = () => {
           price: p.price ?? 0,
           price_label: p.price_label ?? null,
           disclosure: p.disclosure ?? null,
+          benefit_justification: p.benefit_justification ?? null,
           sort_order: p.sort_order ?? i,
           is_active: true,
         })));
