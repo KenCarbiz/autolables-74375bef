@@ -32,6 +32,7 @@ export interface PublicMessages {
   rate_limited_body: string;
   vehicle_not_found: string;
   not_stickered_yet: string;
+  vehicle_details_fallback: string; // hero headline fallback, contains {n} (VIN tail)
   // header / share
   open_on_another_device: string;
   share: string;
@@ -42,13 +43,16 @@ export interface PublicMessages {
   suggested_retail_price: string;
   asking_price: string;
   drive_out_price: string;
+  drive_out_disclaimer: string;
   whats_in_price: string;
+  addon_included_note: string;
   base_price: string;
   base: string;
   accessories: string;
   dealer_installed_addons: string;
   doc_fee: string;
   miles: string;
+  mi_short: string;
   stock: string;
   // sections
   about_this_vehicle: string;
@@ -68,31 +72,67 @@ export interface PublicMessages {
   tap_to_view: string;
   why_benefits_you: string;
   optional_not_condition: string;
+  key_specs: string;
+  certified_preowned: string;
+  watch_caption: string; // contains {n} (video caption)
+  video_fallback: string; // default caption when none provided
   // reserve / inquiry
   reserve_vehicle: string;
   reserved: string;
+  reserved_subtitle: string; // contains {n} (dealer name)
+  vehicle_held_title: string;
+  vehicle_held_body: string;
+  dealership: string;
+  close: string;
+  reserve_intro: string;
   hold_for_me: string;
   test_drive: string;
   make_offer: string;
   your_name: string;
+  full_name: string;
   phone: string;
   email: string;
+  message: string;
+  default_inquiry_message: string;
   send_request: string;
+  reserve_now: string;
+  reserving: string;
   sending: string;
   inquiry_disclaimer: string;
+  inquiry_validation_error: string;
+  inquiry_send_error: string;
+  // handoff
+  open_on_another_device_title: string;
+  scan_to_continue: string;
+  scan_to_continue_body: string;
+  copy_link: string;
+  call_dealership: string;
+  share_vehicle: string;
   // availability
   pickup: string;
   ready_now: string;
   delivery: string;
   on_request: string;
+  pickup_available_at: string; // contains {n} (dealer + city phrase)
+  pickup_available_generic: string;
+  delivery_ask: string;
   // trust band
   prep_signed: string;
+  prep_pending: string;
+  prep_checked: string; // "Checked"
+  prep_signed_title: string; // contains {n} (date)
+  prep_required_title: string;
   recalls_clear: string;
   recalls_open: string; // contains {n}
+  recalls_as_of: string; // contains {n} (date)
+  recalls_open_title: string;
+  recalls_clear_title: string;
   archived: string;
+  archived_title: string;
   // recall banner
   recall_banner_title: string;
   recall_banner_body: string;
+  recall_more: string; // contains {n}
   // specs
   body: string;
   drivetrain: string;
@@ -102,6 +142,7 @@ export interface PublicMessages {
   exterior: string;
   // photos
   photos: string;
+  photo_alt: string; // contains {n} (photo index)
   more_photos: string; // contains {n}
   // certification
   warranty: string;
@@ -111,6 +152,7 @@ export interface PublicMessages {
   // payment estimator
   est_monthly_payment: string;
   estimate_only: string;
+  per_mo: string;
   apr: string;
   down: string;
   term: string;
@@ -136,6 +178,7 @@ export const LABELS: Record<PublicLocale, PublicMessages> = {
     rate_limited_body: "You're loading pages quickly. Please wait a few seconds and try again.",
     vehicle_not_found: "Vehicle Not Found",
     not_stickered_yet: "This vehicle may not have been stickered yet.",
+    vehicle_details_fallback: "Vehicle Details — VIN {n}",
     open_on_another_device: "Open on another device",
     share: "Share",
     link_copied: "Link copied",
@@ -144,13 +187,17 @@ export const LABELS: Record<PublicLocale, PublicMessages> = {
     suggested_retail_price: "Suggested Retail Price",
     asking_price: "Asking Price",
     drive_out_price: "Drive-out price",
+    drive_out_disclaimer:
+      "Every mandatory fee is in this number. Tax, tag, and registration are state-set and added at titling.",
     whats_in_price: "What's in this price",
+    addon_included_note: "Included in the total above",
     base_price: "Base price",
     base: "Base",
     accessories: "Accessories",
     dealer_installed_addons: "Dealer-installed add-ons",
     doc_fee: "Doc fee",
     miles: "miles",
+    mi_short: "mi",
     stock: "Stock",
     about_this_vehicle: "About this vehicle",
     video_walkaround: "Video Walkaround",
@@ -170,29 +217,69 @@ export const LABELS: Record<PublicLocale, PublicMessages> = {
     tap_to_view: "Tap to view",
     why_benefits_you: "Why this benefits you:",
     optional_not_condition: "Optional · not a condition of credit approval",
+    key_specs: "Key specs",
+    certified_preowned: "Certified Pre-Owned",
+    watch_caption: "Watch {n}",
+    video_fallback: "video",
     reserve_vehicle: "Reserve this vehicle",
     reserved: "Reserved",
+    reserved_subtitle: "{n} will be in touch shortly.",
+    vehicle_held_title: "Your vehicle is held.",
+    vehicle_held_body:
+      "The dealer has your request time-stamped and hashed into the audit trail. Expect contact shortly during business hours.",
+    dealership: "Dealership",
+    close: "Close",
+    reserve_intro:
+      "Tell us what you'd like to do next. The dealer will reach out with next steps — no contract, no cost.",
     hold_for_me: "Hold for me",
     test_drive: "Test drive",
     make_offer: "Make an offer",
     your_name: "Your name",
+    full_name: "Full name",
     phone: "Phone",
     email: "Email",
+    message: "Message",
+    default_inquiry_message: "I'm interested in this vehicle. Please contact me.",
     send_request: "Send request",
+    reserve_now: "Reserve now",
+    reserving: "Reserving…",
     sending: "Sending…",
     inquiry_disclaimer:
-      "Submitting this is not a purchase or a binding agreement. The dealership will contact you to confirm details.",
+      "By sending this you agree we can share your contact with this dealership so they can follow up. Your request is time-stamped and logged to the dealer's audit trail.",
+    inquiry_validation_error: "Name plus email or phone is required.",
+    inquiry_send_error: "Couldn't send your request. Try calling the dealer directly.",
+    open_on_another_device_title: "Open on another device",
+    scan_to_continue: "Scan to continue on your phone",
+    scan_to_continue_body:
+      "Point your phone camera at the code. At delivery, this is also how the buyer signs on their own device — every signature stays bound to the buyer's hardware.",
+    copy_link: "Copy link",
+    call_dealership: "Call dealership",
+    share_vehicle: "Share vehicle",
     pickup: "Pickup",
     ready_now: "Ready now",
     delivery: "Delivery",
     on_request: "On request",
+    pickup_available_at: "Available today at {n}.",
+    pickup_available_generic: "Available today at the dealership.",
+    delivery_ask: "Ask about home delivery within the dealer's service area.",
     prep_signed: "Prep-signed",
+    prep_pending: "Pending",
+    prep_checked: "Checked",
+    prep_signed_title: "Shop foreman signed on {n}",
+    prep_required_title: "Foreman sign-off required before publish",
     recalls_clear: "Recalls clear",
     recalls_open: "{n} recall(s) open",
+    recalls_as_of: "as of {n}",
+    recalls_open_title:
+      "One or more open NHTSA campaigns. Ask the dealer about remedy status.",
+    recalls_clear_title: "NHTSA campaign check found no open do-not-drive recalls.",
     archived: "Archived",
+    archived_title:
+      "Every signed document for this VIN is retained in a tamper-evident archive for 7 years.",
     recall_banner_title: "Open NHTSA recall(s) on this VIN",
     recall_banner_body:
-      "The manufacturer has one or more open safety recalls on this vehicle. Ask the dealership to confirm the repair status before you buy.",
+      "The campaigns below are on file with NHTSA. Ask the dealer whether remedies have been applied before purchase.",
+    recall_more: "+ {n} more",
     body: "Body",
     drivetrain: "Drivetrain",
     transmission: "Transmission",
@@ -200,6 +287,7 @@ export const LABELS: Record<PublicLocale, PublicMessages> = {
     mpg: "MPG",
     exterior: "Exterior",
     photos: "Photos",
+    photo_alt: "Vehicle photo {n}",
     more_photos: "+ {n} more photos available…",
     warranty: "Warranty",
     coverage: "Coverage",
@@ -207,7 +295,8 @@ export const LABELS: Record<PublicLocale, PublicMessages> = {
     view_full_program: "View full program details →",
     est_monthly_payment: "Estimated monthly payment",
     estimate_only:
-      "Estimate only. Not a financing offer. Your actual terms depend on credit approval, taxes, and fees.",
+      "Estimate only. Your actual rate and payment depend on your credit and the lender's terms.",
+    per_mo: "/mo",
     apr: "APR %",
     down: "Down $",
     term: "Term mo",
@@ -237,6 +326,7 @@ export const LABELS: Record<PublicLocale, PublicMessages> = {
     rate_limited_body: "Está cargando páginas muy rápido. Espere unos segundos e inténtelo de nuevo.",
     vehicle_not_found: "Vehículo no encontrado",
     not_stickered_yet: "Es posible que este vehículo aún no tenga etiqueta.",
+    vehicle_details_fallback: "Detalles del vehículo — VIN {n}",
     open_on_another_device: "Abrir en otro dispositivo",
     share: "Compartir",
     link_copied: "Enlace copiado",
@@ -245,13 +335,17 @@ export const LABELS: Record<PublicLocale, PublicMessages> = {
     suggested_retail_price: "Precio de venta sugerido",
     asking_price: "Precio de venta",
     drive_out_price: "Precio total de salida",
+    drive_out_disclaimer:
+      "Todos los cargos obligatorios están incluidos en este número. Los impuestos, las placas y el registro los fija el estado y se agregan al titular.",
     whats_in_price: "Qué incluye este precio",
+    addon_included_note: "Incluido en el total anterior",
     base_price: "Precio base",
     base: "Base",
     accessories: "Accesorios",
     dealer_installed_addons: "Accesorios instalados por el concesionario",
     doc_fee: "Cargo por documentación",
     miles: "millas",
+    mi_short: "mi",
     stock: "Inventario",
     about_this_vehicle: "Acerca de este vehículo",
     video_walkaround: "Recorrido en video",
@@ -271,29 +365,69 @@ export const LABELS: Record<PublicLocale, PublicMessages> = {
     tap_to_view: "Toque para ver",
     why_benefits_you: "Por qué le beneficia:",
     optional_not_condition: "Opcional · no es una condición para aprobar el crédito",
+    key_specs: "Especificaciones clave",
+    certified_preowned: "Usado certificado",
+    watch_caption: "Ver {n}",
+    video_fallback: "video",
     reserve_vehicle: "Reservar este vehículo",
     reserved: "Reservado",
+    reserved_subtitle: "{n} se comunicará con usted en breve.",
+    vehicle_held_title: "Su vehículo está apartado.",
+    vehicle_held_body:
+      "El concesionario tiene su solicitud registrada con fecha y hora en el historial de auditoría. Espere ser contactado en breve durante el horario comercial.",
+    dealership: "Concesionario",
+    close: "Cerrar",
+    reserve_intro:
+      "Díganos qué le gustaría hacer a continuación. El concesionario se comunicará con los siguientes pasos — sin contrato ni costo.",
     hold_for_me: "Apartar para mí",
     test_drive: "Prueba de manejo",
     make_offer: "Hacer una oferta",
     your_name: "Su nombre",
+    full_name: "Nombre completo",
     phone: "Teléfono",
     email: "Correo electrónico",
+    message: "Mensaje",
+    default_inquiry_message: "Me interesa este vehículo. Por favor contácteme.",
     send_request: "Enviar solicitud",
+    reserve_now: "Reservar ahora",
+    reserving: "Reservando…",
     sending: "Enviando…",
     inquiry_disclaimer:
-      "Enviar esto no es una compra ni un acuerdo vinculante. El concesionario lo contactará para confirmar los detalles.",
+      "Al enviar esto, acepta que podemos compartir su contacto con este concesionario para que puedan dar seguimiento. Su solicitud queda registrada con fecha y hora en el historial de auditoría del concesionario.",
+    inquiry_validation_error: "Se requiere el nombre más el correo electrónico o el teléfono.",
+    inquiry_send_error: "No se pudo enviar su solicitud. Intente llamar directamente al concesionario.",
+    open_on_another_device_title: "Abrir en otro dispositivo",
+    scan_to_continue: "Escanee para continuar en su teléfono",
+    scan_to_continue_body:
+      "Apunte la cámara de su teléfono al código. En la entrega, así es también como el comprador firma en su propio dispositivo — cada firma queda vinculada al equipo del comprador.",
+    copy_link: "Copiar enlace",
+    call_dealership: "Llamar al concesionario",
+    share_vehicle: "Compartir vehículo",
     pickup: "Recoger",
     ready_now: "Listo ahora",
     delivery: "Entrega",
     on_request: "A solicitud",
+    pickup_available_at: "Disponible hoy en {n}.",
+    pickup_available_generic: "Disponible hoy en el concesionario.",
+    delivery_ask: "Pregunte sobre la entrega a domicilio dentro del área de servicio del concesionario.",
     prep_signed: "Preparación firmada",
+    prep_pending: "Pendiente",
+    prep_checked: "Verificado",
+    prep_signed_title: "El jefe de taller firmó el {n}",
+    prep_required_title: "Se requiere la firma del jefe de taller antes de publicar",
     recalls_clear: "Sin llamados a revisión",
     recalls_open: "{n} llamado(s) a revisión abierto(s)",
+    recalls_as_of: "al {n}",
+    recalls_open_title:
+      "Una o más campañas abiertas de la NHTSA. Pregunte al concesionario sobre el estado de la reparación.",
+    recalls_clear_title: "La revisión de campañas de la NHTSA no encontró llamados a revisión abiertos.",
     archived: "Archivado",
+    archived_title:
+      "Cada documento firmado para este VIN se conserva en un archivo a prueba de manipulaciones durante 7 años.",
     recall_banner_title: "Llamado(s) a revisión de la NHTSA abierto(s) en este VIN",
     recall_banner_body:
       "El fabricante tiene uno o más llamados a revisión de seguridad abiertos en este vehículo. Pida al concesionario que confirme el estado de la reparación antes de comprar.",
+    recall_more: "+ {n} más",
     body: "Carrocería",
     drivetrain: "Tracción",
     transmission: "Transmisión",
@@ -301,6 +435,7 @@ export const LABELS: Record<PublicLocale, PublicMessages> = {
     mpg: "MPG",
     exterior: "Exterior",
     photos: "Fotos",
+    photo_alt: "Foto del vehículo {n}",
     more_photos: "+ {n} fotos más disponibles…",
     warranty: "Garantía",
     coverage: "Cobertura",
@@ -309,6 +444,7 @@ export const LABELS: Record<PublicLocale, PublicMessages> = {
     est_monthly_payment: "Pago mensual estimado",
     estimate_only:
       "Solo es una estimación. No es una oferta de financiamiento. Sus términos reales dependen de la aprobación de crédito, impuestos y cargos.",
+    per_mo: "/mes",
     apr: "TAE %",
     down: "Enganche $",
     term: "Plazo meses",
