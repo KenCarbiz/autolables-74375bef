@@ -1,0 +1,1 @@
+ALTER TABLE public.vehicle_listings ADD COLUMN IF NOT EXISTS default_locale text NOT NULL DEFAULT 'en';
