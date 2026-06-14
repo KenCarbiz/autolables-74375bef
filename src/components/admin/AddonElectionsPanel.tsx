@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { BadgeCheck, TrendingUp, FileSignature, Layers } from "lucide-react";
+import { BadgeCheck, TrendingUp, FileSignature, Layers, ArrowUpRight } from "lucide-react";
 
 // AddonElectionsPanel — the F&I "provable election" dashboard. Reads
 // signed addendums for the store and derives, per add-on, whether the
@@ -14,6 +14,7 @@ interface SnapshotProduct {
   price?: number;
   badge_type?: string;
   benefit_justification?: string;
+  price_in_advertised?: boolean;
 }
 interface AddendumRow {
   id: string;
@@ -31,6 +32,7 @@ interface Item {
   name: string;
   price: number | null;
   optional: boolean;
+  aboveAdvertised: boolean;
   elected: boolean;
 }
 interface Deal {
@@ -51,13 +53,19 @@ const deriveItems = (a: AddendumRow): Item[] => {
   return products.map((p) => {
     const id = String(p.id ?? "");
     const isOptional = p.badge_type === "optional";
+    // An installed accessory priced above the advertised price is
+    // electable like an optional add-on (proof = affirmative Accept);
+    // one included in the advertised price is acknowledged by initial.
+    const aboveAdvertised = p.badge_type === "installed" && p.price_in_advertised === false;
+    const electable = isOptional || aboveAdvertised;
     const initialed = !!(inits[id] && String(inits[id]).trim());
     return {
       id,
       name: String(p.name ?? ""),
       price: typeof p.price === "number" ? p.price : null,
       optional: isOptional,
-      elected: isOptional ? optional[id] === "accept" : initialed,
+      aboveAdvertised,
+      elected: electable ? optional[id] === "accept" : initialed,
     };
   });
 };
@@ -114,6 +122,14 @@ export const AddonElectionsPanel = ({ storeId }: { storeId: string }) => {
   const acceptanceRate = optionalItems.length ? Math.round((electedOptional / optionalItems.length) * 100) : 0;
   const electedRevenue = allItems.filter((i) => i.elected).reduce((s, i) => s + (i.price || 0), 0);
 
+  // Above-advertised upcharges — the highest-scrutiny lines. Each one
+  // had to be affirmatively elected; surface the elected share and the
+  // exact revenue charged over the advertised price.
+  const aboveItems = allItems.filter((i) => i.aboveAdvertised);
+  const aboveElected = aboveItems.filter((i) => i.elected);
+  const aboveElectedRevenue = aboveElected.reduce((s, i) => s + (i.price || 0), 0);
+  const aboveElectionRate = aboveItems.length ? Math.round((aboveElected.length / aboveItems.length) * 100) : 0;
+
   const byProduct = new Map<string, { offered: number; elected: number }>();
   for (const i of optionalItems) {
     const m = byProduct.get(i.name) || { offered: 0, elected: 0 };
@@ -156,6 +172,27 @@ export const AddonElectionsPanel = ({ storeId }: { storeId: string }) => {
         />
         <Kpi icon={BadgeCheck} label="Elected add-on revenue" value={fmtMoney(electedRevenue)} />
       </div>
+
+      {aboveItems.length > 0 && (
+        <div className="rounded-2xl border border-amber-200 bg-amber-50/60 p-5">
+          <div className="flex items-start gap-3">
+            <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg bg-amber-100 text-amber-700">
+              <ArrowUpRight className="h-4 w-4" />
+            </div>
+            <div className="min-w-0">
+              <p className="text-[11px] font-bold uppercase tracking-[0.12em] text-amber-700">Charged above the advertised price</p>
+              <p className="mt-0.5 font-display text-2xl font-black tracking-tight text-foreground">
+                {aboveElected.length}/{aboveItems.length} elected · {fmtMoney(aboveElectedRevenue)}
+              </p>
+              <p className="text-xs text-amber-800/90 mt-1 max-w-2xl leading-relaxed">
+                These dealer-installed accessories were priced above the advertised price, so each required an explicit
+                customer Accept/Decline. {aboveElectionRate}% were affirmatively elected; declined items were billed at
+                the advertised price. The same per-item proof is in each VIN's Audit-Defense Packet.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
 
       {products.length > 0 && (
         <div className="rounded-2xl border border-border bg-card p-5">
