@@ -71,6 +71,7 @@ interface Product {
   disclosure: string | null;
   sort_order: number;
   is_active: boolean;
+  benefit_justification: string;
   icon_type?: string;
 }
 
@@ -86,6 +87,7 @@ const emptyProduct = {
   disclosure: "",
   sort_order: 0,
   is_active: true,
+  benefit_justification: "",
   icon_type: "",
 };
 
