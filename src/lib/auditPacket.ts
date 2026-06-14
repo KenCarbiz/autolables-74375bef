@@ -223,11 +223,11 @@ export async function buildAuditPacket(args: BuildArgs): Promise<AuditPacket> {
       do_not_drive: doNotDrive,
       // Wave 22 — install-photo + signature aggregates across
       // every accessory on every get-ready record for this VIN.
-      install_photo_count: getReadyRows.reduce((sum: number, r: any) => {
+      install_photo_count: (getReadyRows as any[]).reduce((sum: number, r: any) => {
         const accs = (r?.accessories_to_install || []) as Array<{ install_photos?: string[] }>;
         return sum + accs.reduce((s, a) => s + ((a.install_photos || []).length), 0);
       }, 0),
-      install_signature_count: getReadyRows.reduce((sum: number, r: any) => {
+      install_signature_count: (getReadyRows as any[]).reduce((sum: number, r: any) => {
         const accs = (r?.accessories_to_install || []) as Array<{ installer_signature_data?: string }>;
         return sum + accs.filter(a => !!a.installer_signature_data).length;
       }, 0),
