@@ -131,6 +131,13 @@ const MobileSigning = () => {
 
   const products: ProductSnapshot[] = addendum?.products_snapshot || [];
   const installed = products.filter((p) => p.badge_type === "installed");
+  // Per-item add-on election disclosure — FTC Act §5 / CA SB 766: each
+  // optional product must be disclosed as optional, not a condition of
+  // purchase or financing, and not affecting the rate. The exact text
+  // shown is hashed into the signed payload as the election record.
+  const ADDON_ELECTION_DISCLOSURE =
+    "Optional. You are not required to buy this to purchase the vehicle or obtain financing, and choosing it does not affect your interest rate. You may buy the vehicle without it.";
+  const ADDON_ELECTION_DISCLOSURE_VERSION = "ael-2026-06-01";
   const optional = products.filter((p) => p.badge_type === "optional");
 
   const handleFillAll = () => {
@@ -282,6 +289,11 @@ const MobileSigning = () => {
       price_overrides: priceOverrides,
       initials,
       optional_selections: optionalSelections,
+      addon_election: {
+        disclosure_version: ADDON_ELECTION_DISCLOSURE_VERSION,
+        disclosure_text: ADDON_ELECTION_DISCLOSURE,
+        selections: optionalSelections,
+      },
       customer_name: customerName,
       warranty_ack: warrantyAck,
       sticker_match_ack: stickerMatchAck,
@@ -606,6 +618,7 @@ const MobileSigning = () => {
                 </div>
                 <p className="text-sm font-bold text-foreground">${p.price.toFixed(2)}</p>
               </div>
+              <p className="text-base text-foreground/80 leading-snug">{ADDON_ELECTION_DISCLOSURE}</p>
               <div className="flex gap-2">
                 <button
                   onClick={() => setOptionalSelections((prev) => ({ ...prev, [p.id]: "accept" }))}
