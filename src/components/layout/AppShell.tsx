@@ -152,7 +152,7 @@ const AppShell = ({ children }: AppShellProps) => {
         { label: "Saved Addendums", path: "/saved", icon: FolderOpen },
         { label: "Get-Ready", path: "/admin?tab=getready", icon: Clock },
         { label: "Vehicle Files", path: "/admin?tab=files", icon: FolderOpen },
-        { label: "Print Queue", path: "/admin?tab=queue", icon: Printer },
+        { label: "Lot Queue", path: "/queue", icon: ScanLine },
       ],
     },
     admin: {
@@ -261,6 +261,7 @@ const AppShell = ({ children }: AppShellProps) => {
         settings: "Feature Toggles",
         analytics: "Analytics",
         leads: "Leads",
+        funnel: "Signing Funnel",
         audit: "Audit Log",
         queue: "Print Queue",
         getready: "Get-Ready",
@@ -268,7 +269,7 @@ const AppShell = ({ children }: AppShellProps) => {
       };
       const sectionMap: Record<string, string> = {
         products: "Administration", rules: "Administration", branding: "Administration", settings: "Administration",
-        analytics: "Compliance", leads: "Compliance", audit: "Compliance",
+        analytics: "Compliance", leads: "Compliance", funnel: "Compliance", audit: "Compliance",
         queue: "Inventory", getready: "Inventory", files: "Inventory",
       };
       crumbs.push({ label: sectionMap[tab] || "Admin" });
@@ -309,7 +310,7 @@ const AppShell = ({ children }: AppShellProps) => {
           vt-sidebar opts into a stable view-transition-name so route
           changes only cross-fade the main content area, not the chrome. */}
       <aside
-        className={`fixed inset-y-0 left-0 z-40 shimmer-sidebar vt-sidebar border-r border-white/10 flex flex-col transform transition-all duration-200 ease-out lg:translate-x-0 ${
+        className={`fixed inset-y-0 left-0 z-40 shimmer-sidebar vt-sidebar border-r border-sidebar-border flex flex-col transform transition-all duration-200 ease-out lg:translate-x-0 ${
           mobileOpen ? "translate-x-0" : "-translate-x-full"
         } ${collapsed ? "lg:w-16 w-64" : "w-64"}`}
       >
@@ -317,7 +318,7 @@ const AppShell = ({ children }: AppShellProps) => {
         <div className="flex items-center justify-between h-16 px-4 border-b border-sidebar-border flex-shrink-0">
           {tenant?.logo_url && tenant.logo_url !== "/logo-mark.svg" ? (
             <div className="flex items-center gap-2 min-w-0">
-              <img src={tenant.logo_url} alt={tenant.name} className="w-8 h-8 rounded-md object-contain bg-white p-1 flex-shrink-0" />
+              <img src={tenant.logo_url} alt={tenant.name} className="w-8 h-8 rounded-md object-contain bg-muted p-1 flex-shrink-0" />
               <div className={`min-w-0 transition-opacity duration-150 ${collapsed ? "lg:hidden" : ""}`}>
                 <p className="text-sm font-semibold text-sidebar-foreground leading-none tracking-tight truncate">
                   {tenant?.name}
@@ -328,7 +329,7 @@ const AppShell = ({ children }: AppShellProps) => {
               </div>
             </div>
           ) : (
-            <Logo variant={collapsed ? "mark" : "full"} size={28} tagline={!collapsed} inverted />
+            <Logo variant={collapsed ? "mark" : "full"} size={28} tagline={!collapsed} />
           )}
           <button
             onClick={() => setMobileOpen(false)}
@@ -347,22 +348,22 @@ const AppShell = ({ children }: AppShellProps) => {
               setMobileOpen(false);
               navigate("/inventory?add=1");
             }}
-            className="h-12 rounded-xl bg-gradient-to-r from-[#3BB4FF] to-[#1E90FF] text-white inline-flex items-center justify-center gap-1.5 shadow-premium hover:brightness-110 transition-all"
+            className="h-11 rounded-xl bg-[#2563EB] hover:bg-[#1D4ED8] text-white inline-flex items-center justify-center gap-1.5 transition-colors shadow-sm"
             title="Add a vehicle to inventory"
           >
-            <Car className="w-4 h-4 stroke-[2.5]" />
-            <span className={`font-display font-black tracking-tight text-[15px] whitespace-nowrap ${collapsed ? "lg:hidden" : ""}`}>Add Vehicle</span>
+            <Car className="w-4 h-4 stroke-[2.25]" />
+            <span className={`font-display font-semibold tracking-tight text-sm whitespace-nowrap ${collapsed ? "lg:hidden" : ""}`}>Add Vehicle</span>
           </button>
           <button
             onClick={() => {
               setMobileOpen(false);
               navigate("/scan");
             }}
-            className="h-12 rounded-xl bg-sidebar-accent/60 hover:bg-sidebar-accent text-sidebar-foreground inline-flex items-center justify-center gap-1.5 border border-sidebar-border transition-all"
+            className="h-11 rounded-xl bg-card hover:bg-muted text-foreground inline-flex items-center justify-center gap-1.5 border border-border transition-colors"
             title="Scan a VIN barcode or windshield sticker"
           >
-            <ScanLine className="w-4 h-4 stroke-[2.5]" />
-            <span className={`font-display font-black tracking-tight text-[15px] whitespace-nowrap ${collapsed ? "lg:hidden" : ""}`}>Scan Vehicle</span>
+            <ScanLine className="w-4 h-4 stroke-[2.25]" />
+            <span className={`font-display font-semibold tracking-tight text-sm whitespace-nowrap ${collapsed ? "lg:hidden" : ""}`}>Scan Vehicle</span>
           </button>
         </div>
 
@@ -375,8 +376,8 @@ const AppShell = ({ children }: AppShellProps) => {
                   className={`w-full flex items-center gap-2 rounded-lg bg-sidebar-accent/60 hover:bg-sidebar-accent transition-colors text-left group border border-sidebar-border/50 ${collapsed ? "lg:justify-center lg:px-0 lg:py-2 px-2.5 py-2" : "px-2.5 py-2"}`}
                   title={collapsed ? `Store: ${currentStore?.name || "No store"}` : undefined}
                 >
-                  <div className="w-7 h-7 rounded-md bg-gradient-to-br from-[#3BB4FF] to-[#1E90FF] flex items-center justify-center flex-shrink-0 shadow-premium">
-                    <Store className="w-3.5 h-3.5 text-white" />
+                  <div className="w-7 h-7 rounded-md bg-blue-50 text-[#2563EB] flex items-center justify-center flex-shrink-0">
+                    <Store className="w-3.5 h-3.5" />
                   </div>
                   <div className={`flex-1 min-w-0 ${collapsed ? "lg:hidden" : ""}`}>
                     <p className="text-[9px] text-sidebar-foreground/70 uppercase tracking-[0.18em] font-bold">Store</p>
@@ -444,8 +445,8 @@ const AppShell = ({ children }: AppShellProps) => {
                           title={collapsed ? item.label : undefined}
                           className={`w-full flex items-center rounded-md text-sm transition-all relative ${collapsed ? "lg:justify-center lg:px-2 lg:py-2 gap-2.5 px-2.5 py-2" : "gap-2.5 px-2.5 py-2"} ${
                             active
-                              ? "bg-sidebar-accent text-sidebar-accent-foreground font-semibold pl-3 before:absolute before:left-0 before:top-1.5 before:bottom-1.5 before:w-0.5 before:bg-gradient-to-b before:from-[#3BB4FF] before:to-[#1E90FF] before:rounded-full"
-                              : "text-sidebar-foreground/80 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground"
+                              ? "bg-blue-50 text-[#2563EB] font-semibold pl-3 before:absolute before:left-0 before:top-1.5 before:bottom-1.5 before:w-0.5 before:bg-[#2563EB] before:rounded-full"
+                              : "text-sidebar-foreground/75 hover:bg-sidebar-accent hover:text-sidebar-foreground"
                           }`}
                         >
                           <Icon className="w-4 h-4 flex-shrink-0" />
@@ -518,40 +519,33 @@ const AppShell = ({ children }: AppShellProps) => {
           on desktop; on mobile (no lg:), the rail overlays as a
           slide-in so no padding is needed. */}
       <div className={`flex-1 flex flex-col min-w-0 transition-all duration-200 ease-out ${collapsed ? "lg:pl-16" : "lg:pl-64"}`}>
-        {/* Top bar — HarteCash/Autocurb chrome: bordered translucent
-            pills on navy, full-width search bar in the centre, avatar
-            with role-stack on the right. topbar-navy already paints
-            the shimmer-roll animation; vt-topbar stabilises the
-            header across admin tab switches so only the main pane
-            cross-fades. */}
-        <header className="sticky top-0 z-20 topbar-navy vt-topbar text-white border-b border-white/10">
+        {/* Topbar — Autocurb-style clean white surface with hairline
+            border. topbar-navy class kept for backward-compat but
+            now resolves to a light backdrop-blurred panel. */}
+        <header className="sticky top-0 z-20 topbar-navy vt-topbar text-foreground border-b border-border">
           <div className="flex items-center h-14 px-3 lg:px-5 gap-3">
             {/* Left: hamburger (mobile) + greeting block */}
             <div className="flex items-center gap-3 min-w-0 flex-shrink-0">
               <button
                 onClick={() => setMobileOpen(true)}
-                className="lg:hidden h-9 w-9 rounded-lg border border-white/15 bg-white/[0.04] hover:bg-white/10 hover:border-white/25 inline-flex items-center justify-center transition-all"
+                className="lg:hidden h-9 w-9 rounded-lg border border-border bg-card hover:bg-muted text-foreground inline-flex items-center justify-center transition-colors"
               >
                 <Menu className="w-4 h-4" />
               </button>
               <div className="min-w-0 hidden sm:block">
-                <p className="text-sm font-semibold text-white truncate leading-tight">
+                <p className="text-sm font-semibold text-foreground truncate leading-tight">
                   {greeting}, {capitalized}
                 </p>
                 <div className="flex items-center gap-1.5 mt-0.5">
-                  <span className="inline-flex items-center gap-1 text-[9px] font-bold bg-amber-400 text-amber-950 px-1.5 py-0.5 rounded-sm uppercase tracking-[0.12em]">
+                  <span className="inline-flex items-center gap-1 text-[9px] font-bold bg-amber-100 text-amber-800 px-1.5 py-0.5 rounded-sm uppercase tracking-[0.12em]">
                     <Sparkles className="w-2.5 h-2.5" />
                     {isAdmin ? "Super Admin" : "Admin"}
                   </span>
-                  {/* Wave 15.1 — family-positioning tagline. Reads
-                      as "this is one app in a suite", not "this is
-                      a standalone tool". Hides on xs so we don't
-                      crowd the greeting on phones. */}
-                  <span className="hidden lg:inline-flex items-center text-[10px] text-white/55 tracking-[0.08em]">
-                    by <span className="ml-1 font-semibold text-white/75">Autocurb</span>
+                  <span className="hidden lg:inline-flex items-center text-[10px] text-muted-foreground tracking-[0.08em]">
+                    by <span className="ml-1 font-semibold text-foreground/70">Autocurb</span>
                   </span>
                   {currentStore?.name && (
-                    <span className="text-[11px] text-white/65 truncate">
+                    <span className="text-[11px] text-muted-foreground truncate">
                       · {currentStore.name}
                     </span>
                   )}
@@ -562,14 +556,14 @@ const AppShell = ({ children }: AppShellProps) => {
             {/* Centre: command-palette as a full-width search bar */}
             <button
               onClick={() => setPaletteOpen(true)}
-              className="hidden md:flex flex-1 min-w-0 max-w-xl items-center gap-2 h-10 px-3.5 rounded-xl border border-white/15 bg-white/[0.06] hover:bg-white/[0.10] hover:border-white/25 text-sm transition-all shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]"
+              className="hidden md:flex flex-1 min-w-0 max-w-xl items-center gap-2 h-10 px-3.5 rounded-xl border border-border bg-muted/60 hover:bg-muted text-sm transition-colors"
               title="Command palette (⌘K)"
             >
-              <Search className="w-4 h-4 text-white/55 flex-shrink-0" />
-              <span className="flex-1 text-left text-white/55 truncate">
+              <Search className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+              <span className="flex-1 text-left text-muted-foreground truncate">
                 Search vehicles, VIN, customers…
               </span>
-              <kbd className="inline-flex items-center justify-center h-5 min-w-[28px] px-1.5 rounded-md bg-white/10 border border-white/10 text-[10px] font-mono text-white/75 tracking-wider">
+              <kbd className="inline-flex items-center justify-center h-5 min-w-[28px] px-1.5 rounded-md bg-card border border-border text-[10px] font-mono text-muted-foreground tracking-wider">
                 ⌘K
               </kbd>
             </button>
@@ -577,7 +571,7 @@ const AppShell = ({ children }: AppShellProps) => {
             {/* Right cluster */}
             <div className="flex items-center gap-1.5 flex-shrink-0 ml-auto">
               {/* App switcher */}
-              <AppSwitcher currentApp="autolabels" />
+              <AppSwitcher currentApp="autolabels" theme="light" />
 
               {/* Live realtime indicator — pulses on any
                   vehicle_listings change in this tenant
@@ -587,7 +581,7 @@ const AppShell = ({ children }: AppShellProps) => {
               {/* Mobile-scan QR launcher */}
               <button
                 onClick={() => setShowMobileQr(true)}
-                className="h-9 w-9 rounded-lg border border-white/15 bg-white/[0.04] hover:bg-white/10 hover:border-white/25 text-white/85 hover:text-white inline-flex items-center justify-center transition-all"
+                className="h-9 w-9 rounded-lg border border-border bg-card hover:bg-muted text-muted-foreground hover:text-foreground inline-flex items-center justify-center transition-colors"
                 title="Open scanner on your phone"
               >
                 <ScanLine className="w-4 h-4" />
@@ -596,7 +590,7 @@ const AppShell = ({ children }: AppShellProps) => {
               {/* Dark mode toggle */}
               <button
                 onClick={handleToggleDark}
-                className="h-9 w-9 rounded-lg border border-white/15 bg-white/[0.04] hover:bg-white/10 hover:border-white/25 text-white/85 hover:text-white inline-flex items-center justify-center transition-all"
+                className="h-9 w-9 rounded-lg border border-border bg-card hover:bg-muted text-muted-foreground hover:text-foreground inline-flex items-center justify-center transition-colors"
                 title="Toggle dark mode"
               >
                 {darkMode ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
@@ -606,12 +600,12 @@ const AppShell = ({ children }: AppShellProps) => {
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <button
-                    className="relative h-9 w-9 rounded-lg border border-white/15 bg-white/[0.04] hover:bg-white/10 hover:border-white/25 text-white/85 hover:text-white inline-flex items-center justify-center transition-all"
+                    className="relative h-9 w-9 rounded-lg border border-border bg-card hover:bg-muted text-muted-foreground hover:text-foreground inline-flex items-center justify-center transition-colors"
                     title="Notifications"
                   >
                     <Bell className="w-4 h-4" />
                     {recentNotifications.length > 0 && (
-                      <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-rose-500 ring-2 ring-[#0B2041]" />
+                      <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-rose-500 ring-2 ring-card" />
                     )}
                   </button>
                 </DropdownMenuTrigger>
@@ -638,26 +632,26 @@ const AppShell = ({ children }: AppShellProps) => {
 
               {/* Admin role pill — only renders for platform admins */}
               {isAdmin && (
-                <span className="hidden lg:inline-flex items-center gap-1 h-7 px-2.5 rounded-md border border-white/15 bg-white/[0.04] text-[10px] font-bold uppercase tracking-[0.14em] text-white/90">
+                <span className="hidden lg:inline-flex items-center gap-1 h-7 px-2.5 rounded-md border border-border bg-muted text-[10px] font-bold uppercase tracking-[0.14em] text-foreground">
                   Admin
                 </span>
               )}
 
               {/* Divider */}
-              <div className="hidden lg:block w-px h-6 bg-white/12 mx-0.5" />
+              <div className="hidden lg:block w-px h-6 bg-border mx-0.5" />
 
               {/* User cluster — avatar + name/role stack */}
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <button className="inline-flex items-center gap-2 h-10 pl-1 pr-2 rounded-lg hover:bg-white/[0.08] transition-colors group">
-                    <span className="w-8 h-8 rounded-full bg-gradient-to-br from-[#3BB4FF] to-[#1E90FF] text-white flex items-center justify-center text-[11px] font-bold ring-1 ring-white/20 shadow-premium">
+                  <button className="inline-flex items-center gap-2 h-10 pl-1 pr-2 rounded-lg hover:bg-muted transition-colors group">
+                    <span className="w-8 h-8 rounded-full bg-[#2563EB] text-white flex items-center justify-center text-[11px] font-bold">
                       {userInitial}
                     </span>
                     <span className="hidden md:flex flex-col items-start min-w-0 leading-tight">
-                      <span className="text-xs font-semibold text-white truncate max-w-[110px]">{capitalized}</span>
-                      <span className="text-[10px] text-white/60 truncate">{isAdmin ? "Admin" : "Member"}</span>
+                      <span className="text-xs font-semibold text-foreground truncate max-w-[110px]">{capitalized}</span>
+                      <span className="text-[10px] text-muted-foreground truncate">{isAdmin ? "Admin" : "Member"}</span>
                     </span>
-                    <ChevronDown className="hidden md:inline-block w-3 h-3 text-white/55 group-hover:text-white/80 transition-colors" />
+                    <ChevronDown className="hidden md:inline-block w-3 h-3 text-muted-foreground group-hover:text-foreground transition-colors" />
                   </button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-56">
@@ -687,7 +681,7 @@ const AppShell = ({ children }: AppShellProps) => {
               {/* Help */}
               <button
                 onClick={() => window.open("https://autolabels.io/help", "_blank")}
-                className="h-9 w-9 rounded-lg border border-white/15 bg-white/[0.04] hover:bg-white/10 hover:border-white/25 text-white/85 hover:text-white inline-flex items-center justify-center transition-all"
+                className="h-9 w-9 rounded-lg border border-border bg-card hover:bg-muted text-muted-foreground hover:text-foreground inline-flex items-center justify-center transition-colors"
                 title="Help"
               >
                 <HelpCircle className="w-4 h-4" />
@@ -696,7 +690,7 @@ const AppShell = ({ children }: AppShellProps) => {
               {/* Logout — explicit text button on md+, icon on mobile */}
               <button
                 onClick={handleSignOut}
-                className="hidden md:inline-flex items-center gap-1.5 h-9 px-3 rounded-lg border border-white/15 bg-white/[0.04] hover:bg-white/10 hover:border-white/25 text-white/90 hover:text-white text-xs font-semibold transition-all"
+                className="hidden md:inline-flex items-center gap-1.5 h-9 px-3 rounded-lg border border-border bg-card hover:bg-muted text-foreground text-xs font-semibold transition-colors"
                 title="Sign out"
               >
                 <LogOut className="w-3.5 h-3.5" />
@@ -704,7 +698,7 @@ const AppShell = ({ children }: AppShellProps) => {
               </button>
               <button
                 onClick={handleSignOut}
-                className="md:hidden h-9 w-9 rounded-lg border border-white/15 bg-white/[0.04] hover:bg-white/10 hover:border-white/25 text-white/85 hover:text-white inline-flex items-center justify-center transition-all"
+                className="md:hidden h-9 w-9 rounded-lg border border-border bg-card hover:bg-muted text-muted-foreground hover:text-foreground inline-flex items-center justify-center transition-colors"
                 title="Sign out"
               >
                 <LogOut className="w-4 h-4" />

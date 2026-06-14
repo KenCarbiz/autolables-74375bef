@@ -49,20 +49,20 @@ export const LiveBadge = () => {
 
   return (
     <span
-      className="hidden md:inline-flex items-center gap-1.5 h-7 px-2 rounded-md border border-white/15 bg-white/[0.04] text-[10px] font-bold uppercase tracking-[0.14em] text-white/85"
+      className="hidden md:inline-flex items-center gap-1.5 h-7 px-2 rounded-md border border-border bg-muted text-[10px] font-bold uppercase tracking-[0.14em] text-foreground/80"
       title="Realtime sync · your team's changes appear here automatically"
     >
       <span className="relative inline-flex w-2 h-2">
         <span
-          className={`absolute inset-0 rounded-full bg-emerald-400 ${pulse ? "animate-ping" : ""}`}
+          className={`absolute inset-0 rounded-full bg-emerald-500 ${pulse ? "animate-ping" : ""}`}
           aria-hidden
         />
         <span
-          className={`relative inline-flex w-2 h-2 rounded-full ${pulse ? "bg-emerald-300" : "bg-emerald-400"}`}
+          className={`relative inline-flex w-2 h-2 rounded-full ${pulse ? "bg-emerald-400" : "bg-emerald-500"}`}
         />
       </span>
       Live
-      <Radio className={`w-2.5 h-2.5 ${pulse ? "text-emerald-300" : "text-white/70"}`} strokeWidth={2.25} />
+      <Radio className={`w-2.5 h-2.5 ${pulse ? "text-emerald-600" : "text-muted-foreground"}`} strokeWidth={2.25} />
     </span>
   );
 };

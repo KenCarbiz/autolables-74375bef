@@ -10,6 +10,7 @@ import { useVehicleListing } from "@/hooks/useVehicleListing";
 import { useRecallLookup } from "@/hooks/useRecallLookup";
 import RecallBanner from "@/components/addendum/RecallBanner";
 import { toast } from "sonner";
+import { PublishPriceGate } from "@/components/inventory/PublishPriceGate";
 import { QRCodeSVG } from "qrcode.react";
 import { Printer, Download, Sparkles, ChevronDown, ChevronUp, Globe, Copy, Code2 } from "lucide-react";
 
@@ -27,6 +28,7 @@ const NewCarSticker = () => {
   const [generating, setGenerating] = useState(false);
   const [publishedSlug, setPublishedSlug] = useState<string | null>(null);
   const [publishing, setPublishing] = useState(false);
+  const [priceGateOpen, setPriceGateOpen] = useState(false);
   const [stopSale, setStopSale] = useState(false);
 
   const [vehicle, setVehicle] = useState({
@@ -95,10 +97,15 @@ const NewCarSticker = () => {
     if (user) log({ store_id: currentStore?.id || "", user_id: user.id, action: "addendum_printed", entity_type: "new_car_sticker", entity_id: vehicle.vin, details: { ymm: `${vehicle.year} ${vehicle.make} ${vehicle.model}` } });
   };
 
-  const handlePublish = async () => {
+  const handlePublish = () => {
     if (!vehicle.vin) { toast.error("Enter a VIN first"); return; }
     if (!currentStore?.id) { toast.error("Select a store first"); return; }
     if (stopSale) { toast.error("Do-not-drive recall open. Cannot publish until remedied."); return; }
+    setPriceGateOpen(true);
+  };
+
+  const doPublish = async () => {
+    setPriceGateOpen(false);
     setPublishing(true);
     try {
       const ymm = `${vehicle.year} ${vehicle.make} ${vehicle.model}`.trim();
@@ -118,6 +125,7 @@ const NewCarSticker = () => {
             price: p.price,
             price_label: p.price_label,
             disclosure: p.disclosure,
+            benefit_justification: (p as { benefit_justification?: string }).benefit_justification || "",
           })),
           totals: {
             base_price: baseMsrp + destCharge,
@@ -459,6 +467,16 @@ const NewCarSticker = () => {
           </div>
         </div>
       </div>
+
+      {/* Wave 23 — publish-time price-drift gate. */}
+      <PublishPriceGate
+        open={priceGateOpen}
+        vin={vehicle.vin}
+        stickerPrice={totalSuggestedRetail}
+        storeId={currentStore?.id || ""}
+        onProceed={doPublish}
+        onCancel={() => setPriceGateOpen(false)}
+      />
     </div>
   );
 };

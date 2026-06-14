@@ -92,6 +92,49 @@ export const runComplianceRedTeam = (draft: RedTeamDraft): ComplianceFinding[] =
     });
   }
 
+  // ─── Missing benefit justification (Wave 16) ────────────────
+  // FTC §5 + CA SB 766 §11713.21 require dealers to JUSTIFY why
+  // each add-on benefits the buyer for this transaction. Silent
+  // installed products are the #1 hook in the FTC's 97-dealer
+  // letter campaign (March 2026). Hard fail before send.
+  const missingBenefit = (draft.products || [])
+    .filter((p) => p.badge_type === "installed")
+    .filter((p) => {
+      const txt = (p as { benefit_justification?: string }).benefit_justification;
+      return !txt || !txt.trim();
+    });
+  if (missingBenefit.length > 0) {
+    findings.push({
+      id: "missing-benefit-justification",
+      severity: "fail",
+      rule: "Every installed product needs a benefit justification",
+      message: `${missingBenefit.length} installed product(s) have no benefit justification text.`,
+      citation: "FTC Act §5; CA SB 766 §11713.21 (eff. Oct 1, 2026); FTC 97-dealer warning letters, March 2026.",
+      suggestion: `Open the products tab and set the Benefit Justification field for: ${missingBenefit.slice(0, 3).map((p) => p.name).join(", ")}${missingBenefit.length > 3 ? "…" : ""}`,
+    });
+  }
+
+  // Soft warning for optional products without benefit copy —
+  // less enforcement risk (the customer can decline) but it
+  // weakens the "voluntary, justified" pitch the customer reads
+  // on the QR landing.
+  const optionalMissingBenefit = (draft.products || [])
+    .filter((p) => p.badge_type === "optional")
+    .filter((p) => {
+      const txt = (p as { benefit_justification?: string }).benefit_justification;
+      return !txt || !txt.trim();
+    });
+  if (optionalMissingBenefit.length > 0) {
+    findings.push({
+      id: "optional-missing-benefit",
+      severity: "warn",
+      rule: "Optional products benefit from a justification too",
+      message: `${optionalMissingBenefit.length} optional product(s) have no benefit text. The /v/:slug landing will show the name + price only.`,
+      citation: "FTC §5 (best practice); not statutory until accepted by the customer.",
+      suggestion: "Add benefit text so the customer can read what they're buying before initialling.",
+    });
+  }
+
   // ─── Add-on spend ratio ──────────────────────────────────────
   const addOnTotal = (draft.products || []).reduce((sum, p) => sum + (p.price || 0), 0);
   if (draft.vehiclePrice && addOnTotal > 0) {

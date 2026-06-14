@@ -8,6 +8,11 @@ import { useTenant } from "@/contexts/TenantContext";
 import { supabase } from "@/integrations/supabase/client";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
+import { AccessoryInstallPanel } from "@/components/admin/AccessoryInstallPanel";
+import { EmailDistributionPanel } from "@/components/admin/EmailDistributionPanel";
+import { InventoryFeedHealth } from "@/components/admin/InventoryFeedHealth";
+import { OpenSigningsList } from "@/components/admin/OpenSigningsList";
+import { useEmailDistribution } from "@/hooks/useEmailDistribution";
 import { PRODUCT_ICONS } from "@/components/addendum/ProductRow";
 import { STATE_DOC_FEES } from "@/data/docFees";
 import { format } from "date-fns";
@@ -69,7 +74,7 @@ interface Product {
   icon_type?: string;
 }
 
-type AdminTab = "home" | "products" | "rules" | "settings" | "branding" | "analytics" | "leads" | "audit" | "queue" | "files" | "getready" | "inventory" | "invoices" | "warranty";
+type AdminTab = "home" | "products" | "rules" | "settings" | "branding" | "analytics" | "leads" | "funnel" | "audit" | "queue" | "files" | "getready" | "inventory" | "invoices" | "warranty";
 
 const emptyProduct = {
   name: "",
@@ -102,7 +107,8 @@ const FEATURE_TOGGLES: { key: keyof DealerSettings; label: string; description: 
   { key: "feature_product_icons", label: "Product Icons", description: "Show category icons next to products on the addendum", status: "active" },
   { key: "feature_product_rules", label: "Product Rules", description: "Auto-assign products based on vehicle Year/Make/Model/Trim", status: "active" },
   { key: "feature_buyers_guide", label: "Buyers Guide", description: "Generate FTC-compliant Buyers Guides (As-Is / Implied / Warranty)", status: "active" },
-  { key: "feature_spanish_buyers_guide", label: "Spanish Buyers Guide", description: "Enable Spanish language option for Buyers Guides", status: "active" },
+  { key: "feature_spanish_buyers_guide", label: "Spanish Buyers Guide", description: "Enable Spanish language option for Buyers Guides (FTC-canonical translation per 16 CFR Part 455)", status: "active" },
+  { key: "feature_multilang_buyers_guide", label: "Multilang Buyers Guide", description: "Enable Vietnamese / Korean / Chinese options for the FTC Buyers Guide. Dealer-courtesy translations for the California market — verify each language reads correctly for your customer base before enabling.", status: "active" },
   { key: "feature_lead_capture", label: "Lead Capture", description: "Capture customer name, phone, and email when sending QR signing links", status: "active" },
   { key: "feature_cobuyer_signature", label: "Co-Buyer Signature", description: "Show co-buyer signature pad on the addendum", status: "active" },
   { key: "feature_ink_saving", label: "Ink-Saving Mode", description: "Show ink-saving toggle for lighter print output", status: "active" },
@@ -126,7 +132,7 @@ const FEATURE_TOGGLES: { key: keyof DealerSettings; label: string; description: 
   { key: "feature_ai_descriptions", label: "AI Descriptions", description: "Generate vehicle descriptions automatically", status: "coming_soon" },
 ];
 
-const VALID_TABS: AdminTab[] = ["home", "products", "rules", "settings", "branding", "analytics", "leads", "audit", "queue", "files", "getready", "inventory", "invoices", "warranty"];
+const VALID_TABS: AdminTab[] = ["home", "products", "rules", "settings", "branding", "analytics", "leads", "funnel", "audit", "queue", "files", "getready", "inventory", "invoices", "warranty"];
 
 const Admin = () => {
   const { user, isAdmin, loading, signOut } = useAuth();
@@ -165,7 +171,8 @@ const Admin = () => {
   const [fileSearch, setFileSearch] = useState("");
 
   // Get-Ready tracking
-  const { records: getReadyRecords, getPending: getPendingGetReady, validateTimeline } = useGetReady(currentStore?.id || "");
+  const { records: getReadyRecords, getPending: getPendingGetReady, validateTimeline, markAccessoryInstalled, markInventory } = useGetReady(currentStore?.id || "");
+  const { sendGetReadyComplete, sending: emailSending } = useEmailDistribution(currentStore?.id || "");
 
   // Inventory, invoices, warranty
   const { vehicles: inventoryVehicles, importCsv, deleteVehicle: deleteInvVehicle } = useInventory(currentStore?.id || "");
@@ -227,6 +234,10 @@ const Admin = () => {
       disclosure: editing.disclosure || null,
       sort_order: Number(editing.sort_order) || 0,
       is_active: editing.is_active ?? true,
+      // Wave 16 — benefit justification seeds the per-addendum
+      // line at build time. Required on installed products
+      // before the red-team will release a signing link.
+      benefit_justification: editing.benefit_justification || "",
     };
 
     if (editing.id) {
@@ -289,6 +300,7 @@ const Admin = () => {
     { id: "branding", label: "Branding" },
     ...(settings.feature_analytics ? [{ id: "analytics" as const, label: "Analytics" }] : []),
     ...(settings.feature_lead_capture ? [{ id: "leads" as const, label: "Leads" }] : []),
+    { id: "funnel", label: "Signing Funnel" },
     { id: "queue", label: "Print Queue" },
     { id: "getready", label: "Get-Ready" },
     ...(settings.feature_inventory ? [{ id: "inventory" as const, label: "Inventory" }] : []),
@@ -1205,6 +1217,23 @@ const Admin = () => {
           </div>
         )}
 
+        {/* ─── Signing Funnel Tab (Wave 26) ─── */}
+        {/* Dedicated home for Process Dashboard FlowTile #4
+            "Out for sign." Was previously colocated under leads;
+            the dashboard linked at /admin?tab=funnel which never
+            existed (broken link). This tab consolidates the
+            funnel widget + an open-signings list so a manager
+            sees every shopper currently mid-flow at a glance. */}
+        {tab === "funnel" && (
+          <div className="space-y-4">
+            <SigningFunnelWidget />
+            {/* Wave 29 — per-row visibility under the aggregate
+                widget. Dealers see WHICH shoppers hold unsigned
+                links + can copy/re-engage/defend per row. */}
+            <OpenSigningsList />
+          </div>
+        )}
+
         {/* ─── Leads Tab ─── */}
         {tab === "leads" && (
           <div className="space-y-4">
@@ -1441,6 +1470,12 @@ const Admin = () => {
         {/* ─── Get-Ready Tab ─── */}
         {tab === "getready" && (
           <div className="space-y-4">
+            {/* Wave 19 — email distribution panel surfaces here
+                because get-ready completion is the workflow that
+                consumes the F&I list. Edits propagate via the
+                Wave 14.6 realtime sync. */}
+            <EmailDistributionPanel storeId={currentStore?.id || ""} />
+
             <div className="flex items-center justify-between">
               <div>
                 <div className="flex items-center gap-2">
@@ -1521,6 +1556,69 @@ const Admin = () => {
                                     <span className="flex-shrink-0">⚠</span> {w}
                                   </p>
                                 ))}
+                              </div>
+                            )}
+
+                            {/* Wave 17 — per-accessory install panel.
+                                Renders the photos + signature workflow
+                                for every pending accessory. Already-
+                                installed rows show as compact green
+                                summary chips with photo count + signed
+                                indicator. Provides install-time proof
+                                that flows into the Audit-Defense Packet. */}
+                            {record.accessoriesToInstall && record.accessoriesToInstall.length > 0 && (
+                              <div className="mt-3">
+                                <AccessoryInstallPanel
+                                  record={record}
+                                  onMarkInstalled={async (recordId, productId, installedBy, proof) => {
+                                    await markAccessoryInstalled(recordId, productId, installedBy, proof);
+                                  }}
+                                />
+                              </div>
+                            )}
+
+                            {/* Wave 19 — "Send to inventory + notify
+                                F&I". Fires the get-ready completion
+                                email to subscribed recipients, then
+                                marks the record as inventory. If no
+                                subscribers exist, the email no-ops
+                                quietly (with a toast nudge) but the
+                                inventory move still happens. */}
+                            {record.status === "ready" && (
+                              <div className="mt-3 flex items-center justify-end">
+                                <button
+                                  disabled={emailSending}
+                                  onClick={async () => {
+                                    const accessories = (record.accessoriesToInstall || []).map(a => ({
+                                      name: a.productName,
+                                      installed: a.installed,
+                                      installedDate: a.installedDate,
+                                      installedBy: a.installedBy,
+                                      photoCount: (a.install_photos || []).length,
+                                      signed: !!a.installer_signature_data,
+                                    }));
+                                    const sent = await sendGetReadyComplete({
+                                      dealerName: currentStore?.name || settings.dealer_name || "Your dealership",
+                                      vehicleYmm: record.ymm,
+                                      vehicleVin: record.vin,
+                                      stockNumber: record.stockNumber,
+                                      acquiredDate: record.acquiredDate,
+                                      getReadyStartDate: record.getReadyStartDate,
+                                      getReadyCompleteDate: record.getReadyCompleteDate || new Date().toISOString(),
+                                      accessories,
+                                      deepLinkUrl: `${window.location.origin}/admin?tab=files`,
+                                    });
+                                    await markInventory(record.id);
+                                    if (sent) {
+                                      toast.success("Notified F&I distribution · moved to inventory");
+                                    } else {
+                                      toast.info("Moved to inventory · no F&I subscribers on file yet");
+                                    }
+                                  }}
+                                  className="inline-flex items-center gap-1.5 h-9 px-4 rounded-lg bg-gradient-to-r from-[#3BB4FF] to-[#1E90FF] text-white text-xs font-display font-black shadow-premium hover:brightness-110 disabled:opacity-60"
+                                >
+                                  {emailSending ? "Sending…" : "Send to inventory · notify F&I"}
+                                </button>
                               </div>
                             )}
                           </div>
@@ -1648,6 +1746,12 @@ const Admin = () => {
         {/* ─── Vehicle Files Tab ─── */}
         {tab === "files" && (
           <div className="space-y-4">
+            {/* Wave 22 — feed health surfaces the cross-app
+                inventory contract above the file index so a
+                dealer who notices "I'm missing rows" can check
+                the pull status without leaving this tab. */}
+            <InventoryFeedHealth />
+
             <div className="flex items-center justify-between">
               <div>
                 <div className="flex items-center gap-2">
@@ -1902,6 +2006,26 @@ const Admin = () => {
               <div>
                 <label className="text-xs font-semibold text-muted-foreground">Disclosure Text</label>
                 <textarea value={editing.disclosure || ""} onChange={(e) => setEditing({ ...editing, disclosure: e.target.value })} className="w-full px-3 py-2 border border-border-custom rounded text-sm" rows={3} />
+              </div>
+              <div>
+                <label className="text-xs font-semibold text-foreground inline-flex items-center gap-1.5">
+                  Benefit Justification
+                  <span className="text-[9px] font-bold uppercase tracking-[0.12em] px-1.5 py-0.5 rounded bg-amber-100 text-amber-800">
+                    Required — installed
+                  </span>
+                </label>
+                <textarea
+                  value={editing.benefit_justification || ""}
+                  onChange={(e) => setEditing({ ...editing, benefit_justification: e.target.value })}
+                  className="w-full px-3 py-2 border border-border-custom rounded text-sm"
+                  rows={2}
+                  placeholder="e.g. Ceramic coating extends the factory clear-coat life by 5+ years and reduces buyer's long-term reconditioning cost."
+                />
+                <p className="text-[10px] text-muted-foreground mt-1 leading-relaxed">
+                  Seeds the per-addendum line. Dealers can edit per vehicle at addendum time.
+                  Required on installed (pre-installed) products before the compliance red-team
+                  releases a signing link — answers FTC §5 and CA SB 766 §11713.21.
+                </p>
               </div>
               <div className="flex items-center gap-2">
                 <input type="checkbox" checked={editing.is_active ?? true} onChange={(e) => setEditing({ ...editing, is_active: e.target.checked })} />

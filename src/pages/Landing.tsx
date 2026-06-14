@@ -1,874 +1,756 @@
-// TEST3 — mirror/Lovable sync check 2026-04-17
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import Logo from "@/components/brand/Logo";
-import AppSwitcher from "@/components/layout/AppSwitcher";
-import { AUTOCURB_BRAND } from "@/data/autocurbBrand";
 import {
   ArrowRight,
   ShieldCheck,
-  Zap,
-  BarChart3,
-  Sparkles,
-  Scan,
-  FileText,
-  Signature,
-  Check,
-  X,
-  Minus,
-  Play,
-  LogIn,
-  QrCode,
-  Printer,
-  Camera,
-  Wrench,
-  Languages,
-  Database,
-  Globe,
-  Quote,
-  Award,
-  Phone,
-  Mail,
-  ChevronDown,
-  TrendingUp,
-  Building2,
-  FileCheck,
+  Eye,
   Lock,
+  Activity,
+  FileCheck,
+  TrendingUp,
+  ChevronDown,
+  Sparkles,
+  Check,
+  Building2,
 } from "lucide-react";
+
+// ──────────────────────────────────────────────────────────────
+// Landing — complete redesign (Wave 32).
+//
+// Brief: Stripe / Linear / Vanta tier marketing site. Outcome-led
+// narrative, light surface, very large typography, generous
+// whitespace. Lead with "AutoLabels protects your dealership" —
+// not "AutoLabels creates addendums." The product is positioned
+// as the compliance operating system, not a sticker tool.
+//
+// Audience reads in 15 seconds: dealer principals, GMs, GSMs,
+// used/new car managers, compliance managers. Hero must answer
+// "what is this, why do I need it" before any product noun
+// (addendum / sticker / disclosure) appears.
+// ──────────────────────────────────────────────────────────────
 
 const Landing = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
 
-  // ─ Navigation ─
-  const Navigation = () => (
-    <nav className="sticky top-0 z-40 bg-white/95 backdrop-blur border-b border-gray-200">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex items-center justify-between">
-        <button
-          onClick={() => navigate("/")}
-          aria-label="AutoLabels home"
-          className="flex items-center"
-        >
-          <Logo variant="full" size={36} tagline />
-        </button>
-        <div className="hidden md:flex gap-8 items-center justify-center flex-1">
-          <a
-            onClick={() => navigate("/about")}
-            className="text-sm text-gray-700 hover:text-gray-900 cursor-pointer"
-          >
-            About
-          </a>
-          <a
-            onClick={() => document.getElementById("features")?.scrollIntoView({ behavior: "smooth" })}
-            className="text-sm text-gray-700 hover:text-gray-900 cursor-pointer"
-          >
-            Features
-          </a>
-          <a
-            onClick={() => document.getElementById("roi")?.scrollIntoView({ behavior: "smooth" })}
-            className="text-sm text-gray-700 hover:text-gray-900 cursor-pointer"
-          >
-            ROI
-          </a>
-          <a
-            onClick={() => document.getElementById("compare")?.scrollIntoView({ behavior: "smooth" })}
-            className="text-sm text-gray-700 hover:text-gray-900 cursor-pointer"
-          >
-            Compare
-          </a>
-          <a
-            onClick={() => document.getElementById("pricing")?.scrollIntoView({ behavior: "smooth" })}
-            className="text-sm text-gray-700 hover:text-gray-900 cursor-pointer"
-          >
-            Pricing
-          </a>
-          <a
-            onClick={() => document.getElementById("faq")?.scrollIntoView({ behavior: "smooth" })}
-            className="text-sm text-gray-700 hover:text-gray-900 cursor-pointer"
-          >
-            FAQ
-          </a>
-        </div>
-        <div className="flex items-center gap-4">
-          <AppSwitcher currentApp="autolabels" theme="light" />
-          {user ? (
-            <button
-              onClick={() => navigate("/dashboard")}
-              className="text-sm px-4 py-2 text-blue-600 hover:text-blue-700 font-medium"
-            >
-              Open Dashboard
-            </button>
-          ) : (
-            <>
-              <a
-                href="mailto:hello@autolabels.io?subject=AutoLabels.io%20access%20request"
-                className="text-sm px-4 py-2 text-gray-700 hover:text-gray-900 font-medium"
-              >
-                Request access
-              </a>
-              <button
-                onClick={() => navigate("/login")}
-                className="text-sm px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium flex items-center gap-2"
-              >
-                <LogIn size={16} />
-                Dealer Login
-              </button>
-            </>
-          )}
-        </div>
-      </div>
-    </nav>
-  );
-
-  // ─ Hero ─
-  const Hero = () => (
-    <section className="relative py-20 md:py-28 overflow-hidden">
-      <div className="absolute inset-0 opacity-40">
-        <div className="absolute top-20 left-10 w-96 h-96 bg-blue-200 rounded-full mix-blend-multiply filter blur-3xl animate-blob"></div>
-        <div className="absolute top-40 right-20 w-96 h-96 bg-cyan-200 rounded-full mix-blend-multiply filter blur-3xl animate-blob animation-delay-2000"></div>
-      </div>
-      <div className="relative max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-        <div className="inline-block px-4 py-2 bg-gray-100 rounded-full mb-6">
-          <span className="text-sm font-medium text-gray-700">The dealer label & compliance platform</span>
-        </div>
-        <h1 className="font-display text-display-lg md:text-display-xl font-semibold mb-6">
-          Decode. Disclose.{" "}
-          <span className="bg-gradient-to-r from-blue-600 to-cyan-600 bg-clip-text text-transparent italic">
-            Deliver.
-          </span>
-        </h1>
-        <p className="text-xl text-gray-600 mb-8 max-w-2xl mx-auto">
-          Generate NHTSA-compliant window stickers, digital addendums, tamper-evident e-signatures, and a shopper portal—all in one platform.
-        </p>
-        <div className="flex flex-col sm:flex-row gap-4 justify-center mb-12">
-          <button
-            onClick={() => user ? navigate("/dashboard") : (window.location.href = "mailto:hello@autolabels.io?subject=AutoLabels.io%20access%20request")}
-            className="px-8 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium flex items-center justify-center gap-2 shimmer-cta"
-          >
-            Start free trial
-            <ArrowRight size={18} />
-          </button>
-          <button
-            onClick={() => document.getElementById("demo")?.scrollIntoView({ behavior: "smooth" })}
-            className="px-8 py-3 border-2 border-gray-300 text-gray-900 rounded-lg hover:border-gray-400 font-medium flex items-center justify-center gap-2"
-          >
-            <Play size={18} />
-            Watch 90-sec demo
-          </button>
-        </div>
-        <div className="text-sm text-gray-600 space-y-2">
-          <p>No credit card · FTC-aligned · 50-state disclosure engine</p>
-          <p>California SB 766 ready (Oct 2026)</p>
-        </div>
-      </div>
-    </section>
-  );
-
-  // ─ Logo Wall ─
-  const LogoWall = () => (
-    <section className="py-12 bg-gray-50 border-y border-gray-200">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <p className="text-center text-gray-700 font-medium mb-8">Trusted by dealers from coast to coast.</p>
-        {/* TODO: replace with real customer logos */}
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-          {[
-            "Freeman Ford",
-            "Koons Lexus",
-            "Westside Nissan",
-            "Desert Mitsubishi",
-            "River City Chevrolet",
-            "Premier Select Auto Group",
-          ].map((name) => (
-            <div
-              key={name}
-              className="bg-white border border-gray-200 rounded-lg p-4 flex items-center justify-center text-center text-xs font-mono text-gray-500 h-20"
-            >
-              {name}
-            </div>
-          ))}
-        </div>
-      </div>
-    </section>
-  );
-
-  // ─ Demo ─
-  const Demo = () => (
-    <section id="demo" className="py-16 bg-white">
-      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="bg-gradient-to-br from-blue-600 to-cyan-600 rounded-xl overflow-hidden aspect-video flex items-center justify-center mb-8">
-          <div className="text-center">
-            <Play size={64} className="text-white mx-auto mb-4" />
-            <p className="text-white font-semibold">Demo – 0:90</p>
-          </div>
-        </div>
-        <p className="text-gray-700 font-medium mb-4">What you'll see:</p>
-        <ul className="space-y-3 text-gray-600">
-          <li className="flex items-start gap-3">
-            <Check size={20} className="text-green-600 flex-shrink-0 mt-0.5" />
-            <span>Decode a VIN in 800ms</span>
-          </li>
-          <li className="flex items-start gap-3">
-            <Check size={20} className="text-green-600 flex-shrink-0 mt-0.5" />
-            <span>Build a compliant addendum</span>
-          </li>
-          <li className="flex items-start gap-3">
-            <Check size={20} className="text-green-600 flex-shrink-0 mt-0.5" />
-            <span>Publish the shopper portal</span>
-          </li>
-        </ul>
-      </div>
-    </section>
-  );
-
-  // ─ How It Works ─
-  const HowItWorks = () => (
-    <section id="how" className="py-16 bg-gray-50">
-      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
-        <h2 className="font-display text-display font-semibold mb-12 text-center">How it works</h2>
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-          {[
-            { icon: Scan, title: "Decode", desc: "VIN lookup + NHTSA recalls in 800ms" },
-            { icon: Printer, title: "Stick", desc: "Generate Zebra-ready window label" },
-            { icon: Signature, title: "Sign", desc: "Tamper-evident e-signature gate" },
-            { icon: Check, title: "Close", desc: "Shopper portal QR + shopper portal" },
-          ].map((item, idx) => (
-            <div key={idx} className="bg-white p-6 rounded-lg border border-gray-200 text-center">
-              <div className="text-4xl font-bold text-blue-600 mb-3">{idx + 1}</div>
-              <item.icon size={32} className="mx-auto text-blue-600 mb-3" />
-              <h3 className="font-semibold text-gray-900 mb-2">{item.title}</h3>
-              <p className="text-sm text-gray-600">{item.desc}</p>
-            </div>
-          ))}
-        </div>
-      </div>
-    </section>
-  );
-
-  // ─ Sticker to Shopper ─
-  const StickerToShopper = () => (
-    <section className="py-16 bg-white">
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
-          <div>
-            <h2 className="font-display text-display font-semibold mb-6">The only window sticker your buyer reads on their phone.</h2>
-            <p className="text-gray-600 mb-6">
-              The QR on the printed sticker resolves to <code className="bg-gray-100 px-2 py-1 rounded text-sm">/v/&lt;slug&gt;</code>, matching your dealership branding and WCAG 2.1 AA compliant for accessibility.
-            </p>
-          </div>
-          <div className="flex justify-center">
-            <div className="w-64 h-96 bg-gradient-to-b from-gray-100 to-gray-200 rounded-3xl border-8 border-gray-800 flex flex-col items-center justify-center p-4">
-              <Logo variant="full" size={24} />
-              <p className="text-sm font-semibold text-gray-900 mt-4 text-center">2024 Lexus RX 350</p>
-              <div className="mt-4 space-y-2 w-full text-xs">
-                <div className="bg-white rounded p-2 text-center">
-                  <span className="font-medium text-gray-700">Premium Package</span>
-                  <div className="text-gray-500 text-xs mt-1">Pre-Installed</div>
-                </div>
-                <div className="bg-white rounded p-2 text-center">
-                  <span className="font-medium text-gray-700">All-Weather Mats</span>
-                  <div className="text-gray-500 text-xs mt-1">Pre-Installed</div>
-                </div>
-                <div className="bg-white rounded p-2 text-center">
-                  <span className="font-medium text-gray-700">VIN Shield</span>
-                  <div className="text-gray-500 text-xs mt-1">Pre-Installed</div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </section>
-  );
-
-  // ─ Prep & Install Gate ─
-  const PrepGate = () => (
-    <section className="py-16 bg-gray-50">
-      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
-        <h2 className="font-display text-display font-semibold mb-4 text-center">Verified before the car hits the lot.</h2>
-        <p className="text-center text-gray-600 mb-8">
-          Shop-foreman sign-off unlocks the public listing and shopper portal.
-        </p>
-        <div className="flex flex-wrap justify-center gap-3">
-          {["Acquired", "Inspected", "Installed", "Foreman Signed", "Ready", "Listed"].map((stage) => (
-            <div key={stage} className="flex items-center gap-2">
-              <div className="px-4 py-2 bg-white border-2 border-green-600 rounded-full text-sm font-medium text-gray-900 flex items-center gap-2">
-                <Check size={16} className="text-green-600" />
-                {stage}
-              </div>
-              {stage !== "Listed" && <ArrowRight size={20} className="text-gray-400" />}
-            </div>
-          ))}
-        </div>
-      </div>
-    </section>
-  );
-
-  // ─ Features ─
-  //
-  // Wave 15.6 — feature reweight. The previous treatment was 12
-  // identical cards in a 4-column grid; the dealer's eye had
-  // nowhere to land and the compliance moat we sell read as
-  // checkbox feature soup. Linear's 2026 refresh teaches the
-  // discipline: hero 4 features that close the deal, demote the
-  // rest as "and also". The 4 heroes carry the navy/gradient
-  // chrome from elsewhere in the app so they feel premium.
-  const Features = () => {
-    const heroFeatures = [
-      { icon: Globe,       title: "50-state disclosure engine",     desc: "Doc fees, addendum format, and Buyers Guide rules pre-loaded for every U.S. state — and updated when a state legislates." },
-      { icon: Lock,        title: "UETA / E-SIGN with hash chain",  desc: "Every customer signature is captured with consent, IP, user-agent, and a SHA-256 of the canonical payload. Defensible in court." },
-      { icon: Database,    title: "Audit-Defense Packet · per VIN", desc: "One click downloads a self-contained HTML packet with chain root, recall snapshot, addendums, signings, prep sign-offs. Hand it to counsel." },
-      { icon: ShieldCheck, title: "California SB 766 ready",        desc: "3-day return window, 400-mile cap, $1/mi over 250, $150 max mileage charge, $600 restocking ceiling — clamped live in the resolve UI." },
-    ];
-    const supportingFeatures = [
-      { icon: Scan,      title: "VIN decode + Black Book",      desc: "NHTSA-backed lookup, sub-second" },
-      { icon: FileText,  title: "Monroney-grade typography",    desc: "FTC standards" },
-      { icon: Sparkles,  title: "AI disclosure copilot",        desc: "State-aware suggestions" },
-      { icon: Printer,   title: "Zebra · Brother · DYMO print", desc: "Universal label support" },
-      { icon: Camera,    title: "Prep + install photo workflow",desc: "Foreman sign-off gate" },
-      { icon: QrCode,    title: "Shopper portal + QR",          desc: "Mobile-first signing" },
-      { icon: Wrench,    title: "Product rules engine",         desc: "Y/M/M/Trim auto-assign" },
-      { icon: Languages, title: "Multi-language Buyers Guide",  desc: "ES / ZH / TL / VI / KO" },
-    ];
-    return (
-      <section id="features" className="py-16 bg-white">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-12">
-            <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-[#1E90FF] mb-2">
-              The four that close the deal
-            </p>
-            <h2 className="font-display text-display font-semibold">Built for the defense narrative.</h2>
-            <p className="text-sm text-gray-600 mt-3 max-w-2xl mx-auto">
-              Every other lot platform sells features. We sell what you say when an AG, the FTC, or counsel asks for the file.
-            </p>
-          </div>
-
-          {/* Hero row — 4 cards, navy-on-card with cyan accent. */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-5 mb-10">
-            {heroFeatures.map((feature, idx) => (
-              <div key={idx} className="relative overflow-hidden bg-card rounded-2xl border border-border shadow-premium p-6 group hover:shadow-lg transition-shadow">
-                <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-[#3BB4FF] to-[#1E90FF] flex items-center justify-center mb-4 shadow-premium">
-                  <feature.icon size={22} className="text-white" strokeWidth={2.25} />
-                </div>
-                <h3 className="font-display font-semibold text-lg text-foreground mb-1.5">{feature.title}</h3>
-                <p className="text-sm text-gray-600 leading-relaxed">{feature.desc}</p>
-              </div>
-            ))}
-          </div>
-
-          {/* And-also row — supporting features demoted to a denser tile grid. */}
-          <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-gray-500 mb-3">
-            And also
-          </p>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-            {supportingFeatures.map((feature, idx) => (
-              <div key={idx} className="bg-gray-50 p-4 rounded-xl border border-gray-200">
-                <feature.icon size={20} className="text-[#1E90FF] mb-2" strokeWidth={1.75} />
-                <h3 className="font-semibold text-gray-900 text-sm leading-tight">{feature.title}</h3>
-                <p className="text-xs text-gray-600 mt-0.5">{feature.desc}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-    );
-  };
-
-  // ─ ROI Calculator ─
-  const ROICalculator = () => {
-    const [deals, setDeals] = useState(50);
-    const [accessoryRev, setAccessoryRev] = useState(650);
-    const [disputes, setDisputes] = useState(3);
-
-    const incrementalAnnualRevenue = deals * 12 * accessoryRev * 0.15;
-    const complianceHoursSaved = deals * 12 * 0.4;
-    const riskAvoided = disputes * 4500;
-    // Compliance Suite annual cost — the tier that unlocks the prep gate, audit vault, and state engine.
-    const yearCost = 999 * 12;
-    const roi = ((incrementalAnnualRevenue + riskAvoided - yearCost) / yearCost) * 100;
-
-    const fmt = (n: number) =>
-      new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 }).format(n);
-
-    return (
-      <section id="roi" className="py-16 bg-gray-50">
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
-          <h2 className="font-display text-display font-semibold mb-12 text-center">ROI Calculator</h2>
-          <div className="bg-white p-8 rounded-lg border border-gray-200 mb-8">
-            <div className="space-y-6 mb-8">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Deals per month: {deals}
-                </label>
-                <input
-                  type="range"
-                  min="10"
-                  max="500"
-                  value={deals}
-                  onChange={(e) => setDeals(Number(e.target.value))}
-                  className="w-full"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Avg accessory revenue per deal: {fmt(accessoryRev)}
-                </label>
-                <input
-                  type="range"
-                  min="200"
-                  max="2000"
-                  step="50"
-                  value={accessoryRev}
-                  onChange={(e) => setAccessoryRev(Number(e.target.value))}
-                  className="w-full"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Doc-fee-related disputes per year: {disputes}
-                </label>
-                <input
-                  type="range"
-                  min="0"
-                  max="20"
-                  value={disputes}
-                  onChange={(e) => setDisputes(Number(e.target.value))}
-                  className="w-full"
-                />
-              </div>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-              <div className="bg-blue-50 p-4 rounded-lg text-center">
-                <p className="text-sm text-gray-600 mb-2">Annual Revenue Lift</p>
-                <p className="text-2xl font-bold text-blue-600">{fmt(incrementalAnnualRevenue)}</p>
-              </div>
-              <div className="bg-green-50 p-4 rounded-lg text-center">
-                <p className="text-sm text-gray-600 mb-2">Hours Saved Annually</p>
-                <p className="text-2xl font-bold text-green-600">{complianceHoursSaved.toFixed(0)}</p>
-              </div>
-              <div className="bg-purple-50 p-4 rounded-lg text-center">
-                <p className="text-sm text-gray-600 mb-2">Risk Avoided</p>
-                <p className="text-2xl font-bold text-purple-600">{fmt(riskAvoided)}</p>
-              </div>
-              <div className="bg-amber-50 p-4 rounded-lg text-center">
-                <p className="text-sm text-gray-600 mb-2">ROI</p>
-                <p className="text-2xl font-bold text-amber-600">{roi.toFixed(0)}%</p>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-    );
-  };
-
-  // ─ Comparison ─
-  const Comparison = () => (
-    <section id="compare" className="py-16 bg-white">
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
-        <h2 className="font-display text-display font-semibold mb-12 text-center">How we compare</h2>
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b-2 border-gray-300">
-                <th className="text-left py-4 px-4 font-semibold text-gray-900">Feature</th>
-                <th className="text-center py-4 px-4 font-semibold text-gray-900">AutoLabels.io</th>
-                <th className="text-center py-4 px-4 font-semibold text-gray-900">Old DMS plugin</th>
-                <th className="text-center py-4 px-4 font-semibold text-gray-900">Word doc + PDF</th>
-              </tr>
-            </thead>
-            <tbody>
-              {[
-                { feature: "VIN decode + NHTSA recall", al: true, dms: false, doc: false },
-                { feature: "State disclosure engine (50)", al: true, dms: false, doc: false },
-                { feature: "Digital UETA sign-off", al: true, dms: false, doc: false },
-                { feature: "Shopper-facing QR portal", al: true, dms: false, doc: false },
-                { feature: "Prep + install gate", al: true, dms: false, doc: false },
-                { feature: "Immutable audit trail", al: true, dms: false, doc: false },
-                { feature: "Zebra + universal print", al: true, dms: false, doc: false },
-                { feature: "California SB 766 ready", al: true, dms: false, doc: false },
-                { feature: "Transparent flat pricing", al: true, dms: "partial", doc: false },
-              ].map((row, idx) => (
-                <tr key={idx} className="border-b border-gray-200">
-                  <td className="py-4 px-4 text-gray-900 font-medium">{row.feature}</td>
-                  <td className="py-4 px-4 text-center">
-                    {row.al === true ? <Check size={20} className="text-green-600 mx-auto" /> : row.al === false ? <X size={20} className="text-red-600 mx-auto" /> : <Minus size={20} className="text-amber-600 mx-auto" />}
-                  </td>
-                  <td className="py-4 px-4 text-center">
-                    {row.dms === true ? <Check size={20} className="text-green-600 mx-auto" /> : row.dms === false ? <X size={20} className="text-red-600 mx-auto" /> : <Minus size={20} className="text-amber-600 mx-auto" />}
-                  </td>
-                  <td className="py-4 px-4 text-center">
-                    {row.doc === true ? <Check size={20} className="text-green-600 mx-auto" /> : row.doc === false ? <X size={20} className="text-red-600 mx-auto" /> : <Minus size={20} className="text-amber-600 mx-auto" />}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
-    </section>
-  );
-
-  // ─ Testimonials ─
-  const Testimonials = () => (
-    <section className="py-16 bg-gray-50">
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
-        <h2 className="font-display text-display font-semibold mb-12 text-center">What dealers say</h2>
-        {/* TODO: replace with real customer stories */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-          {[
-            {
-              quote: "We went from 6 addendums a week to 27. The prep-gate alone saved our GM from a state AG letter.",
-              author: "Jim Holloway",
-              title: "General Manager",
-              company: "Freeman Ford",
-              city: "Jackson MS",
-            },
-            {
-              quote: "Our customers scan the QR and read the sticker on their phone. VDP bounce-rate dropped 18%.",
-              author: "Maria Chen",
-              title: "Digital Marketing Director",
-              company: "Koons Lexus",
-              city: "Tysons Corner VA",
-            },
-            {
-              quote: "Set up was 11 minutes. My 58-year-old finance director did it alone.",
-              author: "Tony Ruiz",
-              title: "Dealer Principal",
-              company: "Desert Mitsubishi",
-              city: "Mesa AZ",
-            },
-          ].map((test, idx) => (
-            <div key={idx} className="bg-white p-8 rounded-lg border border-gray-200">
-              <Quote size={24} className="text-blue-600 mb-4" />
-              <p className="text-gray-600 mb-6 italic">{test.quote}</p>
-              <div className="flex items-center gap-4">
-                <div className="w-12 h-12 bg-gradient-to-br from-blue-400 to-cyan-400 rounded-full"></div>
-                <div className="text-sm">
-                  <p className="font-semibold text-gray-900">{test.author}</p>
-                  <p className="text-gray-600">{test.title}</p>
-                  <p className="text-gray-600">{test.company}, {test.city}</p>
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-    </section>
-  );
-
-  // ─ Press ─
-  const Press = () => (
-    <section className="py-12 bg-white border-y border-gray-200">
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
-        <p className="text-center text-gray-700 font-medium mb-8">As seen at / In</p>
-        {/* TODO: replace with real press logos */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          {["Automotive News", "Car Dealership Guy", "NADA Show", "Shark Tank"].map((press) => (
-            <div
-              key={press}
-              className="bg-gray-100 border border-gray-200 rounded-lg p-4 flex items-center justify-center text-center text-xs font-medium text-gray-500 h-20"
-            >
-              {press}
-            </div>
-          ))}
-        </div>
-      </div>
-    </section>
-  );
-
-  // ─ Pricing ─
-  const Pricing = () => (
-    <section id="pricing" className="py-16 bg-gray-50">
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
-        <h2 className="font-display text-display font-semibold mb-3 text-center">Pricing</h2>
-        <p className="text-center text-gray-600 mb-12 max-w-2xl mx-auto">
-          One FTC Section 5 enforcement action is up to <strong className="text-gray-900">$53,088</strong> per violation. Compliance Pro is $999/mo.
-          <span className="block mt-1">Small price to pay.</span>
-        </p>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-12">
-          {[
-            {
-              name: "Essential",
-              price: "$299",
-              period: "per rooftop/month",
-              desc: "Window stickers + addendums, up to 75 VINs/month",
-              featured: false,
-              cta: "Start trial",
-              bundledNote: "Free with any Autocurb.io subscription",
-              items: [
-                "Up to 75 VINs / month",
-                "New + used car window stickers",
-                "Full addendum builder",
-                "VIN decode + NHTSA recall",
-                "Shopper portal (QR + embed)",
-                "Zebra + universal print",
-                "Email support",
-              ],
-            },
-            {
-              name: "Unlimited",
-              price: "$499",
-              period: "per rooftop/month",
-              desc: "Unlimited vehicles for high-volume dealers",
-              featured: true,
-              cta: "Start trial",
-              items: [
-                "Everything in Essential, plus:",
-                "Unlimited VINs",
-                "Product rules engine",
-                "Custom branding + logo kit",
-                "Leads + analytics dashboard",
-                "Priority support",
-                "Onboarding assist",
-              ],
-            },
-            {
-              name: "Compliance Pro",
-              price: "$999",
-              period: "per rooftop/month",
-              desc: "Full scan-to-signed FTC flow for airtight deals",
-              featured: false,
-              cta: "Talk to sales",
-              items: [
-                "Everything in Unlimited, plus:",
-                "50-state disclosure engine",
-                "Prep + install gate with foreman sign-off",
-                "UETA / E-SIGN tamper-evident audit vault",
-                "Multi-language addendums (es/zh/tl/vi/ko)",
-                "CA SB 766 ready (Oct 2026)",
-                "DMS webhooks (vAuto / VinSolutions / CDK)",
-                "Dedicated success manager",
-              ],
-            },
-          ].map((tier, idx) => (
-            <div
-              key={idx}
-              className={`rounded-lg p-8 border-2 ${
-                tier.featured ? "border-blue-600 bg-white shadow-premium" : "border-gray-200 bg-white"
-              }`}
-            >
-              {tier.featured && <div className="text-center mb-4 text-sm font-semibold text-blue-600">FEATURED</div>}
-              <h3 className="text-2xl font-bold text-gray-900 mb-2">{tier.name}</h3>
-              <p className="text-gray-600 text-sm mb-4">{tier.desc}</p>
-              <div className="mb-3">
-                <span className="text-4xl font-bold text-gray-900">{tier.price}</span>
-                <span className="text-gray-600 text-sm ml-2">/ {tier.period}</span>
-              </div>
-              {tier.bundledNote && (
-                <div className="mb-6 inline-flex items-center gap-1.5 text-xs font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-full px-2.5 py-1">
-                  <Check size={12} className="text-emerald-600" />
-                  {tier.bundledNote}
-                </div>
-              )}
-              {!tier.bundledNote && <div className="mb-6" />}
-              <button
-                onClick={() =>
-                  tier.cta === "Talk to sales"
-                    ? window.open("mailto:hello@autolabels.io")
-                    : user ? navigate("/dashboard") : (window.location.href = "mailto:hello@autolabels.io?subject=AutoLabels.io%20access%20request")
-                }
-                className={`w-full py-3 rounded-lg font-medium mb-6 ${
-                  tier.featured
-                    ? "bg-blue-600 text-white hover:bg-blue-700"
-                    : "border-2 border-gray-300 text-gray-900 hover:border-gray-400"
-                }`}
-              >
-                {tier.cta}
-              </button>
-              <ul className="space-y-3 text-sm">
-                {tier.items.map((item, i) => (
-                  <li key={i} className="flex items-center gap-2 text-gray-600">
-                    <Check size={16} className="text-green-600" />
-                    {item}
-                  </li>
-                ))}
-              </ul>
-            </div>
-          ))}
-        </div>
-        <div className="bg-white border border-gray-200 rounded-lg p-6">
-          <p className="font-semibold text-gray-900 mb-4">All plans include:</p>
-          <div className="grid grid-cols-2 md:grid-cols-6 gap-4 text-sm">
-            {[
-              "VIN decode",
-              "State engine",
-              "E-SIGN",
-              "Audit vault",
-              "Shopper portal",
-              "Zebra print",
-            ].map((item) => (
-              <div key={item} className="flex items-center gap-2 text-gray-600">
-                <Check size={16} className="text-green-600 flex-shrink-0" />
-                {item}
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
-    </section>
-  );
-
-  // ─ FAQ ─
-  const FAQ = () => (
-    <section id="faq" className="py-16 bg-white">
-      <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
-        <h2 className="font-display text-display font-semibold mb-12 text-center">Frequently asked questions</h2>
-        <div className="space-y-4">
-          {[
-            {
-              q: "Do you handle the FTC Buyers Guide for used cars?",
-              a: "Yes — bilingual (English + Spanish), As-Is / Implied / Warranty, 16 CFR 455 compliant.",
-            },
-            {
-              q: "What happened to the CARS Rule?",
-              a: "The 5th Circuit vacated it on January 27, 2025. We stay FTC-aligned via Section 5 and implement individual state laws like California SB 766 (effective October 1, 2026).",
-            },
-            {
-              q: "Is digital signing legally binding?",
-              a: "Yes. We follow UETA and the federal E-SIGN Act — tamper-evident content hash, IP, user-agent, timestamp, and consent are captured and stored server-side.",
-            },
-            {
-              q: "Can the accessory addendum be viewed from our website?",
-              a: "Yes. Every VIN has a public /v/<slug> URL with WCAG 2.1 AA accessibility, and an iframe embed snippet your web team can drop on the VDP.",
-            },
-            {
-              q: "What if the internet drops?",
-              a: "Draft stickers save to an offline queue and sync when the connection returns.",
-            },
-            {
-              q: "Does it print to Zebra?",
-              a: "Yes — ZPL direct via WebUSB, plus Brother QL, DYMO, and any CUPS/PDF printer.",
-            },
-            {
-              q: "What DMS integrations?",
-              a: "vAuto, VinSolutions, CDK, and Reynolds via webhooks, plus Zapier/Make for the rest.",
-            },
-            {
-              q: "Is there a contract?",
-              a: "Month-to-month. Cancel anytime. No setup fees.",
-            },
-          ].map((faq, idx) => (
-            <details
-              key={idx}
-              className="group border border-gray-200 rounded-lg p-4 cursor-pointer hover:border-gray-300"
-            >
-              <summary className="flex items-center justify-between font-semibold text-gray-900 select-none">
-                {faq.q}
-                <ChevronDown size={20} className="text-gray-400 group-open:rotate-180 transition-transform" />
-              </summary>
-              <p className="text-gray-600 mt-4">{faq.a}</p>
-            </details>
-          ))}
-        </div>
-      </div>
-    </section>
-  );
-
-  // ─ Final CTA ─
-  const FinalCTA = () => (
-    <section className="py-16 bg-white">
-      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="bg-gradient-to-br from-blue-600 to-cyan-600 rounded-2xl p-12 text-center shimmer-hero">
-          <h2 className="font-display text-display font-semibold text-white mb-6">Stop printing stickers the 2010 way.</h2>
-          <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <button
-              onClick={() => user ? navigate("/dashboard") : (window.location.href = "mailto:hello@autolabels.io?subject=AutoLabels.io%20access%20request")}
-              className="px-8 py-3 bg-white text-blue-600 rounded-lg hover:bg-gray-100 font-medium flex items-center justify-center gap-2"
-            >
-              Start free trial
-              <ArrowRight size={18} />
-            </button>
-            <button
-              onClick={() => document.getElementById("demo")?.scrollIntoView({ behavior: "smooth" })}
-              className="px-8 py-3 border-2 border-white text-white rounded-lg hover:bg-white/10 font-medium"
-            >
-              Watch demo
-            </button>
-          </div>
-        </div>
-      </div>
-    </section>
-  );
-
-  // ─ Footer ─
-  const Footer = () => (
-    <footer className="bg-gray-900 text-gray-200 py-16">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-8 mb-8">
-          <div>
-            <h3 className="font-semibold text-white mb-4">Product</h3>
-            <ul className="space-y-2 text-sm">
-              <li><a className="hover:text-gray-200 cursor-pointer">Window Stickers</a></li>
-              <li><a className="hover:text-gray-200 cursor-pointer">Addendums</a></li>
-              <li><a className="hover:text-gray-200 cursor-pointer">Compliance</a></li>
-              <li><a className="hover:text-gray-200 cursor-pointer">Shopper Portal</a></li>
-            </ul>
-          </div>
-          <div>
-            <h3 className="font-semibold text-white mb-4">Resources</h3>
-            <ul className="space-y-2 text-sm">
-              <li><a onClick={() => document.getElementById("faq")?.scrollIntoView({ behavior: "smooth" })} className="hover:text-gray-200 cursor-pointer">FAQ</a></li>
-              <li><a className="hover:text-gray-200 cursor-pointer">Brand</a></li>
-              <li><a onClick={() => navigate("/about")} className="hover:text-gray-200 cursor-pointer">About</a></li>
-              <li><a className="hover:text-gray-200 cursor-pointer">Changelog</a></li>
-            </ul>
-          </div>
-          <div>
-            <h3 className="font-semibold text-white mb-4">Legal</h3>
-            <ul className="space-y-2 text-sm">
-              <li><a className="hover:text-gray-200 cursor-pointer">Privacy</a></li>
-              <li><a className="hover:text-gray-200 cursor-pointer">Terms</a></li>
-              <li><a className="hover:text-gray-200 cursor-pointer">E-SIGN Disclosure</a></li>
-            </ul>
-          </div>
-          <div>
-            <h3 className="font-semibold text-white mb-4">Contact</h3>
-            <ul className="space-y-2 text-sm">
-              <li><a href="mailto:hello@autolabels.io" className="hover:text-gray-200 flex items-center gap-2"><Mail size={16} /> hello@autolabels.io</a></li>
-              <li><a className="hover:text-gray-200 cursor-pointer">Request demo</a></li>
-            </ul>
-          </div>
-        </div>
-        <div className="border-t border-gray-700 pt-8 flex flex-col md:flex-row items-center justify-between gap-4">
-          <div className="flex items-center gap-4">
-            <Logo variant="full" size={24} />
-            <p className="text-sm text-gray-300">© 2026 AutoLabels.io — Built for the American dealer.</p>
-          </div>
-          <div className="flex items-center gap-4 text-xs text-gray-300">
-            <a href="mailto:hello@autolabels.io" className="hover:text-white">hello@autolabels.io</a>
-            <span className="text-gray-500">·</span>
-            <button
-              onClick={() => navigate("/login?admin=1")}
-              className="hover:text-white"
-            >
-              Admin
-            </button>
-          </div>
-        </div>
-      </div>
-    </footer>
-  );
-
   return (
-    <div className="bg-white">
-      <Navigation />
-      <Hero />
-      <LogoWall />
-      <Demo />
-      <HowItWorks />
-      <StickerToShopper />
-      <PrepGate />
-      <Features />
-      <ROICalculator />
-      <Comparison />
-      <Testimonials />
-      <Press />
-      <Pricing />
+    <div className="bg-white text-slate-900 antialiased selection:bg-blue-100 selection:text-slate-900">
+      <Nav user={user} onNav={navigate} />
+      <Hero onPrimary={() => navigate(user ? "/dashboard" : "/onboarding")} />
+      <TrustBand />
+      <Problem />
+      <Pillars />
+      <ProductShot />
+      <DeepFeatures />
+      <TrustAndSecurity />
+      <Outcomes />
+      <Pricing onSelect={() => navigate("/onboarding")} />
       <FAQ />
-      <FinalCTA />
-      <Footer />
+      <FinalCTA onPrimary={() => navigate(user ? "/dashboard" : "/onboarding")} />
+      <Footer onNav={navigate} />
     </div>
   );
 };
+
+// ──────────────────────────────────────────────────────────────
+// Navigation — minimal, sticky, clean. One primary CTA on the
+// right. Mobile collapses to a single "Book a demo" button.
+// ──────────────────────────────────────────────────────────────
+
+const Nav = ({ user, onNav }: { user: unknown; onNav: (to: string) => void }) => (
+  <nav className="sticky top-0 z-50 border-b border-slate-100 bg-white/80 backdrop-blur-xl">
+    <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-6 lg:px-8">
+      <button onClick={() => onNav("/")} aria-label="AutoLabels home" className="flex items-center gap-2">
+        <Logo variant="full" size={28} />
+      </button>
+      <div className="hidden items-center gap-8 md:flex">
+        <a href="#platform" className="text-sm text-slate-600 hover:text-slate-900 transition-colors">Platform</a>
+        <a href="#compliance" className="text-sm text-slate-600 hover:text-slate-900 transition-colors">Compliance</a>
+        <a href="#pricing" className="text-sm text-slate-600 hover:text-slate-900 transition-colors">Pricing</a>
+        <a href="#faq" className="text-sm text-slate-600 hover:text-slate-900 transition-colors">FAQ</a>
+      </div>
+      <div className="flex items-center gap-2">
+        {user ? (
+          <button
+            onClick={() => onNav("/dashboard")}
+            className="inline-flex h-9 items-center gap-1.5 rounded-full bg-slate-900 px-4 text-sm font-medium text-white transition-colors hover:bg-slate-800"
+          >
+            Open dashboard <ArrowRight className="h-3.5 w-3.5" />
+          </button>
+        ) : (
+          <>
+            <button
+              onClick={() => onNav("/login")}
+              className="hidden h-9 items-center px-3 text-sm text-slate-600 transition-colors hover:text-slate-900 md:inline-flex"
+            >
+              Sign in
+            </button>
+            <button
+              onClick={() => onNav("/onboarding")}
+              className="inline-flex h-9 items-center gap-1.5 rounded-full bg-slate-900 px-4 text-sm font-medium text-white transition-colors hover:bg-slate-800"
+            >
+              Book a demo <ArrowRight className="h-3.5 w-3.5" />
+            </button>
+          </>
+        )}
+      </div>
+    </div>
+  </nav>
+);
+
+// ──────────────────────────────────────────────────────────────
+// Hero — huge headline, single outcome sentence. No product
+// noun yet. Soft radial gradient behind so the slab feels like
+// a Linear / Stripe hero, not a flat marketing page.
+// ──────────────────────────────────────────────────────────────
+
+const Hero = ({ onPrimary }: { onPrimary: () => void }) => (
+  <section className="relative isolate overflow-hidden">
+    <div
+      aria-hidden
+      className="pointer-events-none absolute inset-x-0 -top-40 -z-10 h-[600px] [mask-image:radial-gradient(60%_60%_at_50%_30%,#000_40%,transparent_85%)]"
+    >
+      <div className="absolute inset-x-0 top-0 h-full bg-[radial-gradient(60%_50%_at_50%_30%,rgba(37,99,235,0.12),transparent_70%)]" />
+    </div>
+
+    <div className="mx-auto max-w-7xl px-6 pb-20 pt-24 lg:px-8 lg:pb-32 lg:pt-32">
+      <div className="mx-auto max-w-3xl text-center">
+        <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-medium text-slate-600 shadow-sm">
+          <span className="inline-block h-1.5 w-1.5 rounded-full bg-emerald-500" />
+          FTC §5 · CA SB 766 · 50-state ready
+        </div>
+        <h1 className="font-display text-[44px] font-semibold leading-[1.05] tracking-[-0.025em] text-slate-900 sm:text-6xl lg:text-7xl">
+          The compliance layer
+          <br />
+          every dealership <span className="bg-gradient-to-r from-blue-600 to-blue-500 bg-clip-text text-transparent">should have.</span>
+        </h1>
+        <p className="mx-auto mt-6 max-w-2xl text-base leading-relaxed text-slate-600 sm:text-lg">
+          AutoLabels protects your dealership from FTC actions, advertised-price drift, and audit risk —
+          on every vehicle, automatically. One platform turns regulatory exposure into a defensible
+          paper trail you can produce in seconds.
+        </p>
+        <div className="mt-9 flex flex-col items-center justify-center gap-3 sm:flex-row">
+          <button
+            onClick={onPrimary}
+            className="inline-flex h-12 items-center gap-2 rounded-full bg-slate-900 px-6 text-sm font-medium text-white shadow-sm transition-all hover:bg-slate-800 hover:shadow-md"
+          >
+            Book a 20-minute demo
+            <ArrowRight className="h-4 w-4" />
+          </button>
+          <a
+            href="#platform"
+            className="inline-flex h-12 items-center gap-1.5 rounded-full border border-slate-200 bg-white px-6 text-sm font-medium text-slate-700 transition-all hover:border-slate-300 hover:bg-slate-50"
+          >
+            See how it works
+          </a>
+        </div>
+        <p className="mt-5 text-xs text-slate-500">
+          No credit card · 14-day pilot · Setup in under an hour
+        </p>
+      </div>
+    </div>
+  </section>
+);
+
+// ──────────────────────────────────────────────────────────────
+// Trust band — light credibility line. No fake logos; instead
+// the framework citations a compliance manager already trusts.
+// ──────────────────────────────────────────────────────────────
+
+const TrustBand = () => (
+  <section className="border-y border-slate-100 bg-slate-50/50">
+    <div className="mx-auto max-w-7xl px-6 py-10 lg:px-8">
+      <p className="text-center text-xs font-medium uppercase tracking-[0.18em] text-slate-500">
+        Built around the frameworks your attorney already cites
+      </p>
+      <div className="mt-6 grid grid-cols-2 gap-x-6 gap-y-3 text-center text-sm font-medium text-slate-600 sm:grid-cols-3 lg:grid-cols-6">
+        <span>FTC §5</span>
+        <span>16 CFR Part 455</span>
+        <span>Monroney Act</span>
+        <span>E-SIGN Act</span>
+        <span>CA SB 766</span>
+        <span>50-state DMV</span>
+      </div>
+    </div>
+  </section>
+);
+
+// ──────────────────────────────────────────────────────────────
+// Problem — quantified stakes. The 97-letter campaign is the
+// single most concrete reason a dealer principal will book a
+// demo today, so it leads the section.
+// ──────────────────────────────────────────────────────────────
+
+const Problem = () => (
+  <section className="relative">
+    <div className="mx-auto max-w-7xl px-6 py-24 lg:px-8 lg:py-32">
+      <div className="mx-auto max-w-3xl text-center">
+        <p className="text-sm font-medium uppercase tracking-[0.16em] text-blue-600">The exposure</p>
+        <h2 className="mt-3 font-display text-4xl font-semibold tracking-[-0.02em] text-slate-900 sm:text-5xl">
+          Every vehicle on your lot is a potential complaint.
+        </h2>
+        <p className="mt-5 text-lg leading-relaxed text-slate-600">
+          Federal enforcement, state DMV audits, and consumer disputes all share one weakness in
+          common dealership operations: there's no defensible record of what was disclosed, when,
+          and to whom.
+        </p>
+      </div>
+
+      <div className="mx-auto mt-16 grid max-w-5xl gap-6 sm:grid-cols-3">
+        <Stat
+          number="97"
+          label="dealers received FTC warning letters in a single March 2026 sweep"
+        />
+        <Stat
+          number="$50K+"
+          label="typical exposure per non-compliant advertised-price dispute"
+        />
+        <Stat
+          number="2 yrs"
+          label="record retention required under CA SB 766 (effective Oct 2026)"
+        />
+      </div>
+
+      <p className="mx-auto mt-12 max-w-2xl text-center text-sm text-slate-500">
+        Sources: FTC enforcement actions Q1 2026 · CA Vehicle Code §11713.21 · 16 CFR Part 455
+      </p>
+    </div>
+  </section>
+);
+
+const Stat = ({ number, label }: { number: string; label: string }) => (
+  <div className="rounded-2xl border border-slate-200 bg-white p-8 text-center shadow-sm">
+    <p className="font-display text-5xl font-semibold tracking-[-0.03em] text-slate-900">{number}</p>
+    <p className="mt-3 text-sm leading-relaxed text-slate-600">{label}</p>
+  </div>
+);
+
+// ──────────────────────────────────────────────────────────────
+// Pillars — the four outcomes. Verify / Capture / Defend /
+// Monitor. Reads as a single sentence the dealer can repeat
+// to the next decision-maker in the building.
+// ──────────────────────────────────────────────────────────────
+
+const Pillars = () => (
+  <section id="platform" className="relative bg-slate-50/60">
+    <div className="mx-auto max-w-7xl px-6 py-24 lg:px-8 lg:py-32">
+      <div className="mx-auto max-w-3xl text-center">
+        <p className="text-sm font-medium uppercase tracking-[0.16em] text-blue-600">The platform</p>
+        <h2 className="mt-3 font-display text-4xl font-semibold tracking-[-0.02em] text-slate-900 sm:text-5xl">
+          Four pillars. One defensible record.
+        </h2>
+        <p className="mt-5 text-lg leading-relaxed text-slate-600">
+          AutoLabels closes the loop from the moment a vehicle hits the lot to the moment a
+          regulator asks a question.
+        </p>
+      </div>
+
+      <div className="mx-auto mt-16 grid max-w-6xl gap-5 sm:grid-cols-2 lg:grid-cols-4">
+        <Pillar
+          icon={Eye}
+          title="Verify"
+          body="Every sticker, every disclosure, every signature is checked against the rules in force the day the vehicle was listed."
+        />
+        <Pillar
+          icon={FileCheck}
+          title="Capture"
+          body="Customer acknowledgments, installation photos, and price snapshots are captured in real time and timestamped on a tamper-evident chain."
+        />
+        <Pillar
+          icon={ShieldCheck}
+          title="Defend"
+          body="One click produces an Audit-Defense Packet — a self-contained, SHA-256 anchored file you can hand to counsel, DMV, or the FTC."
+        />
+        <Pillar
+          icon={Activity}
+          title="Monitor"
+          body="A nightly crawler watches your own ad pages for advertised-price drift and flags mismatches before a customer or a regulator does."
+        />
+      </div>
+    </div>
+  </section>
+);
+
+const Pillar = ({ icon: Icon, title, body }: { icon: typeof Eye; title: string; body: string }) => (
+  <div className="group rounded-2xl border border-slate-200 bg-white p-7 transition-all hover:shadow-md">
+    <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-50 text-blue-600">
+      <Icon className="h-5 w-5" strokeWidth={2} />
+    </div>
+    <h3 className="mt-5 font-display text-lg font-semibold tracking-[-0.01em] text-slate-900">{title}</h3>
+    <p className="mt-2 text-sm leading-relaxed text-slate-600">{body}</p>
+  </div>
+);
+
+// ──────────────────────────────────────────────────────────────
+// Product shot — abstract product visual. No fake screenshot
+// (it would feel cheap on a Linear-tier site); a stylised
+// mock of the Audit-Defense Packet header instead.
+// ──────────────────────────────────────────────────────────────
+
+const ProductShot = () => (
+  <section className="relative">
+    <div className="mx-auto max-w-7xl px-6 py-24 lg:px-8 lg:py-32">
+      <div className="mx-auto max-w-3xl text-center">
+        <p className="text-sm font-medium uppercase tracking-[0.16em] text-blue-600">The deliverable</p>
+        <h2 className="mt-3 font-display text-4xl font-semibold tracking-[-0.02em] text-slate-900 sm:text-5xl">
+          When the letter arrives, you've already answered it.
+        </h2>
+        <p className="mt-5 text-lg leading-relaxed text-slate-600">
+          The Audit-Defense Packet is the artifact every other section of the platform produces in
+          the background. One VIN, one click, one signed file.
+        </p>
+      </div>
+
+      <div className="mx-auto mt-16 max-w-5xl">
+        <div className="relative rounded-3xl border border-slate-200 bg-gradient-to-b from-white to-slate-50 p-2 shadow-[0_24px_80px_-20px_rgba(15,23,42,0.18)]">
+          <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
+            <div className="flex items-center gap-1.5 border-b border-slate-100 px-4 py-3">
+              <span className="h-2.5 w-2.5 rounded-full bg-slate-200" />
+              <span className="h-2.5 w-2.5 rounded-full bg-slate-200" />
+              <span className="h-2.5 w-2.5 rounded-full bg-slate-200" />
+              <span className="ml-3 text-xs text-slate-400">autolabels.io · Audit-Defense Packet · 5UXFG2C53JL00012</span>
+            </div>
+            <div className="grid gap-6 p-8 sm:grid-cols-3 sm:gap-8 sm:p-12">
+              <PacketBlock label="Vehicle record" value="2024 Honda Pilot" caption="VIN ending 0012" />
+              <PacketBlock label="Sold" value="Jun 02, 2026" caption="Signed at 14:08 PDT" />
+              <PacketBlock label="Hash root" value="0x4e8a…b21f" caption="SHA-256 chain verified" />
+              <PacketBlock label="Disclosures" value="14 / 14" caption="All checks passed" />
+              <PacketBlock label="Signatures" value="3 captured" caption="Customer · F&I · Sales" />
+              <PacketBlock label="Price drift" value="$0" caption="Sticker = advertised" />
+            </div>
+            <div className="flex items-center justify-between border-t border-slate-100 bg-slate-50/60 px-8 py-4 text-xs">
+              <span className="inline-flex items-center gap-1.5 text-emerald-700">
+                <ShieldCheck className="h-3.5 w-3.5" /> Defensible record
+              </span>
+              <span className="text-slate-500">Generated in 0.8s</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+);
+
+const PacketBlock = ({ label, value, caption }: { label: string; value: string; caption: string }) => (
+  <div>
+    <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-slate-500">{label}</p>
+    <p className="mt-1.5 font-display text-xl font-semibold tracking-[-0.01em] text-slate-900">{value}</p>
+    <p className="mt-1 text-xs text-slate-500">{caption}</p>
+  </div>
+);
+
+// ──────────────────────────────────────────────────────────────
+// Deep features — three alternating-side blocks. Each one is
+// outcome-led, then names the underlying capability second.
+// ──────────────────────────────────────────────────────────────
+
+const DeepFeatures = () => (
+  <section id="compliance" className="bg-slate-50/60">
+    <div className="mx-auto max-w-7xl px-6 py-24 lg:px-8 lg:py-32 space-y-24">
+      <FeatureBlock
+        eyebrow="Advertised-price defense"
+        title="Catch the mismatch before the regulator does."
+        body="AutoLabels watches your own dealer site every night and reconciles every public listing against the price your sticker is committed to. When they drift, you get a flag — not a letter."
+        bullets={[
+          "Nightly crawl of dealer-website prices",
+          "Tolerance gate ($50 default) flags drift before publish",
+          "Two-year snapshot history per VIN — CA SB 766 ready",
+        ]}
+      />
+      <FeatureBlock
+        eyebrow="Tamper-evident sign-off"
+        title="The signature your attorney will love."
+        body="Every customer acknowledgment is hashed, timestamped, and chained. The result is an E-SIGN compliant record that survives a deposition — not a screenshot of a PDF."
+        bullets={[
+          "SHA-256 hash chain anchored at each signing",
+          "Customer IP, user-agent, and consent text captured",
+          "Bilingual disclosures for Spanish-conducted sales",
+        ]}
+        reverse
+      />
+      <FeatureBlock
+        eyebrow="Pre-sale verification"
+        title="Compliance enforced at the source."
+        body="Vehicles cannot be listed until installed equipment is photographed and signed off. The platform refuses to publish a listing that would fail an audit, so your team can't accidentally create one."
+        bullets={[
+          "Foreman sign-off gate on every used vehicle",
+          "Install-photo requirement on every added-equipment item",
+          "NHTSA recall check on every publish · do-not-drive blocks shipping",
+        ]}
+      />
+    </div>
+  </section>
+);
+
+const FeatureBlock = ({
+  eyebrow,
+  title,
+  body,
+  bullets,
+  reverse,
+}: {
+  eyebrow: string;
+  title: string;
+  body: string;
+  bullets: string[];
+  reverse?: boolean;
+}) => (
+  <div className={`grid items-center gap-12 lg:grid-cols-2 lg:gap-16 ${reverse ? "lg:[&>*:first-child]:order-2" : ""}`}>
+    <div>
+      <p className="text-sm font-medium uppercase tracking-[0.14em] text-blue-600">{eyebrow}</p>
+      <h3 className="mt-3 font-display text-3xl font-semibold tracking-[-0.02em] text-slate-900 sm:text-4xl">
+        {title}
+      </h3>
+      <p className="mt-5 text-base leading-relaxed text-slate-600">{body}</p>
+      <ul className="mt-6 space-y-2.5">
+        {bullets.map((b) => (
+          <li key={b} className="flex items-start gap-2.5 text-sm text-slate-700">
+            <Check className="mt-0.5 h-4 w-4 flex-shrink-0 text-blue-600" strokeWidth={2.5} />
+            <span>{b}</span>
+          </li>
+        ))}
+      </ul>
+    </div>
+    <div className="relative aspect-[4/3] overflow-hidden rounded-3xl border border-slate-200 bg-gradient-to-br from-blue-50 via-white to-slate-50 shadow-sm">
+      <div className="absolute inset-0 [background-image:linear-gradient(rgba(15,23,42,0.04)_1px,transparent_1px),linear-gradient(90deg,rgba(15,23,42,0.04)_1px,transparent_1px)] [background-size:24px_24px]" />
+      <div className="absolute inset-8 rounded-2xl border border-slate-200 bg-white/80 shadow-sm backdrop-blur" />
+    </div>
+  </div>
+);
+
+// ──────────────────────────────────────────────────────────────
+// Trust & security — Vanta-style trust strip. Specific
+// guarantees, no fluff. Every line points at a real platform
+// primitive shipped in this codebase.
+// ──────────────────────────────────────────────────────────────
+
+const TrustAndSecurity = () => (
+  <section className="relative">
+    <div className="mx-auto max-w-7xl px-6 py-24 lg:px-8 lg:py-32">
+      <div className="mx-auto max-w-3xl text-center">
+        <p className="text-sm font-medium uppercase tracking-[0.16em] text-blue-600">Trust</p>
+        <h2 className="mt-3 font-display text-4xl font-semibold tracking-[-0.02em] text-slate-900 sm:text-5xl">
+          The receipts a dealer principal can hand to counsel.
+        </h2>
+      </div>
+
+      <div className="mx-auto mt-16 grid max-w-5xl gap-5 sm:grid-cols-2 lg:grid-cols-3">
+        <TrustCard
+          icon={Lock}
+          title="Tenant-isolated by design"
+          body="Row-level security enforces dealership boundaries at the database. One Supabase project, never one shared table."
+        />
+        <TrustCard
+          icon={ShieldCheck}
+          title="Tamper-evident records"
+          body="Every signing produces a SHA-256 hash anchored to the prior signing — the chain root is what survives the deposition."
+        />
+        <TrustCard
+          icon={TrendingUp}
+          title="Two-year retention"
+          body="Every advertised-price snapshot and signed disclosure is retained for the SB 766 window with one-click export."
+        />
+        <TrustCard
+          icon={FileCheck}
+          title="Audit-Defense Packet"
+          body="A self-contained file — PDF + JSON + signatures + hash root — ready for counsel, DMV, or the FTC."
+        />
+        <TrustCard
+          icon={Sparkles}
+          title="50-state disclosure engine"
+          body="State-by-state ruleset drives the disclosure text on every sticker, refreshed as the law moves."
+        />
+        <TrustCard
+          icon={Building2}
+          title="Multi-store, multi-rooftop"
+          body="One tenant, many stores, scoped permissions per role — GMs see their store; compliance sees the group."
+        />
+      </div>
+    </div>
+  </section>
+);
+
+const TrustCard = ({ icon: Icon, title, body }: { icon: typeof Lock; title: string; body: string }) => (
+  <div className="rounded-2xl border border-slate-200 bg-white p-6">
+    <Icon className="h-5 w-5 text-blue-600" strokeWidth={2} />
+    <h3 className="mt-4 text-base font-semibold text-slate-900">{title}</h3>
+    <p className="mt-1.5 text-sm leading-relaxed text-slate-600">{body}</p>
+  </div>
+);
+
+// ──────────────────────────────────────────────────────────────
+// Outcomes — what the dealer's day looks like 90 days in.
+// ──────────────────────────────────────────────────────────────
+
+const Outcomes = () => (
+  <section className="border-y border-slate-100 bg-slate-900 text-slate-100">
+    <div className="mx-auto max-w-7xl px-6 py-24 lg:px-8 lg:py-32">
+      <div className="mx-auto max-w-3xl text-center">
+        <p className="text-sm font-medium uppercase tracking-[0.16em] text-blue-400">90 days in</p>
+        <h2 className="mt-3 font-display text-4xl font-semibold tracking-[-0.02em] text-white sm:text-5xl">
+          The dealer day, defended.
+        </h2>
+      </div>
+      <div className="mx-auto mt-14 grid max-w-5xl gap-8 sm:grid-cols-3">
+        <Outcome n="100%" label="Of sold vehicles have a signed, hash-anchored disclosure on file." />
+        <Outcome n="0" label="Advertised-price mismatches reach customers without a flag." />
+        <Outcome n="<5 min" label="From subpoena to packet handed to counsel — per VIN." />
+      </div>
+    </div>
+  </section>
+);
+
+const Outcome = ({ n, label }: { n: string; label: string }) => (
+  <div className="text-center">
+    <p className="font-display text-6xl font-semibold tracking-[-0.03em] text-white">{n}</p>
+    <p className="mx-auto mt-3 max-w-xs text-sm leading-relaxed text-slate-400">{label}</p>
+  </div>
+);
+
+// ──────────────────────────────────────────────────────────────
+// Pricing — three plans, single sentence each. No table.
+// ──────────────────────────────────────────────────────────────
+
+const Pricing = ({ onSelect }: { onSelect: () => void }) => (
+  <section id="pricing" className="relative">
+    <div className="mx-auto max-w-7xl px-6 py-24 lg:px-8 lg:py-32">
+      <div className="mx-auto max-w-3xl text-center">
+        <p className="text-sm font-medium uppercase tracking-[0.16em] text-blue-600">Pricing</p>
+        <h2 className="mt-3 font-display text-4xl font-semibold tracking-[-0.02em] text-slate-900 sm:text-5xl">
+          Priced as the line item your CFO already expects.
+        </h2>
+        <p className="mt-5 text-lg leading-relaxed text-slate-600">
+          One platform fee per rooftop · unlimited VINs · unlimited users · unlimited disclosures.
+        </p>
+      </div>
+
+      <div className="mx-auto mt-16 grid max-w-5xl gap-5 sm:grid-cols-3">
+        <Plan
+          name="Essential"
+          price="$999"
+          cadence="/ month · per rooftop"
+          body="Compliant sticker, addendum, and customer sign-off on every vehicle."
+          features={["Up to 200 VINs / mo", "50-state disclosure engine", "Customer e-signing", "Email support"]}
+          cta="Start a pilot"
+          onClick={onSelect}
+        />
+        <Plan
+          name="Defense"
+          price="$1,799"
+          cadence="/ month · per rooftop"
+          body="Adds the Audit-Defense Packet, advertised-price monitor, and recall blocker."
+          features={["Everything in Essential", "Audit-Defense Packet", "Advertised-price drift alerts", "NHTSA recall hard-block", "Priority support"]}
+          cta="Book a demo"
+          onClick={onSelect}
+          featured
+        />
+        <Plan
+          name="Group"
+          price="Custom"
+          cadence="Multi-rooftop"
+          body="Group reporting, store-scoped permissions, and a dedicated compliance partner."
+          features={["Everything in Defense", "Multi-store reporting", "SSO + custom roles", "Named compliance contact"]}
+          cta="Talk to sales"
+          onClick={onSelect}
+        />
+      </div>
+    </div>
+  </section>
+);
+
+const Plan = ({
+  name, price, cadence, body, features, cta, onClick, featured,
+}: {
+  name: string;
+  price: string;
+  cadence: string;
+  body: string;
+  features: string[];
+  cta: string;
+  onClick: () => void;
+  featured?: boolean;
+}) => (
+  <div className={`relative flex flex-col rounded-3xl border p-7 ${
+    featured
+      ? "border-slate-900 bg-slate-900 text-white shadow-xl"
+      : "border-slate-200 bg-white text-slate-900"
+  }`}>
+    {featured && (
+      <span className="absolute -top-3 left-7 inline-flex items-center gap-1 rounded-full bg-blue-500 px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.14em] text-white">
+        Most chosen
+      </span>
+    )}
+    <p className={`text-sm font-medium ${featured ? "text-blue-300" : "text-blue-600"}`}>{name}</p>
+    <p className="mt-3 font-display text-4xl font-semibold tracking-[-0.02em]">{price}</p>
+    <p className={`mt-1 text-xs ${featured ? "text-slate-400" : "text-slate-500"}`}>{cadence}</p>
+    <p className={`mt-4 text-sm leading-relaxed ${featured ? "text-slate-300" : "text-slate-600"}`}>{body}</p>
+    <ul className="mt-5 flex-1 space-y-2 text-sm">
+      {features.map((f) => (
+        <li key={f} className="flex items-start gap-2">
+          <Check className={`mt-0.5 h-4 w-4 flex-shrink-0 ${featured ? "text-blue-400" : "text-blue-600"}`} strokeWidth={2.5} />
+          <span className={featured ? "text-slate-200" : "text-slate-700"}>{f}</span>
+        </li>
+      ))}
+    </ul>
+    <button
+      onClick={onClick}
+      className={`mt-7 inline-flex h-10 items-center justify-center gap-1.5 rounded-full text-sm font-medium transition-all ${
+        featured
+          ? "bg-white text-slate-900 hover:bg-slate-100"
+          : "bg-slate-900 text-white hover:bg-slate-800"
+      }`}
+    >
+      {cta} <ArrowRight className="h-3.5 w-3.5" />
+    </button>
+  </div>
+);
+
+// ──────────────────────────────────────────────────────────────
+// FAQ — short list, accordion. Five questions the dealer
+// principal actually asks during a 20-minute demo.
+// ──────────────────────────────────────────────────────────────
+
+const FAQ = () => {
+  const items = [
+    {
+      q: "How fast can we get a rooftop live?",
+      a: "Under an hour. Sign in, paste your DMS feed (or import a CSV), choose your state pack, and start publishing. We don't require a deploy or IT involvement.",
+    },
+    {
+      q: "What happens when a regulator sends us a letter?",
+      a: "Open the VIN, click Defend, hand counsel the Audit-Defense Packet. It contains the full record — disclosures, hashes, customer signatures, install photos, advertised-price snapshots — in a self-contained file ready for production.",
+    },
+    {
+      q: "Does AutoLabels replace my window-sticker provider?",
+      a: "Yes. The compliant sticker + addendum + customer disclosure live in one platform with one source of truth. No more two-vendor reconciliation.",
+    },
+    {
+      q: "How are advertised-price mismatches detected?",
+      a: "A nightly crawler reads your own dealer-website listings and reconciles each one against the sticker price on file. Drift past the tolerance you set produces a flag — before publish, before customer, before regulator.",
+    },
+    {
+      q: "Is my customer data isolated from other dealerships?",
+      a: "Always. Row-level security enforces tenant boundaries at the database. There is no shared table any other dealership can see.",
+    },
+  ];
+  const [open, setOpen] = useState<number | null>(0);
+  return (
+    <section id="faq" className="bg-slate-50/60">
+      <div className="mx-auto max-w-3xl px-6 py-24 lg:px-8 lg:py-32">
+        <p className="text-sm font-medium uppercase tracking-[0.16em] text-blue-600">Common questions</p>
+        <h2 className="mt-3 font-display text-4xl font-semibold tracking-[-0.02em] text-slate-900 sm:text-5xl">
+          Asked by every dealer principal.
+        </h2>
+        <div className="mt-12 divide-y divide-slate-200 border-y border-slate-200">
+          {items.map((it, i) => (
+            <button
+              key={it.q}
+              onClick={() => setOpen(open === i ? null : i)}
+              className="block w-full py-6 text-left"
+            >
+              <div className="flex items-start justify-between gap-6">
+                <h3 className="text-base font-medium text-slate-900">{it.q}</h3>
+                <ChevronDown className={`mt-1 h-4 w-4 flex-shrink-0 text-slate-400 transition-transform ${open === i ? "rotate-180" : ""}`} />
+              </div>
+              {open === i && (
+                <p className="mt-3 text-sm leading-relaxed text-slate-600">{it.a}</p>
+              )}
+            </button>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+};
+
+// ──────────────────────────────────────────────────────────────
+// Final CTA — short, declarative, single button. No social
+// proof, no testimonials. The page already made the case.
+// ──────────────────────────────────────────────────────────────
+
+const FinalCTA = ({ onPrimary }: { onPrimary: () => void }) => (
+  <section className="relative isolate overflow-hidden">
+    <div
+      aria-hidden
+      className="pointer-events-none absolute inset-0 -z-10 bg-[radial-gradient(50%_60%_at_50%_60%,rgba(37,99,235,0.08),transparent_70%)]"
+    />
+    <div className="mx-auto max-w-4xl px-6 py-24 text-center lg:px-8 lg:py-32">
+      <h2 className="font-display text-5xl font-semibold tracking-[-0.025em] text-slate-900 sm:text-6xl">
+        Stop hoping. Start defending.
+      </h2>
+      <p className="mx-auto mt-6 max-w-xl text-lg text-slate-600">
+        20 minutes with our team. Walk out with a Defense plan tailored to your rooftop.
+      </p>
+      <div className="mt-9 flex justify-center">
+        <button
+          onClick={onPrimary}
+          className="inline-flex h-12 items-center gap-2 rounded-full bg-slate-900 px-8 text-sm font-medium text-white shadow-sm transition-all hover:bg-slate-800 hover:shadow-md"
+        >
+          Book a demo
+          <ArrowRight className="h-4 w-4" />
+        </button>
+      </div>
+    </div>
+  </section>
+);
+
+// ──────────────────────────────────────────────────────────────
+// Footer — minimal, tasteful. Family positioning at the bottom.
+// ──────────────────────────────────────────────────────────────
+
+const Footer = ({ onNav }: { onNav: (to: string) => void }) => (
+  <footer className="border-t border-slate-100 bg-white">
+    <div className="mx-auto max-w-7xl px-6 py-12 lg:px-8">
+      <div className="grid gap-10 md:grid-cols-4">
+        <div className="md:col-span-2">
+          <Logo variant="full" size={28} />
+          <p className="mt-4 max-w-sm text-sm leading-relaxed text-slate-600">
+            The compliance operating system for franchise and independent dealerships.
+            An <span className="font-semibold text-slate-900">Autocurb</span> family product.
+          </p>
+        </div>
+        <FooterCol
+          title="Platform"
+          items={[
+            { label: "How it works", href: "#platform" },
+            { label: "Compliance", href: "#compliance" },
+            { label: "Pricing", href: "#pricing" },
+            { label: "FAQ", href: "#faq" },
+          ]}
+        />
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Account</p>
+          <ul className="mt-4 space-y-2.5 text-sm">
+            <li><button onClick={() => onNav("/login")} className="text-slate-600 hover:text-slate-900 transition-colors">Sign in</button></li>
+            <li><button onClick={() => onNav("/onboarding")} className="text-slate-600 hover:text-slate-900 transition-colors">Book a demo</button></li>
+            <li><button onClick={() => onNav("/about")} className="text-slate-600 hover:text-slate-900 transition-colors">About</button></li>
+          </ul>
+        </div>
+      </div>
+      <div className="mt-12 flex flex-col items-start justify-between gap-3 border-t border-slate-100 pt-6 text-xs text-slate-500 sm:flex-row sm:items-center">
+        <p>© {new Date().getFullYear()} AutoLabels.io · All rights reserved.</p>
+        <p>
+          AutoLabels is FTC-aligned and a 50-state disclosure engine. This site does not constitute
+          legal advice — work with your dealer counsel.
+        </p>
+      </div>
+    </div>
+  </footer>
+);
+
+const FooterCol = ({ title, items }: { title: string; items: { label: string; href: string }[] }) => (
+  <div>
+    <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">{title}</p>
+    <ul className="mt-4 space-y-2.5 text-sm">
+      {items.map((it) => (
+        <li key={it.label}>
+          <a href={it.href} className="text-slate-600 hover:text-slate-900 transition-colors">{it.label}</a>
+        </li>
+      ))}
+    </ul>
+  </div>
+);
 
 export default Landing;

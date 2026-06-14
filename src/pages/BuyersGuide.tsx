@@ -7,7 +7,23 @@ import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
 
 type GuideType = "as-is" | "implied" | "warranty";
-type Language = "en" | "es";
+// Wave 28 — CA-market language expansion. en/es are FTC-canonical
+// (the Spanish text is the FTC's official translation per 16 CFR
+// Part 455 for sales conducted in Spanish). vi/ko/zh are dealer-
+// courtesy translations for the California market — they don't
+// satisfy the federal bilingual requirement (which is Spanish-
+// specific) but they give dealers a defensible record that the
+// customer received the FTC Buyers Guide content in a language
+// they can read.
+type Language = "en" | "es" | "vi" | "ko" | "zh";
+
+const LANGUAGE_LABELS: Record<Language, string> = {
+  en: "English",
+  es: "Español",
+  vi: "Tiếng Việt",
+  ko: "한국어",
+  zh: "中文",
+};
 
 interface VehicleInfo {
   year: string;
@@ -81,6 +97,99 @@ const LABELS: Record<Language, Record<string, string>> = {
     stock_no: "No. de Stock",
     dealer_name: "Nombre del Concesionario",
     dealer_address: "Dirección",
+  },
+  vi: {
+    title: "HƯỚNG DẪN NGƯỜI MUA",
+    important: "QUAN TRỌNG: Lời hứa bằng lời nói khó thực thi. Yêu cầu đại lý ghi tất cả lời hứa bằng văn bản. Giữ lại biểu mẫu này.",
+    warranties_heading: "BẢO HÀNH CHO XE NÀY:",
+    as_is_title: "BÁN NGUYÊN TRẠNG — KHÔNG CÓ BẢO HÀNH CỦA ĐẠI LÝ",
+    as_is_body: "BẠN SẼ TRẢ TẤT CẢ CHI PHÍ CHO BẤT KỲ SỬA CHỮA NÀO. Đại lý không chịu trách nhiệm về bất kỳ sửa chữa nào bất kể tuyên bố bằng lời nói nào về xe.",
+    implied_title: "CHỈ CÓ BẢO HÀNH NGỤ Ý",
+    implied_body: "Đại lý không đưa ra bất kỳ bảo hành nào, rõ ràng hay ngụ ý, đối với xe này, ngoại trừ các bảo hành ngụ ý về tính thương mại. Bảo hành ngụ ý về tính thương mại có nghĩa là đại lý bảo đảm rằng xe sẽ vượt qua mà không có sự phản đối trong thương mại và phù hợp với mục đích thông thường mà nó được sử dụng. Toàn bộ rủi ro về chất lượng và hiệu suất thuộc về người mua. Tuy nhiên, người mua có thể có các quyền khác theo luật tiểu bang hiện hành.",
+    warranty_title: "BẢO HÀNH CỦA ĐẠI LÝ",
+    warranty_body: "Đại lý sẽ trả một phần trăm chi phí lao động và phụ tùng cho các hệ thống được bảo hiểm bị hỏng trong thời gian bảo hành.",
+    warranty_duration: "THỜI HẠN BẢO HÀNH:",
+    warranty_percentage: "PHẦN TRĂM CHI PHÍ ĐƯỢC BẢO HIỂM:",
+    covered_systems: "HỆ THỐNG ĐƯỢC BẢO HIỂM:",
+    system_engine: "Động cơ — Tất cả các bộ phận bên trong được bôi trơn của động cơ, bơm nước, bơm nhiên liệu, ống xả, khối động cơ, đầu xi-lanh, vỏ động cơ quay và bánh đà.",
+    system_transmission: "Hộp số — Tất cả các bộ phận bên trong được bôi trơn của hộp số, bộ biến mô-men, trục truyền động, khớp các-đăng, trục sau và tất cả các bộ phận được bôi trơn bên trong.",
+    system_steering: "Hệ thống lái — Vỏ bánh răng lái và tất cả các bộ phận bên trong, bơm trợ lực lái, thân van, piston và thước răng.",
+    system_brakes: "Phanh — Xi-lanh chính, bộ trợ lực chân không, xi-lanh bánh xe, đường ống thủy lực và phụ kiện, và kẹp phanh đĩa.",
+    system_electrical: "Hệ thống điện — Máy phát điện, bộ điều chỉnh điện áp, máy khởi động, công tắc đánh lửa và đánh lửa điện tử.",
+    service_contact: "HỢP ĐỒNG DỊCH VỤ",
+    service_body: "Hợp đồng dịch vụ có sẵn với chi phí bổ sung trên xe này. Hỏi chi tiết về phạm vi bảo hiểm, khấu trừ, giá cả và loại trừ. Nếu bạn mua hợp đồng dịch vụ trong vòng 90 ngày kể từ thời điểm bán, \"bảo hành ngụ ý\" của luật tiểu bang có thể cho bạn thêm quyền.",
+    pre_purchase: "KIỂM TRA TRƯỚC KHI MUA: HỎI ĐẠI LÝ XEM BẠN CÓ THỂ ĐƯỢC THỢ CƠ KHÍ CỦA BẠN KIỂM TRA XE NÀY HAY KHÔNG, TRONG HOẶC NGOÀI LÔ ĐẤT.",
+    vehicle_make: "Hãng xe",
+    vehicle_model: "Mẫu",
+    vehicle_year: "Năm",
+    vehicle_vin: "Số VIN",
+    mileage: "Số dặm",
+    price: "Giá",
+    stock_no: "Số tồn kho",
+    dealer_name: "Tên đại lý",
+    dealer_address: "Địa chỉ",
+  },
+  ko: {
+    title: "구매자 안내서",
+    important: "중요: 구두 약속은 집행하기 어렵습니다. 딜러에게 모든 약속을 서면으로 작성하도록 요청하십시오. 이 양식을 보관하십시오.",
+    warranties_heading: "이 차량에 대한 보증:",
+    as_is_title: "있는 그대로 — 딜러 보증 없음",
+    as_is_body: "귀하는 모든 수리 비용을 지불합니다. 딜러는 차량에 대한 어떠한 구두 진술에 관계없이 어떠한 수리에 대해서도 책임을 지지 않습니다.",
+    implied_title: "묵시적 보증만 적용",
+    implied_body: "딜러는 상품성에 대한 묵시적 보증을 제외하고 이 차량에 대해 명시적 또는 묵시적 보증을 하지 않습니다. 상품성에 대한 묵시적 보증은 딜러가 차량이 거래에서 이의 없이 통과될 것이며 사용 목적에 적합하다는 것을 보증한다는 의미입니다. 품질 및 성능에 대한 모든 위험은 구매자에게 있습니다. 그러나 구매자는 해당 주법에 따라 다른 권리를 가질 수 있습니다.",
+    warranty_title: "딜러 보증",
+    warranty_body: "딜러는 보증 기간 동안 고장 난 보장 시스템에 대한 인건비 및 부품 비용의 일정 비율을 지불합니다.",
+    warranty_duration: "보증 기간:",
+    warranty_percentage: "보장 비용 비율:",
+    covered_systems: "보장 시스템:",
+    system_engine: "엔진 — 모든 윤활 내부 엔진 부품, 워터 펌프, 연료 펌프, 매니폴드, 엔진 블록, 실린더 헤드, 로터리 엔진 하우징 및 플라이휠.",
+    system_transmission: "변속기 — 모든 윤활 내부 변속기 부품, 토크 컨버터, 드라이브 샤프트, 유니버설 조인트, 후방 액슬 및 모든 내부 윤활 부품.",
+    system_steering: "조향 장치 — 조향 기어 하우징 및 모든 내부 부품, 파워 스티어링 펌프, 밸브 본체, 피스톤 및 랙.",
+    system_brakes: "브레이크 — 마스터 실린더, 진공 부스터, 휠 실린더, 유압 라인 및 피팅, 디스크 브레이크 캘리퍼.",
+    system_electrical: "전기 시스템 — 알터네이터, 전압 조절기, 스타터, 점화 스위치 및 전자 점화 장치.",
+    service_contact: "서비스 계약",
+    service_body: "이 차량에는 추가 비용으로 서비스 계약을 사용할 수 있습니다. 적용 범위, 공제액, 가격 및 제외 사항에 대한 세부 정보를 문의하십시오. 판매 시점으로부터 90일 이내에 서비스 계약을 구매하는 경우 주법의 \"묵시적 보증\"이 추가 권리를 부여할 수 있습니다.",
+    pre_purchase: "구매 전 점검: 본인의 정비사가 차량을 점검할 수 있는지 딜러에게 문의하십시오. 부지 내 또는 외부에서 가능합니다.",
+    vehicle_make: "차량 제조사",
+    vehicle_model: "모델",
+    vehicle_year: "연식",
+    vehicle_vin: "VIN 번호",
+    mileage: "주행거리",
+    price: "가격",
+    stock_no: "재고 번호",
+    dealer_name: "딜러 이름",
+    dealer_address: "주소",
+  },
+  zh: {
+    title: "买方指南",
+    important: "重要提示：口头承诺难以执行。请要求经销商以书面形式提出所有承诺。保留此表格。",
+    warranties_heading: "本车辆的保修：",
+    as_is_title: "按现状出售 — 经销商无保修",
+    as_is_body: "您将支付任何维修的所有费用。无论经销商对车辆的口头声明如何，经销商均不承担任何维修责任。",
+    implied_title: "仅默示保修",
+    implied_body: "除了适销性的默示保修外，经销商对本车辆不作任何明示或默示的保修。适销性默示保修意味着经销商保证车辆在贸易中将不会受到反对，并且适合其使用的普通目的。质量和性能的所有风险由买方承担。但是，根据适用的州法律，买方可能拥有其他权利。",
+    warranty_title: "经销商保修",
+    warranty_body: "经销商将支付保修期内出现故障的覆盖系统的人工和零件成本的一定百分比。",
+    warranty_duration: "保修期：",
+    warranty_percentage: "覆盖成本的百分比：",
+    covered_systems: "覆盖的系统：",
+    system_engine: "发动机 — 所有润滑的发动机内部零件、水泵、燃油泵、歧管、发动机缸体、气缸盖、转子发动机外壳和飞轮。",
+    system_transmission: "变速箱 — 所有润滑的变速箱内部零件、扭矩转换器、传动轴、万向节、后桥以及所有内部润滑零件。",
+    system_steering: "转向系统 — 转向齿轮箱及所有内部零件、动力转向泵、阀体、活塞和齿条。",
+    system_brakes: "制动器 — 主缸、真空助力器、轮缸、液压管路和接头以及盘式制动卡钳。",
+    system_electrical: "电气系统 — 交流发电机、电压调节器、起动机、点火开关和电子点火装置。",
+    service_contact: "服务合同",
+    service_body: "本车辆可以额外付费购买服务合同。请询问有关覆盖范围、免赔额、价格和除外责任的详细信息。如果您在销售时起 90 天内购买服务合同，州法律的\"默示保修\"可能会赋予您额外权利。",
+    pre_purchase: "购买前检查：询问经销商您是否可以让您的技工在车场内或车场外检查此车辆。",
+    vehicle_make: "车辆品牌",
+    vehicle_model: "型号",
+    vehicle_year: "年份",
+    vehicle_vin: "VIN 号码",
+    mileage: "里程",
+    price: "价格",
+    stock_no: "库存号",
+    dealer_name: "经销商名称",
+    dealer_address: "地址",
   },
 };
 
@@ -175,10 +284,32 @@ const BuyersGuide = () => {
             </button>
           ))}
         </div>
-        {settings.feature_spanish_buyers_guide && (
-          <div className="flex gap-1 bg-muted rounded-md p-0.5">
-            <button onClick={() => setLang("en")} className={`text-[12px] font-semibold px-3 py-1.5 rounded ${lang === "en" ? "bg-action text-primary-foreground" : "text-muted-foreground"}`}>English</button>
-            <button onClick={() => setLang("es")} className={`text-[12px] font-semibold px-3 py-1.5 rounded ${lang === "es" ? "bg-action text-primary-foreground" : "text-muted-foreground"}`}>Español</button>
+        {(settings.feature_spanish_buyers_guide || settings.feature_multilang_buyers_guide) && (
+          <div className="flex gap-1 bg-muted rounded-md p-0.5 flex-wrap">
+            <button
+              onClick={() => setLang("en")}
+              className={`text-[12px] font-semibold px-3 py-1.5 rounded ${lang === "en" ? "bg-action text-primary-foreground" : "text-muted-foreground"}`}
+            >
+              {LANGUAGE_LABELS.en}
+            </button>
+            {settings.feature_spanish_buyers_guide && (
+              <button
+                onClick={() => setLang("es")}
+                className={`text-[12px] font-semibold px-3 py-1.5 rounded ${lang === "es" ? "bg-action text-primary-foreground" : "text-muted-foreground"}`}
+              >
+                {LANGUAGE_LABELS.es}
+              </button>
+            )}
+            {settings.feature_multilang_buyers_guide && (["vi", "ko", "zh"] as Language[]).map(code => (
+              <button
+                key={code}
+                onClick={() => setLang(code)}
+                className={`text-[12px] font-semibold px-3 py-1.5 rounded ${lang === code ? "bg-action text-primary-foreground" : "text-muted-foreground"}`}
+                title={`FTC Buyers Guide content rendered in ${LANGUAGE_LABELS[code]} (dealer-courtesy translation)`}
+              >
+                {LANGUAGE_LABELS[code]}
+              </button>
+            ))}
           </div>
         )}
         <button onClick={handlePrint} className="font-semibold text-[13px] px-5 py-2 rounded-md bg-navy text-primary-foreground tracking-[0.4px] hover:opacity-85">

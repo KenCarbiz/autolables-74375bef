@@ -6,6 +6,7 @@ import { useProductRules, VehicleContext } from "@/hooks/useProductRules";
 import { supabase } from "@/integrations/supabase/client";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
+import { computeFinancingDisclosure } from "@/lib/sb766";
 import AddendumHeader from "@/components/addendum/AddendumHeader";
 import VehicleStrip from "@/components/addendum/VehicleStrip";
 import IntentBox from "@/components/addendum/IntentBox";
@@ -81,6 +82,12 @@ const Index = () => {
 
   // Product type overrides — employee can toggle installed <-> optional at signing time
   const [typeOverrides, setTypeOverrides] = useState<Record<string, "installed" | "optional">>({});
+  // Wave 16 v2 — per-addendum benefit-justification override.
+  // Seeded from the catalog at displayProducts build time; the
+  // dealer can edit per vehicle in the no-print editor under
+  // each line. SB 766 §11713.21 explicitly anticipates per-
+  // transaction justification, not catalog boilerplate.
+  const [benefitOverrides, setBenefitOverrides] = useState<Record<string, string>>({});
 
   // Initials & optional selections
   const [initials, setInitials] = useState<Record<string, string>>({});
@@ -170,7 +177,6 @@ const Index = () => {
           price: p.price ?? 0,
           price_label: p.price_label ?? null,
           disclosure: p.disclosure ?? null,
-          benefit_justification: p.benefit_justification ?? null,
           sort_order: p.sort_order ?? i,
           is_active: true,
         })));
@@ -189,25 +195,33 @@ const Index = () => {
   const displayProducts = useMemo(() => {
     if (!ruledProducts) return [];
     return ruledProducts.map(p => {
-      // Check for employee override first
+      // Wave 16 v2 — benefit override takes precedence over the
+      // catalog value. Undefined override = use catalog default.
+      const effectiveBenefit =
+        benefitOverrides[p.id] !== undefined
+          ? benefitOverrides[p.id]
+          : ((p as { benefit_justification?: string }).benefit_justification || "");
+
+      // Check for employee type override first
       if (typeOverrides[p.id]) {
         const overType = typeOverrides[p.id];
         return {
           ...p,
           badge_type: overType,
           price_label: overType === "installed" ? "Included in Selling Price" : "If Accepted",
+          benefit_justification: effectiveBenefit,
         };
       }
       // Apply admin default mode
       if (settings.product_default_mode === "all_installed") {
-        return { ...p, badge_type: "installed", price_label: "Included in Selling Price" };
+        return { ...p, badge_type: "installed", price_label: "Included in Selling Price", benefit_justification: effectiveBenefit };
       }
       if (settings.product_default_mode === "all_optional") {
-        return { ...p, badge_type: "optional", price_label: "If Accepted" };
+        return { ...p, badge_type: "optional", price_label: "If Accepted", benefit_justification: effectiveBenefit };
       }
-      return p; // "selective" = use whatever's set per product
+      return { ...p, benefit_justification: effectiveBenefit }; // "selective" = use whatever's set per product
     });
-  }, [ruledProducts, typeOverrides, settings.product_default_mode]);
+  }, [ruledProducts, typeOverrides, benefitOverrides, settings.product_default_mode]);
 
   const installed = displayProducts.filter((p) => p.badge_type === "installed");
   const optional = displayProducts.filter((p) => p.badge_type === "optional");
@@ -340,6 +354,10 @@ const Index = () => {
         badge_type: p.badge_type,
         disclosure: p.disclosure || undefined,
         separate_signoff: !!initials[p.id]?.trim(),
+        // Wave 16 — the red-team needs this to fire the new
+        // missing-benefit-justification rule before send.
+        benefit_justification:
+          (p as { benefit_justification?: string }).benefit_justification || "",
       })) || [],
       spanishVersion: false,
       customerName: [customerInfo.buyer_first_name, customerInfo.buyer_last_name].filter(Boolean).join(" "),
@@ -743,6 +761,25 @@ const Index = () => {
             </p>
           </div>
 
+          {/* Wave 16 — voluntary disclosure. FTC §5 enforcement
+              actions (incl. the March 2026 97-dealer warning
+              letter campaign) repeatedly cite the absence of
+              this language as a deceptive-practice hook. Render
+              it whenever any OPTIONAL product appears, so the
+              customer sees the voluntary nature on the paper
+              artifact itself, not just at signing time. */}
+          {optional.length > 0 && (
+            <div className="text-[8px] leading-snug border border-foreground/15 rounded px-2 py-1.5 bg-foreground/[0.02]">
+              <span className="font-bold uppercase tracking-wider">Voluntary purchase notice — </span>
+              <span>
+                Items marked OPTIONAL are not required to purchase, finance, or
+                lease this vehicle. Your decision to accept or decline any
+                optional product is not a condition of credit approval. Each
+                optional item is itemized below with its price and benefit.
+              </span>
+            </div>
+          )}
+
           {/* Product Table Header */}
           <div className="flex text-[8px] font-bold text-muted-foreground border-b border-border-custom pb-0.5">
             <span className="w-5">#</span>
@@ -782,6 +819,28 @@ const Index = () => {
                   inkSaving={inkSaving}
                   iconType={iconMap[p.id] || ""}
                 />
+
+                {/* Wave 16 v2 — per-line benefit-justification
+                    editor + monthly-payment-impact widget. Lives
+                    INSIDE the no-print zone so the builder gets
+                    the controls; the sticker itself only renders
+                    the resulting text via downstream surfaces.
+                    Read-only in viewMode (re-opened signed
+                    addendum). */}
+                {!viewMode && (
+                  <BenefitEditor
+                    product={p}
+                    effectiveBenefit={(p as { benefit_justification?: string }).benefit_justification || ""}
+                    onChange={(text) => setBenefitOverrides(prev => ({ ...prev, [p.id]: text }))}
+                    onResetToCatalog={() => setBenefitOverrides(prev => {
+                      const next = { ...prev };
+                      delete next[p.id];
+                      return next;
+                    })}
+                    isOverridden={benefitOverrides[p.id] !== undefined}
+                    state={settings.doc_fee_state || ""}
+                  />
+                )}
               </div>
             </div>
           ))}
@@ -831,6 +890,126 @@ const Index = () => {
           <AddendumFooter inkSaving={inkSaving} />
         </div>
       </div>
+    </div>
+  );
+};
+
+// ──────────────────────────────────────────────────────────────
+// BenefitEditor — Wave 16 v2 builder-side panel under each
+// product line. Two responsibilities:
+//   1. Capture per-addendum benefit justification text. Defaults
+//      to the catalog value; "Reset to catalog" returns it.
+//   2. On OPTIONAL lines, render a small illustrative monthly-
+//      payment-impact widget so the customer knows what the
+//      add-on does to their payment at a representative APR.
+//      Uses sb766.computeFinancingDisclosure so the math is the
+//      same primitive ReturnsQueue uses for SB 766 receipts.
+//
+// Lives behind no-print so the sticker stays clean; the
+// benefit text is what flows into the sticker / disclosures.
+// ──────────────────────────────────────────────────────────────
+
+interface BenefitEditorProps {
+  product: Product;
+  effectiveBenefit: string;
+  onChange: (text: string) => void;
+  onResetToCatalog: () => void;
+  isOverridden: boolean;
+  state: string;
+}
+
+const BenefitEditor = ({
+  product,
+  effectiveBenefit,
+  onChange,
+  onResetToCatalog,
+  isOverridden,
+  state,
+}: BenefitEditorProps) => {
+  const isOptional = product.badge_type === "optional";
+  // Illustrative defaults — FTC §5 disclosure shape. Dealers can
+  // customise per-tenant later (Wave 16.x). The caveat below the
+  // number makes the "illustrative — your terms may vary" point
+  // explicit so it can't be read as a binding offer.
+  const ILLUSTRATIVE_APR = 7.9;
+  const ILLUSTRATIVE_TERM = 72;
+  const monthly = (() => {
+    if (!isOptional || !product.price || product.price <= 0) return null;
+    try {
+      const disc = computeFinancingDisclosure(
+        {
+          amount_financed: product.price,
+          apr_percent: ILLUSTRATIVE_APR,
+          term_months: ILLUSTRATIVE_TERM,
+        },
+        (state || "CA").toUpperCase(),
+      );
+      return disc.monthly_payment;
+    } catch {
+      return null;
+    }
+  })();
+
+  const missing = !effectiveBenefit.trim();
+  const tone = missing && product.badge_type === "installed"
+    ? "border-rose-300 bg-rose-50/60"
+    : missing
+      ? "border-amber-300 bg-amber-50/60"
+      : "border-foreground/15 bg-foreground/[0.02]";
+
+  return (
+    <div className={`no-print mt-1 rounded border ${tone} px-2 py-1.5 space-y-1.5`}>
+      <div className="flex items-center justify-between gap-2">
+        <p className="text-[9px] font-bold uppercase tracking-[0.12em] text-foreground/80">
+          Benefit justification
+          {missing && product.badge_type === "installed" && (
+            <span className="ml-1.5 text-rose-700 normal-case tracking-normal font-semibold">
+              · required for installed (FTC §5)
+            </span>
+          )}
+          {missing && product.badge_type === "optional" && (
+            <span className="ml-1.5 text-amber-700 normal-case tracking-normal font-semibold">
+              · recommended for /v/:slug
+            </span>
+          )}
+        </p>
+        {isOverridden && (
+          <button
+            type="button"
+            onClick={onResetToCatalog}
+            className="text-[9px] font-semibold text-muted-foreground hover:text-foreground underline-offset-2 hover:underline"
+            title="Replace this addendum's benefit text with the catalog default"
+          >
+            Reset to catalog
+          </button>
+        )}
+      </div>
+      <textarea
+        value={effectiveBenefit}
+        onChange={(e) => onChange(e.target.value)}
+        rows={2}
+        placeholder={
+          product.badge_type === "installed"
+            ? "Why does this benefit the buyer? (transaction-specific — SB 766 §11713.21)"
+            : "Optional — explain the value to the customer scanning the sticker QR."
+        }
+        className="w-full px-2 py-1.5 border border-border rounded text-xs bg-background"
+      />
+      {monthly != null && (
+        <div className="flex items-center justify-between gap-2 text-[10px] text-foreground/80 bg-card border border-border rounded px-2 py-1">
+          <div className="inline-flex items-center gap-1">
+            <span className="font-bold uppercase tracking-wider text-[9px] text-muted-foreground">
+              Monthly impact
+            </span>
+            <span className="font-mono tabular-nums font-semibold">
+              +${monthly.toFixed(2)}/mo
+            </span>
+          </div>
+          <span className="text-[9px] text-muted-foreground">
+            Illustrative · {ILLUSTRATIVE_APR}% APR · {ILLUSTRATIVE_TERM}mo · your terms may vary
+          </span>
+        </div>
+      )}
     </div>
   );
 };

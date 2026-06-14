@@ -57,10 +57,13 @@ const BillingHandshakeDiagnostic = () => {
   const [entitlements, setEntitlements] = useState<Entitlement[]>([]);
   const [loading, setLoading] = useState(false);
   const [reengageSchedule, setReengageSchedule] = useState<{ schedule: string | null; active: boolean } | null>(null);
+  // Wave 24 — surface the advertised-price crawl schedule
+  // alongside the reengage one. Same pattern, different RPC.
+  const [crawlSchedule, setCrawlSchedule] = useState<{ schedule: string | null; active: boolean; last_run: string | null } | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
-    const [evRes, auditRes, tenantsRes, schedRes] = await Promise.all([
+    const [evRes, auditRes, tenantsRes, schedRes, crawlRes] = await Promise.all([
       (supabase as any)
         .from("billing_events")
         .select("id, tenant_id, stripe_event_id, event_type, processed_at, created_at")
@@ -78,12 +81,19 @@ const BillingHandshakeDiagnostic = () => {
         .order("name")
         .limit(50),
       (supabase as any).rpc("get_reengage_schedule"),
+      (supabase as any).rpc("get_crawl_advertised_prices_schedule"),
     ]);
     setEvents((evRes.data as BillingEvent[]) || []);
     setAudit((auditRes.data as AuditEntry[]) || []);
     setTenants((tenantsRes.data as { id: string; name: string }[]) || []);
     const schedRow = Array.isArray(schedRes.data) ? schedRes.data[0] : schedRes.data;
     setReengageSchedule(schedRow ? { schedule: schedRow.schedule, active: !!schedRow.active } : { schedule: null, active: false });
+    const crawlRow = Array.isArray(crawlRes.data) ? crawlRes.data[0] : crawlRes.data;
+    setCrawlSchedule(crawlRow ? {
+      schedule: crawlRow.cron_expression,
+      active: !!crawlRow.active,
+      last_run: crawlRow.last_run ?? null,
+    } : { schedule: null, active: false, last_run: null });
     setLoading(false);
   }, []);
 
@@ -166,6 +176,28 @@ const BillingHandshakeDiagnostic = () => {
           ) : (
             <>
               not scheduled. Call <span className="font-mono">SELECT public.schedule_reengage_abandoned_signings();</span> from psql once secrets are in vault.
+            </>
+          )}
+        </div>
+      </div>
+
+      {/* Wave 24 — advertised-price crawl status. Same shape. */}
+      <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 flex items-start gap-2">
+        <Clock className="w-4 h-4 text-slate-600 mt-0.5 flex-shrink-0" />
+        <div className="text-[12px] text-slate-700 leading-relaxed">
+          <span className="font-semibold">Advertised-price crawl: </span>
+          {crawlSchedule === null ? (
+            <span className="text-muted-foreground">checking…</span>
+          ) : crawlSchedule.schedule ? (
+            <>
+              scheduled (<span className="font-mono">{crawlSchedule.schedule}</span>) &middot; {crawlSchedule.active ? "active" : "paused"}
+              {crawlSchedule.last_run && (
+                <> &middot; last run {new Date(crawlSchedule.last_run).toLocaleString()}</>
+              )}
+            </>
+          ) : (
+            <>
+              not scheduled. Call <span className="font-mono">SELECT public.schedule_crawl_advertised_prices();</span> from psql to enable nightly drift detection.
             </>
           )}
         </div>

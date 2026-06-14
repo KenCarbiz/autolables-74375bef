@@ -141,6 +141,8 @@ describe("buildAuditPacket — manifest shape", () => {
       "07-recall-snapshot",
       "08-audit-log",
       "09-archive",
+      "10-get-ready",
+      "11-advertised-prices",
     ]);
   });
 

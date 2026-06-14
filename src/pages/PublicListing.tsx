@@ -692,6 +692,7 @@ const ProductCard = ({
     warranty?: string | null;
     price: number;
     disclosure?: string | null;
+    benefit_justification?: string | null;
   };
   tone: "installed" | "optional";
 }) => (
@@ -716,8 +717,29 @@ const ProductCard = ({
         {p.price.toLocaleString()}
       </p>
     </div>
+    {/* Wave 27 — benefit justification text reads first because
+        it's what the customer cares about: WHY did the dealer
+        add this. Renders distinct from the legal disclosure so
+        the eye lands on the value pitch before the fine print. */}
+    {p.benefit_justification && p.benefit_justification.trim() && (
+      <p className="text-[11px] text-foreground mt-2 leading-relaxed font-medium">
+        <span className="text-[9px] uppercase tracking-[0.14em] font-bold text-foreground/60 mr-1">
+          Why this benefits you:
+        </span>
+        {p.benefit_justification}
+      </p>
+    )}
     {p.disclosure && (
       <p className="text-[10px] text-muted-foreground mt-2 leading-relaxed">{p.disclosure}</p>
+    )}
+    {/* Wave 27 — voluntary notice on optional items. FTC §5 hook
+        the dealer's addendum builder also renders; restating it
+        here gives the customer the same notice in the digital
+        receipt before they scan the QR at delivery. */}
+    {tone === "optional" && (
+      <p className="text-[9px] text-amber-900 mt-2 leading-snug font-semibold uppercase tracking-[0.08em]">
+        Optional · not a condition of credit approval
+      </p>
     )}
   </div>
 );

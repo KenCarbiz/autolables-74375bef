@@ -11,6 +11,7 @@ import {
   X, CheckCircle2, AlertTriangle,
 } from "lucide-react";
 import SharedEmptyState from "@/components/ui/empty-state";
+import { AdvertisedPriceBand } from "@/components/inventory/AdvertisedPriceBand";
 
 // ──────────────────────────────────────────────────────────────
 // Inventory — dealer's primary workspace.
@@ -298,8 +299,17 @@ const Inventory = () => {
                   <td className="px-3 py-2.5 text-right tabular-nums">
                     {r.mileage ? r.mileage.toLocaleString() : "—"}
                   </td>
-                  <td className="px-3 py-2.5 text-right tabular-nums">
-                    {r.price ? `$${r.price.toLocaleString()}` : "—"}
+                  <td className="px-3 py-2.5 text-right tabular-nums" onClick={(e) => e.stopPropagation()}>
+                    <div className="inline-flex flex-col items-end gap-1">
+                      <span>{r.price ? `$${r.price.toLocaleString()}` : "—"}</span>
+                      {r.vin && r.price ? (
+                        <AdvertisedPriceBand
+                          vin={r.vin}
+                          stickerPrice={r.price}
+                          compact
+                        />
+                      ) : null}
+                    </div>
                   </td>
                   <td className="px-3 py-2.5">
                     <StatusPill status={r.status} />

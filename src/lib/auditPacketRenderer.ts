@@ -47,6 +47,10 @@ const sectionLabel: Record<string, string> = {
   "07-recall-snapshot": "NHTSA recall snapshot (live)",
   "08-audit-log":     "Audit log events",
   "09-archive":       "Archived signed documents",
+  // Wave 22 — install proof (photos + installer signatures) and
+  // the advertised-price history per VIN.
+  "10-get-ready":     "Get-ready records · install photos & signatures",
+  "11-advertised-prices": "Advertised price history · drift evidence",
 };
 
 const renderSection = (section: { name: string; count: number; sha256: string; data: unknown }) => {
@@ -88,6 +92,10 @@ const renderManifestTable = (packet: AuditPacket): string => {
 
 const renderSummaryCards = (packet: AuditPacket): string => {
   const s = packet.summary;
+  // Wave 22 — install-proof + advertised-price cards added.
+  // Cards may be undefined-safe (older AuditPacket consumers can
+  // still render packets shipped before Wave 22 because the
+  // missing fields default to falsy "0" via the chained ?? 0).
   const cards: { label: string; value: string | number; note?: string }[] = [
     { label: "Listing on file", value: s.has_listing ? "Yes" : "No" },
     { label: "Vehicle file", value: s.has_vehicle_file ? "Yes" : "No" },
@@ -95,6 +103,8 @@ const renderSummaryCards = (packet: AuditPacket): string => {
     { label: "Customer signings", value: s.customer_signing_count, note: "E-SIGN provenance attached" },
     { label: "Signed prep sign-offs", value: s.signed_prep_count, note: `${s.prep_signoff_count} total` },
     { label: "Signed deal jackets", value: s.signed_deal_count, note: `${s.deal_token_count} total` },
+    { label: "Install photos", value: s.install_photo_count ?? 0, note: `${s.install_signature_count ?? 0} installer signatures` },
+    { label: "Advertised snapshots", value: s.advertised_price_snapshot_count ?? 0, note: s.latest_advertised_price != null ? `Latest $${s.latest_advertised_price.toLocaleString()} · ${s.latest_advertised_source || "manual"}` : "no snapshots" },
     { label: "Audit events", value: s.audit_event_count },
     { label: "Open recalls", value: s.open_recall_count, note: s.do_not_drive ? "DO NOT DRIVE" : "" },
   ];

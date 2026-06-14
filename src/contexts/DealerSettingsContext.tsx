@@ -20,6 +20,10 @@ export interface DealerSettings {
   feature_custom_branding: boolean;
   feature_ink_saving: boolean;
   feature_spanish_buyers_guide: boolean;
+  // Wave 28 — VI / KO / ZH for the CA market. Defaults OFF
+  // because the dealer should verify each translation reads
+  // correctly for their customer base before enabling.
+  feature_multilang_buyers_guide: boolean;
   feature_url_scrape: boolean;
   // Extended feature toggles
   feature_inventory: boolean;
@@ -65,6 +69,7 @@ export const DEFAULT_SETTINGS: DealerSettings = {
   feature_custom_branding: true,
   feature_ink_saving: false,
   feature_spanish_buyers_guide: true,
+  feature_multilang_buyers_guide: false,
   feature_url_scrape: true,
   feature_inventory: true,
   feature_invoicing: true,

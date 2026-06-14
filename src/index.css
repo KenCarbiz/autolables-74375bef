@@ -16,9 +16,9 @@
     --popover: 0 0% 100%;
     --popover-foreground: 222 47% 11%;
 
-    /* Deep navy primary */
-    --primary: 217 71% 15%;
-    --primary-foreground: 210 40% 98%;
+    /* Autocurb blue primary (#2563EB) */
+    --primary: 221 83% 53%;
+    --primary-foreground: 0 0% 100%;
 
     --secondary: 220 14% 96%;
     --secondary-foreground: 222 47% 11%;
@@ -34,7 +34,7 @@
 
     --border: 220 13% 91%;
     --input: 220 13% 91%;
-    --ring: 217 71% 15%;
+    --ring: 221 83% 53%;
     --radius: 0.75rem;
 
     /* Brand accents — used for badges, gradients, status chips */
@@ -56,15 +56,15 @@
     --muted-custom: 220 9% 46%;
     --border-custom: 220 13% 91%;
 
-    /* Sidebar — dark charcoal with light text (HarteCash style) */
-    --sidebar-background: 222 47% 9%;
-    --sidebar-foreground: 210 20% 88%;
-    --sidebar-primary: 210 100% 56%;
+    /* Sidebar — light Autocurb surface, dark text */
+    --sidebar-background: 0 0% 100%;
+    --sidebar-foreground: 222 47% 11%;
+    --sidebar-primary: 221 83% 53%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 217 33% 17%;
-    --sidebar-accent-foreground: 0 0% 100%;
-    --sidebar-border: 217 33% 17%;
-    --sidebar-ring: 210 100% 56%;
+    --sidebar-accent: 220 14% 96%;
+    --sidebar-accent-foreground: 222 47% 11%;
+    --sidebar-border: 220 13% 91%;
+    --sidebar-ring: 221 83% 53%;
   }
 
   .dark {
@@ -250,41 +250,18 @@
     color: white;
   }
 
-  /* Top bar gradient — navy with the price-tag blue rolling through.
-     Semi-transparent stops + backdrop-filter blur give the bar the
-     Apple / Arc "depth through the glass" look when content scrolls
-     beneath it. Falls back to solid navy on browsers without
-     backdrop-filter support. */
+  /* Topbar — Autocurb-style clean white surface with subtle
+     backdrop blur so content scrolling beneath shows through
+     softly. Class name kept (`topbar-navy`) for backward-compat
+     with existing AppShell markup; the visual is now light. */
   .topbar-navy {
-    background:
-      linear-gradient(
-        120deg,
-        hsl(217 71% 10% / 0.85) 0%,
-        hsl(218 65% 16% / 0.85) 20%,
-        hsl(214 80% 24% / 0.85) 40%,
-        hsl(210 100% 50% / 0.85) 52%,
-        hsl(214 80% 24% / 0.85) 64%,
-        hsl(218 65% 16% / 0.85) 80%,
-        hsl(217 71% 10% / 0.85) 100%
-      );
-    background-size: 220% 220%;
-    animation: shimmer-roll 18s ease-in-out infinite;
-    backdrop-filter: saturate(1.5) blur(18px);
-    -webkit-backdrop-filter: saturate(1.5) blur(18px);
+    background-color: hsl(0 0% 100% / 0.82);
+    backdrop-filter: saturate(1.4) blur(16px);
+    -webkit-backdrop-filter: saturate(1.4) blur(16px);
   }
   @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
     .topbar-navy {
-      background:
-        linear-gradient(
-          120deg,
-          hsl(217 71% 10%) 0%,
-          hsl(218 65% 16%) 20%,
-          hsl(214 80% 24%) 40%,
-          hsl(210 100% 50%) 52%,
-          hsl(214 80% 24%) 64%,
-          hsl(218 65% 16%) 80%,
-          hsl(217 71% 10%) 100%
-        );
+      background-color: hsl(0 0% 100%);
     }
   }
 
@@ -338,44 +315,13 @@
     color: white;
   }
 
-  /* Sidebar shimmer — deep navy→blue vertical roll that mirrors
-     the Landing shimmer-hero but tuned for a tall chrome panel.
-     The ::before radial glow matches the hero's highlight pools so
-     the sidebar visually reads as the same blue family. Note: we
-     deliberately do NOT set position here — the <aside> ships with
-     Tailwind's `fixed` utility, which is already a containing block
-     for ::before. Setting position: relative here fights `.fixed`
-     and collapses the sidebar into the mobile flex flow. */
+  /* Sidebar — Autocurb-style clean white panel. Class name
+     kept (`shimmer-sidebar`) for backward-compat with existing
+     AppShell markup; the visual is now light. No gradient, no
+     animation — generous whitespace and a single hairline border
+     do the work. */
   .shimmer-sidebar {
-    background:
-      linear-gradient(
-        180deg,
-        #050a18 0%,
-        #0B2041 18%,
-        #0f3a7a 42%,
-        #1E90FF 55%,
-        #0f3a7a 68%,
-        #0B2041 82%,
-        #050a18 100%
-      );
-    background-size: 100% 240%;
-    animation: shimmer-roll 26s ease-in-out infinite;
-  }
-  .shimmer-sidebar::before {
-    content: "";
-    position: absolute;
-    inset: 0;
-    background:
-      radial-gradient(60% 30% at 20% 20%, rgba(59, 180, 255, 0.14), transparent 70%),
-      radial-gradient(50% 40% at 85% 75%, rgba(30, 144, 255, 0.12), transparent 70%);
-    pointer-events: none;
-    mix-blend-mode: screen;
-    z-index: 0;
-  }
-  /* Keep the sidebar's content stacked above the shine pools */
-  .shimmer-sidebar > * {
-    position: relative;
-    z-index: 1;
+    background-color: hsl(var(--sidebar-background));
   }
 
   /* View-transition helpers — retired. Sidebar navigation no

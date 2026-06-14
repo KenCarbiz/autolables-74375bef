@@ -333,6 +333,10 @@ export interface ComplianceDraft {
     disclosure?: string;
     installed_at?: string;
     separate_signoff?: boolean;
+    // Wave 16 — per-line benefit text. Seeded from the catalog,
+    // overridable per-addendum. The red-team gates send on this
+    // for installed products (FTC §5 + CA SB 766 §11713.21).
+    benefit_justification?: string;
   }>;
   spanishVersion?: boolean;
   threeDayAck?: boolean;

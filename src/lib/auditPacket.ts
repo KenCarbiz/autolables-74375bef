@@ -53,6 +53,13 @@ export interface AuditPacket {
     has_recall_snapshot: boolean;
     open_recall_count: number;
     do_not_drive: boolean;
+    // Wave 22 — install-photo + advertised-price summary so
+    // the cover KPI strip can quote both at a glance.
+    install_photo_count: number;
+    install_signature_count: number;
+    advertised_price_snapshot_count: number;
+    latest_advertised_price: number | null;
+    latest_advertised_source: string | null;
   };
 }
 
@@ -106,6 +113,9 @@ export async function buildAuditPacket(args: BuildArgs): Promise<AuditPacket> {
     deals,
     audits,
     archive,
+    // Wave 22 — three new dimensions in the packet:
+    getReady,           // installer photos + signatures (Wave 17)
+    advertisedPrices,   // full history of advertised snapshots (Wave 20)
   ] = await Promise.all([
     supabase.from("vehicle_listings").select("*").eq("vin", cleanVin).order("created_at", { ascending: false }).limit(20),
     supabase.from("vehicle_files").select("*").eq("vin", cleanVin).limit(5),
@@ -115,6 +125,8 @@ export async function buildAuditPacket(args: BuildArgs): Promise<AuditPacket> {
     supabase.from("deal_signing_tokens").select("*").or(`vehicle_payload->>vin.eq.${cleanVin}`).order("created_at", { ascending: false }).limit(20),
     supabase.from("audit_log").select("*").or(`details->>vin.eq.${cleanVin}`).order("created_at", { ascending: false }).limit(500),
     supabase.from("signed_document_archive").select("*").eq("vin", cleanVin).order("created_at", { ascending: false }).limit(50),
+    supabase.from("get_ready_records").select("*").eq("vin", cleanVin).order("updated_at", { ascending: false }).limit(5),
+    supabase.from("advertised_prices").select("*").eq("vin", cleanVin).order("snapshot_at", { ascending: false }).limit(100),
   ]);
 
   // Live NHTSA recall snapshot — taken at packet time, included
@@ -140,8 +152,13 @@ export async function buildAuditPacket(args: BuildArgs): Promise<AuditPacket> {
   const dealRows = rows(deals) as Array<{ status?: string }>;
   const auditRows = rows(audits);
   const archiveRows = rows(archive);
+  const getReadyRows = rows(getReady);
+  const advertisedPriceRows = rows(advertisedPrices) as Array<{ advertised_price?: number; source_label?: string; snapshot_at?: string }>;
 
   // Hash each section. Order matters for chain root — keep stable.
+  // Wave 22 appends sections 10 + 11; do NOT reorder existing
+  // names or every chain root quoted in past correspondence
+  // becomes orphan.
   const sectionOrder: { name: string; data: unknown }[] = [
     { name: "01-vehicle-file",  data: vehicleFileRow },
     { name: "02-listings",      data: listingRows },
@@ -152,6 +169,8 @@ export async function buildAuditPacket(args: BuildArgs): Promise<AuditPacket> {
     { name: "07-recall-snapshot", data: recall },
     { name: "08-audit-log",     data: auditRows },
     { name: "09-archive",       data: archiveRows },
+    { name: "10-get-ready",     data: getReadyRows },
+    { name: "11-advertised-prices", data: advertisedPriceRows },
   ];
 
   const sections: AuditPacketSection[] = [];
@@ -202,6 +221,19 @@ export async function buildAuditPacket(args: BuildArgs): Promise<AuditPacket> {
       has_recall_snapshot: recall !== null && !(recall as { error?: string }).error,
       open_recall_count: openRecallCount,
       do_not_drive: doNotDrive,
+      // Wave 22 — install-photo + signature aggregates across
+      // every accessory on every get-ready record for this VIN.
+      install_photo_count: getReadyRows.reduce((sum: number, r: any) => {
+        const accs = (r?.accessories_to_install || []) as Array<{ install_photos?: string[] }>;
+        return sum + accs.reduce((s, a) => s + ((a.install_photos || []).length), 0);
+      }, 0),
+      install_signature_count: getReadyRows.reduce((sum: number, r: any) => {
+        const accs = (r?.accessories_to_install || []) as Array<{ installer_signature_data?: string }>;
+        return sum + accs.filter(a => !!a.installer_signature_data).length;
+      }, 0),
+      advertised_price_snapshot_count: advertisedPriceRows.length,
+      latest_advertised_price: advertisedPriceRows[0]?.advertised_price ?? null,
+      latest_advertised_source: advertisedPriceRows[0]?.source_label ?? null,
     },
   };
 }

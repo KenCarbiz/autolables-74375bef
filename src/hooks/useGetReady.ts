@@ -59,6 +59,16 @@ export interface AccessoryToInstall {
   installed: boolean;
   installedDate?: string;
   installedBy?: string;
+  // Wave 17 — installer proof artifact. install_photos[] holds
+  // Supabase Storage public URLs (bucket: accessory-install-photos).
+  // installer_signature_data is base64 PNG OR typed name (matching
+  // the addendum_signings.signature_data shape). Both feed the
+  // Audit-Defense Packet so a regulator can see "this dealer
+  // proves the accessory was on the vehicle before sale, with
+  // an installer signature and timestamp."
+  install_photos?: string[];
+  installer_signature_data?: string;
+  installer_signature_type?: "draw" | "type";
 }
 
 export interface GetReadyRecord {
@@ -327,10 +337,20 @@ export const useGetReady = (storeId: string) => {
     await load();
   };
 
+  // Wave 17 — install proof. The caller can attach photo URLs
+  // (uploaded to the accessory-install-photos Storage bucket
+  // before this call) and an installer signature (base64 PNG
+  // or typed name). Backward-compatible: the older 3-arg call
+  // still works because every new field is optional.
   const markAccessoryInstalled = async (
     recordId: string,
     productId: string,
     installedBy: string,
+    proof?: {
+      photos?: string[];
+      signature_data?: string;
+      signature_type?: "draw" | "type";
+    },
   ) => {
     const { data: row } = await (supabase as any)
       .from("get_ready_records")
@@ -343,7 +363,19 @@ export const useGetReady = (storeId: string) => {
     if (!acc) return;
     const nextAccessories: AccessoryToInstall[] = accessories.map(a =>
       a.productId === productId
-        ? { ...a, installed: true, installedDate: new Date().toISOString(), installedBy }
+        ? {
+            ...a,
+            installed: true,
+            installedDate: new Date().toISOString(),
+            installedBy,
+            // Merge photos with any previously uploaded ones so
+            // a second install pass can append rather than
+            // overwrite (e.g. dealer adds wheel photos after
+            // initial body-protection photos).
+            install_photos: [...(a.install_photos || []), ...(proof?.photos || [])],
+            installer_signature_data: proof?.signature_data ?? a.installer_signature_data,
+            installer_signature_type: proof?.signature_type ?? a.installer_signature_type,
+          }
         : a
     );
     const items: GetReadyItem[] = (row.items as GetReadyItem[]).map(i =>
