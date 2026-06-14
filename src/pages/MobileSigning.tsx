@@ -69,6 +69,9 @@ const MobileSigning = () => {
   const [deliveryMileage, setDeliveryMileage] = useState("");
   // Addendum/sticker matching acknowledgment
   const [stickerMatchAck, setStickerMatchAck] = useState(false);
+  // Payment walk — single confirmation that the customer saw the base
+  // vehicle price, the add-ons they elected, and the resulting total.
+  const [paymentConfirmed, setPaymentConfirmed] = useState(false);
   // Price overrides — sales manager can discount accessories (NOT doc fee)
   const [priceOverrides, setPriceOverrides] = useState<Record<string, number>>({});
   const [showPriceEdit, setShowPriceEdit] = useState(false);
@@ -131,20 +134,76 @@ const MobileSigning = () => {
 
   const products: ProductSnapshot[] = addendum?.products_snapshot || [];
   const installed = products.filter((p) => p.badge_type === "installed");
-  // Per-item add-on election disclosure — FTC Act §5 / CA SB 766: each
-  // optional product must be disclosed as optional, not a condition of
-  // purchase or financing, and not affecting the rate. The exact text
-  // shown is hashed into the signed payload as the election record.
-  const ADDON_ELECTION_DISCLOSURE =
-    "Optional. You are not required to buy this to purchase the vehicle or obtain financing, and choosing it does not affect your interest rate. You may buy the vehicle without it.";
-  const ADDON_ELECTION_DISCLOSURE_VERSION = "ael-2026-06-01";
   const optional = products.filter((p) => p.badge_type === "optional");
+  // Whether this deal is financed. Drives the add-on election language:
+  // the "won't change your interest rate" clause only makes sense — and
+  // is only defensible — when there's a rate in play.
+  const isFinanced = !!addendum?.financing_input;
+
+  // A small set of optional products carry their own statutory per-item
+  // acknowledgment rule (GAP waivers, vehicle service contracts, and
+  // credit insurance/debt-cancellation products). Those keep a separate
+  // initial. Every other discretionary add-on (paint protection, nitrogen,
+  // etch, etc.) is elected with a single Accept/Decline — no per-item
+  // initial — so the flow stops feeling like a gauntlet. The Accept choice
+  // is itself the affirmative, hashed election under FTC Act §5.
+  const STATUTORY_INITIAL_KEYWORDS = [
+    "gap",
+    "service contract",
+    "vehicle service",
+    "vsc",
+    "extended warranty",
+    "extended service",
+    "credit life",
+    "credit insurance",
+    "credit disability",
+    "debt cancellation",
+    "guaranteed asset",
+  ];
+  const requiresStatutoryInitials = (name: string) =>
+    STATUTORY_INITIAL_KEYWORDS.some((k) => name.toLowerCase().includes(k));
+  // Installed items always carry a customer initial (the red-team layer
+  // hard-blocks an unsigned installed product). A statutory optional needs
+  // one only when the customer is actually keeping it — declining GAP
+  // shouldn't demand an initial.
+  const needsInitials = (p: ProductSnapshot) =>
+    p.badge_type === "installed" ||
+    (p.badge_type === "optional" &&
+      requiresStatutoryInitials(p.name) &&
+      optionalSelections[p.id] === "accept");
+
+  // One calm banner over the whole optional section instead of a scary
+  // disclosure stamped under every line. Same FTC Act §5 substance —
+  // optional, no effect on price or (when financed) rate — framed so the
+  // customer feels in control, not interrogated. The exact text the
+  // customer saw is hashed into the signed payload as the election record.
+  const ADDON_ELECTION_BANNER = isFinanced
+    ? "These add-ons are optional and yours to choose. Adding or skipping any of them won't change your vehicle price or your interest rate. Accept the ones you want and decline the rest."
+    : "These add-ons are optional and yours to choose. Adding or skipping any of them won't change your vehicle price. Accept the ones you want and decline the rest.";
+  const ADDON_ELECTION_DISCLOSURE_VERSION = "ael-2026-06-14";
+
+  // Payment walk math. Base vehicle price + every accessory the customer
+  // is keeping (pre-installed, plus optional add-ons they accepted), with
+  // any manager discount applied. This is the number the customer confirms
+  // — itemized, so an elected add-on can never be a silent line on a
+  // contract later.
+  const effectivePrice = (p: ProductSnapshot) => priceOverrides[p.id] ?? p.price;
+  const basePrice = typeof addendum?.vehicle_price === "number" ? addendum.vehicle_price : 0;
+  const keptItems = products.filter(
+    (p) => p.badge_type === "installed" || optionalSelections[p.id] === "accept",
+  );
+  const addOnsTotal = keptItems.reduce((s, p) => s + effectivePrice(p), 0);
+  const addendumTotal = basePrice + addOnsTotal;
 
   const handleFillAll = () => {
     if (!bulkInitials.trim()) return;
-    const filled: Record<string, string> = {};
-    products.forEach((p) => { filled[p.id] = bulkInitials.toUpperCase(); });
-    setInitials(filled);
+    setInitials((prev) => {
+      const filled: Record<string, string> = { ...prev };
+      products.forEach((p) => {
+        if (needsInitials(p)) filled[p.id] = bulkInitials.toUpperCase();
+      });
+      return filled;
+    });
   };
 
   const handleSubmit = async () => {
@@ -152,14 +211,14 @@ const MobileSigning = () => {
       toast.error("Please accept the Electronic Records Disclosure before signing.");
       return;
     }
-    const missingInitials = products.filter((p) => !initials[p.id]?.trim());
+    const missingInitials = products.filter((p) => needsInitials(p) && !initials[p.id]?.trim());
     if (missingInitials.length > 0) {
       toast.error(`Please initial all ${missingInitials.length} product(s).`);
       return;
     }
     const missingSelections = optional.filter((p) => !optionalSelections[p.id]);
     if (missingSelections.length > 0) {
-      toast.error(`Please accept or decline all optional products.`);
+      toast.error(`Please accept or decline all optional items.`);
       return;
     }
     if (!warrantyAck) {
@@ -172,6 +231,10 @@ const MobileSigning = () => {
     }
     if (!stickerMatchAck) {
       toast.error("Please acknowledge the window sticker matches this addendum.");
+      return;
+    }
+    if (!paymentConfirmed) {
+      toast.error("Please confirm your price breakdown.");
       return;
     }
     if (isSb766Applicable(addendum?.vehicle_state, addendum?.vehicle_price) && !sb766ThreeDayAck) {
@@ -237,7 +300,12 @@ const MobileSigning = () => {
         price: p.price,
         badge_type: p.badge_type,
         disclosure: p.disclosure || undefined,
-        separate_signoff: !!initials[p.id]?.trim(),
+        // An optional add-on's per-item sign-off is its affirmative
+        // Accept/Decline election; installed items still rely on initials.
+        separate_signoff:
+          p.badge_type === "optional"
+            ? !!optionalSelections[p.id]
+            : !!initials[p.id]?.trim(),
       })),
       spanishVersion: consent.language?.startsWith("es") || false,
       threeDayAck: sb766ThreeDayAck,
@@ -291,12 +359,21 @@ const MobileSigning = () => {
       optional_selections: optionalSelections,
       addon_election: {
         disclosure_version: ADDON_ELECTION_DISCLOSURE_VERSION,
-        disclosure_text: ADDON_ELECTION_DISCLOSURE,
+        disclosure_text: ADDON_ELECTION_BANNER,
+        financed: isFinanced,
         selections: optionalSelections,
+      },
+      payment_walk: {
+        base_price: basePrice,
+        add_ons_total: addOnsTotal,
+        addendum_total: addendumTotal,
+        kept_item_ids: keptItems.map((p) => p.id),
+        confirmed: paymentConfirmed,
       },
       customer_name: customerName,
       warranty_ack: warrantyAck,
       sticker_match_ack: stickerMatchAck,
+      payment_confirmed: paymentConfirmed,
       delivery_mileage: deliveryMileage,
       esign_consent_version: consent.version,
       sb766_three_day_return_ack: sb766ThreeDayAck || null,
@@ -503,16 +580,17 @@ const MobileSigning = () => {
 
   // Progress — compute completion percentage of the required fields so the
   // customer can see how much is left.
-  const requiredProducts = products;
-  const productsInitialedCount = requiredProducts.filter((p) => (initials[p.id] || "").trim()).length;
+  const initialItems = products.filter((p) => needsInitials(p));
+  const initialsDoneCount = initialItems.filter((p) => (initials[p.id] || "").trim()).length;
   const optionalSelectedCount = optional.filter((p) => !!optionalSelections[p.id]).length;
   const requirements = [
     { label: "E-SIGN consent",  done: esignConsent },
-    { label: "Initials on all products", done: requiredProducts.length > 0 && productsInitialedCount === requiredProducts.length },
+    { label: "Required initials", done: initialItems.length === 0 || initialsDoneCount === initialItems.length },
     { label: "Optional items chosen",    done: optional.length === 0 || optionalSelectedCount === optional.length },
     { label: "Warranty acknowledged",    done: warrantyAck },
     { label: "Delivery mileage",         done: deliveryMileage.trim().length > 0 },
     { label: "Sticker match acknowledged", done: stickerMatchAck },
+    { label: "Price confirmed",          done: paymentConfirmed },
     { label: "Signature",                done: !!customerSig.data },
   ];
   const doneCount = requirements.filter((r) => r.done).length;
@@ -579,7 +657,7 @@ const MobileSigning = () => {
 
         {/* Products */}
         <div className="bg-card rounded-xl p-5 shadow-sm space-y-4">
-          <h2 className="text-sm font-bold font-barlow-condensed text-foreground">Products & Acknowledgment</h2>
+          <h2 className="text-sm font-bold font-barlow-condensed text-foreground">Your package — choose what's included</h2>
 
           {installed.map((p) => (
             <div key={p.id} className="border border-border rounded-lg p-3 space-y-2">
@@ -604,46 +682,55 @@ const MobileSigning = () => {
           ))}
 
           {optional.length > 0 && (
-            <div className="border-t border-border pt-3">
-              <p className="text-xs font-bold text-muted-foreground mb-2">▼ Optional Items — Accept or Decline</p>
+            <div className="border-t border-border pt-4 space-y-3">
+              <div className="rounded-lg border border-teal/30 bg-teal/5 p-3">
+                <p className="text-sm font-semibold text-foreground">Optional add-ons — yours to choose</p>
+                <p className="text-[13px] text-muted-foreground leading-snug mt-1">{ADDON_ELECTION_BANNER}</p>
+              </div>
+
+              {optional.map((p) => {
+                const choice = optionalSelections[p.id];
+                const showInitials = needsInitials(p) && choice === "accept";
+                return (
+                  <div key={p.id} className="border border-border rounded-lg p-3 space-y-2.5">
+                    <div className="flex items-start justify-between">
+                      <div>
+                        <span className="text-[10px] font-bold bg-gold text-navy px-1.5 py-0.5 rounded">Optional</span>
+                        <p className="text-sm font-semibold text-foreground mt-1">{p.name}</p>
+                      </div>
+                      <p className="text-sm font-bold text-foreground">${effectivePrice(p).toFixed(2)}</p>
+                    </div>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => setOptionalSelections((prev) => ({ ...prev, [p.id]: "accept" }))}
+                        className={`flex-1 h-10 rounded-lg text-sm font-bold border-2 ${choice === "accept" ? "border-teal bg-teal text-primary-foreground" : "border-border text-foreground"}`}
+                      >
+                        Add it
+                      </button>
+                      <button
+                        onClick={() => setOptionalSelections((prev) => ({ ...prev, [p.id]: "decline" }))}
+                        className={`flex-1 h-10 rounded-lg text-sm font-bold border-2 ${choice === "decline" ? "border-slate-400 bg-slate-100 text-foreground" : "border-border text-foreground"}`}
+                      >
+                        No thanks
+                      </button>
+                    </div>
+                    {showInitials && (
+                      <div className="flex items-center gap-2">
+                        <span className="text-[10px] font-semibold text-muted-foreground">INITIALS:</span>
+                        <input
+                          value={initials[p.id] || ""}
+                          onChange={(e) => setInitials((prev) => ({ ...prev, [p.id]: e.target.value.toUpperCase() }))}
+                          placeholder="____"
+                          className={`w-20 h-10 border-2 rounded-lg px-2 text-base font-bold text-center uppercase bg-background text-foreground ${initials[p.id]?.trim() ? "border-teal" : "border-action"}`}
+                        />
+                        <span className="text-[10px] text-muted-foreground">Initial to confirm this add-on.</span>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
             </div>
           )}
-
-          {optional.map((p) => (
-            <div key={p.id} className="border border-border rounded-lg p-3 space-y-2">
-              <div className="flex items-start justify-between">
-                <div>
-                  <span className="text-[10px] font-bold bg-gold text-navy px-1.5 py-0.5 rounded">Optional</span>
-                  <p className="text-sm font-semibold text-foreground mt-1">{p.name}</p>
-                </div>
-                <p className="text-sm font-bold text-foreground">${p.price.toFixed(2)}</p>
-              </div>
-              <p className="text-base text-foreground/80 leading-snug">{ADDON_ELECTION_DISCLOSURE}</p>
-              <div className="flex gap-2">
-                <button
-                  onClick={() => setOptionalSelections((prev) => ({ ...prev, [p.id]: "accept" }))}
-                  className={`flex-1 h-10 rounded-lg text-sm font-bold border-2 ${optionalSelections[p.id] === "accept" ? "border-teal bg-teal text-primary-foreground" : "border-border text-foreground"}`}
-                >
-                  ✓ Accept
-                </button>
-                <button
-                  onClick={() => setOptionalSelections((prev) => ({ ...prev, [p.id]: "decline" }))}
-                  className={`flex-1 h-10 rounded-lg text-sm font-bold border-2 ${optionalSelections[p.id] === "decline" ? "border-destructive bg-destructive text-primary-foreground" : "border-border text-foreground"}`}
-                >
-                  ✗ Decline
-                </button>
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="text-[10px] font-semibold text-muted-foreground">INITIALS:</span>
-                <input
-                  value={initials[p.id] || ""}
-                  onChange={(e) => setInitials((prev) => ({ ...prev, [p.id]: e.target.value.toUpperCase() }))}
-                  placeholder="____"
-                  className={`w-20 h-10 border-2 rounded-lg px-2 text-base font-bold text-center uppercase bg-background text-foreground ${initials[p.id]?.trim() ? "border-teal" : "border-action"}`}
-                />
-              </div>
-            </div>
-          ))}
         </div>
 
         {/* Price Confirmation — sales manager can discount accessories */}
@@ -798,6 +885,55 @@ const MobileSigning = () => {
                 (2) I have been given time to review both documents; (3) my initials and signature
                 below constitute acceptance of the products and pricing as disclosed; (4) I understand
                 that optional items can be declined with no impact on my purchase or financing.
+              </p>
+            </div>
+          </button>
+        </div>
+
+        {/* Payment walk — base vehicle price, the add-ons the customer is
+            keeping, and the resulting total, with one confirmation. Itemized
+            so an elected add-on can never become a silent line later. */}
+        <div className="bg-card rounded-xl p-5 shadow-sm space-y-4">
+          <h2 className="text-sm font-bold font-barlow-condensed text-foreground">Your price breakdown</h2>
+          <div className="rounded-lg border border-border divide-y divide-border">
+            <div className="flex items-center justify-between px-3 py-2.5">
+              <span className="text-sm font-medium text-foreground">Vehicle price</span>
+              <span className="text-sm font-bold text-foreground tabular-nums">${basePrice.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+            </div>
+            {keptItems.map((p) => (
+              <div key={p.id} className="flex items-center justify-between px-3 py-2.5">
+                <span className="text-sm text-muted-foreground truncate pr-3">
+                  {p.name}
+                  <span className="ml-1.5 text-[10px] uppercase tracking-wider text-muted-foreground/70">
+                    {p.badge_type === "installed" ? "Installed" : "Added"}
+                  </span>
+                </span>
+                <span className="text-sm font-semibold text-foreground tabular-nums">+${effectivePrice(p).toFixed(2)}</span>
+              </div>
+            ))}
+            <div className="flex items-center justify-between px-3 py-3 bg-muted/30">
+              <span className="text-sm font-bold text-foreground">Addendum total</span>
+              <span className="text-base font-black text-foreground tabular-nums">${addendumTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+            </div>
+          </div>
+          <p className="text-[11px] text-muted-foreground leading-relaxed">
+            This is the vehicle plus the add-ons you chose. It does not include tax, title, license, or any financing charges, which appear on your final contract.
+          </p>
+          <button
+            onClick={() => setPaymentConfirmed(!paymentConfirmed)}
+            className={`w-full flex items-start gap-3 p-3 rounded-lg border-2 text-left transition-all ${
+              paymentConfirmed ? "border-teal bg-teal/5" : "border-border"
+            }`}
+          >
+            <div className={`w-6 h-6 rounded-md border-2 flex items-center justify-center flex-shrink-0 mt-0.5 ${
+              paymentConfirmed ? "border-teal bg-teal text-white" : "border-border"
+            }`}>
+              {paymentConfirmed && <span className="text-sm font-bold">✓</span>}
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-semibold text-foreground">This breakdown is correct</p>
+              <p className="text-xs text-muted-foreground mt-0.5 leading-relaxed">
+                I reviewed the vehicle price and each add-on I chose, and I confirm the addendum total above.
               </p>
             </div>
           </button>
