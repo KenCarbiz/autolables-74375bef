@@ -17,6 +17,8 @@ import {
   Building2,
   QrCode,
   ChevronDown,
+  BadgeCheck,
+  Tag,
 } from "lucide-react";
 import { useState } from "react";
 
@@ -48,6 +50,7 @@ const Landing = () => {
         <Hero onWaitlist={goWaitlist} onDemo={goDemo} />
         <TrustBand />
         <Risk />
+        <TakeThePowerBack onWaitlist={goWaitlist} />
         <HowItWorks />
         <Principles />
         <PowerGrid />
@@ -456,6 +459,95 @@ const PowerGrid = () => (
       </div>
     </div>
   </section>
+);
+
+// ──────────────────────────────────────────────────────────────
+// Take the power back — the pivot. Two pillars: provable add-on
+// election and price integrity. Anchored at #power for the nav.
+// ──────────────────────────────────────────────────────────────
+
+const TakeThePowerBack = ({ onWaitlist }: { onWaitlist: () => void }) => (
+  <section id="power" className="border-b border-slate-100 bg-white">
+    <div className="mx-auto max-w-7xl px-6 py-20 lg:px-8">
+      <div className="mx-auto max-w-3xl text-center">
+        <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-blue-600">Take the power back</p>
+        <h2 className="mt-3 font-display text-4xl font-black tracking-tighter text-slate-900 sm:text-5xl">
+          The FTC made you play defense.
+          <br className="hidden sm:block" /> Take the power back.
+        </h2>
+        <p className="mt-5 text-base leading-relaxed text-slate-700">
+          Scared of complaints, dealers stopped pitching add-ons and stopped putting a real price in
+          writing. AutoLabels flips it: prove the customer chose it, prove you honored the price.
+        </p>
+      </div>
+
+      <div className="mx-auto mt-12 grid max-w-5xl gap-5 lg:grid-cols-2">
+        <PowerPillar
+          icon={BadgeCheck}
+          eyebrow="Profitable add-on election"
+          title="Sell add-ons without fear."
+          body="F&I is your most profitable revenue — and your most exposed. AutoLabels captures per-item, informed election: the customer sees each product's price, sees it's optional, sees the benefit, and signs. Every yes is provable."
+          chips={["$2,534 avg F&I gross per vehicle", "Napleton: 83% charged without consent"]}
+          punch="Every yes, provable."
+        />
+        <PowerPillar
+          icon={Tag}
+          eyebrow="Price integrity"
+          title="Own your price. Prove you honored it."
+          body="The FTC reframed your posted price as a binding commitment. AutoLabels locks one price across your site, the lot, and the desk, then seals a tamper-evident record that you honored it."
+          chips={["97 dealer groups warned, Mar 2026", "Buyers pay ~$1,117 to skip the games"]}
+          punch="Priced in ink, not pencil."
+        />
+      </div>
+
+      <div className="mx-auto mt-10 flex max-w-2xl flex-col items-center gap-4 text-center">
+        <p className="text-xs leading-relaxed text-slate-500">
+          Tamper-evident, not tamper-proof. AutoLabels documents informed election and strengthens
+          your position under FTC Act §5 &mdash; it does not guarantee the outcome of a dispute.
+        </p>
+        <button
+          onClick={onWaitlist}
+          className="inline-flex h-12 items-center gap-2 rounded-full bg-[#0B2041] px-6 text-sm font-semibold text-white hover:bg-[#13315e]"
+        >
+          Get on the waitlist
+          <ArrowRight className="h-4 w-4" />
+        </button>
+      </div>
+    </div>
+  </section>
+);
+
+const PowerPillar = ({
+  icon: Icon,
+  eyebrow,
+  title,
+  body,
+  chips,
+  punch,
+}: {
+  icon: IconType;
+  eyebrow: string;
+  title: string;
+  body: string;
+  chips: string[];
+  punch: string;
+}) => (
+  <div className="flex flex-col rounded-2xl border border-slate-200 bg-white p-8 shadow-sm">
+    <div className="flex h-11 w-11 items-center justify-center rounded-lg bg-blue-50 text-[#2563EB]">
+      <Icon className="h-5 w-5" />
+    </div>
+    <p className="mt-5 text-[11px] font-bold uppercase tracking-[0.16em] text-blue-600">{eyebrow}</p>
+    <h3 className="mt-1.5 font-display text-2xl font-black tracking-tight text-slate-900">{title}</h3>
+    <p className="mt-3 text-sm leading-relaxed text-slate-600">{body}</p>
+    <div className="mt-5 flex flex-wrap gap-2">
+      {chips.map((c) => (
+        <span key={c} className="inline-flex items-center gap-1.5 rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-700">
+          <span className="h-1.5 w-1.5 rounded-full bg-blue-500" /> {c}
+        </span>
+      ))}
+    </div>
+    <p className="mt-6 border-t border-slate-100 pt-4 font-display text-base font-bold text-slate-900">{punch}</p>
+  </div>
 );
 
 // ──────────────────────────────────────────────────────────────
