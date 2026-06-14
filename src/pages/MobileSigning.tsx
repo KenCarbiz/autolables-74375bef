@@ -26,6 +26,10 @@ interface ProductSnapshot {
   price: number;
   price_label: string | null;
   disclosure: string | null;
+  // True (or absent) when this installed accessory's price is already
+  // in the advertised price — itemized, never additive. False marks a
+  // dealer-installed upcharge added above the advertised price.
+  price_in_advertised?: boolean;
 }
 
 interface ReturnStatus {
@@ -182,18 +186,31 @@ const MobileSigning = () => {
     : "These add-ons are optional and yours to choose. Adding or skipping any of them won't change your vehicle price. Accept the ones you want and decline the rest.";
   const ADDON_ELECTION_DISCLOSURE_VERSION = "ael-2026-06-14";
 
-  // Payment walk math. Base vehicle price + every accessory the customer
-  // is keeping (pre-installed, plus optional add-ons they accepted), with
-  // any manager discount applied. This is the number the customer confirms
-  // — itemized, so an elected add-on can never be a silent line on a
-  // contract later.
+  // Payment walk math, split by what the advertised price already
+  // covers. An installed accessory is "included" (price_in_advertised
+  // !== false) when its price is already in the online/lot price — it's
+  // itemized for transparency but NEVER added again. Anything additive
+  // is either a dealer-installed upcharge above advertised
+  // (price_in_advertised === false) or an optional add-on the customer
+  // accepted. That additive subtotal is the number the customer confirms,
+  // so an elected add-on can't surface as a silent contract line later.
   const effectivePrice = (p: ProductSnapshot) => priceOverrides[p.id] ?? p.price;
-  const basePrice = typeof addendum?.vehicle_price === "number" ? addendum.vehicle_price : 0;
-  const keptItems = products.filter(
-    (p) => p.badge_type === "installed" || optionalSelections[p.id] === "accept",
+  const includedItems = products.filter(
+    (p) => p.badge_type === "installed" && p.price_in_advertised !== false,
   );
-  const addOnsTotal = keptItems.reduce((s, p) => s + effectivePrice(p), 0);
-  const addendumTotal = basePrice + addOnsTotal;
+  const addedItems = products.filter(
+    (p) =>
+      (p.badge_type === "installed" && p.price_in_advertised === false) ||
+      (p.badge_type === "optional" && optionalSelections[p.id] === "accept"),
+  );
+  const includedTotal = includedItems.reduce((s, p) => s + effectivePrice(p), 0);
+  const addedTotal = addedItems.reduce((s, p) => s + effectivePrice(p), 0);
+  // The advertised price is only reliably present on some addendum rows
+  // (the accessory addendum doesn't always carry the base vehicle price).
+  // When we have it, anchor the walk and show the final all-in; when we
+  // don't, show the additions and point to the purchase agreement.
+  const advertisedPrice = typeof addendum?.vehicle_price === "number" ? addendum.vehicle_price : null;
+  const finalAllIn = advertisedPrice != null ? advertisedPrice + addedTotal : null;
 
   const handleFillAll = () => {
     if (!bulkInitials.trim()) return;
@@ -364,10 +381,12 @@ const MobileSigning = () => {
         selections: optionalSelections,
       },
       payment_walk: {
-        base_price: basePrice,
-        add_ons_total: addOnsTotal,
-        addendum_total: addendumTotal,
-        kept_item_ids: keptItems.map((p) => p.id),
+        advertised_price: advertisedPrice,
+        included_in_advertised_ids: includedItems.map((p) => p.id),
+        included_in_advertised_total: includedTotal,
+        added_above_advertised_ids: addedItems.map((p) => p.id),
+        added_above_advertised_total: addedTotal,
+        final_all_in: finalAllIn,
         confirmed: paymentConfirmed,
       },
       customer_name: customerName,
@@ -890,34 +909,77 @@ const MobileSigning = () => {
           </button>
         </div>
 
-        {/* Payment walk — base vehicle price, the add-ons the customer is
-            keeping, and the resulting total, with one confirmation. Itemized
-            so an elected add-on can never become a silent line later. */}
+        {/* Payment walk — split by what the advertised price already
+            covers. Included accessories are shown for transparency but
+            never re-charged; only genuine additions roll up to the number
+            the customer confirms. One confirmation, hashed into the
+            signed payload, so nothing can surface as a silent line later. */}
         <div className="bg-card rounded-xl p-5 shadow-sm space-y-4">
           <h2 className="text-sm font-bold font-barlow-condensed text-foreground">Your price breakdown</h2>
-          <div className="rounded-lg border border-border divide-y divide-border">
-            <div className="flex items-center justify-between px-3 py-2.5">
-              <span className="text-sm font-medium text-foreground">Vehicle price</span>
-              <span className="text-sm font-bold text-foreground tabular-nums">${basePrice.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+
+          {advertisedPrice != null && (
+            <div className="flex items-center justify-between rounded-lg border border-border px-3 py-2.5">
+              <span className="text-sm font-medium text-foreground">Advertised price</span>
+              <span className="text-sm font-bold text-foreground tabular-nums">${advertisedPrice.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
             </div>
-            {keptItems.map((p) => (
-              <div key={p.id} className="flex items-center justify-between px-3 py-2.5">
-                <span className="text-sm text-muted-foreground truncate pr-3">
-                  {p.name}
-                  <span className="ml-1.5 text-[10px] uppercase tracking-wider text-muted-foreground/70">
-                    {p.badge_type === "installed" ? "Installed" : "Added"}
-                  </span>
-                </span>
-                <span className="text-sm font-semibold text-foreground tabular-nums">+${effectivePrice(p).toFixed(2)}</span>
+          )}
+
+          {includedItems.length > 0 && (
+            <div className="rounded-lg border border-border overflow-hidden">
+              <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground bg-muted/40 px-3 py-2">
+                Already included in {advertisedPrice != null ? "that price" : "your advertised price"}
+              </p>
+              <div className="divide-y divide-border">
+                {includedItems.map((p) => (
+                  <div key={p.id} className="flex items-center justify-between px-3 py-2.5">
+                    <span className="text-sm text-muted-foreground truncate pr-3">{p.name}</span>
+                    <span className="text-xs font-medium text-muted-foreground tabular-nums">${effectivePrice(p).toFixed(2)} · included</span>
+                  </div>
+                ))}
               </div>
-            ))}
-            <div className="flex items-center justify-between px-3 py-3 bg-muted/30">
-              <span className="text-sm font-bold text-foreground">Addendum total</span>
-              <span className="text-base font-black text-foreground tabular-nums">${addendumTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
             </div>
+          )}
+
+          <div className="rounded-lg border border-border overflow-hidden">
+            <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground bg-muted/40 px-3 py-2">
+              Added to your price
+            </p>
+            {addedItems.length === 0 ? (
+              <p className="px-3 py-3 text-sm text-muted-foreground">Nothing added — you're paying the advertised price.</p>
+            ) : (
+              <div className="divide-y divide-border">
+                {addedItems.map((p) => (
+                  <div key={p.id} className="flex items-center justify-between px-3 py-2.5">
+                    <span className="text-sm text-foreground truncate pr-3">
+                      {p.name}
+                      <span className="ml-1.5 text-[10px] uppercase tracking-wider text-muted-foreground/70">
+                        {p.badge_type === "installed" ? "Dealer-installed" : "Optional"}
+                      </span>
+                    </span>
+                    <span className="text-sm font-semibold text-foreground tabular-nums">+${effectivePrice(p).toFixed(2)}</span>
+                  </div>
+                ))}
+                <div className="flex items-center justify-between px-3 py-2.5 bg-muted/30">
+                  <span className="text-sm font-semibold text-foreground">Total added</span>
+                  <span className="text-sm font-bold text-foreground tabular-nums">+${addedTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                </div>
+              </div>
+            )}
           </div>
+
+          {finalAllIn != null && (
+            <div className="flex items-center justify-between rounded-lg border-2 border-teal/40 bg-teal/5 px-3 py-3">
+              <span className="text-sm font-bold text-foreground">Your total</span>
+              <span className="text-base font-black text-foreground tabular-nums">${finalAllIn.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+            </div>
+          )}
+
           <p className="text-[11px] text-muted-foreground leading-relaxed">
-            This is the vehicle plus the add-ons you chose. It does not include tax, title, license, or any financing charges, which appear on your final contract.
+            Accessories already included in the advertised price are shown for transparency and are not charged again.
+            {finalAllIn != null
+              ? " Your total is the advertised price plus only what you added."
+              : " The amounts above are added to your vehicle's advertised price; your full out-the-door figure is on your purchase agreement."}
+            {" "}This excludes tax, title, license, and any financing charges.
           </p>
           <button
             onClick={() => setPaymentConfirmed(!paymentConfirmed)}
@@ -933,7 +995,7 @@ const MobileSigning = () => {
             <div className="flex-1 min-w-0">
               <p className="text-sm font-semibold text-foreground">This breakdown is correct</p>
               <p className="text-xs text-muted-foreground mt-0.5 leading-relaxed">
-                I reviewed the vehicle price and each add-on I chose, and I confirm the addendum total above.
+                I reviewed what's already included in the advertised price and each item added to it, and I confirm the amounts above.
               </p>
             </div>
           </button>

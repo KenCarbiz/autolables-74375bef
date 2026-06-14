@@ -74,6 +74,7 @@ interface Product {
   sort_order: number;
   is_active: boolean;
   benefit_justification: string;
+  price_in_advertised: boolean;
   icon_type?: string;
 }
 
@@ -90,6 +91,7 @@ const emptyProduct = {
   sort_order: 0,
   is_active: true,
   benefit_justification: "",
+  price_in_advertised: true,
   icon_type: "",
 };
 
@@ -242,6 +244,9 @@ const Admin = () => {
       // line at build time. Required on installed products
       // before the red-team will release a signing link.
       benefit_justification: editing.benefit_justification || "",
+      // Default included-in-advertised so an accessory is never
+      // silently charged above the advertised price.
+      price_in_advertised: editing.price_in_advertised ?? true,
     };
 
     if (editing.id) {
@@ -2032,6 +2037,24 @@ const Admin = () => {
                   releases a signing link — answers FTC §5 and CA SB 766 §11713.21.
                 </p>
               </div>
+              {(editing.badge_type || "installed") === "installed" && (
+                <div className="rounded-lg border border-border-custom p-3">
+                  <label className="flex items-start gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      className="mt-0.5"
+                      checked={editing.price_in_advertised ?? true}
+                      onChange={(e) => setEditing({ ...editing, price_in_advertised: e.target.checked })}
+                    />
+                    <span>
+                      <span className="text-xs font-semibold text-foreground">Price is included in the advertised price</span>
+                      <span className="block text-[10px] text-muted-foreground mt-0.5 leading-relaxed">
+                        On — this accessory is already baked into the online/lot price and is itemized for transparency, never charged again at signing. Off — it's a dealer-installed upcharge added above the advertised price, shown as an explicit addition the customer confirms.
+                      </span>
+                    </span>
+                  </label>
+                </div>
+              )}
               <div className="flex items-center gap-2">
                 <input type="checkbox" checked={editing.is_active ?? true} onChange={(e) => setEditing({ ...editing, is_active: e.target.checked })} />
                 <label className="text-xs">Active</label>
