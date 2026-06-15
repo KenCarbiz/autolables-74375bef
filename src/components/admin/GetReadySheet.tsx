@@ -4,12 +4,32 @@ import { supabase } from "@/integrations/supabase/client";
 import { Printer } from "lucide-react";
 import type { GetReadyRecord } from "@/hooks/useGetReady";
 
-// Printable Get-Ready / Installer sheet. The dealer prints this and hands
-// it to the detail shop. It carries the installer QR (encodes
-// /install/:install_token, resolved from the vehicle's install_token), the
-// equipment checklist, and step-by-step instructions. The installer scans,
-// verifies what they installed, and attaches a photo — creating the
-// install_proof that later defaults the addendum line to Pre-Installed.
+// Printable Get-Ready / Recon slip, modeled on the standard dealership
+// reconditioning sheet: a vehicle header grid, a recon stage strip, an
+// itemized work/accessory table (vendor, date, initials), notes, and
+// manager sign-offs. It also carries the installer QR (encodes
+// /install/:install_token) so the detail shop scans, verifies what they
+// installed, and attaches a photo — creating the install_proof that later
+// defaults the addendum line to Pre-Installed.
+
+// The conventional recon path a used car moves through on the lot.
+const STAGES = ["Intake", "Inspection", "Mechanical", "Body", "Parts", "Detail", "Photos", "Frontline"];
+
+// Map our stored status onto the visible stage strip.
+const STATUS_STAGE: Record<string, number> = {
+  pending: 0,
+  in_progress: 2,
+  inspection: 1,
+  detail: 5,
+  photo: 6,
+  ready: 7,
+  inventory: 7,
+};
+
+const fmtDate = (iso?: string | null) =>
+  iso ? new Date(iso).toLocaleDateString(undefined, { month: "numeric", day: "numeric", year: "2-digit" }) : "";
+
+const Blank = ({ w = "w-20" }: { w?: string }) => <span className={`inline-block ${w} border-b border-slate-400`}>&nbsp;</span>;
 
 export const GetReadySheet = ({
   open,
@@ -44,6 +64,8 @@ export const GetReadySheet = ({
 
   const installUrl = token ? `${window.location.origin}/install/${token}` : "";
   const accessories = record.accessoriesToInstall || [];
+  const reachedStage = STATUS_STAGE[record.status] ?? 0;
+  const blankRows = Math.max(0, 4 - accessories.length);
 
   return (
     <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4 no-print" onClick={onClose}>
@@ -53,76 +75,156 @@ export const GetReadySheet = ({
         #gr-sheet { position: fixed; inset: 0; margin: 0; box-shadow: none; border: 0; }
         .gr-noprint { display: none !important; }
       }`}</style>
-      <div className="bg-white rounded-2xl max-w-lg w-full max-h-[90vh] overflow-auto" onClick={(e) => e.stopPropagation()}>
-        <div id="gr-sheet" className="p-8">
-          <div className="flex items-start justify-between gap-4">
+      <div className="bg-white rounded-2xl max-w-2xl w-full max-h-[92vh] overflow-auto" onClick={(e) => e.stopPropagation()}>
+        <div id="gr-sheet" className="p-7 text-slate-900">
+          {/* Header */}
+          <div className="flex items-start justify-between gap-5 border-b-2 border-slate-900 pb-3">
             <div className="min-w-0">
-              <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-500">Get-Ready · Installer Sheet</p>
-              <h1 className="text-2xl font-black text-slate-950 leading-tight">{record.ymm || "Vehicle"}</h1>
-              <p className="text-xs font-mono text-slate-500 mt-0.5">
-                VIN {record.vin}{record.stockNumber ? ` · Stock ${record.stockNumber}` : ""}
-              </p>
-              {dealerName && <p className="text-xs text-slate-500 mt-0.5">{dealerName}</p>}
+              <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-500">Get-Ready · Reconditioning Slip</p>
+              <h1 className="text-xl font-black leading-tight">{dealerName || "Dealership"}</h1>
+              <p className="text-[13px] font-semibold mt-0.5">{record.ymm || "Vehicle"}</p>
             </div>
             <div className="text-center flex-shrink-0">
               {loading ? (
-                <div className="w-[120px] h-[120px] rounded-lg bg-slate-100 animate-pulse" />
+                <div className="w-[110px] h-[110px] rounded bg-slate-100 animate-pulse" />
               ) : installUrl ? (
                 <>
-                  <div className="rounded-lg border border-slate-200 p-2 bg-white">
-                    <QRCodeSVG value={installUrl} size={116} />
+                  <div className="border border-slate-300 p-1.5 inline-block bg-white">
+                    <QRCodeSVG value={installUrl} size={100} />
                   </div>
-                  <p className="text-[9px] uppercase tracking-wider text-slate-500 mt-1">Installer: scan to verify</p>
+                  <p className="text-[8px] font-bold uppercase tracking-wider text-slate-500 mt-0.5">Installer: scan to verify</p>
                 </>
               ) : (
-                <p className="text-[10px] text-slate-500 w-[120px]">
-                  Add this vehicle to inventory to generate the installer QR.
-                </p>
+                <p className="text-[10px] text-slate-500 w-[110px]">Add vehicle to inventory to generate the installer QR.</p>
               )}
             </div>
           </div>
 
-          <div className="mt-6">
-            <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-2">Equipment to install</p>
-            {accessories.length === 0 ? (
-              <p className="text-sm text-slate-500">No accessories on this vehicle's get-ready plan.</p>
-            ) : (
-              <ul className="space-y-2">
-                {accessories.map((a) => (
-                  <li key={a.productId} className="flex items-center gap-3 border border-slate-200 rounded-lg px-3 py-2.5">
-                    <span className={`w-5 h-5 rounded border-2 flex items-center justify-center ${a.installed ? "bg-emerald-500 border-emerald-500 text-white" : "border-slate-300"}`}>
-                      {a.installed && <span className="text-xs font-bold">✓</span>}
-                    </span>
-                    <span className="text-sm font-semibold text-slate-800">{a.productName}</span>
-                    {a.installed && <span className="ml-auto text-[10px] font-semibold text-emerald-600">Installed</span>}
-                  </li>
-                ))}
-              </ul>
-            )}
+          {/* Vehicle header grid */}
+          <div className="grid grid-cols-4 gap-x-4 gap-y-2 mt-3 text-[11px]">
+            <Cell label="Stock #" value={record.stockNumber || ""} fill />
+            <Cell label="VIN" value={record.vin} mono span={2} />
+            <Cell label="RO #" value="" fill />
+            <Cell label="Color" value="" fill />
+            <Cell label="Mileage" value="" fill />
+            <Cell label="Date In" value={fmtDate(record.acquiredDate)} fill />
+            <Cell label="Frontline target" value={fmtDate(record.getReadyCompleteDate)} fill />
           </div>
 
-          <div className="mt-6 rounded-lg bg-slate-50 border border-slate-200 p-4">
-            <p className="text-[11px] font-bold uppercase tracking-wider text-slate-600 mb-1">For the installer</p>
-            <ol className="text-[12px] text-slate-700 list-decimal pl-4 space-y-0.5">
-              <li>Scan the QR code above with your phone.</li>
-              <li>Enter your name and company.</li>
-              <li>Confirm what you installed and when.</li>
-              <li>Take a photo of the equipment on the vehicle and submit.</li>
-            </ol>
+          {/* Recon stage strip */}
+          <div className="mt-4">
+            <p className="text-[9px] font-bold uppercase tracking-[0.18em] text-slate-500 mb-1">Recon stage</p>
+            <div className="flex items-stretch gap-1">
+              {STAGES.map((s, i) => (
+                <div
+                  key={s}
+                  className={`flex-1 text-center text-[9px] font-bold uppercase tracking-wide py-1.5 rounded border ${
+                    i < reachedStage
+                      ? "bg-slate-100 border-slate-300 text-slate-500"
+                      : i === reachedStage
+                        ? "bg-slate-900 border-slate-900 text-white"
+                        : "bg-white border-slate-200 text-slate-400"
+                  }`}
+                >
+                  {s}
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Work / accessories table */}
+          <div className="mt-4">
+            <p className="text-[9px] font-bold uppercase tracking-[0.18em] text-slate-500 mb-1">Equipment &amp; recon items</p>
+            <table className="w-full border-collapse text-[11px]">
+              <thead>
+                <tr className="bg-slate-100 text-left text-[9px] uppercase tracking-wider text-slate-600">
+                  <th className="border border-slate-300 px-2 py-1 w-6">✓</th>
+                  <th className="border border-slate-300 px-2 py-1">Item</th>
+                  <th className="border border-slate-300 px-2 py-1 w-32">Vendor / Tech</th>
+                  <th className="border border-slate-300 px-2 py-1 w-16">Date</th>
+                  <th className="border border-slate-300 px-2 py-1 w-14">Init.</th>
+                </tr>
+              </thead>
+              <tbody>
+                {accessories.map((a) => (
+                  <tr key={a.productId}>
+                    <td className="border border-slate-300 px-2 py-1.5 text-center">
+                      <span className={`inline-block w-3.5 h-3.5 border border-slate-500 ${a.installed ? "bg-slate-900" : ""}`} />
+                    </td>
+                    <td className="border border-slate-300 px-2 py-1.5 font-semibold">{a.productName}</td>
+                    <td className="border border-slate-300 px-2 py-1.5">{a.installedBy || ""}</td>
+                    <td className="border border-slate-300 px-2 py-1.5">{fmtDate(a.installedDate)}</td>
+                    <td className="border border-slate-300 px-2 py-1.5"></td>
+                  </tr>
+                ))}
+                {Array.from({ length: blankRows }).map((_, i) => (
+                  <tr key={`b${i}`}>
+                    <td className="border border-slate-300 px-2 py-1.5 text-center">
+                      <span className="inline-block w-3.5 h-3.5 border border-slate-400" />
+                    </td>
+                    <td className="border border-slate-300 px-2 py-1.5">&nbsp;</td>
+                    <td className="border border-slate-300 px-2 py-1.5"></td>
+                    <td className="border border-slate-300 px-2 py-1.5"></td>
+                    <td className="border border-slate-300 px-2 py-1.5"></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Notes */}
+          <div className="mt-4">
+            <p className="text-[9px] font-bold uppercase tracking-[0.18em] text-slate-500 mb-1">Recon notes</p>
+            <div className="border border-slate-300 rounded h-16" />
+          </div>
+
+          {/* Installer instructions */}
+          <div className="mt-3 rounded bg-slate-50 border border-slate-200 p-3">
+            <p className="text-[9px] font-bold uppercase tracking-wider text-slate-600 mb-0.5">For the installer</p>
+            <p className="text-[10px] text-slate-700 leading-snug">
+              Scan the QR above, enter your name and company, confirm what you installed and when, then take a photo of the
+              equipment on the vehicle and submit. This creates the time-stamped proof of installation.
+            </p>
+          </div>
+
+          {/* Sign-offs */}
+          <div className="mt-5 grid grid-cols-2 gap-6 text-[10px]">
+            <div>
+              <div className="border-b border-slate-500 h-5" />
+              <p className="mt-1 uppercase tracking-wider text-slate-500">Recon / Service Manager · Date</p>
+            </div>
+            <div>
+              <div className="border-b border-slate-500 h-5" />
+              <p className="mt-1 uppercase tracking-wider text-slate-500">Used Car Manager · Date</p>
+            </div>
           </div>
         </div>
 
-        <div className="gr-noprint flex items-center justify-end gap-2 px-8 pb-6">
+        {/* Actions */}
+        <div className="gr-noprint flex items-center justify-end gap-2 px-7 pb-6">
           <button onClick={onClose} className="h-10 px-4 rounded-lg border border-slate-200 text-sm font-semibold text-slate-700 hover:bg-slate-50">
             Close
           </button>
           <button onClick={() => window.print()} className="h-10 px-4 rounded-lg bg-slate-950 text-white text-sm font-semibold inline-flex items-center gap-1.5 hover:bg-slate-900">
-            <Printer className="w-4 h-4" /> Print sheet
+            <Printer className="w-4 h-4" /> Print slip
           </button>
         </div>
       </div>
     </div>
   );
 };
+
+const Cell = ({
+  label, value, mono, fill, span,
+}: { label: string; value: string; mono?: boolean; fill?: boolean; span?: number }) => (
+  <div className={span === 2 ? "col-span-2" : ""}>
+    <p className="text-[8px] font-bold uppercase tracking-wider text-slate-500">{label}</p>
+    {value ? (
+      <p className={`text-[12px] font-semibold ${mono ? "font-mono" : ""} ${fill ? "border-b border-slate-300" : ""}`}>{value}</p>
+    ) : (
+      <p className="border-b border-slate-400 h-[15px]">&nbsp;</p>
+    )}
+  </div>
+);
 
 export default GetReadySheet;
