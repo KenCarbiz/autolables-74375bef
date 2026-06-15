@@ -1273,6 +1273,51 @@ export type Database = {
           },
         ]
       }
+      product_sale_mode_changes: {
+        Row: {
+          addendum_id: string | null
+          changed_by: string
+          changed_by_name: string | null
+          created_at: string
+          from_mode: string | null
+          id: string
+          product_id: string | null
+          product_name: string
+          signing_token: string | null
+          tenant_id: string
+          to_mode: string
+          vehicle_vin: string | null
+        }
+        Insert: {
+          addendum_id?: string | null
+          changed_by?: string
+          changed_by_name?: string | null
+          created_at?: string
+          from_mode?: string | null
+          id?: string
+          product_id?: string | null
+          product_name: string
+          signing_token?: string | null
+          tenant_id: string
+          to_mode: string
+          vehicle_vin?: string | null
+        }
+        Update: {
+          addendum_id?: string | null
+          changed_by?: string
+          changed_by_name?: string | null
+          created_at?: string
+          from_mode?: string | null
+          id?: string
+          product_id?: string | null
+          product_name?: string
+          signing_token?: string | null
+          tenant_id?: string
+          to_mode?: string
+          vehicle_vin?: string | null
+        }
+        Relationships: []
+      }
       products: {
         Row: {
           available_preinstalled: boolean
