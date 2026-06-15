@@ -16,6 +16,7 @@ import { getStateRule, validateAddendum, summarizeFindings } from "@/lib/stateCo
 import { runComplianceRedTeam, summarizeRedTeam } from "@/lib/complianceRedTeam";
 import { isSb766Applicable, type FinancingDisclosure } from "@/lib/sb766";
 import SB766DisclosurePanel from "@/components/addendum/SB766DisclosurePanel";
+import TransactionAuditRecord from "@/components/addendum/TransactionAuditRecord";
 
 interface ProductSnapshot {
   id: string;
@@ -85,6 +86,11 @@ const MobileSigning = () => {
   // CA SB 766 (eff 10/1/2026) — 3-day return ack + financing disclosure
   const [sb766ThreeDayAck, setSb766ThreeDayAck] = useState(false);
   const [sb766Disclosure, setSb766Disclosure] = useState<FinancingDisclosure | null>(null);
+  const [auditRecord, setAuditRecord] = useState<{
+    dealId: string; vin: string | null; signedAt: string; customerName: string;
+    ip: string | null; userAgent: string | null; contentHash: string;
+    location: { latitude?: number | null; longitude?: number | null } | null;
+  } | null>(null);
 
   useEffect(() => {
     if (!token) return;
@@ -494,6 +500,16 @@ const MobileSigning = () => {
         return;
       }
     }
+    setAuditRecord({
+      dealId: addendum.id,
+      vin: addendum.vehicle_vin ?? null,
+      signedAt: canonicalPayload.signed_at,
+      customerName,
+      ip: customerIp,
+      userAgent: consent.user_agent,
+      contentHash,
+      location: geoloc as { latitude?: number | null; longitude?: number | null } | null,
+    });
     setSubmitted(true);
   };
 
@@ -585,6 +601,19 @@ const MobileSigning = () => {
               Every product, price, initial, and consent you reviewed is SHA-256 hashed and stored with your IP and device info — defensible under the federal E-SIGN Act and your state's UETA.
             </p>
           </div>
+
+          {auditRecord && (
+            <TransactionAuditRecord
+              dealId={auditRecord.dealId}
+              vin={auditRecord.vin}
+              signedAt={auditRecord.signedAt}
+              customerName={auditRecord.customerName}
+              ip={auditRecord.ip}
+              userAgent={auditRecord.userAgent}
+              contentHash={auditRecord.contentHash}
+              location={auditRecord.location}
+            />
+          )}
 
           {dealerPhone && (
             <a

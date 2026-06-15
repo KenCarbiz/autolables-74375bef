@@ -3,6 +3,7 @@ import { useParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import SignaturePad from "@/components/addendum/SignaturePad";
 import SB766DisclosurePanel from "@/components/addendum/SB766DisclosurePanel";
+import TransactionAuditRecord from "@/components/addendum/TransactionAuditRecord";
 import { toast } from "sonner";
 import { ChevronLeft, ChevronRight, Check } from "lucide-react";
 import {
@@ -86,6 +87,13 @@ const CustomerReview = () => {
   const [finalChecklistAck, setFinalChecklistAck] = useState(false);
   const [sb766ThreeDayAck, setSb766ThreeDayAck] = useState(false);
   const [sb766Disclosure, setSb766Disclosure] = useState<FinancingDisclosure | null>(null);
+  // Captured at submit so the post-sign Transaction Audit Record can render
+  // the exact device/IP/hash that were sealed into the signed payload.
+  const [auditRecord, setAuditRecord] = useState<{
+    dealId: string; vin: string | null; signedAt: string; customerName: string;
+    ip: string | null; userAgent: string | null; contentHash: string;
+    location: { latitude?: number | null; longitude?: number | null } | null;
+  } | null>(null);
 
   useEffect(() => {
     if (!token) return;
@@ -398,6 +406,16 @@ const CustomerReview = () => {
         .eq("signing_token", token!);
       if (legacyErr) { toast.error("Failed to submit. Please try again."); return; }
     }
+    setAuditRecord({
+      dealId: addendum.id,
+      vin: addendum.vehicle_vin ?? null,
+      signedAt: canonicalPayload.signed_at,
+      customerName,
+      ip: customerIp,
+      userAgent: consent.user_agent,
+      contentHash,
+      location: geoloc as { latitude?: number | null; longitude?: number | null } | null,
+    });
     setSubmitted(true);
   };
 
@@ -450,6 +468,19 @@ const CustomerReview = () => {
               <p className="text-[10px] font-mono text-slate-500">{signedAt}</p>
             </div>
           </div>
+          {auditRecord && (
+            <TransactionAuditRecord
+              dealId={auditRecord.dealId}
+              vin={auditRecord.vin}
+              signedAt={auditRecord.signedAt}
+              customerName={auditRecord.customerName}
+              ip={auditRecord.ip}
+              userAgent={auditRecord.userAgent}
+              contentHash={auditRecord.contentHash}
+              location={auditRecord.location}
+            />
+          )}
+
           <p className="text-center text-[10px] font-mono uppercase tracking-wider text-slate-400 pt-2">
             You can close this page. A copy is on its way.
           </p>
