@@ -241,7 +241,7 @@ const Index = () => {
       // per-vehicle benefit override still wins (Wave 16 v2).
       const dispoBenefit = isOptional
         ? ((pr.benefit_justification_optional || "").trim() || pr.benefit_justification || "")
-        : (pr.benefit_justification || "");
+        : ((pr.benefit_justification || "").trim() || pr.benefit_justification_optional || "");
       const upgradeBenefit = upgradeApplied && up
         ? (isOptional
             ? ((up.benefit_justification_optional || "").trim() || up.benefit_justification || "")

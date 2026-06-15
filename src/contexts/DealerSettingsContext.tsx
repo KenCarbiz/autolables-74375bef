@@ -157,9 +157,15 @@ export const DealerSettingsProvider = ({ children }: { children: ReactNode }) =>
         .eq("tenant_id", tenantId)
         .maybeSingle();
       if (error) throw error;
+      // Layer: defaults < local cache < DB. When the DB row is empty
+      // (e.g. a write failed and never persisted), the local cache still
+      // carries the dealer's last edits so doc fee / state survive a
+      // reload instead of silently resetting to defaults.
+      const dbSettings = (data?.settings as Partial<DealerSettings>) || {};
       const merged: DealerSettings = {
         ...DEFAULT_SETTINGS,
-        ...((data?.settings as Partial<DealerSettings>) || {}),
+        ...(readCache(tenantId) || {}),
+        ...dbSettings,
       };
       setSettings(merged);
       writeCache(tenantId, merged);

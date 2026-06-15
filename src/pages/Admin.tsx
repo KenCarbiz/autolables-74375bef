@@ -296,12 +296,12 @@ const Admin = () => {
 
   const handleSaveProduct = async () => {
     if (!editing || !editing.name) return;
-    // Required: every product must carry its contract — or, when there is
-    // no contract, its warranty card — as the substantiation behind the
-    // benefit claims (FTC §5).
+    // The contract/warranty document is the substantiation behind the
+    // benefit claims (FTC §5). Strongly encouraged, but do NOT hard-block
+    // the save on it — that would prevent editing benefit/pricing while
+    // document storage is unavailable. Surface it as a warning instead.
     if (!editing.contract_url) {
-      toast.error("Attach the product contract (or warranty card) before saving.");
-      return;
+      toast.warning("Saved without a product document. Attach the contract or warranty card when you can — it substantiates the benefit claims.");
     }
     const payload = {
       name: editing.name,
@@ -477,7 +477,7 @@ const Admin = () => {
           // Setup checklist predicates
           const brandedOk = !!settings.dealer_logo_url && !!settings.dealer_name && !!settings.dealer_tagline;
           const productsOk = products.length >= 4;
-          const docFeeOk = !!settings.doc_fee_enabled && settings.doc_fee_amount > 0 && !!settings.doc_fee_state;
+          const docFeeOk = !!settings.doc_fee_enabled && !!settings.doc_fee_state;
           const firstStickerOk = fileStats.totalFiles > 0;
           const addendumSignedOk = auditEntries.some(e => e.action === "addendum_signed");
           const portalPublishedOk = fileStats.totalFiles > 0;
