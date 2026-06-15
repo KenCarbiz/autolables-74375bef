@@ -319,6 +319,32 @@ const Index = () => {
     ? getMatchingProducts(vehicleContext, baseProducts || [])
     : baseProducts;
 
+  // Install-proof regime — once any vendor/detail-shop has scanned this VIN
+  // and verified an installation, the deal enters the proof regime: products
+  // with a matching proof default to Pre-Installed and everything else
+  // defaults to Customer Elected (a fresh car with nothing installed yet is
+  // the customer's choice). Before any proof exists, defaulting is unchanged.
+  // The dealer can always override per line with the Sale Method control.
+  const [installProofs, setInstallProofs] = useState<{ product_name: string | null }[]>([]);
+  useEffect(() => {
+    const vin = vehicle.vin?.trim();
+    if (!vin || viewMode) { setInstallProofs([]); return; }
+    let cancelled = false;
+    (async () => {
+      const { data } = await (supabase as any)
+        .from("install_proofs")
+        .select("product_name")
+        .eq("vehicle_vin", vin);
+      if (!cancelled) setInstallProofs((data as { product_name: string | null }[]) || []);
+    })();
+    return () => { cancelled = true; };
+  }, [vehicle.vin, viewMode]);
+  const provenNames = useMemo(
+    () => new Set(installProofs.map((p) => (p.product_name || "").trim().toLowerCase()).filter(Boolean)),
+    [installProofs],
+  );
+  const proofRegime = provenNames.size > 0;
+
   // Apply product_default_mode + per-product overrides, then pick the
   // disposition-correct disclosure + benefit (pre-installed vs optional),
   // forcing optional for non-preinstallable products and swapping to the
@@ -338,13 +364,20 @@ const Index = () => {
       // Effective disposition: per-vehicle override > admin default mode >
       // catalog type. A product that can't be pre-installed is always
       // optional, no matter the override or mode.
+      const proven =
+        proofRegime &&
+        [...provenNames].some(
+          (n) => n && (p.name.toLowerCase().includes(n) || n.includes(p.name.toLowerCase())),
+        );
       let badge =
         typeOverrides[p.id] ||
-        (settings.product_default_mode === "all_installed"
-          ? "installed"
-          : settings.product_default_mode === "all_optional"
-            ? "optional"
-            : p.badge_type);
+        (proofRegime
+          ? (proven ? "installed" : "optional")
+          : settings.product_default_mode === "all_installed"
+            ? "installed"
+            : settings.product_default_mode === "all_optional"
+              ? "optional"
+              : p.badge_type);
       if (pr.available_preinstalled === false) badge = "optional";
       const isOptional = badge === "optional";
 
@@ -396,7 +429,7 @@ const Index = () => {
 
       return { ...p, name, price, badge_type: badge, price_label, benefit_justification: effectiveBenefit, disclosure };
     });
-  }, [ruledProducts, typeOverrides, benefitOverrides, upgradeSelections, settings.product_default_mode, vehicleContext.bodyStyle, vehicleContext.model]);
+  }, [ruledProducts, typeOverrides, benefitOverrides, upgradeSelections, settings.product_default_mode, vehicleContext.bodyStyle, vehicleContext.model, proofRegime, provenNames]);
 
   const installed = displayProducts.filter((p) => p.badge_type === "installed");
   const optional = displayProducts.filter((p) => p.badge_type === "optional");
