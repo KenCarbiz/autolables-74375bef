@@ -59,6 +59,9 @@ const Index = () => {
   const cardRef = useRef<HTMLDivElement>(null);
   const [generating, setGenerating] = useState(false);
   const [inkSaving, setInkSaving] = useState(false);
+  // On-screen preview zoom only. Print + PDF capture always reset to 1
+  // so the artifact stays true-to-paper-size.
+  const [zoom, setZoom] = useState(1.1);
   // Language of the disclosure block. FTC Used Car Rule + CA SB 766
   // require the disclosure to be presented in the language the sale
   // is conducted in. Dealer picks per-addendum; "en" is default.
@@ -334,7 +337,12 @@ const Index = () => {
       const { default: html2canvas } = await import("html2canvas-pro");
       const { default: jsPDF } = await import("jspdf");
       const { archivePdf, persistArchivedPdf } = await import("@/lib/pdfArchive");
-      const canvas = await html2canvas(card, { scale: 2, useCORS: true });
+      // Capture at true paper size regardless of the on-screen zoom.
+      const prevZoom = card.style.zoom;
+      card.style.zoom = "1";
+      const canvas = await html2canvas(card, { scale: 2, useCORS: true }).finally(() => {
+        card.style.zoom = prevZoom;
+      });
       const imgData = canvas.toDataURL("image/jpeg", 0.95);
       // Paginate the tall capture across standard 8.5x11 letter sheets.
       // The previous single oversized page (format [width, fullHeight])
@@ -713,6 +721,12 @@ const Index = () => {
             <Download className="w-3.5 h-3.5" />
             {generating ? "Generating..." : "PDF"}
           </button>
+          {/* On-screen zoom only — print/PDF stay true-to-paper-size. */}
+          <div className="inline-flex items-center gap-1 h-9 px-1 rounded-md border border-border" title="Adjust on-screen preview size (does not affect print or PDF)">
+            <button onClick={() => setZoom((z) => Math.max(0.6, +(z - 0.1).toFixed(2)))} className="w-6 h-6 inline-flex items-center justify-center rounded hover:bg-muted text-sm" aria-label="Zoom out">−</button>
+            <button onClick={() => setZoom(1.1)} className="text-xs tabular-nums w-11 text-center text-muted-foreground hover:text-foreground" title="Reset zoom">{Math.round(zoom * 100)}%</button>
+            <button onClick={() => setZoom((z) => Math.min(2, +(z + 0.1).toFixed(2)))} className="w-6 h-6 inline-flex items-center justify-center rounded hover:bg-muted text-sm" aria-label="Zoom in">+</button>
+          </div>
           {settings.feature_ink_saving && (
             <label className="flex items-center gap-1.5 text-xs text-muted-foreground cursor-pointer ml-1">
               <input
@@ -802,7 +816,7 @@ const Index = () => {
       )}
 
       {/* Addendum Card — scales to paper size */}
-      <div ref={cardRef} style={{ maxWidth: paperWidth }} className="addendum-card mx-auto bg-card shadow-lg rounded-lg overflow-hidden border border-border-custom">
+      <div ref={cardRef} style={{ maxWidth: paperWidth, zoom }} className="addendum-card mx-auto bg-card shadow-lg rounded-lg overflow-hidden border border-border-custom">
         <AddendumHeader inkSaving={inkSaving} />
         <VehicleStrip vehicle={vehicle} onChange={setVehicle} onVinDecoded={handleVinDecoded} onVehicleScraped={handleVehicleScraped} inkSaving={inkSaving} />
 

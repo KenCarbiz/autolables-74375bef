@@ -460,6 +460,7 @@
     box-shadow: none !important;
     border: 1px solid #999 !important;
     border-radius: 0 !important;
+    zoom: 1 !important;
     /* overflow:hidden on screen would clip the card at the first page
        boundary; let it flow across pages when printing. */
     overflow: visible !important;
