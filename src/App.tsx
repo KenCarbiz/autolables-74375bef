@@ -53,6 +53,7 @@ const PlatformAdmin = lazy(() => import("./pages/PlatformAdmin"));
 const Inventory = lazy(() => import("./pages/Inventory"));
 const VehicleFile = lazy(() => import("./pages/VehicleFile"));
 const SavedAddendums = lazy(() => import("./pages/SavedAddendums"));
+const SignatureQueue = lazy(() => import("./pages/SignatureQueue"));
 const BuyersGuide = lazy(() => import("./pages/BuyersGuide"));
 const MobileSigning = lazy(() => import("./pages/MobileSigning"));
 const CustomerReview = lazy(() => import("./pages/CustomerReview"));
@@ -166,6 +167,7 @@ const App = () => (
                             members reach their own settings here. */}
                         <Route path="/admin" element={<Admin />} />
                         <Route path="/saved" element={<SavedAddendums />} />
+                        <Route path="/signatures" element={<SignatureQueue />} />
                         <Route path="/buyers-guide" element={<BuyersGuide />} />
                         <Route path="/trade-up" element={<TradeUpSticker />} />
                         <Route path="/used-car-sticker" element={<UsedCarSticker />} />

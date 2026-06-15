@@ -104,7 +104,7 @@ const SaleModeControl = ({
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
-        className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full border text-[8px] font-bold uppercase tracking-wide ${meta.badge}`}
+        className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full border text-[9px] font-bold uppercase tracking-wide ${meta.badge}`}
         title="Change sale method"
       >
         <span className={`w-1.5 h-1.5 rounded-full ${meta.dot}`} />
@@ -1145,18 +1145,17 @@ const Index = () => {
                   inkSaving={inkSaving}
                   iconType={iconMap[p.id] || ""}
                   controls={(() => {
+                    // Sale Method is always settable in build mode (pre-
+                    // signature). A product that physically can't be
+                    // pre-installed only offers Customer Elected (+ Upgrade).
+                    if (viewMode) return undefined;
                     const up = (p as { upgrade?: ProductUpgrade | null }).upgrade;
-                    const allowType = settings.allow_type_override_at_signing;
-                    if (viewMode || (!allowType && !up)) return undefined;
                     const canPreinstall = (p as { available_preinstalled?: boolean }).available_preinstalled !== false;
-                    const baseMode: SaleMode = p.badge_type === "optional" ? "customer_elected" : "pre_installed";
-                    const options: SaleMode[] = allowType
-                      ? [
-                          ...(canPreinstall ? (["pre_installed"] as SaleMode[]) : []),
-                          "customer_elected",
-                          ...(up ? (["upgrade"] as SaleMode[]) : []),
-                        ]
-                      : [baseMode, ...(up ? (["upgrade"] as SaleMode[]) : [])];
+                    const options: SaleMode[] = [
+                      ...(canPreinstall ? (["pre_installed"] as SaleMode[]) : []),
+                      "customer_elected",
+                      ...(up ? (["upgrade"] as SaleMode[]) : []),
+                    ];
                     return (
                       <SaleModeControl
                         mode={modeOf({ id: p.id, badge_type: p.badge_type, upgrade: up })}
