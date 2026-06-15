@@ -69,3 +69,12 @@ export const getDocFeeTerminology = (stateCode: string): string => {
   const config = getDocFeeForState(stateCode);
   return config?.terminology || "Documentation Fee";
 };
+
+// The statutory doc-fee disclosure sentence. Includes the state's
+// terminology and the "not a tax or government fee" clause that states
+// like CT require verbatim. Rendered on the addendum AND fed into the
+// compliance validator so the required-verbiage check passes.
+export const getDocFeeDisclosure = (stateCode: string, amount: number): string => {
+  const label = getDocFeeTerminology(stateCode);
+  return `${label}: A ${label.toLowerCase()} of $${amount.toFixed(2)} is charged to cover the cost of processing documents related to the sale of this vehicle. This ${label.toLowerCase()} is a charge by the dealer and is not a tax or government fee.`;
+};

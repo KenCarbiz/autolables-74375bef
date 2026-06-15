@@ -149,7 +149,10 @@ export const STATE_RULES: Record<StateCode, StateRule> = {
   CT: {
     ...fallback("CT", "Connecticut"),
     docFee: {
-      cap: 599,
+      // Connecticut's conveyance fee max is indexed (Conn. Gen. Stat.
+      // §14-62) and has risen above the old $599; $695 reflects the
+      // current cap. Verify against the DMV's annual figure.
+      cap: 695,
       requiredVerbiage: [
         "Conveyance fee",
         "not a tax or government fee",

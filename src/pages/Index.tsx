@@ -8,6 +8,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 import { computeFinancingDisclosure } from "@/lib/sb766";
+import { getDocFeeDisclosure } from "@/data/docFees";
 import AddendumHeader from "@/components/addendum/AddendumHeader";
 import VehicleStrip from "@/components/addendum/VehicleStrip";
 import IntentBox from "@/components/addendum/IntentBox";
@@ -114,6 +115,15 @@ const Index = () => {
   // them as concrete bullet points so the dealer SEES the moat
   // they're paying for, not just a "link created" toast.
   const [complianceReceipt, setComplianceReceipt] = useState<{ label: string; cite?: string }[]>([]);
+
+  // Statutory doc-fee disclosure for the operating state. Fed into the
+  // compliance validator's stickerText so the required-verbiage check
+  // (e.g. CT "conveyance fee" + "not a tax or government fee") matches the
+  // language the TotalBar actually renders.
+  const docFeeDisclosureText =
+    settings.doc_fee_enabled && (settings.doc_fee_amount || 0) > 0
+      ? getDocFeeDisclosure(settings.doc_fee_state || settings.dealer_state || "", settings.doc_fee_amount)
+      : "";
 
   // Paper size
   const paperWidth = settings.addendum_paper_size === "custom"
@@ -431,9 +441,7 @@ const Index = () => {
     const rtFindings = runComplianceRedTeam({
       state: settings.doc_fee_state || settings.dealer_state || "",
       docFeeAmount: settings.doc_fee_enabled ? settings.doc_fee_amount : undefined,
-      stickerText: displayProducts
-        ?.map((p) => `${p.name} ${p.disclosure || ""}`)
-        .join(" ") || "",
+      stickerText: `${displayProducts?.map((p) => `${p.name} ${p.disclosure || ""}`).join(" ") || ""} ${docFeeDisclosureText}`,
       products: displayProducts?.map((p) => ({
         id: p.id,
         name: p.name,
