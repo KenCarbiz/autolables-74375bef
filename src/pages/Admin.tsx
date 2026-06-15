@@ -224,9 +224,31 @@ const Admin = () => {
   const handleUploadDoc = async (file: File) => {
     setUploadingDoc(true);
     try {
-      const res = await uploadPhoto("product-docs", file, { tenantId: tenant?.id });
-      if (res?.url) setEditing(prev => (prev ? { ...prev, contract_url: res.url } : prev));
-      else toast.error("Upload failed. Check your connection and try again.");
+      // Catalog-level upload — scope by tenant/store when present, else a
+      // shared prefix (product-docs RLS is bucket-scoped, not path-scoped).
+      const scope = tenant?.id || currentStore?.id || "shared";
+      const clean = file.name.replace(/[^a-zA-Z0-9._-]/g, "_").slice(-80);
+      const path = `${scope}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}-${clean}`;
+      const { error } = await supabase.storage
+        .from("product-docs")
+        .upload(path, file, { cacheControl: "3600", upsert: false, contentType: file.type || undefined });
+      if (error) {
+        const msg = (error.message || "").toLowerCase();
+        if (msg.includes("bucket") || msg.includes("not found")) {
+          toast.error("Document storage isn't set up yet — apply the product-docs migration on Supabase, then retry.");
+        } else {
+          toast.error(`Upload failed: ${error.message}`);
+        }
+        return;
+      }
+      const { data: pub } = supabase.storage.from("product-docs").getPublicUrl(path);
+      if (pub?.publicUrl) {
+        setEditing(prev => (prev ? { ...prev, contract_url: pub.publicUrl } : prev));
+      } else {
+        toast.error("Uploaded, but no public URL was returned.");
+      }
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Upload failed.");
     } finally {
       setUploadingDoc(false);
     }
