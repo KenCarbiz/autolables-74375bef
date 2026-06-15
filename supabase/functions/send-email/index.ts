@@ -16,10 +16,6 @@ serve(async (req) => {
 
   try {
     // ── Auth gate ────────────────────────────────────────────────
-    // Accept either (a) the service-role key (server-to-server
-    // callers like reengage-abandoned-signings), or (b) a valid
-    // user JWT. Never accept anonymous callers — this function
-    // can send arbitrary HTML mail under our domain.
     const supabaseUrl = Deno.env.get("SUPABASE_URL") || "";
     const serviceKey  = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
     const jwt = (req.headers.get("Authorization") || "").replace(/^Bearer\s+/i, "");
@@ -28,7 +24,10 @@ serve(async (req) => {
         status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
-    if (jwt !== serviceKey) {
+
+    const isServiceRole = jwt === serviceKey;
+    let callerUserId: string | null = null;
+    if (!isServiceRole) {
       const admin = createClient(supabaseUrl, serviceKey, {
         auth: { persistSession: false, autoRefreshToken: false },
       });
@@ -38,6 +37,7 @@ serve(async (req) => {
           status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
+      callerUserId = userRes.user.id;
     }
 
     const { to, subject, html, from, replyTo, attachments } = await req.json();
@@ -47,6 +47,70 @@ serve(async (req) => {
         JSON.stringify({ error: "to and subject required" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
+    }
+
+    // ── Recipient allowlist for user-JWT callers ───────────────
+    // Block this function from acting as an open relay. User-JWT
+    // callers may only email addresses that already belong to a
+    // tenant they are an accepted member of (recipients, leads,
+    // teammates, prior signers/customers). Service-role callers
+    // (cron, server-to-server) bypass this check.
+    if (!isServiceRole && callerUserId) {
+      const recipients = (Array.isArray(to) ? to : [to])
+        .map((e: unknown) => String(e || "").trim().toLowerCase())
+        .filter(Boolean);
+      if (recipients.length === 0) {
+        return new Response(JSON.stringify({ error: "no recipients" }), {
+          status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      if (recipients.length > 25) {
+        return new Response(JSON.stringify({ error: "too many recipients (max 25 per call)" }), {
+          status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      const admin = createClient(supabaseUrl, serviceKey, {
+        auth: { persistSession: false, autoRefreshToken: false },
+      });
+      const { data: memberships } = await admin
+        .from("tenant_members")
+        .select("tenant_id")
+        .eq("user_id", callerUserId)
+        .not("accepted_at", "is", null);
+      const tenantIds = (memberships || []).map((m: { tenant_id: string }) => m.tenant_id);
+      if (tenantIds.length === 0) {
+        return new Response(JSON.stringify({ error: "caller has no tenant memberships" }), {
+          status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      const allow = new Set<string>();
+      const collect = (rows: Array<Record<string, unknown>> | null, field: string) => {
+        for (const r of rows || []) {
+          const v = r[field];
+          if (typeof v === "string" && v.includes("@")) allow.add(v.trim().toLowerCase());
+        }
+      };
+      const [recRes, leadsRes, memRes, signRes, dealRes] = await Promise.all([
+        admin.from("email_recipients").select("email").in("tenant_id", tenantIds),
+        admin.from("leads").select("email").in("tenant_id", tenantIds),
+        admin.from("tenant_members").select("invited_email").in("tenant_id", tenantIds),
+        admin.from("addendum_signings").select("signer_email").in("tenant_id", tenantIds),
+        admin.from("deal_signing_tokens").select("customer_email").in("tenant_id", tenantIds),
+      ]);
+      collect(recRes.data as Array<Record<string, unknown>> | null, "email");
+      collect(leadsRes.data as Array<Record<string, unknown>> | null, "email");
+      collect(memRes.data as Array<Record<string, unknown>> | null, "invited_email");
+      collect(signRes.data as Array<Record<string, unknown>> | null, "signer_email");
+      collect(dealRes.data as Array<Record<string, unknown>> | null, "customer_email");
+
+      const blocked = recipients.filter((r) => !allow.has(r));
+      if (blocked.length > 0) {
+        return new Response(JSON.stringify({
+          error: "recipient_not_allowed",
+          message: "user-JWT senders may only email contacts within their tenants",
+          blocked,
+        }), { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
     }
 
     const resendKey = Deno.env.get("RESEND_API_KEY");

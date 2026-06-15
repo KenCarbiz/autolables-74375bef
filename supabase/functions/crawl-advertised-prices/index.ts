@@ -56,6 +56,29 @@ interface LatestRow {
 
 const PRICE_REGEX = /\$\s?(\d{1,3}(?:,\d{3})+|\d{4,6})(?:\.\d{2})?/g;
 
+// SSRF guard — reject private/loopback/link-local/cloud-metadata hosts.
+const BLOCKED_HOST_PATTERNS: RegExp[] = [
+  /^localhost$/i,
+  /^127\./, /^0\./, /^10\./,
+  /^169\.254\./,
+  /^192\.168\./,
+  /^172\.(1[6-9]|2\d|3[0-1])\./,
+  /^::1$/, /^fe80:/i, /^fc[0-9a-f]{2}:/i, /^fd[0-9a-f]{2}:/i,
+  /metadata\.google\.internal$/i,
+  /metadata\.azure\.com$/i,
+];
+const isUrlSafe = (raw: string): boolean => {
+  try {
+    const u = new URL(raw);
+    if (u.protocol !== "http:" && u.protocol !== "https:") return false;
+    const host = u.hostname;
+    if (!host) return false;
+    return !BLOCKED_HOST_PATTERNS.some((p) => p.test(host));
+  } catch {
+    return false;
+  }
+};
+
 // Try every reasonable signal a dealer page might emit for a
 // price. Falls through to the regex if nothing structured wins.
 const extractPrice = (html: string): number | null => {
@@ -174,6 +197,17 @@ serve(async (req) => {
 
   for (const row of rows) {
     try {
+      if (!isUrlSafe(row.source_url)) {
+        failed++;
+        await admin.from("audit_log").insert({
+          action: "advertised_price_crawl_error",
+          entity_type: "advertised_price",
+          entity_id: row.vin,
+          store_id: row.tenant_id,
+          details: { vin: row.vin, url: row.source_url, reason: "url_blocked_ssrf_guard" },
+        }).then(() => undefined, () => undefined);
+        continue;
+      }
       const res = await fetch(row.source_url, {
         method: "GET",
         headers: {

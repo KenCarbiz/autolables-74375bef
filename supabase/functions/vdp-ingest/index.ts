@@ -45,6 +45,29 @@ const json = (status: number, body: unknown) =>
     headers: { ...corsHeaders, "Content-Type": "application/json" },
   });
 
+// SSRF guard — block private/loopback/link-local/cloud-metadata hosts.
+const BLOCKED_HOST_PATTERNS: RegExp[] = [
+  /^localhost$/i,
+  /^127\./, /^0\./, /^10\./,
+  /^169\.254\./,
+  /^192\.168\./,
+  /^172\.(1[6-9]|2\d|3[0-1])\./,
+  /^::1$/, /^fe80:/i, /^fc[0-9a-f]{2}:/i, /^fd[0-9a-f]{2}:/i,
+  /metadata\.google\.internal$/i,
+  /metadata\.azure\.com$/i,
+];
+const isUrlSafe = (raw: string): { ok: true; url: URL } | { ok: false; reason: string } => {
+  let u: URL;
+  try { u = new URL(raw); } catch { return { ok: false, reason: "invalid URL" }; }
+  if (u.protocol !== "http:" && u.protocol !== "https:") return { ok: false, reason: "unsupported protocol" };
+  const host = u.hostname;
+  if (!host) return { ok: false, reason: "missing host" };
+  for (const pat of BLOCKED_HOST_PATTERNS) {
+    if (pat.test(host)) return { ok: false, reason: `blocked host (${host})` };
+  }
+  return { ok: true, url: u };
+};
+
 interface ScrapeResult {
   photos: Array<{ url: string; alt?: string; kind?: string }>;
   description: string | null;
@@ -221,14 +244,9 @@ serve(async (req) => {
       return json(400, { error: "vehicle_id and source_url required" });
     }
 
-    let target: URL;
-    try {
-      target = new URL(body.source_url);
-    } catch {
-      return json(400, { error: "invalid source_url" });
-    }
-    if (!/^https?:$/.test(target.protocol)) {
-      return json(400, { error: "only http/https URLs allowed" });
+    const safety = isUrlSafe(body.source_url);
+    if (!safety.ok) {
+      return json(400, { error: `source_url rejected: ${safety.reason}` });
     }
 
     const admin = createClient(supabaseUrl, serviceKey);
