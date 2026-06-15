@@ -241,12 +241,8 @@ const Admin = () => {
         }
         return;
       }
-      const { data: pub } = supabase.storage.from("product-docs").getPublicUrl(path);
-      if (pub?.publicUrl) {
-        setEditing(prev => (prev ? { ...prev, contract_url: pub.publicUrl } : prev));
-      } else {
-        toast.error("Uploaded, but no public URL was returned.");
-      }
+      // Bucket is private — store the object path; resolve to a signed URL on view.
+      setEditing(prev => (prev ? { ...prev, contract_url: path } : prev));
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Upload failed.");
     } finally {
