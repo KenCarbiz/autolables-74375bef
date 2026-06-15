@@ -82,7 +82,7 @@ const StateRewriterPanel = ({
             {pack.blocks.map((b) => (
               <div key={b.id} className="px-4 py-3">
                 <div className="flex items-center gap-2 mb-1">
-                  <CheckCircle2 className="w-3.5 h-3.5 text-blue-600 flex-shrink-0" />
+                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 flex-shrink-0" />
                   <p className="text-body-sm font-semibold text-foreground">
                     {b.title}
                     {b.language === "es" && (
