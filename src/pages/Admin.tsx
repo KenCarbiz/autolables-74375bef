@@ -1159,18 +1159,21 @@ const Admin = () => {
                         const f = e.target.files?.[0];
                         if (!f) return;
                         setLogoUploading(true);
-                        const result = await uploadPhoto("dealer-logos", f, {
-                          tenantId: tenant?.id,
-                          storeId: currentStore?.id,
-                          vin: "brand-logo",
-                        });
-                        setLogoUploading(false);
-                        e.target.value = "";
-                        if (result?.url) {
-                          setBranding({ ...branding, dealer_logo_url: result.url });
-                          toast.success("Logo uploaded");
-                        } else {
-                          toast.error("Upload failed");
+                        try {
+                          const result = await uploadPhoto("dealer-logos", f, {
+                            tenantId: tenant?.id,
+                            storeId: currentStore?.id,
+                            vin: "brand-logo",
+                          });
+                          if (result?.url) {
+                            setBranding({ ...branding, dealer_logo_url: result.url });
+                            toast.success("Logo uploaded");
+                          }
+                        } catch (err) {
+                          toast.error(`Upload failed: ${err instanceof Error ? err.message : "unknown error"}`);
+                        } finally {
+                          setLogoUploading(false);
+                          e.target.value = "";
                         }
                       }}
                     />

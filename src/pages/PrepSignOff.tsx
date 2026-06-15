@@ -402,11 +402,17 @@ const PrepSignOff = () => {
                     }));
                     e.currentTarget.value = "";
                     for (let i = 0; i < files.length; i++) {
-                      const uploaded = await uploadPhoto("prep-photos", files[i], {
-                        tenantId: tenant?.id,
-                        storeId,
-                        vin: newForm.vin,
-                      });
+                      let uploaded: Awaited<ReturnType<typeof uploadPhoto>> = null;
+                      let uploadError = "Upload failed";
+                      try {
+                        uploaded = await uploadPhoto("prep-photos", files[i], {
+                          tenantId: tenant?.id,
+                          storeId,
+                          vin: newForm.vin,
+                        });
+                      } catch (err) {
+                        uploadError = err instanceof Error ? err.message : uploadError;
+                      }
                       setNewForm(prev => ({
                         ...prev,
                         install_photos: prev.install_photos.map(ph =>
@@ -417,7 +423,7 @@ const PrepSignOff = () => {
                             : ph
                         ),
                       }));
-                      if (!uploaded) toast.error(`Upload failed for ${files[i].name}`);
+                      if (!uploaded) toast.error(`Upload failed for ${files[i].name}: ${uploadError}`);
                     }
                   }}
                   className="block w-full text-sm text-muted-foreground file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:bg-blue-50 file:text-blue-700"
