@@ -3,6 +3,8 @@ import { useAuth } from "@/contexts/AuthContext";
 import { uploadPhoto } from "@/lib/storage";
 import { useDealerSettings, DealerSettings, DEFAULT_SETTINGS } from "@/contexts/DealerSettingsContext";
 import { useProductRules, ProductRule } from "@/hooks/useProductRules";
+import type { ProductUpgrade } from "@/hooks/useProducts";
+import type { Json } from "@/integrations/supabase/types";
 import { useAudit } from "@/contexts/AuditContext";
 import { useTenant } from "@/contexts/TenantContext";
 import { supabase } from "@/integrations/supabase/client";
@@ -77,6 +79,8 @@ interface Product {
   benefit_justification_optional: string | null;
   disclosure_optional: string | null;
   price_in_advertised: boolean;
+  available_preinstalled: boolean;
+  upgrade: ProductUpgrade | null;
   icon_type?: string;
 }
 
@@ -96,7 +100,18 @@ const emptyProduct = {
   benefit_justification_optional: "",
   disclosure_optional: "",
   price_in_advertised: true,
+  available_preinstalled: true,
+  upgrade: null as ProductUpgrade | null,
   icon_type: "",
+};
+
+const EMPTY_UPGRADE: ProductUpgrade = {
+  name: "",
+  price: 0,
+  disclosure: "",
+  benefit_justification: "",
+  disclosure_optional: "",
+  benefit_justification_optional: "",
 };
 
 const emptyRule: Omit<ProductRule, "id"> = {
@@ -255,6 +270,8 @@ const Admin = () => {
       // Default included-in-advertised so an accessory is never
       // silently charged above the advertised price.
       price_in_advertised: editing.price_in_advertised ?? true,
+      available_preinstalled: editing.available_preinstalled ?? true,
+      upgrade: ((editing.upgrade && editing.upgrade.name?.trim()) ? editing.upgrade : null) as unknown as Json,
     };
 
     if (editing.id) {
@@ -2029,6 +2046,26 @@ const Admin = () => {
               <div className="space-y-3">
                 <label className="text-xs font-semibold text-muted-foreground">Descriptions by how it's sold</label>
 
+                <label className="flex items-start gap-2 cursor-pointer rounded-lg border border-border-custom p-2.5">
+                  <input
+                    type="checkbox"
+                    className="mt-0.5"
+                    checked={!(editing.available_preinstalled ?? true)}
+                    onChange={(e) =>
+                      setEditing({
+                        ...editing,
+                        available_preinstalled: !e.target.checked,
+                        ...(e.target.checked ? { badge_type: "optional", price_label: "If Accepted" } : {}),
+                      })
+                    }
+                  />
+                  <span>
+                    <span className="text-[11px] font-semibold text-foreground">Not available for pre-install</span>
+                    <span className="block text-[10px] text-muted-foreground mt-0.5 leading-relaxed">On — sold only as a customer choice, never pre-installed. The pre-installed description is hidden and the addendum keeps this line optional.</span>
+                  </span>
+                </label>
+
+                {(editing.available_preinstalled ?? true) && (
                 <div className={`rounded-lg border p-3 space-y-2.5 ${((editing.badge_type || "installed") === "installed") ? "border-teal/50 bg-teal/5" : "border-border-custom"}`}>
                   <div className="flex items-center justify-between">
                     <span className="text-xs font-bold text-foreground">
@@ -2059,6 +2096,7 @@ const Admin = () => {
                     </span>
                   </label>
                 </div>
+                )}
 
                 <div className={`rounded-lg border p-3 space-y-2.5 ${!((editing.badge_type || "installed") === "installed") ? "border-teal/50 bg-teal/5" : "border-border-custom"}`}>
                   <div className="flex items-center justify-between">
@@ -2087,6 +2125,62 @@ const Admin = () => {
                 <p className="text-[10px] text-muted-foreground leading-relaxed">
                   Both sets are stored. The addendum shows the set matching how the line is sold on each deal (optional falls back to the pre-installed text when blank). Required benefit answers FTC §5 / CA SB 766 §11713.21.
                 </p>
+
+                {/* Upgrade tier — optional higher level (e.g. Standard ->
+                    Platinum). When applied on an addendum line it swaps the
+                    line to this package price + descriptions. */}
+                <label className="flex items-start gap-2 cursor-pointer rounded-lg border border-border-custom p-2.5">
+                  <input
+                    type="checkbox"
+                    className="mt-0.5"
+                    checked={!!editing.upgrade}
+                    onChange={(e) => setEditing({ ...editing, upgrade: e.target.checked ? (editing.upgrade ?? EMPTY_UPGRADE) : null })}
+                  />
+                  <span>
+                    <span className="text-[11px] font-semibold text-foreground">This product has an upgrade tier</span>
+                    <span className="block text-[10px] text-muted-foreground mt-0.5 leading-relaxed">A higher level (e.g. Platinum that includes Standard). On the addendum the dealer can apply it to a line — the line swaps to this package price, disclosure, and benefit.</span>
+                  </span>
+                </label>
+
+                {editing.upgrade && (
+                  <div className="rounded-lg border border-gold/50 bg-gold/5 p-3 space-y-2.5">
+                    <span className="text-xs font-bold text-foreground">Upgrade tier</span>
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <label className="text-[10px] font-semibold text-muted-foreground">Upgrade name</label>
+                        <input value={editing.upgrade.name} onChange={(e) => setEditing({ ...editing, upgrade: { ...(editing.upgrade ?? EMPTY_UPGRADE), name: e.target.value } })} className="w-full px-3 py-2 border border-border-custom rounded text-sm" placeholder="Platinum Protection" />
+                      </div>
+                      <div>
+                        <label className="text-[10px] font-semibold text-muted-foreground">Package price ($)</label>
+                        <input type="number" step="0.01" value={editing.upgrade.price} onChange={(e) => setEditing({ ...editing, upgrade: { ...(editing.upgrade ?? EMPTY_UPGRADE), price: parseFloat(e.target.value) || 0 } })} className="w-full px-3 py-2 border border-border-custom rounded text-sm" />
+                      </div>
+                    </div>
+                    {(editing.available_preinstalled ?? true) && (
+                      <div className="rounded-lg border border-border-custom p-3 space-y-2.5">
+                        <span className="text-[11px] font-bold text-foreground">Pre-installed <span className="font-normal text-muted-foreground">(upgrade)</span></span>
+                        <div>
+                          <label className="text-[10px] font-semibold text-muted-foreground">Disclosure</label>
+                          <textarea value={editing.upgrade.disclosure} onChange={(e) => setEditing({ ...editing, upgrade: { ...(editing.upgrade ?? EMPTY_UPGRADE), disclosure: e.target.value } })} className="w-full px-3 py-2 border border-border-custom rounded text-sm" rows={2} placeholder="Upgrade pre-installed disclosure…" />
+                        </div>
+                        <div>
+                          <label className="text-[10px] font-semibold text-muted-foreground">Benefit justification</label>
+                          <textarea value={editing.upgrade.benefit_justification} onChange={(e) => setEditing({ ...editing, upgrade: { ...(editing.upgrade ?? EMPTY_UPGRADE), benefit_justification: e.target.value } })} className="w-full px-3 py-2 border border-border-custom rounded text-sm" rows={2} placeholder="Includes Standard, plus… (why the upgrade benefits the buyer)" />
+                        </div>
+                      </div>
+                    )}
+                    <div className="rounded-lg border border-border-custom p-3 space-y-2.5">
+                      <span className="text-[11px] font-bold text-foreground">Optional <span className="font-normal text-muted-foreground">(upgrade)</span></span>
+                      <div>
+                        <label className="text-[10px] font-semibold text-muted-foreground">Disclosure</label>
+                        <textarea value={editing.upgrade.disclosure_optional} onChange={(e) => setEditing({ ...editing, upgrade: { ...(editing.upgrade ?? EMPTY_UPGRADE), disclosure_optional: e.target.value } })} className="w-full px-3 py-2 border border-border-custom rounded text-sm" rows={2} placeholder="Upgrade optional disclosure…" />
+                      </div>
+                      <div>
+                        <label className="text-[10px] font-semibold text-muted-foreground">Benefit justification</label>
+                        <textarea value={editing.upgrade.benefit_justification_optional} onChange={(e) => setEditing({ ...editing, upgrade: { ...(editing.upgrade ?? EMPTY_UPGRADE), benefit_justification_optional: e.target.value } })} className="w-full px-3 py-2 border border-border-custom rounded text-sm" rows={2} placeholder="Includes Standard, plus… (why the upgrade benefits the buyer)" />
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
               <div className="flex items-center gap-2">
                 <input type="checkbox" checked={editing.is_active ?? true} onChange={(e) => setEditing({ ...editing, is_active: e.target.checked })} />

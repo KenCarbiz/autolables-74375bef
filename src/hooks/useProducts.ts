@@ -1,6 +1,18 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 
+// An optional higher tier for multi-level products (e.g. Door Edge Guard
+// Standard -> Platinum). Applying it on an addendum line swaps the line to
+// this tier's package price, disclosure, and benefit (per disposition).
+export interface ProductUpgrade {
+  name: string;
+  price: number;
+  disclosure: string;
+  benefit_justification: string;
+  disclosure_optional: string;
+  benefit_justification_optional: string;
+}
+
 export interface Product {
   id: string;
   name: string;
@@ -29,6 +41,10 @@ export interface Product {
   // text when blank).
   disclosure_optional: string | null;
   benefit_justification_optional: string | null;
+  // False = sold only as a customer-elected option, never pre-installed.
+  available_preinstalled: boolean;
+  // Optional higher tier for multi-level products (null when none).
+  upgrade: ProductUpgrade | null;
 }
 
 export const useProducts = () => {
@@ -41,7 +57,9 @@ export const useProducts = () => {
         .eq("is_active", true)
         .order("sort_order");
       if (error) throw error;
-      return data as Product[];
+      // `upgrade` is jsonb in the DB (Json); cast through unknown so the
+      // typed ProductUpgrade shape lands on the client.
+      return data as unknown as Product[];
     },
   });
 };
