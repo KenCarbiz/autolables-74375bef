@@ -60,6 +60,12 @@ export interface Product {
 export const useProducts = () => {
   return useQuery({
     queryKey: ["products"],
+    // Always refetch on mount + window focus so the addendum can never run
+    // its compliance checks against a stale product list (e.g. after the
+    // dealer just edited benefit text in the Products tab).
+    staleTime: 0,
+    refetchOnMount: "always",
+    refetchOnWindowFocus: true,
     queryFn: async () => {
       const { data, error } = await supabase
         .from("products")

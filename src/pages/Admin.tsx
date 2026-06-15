@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/contexts/AuthContext";
 import { uploadPhoto } from "@/lib/storage";
 import { Switch } from "@/components/ui/switch";
@@ -168,6 +169,7 @@ const FEATURE_TOGGLES: { key: keyof DealerSettings; label: string; description: 
 const VALID_TABS: AdminTab[] = ["home", "products", "rules", "settings", "branding", "analytics", "leads", "funnel", "audit", "queue", "files", "getready", "inventory", "invoices", "warranty"];
 
 const Admin = () => {
+  const queryClient = useQueryClient();
   const { user, isAdmin, loading, signOut } = useAuth();
   const { settings, updateSettings } = useDealerSettings();
   const { rules, addRule, updateRule, deleteRule } = useProductRules();
@@ -360,6 +362,9 @@ const Admin = () => {
     }
     setEditing(null);
     fetchProducts();
+    // Refresh the shared products query the addendum/sticker builders read,
+    // so a just-saved benefit/price is reflected without a hard refresh.
+    queryClient.invalidateQueries({ queryKey: ["products"] });
   };
 
   const handleDeleteProduct = async (id: string) => {
@@ -367,6 +372,7 @@ const Admin = () => {
     await supabase.from("products").delete().eq("id", id);
     toast.success("Product deleted");
     fetchProducts();
+    queryClient.invalidateQueries({ queryKey: ["products"] });
   };
 
   const handleSaveRule = () => {
@@ -859,6 +865,7 @@ const Admin = () => {
                   if (error) { toast.error(error.message); return; }
                   toast.success(`${p.name} marked as ${next}`);
                   fetchProducts();
+                  queryClient.invalidateQueries({ queryKey: ["products"] });
                 };
                 return (
                   <div
