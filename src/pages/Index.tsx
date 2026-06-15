@@ -180,6 +180,8 @@ const Index = () => {
           sort_order: p.sort_order ?? i,
           is_active: true,
           benefit_justification: (p as { benefit_justification?: string }).benefit_justification ?? "",
+          benefit_justification_optional: (p as { benefit_justification_optional?: string | null }).benefit_justification_optional ?? null,
+          disclosure_optional: (p as { disclosure_optional?: string | null }).disclosure_optional ?? null,
           price_in_advertised: (p as { price_in_advertised?: boolean }).price_in_advertised ?? true,
         })));
       }
