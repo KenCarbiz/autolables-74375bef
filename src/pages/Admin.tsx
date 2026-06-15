@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { uploadPhoto } from "@/lib/storage";
 import { Switch } from "@/components/ui/switch";
+import { PRICE_BUCKETS } from "@/types/product";
 import { useDealerSettings, DealerSettings, DEFAULT_SETTINGS } from "@/contexts/DealerSettingsContext";
 import { useProductRules, ProductRule } from "@/hooks/useProductRules";
 import type { ProductUpgrade } from "@/hooks/useProducts";
@@ -84,6 +85,7 @@ interface Product {
   upgrade: ProductUpgrade | null;
   contract_url: string | null;
   contract_doc_type: string | null;
+  price_tiers: Record<string, number> | null;
   icon_type?: string;
 }
 
@@ -107,6 +109,7 @@ const emptyProduct = {
   upgrade: null as ProductUpgrade | null,
   contract_url: null as string | null,
   contract_doc_type: "contract",
+  price_tiers: null as Record<string, number> | null,
   icon_type: "",
 };
 
@@ -325,6 +328,7 @@ const Admin = () => {
       upgrade: ((editing.upgrade && editing.upgrade.name?.trim()) ? editing.upgrade : null) as unknown as Json,
       contract_url: editing.contract_url || null,
       contract_doc_type: editing.contract_doc_type || null,
+      price_tiers: (editing.price_tiers && Object.keys(editing.price_tiers).length ? editing.price_tiers : null) as unknown as Json,
     };
 
     if (editing.id) {
@@ -2062,6 +2066,34 @@ const Admin = () => {
                 <div>
                   <label className="text-xs font-semibold text-muted-foreground">Sort Order</label>
                   <input type="number" value={editing.sort_order || 0} onChange={(e) => setEditing({ ...editing, sort_order: parseInt(e.target.value) || 0 })} className="w-full px-3 py-2 border border-border-custom rounded text-sm" />
+                </div>
+              </div>
+              {/* Vehicle-category pricing — optional per-size prices. Blank
+                  buckets fall back to the base Price above; the addendum
+                  auto-picks the bucket from the vehicle's decoded body class. */}
+              <div className="rounded-md border border-border-custom p-3 space-y-2">
+                <p className="text-xs font-semibold text-foreground">Vehicle-category pricing <span className="font-normal text-muted-foreground">(optional)</span></p>
+                <p className="text-[11px] text-muted-foreground">Set a price per vehicle size. Blank uses the base Price above. The addendum picks the right one from the vehicle body class.</p>
+                <div className="grid grid-cols-2 gap-2">
+                  {PRICE_BUCKETS.map((b) => (
+                    <div key={b.id}>
+                      <label className="text-[11px] font-medium text-muted-foreground">{b.label}</label>
+                      <input
+                        type="number"
+                        step="0.01"
+                        value={editing.price_tiers?.[b.id] ?? ""}
+                        placeholder={`Base $${Number(editing.price) || 0}`}
+                        onChange={(e) => {
+                          const next = { ...(editing.price_tiers || {}) };
+                          const v = parseFloat(e.target.value);
+                          if (!e.target.value || isNaN(v) || v <= 0) delete next[b.id];
+                          else next[b.id] = v;
+                          setEditing({ ...editing, price_tiers: Object.keys(next).length ? next : null });
+                        }}
+                        className="w-full px-2 py-1.5 border border-border-custom rounded text-sm"
+                      />
+                    </div>
+                  ))}
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-3">

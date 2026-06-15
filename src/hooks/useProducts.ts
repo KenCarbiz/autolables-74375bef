@@ -50,6 +50,11 @@ export interface Product {
   // which kind was attached ('contract' | 'warranty').
   contract_url: string | null;
   contract_doc_type: string | null;
+  // Optional vehicle-category pricing. Map of pricing bucket
+  // ("car" | "suv" | "truck" | "van") to price. When the addendum's
+  // vehicle matches a bucket with a positive price, that price overrides
+  // the base `price`; otherwise the base price is used.
+  price_tiers: Record<string, number> | null;
 }
 
 export const useProducts = () => {

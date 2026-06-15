@@ -3,6 +3,7 @@ import { useProducts, Product, type ProductUpgrade } from "@/hooks/useProducts";
 import { useAuth } from "@/contexts/AuthContext";
 import { useDealerSettings } from "@/contexts/DealerSettingsContext";
 import { useProductRules, VehicleContext } from "@/hooks/useProductRules";
+import { bucketForVehicle, resolveTierPrice } from "@/types/product";
 import { supabase } from "@/integrations/supabase/client";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
@@ -190,6 +191,7 @@ const Index = () => {
           upgrade: (p as { upgrade?: ProductUpgrade | null }).upgrade ?? null,
           contract_url: (p as { contract_url?: string | null }).contract_url ?? null,
           contract_doc_type: (p as { contract_doc_type?: string | null }).contract_doc_type ?? null,
+          price_tiers: (p as { price_tiers?: Record<string, number> | null }).price_tiers ?? null,
         })));
       }
     };
@@ -216,6 +218,7 @@ const Index = () => {
         disclosure_optional?: string | null;
         available_preinstalled?: boolean;
         upgrade?: ProductUpgrade | null;
+        price_tiers?: Record<string, number> | null;
       };
       // Effective disposition: per-vehicle override > admin default mode >
       // catalog type. A product that can't be pre-installed is always
@@ -257,7 +260,12 @@ const Index = () => {
       const disclosure = upgradeDisclosure || dispoDisclosure;
 
       const name = upgradeApplied && up && (up.name || "").trim() ? `${p.name} — ${up.name}` : p.name;
-      const price = upgradeApplied && up ? up.price : p.price;
+      // Resolve the base price from the vehicle-category tier (when set for
+      // this body class), else the catalog base price. Upgrade keeps its
+      // own flat price.
+      const tierPrice = resolveTierPrice(pr.price_tiers, bucketForVehicle(vehicleContext.bodyStyle, vehicleContext.model));
+      const basePrice = tierPrice ?? p.price;
+      const price = upgradeApplied && up ? up.price : basePrice;
 
       // Keep the catalog price label in "selective" mode; apply the
       // standard label when an override / default mode / non-preinstall
@@ -273,7 +281,7 @@ const Index = () => {
 
       return { ...p, name, price, badge_type: badge, price_label, benefit_justification: effectiveBenefit, disclosure };
     });
-  }, [ruledProducts, typeOverrides, benefitOverrides, upgradeSelections, settings.product_default_mode]);
+  }, [ruledProducts, typeOverrides, benefitOverrides, upgradeSelections, settings.product_default_mode, vehicleContext.bodyStyle, vehicleContext.model]);
 
   const installed = displayProducts.filter((p) => p.badge_type === "installed");
   const optional = displayProducts.filter((p) => p.badge_type === "optional");

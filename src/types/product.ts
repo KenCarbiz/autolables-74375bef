@@ -147,6 +147,50 @@ export function getProductPrice(product: ProductLibraryEntry, vehicleCategory: V
   return product.defaultPrice;
 }
 
+// ──────────────────────────────────────────────────────────────
+// Live-product vehicle-category pricing.
+//
+// The catalog Product carries an optional `price_tiers` map keyed by
+// one of these four broad buckets. Protection products (ceramic, PPF,
+// tint, etc.) are commonly priced by vehicle size, so the addendum
+// resolves the line price from the decoded body class, falling back to
+// the product's base `price` when a bucket is blank.
+// ──────────────────────────────────────────────────────────────
+export type PriceBucket = "car" | "suv" | "truck" | "van";
+
+export const PRICE_BUCKETS: { id: PriceBucket; label: string }[] = [
+  { id: "car", label: "Car / Sedan / Coupe" },
+  { id: "suv", label: "SUV / Crossover" },
+  { id: "truck", label: "Truck / Pickup" },
+  { id: "van", label: "Van / Minivan" },
+];
+
+// Collapse the fine-grained VehicleCategory into a pricing bucket.
+export function bucketForVehicle(bodyStyle: string, model?: string): PriceBucket {
+  switch (getVehicleCategory(bodyStyle, model)) {
+    case "small_suv":
+    case "large_suv":
+      return "suv";
+    case "truck":
+      return "truck";
+    case "van":
+      return "van";
+    default:
+      return "car";
+  }
+}
+
+// Resolve a product's price for a bucket from its price_tiers map.
+// Returns null when no positive tier is set so callers fall back to base.
+export function resolveTierPrice(
+  tiers: Record<string, number> | null | undefined,
+  bucket: PriceBucket
+): number | null {
+  if (!tiers) return null;
+  const v = tiers[bucket];
+  return typeof v === "number" && v > 0 ? v : null;
+}
+
 // Default product categories for organizing the library
 export const PRODUCT_CATEGORIES = [
   { id: "paint_protection", name: "Paint Protection", description: "PPF, ceramic coating, paint sealant" },

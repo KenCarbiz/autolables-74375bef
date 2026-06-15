@@ -1290,6 +1290,7 @@ export type Database = {
           price: number
           price_in_advertised: boolean
           price_label: string | null
+          price_tiers: Json | null
           sort_order: number
           subtitle: string | null
           updated_at: string
@@ -1312,6 +1313,7 @@ export type Database = {
           price?: number
           price_in_advertised?: boolean
           price_label?: string | null
+          price_tiers?: Json | null
           sort_order?: number
           subtitle?: string | null
           updated_at?: string
@@ -1334,6 +1336,7 @@ export type Database = {
           price?: number
           price_in_advertised?: boolean
           price_label?: string | null
+          price_tiers?: Json | null
           sort_order?: number
           subtitle?: string | null
           updated_at?: string
