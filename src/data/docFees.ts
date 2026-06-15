@@ -79,7 +79,7 @@ export const getDocFeeDisclosure = (stateCode: string, amount: number): string =
   const label = getDocFeeTerminology(stateCode);
   const lower = label.toLowerCase();
   if (stateCode.toUpperCase() === "CT") {
-    return `${label}: A ${lower} of $${amount.toFixed(2)} is charged for processing documents related to the sale of this vehicle. This ${lower} is negotiable and is not payable to the State of Connecticut. You may elect to submit certain Department of Motor Vehicles paperwork yourself, in which case the ${lower} will be reduced proportionally.`;
+    return `Dealer Conveyance / Processing Fee: $${amount.toFixed(2)}. This fee is negotiable. The "dealer conveyance fee" or "dealer processing fee" means a fee charged by a dealer to recover reasonable costs for processing all documentation and performing services related to the closing of a sale, including but not limited to the registration and transfer of ownership of the motor vehicle which is the subject of the sale. This fee is not payable to the State of Connecticut. When the buyer elects, where appropriate, to submit the documentation for registration and transfer of ownership to the Commissioner of Motor Vehicles, the dealer conveyance/processing fee shall be reduced by the portion attributable to those services.`;
   }
   return `${label}: A ${lower} of $${amount.toFixed(2)} is charged to cover the cost of processing documents related to the sale of this vehicle. This ${lower} is a charge by the dealer and is not a tax or government fee.`;
 };
