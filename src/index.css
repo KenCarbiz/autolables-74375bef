@@ -438,17 +438,31 @@
 }
 
 @media print {
+  html,
   body {
     background: none !important;
     padding: 0 !important;
+    margin: 0 !important;
   }
   .no-print {
     display: none !important;
   }
+  /* Print backgrounds + brand colors (blue header, badges) instead of
+     dropping them to white. */
+  * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
   .addendum-card {
     width: 100% !important;
+    max-width: 100% !important;
+    margin: 0 !important;
     box-shadow: none !important;
     border: 1px solid #999 !important;
+    border-radius: 0 !important;
+    /* overflow:hidden on screen would clip the card at the first page
+       boundary; let it flow across pages when printing. */
+    overflow: visible !important;
   }
   @page {
     margin: 0.3in;

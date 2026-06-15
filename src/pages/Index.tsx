@@ -328,10 +328,25 @@ const Index = () => {
       const { archivePdf, persistArchivedPdf } = await import("@/lib/pdfArchive");
       const canvas = await html2canvas(card, { scale: 2, useCORS: true });
       const imgData = canvas.toDataURL("image/jpeg", 0.95);
+      // Paginate the tall capture across standard 8.5x11 letter sheets.
+      // The previous single oversized page (format [width, fullHeight])
+      // forced printers to scale the whole addendum onto one sheet,
+      // which made the signing copy print tiny and distorted. Slicing it
+      // into letter pages keeps every page at readable, true scale.
       const pdfWidth = 8.5;
-      const pdfHeight = (canvas.height / canvas.width) * pdfWidth;
-      const pdf = new jsPDF({ unit: "in", format: [pdfWidth, pdfHeight], orientation: "portrait" });
-      pdf.addImage(imgData, "JPEG", 0, 0, pdfWidth, pdfHeight);
+      const pageHeight = 11;
+      const imgHeight = (canvas.height / canvas.width) * pdfWidth;
+      const pdf = new jsPDF({ unit: "in", format: "letter", orientation: "portrait" });
+      let heightLeft = imgHeight;
+      let position = 0;
+      pdf.addImage(imgData, "JPEG", 0, position, pdfWidth, imgHeight);
+      heightLeft -= pageHeight;
+      while (heightLeft > 0) {
+        position -= pageHeight;
+        pdf.addPage();
+        pdf.addImage(imgData, "JPEG", 0, position, pdfWidth, imgHeight);
+        heightLeft -= pageHeight;
+      }
 
       // Wave 4.5 — PDF/A-3 archival metadata: stamp the PDF with a
       // canonical-JSON SHA-256, deterministic /ID, XMP metadata, and
