@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useMemo } from "react";
-import { useProducts, Product } from "@/hooks/useProducts";
+import { useProducts, Product, type ProductUpgrade } from "@/hooks/useProducts";
 import { useAuth } from "@/contexts/AuthContext";
 import { useDealerSettings } from "@/contexts/DealerSettingsContext";
 import { useProductRules, VehicleContext } from "@/hooks/useProductRules";
@@ -82,6 +82,9 @@ const Index = () => {
 
   // Product type overrides — employee can toggle installed <-> optional at signing time
   const [typeOverrides, setTypeOverrides] = useState<Record<string, "installed" | "optional">>({});
+  // Per-line upgrade-tier selection (multi-level products). When true the
+  // line swaps to the product's upgrade package price + descriptions.
+  const [upgradeSelections, setUpgradeSelections] = useState<Record<string, boolean>>({});
   // Wave 16 v2 — per-addendum benefit-justification override.
   // Seeded from the catalog at displayProducts build time; the
   // dealer can edit per vehicle in the no-print editor under
@@ -183,6 +186,10 @@ const Index = () => {
           benefit_justification_optional: (p as { benefit_justification_optional?: string | null }).benefit_justification_optional ?? null,
           disclosure_optional: (p as { disclosure_optional?: string | null }).disclosure_optional ?? null,
           price_in_advertised: (p as { price_in_advertised?: boolean }).price_in_advertised ?? true,
+          available_preinstalled: (p as { available_preinstalled?: boolean }).available_preinstalled ?? true,
+          upgrade: (p as { upgrade?: ProductUpgrade | null }).upgrade ?? null,
+          contract_url: (p as { contract_url?: string | null }).contract_url ?? null,
+          contract_doc_type: (p as { contract_doc_type?: string | null }).contract_doc_type ?? null,
         })));
       }
     };
@@ -195,9 +202,10 @@ const Index = () => {
     ? getMatchingProducts(vehicleContext, baseProducts || [])
     : baseProducts;
 
-  // Apply product_default_mode from admin settings, then per-product
-  // overrides, then pick the disposition-correct disclosure + benefit
-  // (pre-installed vs customer-elected optional).
+  // Apply product_default_mode + per-product overrides, then pick the
+  // disposition-correct disclosure + benefit (pre-installed vs optional),
+  // forcing optional for non-preinstallable products and swapping to the
+  // upgrade tier when the line has the upgrade applied.
   const displayProducts = useMemo(() => {
     if (!ruledProducts) return [];
     return ruledProducts.map(p => {
@@ -206,43 +214,66 @@ const Index = () => {
         benefit_justification_optional?: string | null;
         disclosure?: string | null;
         disclosure_optional?: string | null;
+        available_preinstalled?: boolean;
+        upgrade?: ProductUpgrade | null;
       };
       // Effective disposition: per-vehicle override > admin default mode >
-      // the product's catalog type.
-      const badge =
+      // catalog type. A product that can't be pre-installed is always
+      // optional, no matter the override or mode.
+      let badge =
         typeOverrides[p.id] ||
         (settings.product_default_mode === "all_installed"
           ? "installed"
           : settings.product_default_mode === "all_optional"
             ? "optional"
             : p.badge_type);
+      if (pr.available_preinstalled === false) badge = "optional";
       const isOptional = badge === "optional";
 
-      // Disposition-correct copy. The optional set falls back to the
-      // pre-installed text when blank, so existing products keep working.
-      // A per-vehicle benefit override still wins (Wave 16 v2).
+      const up = pr.upgrade;
+      const upgradeApplied = !!upgradeSelections[p.id] && !!up;
+
+      // Disposition-correct copy, upgraded when the line has the upgrade
+      // on. Optional falls back to the pre-installed text when blank; a
+      // per-vehicle benefit override still wins (Wave 16 v2).
       const dispoBenefit = isOptional
         ? ((pr.benefit_justification_optional || "").trim() || pr.benefit_justification || "")
         : (pr.benefit_justification || "");
+      const upgradeBenefit = upgradeApplied && up
+        ? (isOptional
+            ? ((up.benefit_justification_optional || "").trim() || up.benefit_justification || "")
+            : (up.benefit_justification || ""))
+        : "";
+      const baseBenefit = upgradeBenefit || dispoBenefit;
       const effectiveBenefit =
-        benefitOverrides[p.id] !== undefined ? benefitOverrides[p.id] : dispoBenefit;
-      const disclosure = isOptional
+        benefitOverrides[p.id] !== undefined ? benefitOverrides[p.id] : baseBenefit;
+
+      const dispoDisclosure = isOptional
         ? ((pr.disclosure_optional || "").trim() || pr.disclosure || "")
         : (pr.disclosure || "");
+      const upgradeDisclosure = upgradeApplied && up
+        ? (isOptional ? ((up.disclosure_optional || "").trim() || up.disclosure || "") : (up.disclosure || ""))
+        : "";
+      const disclosure = upgradeDisclosure || dispoDisclosure;
+
+      const name = upgradeApplied && up && (up.name || "").trim() ? `${p.name} — ${up.name}` : p.name;
+      const price = upgradeApplied && up ? up.price : p.price;
 
       // Keep the catalog price label in "selective" mode; apply the
-      // standard label only when an override or default mode changed type.
+      // standard label when an override / default mode / non-preinstall
+      // changed the type.
       const typeChanged =
         !!typeOverrides[p.id] ||
+        pr.available_preinstalled === false ||
         settings.product_default_mode === "all_installed" ||
         settings.product_default_mode === "all_optional";
       const price_label = typeChanged
         ? (isOptional ? "If Accepted" : "Included in Selling Price")
         : (p.price_label ?? (isOptional ? "If Accepted" : "Included in Selling Price"));
 
-      return { ...p, badge_type: badge, price_label, benefit_justification: effectiveBenefit, disclosure };
+      return { ...p, name, price, badge_type: badge, price_label, benefit_justification: effectiveBenefit, disclosure };
     });
-  }, [ruledProducts, typeOverrides, benefitOverrides, settings.product_default_mode]);
+  }, [ruledProducts, typeOverrides, benefitOverrides, upgradeSelections, settings.product_default_mode]);
 
   const installed = displayProducts.filter((p) => p.badge_type === "installed");
   const optional = displayProducts.filter((p) => p.badge_type === "optional");
@@ -268,6 +299,10 @@ const Index = () => {
         return next;
       });
     }
+  };
+
+  const handleToggleUpgrade = (productId: string) => {
+    setUpgradeSelections(prev => ({ ...prev, [productId]: !prev[productId] }));
   };
 
   const handleVinDecoded = (result: { year: string; make: string; model: string; trim: string; bodyStyle: string }) => {
@@ -812,19 +847,37 @@ const Index = () => {
           {/* Products with inline type override toggle */}
           {displayProducts?.map((p, i) => (
             <div key={p.id} className="flex items-start gap-0">
-              {settings.allow_type_override_at_signing && !viewMode && (
-                <button
-                  onClick={() => handleToggleProductType(p.id)}
-                  className="no-print w-14 shrink-0 mt-2 flex flex-col items-center gap-0.5"
-                  title={`Click to switch to ${p.badge_type === "installed" ? "optional" : "installed"}`}
-                >
-                  <div className={`relative w-8 h-4 rounded-full transition-colors ${p.badge_type === "installed" ? "bg-navy" : "bg-gold"}`}>
-                    <div className={`absolute top-0.5 w-3 h-3 rounded-full bg-card shadow transition-transform ${p.badge_type === "installed" ? "translate-x-0.5" : "translate-x-4"}`} />
-                  </div>
-                  <span className="text-[6px] text-muted-foreground font-semibold">
-                    {p.badge_type === "installed" ? "INST" : "OPT"}
-                  </span>
-                </button>
+              {!viewMode && (settings.allow_type_override_at_signing || (p as { upgrade?: ProductUpgrade | null }).upgrade) && (
+                <div className="no-print w-14 shrink-0 mt-2 flex flex-col items-center gap-1.5">
+                  {settings.allow_type_override_at_signing && (p as { available_preinstalled?: boolean }).available_preinstalled !== false && (
+                    <button
+                      onClick={() => handleToggleProductType(p.id)}
+                      className="flex flex-col items-center gap-0.5"
+                      title={`Click to switch to ${p.badge_type === "installed" ? "optional" : "installed"}`}
+                    >
+                      <div className={`relative w-8 h-4 rounded-full transition-colors ${p.badge_type === "installed" ? "bg-navy" : "bg-gold"}`}>
+                        <div className={`absolute top-0.5 w-3 h-3 rounded-full bg-card shadow transition-transform ${p.badge_type === "installed" ? "translate-x-0.5" : "translate-x-4"}`} />
+                      </div>
+                      <span className="text-[6px] text-muted-foreground font-semibold">
+                        {p.badge_type === "installed" ? "INST" : "OPT"}
+                      </span>
+                    </button>
+                  )}
+                  {(p as { upgrade?: ProductUpgrade | null }).upgrade && (
+                    <button
+                      onClick={() => handleToggleUpgrade(p.id)}
+                      className="flex flex-col items-center gap-0.5"
+                      title={upgradeSelections[p.id] ? "Remove upgrade" : "Apply upgrade"}
+                    >
+                      <div className={`relative w-8 h-4 rounded-full transition-colors ${upgradeSelections[p.id] ? "bg-gold" : "bg-muted"}`}>
+                        <div className={`absolute top-0.5 w-3 h-3 rounded-full bg-card shadow transition-transform ${upgradeSelections[p.id] ? "translate-x-4" : "translate-x-0.5"}`} />
+                      </div>
+                      <span className="text-[6px] text-muted-foreground font-semibold">
+                        {upgradeSelections[p.id] ? "UPGR" : "BASE"}
+                      </span>
+                    </button>
+                  )}
+                </div>
               )}
               <div className="flex-1 min-w-0">
                 <ProductRow

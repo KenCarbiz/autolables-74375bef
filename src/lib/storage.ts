@@ -7,7 +7,7 @@ import { supabase } from "@/integrations/supabase/client";
 // the caller can store it in a JSONB column.
 // ──────────────────────────────────────────────────────────────
 
-export type PhotoBucket = "prep-photos" | "listing-photos" | "dealer-logos";
+export type PhotoBucket = "prep-photos" | "listing-photos" | "dealer-logos" | "product-docs";
 
 export interface UploadedPhoto {
   url: string;       // public URL
