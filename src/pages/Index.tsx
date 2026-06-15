@@ -207,6 +207,12 @@ const Index = () => {
   // them as concrete bullet points so the dealer SEES the moat
   // they're paying for, not just a "link created" toast.
   const [complianceReceipt, setComplianceReceipt] = useState<{ label: string; cite?: string }[]>([]);
+  // Phase 2 lifecycle — set when "Ready for Signatures" locks + versions the
+  // addendum, so the delivery modal can show the version/Deal ID and emit
+  // per-channel `link_sent` events to the addendum timeline.
+  const [readyDealId, setReadyDealId] = useState("");
+  const [readyToken, setReadyToken] = useState("");
+  const [versionLabel, setVersionLabel] = useState("");
 
   // Statutory doc-fee disclosure for the operating state. Fed into the
   // compliance validator's stickerText so the required-verbiage check
@@ -636,11 +642,32 @@ const Index = () => {
       status: "draft" as const,
       signing_token: token,
     };
-    const { error } = await supabase.from("addendums").insert([payload as any]);
+    const { data: inserted, error } = await supabase
+      .from("addendums")
+      .insert([payload as any])
+      .select("id")
+      .single();
     setSaving(false);
     if (error) { toast.error(error.message); return; }
 
-    const url = `${window.location.origin}/sign/${token}`;
+    // Lock + version the deal: "Ready for Signatures" snapshots the line
+    // items/prices/disclosures, mints a human version label, flips
+    // lifecycle_status, and logs the ready_for_signature event. Fire-and-
+    // forget so a propagating migration never blocks link delivery.
+    const addendumId = (inserted as { id?: string } | null)?.id || "";
+    const version = `A-${new Date().toISOString().slice(0, 10).replace(/-/g, "")}-${token.slice(0, 4).toUpperCase()}`;
+    if (addendumId) {
+      (supabase as any)
+        .rpc("mark_ready_for_signature", { _addendum_id: addendumId, _version_label: version })
+        .then(() => {}, () => { /* lifecycle columns may still be propagating */ });
+    }
+    setReadyDealId(addendumId);
+    setReadyToken(token);
+    setVersionLabel(version);
+
+    // Deliver the guided customer review wizard (Pages 1-5), not the raw
+    // single-page form — the customer reviews a transaction, not a document.
+    const url = `${window.location.origin}/review/${token}`;
     setSigningUrl(url);
 
     // Build the compliance receipt — surface every gate that
@@ -674,8 +701,45 @@ const Index = () => {
     setComplianceReceipt(receipt);
 
     setQrOpen(true);
-    toast.success("Signing link created · compliance verified");
-    log({ store_id: currentStore?.id || "", user_id: user.id, action: "addendum_sent", entity_type: "addendum", entity_id: vehicle.vin, details: { ymm: vehicle.ymm, token } });
+    toast.success(`Addendum ${version} locked · ready for signatures`);
+    log({ store_id: currentStore?.id || "", user_id: user.id, action: "addendum_sent", entity_type: "addendum", entity_id: vehicle.vin, details: { ymm: vehicle.ymm, token, version } });
+  };
+
+  // Append a per-channel `link_sent` event to the addendum timeline so the
+  // dealer dashboard can show how the link went out. Fire-and-forget.
+  const emitDeliveryEvent = (channel: string) => {
+    if (!readyDealId) return;
+    (supabase as any)
+      .from("addendum_events")
+      .insert({
+        addendum_id: readyDealId,
+        signing_token: readyToken || null,
+        event: "link_sent",
+        channel,
+        actor: "dealer",
+        actor_name: user?.email || null,
+      })
+      .then(() => {}, () => { /* events table may still be propagating */ });
+  };
+
+  // Email the guided-review link via the existing send-email edge function.
+  const sendSigningEmail = async (toEmail: string) => {
+    const link = signingUrl;
+    const html = `
+      <div style="font-family:system-ui,sans-serif;max-width:480px;margin:0 auto">
+        <h2 style="font-weight:800">Review &amp; sign your addendum</h2>
+        <p>${settings.dealer_name || currentStore?.name || "Your dealership"} has prepared your
+        ${vehicle.ymm || "vehicle"} addendum for review.</p>
+        <p style="margin:24px 0">
+          <a href="${link}" style="background:#0f172a;color:#fff;padding:12px 20px;border-radius:10px;text-decoration:none;font-weight:700">Review &amp; sign</a>
+        </p>
+        <p style="font-size:12px;color:#64748b">Or open this link: ${link}</p>
+      </div>`;
+    const { error } = await supabase.functions.invoke("send-email", {
+      body: { to: [toEmail], subject: `Review & sign your addendum — ${vehicle.ymm || "your vehicle"}`, html },
+    });
+    if (error) { toast.error("Email failed to send"); return; }
+    toast.success(`Signing link emailed to ${toEmail}`);
   };
 
   const handleSave = async () => {
@@ -853,7 +917,7 @@ const Index = () => {
               className="inline-flex items-center gap-1.5 h-9 px-3 rounded-md bg-teal text-primary-foreground text-sm font-medium hover:opacity-90 transition-opacity disabled:opacity-50"
             >
               <Send className="w-3.5 h-3.5" />
-              Send to Customer
+              Ready for Signatures
             </button>
           )}
           <button
@@ -914,6 +978,11 @@ const Index = () => {
           signingUrl={signingUrl}
           onClose={() => setQrOpen(false)}
           complianceReceipt={complianceReceipt}
+          dealId={readyDealId}
+          version={versionLabel}
+          customerEmail={(customerInfo as { buyer_email?: string }).buyer_email || ""}
+          onChannel={emitDeliveryEvent}
+          onSendEmail={sendSigningEmail}
         />
       )}
 
