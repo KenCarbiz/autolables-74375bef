@@ -351,7 +351,14 @@ const Index = () => {
       // Capture at true paper size regardless of the on-screen zoom.
       const prevZoom = card.style.zoom;
       card.style.zoom = "1";
-      const canvas = await html2canvas(card, { scale: 2, useCORS: true }).finally(() => {
+      // Exclude dealer-only controls (toggles, edit textareas) from the
+      // customer PDF — they are screen-only editing aids, and html2canvas
+      // otherwise ignores @media print and would bake them into the record.
+      const canvas = await html2canvas(card, {
+        scale: 2,
+        useCORS: true,
+        ignoreElements: (el) => el.classList?.contains("no-print"),
+      }).finally(() => {
         card.style.zoom = prevZoom;
       });
       const imgData = canvas.toDataURL("image/jpeg", 0.95);
@@ -964,6 +971,19 @@ const Index = () => {
                     ) : undefined
                   }
                 />
+
+                {/* Customer-facing benefit statement — full plain text,
+                    always visible, part of the signed/printed/PDF record.
+                    No scroll box, no hidden content: a customer (and a
+                    juror) sees the entire representation at a glance. */}
+                {(p as { benefit_justification?: string }).benefit_justification?.trim() && (
+                  <div className="px-2 py-1.5 border-b border-border-custom">
+                    <p className="text-[7px] font-bold uppercase tracking-[0.1em] text-muted-foreground">Benefit Justification</p>
+                    <p className="text-[8px] text-foreground leading-snug whitespace-pre-wrap mt-0.5">
+                      {(p as { benefit_justification?: string }).benefit_justification}
+                    </p>
+                  </div>
+                )}
 
                 {/* Wave 16 v2 — per-line benefit-justification
                     editor + monthly-payment-impact widget. Lives
