@@ -230,14 +230,24 @@ export const rewriteForState = (
   // in the pack, NOT as actionable warnings — a compliant deal shouldn't
   // read as if something is wrong.
   if (rule.addOnRules.separateSignoffRequired) {
-    blocks.push(
-      `${rule.name.toUpperCase()} — PER-ITEM ADD-ON SIGN-OFF: The customer separately accepts or declines and initials each optional add-on (${rule.addOnRules.citation}).`
-    );
+    blocks.push({
+      id: `${rule.code.toLowerCase()}-addon-signoff`,
+      title: `${rule.name.toUpperCase()} — PER-ITEM ADD-ON SIGN-OFF`,
+      body: `The customer separately accepts or declines and initials each optional add-on.`,
+      citation: rule.addOnRules.citation,
+      language: "en",
+      required: true,
+    });
   }
   if (rule.addOnRules.mandatoryProhibited) {
-    blocks.push(
-      `${rule.name.toUpperCase()} — VOLUNTARY ADD-ONS: No add-on or accessory is required as a condition of sale, financing, or lease (${rule.addOnRules.citation}).`
-    );
+    blocks.push({
+      id: `${rule.code.toLowerCase()}-voluntary-addons`,
+      title: `${rule.name.toUpperCase()} — VOLUNTARY ADD-ONS`,
+      body: `No add-on or accessory is required as a condition of sale, financing, or lease.`,
+      citation: rule.addOnRules.citation,
+      language: "en",
+      required: true,
+    });
   }
 
   return {
