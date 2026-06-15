@@ -118,6 +118,7 @@ const MobileSigning = () => {
     }
     setLoading(false);
     fireFunnelEvent("signing_link_opened", openedFiredRef);
+    if (doc.status !== "signed") emitTimelineEvent("customer_opened");
   };
 
   // Fires a single tenant-scoped audit event server-side via the
@@ -140,7 +141,19 @@ const MobileSigning = () => {
 
   // Called from any onChange/onFocus in the form below. The ref
   // guards against spamming the RPC on every keystroke.
-  const markStarted = () => fireFunnelEvent("signing_link_started", startedFiredRef);
+  const markStarted = () => {
+    fireFunnelEvent("signing_link_started", startedFiredRef);
+    emitTimelineEvent("reviewing");
+  };
+
+  // Customer-side timeline event (DocuSign-style), keyed by token via a
+  // definer RPC. Best-effort; never blocks the signer.
+  const emitTimelineEvent = (event: string, details: Record<string, unknown> = {}) => {
+    if (!token) return;
+    (supabase as any)
+      .rpc("record_addendum_event", { _signing_token: token, _event: event, _channel: null, _details: details })
+      .then(() => {}, () => { /* events table may still be propagating */ });
+  };
 
   const products: ProductSnapshot[] = addendum?.products_snapshot || [];
   const installed = products.filter((p) => p.badge_type === "installed");
@@ -510,6 +523,7 @@ const MobileSigning = () => {
       contentHash,
       location: geoloc as { latitude?: number | null; longitude?: number | null } | null,
     });
+    emitTimelineEvent("customer_signed", { name: customerName });
     setSubmitted(true);
   };
 

@@ -115,6 +115,7 @@ const CustomerReview = () => {
     if (doc.status === "signed") setSubmitted(true);
     setLoading(false);
     fireFunnelEvent("signing_link_opened", openedFiredRef);
+    if (doc.status !== "signed") emitTimelineEvent("customer_opened");
   };
 
   const fireFunnelEvent = (
@@ -129,7 +130,19 @@ const CustomerReview = () => {
       _details: { ua: typeof navigator !== "undefined" ? navigator.userAgent : null, mode: "review" },
     }).catch(() => { /* best-effort telemetry */ });
   };
-  const markStarted = () => fireFunnelEvent("signing_link_started", startedFiredRef);
+  const markStarted = () => {
+    fireFunnelEvent("signing_link_started", startedFiredRef);
+    emitTimelineEvent("reviewing");
+  };
+
+  // Appends a customer-side event to the addendum timeline (DocuSign-style),
+  // keyed by the signing token via a definer RPC. Best-effort; never blocks.
+  const emitTimelineEvent = (event: string, details: Record<string, unknown> = {}) => {
+    if (!token) return;
+    (supabase as any)
+      .rpc("record_addendum_event", { _signing_token: token, _event: event, _channel: null, _details: details })
+      .then(() => {}, () => { /* events table may still be propagating */ });
+  };
 
   const products: ProductSnapshot[] = addendum?.products_snapshot || [];
   const installed = products.filter((p) => p.badge_type === "installed");
@@ -416,6 +429,7 @@ const CustomerReview = () => {
       contentHash,
       location: geoloc as { latitude?: number | null; longitude?: number | null } | null,
     });
+    emitTimelineEvent("customer_signed", { name: customerName });
     setSubmitted(true);
   };
 

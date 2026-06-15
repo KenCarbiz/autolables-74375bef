@@ -22,6 +22,7 @@ import SignaturePad from "@/components/addendum/SignaturePad";
 import AddendumFooter from "@/components/addendum/AddendumFooter";
 import QRCodeModal from "@/components/addendum/QRCodeModal";
 import LeadCaptureModal from "@/components/addendum/LeadCaptureModal";
+import AddendumStatusTimeline from "@/components/addendum/AddendumStatusTimeline";
 import VinBarcode from "@/components/addendum/VinBarcode";
 import VehicleDetailsBar from "@/components/addendum/VehicleDetailsBar";
 import CustomerInfoSection, { CustomerInfo, emptyCustomerInfo } from "@/components/addendum/CustomerInfoSection";
@@ -968,6 +969,14 @@ const Index = () => {
           </label>
         </div>
       </div>
+
+      {/* Live signing status — appears once the deal is locked for
+          signatures. DocuSign-style stepper + event timeline. */}
+      {!viewMode && readyDealId && (
+        <div className="max-w-[8.5in] mx-auto w-full mb-3">
+          <AddendumStatusTimeline addendumId={readyDealId} version={versionLabel} />
+        </div>
+      )}
 
       {/* QR / Lead Capture Modal */}
       {settings.feature_lead_capture ? (
