@@ -23,6 +23,12 @@ export interface Product {
   // again on top. False marks a dealer-installed upcharge above the
   // advertised price, which is additive and confirmed at signing.
   price_in_advertised: boolean;
+  // Optional-disposition copy. `disclosure` / `benefit_justification`
+  // are the pre-installed versions; these are used when the line is sold
+  // as a customer-elected optional add-on (fall back to the pre-installed
+  // text when blank).
+  disclosure_optional: string | null;
+  benefit_justification_optional: string | null;
 }
 
 export const useProducts = () => {

@@ -193,35 +193,52 @@ const Index = () => {
     ? getMatchingProducts(vehicleContext, baseProducts || [])
     : baseProducts;
 
-  // Apply product_default_mode from admin settings, then per-product overrides
+  // Apply product_default_mode from admin settings, then per-product
+  // overrides, then pick the disposition-correct disclosure + benefit
+  // (pre-installed vs customer-elected optional).
   const displayProducts = useMemo(() => {
     if (!ruledProducts) return [];
     return ruledProducts.map(p => {
-      // Wave 16 v2 — benefit override takes precedence over the
-      // catalog value. Undefined override = use catalog default.
-      const effectiveBenefit =
-        benefitOverrides[p.id] !== undefined
-          ? benefitOverrides[p.id]
-          : ((p as { benefit_justification?: string }).benefit_justification || "");
+      const pr = p as {
+        benefit_justification?: string;
+        benefit_justification_optional?: string | null;
+        disclosure?: string | null;
+        disclosure_optional?: string | null;
+      };
+      // Effective disposition: per-vehicle override > admin default mode >
+      // the product's catalog type.
+      const badge =
+        typeOverrides[p.id] ||
+        (settings.product_default_mode === "all_installed"
+          ? "installed"
+          : settings.product_default_mode === "all_optional"
+            ? "optional"
+            : p.badge_type);
+      const isOptional = badge === "optional";
 
-      // Check for employee type override first
-      if (typeOverrides[p.id]) {
-        const overType = typeOverrides[p.id];
-        return {
-          ...p,
-          badge_type: overType,
-          price_label: overType === "installed" ? "Included in Selling Price" : "If Accepted",
-          benefit_justification: effectiveBenefit,
-        };
-      }
-      // Apply admin default mode
-      if (settings.product_default_mode === "all_installed") {
-        return { ...p, badge_type: "installed", price_label: "Included in Selling Price", benefit_justification: effectiveBenefit };
-      }
-      if (settings.product_default_mode === "all_optional") {
-        return { ...p, badge_type: "optional", price_label: "If Accepted", benefit_justification: effectiveBenefit };
-      }
-      return { ...p, benefit_justification: effectiveBenefit }; // "selective" = use whatever's set per product
+      // Disposition-correct copy. The optional set falls back to the
+      // pre-installed text when blank, so existing products keep working.
+      // A per-vehicle benefit override still wins (Wave 16 v2).
+      const dispoBenefit = isOptional
+        ? ((pr.benefit_justification_optional || "").trim() || pr.benefit_justification || "")
+        : (pr.benefit_justification || "");
+      const effectiveBenefit =
+        benefitOverrides[p.id] !== undefined ? benefitOverrides[p.id] : dispoBenefit;
+      const disclosure = isOptional
+        ? ((pr.disclosure_optional || "").trim() || pr.disclosure || "")
+        : (pr.disclosure || "");
+
+      // Keep the catalog price label in "selective" mode; apply the
+      // standard label only when an override or default mode changed type.
+      const typeChanged =
+        !!typeOverrides[p.id] ||
+        settings.product_default_mode === "all_installed" ||
+        settings.product_default_mode === "all_optional";
+      const price_label = typeChanged
+        ? (isOptional ? "If Accepted" : "Included in Selling Price")
+        : (p.price_label ?? (isOptional ? "If Accepted" : "Included in Selling Price"));
+
+      return { ...p, badge_type: badge, price_label, benefit_justification: effectiveBenefit, disclosure };
     });
   }, [ruledProducts, typeOverrides, benefitOverrides, settings.product_default_mode]);
 

@@ -1277,8 +1277,10 @@ export type Database = {
         Row: {
           badge_type: string
           benefit_justification: string
+          benefit_justification_optional: string | null
           created_at: string
           disclosure: string | null
+          disclosure_optional: string | null
           id: string
           is_active: boolean
           name: string
@@ -1293,8 +1295,10 @@ export type Database = {
         Insert: {
           badge_type?: string
           benefit_justification?: string
+          benefit_justification_optional?: string | null
           created_at?: string
           disclosure?: string | null
+          disclosure_optional?: string | null
           id?: string
           is_active?: boolean
           name: string
@@ -1309,8 +1313,10 @@ export type Database = {
         Update: {
           badge_type?: string
           benefit_justification?: string
+          benefit_justification_optional?: string | null
           created_at?: string
           disclosure?: string | null
+          disclosure_optional?: string | null
           id?: string
           is_active?: boolean
           name?: string
