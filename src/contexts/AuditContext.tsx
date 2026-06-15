@@ -59,7 +59,10 @@ export const AuditProvider = ({ children }: { children: ReactNode }) => {
       const { data, error } = await (supabase as any)
         .from("audit_log")
         .select("id, action, entity_type, entity_id, store_id, user_id, user_email, ip_address, user_agent, content_hash, details, created_at")
-        .or(`store_id.eq.${tenantId},details->>tenant_id.eq.${tenantId}`)
+        // store_id holds the tenant id (text). The previous .or() included
+        // a `details->>tenant_id` JSON arrow, which is invalid PostgREST
+        // filter syntax inside .or() and 500'd the whole query.
+        .eq("store_id", tenantId)
         .order("created_at", { ascending: false })
         .limit(RECENT_LIMIT);
       if (error) throw error;
