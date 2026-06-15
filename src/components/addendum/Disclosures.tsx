@@ -21,7 +21,7 @@ const STRINGS = {
   en: {
     heading: "Required Disclosures & Consumer Rights",
     carsBanner: (languages: string) =>
-      `CALIFORNIA CARS ACT (SB 766) — This addendum complies with California disclosure requirements effective October 1, 2026. Headings are in 12-point bold type and body text in 10-point bold type as required.${languages ? " Available in: " + languages + "." : ""}`,
+      `CALIFORNIA SB 766 DISCLOSURE — This addendum reflects California's add-on disclosure requirements effective October 1, 2026. Headings are in 12-point bold type and body text in 10-point bold type as required.${languages ? " Available in: " + languages + "." : ""}`,
     ackLabel: "ADDENDUM & WINDOW STICKER ACKNOWLEDGMENT:",
     ackBody:
       "By signing this addendum, the consumer acknowledges and agrees that: (1) this addendum accurately reflects and corresponds to the window sticker affixed to this vehicle; (2) the consumer has been given adequate time and opportunity to review both the window sticker on the vehicle and this addendum in full; (3) the products, pricing, and terms listed on this addendum match those displayed on the vehicle's window sticker; and (4) the consumer's initials and signature below constitute acceptance of the products and pricing as disclosed on both documents. Any discrepancy between the window sticker and this addendum should be reported to dealership management prior to signing.",

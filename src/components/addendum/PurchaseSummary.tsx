@@ -51,8 +51,8 @@ const PurchaseSummary = ({
           <p className="text-[9px] font-extrabold uppercase tracking-[0.14em] text-foreground">
             Your deal at a glance
           </p>
-          <span className="text-[8px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700">
-            Compliant{state ? ` · ${state}` : ""}
+          <span className="text-[8px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-muted text-muted-foreground">
+            {state ? `${state} disclosures` : "Itemized"}
           </span>
         </div>
 

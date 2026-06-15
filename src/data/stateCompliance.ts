@@ -322,7 +322,7 @@ export function getAddendumDisclosures(stateCode: string): string[] {
   // 6. CA CARS Act specific
   if (compliance.carsActState) {
     disclosures.push(
-      "CALIFORNIA CARS ACT NOTICE: Under California law (SB 766), " +
+      "CALIFORNIA SB 766 NOTICE: Under California law (SB 766), " +
       "this disclosure must be provided in at least 12-point bold type for headings and " +
       "10-point bold type for text, circumscribed by a line, immediately above the " +
       "contract signature line. If this negotiation is being conducted primarily in " +
@@ -365,7 +365,7 @@ export function checkNoBenefitItems(productName: string): string | null {
   const lower = productName.toLowerCase();
 
   if (lower.includes("nitrogen") && (lower.includes("tire") || lower.includes("fill"))) {
-    return "WARNING: Nitrogen tire fill products have been flagged by the FTC and state AGs as potentially providing no benefit unless nitrogen purity exceeds 95%. California CARS Act prohibits charging for add-ons that provide no benefit.";
+    return "WARNING: Nitrogen tire fill products have been flagged by the FTC and state AGs as potentially providing no benefit unless nitrogen purity exceeds 95%. California SB 766 prohibits charging for add-ons that provide no benefit.";
   }
 
   if (lower.includes("vin etch") || lower.includes("vin-etch") || lower.includes("vehicle identification etch")) {
