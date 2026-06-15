@@ -226,11 +226,15 @@ const Admin = () => {
   const [uploadingDoc, setUploadingDoc] = useState(false);
 
   const handleUploadDoc = async (file: File) => {
+    // The first path folder MUST be the tenant id so tenant-scoped storage
+    // RLS can match it; never fall back to a shared prefix.
+    const scope = tenant?.id || currentStore?.id;
+    if (!scope) {
+      toast.error("No dealership context found — reload the page and try again.");
+      return;
+    }
     setUploadingDoc(true);
     try {
-      // Catalog-level upload — scope by tenant/store when present, else a
-      // shared prefix (product-docs RLS is bucket-scoped, not path-scoped).
-      const scope = tenant?.id || currentStore?.id || "shared";
       const clean = file.name.replace(/[^a-zA-Z0-9._-]/g, "_").slice(-80);
       const path = `${scope}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}-${clean}`;
       const { error } = await supabase.storage
