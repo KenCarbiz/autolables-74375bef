@@ -74,6 +74,8 @@ interface Product {
   sort_order: number;
   is_active: boolean;
   benefit_justification: string;
+  benefit_justification_optional: string | null;
+  disclosure_optional: string | null;
   price_in_advertised: boolean;
   icon_type?: string;
 }
@@ -91,6 +93,8 @@ const emptyProduct = {
   sort_order: 0,
   is_active: true,
   benefit_justification: "",
+  benefit_justification_optional: "",
+  disclosure_optional: "",
   price_in_advertised: true,
   icon_type: "",
 };
@@ -244,6 +248,10 @@ const Admin = () => {
       // line at build time. Required on installed products
       // before the red-team will release a signing link.
       benefit_justification: editing.benefit_justification || "",
+      // Optional-disposition copy (used when the line is sold as a
+      // customer-elected add-on rather than pre-installed).
+      benefit_justification_optional: editing.benefit_justification_optional || null,
+      disclosure_optional: editing.disclosure_optional || null,
       // Default included-in-advertised so an accessory is never
       // silently charged above the advertised price.
       price_in_advertised: editing.price_in_advertised ?? true,
@@ -2013,48 +2021,73 @@ const Admin = () => {
                 <label className="text-xs font-semibold text-muted-foreground">Price Label</label>
                 <input value={editing.price_label || ""} onChange={(e) => setEditing({ ...editing, price_label: e.target.value })} className="w-full px-3 py-2 border border-border-custom rounded text-sm" />
               </div>
-              <div>
-                <label className="text-xs font-semibold text-muted-foreground">Disclosure Text</label>
-                <textarea value={editing.disclosure || ""} onChange={(e) => setEditing({ ...editing, disclosure: e.target.value })} className="w-full px-3 py-2 border border-border-custom rounded text-sm" rows={3} />
-              </div>
-              <div>
-                <label className="text-xs font-semibold text-foreground inline-flex items-center gap-1.5">
-                  Benefit Justification
-                  <span className="text-[9px] font-bold uppercase tracking-[0.12em] px-1.5 py-0.5 rounded bg-amber-100 text-amber-800">
-                    Required — installed
-                  </span>
-                </label>
-                <textarea
-                  value={editing.benefit_justification || ""}
-                  onChange={(e) => setEditing({ ...editing, benefit_justification: e.target.value })}
-                  className="w-full px-3 py-2 border border-border-custom rounded text-sm"
-                  rows={2}
-                  placeholder="e.g. Ceramic coating extends the factory clear-coat life by 5+ years and reduces buyer's long-term reconditioning cost."
-                />
-                <p className="text-[10px] text-muted-foreground mt-1 leading-relaxed">
-                  Seeds the per-addendum line. Dealers can edit per vehicle at addendum time.
-                  Required on installed (pre-installed) products before the compliance red-team
-                  releases a signing link — answers FTC §5 and CA SB 766 §11713.21.
-                </p>
-              </div>
-              {(editing.badge_type || "installed") === "installed" && (
-                <div className="rounded-lg border border-border-custom p-3">
-                  <label className="flex items-start gap-2 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      className="mt-0.5"
-                      checked={editing.price_in_advertised ?? true}
-                      onChange={(e) => setEditing({ ...editing, price_in_advertised: e.target.checked })}
-                    />
+              {/* Disposition descriptions — one set for pre-installed, one
+                  for customer-elected optional. Both are stored; the
+                  addendum shows the set matching how the line is sold. The
+                  Type above marks which is the default + which benefit the
+                  red-team requires. */}
+              <div className="space-y-3">
+                <label className="text-xs font-semibold text-muted-foreground">Descriptions by how it's sold</label>
+
+                <div className={`rounded-lg border p-3 space-y-2.5 ${((editing.badge_type || "installed") === "installed") ? "border-teal/50 bg-teal/5" : "border-border-custom"}`}>
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-foreground">
+                      Pre-installed <span className="font-normal text-muted-foreground">— already on the car, in the price</span>
+                    </span>
+                    {((editing.badge_type || "installed") === "installed") && (
+                      <span className="text-[9px] font-bold uppercase tracking-[0.12em] px-1.5 py-0.5 rounded bg-teal text-primary-foreground">Default</span>
+                    )}
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-semibold text-muted-foreground">Disclosure</label>
+                    <textarea value={editing.disclosure || ""} onChange={(e) => setEditing({ ...editing, disclosure: e.target.value })} className="w-full px-3 py-2 border border-border-custom rounded text-sm" rows={2} placeholder="Pre-installed, non-removable; cost included in the selling price…" />
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-semibold text-foreground inline-flex items-center gap-1.5">
+                      Benefit justification
+                      {((editing.badge_type || "installed") === "installed") && (
+                        <span className="text-[9px] font-bold uppercase tracking-[0.12em] px-1.5 py-0.5 rounded bg-amber-100 text-amber-800">Required</span>
+                      )}
+                    </label>
+                    <textarea value={editing.benefit_justification || ""} onChange={(e) => setEditing({ ...editing, benefit_justification: e.target.value })} className="w-full px-3 py-2 border border-border-custom rounded text-sm" rows={2} placeholder="This vehicle was treated before sale with… (why it benefits the buyer)" />
+                  </div>
+                  <label className="flex items-start gap-2 cursor-pointer pt-0.5">
+                    <input type="checkbox" className="mt-0.5" checked={editing.price_in_advertised ?? true} onChange={(e) => setEditing({ ...editing, price_in_advertised: e.target.checked })} />
                     <span>
-                      <span className="text-xs font-semibold text-foreground">Price is included in the advertised price</span>
-                      <span className="block text-[10px] text-muted-foreground mt-0.5 leading-relaxed">
-                        On — this accessory is already baked into the online/lot price and is itemized for transparency, never charged again at signing. Off — it's a dealer-installed upcharge added above the advertised price, shown as an explicit addition the customer confirms.
-                      </span>
+                      <span className="text-[11px] font-semibold text-foreground">Price is included in the advertised price</span>
+                      <span className="block text-[10px] text-muted-foreground mt-0.5 leading-relaxed">On — itemized for transparency, never charged again. Off — a dealer-installed upcharge above the advertised price the customer confirms.</span>
                     </span>
                   </label>
                 </div>
-              )}
+
+                <div className={`rounded-lg border p-3 space-y-2.5 ${!((editing.badge_type || "installed") === "installed") ? "border-teal/50 bg-teal/5" : "border-border-custom"}`}>
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-foreground">
+                      Optional <span className="font-normal text-muted-foreground">— customer adds at time of sale</span>
+                    </span>
+                    {!((editing.badge_type || "installed") === "installed") && (
+                      <span className="text-[9px] font-bold uppercase tracking-[0.12em] px-1.5 py-0.5 rounded bg-teal text-primary-foreground">Default</span>
+                    )}
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-semibold text-muted-foreground">Disclosure</label>
+                    <textarea value={editing.disclosure_optional || ""} onChange={(e) => setEditing({ ...editing, disclosure_optional: e.target.value })} className="w-full px-3 py-2 border border-border-custom rounded text-sm" rows={2} placeholder="Optional — not required to buy or finance, does not affect your rate; itemized as an add-on…" />
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-semibold text-foreground inline-flex items-center gap-1.5">
+                      Benefit justification
+                      {!((editing.badge_type || "installed") === "installed") && (
+                        <span className="text-[9px] font-bold uppercase tracking-[0.12em] px-1.5 py-0.5 rounded bg-amber-100 text-amber-800">Required</span>
+                      )}
+                    </label>
+                    <textarea value={editing.benefit_justification_optional || ""} onChange={(e) => setEditing({ ...editing, benefit_justification_optional: e.target.value })} className="w-full px-3 py-2 border border-border-custom rounded text-sm" rows={2} placeholder="At the time of sale you chose to add… (why it benefits the buyer)" />
+                  </div>
+                </div>
+
+                <p className="text-[10px] text-muted-foreground leading-relaxed">
+                  Both sets are stored. The addendum shows the set matching how the line is sold on each deal (optional falls back to the pre-installed text when blank). Required benefit answers FTC §5 / CA SB 766 §11713.21.
+                </p>
+              </div>
               <div className="flex items-center gap-2">
                 <input type="checkbox" checked={editing.is_active ?? true} onChange={(e) => setEditing({ ...editing, is_active: e.target.checked })} />
                 <label className="text-xs">Active</label>
