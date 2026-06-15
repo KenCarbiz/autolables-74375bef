@@ -127,46 +127,43 @@ const Inventory = () => {
 
   return (
     <div className="p-4 lg:p-6 max-w-[1400px] mx-auto space-y-4">
-      {/* Shimmer banner — matches Landing aesthetic */}
-      <div className="shimmer-hero relative overflow-hidden rounded-2xl px-6 py-5 text-white">
-        <div className="relative z-10 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
-          <div>
-            <div className="inline-flex items-center gap-1.5 bg-white/15 px-2.5 py-1 rounded-full text-caption font-bold uppercase tracking-label">
-              <Car className="w-3 h-3" />
-              Inventory
-            </div>
-            <h1 className="mt-1.5 text-title md:text-headline font-display font-semibold text-white">
-              Your vehicles
-            </h1>
-            <p className="text-body-sm text-white/70 mt-1">
-              Every sticker, addendum, prep sign-off, and customer signature
-              attaches to a vehicle file here.
-            </p>
+      {/* Operational header — actions live here, not in a marketing hero. */}
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 pt-1">
+        <div>
+          <div className="inline-flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
+            <Car className="w-3 h-3" />
+            Inventory
           </div>
-          <div className="flex items-stretch gap-2.5 flex-wrap">
-            <button
-              onClick={() => setShowAdd(true)}
-              className="h-12 px-5 rounded-xl bg-white text-[#0B2041] inline-flex items-center gap-2 hover:brightness-95 shadow-premium transition-all whitespace-nowrap"
-            >
-              <Plus className="w-5 h-5 stroke-[2.5]" />
-              <span className="font-display font-black tracking-tight text-base">Add Vehicle</span>
-            </button>
-            <button
-              onClick={() => navigate("/scan")}
-              className="h-12 px-5 rounded-xl bg-gradient-to-r from-[#3BB4FF] to-[#1E90FF] text-white inline-flex items-center gap-2 hover:brightness-110 shadow-premium transition-all whitespace-nowrap"
-              title="Scan a VIN barcode into inventory"
-            >
-              <ScanLine className="w-5 h-5 stroke-[2.5]" />
-              <span className="font-display font-black tracking-tight text-base">Scan Vehicle</span>
-            </button>
-            <button
-              onClick={() => setShowImport(true)}
-              className="h-12 px-4 rounded-xl bg-white/10 backdrop-blur border border-white/20 text-white inline-flex items-center gap-2 hover:bg-white/20 transition-all whitespace-nowrap"
-            >
-              <Upload className="w-4 h-4 stroke-[2.5]" />
-              <span className="font-display font-bold tracking-tight text-sm">CSV Import</span>
-            </button>
-          </div>
+          <h1 className="mt-0.5 text-2xl font-display font-semibold tracking-tight text-foreground">
+            Your vehicles
+          </h1>
+          <p className="text-sm text-muted-foreground mt-0.5">
+            Every sticker, addendum, prep sign-off, and customer signature attaches to a vehicle file here.
+          </p>
+        </div>
+        <div className="flex items-stretch gap-2 flex-wrap">
+          <button
+            onClick={() => setShowAdd(true)}
+            className="h-9 px-4 rounded-md bg-[#2563EB] hover:bg-[#1D4ED8] text-white inline-flex items-center gap-2 text-sm font-medium shadow-sm transition-colors whitespace-nowrap"
+          >
+            <Plus className="w-4 h-4 stroke-2" />
+            Add Vehicle
+          </button>
+          <button
+            onClick={() => navigate("/scan")}
+            className="h-9 px-4 rounded-md border border-border bg-transparent hover:bg-muted text-foreground inline-flex items-center gap-2 text-sm font-medium transition-colors whitespace-nowrap"
+            title="Scan a VIN barcode into inventory"
+          >
+            <ScanLine className="w-4 h-4 stroke-2" />
+            Scan VIN
+          </button>
+          <button
+            onClick={() => setShowImport(true)}
+            className="h-9 px-4 rounded-md border border-border bg-transparent hover:bg-muted text-foreground inline-flex items-center gap-2 text-sm font-medium transition-colors whitespace-nowrap"
+          >
+            <Upload className="w-4 h-4 stroke-2" />
+            CSV Import
+          </button>
         </div>
       </div>
 
