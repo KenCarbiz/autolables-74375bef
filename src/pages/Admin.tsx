@@ -2252,9 +2252,19 @@ const Admin = () => {
                   {uploadingDoc && <span className="text-[10px] text-muted-foreground">Uploading…</span>}
                 </div>
                 {editing.contract_url ? (
-                  <a href={editing.contract_url} target="_blank" rel="noopener noreferrer" className="text-[11px] text-[#2563EB] hover:underline">
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      const url = editing.contract_url || "";
+                      if (/^https?:\/\//i.test(url)) { window.open(url, "_blank", "noopener,noreferrer"); return; }
+                      const { data, error } = await supabase.storage.from("product-docs").createSignedUrl(url, 3600);
+                      if (error || !data?.signedUrl) { toast.error(`Could not open document: ${error?.message || "unknown error"}`); return; }
+                      window.open(data.signedUrl, "_blank", "noopener,noreferrer");
+                    }}
+                    className="text-[11px] text-[#2563EB] hover:underline text-left"
+                  >
                     View attached {editing.contract_doc_type === "warranty" ? "warranty card" : "contract"}
-                  </a>
+                  </button>
                 ) : (
                   <p className="text-[10px] text-destructive font-semibold">No document attached — required to save.</p>
                 )}
