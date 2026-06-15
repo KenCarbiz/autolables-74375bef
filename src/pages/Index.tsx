@@ -103,9 +103,9 @@ const Index = () => {
   const [optionalSelections, setOptionalSelections] = useState<Record<string, string>>({});
 
   // Signatures
-  const [customerSig, setCustomerSig] = useState({ data: "", type: "draw" as "draw" | "type" });
-  const [cobuyerSig, setCobuyerSig] = useState({ data: "", type: "draw" as "draw" | "type" });
-  const [employeeSig, setEmployeeSig] = useState({ data: "", type: "draw" as "draw" | "type" });
+  const [customerSig, setCustomerSig] = useState({ data: "", type: "draw" as "draw" | "type", at: "" });
+  const [cobuyerSig, setCobuyerSig] = useState({ data: "", type: "draw" as "draw" | "type", at: "" });
+  const [employeeSig, setEmployeeSig] = useState({ data: "", type: "draw" as "draw" | "type", at: "" });
 
   // QR / Lead capture modal
   const [qrOpen, setQrOpen] = useState(false);
@@ -175,14 +175,17 @@ const Index = () => {
       setCustomerSig({
         data: data.customer_signature_data || "",
         type: (data.customer_signature_type as "draw" | "type") || "draw",
+        at: (data as { customer_signed_at?: string }).customer_signed_at || "",
       });
       setCobuyerSig({
         data: data.cobuyer_signature_data || "",
         type: (data.cobuyer_signature_type as "draw" | "type") || "draw",
+        at: (data as { cobuyer_signed_at?: string }).cobuyer_signed_at || "",
       });
       setEmployeeSig({
         data: data.employee_signature_data || "",
         type: (data.employee_signature_type as "draw" | "type") || "draw",
+        at: (data as { employee_signed_at?: string }).employee_signed_at || "",
       });
       const snapshot = (data.products_snapshot || []) as Partial<Product>[];
       if (snapshot.length) {
@@ -303,6 +306,9 @@ const Index = () => {
   const acceptedOptional = optional.filter((p) => optionalSelections[p.id] === "accept");
   const optionalTotal = acceptedOptional.reduce((sum, p) => sum + p.price, 0);
   const grandTotal = installedTotal + optionalTotal;
+  // Co-buyer signature shows ONLY when a co-buyer is on the deal (two
+  // customers). One customer → one customer + one dealer signature.
+  const hasCobuyer = !!(customerInfo.cobuyer_first_name?.trim() || customerInfo.cobuyer_last_name?.trim());
   const docFeeAmount = settings.doc_fee_enabled ? (settings.doc_fee_amount || 0) : 0;
   const grandTotalWithFee = grandTotal + docFeeAmount;
 
@@ -586,13 +592,13 @@ const Index = () => {
       cobuyer_name: [customerInfo.cobuyer_first_name, customerInfo.cobuyer_last_name].filter(Boolean).join(" ") || null,
       customer_signature_data: customerSig.data,
       customer_signature_type: customerSig.type,
-      customer_signed_at: customerSig.data ? now : null,
+      customer_signed_at: customerSig.data ? (customerSig.at || now) : null,
       cobuyer_signature_data: cobuyerSig.data || null,
       cobuyer_signature_type: cobuyerSig.data ? cobuyerSig.type : null,
-      cobuyer_signed_at: cobuyerSig.data ? now : null,
+      cobuyer_signed_at: cobuyerSig.data ? (cobuyerSig.at || now) : null,
       employee_signature_data: employeeSig.data,
       employee_signature_type: employeeSig.type,
-      employee_signed_at: employeeSig.data ? now : null,
+      employee_signed_at: employeeSig.data ? (employeeSig.at || now) : null,
       total_installed: installedTotal,
       total_with_optional: grandTotalWithFee,
       status: customerSig.data && employeeSig.data ? "signed" : "draft",
@@ -1026,13 +1032,24 @@ const Index = () => {
             </div>
           )}
 
-          {/* Signature Section */}
+          {/* Signature Section — one customer block; the co-buyer block
+              appears ONLY when a co-buyer is on the deal. Each signature is
+              individually date/time stamped at the moment it is signed. */}
           <div className="space-y-3 pt-2">
-            <SignaturePad label="Customer Signature" subtitle="Buyer acknowledges receipt of this addendum" value={customerSig.data} type={customerSig.type} onChange={(data, type) => setCustomerSig({ data, type })} />
-            {settings.feature_cobuyer_signature && (
-              <SignaturePad label="Co-Buyer Signature (if applicable)" subtitle="Co-Buyer acknowledges receipt" value={cobuyerSig.data} type={cobuyerSig.type} onChange={(data, type) => setCobuyerSig({ data, type })} />
+            <div>
+              <SignaturePad label="Customer Signature" subtitle="Buyer acknowledges receipt of this addendum" value={customerSig.data} type={customerSig.type} onChange={(data, type) => setCustomerSig({ data, type, at: data ? new Date().toISOString() : "" })} />
+              {customerSig.at && <SignatureStamp at={customerSig.at} who={[customerInfo.buyer_first_name, customerInfo.buyer_last_name].filter(Boolean).join(" ") || "Buyer"} />}
+            </div>
+            {hasCobuyer && (
+              <div>
+                <SignaturePad label="Co-Buyer Signature" subtitle="Co-Buyer acknowledges receipt of this addendum" value={cobuyerSig.data} type={cobuyerSig.type} onChange={(data, type) => setCobuyerSig({ data, type, at: data ? new Date().toISOString() : "" })} />
+                {cobuyerSig.at && <SignatureStamp at={cobuyerSig.at} who={[customerInfo.cobuyer_first_name, customerInfo.cobuyer_last_name].filter(Boolean).join(" ") || "Co-Buyer"} />}
+              </div>
             )}
-            <SignaturePad label="Dealer Representative" subtitle="Sales / Finance representative signature & date" value={employeeSig.data} type={employeeSig.type} onChange={(data, type) => setEmployeeSig({ data, type })} />
+            <div>
+              <SignaturePad label="Dealer Representative" subtitle="Sales / Finance representative signature" value={employeeSig.data} type={employeeSig.type} onChange={(data, type) => setEmployeeSig({ data, type, at: data ? new Date().toISOString() : "" })} />
+              {employeeSig.at && <SignatureStamp at={employeeSig.at} who="Dealer Representative" />}
+            </div>
           </div>
 
           <AddendumFooter inkSaving={inkSaving} />
@@ -1159,6 +1176,20 @@ const BenefitEditor = ({
         </div>
       )}
     </div>
+  );
+};
+
+// Per-signature date/time stamp printed under each signature on the
+// document, so the signed record shows exactly who signed and when.
+const SignatureStamp = ({ at, who }: { at: string; who: string }) => {
+  const d = new Date(at);
+  const stamp = Number.isNaN(d.getTime())
+    ? at
+    : d.toLocaleString(undefined, { year: "numeric", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
+  return (
+    <p className="text-[8px] text-muted-foreground mt-0.5 px-1">
+      Signed by {who} · {stamp}
+    </p>
   );
 };
 
