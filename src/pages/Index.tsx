@@ -430,7 +430,7 @@ const Index = () => {
     // Buyers Guide on a used car, un-initialled installed products).
     const rtFindings = runComplianceRedTeam({
       state: settings.doc_fee_state || settings.dealer_state || "",
-      docFeeAmount: displayProducts?.find((p) => p.name.toLowerCase().includes("doc"))?.price,
+      docFeeAmount: settings.doc_fee_enabled ? settings.doc_fee_amount : undefined,
       stickerText: displayProducts
         ?.map((p) => `${p.name} ${p.disclosure || ""}`)
         .join(" ") || "",
@@ -784,7 +784,7 @@ const Index = () => {
             findings={runComplianceRedTeam({
               state: settings.doc_fee_state || settings.dealer_state || "",
               vehiclePrice: undefined,
-              docFeeAmount: displayProducts?.find((p) => p.name.toLowerCase().includes("doc"))?.price,
+              docFeeAmount: settings.doc_fee_enabled ? settings.doc_fee_amount : undefined,
               stickerText: displayProducts
                 ?.map((p) => `${p.name} ${p.disclosure || ""}`)
                 .join(" ") || "",
@@ -807,7 +807,7 @@ const Index = () => {
             state={settings.doc_fee_state || settings.dealer_state || null}
             input={{
               vehiclePrice: undefined,
-              docFeeAmount: displayProducts?.find((p) => p.name.toLowerCase().includes("doc"))?.price,
+              docFeeAmount: settings.doc_fee_enabled ? settings.doc_fee_amount : undefined,
               vehicleCondition: undefined,
               saleConductedInSpanish: false,
             }}
