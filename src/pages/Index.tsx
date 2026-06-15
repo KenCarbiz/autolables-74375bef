@@ -8,7 +8,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 import { computeFinancingDisclosure } from "@/lib/sb766";
-import { getDocFeeDisclosure } from "@/data/docFees";
+import { getDocFeeDisclosure, getDocFeeTerminology } from "@/data/docFees";
+import PurchaseSummary from "@/components/addendum/PurchaseSummary";
 import AddendumHeader from "@/components/addendum/AddendumHeader";
 import VehicleStrip from "@/components/addendum/VehicleStrip";
 import IntentBox from "@/components/addendum/IntentBox";
@@ -835,6 +836,21 @@ const Index = () => {
       <div ref={cardRef} style={{ maxWidth: paperWidth, zoom }} className="addendum-card mx-auto bg-card shadow-lg rounded-lg overflow-hidden border border-border-custom">
         <AddendumHeader inkSaving={inkSaving} />
         <VehicleStrip vehicle={vehicle} onChange={setVehicle} onVinDecoded={handleVinDecoded} onVehicleScraped={handleVehicleScraped} inkSaving={inkSaving} />
+
+        {/* Receipt before signature — the whole deal in one frame. */}
+        <PurchaseSummary
+          ymm={vehicle.ymm || [vehicleContext.year, vehicleContext.make, vehicleContext.model].filter(Boolean).join(" ")}
+          vin={vehicle.vin}
+          installedTotal={installedTotal}
+          installedCount={installed.length}
+          optionalTotal={optionalTotal}
+          optionalAcceptedCount={acceptedOptional.length}
+          optionalAvailableCount={optional.length}
+          docFee={settings.doc_fee_enabled ? (settings.doc_fee_amount || 0) : 0}
+          docFeeLabel={getDocFeeTerminology(settings.doc_fee_state || settings.dealer_state || "")}
+          state={settings.doc_fee_state || settings.dealer_state || null}
+          inkSaving={inkSaving}
+        />
 
         {/* Customer Info (Buyer + optional Co-Buyer) */}
         <div className="px-3 pt-2">
