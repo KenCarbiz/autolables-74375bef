@@ -33,6 +33,8 @@
 // and show a warning in the UI rather than silently pass.
 // ──────────────────────────────────────────────────────────────
 
+import { getDocFeeDisclosure } from "@/data/docFees";
+
 export type StateCode =
   | "AL" | "AK" | "AZ" | "AR" | "CA" | "CO" | "CT" | "DE" | "DC" | "FL"
   | "GA" | "HI" | "ID" | "IL" | "IN" | "IA" | "KS" | "KY" | "LA" | "ME"
@@ -387,9 +389,13 @@ export const validateAddendum = (draft: ComplianceDraft): ComplianceFinding[] =>
     }
   }
 
-  // A.1 Required verbiage
-  if (rule.docFee.requiredVerbiage.length > 0 && draft.stickerText) {
-    const text = draft.stickerText.toLowerCase();
+  // A.1 Required verbiage. Check the sticker text PLUS the statutory
+  // doc-fee disclosure the system always renders for this state + amount,
+  // so the phrases are recognized even if the caller did not thread the
+  // disclosure into stickerText.
+  if (rule.docFee.requiredVerbiage.length > 0 && typeof draft.docFeeAmount === "number" && draft.docFeeAmount > 0) {
+    const rendered = getDocFeeDisclosure(rule.code, draft.docFeeAmount);
+    const text = `${draft.stickerText || ""} ${rendered}`.toLowerCase();
     const missing = rule.docFee.requiredVerbiage.filter(
       (phrase) => !text.includes(phrase.toLowerCase())
     );
