@@ -233,16 +233,20 @@ const Admin = () => {
         .from("product-docs")
         .upload(path, file, { cacheControl: "3600", upsert: false, contentType: file.type || undefined });
       if (error) {
-        const msg = (error.message || "").toLowerCase();
-        // "bucket not found" and "schema is invalid/incompatible" both mean
-        // the product-docs storage bucket has not been provisioned yet.
-        const notProvisioned =
-          msg.includes("bucket") || msg.includes("not found") ||
-          msg.includes("schema") || msg.includes("incompatible");
-        if (notProvisioned) {
-          toast.error("Document storage isn't set up yet. Create the 'product-docs' bucket on Supabase (Storage > New bucket), then re-pick the file.");
+        const raw = error.message || "unknown error";
+        const msg = raw.toLowerCase();
+        // Surface the real Supabase error so storage problems are
+        // diagnosable instead of guessed-at.
+        if (msg.includes("not found") && msg.includes("bucket")) {
+          toast.error("The 'product-docs' bucket doesn't exist yet. Create it in Supabase Storage > New bucket, then re-pick the file.");
+        } else if (msg.includes("row-level security") || msg.includes("policy") || msg.includes("permission") || msg.includes("denied")) {
+          toast.error("Storage blocked the upload (missing policy). Add an INSERT policy for authenticated users on the product-docs bucket, then retry.");
+        } else if (msg.includes("mime") || msg.includes("content type") || msg.includes("not supported")) {
+          toast.error(`File type not allowed on the bucket: ${raw}. Add application/pdf to product-docs allowed MIME types.`);
+        } else if (msg.includes("schema") || msg.includes("incompatible")) {
+          toast.error(`Storage error: "${raw}". The product-docs bucket metadata looks incomplete — delete it and re-create it via Storage > New bucket (not via raw SQL), then retry.`);
         } else {
-          toast.error(`Upload failed: ${error.message}`);
+          toast.error(`Upload failed: ${raw}`);
         }
         return;
       }
