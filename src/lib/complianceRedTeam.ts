@@ -101,9 +101,17 @@ export const runComplianceRedTeam = (draft: RedTeamDraft): ComplianceFinding[] =
     const pp = p as { benefit_justification?: string; benefit_justification_optional?: string };
     return !!((pp.benefit_justification || "").trim() || (pp.benefit_justification_optional || "").trim());
   };
-  const missingBenefit = (draft.products || [])
-    .filter((p) => p.badge_type === "installed")
-    .filter((p) => !hasBenefit(p));
+  const hasDisclosure = (p: unknown): boolean => {
+    const pp = p as { disclosure?: string };
+    return !!(pp.disclosure || "").trim();
+  };
+  const installedProducts = (draft.products || []).filter((p) => p.badge_type === "installed");
+  const optionalProducts = (draft.products || []).filter((p) => p.badge_type === "optional");
+  const allProducts = draft.products || [];
+
+  // Benefit justification — FAIL (red) if any installed product is missing
+  // it, otherwise an explicit PASS (green) so the dealer SEES it's present.
+  const missingBenefit = installedProducts.filter((p) => !hasBenefit(p));
   if (missingBenefit.length > 0) {
     findings.push({
       id: "missing-benefit-justification",
@@ -113,15 +121,18 @@ export const runComplianceRedTeam = (draft: RedTeamDraft): ComplianceFinding[] =
       citation: "FTC Act §5; CA SB 766 §11713.21 (eff. Oct 1, 2026); FTC 97-dealer warning letters, March 2026.",
       suggestion: `Open the products tab and set the Benefit Justification field for: ${missingBenefit.slice(0, 3).map((p) => p.name).join(", ")}${missingBenefit.length > 3 ? "…" : ""}`,
     });
+  } else if (installedProducts.length > 0) {
+    findings.push({
+      id: "benefit-justification-ok",
+      severity: "pass",
+      rule: "Every installed product has a benefit justification",
+      message: `All ${installedProducts.length} installed product(s) carry benefit justification text the customer can read.`,
+      citation: "FTC Act §5; CA SB 766 §11713.21.",
+    });
   }
 
-  // Soft warning for optional products without benefit copy —
-  // less enforcement risk (the customer can decline) but it
-  // weakens the "voluntary, justified" pitch the customer reads
-  // on the QR landing.
-  const optionalMissingBenefit = (draft.products || [])
-    .filter((p) => p.badge_type === "optional")
-    .filter((p) => !hasBenefit(p));
+  // Optional benefit copy — WARN (yellow) if missing, else PASS (green).
+  const optionalMissingBenefit = optionalProducts.filter((p) => !hasBenefit(p));
   if (optionalMissingBenefit.length > 0) {
     findings.push({
       id: "optional-missing-benefit",
@@ -130,6 +141,37 @@ export const runComplianceRedTeam = (draft: RedTeamDraft): ComplianceFinding[] =
       message: `${optionalMissingBenefit.length} optional product(s) have no benefit text. The /v/:slug landing will show the name + price only.`,
       citation: "FTC §5 (best practice); not statutory until accepted by the customer.",
       suggestion: "Add benefit text so the customer can read what they're buying before initialling.",
+    });
+  } else if (optionalProducts.length > 0) {
+    findings.push({
+      id: "optional-benefit-ok",
+      severity: "pass",
+      rule: "Optional products carry benefit text",
+      message: `All ${optionalProducts.length} optional product(s) show benefit text before the customer accepts.`,
+      citation: "FTC §5 (best practice).",
+    });
+  }
+
+  // Product disclosure present — WARN (yellow) if any line lacks the
+  // customer-facing disclosure, else PASS (green). Material terms must be
+  // disclosed; the addendum shows this text directly under each product.
+  const missingDisclosure = allProducts.filter((p) => !hasDisclosure(p));
+  if (missingDisclosure.length > 0) {
+    findings.push({
+      id: "missing-product-disclosure",
+      severity: "warn",
+      rule: "Every product needs a disclosure",
+      message: `${missingDisclosure.length} product(s) have no disclosure text shown to the customer.`,
+      citation: "FTC Act §5 — material terms must be clearly disclosed.",
+      suggestion: `Set the Disclosure field for: ${missingDisclosure.slice(0, 3).map((p) => p.name).join(", ")}${missingDisclosure.length > 3 ? "…" : ""}`,
+    });
+  } else if (allProducts.length > 0) {
+    findings.push({
+      id: "product-disclosure-ok",
+      severity: "pass",
+      rule: "Every product has a disclosure",
+      message: `All ${allProducts.length} product(s) carry disclosure text on the addendum.`,
+      citation: "FTC Act §5.",
     });
   }
 
