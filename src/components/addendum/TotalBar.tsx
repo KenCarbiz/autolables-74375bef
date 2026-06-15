@@ -1,6 +1,6 @@
 import { Product } from "@/hooks/useProducts";
 import { useDealerSettings } from "@/contexts/DealerSettingsContext";
-import { getDocFeeTerminology, getDocFeeForState } from "@/data/docFees";
+import { getDocFeeTerminology, getDocFeeForState, getDocFeeDisclosure } from "@/data/docFees";
 
 interface TotalBarProps {
   installedTotal: number;
@@ -90,8 +90,7 @@ const TotalBar = ({ installedTotal, optionalTotal, grandTotal, optionalItems, ac
       {settings.doc_fee_enabled && docFeeAmount > 0 && (
         <div className="mt-1 pt-1 border-t border-border-custom/50">
           <p className="text-[7px] text-muted-foreground leading-tight">
-            <strong>{docFeeLabel}:</strong> A {docFeeLabel.toLowerCase()} of ${docFeeAmount.toFixed(2)} is charged to cover the cost of processing documents related to the sale of this vehicle. This {docFeeLabel.toLowerCase()} is a charge by the dealer and is not a tax or government fee.
-            {docFeeConfig?.notes && ` ${docFeeConfig.notes}.`}
+            {getDocFeeDisclosure(settings.doc_fee_state || settings.dealer_state || "CT", docFeeAmount)}
           </p>
         </div>
       )}

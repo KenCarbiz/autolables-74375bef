@@ -149,18 +149,20 @@ export const STATE_RULES: Record<StateCode, StateRule> = {
   CT: {
     ...fallback("CT", "Connecticut"),
     docFee: {
-      // Connecticut's conveyance fee max is indexed (Conn. Gen. Stat.
-      // §14-62) and has risen above the old $599; $695 reflects the
-      // current cap. Verify against the DMV's annual figure.
-      cap: 695,
+      // Connecticut does NOT cap the conveyance fee. Conn. Gen. Stat.
+      // §14-62 is a disclosure statute (Macomber v. Travelers, 281 Conn.
+      // 620) — it requires disclosure + that the fee is negotiable and not
+      // payable to the State, but imposes no dollar limit.
+      cap: null,
       requiredVerbiage: [
-        "Conveyance fee",
-        "not a tax or government fee",
+        "conveyance fee",
+        "negotiable",
+        "not payable to the State of Connecticut",
       ],
       mustAppearOnSticker: true,
-      citation: "Conn. Gen. Stat. §14-62(d); CT Regs §42-110b-28",
+      citation: "Conn. Gen. Stat. §14-62; Macomber v. Travelers, 281 Conn. 620",
     },
-    notes: "CT calls it a 'conveyance fee'; K-208 inspection required on used sales.",
+    notes: "CT 'conveyance fee' is a disclosure statute, not a cap: it must appear on the order/invoice, be disclosed as negotiable, state it is not payable to the State of Connecticut, and the customer may submit DMV paperwork themselves for a proportional reduction. K-208 inspection required on used sales.",
   },
   DE: fallback("DE", "Delaware"),
   DC: fallback("DC", "District of Columbia"),
