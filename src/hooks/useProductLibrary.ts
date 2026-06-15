@@ -1,13 +1,33 @@
 import { useState, useEffect } from "react";
 import type { ProductLibraryEntry, VehicleCategory } from "@/types/product";
 import { getProductPrice } from "@/types/product";
+import { DEFAULT_PRODUCT_LIBRARY } from "@/data/defaultProductLibrary";
 
 const STORAGE_KEY = "product_library";
+// Bump the suffix to re-seed when the starter catalog changes. The flag
+// keeps a dealer who intentionally cleared the library from having it
+// silently refilled on the next load.
+const SEED_FLAG = "product_library_seeded_v1";
+
+// Seed the starter catalog once per browser. Entries already present
+// (matched by name) are left untouched so a dealer's own edits win.
+const seedDefaults = () => {
+  if (localStorage.getItem(SEED_FLAG)) return;
+  let existing: ProductLibraryEntry[] = [];
+  try { existing = JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]"); } catch { /* */ }
+  const have = new Set(existing.map(p => p.name.toLowerCase()));
+  const now = new Date().toISOString();
+  const seeded: ProductLibraryEntry[] = DEFAULT_PRODUCT_LIBRARY
+    .filter(s => !have.has(s.name.toLowerCase()))
+    .map((s, i) => ({ ...s, id: crypto.randomUUID(), sort_order: s.sort_order || existing.length + i + 1, created_at: now, updated_at: now }));
+  localStorage.setItem(STORAGE_KEY, JSON.stringify([...existing, ...seeded]));
+  localStorage.setItem(SEED_FLAG, "1");
+};
 
 export const useProductLibrary = (storeId: string) => {
   const [library, setLibrary] = useState<ProductLibraryEntry[]>([]);
 
-  useEffect(() => { load(); }, [storeId]);
+  useEffect(() => { seedDefaults(); load(); }, [storeId]);
 
   const load = () => {
     try {
