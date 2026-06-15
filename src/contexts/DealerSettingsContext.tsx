@@ -19,6 +19,7 @@ export interface DealerSettings {
   dealer_phone: string;
   dealer_principal: string;        // dealer principal / owner of record
   dealer_license_number: string;   // DMV dealer license / ID number
+  dealer_oem_brands: string;       // franchised OEM brands (comma-separated)
   // Feature toggles — what shows on the employee-facing addendum
   feature_vin_decode: boolean;
   feature_buyers_guide: boolean;
@@ -76,6 +77,7 @@ export const DEFAULT_SETTINGS: DealerSettings = {
   dealer_phone: "",
   dealer_principal: "",
   dealer_license_number: "",
+  dealer_oem_brands: "",
   feature_vin_decode: true,
   feature_buyers_guide: true,
   feature_product_rules: true,

@@ -1,7 +1,8 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { useAdminPlatform, type TenantSummary } from "@/hooks/useAdminPlatform";
+import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Building2, Search, Power, PowerOff, Calendar, Users, AppWindow, Plus, X } from "lucide-react";
+import { Building2, Search, Power, PowerOff, Calendar, Users, AppWindow, Plus, X, Pencil } from "lucide-react";
 import { SortHeader, TablePagination, useSortAndPaginate, toCsv, downloadCsv, useTableDensity, DensityToggle } from "./tablePrimitives";
 import { TableEmptyState } from "./TableEmptyState";
 
@@ -25,6 +26,7 @@ export const PlatformTenants = () => {
   const [q, setQ] = useState("");
   const [filter, setFilter] = useState<"all" | "active" | "inactive">("all");
   const [creating, setCreating] = useState(false);
+  const [editing, setEditing] = useState<TenantSummary | null>(null);
 
   const rows = useMemo(() => {
     const all = tenants.data || [];
@@ -135,6 +137,14 @@ export const PlatformTenants = () => {
         />
       )}
 
+      {editing && (
+        <TenantDetailsDrawer
+          tenant={editing}
+          onClose={() => setEditing(null)}
+          onSaved={() => { setEditing(null); toast.success("Dealership details saved"); }}
+        />
+      )}
+
       {tenants.isLoading ? (
         <div className="py-10 text-center text-sm text-muted-foreground">Loading tenants…</div>
       ) : rows.length === 0 ? (
@@ -205,17 +215,26 @@ export const PlatformTenants = () => {
                     {formatDate(t.last_activity)}
                   </td>
                   <td className={`${rowClass} text-right`}>
-                    <button
-                      onClick={() => toggle(t)}
-                      className={`inline-flex items-center gap-1.5 text-[11px] font-semibold px-2.5 h-7 rounded-md ${
-                        t.is_active
-                          ? "text-destructive hover:bg-destructive/10"
-                          : "text-emerald-600 hover:bg-emerald-50"
-                      }`}
-                    >
-                      {t.is_active ? <PowerOff className="w-3 h-3" /> : <Power className="w-3 h-3" />}
-                      {t.is_active ? "Suspend" : "Reactivate"}
-                    </button>
+                    <div className="inline-flex items-center gap-1 justify-end">
+                      <button
+                        onClick={() => setEditing(t)}
+                        className="inline-flex items-center gap-1.5 text-[11px] font-semibold px-2.5 h-7 rounded-md text-foreground hover:bg-muted"
+                      >
+                        <Pencil className="w-3 h-3" />
+                        Edit
+                      </button>
+                      <button
+                        onClick={() => toggle(t)}
+                        className={`inline-flex items-center gap-1.5 text-[11px] font-semibold px-2.5 h-7 rounded-md ${
+                          t.is_active
+                            ? "text-destructive hover:bg-destructive/10"
+                            : "text-emerald-600 hover:bg-emerald-50"
+                        }`}
+                      >
+                        {t.is_active ? <PowerOff className="w-3 h-3" /> : <Power className="w-3 h-3" />}
+                        {t.is_active ? "Suspend" : "Reactivate"}
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -382,5 +401,122 @@ const Select = ({ label, value, onChange, options }: SelectProps) => (
     </select>
   </div>
 );
+
+// Dealer legal + contact profile, editable per tenant by a platform admin.
+// Writes to dealer_profiles.settings (the same blob the dealer edits in
+// Admin > Branding), so there's one source of truth. The legal fields here
+// drive the addendum/Buyers Guide seller identity and the state engine.
+const LEGAL_FIELDS: { key: string; label: string; placeholder?: string; required?: boolean }[] = [
+  { key: "dealer_name", label: "Legal / business name", required: true },
+  { key: "dealer_address", label: "Street address", required: true },
+  { key: "dealer_city", label: "City" },
+  { key: "dealer_state", label: "Operating state (2-letter)", placeholder: "CT", required: true },
+  { key: "dealer_zip", label: "ZIP" },
+  { key: "dealer_phone", label: "Phone" },
+  { key: "dealer_principal", label: "Dealer principal / owner" },
+  { key: "dealer_license_number", label: "DMV dealer license / ID #", required: true },
+  { key: "dealer_oem_brands", label: "Franchised OEM brands", placeholder: "e.g. Ford, Lincoln" },
+];
+
+const TenantDetailsDrawer = ({
+  tenant,
+  onClose,
+  onSaved,
+}: {
+  tenant: TenantSummary;
+  onClose: () => void;
+  onSaved: () => void;
+}) => {
+  const [form, setForm] = useState<Record<string, string>>({});
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+    (async () => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { data } = await (supabase as any).from("dealer_profiles").select("settings").eq("tenant_id", tenant.id).maybeSingle();
+      if (!active) return;
+      const s = (data?.settings as Record<string, string>) || {};
+      const next: Record<string, string> = {};
+      LEGAL_FIELDS.forEach((f) => { next[f.key] = (s[f.key] as string) || ""; });
+      if (!next.dealer_name) next.dealer_name = tenant.name || "";
+      setForm(next);
+      setLoading(false);
+    })();
+    return () => { active = false; };
+  }, [tenant.id, tenant.name]);
+
+  const required = LEGAL_FIELDS.filter((f) => f.required);
+  const doneCount = required.filter((f) => (form[f.key] || "").trim()).length;
+  const pct = required.length ? Math.round((doneCount / required.length) * 100) : 100;
+
+  const save = async () => {
+    setSaving(true);
+    // Merge into the existing settings blob so we never drop other keys.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data: existing } = await (supabase as any).from("dealer_profiles").select("settings").eq("tenant_id", tenant.id).maybeSingle();
+    const merged = { ...((existing?.settings as Record<string, unknown>) || {}) };
+    LEGAL_FIELDS.forEach((f) => { merged[f.key] = (form[f.key] || "").trim(); });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { error } = await (supabase as any).from("dealer_profiles").upsert({ tenant_id: tenant.id, settings: merged }, { onConflict: "tenant_id" });
+    setSaving(false);
+    if (error) { toast.error(`Save failed: ${error.message}`); return; }
+    onSaved();
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 bg-black/40 flex items-start justify-end" onClick={onClose}>
+      <div className="h-full w-full max-w-md bg-card border-l border-border shadow-2xl overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between p-4 border-b border-border">
+          <div>
+            <h3 className="text-sm font-bold text-foreground">Dealership details</h3>
+            <p className="text-[11px] text-muted-foreground">{tenant.name}</p>
+          </div>
+          <button onClick={onClose} className="text-muted-foreground hover:text-foreground"><X className="w-4 h-4" /></button>
+        </div>
+
+        <div className={`mx-4 mt-4 rounded-lg border-2 p-3 ${pct === 100 ? "border-emerald-500 bg-emerald-50" : "border-amber-300 bg-amber-50/60"}`}>
+          <div className="flex items-center justify-between">
+            <p className="text-[11px] font-bold uppercase tracking-wider text-foreground">Compliance profile</p>
+            <span className={`text-lg font-bold tabular-nums ${pct === 100 ? "text-emerald-600" : "text-amber-600"}`}>{pct}%</span>
+          </div>
+          <p className="text-[10px] text-muted-foreground mt-1">Legal name, address, operating state, and DMV license are required for compliant documents.</p>
+        </div>
+
+        {loading ? (
+          <div className="p-6 text-center text-sm text-muted-foreground">Loading…</div>
+        ) : (
+          <div className="p-4 space-y-3">
+            {LEGAL_FIELDS.map((f) => (
+              <div key={f.key}>
+                <label className="text-[11px] font-semibold text-muted-foreground">
+                  {f.label}{f.required && <span className="text-destructive"> *</span>}
+                </label>
+                <input
+                  value={form[f.key] || ""}
+                  placeholder={f.placeholder}
+                  maxLength={f.key === "dealer_state" ? 2 : undefined}
+                  onChange={(e) => {
+                    const v = f.key === "dealer_state" ? e.target.value.toUpperCase() : e.target.value;
+                    setForm((prev) => ({ ...prev, [f.key]: v }));
+                  }}
+                  className={`mt-1 w-full h-9 px-2 rounded-md border border-border bg-background text-sm ${f.key === "dealer_state" ? "uppercase" : ""}`}
+                />
+              </div>
+            ))}
+          </div>
+        )}
+
+        <div className="sticky bottom-0 flex gap-2 p-4 border-t border-border bg-card">
+          <button onClick={onClose} className="flex-1 h-9 rounded-md bg-muted text-foreground text-sm font-semibold">Cancel</button>
+          <button onClick={save} disabled={saving || loading} className="flex-1 h-9 rounded-md bg-primary text-primary-foreground text-sm font-semibold disabled:opacity-50">
+            {saving ? "Saving…" : "Save details"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
 
 export default PlatformTenants;
