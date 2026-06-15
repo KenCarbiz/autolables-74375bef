@@ -9,6 +9,7 @@ import {
   CheckCircle2, Clock, Gauge, DollarSign, MapPin, Copy, ExternalLink,
   FileUp, Upload, Printer, Sparkles, Plus, ArrowUpRight,
   AlertTriangle, ShieldCheck, Lock, Unlock, Send, MessageSquare,
+  Link as LinkIcon,
 } from "lucide-react";
 import EmptyState from "@/components/ui/empty-state";
 import { InstallProofList } from "@/components/admin/InstallProofList";
@@ -414,6 +415,27 @@ const OverviewPanel = ({ vehicle }: { vehicle: VehicleRow; onReload: () => void 
 
 const DocumentsPanel = ({ vehicle, onReload }: { vehicle: VehicleRow; onReload: () => void }) => {
   const [uploading, setUploading] = useState<string | null>(null);
+  const [linkSlot, setLinkSlot] = useState<string | null>(null);
+  const [linkName, setLinkName] = useState("");
+  const [linkUrl, setLinkUrl] = useState("");
+
+  // Attach an external link (digital brochure, Carfax URL, inspection
+  // report) rather than a file. Appends to the same documents array the
+  // customer QR page renders, so it shows up on /v/:slug immediately.
+  const addLink = async (type: "factory_sticker" | "carfax" | "brochure" | "we_owe" | "other") => {
+    const raw = linkUrl.trim();
+    if (!raw) { toast.error("Paste a link first"); return; }
+    const url = /^https?:\/\//i.test(raw) ? raw : `https://${raw}`;
+    const next = [...(vehicle.documents || []), { name: linkName.trim() || url, type, url }];
+    const { error } = await (supabase as any)
+      .from("vehicle_listings")
+      .update({ documents: next })
+      .eq("id", vehicle.id);
+    if (error) { toast.error("Failed to add link"); return; }
+    setLinkSlot(null); setLinkName(""); setLinkUrl("");
+    toast.success("Link added");
+    onReload();
+  };
 
   const upload = async (file: File, type: "factory_sticker" | "carfax" | "brochure" | "we_owe" | "other") => {
     if (!vehicle.tenant_id) {
@@ -496,20 +518,55 @@ const DocumentsPanel = ({ vehicle, onReload }: { vehicle: VehicleRow; onReload: 
               {d.name}
             </a>
           ))}
-          <label className="inline-flex items-center gap-1.5 h-8 px-3 rounded-md border border-dashed border-border text-xs font-semibold cursor-pointer hover:bg-muted/40">
-            <Upload className="w-3 h-3" />
-            {uploading === s.type ? "Uploading…" : "Upload"}
-            <input
-              type="file"
-              className="hidden"
-              disabled={uploading !== null}
-              onChange={(e) => {
-                const f = e.target.files?.[0];
-                if (f) upload(f, s.type);
-                e.target.value = "";
-              }}
-            />
-          </label>
+          <div className="flex items-center gap-2">
+            <label className="inline-flex items-center gap-1.5 h-8 px-3 rounded-md border border-dashed border-border text-xs font-semibold cursor-pointer hover:bg-muted/40">
+              <Upload className="w-3 h-3" />
+              {uploading === s.type ? "Uploading…" : "Upload"}
+              <input
+                type="file"
+                className="hidden"
+                disabled={uploading !== null}
+                onChange={(e) => {
+                  const f = e.target.files?.[0];
+                  if (f) upload(f, s.type);
+                  e.target.value = "";
+                }}
+              />
+            </label>
+            <button
+              type="button"
+              onClick={() => { setLinkSlot(linkSlot === s.type ? null : s.type); setLinkName(""); setLinkUrl(""); }}
+              className="inline-flex items-center gap-1.5 h-8 px-3 rounded-md border border-border text-xs font-semibold hover:bg-muted/40"
+            >
+              <LinkIcon className="w-3 h-3" />
+              Add link
+            </button>
+          </div>
+          {linkSlot === s.type && (
+            <div className="space-y-1.5 pt-1.5">
+              <input
+                value={linkName}
+                onChange={(e) => setLinkName(e.target.value)}
+                placeholder="Label (optional) — e.g. 2026 CR-V brochure"
+                className="w-full h-8 rounded-md border border-border bg-background px-2.5 text-xs"
+              />
+              <div className="flex gap-1.5">
+                <input
+                  value={linkUrl}
+                  onChange={(e) => setLinkUrl(e.target.value)}
+                  placeholder="https://…"
+                  className="flex-1 h-8 rounded-md border border-border bg-background px-2.5 text-xs"
+                />
+                <button
+                  type="button"
+                  onClick={() => addLink(s.type)}
+                  className="h-8 px-3 rounded-md bg-primary text-primary-foreground text-xs font-semibold"
+                >
+                  Add
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       ))}
     </div>
