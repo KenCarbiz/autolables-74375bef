@@ -9,6 +9,16 @@ export interface DealerSettings {
   dealer_tagline: string;
   dealer_logo_url: string;
   primary_color: string;
+  // Dealership legal + contact details (appear on the addendum / Buyers
+  // Guide and identify the licensed seller). dealer_state is the state the
+  // dealer legally operates in and drives state compliance rules.
+  dealer_address: string;
+  dealer_city: string;
+  dealer_state: string;   // 2-letter operating state
+  dealer_zip: string;
+  dealer_phone: string;
+  dealer_principal: string;        // dealer principal / owner of record
+  dealer_license_number: string;   // DMV dealer license / ID number
   // Feature toggles — what shows on the employee-facing addendum
   feature_vin_decode: boolean;
   feature_buyers_guide: boolean;
@@ -59,6 +69,13 @@ export const DEFAULT_SETTINGS: DealerSettings = {
   dealer_tagline: "Your Trusted Automotive Partner",
   dealer_logo_url: "",
   primary_color: "",
+  dealer_address: "",
+  dealer_city: "",
+  dealer_state: "",
+  dealer_zip: "",
+  dealer_phone: "",
+  dealer_principal: "",
+  dealer_license_number: "",
   feature_vin_decode: true,
   feature_buyers_guide: true,
   feature_product_rules: true,

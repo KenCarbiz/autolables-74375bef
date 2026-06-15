@@ -370,7 +370,7 @@ const Index = () => {
           totals: { installedTotal, optionalTotal },
           initials,
           optionalSelections,
-          dealer: { name: storeName, state: settings.doc_fee_state || null },
+          dealer: { name: storeName, state: settings.doc_fee_state || settings.dealer_state || null },
         },
         {
           tenantId: currentStore?.id || null,
@@ -421,7 +421,7 @@ const Index = () => {
     // dealer in an audit (banned phrases, missing E-SIGN, missing
     // Buyers Guide on a used car, un-initialled installed products).
     const rtFindings = runComplianceRedTeam({
-      state: settings.doc_fee_state || "",
+      state: settings.doc_fee_state || settings.dealer_state || "",
       docFeeAmount: displayProducts?.find((p) => p.name.toLowerCase().includes("doc"))?.price,
       stickerText: displayProducts
         ?.map((p) => `${p.name} ${p.disclosure || ""}`)
@@ -487,7 +487,7 @@ const Index = () => {
 
     // Build the compliance receipt — surface every gate that
     // just verified before the customer ever sees the link.
-    const state = settings.doc_fee_state || "";
+    const state = settings.doc_fee_state || settings.dealer_state || "";
     const receipt: { label: string; cite?: string }[] = [
       { label: "E-SIGN consent v1 attached", cite: "15 U.S.C. §7001" },
       { label: "Payload hashed (SHA-256) for tamper evidence" },
@@ -768,7 +768,7 @@ const Index = () => {
         <div style={{ maxWidth: paperWidth }} className="mx-auto mb-3 no-print space-y-3">
           <ComplianceRedTeamPanel
             findings={runComplianceRedTeam({
-              state: settings.doc_fee_state || "",
+              state: settings.doc_fee_state || settings.dealer_state || "",
               vehiclePrice: undefined,
               docFeeAmount: displayProducts?.find((p) => p.name.toLowerCase().includes("doc"))?.price,
               stickerText: displayProducts
@@ -790,7 +790,7 @@ const Index = () => {
           />
           {/* Wave 4.3 — per-state disclosure pack for the dealer's state */}
           <StateRewriterPanel
-            state={settings.doc_fee_state || null}
+            state={settings.doc_fee_state || settings.dealer_state || null}
             input={{
               vehiclePrice: undefined,
               docFeeAmount: displayProducts?.find((p) => p.name.toLowerCase().includes("doc"))?.price,
@@ -935,7 +935,7 @@ const Index = () => {
                       return next;
                     })}
                     isOverridden={benefitOverrides[p.id] !== undefined}
-                    state={settings.doc_fee_state || ""}
+                    state={settings.doc_fee_state || settings.dealer_state || ""}
                   />
                 )}
               </div>

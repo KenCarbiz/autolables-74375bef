@@ -274,6 +274,13 @@ const Admin = () => {
     dealer_tagline: settings.dealer_tagline,
     dealer_logo_url: settings.dealer_logo_url,
     primary_color: settings.primary_color,
+    dealer_address: settings.dealer_address,
+    dealer_city: settings.dealer_city,
+    dealer_state: settings.dealer_state,
+    dealer_zip: settings.dealer_zip,
+    dealer_phone: settings.dealer_phone,
+    dealer_principal: settings.dealer_principal,
+    dealer_license_number: settings.dealer_license_number,
   });
   const [logoUploading, setLogoUploading] = useState(false);
 
@@ -1213,6 +1220,49 @@ const Admin = () => {
                   {branding.primary_color && (
                     <div className="w-10 h-10 rounded border border-border-custom" style={{ backgroundColor: branding.primary_color }} />
                   )}
+                </div>
+              </div>
+              {/* Dealership legal + contact details. These identify the
+                  licensed seller on the addendum / Buyers Guide; the
+                  operating state also drives state compliance rules. */}
+              <div className="pt-3 mt-3 border-t border-border-custom space-y-3">
+                <div>
+                  <h4 className="text-sm font-bold text-foreground">Dealership Details</h4>
+                  <p className="text-xs text-muted-foreground">Address, contact, dealer principal, and DMV license. Shown on generated documents.</p>
+                </div>
+                <div>
+                  <label className="text-xs font-semibold text-muted-foreground">Street Address</label>
+                  <input value={branding.dealer_address} onChange={(e) => setBranding({ ...branding, dealer_address: e.target.value })} placeholder="123 Main St" className="mt-1 w-full px-3 py-2 border border-border-custom rounded text-sm bg-background text-foreground placeholder:text-muted-foreground/50" />
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-xs font-semibold text-muted-foreground">City</label>
+                    <input value={branding.dealer_city} onChange={(e) => setBranding({ ...branding, dealer_city: e.target.value })} className="mt-1 w-full px-3 py-2 border border-border-custom rounded text-sm bg-background text-foreground" />
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className="text-xs font-semibold text-muted-foreground">State</label>
+                      <input value={branding.dealer_state} maxLength={2} onChange={(e) => setBranding({ ...branding, dealer_state: e.target.value.toUpperCase() })} placeholder="CT" className="mt-1 w-full px-3 py-2 border border-border-custom rounded text-sm bg-background text-foreground placeholder:text-muted-foreground/50 uppercase" />
+                    </div>
+                    <div>
+                      <label className="text-xs font-semibold text-muted-foreground">ZIP</label>
+                      <input value={branding.dealer_zip} onChange={(e) => setBranding({ ...branding, dealer_zip: e.target.value })} className="mt-1 w-full px-3 py-2 border border-border-custom rounded text-sm bg-background text-foreground" />
+                    </div>
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-xs font-semibold text-muted-foreground">Phone</label>
+                    <input value={branding.dealer_phone} onChange={(e) => setBranding({ ...branding, dealer_phone: e.target.value })} placeholder="(555) 123-4567" className="mt-1 w-full px-3 py-2 border border-border-custom rounded text-sm bg-background text-foreground placeholder:text-muted-foreground/50" />
+                  </div>
+                  <div>
+                    <label className="text-xs font-semibold text-muted-foreground">Dealer Principal</label>
+                    <input value={branding.dealer_principal} onChange={(e) => setBranding({ ...branding, dealer_principal: e.target.value })} placeholder="Owner of record" className="mt-1 w-full px-3 py-2 border border-border-custom rounded text-sm bg-background text-foreground placeholder:text-muted-foreground/50" />
+                  </div>
+                </div>
+                <div>
+                  <label className="text-xs font-semibold text-muted-foreground">DMV Dealer License / ID Number</label>
+                  <input value={branding.dealer_license_number} onChange={(e) => setBranding({ ...branding, dealer_license_number: e.target.value })} placeholder="e.g. CT dealer #00000" className="mt-1 w-full px-3 py-2 border border-border-custom rounded text-sm bg-background text-foreground placeholder:text-muted-foreground/50" />
                 </div>
               </div>
               <div className="flex gap-3">
