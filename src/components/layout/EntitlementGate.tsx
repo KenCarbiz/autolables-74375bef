@@ -40,14 +40,46 @@ interface Props {
 
 const EntitlementGate = ({ app, children }: Props) => {
   const navigate = useNavigate();
-  const { user, isAdmin, loading: authLoading } = useAuth();
+  const { user, isAdmin, loading: authLoading, signOut } = useAuth();
   const { loading, tenant, hasApp, needsOnboarding, entitlementFor, activateApp, reload } =
     useEntitlements();
 
   const [pulling, setPulling] = useState(false);
   const [activating, setActivating] = useState(false);
+  const [deadlineReached, setDeadlineReached] = useState(false);
   const pulledRef = useRef(false);
   const activatedRef = useRef(false);
+
+  // Whether we're still resolving access (auth, entitlement load, the
+  // Autocurb pull, or the bundle auto-provision).
+  const stillResolving = authLoading || loading || pulling || activating;
+
+  // Absolute escape hatch: if resolving hasn't finished within 14s (past
+  // the pull 5s + reload 5s + watchdog 12s budget), stop spinning and show
+  // a clear Retry / Sign-out screen instead of an endless loader. Resets
+  // the moment resolving completes.
+  useEffect(() => {
+    if (!stillResolving) {
+      setDeadlineReached(false);
+      return;
+    }
+    const t = setTimeout(() => setDeadlineReached(true), 14000);
+    return () => clearTimeout(t);
+  }, [stillResolving]);
+
+  const handleRetry = () => {
+    pulledRef.current = false;
+    setDeadlineReached(false);
+    setPulling(false);
+    void reload();
+  };
+  const handleSignOut = async () => {
+    try {
+      await signOut();
+    } finally {
+      navigate("/login");
+    }
+  };
 
   // Cold pull from Autocurb when the user has no local tenant.
   // Admins skip this entirely — they are platform operators, not
@@ -121,7 +153,10 @@ const EntitlementGate = ({ app, children }: Props) => {
     })();
   }, [tenant, app, hasApp, activateApp]);
 
-  if (authLoading || loading || pulling || activating) {
+  if (stillResolving) {
+    if (deadlineReached) {
+      return <AccessUnconfirmed onRetry={handleRetry} onSignOut={handleSignOut} />;
+    }
     return <GateSpinner label={
       activating ? "Activating your AutoLabels bundle…" :
       pulling    ? "Checking your Autocurb profile…" :
@@ -194,5 +229,45 @@ const GateSpinner = ({ label }: { label: string }) => {
     </div>
   );
 };
+
+// Terminal escape when access can't be confirmed in time. Never leave the
+// user on an endless spinner — give them an explicit Retry and a Sign-out.
+const AccessUnconfirmed = ({
+  onRetry,
+  onSignOut,
+}: {
+  onRetry: () => void;
+  onSignOut: () => void;
+}) => (
+  <div className="min-h-screen flex items-center justify-center bg-background px-6">
+    <div className="text-center space-y-4 max-w-sm">
+      <h1 className="text-xl font-bold text-foreground">We couldn't confirm your access</h1>
+      <p className="text-sm text-muted-foreground leading-relaxed">
+        Your sign-in worked, but we couldn't verify your account in time. This is usually a
+        slow connection or a session that needs refreshing — not a problem with your account.
+      </p>
+      <div className="flex flex-col gap-2 pt-1">
+        <button
+          onClick={onRetry}
+          className="h-11 rounded-xl bg-primary text-primary-foreground text-sm font-bold hover:opacity-90"
+        >
+          Try again
+        </button>
+        <button
+          onClick={() => window.location.reload()}
+          className="h-11 rounded-xl border border-border text-foreground text-sm font-semibold hover:bg-muted"
+        >
+          Hard refresh
+        </button>
+        <button
+          onClick={onSignOut}
+          className="h-9 text-xs text-muted-foreground hover:text-foreground"
+        >
+          Sign out and back in
+        </button>
+      </div>
+    </div>
+  </div>
+);
 
 export default EntitlementGate;
