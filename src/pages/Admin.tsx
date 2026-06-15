@@ -1276,6 +1276,13 @@ const Admin = () => {
                       dealer_tagline: "",
                       dealer_logo_url: "",
                       primary_color: "",
+                      dealer_address: "",
+                      dealer_city: "",
+                      dealer_state: "",
+                      dealer_zip: "",
+                      dealer_phone: "",
+                      dealer_principal: "",
+                      dealer_license_number: "",
                     };
                     setBranding(defaults);
                     updateSettings(defaults);
