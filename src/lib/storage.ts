@@ -60,7 +60,13 @@ export const uploadPhotos = async (
   files: File[],
   opts: { tenantId?: string | null; storeId?: string; vin?: string } = {}
 ): Promise<UploadedPhoto[]> => {
-  const results = await Promise.all(files.map((f) => uploadPhoto(bucket, f, opts)));
+  const results = await Promise.all(files.map(async (f) => {
+    try {
+      return await uploadPhoto(bucket, f, opts);
+    } catch {
+      return null;
+    }
+  }));
   return results.filter((r): r is UploadedPhoto => r !== null);
 };
 
