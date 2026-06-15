@@ -234,8 +234,13 @@ const Admin = () => {
         .upload(path, file, { cacheControl: "3600", upsert: false, contentType: file.type || undefined });
       if (error) {
         const msg = (error.message || "").toLowerCase();
-        if (msg.includes("bucket") || msg.includes("not found")) {
-          toast.error("Document storage isn't set up yet — apply the product-docs migration on Supabase, then retry.");
+        // "bucket not found" and "schema is invalid/incompatible" both mean
+        // the product-docs storage bucket has not been provisioned yet.
+        const notProvisioned =
+          msg.includes("bucket") || msg.includes("not found") ||
+          msg.includes("schema") || msg.includes("incompatible");
+        if (notProvisioned) {
+          toast.error("Document storage isn't set up yet. Create the 'product-docs' bucket on Supabase (Storage > New bucket), then re-pick the file.");
         } else {
           toast.error(`Upload failed: ${error.message}`);
         }
@@ -2029,7 +2034,8 @@ const Admin = () => {
         {/* ─── Product Edit Modal ─── */}
         {editing && (
           <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-            <div className="bg-card rounded-lg p-6 w-full max-w-md space-y-3 max-h-[90vh] overflow-y-auto">
+            <div className="bg-card rounded-lg w-full max-w-4xl max-h-[90vh] flex overflow-hidden">
+              <div className="flex-1 p-6 space-y-3 overflow-y-auto min-w-0">
               <h2 className="text-lg font-bold font-barlow-condensed">{editing.id ? "Edit Product" : "Add Product"}</h2>
               <div>
                 <label className="text-xs font-semibold text-muted-foreground">Product Name</label>
@@ -2277,6 +2283,8 @@ const Admin = () => {
                 <button onClick={handleSaveProduct} className="flex-1 py-2 bg-teal text-primary-foreground rounded font-semibold text-sm">Save</button>
                 <button onClick={() => setEditing(null)} className="flex-1 py-2 bg-muted text-foreground rounded font-semibold text-sm">Cancel</button>
               </div>
+              </div>
+              <ProductEditPreview editing={editing} />
             </div>
           </div>
         )}
@@ -2390,6 +2398,89 @@ const Admin = () => {
             route (src/pages/PlatformAdmin.tsx) so the platform bundle
             doesn't ship with every dealer page load. */}
         </div>
+    </div>
+  );
+};
+
+// Live customer-facing preview + FTC-readiness checklist shown beside the
+// product editor. Mirrors how the line renders on the addendum so the dealer
+// sees the output (and what's still missing) while editing.
+const ProductEditPreview = ({ editing }: { editing: Partial<Product> }) => {
+  const isInstalled = (editing.badge_type || "installed") === "installed";
+  const disclosure = isInstalled
+    ? (editing.disclosure || "")
+    : (editing.disclosure_optional || editing.disclosure || "");
+  const benefit = isInstalled
+    ? (editing.benefit_justification || "")
+    : (editing.benefit_justification_optional || editing.benefit_justification || "");
+  const price = Number(editing.price) || 0;
+  const inAdvertised = editing.price_in_advertised ?? true;
+
+  const checks = [
+    { label: "Pricing set", ok: price > 0 },
+    { label: "Disclosure present", ok: !!(editing.disclosure || editing.disclosure_optional || "").trim() },
+    { label: "Benefit justification present", ok: !!(editing.benefit_justification || editing.benefit_justification_optional || "").trim() },
+    { label: "Contract / warranty attached", ok: !!editing.contract_url },
+  ];
+  const done = checks.filter((c) => c.ok).length;
+  const score = Math.round((done / checks.length) * 100);
+  const scoreColor = score === 100 ? "text-emerald-600" : score >= 50 ? "text-amber-600" : "text-destructive";
+
+  return (
+    <div className="hidden lg:flex w-80 flex-shrink-0 flex-col border-l border-border bg-muted/20 overflow-y-auto">
+      <div className="p-5 space-y-4">
+        <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Live preview</p>
+
+        {/* How the line renders to the customer */}
+        <div className="rounded-xl border border-border bg-card shadow-premium p-4">
+          <div className="flex items-center justify-between gap-2">
+            <span className={`text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded ${isInstalled ? "bg-blue/10 text-blue" : "bg-gold/10 text-gold"}`}>
+              {isInstalled ? "Pre-Installed" : "Optional"}
+            </span>
+            <span className="text-sm font-bold tabular-nums text-foreground">${price.toFixed(2)}</span>
+          </div>
+          <p className="mt-2 text-sm font-semibold text-foreground">{editing.name || "Product name"}</p>
+          {editing.subtitle && <p className="text-xs text-muted-foreground mt-0.5">{editing.subtitle}</p>}
+          {editing.warranty && <p className="text-[11px] text-muted-foreground mt-2">Warranty: {editing.warranty}</p>}
+          <p className="text-[10px] text-muted-foreground mt-2">
+            {inAdvertised ? "Itemized — included in the advertised price." : "Dealer-installed upcharge above the advertised price."}
+          </p>
+          {disclosure ? (
+            <p className="text-[11px] text-foreground mt-3 whitespace-pre-wrap leading-snug">{disclosure}</p>
+          ) : (
+            <p className="text-[11px] italic text-muted-foreground mt-3">Disclosure will appear here.</p>
+          )}
+          {benefit && (
+            <div className="mt-3">
+              <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Why this benefits you</p>
+              <p className="text-[11px] text-foreground mt-1 whitespace-pre-wrap leading-snug">{benefit}</p>
+            </div>
+          )}
+        </div>
+
+        {/* FTC-readiness checklist */}
+        <div className="rounded-xl border border-border bg-card shadow-premium p-4">
+          <div className="flex items-center justify-between">
+            <p className="text-xs font-semibold text-foreground">FTC readiness</p>
+            <span className={`text-sm font-bold tabular-nums ${scoreColor}`}>{score}%</span>
+          </div>
+          <div className="mt-3 space-y-2">
+            {checks.map((c) => (
+              <div key={c.label} className="flex items-center gap-2">
+                {c.ok ? (
+                  <CheckCircle2 className="w-4 h-4 text-emerald-500 flex-shrink-0" />
+                ) : (
+                  <AlertTriangle className="w-4 h-4 text-amber-500 flex-shrink-0" />
+                )}
+                <span className={`text-[11px] ${c.ok ? "text-foreground" : "text-muted-foreground"}`}>{c.label}</span>
+              </div>
+            ))}
+          </div>
+          {score < 100 && (
+            <p className="text-[10px] text-muted-foreground mt-3">Complete every item before this product is sale-ready.</p>
+          )}
+        </div>
+      </div>
     </div>
   );
 };
