@@ -2094,7 +2094,8 @@ const Admin = () => {
         {editing && (
           <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
             <div className="bg-card rounded-lg w-full max-w-4xl max-h-[90vh] flex overflow-hidden">
-              <div className="flex-1 p-6 space-y-3 overflow-y-auto min-w-0">
+              <div className="flex-1 flex flex-col min-w-0">
+              <div className="p-6 space-y-3 overflow-y-auto flex-1">
               <h2 className="text-lg font-bold font-barlow-condensed">{editing.id ? "Edit Product" : "Add Product"}</h2>
               <div>
                 <label className="text-xs font-semibold text-muted-foreground">Product Name</label>
@@ -2366,9 +2367,11 @@ const Admin = () => {
                 <input type="checkbox" checked={editing.is_active ?? true} onChange={(e) => setEditing({ ...editing, is_active: e.target.checked })} />
                 <label className="text-xs">Active</label>
               </div>
-              <div className="flex gap-2 pt-2">
-                <button onClick={handleSaveProduct} className="flex-1 py-2 bg-teal text-primary-foreground rounded font-semibold text-sm">Save</button>
+              </div>
+              {/* Sticky footer — always visible regardless of form length. */}
+              <div className="flex gap-2 p-4 border-t border-border bg-card">
                 <button onClick={() => setEditing(null)} className="flex-1 py-2 bg-muted text-foreground rounded font-semibold text-sm">Cancel</button>
+                <button onClick={handleSaveProduct} className="flex-1 py-2 bg-teal text-primary-foreground rounded font-semibold text-sm">{editing.id ? "Save Product" : "Add Product"}</button>
               </div>
               </div>
               <ProductEditPreview editing={editing} />
@@ -2516,7 +2519,10 @@ const ProductEditPreview = ({ editing }: { editing: Partial<Product> }) => {
   return (
     <div className="hidden lg:flex w-80 flex-shrink-0 flex-col border-l border-border bg-muted/20 overflow-y-auto">
       <div className="p-5 space-y-4">
-        <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Live preview</p>
+        <div>
+          <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Customer view</p>
+          <p className="text-[11px] text-muted-foreground">This is exactly how this item appears on the addendum.</p>
+        </div>
 
         {/* How the line renders to the customer */}
         <div className="rounded-xl border border-border bg-card shadow-premium p-4">
@@ -2545,11 +2551,12 @@ const ProductEditPreview = ({ editing }: { editing: Partial<Product> }) => {
           )}
         </div>
 
-        {/* FTC-readiness checklist */}
-        <div className="rounded-xl border border-border bg-card shadow-premium p-4">
+        {/* FTC-readiness — the reason dealers buy AutoLabels, so it carries
+            the strongest visual weight (colored border + large score). */}
+        <div className={`rounded-xl border-2 p-4 shadow-premium ${score === 100 ? "border-emerald-500 bg-emerald-50" : score >= 50 ? "border-amber-300 bg-amber-50/60" : "border-destructive/40 bg-destructive/5"}`}>
           <div className="flex items-center justify-between">
-            <p className="text-xs font-semibold text-foreground">FTC readiness</p>
-            <span className={`text-sm font-bold tabular-nums ${scoreColor}`}>{score}%</span>
+            <p className="text-xs font-bold uppercase tracking-wider text-foreground">{score === 100 ? "FTC Ready" : "FTC Readiness"}</p>
+            <span className={`text-2xl font-bold tabular-nums ${scoreColor}`}>{score}%</span>
           </div>
           <div className="mt-3 space-y-2">
             {checks.map((c) => (
