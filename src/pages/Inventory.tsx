@@ -4,6 +4,7 @@ import { useViewTransitionNavigate } from "@/lib/navigation";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useTenant } from "@/contexts/TenantContext";
+import { useGetReady } from "@/hooks/useGetReady";
 import { useVinDecode } from "@/hooks/useVinDecode";
 import { toast } from "sonner";
 import {
@@ -47,6 +48,24 @@ const Inventory = () => {
   const { user } = useAuth();
   const { tenant } = useTenant();
   const navigate = useViewTransitionNavigate();
+  const { createGetReady } = useGetReady(tenant?.id || "");
+
+  // Push an inventory vehicle into the Get-Ready prep pipeline. Get-Ready
+  // had no intake wired, so the pipeline was always empty.
+  const sendToGetReady = async (r: { id: string; vin: string | null; ymm: string | null; condition: string | null }) => {
+    const rec = await createGetReady({
+      vin: r.vin || "",
+      stockNumber: (r.vin || "").slice(-6),
+      ymm: r.ymm || "",
+      condition: r.condition === "new" ? "new" : "used",
+      acquiredDate: new Date().toISOString().slice(0, 10),
+      accessoriesToInstall: [],
+      inspectionRequired: r.condition !== "new",
+      createdBy: user?.id || "",
+    });
+    if (rec) toast.success(`${r.ymm || r.vin || "Vehicle"} sent to Get-Ready`);
+    else toast.error("Could not add to Get-Ready (it may already be in the pipeline).");
+  };
   const [rows, setRows] = useState<VehicleRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [q, setQ] = useState("");
@@ -320,6 +339,11 @@ const Inventory = () => {
                           e.stopPropagation();
                           navigate(r.condition === "new" ? "/new-car-sticker" : "/used-car-sticker");
                         }}
+                      />
+                      <RowAction
+                        label="Get-Ready"
+                        title="Send this vehicle into the Get-Ready prep pipeline"
+                        onClick={(e) => { e.stopPropagation(); sendToGetReady(r); }}
                       />
                       <RowAction
                         label="Prep"
