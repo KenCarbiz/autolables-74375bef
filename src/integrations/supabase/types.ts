@@ -2459,6 +2459,10 @@ export type Database = {
         Returns: boolean
       }
       increment_listing_view: { Args: { _slug: string }; Returns: undefined }
+      is_tenant_manager: {
+        Args: { _tenant_id: string; _user_id: string }
+        Returns: boolean
+      }
       listings_with_stale_recalls: {
         Args: { p_limit?: number }
         Returns: {

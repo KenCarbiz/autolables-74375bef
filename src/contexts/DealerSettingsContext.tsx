@@ -133,7 +133,7 @@ const writeCache = (tenantId: string | null, settings: DealerSettings) => {
 export const DealerSettingsProvider = ({ children }: { children: ReactNode }) => {
   const { user } = useAuth();
   const { tenant } = useTenant();
-  const tenantId = tenant?.id ?? null;
+  const tenantId = tenant?.id && tenant.id !== "house" ? tenant.id : null;
 
   const [settings, setSettings] = useState<DealerSettings>(() => readCache(tenantId) ?? DEFAULT_SETTINGS);
   const [loading, setLoading] = useState(true);
