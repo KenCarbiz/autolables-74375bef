@@ -12,6 +12,7 @@ interface ProductRowProps {
   isOptional?: boolean;
   inkSaving?: boolean;
   iconType?: string;
+  controls?: React.ReactNode;
 }
 
 const PRODUCT_ICONS: Record<string, string> = {
@@ -47,7 +48,7 @@ const PRODUCT_ICONS: Record<string, string> = {
   default: "⚙️",
 };
 
-const ProductRow = ({ num, name, subtitle, warranty, badgeType, price, priceLabel, disclosure, isOptional, inkSaving, iconType }: ProductRowProps) => {
+const ProductRow = ({ num, name, subtitle, warranty, badgeType, price, priceLabel, disclosure, isOptional, inkSaving, iconType, controls }: ProductRowProps) => {
   const { settings } = useDealerSettings();
   const icon = settings.feature_product_icons && iconType ? (PRODUCT_ICONS[iconType] || PRODUCT_ICONS.default) : null;
 
@@ -76,6 +77,9 @@ const ProductRow = ({ num, name, subtitle, warranty, badgeType, price, priceLabe
         </div>
       </div>
       <p className="text-[7px] text-muted-foreground mt-1 pl-7 leading-tight">{disclosure}</p>
+      {controls && (
+        <div className="no-print mt-1.5 pl-7 flex items-center gap-3 border-t border-border-custom/40 pt-1.5">{controls}</div>
+      )}
     </div>
   );
 };

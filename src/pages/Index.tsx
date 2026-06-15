@@ -915,39 +915,7 @@ const Index = () => {
 
           {/* Products with inline type override toggle */}
           {displayProducts?.map((p, i) => (
-            <div key={p.id} className="flex items-start gap-0">
-              {!viewMode && (settings.allow_type_override_at_signing || (p as { upgrade?: ProductUpgrade | null }).upgrade) && (
-                <div className="no-print w-14 shrink-0 mt-2 flex flex-col items-center gap-1.5">
-                  {settings.allow_type_override_at_signing && (p as { available_preinstalled?: boolean }).available_preinstalled !== false && (
-                    <button
-                      onClick={() => handleToggleProductType(p.id)}
-                      className="flex flex-col items-center gap-0.5"
-                      title={`Click to switch to ${p.badge_type === "installed" ? "optional" : "installed"}`}
-                    >
-                      <div className={`relative w-8 h-4 rounded-full transition-colors ${p.badge_type === "installed" ? "bg-navy" : "bg-gold"}`}>
-                        <div className={`absolute top-0.5 w-3 h-3 rounded-full bg-card shadow transition-transform ${p.badge_type === "installed" ? "translate-x-0.5" : "translate-x-4"}`} />
-                      </div>
-                      <span className="text-[6px] text-muted-foreground font-semibold">
-                        {p.badge_type === "installed" ? "INST" : "OPT"}
-                      </span>
-                    </button>
-                  )}
-                  {(p as { upgrade?: ProductUpgrade | null }).upgrade && (
-                    <button
-                      onClick={() => handleToggleUpgrade(p.id)}
-                      className="flex flex-col items-center gap-0.5"
-                      title={upgradeSelections[p.id] ? "Remove upgrade" : "Apply upgrade"}
-                    >
-                      <div className={`relative w-8 h-4 rounded-full transition-colors ${upgradeSelections[p.id] ? "bg-gold" : "bg-muted"}`}>
-                        <div className={`absolute top-0.5 w-3 h-3 rounded-full bg-card shadow transition-transform ${upgradeSelections[p.id] ? "translate-x-4" : "translate-x-0.5"}`} />
-                      </div>
-                      <span className="text-[6px] text-muted-foreground font-semibold">
-                        {upgradeSelections[p.id] ? "UPGR" : "BASE"}
-                      </span>
-                    </button>
-                  )}
-                </div>
-              )}
+            <div key={p.id}>
               <div className="flex-1 min-w-0">
                 <ProductRow
                   num={i + 1}
@@ -961,6 +929,40 @@ const Index = () => {
                   isOptional={p.badge_type === "optional"}
                   inkSaving={inkSaving}
                   iconType={iconMap[p.id] || ""}
+                  controls={
+                    !viewMode && (settings.allow_type_override_at_signing || (p as { upgrade?: ProductUpgrade | null }).upgrade) ? (
+                      <>
+                        {settings.allow_type_override_at_signing && (p as { available_preinstalled?: boolean }).available_preinstalled !== false && (
+                          <button
+                            onClick={() => handleToggleProductType(p.id)}
+                            className="inline-flex items-center gap-1"
+                            title={`Click to switch to ${p.badge_type === "installed" ? "optional" : "installed"}`}
+                          >
+                            <div className={`relative w-8 h-4 rounded-full transition-colors ${p.badge_type === "installed" ? "bg-navy" : "bg-gold"}`}>
+                              <div className={`absolute top-0.5 w-3 h-3 rounded-full bg-card shadow transition-transform ${p.badge_type === "installed" ? "translate-x-0.5" : "translate-x-4"}`} />
+                            </div>
+                            <span className="text-[7px] text-muted-foreground font-semibold">
+                              {p.badge_type === "installed" ? "INSTALLED" : "OPTIONAL"}
+                            </span>
+                          </button>
+                        )}
+                        {(p as { upgrade?: ProductUpgrade | null }).upgrade && (
+                          <button
+                            onClick={() => handleToggleUpgrade(p.id)}
+                            className="inline-flex items-center gap-1"
+                            title={upgradeSelections[p.id] ? "Remove upgrade" : "Apply upgrade"}
+                          >
+                            <div className={`relative w-8 h-4 rounded-full transition-colors ${upgradeSelections[p.id] ? "bg-gold" : "bg-muted"}`}>
+                              <div className={`absolute top-0.5 w-3 h-3 rounded-full bg-card shadow transition-transform ${upgradeSelections[p.id] ? "translate-x-4" : "translate-x-0.5"}`} />
+                            </div>
+                            <span className="text-[7px] text-muted-foreground font-semibold">
+                              {upgradeSelections[p.id] ? "UPGRADE" : "BASE"}
+                            </span>
+                          </button>
+                        )}
+                      </>
+                    ) : undefined
+                  }
                 />
 
                 {/* Wave 16 v2 — per-line benefit-justification
