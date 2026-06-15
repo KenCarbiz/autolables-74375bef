@@ -188,6 +188,8 @@ const Index = () => {
           price_in_advertised: (p as { price_in_advertised?: boolean }).price_in_advertised ?? true,
           available_preinstalled: (p as { available_preinstalled?: boolean }).available_preinstalled ?? true,
           upgrade: (p as { upgrade?: ProductUpgrade | null }).upgrade ?? null,
+          contract_url: (p as { contract_url?: string | null }).contract_url ?? null,
+          contract_doc_type: (p as { contract_doc_type?: string | null }).contract_doc_type ?? null,
         })));
       }
     };

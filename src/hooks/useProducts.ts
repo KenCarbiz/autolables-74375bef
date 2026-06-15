@@ -45,6 +45,11 @@ export interface Product {
   available_preinstalled: boolean;
   // Optional higher tier for multi-level products (null when none).
   upgrade: ProductUpgrade | null;
+  // Required substantiating document — the product contract, or the
+  // warranty card when there is no contract. contract_doc_type records
+  // which kind was attached ('contract' | 'warranty').
+  contract_url: string | null;
+  contract_doc_type: string | null;
 }
 
 export const useProducts = () => {

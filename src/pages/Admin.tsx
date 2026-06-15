@@ -5,6 +5,7 @@ import { useDealerSettings, DealerSettings, DEFAULT_SETTINGS } from "@/contexts/
 import { useProductRules, ProductRule } from "@/hooks/useProductRules";
 import type { ProductUpgrade } from "@/hooks/useProducts";
 import type { Json } from "@/integrations/supabase/types";
+import { uploadPhoto } from "@/lib/storage";
 import { useAudit } from "@/contexts/AuditContext";
 import { useTenant } from "@/contexts/TenantContext";
 import { supabase } from "@/integrations/supabase/client";
@@ -81,6 +82,8 @@ interface Product {
   price_in_advertised: boolean;
   available_preinstalled: boolean;
   upgrade: ProductUpgrade | null;
+  contract_url: string | null;
+  contract_doc_type: string | null;
   icon_type?: string;
 }
 
@@ -102,6 +105,8 @@ const emptyProduct = {
   price_in_advertised: true,
   available_preinstalled: true,
   upgrade: null as ProductUpgrade | null,
+  contract_url: null as string | null,
+  contract_doc_type: "contract",
   icon_type: "",
 };
 
@@ -215,6 +220,18 @@ const Admin = () => {
 
   const [products, setProducts] = useState<Product[]>([]);
   const [editing, setEditing] = useState<Partial<Product> | null>(null);
+  const [uploadingDoc, setUploadingDoc] = useState(false);
+
+  const handleUploadDoc = async (file: File) => {
+    setUploadingDoc(true);
+    try {
+      const res = await uploadPhoto("product-docs", file, { tenantId: tenant?.id });
+      if (res?.url) setEditing(prev => (prev ? { ...prev, contract_url: res.url } : prev));
+      else toast.error("Upload failed. Check your connection and try again.");
+    } finally {
+      setUploadingDoc(false);
+    }
+  };
   const [editingRule, setEditingRule] = useState<Partial<ProductRule & { _new?: boolean }> | null>(null);
   const [fetching, setFetching] = useState(true);
   const [showComplianceBanner, setShowComplianceBanner] = useState<boolean>(
@@ -249,6 +266,13 @@ const Admin = () => {
 
   const handleSaveProduct = async () => {
     if (!editing || !editing.name) return;
+    // Required: every product must carry its contract — or, when there is
+    // no contract, its warranty card — as the substantiation behind the
+    // benefit claims (FTC §5).
+    if (!editing.contract_url) {
+      toast.error("Attach the product contract (or warranty card) before saving.");
+      return;
+    }
     const payload = {
       name: editing.name,
       subtitle: editing.subtitle || null,
@@ -272,6 +296,8 @@ const Admin = () => {
       price_in_advertised: editing.price_in_advertised ?? true,
       available_preinstalled: editing.available_preinstalled ?? true,
       upgrade: ((editing.upgrade && editing.upgrade.name?.trim()) ? editing.upgrade : null) as unknown as Json,
+      contract_url: editing.contract_url || null,
+      contract_doc_type: editing.contract_doc_type || null,
     };
 
     if (editing.id) {
@@ -2180,6 +2206,40 @@ const Admin = () => {
                       </div>
                     </div>
                   </div>
+                )}
+              </div>
+              <div className="rounded-lg border border-amber-200 bg-amber-50/40 p-3 space-y-2">
+                <span className="text-xs font-bold text-foreground inline-flex items-center gap-1.5">
+                  Product document
+                  <span className="text-[9px] font-bold uppercase tracking-[0.12em] px-1.5 py-0.5 rounded bg-amber-100 text-amber-800">Required</span>
+                </span>
+                <p className="text-[10px] text-muted-foreground leading-relaxed">
+                  Attach the product contract — or the warranty card when there is no contract. It's the substantiation behind the benefit claims (FTC §5) and rides with the signed packet.
+                </p>
+                <div className="flex items-center gap-4">
+                  <label className="text-[11px] font-semibold text-foreground inline-flex items-center gap-1.5 cursor-pointer">
+                    <input type="radio" name="contract_doc_type" checked={(editing.contract_doc_type || "contract") === "contract"} onChange={() => setEditing({ ...editing, contract_doc_type: "contract" })} /> Contract
+                  </label>
+                  <label className="text-[11px] font-semibold text-foreground inline-flex items-center gap-1.5 cursor-pointer">
+                    <input type="radio" name="contract_doc_type" checked={editing.contract_doc_type === "warranty"} onChange={() => setEditing({ ...editing, contract_doc_type: "warranty" })} /> Warranty card
+                  </label>
+                </div>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="file"
+                    accept="application/pdf,image/*"
+                    disabled={uploadingDoc}
+                    onChange={(e) => { const f = e.target.files?.[0]; if (f) handleUploadDoc(f); }}
+                    className="text-[11px]"
+                  />
+                  {uploadingDoc && <span className="text-[10px] text-muted-foreground">Uploading…</span>}
+                </div>
+                {editing.contract_url ? (
+                  <a href={editing.contract_url} target="_blank" rel="noopener noreferrer" className="text-[11px] text-[#2563EB] hover:underline">
+                    View attached {editing.contract_doc_type === "warranty" ? "warranty card" : "contract"}
+                  </a>
+                ) : (
+                  <p className="text-[10px] text-destructive font-semibold">No document attached — required to save.</p>
                 )}
               </div>
               <div className="flex items-center gap-2">

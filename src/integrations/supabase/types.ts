@@ -1279,6 +1279,8 @@ export type Database = {
           badge_type: string
           benefit_justification: string
           benefit_justification_optional: string | null
+          contract_doc_type: string | null
+          contract_url: string | null
           created_at: string
           disclosure: string | null
           disclosure_optional: string | null
@@ -1299,6 +1301,8 @@ export type Database = {
           badge_type?: string
           benefit_justification?: string
           benefit_justification_optional?: string | null
+          contract_doc_type?: string | null
+          contract_url?: string | null
           created_at?: string
           disclosure?: string | null
           disclosure_optional?: string | null
@@ -1319,6 +1323,8 @@ export type Database = {
           badge_type?: string
           benefit_justification?: string
           benefit_justification_optional?: string | null
+          contract_doc_type?: string | null
+          contract_url?: string | null
           created_at?: string
           disclosure?: string | null
           disclosure_optional?: string | null
