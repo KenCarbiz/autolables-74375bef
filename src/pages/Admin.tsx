@@ -5,7 +5,6 @@ import { useDealerSettings, DealerSettings, DEFAULT_SETTINGS } from "@/contexts/
 import { useProductRules, ProductRule } from "@/hooks/useProductRules";
 import type { ProductUpgrade } from "@/hooks/useProducts";
 import type { Json } from "@/integrations/supabase/types";
-import { uploadPhoto } from "@/lib/storage";
 import { useAudit } from "@/contexts/AuditContext";
 import { useTenant } from "@/contexts/TenantContext";
 import { supabase } from "@/integrations/supabase/client";
