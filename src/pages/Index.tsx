@@ -985,27 +985,10 @@ const Index = () => {
                   </div>
                 )}
 
-                {/* Wave 16 v2 — per-line benefit-justification
-                    editor + monthly-payment-impact widget. Lives
-                    INSIDE the no-print zone so the builder gets
-                    the controls; the sticker itself only renders
-                    the resulting text via downstream surfaces.
-                    Read-only in viewMode (re-opened signed
-                    addendum). */}
-                {!viewMode && (
-                  <BenefitEditor
-                    product={p}
-                    effectiveBenefit={(p as { benefit_justification?: string }).benefit_justification || ""}
-                    onChange={(text) => setBenefitOverrides(prev => ({ ...prev, [p.id]: text }))}
-                    onResetToCatalog={() => setBenefitOverrides(prev => {
-                      const next = { ...prev };
-                      delete next[p.id];
-                      return next;
-                    })}
-                    isOverridden={benefitOverrides[p.id] !== undefined}
-                    state={settings.doc_fee_state || settings.dealer_state || ""}
-                  />
-                )}
+                {/* Benefit justification is shown as full plain text above
+                    (display-only on the sign-off copy). It is edited in the
+                    Products tab, never inline on the addendum the customer
+                    signs. */}
               </div>
             </div>
           ))}
