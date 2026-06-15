@@ -11,6 +11,7 @@ import {
   AlertTriangle, ShieldCheck, Lock, Unlock, Send, MessageSquare,
 } from "lucide-react";
 import EmptyState from "@/components/ui/empty-state";
+import { InstallProofList } from "@/components/admin/InstallProofList";
 
 // ──────────────────────────────────────────────────────────────
 // VehicleFile — /vehicle-file/:id
@@ -825,6 +826,9 @@ const PrepPanel = ({ vehicle }: { vehicle: VehicleRow }) => {
           </p>
         </div>
       </div>
+
+      {/* Vendor / detail-shop install proofs (scan-to-verify QR flow) */}
+      <InstallProofList vin={vehicle.vin} />
 
       {loading ? (
         <div className="rounded-xl border border-border bg-card p-8 text-center text-sm text-muted-foreground">

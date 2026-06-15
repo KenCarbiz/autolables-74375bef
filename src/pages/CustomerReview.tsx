@@ -260,7 +260,7 @@ const CustomerReview = () => {
 
     setSubmitting(true);
     const consent = buildConsentRecord();
-    const [customerIp, geoloc, prepSnapshot] = await Promise.all([
+    const [customerIp, geoloc, prepSnapshot, installProofs] = await Promise.all([
       fetchClientIp(),
       fetchGeoloc(),
       (async () => {
@@ -275,6 +275,16 @@ const CustomerReview = () => {
             .maybeSingle();
           return data || null;
         } catch { return null; }
+      })(),
+      (async () => {
+        try {
+          const { data } = await (supabase as any)
+            .from("install_proofs")
+            .select("id,product_name,installer_name,installer_company,installed_at,photo_path,created_at")
+            .eq("vehicle_vin", addendum.vehicle_vin)
+            .order("created_at", { ascending: false });
+          return data || [];
+        } catch { return []; }
       })(),
     ]);
 
@@ -355,6 +365,7 @@ const CustomerReview = () => {
       sb766_three_day_return_ack: sb766ThreeDayAck || null,
       sb766_financing_disclosure: sb766Disclosure,
       prep_sign_off_snapshot: prepSnapshot,
+      install_proofs_snapshot: installProofs,
       state_rule_snapshot: stateRule,
       compliance_findings: complianceFindings,
       compliance_summary: complianceSummary,
