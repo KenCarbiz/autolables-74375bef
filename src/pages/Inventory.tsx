@@ -586,6 +586,10 @@ const AddVehicleModal = ({ tenantId, userId, onClose, onCreated }: AddProps) => 
     const { data, error } = await (supabase as any)
       .from("vehicle_listings")
       .insert({
+        // store_id is NOT NULL and holds the tenant id (text); set both so
+        // the tenant-scoped (Inventory) and store-scoped (useVehicleListing)
+        // read paths both find the row.
+        store_id: tenantId,
         tenant_id: tenantId,
         vin: vin.trim().toUpperCase(),
         slug,
@@ -784,6 +788,7 @@ const CsvImportModal = ({ tenantId, userId, onClose, onImported }: ImportProps) 
       const model = idx.model >= 0 ? cells[idx.model] : "";
       const ymm = [year, make, model].filter(Boolean).join(" ");
       return {
+        store_id: tenantId,
         tenant_id: tenantId,
         vin,
         slug: makeSlug(`${make}-${model || vin.slice(-6)}`),
