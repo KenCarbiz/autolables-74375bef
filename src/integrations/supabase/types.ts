@@ -14,6 +14,50 @@ export type Database = {
   }
   public: {
     Tables: {
+      addendum_events: {
+        Row: {
+          actor: string | null
+          actor_name: string | null
+          addendum_id: string
+          channel: string | null
+          created_at: string
+          details: Json | null
+          event: string
+          id: string
+          signing_token: string | null
+        }
+        Insert: {
+          actor?: string | null
+          actor_name?: string | null
+          addendum_id: string
+          channel?: string | null
+          created_at?: string
+          details?: Json | null
+          event: string
+          id?: string
+          signing_token?: string | null
+        }
+        Update: {
+          actor?: string | null
+          actor_name?: string | null
+          addendum_id?: string
+          channel?: string | null
+          created_at?: string
+          details?: Json | null
+          event?: string
+          id?: string
+          signing_token?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "addendum_events_addendum_id_fkey"
+            columns: ["addendum_id"]
+            isOneToOne: false
+            referencedRelation: "addendums"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       addendum_signings: {
         Row: {
           acknowledgments: Json
@@ -162,12 +206,16 @@ export type Database = {
           employee_signed_at: string | null
           esign_consent: Json | null
           financing_input: Json | null
+          frozen_snapshot: Json | null
           id: string
           initials: Json | null
+          lifecycle_status: string
           listing_slug: string | null
+          locked_at: string | null
           optional_selections: Json | null
           price_overrides: Json | null
           products_snapshot: Json
+          ready_at: string | null
           sb766_add_on_precontract: Json | null
           sb766_financing_disclosure: Json | null
           sb766_three_day_return_ack: boolean | null
@@ -186,6 +234,7 @@ export type Database = {
           vehicle_stock: string | null
           vehicle_vin: string | null
           vehicle_ymm: string | null
+          version_label: string | null
           warranty_ack: boolean | null
         }
         Insert: {
@@ -211,12 +260,16 @@ export type Database = {
           employee_signed_at?: string | null
           esign_consent?: Json | null
           financing_input?: Json | null
+          frozen_snapshot?: Json | null
           id?: string
           initials?: Json | null
+          lifecycle_status?: string
           listing_slug?: string | null
+          locked_at?: string | null
           optional_selections?: Json | null
           price_overrides?: Json | null
           products_snapshot?: Json
+          ready_at?: string | null
           sb766_add_on_precontract?: Json | null
           sb766_financing_disclosure?: Json | null
           sb766_three_day_return_ack?: boolean | null
@@ -235,6 +288,7 @@ export type Database = {
           vehicle_stock?: string | null
           vehicle_vin?: string | null
           vehicle_ymm?: string | null
+          version_label?: string | null
           warranty_ack?: boolean | null
         }
         Update: {
@@ -260,12 +314,16 @@ export type Database = {
           employee_signed_at?: string | null
           esign_consent?: Json | null
           financing_input?: Json | null
+          frozen_snapshot?: Json | null
           id?: string
           initials?: Json | null
+          lifecycle_status?: string
           listing_slug?: string | null
+          locked_at?: string | null
           optional_selections?: Json | null
           price_overrides?: Json | null
           products_snapshot?: Json
+          ready_at?: string | null
           sb766_add_on_precontract?: Json | null
           sb766_financing_disclosure?: Json | null
           sb766_three_day_return_ack?: boolean | null
@@ -284,6 +342,7 @@ export type Database = {
           vehicle_stock?: string | null
           vehicle_vin?: string | null
           vehicle_ymm?: string | null
+          version_label?: string | null
           warranty_ack?: boolean | null
         }
         Relationships: [
@@ -2491,6 +2550,10 @@ export type Database = {
           ymm: string
         }[]
       }
+      mark_ready_for_signature: {
+        Args: { _addendum_id: string; _version_label: string }
+        Returns: undefined
+      }
       merge_scraped_vdp: {
         Args: {
           _description: string
@@ -2504,6 +2567,15 @@ export type Database = {
           _vehicle_id: string
         }
         Returns: string
+      }
+      record_addendum_event: {
+        Args: {
+          _channel?: string
+          _details?: Json
+          _event: string
+          _signing_token: string
+        }
+        Returns: undefined
       }
       record_customer_signing: {
         Args: {
