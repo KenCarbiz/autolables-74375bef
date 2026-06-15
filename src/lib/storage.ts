@@ -29,9 +29,7 @@ export const uploadPhoto = async (
   opts: { tenantId?: string | null; storeId?: string; vin?: string } = {}
 ): Promise<UploadedPhoto | null> => {
   if (!opts.tenantId) {
-    // eslint-disable-next-line no-console
-    console.error("uploadPhoto: tenantId is required (RLS path scoping)");
-    return null;
+    throw new Error("Missing tenant for upload.");
   }
   const scope = [opts.tenantId, opts.storeId || "any", opts.vin || "misc"].join("/");
   const stamp = Date.now();
@@ -44,9 +42,7 @@ export const uploadPhoto = async (
     contentType: file.type || undefined,
   });
   if (error) {
-    // eslint-disable-next-line no-console
-    console.error("uploadPhoto error", error);
-    return null;
+    throw new Error(error.message || "Upload failed.");
   }
 
   const { data: pub } = supabase.storage.from(bucket).getPublicUrl(path);
