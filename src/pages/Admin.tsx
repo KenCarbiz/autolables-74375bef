@@ -224,6 +224,7 @@ const Admin = () => {
   const { getPending: getPendingTradeIns } = useTradeInLifecycle();
 
   const [products, setProducts] = useState<Product[]>([]);
+  const [showLibrary, setShowLibrary] = useState(false);
   const [editing, setEditing] = useState<Partial<Product> | null>(null);
   const [uploadingDoc, setUploadingDoc] = useState(false);
 
@@ -768,35 +769,26 @@ const Admin = () => {
 
         {/* ─── Products Tab ─── */}
         {tab === "products" && (
-          <div>
-            <div className="flex items-center justify-between mb-4">
-              <div>
-                <h2 className="text-lg font-semibold text-foreground">Products</h2>
-                <p className="text-xs text-muted-foreground">Toggle each product as installed or optional. Changes apply to every new addendum instantly.</p>
-              </div>
-              <button
-                onClick={() => setEditing({ ...emptyProduct, sort_order: products.length + 1 })}
-                className="inline-flex items-center gap-1.5 h-9 px-3 rounded-md bg-primary text-primary-foreground text-sm font-medium hover:opacity-90"
-              >
-                + Add Product
-              </button>
+          <div className="flex flex-col">
+            <div className="mb-4">
+              <h2 className="text-lg font-semibold text-foreground">Products</h2>
+              <p className="text-xs text-muted-foreground">Your active products power every addendum. Open the template library below to add more.</p>
             </div>
 
-            {/* Product Library */}
-            <div className="mb-6 bg-card rounded-xl border border-border shadow-premium p-5">
-              <div className="flex items-center gap-2 mb-1">
-                <Library className="w-4 h-4 text-blue-600" />
-                <h3 className="text-sm font-semibold text-foreground">Product Library</h3>
-              </div>
-              <p className="text-xs text-muted-foreground mb-3">
-                Browse your local product library. Click "Add to dealership" to copy a library entry into your active products list.
-              </p>
-              <div className="flex items-start gap-2 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 mb-3">
-                <Plus className="w-3.5 h-3.5 text-blue-700 mt-0.5 flex-shrink-0" />
-                <p className="text-[11px] text-blue-900">
-                  Need a new product not in the library? Use the "+ Add Product" button above to create a custom one.
-                </p>
-              </div>
+            {/* Template Library */}
+            <div className="order-2 mt-6 bg-card rounded-xl border border-border shadow-premium p-5">
+              <button onClick={() => setShowLibrary((v) => !v)} className="w-full flex items-center justify-between gap-2 text-left">
+                <span className="inline-flex items-center gap-2">
+                  <Library className="w-4 h-4 text-blue-600" />
+                  <span className="text-sm font-semibold text-foreground">Template Library</span>
+                </span>
+                <span className="text-xs font-medium text-blue-700">{showLibrary ? "Hide" : "Show templates"}</span>
+              </button>
+              {showLibrary && (
+                <div className="mt-3">
+                  <p className="text-xs text-muted-foreground mb-3">
+                    Browse templates and click "Add to dealership" to copy one into your active products. Need a custom one? Use "+ Add Product" in your Active Products list.
+                  </p>
               {(() => {
               // Hide archive/library cards the dealer has already activated
               // (a product of the same name exists in their active list), so
@@ -858,9 +850,22 @@ const Admin = () => {
                 </div>
               );
               })()}
+                </div>
+              )}
             </div>
 
-            <div className="space-y-2">
+            {/* Active products — the dealer's live catalog, the star of the page. */}
+            <div className="order-1">
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-sm font-bold text-foreground">Active Products <span className="font-normal text-muted-foreground">({products.length})</span></h3>
+                <button
+                  onClick={() => setEditing({ ...emptyProduct, sort_order: products.length + 1 })}
+                  className="inline-flex items-center gap-1.5 h-9 px-3 rounded-md bg-primary text-primary-foreground text-sm font-medium hover:opacity-90"
+                >
+                  + Add Product
+                </button>
+              </div>
+              <div className="space-y-2">
               {products.map((p) => {
                 const iconMap = JSON.parse(localStorage.getItem("product_icons") || "{}");
                 const icon = iconMap[p.id];
@@ -922,6 +927,7 @@ const Admin = () => {
                   </div>
                 );
               })}
+              </div>
             </div>
           </div>
         )}
