@@ -30,7 +30,7 @@ import { useAudit } from "@/contexts/AuditContext";
 import { useTenant } from "@/contexts/TenantContext";
 import { useVehicleFiles } from "@/hooks/useVehicleFiles";
 import { QRCodeSVG } from "qrcode.react";
-import { ArrowLeft, Save, Send, Printer, Download } from "lucide-react";
+import { ArrowLeft, Save, Send, Printer, Download, ChevronDown, Check } from "lucide-react";
 import ComplianceRedTeamPanel from "@/components/addendum/ComplianceRedTeamPanel";
 import { runComplianceRedTeam, summarizeRedTeam } from "@/lib/complianceRedTeam";
 import StateRewriterPanel from "@/components/addendum/StateRewriterPanel";
@@ -45,6 +45,97 @@ const PAPER_WIDTHS: Record<string, string> = {
   "addendum-half": "5.5in",   // 5.5 × 12.5 (common half-page addendum)
   monroney: "7.5in",          // 7.5 × 10 (Monroney sticker format)
   custom: "8.5in",
+};
+
+// ── Sale Method ──────────────────────────────────────────────────
+// The three peer dispositions a product can carry on a deal. Switching
+// mode swaps the disclosure + benefit + acknowledgment + signature
+// requirements (handled downstream in displayProducts) and writes an
+// audit row. Never instant: the badge opens a menu, the menu requires
+// an explicit confirm.
+type SaleMode = "pre_installed" | "customer_elected" | "upgrade";
+
+const SALE_MODE_META: Record<SaleMode, { label: string; badge: string; dot: string }> = {
+  pre_installed:    { label: "Pre-Installed",    badge: "bg-blue-100 text-blue-700 border-blue-200",       dot: "bg-blue-500" },
+  customer_elected: { label: "Customer Elected", badge: "bg-orange-100 text-orange-700 border-orange-200", dot: "bg-orange-500" },
+  upgrade:          { label: "Upgrade",          badge: "bg-violet-100 text-violet-700 border-violet-200", dot: "bg-violet-500" },
+};
+
+const SaleModeControl = ({
+  mode,
+  options,
+  onChange,
+}: {
+  mode: SaleMode;
+  options: SaleMode[];
+  onChange: (next: SaleMode) => void;
+}) => {
+  const [open, setOpen] = useState(false);
+  const [pending, setPending] = useState<SaleMode | null>(null);
+  const meta = SALE_MODE_META[mode];
+
+  if (pending) {
+    return (
+      <span className="no-print inline-flex items-center gap-1.5">
+        <span className="text-[8px] text-muted-foreground">
+          Switch to {SALE_MODE_META[pending].label}?
+        </span>
+        <button
+          type="button"
+          onClick={() => { onChange(pending); setPending(null); setOpen(false); }}
+          className="text-[8px] font-bold px-1.5 py-0.5 rounded bg-navy text-white"
+        >
+          Confirm
+        </button>
+        <button
+          type="button"
+          onClick={() => setPending(null)}
+          className="text-[8px] font-bold px-1.5 py-0.5 rounded bg-muted text-muted-foreground"
+        >
+          Cancel
+        </button>
+      </span>
+    );
+  }
+
+  return (
+    <span className="no-print relative inline-block">
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full border text-[8px] font-bold uppercase tracking-wide ${meta.badge}`}
+        title="Change sale method"
+      >
+        <span className={`w-1.5 h-1.5 rounded-full ${meta.dot}`} />
+        {meta.label}
+        <ChevronDown className="w-2.5 h-2.5" />
+      </button>
+      {open && (
+        <span className="absolute z-30 mt-1 left-0 w-44 rounded-lg border border-border bg-card shadow-lg overflow-hidden block">
+          <span className="block px-2.5 py-1.5 text-[8px] font-bold uppercase tracking-wider text-muted-foreground border-b border-border">
+            Change sale method
+          </span>
+          {options.map((opt) => {
+            const om = SALE_MODE_META[opt];
+            const isCurrent = opt === mode;
+            return (
+              <button
+                key={opt}
+                type="button"
+                disabled={isCurrent}
+                onClick={() => { setOpen(false); if (!isCurrent) setPending(opt); }}
+                className={`w-full flex items-center gap-2 px-2.5 py-1.5 text-left text-[10px] ${isCurrent ? "bg-muted/50 cursor-default" : "hover:bg-muted"}`}
+              >
+                <span className={`w-1.5 h-1.5 rounded-full ${om.dot}`} />
+                <span className="font-semibold text-foreground">{om.label}</span>
+                {isCurrent && <Check className="w-3 h-3 ml-auto text-emerald-500" />}
+              </button>
+            );
+          })}
+        </span>
+      )}
+    </span>
+  );
 };
 
 const Index = () => {
@@ -314,23 +405,56 @@ const Index = () => {
 
   const iconMap = JSON.parse(localStorage.getItem("product_icons") || "{}");
 
-  const handleToggleProductType = (productId: string) => {
-    const current = displayProducts.find(p => p.id === productId);
-    if (!current) return;
-    const newType = current.badge_type === "installed" ? "optional" : "installed";
-    setTypeOverrides(prev => ({ ...prev, [productId]: newType as "installed" | "optional" }));
-    // Clear optional selection if switching to installed
-    if (newType === "installed") {
-      setOptionalSelections(prev => {
-        const next = { ...prev };
-        delete next[productId];
-        return next;
+  // Sale Method — the three peer dispositions a product can be sold under,
+  // derived from the existing type-override + upgrade state so all the
+  // disclosure/benefit/price swap logic in displayProducts is reused.
+  const modeOf = (p: { id: string; badge_type: string; upgrade?: ProductUpgrade | null }): SaleMode =>
+    upgradeSelections[p.id] && p.upgrade
+      ? "upgrade"
+      : p.badge_type === "optional"
+        ? "customer_elected"
+        : "pre_installed";
+
+  // Applies a sale-method change and writes an append-only audit row to
+  // product_sale_mode_changes (fire-and-forget; degrades to a no-op while
+  // the table is still propagating). Mirrors into the audit_log spine too.
+  const changeSaleMode = (
+    p: { id: string; name: string; badge_type: string; upgrade?: ProductUpgrade | null },
+    next: SaleMode,
+  ) => {
+    const from = modeOf(p);
+    if (from === next) return;
+    if (next === "upgrade") {
+      setUpgradeSelections(prev => ({ ...prev, [p.id]: true }));
+    } else {
+      setUpgradeSelections(prev => ({ ...prev, [p.id]: false }));
+      setTypeOverrides(prev => ({ ...prev, [p.id]: next === "customer_elected" ? "optional" : "installed" }));
+      if (next === "pre_installed") {
+        setOptionalSelections(prev => { const n = { ...prev }; delete n[p.id]; return n; });
+      }
+    }
+    (supabase as any)
+      .from("product_sale_mode_changes")
+      .insert({
+        tenant_id: currentStore?.id || null,
+        vehicle_vin: vehicle.vin || null,
+        product_id: p.id,
+        product_name: p.name,
+        from_mode: from,
+        to_mode: next,
+        changed_by_name: user?.email || null,
+      })
+      .then(() => {}, () => { /* table may still be propagating */ });
+    if (user) {
+      log({
+        store_id: currentStore?.id || "",
+        user_id: user.id,
+        action: "product_sale_mode_changed",
+        entity_type: "product",
+        entity_id: p.id,
+        details: { product: p.name, from, to: next, vin: vehicle.vin },
       });
     }
-  };
-
-  const handleToggleUpgrade = (productId: string) => {
-    setUpgradeSelections(prev => ({ ...prev, [productId]: !prev[productId] }));
   };
 
   const handleVinDecoded = (result: { year: string; make: string; model: string; trim: string; bodyStyle: string }) => {
@@ -942,40 +1066,27 @@ const Index = () => {
                   isOptional={p.badge_type === "optional"}
                   inkSaving={inkSaving}
                   iconType={iconMap[p.id] || ""}
-                  controls={
-                    !viewMode && (settings.allow_type_override_at_signing || (p as { upgrade?: ProductUpgrade | null }).upgrade) ? (
-                      <>
-                        {settings.allow_type_override_at_signing && (p as { available_preinstalled?: boolean }).available_preinstalled !== false && (
-                          <button
-                            onClick={() => handleToggleProductType(p.id)}
-                            className="inline-flex items-center gap-1"
-                            title={`Click to switch to ${p.badge_type === "installed" ? "optional" : "installed"}`}
-                          >
-                            <div className={`relative w-8 h-4 rounded-full transition-colors ${p.badge_type === "installed" ? "bg-navy" : "bg-gold"}`}>
-                              <div className={`absolute top-0.5 w-3 h-3 rounded-full bg-card shadow transition-transform ${p.badge_type === "installed" ? "translate-x-0.5" : "translate-x-4"}`} />
-                            </div>
-                            <span className="text-[7px] text-muted-foreground font-semibold">
-                              {p.badge_type === "installed" ? "INSTALLED" : "OPTIONAL"}
-                            </span>
-                          </button>
-                        )}
-                        {(p as { upgrade?: ProductUpgrade | null }).upgrade && (
-                          <button
-                            onClick={() => handleToggleUpgrade(p.id)}
-                            className="inline-flex items-center gap-1"
-                            title={upgradeSelections[p.id] ? "Remove upgrade" : "Apply upgrade"}
-                          >
-                            <div className={`relative w-8 h-4 rounded-full transition-colors ${upgradeSelections[p.id] ? "bg-gold" : "bg-muted"}`}>
-                              <div className={`absolute top-0.5 w-3 h-3 rounded-full bg-card shadow transition-transform ${upgradeSelections[p.id] ? "translate-x-4" : "translate-x-0.5"}`} />
-                            </div>
-                            <span className="text-[7px] text-muted-foreground font-semibold">
-                              {upgradeSelections[p.id] ? "UPGRADE" : "BASE"}
-                            </span>
-                          </button>
-                        )}
-                      </>
-                    ) : undefined
-                  }
+                  controls={(() => {
+                    const up = (p as { upgrade?: ProductUpgrade | null }).upgrade;
+                    const allowType = settings.allow_type_override_at_signing;
+                    if (viewMode || (!allowType && !up)) return undefined;
+                    const canPreinstall = (p as { available_preinstalled?: boolean }).available_preinstalled !== false;
+                    const baseMode: SaleMode = p.badge_type === "optional" ? "customer_elected" : "pre_installed";
+                    const options: SaleMode[] = allowType
+                      ? [
+                          ...(canPreinstall ? (["pre_installed"] as SaleMode[]) : []),
+                          "customer_elected",
+                          ...(up ? (["upgrade"] as SaleMode[]) : []),
+                        ]
+                      : [baseMode, ...(up ? (["upgrade"] as SaleMode[]) : [])];
+                    return (
+                      <SaleModeControl
+                        mode={modeOf({ id: p.id, badge_type: p.badge_type, upgrade: up })}
+                        options={options}
+                        onChange={(next) => changeSaleMode({ id: p.id, name: p.name, badge_type: p.badge_type, upgrade: up }, next)}
+                      />
+                    );
+                  })()}
                 />
 
                 {/* Customer-facing benefit statement — full plain text,
