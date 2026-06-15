@@ -956,6 +956,48 @@ export type Database = {
           },
         ]
       }
+      install_proofs: {
+        Row: {
+          created_at: string
+          id: string
+          installed_at: string | null
+          installer_company: string | null
+          installer_name: string | null
+          notes: string | null
+          photo_path: string | null
+          product_id: string | null
+          product_name: string | null
+          tenant_id: string | null
+          vehicle_vin: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          installed_at?: string | null
+          installer_company?: string | null
+          installer_name?: string | null
+          notes?: string | null
+          photo_path?: string | null
+          product_id?: string | null
+          product_name?: string | null
+          tenant_id?: string | null
+          vehicle_vin: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          installed_at?: string | null
+          installer_company?: string | null
+          installer_name?: string | null
+          notes?: string | null
+          photo_path?: string | null
+          product_id?: string | null
+          product_name?: string | null
+          tenant_id?: string | null
+          vehicle_vin?: string
+        }
+        Relationships: []
+      }
       leads: {
         Row: {
           captured_at: string
@@ -1849,6 +1891,7 @@ export type Database = {
           factory_sticker_url: string | null
           features: Json
           id: string
+          install_token: string
           key_specs: Json
           mileage: number | null
           payment_estimate: Json | null
@@ -1887,6 +1930,7 @@ export type Database = {
           factory_sticker_url?: string | null
           features?: Json
           id?: string
+          install_token?: string
           key_specs?: Json
           mileage?: number | null
           payment_estimate?: Json | null
@@ -1925,6 +1969,7 @@ export type Database = {
           factory_sticker_url?: string | null
           features?: Json
           id?: string
+          install_token?: string
           key_specs?: Json
           mileage?: number | null
           payment_estimate?: Json | null
@@ -2490,6 +2535,7 @@ export type Database = {
           factory_sticker_url: string | null
           features: Json
           id: string
+          install_token: string
           key_specs: Json
           mileage: number | null
           payment_estimate: Json | null
@@ -2595,6 +2641,19 @@ export type Database = {
           _signing_location: Json
           _signing_token: string
           _user_agent: string
+        }
+        Returns: string
+      }
+      record_install_proof: {
+        Args: {
+          _install_token: string
+          _installed_at: string
+          _installer_company: string
+          _installer_name: string
+          _notes?: string
+          _photo_path: string
+          _product_id: string
+          _product_name: string
         }
         Returns: string
       }
