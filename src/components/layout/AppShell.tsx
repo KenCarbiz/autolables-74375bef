@@ -357,10 +357,16 @@ const AppShell = ({ children }: AppShellProps) => {
           <button
             onClick={() => {
               setMobileOpen(false);
-              navigate("/scan");
+              // Device-aware: phones/tablets (touch + camera) open the
+              // scanner directly; desktops get the QR hand-off so the
+              // user can continue on their phone next to the car.
+              const touch = typeof window !== "undefined" && window.matchMedia("(pointer: coarse)").matches;
+              const hasCamera = typeof navigator !== "undefined" && !!navigator.mediaDevices?.getUserMedia;
+              if (touch && hasCamera) navigate("/scan");
+              else setShowMobileQr(true);
             }}
             className="h-10 rounded-lg bg-card hover:bg-muted text-foreground inline-flex items-center justify-center gap-1.5 text-sm font-semibold border border-border transition-colors"
-            title="Scan a VIN barcode or windshield sticker"
+            title="Scan a VIN — opens the camera on a phone/tablet, or a QR hand-off on desktop"
           >
             <ScanLine className="w-4 h-4 stroke-[2.25]" />
             <span className={`font-display font-semibold tracking-tight text-sm whitespace-nowrap ${collapsed ? "lg:hidden" : ""}`}>Scan Vehicle</span>
