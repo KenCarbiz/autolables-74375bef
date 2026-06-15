@@ -1037,6 +1037,17 @@ const Index = () => {
         </div>
       )}
 
+      {/* Install-proof default banner — explains why lines auto-defaulted
+          once a vendor has verified an installation on this VIN. */}
+      {!viewMode && proofRegime && (
+        <div style={{ maxWidth: paperWidth }} className="mx-auto mb-2 no-print">
+          <div className="bg-emerald-50 border border-emerald-200 rounded-md px-3 py-1.5 text-[11px] text-emerald-800 font-semibold flex items-center gap-1.5">
+            <Check className="w-3.5 h-3.5 flex-shrink-0" />
+            {provenNames.size} verified installation{provenNames.size === 1 ? "" : "s"} on file for this VIN — matching lines default to Pre-Installed, the rest to Customer Elected. Override any line with its Sale Method badge.
+          </div>
+        </div>
+      )}
+
       {/* Compliance red-team — Wave 4.2. Runs on every keystroke and
           lists what a regulator would flag before the customer signs. */}
       {!viewMode && (
