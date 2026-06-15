@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { uploadPhoto } from "@/lib/storage";
+import { Switch } from "@/components/ui/switch";
 import { useDealerSettings, DealerSettings, DEFAULT_SETTINGS } from "@/contexts/DealerSettingsContext";
 import { useProductRules, ProductRule } from "@/hooks/useProductRules";
 import type { ProductUpgrade } from "@/hooks/useProducts";
@@ -1025,12 +1026,11 @@ const Admin = () => {
                   <p className="text-sm font-semibold text-foreground">Allow Type Override at Signing</p>
                   <p className="text-xs text-muted-foreground">Employee can toggle installed ↔ optional live with the customer</p>
                 </div>
-                <button
-                  onClick={() => updateSettings({ allow_type_override_at_signing: !settings.allow_type_override_at_signing })}
-                  className={`relative w-12 h-7 rounded-full transition-colors ${settings.allow_type_override_at_signing ? "bg-teal" : "bg-muted"}`}
-                >
-                  <span className={`absolute top-1 w-5 h-5 rounded-full bg-card shadow transition-transform ${settings.allow_type_override_at_signing ? "translate-x-6" : "translate-x-1"}`} />
-                </button>
+                <Switch
+                  checked={!!settings.allow_type_override_at_signing}
+                  onCheckedChange={(v) => updateSettings({ allow_type_override_at_signing: v })}
+                  className="data-[state=checked]:bg-teal"
+                />
               </div>
             </div>
 
@@ -1040,12 +1040,11 @@ const Admin = () => {
               <p className="text-xs text-muted-foreground mb-3">Add a state-compliant documentation fee to every addendum. The correct terminology auto-applies based on your state.</p>
               <div className="flex items-center justify-between mb-3">
                 <span className="text-sm font-semibold text-foreground">Enable Doc Fee</span>
-                <button
-                  onClick={() => updateSettings({ doc_fee_enabled: !settings.doc_fee_enabled })}
-                  className={`relative w-12 h-7 rounded-full transition-colors ${settings.doc_fee_enabled ? "bg-teal" : "bg-muted"}`}
-                >
-                  <span className={`absolute top-1 w-5 h-5 rounded-full bg-card shadow transition-transform ${settings.doc_fee_enabled ? "translate-x-6" : "translate-x-1"}`} />
-                </button>
+                <Switch
+                  checked={!!settings.doc_fee_enabled}
+                  onCheckedChange={(v) => updateSettings({ doc_fee_enabled: v })}
+                  className="data-[state=checked]:bg-teal"
+                />
               </div>
               {settings.doc_fee_enabled && (
                 <div className="grid grid-cols-2 gap-3">
@@ -1106,12 +1105,11 @@ const Admin = () => {
                     </p>
                     <p className="text-xs text-muted-foreground">{ft.description}</p>
                   </div>
-                  <button
-                    onClick={() => handleToggleFeature(ft.key)}
-                    className={`relative w-12 h-7 rounded-full transition-colors flex-shrink-0 ml-3 ${(settings[ft.key] as boolean) ? "bg-teal" : "bg-muted"}`}
-                  >
-                    <span className={`absolute top-1 w-5 h-5 rounded-full bg-card shadow transition-transform ${(settings[ft.key] as boolean) ? "translate-x-6" : "translate-x-1"}`} />
-                  </button>
+                  <Switch
+                    checked={!!(settings[ft.key] as boolean)}
+                    onCheckedChange={() => handleToggleFeature(ft.key)}
+                    className="flex-shrink-0 ml-3 data-[state=checked]:bg-teal"
+                  />
                 </div>
               ))}
             </div>
