@@ -1275,9 +1275,12 @@ export type Database = {
       }
       products: {
         Row: {
+          available_preinstalled: boolean
           badge_type: string
           benefit_justification: string
           benefit_justification_optional: string | null
+          contract_doc_type: string | null
+          contract_url: string | null
           created_at: string
           disclosure: string | null
           disclosure_optional: string | null
@@ -1290,12 +1293,16 @@ export type Database = {
           sort_order: number
           subtitle: string | null
           updated_at: string
+          upgrade: Json | null
           warranty: string | null
         }
         Insert: {
+          available_preinstalled?: boolean
           badge_type?: string
           benefit_justification?: string
           benefit_justification_optional?: string | null
+          contract_doc_type?: string | null
+          contract_url?: string | null
           created_at?: string
           disclosure?: string | null
           disclosure_optional?: string | null
@@ -1308,12 +1315,16 @@ export type Database = {
           sort_order?: number
           subtitle?: string | null
           updated_at?: string
+          upgrade?: Json | null
           warranty?: string | null
         }
         Update: {
+          available_preinstalled?: boolean
           badge_type?: string
           benefit_justification?: string
           benefit_justification_optional?: string | null
+          contract_doc_type?: string | null
+          contract_url?: string | null
           created_at?: string
           disclosure?: string | null
           disclosure_optional?: string | null
@@ -1326,6 +1337,7 @@ export type Database = {
           sort_order?: number
           subtitle?: string | null
           updated_at?: string
+          upgrade?: Json | null
           warranty?: string | null
         }
         Relationships: []
