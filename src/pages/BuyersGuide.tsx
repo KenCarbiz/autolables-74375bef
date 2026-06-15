@@ -1,9 +1,10 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { useDealerSettings } from "@/contexts/DealerSettingsContext";
 import { useAudit } from "@/contexts/AuditContext";
 import { useTenant } from "@/contexts/TenantContext";
 import { useAuth } from "@/contexts/AuthContext";
+import { resolveBuyersGuideWarranty } from "@/lib/stateCompliance";
 import { toast } from "sonner";
 
 type GuideType = "as-is" | "implied" | "warranty";
@@ -212,6 +213,30 @@ const BuyersGuide = () => {
   const [warrantyPct, setWarrantyPct] = useState("100%");
   const [coveredSystems, setCoveredSystems] = useState<string[]>(WARRANTY_SYSTEMS);
 
+  // State-aware warranty box: several states override "As-Is" with a
+  // mandatory used-vehicle warranty keyed to price/mileage. Driven by the
+  // dealer's operating state + this vehicle's age/mileage/price.
+  const operatingState = settings.dealer_state || settings.doc_fee_state || "";
+  const bgResolution = useMemo(
+    () =>
+      resolveBuyersGuideWarranty(operatingState, {
+        ageYears: vehicle.year ? new Date().getFullYear() - Number(vehicle.year) : undefined,
+        mileage: vehicle.mileage ? Number(vehicle.mileage.replace(/[^0-9]/g, "")) : undefined,
+        price: vehicle.price ? Number(vehicle.price.replace(/[^0-9.]/g, "")) : undefined,
+      }),
+    [operatingState, vehicle.year, vehicle.mileage, vehicle.price]
+  );
+
+  // Auto-populate the box + statutory floor whenever the inputs change.
+  // Forced states lock As-Is; dealers may still RAISE warranty terms.
+  useEffect(() => {
+    setGuideType(bgResolution.box);
+    if (bgResolution.box === "warranty" && bgResolution.minDurationDays > 0) {
+      setWarrantyDuration(`${bgResolution.minDurationDays} Days / ${bgResolution.minMiles.toLocaleString()} Miles`);
+      setWarrantyPct(`${bgResolution.minPct}%`);
+    }
+  }, [bgResolution]);
+
   const L = LABELS[lang];
 
   const handleSave = () => {
@@ -273,16 +298,28 @@ const BuyersGuide = () => {
         <button onClick={() => navigate("/addendum")} className="font-semibold text-[13px] px-5 py-2 rounded-md bg-navy text-primary-foreground tracking-[0.4px] hover:opacity-85">
           ← Back to Addendum
         </button>
-        <div className="flex gap-1 bg-muted rounded-md p-0.5">
-          {(["as-is", "implied", "warranty"] as GuideType[]).map((t) => (
-            <button
-              key={t}
-              onClick={() => setGuideType(t)}
-              className={`text-[12px] font-semibold px-3 py-1.5 rounded ${guideType === t ? "bg-navy text-primary-foreground" : "text-muted-foreground hover:text-foreground"}`}
-            >
-              {t === "as-is" ? "As-Is" : t === "implied" ? "Implied" : "Warranty"}
-            </button>
-          ))}
+        <div className="flex flex-col gap-1">
+          <div className="flex gap-1 bg-muted rounded-md p-0.5">
+            {(["as-is", "implied", "warranty"] as GuideType[]).map((t) => {
+              const locked = bgResolution.forced && t === "as-is";
+              return (
+                <button
+                  key={t}
+                  onClick={() => { if (!locked) setGuideType(t); }}
+                  disabled={locked}
+                  title={locked ? bgResolution.reason : undefined}
+                  className={`text-[12px] font-semibold px-3 py-1.5 rounded ${guideType === t ? "bg-navy text-primary-foreground" : "text-muted-foreground hover:text-foreground"} ${locked ? "opacity-40 cursor-not-allowed line-through" : ""}`}
+                >
+                  {t === "as-is" ? "As-Is" : t === "implied" ? "Implied" : "Warranty"}
+                </button>
+              );
+            })}
+          </div>
+          {(bgResolution.forced || bgResolution.needsVerification) && bgResolution.reason && (
+            <p className="text-[10px] text-amber-700 max-w-xs">
+              {bgResolution.reason}{bgResolution.citation ? ` (${bgResolution.citation})` : ""} — confirm with counsel.
+            </p>
+          )}
         </div>
         {(settings.feature_spanish_buyers_guide || settings.feature_multilang_buyers_guide) && (
           <div className="flex gap-1 bg-muted rounded-md p-0.5 flex-wrap">

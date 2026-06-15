@@ -504,3 +504,85 @@ export const summarizeFindings = (findings: ComplianceFinding[]) => {
     status: fails > 0 ? "fail" : warns > 0 ? "warn" : "pass",
   } as const;
 };
+
+// ──────────────────────────────────────────────────────────────
+// FTC Buyers Guide (16 CFR Part 455) warranty-box resolver.
+//
+// Several states override the dealer's "As-Is" choice with a mandatory
+// statutory used-vehicle warranty keyed to price and/or mileage. This
+// resolver returns which box (As-Is / Implied / Warranty) should populate
+// and the statutory FLOOR terms, given the dealer's operating state and the
+// specific vehicle. The dealer may always RAISE terms, never go below.
+//
+// The state thresholds below are compliance-critical and AI-assembled —
+// every Warranty/Implied result carries needsVerification:true so the UI
+// flags "confirm with counsel" rather than asserting them as gospel.
+// ──────────────────────────────────────────────────────────────
+export type BuyersGuideBox = "as-is" | "implied" | "warranty";
+
+export interface BuyersGuideResolution {
+  box: BuyersGuideBox;
+  forced: boolean;          // true = state mandates; lock out As-Is
+  minDurationDays: number;  // statutory floor (0 when n/a)
+  minMiles: number;
+  minPct: number;           // % of parts+labor covered
+  citation: string;
+  reason: string;
+  needsVerification: boolean;
+}
+
+export const resolveBuyersGuideWarranty = (
+  state: string | null | undefined,
+  v: { ageYears?: number; mileage?: number; price?: number }
+): BuyersGuideResolution => {
+  const code = (state || "").toUpperCase();
+  const miles = Number.isFinite(v.mileage) ? (v.mileage as number) : 0;
+  const price = Number.isFinite(v.price) ? (v.price as number) : 0;
+
+  const asIs = (reason = "As-Is sale is permitted in this state."): BuyersGuideResolution => ({
+    box: "as-is", forced: false, minDurationDays: 0, minMiles: 0, minPct: 0,
+    citation: "", reason, needsVerification: false,
+  });
+  const warranty = (
+    days: number, mi: number, pct: number, citation: string, reason: string
+  ): BuyersGuideResolution => ({
+    box: "warranty", forced: true, minDurationDays: days, minMiles: mi, minPct: pct,
+    citation, reason, needsVerification: true,
+  });
+
+  switch (code) {
+    case "CT": {
+      if (price < 3000) return asIs("Connecticut: As-Is allowed under $3,000.");
+      if (price >= 5000) return warranty(60, 3000, 50, "Conn. Gen. Stat. §42-221", "Connecticut used-car warranty: price $5,000+.");
+      return warranty(30, 1500, 50, "Conn. Gen. Stat. §42-221", "Connecticut used-car warranty: price $3,000–$4,999.");
+    }
+    case "MA": {
+      if (miles >= 125000) return asIs("Massachusetts: As-Is allowed at 125,000+ miles.");
+      if (miles < 40000) return warranty(90, 3750, 100, "M.G.L. c. 90 §7N¼", "Massachusetts used-vehicle warranty: under 40,000 mi.");
+      if (miles < 80000) return warranty(60, 2500, 100, "M.G.L. c. 90 §7N¼", "Massachusetts used-vehicle warranty: 40,000–79,999 mi.");
+      return warranty(30, 1250, 100, "M.G.L. c. 90 §7N¼", "Massachusetts used-vehicle warranty: 80,000–124,999 mi.");
+    }
+    case "NY": {
+      if (price < 1500 || miles > 100000) return asIs("New York: As-Is allowed under $1,500 or over 100,000 mi.");
+      if (miles <= 36000) return warranty(90, 4000, 100, "NY Gen. Bus. Law §198-b", "New York Used Car Lemon Law: 36,000 mi or less.");
+      if (miles < 80000) return warranty(60, 3000, 100, "NY Gen. Bus. Law §198-b", "New York Used Car Lemon Law: 36,001–79,999 mi.");
+      return warranty(30, 1000, 100, "NY Gen. Bus. Law §198-b", "New York Used Car Lemon Law: 80,000–100,000 mi.");
+    }
+    case "NJ": {
+      if (price < 3000 || miles >= 100000) return asIs("New Jersey: As-Is allowed under $3,000 or over 100,000 mi.");
+      if (miles <= 24000) return warranty(90, 3000, 100, "N.J.S.A. 56:8-67", "New Jersey used-car warranty: 24,000 mi or less.");
+      if (miles < 60000) return warranty(60, 2000, 100, "N.J.S.A. 56:8-67", "New Jersey used-car warranty: 24,001–59,999 mi.");
+      return warranty(30, 1000, 100, "N.J.S.A. 56:8-67", "New Jersey used-car warranty: 60,000–99,999 mi.");
+    }
+    case "ME":
+    case "WI":
+      return {
+        box: "implied", forced: false, minDurationDays: 0, minMiles: 0, minPct: 0,
+        citation: code === "ME" ? "Maine Used Car Information Act" : "Wis. Admin. Code Trans 139",
+        reason: `${code === "ME" ? "Maine" : "Wisconsin"} uses its own state Buyers Guide; defaulting to Implied Warranties.`,
+        needsVerification: true,
+      };
+    default:
+      return asIs();
+  }
+};
