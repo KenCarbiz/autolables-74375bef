@@ -584,13 +584,21 @@ const AppShell = ({ children }: AppShellProps) => {
                   (Wave 15.3 surfaces the Wave 14.6 sync). */}
               <LiveBadge />
 
-              {/* Mobile-scan QR launcher */}
+              {/* Persistent Scan VIN — the primary way inventory enters the
+                  platform, so it lives in the top bar on every page.
+                  Device-aware: camera on phone/tablet, QR hand-off on desktop. */}
               <button
-                onClick={() => setShowMobileQr(true)}
-                className="h-9 w-9 rounded-lg border border-border bg-card hover:bg-muted text-muted-foreground hover:text-foreground inline-flex items-center justify-center transition-colors"
-                title="Open scanner on your phone"
+                onClick={() => {
+                  const touch = typeof window !== "undefined" && window.matchMedia("(pointer: coarse)").matches;
+                  const hasCamera = typeof navigator !== "undefined" && !!navigator.mediaDevices?.getUserMedia;
+                  if (touch && hasCamera) navigate("/scan");
+                  else setShowMobileQr(true);
+                }}
+                className="h-9 px-3 rounded-md bg-[#2563EB] hover:bg-[#1D4ED8] text-white inline-flex items-center gap-1.5 text-[13px] font-medium shadow-sm transition-colors"
+                title="Scan a VIN — camera on phone/tablet, QR hand-off on desktop"
               >
-                <ScanLine className="w-4 h-4" />
+                <ScanLine className="w-4 h-4 stroke-2" />
+                <span className="hidden sm:inline">Scan VIN</span>
               </button>
 
               {/* Dark mode toggle */}
