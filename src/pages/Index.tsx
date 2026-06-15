@@ -797,9 +797,7 @@ const Index = () => {
               state: settings.doc_fee_state || settings.dealer_state || "",
               vehiclePrice: undefined,
               docFeeAmount: settings.doc_fee_enabled ? settings.doc_fee_amount : undefined,
-              stickerText: displayProducts
-                ?.map((p) => `${p.name} ${p.disclosure || ""}`)
-                .join(" ") || "",
+              stickerText: `${displayProducts?.map((p) => `${p.name} ${p.disclosure || ""}`).join(" ") || ""} ${docFeeDisclosureText}`,
               products: displayProducts?.map((p) => ({
                 id: p.id,
                 name: p.name,
@@ -807,6 +805,12 @@ const Index = () => {
                 badge_type: p.badge_type,
                 disclosure: p.disclosure || undefined,
                 separate_signoff: !!initials[p.id]?.trim(),
+                // The panel's check needs the benefit text too — without it
+                // every installed product falsely flagged as missing benefit.
+                benefit_justification:
+                  (p as { benefit_justification?: string }).benefit_justification || "",
+                benefit_justification_optional:
+                  (p as { benefit_justification_optional?: string | null }).benefit_justification_optional || "",
               })) || [],
               spanishVersion: false,
               customerName: [customerInfo.buyer_first_name, customerInfo.buyer_last_name].filter(Boolean).join(" "),
