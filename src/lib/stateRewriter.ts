@@ -224,14 +224,19 @@ export const rewriteForState = (
       `Doc fee $${input.docFeeAmount} exceeds the ${rule.name} statutory cap of $${rule.docFee.cap} (${rule.docFee.citation}).`
     );
   }
+  // These are standing state requirements the AutoLabels addendum already
+  // satisfies by design (per-item sign-off in the Selection Record + the
+  // Voluntary Purchase Notice). Surface them as required disclosure content
+  // in the pack, NOT as actionable warnings — a compliant deal shouldn't
+  // read as if something is wrong.
   if (rule.addOnRules.separateSignoffRequired) {
-    warnings.push(
-      `${rule.name} requires per-item customer sign-off on every add-on (${rule.addOnRules.citation}).`
+    blocks.push(
+      `${rule.name.toUpperCase()} — PER-ITEM ADD-ON SIGN-OFF: The customer separately accepts or declines and initials each optional add-on (${rule.addOnRules.citation}).`
     );
   }
   if (rule.addOnRules.mandatoryProhibited) {
-    warnings.push(
-      `${rule.name} prohibits add-ons required as a condition of sale (${rule.addOnRules.citation}).`
+    blocks.push(
+      `${rule.name.toUpperCase()} — VOLUNTARY ADD-ONS: No add-on or accessory is required as a condition of sale, financing, or lease (${rule.addOnRules.citation}).`
     );
   }
 
