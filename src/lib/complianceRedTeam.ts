@@ -97,12 +97,13 @@ export const runComplianceRedTeam = (draft: RedTeamDraft): ComplianceFinding[] =
   // each add-on benefits the buyer for this transaction. Silent
   // installed products are the #1 hook in the FTC's 97-dealer
   // letter campaign (March 2026). Hard fail before send.
+  const hasBenefit = (p: unknown): boolean => {
+    const pp = p as { benefit_justification?: string; benefit_justification_optional?: string };
+    return !!((pp.benefit_justification || "").trim() || (pp.benefit_justification_optional || "").trim());
+  };
   const missingBenefit = (draft.products || [])
     .filter((p) => p.badge_type === "installed")
-    .filter((p) => {
-      const txt = (p as { benefit_justification?: string }).benefit_justification;
-      return !txt || !txt.trim();
-    });
+    .filter((p) => !hasBenefit(p));
   if (missingBenefit.length > 0) {
     findings.push({
       id: "missing-benefit-justification",
@@ -120,10 +121,7 @@ export const runComplianceRedTeam = (draft: RedTeamDraft): ComplianceFinding[] =
   // on the QR landing.
   const optionalMissingBenefit = (draft.products || [])
     .filter((p) => p.badge_type === "optional")
-    .filter((p) => {
-      const txt = (p as { benefit_justification?: string }).benefit_justification;
-      return !txt || !txt.trim();
-    });
+    .filter((p) => !hasBenefit(p));
   if (optionalMissingBenefit.length > 0) {
     findings.push({
       id: "optional-missing-benefit",

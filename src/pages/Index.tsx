@@ -450,9 +450,13 @@ const Index = () => {
         disclosure: p.disclosure || undefined,
         separate_signoff: !!initials[p.id]?.trim(),
         // Wave 16 — the red-team needs this to fire the new
-        // missing-benefit-justification rule before send.
+        // missing-benefit-justification rule before send. Pass both the
+        // resolved benefit and the raw optional benefit so the check
+        // passes when the dealer entered text in EITHER disposition slot.
         benefit_justification:
           (p as { benefit_justification?: string }).benefit_justification || "",
+        benefit_justification_optional:
+          (p as { benefit_justification_optional?: string | null }).benefit_justification_optional || "",
       })) || [],
       spanishVersion: false,
       customerName: [customerInfo.buyer_first_name, customerInfo.buyer_last_name].filter(Boolean).join(" "),

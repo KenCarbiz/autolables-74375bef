@@ -340,8 +340,11 @@ export interface ComplianceDraft {
     separate_signoff?: boolean;
     // Wave 16 — per-line benefit text. Seeded from the catalog,
     // overridable per-addendum. The red-team gates send on this
-    // for installed products (FTC §5 + CA SB 766 §11713.21).
+    // for installed products (FTC §5 + CA SB 766 §11713.21). The
+    // _optional variant lets the gate accept benefit text entered in
+    // either disposition slot.
     benefit_justification?: string;
+    benefit_justification_optional?: string;
   }>;
   spanishVersion?: boolean;
   threeDayAck?: boolean;
