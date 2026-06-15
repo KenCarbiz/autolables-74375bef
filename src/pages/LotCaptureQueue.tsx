@@ -170,48 +170,46 @@ const LotCaptureQueue = () => {
 
   return (
     <div className="p-4 lg:p-6 max-w-[1400px] mx-auto space-y-4">
-      {/* Hero band — process step 1 of the dashboard flow. */}
-      <div className="rounded-2xl bg-gradient-to-br from-[#0B2041] via-[#1E3A5F] to-[#1E90FF] text-white px-6 py-5 shadow-premium">
-        <div className="flex items-end justify-between gap-4 flex-wrap">
-          <div>
-            <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-white/65">
-              Process step 1 · Lot capture
-            </p>
-            <h1 className="font-display text-2xl md:text-3xl font-black tracking-tight mt-0.5">
-              Vehicles in the queue
-            </h1>
-            <p className="text-sm text-white/80 mt-1.5">
-              <span className="font-semibold text-white">{counts.queued}</span> awaiting sticker work
-              {counts.processing > 0 && (
-                <> · <span className="font-semibold text-white">{counts.processing}</span> in progress</>
-              )}
-              {counts.completed > 0 && (
-                <> · <span className="font-semibold text-white">{counts.completed}</span> done</>
-              )}
-            </p>
-          </div>
-          <div className="flex items-center gap-2 flex-wrap">
-            <button
-              onClick={() => navigate("/scan")}
-              className="h-11 px-4 rounded-xl bg-gradient-to-r from-[#3BB4FF] to-[#1E90FF] text-white inline-flex items-center gap-1.5 shadow-premium hover:brightness-110 transition-all"
-            >
-              <ScanLine className="w-4 h-4 stroke-[2.5]" />
-              <span className="font-display font-black tracking-tight text-sm">Open scanner</span>
-            </button>
-            <button
-              onClick={() => {
-                if (counts.completed === 0) {
-                  toast.info("Nothing completed to clear");
-                  return;
-                }
-                clearCompleted();
-                toast.success(`Cleared ${counts.completed} completed`);
-              }}
-              className="h-11 px-4 rounded-xl bg-white/15 backdrop-blur border border-white/20 text-white inline-flex items-center gap-1.5 hover:bg-white/25 transition-all"
-            >
-              <span className="font-display font-bold tracking-tight text-sm">Clear completed</span>
-            </button>
-          </div>
+      {/* Operational header — workspace, not a marketing hero. */}
+      <div className="flex items-end justify-between gap-4 flex-wrap pt-1">
+        <div>
+          <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground">
+            Process step 1 · Lot capture
+          </p>
+          <h1 className="text-2xl font-display font-semibold tracking-tight text-foreground mt-0.5">
+            Lot Queue
+          </h1>
+          <p className="text-sm text-muted-foreground mt-1">
+            <span className="font-semibold text-foreground">{counts.queued}</span> awaiting sticker work
+            {counts.processing > 0 && (
+              <> · <span className="font-semibold text-foreground">{counts.processing}</span> in progress</>
+            )}
+            {counts.completed > 0 && (
+              <> · <span className="font-semibold text-foreground">{counts.completed}</span> done</>
+            )}
+          </p>
+        </div>
+        <div className="flex items-center gap-2 flex-wrap">
+          <button
+            onClick={() => navigate("/scan")}
+            className="h-9 px-4 rounded-md bg-[#2563EB] hover:bg-[#1D4ED8] text-white inline-flex items-center gap-2 text-sm font-medium shadow-sm transition-colors"
+          >
+            <ScanLine className="w-4 h-4 stroke-2" />
+            Open Scanner
+          </button>
+          <button
+            onClick={() => {
+              if (counts.completed === 0) {
+                toast.info("Nothing completed to clear");
+                return;
+              }
+              clearCompleted();
+              toast.success(`Cleared ${counts.completed} completed`);
+            }}
+            className="h-9 px-4 rounded-md border border-border bg-transparent hover:bg-muted text-foreground inline-flex items-center gap-2 text-sm font-medium transition-colors"
+          >
+            Clear completed
+          </button>
         </div>
       </div>
 

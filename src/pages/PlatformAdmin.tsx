@@ -50,19 +50,17 @@ const PlatformAdmin = () => {
 
   return (
     <div className="max-w-6xl mx-auto">
-      <div className="shimmer-hero relative overflow-hidden rounded-b-3xl px-6 lg:px-10 pt-8 pb-10 text-white">
-        <div className="relative z-10">
-          <div className="inline-flex items-center gap-1.5 bg-white/15 backdrop-blur px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-label">
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-            Platform Admin
-          </div>
-          <h1 className="mt-2 text-2xl lg:text-3xl font-black tracking-tight font-display leading-tight">
-            Platform Control
-          </h1>
-          <p className="text-xs lg:text-sm text-white/70 mt-1 max-w-xl">
-            Cross-tenant surfaces: dealers, seat assignments, app entitlements, and the tamper-evident platform audit log.
-          </p>
+      <div className="px-4 lg:px-6 pt-6">
+        <div className="inline-flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+          Platform Admin
         </div>
+        <h1 className="mt-1 text-2xl font-display font-semibold tracking-tight text-foreground">
+          Platform Control
+        </h1>
+        <p className="text-sm text-muted-foreground mt-1 max-w-xl">
+          Cross-tenant surfaces: dealers, seat assignments, app entitlements, and the tamper-evident platform audit log.
+        </p>
       </div>
 
       <div className="p-4 lg:p-6 space-y-4">
