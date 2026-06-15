@@ -2275,60 +2275,26 @@ export type Database = {
       get_addendum_by_token: {
         Args: { _token: string }
         Returns: {
-          addendum_date: string | null
-          cobuyer_name: string | null
-          cobuyer_signature_data: string | null
-          cobuyer_signature_type: string | null
-          cobuyer_signed_at: string | null
-          content_hash: string | null
-          created_at: string
-          created_by: string | null
-          customer_email: string | null
-          customer_ip: string | null
-          customer_name: string | null
-          customer_signature_data: string | null
-          customer_signature_type: string | null
-          customer_signed_at: string | null
-          dealer_snapshot: Json | null
-          delivery_mileage: number | null
-          employee_name: string | null
-          employee_signature_data: string | null
-          employee_signature_type: string | null
-          employee_signed_at: string | null
-          esign_consent: Json | null
-          financing_input: Json | null
+          addendum_date: string
+          buyers_guide_id: string
+          dealer_snapshot: Json
+          financing_input: Json
           id: string
-          initials: Json | null
-          listing_slug: string | null
-          optional_selections: Json | null
-          price_overrides: Json | null
+          initials: Json
+          listing_slug: string
+          optional_selections: Json
+          price_overrides: Json
           products_snapshot: Json
-          sb766_add_on_precontract: Json | null
-          sb766_financing_disclosure: Json | null
-          sb766_three_day_return_ack: boolean | null
-          signing_location: Json | null
-          signing_token: string | null
+          sb766_add_on_precontract: Json
+          sb766_financing_disclosure: Json
+          sb766_three_day_return_ack: boolean
           status: string
-          sticker_match_ack: boolean | null
-          store_id: string | null
-          tenant_id: string | null
-          total_installed: number | null
-          total_with_optional: number | null
-          updated_at: string
-          user_agent: string | null
-          vehicle_price: number | null
-          vehicle_state: string | null
-          vehicle_stock: string | null
-          vehicle_vin: string | null
-          vehicle_ymm: string | null
-          warranty_ack: boolean | null
+          vehicle_condition: string
+          vehicle_price: number
+          vehicle_state: string
+          vehicle_vin: string
+          vehicle_ymm: string
         }[]
-        SetofOptions: {
-          from: "*"
-          to: "addendums"
-          isOneToOne: false
-          isSetofReturn: true
-        }
       }
       get_deal_token: {
         Args: { _token: string }
