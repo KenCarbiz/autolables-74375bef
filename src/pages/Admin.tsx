@@ -14,6 +14,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 import { AccessoryInstallPanel } from "@/components/admin/AccessoryInstallPanel";
+import { GetReadySheet } from "@/components/admin/GetReadySheet";
+import type { GetReadyRecord } from "@/hooks/useGetReady";
 import { EmailDistributionPanel } from "@/components/admin/EmailDistributionPanel";
 import { InventoryFeedHealth } from "@/components/admin/InventoryFeedHealth";
 import { OpenSigningsList } from "@/components/admin/OpenSigningsList";
@@ -206,6 +208,7 @@ const Admin = () => {
   const [fileSearch, setFileSearch] = useState("");
 
   // Get-Ready tracking
+  const [sheetRecord, setSheetRecord] = useState<GetReadyRecord | null>(null);
   const { records: getReadyRecords, getPending: getPendingGetReady, validateTimeline, markAccessoryInstalled, markInventory } = useGetReady(currentStore?.id || "");
   const { sendGetReadyComplete, sending: emailSending } = useEmailDistribution(currentStore?.id || "");
 
@@ -1703,6 +1706,12 @@ const Admin = () => {
                             <div className="flex items-center gap-3 mt-0.5 text-xs text-muted-foreground">
                               <span className="font-mono">{record.vin}</span>
                               {record.stockNumber && <span>Stock: {record.stockNumber}</span>}
+                              <button
+                                onClick={() => setSheetRecord(record)}
+                                className="inline-flex items-center gap-1 text-[10px] font-semibold text-navy hover:underline"
+                              >
+                                Installer sheet
+                              </button>
                             </div>
 
                             {/* Timeline dates */}
@@ -1850,6 +1859,15 @@ const Admin = () => {
               ))}
             </div>
           </div>
+        )}
+
+        {sheetRecord && (
+          <GetReadySheet
+            open={!!sheetRecord}
+            onClose={() => setSheetRecord(null)}
+            record={sheetRecord}
+            dealerName={currentStore?.name || settings.dealer_name}
+          />
         )}
 
         {/* ─── Invoices Tab ─── */}
