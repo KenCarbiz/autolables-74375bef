@@ -37,7 +37,7 @@ export interface AuditLogEntry {
   user_id: string;
   action: "addendum_created" | "addendum_signed" | "addendum_sent" | "addendum_printed" | "addendum_pdf"
     | "addendum_consent_given" | "addendum_viewed"
-    | "product_added" | "product_updated" | "product_deleted"
+    | "product_added" | "product_updated" | "product_deleted" | "product_sale_mode_changed"
     | "rule_added" | "rule_updated" | "rule_deleted"
     | "settings_updated" | "buyers_guide_created"
     | "invoice_created" | "invoice_updated"
