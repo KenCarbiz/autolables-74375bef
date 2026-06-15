@@ -797,13 +797,19 @@ const Admin = () => {
                   Need a new product not in the library? Use the "+ Add Product" button above to create a custom one.
                 </p>
               </div>
-              {productLibrary.length === 0 ? (
+              {(() => {
+              // Hide archive/library cards the dealer has already activated
+              // (a product of the same name exists in their active list), so
+              // the library stops looking like duplicates of live products.
+              const activeNames = new Set(products.map((p) => (p.name || "").trim().toLowerCase()));
+              const libraryToShow = productLibrary.filter((e) => !activeNames.has((e.name || "").trim().toLowerCase()));
+              return libraryToShow.length === 0 ? (
                 <p className="text-xs text-muted-foreground py-6 text-center">
-                  Your product library is empty. Imported library entries will appear here.
+                  No archived products to import — your active products are listed below.
                 </p>
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                  {productLibrary.map(entry => {
+                  {libraryToShow.map(entry => {
                     const defaultTier = entry.priceTiers.find(t => t.vehicleCategory === "default");
                     const basePrice = defaultTier ? defaultTier.price : entry.defaultPrice;
                     return (
@@ -850,7 +856,8 @@ const Admin = () => {
                     );
                   })}
                 </div>
-              )}
+              );
+              })()}
             </div>
 
             <div className="space-y-2">

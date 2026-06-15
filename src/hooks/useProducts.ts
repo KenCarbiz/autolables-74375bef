@@ -75,7 +75,23 @@ export const useProducts = () => {
       if (error) throw error;
       // `upgrade` is jsonb in the DB (Json); cast through unknown so the
       // typed ProductUpgrade shape lands on the client.
-      return data as unknown as Product[];
+      const rows = (data as unknown as Product[]) || [];
+      // Collapse duplicate products by name. The catalog can end up with two
+      // rows for the same product (e.g. an older empty copy plus the dealer's
+      // filled-in copy); without this, the addendum would show the empty one
+      // and falsely flag it for a missing benefit. Keep the most complete row:
+      // benefit text present wins, then a disclosure, then the later row.
+      const score = (p: Product) =>
+        ((p.benefit_justification || "").trim() ? 4 : 0) +
+        ((p.benefit_justification_optional || "").trim() ? 2 : 0) +
+        ((p.disclosure || "").trim() || (p.disclosure_optional || "").trim() ? 1 : 0);
+      const byName = new Map<string, Product>();
+      for (const p of rows) {
+        const key = (p.name || "").trim().toLowerCase();
+        const existing = byName.get(key);
+        if (!existing || score(p) >= score(existing)) byName.set(key, p);
+      }
+      return Array.from(byName.values()).sort((a, b) => a.sort_order - b.sort_order);
     },
   });
 };
