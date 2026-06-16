@@ -2473,6 +2473,16 @@ export type Database = {
           isSetofReturn: true
         }
       }
+      get_install_proofs_public: {
+        Args: { _slug: string }
+        Returns: {
+          id: string
+          installed_at: string
+          installer_company: string
+          photo_path: string
+          product_name: string
+        }[]
+      }
       get_reengage_schedule: {
         Args: never
         Returns: {
