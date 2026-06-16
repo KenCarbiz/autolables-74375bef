@@ -497,6 +497,14 @@
   .addn-masthead .addn-divider { border-color: rgba(14, 31, 61, 0.35) !important; }
   .addn-masthead .addn-legalstrip { background: transparent !important; border-color: rgba(14, 31, 61, 0.2) !important; }
   .addn-vehicle { background: #ffffff !important; }
+
+  /* Keep protected blocks (signature boxes, totals, disclosure groups)
+     whole across page boundaries so Print matches the PDF export and no
+     page ends mid-signature or orphans a section header. */
+  .pdf-keep-together {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
 }
 
 .addn-print-mode .addn-masthead {
