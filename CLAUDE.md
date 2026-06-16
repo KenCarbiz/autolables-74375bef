@@ -15,10 +15,12 @@ Functions). Bun as package manager.
 
 ## Git Workflow — MANDATORY
 
-This repo (`KenCarbiz/autolables-95db60ea`) is the **canonical repo
-and the Lovable-watched repo**. All work lands here, and Lovable
-reads from `main`, so changes must reach `main` for the preview to
-update.
+This repo (`KenCarbiz/autolables-74375bef`) is the **active,
+Lovable-watched repo** for current work, confirmed by the owner on
+2026-06-16. All work lands here, and Lovable reads from `main`, so
+changes must reach `main` for the preview to update. (The sibling
+`autolables-95db60ea` is an older clone and is NOT the deploy
+source — do not push there expecting it to deploy.)
 
 1. **Push directly to `main` on every change.** This is the
    Lovable-watched repo; there is no mirror step. Commit locally,
@@ -30,9 +32,8 @@ update.
    No Claude Code attribution footer.
 4. **Never force-push `main`** and never skip hooks (`--no-verify`).
    Never amend published commits.
-5. **Remote**: `origin` is `KenCarbiz/autolables-95db60ea`. All
-   pushes go here. There is no separate `autolables` canonical repo
-   in this workflow.
+5. **Remote**: `origin` is `KenCarbiz/autolables-74375bef`. All
+   pushes go here — this is the deploy source.
 
 ## Code rules
 
