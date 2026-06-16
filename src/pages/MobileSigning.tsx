@@ -791,7 +791,7 @@ const MobileSigning = () => {
                   <div key={p.id} className="border border-border rounded-lg p-3 space-y-2.5">
                     <div className="flex items-start justify-between">
                       <div>
-                        <span className="text-[10px] font-bold bg-gold text-navy px-1.5 py-0.5 rounded">Added above advertised</span>
+                        <span className="text-[10px] font-bold bg-orange-600 text-white px-1.5 py-0.5 rounded">Added above advertised</span>
                         <p className="text-sm font-semibold text-foreground mt-1">{p.name}</p>
                         {p.warranty && <p className="text-[10px] text-muted-foreground">{p.warranty}</p>}
                       </div>
@@ -843,7 +843,7 @@ const MobileSigning = () => {
                   <div key={p.id} className="border border-border rounded-lg p-3 space-y-2.5">
                     <div className="flex items-start justify-between">
                       <div>
-                        <span className="text-[10px] font-bold bg-gold text-navy px-1.5 py-0.5 rounded">Optional</span>
+                        <span className="text-[10px] font-bold bg-orange-600 text-white px-1.5 py-0.5 rounded">Optional</span>
                         <p className="text-sm font-semibold text-foreground mt-1">{p.name}</p>
                       </div>
                       <p className="text-sm font-bold text-foreground">${effectivePrice(p).toFixed(2)}</p>

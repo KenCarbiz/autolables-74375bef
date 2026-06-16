@@ -36,7 +36,7 @@ const ProductRow = ({ num, name, subtitle, warranty, badgeType, price, priceLabe
           {badgeType === "installed" ? (
             <span className="inline-block mt-0.5 text-[8px] font-bold bg-blue text-primary-foreground px-1.5 py-0.5 rounded-sm">Pre-Installed · Non-Removable</span>
           ) : (
-            <span className="inline-block mt-0.5 text-[8px] font-bold bg-gold text-navy px-1.5 py-0.5 rounded-sm">Optional — Consumer May Accept or Decline</span>
+            <span className="inline-block mt-0.5 text-[8px] font-bold bg-orange-600 text-white px-1.5 py-0.5 rounded-sm">Optional — Consumer May Accept or Decline</span>
           )}
         </div>
         <div className="text-right shrink-0">
