@@ -108,7 +108,7 @@ export const DEFAULT_PRODUCT_LIBRARY: LibrarySeed[] = [
       "Pre-cut protective film applied to door edges and behind door handles to help prevent chips and fingernail scratches in everyday use.",
     benefits: [
       "Helps prevent chips on door edges from parking-lot contact",
-      "Protects the paint behind handles from fingernail scratching",
+      "Helps protect the paint behind handles from fingernail scratching",
       "Nearly invisible and conforms to factory contours",
     ],
     whyItMatters:
