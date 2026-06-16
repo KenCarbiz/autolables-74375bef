@@ -2484,6 +2484,10 @@ export type Database = {
           product_name: string
         }[]
       }
+      get_or_create_install_token: {
+        Args: { _store_id: string; _vin: string; _ymm?: string }
+        Returns: string
+      }
       get_reengage_schedule: {
         Args: never
         Returns: {
