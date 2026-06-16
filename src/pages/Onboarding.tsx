@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useTenant } from "@/contexts/TenantContext";
+import { useDealerSettings } from "@/contexts/DealerSettingsContext";
 import { useDealerScraper } from "@/hooks/useDealerScraper";
 import { useEntitlements } from "@/hooks/useEntitlements";
 import { useAuth } from "@/contexts/AuthContext";
@@ -45,6 +46,11 @@ interface OnboardingData {
   phone: string;
   email: string;
 
+  // Inventory feed / website verification
+  dmsProvider: string;
+  newInventoryUrl: string;
+  usedInventoryUrl: string;
+
   // Step 3: Structure
   structure: StructureType;
 
@@ -67,6 +73,9 @@ const INITIAL: OnboardingData = {
   zip: "",
   phone: "",
   email: "",
+  dmsProvider: "",
+  newInventoryUrl: "",
+  usedInventoryUrl: "",
   structure: "single",
   bdcType: "none",
   planTier: "standard",
@@ -76,6 +85,7 @@ const Onboarding = () => {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const { updateTenant, addStore, stores, updateStore, completeOnboarding, isEmbedded } = useTenant();
+  const { updateSettings } = useDealerSettings();
   const { scrapeDealer, scraping, error: scrapeError } = useDealerScraper();
   const { user, isAdmin, loading: authLoading } = useAuth();
   const { tenant, profile, bootstrapTenant, reload: reloadEntitlements } = useEntitlements();
@@ -227,6 +237,21 @@ const Onboarding = () => {
       name: data.dealerName || "Your Dealership",
       logo_url: data.logoUrl,
       primary_color: data.primaryColor,
+    });
+
+    // Persist dealer identity + inventory/feed source into DealerSettings
+    // (the store the addendum + price-integrity crawl read from).
+    updateSettings({
+      dealer_name: data.dealerName,
+      dealer_tagline: data.tagline,
+      dealer_address: data.address,
+      dealer_city: data.city,
+      dealer_state: data.state,
+      dealer_zip: data.zip,
+      dealer_phone: data.phone,
+      dms_provider: data.dmsProvider,
+      new_inventory_url: data.newInventoryUrl,
+      used_inventory_url: data.usedInventoryUrl,
     });
 
     // Create or update the default store
@@ -610,6 +635,14 @@ const Onboarding = () => {
               <div className="grid grid-cols-2 gap-3">
                 <Field label="Phone" value={data.phone} onChange={v => update("phone", v)} icon={Phone} placeholder="(555) 555-5555" />
                 <Field label="Email" value={data.email} onChange={v => update("email", v)} icon={Mail} placeholder="contact@example.com" />
+              </div>
+            </Section>
+
+            <Section icon={Globe} title="Inventory & pricing source" subtitle="Your DMS is the source of truth; your inventory websites let us verify advertised prices match the sticker.">
+              <div className="grid grid-cols-2 gap-3">
+                <Field label="DMS Provider" value={data.dmsProvider} onChange={v => update("dmsProvider", v)} placeholder="CDK, Reynolds, Dealertrack, Tekion…" colSpan={2} />
+                <Field label="New inventory website" value={data.newInventoryUrl} onChange={v => update("newInventoryUrl", v)} placeholder="https://yourdealer.com/inventory/new" />
+                <Field label="Used inventory website" value={data.usedInventoryUrl} onChange={v => update("usedInventoryUrl", v)} placeholder="https://yourdealer.com/inventory/used" />
               </div>
             </Section>
           </div>

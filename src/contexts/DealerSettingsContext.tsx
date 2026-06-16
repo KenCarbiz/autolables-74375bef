@@ -20,6 +20,12 @@ export interface DealerSettings {
   dealer_principal: string;        // dealer principal / owner of record
   dealer_license_number: string;   // DMV dealer license / ID number
   dealer_oem_brands: string;       // franchised OEM brands (comma-separated)
+  // Inventory feed / website verification (Wave 36). The DMS is the
+  // authoritative source for inventory + pricing; the new/used inventory
+  // website URLs feed the advertised-price-vs-sticker crawl.
+  dms_provider: string;            // e.g. CDK, Reynolds, Dealertrack, Tekion
+  new_inventory_url: string;       // dealer's New inventory listing page
+  used_inventory_url: string;      // dealer's Used inventory listing page
   // Feature toggles — what shows on the employee-facing addendum
   feature_vin_decode: boolean;
   feature_buyers_guide: boolean;
@@ -78,6 +84,9 @@ export const DEFAULT_SETTINGS: DealerSettings = {
   dealer_principal: "",
   dealer_license_number: "",
   dealer_oem_brands: "",
+  dms_provider: "",
+  new_inventory_url: "",
+  used_inventory_url: "",
   feature_vin_decode: true,
   feature_buyers_guide: true,
   feature_product_rules: true,

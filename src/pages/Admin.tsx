@@ -292,6 +292,9 @@ const Admin = () => {
     dealer_phone: settings.dealer_phone,
     dealer_principal: settings.dealer_principal,
     dealer_license_number: settings.dealer_license_number,
+    dms_provider: settings.dms_provider,
+    new_inventory_url: settings.new_inventory_url,
+    used_inventory_url: settings.used_inventory_url,
   });
   const [logoUploading, setLogoUploading] = useState(false);
 
@@ -1295,6 +1298,29 @@ const Admin = () => {
                   <input value={branding.dealer_license_number} onChange={(e) => setBranding({ ...branding, dealer_license_number: e.target.value })} placeholder="e.g. CT dealer #00000" className="mt-1 w-full px-3 py-2 border border-border-custom rounded text-sm bg-background text-foreground placeholder:text-muted-foreground/50" />
                 </div>
               </div>
+
+              {/* Inventory feed + website verification */}
+              <div className="border-t border-border-custom pt-3">
+                <h4 className="text-sm font-bold text-foreground">Inventory Feed &amp; Website</h4>
+                <p className="text-[11px] text-muted-foreground mb-2">
+                  Your DMS is the source of truth for inventory and pricing. The new/used website URLs let us verify your advertised prices match the sticker (FTC Act §5).
+                </p>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                  <div>
+                    <label className="text-xs font-semibold text-muted-foreground">DMS Provider</label>
+                    <input value={branding.dms_provider} onChange={(e) => setBranding({ ...branding, dms_provider: e.target.value })} placeholder="CDK, Reynolds, Dealertrack, Tekion…" className="mt-1 w-full px-3 py-2 border border-border-custom rounded text-sm bg-background text-foreground placeholder:text-muted-foreground/50" />
+                  </div>
+                  <div>
+                    <label className="text-xs font-semibold text-muted-foreground">New Inventory Website</label>
+                    <input value={branding.new_inventory_url} onChange={(e) => setBranding({ ...branding, new_inventory_url: e.target.value })} placeholder="https://yourdealer.com/inventory/new" className="mt-1 w-full px-3 py-2 border border-border-custom rounded text-sm bg-background text-foreground placeholder:text-muted-foreground/50" />
+                  </div>
+                  <div>
+                    <label className="text-xs font-semibold text-muted-foreground">Used Inventory Website</label>
+                    <input value={branding.used_inventory_url} onChange={(e) => setBranding({ ...branding, used_inventory_url: e.target.value })} placeholder="https://yourdealer.com/inventory/used" className="mt-1 w-full px-3 py-2 border border-border-custom rounded text-sm bg-background text-foreground placeholder:text-muted-foreground/50" />
+                  </div>
+                </div>
+              </div>
+
               <div className="flex gap-3">
                 <button onClick={handleSaveBranding} className="px-6 py-2 bg-teal text-primary-foreground rounded font-semibold text-sm">
                   Save Branding
@@ -1313,6 +1339,9 @@ const Admin = () => {
                       dealer_phone: "",
                       dealer_principal: "",
                       dealer_license_number: "",
+                      dms_provider: "",
+                      new_inventory_url: "",
+                      used_inventory_url: "",
                     };
                     setBranding(defaults);
                     updateSettings(defaults);
