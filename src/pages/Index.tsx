@@ -438,6 +438,19 @@ const Index = () => {
     });
   }, [ruledProducts, typeOverrides, benefitOverrides, upgradeSelections, settings.product_default_mode, vehicleContext.bodyStyle, vehicleContext.model, proofRegime, provenNames]);
 
+  // Normalize the scraped/entered condition into the red-team's enum. This
+  // addendum is a used-car supplement (the vehicle file is registered as
+  // "used"), so an unknown condition defaults to "used" — that keeps the FTC
+  // Buyers Guide, CT K-208, and CA SB 766 used-car checks active instead of
+  // silently disabling them. Passing undefined here is what previously turned
+  // those gates off.
+  const vehicleCondition: "new" | "used" | "cpo" = useMemo(() => {
+    const c = (vehicleDetails.condition || "").toLowerCase();
+    if (c.includes("cpo") || c.includes("certified")) return "cpo";
+    if (c.includes("new")) return "new";
+    return "used";
+  }, [vehicleDetails.condition]);
+
   const installed = displayProducts.filter((p) => p.badge_type === "installed");
   const optional = displayProducts.filter((p) => p.badge_type === "optional");
   const installedTotal = installed.reduce((sum, p) => sum + p.price, 0);
@@ -1104,7 +1117,7 @@ const Index = () => {
               spanishVersion: false,
               customerName: composeName(customerInfo.buyer_first_name, customerInfo.buyer_middle_initial, customerInfo.buyer_last_name, customerInfo.buyer_suffix),
               initialsByProductId: initials,
-              vehicleCondition: undefined,
+              vehicleCondition,
             })}
           />
           {/* Wave 4.3 — per-state disclosure pack for the dealer's state */}
@@ -1113,7 +1126,7 @@ const Index = () => {
             input={{
               vehiclePrice: undefined,
               docFeeAmount: settings.doc_fee_enabled ? settings.doc_fee_amount : undefined,
-              vehicleCondition: undefined,
+              vehicleCondition,
               saleConductedInSpanish: false,
             }}
           />

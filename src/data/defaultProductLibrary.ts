@@ -131,12 +131,12 @@ export const DEFAULT_PRODUCT_LIBRARY: LibrarySeed[] = [
     description:
       "The vehicle identification number is permanently etched onto the glass and registered with a theft-deterrent database, making the vehicle harder to resell if stolen and parts harder to fence.",
     benefits: [
-      "Permanently marks glass to deter theft and chop-shop resale",
-      "Registration supports recovery and may qualify for an insurance discount",
-      "Etching does not affect glass integrity or visibility",
+      "Permanently marks the glass, so marked parts are harder to resell and easier to trace",
+      "Registration may help law enforcement identify or recover the vehicle if it is stolen",
+      "Some insurers may offer a discount for VIN-etched glass; check with your provider",
     ],
     whyItMatters:
-      "Marked vehicles are less attractive to thieves and easier to identify if recovered.",
+      "The mark stays with the vehicle and gives stolen parts a traceable identity if it is ever recovered.",
     warranty: "Theft-benefit program terms apply — see provider.",
     vendorName: "Dealer-applied",
     disclosure:
