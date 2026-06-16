@@ -4,7 +4,9 @@ import { useViewTransitionNavigate } from "@/lib/navigation";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useTenant } from "@/contexts/TenantContext";
+import { useDealerSettings } from "@/contexts/DealerSettingsContext";
 import { useGetReady } from "@/hooks/useGetReady";
+import { usedSafetyInspectionForm } from "@/data/safetyInspection";
 import { useVinDecode } from "@/hooks/useVinDecode";
 import { toast } from "sonner";
 import {
@@ -49,6 +51,7 @@ const Inventory = () => {
   const { tenant } = useTenant();
   const navigate = useViewTransitionNavigate();
   const { createGetReady } = useGetReady(tenant?.id || "");
+  const { settings } = useDealerSettings();
 
   // Push an inventory vehicle into the Get-Ready prep pipeline. Get-Ready
   // had no intake wired, so the pipeline was always empty.
@@ -60,7 +63,11 @@ const Inventory = () => {
       condition: r.condition === "new" ? "new" : "used",
       acquiredDate: new Date().toISOString().slice(0, 10),
       accessoriesToInstall: [],
+      // Self-aware: used vehicles need a safety inspection before delivery;
+      // new ones do not. Name the state's form (CT -> K-208) when known.
       inspectionRequired: r.condition !== "new",
+      inspectionFormType:
+        usedSafetyInspectionForm(settings.dealer_state || settings.doc_fee_state, r.condition) || undefined,
       createdBy: user?.id || "",
     });
     if (rec) toast.success(`${r.ymm || r.vin || "Vehicle"} sent to Get-Ready`);

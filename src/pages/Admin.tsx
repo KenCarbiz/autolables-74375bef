@@ -1705,6 +1705,17 @@ const Admin = () => {
                                 record.status === "ready" ? "bg-emerald-50 text-emerald-700" :
                                 "bg-amber-50 text-amber-700"
                               }`}>{record.status.replace(/_/g, " ")}</span>
+                              {record.inspectionRequired && (
+                                <span
+                                  className={`text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded ${
+                                    record.inspectionComplete ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-700"
+                                  }`}
+                                  title={record.inspectionComplete ? "Safety inspection on file" : "Safety inspection required before delivery"}
+                                >
+                                  {record.inspectionComplete ? "Inspection done" : "Inspection due"}
+                                  {record.inspectionFormType ? ` · ${record.inspectionFormType}` : ""}
+                                </span>
+                              )}
                             </div>
                             <div className="flex items-center gap-3 mt-0.5 text-xs text-muted-foreground">
                               <span className="font-mono">{record.vin}</span>
