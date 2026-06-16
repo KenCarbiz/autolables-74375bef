@@ -213,6 +213,35 @@ const extractAdvertised = (html: string, url: string, targetVin: string): AdResu
   return { price: null, source: "none", gated: false, reason: "no_price_extracted" };
 };
 
+// Browser-like UA shared by the seeded crawl and discovery fetches.
+const UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36";
+const FETCH_HEADERS = { "User-Agent": UA, "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8", "Accept-Language": "en-US,en;q=0.9" };
+
+const originOf = (u: string): string | null => { try { return new URL(u).origin; } catch { return null; } };
+const vinFromUrl = (u: string): string | null => {
+  const m = u.toUpperCase().match(/[A-HJ-NPR-Z0-9]{17}/);
+  return m ? m[0] : null;
+};
+
+// Collect candidate VDP URLs from a listing page or sitemap body: any URL
+// (absolute or root-relative) that embeds a 17-char VIN — the reliable VDP
+// signature on DealerOn/Apollo/DealerInspire templates.
+const discoverVdpUrls = (docBody: string, origin: string): string[] => {
+  const found = new Set<string>();
+  let m: RegExpExecArray | null;
+  const absRe = /https?:\/\/[^\s"'<>]*[A-HJ-NPR-Z0-9]{17}[^\s"'<>]*/gi;
+  while ((m = absRe.exec(docBody))) {
+    const u = m[0].replace(/&amp;/g, "&").split("?")[0].split("#")[0];
+    if (isUrlSafe(u)) found.add(u);
+  }
+  const relRe = /["'](\/[a-z0-9/_.\-]*[A-HJ-NPR-Z0-9]{17}[a-z0-9/_.\-]*)["']/gi;
+  while ((m = relRe.exec(docBody))) {
+    const u = origin + m[1].split("?")[0].split("#")[0];
+    if (isUrlSafe(u)) found.add(u);
+  }
+  return [...found];
+};
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -247,7 +276,7 @@ serve(async (req) => {
     auth: { persistSession: false, autoRefreshToken: false },
   });
 
-  let body: { limit?: number; tenant_id?: string } = {};
+  let body: { limit?: number; tenant_id?: string; discover?: boolean } = {};
   try { body = await req.json(); } catch { /* empty body OK */ }
   const limit = Math.max(1, Math.min(body.limit ?? 200, 1000));
 
@@ -284,6 +313,7 @@ serve(async (req) => {
   let unchanged = 0;
   let failed = 0;
   let skipped = 0;
+  let discovered = 0;
 
   for (const row of rows) {
     try {
@@ -379,6 +409,77 @@ serve(async (req) => {
     }
   }
 
+  // ── Discovery: find VDPs from each tenant's configured inventory URLs ──
+  // (new_inventory_url / used_inventory_url + the site's sitemap.xml), match
+  // each discovered VIN to our inventory, and snapshot its advertised price.
+  // Best-effort and bounded; JS-rendered/bot-walled sites yield little here
+  // and need the rendering-service fetcher (future) or a feed.
+  if (body.discover !== false) {
+    // deno-lint-ignore no-explicit-any
+    let pq: any = admin.from("dealer_profiles").select("tenant_id, settings");
+    if (body.tenant_id) pq = pq.eq("tenant_id", body.tenant_id);
+    const { data: profiles } = await pq;
+    for (const prof of (profiles || [])) {
+      const tenantId = prof.tenant_id;
+      const s = prof.settings || {};
+      const listingUrls: string[] = [s.new_inventory_url, s.used_inventory_url].filter((x: string) => x && isUrlSafe(x));
+      if (listingUrls.length === 0) continue;
+
+      const sources = [...listingUrls];
+      const origins = new Set<string>();
+      listingUrls.forEach((u) => { const o = originOf(u); if (o) origins.add(o); });
+      for (const o of origins) sources.push(`${o}/sitemap.xml`);
+
+      const vdpUrls = new Set<string>();
+      for (const src of sources) {
+        if (vdpUrls.size > 400) break;
+        try {
+          const r = await fetch(src, { headers: FETCH_HEADERS, signal: AbortSignal.timeout(12000) });
+          if (!r.ok) continue;
+          const txt = await r.text();
+          if (looksLikeChallenge(txt, r.headers, r.status)) continue;
+          discoverVdpUrls(txt, originOf(src) || "").forEach((u) => vdpUrls.add(u));
+        } catch { /* skip source */ }
+      }
+      if (vdpUrls.size === 0) continue;
+
+      const { data: listings } = await admin.from("vehicle_listings").select("vin").eq("tenant_id", tenantId);
+      const knownVins = new Set((listings || []).map((l: { vin: string | null }) => (l.vin || "").toUpperCase()));
+      const { data: latestAds } = await admin.from("advertised_prices")
+        .select("vin, advertised_price, captured_at").eq("tenant_id", tenantId)
+        .order("captured_at", { ascending: false }).limit(3000);
+      const latestByVin = new Map<string, number>();
+      for (const a of (latestAds || [])) {
+        const v = (a.vin || "").toUpperCase();
+        if (!latestByVin.has(v)) latestByVin.set(v, a.advertised_price);
+      }
+
+      let crawledThisTenant = 0;
+      for (const vdp of vdpUrls) {
+        if (crawledThisTenant >= 250) break;
+        const vin = vinFromUrl(vdp);
+        if (!vin || !knownVins.has(vin)) continue; // only verify our own inventory
+        try {
+          const r = await fetch(vdp, { headers: FETCH_HEADERS, signal: AbortSignal.timeout(12000) });
+          const html = r.ok ? await r.text() : "";
+          if (!r.ok || looksLikeChallenge(html, r.headers, r.status)) { crawledThisTenant++; continue; }
+          const result = extractAdvertised(html, vdp, vin);
+          if (result.gated || result.reason === "vin_mismatch" || result.price == null) { crawledThisTenant++; continue; }
+          const prev = latestByVin.get(vin);
+          if (prev != null && Math.abs(result.price - prev) < 1) { crawledThisTenant++; continue; }
+          await admin.from("advertised_prices").insert({
+            tenant_id: tenantId, store_id: "", vin, source_url: vdp, source_channel: "website",
+            advertised_price: result.price, captured_by: "discovery",
+            notes: `Discovered (${result.source})${prev != null ? ` · was $${prev.toLocaleString()}` : ""}`,
+          });
+          latestByVin.set(vin, result.price);
+          discovered++;
+          crawledThisTenant++;
+        } catch { crawledThisTenant++; }
+      }
+    }
+  }
+
   return new Response(JSON.stringify({
     ok: true,
     picked: rows.length,
@@ -386,6 +487,7 @@ serve(async (req) => {
     unchanged,
     failed,
     skipped,
+    discovered,
   }), {
     headers: { ...corsHeaders, "Content-Type": "application/json" },
   });
