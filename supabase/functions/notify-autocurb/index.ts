@@ -78,7 +78,18 @@ serve(async (req) => {
 
     // Resolve caller's tenant.
     let tenantId = bodyTenantId as string | undefined;
-    if (!tenantId) {
+    if (tenantId) {
+      // Verify caller is an accepted owner/admin of the supplied tenant.
+      const { data: m } = await admin
+        .from("tenant_members")
+        .select("role")
+        .eq("tenant_id", tenantId)
+        .eq("user_id", user.id)
+        .in("role", ["owner", "admin"])
+        .not("accepted_at", "is", null)
+        .maybeSingle();
+      if (!m) return json(403, { error: "not a tenant owner/admin" });
+    } else {
       const { data: m } = await admin
         .from("tenant_members")
         .select("tenant_id,role")

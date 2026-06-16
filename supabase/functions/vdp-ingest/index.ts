@@ -200,13 +200,29 @@ const extractHeuristic = (doc: Doc, baseUrl: URL): ScrapeResult => {
   };
 };
 
+const safeFetch = async (url: string, init: RequestInit, maxRedirects = 5): Promise<Response> => {
+  let current = url;
+  for (let i = 0; i <= maxRedirects; i++) {
+    const safety = isUrlSafe(current);
+    if (!safety.ok) throw new Error(`redirect blocked: ${safety.reason}`);
+    const res = await fetch(current, { ...init, redirect: "manual" });
+    if (res.status >= 300 && res.status < 400) {
+      const loc = res.headers.get("location");
+      if (!loc) return res;
+      current = new URL(loc, current).toString();
+      continue;
+    }
+    return res;
+  }
+  throw new Error("too many redirects");
+};
+
 const scrape = async (url: string): Promise<ScrapeResult> => {
-  const res = await fetch(url, {
+  const res = await safeFetch(url, {
     headers: {
       "User-Agent": "Mozilla/5.0 (compatible; AutoLabelsVDPBot/1.0; +https://autolabels.io/bot)",
       Accept: "text/html,application/xhtml+xml",
     },
-    redirect: "follow",
     signal: AbortSignal.timeout ? AbortSignal.timeout(15000) : undefined,
   });
   if (!res.ok) throw new Error(`fetch ${res.status}`);
