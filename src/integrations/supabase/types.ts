@@ -2426,6 +2426,7 @@ export type Database = {
         Returns: {
           addendum_date: string
           buyers_guide_id: string
+          cobuyer_name: string
           dealer_snapshot: Json
           financing_input: Json
           id: string
