@@ -26,7 +26,7 @@ import LeadCaptureModal from "@/components/addendum/LeadCaptureModal";
 import AddendumStatusTimeline from "@/components/addendum/AddendumStatusTimeline";
 import VinBarcode from "@/components/addendum/VinBarcode";
 import VehicleDetailsBar from "@/components/addendum/VehicleDetailsBar";
-import CustomerInfoSection, { CustomerInfo, emptyCustomerInfo } from "@/components/addendum/CustomerInfoSection";
+import CustomerInfoSection, { CustomerInfo, emptyCustomerInfo, composeName } from "@/components/addendum/CustomerInfoSection";
 import { ScrapedVehicle } from "@/hooks/useVehicleUrlScrape";
 import { useAudit } from "@/contexts/AuditContext";
 import { useTenant } from "@/contexts/TenantContext";
@@ -262,14 +262,11 @@ const Index = () => {
       const [bFirst, ...bRest] = (data.customer_name || "").split(" ");
       const [cFirst, ...cRest] = (data.cobuyer_name || "").split(" ");
       setCustomerInfo({
+        ...emptyCustomerInfo,
         buyer_first_name: bFirst || "",
         buyer_last_name: bRest.join(" "),
-        buyer_phone: "",
-        buyer_email: "",
         cobuyer_first_name: cFirst || "",
         cobuyer_last_name: cRest.join(" "),
-        cobuyer_phone: "",
-        cobuyer_email: "",
       });
 
       setCustomerSig({
@@ -660,7 +657,7 @@ const Index = () => {
           (p as { benefit_justification_optional?: string | null }).benefit_justification_optional || "",
       })) || [],
       spanishVersion: false,
-      customerName: [customerInfo.buyer_first_name, customerInfo.buyer_last_name].filter(Boolean).join(" "),
+      customerName: composeName(customerInfo.buyer_first_name, customerInfo.buyer_middle_initial, customerInfo.buyer_last_name, customerInfo.buyer_suffix),
       initialsByProductId: initials,
     });
     const rtSummary = summarizeRedTeam(rtFindings);
@@ -841,8 +838,8 @@ const Index = () => {
       products_snapshot: JSON.parse(JSON.stringify(displayProducts || [])),
       initials,
       optional_selections: optionalSelections,
-      customer_name: [customerInfo.buyer_first_name, customerInfo.buyer_last_name].filter(Boolean).join(" ") || null,
-      cobuyer_name: [customerInfo.cobuyer_first_name, customerInfo.cobuyer_last_name].filter(Boolean).join(" ") || null,
+      customer_name: composeName(customerInfo.buyer_first_name, customerInfo.buyer_middle_initial, customerInfo.buyer_last_name, customerInfo.buyer_suffix) || null,
+      cobuyer_name: composeName(customerInfo.cobuyer_first_name, customerInfo.cobuyer_middle_initial, customerInfo.cobuyer_last_name, customerInfo.cobuyer_suffix) || null,
       customer_signature_data: customerSig.data,
       customer_signature_type: customerSig.type,
       customer_signed_at: customerSig.data ? (customerSig.at || now) : null,
@@ -879,12 +876,12 @@ const Index = () => {
       }> = [];
       if (customerSig.data) signers.push({
         type: "customer",
-        name: [customerInfo.buyer_first_name, customerInfo.buyer_last_name].filter(Boolean).join(" ") || null,
+        name: composeName(customerInfo.buyer_first_name, customerInfo.buyer_middle_initial, customerInfo.buyer_last_name, customerInfo.buyer_suffix) || null,
         sig: customerSig,
       });
       if (cobuyerSig.data) signers.push({
         type: "cobuyer",
-        name: [customerInfo.cobuyer_first_name, customerInfo.cobuyer_last_name].filter(Boolean).join(" ") || null,
+        name: composeName(customerInfo.cobuyer_first_name, customerInfo.cobuyer_middle_initial, customerInfo.cobuyer_last_name, customerInfo.cobuyer_suffix) || null,
         sig: cobuyerSig,
       });
       if (employeeSig.data) signers.push({
@@ -1105,7 +1102,7 @@ const Index = () => {
                   (p as { benefit_justification_optional?: string | null }).benefit_justification_optional || "",
               })) || [],
               spanishVersion: false,
-              customerName: [customerInfo.buyer_first_name, customerInfo.buyer_last_name].filter(Boolean).join(" "),
+              customerName: composeName(customerInfo.buyer_first_name, customerInfo.buyer_middle_initial, customerInfo.buyer_last_name, customerInfo.buyer_suffix),
               initialsByProductId: initials,
               vehicleCondition: undefined,
             })}
@@ -1323,12 +1320,12 @@ const Index = () => {
           <div className="space-y-3 pt-2 pdf-keep-together">
             <div>
               <SignaturePad label="Customer Signature" subtitle="Buyer acknowledges receipt of this addendum" value={customerSig.data} type={customerSig.type} onChange={(data, type) => setCustomerSig({ data, type, at: data ? new Date().toISOString() : "" })} />
-              {customerSig.at && <SignatureStamp at={customerSig.at} who={[customerInfo.buyer_first_name, customerInfo.buyer_last_name].filter(Boolean).join(" ") || "Buyer"} />}
+              {customerSig.at && <SignatureStamp at={customerSig.at} who={composeName(customerInfo.buyer_first_name, customerInfo.buyer_middle_initial, customerInfo.buyer_last_name, customerInfo.buyer_suffix) || "Buyer"} />}
             </div>
             {hasCobuyer && (
               <div>
                 <SignaturePad label="Co-Buyer Signature" subtitle="Co-Buyer acknowledges receipt of this addendum" value={cobuyerSig.data} type={cobuyerSig.type} onChange={(data, type) => setCobuyerSig({ data, type, at: data ? new Date().toISOString() : "" })} />
-                {cobuyerSig.at && <SignatureStamp at={cobuyerSig.at} who={[customerInfo.cobuyer_first_name, customerInfo.cobuyer_last_name].filter(Boolean).join(" ") || "Co-Buyer"} />}
+                {cobuyerSig.at && <SignatureStamp at={cobuyerSig.at} who={composeName(customerInfo.cobuyer_first_name, customerInfo.cobuyer_middle_initial, customerInfo.cobuyer_last_name, customerInfo.cobuyer_suffix) || "Co-Buyer"} />}
               </div>
             )}
             <div>

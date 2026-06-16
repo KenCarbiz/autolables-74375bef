@@ -2,11 +2,15 @@ import { User, Users } from "lucide-react";
 
 export interface CustomerInfo {
   buyer_first_name: string;
+  buyer_middle_initial: string;
   buyer_last_name: string;
+  buyer_suffix: string;
   buyer_phone: string;
   buyer_email: string;
   cobuyer_first_name: string;
+  cobuyer_middle_initial: string;
   cobuyer_last_name: string;
+  cobuyer_suffix: string;
   cobuyer_phone: string;
   cobuyer_email: string;
 }
@@ -18,9 +22,77 @@ interface CustomerInfoSectionProps {
   inkSaving?: boolean;
 }
 
+const SUFFIXES = ["", "Jr.", "Sr.", "II", "III", "IV", "V"];
+
+// Format a US phone as (xxx) xxx-xxxx while the user types.
+export const formatPhone = (v: string): string => {
+  const d = v.replace(/\D/g, "").slice(0, 10);
+  if (d.length === 0) return "";
+  if (d.length < 4) return `(${d}`;
+  if (d.length < 7) return `(${d.slice(0, 3)}) ${d.slice(3)}`;
+  return `(${d.slice(0, 3)}) ${d.slice(3, 6)}-${d.slice(6)}`;
+};
+
+// Compose a full legal name "First M. Last Suffix" from the parts.
+export const composeName = (first: string, mi: string, last: string, suffix: string): string =>
+  [first?.trim(), mi?.trim() ? `${mi.trim().toUpperCase()}.` : "", last?.trim(), suffix?.trim()]
+    .filter(Boolean)
+    .join(" ");
+
+const inputCls =
+  "w-full border-b-[1.5px] border-border-custom bg-transparent text-xs text-foreground outline-none placeholder:text-muted-foreground/50 py-0.5";
+const labelCls = "text-[7px] font-bold text-muted-foreground uppercase tracking-wider";
+
 const CustomerInfoSection = ({ info, onChange, showCobuyer, inkSaving }: CustomerInfoSectionProps) => {
   const update = (field: keyof CustomerInfo, value: string) => {
     onChange({ ...info, [field]: value });
+  };
+
+  // Renders one person's fields (buyer or co-buyer) given the field prefix.
+  const PersonFields = ({ prefix }: { prefix: "buyer" | "cobuyer" }) => {
+    const k = (s: string) => `${prefix}_${s}` as keyof CustomerInfo;
+    return (
+      <>
+        {/* Name row */}
+        <div className="grid grid-cols-6 gap-2 mb-1">
+          <div className="col-span-2">
+            <label className={labelCls}>First Name</label>
+            <input value={info[k("first_name")]} onChange={(e) => update(k("first_name"), e.target.value)} placeholder="First" className={inputCls} />
+          </div>
+          <div className="col-span-1">
+            <label className={labelCls}>M.I.</label>
+            <input value={info[k("middle_initial")]} onChange={(e) => update(k("middle_initial"), e.target.value.replace(/[^a-zA-Z]/g, "").slice(0, 1).toUpperCase())} placeholder="M" maxLength={1} className={`${inputCls} text-center`} />
+          </div>
+          <div className="col-span-2">
+            <label className={labelCls}>Last Name</label>
+            <input value={info[k("last_name")]} onChange={(e) => update(k("last_name"), e.target.value)} placeholder="Last" className={inputCls} />
+          </div>
+          <div className="col-span-1">
+            <label className={labelCls}>Suffix</label>
+            <select
+              value={info[k("suffix")]}
+              onChange={(e) => update(k("suffix"), e.target.value)}
+              className={`${inputCls} cursor-pointer`}
+            >
+              {SUFFIXES.map((s) => (
+                <option key={s} value={s}>{s || "—"}</option>
+              ))}
+            </select>
+          </div>
+        </div>
+        {/* Contact row */}
+        <div className="grid grid-cols-2 gap-2">
+          <div>
+            <label className={labelCls}>Phone</label>
+            <input value={info[k("phone")]} onChange={(e) => update(k("phone"), formatPhone(e.target.value))} placeholder="(555) 555-5555" type="tel" inputMode="tel" className={inputCls} />
+          </div>
+          <div>
+            <label className={labelCls}>Email</label>
+            <input value={info[k("email")]} onChange={(e) => update(k("email"), e.target.value)} placeholder="email@example.com" type="email" className={inputCls} />
+          </div>
+        </div>
+      </>
+    );
   };
 
   return (
@@ -29,47 +101,7 @@ const CustomerInfoSection = ({ info, onChange, showCobuyer, inkSaving }: Custome
         <User className="w-3 h-3 text-muted-foreground" />
         <p className="text-[9px] font-bold text-foreground uppercase tracking-wide">Buyer Information</p>
       </div>
-
-      <div className="grid grid-cols-4 gap-2 mb-1">
-        <div>
-          <label className="text-[7px] font-bold text-muted-foreground uppercase tracking-wider">First Name</label>
-          <input
-            value={info.buyer_first_name}
-            onChange={(e) => update("buyer_first_name", e.target.value)}
-            placeholder="First"
-            className="w-full border-b-[1.5px] border-border-custom bg-transparent text-xs text-foreground outline-none placeholder:text-muted-foreground/50 py-0.5"
-          />
-        </div>
-        <div>
-          <label className="text-[7px] font-bold text-muted-foreground uppercase tracking-wider">Last Name</label>
-          <input
-            value={info.buyer_last_name}
-            onChange={(e) => update("buyer_last_name", e.target.value)}
-            placeholder="Last"
-            className="w-full border-b-[1.5px] border-border-custom bg-transparent text-xs text-foreground outline-none placeholder:text-muted-foreground/50 py-0.5"
-          />
-        </div>
-        <div>
-          <label className="text-[7px] font-bold text-muted-foreground uppercase tracking-wider">Phone</label>
-          <input
-            value={info.buyer_phone}
-            onChange={(e) => update("buyer_phone", e.target.value)}
-            placeholder="(555) 555-5555"
-            type="tel"
-            className="w-full border-b-[1.5px] border-border-custom bg-transparent text-xs text-foreground outline-none placeholder:text-muted-foreground/50 py-0.5"
-          />
-        </div>
-        <div>
-          <label className="text-[7px] font-bold text-muted-foreground uppercase tracking-wider">Email</label>
-          <input
-            value={info.buyer_email}
-            onChange={(e) => update("buyer_email", e.target.value)}
-            placeholder="email@example.com"
-            type="email"
-            className="w-full border-b-[1.5px] border-border-custom bg-transparent text-xs text-foreground outline-none placeholder:text-muted-foreground/50 py-0.5"
-          />
-        </div>
-      </div>
+      <PersonFields prefix="buyer" />
 
       {showCobuyer && (
         <>
@@ -77,46 +109,7 @@ const CustomerInfoSection = ({ info, onChange, showCobuyer, inkSaving }: Custome
             <Users className="w-3 h-3 text-muted-foreground" />
             <p className="text-[9px] font-bold text-foreground uppercase tracking-wide">Co-Buyer Information <span className="text-muted-foreground font-normal normal-case">(optional)</span></p>
           </div>
-          <div className="grid grid-cols-4 gap-2">
-            <div>
-              <label className="text-[7px] font-bold text-muted-foreground uppercase tracking-wider">First Name</label>
-              <input
-                value={info.cobuyer_first_name}
-                onChange={(e) => update("cobuyer_first_name", e.target.value)}
-                placeholder="First"
-                className="w-full border-b-[1.5px] border-border-custom bg-transparent text-xs text-foreground outline-none placeholder:text-muted-foreground/50 py-0.5"
-              />
-            </div>
-            <div>
-              <label className="text-[7px] font-bold text-muted-foreground uppercase tracking-wider">Last Name</label>
-              <input
-                value={info.cobuyer_last_name}
-                onChange={(e) => update("cobuyer_last_name", e.target.value)}
-                placeholder="Last"
-                className="w-full border-b-[1.5px] border-border-custom bg-transparent text-xs text-foreground outline-none placeholder:text-muted-foreground/50 py-0.5"
-              />
-            </div>
-            <div>
-              <label className="text-[7px] font-bold text-muted-foreground uppercase tracking-wider">Phone</label>
-              <input
-                value={info.cobuyer_phone}
-                onChange={(e) => update("cobuyer_phone", e.target.value)}
-                placeholder="(555) 555-5555"
-                type="tel"
-                className="w-full border-b-[1.5px] border-border-custom bg-transparent text-xs text-foreground outline-none placeholder:text-muted-foreground/50 py-0.5"
-              />
-            </div>
-            <div>
-              <label className="text-[7px] font-bold text-muted-foreground uppercase tracking-wider">Email</label>
-              <input
-                value={info.cobuyer_email}
-                onChange={(e) => update("cobuyer_email", e.target.value)}
-                placeholder="email@example.com"
-                type="email"
-                className="w-full border-b-[1.5px] border-border-custom bg-transparent text-xs text-foreground outline-none placeholder:text-muted-foreground/50 py-0.5"
-              />
-            </div>
-          </div>
+          <PersonFields prefix="cobuyer" />
         </>
       )}
     </div>
@@ -126,11 +119,15 @@ const CustomerInfoSection = ({ info, onChange, showCobuyer, inkSaving }: Custome
 export default CustomerInfoSection;
 export const emptyCustomerInfo: CustomerInfo = {
   buyer_first_name: "",
+  buyer_middle_initial: "",
   buyer_last_name: "",
+  buyer_suffix: "",
   buyer_phone: "",
   buyer_email: "",
   cobuyer_first_name: "",
+  cobuyer_middle_initial: "",
   cobuyer_last_name: "",
+  cobuyer_suffix: "",
   cobuyer_phone: "",
   cobuyer_email: "",
 };
