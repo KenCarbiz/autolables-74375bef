@@ -531,6 +531,18 @@ const Index = () => {
       // Capture at true paper size regardless of the on-screen zoom.
       const prevZoom = card.style.zoom;
       card.style.zoom = "1";
+      const pdfWidth = 8.5;
+      const pageHeight = 11;
+      // Measure protected blocks (signatures, total) at zoom=1 so we can
+      // avoid slicing through them at a page boundary. Inches = px * scale.
+      const cardRect = card.getBoundingClientRect();
+      const inPerPx = (cardRect.height > 0) ? ((card.scrollHeight / card.scrollWidth) * pdfWidth) / card.scrollHeight : 0;
+      const protectedRanges: { top: number; bottom: number }[] = Array.from(
+        card.querySelectorAll<HTMLElement>(".pdf-keep-together"),
+      ).map((el) => {
+        const r = el.getBoundingClientRect();
+        return { top: (r.top - cardRect.top) * inPerPx, bottom: (r.bottom - cardRect.top) * inPerPx };
+      });
       // Exclude dealer-only controls (toggles, edit textareas) from the
       // customer PDF — they are screen-only editing aids, and html2canvas
       // otherwise ignores @media print and would bake them into the record.
@@ -542,24 +554,33 @@ const Index = () => {
         card.style.zoom = prevZoom;
       });
       const imgData = canvas.toDataURL("image/jpeg", 0.95);
-      // Paginate the tall capture across standard 8.5x11 letter sheets.
-      // The previous single oversized page (format [width, fullHeight])
-      // forced printers to scale the whole addendum onto one sheet,
-      // which made the signing copy print tiny and distorted. Slicing it
-      // into letter pages keeps every page at readable, true scale.
-      const pdfWidth = 8.5;
-      const pageHeight = 11;
       const imgHeight = (canvas.height / canvas.width) * pdfWidth;
       const pdf = new jsPDF({ unit: "in", format: "letter", orientation: "portrait" });
-      let heightLeft = imgHeight;
-      let position = 0;
-      pdf.addImage(imgData, "JPEG", 0, position, pdfWidth, imgHeight);
-      heightLeft -= pageHeight;
-      while (heightLeft > 0) {
-        position -= pageHeight;
-        pdf.addPage();
-        pdf.addImage(imgData, "JPEG", 0, position, pdfWidth, imgHeight);
-        heightLeft -= pageHeight;
+
+      // Walk the tall image one page at a time. If a protected block starts
+      // on this page but spills past the bottom boundary, end the page at
+      // the block's top and mask the cut remainder with white so the block
+      // begins cleanly on the next page.
+      let start = 0;
+      let first = true;
+      let guard = 0;
+      while (start < imgHeight - 0.01 && guard++ < 60) {
+        const boundary = start + pageHeight;
+        let pageEnd = Math.min(boundary, imgHeight);
+        for (const r of protectedRanges) {
+          if (r.top > start + 0.05 && r.top < boundary && r.bottom > boundary && (r.bottom - r.top) < pageHeight) {
+            pageEnd = r.top;
+            break;
+          }
+        }
+        if (!first) pdf.addPage();
+        first = false;
+        pdf.addImage(imgData, "JPEG", 0, -start, pdfWidth, imgHeight);
+        if (pageEnd < boundary) {
+          pdf.setFillColor(255, 255, 255);
+          pdf.rect(0, pageEnd - start, pdfWidth, boundary - pageEnd, "F");
+        }
+        start = pageEnd;
       }
 
       // Wave 4.5 — PDF/A-3 archival metadata: stamp the PDF with a
@@ -1250,14 +1271,16 @@ const Index = () => {
             </div>
           ))}
 
-          <TotalBar
-            installedTotal={installedTotal}
-            optionalTotal={optionalTotal}
-            grandTotal={grandTotal}
-            optionalItems={optional}
-            acceptedOptional={acceptedOptional}
-            inkSaving={inkSaving}
-          />
+          <div className="pdf-keep-together">
+            <TotalBar
+              installedTotal={installedTotal}
+              optionalTotal={optionalTotal}
+              grandTotal={grandTotal}
+              optionalItems={optional}
+              acceptedOptional={acceptedOptional}
+              inkSaving={inkSaving}
+            />
+          </div>
           <SelectionRecord
             installed={installed}
             optional={optional}
@@ -1286,7 +1309,7 @@ const Index = () => {
           {/* Signature Section — one customer block; the co-buyer block
               appears ONLY when a co-buyer is on the deal. Each signature is
               individually date/time stamped at the moment it is signed. */}
-          <div className="space-y-3 pt-2">
+          <div className="space-y-3 pt-2 pdf-keep-together">
             <div>
               <SignaturePad label="Customer Signature" subtitle="Buyer acknowledges receipt of this addendum" value={customerSig.data} type={customerSig.type} onChange={(data, type) => setCustomerSig({ data, type, at: data ? new Date().toISOString() : "" })} />
               {customerSig.at && <SignatureStamp at={customerSig.at} who={[customerInfo.buyer_first_name, customerInfo.buyer_last_name].filter(Boolean).join(" ") || "Buyer"} />}
