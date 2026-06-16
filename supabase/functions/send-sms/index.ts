@@ -40,8 +40,13 @@ serve(async (req) => {
 
   const sid = Deno.env.get("TWILIO_ACCOUNT_SID");
   const token = Deno.env.get("TWILIO_AUTH_TOKEN");
+  // For A2P 10DLC, prefer a Messaging Service tied to the registered
+  // campaign; fall back to a single From number on that campaign.
+  const messagingServiceSid = Deno.env.get("TWILIO_MESSAGING_SERVICE_SID");
   const from = Deno.env.get("TWILIO_FROM_NUMBER");
-  if (!sid || !token || !from) return json({ success: false, error: "Twilio not configured" }, 500);
+  if (!sid || !token || (!messagingServiceSid && !from)) {
+    return json({ success: false, error: "Twilio not configured" }, 500);
+  }
 
   let payload: { to?: string; body?: string } = {};
   try { payload = await req.json(); } catch { /* empty */ }
@@ -50,7 +55,9 @@ serve(async (req) => {
   if (!to) return json({ success: false, error: "Invalid phone number" }, 400);
   if (!body) return json({ success: false, error: "Empty message" }, 400);
 
-  const form = new URLSearchParams({ From: from, To: to, Body: body });
+  const form = new URLSearchParams({ To: to, Body: body });
+  if (messagingServiceSid) form.set("MessagingServiceSid", messagingServiceSid);
+  else form.set("From", from as string);
   const res = await fetch(`https://api.twilio.com/2010-04-01/Accounts/${sid}/Messages.json`, {
     method: "POST",
     headers: {
