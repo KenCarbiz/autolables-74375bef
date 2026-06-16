@@ -51,7 +51,6 @@ import { toast } from "sonner";
 import Logo from "@/components/brand/Logo";
 import AppSwitcher from "@/components/layout/AppSwitcher";
 import CommandPalette, { useCommandPalette } from "@/components/layout/CommandPalette";
-import { LiveBadge } from "@/components/layout/LiveBadge";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -580,11 +579,6 @@ const AppShell = ({ children }: AppShellProps) => {
             <div className="flex items-center gap-1.5 flex-shrink-0 ml-auto">
               {/* App switcher */}
               <AppSwitcher currentApp="autolabels" theme="light" />
-
-              {/* Live realtime indicator — pulses on any
-                  vehicle_listings change in this tenant
-                  (Wave 15.3 surfaces the Wave 14.6 sync). */}
-              <LiveBadge />
 
               {/* Persistent Scan VIN — the primary way inventory enters the
                   platform, so it lives in the top bar on every page.
