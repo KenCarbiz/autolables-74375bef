@@ -1199,7 +1199,10 @@ const Index = () => {
                 Items marked OPTIONAL are not required to purchase, finance, or
                 lease this vehicle. Your decision to accept or decline any
                 optional product is not a condition of credit approval. Each
-                optional item is itemized below with its price and benefit.
+                optional item is itemized below with its price and benefit. By
+                signing, the customer expressly and voluntarily agrees to each
+                optional product accepted; none is a condition of purchase,
+                lease, or financing.
               </span>
             </div>
           )}

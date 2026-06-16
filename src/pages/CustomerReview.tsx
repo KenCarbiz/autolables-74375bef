@@ -1069,6 +1069,7 @@ const SignStep = ({
           "Pricing for every item was disclosed to me.",
           "I received warranty information where applicable.",
           "Optional products were voluntary and not required to buy, lease, or finance this vehicle.",
+          "I expressly and voluntarily agreed to each optional product I accepted; none were a condition of purchase, lease, or financing.",
         ].map((t) => (
           <li key={t} className="flex items-start gap-2.5">
             <Check className="w-4 h-4 text-emerald-500 flex-shrink-0 mt-0.5" />
