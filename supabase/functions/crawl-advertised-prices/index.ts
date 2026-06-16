@@ -173,16 +173,19 @@ serve(async (req) => {
   try { body = await req.json(); } catch { /* empty body OK */ }
   const limit = Math.max(1, Math.min(body.limit ?? 200, 1000));
 
-  // Pull the latest snapshot per (tenant, VIN). Only consider
-  // rows that have a real source_url to fetch.
+  // Pull rows with a real source_url, newest first, and dedupe to the
+  // latest per (tenant, VIN). Reads the real table with column aliases —
+  // the live schema uses source_channel/captured_at, and there is no
+  // latest_advertised_prices view.
   let query = admin
-    .from("latest_advertised_prices")
-    .select("id, tenant_id, store_id, vin, source_url, source_label, advertised_price, snapshot_at")
+    .from("advertised_prices")
+    .select("id, tenant_id, store_id, vin, source_url, source_label:source_channel, advertised_price, snapshot_at:captured_at")
     .neq("source_url", "")
-    .limit(limit);
+    .order("captured_at", { ascending: false })
+    .limit(2000);
   if (body.tenant_id) query = query.eq("tenant_id", body.tenant_id);
 
-  const { data: latest, error: listErr } = await query;
+  const { data: all, error: listErr } = await query;
   if (listErr) {
     return new Response(JSON.stringify({ error: listErr.message }), {
       status: 500,
@@ -190,7 +193,15 @@ serve(async (req) => {
     });
   }
 
-  const rows = (latest || []) as LatestRow[];
+  const seen = new Set<string>();
+  const rows: LatestRow[] = [];
+  for (const r of (all || []) as LatestRow[]) {
+    const k = r.tenant_id + "|" + (r.vin || "").toUpperCase();
+    if (seen.has(k)) continue;
+    seen.add(k);
+    rows.push(r);
+    if (rows.length >= limit) break;
+  }
   let updated = 0;
   let unchanged = 0;
   let failed = 0;
@@ -251,7 +262,7 @@ serve(async (req) => {
         store_id: row.store_id || "",
         vin: row.vin,
         source_url: row.source_url,
-        source_label: row.source_label,
+        source_channel: row.source_label,
         advertised_price: newPrice,
         captured_by: "crawler",
         notes: `Nightly crawl · previous $${row.advertised_price.toLocaleString()} → $${newPrice.toLocaleString()}`,

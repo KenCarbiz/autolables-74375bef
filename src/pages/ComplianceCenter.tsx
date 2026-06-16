@@ -10,6 +10,7 @@ import { toast } from "sonner";
 import { ShieldCheck, FileText, Scale, Building2, AlertTriangle, CheckCircle2, BookOpen, Gavel, Users, Globe, Search, Download, FileSignature, Wrench, Car, ScrollText, FileArchive } from "lucide-react";
 import { buildAuditPacket } from "@/lib/auditPacket";
 import { downloadPacketHtml } from "@/lib/auditPacketRenderer";
+import PriceIntegrityPanel from "@/components/admin/PriceIntegrityPanel";
 
 // ──────────────────────────────────────────────────────────────
 // Compliance packet — the regulator-defense surface. Given a VIN,
@@ -361,6 +362,9 @@ const ComplianceCenter = () => {
         tenantId={tenant?.id || null}
         tenantName={tenant?.name || null}
       />
+
+      {/* Advertised-vs-sticker price reconciliation (nightly crawl feeds this) */}
+      <PriceIntegrityPanel />
 
       {/* Header */}
       <div>

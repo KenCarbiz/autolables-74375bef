@@ -60,11 +60,23 @@ export const useAdvertisedPrices = (storeId: string = "") => {
     queryKey: cacheKey(tenantId),
     enabled: !!tenantId,
     queryFn: async (): Promise<AdvertisedPrice[]> => {
+      // Read the real table (the latest_advertised_prices view isn't in the
+      // live schema) and alias the live column names (captured_at,
+      // source_channel) to the shape the rest of the app expects, then
+      // dedupe to the latest row per VIN.
       const { data } = await (supabase as any)
-        .from("latest_advertised_prices")
-        .select("id, vin, source_url, source_label, advertised_price, snapshot_at, captured_by, notes")
-        .order("snapshot_at", { ascending: false });
-      return (data as AdvertisedPrice[]) || [];
+        .from("advertised_prices")
+        .select("id, vin, source_url, source_label:source_channel, advertised_price, snapshot_at:captured_at, captured_by, notes")
+        .order("captured_at", { ascending: false })
+        .limit(2000);
+      const rows = (data as AdvertisedPrice[]) || [];
+      const seen = new Set<string>();
+      const latest: AdvertisedPrice[] = [];
+      for (const r of rows) {
+        const v = (r.vin || "").toUpperCase();
+        if (v && !seen.has(v)) { seen.add(v); latest.push(r); }
+      }
+      return latest;
     },
     staleTime: 60_000,
   });
@@ -99,7 +111,7 @@ export const useAdvertisedPrices = (storeId: string = "") => {
         .insert({
           store_id: storeId,
           vin: args.vin.toUpperCase().trim(),
-          source_label: args.source_label || "manual",
+          source_channel: args.source_label || "manual",
           source_url: args.source_url || "",
           advertised_price: args.advertised_price,
           captured_by: args.captured_by || "",
