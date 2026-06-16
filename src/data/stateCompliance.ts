@@ -182,8 +182,19 @@ const STATE_OVERRIDES: Record<string, Partial<StateCompliance>> = {
 
   NH: {
     stateName: "New Hampshire",
-    docFeeTerminology: "Administration Fee",
-    docFeeMaxCap: 310,
+    docFeeTerminology: "Documentation Fee",
+    // New Hampshire does NOT cap dealer documentation fees (verified 2026;
+    // RI is the only New England state with a statutory cap).
+    docFeeMaxCap: null,
+    docFeeDisclosures: [],
+  },
+
+  RI: {
+    stateName: "Rhode Island",
+    docFeeTerminology: "Documentary Fee",
+    // Rhode Island caps the documentary/preparation fee at $200 (verified
+    // 2026, RI Automobile Dealers Association).
+    docFeeMaxCap: 200,
     docFeeDisclosures: [],
   },
 
@@ -216,9 +227,15 @@ const STATE_OVERRIDES: Record<string, Partial<StateCompliance>> = {
 
   PA: {
     stateName: "Pennsylvania",
-    docFeeTerminology: "Document Preparation Fee",
-    docFeeMaxCap: null,
-    docFeeDisclosures: [],
+    docFeeTerminology: "Documentary Fee",
+    // PA caps the documentary fee and CPI-indexes it annually. Effective
+    // Jan 2026: $490 online / $409 manual processing. We use the $490
+    // ceiling for the over-cap guard; the $409 manual tier needs counsel
+    // verification per deal.
+    docFeeMaxCap: 490,
+    docFeeDisclosures: [
+      "The documentary fee is not an official fee and is not required by law.",
+    ],
     addOnDisclosures: [
       "Online statements and representations about this vehicle and its pricing constitute advertisements under Pennsylvania law.",
     ],

@@ -253,17 +253,32 @@ export const STATE_RULES: Record<StateCode, StateRule> = {
   PA: {
     ...fallback("PA", "Pennsylvania"),
     docFee: {
-      cap: 422, // 2026 CPI-adjusted
+      // Effective Jan 2026, CPI-indexed: $490 online / $409 manual. We use
+      // the $490 ceiling for the over-cap guard; the $409 manual tier needs
+      // per-deal verification.
+      cap: 490,
       requiredVerbiage: [
         "The documentary fee is not an official fee",
       ],
       mustAppearOnSticker: true,
-      citation: "67 Pa. Code §19.11",
+      citation: "67 Pa. Code §19.11 (CPI-indexed; $490 online / $409 manual, eff. Jan 2026)",
       needsVerification: true,
     },
-    notes: "PA cap is CPI-adjusted; verify current amount each January.",
+    notes: "PA cap is CPI-adjusted annually ($490 online / $409 manual for 2026). Verify each January.",
   },
-  RI: fallback("RI", "Rhode Island"),
+  RI: {
+    ...fallback("RI", "Rhode Island"),
+    docFee: {
+      // Rhode Island caps the documentary/preparation fee at $200 (verified
+      // 2026, RI Automobile Dealers Association). Only New England state
+      // with a statutory cap.
+      cap: 200,
+      requiredVerbiage: ["Documentary fee"],
+      mustAppearOnSticker: true,
+      citation: "R.I. Gen. Laws §31-5-33 (documentary/preparation fee cap $200)",
+      needsVerification: true,
+    },
+  },
   SC: {
     ...fallback("SC", "South Carolina"),
     docFee: {
