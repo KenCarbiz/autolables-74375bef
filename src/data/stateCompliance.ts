@@ -10,12 +10,20 @@
 //
 // Sources:
 //   16 CFR § 455 (FTC Used Car Rule)
-//   CA SB 766 (CARS Act, eff. Oct 1, 2026)
+//   CA SB 766 (eff. Oct 1, 2026)
 //   CT CGS § 14-62 (Conveyance Fee)
 //   FL § 501.976(18) (Dealer Fee)
 //   OR OAR 137-020-0020 (Price Disclosure)
 //   State AG enforcement guidance (AZ, NJ, IL, MD 2024-2026)
 // ──────────────────────────────────────────────────────────────
+
+import { getStateRule } from "@/lib/stateCompliance";
+
+// Doc-fee caps for the Northeast rollout corridor are sourced from the
+// validator engine (lib/stateCompliance) so the printed cap can never
+// desync from the number the red-team enforces. States outside this set
+// keep their local value until they're verified and added here.
+const NORTHEAST_CAP_STATES = new Set(["CT", "MA", "ME", "NH", "RI", "VT", "NY", "NJ", "PA"]);
 
 export interface StateCompliance {
   stateCode: string;
@@ -296,6 +304,12 @@ export function getStateCompliance(stateCode: string): StateCompliance {
     ...DEFAULT_COMPLIANCE,
     stateCode: code,
     ...override,
+    // Single source of truth for the cap number: the Northeast rollout
+    // states read their doc-fee cap from the validator engine so the
+    // printed disclosure and the red-team can never disagree.
+    docFeeMaxCap: NORTHEAST_CAP_STATES.has(code)
+      ? (getStateRule(code)?.docFee.cap ?? null)
+      : (override.docFeeMaxCap ?? DEFAULT_COMPLIANCE.docFeeMaxCap),
     // Merge add-on disclosures: federal + state-specific
     addOnDisclosures: [
       ...FEDERAL_DISCLOSURES.addOnDisclosures,
