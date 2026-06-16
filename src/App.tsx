@@ -128,7 +128,10 @@ const App = () => (
                       {/* Public routes — no shell */}
                       <Route path="/" element={<Landing />} />
                       <Route path="/login" element={<Login />} />
-                      <Route path="/sign/:token" element={<MobileSigning />} />
+                      {/* Both customer signing links render the guided
+                          review wizard; the legacy single-page MobileSigning
+                          is retired as a customer-facing flow. */}
+                      <Route path="/sign/:token" element={<CustomerReview />} />
                       <Route path="/review/:token" element={<CustomerReview />} />
                       <Route path="/install/:token" element={<InstallerProof />} />
                       {/* Buyer recovery path: VIN + contact -> email a fresh signing link */}

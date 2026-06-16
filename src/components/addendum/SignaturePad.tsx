@@ -137,12 +137,12 @@ const SignaturePad = ({ label, subtitle, value, type: sigType, onChange, classNa
             ref={canvasRef}
             width={800}
             height={160}
-            className={`w-full h-[80px] rounded-lg border-2 transition-colors cursor-crosshair ${
+            className={`w-full h-[120px] md:h-[150px] rounded-lg border-2 transition-colors cursor-crosshair ${
               hasDrawn
                 ? "border-emerald-300 bg-emerald-50/30"
                 : "border-border bg-card hover:border-primary/30"
             }`}
-            style={{ touchAction: "pan-y" }}
+            style={{ touchAction: "none" }}
             onMouseDown={startDraw}
             onMouseMove={draw}
             onMouseUp={endDraw}
@@ -163,7 +163,7 @@ const SignaturePad = ({ label, subtitle, value, type: sigType, onChange, classNa
           {hasDrawn && (
             <button
               onClick={clearCanvas}
-              className="absolute top-2 right-2 inline-flex items-center gap-1 text-[10px] px-2 py-1 bg-card/90 backdrop-blur-sm rounded border border-border text-muted-foreground hover:text-foreground transition-colors opacity-0 group-hover:opacity-100"
+              className="absolute top-2 right-2 inline-flex items-center gap-1 text-[10px] px-2 py-1 bg-card/90 backdrop-blur-sm rounded border border-border text-muted-foreground hover:text-foreground transition-colors"
             >
               <RotateCcw className="w-3 h-3" />
               Clear

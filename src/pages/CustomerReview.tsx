@@ -840,7 +840,10 @@ const OptionalStep = ({
 
   return (
     <div className="space-y-4">
-      <StepHeading title="Your add-ons" sub={banner} />
+      <StepHeading title="Your add-ons" sub="Optional — yours to choose." />
+      <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 text-[13px] text-slate-700 leading-snug">
+        {banner}
+      </div>
       {added.map((p) => <Card key={p.id} p={p} kind="added" />)}
       {optional.map((p) => <Card key={p.id} p={p} kind="optional" />)}
     </div>
@@ -1040,18 +1043,9 @@ const SignStep = ({
 
     {/* Certification — read immediately before the pen. One affirmative
         statement that consolidates every disclosure the customer saw. */}
-    <div className="rounded-2xl border-2 border-slate-950 bg-slate-50 p-5">
-      <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-slate-500">Certification</p>
-      <p className="mt-1.5 text-[13px] text-slate-800 leading-relaxed">
-        By signing below I acknowledge that product pricing and benefits were disclosed, optional products were
-        voluntary, the required state disclosures were provided, I consented to electronic records and signatures,
-        and I had the opportunity to ask questions before signing.
-      </p>
-    </div>
-
     <BigCheck checked={checklistAck} onClick={() => setChecklistAck(!checklistAck)}
-      title="I have read and agree to the acknowledgment and certification above"
-      body="I reviewed the vehicle, the installed products, the options I chose, and my total. I'm ready to sign." />
+      title="I agree and I'm ready to sign"
+      body="Pricing and benefits were disclosed, optional products were voluntary, the required state disclosures were provided, I consented to electronic records, and I had the chance to ask questions." />
 
     <div className="rounded-2xl border border-slate-200 bg-white p-5 space-y-4">
       <input
