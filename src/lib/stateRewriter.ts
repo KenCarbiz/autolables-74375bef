@@ -112,6 +112,20 @@ const ESIGN_CONSENT: DisclosureBlock = {
   required: true,
 };
 
+// Federal FTC Act Section 5 — voluntary add-ons + express informed consent.
+// Always included regardless of state: the voluntary nature and the
+// express-consent requirement are federal, not state-specific. Mirrors the
+// standard the FTC applies in its add-on / "junk fee" enforcement.
+const FEDERAL_ADDON_CONSENT: DisclosureBlock = {
+  id: "ftc-voluntary-addon-consent",
+  title: "Voluntary Add-Ons & Express Consent",
+  body:
+    "Optional products and accessories are voluntary. No add-on is required as a condition of purchasing, financing, or leasing this vehicle. Each optional item is itemized below with its price and the benefit it provides. You pay the advertised price plus only the optional items you affirmatively accept. No charge for any add-on is imposed without your express, informed consent, given after these terms were disclosed to you.",
+  citation: "FTC Act Section 5, 15 U.S.C. §45 (unfair or deceptive acts or practices).",
+  language: "en",
+  required: true,
+};
+
 // California SB 766 (eff 10/1/2026) 3-day right to cancel.
 const CA_SB766_EN: DisclosureBlock = {
   id: "ca-sb766-3day",
@@ -169,7 +183,7 @@ export const rewriteForState = (
 
   if (!rule) {
     warnings.push(`No state rule loaded for "${stateCode}". Using FTC baseline only.`);
-    blocks.push(FTC_BUYERS_GUIDE_EN, ESIGN_CONSENT);
+    blocks.push(FTC_BUYERS_GUIDE_EN, ESIGN_CONSENT, FEDERAL_ADDON_CONSENT);
     return {
       state: null,
       stateName: (stateCode || "").toUpperCase(),
@@ -187,6 +201,10 @@ export const rewriteForState = (
 
   // 2. E-SIGN Act consent
   blocks.push(ESIGN_CONSENT);
+
+  // 2b. Federal FTC §5 voluntary add-on + express-consent disclosure (every
+  // state — the requirement is federal).
+  blocks.push(FEDERAL_ADDON_CONSENT);
 
   // 3. Per-state doc fee block if the rule has one
   const docFeeBlock = buildDocFeeBlock(rule);
