@@ -26,15 +26,30 @@ interface QRCodeModalProps {
   // a `link_sent` event to the addendum timeline.
   onChannel?: (channel: DeliveryChannel) => void;
   onSendEmail?: (email: string) => Promise<void> | void;
+  onSendSms?: (phone: string) => Promise<void> | void;
 }
 
 const QRCodeModal = ({
-  open, signingUrl, onClose, complianceReceipt, dealId, version, customerEmail, onChannel, onSendEmail,
+  open, signingUrl, onClose, complianceReceipt, dealId, version, customerEmail, onChannel, onSendEmail, onSendSms,
 }: QRCodeModalProps) => {
   const [emailOpen, setEmailOpen] = useState(false);
   const [email, setEmail] = useState(customerEmail || "");
+  const [smsOpen, setSmsOpen] = useState(false);
+  const [phone, setPhone] = useState("");
   const [sending, setSending] = useState(false);
   const [copied, setCopied] = useState(false);
+
+  const sendSms = async () => {
+    if (!phone.trim() || !onSendSms) return;
+    setSending(true);
+    try {
+      await onSendSms(phone.trim());
+      onChannel?.("sms");
+      setSmsOpen(false);
+    } finally {
+      setSending(false);
+    }
+  };
 
   if (!open) return null;
 
@@ -132,14 +147,33 @@ const QRCodeModal = ({
           </button>
 
           <button
-            disabled
-            title="Add a Twilio number in Settings to enable SMS delivery"
-            className="inline-flex items-center justify-center gap-1.5 h-11 rounded-lg border-2 border-dashed border-border text-sm font-semibold text-muted-foreground/60 cursor-not-allowed col-span-2"
+            onClick={() => setSmsOpen((v) => !v)}
+            disabled={!onSendSms}
+            className="inline-flex items-center justify-center gap-1.5 h-11 rounded-lg border-2 border-border text-sm font-semibold text-foreground hover:bg-muted disabled:opacity-40 disabled:cursor-not-allowed col-span-2"
           >
             <MessageSquare className="w-4 h-4" />
-            Text message <span className="text-[10px] font-normal">(connect Twilio)</span>
+            Text message
           </button>
         </div>
+
+        {smsOpen && onSendSms && (
+          <div className="flex gap-2">
+            <input
+              value={phone}
+              onChange={(e) => setPhone(e.target.value)}
+              placeholder="(555) 123-4567"
+              type="tel"
+              className="flex-1 h-10 rounded-lg border-2 border-border px-3 text-sm bg-background text-foreground"
+            />
+            <button
+              onClick={sendSms}
+              disabled={sending || !phone.trim()}
+              className="h-10 px-4 rounded-lg bg-teal text-primary-foreground text-sm font-semibold disabled:opacity-50"
+            >
+              {sending ? "Sending…" : "Text"}
+            </button>
+          </div>
+        )}
 
         {emailOpen && onSendEmail && (
           <div className="flex gap-2">

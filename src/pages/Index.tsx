@@ -14,6 +14,7 @@ import AddendumHeader from "@/components/addendum/AddendumHeader";
 import VehicleStrip from "@/components/addendum/VehicleStrip";
 import IntentBox from "@/components/addendum/IntentBox";
 import ProductRow from "@/components/addendum/ProductRow";
+import { useSmsDelivery } from "@/hooks/useSmsDelivery";
 import TotalBar from "@/components/addendum/TotalBar";
 import SelectionRecord from "@/components/addendum/SelectionRecord";
 import Disclosures, { type DisclosureLanguage } from "@/components/addendum/Disclosures";
@@ -146,6 +147,7 @@ const Index = () => {
   const { rules, getMatchingProducts } = useProductRules();
   const { log } = useAudit();
   const { currentStore } = useTenant();
+  const { sendSigningLink } = useSmsDelivery();
   const { getOrCreateFile, registerSticker } = useVehicleFiles(currentStore?.id || "");
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -784,6 +786,14 @@ const Index = () => {
     toast.success(`Signing link emailed to ${toEmail}`);
   };
 
+  // Text the guided-review link via Twilio (falls back to a local queue
+  // until Twilio is configured).
+  const sendSigningSms = async (phone: string) => {
+    const res = await sendSigningLink(phone, signingUrl, vehicle.ymm || "your vehicle");
+    if (res.success) toast.success(res.message);
+    else toast.error(res.message);
+  };
+
   const handleSave = async () => {
     if (!user) { toast.error("Sign in to save"); return; }
     if (!vehicle.ymm.trim()) { toast.error("Please enter Year/Make/Model"); return; }
@@ -1033,6 +1043,7 @@ const Index = () => {
           customerEmail={(customerInfo as { buyer_email?: string }).buyer_email || ""}
           onChannel={emitDeliveryEvent}
           onSendEmail={sendSigningEmail}
+          onSendSms={sendSigningSms}
         />
       )}
 

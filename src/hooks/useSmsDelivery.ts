@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { supabase } from "@/integrations/supabase/client";
 
 interface SmsResult {
   success: boolean;
@@ -22,12 +23,29 @@ export const useSmsDelivery = () => {
       return result;
     }
 
-    // Store the SMS request for when Twilio is connected
+    const message = `Review & sign your ${vehicleInfo} addendum: ${signingUrl}`;
+
+    // Try the live Twilio path first. Fall back to the local queue if the
+    // function isn't deployed or Twilio isn't configured yet.
+    try {
+      const { data, error } = await supabase.functions.invoke("send-sms", {
+        body: { to: cleaned, body: message },
+      });
+      if (!error && (data as { success?: boolean })?.success) {
+        setSending(false);
+        const result = { success: true, message: `Text sent to ${formatPhone(cleaned)}.` };
+        setLastResult(result);
+        return result;
+      }
+    } catch {
+      /* fall through to queue */
+    }
+
     const smsQueue = JSON.parse(localStorage.getItem("sms_queue") || "[]");
     smsQueue.push({
       id: crypto.randomUUID(),
       to: cleaned,
-      body: `You have a dealer addendum to review and sign for: ${vehicleInfo}. Sign here: ${signingUrl}`,
+      body: message,
       signing_url: signingUrl,
       vehicle: vehicleInfo,
       status: "queued",
@@ -35,13 +53,8 @@ export const useSmsDelivery = () => {
     });
     localStorage.setItem("sms_queue", JSON.stringify(smsQueue));
 
-    // In production, this would call:
-    // const { data, error } = await supabase.functions.invoke('send-sms', {
-    //   body: { to: cleaned, body: message }
-    // });
-
     setSending(false);
-    const result = { success: true, message: `SMS queued for ${formatPhone(cleaned)}. Connect Twilio to send.` };
+    const result = { success: true, message: `Queued for ${formatPhone(cleaned)}. Connect Twilio to send live.` };
     setLastResult(result);
     return result;
   };
