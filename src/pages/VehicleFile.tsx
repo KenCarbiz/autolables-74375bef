@@ -3,6 +3,7 @@ import { useParams, useNavigate, useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useTenant } from "@/contexts/TenantContext";
+import { useDealerSettings } from "@/contexts/DealerSettingsContext";
 import { toast } from "sonner";
 import {
   ArrowLeft, Car, FileText, Wrench, Tag, Signature, Globe,
@@ -413,8 +414,29 @@ const OverviewPanel = ({ vehicle }: { vehicle: VehicleRow; onReload: () => void 
   );
 };
 
+// Per-state used-car safety inspection form, by the dealer's operating
+// state. Falls back to a generic label for states without a named form.
+const SAFETY_FORM: Record<string, { label: string; desc: string }> = {
+  CT: { label: "CT K-208 safety inspection", desc: "Connecticut used-car safety inspection (Form K-208)." },
+  NY: { label: "NY safety & emissions inspection", desc: "New York State inspection certificate (safety + anti-theft)." },
+  PA: { label: "PA safety inspection", desc: "Pennsylvania safety inspection certificate." },
+  NJ: { label: "NJ inspection", desc: "New Jersey inspection certificate." },
+  TX: { label: "Texas vehicle inspection", desc: "Texas vehicle inspection report." },
+  MA: { label: "MA safety inspection", desc: "Massachusetts safety/emissions inspection." },
+  VA: { label: "VA safety inspection", desc: "Virginia safety inspection certificate." },
+  ME: { label: "ME safety inspection", desc: "Maine safety inspection certificate." },
+  RI: { label: "RI safety & emissions inspection", desc: "Rhode Island inspection certificate." },
+  MO: { label: "MO safety inspection", desc: "Missouri safety inspection certificate." },
+};
+
 const DocumentsPanel = ({ vehicle, onReload }: { vehicle: VehicleRow; onReload: () => void }) => {
   const [uploading, setUploading] = useState<string | null>(null);
+  const { settings } = useDealerSettings();
+  const opState = (settings.dealer_state || settings.doc_fee_state || "").toUpperCase();
+  const safety = SAFETY_FORM[opState] || {
+    label: "State safety inspection",
+    desc: "State used-car safety inspection certificate where required.",
+  };
   const [linkSlot, setLinkSlot] = useState<string | null>(null);
   const [linkName, setLinkName] = useState("");
   const [linkUrl, setLinkUrl] = useState("");
@@ -500,7 +522,7 @@ const DocumentsPanel = ({ vehicle, onReload }: { vehicle: VehicleRow; onReload: 
   const slots: Array<{ type: string; label: string; desc: string }> = isUsed
     ? [
         { type: "buyers_guide", label: "FTC Buyers Guide (used)", desc: "Required used-car window form — As-Is vs warranty (16 CFR Part 455). Spanish where the sale is conducted in Spanish." },
-        { type: "safety_inspection", label: "State safety inspection", desc: "State used-car safety inspection certificate — e.g. CT K-208, NY safety/anti-theft, PA/NJ safety, TX VI." },
+        { type: "safety_inspection", label: safety.label, desc: safety.desc },
         { type: "emissions", label: "Emissions / smog certificate", desc: "State emissions certificate where required." },
         { type: "carfax", label: "Carfax / AutoCheck", desc: "Vehicle history report — attach for buyer review." },
         { type: "recon", label: "Inspection / MPI report", desc: "Multi-point reconditioning inspection report." },
