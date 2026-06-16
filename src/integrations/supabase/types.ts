@@ -2596,6 +2596,10 @@ export type Database = {
           ymm: string
         }[]
       }
+      mark_addendum_executed: {
+        Args: { _addendum_id: string }
+        Returns: undefined
+      }
       mark_ready_for_signature: {
         Args: { _addendum_id: string; _version_label: string }
         Returns: undefined
