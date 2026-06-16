@@ -1,6 +1,6 @@
 import { lazy, Suspense } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Outlet, Route, Routes } from "react-router-dom";
+import { BrowserRouter, Navigate, Outlet, Route, Routes } from "react-router-dom";
 import { MotionConfig } from "framer-motion";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { Toaster } from "@/components/ui/toaster";
@@ -165,7 +165,7 @@ const App = () => (
                             directly; /queue is the triage view. */}
                         <Route path="/queue" element={<LotCaptureQueue />} />
                         <Route path="/inventory" element={<Inventory />} />
-                        <Route path="/dashboard-legacy" element={<Dashboard />} />
+                        <Route path="/dashboard-legacy" element={<Navigate to="/dashboard" replace />} />
                         <Route path="/vehicle-file/:id" element={<VehicleFile />} />
                         {/* /admin hosts dealer settings (products, rules,
                             branding, leads, queue, files, audit). Tenant

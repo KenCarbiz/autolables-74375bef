@@ -311,7 +311,7 @@ const ProcessDashboard = () => {
             count={signings.open}
             unit={signings.open === 1 ? "link open" : "links open"}
             empty="no opens"
-            href="/admin?tab=funnel"
+            href="/signatures"
             tone="violet"
             blurb="Customers have a signing link; we're waiting for ink."
           />
