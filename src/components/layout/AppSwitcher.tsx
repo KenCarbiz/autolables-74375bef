@@ -14,11 +14,25 @@ export interface PlatformProduct {
   id: string;
   name: string;
   shortName: string;
+  /** Parenthetical of the family wordmark, e.g. "LABELS" -> auto(LABELS). */
+  mark: string;
   icon: typeof Sparkles;
   url: string;
   description: string;
   color: string;
 }
+
+// Family type logo: "auto" + "(MARK)" in the Autocurb family style, matching
+// the site auto(LABELS) wordmark. Inverted for the dark topbar.
+const FamilyWordmark = ({ mark, size = 13, inverted = false }: { mark: string; size?: number; inverted?: boolean }) => (
+  <span
+    aria-label={`auto(${mark})`}
+    style={{ fontFamily: "'Inter', system-ui, -apple-system, sans-serif", fontWeight: 800, fontSize: size, letterSpacing: "-0.02em", lineHeight: 1, whiteSpace: "nowrap" }}
+  >
+    <span style={{ color: inverted ? "#3BB4FF" : "#2563EB" }}>auto</span>
+    <span style={{ color: inverted ? "#FFFFFF" : "#0B2041" }}>({mark})</span>
+  </span>
+);
 
 // Family-aligned product palette. Each sibling app gets a hue
 // inside the Autocurb family blue range so the AppSwitcher reads
@@ -29,10 +43,10 @@ export interface PlatformProduct {
 // for the motion read; AutoCurb (the mothership) keeps the
 // signal-blue accent.
 const ALL_PRODUCTS: PlatformProduct[] = [
-  { id: "autolabels", name: "AutoLabels.io", shortName: "AutoLabels", icon: FileText, url: "/dashboard",                          description: "Dealer labels, stickers & compliance",  color: "bg-primary" },
-  { id: "autocurb",   name: "Autocurb",      shortName: "Autocurb",   icon: Sparkles, url: "https://autocurb.io",                  description: "Inventory + lead routing (the mothership)", color: "bg-[#1E90FF]" },
-  { id: "autoframe",  name: "AutoFrame",     shortName: "AutoFrame",  icon: Camera,   url: "https://autoframe.autolabels.io",     description: "Vehicle photography & background removal", color: "bg-sky-500" },
-  { id: "autovideo",  name: "AutoVideo",     shortName: "AutoVideo",  icon: Video,    url: "https://autovideo.autolabels.io",     description: "Video walkarounds & MPI",               color: "bg-indigo-600" },
+  { id: "autolabels", name: "AutoLabels.io", shortName: "AutoLabels", mark: "LABELS", icon: FileText, url: "/dashboard",                          description: "Dealer labels, stickers & compliance",  color: "bg-primary" },
+  { id: "autocurb",   name: "Autocurb",      shortName: "Autocurb",   mark: "CURB",   icon: Sparkles, url: "https://autocurb.io",                  description: "Inventory + lead routing (the mothership)", color: "bg-[#1E90FF]" },
+  { id: "autoframe",  name: "AutoFrame",     shortName: "AutoFrame",  mark: "FRAME",  icon: Camera,   url: "https://autoframe.autolabels.io",     description: "Vehicle photography & background removal", color: "bg-sky-500" },
+  { id: "autovideo",  name: "AutoVideo",     shortName: "AutoVideo",  mark: "VIDEO",  icon: Video,    url: "https://autovideo.autolabels.io",     description: "Video walkarounds & MPI",               color: "bg-indigo-600" },
 ];
 
 const SUBSCRIPTION_KEY = "platform_subscriptions";
@@ -65,7 +79,6 @@ const AppSwitcher = ({ currentApp = "autolabels", theme = "dark" }: AppSwitcherP
   const subscribedIds = getSubscribedProducts();
 
   const current = ALL_PRODUCTS.find(p => p.id === currentApp) || ALL_PRODUCTS[1];
-  const CurrentIcon = current.icon;
 
   const triggerClass =
     theme === "light"
@@ -76,13 +89,7 @@ const AppSwitcher = ({ currentApp = "autolabels", theme = "dark" }: AppSwitcherP
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <button className={triggerClass} title="Switch app · Autocurb Family">
-          <div className={`w-5 h-5 rounded ${current.color} flex items-center justify-center`}>
-            <CurrentIcon className="w-3 h-3 text-white" />
-          </div>
-          {/* Mobile sees the shortName too — was hidden md:inline,
-              which made the family switcher feel like a secret
-              menu on phones (Wave 15.1 surfaces the family). */}
-          <span className="text-xs">{current.shortName}</span>
+          <FamilyWordmark mark={current.mark} size={14} inverted={theme === "dark"} />
           <ChevronDown className="w-3 h-3 opacity-60" />
         </button>
       </DropdownMenuTrigger>
@@ -96,7 +103,6 @@ const AppSwitcher = ({ currentApp = "autolabels", theme = "dark" }: AppSwitcherP
         <DropdownMenuSeparator />
 
         {ALL_PRODUCTS.map(product => {
-          const Icon = product.icon;
           const hasAccess = subscribedIds.includes(product.id);
           const isCurrent = product.id === currentApp;
 
@@ -114,12 +120,9 @@ const AppSwitcher = ({ currentApp = "autolabels", theme = "dark" }: AppSwitcherP
               className={`flex items-center gap-3 py-2.5 ${!hasAccess ? "opacity-50 cursor-not-allowed" : ""} ${isCurrent ? "bg-accent" : ""}`}
               disabled={!hasAccess}
             >
-              <div className={`w-8 h-8 rounded-lg ${product.color} flex items-center justify-center flex-shrink-0`}>
-                <Icon className="w-4 h-4 text-white" />
-              </div>
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-1.5">
-                  <span className="text-sm font-medium">{product.name}</span>
+                  <FamilyWordmark mark={product.mark} size={14} />
                   {isCurrent && <span className="text-[9px] bg-primary/10 text-primary px-1 py-0.5 rounded font-semibold">Current</span>}
                 </div>
                 <p className="text-[10px] text-muted-foreground">{product.description}</p>
