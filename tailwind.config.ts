@@ -1,4 +1,5 @@
 import type { Config } from "tailwindcss";
+import colors from "tailwindcss/colors";
 
 export default {
   darkMode: ["class"],
@@ -20,14 +21,18 @@ export default {
         background: "hsl(var(--background))",
         foreground: "hsl(var(--foreground))",
         navy: "hsl(var(--navy))",
-        blue: "hsl(var(--blue))",
+        // Spread the default Tailwind scale so utilities like `bg-blue-600`
+        // still resolve; DEFAULT keeps `bg-blue` mapped to the brand token.
+        // Without the spread, the string override deletes the 50–950 scale
+        // and `bg-blue-600 text-white` renders as white text on no fill.
+        blue: { ...colors.blue, DEFAULT: "hsl(var(--blue))" },
         action: "hsl(var(--action))",
         teal: "hsl(var(--teal))",
         gold: "hsl(var(--gold))",
         light: "hsl(var(--light))",
         mid: "hsl(var(--mid))",
         "muted-custom": "hsl(var(--muted-custom))",
-        red: "hsl(var(--red))",
+        red: { ...colors.red, DEFAULT: "hsl(var(--red))" },
         "border-custom": "hsl(var(--border-custom))",
         primary: {
           DEFAULT: "hsl(var(--primary))",
