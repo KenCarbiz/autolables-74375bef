@@ -1324,7 +1324,11 @@ const ProgramDocuments = ({ listing }: { listing: VehicleListing }) => {
   if (listing.factory_sticker_url) {
     docs.push({ name: L.factory_monroney, url: listing.factory_sticker_url, type: "Monroney PDF" });
   }
-  docs.push(...(listing.documents || []));
+  // Internal deal-jacket documents stay off the public shopper page —
+  // title, odometer disclosure, and "we owe" are dealer records, not
+  // customer-facing artifacts.
+  const INTERNAL_TYPES = new Set(["title", "odometer", "we_owe"]);
+  docs.push(...(listing.documents || []).filter((d) => !INTERNAL_TYPES.has(d.type)));
   if (docs.length === 0) return null;
 
   return (

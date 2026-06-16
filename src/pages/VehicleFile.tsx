@@ -9,7 +9,7 @@ import {
   CheckCircle2, Clock, Gauge, DollarSign, MapPin, Copy, ExternalLink,
   FileUp, Upload, Printer, Sparkles, Plus, ArrowUpRight,
   AlertTriangle, ShieldCheck, Lock, Unlock, Send, MessageSquare,
-  Link as LinkIcon,
+  Link as LinkIcon, X,
 } from "lucide-react";
 import EmptyState from "@/components/ui/empty-state";
 import { InstallProofList } from "@/components/admin/InstallProofList";
@@ -437,6 +437,19 @@ const DocumentsPanel = ({ vehicle, onReload }: { vehicle: VehicleRow; onReload: 
     onReload();
   };
 
+  const removeDoc = async (doc: { name: string; url: string; type: string }) => {
+    const next = (vehicle.documents || []).filter(
+      (d) => !(d.name === doc.name && d.url === doc.url && d.type === doc.type),
+    );
+    const { error } = await (supabase as any)
+      .from("vehicle_listings")
+      .update({ documents: next })
+      .eq("id", vehicle.id);
+    if (error) { toast.error("Failed to remove"); return; }
+    toast.success("Removed");
+    onReload();
+  };
+
   const upload = async (file: File, type: string) => {
     if (!vehicle.tenant_id) {
       toast.error("Vehicle has no tenant — re-save the vehicle file first");
@@ -526,15 +539,25 @@ const DocumentsPanel = ({ vehicle, onReload }: { vehicle: VehicleRow; onReload: 
           </div>
           <p className="text-[11px] text-muted-foreground">{s.desc}</p>
           {(filesByType[s.type] || []).map((d, i) => (
-            <a
-              key={i}
-              href={d.url}
-              target="_blank"
-              rel="noreferrer"
-              className="block text-xs text-primary hover:underline truncate"
-            >
-              {d.name}
-            </a>
+            <div key={i} className="flex items-center gap-2">
+              <a
+                href={d.url}
+                target="_blank"
+                rel="noreferrer"
+                className="flex-1 min-w-0 text-xs text-primary hover:underline truncate"
+              >
+                {d.name}
+              </a>
+              <button
+                type="button"
+                onClick={() => removeDoc(d)}
+                className="text-muted-foreground hover:text-destructive flex-shrink-0"
+                title="Remove"
+                aria-label="Remove document"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            </div>
           ))}
           <div className="flex items-center gap-2">
             <label className="inline-flex items-center gap-1.5 h-8 px-3 rounded-md border border-dashed border-border text-xs font-semibold cursor-pointer hover:bg-muted/40">
