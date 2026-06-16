@@ -35,7 +35,7 @@ const SignatureQueue = () => {
   const navigate = useNavigate();
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, refetch } = useQuery({
     queryKey: ["signature-queue"],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -76,6 +76,23 @@ const SignatureQueue = () => {
 
   const toggle = (id: string) => setExpanded((p) => ({ ...p, [id]: !p[id] }));
 
+  // Dealer counter-sign: records the dealer_signed event then flips the
+  // deal to fully_executed, which drops it out of the in-flight queue and
+  // completes the signing status stepper.
+  const executeDeal = async (a: AddendumRow) => {
+    await (supabase as any).from("addendum_events").insert({
+      addendum_id: a.id,
+      signing_token: a.signing_token,
+      event: "dealer_signed",
+      actor: "dealer",
+      actor_name: user?.email || null,
+    });
+    const { error } = await (supabase as any).rpc("mark_addendum_executed", { _addendum_id: a.id });
+    if (error) { toast.error("Could not finalize the deal."); return; }
+    toast.success("Counter-signed · deal executed");
+    refetch();
+  };
+
   const Card = ({ a, done }: { a: AddendumRow; done: boolean }) => (
     <div className="rounded-2xl border border-border bg-card overflow-hidden">
       <div className="flex items-center gap-3 p-4">
@@ -99,6 +116,15 @@ const SignatureQueue = () => {
           </p>
         </div>
         <div className="flex items-center gap-1.5 flex-shrink-0">
+          {done && (
+            <button
+              onClick={() => executeDeal(a)}
+              className="inline-flex items-center gap-1 h-8 px-2.5 rounded-md bg-emerald-600 text-white text-[11px] font-semibold hover:bg-emerald-700"
+              title="Counter-sign and finalize"
+            >
+              <CheckCircle2 className="w-3.5 h-3.5" /> Execute
+            </button>
+          )}
           {a.signing_token && (
             <>
               <button onClick={() => copyLink(a.signing_token)} className="inline-flex items-center gap-1 h-8 px-2.5 rounded-md border border-border text-[11px] font-semibold text-foreground hover:bg-muted" title="Copy signing link">
@@ -159,7 +185,7 @@ const SignatureQueue = () => {
             {executed.length > 0 && (
               <div className="space-y-3">
                 <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-muted-foreground">
-                  Recently signed · {executed.length}
+                  Customer signed · counter-sign to finalize · {executed.length}
                 </p>
                 {executed.map((a) => <Card key={a.id} a={a} done />)}
               </div>
