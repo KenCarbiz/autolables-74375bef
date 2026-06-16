@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { ShieldCheck, AlertTriangle, ExternalLink } from "lucide-react";
+import { ShieldCheck, AlertTriangle, ExternalLink, Globe } from "lucide-react";
+import { toast } from "sonner";
 
 // PriceIntegrityPanel — reconciles each VIN's lot/sticker price
 // (vehicle_listings.price) against the latest advertised price per
@@ -22,6 +23,42 @@ export const PriceIntegrityPanel = () => {
   const [monitored, setMonitored] = useState(0);
   const [matched, setMatched] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [pattern, setPattern] = useState(() => localStorage.getItem("vdp_url_pattern") || "");
+  const [seeding, setSeeding] = useState(false);
+
+  // Seed a website source_url for every in-stock VIN by expanding the
+  // dealer's VDP URL pattern, so the nightly crawler has a target per
+  // vehicle. The baseline advertised price = the current sticker; the
+  // crawler then tracks the live website value against it.
+  const seedWebsite = async () => {
+    const p = pattern.trim();
+    if (!p.includes("{VIN}") && !p.includes("{STOCK}")) {
+      toast.error("Pattern must include {VIN} or {STOCK}");
+      return;
+    }
+    localStorage.setItem("vdp_url_pattern", p);
+    setSeeding(true);
+    const { data: listings } = await (supabase as any)
+      .from("vehicle_listings")
+      .select("vin, stock_number, price")
+      .not("price", "is", null)
+      .limit(1000);
+    const rows = ((listings as { vin: string; stock_number: string | null; price: number }[]) || [])
+      .filter((l) => l.vin)
+      .map((l) => ({
+        vin: l.vin.toUpperCase(),
+        source_channel: "website",
+        source_url: p.replace(/\{VIN\}/g, l.vin).replace(/\{STOCK\}/g, l.stock_number || ""),
+        advertised_price: l.price,
+        captured_by: "seed",
+        notes: "Seeded website URL for nightly crawl",
+      }));
+    if (rows.length === 0) { setSeeding(false); toast.error("No priced inventory to seed."); return; }
+    const { error } = await (supabase as any).from("advertised_prices").insert(rows);
+    setSeeding(false);
+    if (error) { toast.error("Seed failed: " + error.message); return; }
+    toast.success(`Seeded ${rows.length} website URL(s). The nightly crawler will verify them.`);
+  };
 
   useEffect(() => {
     let active = true;
@@ -86,6 +123,34 @@ export const PriceIntegrityPanel = () => {
           Every captured advertised price reconciled against the lot/sticker price for that VIN. Any gap is the exact
           conduct behind the FTC's March 2026 letters — advertise one price, charge another. Catch it here first.
         </p>
+      </div>
+
+      {/* Website monitoring setup */}
+      <div className="rounded-2xl border border-border bg-card p-4 space-y-2">
+        <div className="flex items-center gap-2">
+          <Globe className="w-4 h-4 text-[#2563EB]" />
+          <p className="text-sm font-semibold text-foreground">Nightly website monitoring</p>
+        </div>
+        <p className="text-xs text-muted-foreground">
+          Enter your vehicle-detail-page URL pattern using <code className="font-mono">{"{VIN}"}</code> or{" "}
+          <code className="font-mono">{"{STOCK}"}</code>. We seed a source URL per in-stock vehicle and re-scrape it
+          nightly, flagging any VIN where the live website price drifts from the sticker.
+        </p>
+        <div className="flex gap-2">
+          <input
+            value={pattern}
+            onChange={(e) => setPattern(e.target.value)}
+            placeholder="https://www.yourdealer.com/inventory/{VIN}"
+            className="flex-1 h-9 rounded-md border border-border bg-background px-3 text-sm font-mono"
+          />
+          <button
+            onClick={seedWebsite}
+            disabled={seeding}
+            className="h-9 px-4 rounded-md bg-primary text-primary-foreground text-sm font-semibold disabled:opacity-50"
+          >
+            {seeding ? "Seeding…" : "Seed & monitor"}
+          </button>
+        </div>
       </div>
 
       <div className="grid grid-cols-3 gap-3">
