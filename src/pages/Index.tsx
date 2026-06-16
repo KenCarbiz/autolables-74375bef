@@ -328,17 +328,21 @@ const Index = () => {
   const [installProofs, setInstallProofs] = useState<{ product_name: string | null }[]>([]);
   useEffect(() => {
     const vin = vehicle.vin?.trim();
-    if (!vin || viewMode) { setInstallProofs([]); return; }
+    const tid = currentStore?.id;
+    // Tenant-scope the lookup so a shared VIN across dealers can't leak
+    // another tenant's proofs into this deal's defaulting.
+    if (!vin || viewMode || !tid) { setInstallProofs([]); return; }
     let cancelled = false;
     (async () => {
       const { data } = await (supabase as any)
         .from("install_proofs")
         .select("product_name")
-        .eq("vehicle_vin", vin);
+        .eq("vehicle_vin", vin)
+        .eq("tenant_id", tid);
       if (!cancelled) setInstallProofs((data as { product_name: string | null }[]) || []);
     })();
     return () => { cancelled = true; };
-  }, [vehicle.vin, viewMode]);
+  }, [vehicle.vin, viewMode, currentStore?.id]);
   const provenNames = useMemo(
     () => new Set(installProofs.map((p) => (p.product_name || "").trim().toLowerCase()).filter(Boolean)),
     [installProofs],
@@ -364,11 +368,15 @@ const Index = () => {
       // Effective disposition: per-vehicle override > admin default mode >
       // catalog type. A product that can't be pre-installed is always
       // optional, no matter the override or mode.
+      // Require a reasonably specific match (>= 4 chars) so a short proof
+      // name can't flip many unrelated lines to Pre-Installed.
       const proven =
         proofRegime &&
-        [...provenNames].some(
-          (n) => n && (p.name.toLowerCase().includes(n) || n.includes(p.name.toLowerCase())),
-        );
+        [...provenNames].some((n) => {
+          if (!n || n.length < 4) return false;
+          const pn = p.name.toLowerCase();
+          return pn === n || pn.includes(n) || n.includes(pn);
+        });
       let badge =
         typeOverrides[p.id] ||
         (proofRegime

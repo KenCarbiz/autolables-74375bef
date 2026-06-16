@@ -72,7 +72,7 @@ const Disclosures = ({ inkSaving, language = "en" }: DisclosuresProps) => {
     : "text-[10px] font-bold";
   const bodyClass = compliance.requiresBoldType
     ? "text-[10px] font-bold leading-[1.45]"
-    : "text-[7px] leading-[1.45]";
+    : "text-[9px] leading-[1.45]";
 
   const languageList = compliance.requiredLanguages
     .map(l => ({ es: "Spanish", zh: "Chinese", tl: "Tagalog", vi: "Vietnamese", ko: "Korean" }[l] || l))
@@ -145,7 +145,7 @@ const Disclosures = ({ inkSaving, language = "en" }: DisclosuresProps) => {
         </p>
       )}
 
-      <p className={`text-[6px] text-muted-foreground/70 mt-1`}>
+      <p className={`text-[8px] text-muted-foreground/70 mt-1`}>
         {t.retentionBody(compliance.recordRetentionYears, compliance.stateName)}
       </p>
     </div>

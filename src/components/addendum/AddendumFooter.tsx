@@ -25,7 +25,7 @@ const AddendumFooter = ({ inkSaving }: AddendumFooterProps) => {
   ].filter(Boolean).join(" · ");
 
   return (
-    <div className={`text-center py-2 border-t border-border-custom text-[7px] text-muted-foreground ${inkSaving ? "" : "bg-light"}`}>
+    <div className={`text-center py-2 border-t border-border-custom text-[9px] text-muted-foreground ${inkSaving ? "" : "bg-light"}`}>
       <p>Signed acknowledgment of dealer-installed products, optional products, and disclosures. Retain a signed copy for dealership records per applicable state law. A separate window label is displayed on the vehicle.</p>
       <p className="font-semibold mt-0.5">{name} · Dealer Addendum</p>
       {sellerLine && <p className="mt-0.5">{sellerLine}</p>}
