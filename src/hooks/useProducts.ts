@@ -12,6 +12,10 @@ export interface ProductUpgrade {
   benefit_justification: string;
   disclosure_optional: string;
   benefit_justification_optional: string;
+  // False = this tier is installed after delivery only and can never be
+  // pre-installed, so applying it forces the line to customer-elected.
+  // Undefined/true on legacy rows keeps the tier pre-installable.
+  available_preinstalled?: boolean;
 }
 
 export interface Product {

@@ -386,10 +386,13 @@ const Index = () => {
               ? "optional"
               : p.badge_type);
       if (pr.available_preinstalled === false) badge = "optional";
-      const isOptional = badge === "optional";
 
       const up = pr.upgrade;
       const upgradeApplied = !!upgradeSelections[p.id] && !!up;
+      // An applied upgrade that can't be pre-installed forces the line to
+      // customer-elected, even when the base product is pre-installed.
+      if (upgradeApplied && up && up.available_preinstalled === false) badge = "optional";
+      const isOptional = badge === "optional";
 
       // Disposition-correct copy, upgraded when the line has the upgrade
       // on. Optional falls back to the pre-installed text when blank; a

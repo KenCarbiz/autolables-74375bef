@@ -123,6 +123,7 @@ const EMPTY_UPGRADE: ProductUpgrade = {
   benefit_justification: "",
   disclosure_optional: "",
   benefit_justification_optional: "",
+  available_preinstalled: true,
 };
 
 const emptyRule: Omit<ProductRule, "id"> = {
@@ -2384,7 +2385,24 @@ const Admin = () => {
                         <input type="number" step="0.01" value={editing.upgrade.price} onChange={(e) => setEditing({ ...editing, upgrade: { ...(editing.upgrade ?? EMPTY_UPGRADE), price: parseFloat(e.target.value) || 0 } })} className="w-full px-3 py-2 border border-border-custom rounded text-sm" />
                       </div>
                     </div>
-                    {(editing.available_preinstalled ?? true) && (
+                    <label className="flex items-start gap-2 cursor-pointer rounded-lg border border-border-custom p-2.5">
+                      <input
+                        type="checkbox"
+                        className="mt-0.5"
+                        checked={!(editing.upgrade.available_preinstalled ?? true)}
+                        onChange={(e) =>
+                          setEditing({
+                            ...editing,
+                            upgrade: { ...(editing.upgrade ?? EMPTY_UPGRADE), available_preinstalled: !e.target.checked },
+                          })
+                        }
+                      />
+                      <span>
+                        <span className="text-[11px] font-semibold text-foreground">Not available for pre-install</span>
+                        <span className="block text-[10px] text-muted-foreground mt-0.5 leading-relaxed">On — this upgrade is installed after delivery only. The pre-installed description is hidden and applying it keeps the line optional, even when the base product is pre-installed.</span>
+                      </span>
+                    </label>
+                    {(editing.available_preinstalled ?? true) && (editing.upgrade.available_preinstalled ?? true) && (
                       <div className="rounded-lg border border-border-custom p-3 space-y-2.5">
                         <span className="text-[11px] font-bold text-foreground">Pre-installed <span className="font-normal text-muted-foreground">(upgrade)</span></span>
                         <div>
