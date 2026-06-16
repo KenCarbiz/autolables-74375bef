@@ -422,7 +422,7 @@ const DocumentsPanel = ({ vehicle, onReload }: { vehicle: VehicleRow; onReload: 
   // Attach an external link (digital brochure, Carfax URL, inspection
   // report) rather than a file. Appends to the same documents array the
   // customer QR page renders, so it shows up on /v/:slug immediately.
-  const addLink = async (type: "factory_sticker" | "carfax" | "brochure" | "we_owe" | "other") => {
+  const addLink = async (type: string) => {
     const raw = linkUrl.trim();
     if (!raw) { toast.error("Paste a link first"); return; }
     const url = /^https?:\/\//i.test(raw) ? raw : `https://${raw}`;
@@ -437,7 +437,7 @@ const DocumentsPanel = ({ vehicle, onReload }: { vehicle: VehicleRow; onReload: 
     onReload();
   };
 
-  const upload = async (file: File, type: "factory_sticker" | "carfax" | "brochure" | "we_owe" | "other") => {
+  const upload = async (file: File, type: string) => {
     if (!vehicle.tenant_id) {
       toast.error("Vehicle has no tenant — re-save the vehicle file first");
       return;
@@ -481,13 +481,31 @@ const DocumentsPanel = ({ vehicle, onReload }: { vehicle: VehicleRow; onReload: 
     }
   };
 
-  const slots: Array<{ type: "factory_sticker" | "carfax" | "brochure" | "we_owe" | "other"; label: string; desc: string }> = [
-    { type: "factory_sticker", label: "Factory window sticker", desc: "OEM Monroney PDF / image — we'll show it to the buyer at signing." },
-    { type: "carfax", label: "Carfax / AutoCheck", desc: "Vehicle history report — attach for buyer review + signoff." },
-    { type: "brochure", label: "Product brochure", desc: "OEM or dealer marketing PDF — appears on the shopper page." },
-    { type: "we_owe", label: "\"We owe\"", desc: "Items the dealership agreed to deliver post-sale (e.g. pending install)." },
-    { type: "other", label: "Other", desc: "Anything else — inspection, MPI, warranty paperwork." },
-  ];
+  // Used cars carry a full compliance document set; new cars a lighter one.
+  // CPO and unknown-condition default to the used set (the safer superset).
+  const isUsed = vehicle.condition !== "new";
+  const slots: Array<{ type: string; label: string; desc: string }> = isUsed
+    ? [
+        { type: "buyers_guide", label: "FTC Buyers Guide (used)", desc: "Required used-car window form — As-Is vs warranty (16 CFR Part 455). Spanish where the sale is conducted in Spanish." },
+        { type: "safety_inspection", label: "State safety inspection", desc: "State used-car safety inspection certificate — e.g. CT K-208, NY safety/anti-theft, PA/NJ safety, TX VI." },
+        { type: "emissions", label: "Emissions / smog certificate", desc: "State emissions certificate where required." },
+        { type: "carfax", label: "Carfax / AutoCheck", desc: "Vehicle history report — attach for buyer review." },
+        { type: "recon", label: "Inspection / MPI report", desc: "Multi-point reconditioning inspection report." },
+        { type: "odometer", label: "Odometer disclosure", desc: "Federal odometer disclosure statement." },
+        { type: "title", label: "Title / application", desc: "Title, reassignment, or title application." },
+        { type: "warranty", label: "Warranty / service contract", desc: "Limited warranty, service contract (VSC), or GAP documents." },
+        { type: "we_owe", label: "\"We owe\" / Due bill", desc: "Items the dealership agreed to deliver post-sale (e.g. pending install)." },
+        { type: "brochure", label: "Product brochure", desc: "OEM or dealer marketing PDF / link — appears on the shopper page." },
+        { type: "other", label: "Other", desc: "Anything else relevant to the deal jacket." },
+      ]
+    : [
+        { type: "factory_sticker", label: "Factory window sticker", desc: "OEM Monroney PDF / image — we'll show it to the buyer at signing." },
+        { type: "brochure", label: "Product brochure", desc: "OEM or dealer marketing PDF / link — appears on the shopper page." },
+        { type: "carfax", label: "Carfax / AutoCheck", desc: "Vehicle history report." },
+        { type: "warranty", label: "Warranty / service contract", desc: "Limited warranty, service contract (VSC), or GAP documents." },
+        { type: "we_owe", label: "\"We owe\" / Due bill", desc: "Items the dealership agreed to deliver post-sale." },
+        { type: "other", label: "Other", desc: "Anything else — inspection, MPI, warranty paperwork." },
+      ];
 
   const filesByType = useMemo(() => {
     const m: Record<string, typeof vehicle.documents> = {};
