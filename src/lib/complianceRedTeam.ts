@@ -118,7 +118,7 @@ export const runComplianceRedTeam = (draft: RedTeamDraft): ComplianceFinding[] =
       severity: "fail",
       rule: "Every installed product needs a benefit justification",
       message: `${missingBenefit.length} installed product(s) have no benefit justification text.`,
-      citation: "FTC Act §5; CA SB 766 §11713.21 (eff. Oct 1, 2026); FTC 97-dealer warning letters, March 2026.",
+      citation: "FTC Act §5 claim substantiation (nationwide); CA SB 766 §11713.21 (California only, eff. Oct 1, 2026).",
       suggestion: `Open the products tab and set the Benefit Justification field for: ${missingBenefit.slice(0, 3).map((p) => p.name).join(", ")}${missingBenefit.length > 3 ? "…" : ""}`,
     });
   } else if (installedProducts.length > 0) {
@@ -127,7 +127,7 @@ export const runComplianceRedTeam = (draft: RedTeamDraft): ComplianceFinding[] =
       severity: "pass",
       rule: "Every installed product has a benefit justification",
       message: `All ${installedProducts.length} installed product(s) carry benefit justification text the customer can read.`,
-      citation: "FTC Act §5; CA SB 766 §11713.21.",
+      citation: "FTC Act §5 claim substantiation (nationwide).",
     });
   }
 
