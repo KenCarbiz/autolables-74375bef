@@ -39,6 +39,17 @@ serve(async (req) => {
   const jwt = (req.headers.get("Authorization") || "").replace(/^Bearer\s+/i, "");
   if (!jwt) return json({ error: "missing bearer token" }, 401);
 
+  const supabaseUrl = Deno.env.get("SUPABASE_URL");
+  const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+  if (!supabaseUrl || !serviceKey) return json({ error: "supabase not configured" }, 500);
+  if (jwt !== serviceKey) {
+    const admin = createClient(supabaseUrl, serviceKey, {
+      auth: { persistSession: false, autoRefreshToken: false },
+    });
+    const { data: userRes, error: userErr } = await admin.auth.getUser(jwt);
+    if (userErr || !userRes?.user) return json({ error: "invalid token" }, 401);
+  }
+
   const sid = Deno.env.get("TWILIO_ACCOUNT_SID");
   const token = Deno.env.get("TWILIO_AUTH_TOKEN");
   // For A2P 10DLC, prefer a Messaging Service tied to the registered
