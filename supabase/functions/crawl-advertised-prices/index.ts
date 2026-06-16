@@ -54,8 +54,6 @@ interface LatestRow {
   snapshot_at: string;
 }
 
-const PRICE_REGEX = /\$\s?(\d{1,3}(?:,\d{3})+|\d{4,6})(?:\.\d{2})?/g;
-
 // SSRF guard — reject private/loopback/link-local/cloud-metadata hosts.
 const BLOCKED_HOST_PATTERNS: RegExp[] = [
   /^localhost$/i,
@@ -79,60 +77,140 @@ const isUrlSafe = (raw: string): boolean => {
   }
 };
 
-// Try every reasonable signal a dealer page might emit for a
-// price. Falls through to the regex if nothing structured wins.
-const extractPrice = (html: string): number | null => {
-  // 1. JSON-LD <script type="application/ld+json"> blocks. Common
-  //    on modern dealer CMS templates (DealerInspire, DealerOn,
-  //    DealerOn-on-WP, etc.).
+// ── Bot-challenge detection ───────────────────────────────────────
+// A Cloudflare/Imperva/DataDome interstitial returns HTTP 200 with a
+// "checking your browser" body. Parsing it as a real page could silently
+// overwrite a correct advertised price with garbage, so detect and skip.
+const looksLikeChallenge = (html: string, headers: Headers, status: number): boolean => {
+  if (status === 403 || status === 503 || status === 429) return true;
+  if ((headers.get("cf-mitigated") || "").includes("challenge")) return true;
+  const h = html.toLowerCase();
+  const markers = [
+    "cdn-cgi/challenge-platform", "__cf_chl", "cf_chl_opt", "turnstile",
+    "just a moment", "attention required! | cloudflare",
+    "_incapsula_resource", "request unsuccessful. incapsula incident id",
+    "pardon our interruption", "captcha-delivery.com",
+    "please verify you are a human", "checking your browser",
+  ];
+  if (markers.some((m) => h.includes(m))) return true;
+  if (html.length < 20000 && !h.includes("application/ld+json") && !h.includes("vehicleidentificationnumber")) {
+    if (h.includes("enable javascript") || h.includes("ddos") || h.includes("are a human")) return true;
+  }
+  return false;
+};
+
+const VIN_RE = /\b([A-HJ-NPR-Z0-9]{17})\b/g;
+const normVin = (s: unknown) => String(s || "").toUpperCase().trim();
+const collectVins = (html: string, url: string): Set<string> => {
+  const vins = new Set<string>();
+  let m: RegExpExecArray | null;
+  VIN_RE.lastIndex = 0;
+  while ((m = VIN_RE.exec(`${html}\n${url}`))) vins.add(m[1].toUpperCase());
+  return vins;
+};
+
+const norm = (raw: unknown): number | null => {
+  if (raw == null) return null;
+  const n = parseFloat(String(raw).replace(/[,$\s ]/g, "").replace(/usd/i, ""));
+  return Number.isFinite(n) ? n : null;
+};
+const sane = (n: number | null): n is number => n != null && n >= 1000 && n <= 500000;
+
+const REJECT_PRICE_TYPES = ["msrp", "listprice", "invoiceprice", "strikethroughprice", "regularprice"];
+// deno-lint-ignore no-explicit-any
+const priceTypeOf = (o: any): string =>
+  String(o?.priceType || o?.priceSpecification?.priceType || "")
+    .toLowerCase().replace(/.*\//, "").replace(/[^a-z]/g, "");
+
+interface AdResult {
+  price: number | null;
+  source: "jsonld" | "og_meta" | "dom_label" | "none";
+  gated: boolean;
+  reason: string | null;
+}
+
+// Structured, VIN-gated, priceType-aware price extractor. Replaces the old
+// "largest dollar on the page" heuristic, which grabbed the MSRP off a price
+// stack and produced false "ad != sticker" drift on every discounted car.
+// For Call-for-Price pages it records nothing rather than guess the MSRP.
+const extractAdvertised = (html: string, url: string, targetVin: string): AdResult => {
+  const target = normVin(targetVin);
+  const pageVins = collectVins(html, url);
+  if (target && pageVins.size > 0 && !pageVins.has(target)) {
+    return { price: null, source: "none", gated: false, reason: "vin_mismatch" };
+  }
+
+  // Tier A: schema.org JSON-LD — VIN-gated, priceType-aware.
   const ldMatches = html.match(/<script[^>]+application\/ld\+json[^>]*>([\s\S]*?)<\/script>/gi) || [];
   for (const block of ldMatches) {
     const inner = block.replace(/<script[^>]*>/i, "").replace(/<\/script>/i, "").trim();
-    try {
-      const parsed = JSON.parse(inner);
-      const candidates = Array.isArray(parsed) ? parsed : [parsed];
-      for (const node of candidates) {
-        // schema.org Product → offers.price
-        const offers = node?.offers;
-        if (offers) {
-          const list = Array.isArray(offers) ? offers : [offers];
-          for (const o of list) {
-            const p = typeof o?.price === "number" ? o.price : parseFloat(String(o?.price || ""));
-            if (Number.isFinite(p) && p > 1000) return p;
-          }
+    // deno-lint-ignore no-explicit-any
+    let parsed: any;
+    try { parsed = JSON.parse(inner); } catch { continue; }
+    // deno-lint-ignore no-explicit-any
+    const nodes: any[] = [];
+    // deno-lint-ignore no-explicit-any
+    const push = (x: any) => { if (x && typeof x === "object") nodes.push(x); };
+    // deno-lint-ignore no-explicit-any
+    (Array.isArray(parsed) ? parsed : [parsed]).forEach((p: any) => {
+      push(p);
+      if (Array.isArray(p?.["@graph"])) p["@graph"].forEach(push);
+    });
+    for (const node of nodes) {
+      const nodeVin = normVin(node?.vehicleIdentificationNumber);
+      if (target && nodeVin && nodeVin !== target) continue;
+      const offers = node?.offers;
+      if (!offers) continue;
+      const list = Array.isArray(offers) ? offers : [offers];
+      for (const o of list) {
+        const cur = String(o?.priceCurrency || "USD").toUpperCase();
+        if (cur && cur !== "USD") continue;
+        if (o?.["@type"] === "AggregateOffer" || o?.lowPrice != null) {
+          const lp = norm(o?.lowPrice);
+          if (sane(lp)) return { price: lp, source: "jsonld", gated: false, reason: null };
+          continue;
         }
-        // Sometimes price lives top-level
-        if (typeof node?.price === "number" && node.price > 1000) return node.price;
+        if (REJECT_PRICE_TYPES.includes(priceTypeOf(o))) continue;
+        const p = norm(o?.price);
+        if (sane(p)) return { price: p, source: "jsonld", gated: false, reason: null };
       }
-    } catch {
-      // Malformed JSON-LD — move on.
     }
   }
 
-  // 2. og:price:amount / product:price:amount meta tags.
-  const metaMatch = html.match(/<meta[^>]+(?:og:price:amount|product:price:amount)[^>]+content=["']([^"']+)["']/i);
-  if (metaMatch) {
-    const p = parseFloat(metaMatch[1]);
-    if (Number.isFinite(p) && p > 1000) return p;
+  // Tier B: og:price / product:price meta (USD only).
+  const curMeta = html.match(/<meta[^>]+(?:og:price:currency|product:price:currency)[^>]+content=["']([^"']+)["']/i);
+  if (!curMeta || curMeta[1].toUpperCase() === "USD") {
+    const meta = html.match(/<meta[^>]+(?:og:price:amount|product:price:amount)[^>]+content=["']([^"']+)["']/i);
+    const v = meta ? norm(meta[1]) : null;
+    if (sane(v)) return { price: v, source: "og_meta", gated: false, reason: null };
   }
 
-  // 3. Brutal regex fallback: pick the LARGEST $X,XXX number in
-  //    the body — dealer pages usually display the price more
-  //    prominently than any incidental currency mention.
-  const found: number[] = [];
-  let m: RegExpExecArray | null;
-  PRICE_REGEX.lastIndex = 0;
-  while ((m = PRICE_REGEX.exec(html))) {
-    const n = parseFloat(m[1].replace(/,/g, ""));
-    if (Number.isFinite(n) && n > 1000 && n < 1_000_000) found.push(n);
+  // Tier C: labeled DOM price — the price-stack final line, by LABEL not size.
+  const text = html.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").toLowerCase();
+  const GATE = ["call for price", "please call", "contact us for price", "unlock price", "click for price", "sign in to see price"];
+  const MONTHLY = ["/mo", "per month", "mo.", "lease", " apr", "due at signing", "est. payment", "for 24", "for 36", "for 48", "for 60", "for 72", "for 84"];
+  const GOOD = ["internet price", "sale price", "final price", "your price", "e-price", "eprice", "selling price", "special price"];
+  const BAD = ["msrp", "retail", " was ", "original", "list price", "sticker", "as built"];
+  const moneyRe = /([a-z .,'-]{0,40})\$\s?(\d{1,3}(?:,\d{3})+|\d{4,6})(?:\.\d{2})?/g;
+  let best: number | null = null;
+  let bestScore = -1;
+  let mm: RegExpExecArray | null;
+  moneyRe.lastIndex = 0;
+  while ((mm = moneyRe.exec(text))) {
+    const ctx = mm[1];
+    const val = norm(mm[2]);
+    if (!sane(val)) continue;
+    if (BAD.some((b) => ctx.includes(b))) continue;
+    if (MONTHLY.some((b) => ctx.includes(b))) continue;
+    const idx = GOOD.findIndex((g) => ctx.includes(g));
+    const s = idx === -1 ? 0 : 10 - idx;
+    if (s > bestScore || (s === bestScore && best != null && val < best)) { best = val; bestScore = s; }
   }
-  if (found.length > 0) {
-    // Largest = the sticker / vehicle price (vs. trim accessory
-    // numbers that are typically lower).
-    return Math.max(...found);
-  }
+  if (best != null) return { price: best, source: "dom_label", gated: false, reason: null };
 
-  return null;
+  // Tier D: gate / give up — never guess MSRP.
+  if (GATE.some((g) => text.includes(g))) return { price: null, source: "none", gated: true, reason: "price_gated" };
+  return { price: null, source: "none", gated: false, reason: "no_price_extracted" };
 };
 
 serve(async (req) => {
@@ -205,6 +283,7 @@ serve(async (req) => {
   let updated = 0;
   let unchanged = 0;
   let failed = 0;
+  let skipped = 0;
 
   for (const row of rows) {
     try {
@@ -222,26 +301,41 @@ serve(async (req) => {
       const res = await fetch(row.source_url, {
         method: "GET",
         headers: {
-          "User-Agent": "AutoLabels-PriceCrawler/1.0 (+https://autolabels.io)",
-          "Accept": "text/html",
+          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+          "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+          "Accept-Language": "en-US,en;q=0.9",
         },
-        // Short timeout — dealer pages should respond fast, and
-        // we'd rather move on than block the batch.
-        signal: AbortSignal.timeout(8000),
+        signal: AbortSignal.timeout(12000),
       });
-      if (!res.ok) {
-        failed++;
+      const html = res.ok ? await res.text() : "";
+      // Bot-challenge guard: a 403/503 OR a 200 interstitial. Skip without
+      // writing — never overwrite a good price with a challenge page.
+      if (!res.ok || looksLikeChallenge(html, res.headers, res.status)) {
+        skipped++;
         await admin.from("audit_log").insert({
           action: "advertised_price_crawl_error",
           entity_type: "advertised_price",
           entity_id: row.vin,
           store_id: row.tenant_id,
-          details: { vin: row.vin, url: row.source_url, http_status: res.status },
+          details: { vin: row.vin, url: row.source_url, http_status: res.status, reason: "bot_challenge" },
         }).then(() => undefined, () => undefined);
         continue;
       }
-      const html = await res.text();
-      const newPrice = extractPrice(html);
+      const result = extractAdvertised(html, row.source_url, row.vin);
+      // vin_mismatch (redirect / wrong car) or price_gated ("call for price"):
+      // record the reason but DO NOT write — preserve the prior good snapshot.
+      if (result.reason === "vin_mismatch" || result.gated) {
+        skipped++;
+        await admin.from("audit_log").insert({
+          action: "advertised_price_crawl_error",
+          entity_type: "advertised_price",
+          entity_id: row.vin,
+          store_id: row.tenant_id,
+          details: { vin: row.vin, url: row.source_url, reason: result.reason },
+        }).then(() => undefined, () => undefined);
+        continue;
+      }
+      const newPrice = result.price;
       if (newPrice == null) {
         failed++;
         await admin.from("audit_log").insert({
@@ -265,7 +359,7 @@ serve(async (req) => {
         source_channel: row.source_label,
         advertised_price: newPrice,
         captured_by: "crawler",
-        notes: `Nightly crawl · previous $${row.advertised_price.toLocaleString()} → $${newPrice.toLocaleString()}`,
+        notes: `Nightly crawl (${result.source}) · previous $${row.advertised_price.toLocaleString()} → $${newPrice.toLocaleString()}`,
       });
       if (insErr) {
         failed++;
@@ -291,6 +385,7 @@ serve(async (req) => {
     updated,
     unchanged,
     failed,
+    skipped,
   }), {
     headers: { ...corsHeaders, "Content-Type": "application/json" },
   });
