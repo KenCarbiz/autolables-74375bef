@@ -139,10 +139,9 @@ Deno.serve(async (req) => {
       const timeout = setTimeout(() => controller.abort(), 20000)
 
       try {
-        const res = await fetch(tryUrl, {
+        const res = await safeFetch(tryUrl, {
           signal: controller.signal,
           headers: browserHeaders,
-          redirect: 'follow',
         })
         clearTimeout(timeout)
 
