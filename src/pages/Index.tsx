@@ -1248,11 +1248,11 @@ const Index = () => {
                             className="inline-flex items-center gap-1"
                             title={upgradeSelections[p.id] ? "Remove upgrade tier" : `Apply upgrade tier${up.name ? ` (${up.name})` : ""}`}
                           >
-                            <span className={`relative w-8 h-4 rounded-full transition-colors ${upgradeSelections[p.id] ? "bg-violet-500" : "bg-muted"}`}>
-                              <span className={`absolute top-0.5 w-3 h-3 rounded-full bg-card shadow transition-transform ${upgradeSelections[p.id] ? "translate-x-4" : "translate-x-0.5"}`} />
+                            <span className={`relative inline-block w-8 h-4 shrink-0 rounded-full transition-colors ${upgradeSelections[p.id] ? "bg-violet-500" : "bg-muted"}`}>
+                              <span className={`absolute top-0.5 left-0 w-3 h-3 rounded-full bg-white shadow transition-transform ${upgradeSelections[p.id] ? "translate-x-[18px]" : "translate-x-0.5"}`} />
                             </span>
-                            <span className="text-[9px] font-bold uppercase tracking-wide text-muted-foreground">
-                              {upgradeSelections[p.id] ? (up.name?.trim() ? up.name : "Upgrade") : "Base"}
+                            <span className="text-[9px] font-bold uppercase tracking-wide text-muted-foreground whitespace-nowrap">
+                              {upgradeSelections[p.id] ? "Upgrade" : "Base"}
                             </span>
                           </button>
                         )}
