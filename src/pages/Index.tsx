@@ -58,9 +58,9 @@ const PAPER_WIDTHS: Record<string, string> = {
 type SaleMode = "pre_installed" | "customer_elected" | "upgrade";
 
 const SALE_MODE_META: Record<SaleMode, { label: string; badge: string; dot: string }> = {
-  pre_installed:    { label: "Pre-Installed",    badge: "bg-blue-100 text-blue-700 border-blue-200",       dot: "bg-blue-500" },
-  customer_elected: { label: "Customer Elected", badge: "bg-orange-100 text-orange-900 border-orange-300", dot: "bg-orange-600" },
-  upgrade:          { label: "Upgrade",          badge: "bg-violet-100 text-violet-700 border-violet-200", dot: "bg-violet-500" },
+  pre_installed:    { label: "Pre-Installed",    badge: "bg-blue-600 text-white border-blue-700",     dot: "bg-blue-500" },
+  customer_elected: { label: "Customer Elected", badge: "bg-orange-500 text-white border-orange-600", dot: "bg-orange-500" },
+  upgrade:          { label: "Upgrade",          badge: "bg-violet-600 text-white border-violet-700", dot: "bg-violet-500" },
 };
 
 const SaleModeControl = ({
@@ -108,7 +108,7 @@ const SaleModeControl = ({
         className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full border text-[9px] font-bold uppercase tracking-wide ${meta.badge}`}
         title="Change sale method"
       >
-        <span className={`w-1.5 h-1.5 rounded-full ${meta.dot}`} />
+        <span className="w-1.5 h-1.5 rounded-full bg-white/90" />
         {meta.label}
         <ChevronDown className="w-2.5 h-2.5" />
       </button>
