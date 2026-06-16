@@ -86,7 +86,7 @@ const Login = () => {
             </div>
 
             <div className="space-y-3 max-w-md">
-              <Feature icon={ShieldCheck} text="CARS Act & FTC compliance built-in" />
+              <Feature icon={ShieldCheck} text="FTC-aligned compliance built-in" />
               <Feature icon={Zap} text="VIN decode, rules engine, digital signing" />
               <Feature icon={CheckCircle2} text="Multi-store white label ready" />
             </div>

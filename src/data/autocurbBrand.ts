@@ -30,7 +30,7 @@ export const AUTOCURB_BRAND = {
     {
       number: "02",
       title: "Compliance is a feature",
-      body: "FTC CARS Rule, state AG audits, electronic signatures — handled out of the box.",
+      body: "FTC §5, state AG audits, electronic signatures — handled out of the box.",
     },
     {
       number: "03",

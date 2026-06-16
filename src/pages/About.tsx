@@ -104,7 +104,7 @@ const About = () => {
             </span>
             <span className="flex items-center gap-1.5">
               <Check className="w-3 h-3 text-emerald-400" />
-              CARS Act compliant
+              FTC-aligned
             </span>
             <span className="flex items-center gap-1.5">
               <Check className="w-3 h-3 text-emerald-400" />
@@ -199,7 +199,7 @@ const About = () => {
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-5">
             <Feature
               icon={ShieldCheck}
-              title="CARS Act ready"
+              title="State-law ready"
               body="California SB 766 disclosures, multi-language support, 2-year record retention — built in."
             />
             <Feature

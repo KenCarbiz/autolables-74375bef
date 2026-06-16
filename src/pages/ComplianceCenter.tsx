@@ -384,7 +384,7 @@ const ComplianceCenter = () => {
           <p className="text-xs text-blue-800">
             State: <strong>{compliance.stateName || dealerState}</strong> · Doc fee terminology: <strong>{compliance.docFeeTerminology}</strong>
             {compliance.docFeeMaxCap !== null && <> · Max cap: <strong>${compliance.docFeeMaxCap}</strong></>}
-            {compliance.carsActState && <> · <span className="text-amber-700 font-bold">California CARS Act applies (SB 766, eff. Oct 1, 2026)</span></>}
+            {compliance.carsActState && <> · <span className="text-amber-700 font-bold">California SB 766 applies (eff. Oct 1, 2026)</span></>}
           </p>
         </div>
       )}
@@ -479,7 +479,7 @@ const ComplianceCenter = () => {
           )}
 
           {compliance.carsActState && (
-            <SubSection title="California CARS Act (SB 766)">
+            <SubSection title="California SB 766">
               <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 mb-3">
                 <div className="flex items-start gap-2">
                   <AlertTriangle className="w-4 h-4 text-amber-600 mt-0.5 flex-shrink-0" />
@@ -660,9 +660,9 @@ const ComplianceCenter = () => {
             would have codified.
           </p>
           <p className="text-xs text-muted-foreground leading-relaxed mb-3">
-            Additionally, states are filling the gap with their own laws. California's CARS Act (SB 766)
-            takes effect October 1, 2026 with even stricter requirements than the federal CARS Rule
-            would have imposed.
+            Additionally, states are filling the gap with their own laws. California's SB 766
+            takes effect October 1, 2026 with even stricter requirements than the vacated federal
+            rule would have imposed.
           </p>
           <p className="text-xs text-foreground font-semibold leading-relaxed">
             This is exactly why this platform exists. Whether the requirement comes from federal law,

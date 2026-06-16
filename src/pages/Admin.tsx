@@ -2077,7 +2077,7 @@ const Admin = () => {
                   <ShieldCheck className="w-4 h-4 text-blue-600" />
                   <h3 className="text-sm font-semibold text-foreground">Compliance Audit Log</h3>
                 </div>
-                <p className="text-xs text-muted-foreground mt-0.5">Immutable record of every action for FTC, CARS Act, and state AG audit compliance.</p>
+                <p className="text-xs text-muted-foreground mt-0.5">Immutable record of every action for FTC and state AG audit compliance.</p>
               </div>
               <div className="flex items-center gap-2">
                 <AuditChainVerifier storeId={currentStore?.id || ""} />

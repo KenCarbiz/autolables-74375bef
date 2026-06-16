@@ -283,7 +283,7 @@ const TrustBand = () => (
         <span>16 CFR Part 455</span>
         <span>Monroney Act</span>
         <span>E-SIGN / UETA</span>
-        <span>CA CARS Act</span>
+        <span>CA SB 766</span>
         <span>50-state DMV</span>
       </div>
     </div>
@@ -311,7 +311,7 @@ const Risk = () => (
 
       <div className="mx-auto mt-12 grid max-w-6xl gap-5 sm:grid-cols-2 lg:grid-cols-4" id="power">
         <Card icon={Gavel} title="FTC enforcement">
-          The FTC CARS Rule targets undisclosed add-ons, bait pricing, and missing consent.
+          FTC Act §5 and 16 CFR Part 455 target undisclosed add-ons, bait pricing, and missing consent.
           Investigations begin with a website crawl, not a customer complaint.
         </Card>
         <Card icon={AlertTriangle} title="Advertised-price liability">
@@ -596,7 +596,7 @@ const SocialProof = () => (
         </div>
         <div className="flex flex-col justify-center rounded-2xl border border-slate-200 bg-gradient-to-br from-[#0B2041] to-[#13315e] p-6 text-white shadow-sm">
           <ShieldCheck className="h-7 w-7 text-[#3BB4FF]" />
-          <p className="mt-3 font-display text-lg font-bold tracking-tight">FTC CARS Rule</p>
+          <p className="mt-3 font-display text-lg font-bold tracking-tight">FTC-aligned</p>
           <p className="text-sm text-white/70">50-state disclosure engine</p>
           <p className="mt-4 text-[11px] font-medium uppercase tracking-[0.18em] text-white/50">
             Compliance credential
@@ -613,7 +613,7 @@ const SocialProof = () => (
 
 const TIERS = [
   { name: "Essential", body: "Single-store dealers. Stickers, addendums, signing, audit log." },
-  { name: "Defense", body: "Adds website price monitoring, CARS Rule defense pack, and recall guard.", featured: true },
+  { name: "Defense", body: "Adds website price monitoring, FTC §5 defense pack, and recall guard.", featured: true },
   { name: "Group", body: "Multi-rooftop. SSO, group analytics, custom rules, dedicated success." },
 ];
 
@@ -691,7 +691,7 @@ const FAQS = [
     a: "We're in pilot now with select dealer groups. General availability rolls out through 2026. Early-access dealers get first access and locked-in early pricing.",
   },
   {
-    q: "Is this CARS Act compliant?",
+    q: "Is this FTC compliant?",
     a: "The FTC CARS Rule was vacated by the 5th Circuit in January 2025. We build to the underlying FTC §5 framework, 16 CFR Part 455, the Monroney Act, E-SIGN/UETA, and California SB 766 (eff. October 2026). AutoLabels documents your compliance posture — it does not provide legal advice.",
   },
   {
