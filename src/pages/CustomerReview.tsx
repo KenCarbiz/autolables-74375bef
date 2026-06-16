@@ -78,6 +78,8 @@ const CustomerReview = () => {
   const [optionalSelections, setOptionalSelections] = useState<Record<string, string>>({});
   const [customerName, setCustomerName] = useState("");
   const [customerSig, setCustomerSig] = useState({ data: "", type: "draw" as "draw" | "type" });
+  const [cobuyerName, setCobuyerName] = useState("");
+  const [cobuyerSig, setCobuyerSig] = useState({ data: "", type: "draw" as "draw" | "type" });
   const [warrantyAck, setWarrantyAck] = useState(false);
   const [deliveryMileage, setDeliveryMileage] = useState("");
   const [stickerMatchAck, setStickerMatchAck] = useState(false);
@@ -112,6 +114,7 @@ const CustomerReview = () => {
     setAddendum(doc);
     setInitials((doc.initials as Record<string, string>) || {});
     setOptionalSelections((doc.optional_selections as Record<string, string>) || {});
+    setCobuyerName((doc.cobuyer_name as string) || "");
     if (doc.status === "signed") setSubmitted(true);
     setLoading(false);
     fireFunnelEvent("signing_link_opened", openedFiredRef);
@@ -153,6 +156,10 @@ const CustomerReview = () => {
   const addedInstalled = installed.filter((p) => p.price_in_advertised === false);
   const electable = products.filter((p) => p.badge_type === "optional" || isAddedOn(p));
   const isFinanced = !!addendum?.financing_input;
+  // Two-buyer deals require a co-buyer signature too. Surfaces only when the
+  // token row carries a co-buyer name (needs the field exposed by
+  // get_addendum_by_token); otherwise the flow stays single-signer.
+  const hasCobuyer = !!(addendum?.cobuyer_name && String(addendum.cobuyer_name).trim());
 
   const requiresStatutoryInitials = (name: string) =>
     STATUTORY_INITIAL_KEYWORDS.some((k) => name.toLowerCase().includes(k));
@@ -218,7 +225,8 @@ const CustomerReview = () => {
       case "optional": return electableChosen && electableInitialsDone;
       case "pricing": return paymentConfirmed;
       case "disclosures": return disclosuresDone;
-      case "sign": return finalChecklistAck && customerName.trim().length > 0 && !!customerSig.data;
+      case "sign": return finalChecklistAck && customerName.trim().length > 0 && !!customerSig.data
+        && (!hasCobuyer || (cobuyerName.trim().length > 0 && !!cobuyerSig.data));
       default: return true;
     }
   })();
@@ -257,6 +265,7 @@ const CustomerReview = () => {
     if (!paymentConfirmed) { toast.error("Please confirm your price breakdown."); return; }
     if (sb766Applies && !sb766ThreeDayAck) { toast.error("Please acknowledge the California 3-Day Right to Cancel notice."); return; }
     if (!customerSig.data) { toast.error("Please provide your signature."); return; }
+    if (hasCobuyer && !cobuyerSig.data) { toast.error("The co-buyer also needs to sign."); return; }
 
     setSubmitting(true);
     const consent = buildConsentRecord();
@@ -429,6 +438,27 @@ const CustomerReview = () => {
         } as any)
         .eq("signing_token", token!);
       if (legacyErr) { toast.error("Failed to submit. Please try again."); return; }
+    }
+    // Co-buyer signature, recorded as a second signer on the same deal.
+    if (hasCobuyer && cobuyerSig.data) {
+      await (supabase as any).rpc("record_customer_signing", {
+        _signing_token: token!,
+        _signer_type: "cobuyer",
+        _signer_name: cobuyerName || null,
+        _signer_email: null,
+        _signer_phone: null,
+        _signature_data: cobuyerSig.data,
+        _signature_type: cobuyerSig.type,
+        _ip_address: customerIp,
+        _user_agent: consent.user_agent,
+        _signing_location: geoloc as any,
+        _content_hash: contentHash,
+        _esign_consent: consent as any,
+        _canonical_payload: canonicalPayload,
+        _acknowledgments: acknowledgments,
+        _delivery_mileage: deliveryMileage ? parseInt(deliveryMileage, 10) : null,
+        _price_overrides: {} as any,
+      }).then(() => {}, () => { /* best-effort co-buyer record */ });
     }
     setAuditRecord({
       dealId: addendum.id,
@@ -605,6 +635,9 @@ const CustomerReview = () => {
               customerName={customerName} setCustomerName={setCustomerName}
               setCustomerSig={setCustomerSig}
               checklistAck={finalChecklistAck} setChecklistAck={setFinalChecklistAck}
+              hasCobuyer={hasCobuyer}
+              cobuyerName={cobuyerName} setCobuyerName={setCobuyerName}
+              setCobuyerSig={setCobuyerSig}
             />
           )}
         </div>
@@ -999,12 +1032,16 @@ const DisclosuresStep = ({
 const SignStep = ({
   ymm, finalAllIn, addedTotal, installedCount, acceptedCount,
   customerName, setCustomerName, setCustomerSig, checklistAck, setChecklistAck,
+  hasCobuyer, cobuyerName, setCobuyerName, setCobuyerSig,
 }: {
   ymm: string; finalAllIn: number | null; addedTotal: number;
   installedCount: number; acceptedCount: number;
   customerName: string; setCustomerName: (v: string) => void;
   setCustomerSig: (v: { data: string; type: "draw" | "type" }) => void;
   checklistAck: boolean; setChecklistAck: (v: boolean) => void;
+  hasCobuyer: boolean;
+  cobuyerName: string; setCobuyerName: (v: string) => void;
+  setCobuyerSig: (v: { data: string; type: "draw" | "type" }) => void;
 }) => (
   <div className="space-y-4">
     <StepHeading title="Review and sign" sub="One last look before you sign." />
@@ -1055,11 +1092,29 @@ const SignStep = ({
         className="w-full h-14 border-2 border-slate-300 rounded-xl px-4 text-base bg-white text-slate-900 placeholder:text-slate-400"
       />
       <SignaturePad
-        label="Your signature"
+        label={hasCobuyer ? "Buyer signature" : "Your signature"}
         subtitle="Sign above to finalize. Your signature is hashed and time-stamped."
         onChange={(data, type) => setCustomerSig({ data, type })}
       />
     </div>
+
+    {hasCobuyer && (
+      <div className="rounded-2xl border border-slate-200 bg-white p-5 space-y-4">
+        <p className="text-sm font-bold text-slate-900">Co-buyer signature</p>
+        <input
+          value={cobuyerName}
+          onChange={(e) => setCobuyerName(e.target.value)}
+          placeholder="Co-buyer full legal name (printed)"
+          className="w-full h-14 border-2 border-slate-300 rounded-xl px-4 text-base bg-white text-slate-900 placeholder:text-slate-400"
+        />
+        <SignaturePad
+          label="Co-buyer signature"
+          subtitle="The co-buyer signs here. Captured and time-stamped separately."
+          onChange={(data, type) => setCobuyerSig({ data, type })}
+        />
+      </div>
+    )}
+
     <p className="text-center text-[10px] font-mono uppercase tracking-wider text-slate-400">
       By signing, your acknowledgment is hashed, archived, and legally binding.
     </p>
