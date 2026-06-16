@@ -59,7 +59,7 @@ type SaleMode = "pre_installed" | "customer_elected" | "upgrade";
 
 const SALE_MODE_META: Record<SaleMode, { label: string; badge: string; dot: string }> = {
   pre_installed:    { label: "Pre-Installed",    badge: "bg-blue-100 text-blue-700 border-blue-200",       dot: "bg-blue-500" },
-  customer_elected: { label: "Customer Elected", badge: "bg-orange-100 text-orange-700 border-orange-200", dot: "bg-orange-500" },
+  customer_elected: { label: "Customer Elected", badge: "bg-orange-100 text-orange-900 border-orange-300", dot: "bg-orange-600" },
   upgrade:          { label: "Upgrade",          badge: "bg-violet-100 text-violet-700 border-violet-200", dot: "bg-violet-500" },
 };
 
