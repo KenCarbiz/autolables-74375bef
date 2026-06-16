@@ -170,14 +170,14 @@ const Inventory = () => {
         <div className="flex items-stretch gap-2 flex-wrap">
           <button
             onClick={() => setShowAdd(true)}
-            className="h-9 px-4 rounded-md bg-[#2563EB] hover:bg-[#1D4ED8] text-white inline-flex items-center gap-2 text-sm font-medium shadow-sm transition-colors whitespace-nowrap"
+            className="h-9 px-4 rounded-xl bg-blue-600 hover:bg-blue-700 text-white inline-flex items-center gap-2 text-sm font-semibold shadow-sm shadow-blue-600/30 ring-1 ring-inset ring-white/15 transition-colors whitespace-nowrap"
           >
             <Plus className="w-4 h-4 stroke-2" />
             Add Vehicle
           </button>
           <button
             onClick={() => navigate("/scan")}
-            className="h-9 px-4 rounded-md border border-border bg-transparent hover:bg-muted text-foreground inline-flex items-center gap-2 text-sm font-medium transition-colors whitespace-nowrap"
+            className="h-9 px-4 rounded-xl border border-border bg-card hover:bg-muted text-foreground inline-flex items-center gap-2 text-sm font-medium transition-colors whitespace-nowrap"
             title="Scan a VIN barcode into inventory"
           >
             <ScanLine className="w-4 h-4 stroke-2" />
@@ -185,7 +185,7 @@ const Inventory = () => {
           </button>
           <button
             onClick={() => setShowImport(true)}
-            className="h-9 px-4 rounded-md border border-border bg-transparent hover:bg-muted text-foreground inline-flex items-center gap-2 text-sm font-medium transition-colors whitespace-nowrap"
+            className="h-9 px-4 rounded-xl border border-border bg-card hover:bg-muted text-foreground inline-flex items-center gap-2 text-sm font-medium transition-colors whitespace-nowrap"
           >
             <Upload className="w-4 h-4 stroke-2" />
             CSV Import
