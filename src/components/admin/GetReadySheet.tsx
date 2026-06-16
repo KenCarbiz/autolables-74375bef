@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { QRCodeSVG } from "qrcode.react";
 import { supabase } from "@/integrations/supabase/client";
+import { useTenant } from "@/contexts/TenantContext";
 import { Printer } from "lucide-react";
 import type { GetReadyRecord } from "@/hooks/useGetReady";
 
@@ -42,6 +43,7 @@ export const GetReadySheet = ({
   record: GetReadyRecord;
   dealerName?: string;
 }) => {
+  const { tenant } = useTenant();
   const [token, setToken] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -49,16 +51,18 @@ export const GetReadySheet = ({
     if (!open) return;
     setLoading(true);
     (async () => {
-      const { data } = await (supabase as any)
+      let q = (supabase as any)
         .from("vehicle_listings")
         .select("install_token")
-        .eq("vin", record.vin)
-        .limit(1)
-        .maybeSingle();
+        .eq("vin", record.vin);
+      // Tenant-scope so a VIN shared across dealers can't encode another
+      // tenant's install token onto this slip.
+      if (tenant?.id) q = q.eq("tenant_id", tenant.id);
+      const { data } = await q.limit(1).maybeSingle();
       setToken(data?.install_token || null);
       setLoading(false);
     })();
-  }, [open, record.vin]);
+  }, [open, record.vin, tenant?.id]);
 
   if (!open) return null;
 

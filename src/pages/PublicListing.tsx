@@ -26,6 +26,8 @@ import {
   Palette,
   QrCode,
   Smartphone,
+  BadgeCheck,
+  Camera,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Helmet } from "react-helmet-async";
@@ -385,6 +387,10 @@ const PublicListingBody = () => {
             <p className="text-xs text-muted-foreground">{L.no_additional_products}</p>
           )}
         </section>
+
+        {/* Verified installations — vendor/detail-shop proof (photo + date)
+            that the protection is really on this vehicle. */}
+        <VerifiedInstallsPublic slug={listing.slug} />
 
         {/* Dealer value props */}
         {listing.value_props?.length > 0 && (
@@ -1354,6 +1360,79 @@ const ProgramDocuments = ({ listing }: { listing: VehicleListing }) => {
               <p className="text-[10px] text-muted-foreground">{d.type} — {L.tap_to_view}</p>
             </div>
           </a>
+        ))}
+      </div>
+    </section>
+  );
+};
+
+// Buyer-facing proof that the protection was professionally installed.
+// Reads through a public, slug-keyed RPC (anon can't read install_proofs
+// directly); photos come from the private bucket via short-lived signed
+// URLs. Renders nothing until the RPC exists or if there are no proofs.
+const VerifiedInstallsPublic = ({ slug }: { slug: string }) => {
+  const [proofs, setProofs] = useState<
+    { id: string; product_name: string | null; installer_company: string | null; installed_at: string | null; photo_path: string | null }[]
+  >([]);
+  const [urls, setUrls] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    if (!slug) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const { data } = await (supabase as any).rpc("get_install_proofs_public", { _slug: slug });
+        const rows = (data as typeof proofs) || [];
+        if (cancelled) return;
+        setProofs(rows);
+        const map: Record<string, string> = {};
+        await Promise.all(
+          rows
+            .filter((r) => r.photo_path)
+            .map(async (r) => {
+              const { data: signed } = await supabase.storage
+                .from("install-proofs")
+                .createSignedUrl(r.photo_path as string, 3600);
+              if (signed?.signedUrl) map[r.id] = signed.signedUrl;
+            }),
+        );
+        if (!cancelled) setUrls(map);
+      } catch {
+        /* RPC not deployed yet — hide the section */
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [slug]);
+
+  if (proofs.length === 0) return null;
+
+  return (
+    <section className="rounded-2xl border border-border bg-card shadow-premium p-5">
+      <div className="flex items-center gap-2 mb-3">
+        <BadgeCheck className="w-4 h-4 text-emerald-600" />
+        <h2 className="text-sm font-semibold text-foreground">Verified installations</h2>
+      </div>
+      <p className="text-[11px] text-muted-foreground leading-relaxed mb-4">
+        Each item below was confirmed installed on this vehicle by the installer, with a photo and timestamp.
+      </p>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        {proofs.map((p) => (
+          <div key={p.id} className="rounded-lg border border-border overflow-hidden">
+            {urls[p.id] ? (
+              <img src={urls[p.id]} alt={p.product_name || "Installed"} className="w-full h-32 object-cover" />
+            ) : (
+              <div className="w-full h-32 bg-muted flex items-center justify-center">
+                <Camera className="w-5 h-5 text-muted-foreground" />
+              </div>
+            )}
+            <div className="p-3">
+              <p className="text-sm font-semibold text-foreground">{p.product_name || "Installed equipment"}</p>
+              <p className="text-[10px] text-muted-foreground">
+                {p.installer_company ? `${p.installer_company} · ` : ""}
+                {p.installed_at ? new Date(p.installed_at).toLocaleDateString() : ""}
+              </p>
+            </div>
+          </div>
         ))}
       </div>
     </section>
