@@ -34,6 +34,24 @@ const isUrlSafe = (raw: string): { ok: true; url: URL } | { ok: false; reason: s
   return { ok: true, url: u }
 }
 
+const safeFetch = async (url: string, init: RequestInit, maxRedirects = 5): Promise<Response> => {
+  let current = url
+  for (let i = 0; i <= maxRedirects; i++) {
+    const safety = isUrlSafe(current)
+    if (!safety.ok) throw new Error(`redirect blocked: ${safety.reason}`)
+    const res = await fetch(current, { ...init, redirect: 'manual' })
+    if (res.status >= 300 && res.status < 400) {
+      const loc = res.headers.get('location')
+      if (!loc) return res
+      current = new URL(loc, current).toString()
+      continue
+    }
+    return res
+  }
+  throw new Error('too many redirects')
+}
+
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
