@@ -114,7 +114,6 @@ const STATE_OVERRIDES: Record<string, Partial<StateCompliance>> = {
     ],
     addOnDisclosures: [
       "This addendum is provided pursuant to applicable federal and Connecticut state consumer protection requirements.",
-      "CONNECTICUT SAFETY INSPECTION (CGS 14-62(g)): A CT Licensed Dealer Vehicle Inspection (Form K-208) is mandatory for every used motor vehicle sold at retail by a licensed dealer in Connecticut. The completed form must be provided to the buyer. Failure to inspect: $500 fine. Failure to provide copy to buyer: $250 fine.",
     ],
     recordRetentionYears: 7,
   },
