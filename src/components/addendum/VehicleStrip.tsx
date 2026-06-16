@@ -13,14 +13,7 @@ interface VehicleStripProps {
   inkSaving?: boolean;
 }
 
-const fields = [
-  { label: "Year / Make / Model", key: "ymm" as const, placeholder: "e.g. 2026 Honda CR-V EX-L" },
-  { label: "Stock #", key: "stock" as const, placeholder: "e.g. H12345" },
-  { label: "VIN", key: "vin" as const, placeholder: "e.g. 1HGCV1F3XRA000000" },
-  { label: "Date", key: "date" as const, placeholder: "e.g. 04/04/2026" },
-];
-
-const VehicleStrip = ({ vehicle, onChange, onVinDecoded, onVehicleScraped, inkSaving }: VehicleStripProps) => {
+const VehicleStrip =({ vehicle, onChange, onVinDecoded, onVehicleScraped, inkSaving }: VehicleStripProps) => {
   const { decode, decoding, error: vinError } = useVinDecode();
   const { scrape, scraping, error: scrapeError } = useVehicleUrlScrape();
   const { pull: pullBlackBook, loading: bbLoading, data: bbData, error: bbError } = useBlackBook();
@@ -66,7 +59,7 @@ const VehicleStrip = ({ vehicle, onChange, onVinDecoded, onVehicleScraped, inkSa
   };
 
   return (
-    <div className={`px-3 py-2 text-[9px] ${inkSaving ? "bg-card" : "bg-blue/10"}`}>
+    <div className={`px-3 py-2.5 ${inkSaving ? "bg-card" : "bg-blue/10"}`}>
       {/* URL Import Bar */}
       {settings.feature_url_scrape && (
         <div className="mb-2 no-print">
@@ -109,53 +102,76 @@ const VehicleStrip = ({ vehicle, onChange, onVinDecoded, onVehicleScraped, inkSa
         </div>
       )}
 
-      {/* Vehicle fields */}
-      <div className="grid grid-cols-4 gap-2">
-        {fields.map((f) => (
-          <div key={f.key}>
-            <span className="font-semibold text-muted-foreground uppercase tracking-wider">{f.label}</span>
-            <div className={f.key === "vin" && settings.feature_vin_decode ? "flex gap-1 items-end" : ""}>
+      {/* Vehicle Identification — boxed data block */}
+      <fieldset className={`border rounded-md overflow-hidden ${inkSaving ? "border-navy/40" : "border-navy/30"}`}>
+        <legend className="ml-2 px-1.5 text-[8px] font-bold uppercase tracking-[0.18em] text-navy">
+          Vehicle Identification
+        </legend>
+
+        {/* Y/M/M (wide) · Stock · Date */}
+        <div className="grid grid-cols-[2fr_1fr_1fr] divide-x divide-border-custom border-b border-border-custom">
+          {([
+            { label: "Year / Make / Model", key: "ymm" as const, placeholder: "2026 Honda CR-V EX-L" },
+            { label: "Stock #", key: "stock" as const, placeholder: "H12345" },
+            { label: "Date", key: "date" as const, placeholder: "04/04/2026" },
+          ]).map((f) => (
+            <label key={f.key} className="flex flex-col px-2.5 py-1.5">
+              <span className="text-[8px] font-bold uppercase tracking-[0.14em] text-navy/70 mb-0.5">{f.label}</span>
               <input
                 value={vehicle[f.key]}
                 onChange={(e) => onChange({ ...vehicle, [f.key]: e.target.value })}
                 placeholder={f.placeholder}
-                className="w-full border-b-[1.5px] border-border-custom bg-transparent text-xs text-foreground outline-none placeholder:text-muted-foreground/50 min-h-[20px] py-0.5"
+                className="w-full bg-transparent text-[13px] font-medium text-foreground outline-none placeholder:text-muted-foreground/40 placeholder:font-normal"
               />
-              {f.key === "vin" && settings.feature_vin_decode && (
+            </label>
+          ))}
+        </div>
+
+        {/* VIN — full-width hero row */}
+        <div className="px-2.5 py-1.5">
+          <span className="text-[8px] font-bold uppercase tracking-[0.14em] text-navy/70">
+            Vehicle Identification Number (VIN)
+          </span>
+          <div className="flex items-center gap-2 mt-0.5">
+            <input
+              value={vehicle.vin}
+              onChange={(e) => onChange({ ...vehicle, vin: e.target.value.toUpperCase() })}
+              placeholder="1HGCV1F3XRA000000"
+              maxLength={17}
+              className="flex-1 min-w-0 bg-transparent font-mono text-[15px] font-semibold tracking-[0.18em] text-foreground uppercase outline-none border-b-2 border-navy/40 focus:border-action py-0.5 placeholder:text-muted-foreground/40 placeholder:tracking-normal"
+            />
+            <div className="flex shrink-0 gap-1 no-print">
+              {settings.feature_vin_decode && (
                 <button
                   onClick={handleVinDecode}
                   disabled={decoding || !vehicle.vin.trim()}
-                  className={`shrink-0 text-[8px] font-bold px-2 py-1 rounded transition-all ${
-                    decoded
-                      ? "bg-teal text-primary-foreground"
-                      : "bg-action text-primary-foreground hover:opacity-85"
-                  } disabled:opacity-40`}
+                  className={`text-[9px] font-bold px-2.5 py-1 rounded-sm transition-all ${decoded ? "bg-teal text-primary-foreground" : "bg-action text-primary-foreground hover:opacity-85"} disabled:opacity-40`}
                 >
-                  {decoding ? "Decoding..." : decoded ? "Decoded" : "Decode VIN"}
+                  {decoding ? "Decoding…" : decoded ? "Decoded" : "Decode VIN"}
                 </button>
               )}
-              {f.key === "vin" && vehicle.vin.trim().length === 17 && (
+              {vehicle.vin.trim().length === 17 && (
                 <button
                   onClick={() => pullOem(vehicle.vin.trim())}
                   disabled={oemLoading}
-                  className="shrink-0 text-[8px] font-bold px-2 py-1 rounded bg-blue-600 text-white hover:opacity-85 disabled:opacity-40 transition-all"
+                  className="text-[9px] font-bold px-2 py-1 rounded-sm border border-navy/30 text-navy hover:bg-navy/5 disabled:opacity-40 transition-all"
                 >
-                  {oemLoading ? "Pulling..." : oemData ? "OEM" : "OEM Data"}
+                  {oemLoading ? "…" : oemData ? "OEM" : "OEM"}
                 </button>
               )}
-              {f.key === "vin" && settings.feature_blackbook && vehicle.vin.trim().length === 17 && (
+              {settings.feature_blackbook && vehicle.vin.trim().length === 17 && (
                 <button
                   onClick={() => pullBlackBook(vehicle.vin.trim())}
                   disabled={bbLoading}
-                  className="shrink-0 text-[8px] font-bold px-2 py-1 rounded bg-purple-600 text-white hover:opacity-85 disabled:opacity-40 transition-all"
+                  className="text-[9px] font-bold px-2 py-1 rounded-sm border border-navy/30 text-navy hover:bg-navy/5 disabled:opacity-40 transition-all"
                 >
-                  {bbLoading ? "Pulling..." : bbData ? "Pulled" : "Black Book"}
+                  {bbLoading ? "…" : bbData ? "BB" : "Black Book"}
                 </button>
               )}
             </div>
           </div>
-        ))}
-      </div>
+        </div>
+      </fieldset>
       {vinError && settings.feature_vin_decode && (
         <p className="text-[8px] text-red mt-1">{vinError}</p>
       )}
@@ -189,15 +205,6 @@ const VehicleStrip = ({ vehicle, onChange, onVinDecoded, onVehicleScraped, inkSa
           )}
         </div>
       )}
-      <div className="flex justify-end">
-        <span className="inline-block mt-1 text-[8px] font-bold bg-teal text-primary-foreground px-2 py-0.5 rounded-sm tracking-widest">
-          FTC
-          <br />
-          Compliant
-          <br />
-          Label
-        </span>
-      </div>
     </div>
   );
 };
