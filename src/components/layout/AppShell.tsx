@@ -343,13 +343,13 @@ const AppShell = ({ children }: AppShellProps) => {
         {/* Primary actions — every workflow starts with adding or
             scanning a vehicle. Collapsed-rail mode stacks them
             vertically as icon-only buttons. */}
-        <div className={`px-3 pt-3 flex-shrink-0 grid gap-1.5 ${collapsed ? "lg:grid-cols-1 grid-cols-2" : "grid-cols-2"}`}>
+        <div className={`px-3 pt-3 flex-shrink-0 grid gap-2 ${collapsed ? "lg:grid-cols-1 grid-cols-2" : "grid-cols-2"}`}>
           <button
             onClick={() => {
               setMobileOpen(false);
               navigate("/inventory?add=1");
             }}
-            className="h-9 rounded-md bg-[#2563EB] hover:bg-[#1D4ED8] text-white inline-flex items-center justify-center gap-2 text-[13px] font-medium shadow-sm transition-colors"
+            className="h-10 rounded-xl bg-blue-600 hover:bg-blue-700 text-white inline-flex items-center justify-center gap-2 text-[13px] font-semibold shadow-sm shadow-blue-600/30 ring-1 ring-inset ring-white/15 transition-colors"
             title="Add a vehicle to inventory"
           >
             <Car className="w-4 h-4 stroke-2" />
@@ -366,7 +366,7 @@ const AppShell = ({ children }: AppShellProps) => {
               if (touch && hasCamera) navigate("/scan");
               else setShowMobileQr(true);
             }}
-            className="h-9 rounded-md bg-transparent hover:bg-muted text-foreground inline-flex items-center justify-center gap-2 text-[13px] font-medium border border-border/70 transition-colors"
+            className="h-10 rounded-xl bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-100 dark:bg-blue-950/40 dark:hover:bg-blue-900/50 dark:text-blue-300 dark:border-blue-900 inline-flex items-center justify-center gap-2 text-[13px] font-semibold transition-colors"
             title="Scan a VIN — opens the camera on a phone/tablet, or a QR hand-off on desktop"
           >
             <ScanLine className="w-4 h-4 stroke-2" />
