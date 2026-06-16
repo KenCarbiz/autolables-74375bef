@@ -1,4 +1,5 @@
 import { useDealerSettings } from "@/contexts/DealerSettingsContext";
+import { ProductIcon, PRODUCT_ICONS } from "@/components/addendum/productIcons";
 
 interface ProductRowProps {
   num: number;
@@ -15,50 +16,17 @@ interface ProductRowProps {
   controls?: React.ReactNode;
 }
 
-const PRODUCT_ICONS: Record<string, string> = {
-  paint_protection: "🛡️",
-  window_tint: "🪟",
-  ceramic_coating: "✨",
-  theft_deterrent: "🔒",
-  wheel_locks: "🔩",
-  nitrogen_tires: "💨",
-  interior_protection: "🛋️",
-  rust_proofing: "🧱",
-  clear_bra: "🎯",
-  door_edge_guards: "🚪",
-  pinstripe: "🎨",
-  remote_start: "🔑",
-  alarm: "🚨",
-  gps_tracking: "📍",
-  dash_cam: "📷",
-  all_weather_mats: "🏔️",
-  cargo_liner: "📦",
-  roof_rack: "🏗️",
-  running_boards: "🪜",
-  trailer_hitch: "🪝",
-  bed_liner: "🛻",
-  tonneau_cover: "📐",
-  extended_warranty: "📋",
-  maintenance_plan: "🔧",
-  gap_insurance: "📄",
-  road_hazard: "🛣️",
-  dent_repair: "🔨",
-  key_replacement: "🗝️",
-  windshield_protection: "🪛",
-  default: "⚙️",
-};
-
 const ProductRow = ({ num, name, subtitle, warranty, badgeType, price, priceLabel, disclosure, isOptional, inkSaving, iconType, controls }: ProductRowProps) => {
   const { settings } = useDealerSettings();
-  const icon = settings.feature_product_icons && iconType ? (PRODUCT_ICONS[iconType] || PRODUCT_ICONS.default) : null;
+  const showIcon = settings.feature_product_icons && !!iconType;
 
   return (
     <div className={`border-b border-border-custom py-2 px-2 border-l-4 transition-colors ${isOptional ? "bg-gold/5 border-l-gold" : "bg-blue/5 border-l-blue"}`}>
       <div className="flex gap-2">
         <span className="text-[10px] font-bold text-muted-foreground w-5 shrink-0 pt-0.5">{num}</span>
-        {icon && (
-          <span className="text-base shrink-0 pt-0.5" title={iconType?.replace(/_/g, " ")}>
-            {icon}
+        {showIcon && (
+          <span className="shrink-0 pt-0.5 text-muted-foreground" title={iconType?.replace(/_/g, " ")}>
+            <ProductIcon type={iconType} className="w-4 h-4" />
           </span>
         )}
         <div className="flex-1 min-w-0">
@@ -86,3 +54,5 @@ const ProductRow = ({ num, name, subtitle, warranty, badgeType, price, priceLabe
 
 export default ProductRow;
 export { PRODUCT_ICONS };
+// PRODUCT_ICONS is re-exported above for back-compat; new consumers should
+// import from "@/components/addendum/productIcons".

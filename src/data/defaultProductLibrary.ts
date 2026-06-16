@@ -40,12 +40,12 @@ export const DEFAULT_PRODUCT_LIBRARY: LibrarySeed[] = [
       "Adds a hydrophobic layer that helps water and contaminants bead and release",
     ],
     whyItMatters:
-      "A coated finish is easier to keep clean and helps protect the vehicle's appearance and resale value over years of ownership.",
+      "A coated finish is easier to keep clean and helps maintain the vehicle's appearance over years of ownership.",
     warranty: "Limited finish warranty — see provider terms.",
     vendorName: "Dealer-applied",
     disclosure:
       "Ceramic Protection Package: a ceramic polymer coating professionally applied to the exterior paint and designated interior surfaces. This is a genuine protective treatment, not paint or a structural part. Coverage and duration are governed by the provider's written limited warranty.",
-    iconType: "sparkles",
+    iconType: "ceramic_coating",
     sort_order: 1,
   }),
   mk({
@@ -69,7 +69,7 @@ export const DEFAULT_PRODUCT_LIBRARY: LibrarySeed[] = [
     vendorName: "Dealer-applied",
     disclosure:
       "Paint Protection Film: a clear urethane film applied to specified exterior surfaces. Coverage area and duration are governed by the film manufacturer's written warranty.",
-    iconType: "shield",
+    iconType: "clear_bra",
     sort_order: 2,
   }),
   mk({
@@ -93,7 +93,7 @@ export const DEFAULT_PRODUCT_LIBRARY: LibrarySeed[] = [
     vendorName: "Dealer-applied",
     disclosure:
       "Window Tint: window film installed to shades permitted by state law for each window position. The customer is responsible for confirming local legality of any front-window application.",
-    iconType: "sun",
+    iconType: "window_tint",
     sort_order: 3,
   }),
   mk({
@@ -117,7 +117,7 @@ export const DEFAULT_PRODUCT_LIBRARY: LibrarySeed[] = [
     vendorName: "Dealer-applied",
     disclosure:
       "Door Edge Guard & Handle Cup Protection: pre-cut protective film applied to door edges and handle cups. A cosmetic protection product, not a structural component.",
-    iconType: "shield",
+    iconType: "door_edge_guards",
     sort_order: 4,
   }),
   mk({
@@ -141,7 +141,7 @@ export const DEFAULT_PRODUCT_LIBRARY: LibrarySeed[] = [
     vendorName: "Dealer-applied",
     disclosure:
       "VIN Etch Theft Deterrent: permanent etching of the VIN onto vehicle glass plus registration in a theft-deterrent program. Any benefit payment is governed by the program's written terms; this is a deterrent, not a guarantee against theft.",
-    iconType: "lock",
+    iconType: "theft_deterrent",
     sort_order: 5,
   }),
   mk({
@@ -165,7 +165,7 @@ export const DEFAULT_PRODUCT_LIBRARY: LibrarySeed[] = [
     vendorName: "Dealer-applied",
     disclosure:
       "Nitrogen Tire Fill: tires filled with nitrogen plus periodic top-off service per program terms. Routine pressure checks are still recommended.",
-    iconType: "circle",
+    iconType: "nitrogen_tires",
     sort_order: 6,
   }),
   mk({
@@ -189,7 +189,7 @@ export const DEFAULT_PRODUCT_LIBRARY: LibrarySeed[] = [
     vendorName: "Third-party administrator",
     disclosure:
       "Wheel & Tire Protection: a contract that repairs or replaces wheels and tires damaged by covered road hazards. Covered events, limits, and exclusions are governed by the written contract.",
-    iconType: "circle",
+    iconType: "road_hazard",
     sort_order: 7,
   }),
   mk({
@@ -213,7 +213,7 @@ export const DEFAULT_PRODUCT_LIBRARY: LibrarySeed[] = [
     vendorName: "Dealer-applied",
     disclosure:
       "Interior Fabric & Leather Protection: a protective treatment plus a covered-stain plan. Covered stains, limits, and exclusions are governed by the written plan.",
-    iconType: "sparkles",
+    iconType: "interior_protection",
     sort_order: 8,
   }),
   mk({
@@ -237,7 +237,7 @@ export const DEFAULT_PRODUCT_LIBRARY: LibrarySeed[] = [
     vendorName: "Accessory",
     disclosure:
       "All-Weather Floor Liner Set: custom-fit accessory floor liners. A physical accessory included with the vehicle when elected.",
-    iconType: "layers",
+    iconType: "all_weather_mats",
     sort_order: 9,
   }),
   mk({
@@ -261,7 +261,7 @@ export const DEFAULT_PRODUCT_LIBRARY: LibrarySeed[] = [
     vendorName: "Third-party administrator",
     disclosure:
       "GAP Coverage: an optional debt-cancellation/insurance product that addresses the difference between the loan balance and the primary insurer's settlement on a covered total loss. Coverage, caps, and exclusions are governed by the written contract. GAP is voluntary and not required to obtain financing.",
-    iconType: "shield",
+    iconType: "gap_insurance",
     sort_order: 10,
   }),
   mk({
@@ -285,7 +285,7 @@ export const DEFAULT_PRODUCT_LIBRARY: LibrarySeed[] = [
     vendorName: "Third-party administrator",
     disclosure:
       "Key Replacement Coverage: a contract that covers replacement and programming of lost, stolen, or damaged keys for the term. Limits and exclusions are governed by the written contract.",
-    iconType: "key",
+    iconType: "key_replacement",
     sort_order: 11,
   }),
 ];

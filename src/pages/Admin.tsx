@@ -22,7 +22,7 @@ import { OpenSigningsList } from "@/components/admin/OpenSigningsList";
 import { AddonElectionsPanel } from "@/components/admin/AddonElectionsPanel";
 import { PriceIntegrityPanel } from "@/components/admin/PriceIntegrityPanel";
 import { useEmailDistribution } from "@/hooks/useEmailDistribution";
-import { PRODUCT_ICONS } from "@/components/addendum/ProductRow";
+import { ProductIcon, PRODUCT_ICON_KEYS } from "@/components/addendum/productIcons";
 import { STATE_DOC_FEES } from "@/data/docFees";
 import { format } from "date-fns";
 import { useLeads } from "@/hooks/useLeads";
@@ -913,7 +913,7 @@ const Admin = () => {
                         </button>
 
                         {icon && settings.feature_product_icons && (
-                          <span className="text-xl flex-shrink-0">{PRODUCT_ICONS[icon] || "⚙️"}</span>
+                          <span className="flex-shrink-0 text-muted-foreground"><ProductIcon type={icon} className="w-5 h-5" /></span>
                         )}
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2">
@@ -2251,16 +2251,21 @@ const Admin = () => {
                 {settings.feature_product_icons && (
                   <div>
                     <label className="text-xs font-semibold text-muted-foreground">Icon</label>
-                    <select
-                      value={editing.icon_type || ""}
-                      onChange={(e) => setEditing({ ...editing, icon_type: e.target.value })}
-                      className="w-full px-3 py-2 border border-border-custom rounded text-sm"
-                    >
-                      <option value="">No icon</option>
-                      {Object.entries(PRODUCT_ICONS).filter(([k]) => k !== "default").map(([key, emoji]) => (
-                        <option key={key} value={key}>{emoji} {key.replace(/_/g, " ")}</option>
-                      ))}
-                    </select>
+                    <div className="flex items-center gap-2">
+                      {editing.icon_type && (
+                        <span className="shrink-0 text-muted-foreground"><ProductIcon type={editing.icon_type} className="w-5 h-5" /></span>
+                      )}
+                      <select
+                        value={editing.icon_type || ""}
+                        onChange={(e) => setEditing({ ...editing, icon_type: e.target.value })}
+                        className="w-full px-3 py-2 border border-border-custom rounded text-sm"
+                      >
+                        <option value="">No icon</option>
+                        {PRODUCT_ICON_KEYS.map((key) => (
+                          <option key={key} value={key}>{key.replace(/_/g, " ")}</option>
+                        ))}
+                      </select>
+                    </div>
                   </div>
                 )}
               </div>
