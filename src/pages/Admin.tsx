@@ -177,6 +177,7 @@ const Admin = () => {
   const { rules, addRule, updateRule, deleteRule } = useProductRules();
   const { entries: auditEntries, exportCsv: exportAuditCsv } = useAudit();
   const { currentStore, updateTenant, tenant } = useTenant();
+  const productIconKey = `product_icons:${tenant?.id || "none"}`;
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
 
@@ -353,16 +354,18 @@ const Admin = () => {
       if (error) { toast.error(error.message); return; }
       toast.success("Product updated");
     } else {
-      const { error } = await supabase.from("products").insert(payload);
+      // New products belong to this dealer's tenant (Option 1: platform
+      // templates have tenant_id NULL; dealer-created products are scoped).
+      const { error } = await supabase.from("products").insert({ ...payload, tenant_id: tenant?.id ?? null } as typeof payload);
       if (error) { toast.error(error.message); return; }
       toast.success("Product added");
     }
     // Save icon_type to localStorage (extend later to DB)
     if (editing.icon_type) {
-      const iconMap = JSON.parse(localStorage.getItem("product_icons") || "{}");
+      const iconMap = JSON.parse(localStorage.getItem(productIconKey) || "{}");
       const productId = editing.id || "pending";
       iconMap[productId] = editing.icon_type;
-      localStorage.setItem("product_icons", JSON.stringify(iconMap));
+      localStorage.setItem(productIconKey, JSON.stringify(iconMap));
     }
     setEditing(null);
     fetchProducts();
@@ -870,7 +873,7 @@ const Admin = () => {
               </div>
               <div className="space-y-2">
               {products.map((p) => {
-                const iconMap = JSON.parse(localStorage.getItem("product_icons") || "{}");
+                const iconMap = JSON.parse(localStorage.getItem(productIconKey) || "{}");
                 const icon = iconMap[p.id];
                 const isInstalled = p.badge_type === "installed";
                 const toggleType = async () => {

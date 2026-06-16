@@ -126,7 +126,7 @@ export async function buildAuditPacket(args: BuildArgs): Promise<AuditPacket> {
     supabase.from("audit_log").select("*").or(`details->>vin.eq.${cleanVin}`).order("created_at", { ascending: false }).limit(500),
     supabase.from("signed_document_archive").select("*").eq("vin", cleanVin).order("created_at", { ascending: false }).limit(50),
     supabase.from("get_ready_records").select("*").eq("vin", cleanVin).order("updated_at", { ascending: false }).limit(5),
-    supabase.from("advertised_prices").select("*").eq("vin", cleanVin).order("snapshot_at", { ascending: false }).limit(100),
+    supabase.from("advertised_prices").select("*").eq("vin", cleanVin).order("captured_at", { ascending: false }).limit(100),
   ]);
 
   // Live NHTSA recall snapshot — taken at packet time, included

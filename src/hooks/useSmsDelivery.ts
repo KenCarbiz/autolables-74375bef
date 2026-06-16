@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { useTenant } from "@/contexts/TenantContext";
 
 interface SmsResult {
   success: boolean;
@@ -11,6 +12,8 @@ interface SmsResult {
 export const useSmsDelivery = () => {
   const [sending, setSending] = useState(false);
   const [lastResult, setLastResult] = useState<SmsResult | null>(null);
+  const { tenant } = useTenant();
+  const queueKey = `sms_queue:${tenant?.id || "none"}`;
 
   const sendSigningLink = async (phone: string, signingUrl: string, vehicleInfo: string): Promise<SmsResult> => {
     setSending(true);
@@ -41,7 +44,7 @@ export const useSmsDelivery = () => {
       /* fall through to queue */
     }
 
-    const smsQueue = JSON.parse(localStorage.getItem("sms_queue") || "[]");
+    const smsQueue = JSON.parse(localStorage.getItem(queueKey) || "[]");
     smsQueue.push({
       id: crypto.randomUUID(),
       to: cleaned,
@@ -51,7 +54,7 @@ export const useSmsDelivery = () => {
       status: "queued",
       created_at: new Date().toISOString(),
     });
-    localStorage.setItem("sms_queue", JSON.stringify(smsQueue));
+    localStorage.setItem(queueKey, JSON.stringify(smsQueue));
 
     setSending(false);
     const result = { success: true, message: `Queued for ${formatPhone(cleaned)}. Connect Twilio to send live.` };

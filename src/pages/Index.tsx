@@ -453,7 +453,7 @@ const Index = () => {
   const docFeeAmount = settings.doc_fee_enabled ? (settings.doc_fee_amount || 0) : 0;
   const grandTotalWithFee = grandTotal + docFeeAmount;
 
-  const iconMap = JSON.parse(localStorage.getItem("product_icons") || "{}");
+  const iconMap = JSON.parse(localStorage.getItem(`product_icons:${tenant?.id || "none"}`) || "{}");
 
   // Sale Method — the three peer dispositions a product can be sold under,
   // derived from the existing type-override + upgrade state so all the
