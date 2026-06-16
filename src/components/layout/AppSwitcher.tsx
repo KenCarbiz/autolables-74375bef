@@ -20,6 +20,8 @@ export interface PlatformProduct {
   url: string;
   description: string;
   color: string;
+  /** Optional brand SVG (in /public) shown instead of the type wordmark. */
+  logo?: string;
 }
 
 // Family type logo: "auto" + "(MARK)" in the Autocurb family style, matching
@@ -44,7 +46,7 @@ const FamilyWordmark = ({ mark, size = 13, inverted = false }: { mark: string; s
 // signal-blue accent.
 const ALL_PRODUCTS: PlatformProduct[] = [
   { id: "autolabels", name: "AutoLabels.io", shortName: "AutoLabels", mark: "LABELS", icon: FileText, url: "/dashboard",                          description: "Dealer labels, stickers & compliance",  color: "bg-primary" },
-  { id: "autocurb",   name: "Autocurb",      shortName: "Autocurb",   mark: "CURB",   icon: Sparkles, url: "https://autocurb.io",                  description: "Inventory + lead routing (the mothership)", color: "bg-[#1E90FF]" },
+  { id: "autocurb",   name: "Autocurb",      shortName: "Autocurb",   mark: "CURB",   icon: Sparkles, url: "https://autocurb.io",                  description: "Inventory + lead routing (the mothership)", color: "bg-[#1E90FF]", logo: "/autocurb-logo.svg" },
   { id: "autoframe",  name: "AutoFrame",     shortName: "AutoFrame",  mark: "FRAME",  icon: Camera,   url: "https://autoframe.autolabels.io",     description: "Vehicle photography & background removal", color: "bg-sky-500" },
   { id: "autovideo",  name: "AutoVideo",     shortName: "AutoVideo",  mark: "VIDEO",  icon: Video,    url: "https://autovideo.autolabels.io",     description: "Video walkarounds & MPI",               color: "bg-indigo-600" },
 ];
@@ -122,7 +124,11 @@ const AppSwitcher = ({ currentApp = "autolabels", theme = "dark" }: AppSwitcherP
             >
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-1.5">
-                  <FamilyWordmark mark={product.mark} size={14} />
+                  {product.logo ? (
+                    <img src={product.logo} alt={product.name} className="h-3.5 w-auto" style={{ maxWidth: 96 }} />
+                  ) : (
+                    <FamilyWordmark mark={product.mark} size={14} />
+                  )}
                   {isCurrent && <span className="text-[9px] bg-primary/10 text-primary px-1 py-0.5 rounded font-semibold">Current</span>}
                 </div>
                 <p className="text-[10px] text-muted-foreground">{product.description}</p>
