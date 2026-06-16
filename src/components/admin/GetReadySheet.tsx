@@ -51,18 +51,28 @@ export const GetReadySheet = ({
     if (!open) return;
     setLoading(true);
     (async () => {
+      // Prefer a get-or-create RPC so a vehicle not yet in inventory still
+      // gets an install token (and never a blank QR). Fall back to the
+      // tenant-scoped lookup until that RPC is deployed.
+      try {
+        const { data: tok, error } = await (supabase as any).rpc("get_or_create_install_token", {
+          _store_id: record.storeId,
+          _vin: record.vin,
+          _ymm: record.ymm || null,
+        });
+        if (!error && tok) { setToken(tok as string); setLoading(false); return; }
+      } catch { /* fall through to direct lookup */ }
+
       let q = (supabase as any)
         .from("vehicle_listings")
         .select("install_token")
         .eq("vin", record.vin);
-      // Tenant-scope so a VIN shared across dealers can't encode another
-      // tenant's install token onto this slip.
       if (tenant?.id) q = q.eq("tenant_id", tenant.id);
       const { data } = await q.limit(1).maybeSingle();
       setToken(data?.install_token || null);
       setLoading(false);
     })();
-  }, [open, record.vin, tenant?.id]);
+  }, [open, record.vin, record.storeId, record.ymm, tenant?.id]);
 
   if (!open) return null;
 
