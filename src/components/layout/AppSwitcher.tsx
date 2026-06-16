@@ -125,7 +125,7 @@ const AppSwitcher = ({ currentApp = "autolabels", theme = "dark" }: AppSwitcherP
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-1.5">
                   {product.logo ? (
-                    <img src={product.logo} alt={product.name} className="h-3.5 w-auto" style={{ maxWidth: 96 }} />
+                    <img src={product.logo} alt={product.name} className="h-[18px] w-auto" style={{ maxWidth: 110 }} />
                   ) : (
                     <FamilyWordmark mark={product.mark} size={14} />
                   )}
