@@ -146,7 +146,7 @@ const Index = () => {
   const { settings } = useDealerSettings();
   const { rules, getMatchingProducts } = useProductRules();
   const { log } = useAudit();
-  const { currentStore } = useTenant();
+  const { currentStore, tenant } = useTenant();
   const { sendSigningLink } = useSmsDelivery();
   const { getOrCreateFile, registerSticker } = useVehicleFiles(currentStore?.id || "");
   const navigate = useNavigate();
@@ -486,7 +486,7 @@ const Index = () => {
     (supabase as any)
       .from("product_sale_mode_changes")
       .insert({
-        tenant_id: currentStore?.id || null,
+        tenant_id: tenant?.id || null,
         vehicle_vin: vehicle.vin || null,
         product_id: p.id,
         product_name: p.name,
@@ -1381,7 +1381,7 @@ const BenefitEditor = ({
           apr_percent: ILLUSTRATIVE_APR,
           term_months: ILLUSTRATIVE_TERM,
         },
-        (state || "CA").toUpperCase(),
+        (state || "").toUpperCase(),
       );
       return disc.monthly_payment;
     } catch {

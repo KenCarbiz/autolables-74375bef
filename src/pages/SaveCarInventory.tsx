@@ -180,7 +180,7 @@ const SaveCarInventory = () => {
             dealerPhone: currentStore?.phone || "",
             dealerAddress: currentStore?.address || "",
             dealerCity: currentStore?.city || "",
-            dealerState: "CT",
+            dealerState: currentStore?.state || "CT",
             dealerZip: currentStore?.zip || "",
             inspectionItems: k208Items,
             inspectionDate: new Date().toISOString().split("T")[0],

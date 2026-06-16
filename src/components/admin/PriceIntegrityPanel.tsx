@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { useTenant } from "@/contexts/TenantContext";
 import { ShieldCheck, AlertTriangle, ExternalLink, Globe } from "lucide-react";
 import { toast } from "sonner";
 
@@ -23,8 +24,16 @@ export const PriceIntegrityPanel = () => {
   const [monitored, setMonitored] = useState(0);
   const [matched, setMatched] = useState(0);
   const [loading, setLoading] = useState(true);
-  const [pattern, setPattern] = useState(() => localStorage.getItem("vdp_url_pattern") || "");
+  const { tenant } = useTenant();
+  const patternKey = `vdp_url_pattern:${tenant?.id || "none"}`;
+  const [pattern, setPattern] = useState("");
   const [seeding, setSeeding] = useState(false);
+
+  // Load the saved pattern per-tenant so a shared device can't carry one
+  // dealer's website URL into another's.
+  useEffect(() => {
+    setPattern(localStorage.getItem(patternKey) || "");
+  }, [patternKey]);
 
   // Seed a website source_url for every in-stock VIN by expanding the
   // dealer's VDP URL pattern, so the nightly crawler has a target per
@@ -36,7 +45,7 @@ export const PriceIntegrityPanel = () => {
       toast.error("Pattern must include {VIN} or {STOCK}");
       return;
     }
-    localStorage.setItem("vdp_url_pattern", p);
+    localStorage.setItem(patternKey, p);
     setSeeding(true);
     const { data: listings } = await (supabase as any)
       .from("vehicle_listings")

@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { useTenant } from "@/contexts/TenantContext";
 
 // An optional higher tier for multi-level products (e.g. Door Edge Guard
 // Standard -> Platinum). Applying it on an addendum line swaps the line to
@@ -58,8 +59,9 @@ export interface Product {
 }
 
 export const useProducts = () => {
+  const { tenant } = useTenant();
   return useQuery({
-    queryKey: ["products"],
+    queryKey: ["products", tenant?.id || null],
     // Always refetch on mount + window focus so the addendum can never run
     // its compliance checks against a stale product list (e.g. after the
     // dealer just edited benefit text in the Products tab).
