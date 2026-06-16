@@ -12,6 +12,7 @@ import { useAudit } from "@/contexts/AuditContext";
 import { useTenant } from "@/contexts/TenantContext";
 import { supabase } from "@/integrations/supabase/client";
 import { useNavigate, useSearchParams } from "react-router-dom";
+import { useVinScan } from "@/contexts/VinScanContext";
 import { toast } from "sonner";
 import { AccessoryInstallPanel } from "@/components/admin/AccessoryInstallPanel";
 import { GetReadySheet } from "@/components/admin/GetReadySheet";
@@ -180,6 +181,7 @@ const Admin = () => {
   const { currentStore, updateTenant, tenant } = useTenant();
   const productIconKey = `product_icons:${tenant?.id || "none"}`;
   const navigate = useNavigate();
+  const { openScan } = useVinScan();
   const [searchParams, setSearchParams] = useSearchParams();
 
   // Read tab from URL ?tab= and keep in sync
@@ -532,7 +534,7 @@ const Admin = () => {
           const progressPct = Math.round((completedCount / checklist.length) * 100);
 
           const quickActions: { icon: typeof FileText; title: string; subtitle: string; onClick: () => void }[] = [
-            { icon: ScanLine, title: "Scan VIN", subtitle: "Use your phone camera on the lot", onClick: () => navigate("/scan") },
+            { icon: ScanLine, title: "Scan VIN", subtitle: "Camera on phone/tablet, QR hand-off on desktop", onClick: openScan },
             { icon: FileSignature, title: "Build Addendum", subtitle: "Create a signable addendum", onClick: () => navigate("/addendum") },
             { icon: Sparkles, title: "New Car Sticker", subtitle: "Monroney-style window label", onClick: () => navigate("/new-car-sticker") },
             { icon: Car, title: "Used Car Sticker", subtitle: "Addendum for used inventory", onClick: () => navigate("/used-car-sticker") },
@@ -1558,7 +1560,7 @@ const Admin = () => {
                   Clear Completed
                 </button>
                 <button
-                  onClick={() => navigate("/scan")}
+                  onClick={openScan}
                   className="inline-flex items-center gap-1.5 h-9 px-3 rounded-md bg-primary text-primary-foreground text-xs font-medium hover:opacity-90"
                 >
                   <ScanLine className="w-3.5 h-3.5" />
@@ -1574,7 +1576,7 @@ const Admin = () => {
                   <p className="text-sm font-medium text-foreground">No vehicles in queue</p>
                   <p className="text-xs text-muted-foreground mt-1">Go to the lot, open the scanner on your phone, and scan VINs to populate this queue.</p>
                   <button
-                    onClick={() => navigate("/scan")}
+                    onClick={openScan}
                     className="mt-4 inline-flex items-center gap-1.5 h-9 px-4 rounded-md bg-primary text-primary-foreground text-xs font-medium hover:opacity-90"
                   >
                     <ScanLine className="w-3.5 h-3.5" />

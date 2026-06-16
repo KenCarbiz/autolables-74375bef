@@ -1,6 +1,7 @@
 import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link, useNavigate } from "react-router-dom";
+import { useVinScan } from "@/contexts/VinScanContext";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useTenant } from "@/contexts/TenantContext";
@@ -32,6 +33,7 @@ import {
 
 const ProcessDashboard = () => {
   const navigate = useNavigate();
+  const { openScan } = useVinScan();
   const { user } = useAuth();
   const { tenant, currentStore } = useTenant();
   const storeId = currentStore?.id || "";
@@ -212,8 +214,8 @@ const ProcessDashboard = () => {
           </div>
           <div className="flex items-center gap-2 flex-wrap">
             <button
-              onClick={() => navigate("/scan")}
-              className="h-10 px-4 rounded-xl bg-[#2563EB] text-white inline-flex items-center gap-1.5 shadow-sm hover:bg-[#1D4ED8] transition-colors"
+              onClick={openScan}
+              className="h-10 px-4 rounded-xl bg-blue-600 text-white inline-flex items-center gap-1.5 shadow-sm shadow-blue-600/30 ring-1 ring-inset ring-white/15 hover:bg-blue-700 transition-colors"
             >
               <ScanLine className="w-4 h-4 stroke-[2.5]" />
               <span className="font-display font-semibold tracking-tight text-sm">Scan a VIN</span>

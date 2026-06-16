@@ -1,4 +1,4 @@
-import { ReactNode, useState } from "react";
+import { ReactNode, useState, useCallback, useMemo } from "react";
 import { useLocation, useNavigate as useBaseNavigate, Link } from "react-router-dom";
 import { useViewTransitionNavigate } from "@/lib/navigation";
 import {
@@ -51,6 +51,7 @@ import { toast } from "sonner";
 import Logo from "@/components/brand/Logo";
 import AppSwitcher from "@/components/layout/AppSwitcher";
 import CommandPalette, { useCommandPalette } from "@/components/layout/CommandPalette";
+import { VinScanContext, prefersLiveScanner } from "@/contexts/VinScanContext";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -92,6 +93,13 @@ const AppShell = ({ children }: AppShellProps) => {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [showMobileQr, setShowMobileQr] = useState(false);
   const { open: paletteOpen, setOpen: setPaletteOpen } = useCommandPalette();
+  // Device-aware VIN scan, shared with every page via VinScanContext:
+  // live camera on phone/tablet, QR hand-off on desktop.
+  const openScan = useCallback(() => {
+    if (prefersLiveScanner()) navigate("/scan");
+    else setShowMobileQr(true);
+  }, [navigate]);
+  const vinScanApi = useMemo(() => ({ openScan }), [openScan]);
   // Wave 14.5.1 — collapsible icon-rail. Persisted per-user so a
   // pinned-collapsed dealer doesn't have to re-collapse every
   // session. Mobile (lg:) keeps the existing slide-in behaviour;
@@ -306,6 +314,7 @@ const AppShell = ({ children }: AppShellProps) => {
   const capitalized = firstName.charAt(0).toUpperCase() + firstName.slice(1);
 
   return (
+   <VinScanContext.Provider value={vinScanApi}>
     <div className="min-h-screen bg-background flex">
       {/* Sidebar — shimmer-sidebar paints the landing-page blue shine.
           vt-sidebar opts into a stable view-transition-name so route
@@ -358,13 +367,7 @@ const AppShell = ({ children }: AppShellProps) => {
           <button
             onClick={() => {
               setMobileOpen(false);
-              // Device-aware: phones/tablets (touch + camera) open the
-              // scanner directly; desktops get the QR hand-off so the
-              // user can continue on their phone next to the car.
-              const touch = typeof window !== "undefined" && window.matchMedia("(pointer: coarse)").matches;
-              const hasCamera = typeof navigator !== "undefined" && !!navigator.mediaDevices?.getUserMedia;
-              if (touch && hasCamera) navigate("/scan");
-              else setShowMobileQr(true);
+              openScan();
             }}
             className="h-10 w-10 justify-self-center rounded-xl bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-100 dark:bg-blue-950/40 dark:hover:bg-blue-900/50 dark:text-blue-300 dark:border-blue-900 inline-flex items-center justify-center transition-colors"
             title="Scan a VIN — opens the camera on a phone/tablet, or a QR hand-off on desktop"
@@ -584,12 +587,7 @@ const AppShell = ({ children }: AppShellProps) => {
                   platform, so it lives in the top bar on every page.
                   Device-aware: camera on phone/tablet, QR hand-off on desktop. */}
               <button
-                onClick={() => {
-                  const touch = typeof window !== "undefined" && window.matchMedia("(pointer: coarse)").matches;
-                  const hasCamera = typeof navigator !== "undefined" && !!navigator.mediaDevices?.getUserMedia;
-                  if (touch && hasCamera) navigate("/scan");
-                  else setShowMobileQr(true);
-                }}
+                onClick={openScan}
                 className="h-9 px-3.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white inline-flex items-center gap-1.5 text-[13px] font-semibold shadow-sm shadow-blue-600/30 ring-1 ring-inset ring-white/15 transition-colors"
                 title="Scan a VIN — camera on phone/tablet, QR hand-off on desktop"
               >
@@ -782,6 +780,7 @@ const AppShell = ({ children }: AppShellProps) => {
         </div>
       )}
     </div>
+   </VinScanContext.Provider>
   );
 };
 

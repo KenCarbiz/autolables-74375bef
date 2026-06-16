@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { useVinScan } from "@/contexts/VinScanContext";
 import { format } from "date-fns";
 import {
   ScanLine, Car, Printer, Trash2, CheckCircle2,
@@ -43,6 +44,7 @@ const STATUS_TAGS: Record<QueuedVehicle["status"], { label: string; tone: string
 
 const LotCaptureQueue = () => {
   const navigate = useNavigate();
+  const { openScan } = useVinScan();
   const { queue, loading, updateItem, removeItem, clearCompleted } = useVinQueue();
 
   const [q, setQ] = useState("");
@@ -191,8 +193,8 @@ const LotCaptureQueue = () => {
         </div>
         <div className="flex items-center gap-2 flex-wrap">
           <button
-            onClick={() => navigate("/scan")}
-            className="h-9 px-4 rounded-md bg-[#2563EB] hover:bg-[#1D4ED8] text-white inline-flex items-center gap-2 text-sm font-medium shadow-sm transition-colors"
+            onClick={openScan}
+            className="h-9 px-4 rounded-xl bg-blue-600 hover:bg-blue-700 text-white inline-flex items-center gap-2 text-sm font-semibold shadow-sm shadow-blue-600/30 ring-1 ring-inset ring-white/15 transition-colors"
           >
             <ScanLine className="w-4 h-4 stroke-2" />
             Open Scanner
@@ -283,7 +285,7 @@ const LotCaptureQueue = () => {
               : "Open the scanner on your phone, walk the lot, and scan VINs to populate this queue. New scans appear here in real time."
           }
           ctaLabel="Open scanner"
-          onCta={() => navigate("/scan")}
+          onCta={openScan}
         />
       ) : (
         <div className="rounded-xl border border-border bg-card overflow-hidden">

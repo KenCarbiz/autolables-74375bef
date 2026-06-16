@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { useViewTransitionNavigate } from "@/lib/navigation";
+import { useVinScan } from "@/contexts/VinScanContext";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useTenant } from "@/contexts/TenantContext";
@@ -50,6 +51,7 @@ const Inventory = () => {
   const { user } = useAuth();
   const { tenant } = useTenant();
   const navigate = useViewTransitionNavigate();
+  const { openScan } = useVinScan();
   const { createGetReady } = useGetReady(tenant?.id || "");
   const { settings } = useDealerSettings();
 
@@ -176,9 +178,9 @@ const Inventory = () => {
             Add Vehicle
           </button>
           <button
-            onClick={() => navigate("/scan")}
+            onClick={openScan}
             className="h-9 px-4 rounded-xl border border-border bg-card hover:bg-muted text-foreground inline-flex items-center gap-2 text-sm font-medium transition-colors whitespace-nowrap"
-            title="Scan a VIN barcode into inventory"
+            title="Scan a VIN — camera on phone/tablet, QR hand-off on desktop"
           >
             <ScanLine className="w-4 h-4 stroke-2" />
             Scan VIN

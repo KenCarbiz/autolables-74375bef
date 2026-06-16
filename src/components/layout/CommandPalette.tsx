@@ -33,6 +33,7 @@ import {
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useViewTransitionNavigate } from "@/lib/navigation";
+import { useVinScan } from "@/contexts/VinScanContext";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
@@ -48,6 +49,14 @@ const CommandPalette = ({ open, onOpenChange }: CommandPaletteProps) => {
   const go = (path: string) => {
     onOpenChange(false);
     setTimeout(() => navigate(path), 50);
+  };
+
+  // Device-aware VIN scan: live camera on phone/tablet, QR hand-off on
+  // desktop — shared with every Scan VIN button via VinScanContext.
+  const { openScan } = useVinScan();
+  const doScan = () => {
+    onOpenChange(false);
+    setTimeout(() => openScan(), 50);
   };
 
   const doSignOut = async () => {
@@ -85,7 +94,7 @@ const CommandPalette = ({ open, onOpenChange }: CommandPaletteProps) => {
             Add Vehicle
             <CommandShortcut>N</CommandShortcut>
           </CommandItem>
-          <CommandItem onSelect={() => go("/scan")}>
+          <CommandItem onSelect={doScan}>
             <ScanLine className="w-4 h-4 mr-2" />
             Scan VIN
           </CommandItem>
