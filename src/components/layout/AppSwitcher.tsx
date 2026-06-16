@@ -84,7 +84,7 @@ const AppSwitcher = ({ currentApp = "autolabels", theme = "dark" }: AppSwitcherP
 
   const triggerClass =
     theme === "light"
-      ? "inline-flex items-center gap-1.5 h-9 px-2.5 rounded-md border border-border bg-card hover:bg-muted text-foreground text-sm font-medium transition-colors"
+      ? "inline-flex items-center gap-1.5 h-9 px-2.5 rounded-xl border border-border bg-card hover:bg-muted text-foreground text-sm font-medium transition-colors"
       : "inline-flex items-center gap-1.5 h-9 pl-1.5 pr-2 rounded-lg border border-white/15 bg-white/[0.04] hover:bg-white/10 hover:border-white/25 text-white text-xs font-semibold transition-all";
 
   return (

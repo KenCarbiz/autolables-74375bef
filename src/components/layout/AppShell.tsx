@@ -590,7 +590,7 @@ const AppShell = ({ children }: AppShellProps) => {
                   if (touch && hasCamera) navigate("/scan");
                   else setShowMobileQr(true);
                 }}
-                className="h-9 px-3 rounded-md bg-[#2563EB] hover:bg-[#1D4ED8] text-white inline-flex items-center gap-1.5 text-[13px] font-medium shadow-sm transition-colors"
+                className="h-9 px-3.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white inline-flex items-center gap-1.5 text-[13px] font-semibold shadow-sm shadow-blue-600/30 ring-1 ring-inset ring-white/15 transition-colors"
                 title="Scan a VIN — camera on phone/tablet, QR hand-off on desktop"
               >
                 <ScanLine className="w-4 h-4 stroke-2" />
@@ -600,7 +600,7 @@ const AppShell = ({ children }: AppShellProps) => {
               {/* Dark mode toggle */}
               <button
                 onClick={handleToggleDark}
-                className="h-9 w-9 rounded-lg border border-border bg-card hover:bg-muted text-muted-foreground hover:text-foreground inline-flex items-center justify-center transition-colors"
+                className="h-9 w-9 rounded-xl border border-border bg-card hover:bg-muted text-muted-foreground hover:text-foreground inline-flex items-center justify-center transition-colors"
                 title="Toggle dark mode"
               >
                 {darkMode ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
@@ -610,7 +610,7 @@ const AppShell = ({ children }: AppShellProps) => {
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <button
-                    className="relative h-9 w-9 rounded-lg border border-border bg-card hover:bg-muted text-muted-foreground hover:text-foreground inline-flex items-center justify-center transition-colors"
+                    className="relative h-9 w-9 rounded-xl border border-border bg-card hover:bg-muted text-muted-foreground hover:text-foreground inline-flex items-center justify-center transition-colors"
                     title="Notifications"
                   >
                     <Bell className="w-4 h-4" />
@@ -646,8 +646,8 @@ const AppShell = ({ children }: AppShellProps) => {
               {/* User cluster — avatar + name/role stack */}
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <button className="inline-flex items-center gap-2 h-10 pl-1 pr-2 rounded-lg hover:bg-muted transition-colors group">
-                    <span className="w-8 h-8 rounded-full bg-[#2563EB] text-white flex items-center justify-center text-[11px] font-bold">
+                  <button className="inline-flex items-center gap-2 h-10 pl-1 pr-2 rounded-xl hover:bg-muted transition-colors group">
+                    <span className="w-8 h-8 rounded-full bg-blue-600 text-white flex items-center justify-center text-[11px] font-bold">
                       {userInitial}
                     </span>
                     <span className="hidden md:flex flex-col items-start min-w-0 leading-tight">
