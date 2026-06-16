@@ -533,9 +533,12 @@ const Index = () => {
       const { default: html2canvas } = await import("html2canvas-pro");
       const { default: jsPDF } = await import("jspdf");
       const { archivePdf, persistArchivedPdf } = await import("@/lib/pdfArchive");
-      // Capture at true paper size regardless of the on-screen zoom.
+      // Capture at true paper size regardless of the on-screen zoom, and in
+      // print mode (engraved letterhead / white vehicle block) since
+      // html2canvas ignores @media print.
       const prevZoom = card.style.zoom;
       card.style.zoom = "1";
+      card.classList.add("addn-print-mode");
       const pdfWidth = 8.5;
       const pageHeight = 11;
       // Measure protected blocks (signatures, total) at zoom=1 so we can
@@ -557,6 +560,7 @@ const Index = () => {
         ignoreElements: (el) => el.classList?.contains("no-print"),
       }).finally(() => {
         card.style.zoom = prevZoom;
+        card.classList.remove("addn-print-mode");
       });
       const imgData = canvas.toDataURL("image/jpeg", 0.95);
       const imgHeight = (canvas.height / canvas.width) * pdfWidth;

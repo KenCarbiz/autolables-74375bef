@@ -59,7 +59,7 @@ const VehicleStrip =({ vehicle, onChange, onVinDecoded, onVehicleScraped, inkSav
   };
 
   return (
-    <div className={`px-3 py-2.5 ${inkSaving ? "bg-card" : "bg-blue/10"}`}>
+    <div className={`addn-vehicle px-3 py-2.5 ${inkSaving ? "bg-card" : "bg-blue/10"}`}>
       {/* URL Import Bar */}
       {settings.feature_url_scrape && (
         <div className="mb-2 no-print">

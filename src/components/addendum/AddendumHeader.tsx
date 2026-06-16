@@ -21,7 +21,7 @@ const AddendumHeader = ({ inkSaving }: AddendumHeaderProps) => {
     .join(" · ");
 
   return (
-    <header className={`border-b-2 border-navy ${inkSaving ? "bg-card text-navy" : "bg-navy text-primary-foreground"}`}>
+    <header className={`addn-masthead border-b-2 border-navy ${inkSaving ? "bg-card text-navy" : "bg-navy text-primary-foreground"}`}>
       {/* Masthead: letterhead left / document-control block right */}
       <div className="flex items-stretch justify-between gap-3 px-4 pt-2.5 pb-2">
         <div className="flex items-center gap-2.5 min-w-0">
@@ -37,7 +37,7 @@ const AddendumHeader = ({ inkSaving }: AddendumHeaderProps) => {
           </div>
         </div>
 
-        <div className={`shrink-0 text-right pl-3 flex flex-col justify-center border-l ${inkSaving ? "border-navy/25" : "border-white/25"}`}>
+        <div className={`addn-divider shrink-0 text-right pl-3 flex flex-col justify-center border-l ${inkSaving ? "border-navy/25" : "border-white/25"}`}>
           <p className="font-barlow-condensed font-extrabold uppercase tracking-[0.12em] text-[17px] leading-none">
             Dealer Addendum
           </p>
@@ -48,7 +48,7 @@ const AddendumHeader = ({ inkSaving }: AddendumHeaderProps) => {
       </div>
 
       {/* Legal subtitle strip on a hairline rule */}
-      <div className={`px-4 py-1 border-t ${inkSaving ? "border-navy/25" : "border-white/20 bg-white/[0.04]"}`}>
+      <div className={`addn-legalstrip px-4 py-1 border-t ${inkSaving ? "border-navy/25" : "border-white/20 bg-white/[0.04]"}`}>
         <p className="text-[8px] tracking-[0.22em] uppercase text-center opacity-80">
           Supplemental Window Label · Dealer-Installed Products &amp; Accessories
         </p>
