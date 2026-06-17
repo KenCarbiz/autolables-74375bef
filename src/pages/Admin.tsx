@@ -311,6 +311,10 @@ const Admin = () => {
     why_buy_here: settings.why_buy_here,
     warranty_programs: settings.warranty_programs,
     vehicle_conditions: settings.vehicle_conditions,
+    default_new_addendum: settings.default_new_addendum,
+    default_used_window: settings.default_used_window,
+    default_used_addendum: settings.default_used_addendum,
+    default_ftc_warranty: settings.default_ftc_warranty,
   });
   const [logoUploading, setLogoUploading] = useState(false);
 
@@ -1377,6 +1381,38 @@ const Admin = () => {
                 </div>
               </div>
 
+              {/* Sticker & document defaults */}
+              <div className="border-t border-border-custom pt-3">
+                <h4 className="text-sm font-bold text-foreground">Sticker &amp; Document Defaults</h4>
+                <p className="text-[11px] text-muted-foreground mb-2">What each generator pulls by default when you start a new or used vehicle.</p>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-xs font-semibold text-muted-foreground">New-car addendum</label>
+                    <select value={branding.default_new_addendum} onChange={(e) => setBranding({ ...branding, default_new_addendum: e.target.value })} className="mt-1 w-full px-3 py-2 border border-border-custom rounded text-sm bg-background text-foreground">
+                      <option value="standard">Standard</option><option value="premium">Premium</option><option value="compact">Compact</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-xs font-semibold text-muted-foreground">Used-car window sticker</label>
+                    <select value={branding.default_used_window} onChange={(e) => setBranding({ ...branding, default_used_window: e.target.value })} className="mt-1 w-full px-3 py-2 border border-border-custom rounded text-sm bg-background text-foreground">
+                      <option value="standard">Standard</option><option value="premium">Premium</option><option value="compact">Compact</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-xs font-semibold text-muted-foreground">Used-car addendum</label>
+                    <select value={branding.default_used_addendum} onChange={(e) => setBranding({ ...branding, default_used_addendum: e.target.value })} className="mt-1 w-full px-3 py-2 border border-border-custom rounded text-sm bg-background text-foreground">
+                      <option value="standard">Standard</option><option value="premium">Premium</option><option value="compact">Compact</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-xs font-semibold text-muted-foreground">FTC used-car warranty (Buyers Guide)</label>
+                    <select value={branding.default_ftc_warranty} onChange={(e) => setBranding({ ...branding, default_ftc_warranty: e.target.value })} className="mt-1 w-full px-3 py-2 border border-border-custom rounded text-sm bg-background text-foreground">
+                      <option value="as_is">As-Is — No Warranty</option><option value="implied">Implied Warranties Only</option><option value="dealer">Dealer Warranty</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+
               <div className="flex gap-3">
                 <button onClick={handleSaveBranding} className="px-6 py-2 bg-teal text-primary-foreground rounded font-semibold text-sm">
                   Save Branding
@@ -1405,6 +1441,10 @@ const Admin = () => {
                       why_buy_here: "",
                       warranty_programs: "",
                       vehicle_conditions: "New, Demo, Used, CPO",
+                      default_new_addendum: "standard",
+                      default_used_window: "standard",
+                      default_used_addendum: "standard",
+                      default_ftc_warranty: "as_is",
                     };
                     setBranding(defaults);
                     updateSettings(defaults);

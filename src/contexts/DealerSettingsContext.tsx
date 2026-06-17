@@ -52,6 +52,12 @@ export interface DealerSettings {
   // service routes to a responsible party (name + email) and carries a default
   // dealer cost; picked when starting a Get-Ready.
   get_ready_services: GetReadyService[];
+  // Per-dealer document defaults the sticker/addendum generators pull when a
+  // new or used vehicle is started.
+  default_new_addendum: string;     // layout id for the new-car addendum sticker
+  default_used_window: string;      // layout id for the used-car window sticker
+  default_used_addendum: string;    // layout id for the used-car addendum sticker
+  default_ftc_warranty: string;     // FTC Buyers Guide warranty designation
   // Feature toggles — what shows on the employee-facing addendum
   feature_vin_decode: boolean;
   feature_buyers_guide: boolean;
@@ -125,6 +131,10 @@ export const DEFAULT_SETTINGS: DealerSettings = {
     { name: "Emissions / safety inspection", responsible_name: "Lot Attendant", responsible_email: "", cost: "" },
     { name: "Accessories install", responsible_name: "Detail / Vendor", responsible_email: "", cost: "" },
   ],
+  default_new_addendum: "standard",
+  default_used_window: "standard",
+  default_used_addendum: "standard",
+  default_ftc_warranty: "as_is",
   feature_vin_decode: true,
   feature_buyers_guide: true,
   feature_product_rules: true,
