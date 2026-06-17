@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { format } from "date-fns";
 import {
-  Send, Clock, Copy, ShieldCheck, Search, AlertCircle, ChevronRight,
+  Send, Clock, Copy, ShieldCheck, Search, AlertCircle, ChevronRight, Pencil,
 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -216,7 +216,14 @@ export const OpenSigningsList = () => {
                           </button>
                         )}
                         <button
-                          onClick={() => navigate(`/?id=${r.id}`)}
+                          onClick={() => navigate(`/addendum?id=${r.id}&edit=1`)}
+                          className="inline-flex items-center gap-1 text-[11px] font-semibold px-2 h-7 rounded-md border border-border text-foreground hover:bg-muted"
+                          title="Continue editing this addendum"
+                        >
+                          <Pencil className="w-3 h-3" /> Edit
+                        </button>
+                        <button
+                          onClick={() => navigate(`/addendum?id=${r.id}`)}
                           className="inline-flex items-center gap-1 text-[11px] font-semibold px-2 h-7 rounded-md bg-foreground text-background hover:opacity-90"
                           title="Open the addendum"
                         >

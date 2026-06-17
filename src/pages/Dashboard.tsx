@@ -250,7 +250,7 @@ const Dashboard = () => {
                   <tr
                     key={a.id}
                     className="border-t border-border hover:bg-muted/30 cursor-pointer transition-colors"
-                    onClick={() => navigate(`/?id=${a.id}`)}
+                    onClick={() => navigate(`/addendum?id=${a.id}`)}
                   >
                     <td className="px-5 py-3 text-xs text-muted-foreground tabular-nums">
                       {format(new Date(a.created_at), "M/d/yyyy")}

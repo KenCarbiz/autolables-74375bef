@@ -4,7 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useNavigate } from "react-router-dom";
 import { format } from "date-fns";
-import { Search, FileText, ArrowLeft, Eye, Plus, Printer, ShieldCheck, Mail } from "lucide-react";
+import { Search, FileText, ArrowLeft, Eye, Plus, Printer, ShieldCheck, Mail, Pencil } from "lucide-react";
 import EmptyState from "@/components/ui/empty-state";
 import { toast } from "sonner";
 
@@ -132,11 +132,18 @@ const SavedAddendums = () => {
                             the page. */}
                         <div className="inline-flex items-center gap-1">
                           <button
-                            onClick={() => navigate(`/?id=${a.id}`)}
+                            onClick={() => navigate(`/addendum?id=${a.id}`)}
                             className="inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1.5 rounded-md bg-primary/10 text-primary hover:bg-primary/20 transition-colors"
                             title="Open in read-only mode"
                           >
                             <Eye className="w-3.5 h-3.5" /> View
+                          </button>
+                          <button
+                            onClick={() => navigate(`/addendum?id=${a.id}&edit=1`)}
+                            className="inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+                            title="Continue editing this addendum"
+                          >
+                            <Pencil className="w-3.5 h-3.5" /> Edit
                           </button>
                           <button
                             onClick={() => {
@@ -155,7 +162,7 @@ const SavedAddendums = () => {
                           </button>
                           <button
                             onClick={() => {
-                              const w = window.open(`/?id=${a.id}&print=1`, "_blank");
+                              const w = window.open(`/addendum?id=${a.id}&print=1`, "_blank");
                               if (!w) toast.error("Pop-up blocked — allow pop-ups to print");
                             }}
                             className="inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"

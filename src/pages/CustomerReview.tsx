@@ -688,7 +688,7 @@ const SummaryStep = ({
   optionalCount: number; docFee: number; docFeeLabel: string;
   advertisedPrice: number | null; state?: string | null;
 }) => {
-  const vinTail = vin && vin.trim().length >= 4 ? `…${vin.trim().slice(-4)}` : (vin || "").trim();
+  const fullVin = (vin || "").trim();
   return (
     <div className="space-y-5">
       <div className="rounded-3xl bg-slate-950 text-white p-7 md:p-9">
@@ -696,8 +696,8 @@ const SummaryStep = ({
         <h1 className="mt-2 text-3xl md:text-4xl font-black font-display tracking-[-0.03em] leading-[0.97]">
           {ymm || "Your vehicle"}
         </h1>
-        <p className="mt-2 text-[12px] font-mono uppercase tracking-wider text-white/50">
-          {vinTail ? `VIN · ${vinTail}` : ""}{state ? `${vinTail ? "  ·  " : ""}${state}` : ""}
+        <p className="mt-2 text-[12px] font-mono uppercase tracking-wider text-white/50 break-all">
+          {fullVin ? `VIN · ${fullVin}` : ""}{state ? `${fullVin ? "  ·  " : ""}${state}` : ""}
         </p>
         {advertisedPrice != null && (
           <p className="mt-5 text-4xl md:text-5xl font-black font-display tabular-nums tracking-[-0.02em]">
@@ -803,22 +803,17 @@ const InstalledStep = ({
   </div>
 );
 
-// ── Step: Optional + above-advertised add-ons ────────────────────
-const OptionalStep = ({
-  added, optional, banner, selections, setSelections, initials, setInitials, needsInitials, benefitOf,
+// One add-on card. MUST stay at module scope — defining it inside OptionalStep
+// made it a new component type on every keystroke, remounting the initials
+// input and dropping focus after each character.
+const ProductCard = ({
+  p, kind, choice, bullets, showInitials, initialsValue, onAccept, onDecline, onInitials,
 }: {
-  added: ProductSnapshot[]; optional: ProductSnapshot[]; banner: string;
-  selections: Record<string, string>;
-  setSelections: React.Dispatch<React.SetStateAction<Record<string, string>>>;
-  initials: Record<string, string>;
-  setInitials: React.Dispatch<React.SetStateAction<Record<string, string>>>;
-  needsInitials: (p: ProductSnapshot) => boolean;
-  benefitOf: (p: ProductSnapshot) => string[];
+  p: ProductSnapshot; kind: "added" | "optional";
+  choice: string | undefined; bullets: string[]; showInitials: boolean;
+  initialsValue: string;
+  onAccept: () => void; onDecline: () => void; onInitials: (v: string) => void;
 }) => {
-  const Card = ({ p, kind }: { p: ProductSnapshot; kind: "added" | "optional" }) => {
-    const choice = selections[p.id];
-    const bullets = benefitOf(p);
-    const showInitials = needsInitials(p) && choice === "accept";
     return (
       <div className={`rounded-2xl border-2 bg-white p-5 transition-colors ${choice === "accept" ? "border-emerald-300" : choice === "decline" ? "border-slate-200" : "border-amber-300"}`}>
         <div className="flex items-start justify-between gap-3">
@@ -843,13 +838,13 @@ const OptionalStep = ({
         )}
         <div className="mt-4 grid grid-cols-2 gap-3">
           <button
-            onClick={() => setSelections((prev) => ({ ...prev, [p.id]: "accept" }))}
+            onClick={onAccept}
             className={`h-14 rounded-xl text-base font-bold border-2 ${choice === "accept" ? "border-emerald-500 bg-emerald-500 text-white" : "border-slate-300 text-slate-700"}`}
           >
             Add it
           </button>
           <button
-            onClick={() => setSelections((prev) => ({ ...prev, [p.id]: "decline" }))}
+            onClick={onDecline}
             className={`h-14 rounded-xl text-base font-bold border-2 ${choice === "decline" ? "border-slate-400 bg-slate-100 text-slate-700" : "border-slate-300 text-slate-700"}`}
           >
             No thanks
@@ -859,26 +854,52 @@ const OptionalStep = ({
           <div className="mt-3 flex items-center gap-3">
             <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Initial to confirm</span>
             <input
-              value={initials[p.id] || ""}
-              onChange={(e) => setInitials((prev) => ({ ...prev, [p.id]: e.target.value.toUpperCase() }))}
+              value={initialsValue}
+              onChange={(e) => onInitials(e.target.value)}
               placeholder="____"
               maxLength={5}
-              className={`w-24 h-14 border-2 rounded-xl px-2 text-2xl font-black text-center uppercase bg-white text-slate-900 ${(initials[p.id] || "").trim() ? "border-emerald-400" : "border-slate-300"}`}
+              className={`w-24 h-14 border-2 rounded-xl px-2 text-2xl font-black text-center uppercase bg-white text-slate-900 ${initialsValue.trim() ? "border-emerald-400" : "border-slate-300"}`}
             />
           </div>
         )}
       </div>
     );
-  };
+};
 
+// ── Step: Optional + above-advertised add-ons ────────────────────
+const OptionalStep = ({
+  added, optional, banner, selections, setSelections, initials, setInitials, needsInitials, benefitOf,
+}: {
+  added: ProductSnapshot[]; optional: ProductSnapshot[]; banner: string;
+  selections: Record<string, string>;
+  setSelections: React.Dispatch<React.SetStateAction<Record<string, string>>>;
+  initials: Record<string, string>;
+  setInitials: React.Dispatch<React.SetStateAction<Record<string, string>>>;
+  needsInitials: (p: ProductSnapshot) => boolean;
+  benefitOf: (p: ProductSnapshot) => string[];
+}) => {
+  const card = (p: ProductSnapshot, kind: "added" | "optional") => (
+    <ProductCard
+      key={p.id}
+      p={p}
+      kind={kind}
+      choice={selections[p.id]}
+      bullets={benefitOf(p)}
+      showInitials={needsInitials(p) && selections[p.id] === "accept"}
+      initialsValue={initials[p.id] || ""}
+      onAccept={() => setSelections((prev) => ({ ...prev, [p.id]: "accept" }))}
+      onDecline={() => setSelections((prev) => ({ ...prev, [p.id]: "decline" }))}
+      onInitials={(v) => setInitials((prev) => ({ ...prev, [p.id]: v.toUpperCase() }))}
+    />
+  );
   return (
     <div className="space-y-4">
       <StepHeading title="Your add-ons" sub="Optional — yours to choose." />
       <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 text-[13px] text-slate-700 leading-snug">
         {banner}
       </div>
-      {added.map((p) => <Card key={p.id} p={p} kind="added" />)}
-      {optional.map((p) => <Card key={p.id} p={p} kind="optional" />)}
+      {added.map((p) => card(p, "added"))}
+      {optional.map((p) => card(p, "optional"))}
     </div>
   );
 };

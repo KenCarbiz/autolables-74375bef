@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useParams } from "react-router-dom";
 import SignaturePad from "@/components/addendum/SignaturePad";
+import { formatPhone } from "@/components/addendum/CustomerInfoSection";
 import { toast } from "sonner";
 import {
   Car,
@@ -506,8 +507,8 @@ const DealSigning = () => {
           <div className="grid grid-cols-2 gap-3">
             <input
               value={customerPhone}
-              onChange={(e) => setCustomerPhone(e.target.value)}
-              placeholder="Phone"
+              onChange={(e) => setCustomerPhone(formatPhone(e.target.value))}
+              placeholder="(555) 555-5555"
               inputMode="tel"
               className="h-11 border-2 border-border rounded-lg px-4 text-sm bg-background text-foreground placeholder:text-muted-foreground/40"
             />
@@ -557,8 +558,8 @@ const DealSigning = () => {
             />
             <input
               value={cobuyerPhone}
-              onChange={(e) => setCobuyerPhone(e.target.value)}
-              placeholder="Co-buyer phone"
+              onChange={(e) => setCobuyerPhone(formatPhone(e.target.value))}
+              placeholder="Co-buyer phone (555) 555-5555"
               inputMode="tel"
               className="w-full h-11 border-2 border-border rounded-lg px-4 text-sm bg-background text-foreground placeholder:text-muted-foreground/40"
             />

@@ -1,4 +1,4 @@
-import { User, Users } from "lucide-react";
+import { User, Users, Copy } from "lucide-react";
 
 export interface CustomerInfo {
   buyer_first_name: string;
@@ -133,6 +133,18 @@ const CustomerInfoSection = ({ info, onChange, showCobuyer, inkSaving }: Custome
     onChange({ ...info, [field]: value });
   };
 
+  // Copy the buyer's address onto the co-buyer (common: spouses at one address).
+  const copyAddressToCobuyer = () => {
+    onChange({
+      ...info,
+      cobuyer_address: info.buyer_address,
+      cobuyer_city: info.buyer_city,
+      cobuyer_state: info.buyer_state,
+      cobuyer_zip: info.buyer_zip,
+    });
+  };
+  const hasBuyerAddress = !!(info.buyer_address || info.buyer_city || info.buyer_zip);
+
   return (
     <div className={`px-3 py-2 rounded ${inkSaving ? "bg-card border border-border" : "bg-light border border-border-custom"}`}>
       <div className="flex items-center gap-1 mb-1.5">
@@ -143,9 +155,21 @@ const CustomerInfoSection = ({ info, onChange, showCobuyer, inkSaving }: Custome
 
       {showCobuyer && (
         <>
-          <div className="flex items-center gap-1 mt-2 mb-1.5 pt-1.5 border-t border-border-custom/50">
-            <Users className="w-3 h-3 text-muted-foreground" />
-            <p className="text-[9px] font-bold text-foreground uppercase tracking-wide">Co-Buyer Information <span className="text-muted-foreground font-normal normal-case">(optional)</span></p>
+          <div className="flex items-center justify-between gap-2 mt-2 mb-1.5 pt-1.5 border-t border-border-custom/50">
+            <div className="flex items-center gap-1">
+              <Users className="w-3 h-3 text-muted-foreground" />
+              <p className="text-[9px] font-bold text-foreground uppercase tracking-wide">Co-Buyer Information <span className="text-muted-foreground font-normal normal-case">(optional)</span></p>
+            </div>
+            {hasBuyerAddress && (
+              <button
+                type="button"
+                onClick={copyAddressToCobuyer}
+                className="no-print inline-flex items-center gap-1 text-[8px] font-bold uppercase tracking-wide text-primary hover:underline"
+                title="Copy the buyer's address to the co-buyer"
+              >
+                <Copy className="w-2.5 h-2.5" /> Same as buyer
+              </button>
+            )}
           </div>
           <PersonFields prefix="cobuyer" info={info} update={update} />
         </>

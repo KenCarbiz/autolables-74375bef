@@ -33,7 +33,7 @@ import { useAudit } from "@/contexts/AuditContext";
 import { useTenant } from "@/contexts/TenantContext";
 import { useVehicleFiles } from "@/hooks/useVehicleFiles";
 import { QRCodeSVG } from "qrcode.react";
-import { ArrowLeft, Save, Send, Printer, Download, ChevronDown, Check } from "lucide-react";
+import { ArrowLeft, Save, Send, Printer, Download, ChevronDown, Check, Pencil } from "lucide-react";
 import ComplianceRedTeamPanel from "@/components/addendum/ComplianceRedTeamPanel";
 import { runComplianceRedTeam, summarizeRedTeam } from "@/lib/complianceRedTeam";
 import StateRewriterPanel from "@/components/addendum/StateRewriterPanel";
@@ -154,6 +154,12 @@ const Index = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const viewId = searchParams.get("id");
+  // ?edit=1 opens a saved/pending addendum in editable mode (continue editing)
+  // instead of the read-only view.
+  const editParam = searchParams.get("edit") === "1";
+  // The row we're editing/updating, so re-saving a draft updates it in place
+  // (and keeps it as ONE entry in Saved Addendums) instead of inserting copies.
+  const [currentId, setCurrentId] = useState<string | null>(viewId);
   const cardRef = useRef<HTMLDivElement>(null);
   const [generating, setGenerating] = useState(false);
   const [inkSaving, setInkSaving] = useState(false);
@@ -238,8 +244,10 @@ const Index = () => {
     if (!viewId) {
       setViewMode(false);
       setLoadedProducts(null);
+      setCurrentId(null);
       return;
     }
+    setCurrentId(viewId);
     const loadAddendum = async () => {
       const { data, error } = await supabase
         .from("addendums")
@@ -250,7 +258,8 @@ const Index = () => {
         toast.error("Could not load addendum");
         return;
       }
-      setViewMode(true);
+      // ?edit=1 → editable; otherwise read-only view.
+      setViewMode(!editParam);
       setVehicle({
         ymm: data.vehicle_ymm || "",
         stock: data.vehicle_stock || "",
@@ -312,11 +321,13 @@ const Index = () => {
       }
     };
     loadAddendum();
-  }, [viewId]);
+  }, [viewId, editParam]);
 
-  // Apply product rules, then apply admin default mode + overrides
-  const baseProducts = viewMode && loadedProducts ? loadedProducts : products;
-  const ruledProducts = settings.feature_product_rules && rules.length > 0 && !viewMode
+  // Apply product rules, then apply admin default mode + overrides. A loaded
+  // addendum (view OR edit) uses its saved product snapshot as-is — we never
+  // re-rule it, so continuing to edit a draft keeps the exact line items.
+  const baseProducts = loadedProducts ? loadedProducts : products;
+  const ruledProducts = settings.feature_product_rules && rules.length > 0 && !viewMode && !loadedProducts
     ? getMatchingProducts(vehicleContext, baseProducts || [])
     : baseProducts;
 
@@ -881,60 +892,62 @@ const Index = () => {
 
   const handleSave = async () => {
     if (!user) { toast.error("Sign in to save"); return; }
-    if (!vehicle.ymm.trim()) { toast.error("Please enter Year/Make/Model"); return; }
-    if (!vehicle.vin.trim()) { toast.error("Please enter the VIN"); return; }
-
-    const allProducts = displayProducts || [];
-    const missingInitials = allProducts.filter((p) => !initials[p.id]?.trim());
-    if (missingInitials.length > 0) {
-      toast.error(`Please initial all products. Missing ${missingInitials.length} initial(s).`);
+    // Save at ANY point — a draft only needs something to identify the vehicle.
+    // Completion (all initials, selections, signatures) is enforced by the
+    // "Ready for Signatures" path, not by Save.
+    if (!vehicle.vin.trim() && !vehicle.ymm.trim()) {
+      toast.error("Add a VIN or Year/Make/Model before saving");
       return;
     }
-
-    const optionalProducts = allProducts.filter((p) => p.badge_type === "optional");
-    const missingSelections = optionalProducts.filter((p) => !optionalSelections[p.id]);
-    if (missingSelections.length > 0) {
-      toast.error(`Please accept or decline all optional products. ${missingSelections.length} remaining.`);
-      return;
-    }
-
-    if (!customerSig.data) { toast.error("Customer signature is required"); return; }
-    if (!employeeSig.data) { toast.error("Dealer representative signature is required"); return; }
 
     setSaving(true);
     const now = new Date().toISOString();
-    const token = crypto.randomUUID();
+    const fullySigned = !!customerSig.data && !!employeeSig.data;
     const payload = {
       created_by: user.id,
-      vehicle_ymm: vehicle.ymm,
-      vehicle_stock: vehicle.stock,
-      vehicle_vin: vehicle.vin,
+      vehicle_ymm: vehicle.ymm || null,
+      vehicle_stock: vehicle.stock || null,
+      vehicle_vin: vehicle.vin || null,
       addendum_date: vehicle.date || null,
       products_snapshot: JSON.parse(JSON.stringify(displayProducts || [])),
       initials,
       optional_selections: optionalSelections,
       customer_name: composeName(customerInfo.buyer_first_name, customerInfo.buyer_middle_initial, customerInfo.buyer_last_name, customerInfo.buyer_suffix) || null,
       cobuyer_name: composeName(customerInfo.cobuyer_first_name, customerInfo.cobuyer_middle_initial, customerInfo.cobuyer_last_name, customerInfo.cobuyer_suffix) || null,
-      customer_signature_data: customerSig.data,
-      customer_signature_type: customerSig.type,
+      customer_signature_data: customerSig.data || null,
+      customer_signature_type: customerSig.data ? customerSig.type : null,
       customer_signed_at: customerSig.data ? (customerSig.at || now) : null,
       cobuyer_signature_data: cobuyerSig.data || null,
       cobuyer_signature_type: cobuyerSig.data ? cobuyerSig.type : null,
       cobuyer_signed_at: cobuyerSig.data ? (cobuyerSig.at || now) : null,
-      employee_signature_data: employeeSig.data,
-      employee_signature_type: employeeSig.type,
+      employee_signature_data: employeeSig.data || null,
+      employee_signature_type: employeeSig.data ? employeeSig.type : null,
       employee_signed_at: employeeSig.data ? (employeeSig.at || now) : null,
       total_installed: installedTotal,
       total_with_optional: grandTotalWithFee,
-      status: customerSig.data && employeeSig.data ? "signed" : "draft",
-      signing_token: token,
+      status: fullySigned ? "signed" : "draft",
     };
-    const { data: inserted, error } = await supabase.from("addendums").insert([payload]).select("id").single();
+    // Update the existing row when continuing a draft, else insert a new one
+    // (with a signing token) so re-saving keeps ONE entry in Saved Addendums.
+    let inserted: { id?: string } | null = null;
+    let error: { message: string } | null = null;
+    if (currentId) {
+      const res = await supabase.from("addendums").update(payload).eq("id", currentId);
+      error = res.error;
+      inserted = { id: currentId };
+    } else {
+      const res = await supabase.from("addendums")
+        .insert([{ ...payload, signing_token: crypto.randomUUID() }])
+        .select("id").single();
+      error = res.error;
+      inserted = res.data as { id?: string } | null;
+      if (inserted?.id) setCurrentId(inserted.id);
+    }
     setSaving(false);
     if (error) {
       toast.error(error.message);
     } else {
-      toast.success("Addendum saved!");
+      toast.success(payload.status === "signed" ? "Addendum saved." : "Draft saved — find it in Saved Addendums.");
       log({ store_id: currentStore?.id || "", user_id: user.id, action: "addendum_created", entity_type: "addendum", entity_id: vehicle.vin, details: { ymm: vehicle.ymm, vin: vehicle.vin, status: payload.status, products_count: displayProducts.length, installed_total: installedTotal, optional_total: optionalTotal, type_overrides: typeOverrides } });
 
       // Mirror every signer into addendum_signings so the unified
@@ -1037,14 +1050,24 @@ const Index = () => {
               New
             </button>
           )}
+          {user && viewMode && currentId && (
+            <button
+              onClick={() => navigate(`/addendum?id=${currentId}&edit=1`)}
+              className="inline-flex items-center gap-1.5 h-9 px-3 rounded-md bg-primary text-primary-foreground text-sm font-medium hover:opacity-90 transition-opacity"
+            >
+              <Pencil className="w-3.5 h-3.5" />
+              Edit
+            </button>
+          )}
           {user && !viewMode && (
             <button
               onClick={handleSave}
               disabled={saving}
               className="inline-flex items-center gap-1.5 h-9 px-3 rounded-md bg-primary text-primary-foreground text-sm font-medium hover:opacity-90 transition-opacity disabled:opacity-50"
+              title="Save your progress at any point — it lands in Saved Addendums as a draft"
             >
               <Save className="w-3.5 h-3.5" />
-              {saving ? "Saving..." : "Save"}
+              {saving ? "Saving..." : "Save Draft"}
             </button>
           )}
           {user && !viewMode && (

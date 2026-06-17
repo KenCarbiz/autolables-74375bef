@@ -5,6 +5,7 @@ import { useSmsDelivery } from "@/hooks/useSmsDelivery";
 import { useLeads } from "@/hooks/useLeads";
 import { useTenant } from "@/contexts/TenantContext";
 import { supabase } from "@/integrations/supabase/client";
+import { formatPhone } from "@/components/addendum/CustomerInfoSection";
 
 interface LeadCaptureModalProps {
   open: boolean;
@@ -100,8 +101,8 @@ const LeadCaptureModal = ({ open, signingUrl, vehicleInfo, vehicleVin, onClose }
           />
           <input
             value={lead.phone}
-            onChange={(e) => setLead({ ...lead, phone: e.target.value })}
-            placeholder="Phone number"
+            onChange={(e) => setLead({ ...lead, phone: formatPhone(e.target.value) })}
+            placeholder="(555) 555-5555"
             type="tel"
             className="w-full px-3 py-2 border border-border-custom rounded-lg text-sm bg-background text-foreground placeholder:text-muted-foreground/50"
           />
