@@ -1145,6 +1145,30 @@ const MobileSigning = () => {
             </div>
           )}
 
+          {addedTotal > 0 && (
+            <div className="rounded-lg border border-border p-3">
+              <p className="text-sm font-bold text-foreground">If you finance these add-ons</p>
+              <p className="text-[11px] text-muted-foreground leading-relaxed mt-0.5">
+                Estimated extra cost over the life of the loan at common rates. Adding or declining any
+                add-on is your choice and is not a condition of buying, leasing, or financing the vehicle.
+              </p>
+              <div className="mt-2 grid grid-cols-3 gap-2">
+                {[{ t: 48, a: 6.5 }, { t: 60, a: 6.5 }, { t: 72, a: 7.0 }].map((s) => {
+                  const r = s.a / 100 / 12;
+                  const m = (addedTotal * r * Math.pow(1 + r, s.t)) / (Math.pow(1 + r, s.t) - 1);
+                  return (
+                    <div key={s.t} className="rounded-md border border-border p-2 text-center">
+                      <p className="text-[9px] uppercase tracking-wider text-muted-foreground">{s.t} mo · {s.a}%</p>
+                      <p className="text-sm font-black tabular-nums text-foreground">${m.toFixed(0)}<span className="text-[9px] font-semibold text-muted-foreground">/mo</span></p>
+                      <p className="text-[9px] text-muted-foreground">${(m * s.t).toFixed(0)} total</p>
+                    </div>
+                  );
+                })}
+              </div>
+              <p className="text-[9px] text-muted-foreground mt-1.5">Illustrative only — your actual rate, term, and payment may differ.</p>
+            </div>
+          )}
+
           <p className="text-[11px] text-muted-foreground leading-relaxed">
             Accessories already included in the advertised price are shown for transparency and are not charged again.
             {finalAllIn != null
