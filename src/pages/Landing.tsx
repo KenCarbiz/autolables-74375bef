@@ -482,6 +482,34 @@ const TakeThePowerBack = ({ onWaitlist }: { onWaitlist: () => void }) => (
         </p>
       </div>
 
+      <div className="mx-auto mt-10 max-w-4xl rounded-2xl border border-blue-200 bg-blue-50/50 p-8">
+        <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-blue-600">For the dealer who sells it, not pre-installs it</p>
+        <h3 className="mt-2 font-display text-2xl font-black tracking-tight text-slate-900">
+          You sell exterior &amp; interior protection — and install it when the car is delivered.
+        </h3>
+        <p className="mt-4 text-sm leading-relaxed text-slate-700">
+          You did everything right. The customer wanted it, you sold it, you installed it. Then weeks
+          later comes the call: <em>&ldquo;I never agreed to that,&rdquo;</em> or <em>&ldquo;your
+          salesperson told me it was required.&rdquo;</em> Until now an honest dealer had no way to
+          answer that — no pre-installed product to point to, just word against word in an
+          FTC-hostile market.
+        </p>
+        <p className="mt-4 text-sm leading-relaxed text-slate-700">
+          Now you have the receipt. Before delivery, the customer sees each product priced, sees it
+          marked <strong>optional and not required to buy, lease, or finance</strong>, sees the
+          benefit, initials it, and e-signs — captured with a tamper-evident hash, timestamp, IP, and
+          the exact disclosures shown. When the buyer&rsquo;s-remorse call comes, you can prove the
+          customer opted in.
+        </p>
+        <div className="mt-5 flex flex-wrap gap-2">
+          {["Can you prove the customer opted in?", "Can you show it was never mandatory?", "Now you can."].map((c, i) => (
+            <span key={c} className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold ${i === 2 ? "bg-[#0B2041] text-white" : "bg-white text-slate-700 border border-slate-200"}`}>
+              {c}
+            </span>
+          ))}
+        </div>
+      </div>
+
       <div className="mx-auto mt-12 grid max-w-5xl gap-5 lg:grid-cols-2">
         <PowerPillar
           icon={BadgeCheck}
