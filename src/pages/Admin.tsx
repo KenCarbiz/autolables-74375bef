@@ -18,6 +18,7 @@ import { AccessoryInstallPanel } from "@/components/admin/AccessoryInstallPanel"
 import { GetReadySheet } from "@/components/admin/GetReadySheet";
 import type { GetReadyRecord } from "@/hooks/useGetReady";
 import { EmailDistributionPanel } from "@/components/admin/EmailDistributionPanel";
+import { StartGetReadyModal } from "@/components/admin/StartGetReadyModal";
 import { InventoryFeedHealth } from "@/components/admin/InventoryFeedHealth";
 import { OpenSigningsList } from "@/components/admin/OpenSigningsList";
 import { AddonElectionsPanel } from "@/components/admin/AddonElectionsPanel";
@@ -213,7 +214,8 @@ const Admin = () => {
 
   // Get-Ready tracking
   const [sheetRecord, setSheetRecord] = useState<GetReadyRecord | null>(null);
-  const { records: getReadyRecords, getPending: getPendingGetReady, validateTimeline, markAccessoryInstalled, markInventory } = useGetReady(currentStore?.id || "");
+  const { records: getReadyRecords, getPending: getPendingGetReady, validateTimeline, markAccessoryInstalled, markInventory, createGetReady } = useGetReady(currentStore?.id || "");
+  const [startGetReadyOpen, setStartGetReadyOpen] = useState(false);
   const { sendGetReadyComplete, sending: emailSending } = useEmailDistribution(currentStore?.id || "");
 
   // Inventory, invoices, warranty
@@ -1743,7 +1745,14 @@ const Admin = () => {
                   Track vehicle preparation from acquisition to inventory-ready. Proves accessories installed before listing date.
                 </p>
               </div>
+              <button
+                onClick={() => setStartGetReadyOpen(true)}
+                className="h-10 px-4 rounded-xl bg-blue-600 text-white text-sm font-semibold hover:bg-blue-700 shadow-sm shadow-blue-600/30 ring-1 ring-inset ring-white/15 inline-flex items-center gap-2 shrink-0"
+              >
+                <Plus className="w-4 h-4" /> Start Get-Ready
+              </button>
             </div>
+            <StartGetReadyModal open={startGetReadyOpen} onClose={() => setStartGetReadyOpen(false)} onCreate={createGetReady} />
 
             {/* Stats */}
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
