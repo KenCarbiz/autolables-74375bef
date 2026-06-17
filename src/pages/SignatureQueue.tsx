@@ -10,6 +10,7 @@ import EmptyState from "@/components/ui/empty-state";
 import AddendumStatusTimeline from "@/components/addendum/AddendumStatusTimeline";
 import QRCodeModal, { type DeliveryChannel } from "@/components/addendum/QRCodeModal";
 import { useSmsDelivery } from "@/hooks/useSmsDelivery";
+import { useAdvertisedPrices, assessDrift } from "@/hooks/useAdvertisedPrices";
 
 // "Waiting for Signatures" — the queue of deals that have been LOCKED
 // (Ready for Signatures) but not yet fully executed. The dealer confirms
@@ -28,6 +29,7 @@ interface AddendumRow {
   customer_name: string | null;
   ready_at: string | null;
   created_at: string;
+  frozen_snapshot: { vehicle_price?: number | null } | null;
 }
 
 const IN_FLIGHT = ["ready_for_signature", "awaiting_customer", "customer_opened", "partially_signed"];
@@ -36,6 +38,7 @@ const SignatureQueue = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
   const { sendSigningLink } = useSmsDelivery();
+  const { byVin } = useAdvertisedPrices();
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
   // The deal whose delivery panel (QR / SMS / Email / Copy) is open.
   const [sendFor, setSendFor] = useState<AddendumRow | null>(null);
@@ -45,7 +48,7 @@ const SignatureQueue = () => {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("addendums")
-        .select("id,signing_token,version_label,vehicle_ymm,vehicle_vin,status,lifecycle_status,customer_name,ready_at,created_at")
+        .select("id,signing_token,version_label,vehicle_ymm,vehicle_vin,status,lifecycle_status,customer_name,ready_at,created_at,frozen_snapshot")
         .in("lifecycle_status", IN_FLIGHT)
         .order("ready_at", { ascending: false, nullsFirst: false });
       if (error) throw error;
@@ -130,7 +133,14 @@ const SignatureQueue = () => {
     toast.success("Email sent");
   };
 
-  const Card = ({ a, done }: { a: AddendumRow; done: boolean }) => (
+  const Card = ({ a, done }: { a: AddendumRow; done: boolean }) => {
+    // Re-verification: compare the price this deal was LOCKED at against the
+    // latest advertised price for the VIN. If the website price moved after
+    // lock, flag it so the dealer can re-verify before the customer signs.
+    const lockedPrice = Number(a.frozen_snapshot?.vehicle_price) || 0;
+    const ad = a.vehicle_vin ? byVin.get(a.vehicle_vin.toUpperCase()) : undefined;
+    const drift = lockedPrice > 0 && ad ? assessDrift(lockedPrice, ad) : null;
+    return (
     <div className="rounded-2xl border border-border bg-card overflow-hidden">
       <div className="flex items-center gap-3 p-4">
         <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${done ? "bg-emerald-100 text-emerald-700" : "bg-navy/10 text-navy"}`}>
@@ -151,6 +161,16 @@ const SignatureQueue = () => {
             {a.ready_at ? `  ·  locked ${format(new Date(a.ready_at), "MMM d, h:mm a")}` : ""}
             {a.customer_name ? `  ·  ${a.customer_name}` : ""}
           </p>
+          {drift && drift.status === "drift" && (
+            <span className="inline-flex items-center gap-1 mt-1 text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-amber-100 text-amber-800">
+              Advertised price moved · now ${drift.advertised?.toLocaleString()} vs locked ${drift.sticker.toLocaleString()} — re-verify
+            </span>
+          )}
+          {drift && drift.status === "match" && (
+            <span className="inline-flex items-center gap-1 mt-1 text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700">
+              Price verified vs advertised
+            </span>
+          )}
         </div>
         <div className="flex items-center gap-1.5 flex-shrink-0">
           {done && (
@@ -188,7 +208,8 @@ const SignatureQueue = () => {
         </div>
       )}
     </div>
-  );
+    );
+  };
 
   return (
     <div className="min-h-screen bg-background">
