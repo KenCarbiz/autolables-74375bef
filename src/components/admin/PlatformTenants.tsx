@@ -498,6 +498,25 @@ const LEGAL_FIELDS: { key: string; label: string; placeholder?: string; required
   { key: "dealer_oem_brands", label: "Franchised OEM brands", placeholder: "e.g. Ford, Lincoln" },
 ];
 
+// First non-empty stringy value among candidates. Autocurb's dealers-api has
+// shifted field names over time (address vs address_line1, zip vs postal_code,
+// license at the profile vs branding vs store level), so we probe several.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const pickStr = (...vals: any[]): string => {
+  for (const v of vals) {
+    if (v != null && String(v).trim() !== "") return String(v).trim();
+  }
+  return "";
+};
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const brandsToStr = (...vals: any[]): string => {
+  for (const v of vals) {
+    if (Array.isArray(v) && v.length) return v.join(", ");
+    if (typeof v === "string" && v.trim()) return v.trim();
+  }
+  return "";
+};
+
 const TenantDetailsDrawer = ({
   tenant,
   onClose,
@@ -533,17 +552,18 @@ const TenantDetailsDrawer = ({
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const prof = (trow?.autocurb_profile || {}) as Record<string, any>;
       if (prof && Object.keys(prof).length) {
-        const b = (prof.branding || {}) as Record<string, string>;
+        const b = (prof.branding || {}) as Record<string, any>;
         const st = (Array.isArray(prof.stores) && prof.stores[0] ? prof.stores[0] : {}) as Record<string, any>;
         const fromAc: Record<string, string> = {
-          dealer_name: prof.legal_entity_name || prof.name || "",
-          dealer_address: prof.address || st.address || "",
-          dealer_city: st.city || "",
-          dealer_state: prof.governing_law_state || st.state || "",
-          dealer_zip: st.zip || "",
-          dealer_phone: prof.phone || st.phone || "",
-          dealer_license_number: b.dealer_license_number || "",
-          dealer_oem_brands: Array.isArray(st.oem_brands) ? st.oem_brands.join(", ") : "",
+          dealer_name: pickStr(prof.legal_entity_name, prof.name),
+          dealer_address: pickStr(prof.address, prof.address_line1, prof.street, prof.street_address, st.address, st.address_line1, st.street, st.street_address),
+          dealer_city: pickStr(st.city, prof.city),
+          dealer_state: pickStr(prof.governing_law_state, st.state, prof.state),
+          dealer_zip: pickStr(st.zip, st.postal_code, st.zip_code, prof.zip, prof.postal_code, prof.zip_code),
+          dealer_phone: pickStr(prof.phone, st.phone),
+          dealer_principal: pickStr(prof.dealer_principal, prof.principal, prof.owner_name, b.dealer_principal),
+          dealer_license_number: pickStr(b.dealer_license_number, prof.dealer_license_number, prof.license_number, prof.dealer_license, st.dealer_license_number, st.license_number),
+          dealer_oem_brands: brandsToStr(st.oem_brands, st.brands, st.makes, prof.oem_brands, prof.brands),
         };
         Object.entries(fromAc).forEach(([k, v]) => { if (!next[k] && v) next[k] = String(v); });
       }
@@ -606,17 +626,20 @@ const TenantDetailsDrawer = ({
 
         {mirror?.source === "autocurb" && mirror.profile && (() => {
           const p = mirror.profile;
-          const b = (p.branding || {}) as Record<string, string>;
+          const b = (p.branding || {}) as Record<string, any>;
           const stores = Array.isArray(p.stores) ? p.stores : [];
+          const st = (stores[0] || {}) as Record<string, any>;
           const rows: [string, string][] = [
-            ["Legal name", p.legal_entity_name || p.name],
-            ["Domain", p.domain],
-            ["Owner email", p.primary_email],
-            ["Phone", p.phone],
-            ["Address", p.address],
-            ["Governing state", p.governing_law_state],
-            ["DMV license #", b.dealer_license_number],
-            ["Bundle tier", p.bundle_tier],
+            ["Legal name", pickStr(p.legal_entity_name, p.name)],
+            ["Domain", pickStr(p.domain)],
+            ["Owner email", pickStr(p.primary_email)],
+            ["Phone", pickStr(p.phone, st.phone)],
+            ["Address", pickStr(p.address, p.address_line1, p.street, st.address, st.address_line1, st.street)],
+            ["ZIP", pickStr(st.zip, st.postal_code, st.zip_code, p.zip, p.postal_code)],
+            ["Governing state", pickStr(p.governing_law_state, st.state)],
+            ["DMV license #", pickStr(b.dealer_license_number, p.dealer_license_number, p.license_number, st.license_number)],
+            ["OEM brands", brandsToStr(st.oem_brands, st.brands, st.makes, p.oem_brands)],
+            ["Bundle tier", pickStr(p.bundle_tier)],
           ].filter(([, v]) => v) as [string, string][];
           return (
             <div className="mx-4 mt-3 rounded-lg border border-blue-200 bg-blue-50/50 dark:bg-blue-950/30 dark:border-blue-900 p-3">
@@ -660,6 +683,17 @@ const TenantDetailsDrawer = ({
                 </div>
               )}
               <p className="text-[9px] text-muted-foreground mt-2">Entitlement, plan tier, members, and templates are AutoLabels-owned and edited below — a re-sync never overwrites them.</p>
+              {/* Raw payload — the source of truth for "why isn't field X
+                  populating": if a value is missing here, Autocurb didn't
+                  send it (fix is in Autocurb's dealers-api). */}
+              <details className="mt-2">
+                <summary className="text-[10px] font-semibold text-blue-700 dark:text-blue-300 cursor-pointer select-none">
+                  View raw Autocurb payload
+                </summary>
+                <pre className="mt-1 max-h-64 overflow-auto rounded bg-background/80 border border-border p-2 text-[10px] leading-snug text-foreground whitespace-pre-wrap break-all">
+                  {JSON.stringify(p, null, 2)}
+                </pre>
+              </details>
             </div>
           );
         })()}
