@@ -183,6 +183,45 @@ are written directly by Autocurb against the same DB.
 - FTC Used Car Rule (16 CFR Part 455) requires the Buyers Guide on
   every used car — bilingual where the sale is conducted in Spanish.
 
+## iPacket parity — the customer packet we are building toward
+
+The north-star for the customer-facing scan packet (`/v/:slug`) is
+the **iPacket** "digital evidence manual" for a vehicle: a dealer-
+curated, shareable set of documents/modules the shopper can browse.
+A typical customer packet contains (dealer can include/exclude each,
+and attach extra PDFs/images):
+
+- OEM window sticker / build sheet
+- Vehicle history report (CARFAX or AutoCheck)
+- Vehicle photos (gallery)
+- Vehicle description & features
+- OEM brochures & specifications
+- Service & maintenance records
+- Reconditioning reports (the Get-Ready output)
+- Safety inspection reports (state — e.g. CT K-208)
+- Warranty information (remaining coverage)
+- Recall information (NHTSA)
+- Fuel economy information (EPA)
+- Vehicle value reports
+- Accessories & option lists (installed + available)
+- Financing / payment info (optional, dealer's choice)
+- Any dealership-added documents/PDFs
+
+Typical **used-car** packet (e.g. Harte Infiniti): OEM sticker ·
+CARFAX · recon/service performed · state safety inspection · options
+& equipment · photos · warranty coverage · financing/payment link ·
+dealer contact.
+
+Status against this list (as of 2026-06-17): DONE — description/
+features, recall, warranty (remaining), service history, accessories
+(installed + available), dealer-added documents. PARTIAL — photos
+(field exists; no rich gallery), window-sticker data (decoded, not the
+OEM sticker image). MISSING — CARFAX/AutoCheck, OEM build sheet
+image/brochures (needs DataOne/Auto.dev key), fuel economy (EPA),
+value reports, financing link, and a **packet curation UI** (dealer
+include/exclude per module before sharing). Treat closing these as the
+roadmap to iPacket parity.
+
 ## Run / verify commands
 
 - Dev server: `bun run dev`
