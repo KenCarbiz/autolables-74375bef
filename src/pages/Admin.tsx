@@ -218,6 +218,7 @@ const Admin = () => {
   const [startGetReadyOpen, setStartGetReadyOpen] = useState(false);
   const [svcDraft, setSvcDraft] = useState<GetReadyService[]>(settings.get_ready_services || []);
   const [svcSaved, setSvcSaved] = useState(false);
+  const [svcOpen, setSvcOpen] = useState(false);
   const saveServices = () => { updateSettings({ get_ready_services: svcDraft }); setSvcSaved(true); setTimeout(() => setSvcSaved(false), 1800); };
   const { sendGetReadyComplete, sending: emailSending } = useEmailDistribution(currentStore?.id || "");
 
@@ -1767,12 +1768,19 @@ const Admin = () => {
             {/* Configurable internal service catalog (non-customer charge) */}
             <div className="rounded-2xl border border-border-custom bg-card p-4">
               <div className="flex items-center justify-between">
-                <div>
-                  <h3 className="text-sm font-bold text-foreground">Get-Ready service catalog</h3>
-                  <p className="text-[11px] text-muted-foreground">Internal services you can add to any Get-Ready — routed to a responsible party. Non-customer charge; never billed to the buyer.</p>
-                </div>
-                <button onClick={() => setSvcDraft((s) => [...s, { name: "", responsible_name: "", responsible_email: "", cost: "" }])} className="inline-flex items-center gap-1 h-8 px-2.5 rounded-lg border border-border text-xs font-semibold hover:bg-muted"><Plus className="w-3.5 h-3.5" /> Add service</button>
+                <button onClick={() => setSvcOpen((o) => !o)} className="flex items-center gap-2 text-left min-w-0">
+                  <span className={`text-muted-foreground transition-transform ${svcOpen ? "rotate-90" : ""}`}>›</span>
+                  <span>
+                    <span className="text-sm font-bold text-foreground">Get-Ready service catalog</span>
+                    <span className="text-[11px] text-muted-foreground ml-2">{svcDraft.length} configured</span>
+                  </span>
+                </button>
+                {svcOpen && (
+                  <button onClick={() => setSvcDraft((s) => [...s, { name: "", responsible_name: "", responsible_email: "", cost: "" }])} className="inline-flex items-center gap-1 h-8 px-2.5 rounded-lg border border-border text-xs font-semibold hover:bg-muted"><Plus className="w-3.5 h-3.5" /> Add service</button>
+                )}
               </div>
+              {svcOpen && (<>
+              <p className="text-[11px] text-muted-foreground mt-1">Internal services you can add to any Get-Ready — routed to a responsible party. Non-customer charge; never billed to the buyer.</p>
               <div className="mt-3 space-y-2">
                 {svcDraft.length === 0 ? (
                   <p className="text-xs text-muted-foreground">No services configured. Add reconditioning, emissions, key cut, etc.</p>
@@ -1789,6 +1797,7 @@ const Admin = () => {
               <div className="mt-3">
                 <button onClick={saveServices} className="px-5 py-2 bg-blue-600 text-white rounded-lg font-semibold text-sm hover:bg-blue-700">{svcSaved ? "Saved" : "Save services"}</button>
               </div>
+              </>)}
             </div>
 
             {/* Stats */}
