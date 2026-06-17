@@ -577,7 +577,7 @@ const CustomerReview = () => {
               <span className="text-slate-950">Step {step + 1} of {steps.length}</span>
             </div>
             <a
-              href={token ? `/sign/${token}` : "#"}
+              href={token ? `/sign/${token}?doc=1` : "#"}
               className="text-slate-500 hover:text-slate-900 normal-case tracking-normal underline decoration-dotted underline-offset-2"
               title="See and sign the full single-page addendum instead"
             >

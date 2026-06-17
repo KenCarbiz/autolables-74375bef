@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { useParams } from "react-router-dom";
+import { useParams, useNavigate, useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import SignaturePad from "@/components/addendum/SignaturePad";
 import { AddendumDisclosurePacket, type PacketProduct } from "@/components/addendum/AddendumDisclosurePacket";
@@ -48,6 +48,22 @@ interface ReturnStatus {
 
 const MobileSigning = () => {
   const { token } = useParams<{ token: string }>();
+  const navigate = useNavigate();
+  const [params] = useSearchParams();
+
+  // Device-aware default: phones/tablets get the easier page-by-page wizard;
+  // desktop stays on the full single-page document. The customer can still
+  // force this document on mobile via the wizard's "Full document →" link
+  // (which adds ?doc=1) so we don't bounce them back.
+  useEffect(() => {
+    if (!token) return;
+    if (params.get("doc") === "1") return;
+    const isHandheld =
+      typeof window !== "undefined" &&
+      (window.matchMedia?.("(pointer: coarse)").matches || window.innerWidth < 768);
+    if (isHandheld) navigate(`/review/${token}`, { replace: true });
+  }, [token, params, navigate]);
+
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
