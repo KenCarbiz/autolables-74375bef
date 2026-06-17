@@ -262,22 +262,50 @@ serve(async (req) => {
     });
   }
 
-  // ── Auth gate ────────────────────────────────────────────────
-  // Service-role only. Cron jobs supply the service key in the
-  // Authorization header; no other caller should reach this.
-  const auth = (req.headers.get("Authorization") || "").replace(/^Bearer\s+/i, "");
-  if (auth !== serviceKey) {
-    return new Response(JSON.stringify({ error: "service-role required" }), {
-      status: 401,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
-  }
   const admin = createClient(supabaseUrl, serviceKey, {
     auth: { persistSession: false, autoRefreshToken: false },
   });
 
   let body: { limit?: number; tenant_id?: string; discover?: boolean } = {};
   try { body = await req.json(); } catch { /* empty body OK */ }
+
+  // ── Auth gate ────────────────────────────────────────────────
+  // Two callers: (1) the nightly cron with the service-role key — full
+  // batch over all tenants; (2) a signed-in dealer admin clicking
+  // "Start scraping" on their inventory page — restricted to their own
+  // tenant. A JWT caller MUST pass their tenant_id and be a member of it
+  // (or a platform admin).
+  const auth = (req.headers.get("Authorization") || "").replace(/^Bearer\s+/i, "");
+  if (auth !== serviceKey) {
+    const { data: ures, error: uerr } = await admin.auth.getUser(auth);
+    const userId = ures?.user?.id;
+    if (uerr || !userId) {
+      return new Response(JSON.stringify({ error: "authentication required" }), {
+        status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+    const tenantId = body.tenant_id;
+    if (!tenantId) {
+      return new Response(JSON.stringify({ error: "tenant_id required" }), {
+        status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+    const { data: isAdmin } = await admin.from("user_roles")
+      .select("role").eq("user_id", userId).eq("role", "admin").maybeSingle();
+    if (!isAdmin) {
+      const { data: membership } = await admin.from("tenant_members")
+        .select("tenant_id").eq("user_id", userId).eq("tenant_id", tenantId).maybeSingle();
+      if (!membership) {
+        return new Response(JSON.stringify({ error: "not a member of this tenant" }), {
+          status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+    }
+    // Pin the batch to the caller's tenant and keep manual runs bounded.
+    body.tenant_id = tenantId;
+    body.limit = Math.min(body.limit ?? 300, 500);
+  }
+
   const limit = Math.max(1, Math.min(body.limit ?? 200, 1000));
 
   // Pull rows with a real source_url, newest first, and dedupe to the
@@ -422,60 +450,84 @@ serve(async (req) => {
     for (const prof of (profiles || [])) {
       const tenantId = prof.tenant_id;
       const s = prof.settings || {};
-      const listingUrls: string[] = [s.new_inventory_url, s.used_inventory_url].filter((x: string) => x && isUrlSafe(x));
-      if (listingUrls.length === 0) continue;
 
-      const sources = [...listingUrls];
-      const origins = new Set<string>();
-      listingUrls.forEach((u) => { const o = originOf(u); if (o) origins.add(o); });
-      for (const o of origins) sources.push(`${o}/sitemap.xml`);
-
-      const vdpUrls = new Set<string>();
-      for (const src of sources) {
-        if (vdpUrls.size > 400) break;
-        try {
-          const r = await fetch(src, { headers: FETCH_HEADERS, signal: AbortSignal.timeout(12000) });
-          if (!r.ok) continue;
-          const txt = await r.text();
-          if (looksLikeChallenge(txt, r.headers, r.status)) continue;
-          discoverVdpUrls(txt, originOf(src) || "").forEach((u) => vdpUrls.add(u));
-        } catch { /* skip source */ }
-      }
-      if (vdpUrls.size === 0) continue;
+      // Each configured listing surface is crawled under its own channel so we
+      // record the advertised price PER SITE for the same VIN. The dealer's
+      // website is authoritative for drift; the marketplaces (CARFAX, CarGurus,
+      // Cars.com, AutoTrader, Capital One) are recorded so the dealer can
+      // confirm every site lists the same price. Marketplaces are frequently
+      // JS-rendered / bot-walled, so a VIN-in-URL discovery yields what it can
+      // and the nightly re-crawl maintains any price already captured.
+      const channelSources: { channel: string; url: string; sitemap: boolean }[] = [];
+      const addSrc = (channel: string, url: unknown, sitemap = false) => {
+        if (typeof url === "string" && url && isUrlSafe(url)) channelSources.push({ channel, url, sitemap });
+      };
+      addSrc("website", s.new_inventory_url, true);
+      addSrc("website", s.used_inventory_url, true);
+      addSrc("carfax", s.carfax_url);
+      addSrc("cargurus", s.cargurus_url);
+      addSrc("cars_com", s.cars_com_url);
+      addSrc("autotrader", s.autotrader_url);
+      addSrc("capital_one", s.capital_one_url);
+      if (channelSources.length === 0) continue;
 
       const { data: listings } = await admin.from("vehicle_listings").select("vin").eq("tenant_id", tenantId);
       const knownVins = new Set((listings || []).map((l: { vin: string | null }) => (l.vin || "").toUpperCase()));
+      if (knownVins.size === 0) continue;
+
+      // Latest price per (VIN, channel) — only write a new snapshot when a
+      // site's price actually changes, so we keep one current entry per site.
       const { data: latestAds } = await admin.from("advertised_prices")
-        .select("vin, advertised_price, captured_at").eq("tenant_id", tenantId)
-        .order("captured_at", { ascending: false }).limit(3000);
-      const latestByVin = new Map<string, number>();
+        .select("vin, source_channel, advertised_price, captured_at").eq("tenant_id", tenantId)
+        .order("captured_at", { ascending: false }).limit(5000);
+      const latestByVinChannel = new Map<string, number>();
       for (const a of (latestAds || [])) {
-        const v = (a.vin || "").toUpperCase();
-        if (!latestByVin.has(v)) latestByVin.set(v, a.advertised_price);
+        const k = `${(a.vin || "").toUpperCase()}|${a.source_channel}`;
+        if (!latestByVinChannel.has(k)) latestByVinChannel.set(k, a.advertised_price);
       }
 
       let crawledThisTenant = 0;
-      for (const vdp of vdpUrls) {
-        if (crawledThisTenant >= 250) break;
-        const vin = vinFromUrl(vdp);
-        if (!vin || !knownVins.has(vin)) continue; // only verify our own inventory
-        try {
-          const r = await fetch(vdp, { headers: FETCH_HEADERS, signal: AbortSignal.timeout(12000) });
-          const html = r.ok ? await r.text() : "";
-          if (!r.ok || looksLikeChallenge(html, r.headers, r.status)) { crawledThisTenant++; continue; }
-          const result = extractAdvertised(html, vdp, vin);
-          if (result.gated || result.reason === "vin_mismatch" || result.price == null) { crawledThisTenant++; continue; }
-          const prev = latestByVin.get(vin);
-          if (prev != null && Math.abs(result.price - prev) < 1) { crawledThisTenant++; continue; }
-          await admin.from("advertised_prices").insert({
-            tenant_id: tenantId, store_id: "", vin, source_url: vdp, source_channel: "website",
-            advertised_price: result.price, captured_by: "discovery",
-            notes: `Discovered (${result.source})${prev != null ? ` · was $${prev.toLocaleString()}` : ""}`,
-          });
-          latestByVin.set(vin, result.price);
-          discovered++;
-          crawledThisTenant++;
-        } catch { crawledThisTenant++; }
+      for (const { channel, url, sitemap } of channelSources) {
+        if (crawledThisTenant >= 300) break;
+
+        // Discover candidate VDP URLs for this site (listing page + sitemap).
+        const seeds = [url];
+        if (sitemap) { const o = originOf(url); if (o) seeds.push(`${o}/sitemap.xml`); }
+        const vdpUrls = new Set<string>();
+        for (const src of seeds) {
+          if (vdpUrls.size > 400) break;
+          try {
+            const r = await fetch(src, { headers: FETCH_HEADERS, signal: AbortSignal.timeout(12000) });
+            if (!r.ok) continue;
+            const txt = await r.text();
+            if (looksLikeChallenge(txt, r.headers, r.status)) continue;
+            discoverVdpUrls(txt, originOf(src) || "").forEach((u) => vdpUrls.add(u));
+          } catch { /* skip source */ }
+        }
+
+        for (const vdp of vdpUrls) {
+          if (crawledThisTenant >= 300) break;
+          const vin = vinFromUrl(vdp);
+          if (!vin || !knownVins.has(vin)) continue; // only verify our own inventory
+          try {
+            const r = await fetch(vdp, { headers: FETCH_HEADERS, signal: AbortSignal.timeout(12000) });
+            const html = r.ok ? await r.text() : "";
+            if (!r.ok || looksLikeChallenge(html, r.headers, r.status)) { crawledThisTenant++; continue; }
+            const result = extractAdvertised(html, vdp, vin);
+            if (result.gated || result.reason === "vin_mismatch" || result.price == null) { crawledThisTenant++; continue; }
+            const k = `${vin}|${channel}`;
+            const prev = latestByVinChannel.get(k);
+            if (prev != null && Math.abs(result.price - prev) < 1) { crawledThisTenant++; continue; }
+            await admin.from("advertised_prices").insert({
+              tenant_id: tenantId, store_id: "", vin, source_url: vdp, source_channel: channel,
+              advertised_price: result.price, captured_by: "discovery",
+              notes: `Discovered on ${channel} (${result.source})${prev != null ? ` · was $${prev.toLocaleString()}` : ""}`,
+            });
+            latestByVinChannel.set(k, result.price);
+            discovered++;
+            crawledThisTenant++;
+          } catch { crawledThisTenant++; }
+        }
       }
     }
   }

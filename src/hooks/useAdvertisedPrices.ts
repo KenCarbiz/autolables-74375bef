@@ -24,18 +24,22 @@ export type AdvertisedSource =
   | "facebook"
   | "cargurus"
   | "truecar"
+  | "carfax"
+  | "capital_one"
   | "manual"
   | "other";
 
 export const SOURCE_LABELS: Record<AdvertisedSource, string> = {
-  website:    "Dealer website",
-  autotrader: "AutoTrader",
-  cars_com:   "Cars.com",
-  facebook:   "Facebook",
-  cargurus:   "CarGurus",
-  truecar:    "TrueCar",
-  manual:     "Manual entry",
-  other:      "Other",
+  website:     "Dealer website",
+  autotrader:  "AutoTrader",
+  cars_com:    "Cars.com",
+  facebook:    "Facebook",
+  cargurus:    "CarGurus",
+  truecar:     "TrueCar",
+  carfax:      "CARFAX",
+  capital_one: "Capital One",
+  manual:      "Manual entry",
+  other:       "Other",
 };
 
 export interface AdvertisedPrice {
@@ -69,12 +73,18 @@ export const useAdvertisedPrices = (storeId: string = "") => {
         .select("id, vin, source_url, source_label:source_channel, advertised_price, snapshot_at:captured_at, captured_by, notes")
         .order("captured_at", { ascending: false })
         .limit(2000);
+      // Keep the latest snapshot per (VIN, source) — one canonical price per
+      // site so the dealer can verify every marketplace lists the same number.
+      // Rows arrive newest-first, so the first time we see a (vin, channel) it
+      // is the current value for that site.
       const rows = (data as AdvertisedPrice[]) || [];
       const seen = new Set<string>();
       const latest: AdvertisedPrice[] = [];
       for (const r of rows) {
         const v = (r.vin || "").toUpperCase();
-        if (v && !seen.has(v)) { seen.add(v); latest.push(r); }
+        if (!v) continue;
+        const key = `${v}|${r.source_label}`;
+        if (!seen.has(key)) { seen.add(key); latest.push(r); }
       }
       return latest;
     },
@@ -89,11 +99,33 @@ export const useAdvertisedPrices = (storeId: string = "") => {
     enabled: !!tenantId,
   });
 
-  // Map vin → latest price for cheap O(1) lookup from row
-  // renderers in /inventory etc.
+  // Map vin → canonical latest price (one entry per VIN) for cheap O(1) lookup
+  // from row renderers in /inventory etc. Prefer the dealer's own website as
+  // authoritative; otherwise the newest snapshot across sites. q.data is
+  // newest-first, so the first website row (or first row) per VIN wins.
   const byVin = useMemo(() => {
     const m = new Map<string, AdvertisedPrice>();
-    for (const p of q.data || []) m.set(p.vin, p);
+    for (const p of q.data || []) {
+      const v = (p.vin || "").toUpperCase();
+      const existing = m.get(v);
+      if (!existing || (p.source_label === "website" && existing.source_label !== "website")) {
+        if (!existing) m.set(v, p);
+        else if (p.source_label === "website") m.set(v, p);
+      }
+    }
+    return m;
+  }, [q.data]);
+
+  // Map vin → every site's latest price, so a panel can show the cross-site
+  // spread and flag a marketplace that is out of step with the sticker.
+  const crossSiteByVin = useMemo(() => {
+    const m = new Map<string, AdvertisedPrice[]>();
+    for (const p of q.data || []) {
+      const v = (p.vin || "").toUpperCase();
+      const arr = m.get(v) || [];
+      arr.push(p);
+      m.set(v, arr);
+    }
     return m;
   }, [q.data]);
 
@@ -131,10 +163,43 @@ export const useAdvertisedPrices = (storeId: string = "") => {
   return {
     prices: q.data ?? [],
     byVin,
+    crossSiteByVin,
     loading: q.isLoading,
     captureSnapshot,
     capturing: captureMutation.isPending,
     SOURCE_LABELS,
+  };
+};
+
+// Cross-site price agreement for one VIN. Returns the per-site latest prices,
+// the min/max spread, and whether any site disagrees beyond tolerance — the
+// "are all my listings showing the right price" check.
+export interface SiteSpread {
+  prices: AdvertisedPrice[];
+  min: number;
+  max: number;
+  spread: number;
+  inAgreement: boolean;
+  sites: number;
+}
+
+export const assessSiteSpread = (
+  rows: AdvertisedPrice[] | undefined,
+  tolerance: number = TOLERANCE_DOLLARS,
+): SiteSpread | null => {
+  const prices = (rows || []).filter((r) => r.advertised_price > 0);
+  if (prices.length === 0) return null;
+  const vals = prices.map((p) => p.advertised_price);
+  const min = Math.min(...vals);
+  const max = Math.max(...vals);
+  const spread = max - min;
+  return {
+    prices,
+    min,
+    max,
+    spread,
+    inAgreement: spread <= tolerance,
+    sites: prices.length,
   };
 };
 

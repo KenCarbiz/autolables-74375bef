@@ -309,6 +309,7 @@ const Admin = () => {
     cars_com_url: settings.cars_com_url,
     autotrader_url: settings.autotrader_url,
     capital_one_url: settings.capital_one_url,
+    carfax_url: settings.carfax_url,
     why_buy_here: settings.why_buy_here,
     warranty_programs: settings.warranty_programs,
     vehicle_conditions: settings.vehicle_conditions,
@@ -1371,6 +1372,10 @@ const Admin = () => {
                     <label className="text-xs font-semibold text-muted-foreground">Capital One</label>
                     <input value={branding.capital_one_url} onChange={(e) => setBranding({ ...branding, capital_one_url: e.target.value })} placeholder="capitalone.com/cars/…" className="mt-1 w-full px-3 py-2 border border-border-custom rounded text-sm bg-background text-foreground placeholder:text-muted-foreground/50" />
                   </div>
+                  <div>
+                    <label className="text-xs font-semibold text-muted-foreground">CARFAX</label>
+                    <input value={branding.carfax_url} onChange={(e) => setBranding({ ...branding, carfax_url: e.target.value })} placeholder="carfax.com/dealer/…" className="mt-1 w-full px-3 py-2 border border-border-custom rounded text-sm bg-background text-foreground placeholder:text-muted-foreground/50" />
+                  </div>
                 </div>
               </div>
 
@@ -1452,6 +1457,7 @@ const Admin = () => {
                       cars_com_url: "",
                       autotrader_url: "",
                       capital_one_url: "",
+                      carfax_url: "",
                       why_buy_here: "",
                       warranty_programs: "",
                       vehicle_conditions: "New, Demo, Used, CPO",

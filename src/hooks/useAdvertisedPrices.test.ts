@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { assessDrift, TOLERANCE_DOLLARS, type AdvertisedPrice } from "./useAdvertisedPrices";
+import { assessDrift, assessSiteSpread, TOLERANCE_DOLLARS, type AdvertisedPrice } from "./useAdvertisedPrices";
 
 // ──────────────────────────────────────────────────────────────
 // assessDrift is the pure gate primitive every publish path
@@ -145,5 +145,36 @@ describe("assessDrift — boundary precision", () => {
     // a refactor.
     const r = assessDrift(22_050.01, makeAp({ advertised_price: 22_000 }));
     expect(r.status).toBe("drift");
+  });
+});
+
+describe("assessSiteSpread — cross-site price agreement", () => {
+  it("returns null when no priced rows exist", () => {
+    expect(assessSiteSpread([])).toBeNull();
+    expect(assessSiteSpread(undefined)).toBeNull();
+    expect(assessSiteSpread([makeAp({ advertised_price: 0 })])).toBeNull();
+  });
+
+  it("flags agreement when every site is within tolerance", () => {
+    const r = assessSiteSpread([
+      makeAp({ source_label: "website", advertised_price: 22_000 }),
+      makeAp({ source_label: "carfax", advertised_price: 22_025 }),
+      makeAp({ source_label: "cargurus", advertised_price: 22_000 }),
+    ]);
+    expect(r).not.toBeNull();
+    expect(r!.sites).toBe(3);
+    expect(r!.spread).toBe(25);
+    expect(r!.inAgreement).toBe(true);
+  });
+
+  it("flags disagreement when a site is out of step beyond tolerance", () => {
+    const r = assessSiteSpread([
+      makeAp({ source_label: "website", advertised_price: 22_000 }),
+      makeAp({ source_label: "carfax", advertised_price: 24_500 }),
+    ]);
+    expect(r!.min).toBe(22_000);
+    expect(r!.max).toBe(24_500);
+    expect(r!.spread).toBe(2_500);
+    expect(r!.inAgreement).toBe(false);
   });
 });

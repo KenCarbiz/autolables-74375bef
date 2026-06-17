@@ -104,6 +104,7 @@ export interface DealerSettings {
   cars_com_url: string;
   autotrader_url: string;
   capital_one_url: string;
+  carfax_url: string;
   // Marketing assets shown to shoppers (packet / stickers / portal).
   why_buy_here: string;            // dealership value prop / why buy here
   warranty_programs: string;       // warranty programs offered (free text)
@@ -190,6 +191,7 @@ export const DEFAULT_SETTINGS: DealerSettings = {
   cars_com_url: "",
   autotrader_url: "",
   capital_one_url: "",
+  carfax_url: "",
   why_buy_here: "",
   warranty_programs: "",
   vehicle_conditions: "New, Demo, Used, CPO",

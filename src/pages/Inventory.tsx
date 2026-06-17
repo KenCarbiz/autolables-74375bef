@@ -12,7 +12,7 @@ import { useVinDecode } from "@/hooks/useVinDecode";
 import { toast } from "sonner";
 import {
   Plus, Search, Upload, Car, FileText, Printer, Signature, ScanLine,
-  X, CheckCircle2, AlertTriangle,
+  X, CheckCircle2, AlertTriangle, RefreshCw,
 } from "lucide-react";
 import SharedEmptyState from "@/components/ui/empty-state";
 import { AdvertisedPriceBand } from "@/components/inventory/AdvertisedPriceBand";
@@ -83,6 +83,34 @@ const Inventory = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const [showAdd, setShowAdd] = useState(searchParams.get("add") === "1");
   const [showImport, setShowImport] = useState(false);
+  const [scraping, setScraping] = useState(false);
+
+  // Manually kick the price-integrity crawl for THIS tenant: re-fetch every
+  // seeded marketplace URL and discover VDPs from the dealer's website +
+  // CARFAX/CarGurus/Cars.com/AutoTrader/Capital One, recording each site's
+  // advertised price per VIN. The edge function is admin/member-gated and
+  // pinned to the caller's tenant.
+  const runPriceScrape = async () => {
+    if (!tenant?.id) { toast.error("No active dealership"); return; }
+    setScraping(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("crawl-advertised-prices", {
+        body: { tenant_id: tenant.id, discover: true },
+      });
+      if (error) throw error;
+      const d = (data || {}) as { discovered?: number; updated?: number; picked?: number; skipped?: number };
+      const found = (d.discovered ?? 0) + (d.updated ?? 0);
+      toast.success(
+        found > 0
+          ? `Price scrape done — ${found} price${found === 1 ? "" : "s"} recorded across sites.`
+          : "Price scrape done — no new prices found (sites may be bot-walled or unchanged).",
+      );
+    } catch (err) {
+      toast.error(`Scrape failed: ${err instanceof Error ? err.message : "unknown error"}`);
+    } finally {
+      setScraping(false);
+    }
+  };
 
   // Clear the ?add=1 flag so a back-nav doesn't re-open the modal.
   useEffect(() => {
@@ -191,6 +219,15 @@ const Inventory = () => {
           >
             <Upload className="w-4 h-4 stroke-2" />
             CSV Import
+          </button>
+          <button
+            onClick={runPriceScrape}
+            disabled={scraping}
+            title="Crawl your website and marketplaces (CARFAX, CarGurus, Cars.com, AutoTrader, Capital One) and record each site's advertised price per VIN"
+            className="h-9 px-4 rounded-xl border border-border bg-card hover:bg-muted text-foreground inline-flex items-center gap-2 text-sm font-medium transition-colors whitespace-nowrap disabled:opacity-50"
+          >
+            <RefreshCw className={`w-4 h-4 stroke-2 ${scraping ? "animate-spin" : ""}`} />
+            {scraping ? "Scraping…" : "Verify prices"}
           </button>
         </div>
       </div>
