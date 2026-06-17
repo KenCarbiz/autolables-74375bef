@@ -262,8 +262,9 @@ const AppShell = ({ children }: AppShellProps) => {
     if (pathname === "/description-writer") { crumbs.push({ label: "Documents" }); crumbs.push({ label: "Description Writer" }); return crumbs; }
     if (pathname === "/compliance") { crumbs.push({ label: "Compliance" }); crumbs.push({ label: "Compliance Guide" }); return crumbs; }
     if (pathname === "/admin") {
-      const tab = new URLSearchParams(search).get("tab") || "products";
+      const tab = new URLSearchParams(search).get("tab") || "home";
       const tabLabels: Record<string, string> = {
+        home: "Admin Home",
         products: "Products",
         rules: "Product Rules",
         branding: "Branding",
@@ -275,14 +276,19 @@ const AppShell = ({ children }: AppShellProps) => {
         queue: "Print Queue",
         getready: "Get-Ready",
         files: "Vehicle Files",
+        inventory: "Inventory",
+        invoices: "Invoices",
+        warranty: "Warranty",
       };
       const sectionMap: Record<string, string> = {
+        home: "Administration",
         products: "Administration", rules: "Administration", branding: "Administration", settings: "Administration",
         analytics: "Compliance", leads: "Compliance", funnel: "Compliance", audit: "Compliance",
         queue: "Inventory", getready: "Inventory", files: "Inventory",
+        inventory: "Inventory", invoices: "Inventory", warranty: "Inventory",
       };
-      crumbs.push({ label: sectionMap[tab] || "Admin" });
-      crumbs.push({ label: tabLabels[tab] || "Settings" });
+      crumbs.push({ label: sectionMap[tab] || "Administration" });
+      crumbs.push({ label: tabLabels[tab] || "Admin Home" });
       return crumbs;
     }
     if (pathname === "/platform-admin") {
