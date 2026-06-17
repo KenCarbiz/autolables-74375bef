@@ -2,6 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useRef, useState, Re
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useTenant } from "@/contexts/TenantContext";
+import { mapAutocurbProfile } from "@/lib/autocurbProfile";
 
 // A configurable internal recon/service the dealer routes to a responsible
 // party. Non-customer charge — tracked as the store's own cost.
@@ -300,13 +301,26 @@ export const DealerSettingsProvider = ({ children }: { children: ReactNode }) =>
         .eq("tenant_id", tenantId)
         .maybeSingle();
       if (error) throw error;
-      // Layer: defaults < local cache < DB. When the DB row is empty
-      // (e.g. a write failed and never persisted), the local cache still
-      // carries the dealer's last edits so doc fee / state survive a
-      // reload instead of silently resetting to defaults.
+      // Autocurb-imported tenants carry the dealership profile on the tenant
+      // mirror. Derive branding/legal defaults from it so Admin → Branding is
+      // pre-populated for Autocurb dealers without a manual save. Best-effort:
+      // a missing column or RLS denial just yields no fallback.
+      let autocurbDerived: Record<string, string> = {};
+      try {
+        const { data: trow } = await (supabase as any)
+          .from("tenants")
+          .select("autocurb_profile, source")
+          .eq("id", tenantId)
+          .maybeSingle();
+        if (trow?.autocurb_profile) autocurbDerived = mapAutocurbProfile(trow.autocurb_profile);
+      } catch { /* mirror unavailable; skip the fallback layer */ }
+      // Layer: defaults < Autocurb mirror < local cache < DB. Saved dealer
+      // edits always win; the mirror only fills gaps. The cache carries last
+      // edits so doc fee / state survive a reload if a DB write failed.
       const dbSettings = (data?.settings as Partial<DealerSettings>) || {};
       const merged: DealerSettings = {
         ...DEFAULT_SETTINGS,
+        ...autocurbDerived,
         ...(readCache(tenantId) || {}),
         ...dbSettings,
       };

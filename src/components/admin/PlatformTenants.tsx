@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { Building2, Search, Power, PowerOff, Calendar, Users, AppWindow, Plus, X, Pencil } from "lucide-react";
 import { SortHeader, TablePagination, useSortAndPaginate, toCsv, downloadCsv, useTableDensity, DensityToggle } from "./tablePrimitives";
 import { TableEmptyState } from "./TableEmptyState";
+import { pickStr, brandsToStr, mapAutocurbProfile } from "@/lib/autocurbProfile";
 
 const formatDate = (s: string | null) => {
   if (!s) return "—";
@@ -498,25 +499,6 @@ const LEGAL_FIELDS: { key: string; label: string; placeholder?: string; required
   { key: "dealer_oem_brands", label: "Franchised OEM brands", placeholder: "e.g. Ford, Lincoln" },
 ];
 
-// First non-empty stringy value among candidates. Autocurb's dealers-api has
-// shifted field names over time (address vs address_line1, zip vs postal_code,
-// license at the profile vs branding vs store level), so we probe several.
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const pickStr = (...vals: any[]): string => {
-  for (const v of vals) {
-    if (v != null && String(v).trim() !== "") return String(v).trim();
-  }
-  return "";
-};
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const brandsToStr = (...vals: any[]): string => {
-  for (const v of vals) {
-    if (Array.isArray(v) && v.length) return v.join(", ");
-    if (typeof v === "string" && v.trim()) return v.trim();
-  }
-  return "";
-};
-
 const TenantDetailsDrawer = ({
   tenant,
   onClose,
@@ -552,19 +534,7 @@ const TenantDetailsDrawer = ({
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const prof = (trow?.autocurb_profile || {}) as Record<string, any>;
       if (prof && Object.keys(prof).length) {
-        const b = (prof.branding || {}) as Record<string, any>;
-        const st = (Array.isArray(prof.stores) && prof.stores[0] ? prof.stores[0] : {}) as Record<string, any>;
-        const fromAc: Record<string, string> = {
-          dealer_name: pickStr(prof.legal_entity_name, prof.name),
-          dealer_address: pickStr(prof.address, prof.address_line1, prof.street, prof.street_address, st.address, st.address_line1, st.street, st.street_address),
-          dealer_city: pickStr(st.city, prof.city),
-          dealer_state: pickStr(prof.governing_law_state, st.state, prof.state),
-          dealer_zip: pickStr(st.zip, st.postal_code, st.zip_code, prof.zip, prof.postal_code, prof.zip_code),
-          dealer_phone: pickStr(prof.phone, st.phone),
-          dealer_principal: pickStr(prof.dealer_principal, prof.principal, prof.owner_name, b.dealer_principal),
-          dealer_license_number: pickStr(b.dealer_license_number, prof.dealer_license_number, prof.license_number, prof.dealer_license, st.dealer_license_number, st.license_number),
-          dealer_oem_brands: brandsToStr(st.oem_brands, st.brands, st.makes, prof.oem_brands, prof.brands),
-        };
+        const fromAc = mapAutocurbProfile(prof);
         Object.entries(fromAc).forEach(([k, v]) => { if (!next[k] && v) next[k] = String(v); });
       }
       setForm(next);
