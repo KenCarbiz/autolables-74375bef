@@ -193,6 +193,7 @@ export type Database = {
           created_at: string
           created_by: string | null
           customer_email: string | null
+          customer_info: Json
           customer_ip: string | null
           customer_name: string | null
           customer_signature_data: string | null
@@ -248,6 +249,7 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           customer_email?: string | null
+          customer_info?: Json
           customer_ip?: string | null
           customer_name?: string | null
           customer_signature_data?: string | null
@@ -303,6 +305,7 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           customer_email?: string | null
+          customer_info?: Json
           customer_ip?: string | null
           customer_name?: string | null
           customer_signature_data?: string | null
