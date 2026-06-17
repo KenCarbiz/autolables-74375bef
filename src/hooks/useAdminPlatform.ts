@@ -185,7 +185,7 @@ export const useAdminPlatform = () => {
       if (error) {
         // eslint-disable-next-line no-console
         console.error("createTenant", error);
-        return null;
+        throw new Error(error.message || error.hint || "Tenant create failed");
       }
       await qc.invalidateQueries({ queryKey: ["admin", "tenants"] });
       await qc.invalidateQueries({ queryKey: ["admin", "members"] });

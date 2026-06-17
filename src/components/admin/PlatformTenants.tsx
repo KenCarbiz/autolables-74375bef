@@ -134,8 +134,9 @@ export const PlatformTenants = () => {
         <CreateTenantForm
           onClose={() => setCreating(false)}
           onCreate={async (form) => {
-            const id = await createTenant(form);
-            if (id) {
+            try {
+              const id = await createTenant(form);
+              if (!id) { toast.error("Tenant create failed — no id returned."); return; }
               // Persist the Autocurb mirror (sync key + full profile) on the
               // new tenant, separate from the create RPC.
               if (form.autocurbId && form.autocurbProfile) {
@@ -147,8 +148,8 @@ export const PlatformTenants = () => {
               }
               toast.success(`Tenant "${form.name}" created. Invite sent to ${form.ownerEmail}.`);
               setCreating(false);
-            } else {
-              toast.error("Tenant create failed. See console.");
+            } catch (e) {
+              toast.error(`Create failed: ${e instanceof Error ? e.message : "unknown error"}`);
             }
           }}
         />
