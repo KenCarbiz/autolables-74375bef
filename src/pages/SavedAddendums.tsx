@@ -196,38 +196,38 @@ const SavedAddendums = ({ stage = "saved" }: { stage?: DealStage }) => {
                               window.location.href = mailto;
                             }}
                             disabled={!a.customer_email}
-                            className="inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                            className="inline-flex items-center justify-center w-8 h-8 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                             title={a.customer_email ? `Email to ${a.customer_email}` : "No customer email on file"}
                           >
-                            <Mail className="w-3.5 h-3.5" /> Email
+                            <Mail className="w-4 h-4" />
                           </button>
                           <button
                             onClick={() => {
                               const w = window.open(`/addendum?id=${a.id}&print=1`, "_blank");
                               if (!w) toast.error("Pop-up blocked — allow pop-ups to print");
                             }}
-                            className="inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+                            className="inline-flex items-center justify-center w-8 h-8 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
                             title="Open in a new tab for printing / save-as-PDF"
                           >
-                            <Printer className="w-3.5 h-3.5" /> Print
+                            <Printer className="w-4 h-4" />
                           </button>
                           {stage === "signed" && (
                             <button
                               onClick={() => deliver.mutate(a)}
                               disabled={deliver.isPending}
-                              className="inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1.5 rounded-md bg-emerald-600 text-white hover:bg-emerald-700 transition-colors disabled:opacity-50"
+                              className="inline-flex items-center gap-1.5 text-xs font-semibold px-3 h-8 rounded-lg whitespace-nowrap text-white bg-gradient-to-b from-emerald-500 to-emerald-600 hover:from-emerald-500 hover:to-emerald-700 shadow-sm shadow-emerald-600/30 ring-1 ring-inset ring-white/15 transition-all disabled:opacity-50"
                               title="Mark the vehicle delivered — stamps the record and removes it from inventory"
                             >
-                              <Truck className="w-3.5 h-3.5" /> Mark Delivered
+                              <Truck className="w-3.5 h-3.5 stroke-2" /> {deliver.isPending ? "Delivering…" : "Mark Delivered"}
                             </button>
                           )}
                           {a.vehicle_vin && (
                             <button
                               onClick={() => navigate(`/compliance?vin=${encodeURIComponent(a.vehicle_vin)}`)}
-                              className="inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1.5 rounded-md text-emerald-700 hover:bg-emerald-50 transition-colors"
+                              className="inline-flex items-center justify-center w-8 h-8 rounded-md text-emerald-700 hover:bg-emerald-50 transition-colors"
                               title="Generate the SB 766 / FTC audit-defense packet for this VIN"
                             >
-                              <ShieldCheck className="w-3.5 h-3.5" /> Defend
+                              <ShieldCheck className="w-4 h-4" />
                             </button>
                           )}
                         </div>
