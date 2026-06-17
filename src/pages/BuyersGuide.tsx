@@ -269,7 +269,7 @@ const BuyersGuide = () => {
       const { default: html2canvas } = await import("html2canvas-pro");
       const { default: jsPDF } = await import("jspdf");
       const { archivePdf, persistArchivedPdf } = await import("@/lib/pdfArchive");
-      const canvas = await html2canvas(card, { scale: 2, useCORS: true });
+      const canvas = await html2canvas(card, { scale: 2, useCORS: true, onclone: (await import("@/lib/html2canvasInputs")).replaceInputsForCanvas } as any);
       const imgData = canvas.toDataURL("image/jpeg", 0.95);
       const pdfWidth = 8.5;
       const pdfHeight = (canvas.height / canvas.width) * pdfWidth;

@@ -255,7 +255,7 @@ const UsedCarSticker = () => {
       const { default: html2canvas } = await import("html2canvas-pro");
       const { default: jsPDF } = await import("jspdf");
       const { archivePdf, persistArchivedPdf } = await import("@/lib/pdfArchive");
-      const canvas = await html2canvas(target, { scale: 2, useCORS: true });
+      const canvas = await html2canvas(target, { scale: 2, useCORS: true, onclone: (await import("@/lib/html2canvasInputs")).replaceInputsForCanvas } as any);
       const imgData = canvas.toDataURL("image/jpeg", 0.95);
       // Pre-printed stock prints at the dealer's exact label size; blank
       // stock keeps the legacy 8.5"-wide aspect-derived page.

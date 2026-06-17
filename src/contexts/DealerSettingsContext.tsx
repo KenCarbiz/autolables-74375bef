@@ -1,4 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState, ReactNode } from "react";
+import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useTenant } from "@/contexts/TenantContext";
@@ -366,21 +367,19 @@ export const DealerSettingsProvider = ({ children }: { children: ReactNode }) =>
       writeCache(tenantId, next);
       // Only persist to Supabase when we have a real tenant.
       if (!user || !tenantId) return;
-      try {
-        await (supabase as any)
-          .from("dealer_profiles")
-          .upsert(
-            {
-              tenant_id: tenantId,
-              settings: next,
-              updated_by: user.id,
-            },
-            { onConflict: "tenant_id" }
-          );
-      } catch {
-        // Keep the in-memory + cache update; log for observability later.
+      // Supabase returns RLS denials in `error` (it does not throw), so check
+      // it explicitly and tell the dealer when a save didn't reach the server —
+      // otherwise edits silently live in cache and vanish on reload.
+      const { error } = await (supabase as any)
+        .from("dealer_profiles")
+        .upsert(
+          { tenant_id: tenantId, settings: next, updated_by: user.id },
+          { onConflict: "tenant_id" }
+        );
+      if (error) {
         // eslint-disable-next-line no-console
-        console.warn("dealer_profiles upsert failed; kept local cache");
+        console.warn("dealer_profiles upsert failed:", error.message);
+        toast.error("Couldn't save to the server — you may not have access to this dealership's settings. Changes are kept locally only.");
       }
     },
     [settings, tenantId, user]

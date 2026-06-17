@@ -617,6 +617,7 @@ const Index = () => {
     setGenerating(true);
     try {
       const { default: html2canvas } = await import("html2canvas-pro");
+      const { replaceInputsForCanvas } = await import("@/lib/html2canvasInputs");
       const { default: jsPDF } = await import("jspdf");
       const { archivePdf, persistArchivedPdf } = await import("@/lib/pdfArchive");
       // Capture at true paper size regardless of the on-screen zoom, and in
@@ -644,25 +645,9 @@ const Index = () => {
         scale: 2,
         useCORS: true,
         ignoreElements: (el) => el.classList?.contains("no-print"),
-        // html2canvas renders <input>/<select> text on the wrong baseline and
-        // clips it at the bottom. Replace each field with a plain <div> that
-        // carries the same classes + value so the text flows normally.
-        onclone: (doc: Document) => {
-          const swap = (el: HTMLElement, text: string) => {
-            const d = doc.createElement("div");
-            d.textContent = text;
-            d.className = el.className;
-            d.setAttribute("style", `${el.getAttribute("style") || ""};white-space:pre-wrap;display:flex;align-items:center;`);
-            el.parentNode?.replaceChild(d, el);
-          };
-          doc.querySelectorAll("input").forEach((el) => swap(el as HTMLElement, (el as HTMLInputElement).value || ""));
-          doc.querySelectorAll("textarea").forEach((el) => swap(el as HTMLElement, (el as HTMLTextAreaElement).value || ""));
-          doc.querySelectorAll("select").forEach((el) => {
-            const s = el as HTMLSelectElement;
-            const o = s.options[s.selectedIndex];
-            swap(el as HTMLElement, o ? o.text : "");
-          });
-        },
+        // Render input/select/textarea text as plain text so html2canvas
+        // doesn't clip it at the bottom of the PDF.
+        onclone: replaceInputsForCanvas,
       } as any).finally(() => {
         card.style.zoom = prevZoom;
         card.classList.remove("addn-print-mode");
