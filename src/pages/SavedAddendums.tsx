@@ -150,7 +150,7 @@ const SavedAddendums = () => {
                               const mailto = `mailto:${a.customer_email || ""}?subject=${encodeURIComponent(
                                 `Your addendum from us — ${a.vehicle_ymm || "vehicle"}`
                               )}&body=${encodeURIComponent(
-                                `${window.location.origin}/?id=${a.id}`
+                                `${window.location.origin}/addendum?id=${a.id}`
                               )}`;
                               window.location.href = mailto;
                             }}
