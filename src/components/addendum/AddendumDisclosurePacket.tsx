@@ -81,33 +81,39 @@ export function AddendumDisclosurePacket({
         </div>
       )}
 
-      {/* Every product, full benefit + legal disclosure text */}
+      {/* Full per-product benefit + legal disclosure text. Collapsed by
+          default — the concise benefit already shows on each decision card, so
+          this is the complete record one tap away, not a second wall of text. */}
       {products.length > 0 && (
-        <div className="rounded-2xl border border-slate-200 bg-white p-4 space-y-3">
-          <p className="text-sm font-bold text-slate-900">Products on this addendum</p>
-          {products.map((p, i) => {
-            const benefit = (p.benefit_justification || p.benefit_justification_optional || "").trim();
-            const isOptional = p.badge_type === "optional";
-            return (
-              <div key={p.id || i} className="border-t border-slate-100 pt-3 first:border-0 first:pt-0">
-                <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <p className="text-[13px] font-semibold text-slate-900">{p.name}</p>
-                    <span className={`text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded ${isOptional ? "bg-amber-100 text-amber-700" : "bg-blue-100 text-blue-700"}`}>
-                      {isOptional ? "Optional — accept or decline" : "Pre-installed · included in price"}
-                    </span>
+        <details className="rounded-2xl border border-slate-200 bg-white p-4">
+          <summary className="text-sm font-bold text-slate-900 cursor-pointer select-none">
+            Full product details &amp; disclosures
+          </summary>
+          <div className="mt-3 space-y-3">
+            {products.map((p, i) => {
+              const benefit = (p.benefit_justification || p.benefit_justification_optional || "").trim();
+              const isOptional = p.badge_type === "optional";
+              return (
+                <div key={p.id || i} className="border-t border-slate-100 pt-3 first:border-0 first:pt-0">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="text-[13px] font-semibold text-slate-900">{p.name}</p>
+                      <span className={`text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded ${isOptional ? "bg-amber-100 text-amber-700" : "bg-blue-100 text-blue-700"}`}>
+                        {isOptional ? "Optional — accept or decline" : "Pre-installed · included in price"}
+                      </span>
+                    </div>
+                    {typeof p.price === "number" && (
+                      <p className="text-[13px] font-bold tabular-nums text-slate-900 shrink-0">{money(p.price)}</p>
+                    )}
                   </div>
-                  {typeof p.price === "number" && (
-                    <p className="text-[13px] font-bold tabular-nums text-slate-900 shrink-0">{money(p.price)}</p>
-                  )}
+                  {p.subtitle && <p className="text-[12px] text-slate-500 mt-1">{p.subtitle}</p>}
+                  {benefit && <p className="text-[12px] text-slate-700 mt-1 whitespace-pre-line leading-snug">{benefit}</p>}
+                  {p.disclosure && <p className="text-[11px] text-slate-500 mt-1 whitespace-pre-line leading-snug">{p.disclosure}</p>}
                 </div>
-                {p.subtitle && <p className="text-[12px] text-slate-500 mt-1">{p.subtitle}</p>}
-                {benefit && <p className="text-[12px] text-slate-700 mt-1 whitespace-pre-line leading-snug">{benefit}</p>}
-                {p.disclosure && <p className="text-[11px] text-slate-500 mt-1 whitespace-pre-line leading-snug">{p.disclosure}</p>}
-              </div>
-            );
-          })}
-        </div>
+              );
+            })}
+          </div>
+        </details>
       )}
 
       {/* State + federal statutory disclosure pack (FTC Buyers Guide, E-SIGN,
