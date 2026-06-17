@@ -136,6 +136,15 @@ export const PlatformTenants = () => {
           onCreate={async (form) => {
             const id = await createTenant(form);
             if (id) {
+              // Persist the Autocurb mirror (sync key + full profile) on the
+              // new tenant, separate from the create RPC.
+              if (form.autocurbId && form.autocurbProfile) {
+                await (supabase as any).rpc("admin_link_autocurb", {
+                  p_tenant_id: id,
+                  p_autocurb_id: form.autocurbId,
+                  p_profile: form.autocurbProfile,
+                });
+              }
               toast.success(`Tenant "${form.name}" created. Invite sent to ${form.ownerEmail}.`);
               setCreating(false);
             } else {
@@ -275,6 +284,8 @@ interface CreateFormProps {
     appSlug?: string;
     planTier?: string;
     trialDays?: number;
+    autocurbId?: string;
+    autocurbProfile?: Record<string, unknown>;
   }) => Promise<void>;
 }
 
@@ -291,6 +302,9 @@ const CreateTenantForm = ({ onClose, onCreate }: CreateFormProps) => {
   const [acQuery, setAcQuery] = useState("");
   const [acHits, setAcHits] = useState<{ autocurb_tenant_id: string; name: string; domain?: string; primary_email?: string; city?: string; state?: string }[]>([]);
   const [acBusy, setAcBusy] = useState(false);
+  // Full mirrored profile + sync key from /by-id, persisted after create.
+  const [acProfile, setAcProfile] = useState<Record<string, unknown> | null>(null);
+  const [acId, setAcId] = useState<string>("");
 
   const searchAutocurb = async (q: string) => {
     setAcQuery(q);
@@ -317,6 +331,8 @@ const CreateTenantForm = ({ onClose, onCreate }: CreateFormProps) => {
     setOwnerEmail(r.primary_email || "");
     if (r.name) setSlug(String(r.name).toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, ""));
     if (r.bundle_tier === "base" || r.bundle_tier === "pro") setPlanTier(r.bundle_tier);
+    setAcProfile(r as Record<string, unknown>);
+    setAcId(String(r.autocurb_tenant_id || id));
     setAcHits([]); setAcQuery(r.name || "");
     toast.success("Imported from Autocurb — review and create.");
   };
@@ -336,6 +352,8 @@ const CreateTenantForm = ({ onClose, onCreate }: CreateFormProps) => {
       appSlug,
       planTier,
       trialDays,
+      autocurbId: acId || undefined,
+      autocurbProfile: acProfile || undefined,
     });
     setSubmitting(false);
   };
