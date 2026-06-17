@@ -28,9 +28,13 @@ const AddendumHeader = ({ inkSaving }: AddendumHeaderProps) => {
     currentStore?.tagline ||
     configured(settings.dealer_tagline, DEFAULT_SETTINGS.dealer_tagline);
   const logo = currentStore?.logo_url || settings.dealer_logo_url || tenant?.logo_url;
-  const address = [settings.dealer_address, settings.dealer_city, settings.dealer_state, settings.dealer_zip]
-    .filter(Boolean)
-    .join(" · ");
+  // Fall back to the active store's location so the licensed-seller line shows
+  // even when the dealer hasn't typed an address into Branding yet.
+  const street = settings.dealer_address || (currentStore as { address?: string } | null)?.address || "";
+  const city = settings.dealer_city || currentStore?.city || "";
+  const stateAbbr = settings.dealer_state || currentStore?.state || "";
+  const zip = settings.dealer_zip || currentStore?.zip || "";
+  const address = [street, city, stateAbbr, zip].filter(Boolean).join(" · ");
 
   return (
     <header className={`addn-masthead border-b-2 border-navy ${inkSaving ? "bg-card text-navy" : "bg-navy text-primary-foreground"}`}>
