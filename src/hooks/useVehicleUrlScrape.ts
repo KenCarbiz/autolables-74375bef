@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { supabase } from "@/integrations/supabase/client";
 
 export interface ScrapedVehicle {
   vin: string;
@@ -64,17 +65,30 @@ export const useVehicleUrlScrape = () => {
       }
     }
 
-    if (!html || html.length < 500) {
-      setError("Could not fetch the page. Try pasting the page source instead.");
-      setScraping(false);
-      return null;
+    // Parse whatever the proxy returned.
+    let result = html ? parseVehiclePage(html, trimmed) : null;
+    const empty = (r: ScrapedVehicle | null) => !r || (!r.vin && !r.make && !r.model && !r.year);
+
+    // Fallback for JS-walled sites (Team Velocity/Apollo, DealerOn, etc.):
+    // a plain fetch returns the empty JS shell, so render the page through
+    // Firecrawl (when configured) and parse the real HTML.
+    if (empty(result)) {
+      try {
+        const { data } = await supabase.functions.invoke("firecrawl-scrape", { body: { url: trimmed } });
+        const fcHtml = (data as { html?: string } | null)?.html;
+        if (fcHtml && fcHtml.length > 500) {
+          const fcResult = parseVehiclePage(fcHtml, trimmed);
+          if (!empty(fcResult)) result = fcResult;
+        }
+      } catch {
+        /* Firecrawl unavailable — fall through to the error below */
+      }
     }
 
-    const result = parseVehiclePage(html, trimmed);
     setScraping(false);
 
-    if (!result.vin && !result.make && !result.model && !result.year) {
-      setError("No vehicle data found on this page. Make sure it's a vehicle detail page (VDP).");
+    if (empty(result)) {
+      setError("No vehicle data found. Add the Firecrawl key for JS-heavy sites, or paste the page source.");
       return null;
     }
 
