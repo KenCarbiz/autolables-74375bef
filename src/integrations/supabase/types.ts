@@ -1809,6 +1809,7 @@ export type Database = {
           created_at: string
           created_by: string | null
           customer_email: string
+          customer_info: Json
           customer_name: string
           customer_phone: string
           deal_qr_token: string
@@ -1822,6 +1823,7 @@ export type Database = {
           msrp: number
           service_records: Json
           signings: Json
+          sold_at: string | null
           stickers: Json
           stock_number: string
           store_id: string | null
@@ -1843,6 +1845,7 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           customer_email?: string
+          customer_info?: Json
           customer_name?: string
           customer_phone?: string
           deal_qr_token?: string
@@ -1856,6 +1859,7 @@ export type Database = {
           msrp?: number
           service_records?: Json
           signings?: Json
+          sold_at?: string | null
           stickers?: Json
           stock_number?: string
           store_id?: string | null
@@ -1877,6 +1881,7 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           customer_email?: string
+          customer_info?: Json
           customer_name?: string
           customer_phone?: string
           deal_qr_token?: string
@@ -1890,6 +1895,7 @@ export type Database = {
           msrp?: number
           service_records?: Json
           signings?: Json
+          sold_at?: string | null
           stickers?: Json
           stock_number?: string
           store_id?: string | null
@@ -2567,6 +2573,7 @@ export type Database = {
           created_at: string
           created_by: string | null
           customer_email: string
+          customer_info: Json
           customer_name: string
           customer_phone: string
           deal_qr_token: string
@@ -2580,6 +2587,7 @@ export type Database = {
           msrp: number
           service_records: Json
           signings: Json
+          sold_at: string | null
           stickers: Json
           stock_number: string
           store_id: string | null
