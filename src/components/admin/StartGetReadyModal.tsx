@@ -46,15 +46,28 @@ export const StartGetReadyModal = ({ open, onClose, onCreate }: Props) => {
   };
 
   const doScrape = async () => {
-    if (!url.trim()) return;
-    const r = await scrape(url.trim());
+    const u = url.trim();
+    if (!u) return;
+    let filled = false;
+    const r = await scrape(u);
     if (r) {
-      setVin(r.vin || vin);
-      setYmm(r.ymm || ymm);
-      setStock(r.stock || stock);
+      if (r.vin) { setVin(r.vin.toUpperCase()); filled = true; }
+      if (r.ymm) { setYmm(r.ymm); filled = true; }
+      if (r.stock) { setStock(r.stock); filled = true; }
       if (r.condition) setCondition(r.condition.toLowerCase().includes("new") ? "new" : "used");
-      toast.success("Pulled vehicle details from the website link");
     }
+    // Fallback for JS-walled sites (Team Velocity/Apollo, etc.) where the page
+    // can't be scraped: many dealer VDP URLs carry the VIN + condition in the
+    // path itself. Pull what we can so the form still fills.
+    if (!r?.vin) {
+      const m = u.toUpperCase().match(/[A-HJ-NPR-Z0-9]{17}/);
+      if (m) { setVin(m[0]); filled = true; }
+    }
+    if (/\/new\//i.test(u)) setCondition("new");
+    else if (/\/(used|pre-owned|preowned|cpo|certified)\//i.test(u)) setCondition("used");
+    toast[filled ? "success" : "error"](
+      filled ? "Pulled what we could from the link — confirm the details below." : "Couldn't read that page automatically. Enter the VIN / vehicle below.",
+    );
   };
 
   const submit = async () => {
