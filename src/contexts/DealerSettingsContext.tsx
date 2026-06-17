@@ -39,6 +39,11 @@ export interface StickerPrintTemplate {
   height: string;       // label height, inches
   artwork_url: string;  // pre-printed stock artwork (preprinted mode only)
   content_area: StickerContentArea;
+  // What the dealer wants printed into the pre-printed fill area. Vehicle ID
+  // and the QR always print; equipment + pricing are dealer's choice so the
+  // same engine can drive sparse (AutoExperts-style) or full-data stock.
+  fill_equipment: boolean;
+  fill_pricing: boolean;
 }
 
 // Default content area roughly matches the open white region on common
@@ -51,6 +56,8 @@ export const DEFAULT_STICKER_TEMPLATE: StickerPrintTemplate = {
   height: "11",
   artwork_url: "",
   content_area: { ...DEFAULT_CONTENT_AREA },
+  fill_equipment: true,
+  fill_pricing: true,
 };
 
 export const STICKER_DOC_LABELS: Record<StickerDocType, string> = {

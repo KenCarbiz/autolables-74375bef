@@ -13,6 +13,17 @@ import {
 import { useTenant } from "@/contexts/TenantContext";
 import { uploadPhoto } from "@/lib/storage";
 import { PrePrintedStickerFrame } from "@/components/sticker/PrePrintedStickerFrame";
+import { StickerFillBlock, type StickerFillData } from "@/components/sticker/StickerFillBlock";
+
+const SAMPLE_FILL: StickerFillData = {
+  ymm: "2024 Honda Accord EX-L",
+  vin: "1HGCV1F3XPA000000",
+  stock: "H4821",
+  mileage: "12,430",
+  price: "$32,495",
+  equipment: ["Backup Camera", "Heated Leather Seats", "Apple CarPlay", "Blind-Spot Monitor", "Moonroof", "Adaptive Cruise"],
+  qrUrl: "https://autolabels.io",
+};
 
 const SIZE_PRESETS: { label: string; w: string; h: string }[] = [
   { label: 'Letter 8.5×11"', w: "8.5", h: "11" },
@@ -24,39 +35,6 @@ const SIZE_PRESETS: { label: string; w: string; h: string }[] = [
 const DOC_ORDER: StickerDocType[] = ["new_window", "used_window", "new_addendum", "used_addendum"];
 
 const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
-
-// Representative vehicle block shown inside the content area so the dealer
-// sees how live data will fill the white space. Scales to the box it's in.
-function SampleVehicleBlock() {
-  return (
-    <div className="w-full h-full flex flex-col p-[2%] text-gray-900 leading-tight">
-      <div className="flex items-start justify-between gap-2">
-        <div>
-          <div className="font-extrabold" style={{ fontSize: "clamp(9px, 3.2cqw, 22px)" }}>2024 Honda Accord EX-L</div>
-          <div className="text-gray-500" style={{ fontSize: "clamp(6px, 1.7cqw, 11px)" }}>
-            VIN 1HGCV1F3XPA000000 · Stock #H4821
-          </div>
-        </div>
-        <div className="text-right">
-          <div className="font-extrabold text-gray-900" style={{ fontSize: "clamp(10px, 3.6cqw, 26px)" }}>$32,495</div>
-          <div className="text-gray-500" style={{ fontSize: "clamp(6px, 1.7cqw, 11px)" }}>12,430 mi</div>
-        </div>
-      </div>
-      <div className="mt-[3%] grid grid-cols-2 gap-x-[4%] gap-y-[1%] text-gray-700" style={{ fontSize: "clamp(6px, 1.6cqw, 10px)" }}>
-        {["Backup Camera", "Heated Leather Seats", "Apple CarPlay", "Blind-Spot Monitor", "Moonroof", "Adaptive Cruise"].map((e) => (
-          <div key={e}>• {e}</div>
-        ))}
-      </div>
-      <div className="mt-auto flex items-end justify-between">
-        <div className="text-gray-500" style={{ fontSize: "clamp(5px, 1.4cqw, 9px)" }}>Scan for full details &amp; history →</div>
-        <div className="bg-gray-900 text-white grid place-items-center font-bold"
-          style={{ width: "clamp(28px, 14cqw, 90px)", aspectRatio: "1", fontSize: "clamp(5px,1.4cqw,9px)" }}>
-          QR
-        </div>
-      </div>
-    </div>
-  );
-}
 
 export default function StickerPrintTemplates() {
   const { settings, updateSettings } = useDealerSettings();
@@ -227,6 +205,31 @@ export default function StickerPrintTemplates() {
             </div>
           </div>
 
+          {/* What fills the white space */}
+          <div>
+            <label className="text-xs font-semibold text-muted-foreground">Fill content</label>
+            <p className="text-[11px] text-muted-foreground">
+              Vehicle ID and the QR always print. Choose what else fills the area.
+            </p>
+            <div className="mt-1.5 flex flex-wrap gap-2">
+              {([
+                { k: "fill_equipment" as const, l: "Equipment list" },
+                { k: "fill_pricing" as const, l: "Pricing" },
+              ]).map((o) => (
+                <button
+                  key={o.k}
+                  onClick={() => patch({ [o.k]: !tpl[o.k] } as Partial<StickerPrintTemplate>)}
+                  className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold border transition-colors ${
+                    tpl[o.k] ? "bg-teal/10 border-teal text-teal" : "bg-background border-border text-muted-foreground hover:bg-muted"
+                  }`}
+                >
+                  <span className={`w-2 h-2 rounded-full ${tpl[o.k] ? "bg-teal" : "bg-muted-foreground/40"}`} />
+                  {o.l}
+                </button>
+              ))}
+            </div>
+          </div>
+
           {/* Interactive alignment canvas */}
           <div className="grid grid-cols-1 lg:grid-cols-[1fr_220px] gap-4">
             <div>
@@ -253,7 +256,7 @@ export default function StickerPrintTemplates() {
                   </div>
                   <div className="w-full h-full overflow-hidden opacity-90 pointer-events-none">
                     <div style={{ containerType: "inline-size", width: "100%", height: "100%" } as React.CSSProperties}>
-                      <SampleVehicleBlock />
+                      <StickerFillBlock data={SAMPLE_FILL} showEquipment={tpl.fill_equipment} showPricing={tpl.fill_pricing} />
                     </div>
                   </div>
                   {/* Resize handle */}
@@ -303,7 +306,7 @@ export default function StickerPrintTemplates() {
               <div style={{ containerType: "inline-size", maxWidth: 360 }}>
                 <PrePrintedStickerFrame template={tpl} className="rounded border border-border shadow-sm">
                   <div style={{ containerType: "inline-size", width: "100%", height: "100%" } as React.CSSProperties}>
-                    <SampleVehicleBlock />
+                    <StickerFillBlock data={SAMPLE_FILL} showEquipment={tpl.fill_equipment} showPricing={tpl.fill_pricing} />
                   </div>
                 </PrePrintedStickerFrame>
               </div>

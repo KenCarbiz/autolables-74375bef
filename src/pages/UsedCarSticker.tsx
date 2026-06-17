@@ -13,6 +13,8 @@ import { useRecallLookup } from "@/hooks/useRecallLookup";
 import RecallBanner from "@/components/addendum/RecallBanner";
 import { toast } from "sonner";
 import { PublishPriceGate } from "@/components/inventory/PublishPriceGate";
+import { PrePrintedStickerFrame } from "@/components/sticker/PrePrintedStickerFrame";
+import { StickerFillBlock, type StickerFillData } from "@/components/sticker/StickerFillBlock";
 import { QRCodeSVG } from "qrcode.react";
 import {
   Printer, Download, Car, Fuel, Gauge, Cog, Sparkles, MapPin, Tag,
@@ -36,6 +38,7 @@ const UsedCarSticker = () => {
   const { createListing, publishListing, publicUrl, embedSnippet } = useVehicleListing(currentStore?.id || "");
   const { lookup: recallLookup } = useRecallLookup();
   const cardRef = useRef<HTMLDivElement>(null);
+  const prePrintRef = useRef<HTMLDivElement>(null);
   const [generating, setGenerating] = useState(false);
   const [publishedSlug, setPublishedSlug] = useState<string | null>(null);
   const [publishing, setPublishing] = useState(false);
@@ -90,6 +93,21 @@ const UsedCarSticker = () => {
     : vehicle.vin
       ? `${window.location.origin}/vehicle/${vehicle.vin}`
       : "";
+
+  // Per-dealer used-car print template. In pre-printed mode the dealer's
+  // own stock carries the branding, so we print only the vehicle fill block
+  // into the configured area instead of the full designed sticker.
+  const printTpl = settings.sticker_print_templates?.used_window;
+  const prePrinted = printTpl?.mode === "preprinted" && !!printTpl.artwork_url;
+  const fillData: StickerFillData = {
+    ymm: `${vehicle.year} ${vehicle.make} ${vehicle.model} ${vehicle.trim}`.trim(),
+    vin: vehicle.vin || undefined,
+    stock: vehicle.stock || undefined,
+    mileage: vehicle.mileage ? parseInt(vehicle.mileage).toLocaleString() : undefined,
+    price: totalPrice > 0 ? `$${totalPrice.toLocaleString(undefined, { minimumFractionDigits: 0 })}` : undefined,
+    equipment: equipment.filter(Boolean),
+    qrUrl: signingUrl || undefined,
+  };
 
   const handleVinDecode = async () => {
     if (vehicle.vin.length !== 17) return;
@@ -230,16 +248,20 @@ const UsedCarSticker = () => {
   };
 
   const handlePdf = async () => {
-    if (!cardRef.current) return;
+    const target = prePrinted ? prePrintRef.current : cardRef.current;
+    if (!target) return;
     setGenerating(true);
     try {
       const { default: html2canvas } = await import("html2canvas-pro");
       const { default: jsPDF } = await import("jspdf");
       const { archivePdf, persistArchivedPdf } = await import("@/lib/pdfArchive");
-      const canvas = await html2canvas(cardRef.current, { scale: 2, useCORS: true });
+      const canvas = await html2canvas(target, { scale: 2, useCORS: true });
       const imgData = canvas.toDataURL("image/jpeg", 0.95);
-      const w = 8.5, h = (canvas.height / canvas.width) * w;
-      const pdf = new jsPDF({ unit: "in", format: [w, h], orientation: "portrait" });
+      // Pre-printed stock prints at the dealer's exact label size; blank
+      // stock keeps the legacy 8.5"-wide aspect-derived page.
+      const w = prePrinted ? (parseFloat(printTpl!.width) || 8.5) : 8.5;
+      const h = prePrinted ? (parseFloat(printTpl!.height) || 11) : (canvas.height / canvas.width) * w;
+      const pdf = new jsPDF({ unit: "in", format: [w, h], orientation: w > h ? "landscape" : "portrait" });
       pdf.addImage(imgData, "JPEG", 0, 0, w, h);
       // Wave 4.5 — stamp + archive. Stamp is synchronous metadata;
       // persist uploads to signed_document_archive for retention.
@@ -453,7 +475,21 @@ const UsedCarSticker = () => {
 
         {/* Live sticker preview */}
         <div className="lg:col-span-3">
-          <p className="text-[11px] font-semibold uppercase tracking-label text-muted-foreground mb-2 no-print">Live Preview — {mode === "full" ? "Full Sticker" : mode === "equipment_only" ? "Equipment Only" : "Accessories Only"}</p>
+          <p className="text-[11px] font-semibold uppercase tracking-label text-muted-foreground mb-2 no-print">
+            Live Preview — {prePrinted ? "Pre-printed stock fill" : mode === "full" ? "Full Sticker" : mode === "equipment_only" ? "Equipment Only" : "Accessories Only"}
+          </p>
+
+          {prePrinted && (
+            <div ref={prePrintRef} className="mx-auto" style={{ maxWidth: "600px", containerType: "inline-size" } as React.CSSProperties}>
+              <PrePrintedStickerFrame template={printTpl!} className="shadow-premium-lg">
+                <div style={{ containerType: "inline-size", width: "100%", height: "100%" } as React.CSSProperties}>
+                  <StickerFillBlock data={fillData} showEquipment={printTpl!.fill_equipment} showPricing={printTpl!.fill_pricing} />
+                </div>
+              </PrePrintedStickerFrame>
+            </div>
+          )}
+
+          {!prePrinted && (
           <div ref={cardRef} className="bg-white rounded-lg border-2 border-foreground overflow-hidden shadow-premium-lg mx-auto" style={{ maxWidth: "600px" }}>
 
             {/* Dealer header */}
@@ -641,6 +677,7 @@ const UsedCarSticker = () => {
               {dealerName} {dealerPhone && `· ${dealerPhone}`} {dealerAddress && `· ${dealerAddress}`}
             </div>
           </div>
+          )}
         </div>
       </div>
 
