@@ -4,7 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useNavigate } from "react-router-dom";
 import { format } from "date-fns";
-import { ArrowLeft, PenLine, ExternalLink, Link2, ChevronDown, ChevronRight, CheckCircle2, Send } from "lucide-react";
+import { ArrowLeft, PenLine, ExternalLink, Link2, ChevronDown, ChevronRight, CheckCircle2, Send, Pencil } from "lucide-react";
 import { toast } from "sonner";
 import EmptyState from "@/components/ui/empty-state";
 import AddendumStatusTimeline from "@/components/addendum/AddendumStatusTimeline";
@@ -197,6 +197,9 @@ const SignatureQueue = () => {
               </a>
             </>
           )}
+          <button onClick={() => navigate(`/addendum?id=${a.id}&edit=1`)} className="inline-flex items-center gap-1 h-8 px-2.5 rounded-md border border-border text-[11px] font-semibold text-foreground hover:bg-muted" title="Continue editing this addendum">
+            <Pencil className="w-3.5 h-3.5" /> Edit
+          </button>
           <button onClick={() => toggle(a.id)} className="w-8 h-8 inline-flex items-center justify-center rounded-md hover:bg-muted text-muted-foreground" title="Show activity">
             {expanded[a.id] ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
           </button>
