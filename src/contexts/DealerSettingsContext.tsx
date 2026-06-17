@@ -3,6 +3,15 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useTenant } from "@/contexts/TenantContext";
 
+// A configurable internal recon/service the dealer routes to a responsible
+// party. Non-customer charge — tracked as the store's own cost.
+export interface GetReadyService {
+  name: string;
+  responsible_name: string;
+  responsible_email: string;
+  cost: string;
+}
+
 export interface DealerSettings {
   // Branding
   dealer_name: string;
@@ -39,6 +48,10 @@ export interface DealerSettings {
   // their own labels (e.g. "OEM CPO", "Dealer CPO"); each maps to a canonical
   // new/used/cpo value under the hood for storage + compliance gating.
   vehicle_conditions: string;
+  // Configurable internal recon/service catalog (non-customer charge). Each
+  // service routes to a responsible party (name + email) and carries a default
+  // dealer cost; picked when starting a Get-Ready.
+  get_ready_services: GetReadyService[];
   // Feature toggles — what shows on the employee-facing addendum
   feature_vin_decode: boolean;
   feature_buyers_guide: boolean;
@@ -107,6 +120,11 @@ export const DEFAULT_SETTINGS: DealerSettings = {
   why_buy_here: "",
   warranty_programs: "",
   vehicle_conditions: "New, Demo, Used, CPO",
+  get_ready_services: [
+    { name: "Reconditioning / mechanical", responsible_name: "Service Dept.", responsible_email: "", cost: "" },
+    { name: "Emissions / safety inspection", responsible_name: "Lot Attendant", responsible_email: "", cost: "" },
+    { name: "Accessories install", responsible_name: "Detail / Vendor", responsible_email: "", cost: "" },
+  ],
   feature_vin_decode: true,
   feature_buyers_guide: true,
   feature_product_rules: true,

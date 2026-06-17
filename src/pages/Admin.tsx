@@ -4,7 +4,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { uploadPhoto } from "@/lib/storage";
 import { Switch } from "@/components/ui/switch";
 import { PRICE_BUCKETS } from "@/types/product";
-import { useDealerSettings, DealerSettings, DEFAULT_SETTINGS } from "@/contexts/DealerSettingsContext";
+import { useDealerSettings, DealerSettings, DEFAULT_SETTINGS, type GetReadyService } from "@/contexts/DealerSettingsContext";
 import { useProductRules, ProductRule } from "@/hooks/useProductRules";
 import type { ProductUpgrade } from "@/hooks/useProducts";
 import type { Json } from "@/integrations/supabase/types";
@@ -216,6 +216,9 @@ const Admin = () => {
   const [sheetRecord, setSheetRecord] = useState<GetReadyRecord | null>(null);
   const { records: getReadyRecords, getPending: getPendingGetReady, validateTimeline, markAccessoryInstalled, markInventory, createGetReady } = useGetReady(currentStore?.id || "");
   const [startGetReadyOpen, setStartGetReadyOpen] = useState(false);
+  const [svcDraft, setSvcDraft] = useState<GetReadyService[]>(settings.get_ready_services || []);
+  const [svcSaved, setSvcSaved] = useState(false);
+  const saveServices = () => { updateSettings({ get_ready_services: svcDraft }); setSvcSaved(true); setTimeout(() => setSvcSaved(false), 1800); };
   const { sendGetReadyComplete, sending: emailSending } = useEmailDistribution(currentStore?.id || "");
 
   // Inventory, invoices, warranty
@@ -1760,6 +1763,33 @@ const Admin = () => {
               </button>
             </div>
             <StartGetReadyModal open={startGetReadyOpen} onClose={() => setStartGetReadyOpen(false)} onCreate={createGetReady} />
+
+            {/* Configurable internal service catalog (non-customer charge) */}
+            <div className="rounded-2xl border border-border-custom bg-card p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="text-sm font-bold text-foreground">Get-Ready service catalog</h3>
+                  <p className="text-[11px] text-muted-foreground">Internal services you can add to any Get-Ready — routed to a responsible party. Non-customer charge; never billed to the buyer.</p>
+                </div>
+                <button onClick={() => setSvcDraft((s) => [...s, { name: "", responsible_name: "", responsible_email: "", cost: "" }])} className="inline-flex items-center gap-1 h-8 px-2.5 rounded-lg border border-border text-xs font-semibold hover:bg-muted"><Plus className="w-3.5 h-3.5" /> Add service</button>
+              </div>
+              <div className="mt-3 space-y-2">
+                {svcDraft.length === 0 ? (
+                  <p className="text-xs text-muted-foreground">No services configured. Add reconditioning, emissions, key cut, etc.</p>
+                ) : svcDraft.map((s, i) => (
+                  <div key={i} className="grid grid-cols-1 md:grid-cols-[1.4fr_1fr_1.4fr_0.7fr_auto] gap-2">
+                    <input value={s.name} onChange={(e) => setSvcDraft((p) => p.map((x, j) => j === i ? { ...x, name: e.target.value } : x))} placeholder="Service (e.g. Reconditioning)" className="px-3 py-2 border border-border-custom rounded text-sm bg-background text-foreground" />
+                    <input value={s.responsible_name} onChange={(e) => setSvcDraft((p) => p.map((x, j) => j === i ? { ...x, responsible_name: e.target.value } : x))} placeholder="Responsible (Service Dept.)" className="px-3 py-2 border border-border-custom rounded text-sm bg-background text-foreground" />
+                    <input value={s.responsible_email} type="email" onChange={(e) => setSvcDraft((p) => p.map((x, j) => j === i ? { ...x, responsible_email: e.target.value } : x))} placeholder="responsible@email.com" className="px-3 py-2 border border-border-custom rounded text-sm bg-background text-foreground" />
+                    <input value={s.cost} onChange={(e) => setSvcDraft((p) => p.map((x, j) => j === i ? { ...x, cost: e.target.value } : x))} placeholder="$ cost" className="px-3 py-2 border border-border-custom rounded text-sm bg-background text-foreground" />
+                    <button onClick={() => setSvcDraft((p) => p.filter((_, j) => j !== i))} className="h-9 w-9 inline-flex items-center justify-center rounded border border-border-custom text-muted-foreground hover:text-destructive">×</button>
+                  </div>
+                ))}
+              </div>
+              <div className="mt-3">
+                <button onClick={saveServices} className="px-5 py-2 bg-blue-600 text-white rounded-lg font-semibold text-sm hover:bg-blue-700">{svcSaved ? "Saved" : "Save services"}</button>
+              </div>
+            </div>
 
             {/* Stats */}
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">

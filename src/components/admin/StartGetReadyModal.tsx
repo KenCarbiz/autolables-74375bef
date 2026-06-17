@@ -42,6 +42,7 @@ export const StartGetReadyModal = ({ open, onClose, onCreate }: Props) => {
   const { data: products = [] } = useProducts();
   const { user } = useAuth();
   const { settings } = useDealerSettings();
+  const catalog = settings.get_ready_services || [];
   const conditions = (settings.vehicle_conditions || "New, Demo, Used, CPO")
     .split(",").map((s) => s.trim()).filter(Boolean);
   const defaultCondition = conditions.find((c) => /used/i.test(c)) || conditions[0] || "Used";
@@ -233,6 +234,15 @@ export const StartGetReadyModal = ({ open, onClose, onCreate }: Props) => {
             <label className={label}>Internal service / recon (dealer cost — not billed to customer)</label>
             <button type="button" onClick={() => setServices((s) => [...s, { label: "", cost: "" }])} className="inline-flex items-center gap-1 h-7 px-2 rounded-lg border border-border text-[11px] font-semibold hover:bg-muted"><Plus className="w-3 h-3" /> Add</button>
           </div>
+          {catalog.length > 0 && (
+            <div className="flex flex-wrap gap-1.5 mt-2">
+              {catalog.map((c, i) => (
+                <button key={i} type="button" onClick={() => setServices((s) => [...s, { label: c.name, cost: c.cost || "" }])} className="inline-flex items-center gap-1 h-7 px-2.5 rounded-full border border-border text-[11px] font-semibold hover:bg-muted">
+                  <Plus className="w-3 h-3" /> {c.name}{c.responsible_name ? ` · ${c.responsible_name}` : ""}
+                </button>
+              ))}
+            </div>
+          )}
           {services.length > 0 && (
             <div className="space-y-2 mt-2">
               {services.map((s, i) => (
