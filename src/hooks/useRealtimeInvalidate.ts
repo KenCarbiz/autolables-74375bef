@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { useQueryClient, type QueryKey } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -41,11 +41,21 @@ export function useRealtimeInvalidate({ table, queryKey, filter, enabled = true 
   // Stringify the queryKey for the dep array — array identity
   // changes every render otherwise, churning the subscription.
   const queryKeyJson = JSON.stringify(queryKey);
+  // Per-instance id so two consumers of the same table/filter (or a
+  // StrictMode/tab remount) never share a channel topic. A shared topic
+  // makes the second .on() land on an already-subscribed channel, which
+  // throws "cannot add postgres_changes callbacks ... after subscribe()".
+  const instanceId = useRef<string>();
+  if (!instanceId.current) {
+    instanceId.current = (typeof crypto !== "undefined" && crypto.randomUUID)
+      ? crypto.randomUUID()
+      : Math.random().toString(36).slice(2);
+  }
 
   useEffect(() => {
     if (!enabled) return;
 
-    const channelName = `rt-${table}-${filter ?? "all"}`;
+    const channelName = `rt-${table}-${filter ?? "all"}-${instanceId.current}`;
     const channel = supabase
       .channel(channelName)
       .on(

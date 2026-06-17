@@ -469,10 +469,67 @@ const ProcessDashboard = () => {
         )}
       </section>
 
+      <ShopperInterest />
+
       {/* Wave 22 — the original 7-wave plan is complete. The
           roadmap row is retired; if/when new dimensions land
           they can be added back. */}
     </div>
+  );
+};
+
+// Shopper interest — which published vehicles are getting the most QR/scan
+// views. Reads vehicle_listings.view_count (RLS-scoped to the dealer). The
+// intelligence iPacket monetizes, surfaced from data already captured.
+const ShopperInterest = () => {
+  const { tenant } = useTenant();
+  const { data = [] } = useQuery({
+    queryKey: ["dash", "shopper-interest", tenant?.id],
+    enabled: !!tenant?.id,
+    staleTime: 30_000,
+    queryFn: async () => {
+      const { data } = await (supabase as any)
+        .from("vehicle_listings")
+        .select("id, ymm, vin, slug, view_count")
+        .eq("status", "published")
+        .gt("view_count", 0)
+        .order("view_count", { ascending: false })
+        .limit(8);
+      return (data || []) as { id: string; ymm: string | null; vin: string; slug: string; view_count: number }[];
+    },
+  });
+  if (data.length === 0) return null;
+  const max = Math.max(...data.map((d) => d.view_count), 1);
+  return (
+    <section>
+      <div className="flex items-center justify-between mb-2">
+        <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground">
+          Shopper interest · most-viewed vehicles
+        </p>
+        <Link to="/inventory" className="text-[11px] font-semibold text-[#2563EB] hover:underline">All inventory →</Link>
+      </div>
+      <div className="rounded-xl border border-border bg-card divide-y divide-border overflow-hidden">
+        {data.map((v, i) => (
+          <div key={v.id} className="flex items-center gap-3 px-4 py-2.5">
+            <span className="text-xs font-bold text-muted-foreground w-5 tabular-nums">{i + 1}</span>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-semibold text-foreground truncate">{v.ymm || "Vehicle"}</p>
+              <p className="text-[11px] text-muted-foreground font-mono">{v.vin ? `VIN ${v.vin.slice(-8)}` : ""}</p>
+            </div>
+            <div className="w-28 hidden sm:block">
+              <div className="h-1.5 rounded-full bg-muted overflow-hidden">
+                <div className="h-full bg-[#2563EB] rounded-full" style={{ width: `${Math.round((v.view_count / max) * 100)}%` }} />
+              </div>
+            </div>
+            <div className="text-right shrink-0 w-16">
+              <p className="text-sm font-bold text-foreground tabular-nums">{v.view_count.toLocaleString()}</p>
+              <p className="text-[10px] text-muted-foreground">views</p>
+            </div>
+            <a href={`/v/${v.slug}`} target="_blank" rel="noreferrer" className="text-[11px] font-semibold text-[#2563EB] hover:underline shrink-0">Open</a>
+          </div>
+        ))}
+      </div>
+    </section>
   );
 };
 
