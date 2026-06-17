@@ -530,6 +530,35 @@ const Index = () => {
     setVehicleDetails(result);
   };
 
+  // Prefill from a vehicle file: /addendum?vin=&ymm=&trim=&mileage=. Runs once
+  // when arriving WITHOUT ?id (loading a saved addendum takes priority), so the
+  // dealer never re-keys VIN / year-make-model / mileage we already have.
+  const prefilledRef = useRef(false);
+  useEffect(() => {
+    if (viewId || prefilledRef.current) return;
+    const vin = searchParams.get("vin") || "";
+    const ymmParam = searchParams.get("ymm") || "";
+    const trim = searchParams.get("trim") || "";
+    const mileage = searchParams.get("mileage") || "";
+    if (!vin && !ymmParam && !mileage) return;
+    prefilledRef.current = true;
+    const ymmFull = [ymmParam, trim].filter(Boolean).join(" ").trim();
+    setVehicle((v) => ({ ...v, vin: vin || v.vin, ymm: ymmFull || v.ymm }));
+    // Parse "year make model" so the rules engine + saved row get structured YMM.
+    const parts = ymmParam.trim().split(/\s+/).filter(Boolean);
+    if (parts.length >= 2) {
+      const [year, make, ...modelRest] = parts;
+      setVehicleContext((c) => ({
+        ...c,
+        year: /^\d{4}$/.test(year) ? year : c.year,
+        make: make || c.make,
+        model: modelRest.join(" ") || c.model,
+        trim: trim || c.trim,
+      }));
+    }
+    if (mileage) setVehicleDetails((d) => ({ ...d, mileage }));
+  }, [viewId, searchParams]);
+
   const handlePrint = () => {
     window.print();
     if (user) log({ store_id: currentStore?.id || "", user_id: user.id, action: "addendum_printed", entity_type: "addendum", entity_id: vehicle.vin, details: { ymm: vehicle.ymm } });

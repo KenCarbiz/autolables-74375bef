@@ -1,4 +1,4 @@
-import { useDealerSettings } from "@/contexts/DealerSettingsContext";
+import { useDealerSettings, DEFAULT_SETTINGS } from "@/contexts/DealerSettingsContext";
 import { useTenant } from "@/contexts/TenantContext";
 
 interface AddendumFooterProps {
@@ -7,9 +7,13 @@ interface AddendumFooterProps {
 
 const AddendumFooter = ({ inkSaving }: AddendumFooterProps) => {
   const { settings } = useDealerSettings();
-  const { currentStore } = useTenant();
+  const { currentStore, tenant } = useTenant();
 
-  const name = currentStore?.name || settings.dealer_name;
+  const configuredName =
+    settings.dealer_name && settings.dealer_name !== DEFAULT_SETTINGS.dealer_name
+      ? settings.dealer_name
+      : "";
+  const name = currentStore?.name || configuredName || tenant?.name || settings.dealer_name;
 
   // Licensed-seller identity — printed on the signed record so the artifact
   // identifies the seller on its own face (dealer-defense / chargeback).

@@ -991,6 +991,18 @@ const AddendumPanel = ({ vehicle }: { vehicle: VehicleRow }) => {
     }
   };
 
+  // Carry the vehicle identity into the addendum builder so the dealer never
+  // re-keys VIN / year-make-model / mileage that we already have on file.
+  const startAddendum = () => {
+    const params = new URLSearchParams();
+    if (vehicle.vin) params.set("vin", vehicle.vin);
+    if (vehicle.ymm) params.set("ymm", vehicle.ymm);
+    if (vehicle.trim) params.set("trim", vehicle.trim);
+    if (vehicle.mileage != null) params.set("mileage", String(vehicle.mileage));
+    const qs = params.toString();
+    navigate(qs ? `/addendum?${qs}` : "/addendum");
+  };
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between gap-3">
@@ -1004,7 +1016,7 @@ const AddendumPanel = ({ vehicle }: { vehicle: VehicleRow }) => {
           </p>
         </div>
         <button
-          onClick={() => navigate("/addendum")}
+          onClick={startAddendum}
           className="h-10 px-4 rounded-md bg-primary text-primary-foreground text-sm font-semibold inline-flex items-center gap-1.5"
         >
           <Plus className="w-4 h-4" />
@@ -1021,7 +1033,7 @@ const AddendumPanel = ({ vehicle }: { vehicle: VehicleRow }) => {
           icon={FileText}
           title="No addendums for this vehicle yet"
           description="Build one and the customer can sign on any phone. Every signed copy is hash-sealed and archived to the compliance record."
-          actions={[{ label: "Start Addendum", icon: Plus, onClick: () => navigate("/addendum") }]}
+          actions={[{ label: "Start Addendum", icon: Plus, onClick: startAddendum }]}
         />
       ) : (
         <div className="space-y-3">

@@ -1,9 +1,15 @@
-import { useDealerSettings } from "@/contexts/DealerSettingsContext";
+import { useDealerSettings, DEFAULT_SETTINGS } from "@/contexts/DealerSettingsContext";
 import { useTenant } from "@/contexts/TenantContext";
 
 interface AddendumHeaderProps {
   inkSaving?: boolean;
 }
+
+// settings.dealer_name defaults to a non-empty placeholder, so it would
+// always shadow the real tenant. Only treat it as set when the dealer has
+// changed it from the default.
+const configured = (v: string, fallback: string) =>
+  v && v !== fallback ? v : "";
 
 // Official-document masthead: left-anchored dealer letterhead (logo + legal
 // name + address + license) vs a right-side form-control block, joined by a
@@ -13,8 +19,14 @@ const AddendumHeader = ({ inkSaving }: AddendumHeaderProps) => {
   const { settings } = useDealerSettings();
   const { currentStore, tenant } = useTenant();
 
-  const name = currentStore?.name || settings.dealer_name;
-  const tagline = currentStore?.tagline || settings.dealer_tagline;
+  const name =
+    currentStore?.name ||
+    configured(settings.dealer_name, DEFAULT_SETTINGS.dealer_name) ||
+    tenant?.name ||
+    settings.dealer_name;
+  const tagline =
+    currentStore?.tagline ||
+    configured(settings.dealer_tagline, DEFAULT_SETTINGS.dealer_tagline);
   const logo = currentStore?.logo_url || settings.dealer_logo_url || tenant?.logo_url;
   const address = [settings.dealer_address, settings.dealer_city, settings.dealer_state, settings.dealer_zip]
     .filter(Boolean)
