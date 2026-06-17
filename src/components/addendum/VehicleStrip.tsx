@@ -103,7 +103,7 @@ const VehicleStrip =({ vehicle, onChange, onVinDecoded, onVehicleScraped, inkSav
       )}
 
       {/* Vehicle Identification — boxed data block */}
-      <fieldset className={`border rounded-md overflow-hidden ${inkSaving ? "border-navy/40" : "border-navy/30"}`}>
+      <fieldset className={`border rounded-md ${inkSaving ? "border-navy/40" : "border-navy/30"}`}>
         <legend className="ml-2 px-1.5 text-[8px] font-bold uppercase tracking-[0.18em] text-navy">
           Vehicle Identification
         </legend>
@@ -121,7 +121,7 @@ const VehicleStrip =({ vehicle, onChange, onVinDecoded, onVehicleScraped, inkSav
                 value={vehicle[f.key]}
                 onChange={(e) => onChange({ ...vehicle, [f.key]: e.target.value })}
                 placeholder={f.placeholder}
-                className="w-full bg-transparent text-[13px] font-medium text-foreground outline-none placeholder:text-muted-foreground/40 placeholder:font-normal leading-[1.6] pb-[2px]"
+                className="w-full bg-transparent text-[13px] font-medium text-foreground outline-none placeholder:text-muted-foreground/40 placeholder:font-normal leading-[1.9] h-7 pb-1"
               />
             </label>
           ))}
@@ -138,7 +138,7 @@ const VehicleStrip =({ vehicle, onChange, onVinDecoded, onVehicleScraped, inkSav
               onChange={(e) => onChange({ ...vehicle, vin: e.target.value.toUpperCase() })}
               placeholder="1HGCV1F3XRA000000"
               maxLength={17}
-              className="flex-1 min-w-0 bg-transparent font-mono text-[15px] font-semibold tracking-[0.18em] text-foreground uppercase outline-none border-b-2 border-navy/40 focus:border-action py-0.5 leading-[1.6] placeholder:text-muted-foreground/40 placeholder:tracking-normal"
+              className="flex-1 min-w-0 bg-transparent font-mono text-[15px] font-semibold tracking-[0.18em] text-foreground uppercase outline-none border-b-2 border-navy/40 focus:border-action leading-[1.9] h-8 pb-1 placeholder:text-muted-foreground/40 placeholder:tracking-normal"
             />
             <div className="flex shrink-0 gap-1 no-print">
               {settings.feature_vin_decode && (

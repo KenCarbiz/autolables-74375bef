@@ -742,6 +742,13 @@ const MobileSigning = () => {
                 </div>
               );
             })()}
+            <a
+              href={token ? `/review/${token}` : "#"}
+              className="no-print mt-2 inline-block text-[11px] text-slate-500 hover:text-slate-900 underline decoration-dotted underline-offset-2"
+              title="Walk through it step by step instead"
+            >
+              Prefer guided steps? →
+            </a>
           </div>
 
         {/* Fill All Initials */}

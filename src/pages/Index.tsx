@@ -866,9 +866,9 @@ const Index = () => {
     setReadyToken(token);
     setVersionLabel(version);
 
-    // Deliver the guided customer review wizard (Pages 1-5), not the raw
-    // single-page form — the customer reviews a transaction, not a document.
-    const url = `${window.location.origin}/review/${token}`;
+    // Default to the full single-page document; the customer can switch to the
+    // guided wizard from there (a "Prefer guided steps?" link on the page).
+    const url = `${window.location.origin}/sign/${token}`;
     setSigningUrl(url);
 
     // Build the compliance receipt — surface every gate that

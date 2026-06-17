@@ -48,7 +48,7 @@ export const composeName = (first: string, mi: string, last: string, suffix: str
     .join(" ");
 
 const inputCls =
-  "w-full border-b-[1.5px] border-border-custom bg-transparent text-xs text-foreground outline-none placeholder:text-muted-foreground/50 py-0.5 leading-[1.6] pb-[2px]";
+  "w-full border-b-[1.5px] border-border-custom bg-transparent text-xs text-foreground outline-none placeholder:text-muted-foreground/50 leading-[1.9] h-7 pb-1";
 const labelCls = "text-[7px] font-bold text-muted-foreground uppercase tracking-wider";
 
 // Renders one person's fields (buyer or co-buyer) given the field prefix.

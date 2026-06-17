@@ -552,8 +552,25 @@ const CustomerReview = () => {
       <header className="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-slate-200">
         <div className="max-w-2xl mx-auto px-5 py-3.5">
           <div className="flex items-center justify-between gap-3 text-[11px] uppercase tracking-[0.16em] font-semibold">
-            <span className="text-slate-950">Step {step + 1} of {steps.length}</span>
-            <span className="text-slate-500">{current?.label}</span>
+            <div className="flex items-center gap-2 min-w-0">
+              {step > 0 && (
+                <button
+                  onClick={() => setStep((s) => Math.max(0, s - 1))}
+                  className="inline-flex items-center gap-1 text-slate-500 hover:text-slate-900 normal-case tracking-normal"
+                  aria-label="Go back a step"
+                >
+                  <ChevronLeft className="w-4 h-4" /> Back
+                </button>
+              )}
+              <span className="text-slate-950">Step {step + 1} of {steps.length}</span>
+            </div>
+            <a
+              href={token ? `/sign/${token}` : "#"}
+              className="text-slate-500 hover:text-slate-900 normal-case tracking-normal underline decoration-dotted underline-offset-2"
+              title="See and sign the full single-page addendum instead"
+            >
+              Full document →
+            </a>
           </div>
           <div className="mt-2 h-1.5 rounded-full bg-slate-100 overflow-hidden">
             <div className="h-full bg-slate-950 transition-all duration-300" style={{ width: `${progressPct}%` }} />
@@ -562,7 +579,7 @@ const CustomerReview = () => {
       </header>
 
       <main className="flex-1 px-5 py-6" onFocusCapture={markStarted} onTouchStartCapture={markStarted}>
-        <div className="max-w-2xl mx-auto">
+        <div key={step} className="max-w-2xl mx-auto animate-in fade-in slide-in-from-right-4 duration-300">
           {current?.id === "summary" && (
             <SummaryStep
               ymm={addendum.vehicle_ymm}
@@ -574,6 +591,8 @@ const CustomerReview = () => {
               docFeeLabel={docFeeProduct?.name || "Doc Fee"}
               advertisedPrice={advertisedPrice}
               state={addendum.vehicle_state}
+              dealerName={addendum.dealer_snapshot?.name}
+              dealerLogo={addendum.dealer_snapshot?.logo_url}
             />
           )}
 
@@ -683,15 +702,26 @@ const CustomerReview = () => {
 // ── Step 1: Purchase Summary hero ────────────────────────────────
 const SummaryStep = ({
   ymm, vin, installedCount, installedTotal, optionalCount, docFee, docFeeLabel, advertisedPrice, state,
+  dealerName, dealerLogo,
 }: {
   ymm: string; vin: string; installedCount: number; installedTotal: number;
   optionalCount: number; docFee: number; docFeeLabel: string;
   advertisedPrice: number | null; state?: string | null;
+  dealerName?: string; dealerLogo?: string;
 }) => {
   const fullVin = (vin || "").trim();
   return (
     <div className="space-y-5">
       <div className="rounded-3xl bg-slate-950 text-white p-7 md:p-9">
+        {(dealerLogo || dealerName) && (
+          <div className="flex items-center gap-2.5 mb-5">
+            {dealerLogo && (
+              <img src={dealerLogo} alt={dealerName || ""} className="h-8 w-auto max-w-[140px] object-contain bg-white rounded-md p-1"
+                onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }} />
+            )}
+            {dealerName && <span className="text-sm font-semibold text-white/85">{dealerName}</span>}
+          </div>
+        )}
         <p className="text-[11px] uppercase tracking-[0.22em] text-white/60 font-semibold">Your purchase</p>
         <h1 className="mt-2 text-3xl md:text-4xl font-black font-display tracking-[-0.03em] leading-[0.97]">
           {ymm || "Your vehicle"}

@@ -128,10 +128,11 @@ const App = () => (
                       {/* Public routes — no shell */}
                       <Route path="/" element={<Landing />} />
                       <Route path="/login" element={<Login />} />
-                      {/* Both customer signing links render the guided
-                          review wizard; the legacy single-page MobileSigning
-                          is retired as a customer-facing flow. */}
-                      <Route path="/sign/:token" element={<CustomerReview />} />
+                      {/* Two interchangeable customer signing experiences on
+                          the same token: /sign = full single-page document
+                          (default), /review = guided step-by-step wizard. Each
+                          links to the other so the customer can sign either way. */}
+                      <Route path="/sign/:token" element={<MobileSigning />} />
                       <Route path="/review/:token" element={<CustomerReview />} />
                       <Route path="/install/:token" element={<InstallerProof />} />
                       {/* Buyer recovery path: VIN + contact -> email a fresh signing link */}

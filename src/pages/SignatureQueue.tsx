@@ -73,8 +73,10 @@ const SignatureQueue = () => {
   const waiting = rows.filter((a) => a.status !== "signed");
   const executed = rows.filter((a) => a.status === "signed");
 
+  // Default the customer to the full single-page document; they can switch to
+  // the guided wizard from there.
   const reviewUrl = (token: string | null) =>
-    token ? `${window.location.origin}/review/${token}` : "";
+    token ? `${window.location.origin}/sign/${token}` : "";
 
   const copyLink = (token: string | null) => {
     const url = reviewUrl(token);
