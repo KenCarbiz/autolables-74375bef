@@ -346,6 +346,21 @@ const OverviewPanel = ({ vehicle }: { vehicle: VehicleRow; onReload: () => void 
     return () => { cancelled = true; };
   }, [vehicle.id, vehicle.vin, vehicle.slug]);
 
+  // Packet completeness — the one "is this vehicle ready?" read.
+  const checks = [
+    { ok: true, label: "Vehicle created", when: vehicle.created_at },
+    { ok: !!vehicle.ymm, label: "VIN decoded", when: vehicle.ymm ? vehicle.updated_at : null },
+    { ok: !!vehicle.recall_check, label: "Recall checked", when: null },
+    { ok: !!vehicle.prep_status?.foreman_signed_at, label: "Prep & install signed off", when: vehicle.prep_status?.foreman_signed_at || null },
+    { ok: (vehicle.documents?.length || 0) > 0, label: "Documents attached", when: null },
+    { ok: (vehicle.service_records?.length || 0) > 0, label: "Service history", when: null },
+    { ok: !!vehicle.warranty_info && Object.keys(vehicle.warranty_info).length > 0, label: "Remaining warranty", when: null },
+    { ok: (vehicle.available_accessories?.length || 0) > 0, label: "Available accessories", when: null },
+    { ok: vehicle.status === "published", label: "Shopper page published", when: vehicle.published_at },
+  ];
+  const doneCount = checks.filter((c) => c.ok).length;
+  const pct = Math.round((doneCount / checks.length) * 100);
+
   return (
     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
       <div className="md:col-span-2 space-y-3">
@@ -407,12 +422,18 @@ const OverviewPanel = ({ vehicle }: { vehicle: VehicleRow; onReload: () => void 
       </div>
 
       <div className="space-y-3">
-        <Card title="Milestones">
+        <Card title="Packet completeness">
+          <div className="mb-3">
+            <div className="flex items-end justify-between mb-1">
+              <span className="text-2xl font-black text-foreground tabular-nums">{pct}%</span>
+              <span className="text-[11px] text-muted-foreground">{doneCount} of {checks.length} complete</span>
+            </div>
+            <div className="h-2 rounded-full bg-muted overflow-hidden">
+              <div className={`h-full rounded-full transition-all ${pct === 100 ? "bg-emerald-500" : pct >= 60 ? "bg-blue-600" : "bg-amber-500"}`} style={{ width: `${pct}%` }} />
+            </div>
+          </div>
           <ul className="space-y-2 text-xs">
-            <Item ok label="Vehicle created" when={vehicle.created_at} />
-            <Item ok={!!vehicle.ymm} label="VIN decoded" when={vehicle.ymm ? vehicle.updated_at : null} />
-            <Item ok={!!vehicle.prep_status?.foreman_signed_at} label="Prep & install signed off" when={vehicle.prep_status?.foreman_signed_at || null} />
-            <Item ok={vehicle.status === "published"} label="Shopper page published" when={vehicle.published_at} />
+            {checks.map((c) => <Item key={c.label} ok={c.ok} label={c.label} when={c.when} />)}
           </ul>
         </Card>
 
