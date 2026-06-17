@@ -95,6 +95,14 @@ export const PlatformTenants = () => {
         <div className="flex items-center gap-2">
           <button
             onClick={() => setCreating(true)}
+            className="inline-flex items-center gap-1.5 h-9 px-3 rounded-md bg-blue-600 text-white text-sm font-semibold hover:bg-blue-700"
+            title="Search Autocurb and import a dealer"
+          >
+            <Building2 className="w-3.5 h-3.5" />
+            Import from Autocurb
+          </button>
+          <button
+            onClick={() => setCreating(true)}
             className="inline-flex items-center gap-1.5 h-9 px-3 rounded-md bg-primary text-primary-foreground text-sm font-semibold"
           >
             <Plus className="w-3.5 h-3.5" />
