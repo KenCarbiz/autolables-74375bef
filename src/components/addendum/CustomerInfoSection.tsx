@@ -51,13 +51,19 @@ const inputCls =
   "w-full border-b-[1.5px] border-border-custom bg-transparent text-xs text-foreground outline-none placeholder:text-muted-foreground/50 py-0.5";
 const labelCls = "text-[7px] font-bold text-muted-foreground uppercase tracking-wider";
 
-const CustomerInfoSection = ({ info, onChange, showCobuyer, inkSaving }: CustomerInfoSectionProps) => {
-  const update = (field: keyof CustomerInfo, value: string) => {
-    onChange({ ...info, [field]: value });
-  };
-
-  // Renders one person's fields (buyer or co-buyer) given the field prefix.
-  const PersonFields = ({ prefix }: { prefix: "buyer" | "cobuyer" }) => {
+// Renders one person's fields (buyer or co-buyer) given the field prefix.
+// MUST stay at module scope: defining it inside CustomerInfoSection makes it a
+// new component type on every keystroke, which remounts the inputs and drops
+// focus after each character.
+const PersonFields = ({
+  prefix,
+  info,
+  update,
+}: {
+  prefix: "buyer" | "cobuyer";
+  info: CustomerInfo;
+  update: (field: keyof CustomerInfo, value: string) => void;
+}) => {
     const k = (s: string) => `${prefix}_${s}` as keyof CustomerInfo;
     return (
       <>
@@ -120,6 +126,11 @@ const CustomerInfoSection = ({ info, onChange, showCobuyer, inkSaving }: Custome
         </div>
       </>
     );
+};
+
+const CustomerInfoSection = ({ info, onChange, showCobuyer, inkSaving }: CustomerInfoSectionProps) => {
+  const update = (field: keyof CustomerInfo, value: string) => {
+    onChange({ ...info, [field]: value });
   };
 
   return (
@@ -128,7 +139,7 @@ const CustomerInfoSection = ({ info, onChange, showCobuyer, inkSaving }: Custome
         <User className="w-3 h-3 text-muted-foreground" />
         <p className="text-[9px] font-bold text-foreground uppercase tracking-wide">Buyer Information</p>
       </div>
-      <PersonFields prefix="buyer" />
+      <PersonFields prefix="buyer" info={info} update={update} />
 
       {showCobuyer && (
         <>
@@ -136,7 +147,7 @@ const CustomerInfoSection = ({ info, onChange, showCobuyer, inkSaving }: Custome
             <Users className="w-3 h-3 text-muted-foreground" />
             <p className="text-[9px] font-bold text-foreground uppercase tracking-wide">Co-Buyer Information <span className="text-muted-foreground font-normal normal-case">(optional)</span></p>
           </div>
-          <PersonFields prefix="cobuyer" />
+          <PersonFields prefix="cobuyer" info={info} update={update} />
         </>
       )}
     </div>
