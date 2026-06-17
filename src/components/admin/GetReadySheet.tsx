@@ -2,8 +2,17 @@ import { useEffect, useState } from "react";
 import { QRCodeSVG } from "qrcode.react";
 import { supabase } from "@/integrations/supabase/client";
 import { useTenant } from "@/contexts/TenantContext";
+import { useDealerSettings } from "@/contexts/DealerSettingsContext";
 import { Printer } from "lucide-react";
 import type { GetReadyRecord } from "@/hooks/useGetReady";
+
+// Standard recon line items and who owns them, so the printed slip is a
+// real work order routed to the right department.
+const STANDARD_ITEMS: { label: string; dept: string }[] = [
+  { label: "Reconditioning / mechanical", dept: "Service Dept." },
+  { label: "Emissions / safety inspection", dept: "Lot Attendant" },
+  { label: "Detail / clean-up", dept: "Detail" },
+];
 
 // Printable Get-Ready / Recon slip, modeled on the standard dealership
 // reconditioning sheet: a vehicle header grid, a recon stage strip, an
@@ -44,8 +53,13 @@ export const GetReadySheet = ({
   dealerName?: string;
 }) => {
   const { tenant } = useTenant();
+  const { settings } = useDealerSettings();
   const [token, setToken] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+
+  const logo = settings.dealer_logo_url || tenant?.logo_url || "";
+  const address = [settings.dealer_address, settings.dealer_city, settings.dealer_state, settings.dealer_zip].filter(Boolean).join(", ");
+  const phone = settings.dealer_phone || "";
 
   useEffect(() => {
     if (!open) return;
@@ -93,10 +107,14 @@ export const GetReadySheet = ({
         <div id="gr-sheet" className="p-7 text-slate-900">
           {/* Header */}
           <div className="flex items-start justify-between gap-5 border-b-2 border-slate-900 pb-3">
-            <div className="min-w-0">
-              <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-500">Get-Ready · Reconditioning Slip</p>
-              <h1 className="text-xl font-black leading-tight">{dealerName || "Dealership"}</h1>
-              <p className="text-[13px] font-semibold mt-0.5">{record.ymm || "Vehicle"}</p>
+            <div className="min-w-0 flex items-start gap-3">
+              {logo && <img src={logo} alt={dealerName || settings.dealer_name} className="h-11 w-auto object-contain shrink-0" />}
+              <div className="min-w-0">
+                <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-500">Get-Ready · Reconditioning Slip</p>
+                <h1 className="text-xl font-black leading-tight">{dealerName || settings.dealer_name || "Dealership"}</h1>
+                {(address || phone) && <p className="text-[10px] text-slate-500">{[address, phone].filter(Boolean).join(" · ")}</p>}
+                <p className="text-[13px] font-semibold mt-0.5">{record.ymm || "Vehicle"}</p>
+              </div>
             </div>
             <div className="text-center flex-shrink-0">
               {loading ? (
@@ -154,18 +172,30 @@ export const GetReadySheet = ({
                 <tr className="bg-slate-100 text-left text-[9px] uppercase tracking-wider text-slate-600">
                   <th className="border border-slate-300 px-2 py-1 w-6">✓</th>
                   <th className="border border-slate-300 px-2 py-1">Item</th>
-                  <th className="border border-slate-300 px-2 py-1 w-32">Vendor / Tech</th>
-                  <th className="border border-slate-300 px-2 py-1 w-16">Date</th>
-                  <th className="border border-slate-300 px-2 py-1 w-14">Init.</th>
+                  <th className="border border-slate-300 px-2 py-1 w-28">Department</th>
+                  <th className="border border-slate-300 px-2 py-1 w-24">Vendor / Tech</th>
+                  <th className="border border-slate-300 px-2 py-1 w-14">Date</th>
+                  <th className="border border-slate-300 px-2 py-1 w-12">Init.</th>
                 </tr>
               </thead>
               <tbody>
+                {STANDARD_ITEMS.map((s) => (
+                  <tr key={s.label}>
+                    <td className="border border-slate-300 px-2 py-1.5 text-center"><span className="inline-block w-3.5 h-3.5 border border-slate-500" /></td>
+                    <td className="border border-slate-300 px-2 py-1.5 font-semibold">{s.label}</td>
+                    <td className="border border-slate-300 px-2 py-1.5 text-slate-600">{s.dept}</td>
+                    <td className="border border-slate-300 px-2 py-1.5"></td>
+                    <td className="border border-slate-300 px-2 py-1.5"></td>
+                    <td className="border border-slate-300 px-2 py-1.5"></td>
+                  </tr>
+                ))}
                 {accessories.map((a) => (
                   <tr key={a.productId}>
                     <td className="border border-slate-300 px-2 py-1.5 text-center">
                       <span className={`inline-block w-3.5 h-3.5 border border-slate-500 ${a.installed ? "bg-slate-900" : ""}`} />
                     </td>
                     <td className="border border-slate-300 px-2 py-1.5 font-semibold">{a.productName}</td>
+                    <td className="border border-slate-300 px-2 py-1.5 text-slate-600">Detail / Vendor</td>
                     <td className="border border-slate-300 px-2 py-1.5">{a.installedBy || ""}</td>
                     <td className="border border-slate-300 px-2 py-1.5">{fmtDate(a.installedDate)}</td>
                     <td className="border border-slate-300 px-2 py-1.5"></td>
@@ -177,6 +207,7 @@ export const GetReadySheet = ({
                       <span className="inline-block w-3.5 h-3.5 border border-slate-400" />
                     </td>
                     <td className="border border-slate-300 px-2 py-1.5">&nbsp;</td>
+                    <td className="border border-slate-300 px-2 py-1.5"></td>
                     <td className="border border-slate-300 px-2 py-1.5"></td>
                     <td className="border border-slate-300 px-2 py-1.5"></td>
                     <td className="border border-slate-300 px-2 py-1.5"></td>
