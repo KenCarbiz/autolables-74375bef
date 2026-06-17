@@ -3,6 +3,7 @@ import { useParams, useNavigate, useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import SignaturePad from "@/components/addendum/SignaturePad";
 import { AddendumDisclosurePacket, type PacketProduct } from "@/components/addendum/AddendumDisclosurePacket";
+import { needsUsedCarWarranty } from "@/lib/vehicleCondition";
 import { useEmailDistribution } from "@/hooks/useEmailDistribution";
 import { useReviewRequest } from "@/hooks/useReviewRequest";
 import { toast } from "sonner";
@@ -284,11 +285,12 @@ const MobileSigning = () => {
       toast.error(`Please accept or decline every optional and added item.`);
       return;
     }
-    if (!warrantyAck) {
+    // FTC Used Car Rule warranty + mileage only gates used/CPO units.
+    if (needsUsedCarWarranty(addendum?.vehicle_condition) && !warrantyAck) {
       toast.error("Please acknowledge the warranty status.");
       return;
     }
-    if (!deliveryMileage.trim()) {
+    if (needsUsedCarWarranty(addendum?.vehicle_condition) && !deliveryMileage.trim()) {
       toast.error("Please confirm mileage at delivery.");
       return;
     }
@@ -694,12 +696,15 @@ const MobileSigning = () => {
   const initialItems = products.filter((p) => needsInitials(p));
   const initialsDoneCount = initialItems.filter((p) => (initials[p.id] || "").trim()).length;
   const electableSelectedCount = electable.filter((p) => !!optionalSelections[p.id]).length;
+  const usedCar = needsUsedCarWarranty(addendum?.vehicle_condition);
   const requirements = [
     { label: "E-SIGN consent",  done: esignConsent },
     { label: "Required initials", done: initialItems.length === 0 || initialsDoneCount === initialItems.length },
     { label: "Options chosen",    done: electable.length === 0 || electableSelectedCount === electable.length },
-    { label: "Warranty acknowledged",    done: warrantyAck },
-    { label: "Delivery mileage",         done: deliveryMileage.trim().length > 0 },
+    ...(usedCar ? [
+      { label: "Warranty acknowledged",    done: warrantyAck },
+      { label: "Delivery mileage",         done: deliveryMileage.trim().length > 0 },
+    ] : []),
     { label: "Sticker match acknowledged", done: stickerMatchAck },
     { label: "Price confirmed",          done: paymentConfirmed },
     { label: "Signature",                done: !!customerSig.data },
@@ -999,7 +1004,8 @@ const MobileSigning = () => {
           )}
         </div>
 
-        {/* FTC Warranty Acknowledgment + Mileage at Delivery */}
+        {/* FTC Warranty Acknowledgment + Mileage — used/CPO only (16 CFR 455). */}
+        {needsUsedCarWarranty(addendum?.vehicle_condition) && (
         <div className="bg-card rounded-xl p-5 shadow-sm space-y-4">
           <h2 className="text-sm font-bold font-barlow-condensed text-foreground">FTC Warranty Acknowledgment</h2>
           <p className="text-xs text-muted-foreground leading-relaxed">
@@ -1046,6 +1052,7 @@ const MobileSigning = () => {
             </div>
           </button>
         </div>
+        )}
 
         {/* Window Sticker / Addendum Match Acknowledgment */}
         <div className="bg-card rounded-xl p-5 shadow-sm space-y-4">

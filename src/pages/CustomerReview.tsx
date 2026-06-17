@@ -7,6 +7,7 @@ import TransactionAuditRecord from "@/components/addendum/TransactionAuditRecord
 import { toast } from "sonner";
 import { ChevronLeft, ChevronRight, Check } from "lucide-react";
 import { AddendumDisclosurePacket, type PacketProduct } from "@/components/addendum/AddendumDisclosurePacket";
+import { needsUsedCarWarranty } from "@/lib/vehicleCondition";
 import {
   ESIGN_CONSENT_TEXT,
   buildConsentRecord,
@@ -216,8 +217,12 @@ const CustomerReview = () => {
   const electableInitialsDone = electable.every(
     (p) => !(needsInitials(p)) || (initials[p.id] || "").trim().length > 0,
   );
+  // FTC Used Car Rule warranty + mileage only applies to used/CPO units; new
+  // and demo cars skip it (and it must not gate their Continue).
+  const isUsedCar = needsUsedCarWarranty(addendum?.vehicle_condition);
   const disclosuresDone =
-    esignConsent && warrantyAck && deliveryMileage.trim().length > 0 && stickerMatchAck &&
+    esignConsent && stickerMatchAck &&
+    (!isUsedCar || (warrantyAck && deliveryMileage.trim().length > 0)) &&
     (!sb766Applies || sb766ThreeDayAck);
 
   const canAdvance = (() => {
@@ -645,6 +650,7 @@ const CustomerReview = () => {
 
           {current?.id === "disclosures" && (
             <DisclosuresStep
+              isUsedCar={isUsedCar}
               esignConsent={esignConsent} setEsignConsent={setEsignConsent}
               showFullConsent={showFullConsent} setShowFullConsent={setShowFullConsent}
               warrantyAck={warrantyAck} setWarrantyAck={setWarrantyAck}
@@ -1024,11 +1030,13 @@ const PricingStep = ({
 
 // ── Step: Disclosures ────────────────────────────────────────────
 const DisclosuresStep = ({
+  isUsedCar,
   esignConsent, setEsignConsent, showFullConsent, setShowFullConsent,
   warrantyAck, setWarrantyAck, deliveryMileage, setDeliveryMileage,
   stickerMatchAck, setStickerMatchAck, addendum,
   sb766ThreeDayAck, setSb766ThreeDayAck, setSb766Disclosure,
 }: {
+  isUsedCar: boolean;
   esignConsent: boolean; setEsignConsent: (v: boolean) => void;
   showFullConsent: boolean; setShowFullConsent: (v: boolean) => void;
   warrantyAck: boolean; setWarrantyAck: (v: boolean) => void;
@@ -1041,21 +1049,27 @@ const DisclosuresStep = ({
   <div className="space-y-4">
     <StepHeading title="A few acknowledgments" sub="Required by federal and state law before you sign." />
 
-    <div className="rounded-2xl border border-slate-200 bg-white p-5 space-y-3">
-      <p className="text-sm font-bold text-slate-900">Mileage at delivery</p>
-      <input
-        value={deliveryMileage}
-        onChange={(e) => setDeliveryMileage(e.target.value.replace(/[^0-9]/g, ""))}
-        placeholder="e.g. 45230"
-        inputMode="numeric"
-        className={`w-full h-14 border-2 rounded-xl px-4 text-lg font-bold text-center bg-white text-slate-900 ${deliveryMileage.trim() ? "border-emerald-400" : "border-slate-300"}`}
-      />
-      {deliveryMileage && <p className="text-xs text-slate-500 text-center">{parseInt(deliveryMileage).toLocaleString()} miles</p>}
-    </div>
+    {/* FTC Used Car Rule: only used/CPO units get the Buyers Guide warranty
+        acknowledgment + delivery mileage. New and demo cars skip it. */}
+    {isUsedCar && (
+      <>
+        <div className="rounded-2xl border border-slate-200 bg-white p-5 space-y-3">
+          <p className="text-sm font-bold text-slate-900">Mileage at delivery</p>
+          <input
+            value={deliveryMileage}
+            onChange={(e) => setDeliveryMileage(e.target.value.replace(/[^0-9]/g, ""))}
+            placeholder="e.g. 45230"
+            inputMode="numeric"
+            className={`w-full h-14 border-2 rounded-xl px-4 text-lg font-bold text-center bg-white text-slate-900 ${deliveryMileage.trim() ? "border-emerald-400" : "border-slate-300"}`}
+          />
+          {deliveryMileage && <p className="text-xs text-slate-500 text-center">{parseInt(deliveryMileage).toLocaleString()} miles</p>}
+        </div>
 
-    <BigCheck checked={warrantyAck} onClick={() => setWarrantyAck(!warrantyAck)}
-      title="I acknowledge the warranty status"
-      body="I reviewed the FTC Buyers Guide on this vehicle and understand the warranty status (As-Is, Implied, or Warranty) as disclosed. The mileage above is accurate at delivery." />
+        <BigCheck checked={warrantyAck} onClick={() => setWarrantyAck(!warrantyAck)}
+          title="I acknowledge the warranty status"
+          body="I reviewed the FTC Buyers Guide on this vehicle and understand the warranty status (As-Is, Implied, or Warranty) as disclosed. The mileage above is accurate at delivery." />
+      </>
+    )}
 
     <BigCheck checked={stickerMatchAck} onClick={() => setStickerMatchAck(!stickerMatchAck)}
       title="The sticker matches this addendum"

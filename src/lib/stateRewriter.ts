@@ -183,7 +183,11 @@ export const rewriteForState = (
 
   if (!rule) {
     warnings.push(`No state rule loaded for "${stateCode}". Using FTC baseline only.`);
-    blocks.push(FTC_BUYERS_GUIDE_EN, ESIGN_CONSENT, FEDERAL_ADDON_CONSENT);
+    // FTC Buyers Guide applies to used/CPO only — never new/demo.
+    if (input.vehicleCondition === "used" || input.vehicleCondition === "cpo") {
+      blocks.push(FTC_BUYERS_GUIDE_EN);
+    }
+    blocks.push(ESIGN_CONSENT, FEDERAL_ADDON_CONSENT);
     return {
       state: null,
       stateName: (stateCode || "").toUpperCase(),

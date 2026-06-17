@@ -1,4 +1,5 @@
 import { rewriteForState } from "@/lib/stateRewriter";
+import { canonicalCondition } from "@/lib/vehicleCondition";
 
 // Canonical, context-free disclosure packet shared by every signing surface
 // (dealer print, /sign document, /review wizard) so the customer always sees
@@ -43,7 +44,9 @@ export function AddendumDisclosurePacket({
   state?: string | null;
   vehiclePrice?: number | null;
   docFeeAmount?: number;
-  vehicleCondition?: "new" | "used" | "cpo";
+  // Accept a raw dealer label (Demo, Factory CPO, …) or a canonical value;
+  // we normalize so the FTC Buyers Guide only attaches to used/cpo units.
+  vehicleCondition?: string | null;
   language?: "en" | "es";
   products?: PacketProduct[];
   dealer?: PacketDealer;
@@ -52,7 +55,7 @@ export function AddendumDisclosurePacket({
   const pack = rewriteForState(state || "", {
     vehiclePrice: vehiclePrice ?? undefined,
     docFeeAmount,
-    vehicleCondition,
+    vehicleCondition: canonicalCondition(vehicleCondition),
     saleConductedInSpanish: language === "es",
   });
   const blocks = pack.blocks.filter((b) => b.language === language || b.language === "en");
