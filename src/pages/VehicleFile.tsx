@@ -835,6 +835,36 @@ const ScanInfoPanel = ({ vehicle, onReload }: { vehicle: VehicleRow; onReload: (
 
 const SUFFIXES = ["", "Jr.", "Sr.", "II", "III", "IV", "V"];
 
+// Buyer / co-buyer fields. MUST be module-scope — defining it inside
+// CustomerPanel made it a new component type each keystroke, remounting the
+// inputs and dropping focus after every character.
+const CP_INPUT = "w-full h-9 px-2.5 rounded-lg border border-border bg-background text-sm text-foreground outline-none focus:border-primary";
+const CP_LABEL = "text-[10px] font-bold uppercase tracking-wider text-muted-foreground";
+const CustomerPersonFields = ({ info, set }: { info: PersonInfo; set: (u: PersonInfo) => void }) => (
+  <div className="space-y-3">
+    <div className="grid grid-cols-2 md:grid-cols-6 gap-2">
+      <div className="md:col-span-2"><label className={CP_LABEL}>First name</label><input value={info.first_name || ""} onChange={(e) => set({ ...info, first_name: e.target.value })} className={CP_INPUT} /></div>
+      <div><label className={CP_LABEL}>M.I.</label><input value={info.middle_initial || ""} maxLength={1} onChange={(e) => set({ ...info, middle_initial: e.target.value.replace(/[^a-zA-Z]/g, "").toUpperCase() })} className={`${CP_INPUT} text-center`} /></div>
+      <div className="md:col-span-2"><label className={CP_LABEL}>Last name</label><input value={info.last_name || ""} onChange={(e) => set({ ...info, last_name: e.target.value })} className={CP_INPUT} /></div>
+      <div><label className={CP_LABEL}>Suffix</label>
+        <select value={info.suffix || ""} onChange={(e) => set({ ...info, suffix: e.target.value })} className={`${CP_INPUT} cursor-pointer`}>
+          {SUFFIXES.map((s) => <option key={s} value={s}>{s || "—"}</option>)}
+        </select>
+      </div>
+    </div>
+    <div><label className={CP_LABEL}>Street address</label><input value={info.address || ""} onChange={(e) => set({ ...info, address: e.target.value })} placeholder="123 Main St" className={CP_INPUT} /></div>
+    <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+      <div className="md:col-span-2"><label className={CP_LABEL}>City</label><input value={info.city || ""} onChange={(e) => set({ ...info, city: e.target.value })} className={CP_INPUT} /></div>
+      <div><label className={CP_LABEL}>State</label><input value={info.state || ""} maxLength={2} onChange={(e) => set({ ...info, state: e.target.value.toUpperCase() })} placeholder="CT" className={`${CP_INPUT} uppercase`} /></div>
+      <div><label className={CP_LABEL}>ZIP</label><input value={info.zip || ""} onChange={(e) => set({ ...info, zip: e.target.value.replace(/[^0-9-]/g, "").slice(0, 10) })} placeholder="06010" className={CP_INPUT} /></div>
+    </div>
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+      <div><label className={CP_LABEL}>Phone</label><input value={info.phone || ""} type="tel" onChange={(e) => set({ ...info, phone: formatPhone(e.target.value) })} placeholder="(555) 555-5555" className={CP_INPUT} /></div>
+      <div><label className={CP_LABEL}>Email</label><input value={info.email || ""} type="email" onChange={(e) => set({ ...info, email: e.target.value })} placeholder="customer@email.com" className={CP_INPUT} /></div>
+    </div>
+  </div>
+);
+
 // Customer capture on the unified vehicle file. Full buyer + co-buyer record
 // (incl. address) saved to vehicle_files — the internal, RLS-protected hub,
 // never the public listing. Captured at sale so the dealer has the complete
@@ -894,31 +924,6 @@ const CustomerPanel = ({ vehicle }: { vehicle: VehicleRow }) => {
   const inputCls = "w-full h-9 px-2.5 rounded-lg border border-border bg-background text-sm text-foreground outline-none focus:border-primary";
   const labelCls = "text-[10px] font-bold uppercase tracking-wider text-muted-foreground";
 
-  const PersonFields = ({ info, set }: { info: PersonInfo; set: (u: PersonInfo) => void }) => (
-    <div className="space-y-3">
-      <div className="grid grid-cols-2 md:grid-cols-6 gap-2">
-        <div className="md:col-span-2"><label className={labelCls}>First name</label><input value={info.first_name || ""} onChange={(e) => set({ ...info, first_name: e.target.value })} className={inputCls} /></div>
-        <div><label className={labelCls}>M.I.</label><input value={info.middle_initial || ""} maxLength={1} onChange={(e) => set({ ...info, middle_initial: e.target.value.replace(/[^a-zA-Z]/g, "").toUpperCase() })} className={`${inputCls} text-center`} /></div>
-        <div className="md:col-span-2"><label className={labelCls}>Last name</label><input value={info.last_name || ""} onChange={(e) => set({ ...info, last_name: e.target.value })} className={inputCls} /></div>
-        <div><label className={labelCls}>Suffix</label>
-          <select value={info.suffix || ""} onChange={(e) => set({ ...info, suffix: e.target.value })} className={`${inputCls} cursor-pointer`}>
-            {SUFFIXES.map((s) => <option key={s} value={s}>{s || "—"}</option>)}
-          </select>
-        </div>
-      </div>
-      <div><label className={labelCls}>Street address</label><input value={info.address || ""} onChange={(e) => set({ ...info, address: e.target.value })} placeholder="123 Main St" className={inputCls} /></div>
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-        <div className="md:col-span-2"><label className={labelCls}>City</label><input value={info.city || ""} onChange={(e) => set({ ...info, city: e.target.value })} className={inputCls} /></div>
-        <div><label className={labelCls}>State</label><input value={info.state || ""} maxLength={2} onChange={(e) => set({ ...info, state: e.target.value.toUpperCase() })} placeholder="CT" className={`${inputCls} uppercase`} /></div>
-        <div><label className={labelCls}>ZIP</label><input value={info.zip || ""} onChange={(e) => set({ ...info, zip: e.target.value })} placeholder="06010" className={inputCls} /></div>
-      </div>
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-        <div><label className={labelCls}>Phone</label><input value={info.phone || ""} type="tel" onChange={(e) => set({ ...info, phone: formatPhone(e.target.value) })} placeholder="(555) 555-5555" className={inputCls} /></div>
-        <div><label className={labelCls}>Email</label><input value={info.email || ""} type="email" onChange={(e) => set({ ...info, email: e.target.value })} placeholder="customer@email.com" className={inputCls} /></div>
-      </div>
-    </div>
-  );
-
   if (loading) return <p className="text-sm text-muted-foreground">Loading customer record…</p>;
 
   return (
@@ -938,7 +943,7 @@ const CustomerPanel = ({ vehicle }: { vehicle: VehicleRow }) => {
           <p className="text-sm font-bold text-foreground flex items-center gap-1.5"><UserRound className="w-4 h-4 text-muted-foreground" /> Buyer</p>
           <div><label className={labelCls}>Sold date</label><input type="date" value={soldAt} onChange={(e) => setSoldAt(e.target.value)} className={`${inputCls} w-auto`} /></div>
         </div>
-        <PersonFields info={buyer} set={setBuyer} />
+        <CustomerPersonFields info={buyer} set={setBuyer} />
       </section>
 
       <section className="rounded-2xl border border-border bg-card p-4 space-y-3">
@@ -946,7 +951,20 @@ const CustomerPanel = ({ vehicle }: { vehicle: VehicleRow }) => {
           <input type="checkbox" checked={showCobuyer} onChange={(e) => setShowCobuyer(e.target.checked)} />
           <span className="text-sm font-bold text-foreground flex items-center gap-1.5"><Users className="w-4 h-4 text-muted-foreground" /> Add co-buyer</span>
         </label>
-        {showCobuyer && <PersonFields info={cobuyer} set={setCobuyer} />}
+        {showCobuyer && (
+          <>
+            {(buyer.address || buyer.city || buyer.zip) && (
+              <button
+                type="button"
+                onClick={() => setCobuyer({ ...cobuyer, address: buyer.address, city: buyer.city, state: buyer.state, zip: buyer.zip })}
+                className="text-[10px] font-bold uppercase tracking-wide text-primary hover:underline"
+              >
+                Same address as buyer
+              </button>
+            )}
+            <CustomerPersonFields info={cobuyer} set={setCobuyer} />
+          </>
+        )}
       </section>
     </div>
   );

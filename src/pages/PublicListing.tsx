@@ -36,6 +36,7 @@ import Logo from "@/components/brand/Logo";
 import { QRCodeSVG } from "qrcode.react";
 import { useVehicleListing, type VehicleListing } from "@/hooks/useVehicleListing";
 import { supabase } from "@/integrations/supabase/client";
+import { formatPhone } from "@/components/addendum/CustomerInfoSection";
 import { PublicLocaleProvider, usePublicLocale, fmt } from "@/lib/i18n/public";
 import PublicLanguageToggle from "@/components/layout/PublicLanguageToggle";
 
@@ -698,7 +699,7 @@ const InquiryModal = ({ listing, dealer, onClose, onSent, sent }: InquiryModalPr
             <Field label={L.your_name} value={name} onChange={setName} placeholder={L.full_name} />
             <div className="grid grid-cols-2 gap-2">
               <Field label={L.email} value={email} onChange={setEmail} placeholder="you@example.com" type="email" />
-              <Field label={L.phone} value={phone} onChange={setPhone} placeholder="(555) 123-4567" type="tel" />
+              <Field label={L.phone} value={phone} onChange={(v) => setPhone(formatPhone(v))} placeholder="(555) 123-4567" type="tel" />
             </div>
             <div>
               <label className="text-[10px] font-bold uppercase tracking-label text-slate-500">{L.message}</label>

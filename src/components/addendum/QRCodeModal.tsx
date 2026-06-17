@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { QRCodeSVG } from "qrcode.react";
 import { ShieldCheck, Check, Smartphone, Mail, Link2, MessageSquare, Monitor } from "lucide-react";
+import { formatPhone } from "@/components/addendum/CustomerInfoSection";
 
 export interface ComplianceReceiptItem {
   label: string;
@@ -160,7 +161,7 @@ const QRCodeModal = ({
           <div className="flex gap-2">
             <input
               value={phone}
-              onChange={(e) => setPhone(e.target.value)}
+              onChange={(e) => setPhone(formatPhone(e.target.value))}
               placeholder="(555) 123-4567"
               type="tel"
               className="flex-1 h-10 rounded-lg border-2 border-border px-3 text-sm bg-background text-foreground"

@@ -21,7 +21,7 @@ const StateRewriterPanel = ({
   className?: string;
 }) => {
   const pack = useMemo(() => rewriteForState(state, input), [state, input]);
-  const [open, setOpen] = useState(true);
+  const [open, setOpen] = useState(false);
 
   const copy = async () => {
     try {

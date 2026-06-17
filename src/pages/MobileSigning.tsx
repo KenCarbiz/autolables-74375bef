@@ -600,7 +600,7 @@ const MobileSigning = () => {
               <p className="text-[10px] font-mono uppercase tracking-[0.18em] text-slate-500">Vehicle</p>
               <p className="text-sm font-bold text-slate-950 mt-1">{addendum.vehicle_ymm || "Vehicle"}</p>
               {addendum.vehicle_vin && (
-                <p className="text-[10px] font-mono text-slate-500">VIN · {addendum.vehicle_vin.slice(-8)}</p>
+                <p className="text-[10px] font-mono text-slate-500 break-all">VIN · {addendum.vehicle_vin}</p>
               )}
             </div>
             <div>
@@ -729,8 +729,19 @@ const MobileSigning = () => {
             )}
             <div className="mt-2 flex items-center gap-3 text-[11px] text-slate-500 font-mono uppercase tracking-wider flex-wrap">
               <span>Dealer addendum</span>
-              {addendum.vehicle_vin && <span>VIN · {addendum.vehicle_vin.slice(-8)}</span>}
+              {addendum.vehicle_vin && <span className="break-all">VIN · {addendum.vehicle_vin}</span>}
             </div>
+            {(() => {
+              const d = addendum.dealer_snapshot || {};
+              const addr = [d.address, [d.city, d.state].filter(Boolean).join(", "), d.zip].filter(Boolean).join(" · ");
+              if (!d.name && !addr) return null;
+              return (
+                <div className="mt-1 text-[11px] text-slate-500">
+                  {d.name && <span className="font-semibold text-slate-700">{d.name}</span>}
+                  {addr && <span>{d.name ? " · " : ""}{addr}</span>}
+                </div>
+              );
+            })()}
           </div>
 
         {/* Fill All Initials */}

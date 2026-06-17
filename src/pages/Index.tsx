@@ -234,6 +234,21 @@ const Index = () => {
       ? getDocFeeDisclosure(settings.doc_fee_state || settings.dealer_state || "", settings.doc_fee_amount)
       : "";
 
+  // Dealer identity embedded on the addendum row so the public signer page
+  // (no access to dealer settings) can print the licensed seller's name AND
+  // full address on the signed waiver.
+  const dealerSnapshot = {
+    name: currentStore?.name || settings.dealer_name || tenant?.name || "",
+    phone: settings.dealer_phone || currentStore?.phone || "",
+    tagline: settings.dealer_tagline || "",
+    logo_url: settings.dealer_logo_url || currentStore?.logo_url || tenant?.logo_url || "",
+    address: settings.dealer_address || "",
+    city: settings.dealer_city || "",
+    state: settings.dealer_state || "",
+    zip: settings.dealer_zip || "",
+    license_number: settings.dealer_license_number || "",
+  };
+
   // Paper size
   const paperWidth = settings.addendum_paper_size === "custom"
     ? `${settings.addendum_custom_width || "8.5"}in`
@@ -775,18 +790,30 @@ const Index = () => {
       vehicle_vin: vehicle.vin,
       addendum_date: vehicle.date || null,
       products_snapshot: JSON.parse(JSON.stringify(displayProducts || [])),
-      initials: {},
-      optional_selections: {},
+      // Keep the dealer's in-progress initials/selections instead of wiping
+      // them when moving a saved draft to the waiting-for-signature queue.
+      initials,
+      optional_selections: optionalSelections,
+      dealer_snapshot: dealerSnapshot,
       total_installed: installedTotal,
       total_with_optional: grandTotalWithFee,
       status: "draft" as const,
       signing_token: token,
     };
-    const { data: inserted, error } = await supabase
-      .from("addendums")
-      .insert([payload as any])
-      .select("id")
-      .single();
+    // Continue the same row when this addendum was already saved as a draft,
+    // so "Ready for Signatures" doesn't create a duplicate in Saved Addendums.
+    let inserted: { id?: string } | null = null;
+    let error: { message: string } | null = null;
+    if (currentId) {
+      const res = await supabase.from("addendums").update(payload as any).eq("id", currentId);
+      error = res.error;
+      inserted = { id: currentId };
+    } else {
+      const res = await supabase.from("addendums").insert([payload as any]).select("id").single();
+      error = res.error;
+      inserted = res.data as { id?: string } | null;
+      if (inserted?.id) setCurrentId(inserted.id);
+    }
     setSaving(false);
     if (error) { toast.error(error.message); return; }
 
@@ -912,6 +939,7 @@ const Index = () => {
       products_snapshot: JSON.parse(JSON.stringify(displayProducts || [])),
       initials,
       optional_selections: optionalSelections,
+      dealer_snapshot: dealerSnapshot,
       customer_name: composeName(customerInfo.buyer_first_name, customerInfo.buyer_middle_initial, customerInfo.buyer_last_name, customerInfo.buyer_suffix) || null,
       cobuyer_name: composeName(customerInfo.cobuyer_first_name, customerInfo.cobuyer_middle_initial, customerInfo.cobuyer_last_name, customerInfo.cobuyer_suffix) || null,
       customer_signature_data: customerSig.data || null,

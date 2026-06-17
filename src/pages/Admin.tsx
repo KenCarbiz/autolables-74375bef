@@ -5,6 +5,7 @@ import { uploadPhoto } from "@/lib/storage";
 import { Switch } from "@/components/ui/switch";
 import { PRICE_BUCKETS } from "@/types/product";
 import { useDealerSettings, DealerSettings, DEFAULT_SETTINGS, type GetReadyService } from "@/contexts/DealerSettingsContext";
+import { formatPhone } from "@/components/addendum/CustomerInfoSection";
 import { useProductRules, ProductRule } from "@/hooks/useProductRules";
 import type { ProductUpgrade } from "@/hooks/useProducts";
 import type { Json } from "@/integrations/supabase/types";
@@ -1321,7 +1322,7 @@ const Admin = () => {
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <label className="text-xs font-semibold text-muted-foreground">Phone</label>
-                    <input value={branding.dealer_phone} onChange={(e) => setBranding({ ...branding, dealer_phone: e.target.value })} placeholder="(555) 123-4567" className="mt-1 w-full px-3 py-2 border border-border-custom rounded text-sm bg-background text-foreground placeholder:text-muted-foreground/50" />
+                    <input value={branding.dealer_phone} onChange={(e) => setBranding({ ...branding, dealer_phone: formatPhone(e.target.value) })} placeholder="(555) 123-4567" className="mt-1 w-full px-3 py-2 border border-border-custom rounded text-sm bg-background text-foreground placeholder:text-muted-foreground/50" />
                   </div>
                   <div>
                     <label className="text-xs font-semibold text-muted-foreground">Dealer Principal</label>

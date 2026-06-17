@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { motion } from "framer-motion";
 import { ShieldCheck, AlertTriangle, XCircle, CheckCircle2, ChevronDown, ChevronRight } from "lucide-react";
 import type { ComplianceFinding } from "@/lib/stateCompliance";
@@ -14,7 +14,17 @@ const ComplianceRedTeamPanel = ({
   className?: string;
 }) => {
   const summary = useMemo(() => summarizeRedTeam(findings), [findings]);
-  const [open, setOpen] = useState(true);
+  // Collapsed by default when clean; auto-expands the first time an issue
+  // (blocker or warning) appears, then respects manual toggling thereafter.
+  const hasIssue = summary.fail > 0 || summary.warn > 0;
+  const [open, setOpen] = useState(hasIssue);
+  const autoOpened = useRef(hasIssue);
+  useEffect(() => {
+    if (hasIssue && !autoOpened.current) {
+      autoOpened.current = true;
+      setOpen(true);
+    }
+  }, [hasIssue]);
 
   const fails = findings.filter((f) => f.severity === "fail");
   const warns = findings.filter((f) => f.severity === "warn");

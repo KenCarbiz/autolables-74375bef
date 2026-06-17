@@ -295,6 +295,17 @@ export const DealerSettingsProvider = ({ children }: { children: ReactNode }) =>
       return;
     }
 
+    // Always-available baseline from the active tenant (TenantContext loads
+    // name + logo from onboarding_profiles). This guarantees Branding / the
+    // addendum letterhead show the dealership even if dealer_profiles is empty
+    // and the Autocurb mirror is RLS-blocked for a non-admin member.
+    const tenantBasics: Record<string, string> = {};
+    if (tenant && tenant.id !== "house") {
+      if (tenant.name && tenant.name !== "AutoLabels.io") tenantBasics.dealer_name = tenant.name;
+      const tl = tenant.logo_url || "";
+      if (tl && !tl.includes("autolabels-mark") && !tl.includes("logo-mark")) tenantBasics.dealer_logo_url = tl;
+    }
+
     // Signed-in + tenant: read from Supabase.
     try {
       const { data, error } = await (supabase as any)
@@ -322,6 +333,7 @@ export const DealerSettingsProvider = ({ children }: { children: ReactNode }) =>
       const dbSettings = (data?.settings as Partial<DealerSettings>) || {};
       const merged: DealerSettings = {
         ...DEFAULT_SETTINGS,
+        ...tenantBasics,
         ...autocurbDerived,
         ...(readCache(tenantId) || {}),
         ...dbSettings,
@@ -330,21 +342,22 @@ export const DealerSettingsProvider = ({ children }: { children: ReactNode }) =>
       writeCache(tenantId, merged);
     } catch {
       // Table may not exist yet (migration not applied) or query failed.
-      // Fall back to cache then defaults so the app still works.
+      // Fall back to cache then defaults, but still seed the tenant basics.
       const cached = readCache(tenantId);
-      setSettings(cached ?? DEFAULT_SETTINGS);
+      setSettings({ ...DEFAULT_SETTINGS, ...tenantBasics, ...(cached || {}) });
     } finally {
       setLoading(false);
     }
-  }, [user, tenantId]);
+  }, [user, tenantId, tenant]);
 
-  // Re-load when the user or their active tenant changes.
+  // Re-load when the user, their active tenant, or the tenant's name/logo
+  // resolves (TenantContext fills name/logo slightly after the id).
   useEffect(() => {
-    const k = `${user?.id ?? "anon"}:${tenantId ?? "none"}`;
+    const k = `${user?.id ?? "anon"}:${tenantId ?? "none"}:${tenant?.name ?? ""}:${tenant?.logo_url ?? ""}`;
     if (loadedKeyRef.current === k) return;
     loadedKeyRef.current = k;
     load();
-  }, [user?.id, tenantId, load]);
+  }, [user?.id, tenantId, tenant?.name, tenant?.logo_url, load]);
 
   const updateSettings = useCallback(
     async (updates: Partial<DealerSettings>) => {

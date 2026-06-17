@@ -6,6 +6,7 @@ import { useDealerScraper } from "@/hooks/useDealerScraper";
 import { useEntitlements } from "@/hooks/useEntitlements";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
+import { formatPhone } from "@/components/addendum/CustomerInfoSection";
 import Logo from "@/components/brand/Logo";
 import { toast } from "sonner";
 import {
@@ -685,7 +686,7 @@ const Onboarding = () => {
 
             <Section icon={Phone} title="Contact" subtitle="How customers reach you.">
               <div className="grid grid-cols-2 gap-3">
-                <Field label="Phone" value={data.phone} onChange={v => update("phone", v)} icon={Phone} placeholder="(555) 555-5555" />
+                <Field label="Phone" value={data.phone} onChange={v => update("phone", formatPhone(v))} icon={Phone} placeholder="(555) 555-5555" />
                 <Field label="Email" value={data.email} onChange={v => update("email", v)} icon={Mail} placeholder="contact@example.com" />
               </div>
             </Section>
