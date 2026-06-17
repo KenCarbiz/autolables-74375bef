@@ -1245,6 +1245,10 @@ const Admin = () => {
                           });
                           if (result?.url) {
                             setBranding({ ...branding, dealer_logo_url: result.url });
+                            // Persist the logo immediately so it isn't lost if
+                            // the dealer forgets to hit Save Branding. updateSettings
+                            // surfaces a toast if the DB write is denied (RLS).
+                            updateSettings({ dealer_logo_url: result.url });
                             toast.success("Logo uploaded");
                           }
                         } catch (err) {
