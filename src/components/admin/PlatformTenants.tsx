@@ -527,6 +527,26 @@ const TenantDetailsDrawer = ({
       const next: Record<string, string> = {};
       LEGAL_FIELDS.forEach((f) => { next[f.key] = (s[f.key] as string) || ""; });
       if (!next.dealer_name) next.dealer_name = tenant.name || "";
+      // Prefill the editable compliance fields from the Autocurb mirror when
+      // empty (a manually-saved value always wins). Lets the operator review
+      // and Save Autocurb's data onto the dealer profile in one step.
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const prof = (trow?.autocurb_profile || {}) as Record<string, any>;
+      if (prof && Object.keys(prof).length) {
+        const b = (prof.branding || {}) as Record<string, string>;
+        const st = (Array.isArray(prof.stores) && prof.stores[0] ? prof.stores[0] : {}) as Record<string, any>;
+        const fromAc: Record<string, string> = {
+          dealer_name: prof.legal_entity_name || prof.name || "",
+          dealer_address: prof.address || st.address || "",
+          dealer_city: st.city || "",
+          dealer_state: prof.governing_law_state || st.state || "",
+          dealer_zip: st.zip || "",
+          dealer_phone: prof.phone || st.phone || "",
+          dealer_license_number: b.dealer_license_number || "",
+          dealer_oem_brands: Array.isArray(st.oem_brands) ? st.oem_brands.join(", ") : "",
+        };
+        Object.entries(fromAc).forEach(([k, v]) => { if (!next[k] && v) next[k] = String(v); });
+      }
       setForm(next);
       setLoading(false);
     })();
@@ -608,7 +628,13 @@ const TenantDetailsDrawer = ({
               </div>
               <p className="text-[10px] text-muted-foreground mt-0.5">Read-only mirror. {mirror.synced_at ? `Last synced ${new Date(mirror.synced_at).toLocaleString()}` : "Not yet synced"}</p>
               <div className="flex items-center gap-2 mt-2">
-                {p.logo_url && <img src={p.logo_url} alt={p.name} className="h-7 w-auto object-contain" />}
+                {(() => {
+                  const logo = p.logo_url || b.logo_url || b.logo_white_url || b.corporate_logo_url;
+                  return logo ? (
+                    <img src={logo} alt={p.name} className="h-7 w-auto max-w-[120px] object-contain"
+                      onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }} />
+                  ) : <span className="text-[10px] text-muted-foreground italic">No logo from Autocurb</span>;
+                })()}
                 {[p.primary_color, p.secondary_color].filter(Boolean).map((c: string) => (
                   <span key={c} className="w-5 h-5 rounded border border-border" style={{ background: c }} title={c} />
                 ))}
