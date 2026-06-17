@@ -12,6 +12,65 @@ export interface GetReadyService {
   cost: string;
 }
 
+// ── Window-sticker PRINT templates ──────────────────────────────
+// Each dealer stores how they physically print a given document onto
+// label stock. Two modes:
+//   - "blank": AutoLabels prints the FULL designed sticker onto blank
+//     stock. Only the label SIZE matters.
+//   - "preprinted": the dealer feeds pre-printed label stock (their own
+//     artwork/branding already on the page) and AutoLabels overlays ONLY
+//     the vehicle data into fixed positions. Needs the artwork image (for
+//     on-screen alignment) plus an X/Y position per field.
+export type StickerDocType = "new_window" | "used_window" | "new_addendum" | "used_addendum";
+
+export interface StickerFieldPosition {
+  key: string;     // canonical data field (ymm, vin, price, …)
+  label: string;   // human label shown in the editor
+  x: number;       // horizontal position, percent of label width (0–100)
+  y: number;       // vertical position, percent of label height (0–100)
+  size: number;    // font size in points
+  enabled: boolean;
+}
+
+export interface StickerPrintTemplate {
+  mode: "blank" | "preprinted";
+  width: string;        // label width, inches
+  height: string;       // label height, inches
+  artwork_url: string;  // pre-printed stock artwork (preprinted mode only)
+  fields: StickerFieldPosition[];
+}
+
+export const DEFAULT_STICKER_FIELDS: StickerFieldPosition[] = [
+  { key: "ymm", label: "Year / Make / Model", x: 8, y: 10, size: 18, enabled: true },
+  { key: "trim", label: "Trim", x: 8, y: 19, size: 12, enabled: true },
+  { key: "price", label: "Price", x: 60, y: 10, size: 24, enabled: true },
+  { key: "mileage", label: "Mileage", x: 60, y: 19, size: 12, enabled: true },
+  { key: "stock", label: "Stock #", x: 8, y: 84, size: 10, enabled: true },
+  { key: "vin", label: "VIN", x: 8, y: 90, size: 10, enabled: true },
+];
+
+export const DEFAULT_STICKER_TEMPLATE: StickerPrintTemplate = {
+  mode: "blank",
+  width: "8.5",
+  height: "11",
+  artwork_url: "",
+  fields: DEFAULT_STICKER_FIELDS,
+};
+
+export const STICKER_DOC_LABELS: Record<StickerDocType, string> = {
+  new_window: "New-car window sticker",
+  used_window: "Used-car window sticker",
+  new_addendum: "New-car addendum",
+  used_addendum: "Used-car addendum",
+};
+
+const defaultStickerTemplates = (): Record<StickerDocType, StickerPrintTemplate> => ({
+  new_window: { ...DEFAULT_STICKER_TEMPLATE, fields: DEFAULT_STICKER_FIELDS.map((f) => ({ ...f })) },
+  used_window: { ...DEFAULT_STICKER_TEMPLATE, fields: DEFAULT_STICKER_FIELDS.map((f) => ({ ...f })) },
+  new_addendum: { ...DEFAULT_STICKER_TEMPLATE, fields: DEFAULT_STICKER_FIELDS.map((f) => ({ ...f })) },
+  used_addendum: { ...DEFAULT_STICKER_TEMPLATE, fields: DEFAULT_STICKER_FIELDS.map((f) => ({ ...f })) },
+});
+
 export interface DealerSettings {
   // Branding
   dealer_name: string;
@@ -58,6 +117,10 @@ export interface DealerSettings {
   default_used_window: string;      // layout id for the used-car window sticker
   default_used_addendum: string;    // layout id for the used-car addendum sticker
   default_ftc_warranty: string;     // FTC Buyers Guide warranty designation
+  // Per-dealer physical PRINT templates, keyed by document type. Stores the
+  // label stock size and (for pre-printed stock) the artwork + the X/Y
+  // positions the vehicle data is overlaid into when printing.
+  sticker_print_templates: Record<StickerDocType, StickerPrintTemplate>;
   // Feature toggles — what shows on the employee-facing addendum
   feature_vin_decode: boolean;
   feature_buyers_guide: boolean;
@@ -135,6 +198,7 @@ export const DEFAULT_SETTINGS: DealerSettings = {
   default_used_window: "standard",
   default_used_addendum: "standard",
   default_ftc_warranty: "as_is",
+  sticker_print_templates: defaultStickerTemplates(),
   feature_vin_decode: true,
   feature_buyers_guide: true,
   feature_product_rules: true,

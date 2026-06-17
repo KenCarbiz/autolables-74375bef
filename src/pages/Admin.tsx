@@ -19,6 +19,7 @@ import { GetReadySheet } from "@/components/admin/GetReadySheet";
 import type { GetReadyRecord } from "@/hooks/useGetReady";
 import { EmailDistributionPanel } from "@/components/admin/EmailDistributionPanel";
 import { StartGetReadyModal } from "@/components/admin/StartGetReadyModal";
+import StickerPrintTemplates from "@/components/admin/StickerPrintTemplates";
 import { InventoryFeedHealth } from "@/components/admin/InventoryFeedHealth";
 import { OpenSigningsList } from "@/components/admin/OpenSigningsList";
 import { AddonElectionsPanel } from "@/components/admin/AddonElectionsPanel";
@@ -1472,6 +1473,10 @@ const Admin = () => {
                   Reset to Defaults
                 </button>
               </div>
+            </div>
+
+            <div className="mt-4">
+              <StickerPrintTemplates />
             </div>
           </div>
         )}
