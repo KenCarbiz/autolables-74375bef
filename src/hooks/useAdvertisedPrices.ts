@@ -268,3 +268,146 @@ export const assessDrift = (
       : `Sticker is $${abs.toLocaleString()} LOWER than the price you're advertising. Less risky, but still a mismatch the audit trail will record.`,
   };
 };
+
+// ──────────────────────────────────────────────────────────────
+// Price-integrity assessment — pure, testable.
+//
+// FTC posture: the dealer must honor its advertised/website price as
+// inclusive of (a) the dealer documentation fee and (b) every product
+// pre-installed and NOT removable. So the number a customer can be asked
+// to sign for must reconcile to the advertised price:
+//
+//   expectedOnline = sellingPrice + docFee
+//                  + Σ(pre-installed, non-removable, price_in_advertised items)
+//
+// If that does not equal the scraped advertised price (within tolerance),
+// the addendum is NOT signable. The resolution is to correct the selling
+// price, find the unaccounted item, or reclassify a pre-installed line to
+// customer-elected (which drops it out of expectedOnline and forces the
+// voluntary/opt-out notice).
+// ──────────────────────────────────────────────────────────────
+
+export interface PriceIntegrityProduct {
+  id?: string;
+  name?: string;
+  price?: number;
+  badge_type?: string;            // "installed" => pre-installed/in-price
+  price_in_advertised?: boolean;  // default true (FTC-safe: inside the ad price)
+  removable?: boolean;            // default false; non-removable pre-installs are mandatory inclusions
+}
+
+export interface PriceIntegrityInput {
+  sellingPrice: number | null;    // actual selling price BEFORE doc fee; null/0 => no_selling_price
+  docFee: number;                 // 0 when doc fee disabled
+  products: PriceIntegrityProduct[];
+  advertised?: AdvertisedPrice;   // byVin.get(vin); undefined => untracked
+}
+
+export interface PriceIntegrityAssessment {
+  status: "ok" | "mismatch" | "no_selling_price" | "untracked";
+  expectedOnline: number;         // sellingPrice + docFee + includedTotal
+  advertised?: number;            // advertised.advertised_price
+  delta: number;                  // expectedOnline - advertised (signed)
+  abs_delta: number;
+  sellingPrice: number;
+  docFee: number;
+  includedTotal: number;          // Σ pre-installed, non-removable, price_in_advertised !== false
+  includedItems: { name: string; price: number }[];
+  source?: AdvertisedSource;
+  snapshot_at?: string;
+  blocking: boolean;              // mismatch / no_selling_price block signing; untracked is soft
+  reason: string;
+}
+
+// Items folded INTO the advertised price: pre-installed, non-removable, and
+// flagged as in-advertised (the default). A removable or explicitly
+// above-advertised line is excluded — it is a transparent add-on, not part
+// of the number that must equal the website price.
+export const includedInAdvertised = (p: PriceIntegrityProduct): boolean =>
+  p.badge_type === "installed" && p.price_in_advertised !== false && p.removable !== true;
+
+export const assessPriceIntegrity = (
+  input: PriceIntegrityInput,
+  tolerance: number = TOLERANCE_DOLLARS,
+): PriceIntegrityAssessment => {
+  const included = (input.products || []).filter(includedInAdvertised);
+  const includedTotal = included.reduce((s, p) => s + (p.price || 0), 0);
+  const includedItems = included.map((p) => ({ name: p.name || "", price: p.price || 0 }));
+  const selling = input.sellingPrice ?? 0;
+  const expectedOnline = selling + (input.docFee || 0) + includedTotal;
+
+  // 1) No selling price → cannot verify. This is a prompt, never a pass.
+  if (!input.sellingPrice || input.sellingPrice <= 0) {
+    return {
+      status: "no_selling_price",
+      expectedOnline,
+      delta: 0,
+      abs_delta: 0,
+      sellingPrice: selling,
+      docFee: input.docFee || 0,
+      includedTotal,
+      includedItems,
+      blocking: true,
+      reason: "Enter the actual selling price (before doc fee) so the all-in price can be verified against your advertised/website price.",
+    };
+  }
+
+  // 2) No advertised price on file → untracked. Soft (don't strand a deal),
+  // but signing stays gated until a price is captured/scraped.
+  if (!input.advertised) {
+    return {
+      status: "untracked",
+      expectedOnline,
+      delta: 0,
+      abs_delta: 0,
+      sellingPrice: selling,
+      docFee: input.docFee || 0,
+      includedTotal,
+      includedItems,
+      blocking: false,
+      reason: "No advertised/website price on file for this VIN. Re-scrape your website or capture the advertised price to verify the all-in total before signing.",
+    };
+  }
+
+  const advertised = input.advertised.advertised_price;
+  const delta = expectedOnline - advertised;
+  const abs = Math.abs(delta);
+
+  if (abs <= tolerance) {
+    return {
+      status: "ok",
+      expectedOnline,
+      advertised,
+      delta,
+      abs_delta: abs,
+      sellingPrice: selling,
+      docFee: input.docFee || 0,
+      includedTotal,
+      includedItems,
+      source: input.advertised.source_label,
+      snapshot_at: input.advertised.snapshot_at,
+      blocking: false,
+      reason: `All-in price reconciles to the advertised price within $${tolerance}. Selling ${money(selling)} + doc fee ${money(input.docFee || 0)} + ${included.length} pre-installed item(s) = ${money(expectedOnline)}.`,
+    };
+  }
+
+  return {
+    status: "mismatch",
+    expectedOnline,
+    advertised,
+    delta,
+    abs_delta: abs,
+    sellingPrice: selling,
+    docFee: input.docFee || 0,
+    includedTotal,
+    includedItems,
+    source: input.advertised.source_label,
+    snapshot_at: input.advertised.snapshot_at,
+    blocking: true,
+    reason: delta > 0
+      ? `All-in total ${money(expectedOnline)} is $${abs.toLocaleString()} OVER the advertised price ${money(advertised)}. The advertised price must include every pre-installed item plus the doc fee. Fix the selling price, or reclassify a pre-installed line to customer-elected so the buyer may decline it.`
+      : `All-in total ${money(expectedOnline)} is $${abs.toLocaleString()} UNDER the advertised price ${money(advertised)}. Re-check the selling price or whether an installed item is missing from the addendum.`,
+  };
+};
+
+const money = (n: number) => n.toLocaleString("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 });

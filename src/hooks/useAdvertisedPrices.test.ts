@@ -1,5 +1,13 @@
 import { describe, it, expect } from "vitest";
-import { assessDrift, assessSiteSpread, TOLERANCE_DOLLARS, type AdvertisedPrice } from "./useAdvertisedPrices";
+import {
+  assessDrift,
+  assessSiteSpread,
+  assessPriceIntegrity,
+  includedInAdvertised,
+  TOLERANCE_DOLLARS,
+  type AdvertisedPrice,
+  type PriceIntegrityProduct,
+} from "./useAdvertisedPrices";
 
 // ──────────────────────────────────────────────────────────────
 // assessDrift is the pure gate primitive every publish path
@@ -176,5 +184,122 @@ describe("assessSiteSpread — cross-site price agreement", () => {
     expect(r!.max).toBe(24_500);
     expect(r!.spread).toBe(2_500);
     expect(r!.inAgreement).toBe(false);
+  });
+});
+
+// ──────────────────────────────────────────────────────────────
+// assessPriceIntegrity is the per-deal FTC gate: the all-in price
+// (selling + doc fee + pre-installed items) must equal the scraped
+// advertised price or the addendum cannot be signed.
+// ──────────────────────────────────────────────────────────────
+
+const installed = (price: number, over: Partial<PriceIntegrityProduct> = {}): PriceIntegrityProduct => ({
+  id: `p-${price}`, name: `Item ${price}`, price, badge_type: "installed", price_in_advertised: true, ...over,
+});
+
+describe("includedInAdvertised — which lines fold into the advertised price", () => {
+  it("includes a pre-installed, non-removable, in-advertised line", () => {
+    expect(includedInAdvertised(installed(995))).toBe(true);
+  });
+  it("excludes an optional/customer-elected line", () => {
+    expect(includedInAdvertised(installed(995, { badge_type: "optional" }))).toBe(false);
+  });
+  it("excludes a line explicitly above the advertised price", () => {
+    expect(includedInAdvertised(installed(995, { price_in_advertised: false }))).toBe(false);
+  });
+  it("excludes a removable pre-installed line", () => {
+    expect(includedInAdvertised(installed(995, { removable: true }))).toBe(false);
+  });
+  it("treats undefined price_in_advertised as inside the ad price (FTC-safe default)", () => {
+    expect(includedInAdvertised({ name: "x", price: 100, badge_type: "installed" })).toBe(true);
+  });
+});
+
+describe("assessPriceIntegrity — no_selling_price branch", () => {
+  it("blocks when selling price is missing", () => {
+    const r = assessPriceIntegrity({ sellingPrice: null, docFee: 599, products: [installed(995)], advertised: makeAp() });
+    expect(r.status).toBe("no_selling_price");
+    expect(r.blocking).toBe(true);
+  });
+  it("blocks when selling price is zero or negative", () => {
+    expect(assessPriceIntegrity({ sellingPrice: 0, docFee: 0, products: [], advertised: makeAp() }).status).toBe("no_selling_price");
+  });
+});
+
+describe("assessPriceIntegrity — untracked branch", () => {
+  it("is soft (non-blocking) when no advertised price is on file", () => {
+    const r = assessPriceIntegrity({ sellingPrice: 20_000, docFee: 599, products: [installed(995)], advertised: undefined });
+    expect(r.status).toBe("untracked");
+    expect(r.blocking).toBe(false);
+    expect(r.expectedOnline).toBe(21_594);
+  });
+});
+
+describe("assessPriceIntegrity — ok branch", () => {
+  it("reconciles selling + doc fee + pre-installed to the advertised price", () => {
+    // 20000 + 599 + 995 + 406 = 22000 → exact match
+    const r = assessPriceIntegrity({
+      sellingPrice: 20_000,
+      docFee: 599,
+      products: [installed(995), installed(406)],
+      advertised: makeAp({ advertised_price: 22_000 }),
+    });
+    expect(r.status).toBe("ok");
+    expect(r.blocking).toBe(false);
+    expect(r.includedTotal).toBe(1_401);
+    expect(r.expectedOnline).toBe(22_000);
+    expect(r.delta).toBe(0);
+  });
+  it("passes within the $50 tolerance window", () => {
+    const r = assessPriceIntegrity({
+      sellingPrice: 20_040,
+      docFee: 599,
+      products: [installed(995), installed(406)],
+      advertised: makeAp({ advertised_price: 22_000 }),
+    });
+    expect(r.status).toBe("ok");
+    expect(r.abs_delta).toBe(40);
+  });
+  it("excludes optional and above-advertised lines from the included total", () => {
+    const r = assessPriceIntegrity({
+      sellingPrice: 21_405,
+      docFee: 0,
+      products: [
+        installed(595),                                   // included
+        installed(900, { badge_type: "optional" }),       // excluded
+        installed(750, { price_in_advertised: false }),   // excluded
+      ],
+      advertised: makeAp({ advertised_price: 22_000 }),
+    });
+    expect(r.includedTotal).toBe(595);
+    expect(r.status).toBe("ok");
+  });
+});
+
+describe("assessPriceIntegrity — mismatch branch", () => {
+  it("blocks and flags OVER when the all-in total exceeds advertised", () => {
+    // 20000 + 599 + 995 = 21594, advertised 21000 → +594 over
+    const r = assessPriceIntegrity({
+      sellingPrice: 20_000,
+      docFee: 599,
+      products: [installed(995)],
+      advertised: makeAp({ advertised_price: 21_000 }),
+    });
+    expect(r.status).toBe("mismatch");
+    expect(r.blocking).toBe(true);
+    expect(r.delta).toBe(594);
+    expect(r.reason).toMatch(/OVER/);
+    expect(r.reason.toLowerCase()).toMatch(/reclassify|customer-elected/);
+  });
+  it("blocks and flags UNDER when the all-in total is below advertised", () => {
+    const r = assessPriceIntegrity({
+      sellingPrice: 18_000,
+      docFee: 599,
+      products: [installed(995)],
+      advertised: makeAp({ advertised_price: 22_000 }),
+    });
+    expect(r.status).toBe("mismatch");
+    expect(r.delta).toBe(-2_406);
+    expect(r.reason).toMatch(/UNDER/);
   });
 });

@@ -15,7 +15,8 @@ import VehicleStrip from "@/components/addendum/VehicleStrip";
 import IntentBox from "@/components/addendum/IntentBox";
 import ProductRow from "@/components/addendum/ProductRow";
 import { useSmsDelivery } from "@/hooks/useSmsDelivery";
-import { useAdvertisedPrices } from "@/hooks/useAdvertisedPrices";
+import { useAdvertisedPrices, assessPriceIntegrity, type AdvertisedSource } from "@/hooks/useAdvertisedPrices";
+import AddendumPriceIntegrity from "@/components/addendum/AddendumPriceIntegrity";
 import TotalBar from "@/components/addendum/TotalBar";
 import SelectionRecord from "@/components/addendum/SelectionRecord";
 import Disclosures, { type DisclosureLanguage } from "@/components/addendum/Disclosures";
@@ -145,10 +146,10 @@ const Index = () => {
   const { data: products, isLoading } = useProducts();
   const { user, isAdmin } = useAuth();
   const { settings } = useDealerSettings();
-  const { byVin } = useAdvertisedPrices();
   const { rules, getMatchingProducts } = useProductRules();
   const { log } = useAudit();
   const { currentStore, tenant } = useTenant();
+  const { byVin, captureSnapshot } = useAdvertisedPrices(currentStore?.id || "");
   const { sendSigningLink } = useSmsDelivery();
   const { getOrCreateFile, registerSticker } = useVehicleFiles(currentStore?.id || "");
   const navigate = useNavigate();
@@ -192,6 +193,12 @@ const Index = () => {
 
   // Scraped vehicle details (from URL import)
   const [vehicleDetails, setVehicleDetails] = useState<Partial<ScrapedVehicle>>({});
+
+  // Actual selling price BEFORE the doc fee. The FTC price-integrity gate
+  // reconciles selling + doc fee + every pre-installed (in-advertised) item
+  // against the scraped advertised/website price for this VIN.
+  const [sellingPrice, setSellingPrice] = useState<number | null>(null);
+  const [rescraping, setRescraping] = useState(false);
 
   // Product type overrides — employee can toggle installed <-> optional at signing time
   const [typeOverrides, setTypeOverrides] = useState<Record<string, "installed" | "optional">>({});
@@ -288,6 +295,8 @@ const Index = () => {
       });
       setInitials((data.initials as Record<string, string>) || {});
       setOptionalSelections((data.optional_selections as Record<string, string>) || {});
+      const savedSelling = (data as { selling_price?: number | null }).selling_price;
+      setSellingPrice(typeof savedSelling === "number" ? savedSelling : null);
 
       // Prefer the full saved customer_info bag (address, phone, email, …).
       // Fall back to splitting the composite names for rows saved before the
@@ -522,6 +531,61 @@ const Index = () => {
   const hasCobuyer = !!(customerInfo.cobuyer_first_name?.trim() || customerInfo.cobuyer_last_name?.trim());
   const docFeeAmount = settings.doc_fee_enabled ? (settings.doc_fee_amount || 0) : 0;
   const grandTotalWithFee = grandTotal + docFeeAmount;
+
+  // FTC price-integrity gate: selling price + doc fee + every pre-installed
+  // (in-advertised, non-removable) item must reconcile to the scraped
+  // advertised/website price. Mismatch / missing-selling-price block signing;
+  // untracked (no price on file) is a soft prompt to capture/re-scrape.
+  const priceIntegrity = useMemo(
+    () => assessPriceIntegrity({
+      sellingPrice,
+      docFee: docFeeAmount,
+      products: displayProducts.map((p) => ({
+        id: p.id,
+        name: p.name,
+        price: p.price,
+        badge_type: p.badge_type,
+        price_in_advertised: (p as { price_in_advertised?: boolean }).price_in_advertised,
+        removable: (p as { removable?: boolean }).removable,
+      })),
+      advertised: advertisedForVin,
+    }),
+    [sellingPrice, docFeeAmount, displayProducts, advertisedForVin],
+  );
+
+  // Manual capture of the advertised/website price for this VIN — the escape
+  // hatch when the scraper can't reach a JS-walled site. Records an audited
+  // advertised_prices snapshot that the integrity check immediately re-reads.
+  const captureAdvertised = async (price: number, source: AdvertisedSource) => {
+    if (!vehicle.vin.trim()) { toast.error("Enter the VIN first"); return; }
+    try {
+      await captureSnapshot({
+        vin: vehicle.vin,
+        advertised_price: price,
+        source_label: source,
+        captured_by: user?.email || "dealer",
+        notes: "Captured at addendum build for price-integrity verification",
+      });
+      toast.success("Advertised price captured.");
+    } catch (e) {
+      toast.error((e as Error).message || "Could not capture advertised price");
+    }
+  };
+
+  // Re-scrape the dealer website for this single VIN (Firecrawl-backed crawl).
+  const rescrapeVin = async () => {
+    if (!vehicle.vin.trim() || !tenant?.id) { toast.error("Enter the VIN first"); return; }
+    setRescraping(true);
+    try {
+      const { error } = await supabase.functions.invoke("crawl-advertised-prices", {
+        body: { tenant_id: tenant.id, vin: vehicle.vin.trim().toUpperCase(), discover: true },
+      });
+      if (error) toast.error("Re-scrape failed — capture the price manually for now");
+      else toast.success("Re-scrape requested — refreshing advertised price");
+    } finally {
+      setRescraping(false);
+    }
+  };
 
   const iconMap = JSON.parse(localStorage.getItem(`product_icons:${tenant?.id || "none"}`) || "{}");
 
@@ -806,6 +870,33 @@ const Index = () => {
       return;
     }
 
+    // Price-integrity hard-block: the all-in price (selling + doc fee +
+    // pre-installed items) must reconcile to the scraped advertised price.
+    // Per the FTC-honor rule, signing is blocked unless this verifies. A
+    // missing advertised price (untracked) also blocks — the dealer must
+    // re-scrape or capture the advertised price first.
+    if (priceIntegrity.status !== "ok") {
+      toast.error(`Price integrity: ${priceIntegrity.reason}`);
+      if (user) log({
+        store_id: currentStore?.id || "",
+        user_id: user.id,
+        action: "price_integrity_block",
+        entity_type: "addendum",
+        entity_id: vehicle.vin,
+        details: {
+          source: "handleSendToCustomer",
+          status: priceIntegrity.status,
+          selling_price: priceIntegrity.sellingPrice,
+          doc_fee: priceIntegrity.docFee,
+          included_total: priceIntegrity.includedTotal,
+          expected_online: priceIntegrity.expectedOnline,
+          advertised: priceIntegrity.advertised,
+          delta: priceIntegrity.delta,
+        },
+      });
+      return;
+    }
+
     setSaving(true);
     const token = crypto.randomUUID();
     const payload = {
@@ -826,6 +917,10 @@ const Index = () => {
       cobuyer_name: composeName(customerInfo.cobuyer_first_name, customerInfo.cobuyer_middle_initial, customerInfo.cobuyer_last_name, customerInfo.cobuyer_suffix) || null,
       total_installed: installedTotal,
       total_with_optional: grandTotalWithFee,
+      selling_price: sellingPrice,
+      // Advertised/website baseline the all-in math reconciles against, so the
+      // signer pages (which can't read dealer settings) show the right number.
+      vehicle_price: advertisedForVin?.advertised_price ?? (vehiclePriceNum || null),
       status: "draft" as const,
       signing_token: token,
     };
@@ -833,20 +928,25 @@ const Index = () => {
     // so "Ready for Signatures" doesn't create a duplicate in Saved Addendums.
     let inserted: { id?: string } | null = null;
     let error: { message: string } | null = null;
-    const missingCol = (e: { message?: string } | null) => !!e && /customer_info/i.test(e.message || "");
+    const missingCol = (e: { message?: string } | null) =>
+      !!e && /(customer_info|selling_price|vehicle_price)/i.test(e.message || "");
+    // Drop any not-yet-migrated optional columns and retry so a propagating
+    // schema never blocks the signing link.
+    const stripOptional = (p: any) => {
+      const { customer_info, selling_price, vehicle_price, ...rest } = p;
+      return rest;
+    };
     if (currentId) {
       let res = await supabase.from("addendums").update(payload as any).eq("id", currentId);
       if (missingCol(res.error)) {
-        const { customer_info, ...rest } = payload as any;
-        res = await supabase.from("addendums").update(rest as any).eq("id", currentId);
+        res = await supabase.from("addendums").update(stripOptional(payload) as any).eq("id", currentId);
       }
       error = res.error;
       inserted = { id: currentId };
     } else {
       let res = await supabase.from("addendums").insert([payload as any]).select("id").single();
       if (missingCol(res.error)) {
-        const { customer_info, ...rest } = payload as any;
-        res = await supabase.from("addendums").insert([rest as any]).select("id").single();
+        res = await supabase.from("addendums").insert([stripOptional(payload) as any]).select("id").single();
       }
       error = res.error;
       inserted = res.data as { id?: string } | null;
@@ -995,20 +1095,26 @@ const Index = () => {
       employee_signed_at: employeeSig.data ? (employeeSig.at || now) : null,
       total_installed: installedTotal,
       total_with_optional: grandTotalWithFee,
+      selling_price: sellingPrice,
+      vehicle_price: advertisedForVin?.advertised_price ?? (vehiclePriceNum || null),
       status: fullySigned ? "signed" : "draft",
     };
     // Update the existing row when continuing a draft, else insert a new one
     // (with a signing token) so re-saving keeps ONE entry in Saved Addendums.
     let inserted: { id?: string } | null = null;
     let error: { message: string } | null = null;
-    // Resilient write: if the customer_info column hasn't been migrated yet,
-    // drop it and retry so the save still succeeds (degrades to name/email).
-    const missingCol = (e: { message?: string } | null) => !!e && /customer_info/i.test(e.message || "");
+    // Resilient write: if an optional column hasn't been migrated yet, drop it
+    // and retry so the save still succeeds (degrades to name/email + totals).
+    const missingCol = (e: { message?: string } | null) =>
+      !!e && /(customer_info|selling_price|vehicle_price)/i.test(e.message || "");
+    const stripOptional = (p: any) => {
+      const { customer_info, selling_price, vehicle_price, ...rest } = p;
+      return rest;
+    };
     if (currentId) {
       let res = await supabase.from("addendums").update(payload as any).eq("id", currentId);
       if (missingCol(res.error)) {
-        const { customer_info, ...rest } = payload as any;
-        res = await supabase.from("addendums").update(rest as any).eq("id", currentId);
+        res = await supabase.from("addendums").update(stripOptional(payload) as any).eq("id", currentId);
       }
       error = res.error;
       inserted = { id: currentId };
@@ -1016,8 +1122,7 @@ const Index = () => {
       const seed = { ...payload, signing_token: crypto.randomUUID() };
       let res = await supabase.from("addendums").insert([seed as any]).select("id").single();
       if (missingCol(res.error)) {
-        const { customer_info, ...rest } = seed as any;
-        res = await supabase.from("addendums").insert([rest as any]).select("id").single();
+        res = await supabase.from("addendums").insert([stripOptional(seed) as any]).select("id").single();
       }
       error = res.error;
       inserted = res.data as { id?: string } | null;
@@ -1259,6 +1364,16 @@ const Index = () => {
           lists what a regulator would flag before the customer signs. */}
       {!viewMode && (
         <div style={{ maxWidth: paperWidth }} className="mx-auto mb-3 no-print space-y-3">
+          <AddendumPriceIntegrity
+            assessment={priceIntegrity}
+            sellingPrice={sellingPrice}
+            onSellingPriceChange={setSellingPrice}
+            docFeeLabel={getDocFeeTerminology(settings.doc_fee_state || settings.dealer_state || "")}
+            vin={vehicle.vin}
+            onCaptureAdvertised={captureAdvertised}
+            onRescrape={rescrapeVin}
+            rescraping={rescraping}
+          />
           <ComplianceRedTeamPanel
             findings={runComplianceRedTeam({
               state: settings.doc_fee_state || settings.dealer_state || "",
