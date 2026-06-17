@@ -1919,6 +1919,7 @@ export type Database = {
       }
       vehicle_listings: {
         Row: {
+          available_accessories: Json
           certification: Json | null
           condition: string | null
           created_at: string
@@ -1944,6 +1945,7 @@ export type Database = {
           recall_override_notes: string | null
           scrape_last_synced_at: string | null
           scrape_source_url: string | null
+          service_records: Json
           slug: string
           status: string
           sticker_snapshot: Json
@@ -1956,9 +1958,11 @@ export type Database = {
           videos: Json
           view_count: number
           vin: string
+          warranty_info: Json
           ymm: string | null
         }
         Insert: {
+          available_accessories?: Json
           certification?: Json | null
           condition?: string | null
           created_at?: string
@@ -1984,6 +1988,7 @@ export type Database = {
           recall_override_notes?: string | null
           scrape_last_synced_at?: string | null
           scrape_source_url?: string | null
+          service_records?: Json
           slug: string
           status?: string
           sticker_snapshot?: Json
@@ -1996,9 +2001,11 @@ export type Database = {
           videos?: Json
           view_count?: number
           vin: string
+          warranty_info?: Json
           ymm?: string | null
         }
         Update: {
+          available_accessories?: Json
           certification?: Json | null
           condition?: string | null
           created_at?: string
@@ -2024,6 +2031,7 @@ export type Database = {
           recall_override_notes?: string | null
           scrape_last_synced_at?: string | null
           scrape_source_url?: string | null
+          service_records?: Json
           slug?: string
           status?: string
           sticker_snapshot?: Json
@@ -2036,6 +2044,7 @@ export type Database = {
           videos?: Json
           view_count?: number
           vin?: string
+          warranty_info?: Json
           ymm?: string | null
         }
         Relationships: [
@@ -2591,6 +2600,7 @@ export type Database = {
       get_vehicle_listing_by_slug: {
         Args: { _slug: string }
         Returns: {
+          available_accessories: Json
           certification: Json | null
           condition: string | null
           created_at: string
@@ -2616,6 +2626,7 @@ export type Database = {
           recall_override_notes: string | null
           scrape_last_synced_at: string | null
           scrape_source_url: string | null
+          service_records: Json
           slug: string
           status: string
           sticker_snapshot: Json
@@ -2628,6 +2639,7 @@ export type Database = {
           videos: Json
           view_count: number
           vin: string
+          warranty_info: Json
           ymm: string | null
         }[]
         SetofOptions: {
