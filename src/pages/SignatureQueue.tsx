@@ -4,10 +4,12 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useNavigate } from "react-router-dom";
 import { format } from "date-fns";
-import { ArrowLeft, PenLine, ExternalLink, Link2, ChevronDown, ChevronRight, CheckCircle2 } from "lucide-react";
+import { ArrowLeft, PenLine, ExternalLink, Link2, ChevronDown, ChevronRight, CheckCircle2, Send } from "lucide-react";
 import { toast } from "sonner";
 import EmptyState from "@/components/ui/empty-state";
 import AddendumStatusTimeline from "@/components/addendum/AddendumStatusTimeline";
+import QRCodeModal, { type DeliveryChannel } from "@/components/addendum/QRCodeModal";
+import { useSmsDelivery } from "@/hooks/useSmsDelivery";
 
 // "Waiting for Signatures" — the queue of deals that have been LOCKED
 // (Ready for Signatures) but not yet fully executed. The dealer confirms
@@ -33,7 +35,10 @@ const IN_FLIGHT = ["ready_for_signature", "awaiting_customer", "customer_opened"
 const SignatureQueue = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const { sendSigningLink } = useSmsDelivery();
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
+  // The deal whose delivery panel (QR / SMS / Email / Copy) is open.
+  const [sendFor, setSendFor] = useState<AddendumRow | null>(null);
 
   const { data, isLoading, refetch } = useQuery({
     queryKey: ["signature-queue"],
@@ -93,6 +98,38 @@ const SignatureQueue = () => {
     refetch();
   };
 
+  // Append a link_sent event so the timeline records the channel + sender.
+  const emitLinkSent = async (a: AddendumRow, channel: DeliveryChannel) => {
+    await (supabase as any).from("addendum_events").insert({
+      addendum_id: a.id,
+      signing_token: a.signing_token,
+      event: "link_sent",
+      channel,
+      actor: "dealer",
+      actor_name: user?.email || null,
+    });
+    refetch();
+  };
+
+  const sendSms = async (a: AddendumRow, phone: string) => {
+    const res = await sendSigningLink(phone, reviewUrl(a.signing_token), a.vehicle_ymm || "your vehicle");
+    toast[res.success ? "success" : "error"](res.message);
+  };
+
+  const sendEmail = async (a: AddendumRow, toEmail: string) => {
+    const url = reviewUrl(a.signing_token);
+    const html = `<div style="font-family:system-ui,sans-serif;font-size:14px;color:#0e1f3d">
+      <p>Your ${a.vehicle_ymm || "vehicle"} addendum is ready to review and sign.</p>
+      <p><a href="${url}" style="color:#2563eb">Review &amp; sign your addendum</a></p>
+      <p style="font-size:12px;color:#64748b">Or open this link: ${url}</p>
+    </div>`;
+    const { error } = await supabase.functions.invoke("send-email", {
+      body: { to: [toEmail], subject: `Review & sign your ${a.vehicle_ymm || "vehicle"} addendum`, html },
+    });
+    if (error) { toast.error("Email could not be sent."); return; }
+    toast.success("Email sent");
+  };
+
   const Card = ({ a, done }: { a: AddendumRow; done: boolean }) => (
     <div className="rounded-2xl border border-border bg-card overflow-hidden">
       <div className="flex items-center gap-3 p-4">
@@ -123,6 +160,11 @@ const SignatureQueue = () => {
               title="Counter-sign and finalize"
             >
               <CheckCircle2 className="w-3.5 h-3.5" /> Execute
+            </button>
+          )}
+          {a.signing_token && !done && (
+            <button onClick={() => setSendFor(a)} className="inline-flex items-center gap-1 h-8 px-2.5 rounded-md bg-blue-600 text-white text-[11px] font-semibold hover:bg-blue-700 shadow-sm shadow-blue-600/30 ring-1 ring-inset ring-white/15" title="Send the signing link by QR, text, or email">
+              <Send className="w-3.5 h-3.5" /> Send
             </button>
           )}
           {a.signing_token && (
@@ -193,6 +235,19 @@ const SignatureQueue = () => {
           </div>
         )}
       </div>
+
+      {sendFor && (
+        <QRCodeModal
+          open={!!sendFor}
+          signingUrl={reviewUrl(sendFor.signing_token)}
+          dealId={sendFor.id}
+          version={sendFor.version_label || undefined}
+          onClose={() => setSendFor(null)}
+          onChannel={(channel) => { if (sendFor) emitLinkSent(sendFor, channel); }}
+          onSendSms={(phone) => sendFor ? sendSms(sendFor, phone) : undefined}
+          onSendEmail={(email) => sendFor ? sendEmail(sendFor, email) : undefined}
+        />
+      )}
     </div>
   );
 };
