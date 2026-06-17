@@ -314,6 +314,12 @@ const CustomerReview = () => {
           price: p.price,
           badge_type: effBadge,
           disclosure: p.disclosure || undefined,
+          // Carry the benefit text so the red-team sees the same justification
+          // the dealer side did — without it, every installed line falsely
+          // reads as "missing benefit justification" and blocks the customer.
+          benefit_justification: p.benefit_justification || undefined,
+          benefit_justification_optional: p.benefit_justification_optional || undefined,
+          price_in_advertised: (p as { price_in_advertised?: boolean }).price_in_advertised,
           separate_signoff: isElectable ? !!optionalSelections[p.id] : !!initials[p.id]?.trim(),
         };
       }),
@@ -332,10 +338,15 @@ const CustomerReview = () => {
       ...(addendum.vehicle_condition ? { vehicleCondition: addendum.vehicle_condition } : {}),
       ...(typeof addendum.buyers_guide_id !== "undefined" ? { buyersGuideAttached: addendum.buyers_guide_id != null } : {}),
     });
-    const redTeamSummary = summarizeRedTeam(redTeamFindings);
-    if (redTeamSummary.blocker) {
-      const top = redTeamFindings.filter((f) => f.severity === "fail").slice(0, 2).map((f) => f.rule).join(" • ");
-      toast.error(`Blocked: ${top}${redTeamSummary.fail > 2 ? " …" : ""}`);
+    // The customer can only resolve THEIR parts (initials, name, e-sign
+    // consent) — and the wizard already gates those per step. Dealer-content
+    // findings (missing benefit text, banned phrases, buyers-guide, prep) are
+    // enforced on the dealer side before sending, so they must never dead-end
+    // the customer here.
+    const CUSTOMER_FIXABLE = new Set(["unsigned-installed", "customer-name-blank", "esign-consent-missing"]);
+    const blockingFails = redTeamFindings.filter((f) => f.severity === "fail" && CUSTOMER_FIXABLE.has(f.id));
+    if (blockingFails.length > 0) {
+      toast.error(`Blocked: ${blockingFails.slice(0, 2).map((f) => f.rule).join(" • ")}`);
       setSubmitting(false);
       return;
     }
