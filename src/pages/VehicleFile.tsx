@@ -10,8 +10,9 @@ import {
   CheckCircle2, Clock, Gauge, DollarSign, MapPin, Copy, ExternalLink,
   FileUp, Upload, Printer, Sparkles, Plus, ArrowUpRight,
   AlertTriangle, ShieldCheck, Lock, Unlock, Send, MessageSquare,
-  Link as LinkIcon, X, QrCode, Trash2, Save, ShieldAlert,
+  Link as LinkIcon, X, QrCode, Trash2, Save, ShieldAlert, UserRound, Users,
 } from "lucide-react";
+import { formatPhone, composeName } from "@/components/addendum/CustomerInfoSection";
 import EmptyState from "@/components/ui/empty-state";
 import { InstallProofList } from "@/components/admin/InstallProofList";
 
@@ -25,7 +26,14 @@ import { InstallProofList } from "@/components/admin/InstallProofList";
 // child artifact refers to it by id.
 // ──────────────────────────────────────────────────────────────
 
-type TabId = "overview" | "documents" | "scan" | "addendum" | "prep" | "labels" | "sign";
+type TabId = "overview" | "documents" | "scan" | "customer" | "addendum" | "prep" | "labels" | "sign";
+
+interface PersonInfo {
+  first_name?: string; middle_initial?: string; last_name?: string; suffix?: string;
+  address?: string; city?: string; state?: string; zip?: string;
+  phone?: string; email?: string;
+}
+interface CustomerInfoBag { buyer?: PersonInfo; cobuyer?: PersonInfo }
 
 interface ServiceRecord { date: string; mileage: string; type: string; notes: string }
 interface WarrantyInfo {
@@ -54,6 +62,7 @@ interface VehicleRow {
   videos: Array<{ id: string; url: string; caption?: string }>;
   prep_status: { all_accessories_installed?: boolean; foreman_signed_at?: string } | null;
   recall_check: Record<string, unknown> | null;
+  vehicle_file_id: string | null;
   service_records: ServiceRecord[] | null;
   warranty_info: WarrantyInfo | null;
   available_accessories: AvailableAccessory[] | null;
@@ -61,7 +70,7 @@ interface VehicleRow {
   updated_at: string;
 }
 
-const VALID_TABS: TabId[] = ["overview", "documents", "scan", "addendum", "prep", "labels", "sign"];
+const VALID_TABS: TabId[] = ["overview", "documents", "scan", "customer", "addendum", "prep", "labels", "sign"];
 
 const VehicleFile = () => {
   const { id } = useParams<{ id: string }>();
@@ -157,6 +166,7 @@ const VehicleFile = () => {
     { id: "overview",  label: "Overview",  icon: Car },
     { id: "documents", label: "Documents", icon: FileUp },
     { id: "scan",      label: "Scan Info", icon: QrCode },
+    { id: "customer",  label: "Customer",  icon: UserRound },
     { id: "addendum",  label: "Addendum",  icon: FileText },
     { id: "prep",      label: "Prep & Install", icon: Wrench },
     { id: "labels",    label: "Labels",    icon: Tag },
@@ -271,6 +281,7 @@ const VehicleFile = () => {
         {tab === "overview"  && <OverviewPanel vehicle={vehicle} onReload={load} />}
         {tab === "documents" && <DocumentsPanel vehicle={vehicle} onReload={load} />}
         {tab === "scan"      && <ScanInfoPanel vehicle={vehicle} onReload={load} />}
+        {tab === "customer"  && <CustomerPanel vehicle={vehicle} />}
         {tab === "addendum"  && <AddendumPanel vehicle={vehicle} />}
         {tab === "prep"      && <PrepPanel vehicle={vehicle} />}
         {tab === "labels"    && <LabelsPanel vehicle={vehicle} />}
@@ -796,6 +807,125 @@ const ScanInfoPanel = ({ vehicle, onReload }: { vehicle: VehicleRow; onReload: (
             <button onClick={() => setAccessories((p) => p.filter((_, j) => j !== i))} className="h-9 w-9 inline-flex items-center justify-center rounded-lg border border-border text-muted-foreground hover:text-destructive hover:border-destructive/40"><Trash2 className="w-4 h-4" /></button>
           </div>
         ))}
+      </section>
+    </div>
+  );
+};
+
+const SUFFIXES = ["", "Jr.", "Sr.", "II", "III", "IV", "V"];
+
+// Customer capture on the unified vehicle file. Full buyer + co-buyer record
+// (incl. address) saved to vehicle_files — the internal, RLS-protected hub,
+// never the public listing. Captured at sale so the dealer has the complete
+// sold-to record on hand for follow-up, registration, recall, or compliance.
+const CustomerPanel = ({ vehicle }: { vehicle: VehicleRow }) => {
+  const { tenant } = useTenant();
+  const [buyer, setBuyer] = useState<PersonInfo>({});
+  const [cobuyer, setCobuyer] = useState<PersonInfo>({});
+  const [showCobuyer, setShowCobuyer] = useState(false);
+  const [soldAt, setSoldAt] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    let on = true;
+    (async () => {
+      let q = (supabase as any).from("vehicle_files").select("id, customer_info, sold_at");
+      q = vehicle.vehicle_file_id
+        ? q.eq("id", vehicle.vehicle_file_id)
+        : q.eq("tenant_id", tenant?.id || "").eq("vin", vehicle.vin);
+      const { data } = await q.maybeSingle();
+      if (!on) return;
+      if (data) {
+        const ci = (data.customer_info || {}) as CustomerInfoBag;
+        setBuyer(ci.buyer || {});
+        setCobuyer(ci.cobuyer || {});
+        setShowCobuyer(!!ci.cobuyer && Object.keys(ci.cobuyer).length > 0);
+        setSoldAt(data.sold_at ? String(data.sold_at).slice(0, 10) : "");
+      }
+      setLoading(false);
+    })();
+    return () => { on = false; };
+  }, [vehicle.vehicle_file_id, vehicle.vin, tenant?.id]);
+
+  const save = async () => {
+    if (!tenant?.id) { toast.error("No tenant in context"); return; }
+    setSaving(true);
+    const customer_info: CustomerInfoBag = { buyer, ...(showCobuyer ? { cobuyer } : {}) };
+    const row = {
+      tenant_id: tenant.id,
+      vin: vehicle.vin,
+      customer_info,
+      sold_at: soldAt ? new Date(soldAt).toISOString() : null,
+      customer_name: composeName(buyer.first_name || "", buyer.middle_initial || "", buyer.last_name || "", buyer.suffix || ""),
+      customer_phone: buyer.phone || "",
+      customer_email: buyer.email || "",
+      cobuyer_name: showCobuyer ? composeName(cobuyer.first_name || "", cobuyer.middle_initial || "", cobuyer.last_name || "", cobuyer.suffix || "") : "",
+      cobuyer_phone: showCobuyer ? (cobuyer.phone || "") : "",
+      cobuyer_email: showCobuyer ? (cobuyer.email || "") : "",
+    };
+    const { error } = await (supabase as any).from("vehicle_files").upsert(row, { onConflict: "tenant_id,vin" });
+    setSaving(false);
+    if (error) { toast.error("Could not save customer info"); return; }
+    toast.success("Customer info saved");
+  };
+
+  const inputCls = "w-full h-9 px-2.5 rounded-lg border border-border bg-background text-sm text-foreground outline-none focus:border-primary";
+  const labelCls = "text-[10px] font-bold uppercase tracking-wider text-muted-foreground";
+
+  const PersonFields = ({ info, set }: { info: PersonInfo; set: (u: PersonInfo) => void }) => (
+    <div className="space-y-3">
+      <div className="grid grid-cols-2 md:grid-cols-6 gap-2">
+        <div className="md:col-span-2"><label className={labelCls}>First name</label><input value={info.first_name || ""} onChange={(e) => set({ ...info, first_name: e.target.value })} className={inputCls} /></div>
+        <div><label className={labelCls}>M.I.</label><input value={info.middle_initial || ""} maxLength={1} onChange={(e) => set({ ...info, middle_initial: e.target.value.replace(/[^a-zA-Z]/g, "").toUpperCase() })} className={`${inputCls} text-center`} /></div>
+        <div className="md:col-span-2"><label className={labelCls}>Last name</label><input value={info.last_name || ""} onChange={(e) => set({ ...info, last_name: e.target.value })} className={inputCls} /></div>
+        <div><label className={labelCls}>Suffix</label>
+          <select value={info.suffix || ""} onChange={(e) => set({ ...info, suffix: e.target.value })} className={`${inputCls} cursor-pointer`}>
+            {SUFFIXES.map((s) => <option key={s} value={s}>{s || "—"}</option>)}
+          </select>
+        </div>
+      </div>
+      <div><label className={labelCls}>Street address</label><input value={info.address || ""} onChange={(e) => set({ ...info, address: e.target.value })} placeholder="123 Main St" className={inputCls} /></div>
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+        <div className="md:col-span-2"><label className={labelCls}>City</label><input value={info.city || ""} onChange={(e) => set({ ...info, city: e.target.value })} className={inputCls} /></div>
+        <div><label className={labelCls}>State</label><input value={info.state || ""} maxLength={2} onChange={(e) => set({ ...info, state: e.target.value.toUpperCase() })} placeholder="CT" className={`${inputCls} uppercase`} /></div>
+        <div><label className={labelCls}>ZIP</label><input value={info.zip || ""} onChange={(e) => set({ ...info, zip: e.target.value })} placeholder="06010" className={inputCls} /></div>
+      </div>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+        <div><label className={labelCls}>Phone</label><input value={info.phone || ""} type="tel" onChange={(e) => set({ ...info, phone: formatPhone(e.target.value) })} placeholder="(555) 555-5555" className={inputCls} /></div>
+        <div><label className={labelCls}>Email</label><input value={info.email || ""} type="email" onChange={(e) => set({ ...info, email: e.target.value })} placeholder="customer@email.com" className={inputCls} /></div>
+      </div>
+    </div>
+  );
+
+  if (loading) return <p className="text-sm text-muted-foreground">Loading customer record…</p>;
+
+  return (
+    <div className="space-y-5 max-w-3xl">
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-base font-bold text-foreground">Customer</h2>
+          <p className="text-xs text-muted-foreground">Captured when the vehicle is sold. Stored on the internal file only — never shown on the public scan.</p>
+        </div>
+        <button onClick={save} disabled={saving} className="inline-flex items-center gap-1.5 h-9 px-4 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold shadow-sm shadow-blue-600/30 ring-1 ring-inset ring-white/15 disabled:opacity-50">
+          <Save className="w-4 h-4" /> {saving ? "Saving…" : "Save"}
+        </button>
+      </div>
+
+      <section className="rounded-2xl border border-border bg-card p-4 space-y-3">
+        <div className="flex items-center justify-between">
+          <p className="text-sm font-bold text-foreground flex items-center gap-1.5"><UserRound className="w-4 h-4 text-muted-foreground" /> Buyer</p>
+          <div><label className={labelCls}>Sold date</label><input type="date" value={soldAt} onChange={(e) => setSoldAt(e.target.value)} className={`${inputCls} w-auto`} /></div>
+        </div>
+        <PersonFields info={buyer} set={setBuyer} />
+      </section>
+
+      <section className="rounded-2xl border border-border bg-card p-4 space-y-3">
+        <label className="flex items-center gap-2 cursor-pointer">
+          <input type="checkbox" checked={showCobuyer} onChange={(e) => setShowCobuyer(e.target.checked)} />
+          <span className="text-sm font-bold text-foreground flex items-center gap-1.5"><Users className="w-4 h-4 text-muted-foreground" /> Add co-buyer</span>
+        </label>
+        {showCobuyer && <PersonFields info={cobuyer} set={setCobuyer} />}
       </section>
     </div>
   );
