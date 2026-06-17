@@ -350,11 +350,11 @@ const Index = () => {
     loadAddendum();
   }, [viewId, editParam]);
 
-  // Apply product rules, then apply admin default mode + overrides. A loaded
-  // addendum (view OR edit) uses its saved product snapshot as-is — we never
-  // re-rule it, so continuing to edit a draft keeps the exact line items.
-  const baseProducts = loadedProducts ? loadedProducts : products;
-  const ruledProducts = settings.feature_product_rules && rules.length > 0 && !viewMode && !loadedProducts
+  // View mode shows the saved snapshot as-is. Edit/fresh derive from the live
+  // catalog (raw base name + base price + upgrade object) so the upgrade toggle
+  // recomputes correctly instead of stacking onto an already-combined snapshot.
+  const baseProducts = viewMode && loadedProducts ? loadedProducts : products;
+  const ruledProducts = settings.feature_product_rules && rules.length > 0 && !viewMode
     ? getMatchingProducts(vehicleContext, baseProducts || [])
     : baseProducts;
 
@@ -394,6 +394,10 @@ const Index = () => {
   // upgrade tier when the line has the upgrade applied.
   const displayProducts = useMemo(() => {
     if (!ruledProducts) return [];
+    // Read-only view of a saved addendum: the snapshot already has final
+    // name/price/badge/benefit. Re-deriving would re-combine the upgrade name
+    // ("base — upgrade — upgrade") and re-freeze the price, so pass it through.
+    if (viewMode && loadedProducts) return ruledProducts;
     return ruledProducts.map(p => {
       const pr = p as {
         benefit_justification?: string;
@@ -457,7 +461,12 @@ const Index = () => {
         : "";
       const disclosure = upgradeDisclosure || dispoDisclosure;
 
-      const name = upgradeApplied && up && (up.name || "").trim() ? `${p.name} — ${up.name}` : p.name;
+      // Idempotent: never append the upgrade name if the base already carries
+      // it (guards against a snapshot/catalog name that was combined before).
+      const upName = (up?.name || "").trim();
+      const name = upgradeApplied && up && upName && !p.name.includes(upName)
+        ? `${p.name} — ${up.name}`
+        : p.name;
       // Resolve the base price from the vehicle-category tier (when set for
       // this body class), else the catalog base price. Upgrade keeps its
       // own flat price.
@@ -479,7 +488,7 @@ const Index = () => {
 
       return { ...p, name, price, badge_type: badge, price_label, benefit_justification: effectiveBenefit, disclosure };
     });
-  }, [ruledProducts, typeOverrides, benefitOverrides, upgradeSelections, settings.product_default_mode, vehicleContext.bodyStyle, vehicleContext.model, proofRegime, provenNames]);
+  }, [ruledProducts, viewMode, loadedProducts, typeOverrides, benefitOverrides, upgradeSelections, settings.product_default_mode, vehicleContext.bodyStyle, vehicleContext.model, proofRegime, provenNames]);
 
   // Normalize the scraped/entered condition into the red-team's enum. This
   // addendum is a used-car supplement (the vehicle file is registered as
