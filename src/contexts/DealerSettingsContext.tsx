@@ -17,19 +17,20 @@ export interface GetReadyService {
 // label stock. Two modes:
 //   - "blank": AutoLabels prints the FULL designed sticker onto blank
 //     stock. Only the label SIZE matters.
-//   - "preprinted": the dealer feeds pre-printed label stock (their own
-//     artwork/branding already on the page) and AutoLabels overlays ONLY
-//     the vehicle data into fixed positions. Needs the artwork image (for
-//     on-screen alignment) plus an X/Y position per field.
+//   - "preprinted": the dealer feeds their own pre-printed label stock
+//     (branding/header/footer already printed, e.g. AutoExperts USA
+//     stock) and AutoLabels fills ONLY the empty content area with the
+//     vehicle data block + QR. Needs the artwork image (for on-screen
+//     alignment) plus the content-area rectangle that data flows into.
 export type StickerDocType = "new_window" | "used_window" | "new_addendum" | "used_addendum";
 
-export interface StickerFieldPosition {
-  key: string;     // canonical data field (ymm, vin, price, …)
-  label: string;   // human label shown in the editor
-  x: number;       // horizontal position, percent of label width (0–100)
-  y: number;       // vertical position, percent of label height (0–100)
-  size: number;    // font size in points
-  enabled: boolean;
+// The empty region on pre-printed stock that AutoLabels fills with the
+// vehicle data block. All values are a percentage of the label (0–100).
+export interface StickerContentArea {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
 }
 
 export interface StickerPrintTemplate {
@@ -37,24 +38,19 @@ export interface StickerPrintTemplate {
   width: string;        // label width, inches
   height: string;       // label height, inches
   artwork_url: string;  // pre-printed stock artwork (preprinted mode only)
-  fields: StickerFieldPosition[];
+  content_area: StickerContentArea;
 }
 
-export const DEFAULT_STICKER_FIELDS: StickerFieldPosition[] = [
-  { key: "ymm", label: "Year / Make / Model", x: 8, y: 10, size: 18, enabled: true },
-  { key: "trim", label: "Trim", x: 8, y: 19, size: 12, enabled: true },
-  { key: "price", label: "Price", x: 60, y: 10, size: 24, enabled: true },
-  { key: "mileage", label: "Mileage", x: 60, y: 19, size: 12, enabled: true },
-  { key: "stock", label: "Stock #", x: 8, y: 84, size: 10, enabled: true },
-  { key: "vin", label: "VIN", x: 8, y: 90, size: 10, enabled: true },
-];
+// Default content area roughly matches the open white region on common
+// pre-printed dealer stock (header band on top, footer band on bottom).
+export const DEFAULT_CONTENT_AREA: StickerContentArea = { x: 6, y: 24, width: 88, height: 54 };
 
 export const DEFAULT_STICKER_TEMPLATE: StickerPrintTemplate = {
   mode: "blank",
   width: "8.5",
   height: "11",
   artwork_url: "",
-  fields: DEFAULT_STICKER_FIELDS,
+  content_area: { ...DEFAULT_CONTENT_AREA },
 };
 
 export const STICKER_DOC_LABELS: Record<StickerDocType, string> = {
@@ -65,10 +61,10 @@ export const STICKER_DOC_LABELS: Record<StickerDocType, string> = {
 };
 
 const defaultStickerTemplates = (): Record<StickerDocType, StickerPrintTemplate> => ({
-  new_window: { ...DEFAULT_STICKER_TEMPLATE, fields: DEFAULT_STICKER_FIELDS.map((f) => ({ ...f })) },
-  used_window: { ...DEFAULT_STICKER_TEMPLATE, fields: DEFAULT_STICKER_FIELDS.map((f) => ({ ...f })) },
-  new_addendum: { ...DEFAULT_STICKER_TEMPLATE, fields: DEFAULT_STICKER_FIELDS.map((f) => ({ ...f })) },
-  used_addendum: { ...DEFAULT_STICKER_TEMPLATE, fields: DEFAULT_STICKER_FIELDS.map((f) => ({ ...f })) },
+  new_window: { ...DEFAULT_STICKER_TEMPLATE, content_area: { ...DEFAULT_CONTENT_AREA } },
+  used_window: { ...DEFAULT_STICKER_TEMPLATE, content_area: { ...DEFAULT_CONTENT_AREA } },
+  new_addendum: { ...DEFAULT_STICKER_TEMPLATE, content_area: { ...DEFAULT_CONTENT_AREA } },
+  used_addendum: { ...DEFAULT_STICKER_TEMPLATE, content_area: { ...DEFAULT_CONTENT_AREA } },
 });
 
 export interface DealerSettings {
