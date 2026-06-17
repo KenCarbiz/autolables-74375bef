@@ -95,6 +95,8 @@ const Onboarding = () => {
   const [scrapeSuccess, setScrapeSuccess] = useState(false);
   const [scrapePreview, setScrapePreview] = useState<Awaited<ReturnType<typeof scrapeDealer>> | null>(null);
   const [handoffLoading, setHandoffLoading] = useState(false);
+  const [pullEmail, setPullEmail] = useState("");
+  const [pullLoading, setPullLoading] = useState(false);
   const [prefilledFrom, setPrefilledFrom] = useState<"autocurb" | "profile" | null>(null);
 
   // ── Handoff token consumption. If the user was redirected here
@@ -193,6 +195,31 @@ const Onboarding = () => {
 
   const update = <K extends keyof OnboardingData>(key: K, value: OnboardingData[K]) => {
     setData(prev => ({ ...prev, [key]: value }));
+  };
+
+  // Pull an existing dealership from Autocurb by email. On a match the
+  // edge function bootstraps the tenant + profile + entitlement locally,
+  // so we just reload and drop the dealer into the app.
+  const handleAutocurbPull = async () => {
+    if (!pullEmail.trim()) return;
+    setPullLoading(true);
+    try {
+      const { data: res, error } = await supabase.functions.invoke("autocurb-pull", {
+        body: { email: pullEmail.trim() },
+      });
+      if (error) throw error;
+      if ((res as { matched?: boolean })?.matched) {
+        toast.success("Found your dealership on Autocurb — pulling your profile.");
+        await reloadEntitlements();
+        navigate("/dashboard");
+      } else {
+        toast.message("No Autocurb dealership found for that email. Continue the quick setup below.");
+      }
+    } catch {
+      toast.error("Couldn't reach Autocurb right now. Continue the setup below.");
+    } finally {
+      setPullLoading(false);
+    }
   };
 
   const handleScrape = async () => {
@@ -429,6 +456,39 @@ const Onboarding = () => {
         {/* Step 1: AI Website Autofill */}
         {step === 1 && (
           <div className="space-y-5">
+            {/* Already on Autocurb — pull the dealership instead of re-typing */}
+            <div className="rounded-xl border border-blue-200 bg-blue-50/50 dark:bg-blue-950/30 dark:border-blue-900 p-5">
+              <div className="flex items-center gap-2 mb-1">
+                <Building2 className="w-4 h-4 text-blue-600 dark:text-blue-300" />
+                <h3 className="text-sm font-bold text-foreground">Already on Autocurb?</h3>
+              </div>
+              <p className="text-xs text-muted-foreground mb-3">
+                Pull your dealership profile, branding, locations, and plan straight from Autocurb — nothing to re-type.
+              </p>
+              <div className="flex gap-2">
+                <input
+                  value={pullEmail}
+                  onChange={(e) => setPullEmail(e.target.value)}
+                  placeholder="you@dealership.com"
+                  type="email"
+                  className="flex-1 h-10 px-3 rounded-md border border-border bg-background text-sm outline-none focus:ring-2 focus:ring-ring"
+                />
+                <button
+                  onClick={handleAutocurbPull}
+                  disabled={pullLoading || !pullEmail.trim()}
+                  className="h-10 px-4 rounded-xl bg-blue-600 text-white text-sm font-semibold hover:bg-blue-700 shadow-sm shadow-blue-600/30 ring-1 ring-inset ring-white/15 disabled:opacity-50 whitespace-nowrap"
+                >
+                  {pullLoading ? "Checking…" : "Pull from Autocurb"}
+                </button>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-3">
+              <div className="flex-1 h-px bg-border" />
+              <span className="text-[10px] uppercase tracking-wider text-muted-foreground">or set up manually</span>
+              <div className="flex-1 h-px bg-border" />
+            </div>
+
             <Section
               icon={Sparkles}
               title="AI Website Auto-Fill"

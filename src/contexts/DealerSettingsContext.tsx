@@ -26,6 +26,15 @@ export interface DealerSettings {
   dms_provider: string;            // e.g. CDK, Reynolds, Dealertrack, Tekion
   new_inventory_url: string;       // dealer's New inventory listing page
   used_inventory_url: string;      // dealer's Used inventory listing page
+  // Marketplace listing URLs the price-integrity crawler verifies against,
+  // so the dealer's website AND the marketplaces match the window sticker.
+  cargurus_url: string;
+  cars_com_url: string;
+  autotrader_url: string;
+  capital_one_url: string;
+  // Marketing assets shown to shoppers (packet / stickers / portal).
+  why_buy_here: string;            // dealership value prop / why buy here
+  warranty_programs: string;       // warranty programs offered (free text)
   // Feature toggles — what shows on the employee-facing addendum
   feature_vin_decode: boolean;
   feature_buyers_guide: boolean;
@@ -87,6 +96,12 @@ export const DEFAULT_SETTINGS: DealerSettings = {
   dms_provider: "",
   new_inventory_url: "",
   used_inventory_url: "",
+  cargurus_url: "",
+  cars_com_url: "",
+  autotrader_url: "",
+  capital_one_url: "",
+  why_buy_here: "",
+  warranty_programs: "",
   feature_vin_decode: true,
   feature_buyers_guide: true,
   feature_product_rules: true,

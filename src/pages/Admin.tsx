@@ -298,6 +298,12 @@ const Admin = () => {
     dms_provider: settings.dms_provider,
     new_inventory_url: settings.new_inventory_url,
     used_inventory_url: settings.used_inventory_url,
+    cargurus_url: settings.cargurus_url,
+    cars_com_url: settings.cars_com_url,
+    autotrader_url: settings.autotrader_url,
+    capital_one_url: settings.capital_one_url,
+    why_buy_here: settings.why_buy_here,
+    warranty_programs: settings.warranty_programs,
   });
   const [logoUploading, setLogoUploading] = useState(false);
 
@@ -1322,6 +1328,41 @@ const Admin = () => {
                     <input value={branding.used_inventory_url} onChange={(e) => setBranding({ ...branding, used_inventory_url: e.target.value })} placeholder="https://yourdealer.com/inventory/used" className="mt-1 w-full px-3 py-2 border border-border-custom rounded text-sm bg-background text-foreground placeholder:text-muted-foreground/50" />
                   </div>
                 </div>
+                <p className="text-[11px] text-muted-foreground mt-3 mb-1">Marketplace listings — we verify these match your sticker too, so a shopper sees the same price everywhere.</p>
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+                  <div>
+                    <label className="text-xs font-semibold text-muted-foreground">AutoTrader</label>
+                    <input value={branding.autotrader_url} onChange={(e) => setBranding({ ...branding, autotrader_url: e.target.value })} placeholder="autotrader.com/dealer/…" className="mt-1 w-full px-3 py-2 border border-border-custom rounded text-sm bg-background text-foreground placeholder:text-muted-foreground/50" />
+                  </div>
+                  <div>
+                    <label className="text-xs font-semibold text-muted-foreground">Cars.com</label>
+                    <input value={branding.cars_com_url} onChange={(e) => setBranding({ ...branding, cars_com_url: e.target.value })} placeholder="cars.com/dealers/…" className="mt-1 w-full px-3 py-2 border border-border-custom rounded text-sm bg-background text-foreground placeholder:text-muted-foreground/50" />
+                  </div>
+                  <div>
+                    <label className="text-xs font-semibold text-muted-foreground">CarGurus</label>
+                    <input value={branding.cargurus_url} onChange={(e) => setBranding({ ...branding, cargurus_url: e.target.value })} placeholder="cargurus.com/…" className="mt-1 w-full px-3 py-2 border border-border-custom rounded text-sm bg-background text-foreground placeholder:text-muted-foreground/50" />
+                  </div>
+                  <div>
+                    <label className="text-xs font-semibold text-muted-foreground">Capital One</label>
+                    <input value={branding.capital_one_url} onChange={(e) => setBranding({ ...branding, capital_one_url: e.target.value })} placeholder="capitalone.com/cars/…" className="mt-1 w-full px-3 py-2 border border-border-custom rounded text-sm bg-background text-foreground placeholder:text-muted-foreground/50" />
+                  </div>
+                </div>
+              </div>
+
+              {/* Marketing assets shown to shoppers */}
+              <div className="border-t border-border-custom pt-3">
+                <h4 className="text-sm font-bold text-foreground">Marketing &amp; Warranty</h4>
+                <p className="text-[11px] text-muted-foreground mb-2">Shown to shoppers on the scanned vehicle packet and stickers.</p>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-xs font-semibold text-muted-foreground">Why Buy Here</label>
+                    <textarea value={branding.why_buy_here} onChange={(e) => setBranding({ ...branding, why_buy_here: e.target.value })} rows={3} placeholder="Family-owned since 1985 · Free lifetime car washes · 7-day exchange…" className="mt-1 w-full px-3 py-2 border border-border-custom rounded text-sm bg-background text-foreground placeholder:text-muted-foreground/50" />
+                  </div>
+                  <div>
+                    <label className="text-xs font-semibold text-muted-foreground">Warranty Programs</label>
+                    <textarea value={branding.warranty_programs} onChange={(e) => setBranding({ ...branding, warranty_programs: e.target.value })} rows={3} placeholder="Powertrain warranty on every used vehicle · Certified pre-owned coverage…" className="mt-1 w-full px-3 py-2 border border-border-custom rounded text-sm bg-background text-foreground placeholder:text-muted-foreground/50" />
+                  </div>
+                </div>
               </div>
 
               <div className="flex gap-3">
@@ -1345,6 +1386,12 @@ const Admin = () => {
                       dms_provider: "",
                       new_inventory_url: "",
                       used_inventory_url: "",
+                      cargurus_url: "",
+                      cars_com_url: "",
+                      autotrader_url: "",
+                      capital_one_url: "",
+                      why_buy_here: "",
+                      warranty_programs: "",
                     };
                     setBranding(defaults);
                     updateSettings(defaults);
