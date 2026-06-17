@@ -200,6 +200,8 @@ export type Database = {
           customer_signature_type: string | null
           customer_signed_at: string | null
           dealer_snapshot: Json | null
+          delivered_at: string | null
+          delivered_by: string | null
           delivery_mileage: number | null
           employee_name: string | null
           employee_signature_data: string | null
@@ -256,6 +258,8 @@ export type Database = {
           customer_signature_type?: string | null
           customer_signed_at?: string | null
           dealer_snapshot?: Json | null
+          delivered_at?: string | null
+          delivered_by?: string | null
           delivery_mileage?: number | null
           employee_name?: string | null
           employee_signature_data?: string | null
@@ -312,6 +316,8 @@ export type Database = {
           customer_signature_type?: string | null
           customer_signed_at?: string | null
           dealer_snapshot?: Json | null
+          delivered_at?: string | null
+          delivered_by?: string | null
           delivery_mileage?: number | null
           employee_name?: string | null
           employee_signature_data?: string | null
