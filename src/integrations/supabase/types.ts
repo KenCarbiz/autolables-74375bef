@@ -1659,6 +1659,8 @@ export type Database = {
       tenants: {
         Row: {
           autocheck_dealer_id: string | null
+          autocurb_profile: Json | null
+          autocurb_synced_at: string | null
           autocurb_tenant_id: string | null
           billing_email: string | null
           carfax_dealer_id: string | null
@@ -1675,6 +1677,8 @@ export type Database = {
         }
         Insert: {
           autocheck_dealer_id?: string | null
+          autocurb_profile?: Json | null
+          autocurb_synced_at?: string | null
           autocurb_tenant_id?: string | null
           billing_email?: string | null
           carfax_dealer_id?: string | null
@@ -1691,6 +1695,8 @@ export type Database = {
         }
         Update: {
           autocheck_dealer_id?: string | null
+          autocurb_profile?: Json | null
+          autocurb_synced_at?: string | null
           autocurb_tenant_id?: string | null
           billing_email?: string | null
           carfax_dealer_id?: string | null
@@ -2415,6 +2421,10 @@ export type Database = {
       admin_invite_member: {
         Args: { _email: string; _role?: string; _tenant_id: string }
         Returns: string
+      }
+      admin_link_autocurb: {
+        Args: { p_autocurb_id: string; p_profile: Json; p_tenant_id: string }
+        Returns: undefined
       }
       admin_override_entitlement: {
         Args: {
