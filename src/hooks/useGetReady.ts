@@ -42,7 +42,7 @@ export interface CheckRequest {
 export interface GetReadyItem {
   id: string;
   label: string;
-  category: "accessory" | "inspection" | "detail" | "photo" | "other";
+  category: "accessory" | "inspection" | "detail" | "photo" | "service" | "other";
   assignedTo: string;
   status: "pending" | "complete";
   completedAt?: string;
@@ -51,6 +51,10 @@ export interface GetReadyItem {
   installMethod?: InstallMethod;
   roNumber?: string;
   checkRequest?: CheckRequest;
+  // Internal (non-customer) recon/service line with its dealer cost. These
+  // never appear on the customer addendum — they are the store's own cost.
+  cost?: number;
+  internal?: boolean;
 }
 
 export interface AccessoryToInstall {
@@ -189,6 +193,8 @@ export const useGetReady = (storeId: string) => {
     condition: "new" | "used";
     acquiredDate: string;
     accessoriesToInstall: { productId: string; productName: string }[];
+    // Internal recon/service the store pays for — never billed to the customer.
+    serviceItems?: { label: string; cost?: number }[];
     inspectionRequired: boolean;
     inspectionFormType?: string;
     assignedTechnician?: string;
@@ -209,6 +215,18 @@ export const useGetReady = (storeId: string) => {
         category: "accessory",
         assignedTo: data.assignedTechnician || "",
         status: "pending",
+      });
+    });
+    (data.serviceItems || []).forEach(s => {
+      if (!s.label.trim()) return;
+      items.push({
+        id: crypto.randomUUID(),
+        label: s.label.trim(),
+        category: "service",
+        assignedTo: "",
+        status: "pending",
+        cost: s.cost,
+        internal: true,
       });
     });
     if (data.inspectionRequired) {

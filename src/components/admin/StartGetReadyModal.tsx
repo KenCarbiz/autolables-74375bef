@@ -1,6 +1,7 @@
 import { useState } from "react";
-import { X, Globe, Check, Wrench } from "lucide-react";
+import { X, Globe, Check, Wrench, Plus } from "lucide-react";
 import { toast } from "sonner";
+import { supabase } from "@/integrations/supabase/client";
 import { useVehicleUrlScrape } from "@/hooks/useVehicleUrlScrape";
 import { useProducts } from "@/hooks/useProducts";
 import { useAuth } from "@/contexts/AuthContext";
@@ -23,9 +24,12 @@ interface CreateArgs {
   condition: "new" | "used";
   acquiredDate: string;
   accessoriesToInstall: { productId: string; productName: string }[];
+  serviceItems?: { label: string; cost?: number }[];
   inspectionRequired: boolean;
   createdBy: string;
 }
+
+interface InventoryHit { id: string; vin: string; ymm: string | null; condition: string | null }
 
 interface Props {
   open: boolean;
@@ -50,12 +54,36 @@ export const StartGetReadyModal = ({ open, onClose, onCreate }: Props) => {
   const [stock, setStock] = useState("");
   const [condition, setCondition] = useState<string>(defaultCondition);
   const [selected, setSelected] = useState<Record<string, boolean>>({});
+  const [services, setServices] = useState<{ label: string; cost: string }[]>([]);
+  const [invQuery, setInvQuery] = useState("");
+  const [invHits, setInvHits] = useState<InventoryHit[]>([]);
   const [saving, setSaving] = useState(false);
 
   if (!open) return null;
 
   const reset = () => {
-    setUrl(""); setVin(""); setYmm(""); setStock(""); setCondition(defaultCondition); setSelected({});
+    setUrl(""); setVin(""); setYmm(""); setStock(""); setCondition(defaultCondition);
+    setSelected({}); setServices([]); setInvQuery(""); setInvHits([]);
+  };
+
+  // Search current inventory (RLS-scoped) by VIN / stock / vehicle.
+  const searchInventory = async (q: string) => {
+    setInvQuery(q);
+    if (q.trim().length < 2) { setInvHits([]); return; }
+    const { data } = await (supabase as any)
+      .from("vehicle_listings")
+      .select("id, vin, ymm, condition")
+      .or(`vin.ilike.%${q}%,ymm.ilike.%${q}%`)
+      .limit(8);
+    setInvHits((data || []) as InventoryHit[]);
+  };
+
+  const pickInventory = (h: InventoryHit) => {
+    setVin((h.vin || "").toUpperCase());
+    setYmm(h.ymm || "");
+    if (h.condition) setCondition(pickByCanonical(h.condition.toLowerCase().includes("new") ? "new" : "used"));
+    setInvQuery(h.ymm || h.vin || "");
+    setInvHits([]);
   };
 
   const doScrape = async () => {
@@ -98,6 +126,9 @@ export const StartGetReadyModal = ({ open, onClose, onCreate }: Props) => {
     const accessoriesToInstall = products
       .filter((p) => selected[p.id])
       .map((p) => ({ productId: p.id, productName: p.name }));
+    const serviceItems = services
+      .filter((s) => s.label.trim())
+      .map((s) => ({ label: s.label.trim(), cost: s.cost.trim() ? Number(s.cost.replace(/[^0-9.]/g, "")) : undefined }));
     const rec = await onCreate({
       vin: vin.trim().toUpperCase(),
       stockNumber: stock.trim(),
@@ -105,6 +136,7 @@ export const StartGetReadyModal = ({ open, onClose, onCreate }: Props) => {
       condition: canonicalCondition(condition),
       acquiredDate: new Date().toISOString(),
       accessoriesToInstall,
+      serviceItems,
       inspectionRequired: canonicalCondition(condition) === "used",
       createdBy: user?.id || "",
     });
@@ -127,6 +159,24 @@ export const StartGetReadyModal = ({ open, onClose, onCreate }: Props) => {
         <div className="flex items-center justify-between">
           <h2 className="text-lg font-bold text-foreground flex items-center gap-2"><Wrench className="w-5 h-5 text-primary" /> Start Get-Ready</h2>
           <button onClick={onClose} className="text-muted-foreground hover:text-foreground"><X className="w-4 h-4" /></button>
+        </div>
+
+        {/* Pull from current inventory */}
+        <div className="rounded-xl border border-border bg-muted/30 p-3">
+          <label className={label}>Pull from current inventory</label>
+          <div className="relative mt-1">
+            <input value={invQuery} onChange={(e) => searchInventory(e.target.value)} placeholder="Search by VIN, stock #, or vehicle…" className={input} />
+            {invHits.length > 0 && (
+              <div className="absolute z-10 left-0 right-0 mt-1 rounded-lg border border-border bg-card shadow-lg overflow-hidden">
+                {invHits.map((h) => (
+                  <button key={h.id} type="button" onClick={() => pickInventory(h)} className="w-full text-left px-3 py-2 text-sm hover:bg-muted flex items-center justify-between gap-2">
+                    <span className="truncate">{h.ymm || "Vehicle"}</span>
+                    <span className="text-[11px] font-mono text-muted-foreground shrink-0">{h.vin ? h.vin.slice(-8) : ""}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Web link import */}
@@ -173,6 +223,25 @@ export const StartGetReadyModal = ({ open, onClose, onCreate }: Props) => {
                   </button>
                 );
               })}
+            </div>
+          )}
+        </div>
+
+        {/* Internal (non-customer-cost) service items */}
+        <div>
+          <div className="flex items-center justify-between">
+            <label className={label}>Internal service / recon (dealer cost — not billed to customer)</label>
+            <button type="button" onClick={() => setServices((s) => [...s, { label: "", cost: "" }])} className="inline-flex items-center gap-1 h-7 px-2 rounded-lg border border-border text-[11px] font-semibold hover:bg-muted"><Plus className="w-3 h-3" /> Add</button>
+          </div>
+          {services.length > 0 && (
+            <div className="space-y-2 mt-2">
+              {services.map((s, i) => (
+                <div key={i} className="flex gap-2">
+                  <input value={s.label} onChange={(e) => setServices((p) => p.map((x, j) => j === i ? { ...x, label: e.target.value } : x))} placeholder="e.g. Brake rotors, alignment, key cut" className={`${input} flex-1`} />
+                  <input value={s.cost} onChange={(e) => setServices((p) => p.map((x, j) => j === i ? { ...x, cost: e.target.value } : x))} placeholder="$ cost" className={`${input} w-24`} />
+                  <button type="button" onClick={() => setServices((p) => p.filter((_, j) => j !== i))} className="h-10 w-10 inline-flex items-center justify-center rounded-lg border border-border text-muted-foreground hover:text-destructive"><X className="w-4 h-4" /></button>
+                </div>
+              ))}
             </div>
           )}
         </div>
