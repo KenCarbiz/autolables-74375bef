@@ -229,6 +229,7 @@ export type Database = {
           total_with_optional: number | null
           updated_at: string
           user_agent: string | null
+          vehicle_file_id: string | null
           vehicle_price: number | null
           vehicle_state: string | null
           vehicle_stock: string | null
@@ -283,6 +284,7 @@ export type Database = {
           total_with_optional?: number | null
           updated_at?: string
           user_agent?: string | null
+          vehicle_file_id?: string | null
           vehicle_price?: number | null
           vehicle_state?: string | null
           vehicle_stock?: string | null
@@ -337,6 +339,7 @@ export type Database = {
           total_with_optional?: number | null
           updated_at?: string
           user_agent?: string | null
+          vehicle_file_id?: string | null
           vehicle_price?: number | null
           vehicle_state?: string | null
           vehicle_stock?: string | null
@@ -358,6 +361,13 @@ export type Database = {
             columns: ["tenant_id"]
             isOneToOne: false
             referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "addendums_vehicle_file_id_fkey"
+            columns: ["vehicle_file_id"]
+            isOneToOne: false
+            referencedRelation: "vehicle_files"
             referencedColumns: ["id"]
           },
         ]
@@ -824,6 +834,7 @@ export type Database = {
           store_id: string | null
           tenant_id: string
           updated_at: string
+          vehicle_file_id: string | null
           vin: string
           ymm: string
         }
@@ -853,6 +864,7 @@ export type Database = {
           store_id?: string | null
           tenant_id: string
           updated_at?: string
+          vehicle_file_id?: string | null
           vin: string
           ymm?: string
         }
@@ -882,6 +894,7 @@ export type Database = {
           store_id?: string | null
           tenant_id?: string
           updated_at?: string
+          vehicle_file_id?: string | null
           vin?: string
           ymm?: string
         }
@@ -898,6 +911,13 @@ export type Database = {
             columns: ["tenant_id"]
             isOneToOne: false
             referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "get_ready_records_vehicle_file_id_fkey"
+            columns: ["vehicle_file_id"]
+            isOneToOne: false
+            referencedRelation: "vehicle_files"
             referencedColumns: ["id"]
           },
         ]
@@ -1236,6 +1256,7 @@ export type Database = {
           store_id: string
           tenant_id: string | null
           updated_at: string
+          vehicle_file_id: string | null
           vin: string
           ymm: string | null
         }
@@ -1260,6 +1281,7 @@ export type Database = {
           store_id: string
           tenant_id?: string | null
           updated_at?: string
+          vehicle_file_id?: string | null
           vin: string
           ymm?: string | null
         }
@@ -1284,6 +1306,7 @@ export type Database = {
           store_id?: string
           tenant_id?: string | null
           updated_at?: string
+          vehicle_file_id?: string | null
           vin?: string
           ymm?: string | null
         }
@@ -1300,6 +1323,13 @@ export type Database = {
             columns: ["tenant_id"]
             isOneToOne: false
             referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "prep_sign_offs_vehicle_file_id_fkey"
+            columns: ["vehicle_file_id"]
+            isOneToOne: false
+            referencedRelation: "vehicle_files"
             referencedColumns: ["id"]
           },
         ]
@@ -1771,6 +1801,7 @@ export type Database = {
         Row: {
           aftermarket_installs: Json
           attached_documents: Json
+          available_accessories: Json
           cobuyer_email: string
           cobuyer_name: string
           cobuyer_phone: string
@@ -1789,6 +1820,7 @@ export type Database = {
           mileage: number
           model: string
           msrp: number
+          service_records: Json
           signings: Json
           stickers: Json
           stock_number: string
@@ -1797,11 +1829,13 @@ export type Database = {
           trim: string
           updated_at: string
           vin: string
+          warranty_info: Json
           year: string
         }
         Insert: {
           aftermarket_installs?: Json
           attached_documents?: Json
+          available_accessories?: Json
           cobuyer_email?: string
           cobuyer_name?: string
           cobuyer_phone?: string
@@ -1820,6 +1854,7 @@ export type Database = {
           mileage?: number
           model?: string
           msrp?: number
+          service_records?: Json
           signings?: Json
           stickers?: Json
           stock_number?: string
@@ -1828,11 +1863,13 @@ export type Database = {
           trim?: string
           updated_at?: string
           vin: string
+          warranty_info?: Json
           year?: string
         }
         Update: {
           aftermarket_installs?: Json
           attached_documents?: Json
+          available_accessories?: Json
           cobuyer_email?: string
           cobuyer_name?: string
           cobuyer_phone?: string
@@ -1851,6 +1888,7 @@ export type Database = {
           mileage?: number
           model?: string
           msrp?: number
+          service_records?: Json
           signings?: Json
           stickers?: Json
           stock_number?: string
@@ -1859,6 +1897,7 @@ export type Database = {
           trim?: string
           updated_at?: string
           vin?: string
+          warranty_info?: Json
           year?: string
         }
         Relationships: [
@@ -1913,6 +1952,7 @@ export type Database = {
           trim: string | null
           updated_at: string
           value_props: Json
+          vehicle_file_id: string | null
           videos: Json
           view_count: number
           vin: string
@@ -1952,6 +1992,7 @@ export type Database = {
           trim?: string | null
           updated_at?: string
           value_props?: Json
+          vehicle_file_id?: string | null
           videos?: Json
           view_count?: number
           vin: string
@@ -1991,6 +2032,7 @@ export type Database = {
           trim?: string | null
           updated_at?: string
           value_props?: Json
+          vehicle_file_id?: string | null
           videos?: Json
           view_count?: number
           vin?: string
@@ -2009,6 +2051,13 @@ export type Database = {
             columns: ["tenant_id"]
             isOneToOne: false
             referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "vehicle_listings_vehicle_file_id_fkey"
+            columns: ["vehicle_file_id"]
+            isOneToOne: false
+            referencedRelation: "vehicle_files"
             referencedColumns: ["id"]
           },
         ]
@@ -2501,6 +2550,7 @@ export type Database = {
         Returns: {
           aftermarket_installs: Json
           attached_documents: Json
+          available_accessories: Json
           cobuyer_email: string
           cobuyer_name: string
           cobuyer_phone: string
@@ -2519,6 +2569,7 @@ export type Database = {
           mileage: number
           model: string
           msrp: number
+          service_records: Json
           signings: Json
           stickers: Json
           stock_number: string
@@ -2527,6 +2578,7 @@ export type Database = {
           trim: string
           updated_at: string
           vin: string
+          warranty_info: Json
           year: string
         }[]
         SetofOptions: {
@@ -2572,6 +2624,7 @@ export type Database = {
           trim: string | null
           updated_at: string
           value_props: Json
+          vehicle_file_id: string | null
           videos: Json
           view_count: number
           vin: string
