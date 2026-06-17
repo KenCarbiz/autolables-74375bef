@@ -6,6 +6,7 @@ import SB766DisclosurePanel from "@/components/addendum/SB766DisclosurePanel";
 import TransactionAuditRecord from "@/components/addendum/TransactionAuditRecord";
 import { toast } from "sonner";
 import { ChevronLeft, ChevronRight, Check } from "lucide-react";
+import { AddendumDisclosurePacket, type PacketProduct } from "@/components/addendum/AddendumDisclosurePacket";
 import {
   ESIGN_CONSENT_TEXT,
   buildConsentRecord,
@@ -1069,33 +1070,15 @@ const DisclosuresStep = ({
       onDisclosureChange={setSb766Disclosure}
     />
 
-    {/* Full per-item disclosures — parity with the single-page document so the
-        guided customer sees every product's benefit + legal disclosure text. */}
-    {Array.isArray(addendum?.products_snapshot) && addendum.products_snapshot.length > 0 && (
-      <details className="rounded-2xl border border-slate-200 bg-white p-5">
-        <summary className="text-sm font-bold text-slate-900 cursor-pointer select-none">
-          All product details &amp; disclosures
-        </summary>
-        <div className="mt-3 space-y-3">
-          {(addendum.products_snapshot as ProductSnapshot[]).map((p, i) => (
-            <div key={p.id || i} className="border-t border-slate-100 pt-3 first:border-0 first:pt-0">
-              <p className="text-[13px] font-semibold text-slate-900">
-                {p.name}{typeof p.price === "number" ? ` · ${money(p.price)}` : ""}
-              </p>
-              {p.subtitle && <p className="text-[12px] text-slate-500">{p.subtitle}</p>}
-              {(p.benefit_justification || p.benefit_justification_optional) && (
-                <p className="text-[12px] text-slate-600 mt-1 whitespace-pre-line leading-snug">
-                  {p.benefit_justification || p.benefit_justification_optional}
-                </p>
-              )}
-              {p.disclosure && (
-                <p className="text-[11px] text-slate-500 mt-1 whitespace-pre-line leading-snug">{p.disclosure}</p>
-              )}
-            </div>
-          ))}
-        </div>
-      </details>
-    )}
+    {/* Full canonical disclosure packet — identical content to the dealer
+        document and the /sign full form, just laid out for the wizard. */}
+    <AddendumDisclosurePacket
+      state={addendum?.vehicle_state}
+      vehiclePrice={addendum?.vehicle_price}
+      vehicleCondition={addendum?.vehicle_condition || undefined}
+      products={(addendum?.products_snapshot as PacketProduct[]) || []}
+      dealer={addendum?.dealer_snapshot || undefined}
+    />
 
     <div className="rounded-2xl border border-slate-200 bg-white p-5 space-y-3">
       <p className="text-sm font-bold text-slate-900">Electronic Records & Signatures</p>

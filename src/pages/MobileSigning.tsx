@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { useParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import SignaturePad from "@/components/addendum/SignaturePad";
+import { AddendumDisclosurePacket, type PacketProduct } from "@/components/addendum/AddendumDisclosurePacket";
 import { useEmailDistribution } from "@/hooks/useEmailDistribution";
 import { useReviewRequest } from "@/hooks/useReviewRequest";
 import { toast } from "sonner";
@@ -1156,6 +1157,16 @@ const MobileSigning = () => {
           threeDayAck={sb766ThreeDayAck}
           onThreeDayAck={setSb766ThreeDayAck}
           onDisclosureChange={setSb766Disclosure}
+        />
+
+        {/* Canonical disclosure packet — same content as the dealer document
+            and the guided wizard, so this full form is fully defendable. */}
+        <AddendumDisclosurePacket
+          state={addendum?.vehicle_state}
+          vehiclePrice={addendum?.vehicle_price}
+          vehicleCondition={addendum?.vehicle_condition || undefined}
+          products={(addendum?.products_snapshot as PacketProduct[]) || []}
+          dealer={addendum?.dealer_snapshot || undefined}
         />
 
         {/* E-SIGN Act consent — REQUIRED before signature */}
