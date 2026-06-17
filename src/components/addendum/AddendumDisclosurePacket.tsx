@@ -1,5 +1,6 @@
 import { rewriteForState } from "@/lib/stateRewriter";
 import { canonicalCondition } from "@/lib/vehicleCondition";
+import { getStateCompliance } from "@/data/stateCompliance";
 
 // Canonical, context-free disclosure packet shared by every signing surface
 // (dealer print, /sign document, /review wizard) so the customer always sees
@@ -124,6 +125,42 @@ export function AddendumDisclosurePacket({
               {b.citation && <p className="text-[10px] text-slate-400 mt-0.5">{b.citation}</p>}
             </div>
           ))}
+
+          {/* General notices that live outside the per-state block engine but
+              are still required on the customer record (parity with the dealer
+              page): sales-contract notice, post-sale add-on window, retention. */}
+          {(() => {
+            const c = getStateCompliance(state || "");
+            return (
+              <>
+                {c.salesContractClause && (
+                  <div className="border-t border-slate-100 pt-3">
+                    <p className="text-[12px] font-bold text-slate-900">Sales contract notice</p>
+                    <p className="text-[12px] text-slate-700 mt-1 whitespace-pre-line leading-snug">{c.salesContractClause}</p>
+                  </div>
+                )}
+                {c.postSalePurchaseWindowDays > 0 && (
+                  <div className="border-t border-slate-100 pt-3">
+                    <p className="text-[12px] font-bold text-slate-900">Post-sale purchase window</p>
+                    <p className="text-[12px] text-slate-700 mt-1 leading-snug">
+                      Under {c.stateName} law you have up to {c.postSalePurchaseWindowDays} days after the date of
+                      sale to purchase any optional add-on listed here. Contact the dealership within this window to
+                      add a previously declined product.
+                    </p>
+                  </div>
+                )}
+                {c.recordRetentionYears > 0 && (
+                  <div className="border-t border-slate-100 pt-3">
+                    <p className="text-[12px] font-bold text-slate-900">Record retention</p>
+                    <p className="text-[12px] text-slate-700 mt-1 leading-snug">
+                      This document and its signing records are retained for at least {c.recordRetentionYears} years
+                      under applicable federal and {c.stateName} requirements.
+                    </p>
+                  </div>
+                )}
+              </>
+            );
+          })()}
         </div>
       </div>
     </div>

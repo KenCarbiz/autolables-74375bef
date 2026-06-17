@@ -1030,16 +1030,19 @@ const PricingStep = ({
           {[{ t: 48, a: 6.5 }, { t: 60, a: 6.5 }, { t: 72, a: 7.0 }].map((s) => {
             const r = s.a / 100 / 12;
             const m = (addedTotal * r * Math.pow(1 + r, s.t)) / (Math.pow(1 + r, s.t) - 1);
+            const total = m * s.t;
             return (
               <div key={s.t} className="rounded-xl border border-slate-200 p-3 text-center">
                 <p className="text-[10px] uppercase tracking-wider text-slate-400">{s.t} mo · {s.a}% APR</p>
                 <p className="text-lg font-black tabular-nums text-slate-900">{money(m)}<span className="text-[10px] font-semibold text-slate-400">/mo</span></p>
-                <p className="text-[10px] text-slate-500">{money(m * s.t)} total</p>
+                <p className="text-[10px] text-slate-500">{money(total)} total</p>
+                <p className="text-[10px] text-slate-500">+{money(total - addedTotal)} interest</p>
               </div>
             );
           })}
         </div>
-        <p className="text-[10px] text-slate-400 mt-2">Illustrative only. Your actual rate, term, and payment may differ — ask your finance manager for exact figures.</p>
+        <p className="text-[12px] font-semibold text-slate-700 mt-2">Cost without financing: {money(addedTotal)}</p>
+        <p className="text-[10px] text-slate-400 mt-0.5">Illustrative only. Your actual rate, term, and payment may differ — ask your finance manager for exact figures.</p>
       </div>
     )}
 

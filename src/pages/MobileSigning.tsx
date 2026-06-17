@@ -29,11 +29,17 @@ interface ProductSnapshot {
   price: number;
   price_label: string | null;
   disclosure: string | null;
+  benefit_justification?: string | null;
+  benefit_justification_optional?: string | null;
   // True (or absent) when this installed accessory's price is already
   // in the advertised price — itemized, never additive. False marks a
   // dealer-installed upcharge added above the advertised price.
   price_in_advertised?: boolean;
 }
+
+// Benefit text shown on a product's decision card (point-of-decision FTC §5).
+const benefitText = (p: ProductSnapshot) =>
+  (p.benefit_justification || p.benefit_justification_optional || "").trim();
 
 interface ReturnStatus {
   addendum_id: string;
@@ -803,6 +809,7 @@ const MobileSigning = () => {
                 </div>
                 <p className="text-sm font-bold text-foreground">${p.price.toFixed(2)}</p>
               </div>
+              {benefitText(p) && <p className="text-[11px] text-foreground leading-snug whitespace-pre-line">{benefitText(p)}</p>}
               <div className="flex items-center gap-2">
                 <span className="text-[10px] font-semibold text-muted-foreground">INITIALS:</span>
                 <input
@@ -837,6 +844,7 @@ const MobileSigning = () => {
                       </div>
                       <p className="text-sm font-bold text-foreground">${effectivePrice(p).toFixed(2)}</p>
                     </div>
+                    {benefitText(p) && <p className="text-[11px] text-foreground leading-snug whitespace-pre-line">{benefitText(p)}</p>}
                     <div className="flex gap-2">
                       <button
                         onClick={() => setOptionalSelections((prev) => ({ ...prev, [p.id]: "accept" }))}
@@ -885,9 +893,11 @@ const MobileSigning = () => {
                       <div>
                         <span className="text-[10px] font-bold bg-orange-600 text-white px-1.5 py-0.5 rounded">Optional</span>
                         <p className="text-sm font-semibold text-foreground mt-1">{p.name}</p>
+                        {p.subtitle && <p className="text-[10px] text-muted-foreground">{p.subtitle}</p>}
                       </div>
                       <p className="text-sm font-bold text-foreground">${effectivePrice(p).toFixed(2)}</p>
                     </div>
+                    {benefitText(p) && <p className="text-[11px] text-foreground leading-snug whitespace-pre-line">{benefitText(p)}</p>}
                     <div className="flex gap-2">
                       <button
                         onClick={() => setOptionalSelections((prev) => ({ ...prev, [p.id]: "accept" }))}
@@ -1156,16 +1166,19 @@ const MobileSigning = () => {
                 {[{ t: 48, a: 6.5 }, { t: 60, a: 6.5 }, { t: 72, a: 7.0 }].map((s) => {
                   const r = s.a / 100 / 12;
                   const m = (addedTotal * r * Math.pow(1 + r, s.t)) / (Math.pow(1 + r, s.t) - 1);
+                  const total = m * s.t;
                   return (
                     <div key={s.t} className="rounded-md border border-border p-2 text-center">
                       <p className="text-[9px] uppercase tracking-wider text-muted-foreground">{s.t} mo · {s.a}%</p>
                       <p className="text-sm font-black tabular-nums text-foreground">${m.toFixed(0)}<span className="text-[9px] font-semibold text-muted-foreground">/mo</span></p>
-                      <p className="text-[9px] text-muted-foreground">${(m * s.t).toFixed(0)} total</p>
+                      <p className="text-[9px] text-muted-foreground">${total.toFixed(0)} total</p>
+                      <p className="text-[9px] text-muted-foreground">+${(total - addedTotal).toFixed(0)} interest</p>
                     </div>
                   );
                 })}
               </div>
-              <p className="text-[9px] text-muted-foreground mt-1.5">Illustrative only — your actual rate, term, and payment may differ.</p>
+              <p className="text-[10px] font-semibold text-foreground mt-2">Cost without financing: ${addedTotal.toFixed(2)}</p>
+              <p className="text-[9px] text-muted-foreground mt-0.5">Illustrative only — your actual rate, term, and payment may differ.</p>
             </div>
           )}
 
