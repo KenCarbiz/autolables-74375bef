@@ -40,6 +40,8 @@ import {
   Search,
   HelpCircle,
   PenLine,
+  CheckCircle2,
+  Truck,
 } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
 import { useAuth } from "@/contexts/AuthContext";
@@ -157,8 +159,10 @@ const AppShell = ({ children }: AppShellProps) => {
       defaultOpen: true,
       items: [
         { label: "All Vehicles", path: "/inventory", icon: Car },
-        { label: "Waiting for Signatures", path: "/signatures", icon: PenLine },
         { label: "Saved Addendums", path: "/saved", icon: FolderOpen },
+        { label: "Waiting for Signatures", path: "/signatures", icon: PenLine },
+        { label: "Signed", path: "/signed", icon: CheckCircle2 },
+        { label: "Delivered", path: "/delivered", icon: Truck },
         { label: "Get-Ready", path: "/admin?tab=getready", icon: Clock },
         { label: "Vehicle Files", path: "/admin?tab=files", icon: FolderOpen },
         { label: "Lot Queue", path: "/queue", icon: ScanLine },

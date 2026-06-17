@@ -173,7 +173,9 @@ const App = () => (
                             members reach their own settings here. */}
                         <Route path="/admin" element={<Admin />} />
                         <Route path="/saved" element={<SavedAddendums />} />
-                        <Route path="/signatures" element={<SignatureQueue />} />
+                        <Route path="/signed" element={<SavedAddendums stage="signed" />} />
+                        <Route path="/delivered" element={<SavedAddendums stage="delivered" />} />
+                        <Route path="/signatures" element={<SignatureQueue /> } />
                         <Route path="/buyers-guide" element={<BuyersGuide />} />
                         <Route path="/trade-up" element={<TradeUpSticker />} />
                         <Route path="/used-car-sticker" element={<UsedCarSticker />} />

@@ -136,7 +136,24 @@ const Inventory = () => {
       toast.error("Failed to load inventory");
       setRows([]);
     } else {
-      setRows((data || []) as VehicleRow[]);
+      // Drop vehicles whose deal is delivered — they've left the lot. Match on
+      // a delivered addendum (delivered_at) or a delivered vehicle file.
+      let rows = (data || []) as VehicleRow[];
+      const vins = rows.map((r) => r.vin).filter(Boolean);
+      if (vins.length) {
+        try {
+          const [{ data: delAdd }, { data: delFiles }] = await Promise.all([
+            (supabase as any).from("addendums").select("vehicle_vin").not("delivered_at", "is", null).in("vehicle_vin", vins),
+            (supabase as any).from("vehicle_files").select("vin").eq("deal_status", "delivered").in("vin", vins),
+          ]);
+          const delivered = new Set<string>([
+            ...((delAdd || []).map((r: { vehicle_vin: string }) => (r.vehicle_vin || "").toUpperCase())),
+            ...((delFiles || []).map((r: { vin: string }) => (r.vin || "").toUpperCase())),
+          ]);
+          if (delivered.size) rows = rows.filter((r) => !delivered.has((r.vin || "").toUpperCase()));
+        } catch { /* delivered columns may not be migrated yet; show all */ }
+      }
+      setRows(rows);
     }
     setLoading(false);
   };

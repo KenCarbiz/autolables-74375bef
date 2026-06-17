@@ -1,17 +1,27 @@
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useNavigate } from "react-router-dom";
 import { format } from "date-fns";
-import { Search, FileText, ArrowLeft, Eye, Plus, Printer, ShieldCheck, Mail, Pencil } from "lucide-react";
+import { Search, FileText, ArrowLeft, Eye, Plus, Printer, ShieldCheck, Mail, Pencil, Truck } from "lucide-react";
 import EmptyState from "@/components/ui/empty-state";
 import { toast } from "sonner";
 
-const SavedAddendums = () => {
+export type DealStage = "saved" | "signed" | "delivered";
+
+const STAGE_META: Record<DealStage, { title: string; empty: string }> = {
+  saved: { title: "Saved Addendums", empty: "Drafts you're still building live here. Start one to fill this list." },
+  signed: { title: "Signed — Awaiting Delivery", empty: "Signed deals appear here until you mark them delivered." },
+  delivered: { title: "Delivered", empty: "Delivered deals are archived here." },
+};
+
+const SavedAddendums = ({ stage = "saved" }: { stage?: DealStage }) => {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const qc = useQueryClient();
   const [search, setSearch] = useState("");
+  const meta = STAGE_META[stage];
 
   const { data: addendums, isLoading } = useQuery({
     queryKey: ["addendums"],
@@ -26,7 +36,42 @@ const SavedAddendums = () => {
     enabled: !!user,
   });
 
-  const filtered = addendums?.filter((a) => {
+  // Mark an executed (signed) addendum as delivered: stamp the addendum and
+  // flip its vehicle file out of inventory.
+  const deliver = useMutation({
+    mutationFn: async (a: any) => {
+      const now = new Date().toISOString();
+      const { error } = await (supabase as any)
+        .from("addendums")
+        .update({ delivered_at: now, delivered_by: user?.id || "" })
+        .eq("id", a.id);
+      if (error) throw error;
+      if (a.vehicle_vin) {
+        // RLS scopes this to the caller's own tenant row.
+        await (supabase as any)
+          .from("vehicle_files")
+          .update({ deal_status: "delivered", sold_at: now })
+          .eq("vin", a.vehicle_vin);
+      }
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["addendums"] });
+      toast.success("Marked delivered — removed from inventory.");
+    },
+    onError: (e: any) => toast.error(e?.message?.includes("delivered_at") ? "Apply the delivered_at migration first." : "Could not mark delivered."),
+  });
+
+  // Stage split: delivered rows only in Delivered; signed-not-delivered in
+  // Signed; everything else (drafts) in Saved.
+  const inStage = (a: any) => {
+    const delivered = !!a.delivered_at;
+    if (stage === "delivered") return delivered;
+    if (delivered) return false;
+    if (stage === "signed") return a.status === "signed";
+    return a.status !== "signed";
+  };
+
+  const filtered = addendums?.filter(inStage).filter((a) => {
     const q = search.toLowerCase();
     if (!q) return true;
     return (
@@ -58,7 +103,7 @@ const SavedAddendums = () => {
             <button onClick={() => navigate("/addendum")} className="p-2 rounded-md hover:bg-muted transition-colors">
               <ArrowLeft className="w-5 h-5" />
             </button>
-            <h1 className="text-2xl font-bold font-barlow-condensed text-foreground">Saved Addendums</h1>
+            <h1 className="text-2xl font-bold font-barlow-condensed text-foreground">{meta.title}</h1>
           </div>
           <button onClick={() => navigate("/addendum")} className="font-semibold text-[13px] px-5 py-2 rounded-md bg-primary text-primary-foreground hover:opacity-85">
             + New Addendum
@@ -85,12 +130,8 @@ const SavedAddendums = () => {
         ) : !filtered?.length ? (
           <EmptyState
             icon={FileText}
-            title={search ? "No addendums match your search" : "No saved addendums yet"}
-            description={
-              search
-                ? "Try a different stock number, VIN, or customer name."
-                : "Every addendum you sign is archived here with its hash, consent record, and customer signature. Start one to fill this list."
-            }
+            title={search ? "No addendums match your search" : `Nothing in ${meta.title}`}
+            description={search ? "Try a different stock number, VIN, or customer name." : meta.empty}
             actions={
               search
                 ? undefined
@@ -170,6 +211,16 @@ const SavedAddendums = () => {
                           >
                             <Printer className="w-3.5 h-3.5" /> Print
                           </button>
+                          {stage === "signed" && (
+                            <button
+                              onClick={() => deliver.mutate(a)}
+                              disabled={deliver.isPending}
+                              className="inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1.5 rounded-md bg-emerald-600 text-white hover:bg-emerald-700 transition-colors disabled:opacity-50"
+                              title="Mark the vehicle delivered — stamps the record and removes it from inventory"
+                            >
+                              <Truck className="w-3.5 h-3.5" /> Mark Delivered
+                            </button>
+                          )}
                           {a.vehicle_vin && (
                             <button
                               onClick={() => navigate(`/compliance?vin=${encodeURIComponent(a.vehicle_vin)}`)}
