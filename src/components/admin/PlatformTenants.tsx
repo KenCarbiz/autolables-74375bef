@@ -306,6 +306,7 @@ const CreateTenantForm = ({ onClose, onCreate }: CreateFormProps) => {
     setDomain(r.domain || "");
     setOwnerEmail(r.primary_email || "");
     if (r.name) setSlug(String(r.name).toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, ""));
+    if (r.bundle_tier === "base" || r.bundle_tier === "pro") setPlanTier(r.bundle_tier);
     setAcHits([]); setAcQuery(r.name || "");
     toast.success("Imported from Autocurb — review and create.");
   };
@@ -370,7 +371,7 @@ const CreateTenantForm = ({ onClose, onCreate }: CreateFormProps) => {
       </div>
       <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
         <Select label="App" value={appSlug} onChange={setAppSlug} options={["autolabels", "autocurb", "autoframe", "autovideo"]} />
-        <Select label="Plan tier" value={planTier} onChange={setPlanTier} options={["starter", "essential", "professional", "unlimited", "enterprise"]} />
+        <Select label="Plan tier" value={planTier} onChange={setPlanTier} options={["base", "pro", "starter", "essential", "professional", "unlimited", "enterprise"]} />
         <div>
           <label className="text-[10px] font-semibold text-muted-foreground uppercase tracking-label">
             Trial length
