@@ -164,6 +164,13 @@ export interface PublicMessages {
   call: string;
   published: string;
   powered_by: string;
+  scan_service_history: string;
+  scan_remaining_warranty: string;
+  scan_available_accessories: string;
+  scan_warranty_factory: string;
+  scan_warranty_powertrain: string;
+  scan_warranty_note: string;
+  scan_accessories_note: string;
 }
 
 export const LABELS: Record<PublicLocale, PublicMessages> = {
@@ -314,6 +321,13 @@ export const LABELS: Record<PublicLocale, PublicMessages> = {
     call: "Call",
     published: "Published",
     powered_by: "Powered by AutoLabels.io",
+    scan_service_history: "Service history",
+    scan_remaining_warranty: "Remaining warranty",
+    scan_available_accessories: "Available accessories",
+    scan_warranty_factory: "Factory / Bumper-to-Bumper",
+    scan_warranty_powertrain: "Powertrain",
+    scan_warranty_note: "Estimated from the in-service date; confirm exact coverage with the manufacturer.",
+    scan_accessories_note: "Optional add-ons available for this vehicle — ask your salesperson.",
   },
   es: {
     language_name: "Español",
@@ -462,6 +476,13 @@ export const LABELS: Record<PublicLocale, PublicMessages> = {
     call: "Llamar a",
     published: "Publicado",
     powered_by: "Con la tecnología de AutoLabels.io",
+    scan_service_history: "Historial de servicio",
+    scan_remaining_warranty: "Garantía restante",
+    scan_available_accessories: "Accesorios disponibles",
+    scan_warranty_factory: "De fábrica / Defensa a defensa",
+    scan_warranty_powertrain: "Tren motriz",
+    scan_warranty_note: "Estimado a partir de la fecha de puesta en servicio; confirme la cobertura exacta con el fabricante.",
+    scan_accessories_note: "Complementos opcionales disponibles para este vehículo — consulte con su vendedor.",
   },
 };
 

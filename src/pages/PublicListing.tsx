@@ -1377,6 +1377,7 @@ const ProgramDocuments = ({ listing }: { listing: VehicleListing }) => {
 // accessories still available for this vehicle. Each block renders only when
 // the dealer has entered data, so an empty file shows nothing.
 const ScanExtras = ({ listing }: { listing: VehicleListing }) => {
+  const { L } = usePublicLocale();
   const records = (listing.service_records || []).filter((r) => r && (r.date || r.type || r.notes || r.mileage));
   const w = listing.warranty_info || {};
   const accessories = (listing.available_accessories || []).filter((a) => a && (a.name || "").trim());
@@ -1402,26 +1403,26 @@ const ScanExtras = ({ listing }: { listing: VehicleListing }) => {
         <section className="rounded-2xl border border-border bg-card shadow-premium p-5">
           <div className="flex items-center gap-2 mb-3">
             <ShieldCheck className="w-4 h-4 text-emerald-600" />
-            <h2 className="text-sm font-bold text-foreground uppercase tracking-wide">Remaining warranty</h2>
+            <h2 className="text-sm font-bold text-foreground uppercase tracking-wide">{L.scan_remaining_warranty}</h2>
           </div>
           <div className="grid grid-cols-2 gap-3">
             {(w.factory_months || w.factory_miles) && (
               <div className="rounded-xl border border-border p-3">
-                <p className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Factory / Bumper-to-Bumper</p>
+                <p className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">{L.scan_warranty_factory}</p>
                 <p className="text-sm font-semibold text-foreground mt-0.5">{[w.factory_months ? `${w.factory_months} mo` : null, w.factory_miles ? `${w.factory_miles.toLocaleString()} mi` : null].filter(Boolean).join(" / ")}</p>
                 {remaining(w.factory_months) && <p className="text-[11px] text-emerald-700 font-semibold mt-0.5">{remaining(w.factory_months)}</p>}
               </div>
             )}
             {(w.powertrain_months || w.powertrain_miles) && (
               <div className="rounded-xl border border-border p-3">
-                <p className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Powertrain</p>
+                <p className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">{L.scan_warranty_powertrain}</p>
                 <p className="text-sm font-semibold text-foreground mt-0.5">{[w.powertrain_months ? `${w.powertrain_months} mo` : null, w.powertrain_miles ? `${w.powertrain_miles.toLocaleString()} mi` : null].filter(Boolean).join(" / ")}</p>
                 {remaining(w.powertrain_months) && <p className="text-[11px] text-emerald-700 font-semibold mt-0.5">{remaining(w.powertrain_months)}</p>}
               </div>
             )}
           </div>
           {w.notes && <p className="text-xs text-muted-foreground mt-3">{w.notes}</p>}
-          <p className="text-[10px] text-muted-foreground mt-2">Estimated from the in-service date; confirm exact coverage with the manufacturer.</p>
+          <p className="text-[10px] text-muted-foreground mt-2">{L.scan_warranty_note}</p>
         </section>
       )}
 
@@ -1429,7 +1430,7 @@ const ScanExtras = ({ listing }: { listing: VehicleListing }) => {
         <section className="rounded-2xl border border-border bg-card shadow-premium p-5">
           <div className="flex items-center gap-2 mb-3">
             <Wrench className="w-4 h-4 text-muted-foreground" />
-            <h2 className="text-sm font-bold text-foreground uppercase tracking-wide">Service history</h2>
+            <h2 className="text-sm font-bold text-foreground uppercase tracking-wide">{L.scan_service_history}</h2>
           </div>
           <ul className="space-y-2">
             {records.map((r, i) => (
@@ -1449,7 +1450,7 @@ const ScanExtras = ({ listing }: { listing: VehicleListing }) => {
         <section className="rounded-2xl border border-border bg-card shadow-premium p-5">
           <div className="flex items-center gap-2 mb-3">
             <Sparkles className="w-4 h-4 text-amber-500" />
-            <h2 className="text-sm font-bold text-foreground uppercase tracking-wide">Available accessories</h2>
+            <h2 className="text-sm font-bold text-foreground uppercase tracking-wide">{L.scan_available_accessories}</h2>
           </div>
           <div className="space-y-2">
             {accessories.map((a, i) => (
@@ -1462,7 +1463,7 @@ const ScanExtras = ({ listing }: { listing: VehicleListing }) => {
               </div>
             ))}
           </div>
-          <p className="text-[10px] text-muted-foreground mt-2">Optional add-ons available for this vehicle — ask your salesperson.</p>
+          <p className="text-[10px] text-muted-foreground mt-2">{L.scan_accessories_note}</p>
         </section>
       )}
     </>
