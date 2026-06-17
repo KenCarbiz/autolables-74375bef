@@ -509,13 +509,19 @@ const TenantDetailsDrawer = ({
   const [form, setForm] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const [mirror, setMirror] = useState<{ id: string | null; profile: Record<string, any> | null; synced_at: string | null; source: string } | null>(null);
+  const [resyncing, setResyncing] = useState(false);
 
   useEffect(() => {
     let active = true;
     (async () => {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const { data } = await (supabase as any).from("dealer_profiles").select("settings").eq("tenant_id", tenant.id).maybeSingle();
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { data: trow } = await (supabase as any).from("tenants").select("autocurb_tenant_id, autocurb_profile, autocurb_synced_at, source").eq("id", tenant.id).maybeSingle();
       if (!active) return;
+      if (trow) setMirror({ id: trow.autocurb_tenant_id, profile: trow.autocurb_profile, synced_at: trow.autocurb_synced_at, source: trow.source });
       const s = (data?.settings as Record<string, string>) || {};
       const next: Record<string, string> = {};
       LEGAL_FIELDS.forEach((f) => { next[f.key] = (s[f.key] as string) || ""; });
@@ -525,6 +531,20 @@ const TenantDetailsDrawer = ({
     })();
     return () => { active = false; };
   }, [tenant.id, tenant.name]);
+
+  const resync = async () => {
+    if (!mirror?.id) return;
+    setResyncing(true);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data, error } = await (supabase as any).functions.invoke("autocurb-dealer-lookup", { body: { action: "by-id", id: mirror.id } });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const p = data as { result?: Record<string, any>; error?: string } | null;
+    if (error || p?.error || !p?.result) { toast.error("Re-sync failed — check the Autocurb connection."); setResyncing(false); return; }
+    await (supabase as any).rpc("admin_link_autocurb", { p_tenant_id: tenant.id, p_autocurb_id: mirror.id, p_profile: p.result });
+    setMirror((m) => m ? { ...m, profile: p.result!, synced_at: new Date().toISOString() } : m);
+    setResyncing(false);
+    toast.success("Re-synced from Autocurb.");
+  };
 
   const required = LEGAL_FIELDS.filter((f) => f.required);
   const doneCount = required.filter((f) => (form[f.key] || "").trim()).length;
@@ -562,6 +582,60 @@ const TenantDetailsDrawer = ({
           </div>
           <p className="text-[10px] text-muted-foreground mt-1">Legal name, address, operating state, and DMV license are required for compliant documents.</p>
         </div>
+
+        {mirror?.source === "autocurb" && mirror.profile && (() => {
+          const p = mirror.profile;
+          const b = (p.branding || {}) as Record<string, string>;
+          const stores = Array.isArray(p.stores) ? p.stores : [];
+          const rows: [string, string][] = [
+            ["Legal name", p.legal_entity_name || p.name],
+            ["Domain", p.domain],
+            ["Owner email", p.primary_email],
+            ["Phone", p.phone],
+            ["Address", p.address],
+            ["Governing state", p.governing_law_state],
+            ["DMV license #", b.dealer_license_number],
+            ["Bundle tier", p.bundle_tier],
+          ].filter(([, v]) => v) as [string, string][];
+          return (
+            <div className="mx-4 mt-3 rounded-lg border border-blue-200 bg-blue-50/50 dark:bg-blue-950/30 dark:border-blue-900 p-3">
+              <div className="flex items-center justify-between">
+                <p className="text-[11px] font-bold uppercase tracking-wider text-blue-700 dark:text-blue-300">Managed in Autocurb</p>
+                <button onClick={resync} disabled={resyncing} className="h-7 px-2.5 rounded-md bg-blue-600 text-white text-[11px] font-semibold hover:bg-blue-700 disabled:opacity-50">
+                  {resyncing ? "Syncing…" : "Re-sync"}
+                </button>
+              </div>
+              <p className="text-[10px] text-muted-foreground mt-0.5">Read-only mirror. {mirror.synced_at ? `Last synced ${new Date(mirror.synced_at).toLocaleString()}` : "Not yet synced"}</p>
+              <div className="flex items-center gap-2 mt-2">
+                {p.logo_url && <img src={p.logo_url} alt={p.name} className="h-7 w-auto object-contain" />}
+                {[p.primary_color, p.secondary_color].filter(Boolean).map((c: string) => (
+                  <span key={c} className="w-5 h-5 rounded border border-border" style={{ background: c }} title={c} />
+                ))}
+              </div>
+              <dl className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1 text-[11px]">
+                {rows.map(([k, v]) => (
+                  <div key={k} className="min-w-0">
+                    <dt className="text-[9px] uppercase tracking-wider text-muted-foreground">{k}</dt>
+                    <dd className="text-foreground truncate">{v}</dd>
+                  </div>
+                ))}
+              </dl>
+              {stores.length > 0 && (
+                <div className="mt-2">
+                  <p className="text-[9px] uppercase tracking-wider text-muted-foreground mb-1">Stores ({stores.length})</p>
+                  <ul className="space-y-0.5">
+                    {stores.map((s: Record<string, string>, i: number) => (
+                      <li key={i} className="text-[11px] text-foreground truncate">
+                        {s.name || "Store"}{[s.city, s.state].filter(Boolean).length ? ` · ${[s.city, s.state].filter(Boolean).join(", ")}` : ""}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+              <p className="text-[9px] text-muted-foreground mt-2">Entitlement, plan tier, members, and templates are AutoLabels-owned and edited below — a re-sync never overwrites them.</p>
+            </div>
+          );
+        })()}
 
         {loading ? (
           <div className="p-6 text-center text-sm text-muted-foreground">Loading…</div>
