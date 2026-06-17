@@ -35,6 +35,10 @@ export interface DealerSettings {
   // Marketing assets shown to shoppers (packet / stickers / portal).
   why_buy_here: string;            // dealership value prop / why buy here
   warranty_programs: string;       // warranty programs offered (free text)
+  // Dealer-configurable condition terms (comma-separated). The dealer can use
+  // their own labels (e.g. "OEM CPO", "Dealer CPO"); each maps to a canonical
+  // new/used/cpo value under the hood for storage + compliance gating.
+  vehicle_conditions: string;
   // Feature toggles — what shows on the employee-facing addendum
   feature_vin_decode: boolean;
   feature_buyers_guide: boolean;
@@ -102,6 +106,7 @@ export const DEFAULT_SETTINGS: DealerSettings = {
   capital_one_url: "",
   why_buy_here: "",
   warranty_programs: "",
+  vehicle_conditions: "New, Demo, Used, CPO",
   feature_vin_decode: true,
   feature_buyers_guide: true,
   feature_product_rules: true,

@@ -4,7 +4,13 @@ import { toast } from "sonner";
 import { useVehicleUrlScrape } from "@/hooks/useVehicleUrlScrape";
 import { useProducts } from "@/hooks/useProducts";
 import { useAuth } from "@/contexts/AuthContext";
+import { useDealerSettings } from "@/contexts/DealerSettingsContext";
 import type { GetReadyRecord } from "@/hooks/useGetReady";
+
+// Dealer condition labels (e.g. "OEM CPO") map to the canonical new/used the
+// get_ready_records table accepts. Anything that isn't "new" is treated as used.
+const canonicalCondition = (label: string): "new" | "used" =>
+  /new/i.test(label) && !/used|pre/i.test(label) ? "new" : "used";
 
 // Start Get-Ready — the single entry point for the recon pipeline. Pick a
 // vehicle by web link (scrape), manual entry, or a VIN you scanned, then
@@ -31,18 +37,25 @@ export const StartGetReadyModal = ({ open, onClose, onCreate }: Props) => {
   const { scrape, scraping } = useVehicleUrlScrape();
   const { data: products = [] } = useProducts();
   const { user } = useAuth();
+  const { settings } = useDealerSettings();
+  const conditions = (settings.vehicle_conditions || "New, Demo, Used, CPO")
+    .split(",").map((s) => s.trim()).filter(Boolean);
+  const defaultCondition = conditions.find((c) => /used/i.test(c)) || conditions[0] || "Used";
+  const pickByCanonical = (canon: "new" | "used") =>
+    conditions.find((c) => canonicalCondition(c) === canon) || defaultCondition;
+
   const [url, setUrl] = useState("");
   const [vin, setVin] = useState("");
   const [ymm, setYmm] = useState("");
   const [stock, setStock] = useState("");
-  const [condition, setCondition] = useState<"new" | "used">("used");
+  const [condition, setCondition] = useState<string>(defaultCondition);
   const [selected, setSelected] = useState<Record<string, boolean>>({});
   const [saving, setSaving] = useState(false);
 
   if (!open) return null;
 
   const reset = () => {
-    setUrl(""); setVin(""); setYmm(""); setStock(""); setCondition("used"); setSelected({});
+    setUrl(""); setVin(""); setYmm(""); setStock(""); setCondition(defaultCondition); setSelected({});
   };
 
   const doScrape = async () => {
@@ -54,7 +67,7 @@ export const StartGetReadyModal = ({ open, onClose, onCreate }: Props) => {
       if (r.vin) { setVin(r.vin.toUpperCase()); filled = true; }
       if (r.ymm) { setYmm(r.ymm); filled = true; }
       if (r.stock) { setStock(r.stock); filled = true; }
-      if (r.condition) setCondition(r.condition.toLowerCase().includes("new") ? "new" : "used");
+      if (r.condition) setCondition(pickByCanonical(r.condition.toLowerCase().includes("new") ? "new" : "used"));
     }
     // Fallback for JS-walled sites (Team Velocity/Apollo, etc.) where the page
     // can't be scraped: many dealer VDP URLs carry the VIN + condition in the
@@ -63,8 +76,17 @@ export const StartGetReadyModal = ({ open, onClose, onCreate }: Props) => {
       const m = u.toUpperCase().match(/[A-HJ-NPR-Z0-9]{17}/);
       if (m) { setVin(m[0]); filled = true; }
     }
-    if (/\/new\//i.test(u)) setCondition("new");
-    else if (/\/(used|pre-owned|preowned|cpo|certified)\//i.test(u)) setCondition("used");
+    // YMM often lives in the VDP slug after the VIN, e.g.
+    // /viewdetails/new/<vin>/2026-infiniti-qx80-sport-utility
+    if (!r?.ymm) {
+      const slug = u.split("?")[0].split("/").find((seg) => /^(19|20)\d{2}-[a-z]/i.test(seg));
+      if (slug) {
+        const ymmText = slug.split("-").map((w) => (/\d/.test(w) ? w.toUpperCase() : w.charAt(0).toUpperCase() + w.slice(1))).join(" ");
+        setYmm(ymmText); filled = true;
+      }
+    }
+    if (/\/new\//i.test(u)) setCondition(pickByCanonical("new"));
+    else if (/\/(used|pre-owned|preowned|cpo|certified)\//i.test(u)) setCondition(pickByCanonical("used"));
     toast[filled ? "success" : "error"](
       filled ? "Pulled what we could from the link — confirm the details below." : "Couldn't read that page automatically. Enter the VIN / vehicle below.",
     );
@@ -80,10 +102,10 @@ export const StartGetReadyModal = ({ open, onClose, onCreate }: Props) => {
       vin: vin.trim().toUpperCase(),
       stockNumber: stock.trim(),
       ymm: ymm.trim(),
-      condition,
+      condition: canonicalCondition(condition),
       acquiredDate: new Date().toISOString(),
       accessoriesToInstall,
-      inspectionRequired: condition === "used",
+      inspectionRequired: canonicalCondition(condition) === "used",
       createdBy: user?.id || "",
     });
     setSaving(false);
@@ -126,9 +148,8 @@ export const StartGetReadyModal = ({ open, onClose, onCreate }: Props) => {
           <div className="md:col-span-2"><label className={label}>Year / Make / Model</label><input value={ymm} onChange={(e) => setYmm(e.target.value)} placeholder="2026 Honda CR-V EX-L" className={input} /></div>
           <div><label className={label}>Stock #</label><input value={stock} onChange={(e) => setStock(e.target.value)} placeholder="H12345" className={input} /></div>
           <div><label className={label}>Condition</label>
-            <select value={condition} onChange={(e) => setCondition(e.target.value as "new" | "used")} className={`${input} cursor-pointer`}>
-              <option value="used">Used</option>
-              <option value="new">New</option>
+            <select value={condition} onChange={(e) => setCondition(e.target.value)} className={`${input} cursor-pointer`}>
+              {conditions.map((c) => <option key={c} value={c}>{c}</option>)}
             </select>
           </div>
           <div className="col-span-2 md:col-span-4"><label className={label}>VIN</label><input value={vin} onChange={(e) => setVin(e.target.value.toUpperCase())} placeholder="1HGCV1F3XRA000000" maxLength={17} className={`${input} font-mono tracking-wide`} /></div>

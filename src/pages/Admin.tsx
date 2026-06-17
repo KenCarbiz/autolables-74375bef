@@ -306,6 +306,7 @@ const Admin = () => {
     capital_one_url: settings.capital_one_url,
     why_buy_here: settings.why_buy_here,
     warranty_programs: settings.warranty_programs,
+    vehicle_conditions: settings.vehicle_conditions,
   });
   const [logoUploading, setLogoUploading] = useState(false);
 
@@ -1365,6 +1366,11 @@ const Admin = () => {
                     <textarea value={branding.warranty_programs} onChange={(e) => setBranding({ ...branding, warranty_programs: e.target.value })} rows={3} placeholder="Powertrain warranty on every used vehicle · Certified pre-owned coverage…" className="mt-1 w-full px-3 py-2 border border-border-custom rounded text-sm bg-background text-foreground placeholder:text-muted-foreground/50" />
                   </div>
                 </div>
+                <div className="mt-3">
+                  <label className="text-xs font-semibold text-muted-foreground">Vehicle condition terms</label>
+                  <input value={branding.vehicle_conditions} onChange={(e) => setBranding({ ...branding, vehicle_conditions: e.target.value })} placeholder="New, Demo, Used, CPO" className="mt-1 w-full px-3 py-2 border border-border-custom rounded text-sm bg-background text-foreground placeholder:text-muted-foreground/50" />
+                  <p className="text-[11px] text-muted-foreground mt-1">Comma-separated. Use your own labels (e.g. OEM CPO, Dealer CPO). Each maps to new/used/cpo for storage and compliance.</p>
+                </div>
               </div>
 
               <div className="flex gap-3">
@@ -1394,6 +1400,7 @@ const Admin = () => {
                       capital_one_url: "",
                       why_buy_here: "",
                       warranty_programs: "",
+                      vehicle_conditions: "New, Demo, Used, CPO",
                     };
                     setBranding(defaults);
                     updateSettings(defaults);
