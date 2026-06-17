@@ -635,15 +635,24 @@ const AppShell = ({ children }: AppShellProps) => {
                       No recent activity
                     </div>
                   ) : (
-                    recentNotifications.map(e => (
-                      <div key={e.id} className="px-3 py-2 text-xs border-b border-border last:border-0">
-                        <p className="font-medium text-foreground capitalize">{e.action.replace(/_/g, " ")}</p>
-                        <p className="text-muted-foreground truncate">{e.entity_type} · {e.entity_id}</p>
-                        <p className="text-[10px] text-muted-foreground mt-0.5">
-                          {new Date(e.created_at).toLocaleString()}
-                        </p>
-                      </div>
-                    ))
+                    recentNotifications.map(e => {
+                      // Label priority: customer name + stock #, then customer
+                      // name, then VIN — much more recognizable than a raw VIN.
+                      const d = (e.details || {}) as Record<string, unknown>;
+                      const cust = String(d.customer_name || "").trim();
+                      const stock = String(d.stock || d.vehicle_stock || "").trim();
+                      const vin = String(d.vin || e.entity_id || "").trim();
+                      const label = cust && stock ? `${cust} · #${stock}` : cust || vin || "—";
+                      return (
+                        <div key={e.id} className="px-3 py-2 text-xs border-b border-border last:border-0">
+                          <p className="font-medium text-foreground capitalize">{e.action.replace(/_/g, " ")}</p>
+                          <p className="text-muted-foreground truncate">{label}</p>
+                          <p className="text-[10px] text-muted-foreground mt-0.5">
+                            {new Date(e.created_at).toLocaleString()}
+                          </p>
+                        </div>
+                      );
+                    })
                   )}
                 </DropdownMenuContent>
               </DropdownMenu>
@@ -677,7 +686,7 @@ const AppShell = ({ children }: AppShellProps) => {
                     <CreditCard className="w-3.5 h-3.5 mr-2" />
                     Manage billing
                   </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => navigate("/admin?tab=branding")}>
+                  <DropdownMenuItem onClick={() => navigate("/admin?tab=settings")}>
                     <Settings className="w-3.5 h-3.5 mr-2" />
                     Settings
                   </DropdownMenuItem>

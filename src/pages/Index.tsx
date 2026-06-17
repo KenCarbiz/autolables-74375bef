@@ -608,7 +608,7 @@ const Index = () => {
 
   const handlePrint = () => {
     window.print();
-    if (user) log({ store_id: currentStore?.id || "", user_id: user.id, action: "addendum_printed", entity_type: "addendum", entity_id: vehicle.vin, details: { ymm: vehicle.ymm } });
+    if (user) log({ store_id: currentStore?.id || "", user_id: user.id, action: "addendum_printed", entity_type: "addendum", entity_id: vehicle.vin, details: { ymm: vehicle.ymm, vin: vehicle.vin, stock: vehicle.stock, customer_name: composeName(customerInfo.buyer_first_name, customerInfo.buyer_middle_initial, customerInfo.buyer_last_name, customerInfo.buyer_suffix) } });
   };
 
   const handleDownloadPdf = async () => {
@@ -907,7 +907,7 @@ const Index = () => {
 
     setQrOpen(true);
     toast.success(`Addendum ${version} locked · ready for signatures`);
-    log({ store_id: currentStore?.id || "", user_id: user.id, action: "addendum_sent", entity_type: "addendum", entity_id: vehicle.vin, details: { ymm: vehicle.ymm, token, version } });
+    log({ store_id: currentStore?.id || "", user_id: user.id, action: "addendum_sent", entity_type: "addendum", entity_id: vehicle.vin, details: { ymm: vehicle.ymm, vin: vehicle.vin, stock: vehicle.stock, customer_name: composeName(customerInfo.buyer_first_name, customerInfo.buyer_middle_initial, customerInfo.buyer_last_name, customerInfo.buyer_suffix), token, version } });
   };
 
   // Append a per-channel `link_sent` event to the addendum timeline so the
@@ -1028,7 +1028,7 @@ const Index = () => {
       toast.error(error.message);
     } else {
       toast.success(payload.status === "signed" ? "Addendum saved." : "Draft saved — find it in Saved Addendums.");
-      log({ store_id: currentStore?.id || "", user_id: user.id, action: "addendum_created", entity_type: "addendum", entity_id: vehicle.vin, details: { ymm: vehicle.ymm, vin: vehicle.vin, status: payload.status, products_count: displayProducts.length, installed_total: installedTotal, optional_total: optionalTotal, type_overrides: typeOverrides } });
+      log({ store_id: currentStore?.id || "", user_id: user.id, action: "addendum_created", entity_type: "addendum", entity_id: vehicle.vin, details: { ymm: vehicle.ymm, vin: vehicle.vin, stock: vehicle.stock, customer_name: composeName(customerInfo.buyer_first_name, customerInfo.buyer_middle_initial, customerInfo.buyer_last_name, customerInfo.buyer_suffix), status: payload.status, products_count: displayProducts.length, installed_total: installedTotal, optional_total: optionalTotal, type_overrides: typeOverrides } });
 
       // Mirror every signer into addendum_signings so the unified
       // compliance packet + VehicleFile activity timeline show every
