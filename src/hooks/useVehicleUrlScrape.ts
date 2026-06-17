@@ -68,17 +68,23 @@ export const useVehicleUrlScrape = () => {
     // Parse whatever the proxy returned.
     let result = html ? parseVehiclePage(html, trimmed) : null;
     const empty = (r: ScrapedVehicle | null) => !r || (!r.vin && !r.make && !r.model && !r.year);
+    // The descriptive fields (year/make/model/mileage/stock) render client-side
+    // on JS-walled sites, so a plain fetch often yields ONLY the VIN (it sits in
+    // the URL / page shell). Treat that as incomplete and still render via
+    // Firecrawl — otherwise the dealer gets a VIN and nothing else.
+    const incomplete = (r: ScrapedVehicle | null) =>
+      !r || !r.year || !r.make || !r.model || !r.mileage || !r.stock;
 
     // Fallback for JS-walled sites (Team Velocity/Apollo, DealerOn, etc.):
-    // a plain fetch returns the empty JS shell, so render the page through
-    // Firecrawl (when configured) and parse the real HTML.
-    if (empty(result)) {
+    // render the page through Firecrawl (when configured), parse the real HTML,
+    // and MERGE so we keep anything the first pass already found (e.g. the VIN).
+    if (incomplete(result)) {
       try {
         const { data } = await supabase.functions.invoke("firecrawl-scrape", { body: { url: trimmed } });
         const fcHtml = (data as { html?: string } | null)?.html;
         if (fcHtml && fcHtml.length > 500) {
           const fcResult = parseVehiclePage(fcHtml, trimmed);
-          if (!empty(fcResult)) result = fcResult;
+          result = mergeVehicles(result, fcResult);
         }
       } catch {
         /* Firecrawl unavailable — fall through to the error below */
@@ -111,6 +117,23 @@ export const useVehicleUrlScrape = () => {
 
   return { scrape, parseFromSource, scraping, error };
 };
+
+// Merge two scrape passes, preferring the first pass's non-empty fields and
+// filling the gaps from the second (the Firecrawl render). Keeps the VIN we
+// already had while picking up the year/make/model/mileage/stock JS revealed.
+function mergeVehicles(a: ScrapedVehicle | null, b: ScrapedVehicle | null): ScrapedVehicle | null {
+  if (!a) return b;
+  if (!b) return a;
+  const out = { ...a };
+  (Object.keys(out) as (keyof ScrapedVehicle)[]).forEach((k) => {
+    if (k === "ymm") return;
+    if (!out[k] && b[k]) out[k] = b[k];
+  });
+  const parts = [out.year, out.make, out.model];
+  if (out.trim) parts.push(out.trim);
+  out.ymm = parts.filter(Boolean).join(" ");
+  return out;
+}
 
 function parseVehiclePage(html: string, sourceUrl: string): ScrapedVehicle {
   const vehicle: ScrapedVehicle = {
