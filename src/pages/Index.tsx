@@ -165,7 +165,12 @@ const Index = () => {
   const [inkSaving, setInkSaving] = useState(false);
   // On-screen preview zoom only. Print + PDF capture always reset to 1
   // so the artifact stays true-to-paper-size.
-  const [zoom, setZoom] = useState(1.1);
+  // Default the on-screen preview to 140% on desktop (wider screens) where
+  // there's room; phones/tablets stay at 110% so the sheet fits.
+  const [zoom, setZoom] = useState(() =>
+    typeof window !== "undefined" && window.innerWidth >= 1024 ? 1.4 : 1.1,
+  );
+  const defaultZoom = typeof window !== "undefined" && window.innerWidth >= 1024 ? 1.4 : 1.1;
   // Language of the disclosure block. FTC Used Car Rule + CA SB 766
   // require the disclosure to be presented in the language the sale
   // is conducted in. Dealer picks per-addendum; "en" is default.
@@ -284,16 +289,23 @@ const Index = () => {
       setInitials((data.initials as Record<string, string>) || {});
       setOptionalSelections((data.optional_selections as Record<string, string>) || {});
 
-      // Populate customer info from saved full name fields
-      const [bFirst, ...bRest] = (data.customer_name || "").split(" ");
-      const [cFirst, ...cRest] = (data.cobuyer_name || "").split(" ");
-      setCustomerInfo({
-        ...emptyCustomerInfo,
-        buyer_first_name: bFirst || "",
-        buyer_last_name: bRest.join(" "),
-        cobuyer_first_name: cFirst || "",
-        cobuyer_last_name: cRest.join(" "),
-      });
+      // Prefer the full saved customer_info bag (address, phone, email, …).
+      // Fall back to splitting the composite names for rows saved before the
+      // customer_info column existed.
+      const savedCi = (data as { customer_info?: Partial<CustomerInfo> }).customer_info;
+      if (savedCi && Object.keys(savedCi).length > 0) {
+        setCustomerInfo({ ...emptyCustomerInfo, ...savedCi });
+      } else {
+        const [bFirst, ...bRest] = (data.customer_name || "").split(" ");
+        const [cFirst, ...cRest] = (data.cobuyer_name || "").split(" ");
+        setCustomerInfo({
+          ...emptyCustomerInfo,
+          buyer_first_name: bFirst || "",
+          buyer_last_name: bRest.join(" "),
+          cobuyer_first_name: cFirst || "",
+          cobuyer_last_name: cRest.join(" "),
+        });
+      }
 
       setCustomerSig({
         data: data.customer_signature_data || "",
@@ -795,6 +807,10 @@ const Index = () => {
       initials,
       optional_selections: optionalSelections,
       dealer_snapshot: dealerSnapshot,
+      customer_info: customerInfo,
+      customer_email: customerInfo.buyer_email || null,
+      customer_name: composeName(customerInfo.buyer_first_name, customerInfo.buyer_middle_initial, customerInfo.buyer_last_name, customerInfo.buyer_suffix) || null,
+      cobuyer_name: composeName(customerInfo.cobuyer_first_name, customerInfo.cobuyer_middle_initial, customerInfo.cobuyer_last_name, customerInfo.cobuyer_suffix) || null,
       total_installed: installedTotal,
       total_with_optional: grandTotalWithFee,
       status: "draft" as const,
@@ -940,6 +956,10 @@ const Index = () => {
       initials,
       optional_selections: optionalSelections,
       dealer_snapshot: dealerSnapshot,
+      // Full buyer/co-buyer capture (address, phone, email, …) so every typed
+      // field round-trips on reopen, not just the name.
+      customer_info: customerInfo,
+      customer_email: customerInfo.buyer_email || null,
       customer_name: composeName(customerInfo.buyer_first_name, customerInfo.buyer_middle_initial, customerInfo.buyer_last_name, customerInfo.buyer_suffix) || null,
       cobuyer_name: composeName(customerInfo.cobuyer_first_name, customerInfo.cobuyer_middle_initial, customerInfo.cobuyer_last_name, customerInfo.cobuyer_suffix) || null,
       customer_signature_data: customerSig.data || null,
@@ -960,12 +980,12 @@ const Index = () => {
     let inserted: { id?: string } | null = null;
     let error: { message: string } | null = null;
     if (currentId) {
-      const res = await supabase.from("addendums").update(payload).eq("id", currentId);
+      const res = await supabase.from("addendums").update(payload as any).eq("id", currentId);
       error = res.error;
       inserted = { id: currentId };
     } else {
       const res = await supabase.from("addendums")
-        .insert([{ ...payload, signing_token: crypto.randomUUID() }])
+        .insert([{ ...payload, signing_token: crypto.randomUUID() } as any])
         .select("id").single();
       error = res.error;
       inserted = res.data as { id?: string } | null;
@@ -1126,7 +1146,7 @@ const Index = () => {
           {/* On-screen zoom only — print/PDF stay true-to-paper-size. */}
           <div className="inline-flex items-center gap-1 h-9 px-1 rounded-md border border-border" title="Adjust on-screen preview size (does not affect print or PDF)">
             <button onClick={() => setZoom((z) => Math.max(0.6, +(z - 0.1).toFixed(2)))} className="w-6 h-6 inline-flex items-center justify-center rounded hover:bg-muted text-sm" aria-label="Zoom out">−</button>
-            <button onClick={() => setZoom(1.1)} className="text-xs tabular-nums w-11 text-center text-muted-foreground hover:text-foreground" title="Reset zoom">{Math.round(zoom * 100)}%</button>
+            <button onClick={() => setZoom(defaultZoom)} className="text-xs tabular-nums w-11 text-center text-muted-foreground hover:text-foreground" title="Reset zoom">{Math.round(zoom * 100)}%</button>
             <button onClick={() => setZoom((z) => Math.min(2, +(z + 0.1).toFixed(2)))} className="w-6 h-6 inline-flex items-center justify-center rounded hover:bg-muted text-sm" aria-label="Zoom in">+</button>
           </div>
           {settings.feature_ink_saving && (
