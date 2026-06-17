@@ -15,6 +15,7 @@ import VehicleStrip from "@/components/addendum/VehicleStrip";
 import IntentBox from "@/components/addendum/IntentBox";
 import ProductRow from "@/components/addendum/ProductRow";
 import { useSmsDelivery } from "@/hooks/useSmsDelivery";
+import { useAdvertisedPrices } from "@/hooks/useAdvertisedPrices";
 import TotalBar from "@/components/addendum/TotalBar";
 import SelectionRecord from "@/components/addendum/SelectionRecord";
 import Disclosures, { type DisclosureLanguage } from "@/components/addendum/Disclosures";
@@ -144,6 +145,7 @@ const Index = () => {
   const { data: products, isLoading } = useProducts();
   const { user, isAdmin } = useAuth();
   const { settings } = useDealerSettings();
+  const { byVin } = useAdvertisedPrices();
   const { rules, getMatchingProducts } = useProductRules();
   const { log } = useAudit();
   const { currentStore, tenant } = useTenant();
@@ -453,6 +455,14 @@ const Index = () => {
     if (c.includes("new")) return "new";
     return "used";
   }, [vehicleDetails.condition]);
+
+  // Goal A: window price vs latest advertised price for this VIN. Both feed
+  // the red-team so a mismatch is flagged before the customer signs.
+  const vehiclePriceNum = useMemo(
+    () => parseFloat((vehicleDetails.price || "").replace(/[^0-9.]/g, "")) || 0,
+    [vehicleDetails.price],
+  );
+  const advertisedForVin = vehicle.vin ? byVin.get(vehicle.vin.toUpperCase()) : undefined;
 
   const installed = displayProducts.filter((p) => p.badge_type === "installed");
   const optional = displayProducts.filter((p) => p.badge_type === "optional");
@@ -1104,7 +1114,8 @@ const Index = () => {
           <ComplianceRedTeamPanel
             findings={runComplianceRedTeam({
               state: settings.doc_fee_state || settings.dealer_state || "",
-              vehiclePrice: undefined,
+              vehiclePrice: vehiclePriceNum || undefined,
+              advertisedPrice: advertisedForVin?.advertised_price,
               docFeeAmount: settings.doc_fee_enabled ? settings.doc_fee_amount : undefined,
               stickerText: `${displayProducts?.map((p) => `${p.name} ${p.disclosure || ""}`).join(" ") || ""} ${docFeeDisclosureText}`,
               products: displayProducts?.map((p) => ({

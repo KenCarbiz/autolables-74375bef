@@ -17,6 +17,22 @@ const baseDraft: RedTeamDraft = {
   spanishVersion: false,
 };
 
+describe("advertised price drift", () => {
+  it("warns when the window price exceeds the advertised price by more than $50", () => {
+    const findings = runComplianceRedTeam({ ...baseDraft, vehiclePrice: 31000, advertisedPrice: 30000 });
+    const f = findings.find((x) => x.id === "advertised-price-drift");
+    expect(f?.severity).toBe("warn");
+  });
+  it("does not warn within the $50 tolerance", () => {
+    const findings = runComplianceRedTeam({ ...baseDraft, vehiclePrice: 30040, advertisedPrice: 30000 });
+    expect(findings.find((x) => x.id === "advertised-price-drift")).toBeUndefined();
+  });
+  it("does not warn when no advertised price is on file", () => {
+    const findings = runComplianceRedTeam({ ...baseDraft, vehiclePrice: 31000 });
+    expect(findings.find((x) => x.id === "advertised-price-drift")).toBeUndefined();
+  });
+});
+
 describe("banned phrases", () => {
   it("hard-FAILS on the vacated 'CARS Act' language", () => {
     const findings = runComplianceRedTeam({

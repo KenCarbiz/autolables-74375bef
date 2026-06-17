@@ -191,6 +191,26 @@ export const runComplianceRedTeam = (draft: RedTeamDraft): ComplianceFinding[] =
     }
   }
 
+  // ─── Advertised price drift (Goal A: website price == price charged) ─
+  if (
+    typeof draft.advertisedPrice === "number" && draft.advertisedPrice > 0 &&
+    typeof draft.vehiclePrice === "number" && draft.vehiclePrice > 0
+  ) {
+    const diff = draft.vehiclePrice - draft.advertisedPrice;
+    if (Math.abs(diff) > 50) {
+      findings.push({
+        id: "advertised-price-drift",
+        severity: "warn",
+        rule: "Window price differs from advertised price",
+        message: diff > 0
+          ? `This vehicle's price ($${draft.vehiclePrice.toLocaleString()}) is $${Math.abs(diff).toLocaleString()} HIGHER than your latest advertised price ($${draft.advertisedPrice.toLocaleString()}).`
+          : `This vehicle's price ($${draft.vehiclePrice.toLocaleString()}) is $${Math.abs(diff).toLocaleString()} lower than your latest advertised price ($${draft.advertisedPrice.toLocaleString()}).`,
+        citation: "FTC §5 — the advertised price must match the price charged.",
+        suggestion: "Reconcile the window price with your website / marketplace listing before the customer signs.",
+      });
+    }
+  }
+
   // ─── Doc fee sanity ──────────────────────────────────────────
   if (typeof draft.docFeeAmount === "number" && draft.docFeeAmount <= 0) {
     findings.push({
