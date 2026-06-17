@@ -279,6 +279,36 @@ const CreateTenantForm = ({ onClose, onCreate }: CreateFormProps) => {
   const [planTier, setPlanTier] = useState("essential");
   const [trialDays, setTrialDays] = useState(14);
   const [submitting, setSubmitting] = useState(false);
+  // Autocurb import
+  const [acQuery, setAcQuery] = useState("");
+  const [acHits, setAcHits] = useState<{ autocurb_tenant_id: string; name: string; domain?: string; primary_email?: string; city?: string; state?: string }[]>([]);
+  const [acBusy, setAcBusy] = useState(false);
+
+  const searchAutocurb = async (q: string) => {
+    setAcQuery(q);
+    if (q.trim().length < 2) { setAcHits([]); return; }
+    setAcBusy(true);
+    const { data } = await supabase.functions.invoke("autocurb-dealer-lookup", { body: { action: "search", q: q.trim() } });
+    setAcBusy(false);
+    const res = (data as { result?: typeof acHits; error?: string } | null);
+    if (res?.error) { toast.error(res.error === "not_configured" ? "Set AUTOCURB_API_BASE + AUTOCURB_API_TOKEN to import." : `Autocurb: ${res.error}`); setAcHits([]); return; }
+    setAcHits(Array.isArray(res?.result) ? res!.result! : []);
+  };
+
+  const importDealer = async (id: string) => {
+    setAcBusy(true);
+    const { data } = await supabase.functions.invoke("autocurb-dealer-lookup", { body: { action: "by-id", id } });
+    setAcBusy(false);
+    const p = (data as { result?: Record<string, string>; error?: string } | null);
+    if (p?.error || !p?.result) { toast.error("Could not load that dealer from Autocurb."); return; }
+    const r = p.result;
+    setName(r.name || r.display_name || "");
+    setDomain(r.domain || "");
+    setOwnerEmail(r.primary_email || "");
+    if (r.name) setSlug(String(r.name).toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, ""));
+    setAcHits([]); setAcQuery(r.name || "");
+    toast.success("Imported from Autocurb — review and create.");
+  };
 
   const autoSlug = slug || name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
 
@@ -312,6 +342,26 @@ const CreateTenantForm = ({ onClose, onCreate }: CreateFormProps) => {
         invitation tied to the email below. When the owner signs up (or signs in, if
         they already have a Supabase account), they'll be auto-linked.
       </p>
+      {/* Look up & import from Autocurb */}
+      <div className="rounded-lg border border-blue-200 bg-blue-50/50 dark:bg-blue-950/30 dark:border-blue-900 p-3">
+        <label className="text-[10px] font-bold uppercase tracking-label text-blue-700 dark:text-blue-300">Look up &amp; import from Autocurb</label>
+        <div className="relative mt-1">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+          <input value={acQuery} onChange={(e) => searchAutocurb(e.target.value)} placeholder="Search Autocurb by name, domain, or owner email…" className="w-full h-9 pl-9 pr-3 rounded-md border border-border bg-background text-sm outline-none" />
+          {acHits.length > 0 && (
+            <div className="absolute z-20 left-0 right-0 mt-1 rounded-lg border border-border bg-card shadow-lg overflow-hidden max-h-64 overflow-y-auto">
+              {acHits.map((h) => (
+                <button key={h.autocurb_tenant_id} type="button" onClick={() => importDealer(h.autocurb_tenant_id)} className="w-full text-left px-3 py-2 text-sm hover:bg-muted">
+                  <span className="font-semibold text-foreground">{h.name}</span>
+                  <span className="block text-[11px] text-muted-foreground">{[h.primary_email, [h.city, h.state].filter(Boolean).join(", ")].filter(Boolean).join(" · ")}</span>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+        <p className="text-[10px] text-muted-foreground mt-1">{acBusy ? "Searching Autocurb…" : "Pick a dealer to auto-fill the form below, or fill it in manually."}</p>
+      </div>
+
       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
         <Field label="Dealership name *" value={name} onChange={setName} placeholder="Freeman Ford" />
         <Field label="Slug" value={autoSlug} onChange={setSlug} placeholder="freeman-ford" mono />
