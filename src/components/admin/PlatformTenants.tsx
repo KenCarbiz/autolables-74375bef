@@ -296,11 +296,13 @@ const CreateTenantForm = ({ onClose, onCreate }: CreateFormProps) => {
     setAcQuery(q);
     if (q.trim().length < 2) { setAcHits([]); return; }
     setAcBusy(true);
-    const { data } = await supabase.functions.invoke("autocurb-dealer-lookup", { body: { action: "search", q: q.trim() } });
+    const { data, error } = await supabase.functions.invoke("autocurb-dealer-lookup", { body: { action: "search", q: q.trim() } });
     setAcBusy(false);
+    if (error) { toast.error("Autocurb lookup unavailable — deploy the autocurb-dealer-lookup function and set its secrets."); setAcHits([]); return; }
     const res = (data as { result?: typeof acHits; error?: string } | null);
     if (res?.error) { toast.error(res.error === "not_configured" ? "Set AUTOCURB_API_BASE + AUTOCURB_API_TOKEN to import." : `Autocurb: ${res.error}`); setAcHits([]); return; }
     setAcHits(Array.isArray(res?.result) ? res!.result! : []);
+    if (!res?.result?.length) toast.message("No matching active Autocurb dealers.");
   };
 
   const importDealer = async (id: string) => {
