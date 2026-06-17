@@ -5,12 +5,20 @@ export interface CustomerInfo {
   buyer_middle_initial: string;
   buyer_last_name: string;
   buyer_suffix: string;
+  buyer_address: string;
+  buyer_city: string;
+  buyer_state: string;
+  buyer_zip: string;
   buyer_phone: string;
   buyer_email: string;
   cobuyer_first_name: string;
   cobuyer_middle_initial: string;
   cobuyer_last_name: string;
   cobuyer_suffix: string;
+  cobuyer_address: string;
+  cobuyer_city: string;
+  cobuyer_state: string;
+  cobuyer_zip: string;
   cobuyer_phone: string;
   cobuyer_email: string;
 }
@@ -80,6 +88,25 @@ const CustomerInfoSection = ({ info, onChange, showCobuyer, inkSaving }: Custome
             </select>
           </div>
         </div>
+        {/* Address row */}
+        <div className="grid grid-cols-6 gap-2 mb-1">
+          <div className="col-span-3">
+            <label className={labelCls}>Street Address</label>
+            <input value={info[k("address")]} onChange={(e) => update(k("address"), e.target.value)} placeholder="123 Main St" className={inputCls} />
+          </div>
+          <div className="col-span-1">
+            <label className={labelCls}>City</label>
+            <input value={info[k("city")]} onChange={(e) => update(k("city"), e.target.value)} placeholder="City" className={inputCls} />
+          </div>
+          <div className="col-span-1">
+            <label className={labelCls}>State</label>
+            <input value={info[k("state")]} onChange={(e) => update(k("state"), e.target.value.replace(/[^a-zA-Z]/g, "").slice(0, 2).toUpperCase())} placeholder="CT" maxLength={2} className={`${inputCls} text-center uppercase`} />
+          </div>
+          <div className="col-span-1">
+            <label className={labelCls}>ZIP</label>
+            <input value={info[k("zip")]} onChange={(e) => update(k("zip"), e.target.value.replace(/[^0-9-]/g, "").slice(0, 10))} placeholder="06010" className={inputCls} />
+          </div>
+        </div>
         {/* Contact row */}
         <div className="grid grid-cols-2 gap-2">
           <div>
@@ -122,12 +149,20 @@ export const emptyCustomerInfo: CustomerInfo = {
   buyer_middle_initial: "",
   buyer_last_name: "",
   buyer_suffix: "",
+  buyer_address: "",
+  buyer_city: "",
+  buyer_state: "",
+  buyer_zip: "",
   buyer_phone: "",
   buyer_email: "",
   cobuyer_first_name: "",
   cobuyer_middle_initial: "",
   cobuyer_last_name: "",
   cobuyer_suffix: "",
+  cobuyer_address: "",
+  cobuyer_city: "",
+  cobuyer_state: "",
+  cobuyer_zip: "",
   cobuyer_phone: "",
   cobuyer_email: "",
 };

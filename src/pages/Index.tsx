@@ -602,6 +602,22 @@ const Index = () => {
         start = pageEnd;
       }
 
+      // Official-form footer band on every page: a hairline rule + a centered
+      // form id / VIN / "Page X of Y". The archival SHA-256 footer (added by
+      // archivePdf) sits just below this on the final page only.
+      const footerStore = currentStore?.name || settings.dealer_name || "";
+      const pageTotal = pdf.getNumberOfPages();
+      for (let p = 1; p <= pageTotal; p++) {
+        pdf.setPage(p);
+        pdf.setDrawColor(185, 185, 185);
+        pdf.setLineWidth(0.008);
+        pdf.line(0.3, 10.62, pdfWidth - 0.3, 10.62);
+        pdf.setFontSize(6.5);
+        pdf.setTextColor(110, 110, 110);
+        const label = `FORM AL-100${footerStore ? ` · ${footerStore}` : ""}${vehicle.vin ? ` · VIN ${vehicle.vin}` : ""} · PAGE ${p} OF ${pageTotal}`;
+        pdf.text(label, pdfWidth / 2, 10.74, { align: "center" });
+      }
+
       // Wave 4.5 — PDF/A-3 archival metadata: stamp the PDF with a
       // canonical-JSON SHA-256, deterministic /ID, XMP metadata, and
       // a visible footer hash so a regulator can verify the artifact
