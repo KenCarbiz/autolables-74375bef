@@ -829,12 +829,21 @@ const Index = () => {
     // so "Ready for Signatures" doesn't create a duplicate in Saved Addendums.
     let inserted: { id?: string } | null = null;
     let error: { message: string } | null = null;
+    const missingCol = (e: { message?: string } | null) => !!e && /customer_info/i.test(e.message || "");
     if (currentId) {
-      const res = await supabase.from("addendums").update(payload as any).eq("id", currentId);
+      let res = await supabase.from("addendums").update(payload as any).eq("id", currentId);
+      if (missingCol(res.error)) {
+        const { customer_info, ...rest } = payload as any;
+        res = await supabase.from("addendums").update(rest as any).eq("id", currentId);
+      }
       error = res.error;
       inserted = { id: currentId };
     } else {
-      const res = await supabase.from("addendums").insert([payload as any]).select("id").single();
+      let res = await supabase.from("addendums").insert([payload as any]).select("id").single();
+      if (missingCol(res.error)) {
+        const { customer_info, ...rest } = payload as any;
+        res = await supabase.from("addendums").insert([rest as any]).select("id").single();
+      }
       error = res.error;
       inserted = res.data as { id?: string } | null;
       if (inserted?.id) setCurrentId(inserted.id);
@@ -988,14 +997,24 @@ const Index = () => {
     // (with a signing token) so re-saving keeps ONE entry in Saved Addendums.
     let inserted: { id?: string } | null = null;
     let error: { message: string } | null = null;
+    // Resilient write: if the customer_info column hasn't been migrated yet,
+    // drop it and retry so the save still succeeds (degrades to name/email).
+    const missingCol = (e: { message?: string } | null) => !!e && /customer_info/i.test(e.message || "");
     if (currentId) {
-      const res = await supabase.from("addendums").update(payload as any).eq("id", currentId);
+      let res = await supabase.from("addendums").update(payload as any).eq("id", currentId);
+      if (missingCol(res.error)) {
+        const { customer_info, ...rest } = payload as any;
+        res = await supabase.from("addendums").update(rest as any).eq("id", currentId);
+      }
       error = res.error;
       inserted = { id: currentId };
     } else {
-      const res = await supabase.from("addendums")
-        .insert([{ ...payload, signing_token: crypto.randomUUID() } as any])
-        .select("id").single();
+      const seed = { ...payload, signing_token: crypto.randomUUID() };
+      let res = await supabase.from("addendums").insert([seed as any]).select("id").single();
+      if (missingCol(res.error)) {
+        const { customer_info, ...rest } = seed as any;
+        res = await supabase.from("addendums").insert([rest as any]).select("id").single();
+      }
       error = res.error;
       inserted = res.data as { id?: string } | null;
       if (inserted?.id) setCurrentId(inserted.id);
