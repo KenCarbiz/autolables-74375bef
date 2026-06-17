@@ -319,11 +319,24 @@ const Admin = () => {
   });
   const [logoUploading, setLogoUploading] = useState(false);
 
+  const [isTenantManager, setIsTenantManager] = useState<boolean | null>(null);
   useEffect(() => {
-    if (!loading && (!user || !isAdmin)) {
-      navigate("/login");
-    }
-  }, [user, isAdmin, loading, navigate]);
+    let cancelled = false;
+    (async () => {
+      if (!user) { setIsTenantManager(false); return; }
+      if (isAdmin) { setIsTenantManager(true); return; }
+      if (!tenant?.id || tenant.id === "house") { setIsTenantManager(false); return; }
+      const { data } = await supabase.rpc("is_tenant_manager", { _tenant_id: tenant.id, _user_id: user.id });
+      if (!cancelled) setIsTenantManager(Boolean(data));
+    })();
+    return () => { cancelled = true; };
+  }, [user, isAdmin, tenant?.id]);
+
+  useEffect(() => {
+    if (loading) return;
+    if (!user) { navigate("/login"); return; }
+    if (isTenantManager === false) { navigate("/dashboard"); }
+  }, [user, isAdmin, loading, isTenantManager, navigate]);
 
   const fetchProducts = async () => {
     const { data } = await supabase
