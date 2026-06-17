@@ -10,7 +10,7 @@ import {
   CheckCircle2, Clock, Gauge, DollarSign, MapPin, Copy, ExternalLink,
   FileUp, Upload, Printer, Sparkles, Plus, ArrowUpRight,
   AlertTriangle, ShieldCheck, Lock, Unlock, Send, MessageSquare,
-  Link as LinkIcon, X,
+  Link as LinkIcon, X, QrCode, Trash2, Save, ShieldAlert,
 } from "lucide-react";
 import EmptyState from "@/components/ui/empty-state";
 import { InstallProofList } from "@/components/admin/InstallProofList";
@@ -25,7 +25,15 @@ import { InstallProofList } from "@/components/admin/InstallProofList";
 // child artifact refers to it by id.
 // ──────────────────────────────────────────────────────────────
 
-type TabId = "overview" | "documents" | "addendum" | "prep" | "labels" | "sign";
+type TabId = "overview" | "documents" | "scan" | "addendum" | "prep" | "labels" | "sign";
+
+interface ServiceRecord { date: string; mileage: string; type: string; notes: string }
+interface WarrantyInfo {
+  factory_months?: number; factory_miles?: number;
+  powertrain_months?: number; powertrain_miles?: number;
+  in_service_date?: string; notes?: string;
+}
+interface AvailableAccessory { name: string; price: string; note: string }
 
 interface VehicleRow {
   id: string;
@@ -46,11 +54,14 @@ interface VehicleRow {
   videos: Array<{ id: string; url: string; caption?: string }>;
   prep_status: { all_accessories_installed?: boolean; foreman_signed_at?: string } | null;
   recall_check: Record<string, unknown> | null;
+  service_records: ServiceRecord[] | null;
+  warranty_info: WarrantyInfo | null;
+  available_accessories: AvailableAccessory[] | null;
   created_at: string;
   updated_at: string;
 }
 
-const VALID_TABS: TabId[] = ["overview", "documents", "addendum", "prep", "labels", "sign"];
+const VALID_TABS: TabId[] = ["overview", "documents", "scan", "addendum", "prep", "labels", "sign"];
 
 const VehicleFile = () => {
   const { id } = useParams<{ id: string }>();
@@ -145,6 +156,7 @@ const VehicleFile = () => {
   const tabs: { id: TabId; label: string; icon: typeof Car }[] = [
     { id: "overview",  label: "Overview",  icon: Car },
     { id: "documents", label: "Documents", icon: FileUp },
+    { id: "scan",      label: "Scan Info", icon: QrCode },
     { id: "addendum",  label: "Addendum",  icon: FileText },
     { id: "prep",      label: "Prep & Install", icon: Wrench },
     { id: "labels",    label: "Labels",    icon: Tag },
@@ -258,6 +270,7 @@ const VehicleFile = () => {
       <div className="pt-2">
         {tab === "overview"  && <OverviewPanel vehicle={vehicle} onReload={load} />}
         {tab === "documents" && <DocumentsPanel vehicle={vehicle} onReload={load} />}
+        {tab === "scan"      && <ScanInfoPanel vehicle={vehicle} onReload={load} />}
         {tab === "addendum"  && <AddendumPanel vehicle={vehicle} />}
         {tab === "prep"      && <PrepPanel vehicle={vehicle} />}
         {tab === "labels"    && <LabelsPanel vehicle={vehicle} />}
@@ -692,6 +705,101 @@ interface AddendumRow {
   token: string | null;
   total_price: number | null;
 }
+
+// Scan Info — staff edit the three customer-facing fields shown on the public
+// /v/:slug scan: service history, remaining warranty, and accessories still
+// available for this vehicle. Saved straight onto vehicle_listings, which the
+// public RPC returns, so changes appear on the shopper page immediately.
+const ScanInfoPanel = ({ vehicle, onReload }: { vehicle: VehicleRow; onReload: () => void }) => {
+  const [records, setRecords] = useState<ServiceRecord[]>(vehicle.service_records || []);
+  const [warranty, setWarranty] = useState<WarrantyInfo>(vehicle.warranty_info || {});
+  const [accessories, setAccessories] = useState<AvailableAccessory[]>(vehicle.available_accessories || []);
+  const [saving, setSaving] = useState(false);
+
+  const save = async () => {
+    setSaving(true);
+    const { error } = await (supabase as any)
+      .from("vehicle_listings")
+      .update({
+        service_records: records.filter((r) => r.date || r.type || r.notes || r.mileage),
+        warranty_info: warranty,
+        available_accessories: accessories.filter((a) => a.name.trim()),
+      })
+      .eq("id", vehicle.id);
+    setSaving(false);
+    if (error) { toast.error("Could not save scan info"); return; }
+    toast.success("Scan info saved");
+    onReload();
+  };
+
+  const inputCls = "w-full h-9 px-2.5 rounded-lg border border-border bg-background text-sm text-foreground outline-none focus:border-primary";
+  const labelCls = "text-[10px] font-bold uppercase tracking-wider text-muted-foreground";
+
+  return (
+    <div className="space-y-6 max-w-3xl">
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-base font-bold text-foreground">Scan Info</h2>
+          <p className="text-xs text-muted-foreground">Shown to shoppers who scan the window QR at /v/{vehicle.slug}.</p>
+        </div>
+        <button onClick={save} disabled={saving} className="inline-flex items-center gap-1.5 h-9 px-4 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold shadow-sm shadow-blue-600/30 ring-1 ring-inset ring-white/15 disabled:opacity-50">
+          <Save className="w-4 h-4" /> {saving ? "Saving…" : "Save"}
+        </button>
+      </div>
+
+      {/* Service history */}
+      <section className="rounded-2xl border border-border bg-card p-4 space-y-3">
+        <div className="flex items-center justify-between">
+          <p className="text-sm font-bold text-foreground flex items-center gap-1.5"><Wrench className="w-4 h-4 text-muted-foreground" /> Service history</p>
+          <button onClick={() => setRecords((r) => [...r, { date: "", mileage: "", type: "", notes: "" }])} className="inline-flex items-center gap-1 h-8 px-2.5 rounded-lg border border-border text-xs font-semibold hover:bg-muted"><Plus className="w-3.5 h-3.5" /> Add</button>
+        </div>
+        {records.length === 0 ? (
+          <p className="text-xs text-muted-foreground">No service records yet.</p>
+        ) : records.map((r, i) => (
+          <div key={i} className="grid grid-cols-[1fr_1fr_1.4fr_2fr_auto] gap-2 items-end">
+            <div><label className={labelCls}>Date</label><input type="date" value={r.date} onChange={(e) => setRecords((p) => p.map((x, j) => j === i ? { ...x, date: e.target.value } : x))} className={inputCls} /></div>
+            <div><label className={labelCls}>Mileage</label><input value={r.mileage} onChange={(e) => setRecords((p) => p.map((x, j) => j === i ? { ...x, mileage: e.target.value } : x))} placeholder="42,000" className={inputCls} /></div>
+            <div><label className={labelCls}>Type</label><input value={r.type} onChange={(e) => setRecords((p) => p.map((x, j) => j === i ? { ...x, type: e.target.value } : x))} placeholder="Oil & filter" className={inputCls} /></div>
+            <div><label className={labelCls}>Notes</label><input value={r.notes} onChange={(e) => setRecords((p) => p.map((x, j) => j === i ? { ...x, notes: e.target.value } : x))} placeholder="Multi-point inspection passed" className={inputCls} /></div>
+            <button onClick={() => setRecords((p) => p.filter((_, j) => j !== i))} className="h-9 w-9 inline-flex items-center justify-center rounded-lg border border-border text-muted-foreground hover:text-destructive hover:border-destructive/40"><Trash2 className="w-4 h-4" /></button>
+          </div>
+        ))}
+      </section>
+
+      {/* Remaining warranty */}
+      <section className="rounded-2xl border border-border bg-card p-4 space-y-3">
+        <p className="text-sm font-bold text-foreground flex items-center gap-1.5"><ShieldCheck className="w-4 h-4 text-muted-foreground" /> Remaining warranty</p>
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+          <div><label className={labelCls}>In-service date</label><input type="date" value={warranty.in_service_date || ""} onChange={(e) => setWarranty((w) => ({ ...w, in_service_date: e.target.value }))} className={inputCls} /></div>
+          <div><label className={labelCls}>Factory (months)</label><input type="number" value={warranty.factory_months ?? ""} onChange={(e) => setWarranty((w) => ({ ...w, factory_months: e.target.value ? Number(e.target.value) : undefined }))} placeholder="36" className={inputCls} /></div>
+          <div><label className={labelCls}>Factory (miles)</label><input type="number" value={warranty.factory_miles ?? ""} onChange={(e) => setWarranty((w) => ({ ...w, factory_miles: e.target.value ? Number(e.target.value) : undefined }))} placeholder="36000" className={inputCls} /></div>
+          <div><label className={labelCls}>Powertrain (months)</label><input type="number" value={warranty.powertrain_months ?? ""} onChange={(e) => setWarranty((w) => ({ ...w, powertrain_months: e.target.value ? Number(e.target.value) : undefined }))} placeholder="60" className={inputCls} /></div>
+          <div><label className={labelCls}>Powertrain (miles)</label><input type="number" value={warranty.powertrain_miles ?? ""} onChange={(e) => setWarranty((w) => ({ ...w, powertrain_miles: e.target.value ? Number(e.target.value) : undefined }))} placeholder="60000" className={inputCls} /></div>
+        </div>
+        <div><label className={labelCls}>Notes</label><input value={warranty.notes || ""} onChange={(e) => setWarranty((w) => ({ ...w, notes: e.target.value }))} placeholder="Balance of factory coverage transfers to the new owner." className={inputCls} /></div>
+        <p className="text-[11px] text-muted-foreground flex items-center gap-1"><ShieldAlert className="w-3 h-3" /> Remaining time/miles are estimated from the in-service date and shown to shoppers as an estimate — confirm terms with the manufacturer.</p>
+      </section>
+
+      {/* Available accessories */}
+      <section className="rounded-2xl border border-border bg-card p-4 space-y-3">
+        <div className="flex items-center justify-between">
+          <p className="text-sm font-bold text-foreground flex items-center gap-1.5"><Sparkles className="w-4 h-4 text-muted-foreground" /> Available accessories</p>
+          <button onClick={() => setAccessories((a) => [...a, { name: "", price: "", note: "" }])} className="inline-flex items-center gap-1 h-8 px-2.5 rounded-lg border border-border text-xs font-semibold hover:bg-muted"><Plus className="w-3.5 h-3.5" /> Add</button>
+        </div>
+        {accessories.length === 0 ? (
+          <p className="text-xs text-muted-foreground">No additional accessories offered yet.</p>
+        ) : accessories.map((a, i) => (
+          <div key={i} className="grid grid-cols-[2fr_1fr_2fr_auto] gap-2 items-end">
+            <div><label className={labelCls}>Accessory</label><input value={a.name} onChange={(e) => setAccessories((p) => p.map((x, j) => j === i ? { ...x, name: e.target.value } : x))} placeholder="All-weather floor liners" className={inputCls} /></div>
+            <div><label className={labelCls}>Price</label><input value={a.price} onChange={(e) => setAccessories((p) => p.map((x, j) => j === i ? { ...x, price: e.target.value } : x))} placeholder="$249" className={inputCls} /></div>
+            <div><label className={labelCls}>Note</label><input value={a.note} onChange={(e) => setAccessories((p) => p.map((x, j) => j === i ? { ...x, note: e.target.value } : x))} placeholder="Custom-fit, installed same day" className={inputCls} /></div>
+            <button onClick={() => setAccessories((p) => p.filter((_, j) => j !== i))} className="h-9 w-9 inline-flex items-center justify-center rounded-lg border border-border text-muted-foreground hover:text-destructive hover:border-destructive/40"><Trash2 className="w-4 h-4" /></button>
+          </div>
+        ))}
+      </section>
+    </div>
+  );
+};
 
 const AddendumPanel = ({ vehicle }: { vehicle: VehicleRow }) => {
   const navigate = useNavigate();

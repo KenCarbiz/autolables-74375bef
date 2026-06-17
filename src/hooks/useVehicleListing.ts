@@ -126,6 +126,15 @@ export interface VehicleListing {
   documents: { name: string; url: string; type: string }[];
   videos: { id: string; url: string; caption?: string }[];
 
+  // Phase 2 scan-experience fields (migration 20260616204000)
+  service_records?: { date?: string; mileage?: string; type?: string; notes?: string }[] | null;
+  warranty_info?: {
+    factory_months?: number; factory_miles?: number;
+    powertrain_months?: number; powertrain_miles?: number;
+    in_service_date?: string; notes?: string;
+  } | null;
+  available_accessories?: { name?: string; price?: string; note?: string }[] | null;
+
   // Premium shopper-page fields (migration 20260418070000_vdp_scrape...)
   photos: ListingPhoto[];
   description: string | null;

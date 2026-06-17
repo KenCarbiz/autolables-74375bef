@@ -28,6 +28,7 @@ import {
   Smartphone,
   BadgeCheck,
   Camera,
+  Wrench,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Helmet } from "react-helmet-async";
@@ -391,6 +392,8 @@ const PublicListingBody = () => {
         {/* Verified installations — vendor/detail-shop proof (photo + date)
             that the protection is really on this vehicle. */}
         <VerifiedInstallsPublic slug={listing.slug} />
+
+        <ScanExtras listing={listing} />
 
         {/* Dealer value props */}
         {listing.value_props?.length > 0 && (
@@ -1370,6 +1373,102 @@ const ProgramDocuments = ({ listing }: { listing: VehicleListing }) => {
 // Reads through a public, slug-keyed RPC (anon can't read install_proofs
 // directly); photos come from the private bucket via short-lived signed
 // URLs. Renders nothing until the RPC exists or if there are no proofs.
+// Phase 2 scan experience — service history, remaining warranty, and
+// accessories still available for this vehicle. Each block renders only when
+// the dealer has entered data, so an empty file shows nothing.
+const ScanExtras = ({ listing }: { listing: VehicleListing }) => {
+  const records = (listing.service_records || []).filter((r) => r && (r.date || r.type || r.notes || r.mileage));
+  const w = listing.warranty_info || {};
+  const accessories = (listing.available_accessories || []).filter((a) => a && (a.name || "").trim());
+
+  // Best-effort remaining-coverage estimate from the in-service date.
+  const remaining = (months?: number): string | null => {
+    if (!months || !w.in_service_date) return null;
+    const end = new Date(w.in_service_date);
+    end.setMonth(end.getMonth() + months);
+    const ms = end.getTime() - Date.now();
+    if (Number.isNaN(ms)) return null;
+    if (ms <= 0) return "Expired";
+    const mo = Math.round(ms / (1000 * 60 * 60 * 24 * 30.44));
+    return mo >= 12 ? `~${Math.floor(mo / 12)} yr ${mo % 12} mo left` : `~${mo} mo left`;
+  };
+  const hasWarranty = !!(w.factory_months || w.factory_miles || w.powertrain_months || w.powertrain_miles || w.notes);
+
+  if (records.length === 0 && !hasWarranty && accessories.length === 0) return null;
+
+  return (
+    <>
+      {hasWarranty && (
+        <section className="rounded-2xl border border-border bg-card shadow-premium p-5">
+          <div className="flex items-center gap-2 mb-3">
+            <ShieldCheck className="w-4 h-4 text-emerald-600" />
+            <h2 className="text-sm font-bold text-foreground uppercase tracking-wide">Remaining warranty</h2>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            {(w.factory_months || w.factory_miles) && (
+              <div className="rounded-xl border border-border p-3">
+                <p className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Factory / Bumper-to-Bumper</p>
+                <p className="text-sm font-semibold text-foreground mt-0.5">{[w.factory_months ? `${w.factory_months} mo` : null, w.factory_miles ? `${w.factory_miles.toLocaleString()} mi` : null].filter(Boolean).join(" / ")}</p>
+                {remaining(w.factory_months) && <p className="text-[11px] text-emerald-700 font-semibold mt-0.5">{remaining(w.factory_months)}</p>}
+              </div>
+            )}
+            {(w.powertrain_months || w.powertrain_miles) && (
+              <div className="rounded-xl border border-border p-3">
+                <p className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Powertrain</p>
+                <p className="text-sm font-semibold text-foreground mt-0.5">{[w.powertrain_months ? `${w.powertrain_months} mo` : null, w.powertrain_miles ? `${w.powertrain_miles.toLocaleString()} mi` : null].filter(Boolean).join(" / ")}</p>
+                {remaining(w.powertrain_months) && <p className="text-[11px] text-emerald-700 font-semibold mt-0.5">{remaining(w.powertrain_months)}</p>}
+              </div>
+            )}
+          </div>
+          {w.notes && <p className="text-xs text-muted-foreground mt-3">{w.notes}</p>}
+          <p className="text-[10px] text-muted-foreground mt-2">Estimated from the in-service date; confirm exact coverage with the manufacturer.</p>
+        </section>
+      )}
+
+      {records.length > 0 && (
+        <section className="rounded-2xl border border-border bg-card shadow-premium p-5">
+          <div className="flex items-center gap-2 mb-3">
+            <Wrench className="w-4 h-4 text-muted-foreground" />
+            <h2 className="text-sm font-bold text-foreground uppercase tracking-wide">Service history</h2>
+          </div>
+          <ul className="space-y-2">
+            {records.map((r, i) => (
+              <li key={i} className="flex items-start gap-3 border-b border-border/60 last:border-0 pb-2 last:pb-0">
+                <div className="text-[11px] font-mono text-muted-foreground w-24 shrink-0 pt-0.5">{[r.date, r.mileage ? `${r.mileage} mi` : null].filter(Boolean).join(" · ")}</div>
+                <div className="min-w-0">
+                  <p className="text-sm font-semibold text-foreground">{r.type || "Service"}</p>
+                  {r.notes && <p className="text-xs text-muted-foreground">{r.notes}</p>}
+                </div>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+
+      {accessories.length > 0 && (
+        <section className="rounded-2xl border border-border bg-card shadow-premium p-5">
+          <div className="flex items-center gap-2 mb-3">
+            <Sparkles className="w-4 h-4 text-amber-500" />
+            <h2 className="text-sm font-bold text-foreground uppercase tracking-wide">Available accessories</h2>
+          </div>
+          <div className="space-y-2">
+            {accessories.map((a, i) => (
+              <div key={i} className="flex items-center justify-between gap-3 rounded-xl border border-border p-3">
+                <div className="min-w-0">
+                  <p className="text-sm font-semibold text-foreground">{a.name}</p>
+                  {a.note && <p className="text-xs text-muted-foreground">{a.note}</p>}
+                </div>
+                {a.price && <p className="text-sm font-bold text-foreground shrink-0">{a.price}</p>}
+              </div>
+            ))}
+          </div>
+          <p className="text-[10px] text-muted-foreground mt-2">Optional add-ons available for this vehicle — ask your salesperson.</p>
+        </section>
+      )}
+    </>
+  );
+};
+
 const VerifiedInstallsPublic = ({ slug }: { slug: string }) => {
   const [proofs, setProofs] = useState<
     { id: string; product_name: string | null; installer_company: string | null; installed_at: string | null; photo_path: string | null }[]
