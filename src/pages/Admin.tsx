@@ -311,6 +311,8 @@ const Admin = () => {
     autotrader_url: settings.autotrader_url,
     capital_one_url: settings.capital_one_url,
     carfax_url: settings.carfax_url,
+    vdp_price_labels: settings.vdp_price_labels,
+    vdp_strip_finance_params: settings.vdp_strip_finance_params,
     why_buy_here: settings.why_buy_here,
     warranty_programs: settings.warranty_programs,
     vehicle_conditions: settings.vehicle_conditions,
