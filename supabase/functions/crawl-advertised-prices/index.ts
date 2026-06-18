@@ -217,6 +217,65 @@ const extractAdvertised = (html: string, url: string, targetVin: string): AdResu
 const UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36";
 const FETCH_HEADERS = { "User-Agent": UA, "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8", "Accept-Language": "en-US,en;q=0.9" };
 
+// ── Firecrawl rendering + screenshot ─────────────────────────────
+// Plain fetch can't see prices on JS-walled dealer sites / marketplaces.
+// When the cheap path fails, escalate to Firecrawl: it returns rendered HTML,
+// a full-page screenshot (our FTC evidence image), and an LLM-extracted
+// {price, vin} we accept only when the VIN matches.
+const FIRECRAWL_KEY = Deno.env.get("FIRECRAWL_API_KEY") || "";
+const FIRECRAWL_ENDPOINT = "https://api.firecrawl.dev/v1/scrape";
+
+interface RenderResult { html: string; screenshotUrl: string | null; jsonPrice: number | null; jsonVin: string | null; }
+
+async function firecrawlRender(url: string): Promise<RenderResult | null> {
+  if (!FIRECRAWL_KEY) return null;
+  try {
+    const res = await fetch(FIRECRAWL_ENDPOINT, {
+      method: "POST",
+      headers: { "Authorization": `Bearer ${FIRECRAWL_KEY}`, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        url,
+        formats: ["html", "screenshot@fullPage", "json"],
+        jsonOptions: {
+          prompt: "Extract the vehicle's advertised selling/internet price in USD (not the MSRP) and its 17-character VIN.",
+          schema: { type: "object", properties: { price: { type: "number" }, vin: { type: "string" }, currency: { type: "string" } } },
+        },
+        onlyMainContent: false,
+        waitFor: 3500,
+        timeout: 30000,
+      }),
+      signal: AbortSignal.timeout(45000),
+    });
+    if (!res.ok) return null;
+    // deno-lint-ignore no-explicit-any
+    const data: any = await res.json();
+    const d = data?.data || data;
+    return {
+      html: d?.html || "",
+      screenshotUrl: d?.screenshot || d?.screenshotUrl || (d?.metadata?.screenshot) || null,
+      jsonPrice: norm(d?.json?.price ?? null),
+      jsonVin: d?.json?.vin ? normVin(d.json.vin) : null,
+    };
+  } catch { return null; }
+}
+
+// Download Firecrawl's (ephemeral) screenshot and persist it to our private
+// price-evidence bucket so the per-VIN defendable file holds the actual image
+// of the advertised page at capture time. Returns the storage path.
+// deno-lint-ignore no-explicit-any
+async function captureScreenshot(admin: any, screenshotUrl: string | null, tenantId: string, vin: string): Promise<string | null> {
+  if (!screenshotUrl) return null;
+  try {
+    const img = await fetch(screenshotUrl, { signal: AbortSignal.timeout(20000) });
+    if (!img.ok) return null;
+    const bytes = new Uint8Array(await img.arrayBuffer());
+    const path = `${tenantId}/${normVin(vin)}/${Date.now()}.png`;
+    const { error } = await admin.storage.from("price-evidence").upload(path, bytes, { contentType: "image/png", upsert: true });
+    if (error) return null;
+    return path;
+  } catch { return null; }
+}
+
 const originOf = (u: string): string | null => { try { return new URL(u).origin; } catch { return null; } };
 const vinFromUrl = (u: string): string | null => {
   const m = u.toUpperCase().match(/[A-HJ-NPR-Z0-9]{17}/);
@@ -266,8 +325,12 @@ serve(async (req) => {
     auth: { persistSession: false, autoRefreshToken: false },
   });
 
-  let body: { limit?: number; tenant_id?: string; discover?: boolean } = {};
+  let body: { limit?: number; tenant_id?: string; discover?: boolean; vin?: string } = {};
   try { body = await req.json(); } catch { /* empty body OK */ }
+  const targetVin = body.vin ? normVin(body.vin) : null;
+  // Firecrawl is metered — cap renders per run. A single-VIN re-scrape (the
+  // Ready-for-Signatures verify) gets a small dedicated budget.
+  let renderBudget = FIRECRAWL_KEY ? (targetVin ? 3 : 30) : 0;
 
   // ── Auth gate ────────────────────────────────────────────────
   // Two callers: (1) the nightly cron with the service-role key — full
@@ -331,6 +394,8 @@ serve(async (req) => {
   const seen = new Set<string>();
   const rows: LatestRow[] = [];
   for (const r of (all || []) as LatestRow[]) {
+    // Single-VIN re-scrape (Ready-for-Signatures verify) only touches that VIN.
+    if (targetVin && (r.vin || "").toUpperCase() !== targetVin) continue;
     const k = r.tenant_id + "|" + (r.vin || "").toUpperCase();
     if (seen.has(k)) continue;
     seen.add(k);
@@ -358,28 +423,50 @@ serve(async (req) => {
       }
       const res = await fetch(row.source_url, {
         method: "GET",
-        headers: {
-          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
-          "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-          "Accept-Language": "en-US,en;q=0.9",
-        },
+        headers: FETCH_HEADERS,
         signal: AbortSignal.timeout(12000),
       });
-      const html = res.ok ? await res.text() : "";
-      // Bot-challenge guard: a 403/503 OR a 200 interstitial. Skip without
-      // writing — never overwrite a good price with a challenge page.
-      if (!res.ok || looksLikeChallenge(html, res.headers, res.status)) {
+      let html = res.ok ? await res.text() : "";
+      let result = (res.ok && !looksLikeChallenge(html, res.headers, res.status))
+        ? extractAdvertised(html, row.source_url, row.vin)
+        : { price: null, source: "none" as const, gated: false, reason: "bot_challenge" };
+
+      // Escalate to Firecrawl when the cheap path is walled or empty — this is
+      // what makes JS-rendered dealer sites + marketplaces return a real price,
+      // and it's where we capture the FTC evidence screenshot.
+      let screenshotPath: string | null = null;
+      let renderSource: string | null = null;
+      const cheapFailed = result.price == null && result.reason !== "vin_mismatch" && !result.gated;
+      if (cheapFailed && renderBudget > 0) {
+        renderBudget--;
+        const r = await firecrawlRender(row.source_url);
+        if (r) {
+          renderSource = "firecrawl";
+          if (r.html) {
+            html = r.html;
+            result = extractAdvertised(r.html, row.source_url, row.vin);
+          }
+          // Fall back to Firecrawl's structured extract, but only when the VIN
+          // it read matches the target — never trust a price off the wrong car.
+          if (result.price == null && r.jsonPrice != null && sane(r.jsonPrice)
+              && (!r.jsonVin || r.jsonVin === normVin(row.vin))) {
+            result = { price: r.jsonPrice, source: "jsonld", gated: false, reason: null };
+          }
+          if (result.price != null) {
+            screenshotPath = await captureScreenshot(admin, r.screenshotUrl, row.tenant_id, row.vin);
+          }
+        }
+      }
+
+      if (result.reason === "bot_challenge" && result.price == null) {
         skipped++;
         await admin.from("audit_log").insert({
-          action: "advertised_price_crawl_error",
-          entity_type: "advertised_price",
-          entity_id: row.vin,
-          store_id: row.tenant_id,
-          details: { vin: row.vin, url: row.source_url, http_status: res.status, reason: "bot_challenge" },
+          action: "advertised_price_crawl_error", entity_type: "advertised_price",
+          entity_id: row.vin, store_id: row.tenant_id,
+          details: { vin: row.vin, url: row.source_url, http_status: res.status, reason: "bot_challenge", rendered: !!renderSource },
         }).then(() => undefined, () => undefined);
         continue;
       }
-      const result = extractAdvertised(html, row.source_url, row.vin);
       // vin_mismatch (redirect / wrong car) or price_gated ("call for price"):
       // record the reason but DO NOT write — preserve the prior good snapshot.
       if (result.reason === "vin_mismatch" || result.gated) {
@@ -401,24 +488,33 @@ serve(async (req) => {
           entity_type: "advertised_price",
           entity_id: row.vin,
           store_id: row.tenant_id,
-          details: { vin: row.vin, url: row.source_url, reason: "no_price_extracted" },
+          details: { vin: row.vin, url: row.source_url, reason: "no_price_extracted", rendered: !!renderSource },
         }).then(() => undefined, () => undefined);
         continue;
       }
-      if (Math.abs(newPrice - row.advertised_price) < 1) {
+      // Skip a no-op write only when nothing changed AND we have no fresh
+      // evidence screenshot to record (a render always logs its screenshot).
+      if (Math.abs(newPrice - row.advertised_price) < 1 && !screenshotPath) {
         unchanged++;
         continue;
       }
-      const { error: insErr } = await admin.from("advertised_prices").insert({
+      const insRow = {
         tenant_id: row.tenant_id,
         store_id: row.store_id || "",
         vin: row.vin,
         source_url: row.source_url,
         source_channel: row.source_label,
         advertised_price: newPrice,
-        captured_by: "crawler",
-        notes: `Nightly crawl (${result.source}) · previous $${row.advertised_price.toLocaleString()} → $${newPrice.toLocaleString()}`,
-      });
+        captured_by: renderSource ? "crawler_rendered" : "crawler",
+        screenshot_url: screenshotPath,
+        notes: `${renderSource ? "Rendered" : "Nightly"} crawl (${result.source}) · previous $${row.advertised_price.toLocaleString()} → $${newPrice.toLocaleString()}`,
+      };
+      let insErr = (await admin.from("advertised_prices").insert(insRow)).error;
+      // Resilient to a not-yet-applied screenshot_url column.
+      if (insErr && /screenshot_url/i.test(insErr.message || "")) {
+        const { screenshot_url, ...rest } = insRow;
+        insErr = (await admin.from("advertised_prices").insert(rest)).error;
+      }
       if (insErr) {
         failed++;
         continue;
