@@ -189,6 +189,7 @@ const AppShell = ({ children }: AppShellProps) => {
         { label: "Products", path: "/admin?tab=products", icon: Package, requireManager: true },
         { label: "Product Rules", path: "/admin?tab=rules", icon: Wrench, featureKey: "feature_product_rules", requireManager: true },
         { label: "Branding & Setup", path: "/admin?tab=branding", icon: Palette, requireManager: true },
+        { label: "Team", path: "/admin?tab=team", icon: Users, requireManager: true },
         { label: "Reports", path: "/admin?tab=analytics", icon: BarChart3, featureKey: "feature_analytics", requireManager: true },
         { label: "Leads", path: "/admin?tab=leads", icon: Users, featureKey: "feature_lead_capture", requireManager: true },
         { label: "Feature Toggles", path: "/admin?tab=settings", icon: ToggleLeft, requireManager: true },

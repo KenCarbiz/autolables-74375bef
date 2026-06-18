@@ -26,6 +26,7 @@ import { OpenSigningsList } from "@/components/admin/OpenSigningsList";
 import { AddonElectionsPanel } from "@/components/admin/AddonElectionsPanel";
 import { PriceIntegrityPanel } from "@/components/admin/PriceIntegrityPanel";
 import MarketcheckSyncCard from "@/components/admin/MarketcheckSyncCard";
+import TeamPanel from "@/components/admin/TeamPanel";
 import { useEmailDistribution } from "@/hooks/useEmailDistribution";
 import { ProductIcon, PRODUCT_ICON_KEYS } from "@/components/addendum/productIcons";
 import { STATE_DOC_FEES } from "@/data/docFees";
@@ -97,7 +98,7 @@ interface Product {
   icon_type?: string;
 }
 
-type AdminTab = "home" | "products" | "rules" | "settings" | "branding" | "analytics" | "leads" | "funnel" | "audit" | "queue" | "files" | "getready" | "inventory" | "invoices" | "warranty";
+type AdminTab = "home" | "products" | "rules" | "settings" | "branding" | "analytics" | "leads" | "funnel" | "audit" | "queue" | "files" | "getready" | "inventory" | "invoices" | "warranty" | "team";
 
 const emptyProduct = {
   name: "",
@@ -174,7 +175,7 @@ const FEATURE_TOGGLES: { key: keyof DealerSettings; label: string; description: 
   { key: "feature_ai_descriptions", label: "AI Descriptions", description: "Generate vehicle descriptions automatically", status: "coming_soon" },
 ];
 
-const VALID_TABS: AdminTab[] = ["home", "products", "rules", "settings", "branding", "analytics", "leads", "funnel", "audit", "queue", "files", "getready", "inventory", "invoices", "warranty"];
+const VALID_TABS: AdminTab[] = ["home", "products", "rules", "settings", "branding", "analytics", "leads", "funnel", "audit", "queue", "files", "getready", "inventory", "invoices", "warranty", "team"];
 
 const Admin = () => {
   const queryClient = useQueryClient();
@@ -505,6 +506,7 @@ const Admin = () => {
     ...(settings.feature_warranty ? [{ id: "warranty" as const, label: "Warranty" }] : []),
     { id: "files", label: "Vehicle Files" },
     { id: "audit", label: "Audit Log" },
+    { id: "team", label: "Team" },
     // Platform-admin tabs moved to /platform-admin.
   ];
 
@@ -546,6 +548,7 @@ const Admin = () => {
             { id: "home", label: "Home", ids: ["home"] },
             { id: "setup", label: "Branding & Setup", ids: ["branding"] },
             { id: "products", label: "Products", ids: ["products", "rules"] },
+            { id: "team", label: "Team", ids: ["team"] },
             { id: "reports", label: "Reports", ids: ["analytics", "leads", "funnel"] },
             { id: "compliance", label: "Compliance", ids: ["audit", "files"] },
             { id: "advanced", label: "Advanced", ids: ["settings", "queue", "getready", "inventory", "invoices", "warranty"] },
@@ -2472,6 +2475,8 @@ const Admin = () => {
         )}
 
         {/* ─── Audit Log Tab ─── */}
+        {tab === "team" && <TeamPanel />}
+
         {tab === "audit" && (
           <div className="space-y-4">
             {/* Platform-operator tooling (MarketCheck grant state, cron health,
