@@ -62,6 +62,7 @@ const SigningLookup = lazy(() => import("./pages/SigningLookup"));
 const Onboarding = lazy(() => import("./pages/Onboarding"));
 const TradeUpSticker = lazy(() => import("./pages/TradeUpSticker"));
 const About = lazy(() => import("./pages/About"));
+const Trust = lazy(() => import("./pages/Trust"));
 const BrandGuide = lazy(() => import("./pages/BrandGuide"));
 const ScanPage = lazy(() => import("./pages/ScanPage"));
 const ComplianceCenter = lazy(() => import("./pages/ComplianceCenter"));
@@ -143,6 +144,7 @@ const App = () => (
                       <Route path="/v/:slug" element={<PublicListing />} />
                       <Route path="/deal/:token" element={<DealSigning />} />
                       <Route path="/about" element={<About />} />
+                      <Route path="/trust" element={<Trust />} />
                       <Route path="/brand" element={<BrandGuide />} />
 
                       {/* Gated layout — one AppShell shared across every
