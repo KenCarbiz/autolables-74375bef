@@ -2595,6 +2595,10 @@ export type Database = {
         Args: { _active: boolean; _tenant_id: string }
         Returns: boolean
       }
+      admin_set_tenant_features: {
+        Args: { _patch: Json; _tenant_id: string }
+        Returns: undefined
+      }
       autocurb_cancel_subscription: {
         Args: { p_stripe_subscription_id: string }
         Returns: number
@@ -2999,6 +3003,10 @@ export type Database = {
           _token: string
           _user_agent: string
         }
+        Returns: boolean
+      }
+      tenant_price_verification_on: {
+        Args: { _tenant_id: string }
         Returns: boolean
       }
       unschedule_marketcheck_sync: { Args: never; Returns: undefined }
