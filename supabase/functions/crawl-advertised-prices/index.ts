@@ -261,18 +261,28 @@ async function firecrawlRender(url: string): Promise<RenderResult | null> {
 
 // Download Firecrawl's (ephemeral) screenshot and persist it to our private
 // price-evidence bucket so the per-VIN defendable file holds the actual image
-// of the advertised page at capture time. Returns the storage path.
+// of the advertised page at capture time. Returns the storage path + the
+// sha256 of the bytes so the addendum row can prove the file hasn't been
+// swapped after capture.
+const PRICE_EVIDENCE_BUCKET = "price-evidence";
+interface CapturedScreenshot { path: string; sha256: string; bucket: string; }
+async function sha256Hex(bytes: Uint8Array): Promise<string> {
+  const digest = await crypto.subtle.digest("SHA-256", bytes);
+  return Array.from(new Uint8Array(digest))
+    .map((b) => b.toString(16).padStart(2, "0")).join("");
+}
 // deno-lint-ignore no-explicit-any
-async function captureScreenshot(admin: any, screenshotUrl: string | null, tenantId: string, vin: string): Promise<string | null> {
+async function captureScreenshot(admin: any, screenshotUrl: string | null, tenantId: string, vin: string): Promise<CapturedScreenshot | null> {
   if (!screenshotUrl) return null;
   try {
     const img = await fetch(screenshotUrl, { signal: AbortSignal.timeout(20000) });
     if (!img.ok) return null;
     const bytes = new Uint8Array(await img.arrayBuffer());
     const path = `${tenantId}/${normVin(vin)}/${Date.now()}.png`;
-    const { error } = await admin.storage.from("price-evidence").upload(path, bytes, { contentType: "image/png", upsert: true });
+    const { error } = await admin.storage.from(PRICE_EVIDENCE_BUCKET).upload(path, bytes, { contentType: "image/png", upsert: true });
     if (error) return null;
-    return path;
+    const sha256 = await sha256Hex(bytes);
+    return { path, sha256, bucket: PRICE_EVIDENCE_BUCKET };
   } catch { return null; }
 }
 
@@ -434,7 +444,7 @@ serve(async (req) => {
       // Escalate to Firecrawl when the cheap path is walled or empty — this is
       // what makes JS-rendered dealer sites + marketplaces return a real price,
       // and it's where we capture the FTC evidence screenshot.
-      let screenshotPath: string | null = null;
+      let screenshot: CapturedScreenshot | null = null;
       let renderSource: string | null = null;
       const cheapFailed = result.price == null && result.reason !== "vin_mismatch" && !result.gated;
       if (cheapFailed && renderBudget > 0) {
@@ -453,7 +463,7 @@ serve(async (req) => {
             result = { price: r.jsonPrice, source: "jsonld", gated: false, reason: null };
           }
           if (result.price != null) {
-            screenshotPath = await captureScreenshot(admin, r.screenshotUrl, row.tenant_id, row.vin);
+            screenshot = await captureScreenshot(admin, r.screenshotUrl, row.tenant_id, row.vin);
           }
         }
       }
@@ -494,11 +504,11 @@ serve(async (req) => {
       }
       // Skip a no-op write only when nothing changed AND we have no fresh
       // evidence screenshot to record (a render always logs its screenshot).
-      if (Math.abs(newPrice - row.advertised_price) < 1 && !screenshotPath) {
+      if (Math.abs(newPrice - row.advertised_price) < 1 && !screenshot) {
         unchanged++;
         continue;
       }
-      const insRow = {
+      const insRow: Record<string, unknown> = {
         tenant_id: row.tenant_id,
         store_id: row.store_id || "",
         vin: row.vin,
@@ -506,13 +516,16 @@ serve(async (req) => {
         source_channel: row.source_label,
         advertised_price: newPrice,
         captured_by: renderSource ? "crawler_rendered" : "crawler",
-        screenshot_url: screenshotPath,
+        screenshot_url: screenshot?.path ?? null,
+        screenshot_sha256: screenshot?.sha256 ?? null,
+        screenshot_bucket: screenshot?.bucket ?? PRICE_EVIDENCE_BUCKET,
         notes: `${renderSource ? "Rendered" : "Nightly"} crawl (${result.source}) · previous $${row.advertised_price.toLocaleString()} → $${newPrice.toLocaleString()}`,
       };
       let insErr = (await admin.from("advertised_prices").insert(insRow)).error;
-      // Resilient to a not-yet-applied screenshot_url column.
-      if (insErr && /screenshot_url/i.test(insErr.message || "")) {
-        const { screenshot_url, ...rest } = insRow;
+      // Resilient to a not-yet-applied screenshot_url / sha256 / bucket column.
+      if (insErr && /screenshot_(url|sha256|bucket)/i.test(insErr.message || "")) {
+        const { screenshot_url, screenshot_sha256, screenshot_bucket, ...rest } = insRow;
+        void screenshot_url; void screenshot_sha256; void screenshot_bucket;
         insErr = (await admin.from("advertised_prices").insert(rest)).error;
       }
       if (insErr) {
