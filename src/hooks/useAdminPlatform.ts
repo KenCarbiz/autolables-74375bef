@@ -131,8 +131,8 @@ export const useAdminPlatform = () => {
   // cross-tenant. save_marketcheck_config accepts an explicit tenant_id and
   // authorizes platform admins, so a super-admin sets it up from the tenant page.
   const saveMarketcheckConfig = useCallback(
-    async (args: { tenantId: string; enabled: boolean; source: string; maxVehicles: number; frequency: string; dayOfWeek: number; runHour: number }): Promise<boolean> => {
-      const { error } = await (supabase as any).rpc("save_marketcheck_config", {
+    async (args: { tenantId: string; enabled: boolean; source: string; maxVehicles: number; frequency: string; dayOfWeek: number; runHour: number; dealerId?: string }): Promise<boolean> => {
+      const base = {
         _tenant_id: args.tenantId,
         _enabled: args.enabled,
         _source: args.source,
@@ -140,7 +140,13 @@ export const useAdminPlatform = () => {
         _frequency: args.frequency,
         _day_of_week: args.dayOfWeek,
         _run_hour: args.runHour,
-      });
+      };
+      // Prefer the 8-arg overload (with dealer_id); fall back if the migration
+      // hasn't been applied yet.
+      let { error } = await (supabase as any).rpc("save_marketcheck_config", { ...base, _dealer_id: args.dealerId ?? "" });
+      if (error && /save_marketcheck_config|function|does not exist|argument/i.test(error.message || "")) {
+        ({ error } = await (supabase as any).rpc("save_marketcheck_config", base));
+      }
       if (error) return false;
       await qc.invalidateQueries({ queryKey: ["admin", "marketcheck"] });
       return true;

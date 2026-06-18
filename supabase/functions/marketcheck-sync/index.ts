@@ -32,8 +32,34 @@ const corsHeaders = {
 };
 
 const MC_KEY = Deno.env.get("MARKETCHECK_API_KEY_1") || Deno.env.get("MARKETCHECK_API_KEY") || "";
-const MC_ENDPOINT = "https://api.marketcheck.com/v2/search/car/active";
+// Dealer-scoped LISTINGS come from the syndication endpoint. The plain
+// inventory-search endpoint forces rows=0 (analytics mode) whenever a dealer
+// scope like `source` is passed, which is why a domain-only query returns no
+// cars. Syndication is keyed on MarketCheck's internal dealer_id.
+const MC_BASE = "https://api.marketcheck.com/v2";
+const SYND_ENDPOINT = `${MC_BASE}/dealerships/inventory`;
+const DEALERS_ENDPOINT = `${MC_BASE}/dealers/car`;
 const ROWS = 50;
+
+// Resolve a MarketCheck dealer_id from the dealer's website domain via the
+// Dealers Search endpoint. Best-effort: returns null if nothing matches, which
+// the caller surfaces as a clear diagnostic.
+async function resolveDealerId(source: string): Promise<{ id: string | null; found: number; status: number }> {
+  try {
+    const url = `${DEALERS_ENDPOINT}?api_key=${encodeURIComponent(MC_KEY)}&source=${encodeURIComponent(source)}&rows=10`;
+    const res = await fetch(url, { signal: AbortSignal.timeout(20000) });
+    if (!res.ok) return { id: null, found: 0, status: res.status };
+    // deno-lint-ignore no-explicit-any
+    const data: any = await res.json().catch(() => ({}));
+    const dealers: any[] = Array.isArray(data?.dealers) ? data.dealers : [];
+    const host = (s: unknown) => toSourceHost(String(s || ""));
+    const hit = dealers.find((d) => host(d?.source) === source || host(d?.website) === source) || dealers[0];
+    const id = hit ? String(hit.id ?? hit.dealer_id ?? hit.mc_dealer_id ?? "") : "";
+    return { id: id || null, found: dealers.length, status: res.status };
+  } catch {
+    return { id: null, found: 0, status: 0 };
+  }
+}
 
 const normVin = (s: unknown) => String(s || "").toUpperCase().trim();
 const sane = (n: unknown): n is number => typeof n === "number" && n >= 1000 && n <= 500000;
@@ -55,6 +81,7 @@ interface SyncConfig {
   tenant_id: string; allowed: boolean; enabled: boolean; source: string;
   max_vehicles: number; frequency: string; day_of_week: number; run_hour: number;
   last_run_at: string | null;
+  dealer_id?: string | null;
 }
 
 const makeSlug = (vin: string, ymm: string | undefined) => {
@@ -111,11 +138,19 @@ serve(async (req) => {
 
   // ── Pick configs: allowed + enabled + source. Manual run targets one tenant
   // and bypasses the schedule (force). Cron runs all tenants due this hour. ──
-  let cq = admin.from("marketcheck_sync_config")
-    .select("tenant_id, allowed, enabled, source, max_vehicles, frequency, day_of_week, run_hour, last_run_at")
-    .eq("allowed", true).eq("enabled", true).neq("source", "");
-  if (body.tenant_id) cq = cq.eq("tenant_id", body.tenant_id);
-  const { data: configs, error: cErr } = await cq;
+  const baseCols = "tenant_id, allowed, enabled, source, max_vehicles, frequency, day_of_week, run_hour, last_run_at";
+  const mkQuery = (cols: string) => {
+    let q = admin.from("marketcheck_sync_config").select(cols)
+      .eq("allowed", true).eq("enabled", true).neq("source", "");
+    if (body.tenant_id) q = q.eq("tenant_id", body.tenant_id);
+    return q;
+  };
+  // Prefer reading dealer_id (manual override); fall back if the column hasn't
+  // been migrated yet.
+  let { data: configs, error: cErr } = await mkQuery(baseCols + ", dealer_id");
+  if (cErr && /dealer_id/i.test(cErr.message || "")) {
+    ({ data: configs, error: cErr } = await mkQuery(baseCols));
+  }
   if (cErr) return json(500, { error: cErr.message });
 
   const now = new Date();
@@ -124,6 +159,7 @@ serve(async (req) => {
 
   let tenantsSynced = 0, newVehicles = 0, listingsUpserted = 0, pricesRecorded = 0, seen = 0;
   const errors: Array<{ tenant_id: string; error: string }> = [];
+  const diagnostics: Array<Record<string, unknown>> = [];
 
   for (const cfg of due as SyncConfig[]) {
     const source = toSourceHost(cfg.source);
@@ -141,18 +177,38 @@ serve(async (req) => {
         if (!latestWebsite.has(v)) latestWebsite.set(v, r.advertised_price);
       }
 
+      // Resolve the dealer's MarketCheck dealer_id: a manual override on the
+      // config wins; otherwise look it up from the website domain.
+      let dealerId = (cfg.dealer_id || "").trim();
+      let resolveInfo: { id: string | null; found: number; status: number } | null = null;
+      if (!dealerId) {
+        resolveInfo = await resolveDealerId(source);
+        dealerId = resolveInfo.id || "";
+      }
+      if (!dealerId) {
+        diagnostics.push({
+          tenant_id: cfg.tenant_id, source, dealers_matched: resolveInfo?.found ?? 0,
+          dealers_http: resolveInfo?.status ?? null, error: "no_dealer_id",
+          note: `No MarketCheck dealer matched "${source}". Enter the MarketCheck dealer_id for this rooftop on the tenant.`,
+        });
+        continue;
+      }
+
       const maxPages = Math.ceil(cfg.max_vehicles / ROWS) + 1;
+      let numFound = 0;
+      let httpStatus = 0;
       outer:
-      for (const carType of ["used", "new"] as const) {
-        for (let page = 0; page < maxPages; page++) {
-          if (tenantSeen >= cfg.max_vehicles) break outer;
-          const url = `${MC_ENDPOINT}?api_key=${encodeURIComponent(MC_KEY)}`
-            + `&source=${encodeURIComponent(source)}&car_type=${carType}&rows=${ROWS}&start=${page * ROWS}`;
+      for (let page = 0; page < maxPages; page++) {
+        {
+          if (tenantSeen >= cfg.max_vehicles) break;
+          const url = `${SYND_ENDPOINT}?api_key=${encodeURIComponent(MC_KEY)}`
+            + `&dealer_id=${encodeURIComponent(dealerId)}&rows=${ROWS}&start=${page * ROWS}`;
           const res = await fetch(url, { signal: AbortSignal.timeout(30000) });
-          if (!res.ok) { errors.push({ tenant_id: cfg.tenant_id, error: `mc ${carType} http ${res.status}` }); break; }
+          if (page === 0) httpStatus = res.status;
+          if (!res.ok) { errors.push({ tenant_id: cfg.tenant_id, error: `mc syndication http ${res.status}` }); break; }
           const data = await res.json().catch(() => ({}));
           const listings: MCListing[] = Array.isArray(data?.listings) ? data.listings : [];
-          const numFound: number = typeof data?.num_found === "number" ? data.num_found : 0;
+          numFound = typeof data?.num_found === "number" ? data.num_found : numFound;
           if (listings.length === 0) break;
 
           for (const l of listings) {
@@ -209,8 +265,8 @@ serve(async (req) => {
                   source_url: l.vdp_url || "", source_channel: "website",
                   advertised_price: price, captured_by: "marketcheck",
                   notes: prev == null
-                    ? `MarketCheck ${carType} · $${price.toLocaleString()}`
-                    : `MarketCheck ${carType} · $${prev.toLocaleString()} → $${price.toLocaleString()}`,
+                    ? `MarketCheck ${l.inventory_type || ""} · $${price.toLocaleString()}`
+                    : `MarketCheck ${l.inventory_type || ""} · $${prev.toLocaleString()} → $${price.toLocaleString()}`,
                 });
                 if (!error) { tenantPrices++; pricesRecorded++; latestWebsite.set(vin, price); }
               }
@@ -221,7 +277,8 @@ serve(async (req) => {
       }
 
       tenantsSynced++;
-      const status = { ran_at: now.toISOString(), seen: tenantSeen, new_vehicles: tenantNew, prices_recorded: tenantPrices };
+      const status = { ran_at: now.toISOString(), seen: tenantSeen, new_vehicles: tenantNew, prices_recorded: tenantPrices, dealer_id: dealerId, num_found: numFound, http: httpStatus };
+      diagnostics.push({ tenant_id: cfg.tenant_id, source, dealer_id: dealerId, resolved: !cfg.dealer_id, num_found: numFound, http: httpStatus, seen: tenantSeen });
       await admin.from("marketcheck_sync_config")
         .update({ last_run_at: now.toISOString(), last_status: status })
         .eq("tenant_id", cfg.tenant_id);
@@ -237,6 +294,6 @@ serve(async (req) => {
   return json(200, {
     ok: true, tenants_due: due.length, tenants_synced: tenantsSynced,
     listings_seen: seen, new_vehicles: newVehicles,
-    listings_upserted: listingsUpserted, prices_recorded: pricesRecorded, errors,
+    listings_upserted: listingsUpserted, prices_recorded: pricesRecorded, errors, diagnostics,
   });
 });

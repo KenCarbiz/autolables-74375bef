@@ -581,7 +581,7 @@ const TenantDetailsDrawer = ({
   currentTier: PlanTier;
   onSetTier: (tier: PlanTier) => Promise<void> | void;
   marketcheck: import("@/hooks/useAdminPlatform").MarketcheckRow | null;
-  onSaveMarketcheck: (cfg: { enabled: boolean; source: string; maxVehicles: number; frequency: string; dayOfWeek: number; runHour: number }) => Promise<boolean>;
+  onSaveMarketcheck: (cfg: { enabled: boolean; source: string; maxVehicles: number; frequency: string; dayOfWeek: number; runHour: number; dealerId?: string }) => Promise<boolean>;
   onRunMarketcheck: () => Promise<{ ok: boolean; message: string }>;
 }) => {
   const [form, setForm] = useState<Record<string, string>>({});
@@ -594,6 +594,7 @@ const TenantDetailsDrawer = ({
   const [mcFreq, setMcFreq] = useState("nightly");
   const [mcHour, setMcHour] = useState(3);
   const [mcMax, setMcMax] = useState(1000);
+  const [mcDealerId, setMcDealerId] = useState("");
   const [mcSaving, setMcSaving] = useState(false);
   const [mcRunning, setMcRunning] = useState(false);
   useEffect(() => {
@@ -602,6 +603,7 @@ const TenantDetailsDrawer = ({
     setMcFreq(marketcheck?.frequency || "nightly");
     setMcHour(marketcheck?.run_hour ?? 3);
     setMcMax(marketcheck?.max_vehicles ?? 1000);
+    setMcDealerId((marketcheck as { dealer_id?: string } | null)?.dealer_id || "");
   }, [marketcheck]);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [mirror, setMirror] = useState<{ id: string | null; profile: Record<string, any> | null; synced_at: string | null; source: string } | null>(null);
@@ -717,6 +719,12 @@ const TenantDetailsDrawer = ({
               <label className="block text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-1">Dealer website domain</label>
               <input value={mcSource} onChange={(e) => setMcSource(e.target.value)} placeholder="hartecars.com"
                 className="w-full h-9 rounded-md border border-border bg-background px-3 text-sm font-mono" />
+              <p className="text-[10px] text-muted-foreground mt-1">We auto-find this rooftop's MarketCheck dealer from the domain.</p>
+            </div>
+            <div>
+              <label className="block text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-1">MarketCheck dealer ID (optional)</label>
+              <input value={mcDealerId} onChange={(e) => setMcDealerId(e.target.value)} placeholder="e.g. 1035095 — only if auto-find fails"
+                className="w-full h-9 rounded-md border border-border bg-background px-3 text-sm font-mono" />
             </div>
             <div className="grid grid-cols-3 gap-2">
               <div>
@@ -742,7 +750,7 @@ const TenantDetailsDrawer = ({
             </div>
             <div className="flex items-center gap-2">
               <button
-                onClick={async () => { setMcSaving(true); const ok = await onSaveMarketcheck({ enabled: mcEnabled, source: mcSource.trim(), maxVehicles: mcMax, frequency: mcFreq, dayOfWeek: marketcheck?.day_of_week ?? 0, runHour: mcHour }); setMcSaving(false); toast[ok ? "success" : "error"](ok ? "MarketCheck settings saved" : "Could not save MarketCheck settings"); }}
+                onClick={async () => { setMcSaving(true); const ok = await onSaveMarketcheck({ enabled: mcEnabled, source: mcSource.trim(), maxVehicles: mcMax, frequency: mcFreq, dayOfWeek: marketcheck?.day_of_week ?? 0, runHour: mcHour, dealerId: mcDealerId.trim() }); setMcSaving(false); toast[ok ? "success" : "error"](ok ? "MarketCheck settings saved" : "Could not save MarketCheck settings"); }}
                 disabled={mcSaving}
                 className="h-9 px-3 rounded-md bg-primary text-primary-foreground text-xs font-semibold disabled:opacity-50"
               >
