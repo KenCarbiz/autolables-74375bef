@@ -493,15 +493,16 @@ serve(async (req) => {
         }).then(() => undefined, () => undefined);
         continue;
       }
-      const res = await fetch(row.source_url, {
+      const fetchUrl = normalizeVdpUrl(row.source_url);
+      const res = await fetch(fetchUrl, {
         method: "GET",
         headers: FETCH_HEADERS,
         signal: AbortSignal.timeout(12000),
       });
       let html = res.ok ? await res.text() : "";
-      let result = (res.ok && !looksLikeChallenge(html, res.headers, res.status))
-        ? extractAdvertised(html, row.source_url, row.vin)
-        : { price: null, source: "none" as const, gated: false, reason: "bot_challenge" };
+      let result: AdResult = (res.ok && !looksLikeChallenge(html, res.headers, res.status))
+        ? extractAdvertised(html, fetchUrl, row.vin)
+        : { price: null, source: "none", gated: false, reason: "bot_challenge", msrp: null, candidates: [] };
 
       // Escalate to Firecrawl when the cheap path is walled or empty — this is
       // what makes JS-rendered dealer sites + marketplaces return a real price,
@@ -511,18 +512,23 @@ serve(async (req) => {
       const cheapFailed = result.price == null && result.reason !== "vin_mismatch" && !result.gated;
       if (cheapFailed && renderBudget > 0) {
         renderBudget--;
-        const r = await firecrawlRender(row.source_url);
+        const r = await firecrawlRender(fetchUrl);
         if (r) {
           renderSource = "firecrawl";
           if (r.html) {
             html = r.html;
-            result = extractAdvertised(r.html, row.source_url, row.vin);
+            result = extractAdvertised(r.html, fetchUrl, row.vin);
           }
           // Fall back to Firecrawl's structured extract, but only when the VIN
           // it read matches the target — never trust a price off the wrong car.
           if (result.price == null && r.jsonPrice != null && sane(r.jsonPrice)
               && (!r.jsonVin || r.jsonVin === normVin(row.vin))) {
-            result = { price: r.jsonPrice, source: "jsonld", gated: false, reason: null };
+            // Apply the same MSRP plausibility guard to the LLM-extracted price.
+            if (result.msrp != null && r.jsonPrice < result.msrp * 0.3) {
+              result = { ...result, reason: "implausible_vs_msrp" };
+            } else {
+              result = { ...result, price: r.jsonPrice, source: "jsonld", gated: false, reason: null };
+            }
           }
           if (result.price != null) {
             screenshot = await captureScreenshot(admin, r.screenshotUrl, row.tenant_id, row.vin);
