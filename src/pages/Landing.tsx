@@ -59,8 +59,8 @@ const Landing = () => {
         <Principles />
         <PowerGrid />
         <SocialProof />
-        <PricingTeaser onWaitlist={goWaitlist} onDemo={goDemo} />
         <FAQ />
+        <PricingTeaser onWaitlist={goWaitlist} onDemo={goDemo} />
         <FinalCTA onWaitlist={goWaitlist} onDemo={goDemo} />
       </main>
       <Footer onNav={navigate} onWaitlist={goWaitlist} />
@@ -711,9 +711,9 @@ const SocialProof = () => (
 // ──────────────────────────────────────────────────────────────
 
 const TIERS = [
-  { name: "Essential", body: "Single-store dealers. Stickers, addendums, signing, audit log." },
-  { name: "Defense", body: "Adds website price monitoring, FTC §5 defense pack, and recall guard.", featured: true },
-  { name: "Group", body: "Multi-rooftop. SSO, group analytics, custom rules, dedicated success." },
+  { name: "Essential", price: "$199", body: "Single-store dealers. Window stickers, addendums, signing, Buyers Guide, audit log." },
+  { name: "Unlimited", price: "$499", body: "Unlimited VINs, product rules, inventory, leads + analytics, AI descriptions.", featured: true },
+  { name: "Compliance Pro", price: "$999", body: "Adds website price verification, nightly inventory sync, and the per-VIN tamper-evident defense file." },
 ];
 
 const PricingTeaser = ({
@@ -728,10 +728,10 @@ const PricingTeaser = ({
       <div className="mx-auto max-w-3xl text-center">
         <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-blue-600">Pricing</p>
         <h2 className="mt-3 font-display text-4xl font-black tracking-tighter text-slate-900 sm:text-5xl">
-          Three tiers. Early-access pricing.
+          Simple pricing. Three tiers.
         </h2>
         <p className="mt-5 text-base leading-relaxed text-slate-600">
-          Early dealers lock in launch pricing. Full pricing publishes at GA.
+          Per rooftop, per month. Free with any Autocurb.io subscription. Cancel anytime.
         </p>
       </div>
 
@@ -739,12 +739,21 @@ const PricingTeaser = ({
         {TIERS.map((t) => (
           <div
             key={t.name}
-            className={`rounded-2xl border bg-white p-6 shadow-sm ${
+            className={`relative rounded-2xl border bg-white p-6 shadow-sm ${
               t.featured ? "border-[#2563EB] ring-1 ring-[#2563EB]" : "border-slate-200"
             }`}
           >
+            {t.featured && (
+              <span className="absolute -top-3 left-6 rounded-full bg-[#2563EB] px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-white">
+                Most popular
+              </span>
+            )}
             <h3 className="font-display text-xl font-bold tracking-tight text-slate-900">{t.name}</h3>
-            <p className="mt-2 text-sm leading-relaxed text-slate-600">{t.body}</p>
+            <div className="mt-3 flex items-baseline gap-1">
+              <span className="font-display text-4xl font-black tracking-tighter text-slate-900">{t.price}</span>
+              <span className="text-sm font-medium text-slate-500">/mo</span>
+            </div>
+            <p className="mt-3 text-sm leading-relaxed text-slate-600">{t.body}</p>
             <div className="mt-5">
               {t.featured ? (
                 <button
