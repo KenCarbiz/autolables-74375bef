@@ -23,6 +23,7 @@ import {
   CheckCircle2,
   Camera,
   RefreshCw,
+  Lock,
 } from "lucide-react";
 
 // ──────────────────────────────────────────────────────────────
@@ -200,64 +201,115 @@ const HeroCheck = ({ icon: Icon, label }: { icon: IconType; label: string }) => 
   </div>
 );
 
-// Live "mission control" compliance dashboard — green verified rows,
-// then a website scan that surfaces a red advertised-price mismatch.
+// Per-VIN tamper-evident "defense file" — the hero proof. Leads with the hard
+// price gate (signing blocked on mismatch), shows the captured evidence, keeps
+// a single "caught before a customer did" beat, and seals with a real
+// content-hash footer so the card reads as a legal evidence record, not a
+// generic status board.
 const ComplianceStatusCard = () => (
-  <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-[0_30px_90px_-25px_rgba(15,23,42,0.28)]">
-    <div className="flex items-center justify-between border-b border-slate-100 bg-slate-50/70 px-5 py-3.5">
-      <div className="flex items-center gap-2">
-        <ShieldCheck className="h-4 w-4 text-slate-500" />
-        <span className="text-[11px] font-bold uppercase tracking-[0.16em] text-slate-500">Compliance status</span>
+  <div className="relative overflow-hidden rounded-2xl border border-slate-200 bg-white ring-1 ring-slate-900/[0.04] shadow-[0_2px_4px_-1px_rgba(15,23,42,0.06),0_20px_40px_-12px_rgba(15,23,42,0.16),0_40px_90px_-30px_rgba(11,32,65,0.28)]">
+    {/* Faint ledger grid so the card reads as an evidence document, not chrome. */}
+    <div
+      aria-hidden
+      className="pointer-events-none absolute inset-0 z-0 bg-[linear-gradient(to_right,rgba(15,23,42,0.03)_1px,transparent_1px),linear-gradient(to_bottom,rgba(15,23,42,0.03)_1px,transparent_1px)] bg-[size:22px_22px] [mask-image:linear-gradient(to_bottom,#000,transparent_88%)]"
+    />
+    <div className="relative z-10">
+      <div className="border-b border-slate-100 bg-gradient-to-b from-slate-50 to-white px-5 pb-3.5 pt-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2.5">
+            <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-[#0B2041] text-white shadow-sm ring-1 ring-white/10">
+              <ShieldCheck className="h-4 w-4" />
+            </span>
+            <div className="leading-none">
+              <p className="font-display text-[13px] font-black tracking-tight text-slate-900">VIN defense file</p>
+              <p className="mt-1 font-mono text-[10px] tracking-tight text-slate-400">REC-2026-0617 · 142 VINs sealed</p>
+            </div>
+          </div>
+          <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-200/70 bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold tracking-wide text-emerald-700">
+            <span className="relative flex h-1.5 w-1.5">
+              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-60" />
+              <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-emerald-500" />
+            </span>
+            Live
+          </span>
+        </div>
       </div>
-      <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold text-emerald-700">
-        <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" /> Live
+
+      <div className="divide-y divide-slate-100/80">
+        <StatusRow label="Advertised price locked to all-in" sub="Signing blocked until the price matches" chip="Enforced" tone="navy" />
+        <StatusRow label="Disclosures signed &amp; hash-sealed" sub="E-sign consent · IP · UTC time" mono="sha-256" chip="Sealed" />
+        <StatusRow label="Installer proof, per pre-installed item" sub="Sign-off + install photo on file" chip="Verified" />
+        <StatusRow label="Website price screenshot at signing" sub="Timestamped image of the live listing" chip="Captured" />
+      </div>
+
+      <div className="border-t border-slate-100 bg-slate-50/40 px-5 pb-5 pt-4">
+        <div className="mb-3 flex items-center justify-between">
+          <span className="font-mono text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-400">Website scan · exceptions</span>
+          <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-semibold text-amber-700 ring-1 ring-amber-200/70">
+            <AlertTriangle className="h-3 w-3" /> Caught &amp; held
+          </span>
+        </div>
+        <AlertRow tone="red" title="Advertised price mismatch — held" detail="VIN 1HGCM826… · Lot $34,991 vs Site $32,995" />
+        <AlertRow tone="amber" title="Missing disclosure — flagged" detail="2019 F-150 · Buyers Guide not attached" />
+        <p className="mt-3 flex items-center gap-1.5 text-[11px] text-slate-500">
+          <Scan className="h-3.5 w-3.5 text-[#2563EB]" /> Nightly price sync flagged this 02:14 AM &mdash; before a customer did.
+        </p>
+
+        {/* Tamper-evident seal — the trust payload. Mirrors the stored content hash. */}
+        <div className="mt-4 flex items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white px-3.5 py-3 shadow-sm">
+          <div className="flex min-w-0 items-center gap-2.5">
+            <span className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-lg bg-slate-50 text-[#0B2041] ring-1 ring-slate-200">
+              <Lock className="h-3.5 w-3.5" />
+            </span>
+            <div className="min-w-0 leading-tight">
+              <p className="flex items-center gap-1.5 text-[11px] font-semibold text-slate-700">
+                Record sealed
+                <span className="inline-flex items-center rounded border border-emerald-200 bg-emerald-50 px-1 py-px font-mono text-[9px] font-semibold uppercase tracking-wide text-emerald-700">tamper-evident</span>
+              </p>
+              <p className="mt-0.5 truncate font-mono text-[10px] text-slate-400">sha256:9f2a1c4e…7b30 · 02:14 UTC</p>
+            </div>
+          </div>
+        </div>
+        <p className="mt-2 text-center text-[10.5px] text-slate-400">Any change to any document changes this hash.</p>
+      </div>
+    </div>
+  </div>
+);
+
+const StatusRow = ({
+  label, sub, mono, chip = "Verified", tone = "emerald",
+}: { label: string; sub: string; mono?: string; chip?: string; tone?: "emerald" | "navy" }) => {
+  const rail = tone === "navy" ? "bg-[#2563EB]" : "bg-emerald-400/70";
+  const chipCls = tone === "navy"
+    ? "border-[#2563EB]/30 bg-blue-50 text-[#1d4ed8]"
+    : "border-emerald-200 bg-emerald-50/60 text-emerald-700";
+  return (
+    <div className="relative flex items-center justify-between py-3 pl-5 pr-5">
+      <span aria-hidden className={`absolute inset-y-1.5 left-0 w-0.5 rounded-full ${rail}`} />
+      <div className="min-w-0">
+        <p className="text-[13px] font-semibold leading-tight text-slate-900">{label}</p>
+        <p className="mt-0.5 truncate text-[11px] leading-tight text-slate-500">
+          {sub}
+          {mono && <span className="ml-1.5 font-mono text-[10px] text-slate-400">{mono}</span>}
+        </p>
+      </div>
+      <span className={`inline-flex flex-shrink-0 items-center gap-1 rounded-md border px-2 py-1 text-[11px] font-semibold ${chipCls}`}>
+        {tone === "navy" ? <Lock className="h-3 w-3" /> : <CheckCircle2 className="h-3.5 w-3.5" />} {chip}
       </span>
     </div>
-    <div className="divide-y divide-slate-100">
-      <StatusRow label="Website pricing" sub="142 VINs reconciled to lot price" />
-      <StatusRow label="Required disclosures" sub="50-state engine · current rule set" />
-      <StatusRow label="Doc fee compliance" sub="At or under state cap on every deal" />
-      <StatusRow label="Customer acknowledgements" sub="Signed, hash-sealed, geo-stamped" />
-    </div>
-    <div className="border-t border-slate-100 bg-slate-50/40 px-5 pb-5 pt-4">
-      <div className="mb-3 flex items-center justify-between">
-        <span className="text-[11px] font-bold uppercase tracking-[0.16em] text-slate-500">Website scan</span>
-        <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-semibold text-amber-700">
-          <AlertTriangle className="h-3 w-3" /> 3 issues detected
-        </span>
-      </div>
-      <AlertRow tone="red" title="Advertised price mismatch" detail="VIN 1HGCM826… · Lot $34,991 vs Site $32,995" />
-      <AlertRow tone="amber" title="Missing disclosure" detail="2019 F-150 · Buyers Guide not attached" />
-      <AlertRow tone="amber" title="Third-party price drift" detail="Marketplace listing $1,400 below sticker" />
-      <p className="mt-3 flex items-center gap-1.5 text-[11px] text-slate-500">
-        <Scan className="h-3.5 w-3.5 text-[#2563EB]" /> Auto-flagged 02:14 AM &mdash; before a customer did.
-      </p>
-    </div>
-  </div>
-);
-
-const StatusRow = ({ label, sub }: { label: string; sub: string }) => (
-  <div className="flex items-center justify-between px-5 py-3">
-    <div className="min-w-0">
-      <p className="text-sm font-semibold text-slate-900">{label}</p>
-      <p className="truncate text-xs text-slate-500">{sub}</p>
-    </div>
-    <span className="inline-flex flex-shrink-0 items-center gap-1.5 rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700">
-      <CheckCircle2 className="h-3.5 w-3.5" /> Verified
-    </span>
-  </div>
-);
+  );
+};
 
 const AlertRow = ({ tone, title, detail }: { tone: "red" | "amber"; title: string; detail: string }) => {
-  const styles = tone === "red" ? "border-red-200 bg-red-50/70" : "border-amber-200 bg-amber-50/60";
-  const dot = tone === "red" ? "bg-red-500" : "bg-amber-500";
-  const titleColor = tone === "red" ? "text-red-800" : "text-amber-800";
+  const c = tone === "red"
+    ? { rail: "bg-red-500", border: "border-red-200", bg: "bg-red-50/60", title: "text-red-900" }
+    : { rail: "bg-amber-500", border: "border-amber-200", bg: "bg-amber-50/50", title: "text-amber-900" };
   return (
-    <div className={`mb-2 flex items-start gap-2.5 rounded-xl border px-3 py-2.5 ${styles}`}>
-      <span className={`mt-1.5 h-1.5 w-1.5 flex-shrink-0 rounded-full ${dot}`} />
+    <div className={`relative mb-2 flex items-start gap-2.5 overflow-hidden rounded-lg border ${c.border} ${c.bg} py-2.5 pl-3.5 pr-3`}>
+      <span aria-hidden className={`absolute inset-y-1.5 left-0 w-0.5 rounded-full ${c.rail}`} />
       <div className="min-w-0">
-        <p className={`text-sm font-semibold ${titleColor}`}>{title}</p>
-        <p className="truncate text-xs text-slate-600">{detail}</p>
+        <p className={`text-[12.5px] font-semibold leading-tight ${c.title}`}>{title}</p>
+        <p className="mt-0.5 truncate font-mono text-[10.5px] leading-tight text-slate-500">{detail}</p>
       </div>
     </div>
   );
