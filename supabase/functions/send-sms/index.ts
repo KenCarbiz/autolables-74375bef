@@ -94,14 +94,12 @@ serve(async (req) => {
         if (norm) allow.add(norm);
       }
     };
-    const [leadsRes, signRes, dealRes] = await Promise.all([
+    const [leadsRes, signRes] = await Promise.all([
       admin.from("leads").select("phone").in("tenant_id", tenantIds),
       admin.from("addendum_signings").select("signer_phone").in("tenant_id", tenantIds),
-      admin.from("deal_signing_tokens").select("customer_phone").in("tenant_id", tenantIds),
     ]);
     collect(leadsRes.data as Array<Record<string, unknown>> | null, "phone");
     collect(signRes.data as Array<Record<string, unknown>> | null, "signer_phone");
-    collect(dealRes.data as Array<Record<string, unknown>> | null, "customer_phone");
 
     if (!allow.has(to)) {
       return json({
