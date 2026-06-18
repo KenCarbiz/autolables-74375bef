@@ -241,8 +241,29 @@ const extractAdvertised = (
     }
   }
 
-  // Tier C: labeled DOM price — the price-stack final line, by LABEL not size.
+  // Tier C0: dealer-configured custom labels (e.g. "Harte Deal"). First label
+  // with a dollar amount within 80 chars wins — short-circuits BEFORE the
+  // generic heuristic so a brand-specific label like "Harte Deal" can't lose
+  // to "MSRP" or anything else on the page.
   const text = html.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").toLowerCase();
+  const labels = (customLabels || [])
+    .map((l) => l.trim().toLowerCase()).filter(Boolean);
+  for (const lbl of labels) {
+    // Escape regex metacharacters in the user-supplied label.
+    const esc = lbl.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const re = new RegExp(`${esc}[^$]{0,80}\\$\\s?(\\d{1,3}(?:,\\d{3})+|\\d{4,6})(?:\\.\\d{2})?`, "i");
+    const m = text.match(re);
+    const v = m ? norm(m[1]) : null;
+    if (sane(v)) {
+      candidates.push({ value: v, label: `custom:${lbl}`, source: "dom_label" });
+      if (msrp != null && v < msrp * 0.3) {
+        return { price: null, source: "none", gated: false, reason: "implausible_vs_msrp", msrp, candidates, matched_label: lbl };
+      }
+      return { price: v, source: "dom_label", gated: false, reason: null, msrp, candidates, matched_label: lbl };
+    }
+  }
+
+  // Tier C: labeled DOM price — the price-stack final line, by LABEL not size.
   const GATE = ["call for price", "please call", "contact us for price", "unlock price", "click for price", "sign in to see price"];
   const MONTHLY = ["/mo", "per month", "mo.", "lease", " apr", "due at signing", "est. payment", "for 24", "for 36", "for 48", "for 60", "for 72", "for 84"];
   const GOOD = ["internet price", "sale price", "final price", "your price", "e-price", "eprice", "selling price", "special price"];
@@ -252,6 +273,7 @@ const extractAdvertised = (
   const moneyRe = /([a-z .,'-]{0,40})\$\s?(\d{1,3}(?:,\d{3})+|\d{4,6})(?:\.\d{2})?/g;
   let best: number | null = null;
   let bestScore = -1;
+  let bestLabel = "";
   let mm: RegExpExecArray | null;
   moneyRe.lastIndex = 0;
   while ((mm = moneyRe.exec(text))) {
@@ -266,7 +288,9 @@ const extractAdvertised = (
     const idx = GOOD.findIndex((g) => ctx.includes(g));
     const s = idx === -1 ? 0 : 10 - idx;
     candidates.push({ value: val, label: ctx.trim() || "(unlabeled)", source: "dom_label" });
-    if (s > bestScore || (s === bestScore && best != null && val < best)) { best = val; bestScore = s; }
+    if (s > bestScore || (s === bestScore && best != null && val < best)) {
+      best = val; bestScore = s; bestLabel = ctx.trim();
+    }
   }
   if (best != null) {
     if (msrp != null && best < msrp * 0.3) {
@@ -277,7 +301,7 @@ const extractAdvertised = (
     if (bestScore === 0 && msrp == null) {
       return { price: null, source: "none", gated: false, reason: "unlabeled_price_only", msrp, candidates };
     }
-    return { price: best, source: "dom_label", gated: false, reason: null, msrp, candidates };
+    return { price: best, source: "dom_label", gated: false, reason: null, msrp, candidates, matched_label: bestLabel || null };
   }
 
   // Tier D: gate / give up — never guess MSRP.
