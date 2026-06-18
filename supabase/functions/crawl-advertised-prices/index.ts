@@ -566,7 +566,14 @@ serve(async (req) => {
           entity_type: "advertised_price",
           entity_id: row.vin,
           store_id: row.tenant_id,
-          details: { vin: row.vin, url: row.source_url, reason: "no_price_extracted", rendered: !!renderSource },
+          details: {
+            vin: row.vin,
+            url: row.source_url,
+            reason: result.reason || "no_price_extracted",
+            rendered: !!renderSource,
+            msrp: result.msrp,
+            candidates: result.candidates.slice(0, 12),
+          },
         }).then(() => undefined, () => undefined);
         continue;
       }
