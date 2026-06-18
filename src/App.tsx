@@ -144,6 +144,7 @@ const App = () => (
                       <Route path="/v/:slug" element={<PublicListing />} />
                       <Route path="/deal/:token" element={<DealSigning />} />
                       <Route path="/about" element={<About />} />
+                      <Route path="/trust" element={<Trust />} />
                       <Route path="/brand" element={<BrandGuide />} />
 
                       {/* Gated layout — one AppShell shared across every
