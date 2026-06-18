@@ -151,7 +151,7 @@ Write the description now (${maxChars} char max):`;
       }
     } catch (err: any) {
       // Fallback to basic prompt
-      toast.error("AI service unavailable. Connect your API key in Supabase > Secrets.");
+      toast.error("AI descriptions aren't enabled for your store yet. Contact AutoLabels support.");
       const fallback = buildFallback();
       setDescription(fallback);
       setCharCount(fallback.length);

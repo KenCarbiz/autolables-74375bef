@@ -163,8 +163,8 @@ const FEATURE_TOGGLES: { key: keyof DealerSettings; label: string; description: 
   // Beta — UI surfaces exist but the underlying integration is partial.
   // Leave the toggle visible so a dealer can opt in once the secret is
   // wired, but mark it BETA so nobody thinks it's already live.
-  { key: "feature_sms", label: "SMS Delivery", description: "Send signing links via SMS text message (requires Twilio key — sending pipeline not yet active)", status: "beta" },
-  { key: "feature_blackbook", label: "Black Book Data", description: "Pull factory equipment and live market data from Black Book (requires BLACKBOOK_API_KEY — read-only preview)", status: "beta" },
+  { key: "feature_sms", label: "SMS Delivery", description: "Send signing links by text message. Contact support to enable for your store.", status: "beta" },
+  { key: "feature_blackbook", label: "Black Book Data", description: "Pull factory equipment and live market data from Black Book. Contact support to enable for your store.", status: "beta" },
   // Coming soon — no functional consumer yet. Hidden from the
   // Feature Toggles list entirely until the underlying feature
   // ships, so the panel only shows switches that actually do
@@ -265,15 +265,15 @@ const Admin = () => {
         // Surface the real Supabase error so storage problems are
         // diagnosable instead of guessed-at.
         if (msg.includes("not found") && msg.includes("bucket")) {
-          toast.error("The 'product-docs' bucket doesn't exist yet. Create it in Supabase Storage > New bucket, then re-pick the file.");
+          toast.error("Document storage isn't set up yet. Contact AutoLabels support.");
         } else if (msg.includes("row-level security") || msg.includes("policy") || msg.includes("permission") || msg.includes("denied")) {
-          toast.error("Storage blocked the upload (missing policy). Add an INSERT policy for authenticated users on the product-docs bucket, then retry.");
+          toast.error("We couldn't save that file. Contact AutoLabels support.");
         } else if (msg.includes("mime") || msg.includes("content type") || msg.includes("not supported")) {
-          toast.error(`File type not allowed on the bucket: ${raw}. Add application/pdf to product-docs allowed MIME types.`);
+          toast.error("That file type isn't supported — upload a PDF or image.");
         } else if (msg.includes("schema") || msg.includes("incompatible")) {
-          toast.error(`Storage error: "${raw}". The product-docs bucket metadata looks incomplete — delete it and re-create it via Storage > New bucket (not via raw SQL), then retry.`);
+          toast.error("Document storage needs attention. Contact AutoLabels support.");
         } else {
-          toast.error(`Upload failed: ${raw}`);
+          toast.error("Upload failed. Please try again.");
         }
         return;
       }
@@ -2429,8 +2429,11 @@ const Admin = () => {
         {/* ─── Audit Log Tab ─── */}
         {tab === "audit" && (
           <div className="space-y-4">
-            <MarketcheckSyncCard />
-            <PriceIntegrityPanel />
+            {/* Platform-operator tooling (MarketCheck grant state, cron health,
+                cross-VIN price reconciliation) — super-admin only, so a normal
+                dealer manager doesn't see an "access not granted" card. */}
+            {isAdmin && <MarketcheckSyncCard />}
+            {isAdmin && <PriceIntegrityPanel />}
             <div className="flex items-center justify-between flex-wrap gap-2">
               <div>
                 <div className="flex items-center gap-2">
@@ -3106,14 +3109,13 @@ const AuditChainVerifier = ({ storeId }: { storeId: string }) => {
   );
 };
 
-const IntegrationRow = ({ label, secretKey, feature }: { label: string; secretKey: string; feature: boolean }) => (
+const IntegrationRow = ({ label, feature }: { label: string; secretKey?: string; feature: boolean }) => (
   <div className="flex items-center justify-between py-1.5 border-b border-border last:border-0">
     <div>
       <p className="font-medium text-foreground">{label}</p>
-      <p className="text-[10px] text-muted-foreground">Secret: {secretKey}</p>
     </div>
     <span className={`text-[9px] font-bold uppercase px-1.5 py-0.5 rounded ${feature ? "bg-emerald-50 text-emerald-700" : "bg-muted text-muted-foreground"}`}>
-      {feature ? "Enabled" : "Configure"}
+      {feature ? "Enabled" : "Contact support"}
     </span>
   </div>
 );
