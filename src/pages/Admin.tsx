@@ -1384,7 +1384,104 @@ const Admin = () => {
                     <input value={branding.carfax_url} onChange={(e) => setBranding({ ...branding, carfax_url: e.target.value })} placeholder="carfax.com/dealer/…" className="mt-1 w-full px-3 py-2 border border-border-custom rounded text-sm bg-background text-foreground placeholder:text-muted-foreground/50" />
                   </div>
                 </div>
+
+                {/* Per-dealer advertised-price extraction. Dealers brand the
+                    selling price line differently — Harte Infiniti calls it
+                    "Harte Deal", another store calls it "Internet Price",
+                    "ePrice", "Your Price", "Selling Price". Hardcoding labels
+                    misreads the page on every new dealer. The list below is
+                    matched against the price-stack labels in priority order. */}
+                <div className="mt-4 pt-3 border-t border-dashed border-border-custom">
+                  <h5 className="text-sm font-bold text-foreground">Advertised price extraction</h5>
+                  <p className="text-[11px] text-muted-foreground mb-2">
+                    The label your store uses for the advertised selling price. The scraper will
+                    look for these labels next to a dollar amount on your VDPs, in the order listed.
+                  </p>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                    <div className="md:col-span-2">
+                      <label className="text-xs font-semibold text-muted-foreground">VDP price label(s) — priority order</label>
+                      <input
+                        value={branding.vdp_price_labels}
+                        onChange={(e) => setBranding({ ...branding, vdp_price_labels: e.target.value })}
+                        placeholder="e.g. Harte Deal, Internet Price, Selling Price"
+                        className="mt-1 w-full px-3 py-2 border border-border-custom rounded text-sm bg-background text-foreground placeholder:text-muted-foreground/50"
+                      />
+                      <p className="text-[11px] text-muted-foreground mt-1">
+                        Comma-separated. Case-insensitive substring match. First label that has a dollar amount adjacent wins.
+                      </p>
+                    </div>
+                    <div className="flex items-start gap-2 pt-6">
+                      <Switch
+                        checked={branding.vdp_strip_finance_params !== false}
+                        onCheckedChange={(v) => setBranding({ ...branding, vdp_strip_finance_params: v })}
+                      />
+                      <div className="text-xs">
+                        <div className="font-semibold text-foreground">Strip finance/lease URL params</div>
+                        <div className="text-muted-foreground">Removes <code>?type=finance</code>, <code>?type=lease</code>, and similar before scraping so the page shows the standard price.</div>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="mt-3 flex items-end gap-2">
+                    <div className="flex-1">
+                      <label className="text-xs font-semibold text-muted-foreground">Test URL</label>
+                      <input
+                        value={priceTestUrl}
+                        onChange={(e) => setPriceTestUrl(e.target.value)}
+                        placeholder="https://yourdealer.com/used/2025-make-model/VIN/"
+                        className="mt-1 w-full px-3 py-2 border border-border-custom rounded text-sm bg-background text-foreground placeholder:text-muted-foreground/50"
+                      />
+                    </div>
+                    <button
+                      onClick={handleTestPriceScrape}
+                      disabled={priceTestRunning || !priceTestUrl || !tenant?.id}
+                      className="px-4 py-2 bg-foreground text-background rounded font-semibold text-sm disabled:opacity-50"
+                    >
+                      {priceTestRunning ? "Testing…" : "Test"}
+                    </button>
+                  </div>
+                  {priceTestResult && (
+                    <div className="mt-3 rounded border border-border-custom bg-muted/30 p-3 text-xs">
+                      {priceTestResult.error ? (
+                        <div className="text-destructive font-semibold">Error: {priceTestResult.error}</div>
+                      ) : (
+                        <>
+                          <div className="flex flex-wrap items-center gap-3 mb-2">
+                            <span className="font-semibold text-foreground">
+                              {priceTestResult.price != null
+                                ? `Price: $${Number(priceTestResult.price).toLocaleString()}`
+                                : "No price extracted"}
+                            </span>
+                            {priceTestResult.matched_label && (
+                              <span className="text-muted-foreground">matched <span className="font-mono">{priceTestResult.matched_label}</span></span>
+                            )}
+                            {priceTestResult.source && (
+                              <span className="text-muted-foreground">source: <span className="font-mono">{priceTestResult.source}</span></span>
+                            )}
+                            {priceTestResult.rendered && <span className="text-muted-foreground">(rendered)</span>}
+                            {priceTestResult.reason && <span className="text-muted-foreground">reason: <span className="font-mono">{priceTestResult.reason}</span></span>}
+                          </div>
+                          {priceTestResult.msrp != null && (
+                            <div className="text-muted-foreground">MSRP captured: ${Number(priceTestResult.msrp).toLocaleString()}</div>
+                          )}
+                          {Array.isArray(priceTestResult.candidates) && priceTestResult.candidates.length > 0 && (
+                            <div className="mt-2">
+                              <div className="font-semibold text-muted-foreground mb-1">Candidates found on page:</div>
+                              <ul className="space-y-0.5 max-h-40 overflow-auto">
+                                {priceTestResult.candidates.slice(0, 20).map((c: { value: number; label: string; source: string }, i: number) => (
+                                  <li key={i} className="font-mono">
+                                    ${Number(c.value).toLocaleString()} <span className="text-muted-foreground">— {c.label} [{c.source}]</span>
+                                  </li>
+                                ))}
+                              </ul>
+                            </div>
+                          )}
+                        </>
+                      )}
+                    </div>
+                  )}
+                </div>
               </div>
+
 
               {/* Marketing assets shown to shoppers */}
               <div className="border-t border-border-custom pt-3">
