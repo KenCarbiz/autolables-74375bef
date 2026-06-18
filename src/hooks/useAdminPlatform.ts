@@ -46,6 +46,14 @@ export interface EntitlementRow {
   seat_limit: number | null;
 }
 
+export interface MarketcheckRow {
+  tenant_id: string;
+  allowed: boolean;
+  enabled: boolean;
+  source: string;
+  last_run_at: string | null;
+}
+
 export interface AuditRow {
   id: string;
   action: string;
@@ -98,6 +106,36 @@ export const useAdminPlatform = () => {
       return (data as EntitlementRow[]) || [];
     },
   });
+
+  // Cross-tenant MarketCheck grant state. Platform admins can read every row
+  // via the marketcheck_sync_config RLS (has_role admin), so the grid joins
+  // this client-side by tenant_id — no view change needed.
+  const marketcheck = useQuery({
+    queryKey: ["admin", "marketcheck"],
+    queryFn: async (): Promise<MarketcheckRow[]> => {
+      const { data, error } = await (supabase as any)
+        .from("marketcheck_sync_config")
+        .select("tenant_id, allowed, enabled, source, last_run_at");
+      if (error) throw error;
+      return (data as MarketcheckRow[]) || [];
+    },
+  });
+
+  // Grant / revoke a tenant's MarketCheck capability from the platform grid.
+  // Uses the existing admin-only RPC (takes an explicit tenant_id), so it
+  // works cross-tenant with no impersonation.
+  const setMarketcheckAllowed = useCallback(
+    async (tenantId: string, allowed: boolean): Promise<boolean> => {
+      const { error } = await (supabase as any).rpc("set_marketcheck_allowed", {
+        _tenant_id: tenantId,
+        _allowed: allowed,
+      });
+      if (error) return false;
+      await qc.invalidateQueries({ queryKey: ["admin", "marketcheck"] });
+      return true;
+    },
+    [qc]
+  );
 
   const setTenantActive = useCallback(
     async (tenantId: string, active: boolean): Promise<boolean> => {
@@ -238,6 +276,8 @@ export const useAdminPlatform = () => {
     tenants,
     members,
     entitlements,
+    marketcheck,
+    setMarketcheckAllowed,
     setTenantActive,
     overrideEntitlement,
     setMemberRole,

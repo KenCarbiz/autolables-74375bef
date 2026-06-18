@@ -2,7 +2,7 @@ import { useMemo, useState, useEffect } from "react";
 import { useAdminPlatform, type TenantSummary } from "@/hooks/useAdminPlatform";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Building2, Search, Power, PowerOff, Calendar, Users, AppWindow, Plus, X, Pencil } from "lucide-react";
+import { Building2, Search, Power, PowerOff, Calendar, Users, AppWindow, Plus, X, Pencil, Database } from "lucide-react";
 import { SortHeader, TablePagination, useSortAndPaginate, toCsv, downloadCsv, useTableDensity, DensityToggle } from "./tablePrimitives";
 import { TableEmptyState } from "./TableEmptyState";
 import { pickStr, brandsToStr, mapAutocurbProfile } from "@/lib/autocurbProfile";
@@ -23,11 +23,25 @@ const sourceBadge = (source: TenantSummary["source"]) => {
 };
 
 export const PlatformTenants = () => {
-  const { tenants, setTenantActive, createTenant } = useAdminPlatform();
+  const { tenants, setTenantActive, createTenant, marketcheck, setMarketcheckAllowed } = useAdminPlatform();
   const [q, setQ] = useState("");
   const [filter, setFilter] = useState<"all" | "active" | "inactive">("all");
   const [creating, setCreating] = useState(false);
   const [editing, setEditing] = useState<TenantSummary | null>(null);
+
+  // tenant_id -> MarketCheck grant/state, joined client-side for the grid.
+  const mcByTenant = useMemo(() => {
+    const m = new Map<string, { allowed: boolean; enabled: boolean; last_run_at: string | null }>();
+    for (const r of marketcheck.data || []) m.set(r.tenant_id, { allowed: r.allowed, enabled: r.enabled, last_run_at: r.last_run_at });
+    return m;
+  }, [marketcheck.data]);
+
+  const toggleMarketcheck = async (t: TenantSummary) => {
+    const cur = mcByTenant.get(t.id)?.allowed ?? false;
+    const ok = await setMarketcheckAllowed(t.id, !cur);
+    if (ok) toast.success(`MarketCheck ${cur ? "revoked for" : "granted to"} ${t.name}`);
+    else toast.error("Could not update MarketCheck access");
+  };
 
   const rows = useMemo(() => {
     const all = tenants.data || [];
@@ -189,6 +203,7 @@ export const PlatformTenants = () => {
                 <SortHeader label="Members"       sortKey="member_count"  activeKey={sortPag.sortKey} dir={sortPag.sortDir} onToggle={sortPag.toggleSort} />
                 <SortHeader label="Created"       sortKey="created_at"    activeKey={sortPag.sortKey} dir={sortPag.sortDir} onToggle={sortPag.toggleSort} />
                 <SortHeader label="Last activity" sortKey="last_activity" activeKey={sortPag.sortKey} dir={sortPag.sortDir} onToggle={sortPag.toggleSort} />
+                <th className="px-3 py-2 text-left font-semibold">MarketCheck</th>
                 <SortHeader label="Status"        sortKey="status"        activeKey={sortPag.sortKey} dir={sortPag.sortDir} onToggle={sortPag.toggleSort} align="right" />
               </tr>
             </thead>
@@ -232,6 +247,28 @@ export const PlatformTenants = () => {
                   </td>
                   <td className={`${rowClass} text-muted-foreground`}>
                     {formatDate(t.last_activity)}
+                  </td>
+                  <td className={rowClass}>
+                    {(() => {
+                      const mc = mcByTenant.get(t.id);
+                      const granted = mc?.allowed ?? false;
+                      return (
+                        <button
+                          onClick={() => toggleMarketcheck(t)}
+                          title={granted
+                            ? `MarketCheck granted${mc?.enabled ? " · dealer enabled" : " · dealer not enabled yet"}${mc?.last_run_at ? ` · last run ${formatDate(mc.last_run_at)}` : ""}`
+                            : "Grant MarketCheck nightly inventory scrape to this dealer"}
+                          className={`inline-flex items-center gap-1.5 text-[11px] font-semibold px-2.5 h-7 rounded-md border ${
+                            granted
+                              ? "border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100"
+                              : "border-border text-muted-foreground hover:bg-muted"
+                          }`}
+                        >
+                          <Database className="w-3 h-3" />
+                          {granted ? (mc?.enabled ? "Granted · on" : "Granted") : "Grant"}
+                        </button>
+                      );
+                    })()}
                   </td>
                   <td className={`${rowClass} text-right`}>
                     <div className="inline-flex items-center gap-1 justify-end">

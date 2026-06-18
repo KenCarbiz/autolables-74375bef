@@ -3,7 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useTenant } from "@/contexts/TenantContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
-import { RefreshCw, Loader2, Database, ShieldCheck, Lock } from "lucide-react";
+import { RefreshCw, Loader2, Database, Lock } from "lucide-react";
 import CronStatusBadge from "@/components/admin/CronStatusBadge";
 
 // MarketcheckSyncCard — per-tenant nightly inventory sync control.
@@ -60,13 +60,6 @@ export default function MarketcheckSyncCard() {
 
   const set = (patch: Partial<Config>) => setCfg((c) => (c ? { ...c, ...patch } : c));
 
-  const toggleAllowed = async (allowed: boolean) => {
-    const { error } = await (supabase as any).rpc("set_marketcheck_allowed", { _tenant_id: tenantId, _allowed: allowed });
-    if (error) { toast.error(error.message); return; }
-    set({ allowed });
-    toast.success(allowed ? "MarketCheck enabled for this dealer" : "MarketCheck access revoked");
-  };
-
   const save = async () => {
     setSaving(true);
     const { error } = await (supabase as any).rpc("save_marketcheck_config", {
@@ -107,24 +100,15 @@ export default function MarketcheckSyncCard() {
         verifies against.
       </p>
 
-      {/* Super-admin capability grant + cron health */}
-      {isAdmin && (
-        <>
-          <CronStatusBadge jobName="marketcheck-sync" label="MarketCheck" />
-          <label className="flex items-center justify-between rounded-xl border border-amber-200 bg-amber-50/60 px-4 py-3">
-            <span className="flex items-center gap-2 text-sm font-semibold text-amber-900">
-              <ShieldCheck className="w-4 h-4" /> Allow this dealer to use MarketCheck (super admin)
-            </span>
-            <input type="checkbox" checked={cfg.allowed} onChange={(e) => toggleAllowed(e.target.checked)}
-              className="h-5 w-5 rounded border-border" />
-          </label>
-        </>
-      )}
+      {/* Cron health (admins). The capability GRANT lives on the platform
+          Tenants grid — a super admin can't reach another dealer's Admin
+          context here, so granting is done from Platform → Tenants. */}
+      {isAdmin && <CronStatusBadge jobName="marketcheck-sync" label="MarketCheck" />}
 
       {!cfg.allowed ? (
         <div className="flex items-center gap-2 rounded-xl border border-border bg-muted/40 px-4 py-3 text-sm text-muted-foreground">
           <Lock className="w-4 h-4" />
-          MarketCheck access has not been granted for this dealership{isAdmin ? " — toggle it on above." : " yet."}
+          MarketCheck access has not been granted by your platform administrator yet.
         </div>
       ) : (
         <div className="space-y-4">
