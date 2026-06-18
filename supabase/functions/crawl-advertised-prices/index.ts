@@ -504,11 +504,11 @@ serve(async (req) => {
       }
       // Skip a no-op write only when nothing changed AND we have no fresh
       // evidence screenshot to record (a render always logs its screenshot).
-      if (Math.abs(newPrice - row.advertised_price) < 1 && !screenshotPath) {
+      if (Math.abs(newPrice - row.advertised_price) < 1 && !screenshot) {
         unchanged++;
         continue;
       }
-      const insRow = {
+      const insRow: Record<string, unknown> = {
         tenant_id: row.tenant_id,
         store_id: row.store_id || "",
         vin: row.vin,
@@ -516,13 +516,16 @@ serve(async (req) => {
         source_channel: row.source_label,
         advertised_price: newPrice,
         captured_by: renderSource ? "crawler_rendered" : "crawler",
-        screenshot_url: screenshotPath,
+        screenshot_url: screenshot?.path ?? null,
+        screenshot_sha256: screenshot?.sha256 ?? null,
+        screenshot_bucket: screenshot?.bucket ?? PRICE_EVIDENCE_BUCKET,
         notes: `${renderSource ? "Rendered" : "Nightly"} crawl (${result.source}) · previous $${row.advertised_price.toLocaleString()} → $${newPrice.toLocaleString()}`,
       };
       let insErr = (await admin.from("advertised_prices").insert(insRow)).error;
-      // Resilient to a not-yet-applied screenshot_url column.
-      if (insErr && /screenshot_url/i.test(insErr.message || "")) {
-        const { screenshot_url, ...rest } = insRow;
+      // Resilient to a not-yet-applied screenshot_url / sha256 / bucket column.
+      if (insErr && /screenshot_(url|sha256|bucket)/i.test(insErr.message || "")) {
+        const { screenshot_url, screenshot_sha256, screenshot_bucket, ...rest } = insRow;
+        void screenshot_url; void screenshot_sha256; void screenshot_bucket;
         insErr = (await admin.from("advertised_prices").insert(rest)).error;
       }
       if (insErr) {
