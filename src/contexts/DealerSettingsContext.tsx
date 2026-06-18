@@ -106,6 +106,15 @@ export interface DealerSettings {
   autotrader_url: string;
   capital_one_url: string;
   carfax_url: string;
+  // Per-dealer VDP advertised-price extraction. Dealers label their selling
+  // price differently (Harte Infiniti = "Harte Deal", others = "Internet
+  // Price" / "ePrice" / "Your Price" / "Selling Price"), so the scraper
+  // takes a comma-separated, priority-ordered list of label strings to
+  // search for next to a dollar amount on the VDP. The strip toggle removes
+  // ?type=finance / ?type=lease style params before fetching so the page
+  // shows the standard advertised price, not the incentive-conditional one.
+  vdp_price_labels: string;
+  vdp_strip_finance_params: boolean;
   // Marketing assets shown to shoppers (packet / stickers / portal).
   why_buy_here: string;            // dealership value prop / why buy here
   warranty_programs: string;       // warranty programs offered (free text)
