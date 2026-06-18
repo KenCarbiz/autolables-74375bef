@@ -117,17 +117,38 @@ const norm = (raw: unknown): number | null => {
 const sane = (n: number | null): n is number => n != null && n >= 1000 && n <= 500000;
 
 const REJECT_PRICE_TYPES = ["msrp", "listprice", "invoiceprice", "strikethroughprice", "regularprice"];
+const MSRP_PRICE_TYPES = ["msrp", "listprice", "regularprice", "strikethroughprice"];
 // deno-lint-ignore no-explicit-any
 const priceTypeOf = (o: any): string =>
   String(o?.priceType || o?.priceSpecification?.priceType || "")
     .toLowerCase().replace(/.*\//, "").replace(/[^a-z]/g, "");
 
+interface PriceCandidate { value: number; label: string; source: string; }
 interface AdResult {
   price: number | null;
   source: "jsonld" | "og_meta" | "dom_label" | "none";
   gated: boolean;
   reason: string | null;
+  msrp: number | null;
+  candidates: PriceCandidate[];
 }
+
+// Normalize a dealer VDP URL before fetching: strip view-mode params that
+// flip the page to incentive-conditional pricing (?type=finance / ?type=lease
+// / ?paymentType=... etc.) so we always read the standard advertised price.
+const VIEW_PARAMS = new Set([
+  "type", "viewtype", "view", "paymenttype", "payment", "pricingmode", "pricetype",
+  "tab", "mode", "incentive", "incentives", "lease", "finance",
+]);
+const normalizeVdpUrl = (raw: string): string => {
+  try {
+    const u = new URL(raw);
+    const drop: string[] = [];
+    u.searchParams.forEach((_v, k) => { if (VIEW_PARAMS.has(k.toLowerCase())) drop.push(k); });
+    drop.forEach((k) => u.searchParams.delete(k));
+    return u.toString();
+  } catch { return raw; }
+};
 
 // Structured, VIN-gated, priceType-aware price extractor. Replaces the old
 // "largest dollar on the page" heuristic, which grabbed the MSRP off a price
@@ -136,12 +157,15 @@ interface AdResult {
 const extractAdvertised = (html: string, url: string, targetVin: string): AdResult => {
   const target = normVin(targetVin);
   const pageVins = collectVins(html, url);
+  const candidates: PriceCandidate[] = [];
+  let msrp: number | null = null;
   if (target && pageVins.size > 0 && !pageVins.has(target)) {
-    return { price: null, source: "none", gated: false, reason: "vin_mismatch" };
+    return { price: null, source: "none", gated: false, reason: "vin_mismatch", msrp: null, candidates };
   }
 
   // Tier A: schema.org JSON-LD — VIN-gated, priceType-aware.
   const ldMatches = html.match(/<script[^>]+application\/ld\+json[^>]*>([\s\S]*?)<\/script>/gi) || [];
+  let jsonldPrice: number | null = null;
   for (const block of ldMatches) {
     const inner = block.replace(/<script[^>]*>/i, "").replace(/<\/script>/i, "").trim();
     // deno-lint-ignore no-explicit-any
@@ -165,16 +189,32 @@ const extractAdvertised = (html: string, url: string, targetVin: string): AdResu
       for (const o of list) {
         const cur = String(o?.priceCurrency || "USD").toUpperCase();
         if (cur && cur !== "USD") continue;
+        const pt = priceTypeOf(o);
         if (o?.["@type"] === "AggregateOffer" || o?.lowPrice != null) {
           const lp = norm(o?.lowPrice);
-          if (sane(lp)) return { price: lp, source: "jsonld", gated: false, reason: null };
+          if (sane(lp)) { candidates.push({ value: lp, label: "AggregateOffer.lowPrice", source: "jsonld" }); if (jsonldPrice == null) jsonldPrice = lp; }
+          const hp = norm(o?.highPrice);
+          if (sane(hp) && msrp == null) msrp = hp;
           continue;
         }
-        if (REJECT_PRICE_TYPES.includes(priceTypeOf(o))) continue;
         const p = norm(o?.price);
-        if (sane(p)) return { price: p, source: "jsonld", gated: false, reason: null };
+        if (MSRP_PRICE_TYPES.includes(pt)) {
+          if (sane(p) && msrp == null) msrp = p;
+          continue;
+        }
+        if (REJECT_PRICE_TYPES.includes(pt)) continue;
+        if (sane(p)) {
+          candidates.push({ value: p, label: `Offer.price${pt ? ` [${pt}]` : ""}`, source: "jsonld" });
+          if (jsonldPrice == null) jsonldPrice = p;
+        }
       }
     }
+  }
+  if (jsonldPrice != null) {
+    if (msrp != null && jsonldPrice < msrp * 0.3) {
+      return { price: null, source: "none", gated: false, reason: "implausible_vs_msrp", msrp, candidates };
+    }
+    return { price: jsonldPrice, source: "jsonld", gated: false, reason: null, msrp, candidates };
   }
 
   // Tier B: og:price / product:price meta (USD only).
@@ -182,7 +222,13 @@ const extractAdvertised = (html: string, url: string, targetVin: string): AdResu
   if (!curMeta || curMeta[1].toUpperCase() === "USD") {
     const meta = html.match(/<meta[^>]+(?:og:price:amount|product:price:amount)[^>]+content=["']([^"']+)["']/i);
     const v = meta ? norm(meta[1]) : null;
-    if (sane(v)) return { price: v, source: "og_meta", gated: false, reason: null };
+    if (sane(v)) {
+      candidates.push({ value: v, label: "og:price:amount", source: "og_meta" });
+      if (msrp != null && v < msrp * 0.3) {
+        return { price: null, source: "none", gated: false, reason: "implausible_vs_msrp", msrp, candidates };
+      }
+      return { price: v, source: "og_meta", gated: false, reason: null, msrp, candidates };
+    }
   }
 
   // Tier C: labeled DOM price — the price-stack final line, by LABEL not size.
@@ -190,7 +236,9 @@ const extractAdvertised = (html: string, url: string, targetVin: string): AdResu
   const GATE = ["call for price", "please call", "contact us for price", "unlock price", "click for price", "sign in to see price"];
   const MONTHLY = ["/mo", "per month", "mo.", "lease", " apr", "due at signing", "est. payment", "for 24", "for 36", "for 48", "for 60", "for 72", "for 84"];
   const GOOD = ["internet price", "sale price", "final price", "your price", "e-price", "eprice", "selling price", "special price"];
-  const BAD = ["msrp", "retail", " was ", "original", "list price", "sticker", "as built"];
+  const BAD = ["msrp", "retail", " was ", "original", "list price", "sticker", "as built",
+               "down payment", "down ", "savings", "save $", "you save", "off msrp", "rebate",
+               "discount", "incentive", "trade-in", "cash back", " bonus", "due at", "deposit"];
   const moneyRe = /([a-z .,'-]{0,40})\$\s?(\d{1,3}(?:,\d{3})+|\d{4,6})(?:\.\d{2})?/g;
   let best: number | null = null;
   let bestScore = -1;
@@ -200,17 +248,31 @@ const extractAdvertised = (html: string, url: string, targetVin: string): AdResu
     const ctx = mm[1];
     const val = norm(mm[2]);
     if (!sane(val)) continue;
-    if (BAD.some((b) => ctx.includes(b))) continue;
+    if (BAD.some((b) => ctx.includes(b))) {
+      if (msrp == null && (ctx.includes("msrp") || ctx.includes("list price") || ctx.includes("sticker"))) msrp = val;
+      continue;
+    }
     if (MONTHLY.some((b) => ctx.includes(b))) continue;
     const idx = GOOD.findIndex((g) => ctx.includes(g));
     const s = idx === -1 ? 0 : 10 - idx;
+    candidates.push({ value: val, label: ctx.trim() || "(unlabeled)", source: "dom_label" });
     if (s > bestScore || (s === bestScore && best != null && val < best)) { best = val; bestScore = s; }
   }
-  if (best != null) return { price: best, source: "dom_label", gated: false, reason: null };
+  if (best != null) {
+    if (msrp != null && best < msrp * 0.3) {
+      return { price: null, source: "none", gated: false, reason: "implausible_vs_msrp", msrp, candidates };
+    }
+    // If we only matched an unlabeled price (score 0) without an MSRP anchor
+    // to sanity-check against, that's not safe enough — flag for manual entry.
+    if (bestScore === 0 && msrp == null) {
+      return { price: null, source: "none", gated: false, reason: "unlabeled_price_only", msrp, candidates };
+    }
+    return { price: best, source: "dom_label", gated: false, reason: null, msrp, candidates };
+  }
 
   // Tier D: gate / give up — never guess MSRP.
-  if (GATE.some((g) => text.includes(g))) return { price: null, source: "none", gated: true, reason: "price_gated" };
-  return { price: null, source: "none", gated: false, reason: "no_price_extracted" };
+  if (GATE.some((g) => text.includes(g))) return { price: null, source: "none", gated: true, reason: "price_gated", msrp, candidates };
+  return { price: null, source: "none", gated: false, reason: "no_price_extracted", msrp, candidates };
 };
 
 // Browser-like UA shared by the seeded crawl and discovery fetches.
