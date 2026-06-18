@@ -222,7 +222,7 @@ const FETCH_HEADERS = { "User-Agent": UA, "Accept": "text/html,application/xhtml
 // When the cheap path fails, escalate to Firecrawl: it returns rendered HTML,
 // a full-page screenshot (our FTC evidence image), and an LLM-extracted
 // {price, vin} we accept only when the VIN matches.
-const FIRECRAWL_KEY = Deno.env.get("FIRECRAWL_API_KEY") || "";
+const FIRECRAWL_KEY = Deno.env.get("FIRECRAWL_API_KEY_1") || Deno.env.get("FIRECRAWL_API_KEY") || "";
 const FIRECRAWL_ENDPOINT = "https://api.firecrawl.dev/v1/scrape";
 
 interface RenderResult { html: string; screenshotUrl: string | null; jsonPrice: number | null; jsonVin: string | null; }

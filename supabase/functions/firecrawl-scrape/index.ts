@@ -7,8 +7,9 @@
 //   POST /functions/v1/firecrawl-scrape   { url }
 //   Returns: { html } on success, { error } otherwise.
 //
-// Requires the FIRECRAWL_API_KEY secret. Returns { error:"not_configured" }
-// (HTTP 200) when unset so the client falls back gracefully.
+// Requires the FIRECRAWL_API_KEY_1 (or legacy FIRECRAWL_API_KEY) secret.
+// Returns { error:"not_configured" } (HTTP 200) when unset so the client
+// falls back gracefully.
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -38,7 +39,7 @@ Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
   if (req.method !== "POST") return json(405, { error: "method_not_allowed" });
 
-  const apiKey = Deno.env.get("FIRECRAWL_API_KEY");
+  const apiKey = Deno.env.get("FIRECRAWL_API_KEY_1") || Deno.env.get("FIRECRAWL_API_KEY");
   if (!apiKey) return json(200, { error: "not_configured" });
 
   try {
