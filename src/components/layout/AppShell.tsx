@@ -47,6 +47,7 @@ import { QRCodeSVG } from "qrcode.react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useTenant } from "@/contexts/TenantContext";
 import { useDealerSettings } from "@/contexts/DealerSettingsContext";
+import { useEntitlements } from "@/hooks/useEntitlements";
 import { useAudit } from "@/contexts/AuditContext";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -73,6 +74,10 @@ interface NavItem {
   icon: typeof LayoutDashboard;
   badge?: string | number;
   featureKey?: string;
+  // Visibility predicates (fail-open). requireManager = dealership
+  // owner/admin/manager; requireAdmin = platform super-admin.
+  requireManager?: boolean;
+  requireAdmin?: boolean;
 }
 
 interface NavSection {
@@ -85,6 +90,11 @@ const AppShell = ({ children }: AppShellProps) => {
   const { user, isAdmin, signOut } = useAuth();
   const { tenant, currentStore, stores, setCurrentStore } = useTenant();
   const { settings } = useDealerSettings();
+  const { member } = useEntitlements();
+  // Dealership role gate. Unknown/missing role fails open to manager so a
+  // slow membership read never hides a manager's nav.
+  const role = member?.role;
+  const isManager = isAdmin || !role || role === "owner" || role === "admin" || role === "manager";
   const { entries } = useAudit();
   const location = useLocation();
   const navigate = useViewTransitionNavigate();
@@ -140,43 +150,26 @@ const AppShell = ({ children }: AppShellProps) => {
   });
 
   const sections: Record<string, NavSection> = {
-    documents: {
-      title: "DOCUMENTS",
+    main: {
+      title: "",
       defaultOpen: true,
       items: [
-        { label: "Dashboard", path: "/dashboard", icon: LayoutDashboard },
+        { label: "Home", path: "/dashboard", icon: LayoutDashboard },
+        { label: "Vehicles", path: "/inventory", icon: Car },
+        { label: "Deals", path: "/saved", icon: FolderOpen },
+      ],
+    },
+    create: {
+      title: "CREATE",
+      defaultOpen: true,
+      items: [
         { label: "New Addendum", path: "/addendum", icon: FileText },
         { label: "New Car Sticker", path: "/new-car-sticker", icon: FileText },
         { label: "Used Car Sticker", path: "/used-car-sticker", icon: Car },
-        { label: "Buyers Guide", path: "/buyers-guide", icon: ScrollText, featureKey: "feature_buyers_guide" },
         { label: "CPO Info Sheet", path: "/cpo-sheet", icon: Award },
         { label: "Trade-Up Sticker", path: "/trade-up", icon: TrendingUp },
+        { label: "Buyers Guide", path: "/buyers-guide", icon: ScrollText, featureKey: "feature_buyers_guide" },
         { label: "Description Writer", path: "/description-writer", icon: Sparkles },
-      ],
-    },
-    inventory: {
-      title: "INVENTORY",
-      defaultOpen: true,
-      items: [
-        { label: "All Vehicles", path: "/inventory", icon: Car },
-        { label: "Saved Addendums", path: "/saved", icon: FolderOpen },
-        { label: "Waiting for Signatures", path: "/signatures", icon: PenLine },
-        { label: "Signed", path: "/signed", icon: CheckCircle2 },
-        { label: "Delivered", path: "/delivered", icon: Truck },
-        { label: "Get-Ready", path: "/admin?tab=getready", icon: Clock },
-        { label: "Vehicle Files", path: "/admin?tab=files", icon: FolderOpen },
-        { label: "Lot Queue", path: "/queue", icon: ScanLine },
-      ],
-    },
-    admin: {
-      title: "ADMINISTRATION",
-      defaultOpen: false,
-      items: [
-        { label: "Admin Home", path: "/admin?tab=home", icon: LayoutDashboard },
-        { label: "Products", path: "/admin?tab=products", icon: Package },
-        { label: "Product Rules", path: "/admin?tab=rules", icon: Wrench, featureKey: "feature_product_rules" },
-        { label: "Branding", path: "/admin?tab=branding", icon: Palette },
-        { label: "Feature Toggles", path: "/admin?tab=settings", icon: ToggleLeft },
       ],
     },
     compliance: {
@@ -184,27 +177,45 @@ const AppShell = ({ children }: AppShellProps) => {
       defaultOpen: false,
       items: [
         { label: "Compliance Guide", path: "/compliance", icon: BookOpen },
+        { label: "Vehicle Files", path: "/admin?tab=files", icon: FolderOpen },
         { label: "Audit Log", path: "/admin?tab=audit", icon: ShieldCheck },
-        { label: "Analytics", path: "/admin?tab=analytics", icon: BarChart3, featureKey: "feature_analytics" },
-        { label: "Leads", path: "/admin?tab=leads", icon: Users, featureKey: "feature_lead_capture" },
+      ],
+    },
+    settings: {
+      title: "SETTINGS",
+      defaultOpen: false,
+      items: [
+        { label: "Admin Home", path: "/admin?tab=home", icon: LayoutDashboard, requireManager: true },
+        { label: "Products", path: "/admin?tab=products", icon: Package, requireManager: true },
+        { label: "Product Rules", path: "/admin?tab=rules", icon: Wrench, featureKey: "feature_product_rules", requireManager: true },
+        { label: "Branding & Setup", path: "/admin?tab=branding", icon: Palette, requireManager: true },
+        { label: "Reports", path: "/admin?tab=analytics", icon: BarChart3, featureKey: "feature_analytics", requireManager: true },
+        { label: "Leads", path: "/admin?tab=leads", icon: Users, featureKey: "feature_lead_capture", requireManager: true },
+        { label: "Feature Toggles", path: "/admin?tab=settings", icon: ToggleLeft, requireManager: true },
       ],
     },
     platform: {
       title: "PLATFORM",
       defaultOpen: false,
-      items: isAdmin ? [
-        { label: "Tenants",            path: "/platform-admin?tab=tenants",      icon: Store },
-        { label: "Members",            path: "/platform-admin?tab=members",      icon: Users },
-        { label: "Entitlements",       path: "/platform-admin?tab=entitlements", icon: Award },
-        { label: "Platform Audit",     path: "/platform-admin?tab=audit",        icon: ShieldCheck },
-        { label: "Recall Refresh",     path: "/platform-admin?tab=recalls",      icon: RefreshCw },
-        { label: "Billing Handshake",  path: "/platform-admin?tab=billing",      icon: CreditCard },
-      ] : [],
+      items: [
+        { label: "Tenants",            path: "/platform-admin?tab=tenants",      icon: Store,       requireAdmin: true },
+        { label: "Members",            path: "/platform-admin?tab=members",      icon: Users,       requireAdmin: true },
+        { label: "Entitlements",       path: "/platform-admin?tab=entitlements", icon: Award,       requireAdmin: true },
+        { label: "Platform Audit",     path: "/platform-admin?tab=audit",        icon: ShieldCheck, requireAdmin: true },
+        { label: "Recall Refresh",     path: "/platform-admin?tab=recalls",      icon: RefreshCw,   requireAdmin: true },
+        { label: "Billing Handshake",  path: "/platform-admin?tab=billing",      icon: CreditCard,  requireAdmin: true },
+      ],
     },
   };
 
+  // Compose feature-flag + role gating. Fail-open: only hide when we
+  // positively know the user lacks the role.
   const filterItems = (items: NavItem[]) =>
-    items.filter(i => !i.featureKey || (settings as unknown as Record<string, unknown>)[i.featureKey]);
+    items.filter(i =>
+      (!i.featureKey || (settings as unknown as Record<string, unknown>)[i.featureKey]) &&
+      (!i.requireManager || isManager) &&
+      (!i.requireAdmin || isAdmin)
+    );
 
   const handleSignOut = async () => {
     await signOut();
@@ -256,14 +267,14 @@ const AppShell = ({ children }: AppShellProps) => {
     const crumbs: { label: string; path?: string }[] = [{ label: "Dashboard", path: "/dashboard" }];
 
     if (pathname === "/dashboard") return crumbs;
-    if (pathname === "/addendum") { crumbs.push({ label: "Documents" }); crumbs.push({ label: "New Addendum" }); return crumbs; }
-    if (pathname === "/saved") { crumbs.push({ label: "Inventory" }); crumbs.push({ label: "Saved Addendums" }); return crumbs; }
-    if (pathname === "/buyers-guide") { crumbs.push({ label: "Documents" }); crumbs.push({ label: "Buyers Guide" }); return crumbs; }
-    if (pathname === "/used-car-sticker") { crumbs.push({ label: "Documents" }); crumbs.push({ label: "Used Car Sticker" }); return crumbs; }
-    if (pathname === "/cpo-sheet") { crumbs.push({ label: "Documents" }); crumbs.push({ label: "CPO Info Sheet" }); return crumbs; }
-    if (pathname === "/trade-up") { crumbs.push({ label: "Documents" }); crumbs.push({ label: "Trade-Up Sticker" }); return crumbs; }
-    if (pathname === "/new-car-sticker") { crumbs.push({ label: "Documents" }); crumbs.push({ label: "New Car Sticker" }); return crumbs; }
-    if (pathname === "/description-writer") { crumbs.push({ label: "Documents" }); crumbs.push({ label: "Description Writer" }); return crumbs; }
+    if (pathname === "/addendum") { crumbs.push({ label: "Create" }); crumbs.push({ label: "New Addendum" }); return crumbs; }
+    if (pathname === "/saved") { crumbs.push({ label: "Deals" }); crumbs.push({ label: "Drafts" }); return crumbs; }
+    if (pathname === "/buyers-guide") { crumbs.push({ label: "Create" }); crumbs.push({ label: "Buyers Guide" }); return crumbs; }
+    if (pathname === "/used-car-sticker") { crumbs.push({ label: "Create" }); crumbs.push({ label: "Used Car Sticker" }); return crumbs; }
+    if (pathname === "/cpo-sheet") { crumbs.push({ label: "Create" }); crumbs.push({ label: "CPO Info Sheet" }); return crumbs; }
+    if (pathname === "/trade-up") { crumbs.push({ label: "Create" }); crumbs.push({ label: "Trade-Up Sticker" }); return crumbs; }
+    if (pathname === "/new-car-sticker") { crumbs.push({ label: "Create" }); crumbs.push({ label: "New Car Sticker" }); return crumbs; }
+    if (pathname === "/description-writer") { crumbs.push({ label: "Create" }); crumbs.push({ label: "Description Writer" }); return crumbs; }
     if (pathname === "/compliance") { crumbs.push({ label: "Compliance" }); crumbs.push({ label: "Compliance Guide" }); return crumbs; }
     if (pathname === "/admin") {
       const tab = new URLSearchParams(search).get("tab") || "home";
@@ -434,23 +445,25 @@ const AppShell = ({ children }: AppShellProps) => {
             const isOpen = openSections[key] !== false;
             return (
               <div key={key}>
-                {/* Section header — hidden when the rail is
-                    collapsed on desktop; on mobile the rail is
-                    full-width so the header stays. */}
-                <button
-                  onClick={() => toggleSection(key)}
-                  className={`w-full flex items-center justify-between px-2 mb-1.5 group ${collapsed ? "lg:hidden" : ""}`}
-                >
-                  <span className="text-[10px] font-bold text-sidebar-foreground/70 uppercase tracking-[0.18em]">
-                    {section.title}
-                  </span>
-                  {isOpen ? (
-                    <ChevronDown className="w-3 h-3 text-sidebar-foreground/40" />
-                  ) : (
-                    <ChevronRight className="w-3 h-3 text-sidebar-foreground/40" />
-                  )}
-                </button>
-                {(isOpen || collapsed) && (
+                {/* Section header — hidden when the rail is collapsed on
+                    desktop, and omitted entirely for the headerless "main"
+                    group (Home/Vehicles/Deals are top-level, no label). */}
+                {section.title && (
+                  <button
+                    onClick={() => toggleSection(key)}
+                    className={`w-full flex items-center justify-between px-2 mb-1.5 group ${collapsed ? "lg:hidden" : ""}`}
+                  >
+                    <span className="text-[10px] font-bold text-sidebar-foreground/70 uppercase tracking-[0.18em]">
+                      {section.title}
+                    </span>
+                    {isOpen ? (
+                      <ChevronDown className="w-3 h-3 text-sidebar-foreground/40" />
+                    ) : (
+                      <ChevronRight className="w-3 h-3 text-sidebar-foreground/40" />
+                    )}
+                  </button>
+                )}
+                {(isOpen || collapsed || !section.title) && (
                   <div className="space-y-0.5">
                     {visibleItems.map(item => {
                       const Icon = item.icon;
@@ -490,21 +503,6 @@ const AppShell = ({ children }: AppShellProps) => {
             collapse/expand pin. The collapse toggle is desktop-
             only (lg:); mobile uses the slide-in close button. */}
         <div className={`border-t border-sidebar-border space-y-1 flex-shrink-0 ${collapsed ? "lg:px-2 p-3" : "p-3"}`}>
-          <button
-            className={`w-full flex items-center rounded-md text-sm text-sidebar-foreground/80 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground transition-colors ${collapsed ? "lg:justify-center lg:px-2 lg:py-2 gap-2.5 px-2.5 py-2" : "gap-2.5 px-2.5 py-2"}`}
-            title={collapsed ? "Platform Updates" : undefined}
-          >
-            <Rocket className="w-4 h-4 flex-shrink-0" />
-            <span className={`flex-1 text-left ${collapsed ? "lg:hidden" : ""}`}>Platform Updates</span>
-          </button>
-          <button
-            className={`w-full flex items-center rounded-md text-sm text-amber-500 hover:bg-amber-500/10 transition-colors ${collapsed ? "lg:justify-center lg:px-2 lg:py-2 gap-2.5 px-2.5 py-2" : "gap-2.5 px-2.5 py-2"}`}
-            title={collapsed ? "Command Center" : undefined}
-          >
-            <Tag className="w-4 h-4 flex-shrink-0" />
-            <span className={`flex-1 text-left font-medium ${collapsed ? "lg:hidden" : ""}`}>Command Center</span>
-          </button>
-
           {/* Collapse / expand pin (desktop only) */}
           <button
             onClick={toggleCollapsed}

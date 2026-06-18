@@ -186,19 +186,19 @@ const CommandPalette = ({ open, onOpenChange }: CommandPaletteProps) => {
           <>
             <CommandSeparator />
             <CommandGroup heading="Platform">
-              <CommandItem onSelect={() => go("/admin?tab=platform-tenants")}>
+              <CommandItem onSelect={() => go("/platform-admin?tab=tenants")}>
                 <Store className="w-4 h-4 mr-2" />
                 Tenants
               </CommandItem>
-              <CommandItem onSelect={() => go("/admin?tab=platform-members")}>
+              <CommandItem onSelect={() => go("/platform-admin?tab=members")}>
                 <Users className="w-4 h-4 mr-2" />
                 Members
               </CommandItem>
-              <CommandItem onSelect={() => go("/admin?tab=platform-entitlements")}>
+              <CommandItem onSelect={() => go("/platform-admin?tab=entitlements")}>
                 <Award className="w-4 h-4 mr-2" />
                 Entitlements
               </CommandItem>
-              <CommandItem onSelect={() => go("/admin?tab=platform-audit")}>
+              <CommandItem onSelect={() => go("/platform-admin?tab=audit")}>
                 <ShieldCheck className="w-4 h-4 mr-2" />
                 Platform Audit
               </CommandItem>
