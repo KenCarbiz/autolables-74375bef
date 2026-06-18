@@ -323,6 +323,46 @@ const Admin = () => {
   });
   const [logoUploading, setLogoUploading] = useState(false);
 
+  // VDP price-extraction "Test" — runs the scraper against a sample URL
+  // and returns which configured label matched (or why it didn't), so the
+  // dealer can confirm their wording before relying on it for live addendums.
+  const [priceTestUrl, setPriceTestUrl] = useState("");
+  const [priceTestRunning, setPriceTestRunning] = useState(false);
+  const [priceTestResult, setPriceTestResult] = useState<null | {
+    error?: string;
+    price?: number | null;
+    matched_label?: string | null;
+    source?: string | null;
+    reason?: string | null;
+    rendered?: boolean;
+    msrp?: number | null;
+    candidates?: { value: number; label: string; source: string }[];
+  }>(null);
+  const handleTestPriceScrape = async () => {
+    if (!priceTestUrl || !tenant?.id) return;
+    setPriceTestRunning(true);
+    setPriceTestResult(null);
+    try {
+      // Save the current label config first so the test reflects what's typed.
+      await updateSettings({
+        vdp_price_labels: branding.vdp_price_labels,
+        vdp_strip_finance_params: branding.vdp_strip_finance_params,
+      });
+      const { data, error } = await supabase.functions.invoke("crawl-advertised-prices", {
+        body: { tenant_id: tenant.id, test_url: priceTestUrl },
+      });
+      if (error) {
+        setPriceTestResult({ error: error.message });
+      } else {
+        setPriceTestResult(data?.test || data || { error: "No result" });
+      }
+    } catch (e) {
+      setPriceTestResult({ error: e instanceof Error ? e.message : String(e) });
+    } finally {
+      setPriceTestRunning(false);
+    }
+  };
+
   const [isTenantManager, setIsTenantManager] = useState<boolean | null>(null);
   useEffect(() => {
     let cancelled = false;
