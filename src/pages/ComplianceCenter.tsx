@@ -191,6 +191,15 @@ const CompliancePacketPanel = ({
         generatedBy: user?.email || null,
       });
       setChainRoot(built.manifest.chain_root);
+      // Persist a tamper-evident receipt that this chain root existed at this
+      // time, so the packet is re-verifiable later: regenerate, compare roots.
+      // Best-effort + tolerant of a not-yet-applied table.
+      (supabase as any).rpc("record_evidence_receipt", {
+        _vin: built.manifest.vin,
+        _chain_root: built.manifest.chain_root,
+        _manifest: built.manifest.sections,
+        _packet_version: (built.manifest as { packet_version?: string }).packet_version || "1",
+      }).then(() => {}, () => { /* receipts table may still be propagating */ });
       downloadPacketHtml(built);
       toast.success("Audit-defense packet downloaded");
     } catch (err) {

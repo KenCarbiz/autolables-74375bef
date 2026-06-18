@@ -128,7 +128,7 @@ describe("buildAuditPacket — tamper detection", () => {
 });
 
 describe("buildAuditPacket — manifest shape", () => {
-  it("lists all 9 sections in the stable canonical order", async () => {
+  it("lists every section in the stable canonical order", async () => {
     const sb = makeSupabase({});
     const p = await buildAuditPacket({ supabase: sb, vin: "X", tenantId: null, tenantName: null });
     expect(p.manifest.sections.map(s => s.name)).toEqual([
@@ -144,6 +144,7 @@ describe("buildAuditPacket — manifest shape", () => {
       "10-get-ready",
       "11-advertised-prices",
       "12-addon-elections",
+      "13-install-proofs",
     ]);
   });
 

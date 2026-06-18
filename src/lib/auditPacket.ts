@@ -116,6 +116,7 @@ export async function buildAuditPacket(args: BuildArgs): Promise<AuditPacket> {
     // Wave 22 — three new dimensions in the packet:
     getReady,           // installer photos + signatures (Wave 17)
     advertisedPrices,   // full history of advertised snapshots (Wave 20)
+    installProofs,      // verified installer sign-offs (signature + photo)
   ] = await Promise.all([
     supabase.from("vehicle_listings").select("*").eq("vin", cleanVin).order("created_at", { ascending: false }).limit(20),
     supabase.from("vehicle_files").select("*").eq("vin", cleanVin).limit(5),
@@ -127,6 +128,7 @@ export async function buildAuditPacket(args: BuildArgs): Promise<AuditPacket> {
     supabase.from("signed_document_archive").select("*").eq("vin", cleanVin).order("created_at", { ascending: false }).limit(50),
     supabase.from("get_ready_records").select("*").eq("vin", cleanVin).order("updated_at", { ascending: false }).limit(5),
     supabase.from("advertised_prices").select("*").eq("vin", cleanVin).order("captured_at", { ascending: false }).limit(100),
+    supabase.from("install_proofs").select("*").eq("vehicle_vin", cleanVin).order("created_at", { ascending: false }).limit(50),
   ]);
 
   // Live NHTSA recall snapshot — taken at packet time, included
@@ -154,6 +156,7 @@ export async function buildAuditPacket(args: BuildArgs): Promise<AuditPacket> {
   const archiveRows = rows(archive);
   const getReadyRows = rows(getReady);
   const advertisedPriceRows = rows(advertisedPrices) as Array<{ advertised_price?: number; source_label?: string; snapshot_at?: string }>;
+  const installProofRows = rows(installProofs);
 
   // Wave 23 — derived Add-On Election Record. For every addendum, we
   // surface per add-on the proof the customer ELECTED it: the price
@@ -236,6 +239,7 @@ export async function buildAuditPacket(args: BuildArgs): Promise<AuditPacket> {
     { name: "10-get-ready",     data: getReadyRows },
     { name: "11-advertised-prices", data: advertisedPriceRows },
     { name: "12-addon-elections", data: addonElections },
+    { name: "13-install-proofs", data: installProofRows },
   ];
 
   const sections: AuditPacketSection[] = [];
