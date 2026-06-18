@@ -1200,7 +1200,7 @@ const Admin = () => {
             {/* Integrations status */}
             <div className="bg-card rounded-lg p-4 shadow-premium mb-3">
               <h4 className="text-sm font-bold text-foreground mb-2">Integration Status</h4>
-              <p className="text-xs text-muted-foreground mb-3">Connect these services in Supabase &gt; Edge Functions &gt; Secrets to activate.</p>
+              <p className="text-xs text-muted-foreground mb-3">Optional services that power scraping, SMS, and AI. Contact AutoLabels support to turn these on for your store.</p>
               <div className="space-y-2 text-xs">
                 <IntegrationRow label="AI Descriptions (Claude)" secretKey="ANTHROPIC_API_KEY" feature={settings.feature_ai_descriptions} />
                 <IntegrationRow label="Email Distribution" secretKey="RESEND_API_KEY or SENDGRID_API_KEY" feature={settings.feature_sms} />

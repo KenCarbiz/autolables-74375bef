@@ -29,7 +29,7 @@ import {
 
 type StructureType = "single" | "single_secondary" | "multi_location" | "dealer_group" | "enterprise";
 type BdcType = "none" | "single" | "multi_location" | "ai_bdc";
-type PlanTier = "starter" | "standard" | "pro" | "enterprise";
+type PlanTier = "essential" | "unlimited" | "compliance_pro";
 
 interface OnboardingData {
   // Step 1: AI website autofill
@@ -79,7 +79,7 @@ const INITIAL: OnboardingData = {
   usedInventoryUrl: "",
   structure: "single",
   bdcType: "none",
-  planTier: "standard",
+  planTier: "essential",
 };
 
 const Onboarding = () => {
@@ -191,7 +191,7 @@ const Onboarding = () => {
     );
   }
 
-  const TOTAL_STEPS = 5;
+  const TOTAL_STEPS = 4;
 
   const update = <K extends keyof OnboardingData>(key: K, value: OnboardingData[K]) => {
     setData(prev => ({ ...prev, [key]: value }));
@@ -325,7 +325,7 @@ const Onboarding = () => {
             name: data.dealerName || "Your Dealership",
             source: "autolabels",
             app: "autolabels",
-            tier: data.planTier || "sticker",
+            tier: data.planTier || "essential",
           });
           tenantId = result.tenantId || undefined;
         }
@@ -646,15 +646,15 @@ const Onboarding = () => {
                   colSpan={2}
                 />
                 <Field
-                  label="Logo URL"
+                  label="Logo (optional)"
                   value={data.logoUrl}
                   onChange={v => update("logoUrl", v)}
-                  placeholder="https://..."
+                  placeholder="Auto-filled from your website — or upload later in Branding"
                   icon={ImageIcon}
                   colSpan={2}
                 />
                 <Field
-                  label="Primary Color"
+                  label="Brand color (optional)"
                   value={data.primaryColor}
                   onChange={v => update("primaryColor", v)}
                   placeholder="#192f54"
@@ -745,79 +745,34 @@ const Onboarding = () => {
           </Section>
         )}
 
-        {/* Step 4: BDC */}
+        {/* Step 4: Plan */}
         {step === 4 && (
-          <Section title="How does this dealership handle leads?" subtitle="This configures lead routing, notification rules, and follow-up automation." center>
-            <div className="space-y-3 mt-2">
-              <SelectionCard
-                icon={Users2}
-                title="No BDC"
-                subtitle="No dedicated BDC team."
-                selected={data.bdcType === "none"}
-                onClick={() => update("bdcType", "none")}
-              />
-              <SelectionCard
-                icon={Phone}
-                title="Single BDC"
-                subtitle="One centralized team handles all inbound leads across locations."
-                selected={data.bdcType === "single"}
-                onClick={() => update("bdcType", "single")}
-              />
-              <SelectionCard
-                icon={Building2}
-                title="Multi-Location BDC"
-                subtitle="Each location has its own BDC team."
-                selected={data.bdcType === "multi_location"}
-                onClick={() => update("bdcType", "multi_location")}
-              />
-              <SelectionCard
-                icon={Sparkles}
-                title="AI BDC"
-                badge={{ label: "Beta", color: "amber" }}
-                subtitle="AI-powered lead handling with automated follow-ups and intelligent routing."
-                selected={data.bdcType === "ai_bdc"}
-                onClick={() => update("bdcType", "ai_bdc")}
-              />
-            </div>
-          </Section>
-        )}
-
-        {/* Step 5: Plan */}
-        {step === 5 && (
-          <Section icon={Crown} title="Billing & Plan" subtitle="Choose a plan that fits your dealership size.">
+          <Section icon={Crown} title="Billing & Plan" subtitle="Start free for 14 days — no credit card. Cancel anytime.">
             <div className="space-y-3 mt-2">
               <PlanCard
-                tier="starter"
-                name="Starter"
-                price="$495/mo"
-                description="Single store, up to 100 addendums/month."
-                selected={data.planTier === "starter"}
-                onClick={() => update("planTier", "starter")}
+                tier="essential"
+                name="Essential"
+                price="$299/mo"
+                description="Window stickers + addendums, up to 75 VINs/month. Free with any Autocurb.io subscription."
+                selected={data.planTier === "essential"}
+                onClick={() => update("planTier", "essential")}
               />
               <PlanCard
-                tier="standard"
-                name="Standard"
-                price="$1,995/mo"
-                description="1–2 locations. Unlimited addendums, full compliance suite."
+                tier="unlimited"
+                name="Unlimited"
+                price="$499/mo"
+                description="Unlimited VINs, product rules, inventory, leads + analytics, AI descriptions."
                 recommended
-                selected={data.planTier === "standard"}
-                onClick={() => update("planTier", "standard")}
+                selected={data.planTier === "unlimited"}
+                onClick={() => update("planTier", "unlimited")}
               />
               <PlanCard
-                tier="pro"
-                name="Pro"
-                price="$3,495/mo"
-                description="3–10 locations. Multi-store management, analytics, priority support."
-                selected={data.planTier === "pro"}
-                onClick={() => update("planTier", "pro")}
-              />
-              <PlanCard
-                tier="enterprise"
-                name="Enterprise"
-                price="Custom"
-                description="11+ locations. Dedicated account manager, DMS integrations, SLA."
-                selected={data.planTier === "enterprise"}
-                onClick={() => update("planTier", "enterprise")}
+                tier="compliance_pro"
+                name="Compliance Pro"
+                price="$999/mo"
+                description="Everything, plus website price verification, nightly inventory sync, and the per-VIN defense file."
+                selected={data.planTier === "compliance_pro"}
+                onClick={() => update("planTier", "compliance_pro")}
               />
             </div>
           </Section>

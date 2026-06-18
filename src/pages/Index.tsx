@@ -90,32 +90,7 @@ const SaleModeControl = ({
   onChange: (next: SaleMode) => void;
 }) => {
   const [open, setOpen] = useState(false);
-  const [pending, setPending] = useState<SaleMode | null>(null);
   const meta = SALE_MODE_META[mode];
-
-  if (pending) {
-    return (
-      <span className="no-print inline-flex items-center gap-1.5">
-        <span className="text-[8px] text-muted-foreground">
-          Switch to {SALE_MODE_META[pending].label}?
-        </span>
-        <button
-          type="button"
-          onClick={() => { onChange(pending); setPending(null); setOpen(false); }}
-          className="text-[8px] font-bold px-1.5 py-0.5 rounded bg-navy text-white"
-        >
-          Confirm
-        </button>
-        <button
-          type="button"
-          onClick={() => setPending(null)}
-          className="text-[8px] font-bold px-1.5 py-0.5 rounded bg-muted text-muted-foreground"
-        >
-          Cancel
-        </button>
-      </span>
-    );
-  }
 
   return (
     <span className="no-print relative inline-block">
@@ -142,7 +117,7 @@ const SaleModeControl = ({
                 key={opt}
                 type="button"
                 disabled={isCurrent}
-                onClick={() => { setOpen(false); if (!isCurrent) setPending(opt); }}
+                onClick={() => { setOpen(false); if (!isCurrent) onChange(opt); }}
                 className={`w-full flex items-center gap-2 px-2.5 py-1.5 text-left text-[10px] ${isCurrent ? "bg-muted/50 cursor-default" : "hover:bg-muted"}`}
               >
                 <span className={`w-1.5 h-1.5 rounded-full ${om.dot}`} />
