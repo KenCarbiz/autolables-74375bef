@@ -54,7 +54,7 @@ export default function AddendumPriceIntegrity({
   const HeaderIcon = a.status === "ok" ? ShieldCheck : a.status === "untracked" ? AlertTriangle : XCircle;
   const title =
     a.status === "ok" ? "Price integrity verified" :
-    a.status === "no_selling_price" ? "Enter the selling price to verify" :
+    a.status === "no_selling_price" ? "Enter the agreed-upon sale price to verify" :
     a.status === "untracked" ? "Advertised price not on file" :
     "Price integrity: mismatch — fix before signing";
 
@@ -81,14 +81,18 @@ export default function AddendumPriceIntegrity({
       </div>
 
       <div className="p-4 space-y-3">
-        {/* Selling price entry */}
+        {/* Agreed-upon sale price — the linchpin the whole FTC gate reconciles
+            against. Make its importance unmistakable to the finance manager. */}
         <label className="block">
-          <span className="text-[11px] font-bold uppercase tracking-[0.12em] text-muted-foreground">
-            Selling price (before doc fee)
+          <span className="block text-[13px] font-bold uppercase tracking-[0.08em] text-foreground">
+            Agreed-Upon Sale Price
           </span>
-          <div className="mt-1 flex items-center gap-2">
+          <span className="block text-[11px] text-muted-foreground mt-0.5">
+            Enter the exact selling price from the signed purchase order, before the doc fee.
+          </span>
+          <div className="mt-1.5 flex items-center gap-2">
             <div className="relative flex-1">
-              <DollarSign className="w-4 h-4 absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
+              <DollarSign className="w-5 h-5 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
               <input
                 inputMode="decimal"
                 value={sellingPrice == null ? "" : String(sellingPrice)}
@@ -97,7 +101,7 @@ export default function AddendumPriceIntegrity({
                   onSellingPriceChange(v === "" ? null : parseFloat(v));
                 }}
                 placeholder="0"
-                className="w-full h-9 rounded-md border border-border bg-background pl-8 pr-3 text-sm tabular-nums"
+                className="w-full h-12 rounded-lg border-2 border-border bg-background pl-9 pr-3 text-lg font-bold tabular-nums focus:border-primary focus:outline-none"
               />
             </div>
           </div>
@@ -105,7 +109,7 @@ export default function AddendumPriceIntegrity({
 
         {/* The equation */}
         <div className="rounded-md border border-border bg-muted/30 px-3 py-2 text-[12px] space-y-1">
-          <Row label="Selling price" value={money(a.sellingPrice)} />
+          <Row label="Agreed-upon sale price" value={money(a.sellingPrice)} />
           <Row label={docFeeLabel} value={money(a.docFee)} />
           <Row
             label={`Pre-installed items (${a.includedItems.length})`}
