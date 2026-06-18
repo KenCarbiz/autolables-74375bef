@@ -444,7 +444,7 @@ serve(async (req) => {
       // Escalate to Firecrawl when the cheap path is walled or empty — this is
       // what makes JS-rendered dealer sites + marketplaces return a real price,
       // and it's where we capture the FTC evidence screenshot.
-      let screenshotPath: string | null = null;
+      let screenshot: CapturedScreenshot | null = null;
       let renderSource: string | null = null;
       const cheapFailed = result.price == null && result.reason !== "vin_mismatch" && !result.gated;
       if (cheapFailed && renderBudget > 0) {
@@ -463,7 +463,7 @@ serve(async (req) => {
             result = { price: r.jsonPrice, source: "jsonld", gated: false, reason: null };
           }
           if (result.price != null) {
-            screenshotPath = await captureScreenshot(admin, r.screenshotUrl, row.tenant_id, row.vin);
+            screenshot = await captureScreenshot(admin, r.screenshotUrl, row.tenant_id, row.vin);
           }
         }
       }
