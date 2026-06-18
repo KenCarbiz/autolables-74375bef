@@ -2479,10 +2479,9 @@ const Admin = () => {
 
         {tab === "audit" && (
           <div className="space-y-4">
-            {/* Platform-operator tooling (MarketCheck grant state, cron health,
-                cross-VIN price reconciliation) — super-admin only, so a normal
-                dealer manager doesn't see an "access not granted" card. */}
-            {isAdmin && <MarketcheckSyncCard />}
+            {/* MarketCheck card self-hides for dealers without the grant; the
+                cross-VIN price reconciliation overview stays super-admin only. */}
+            <MarketcheckSyncCard />
             {isAdmin && <PriceIntegrityPanel />}
             <div className="flex items-center justify-between flex-wrap gap-2">
               <div>

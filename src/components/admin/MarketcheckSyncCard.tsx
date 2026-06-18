@@ -88,6 +88,10 @@ export default function MarketcheckSyncCard() {
 
   const periodic = cfg.frequency !== "nightly";
 
+  // Hide the whole card from a dealer who hasn't been granted MarketCheck, so
+  // a non-premium manager never sees an "access not granted" panel.
+  if (!cfg.allowed && !isAdmin) return null;
+
   return (
     <div className="rounded-2xl border border-border bg-card p-5 space-y-4">
       <div className="flex items-center gap-2">
@@ -106,10 +110,12 @@ export default function MarketcheckSyncCard() {
       {isAdmin && <CronStatusBadge jobName="marketcheck-sync" label="MarketCheck" />}
 
       {!cfg.allowed ? (
-        <div className="flex items-center gap-2 rounded-xl border border-border bg-muted/40 px-4 py-3 text-sm text-muted-foreground">
-          <Lock className="w-4 h-4" />
-          MarketCheck access has not been granted by your platform administrator yet.
-        </div>
+        isAdmin ? (
+          <div className="flex items-center gap-2 rounded-xl border border-border bg-muted/40 px-4 py-3 text-sm text-muted-foreground">
+            <Lock className="w-4 h-4" />
+            Not granted yet — set this dealer's plan to Compliance Pro in Platform → Tenants.
+          </div>
+        ) : null
       ) : (
         <div className="space-y-4">
           <label className="flex items-center justify-between rounded-xl border border-border px-4 py-3">

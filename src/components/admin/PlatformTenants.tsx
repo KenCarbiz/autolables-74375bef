@@ -30,7 +30,7 @@ const sourceBadge = (source: TenantSummary["source"]) => {
 };
 
 export const PlatformTenants = () => {
-  const { tenants, setTenantActive, createTenant, marketcheck, setTenantTier, entitlements } = useAdminPlatform();
+  const { tenants, setTenantActive, createTenant, marketcheck, setTenantTier, saveMarketcheckConfig, runMarketcheckNow, entitlements } = useAdminPlatform();
   const [q, setQ] = useState("");
   const [filter, setFilter] = useState<"all" | "active" | "inactive">("all");
   const [creating, setCreating] = useState(false);
@@ -194,8 +194,10 @@ export const PlatformTenants = () => {
           onClose={() => setEditing(null)}
           onSaved={() => { setEditing(null); toast.success("Dealership details saved"); }}
           currentTier={(tierByTenant.get(editing.id) as PlanTier | undefined) ?? "essential"}
-          marketcheckOn={!!mcByTenant.get(editing.id)?.enabled}
+          marketcheck={marketcheck.data?.find((m) => m.tenant_id === editing.id) ?? null}
           onSetTier={(tier) => changeTier(editing, tier)}
+          onSaveMarketcheck={(cfg) => saveMarketcheckConfig({ tenantId: editing.id, ...cfg })}
+          onRunMarketcheck={() => runMarketcheckNow(editing.id)}
         />
       )}
 
@@ -569,19 +571,38 @@ const TenantDetailsDrawer = ({
   onSaved,
   currentTier,
   onSetTier,
-  marketcheckOn,
+  marketcheck,
+  onSaveMarketcheck,
+  onRunMarketcheck,
 }: {
   tenant: TenantSummary;
   onClose: () => void;
   onSaved: () => void;
   currentTier: PlanTier;
   onSetTier: (tier: PlanTier) => Promise<void> | void;
-  marketcheckOn?: boolean;
+  marketcheck: import("@/hooks/useAdminPlatform").MarketcheckRow | null;
+  onSaveMarketcheck: (cfg: { enabled: boolean; source: string; maxVehicles: number; frequency: string; dayOfWeek: number; runHour: number }) => Promise<boolean>;
+  onRunMarketcheck: () => Promise<{ ok: boolean; message: string }>;
 }) => {
   const [form, setForm] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [savingTier, setSavingTier] = useState(false);
+  // MarketCheck sync config (cross-tenant, super-admin sets it here).
+  const [mcEnabled, setMcEnabled] = useState(false);
+  const [mcSource, setMcSource] = useState("");
+  const [mcFreq, setMcFreq] = useState("nightly");
+  const [mcHour, setMcHour] = useState(3);
+  const [mcMax, setMcMax] = useState(1000);
+  const [mcSaving, setMcSaving] = useState(false);
+  const [mcRunning, setMcRunning] = useState(false);
+  useEffect(() => {
+    setMcEnabled(!!marketcheck?.enabled);
+    setMcSource(marketcheck?.source || "");
+    setMcFreq(marketcheck?.frequency || "nightly");
+    setMcHour(marketcheck?.run_hour ?? 3);
+    setMcMax(marketcheck?.max_vehicles ?? 1000);
+  }, [marketcheck]);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [mirror, setMirror] = useState<{ id: string | null; profile: Record<string, any> | null; synced_at: string | null; source: string } | null>(null);
   const [resyncing, setResyncing] = useState(false);
@@ -664,8 +685,8 @@ const TenantDetailsDrawer = ({
             <div>
               <p className="text-[11px] font-bold uppercase tracking-wider text-foreground">Plan tier</p>
               <p className="text-[10px] text-muted-foreground mt-0.5">
-                Compliance Pro enables price verification + the website scrape.
-                {marketcheckOn ? " Scrape is on." : ""}
+                Compliance Pro grants price verification + the website scrape.
+                {marketcheck?.enabled ? " Scrape is on." : ""}
               </p>
             </div>
             <select
@@ -680,6 +701,69 @@ const TenantDetailsDrawer = ({
             </select>
           </div>
         </div>
+
+        {/* MarketCheck nightly scrape — appears once the tenant is granted
+            (Compliance Pro). Set it up for the dealer right here. */}
+        {marketcheck?.allowed && (
+          <div className="mx-4 mt-4 rounded-lg border border-border p-3 space-y-3">
+            <div className="flex items-center justify-between">
+              <p className="text-[11px] font-bold uppercase tracking-wider text-foreground">MarketCheck inventory scrape</p>
+              <label className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-foreground">
+                <input type="checkbox" checked={mcEnabled} onChange={(e) => setMcEnabled(e.target.checked)} className="h-4 w-4 rounded border-border" />
+                Nightly sync on
+              </label>
+            </div>
+            <div>
+              <label className="block text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-1">Dealer website domain</label>
+              <input value={mcSource} onChange={(e) => setMcSource(e.target.value)} placeholder="hartecars.com"
+                className="w-full h-9 rounded-md border border-border bg-background px-3 text-sm font-mono" />
+            </div>
+            <div className="grid grid-cols-3 gap-2">
+              <div>
+                <label className="block text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-1">Frequency</label>
+                <select value={mcFreq} onChange={(e) => setMcFreq(e.target.value)} className="w-full h-9 rounded-md border border-border bg-background px-1.5 text-xs">
+                  <option value="nightly">Nightly</option>
+                  <option value="weekly">Weekly</option>
+                  <option value="biweekly">Biweekly</option>
+                  <option value="monthly">Monthly</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-1">Hour (UTC)</label>
+                <select value={mcHour} onChange={(e) => setMcHour(parseInt(e.target.value, 10))} className="w-full h-9 rounded-md border border-border bg-background px-1.5 text-xs">
+                  {Array.from({ length: 24 }, (_, h) => <option key={h} value={h}>{String(h).padStart(2, "0")}:00</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="block text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-1">Max / run</label>
+                <input type="number" min={1} max={10000} value={mcMax} onChange={(e) => setMcMax(Math.max(1, Math.min(10000, parseInt(e.target.value, 10) || 1)))}
+                  className="w-full h-9 rounded-md border border-border bg-background px-2 text-xs tabular-nums" />
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={async () => { setMcSaving(true); const ok = await onSaveMarketcheck({ enabled: mcEnabled, source: mcSource.trim(), maxVehicles: mcMax, frequency: mcFreq, dayOfWeek: marketcheck?.day_of_week ?? 0, runHour: mcHour }); setMcSaving(false); toast[ok ? "success" : "error"](ok ? "MarketCheck settings saved" : "Could not save MarketCheck settings"); }}
+                disabled={mcSaving}
+                className="h-9 px-3 rounded-md bg-primary text-primary-foreground text-xs font-semibold disabled:opacity-50"
+              >
+                {mcSaving ? "Saving…" : "Save"}
+              </button>
+              <button
+                onClick={async () => { if (!mcSource.trim()) { toast.error("Enter the website domain first"); return; } setMcRunning(true); const r = await onRunMarketcheck(); setMcRunning(false); toast[r.ok ? "success" : "error"](r.message); }}
+                disabled={mcRunning}
+                className="h-9 px-3 rounded-md border border-border text-xs font-semibold hover:bg-muted disabled:opacity-50"
+              >
+                {mcRunning ? "Syncing…" : "Sync now"}
+              </button>
+            </div>
+            {marketcheck?.last_run_at && (
+              <p className="text-[10px] text-muted-foreground">
+                Last run {new Date(marketcheck.last_run_at).toLocaleString()}
+                {marketcheck.last_status?.seen != null && ` · ${marketcheck.last_status.seen} vehicles · ${marketcheck.last_status.new_vehicles ?? 0} new`}
+              </p>
+            )}
+          </div>
+        )}
 
         <div className={`mx-4 mt-4 rounded-lg border-2 p-3 ${pct === 100 ? "border-emerald-500 bg-emerald-50" : "border-amber-300 bg-amber-50/60"}`}>
           <div className="flex items-center justify-between">

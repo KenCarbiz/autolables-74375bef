@@ -52,7 +52,12 @@ export interface MarketcheckRow {
   allowed: boolean;
   enabled: boolean;
   source: string;
+  max_vehicles?: number;
+  frequency?: string;
+  day_of_week?: number;
+  run_hour?: number;
   last_run_at: string | null;
+  last_status?: { ran_at?: string; seen?: number; new_vehicles?: number; prices_recorded?: number } | null;
 }
 
 export interface AuditRow {
@@ -116,11 +121,45 @@ export const useAdminPlatform = () => {
     queryFn: async (): Promise<MarketcheckRow[]> => {
       const { data, error } = await (supabase as any)
         .from("marketcheck_sync_config")
-        .select("tenant_id, allowed, enabled, source, last_run_at");
+        .select("tenant_id, allowed, enabled, source, max_vehicles, frequency, day_of_week, run_hour, last_run_at, last_status");
       if (error) throw error;
       return (data as MarketcheckRow[]) || [];
     },
   });
+
+  // Configure a tenant's MarketCheck sync (enable + website domain + schedule)
+  // cross-tenant. save_marketcheck_config accepts an explicit tenant_id and
+  // authorizes platform admins, so a super-admin sets it up from the tenant page.
+  const saveMarketcheckConfig = useCallback(
+    async (args: { tenantId: string; enabled: boolean; source: string; maxVehicles: number; frequency: string; dayOfWeek: number; runHour: number }): Promise<boolean> => {
+      const { error } = await (supabase as any).rpc("save_marketcheck_config", {
+        _tenant_id: args.tenantId,
+        _enabled: args.enabled,
+        _source: args.source,
+        _max_vehicles: args.maxVehicles,
+        _frequency: args.frequency,
+        _day_of_week: args.dayOfWeek,
+        _run_hour: args.runHour,
+      });
+      if (error) return false;
+      await qc.invalidateQueries({ queryKey: ["admin", "marketcheck"] });
+      return true;
+    },
+    [qc]
+  );
+
+  // Run a single tenant's scrape now (bypasses the schedule).
+  const runMarketcheckNow = useCallback(
+    async (tenantId: string): Promise<{ ok: boolean; message: string }> => {
+      const { data, error } = await supabase.functions.invoke("marketcheck-sync", { body: { tenant_id: tenantId, force: true } });
+      if (error) return { ok: false, message: "Sync failed — check the MarketCheck key / domain." };
+      const r = (data || {}) as { error?: string; listings_seen?: number; new_vehicles?: number; prices_recorded?: number };
+      if (r.error === "not_configured") return { ok: false, message: "MARKETCHECK_API_KEY_1 is not set on the server." };
+      await qc.invalidateQueries({ queryKey: ["admin", "marketcheck"] });
+      return { ok: true, message: `Synced ${r.listings_seen ?? 0} vehicles · ${r.new_vehicles ?? 0} new · ${r.prices_recorded ?? 0} price updates` };
+    },
+    [qc]
+  );
 
   // Grant / revoke a tenant's MarketCheck capability from the platform grid.
   // Uses the existing admin-only RPC (takes an explicit tenant_id), so it
@@ -310,6 +349,8 @@ export const useAdminPlatform = () => {
     entitlements,
     marketcheck,
     setMarketcheckAllowed,
+    saveMarketcheckConfig,
+    runMarketcheckNow,
     setTenantTier,
     setTenantActive,
     overrideEntitlement,
