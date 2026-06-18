@@ -1465,6 +1465,8 @@ const Admin = () => {
                       autotrader_url: "",
                       capital_one_url: "",
                       carfax_url: "",
+                      vdp_price_labels: "",
+                      vdp_strip_finance_params: true,
                       why_buy_here: "",
                       warranty_programs: "",
                       vehicle_conditions: "New, Demo, Used, CPO",
