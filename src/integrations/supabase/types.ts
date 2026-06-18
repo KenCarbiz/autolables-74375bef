@@ -1021,39 +1021,54 @@ export type Database = {
           id: string
           installed_at: string | null
           installer_company: string | null
+          installer_ip: string | null
           installer_name: string | null
+          installer_signature_data: string | null
+          installer_signature_type: string | null
+          is_verified: boolean | null
           notes: string | null
           photo_path: string | null
           product_id: string | null
           product_name: string | null
           tenant_id: string | null
           vehicle_vin: string
+          verified_at: string | null
         }
         Insert: {
           created_at?: string
           id?: string
           installed_at?: string | null
           installer_company?: string | null
+          installer_ip?: string | null
           installer_name?: string | null
+          installer_signature_data?: string | null
+          installer_signature_type?: string | null
+          is_verified?: boolean | null
           notes?: string | null
           photo_path?: string | null
           product_id?: string | null
           product_name?: string | null
           tenant_id?: string | null
           vehicle_vin: string
+          verified_at?: string | null
         }
         Update: {
           created_at?: string
           id?: string
           installed_at?: string | null
           installer_company?: string | null
+          installer_ip?: string | null
           installer_name?: string | null
+          installer_signature_data?: string | null
+          installer_signature_type?: string | null
+          is_verified?: boolean | null
           notes?: string | null
           photo_path?: string | null
           product_id?: string | null
           product_name?: string | null
           tenant_id?: string | null
           vehicle_vin?: string
+          verified_at?: string | null
         }
         Relationships: []
       }
@@ -2788,19 +2803,36 @@ export type Database = {
         }
         Returns: string
       }
-      record_install_proof: {
-        Args: {
-          _install_token: string
-          _installed_at: string
-          _installer_company: string
-          _installer_name: string
-          _notes?: string
-          _photo_path: string
-          _product_id: string
-          _product_name: string
-        }
-        Returns: string
-      }
+      record_install_proof:
+        | {
+            Args: {
+              _install_token: string
+              _installed_at: string
+              _installer_company: string
+              _installer_name: string
+              _notes?: string
+              _photo_path: string
+              _product_id: string
+              _product_name: string
+            }
+            Returns: string
+          }
+        | {
+            Args: {
+              _install_token: string
+              _installed_at: string
+              _installer_company: string
+              _installer_ip: string
+              _installer_name: string
+              _installer_signature_data: string
+              _installer_signature_type: string
+              _notes: string
+              _photo_path: string
+              _product_id: string
+              _product_name: string
+            }
+            Returns: string
+          }
       record_signing_reengagement: {
         Args: { _addendum_id: string; _channel?: string; _details?: Json }
         Returns: undefined
