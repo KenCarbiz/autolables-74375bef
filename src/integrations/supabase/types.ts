@@ -1171,6 +1171,69 @@ export type Database = {
           },
         ]
       }
+      marketcheck_sync_config: {
+        Row: {
+          allowed: boolean
+          created_at: string
+          day_of_week: number
+          enabled: boolean
+          frequency: string
+          last_run_at: string | null
+          last_status: Json
+          max_vehicles: number
+          run_hour: number
+          source: string
+          tenant_id: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          allowed?: boolean
+          created_at?: string
+          day_of_week?: number
+          enabled?: boolean
+          frequency?: string
+          last_run_at?: string | null
+          last_status?: Json
+          max_vehicles?: number
+          run_hour?: number
+          source?: string
+          tenant_id: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          allowed?: boolean
+          created_at?: string
+          day_of_week?: number
+          enabled?: boolean
+          frequency?: string
+          last_run_at?: string | null
+          last_status?: Json
+          max_vehicles?: number
+          run_hour?: number
+          source?: string
+          tenant_id?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "marketcheck_sync_config_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: true
+            referencedRelation: "tenant_summary"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "marketcheck_sync_config_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: true
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       onboarding_profiles: {
         Row: {
           billing: Json
@@ -2883,6 +2946,26 @@ export type Database = {
         Args: { _contact: string; _origin?: string; _vin: string }
         Returns: Json
       }
+      save_marketcheck_config: {
+        Args: {
+          _day_of_week: number
+          _enabled: boolean
+          _frequency: string
+          _max_vehicles: number
+          _run_hour: number
+          _source: string
+          _tenant_id: string
+        }
+        Returns: undefined
+      }
+      schedule_marketcheck_sync: {
+        Args: {
+          _cron_expr?: string
+          _service_key?: string
+          _supabase_url?: string
+        }
+        Returns: number
+      }
       schedule_reengage_abandoned_signings: {
         Args: {
           _cron_expr?: string
@@ -2890,6 +2973,10 @@ export type Database = {
           _supabase_url?: string
         }
         Returns: number
+      }
+      set_marketcheck_allowed: {
+        Args: { _allowed: boolean; _tenant_id: string }
+        Returns: undefined
       }
       sign_deal_token: {
         Args: {
@@ -2902,6 +2989,7 @@ export type Database = {
         }
         Returns: boolean
       }
+      unschedule_marketcheck_sync: { Args: never; Returns: undefined }
       unschedule_reengage_abandoned_signings: {
         Args: never
         Returns: undefined
