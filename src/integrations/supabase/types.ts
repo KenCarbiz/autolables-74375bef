@@ -208,6 +208,7 @@ export type Database = {
           employee_signature_type: string | null
           employee_signed_at: string | null
           esign_consent: Json | null
+          expected_total: number | null
           financing_input: Json | null
           frozen_snapshot: Json | null
           id: string
@@ -217,11 +218,18 @@ export type Database = {
           locked_at: string | null
           optional_selections: Json | null
           price_overrides: Json | null
+          price_verification_delta: number | null
+          price_verification_method: string | null
+          price_verification_status: string
+          price_verified: boolean
+          price_verified_at: string | null
           products_snapshot: Json
           ready_at: string | null
           sb766_add_on_precontract: Json | null
           sb766_financing_disclosure: Json | null
           sb766_three_day_return_ack: boolean | null
+          scraped_advertised_price: number | null
+          selling_price: number | null
           signing_location: Json | null
           signing_token: string | null
           status: string
@@ -266,6 +274,7 @@ export type Database = {
           employee_signature_type?: string | null
           employee_signed_at?: string | null
           esign_consent?: Json | null
+          expected_total?: number | null
           financing_input?: Json | null
           frozen_snapshot?: Json | null
           id?: string
@@ -275,11 +284,18 @@ export type Database = {
           locked_at?: string | null
           optional_selections?: Json | null
           price_overrides?: Json | null
+          price_verification_delta?: number | null
+          price_verification_method?: string | null
+          price_verification_status?: string
+          price_verified?: boolean
+          price_verified_at?: string | null
           products_snapshot?: Json
           ready_at?: string | null
           sb766_add_on_precontract?: Json | null
           sb766_financing_disclosure?: Json | null
           sb766_three_day_return_ack?: boolean | null
+          scraped_advertised_price?: number | null
+          selling_price?: number | null
           signing_location?: Json | null
           signing_token?: string | null
           status?: string
@@ -324,6 +340,7 @@ export type Database = {
           employee_signature_type?: string | null
           employee_signed_at?: string | null
           esign_consent?: Json | null
+          expected_total?: number | null
           financing_input?: Json | null
           frozen_snapshot?: Json | null
           id?: string
@@ -333,11 +350,18 @@ export type Database = {
           locked_at?: string | null
           optional_selections?: Json | null
           price_overrides?: Json | null
+          price_verification_delta?: number | null
+          price_verification_method?: string | null
+          price_verification_status?: string
+          price_verified?: boolean
+          price_verified_at?: string | null
           products_snapshot?: Json
           ready_at?: string | null
           sb766_add_on_precontract?: Json | null
           sb766_financing_disclosure?: Json | null
           sb766_three_day_return_ack?: boolean | null
+          scraped_advertised_price?: number | null
+          selling_price?: number | null
           signing_location?: Json | null
           signing_token?: string | null
           status?: string
@@ -2517,10 +2541,13 @@ export type Database = {
           listing_slug: string
           optional_selections: Json
           price_overrides: Json
+          price_verification_status: string
+          price_verified: boolean
           products_snapshot: Json
           sb766_add_on_precontract: Json
           sb766_financing_disclosure: Json
           sb766_three_day_return_ack: boolean
+          selling_price: number
           status: string
           vehicle_condition: string
           vehicle_price: number
@@ -2798,6 +2825,10 @@ export type Database = {
       unschedule_reengage_abandoned_signings: {
         Args: never
         Returns: undefined
+      }
+      verify_addendum_price: {
+        Args: { _addendum_id: string; _tolerance?: number }
+        Returns: string
       }
       verify_audit_chain: {
         Args: { _store_id: string }
