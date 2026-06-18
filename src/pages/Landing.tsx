@@ -527,7 +527,22 @@ const TakeThePowerBack = ({ onWaitlist }: { onWaitlist: () => void }) => (
           icon={Tag}
           eyebrow="Price integrity"
           title="Own your price. Prove you honored it."
-          body="The FTC reframed your posted price as a binding commitment. AutoLabels locks one price across your site, the lot, and the desk, then seals a tamper-evident record that you honored it."
+          body={
+            <>
+              <p>
+                The finance manager enters the agreed-upon sale price; AutoLabels adds the doc fee and every
+                pre-installed item and checks it against your live advertised price. If they don't match, the deal
+                is blocked from signing until it's fixed. Once reconciled, the platform seals a per-VIN defense file:
+              </p>
+              <ul className="mt-3 list-disc space-y-1.5 pl-4 text-slate-600">
+                <li>The agreed sale price reconciled to your advertised price.</li>
+                <li>A timestamped screenshot of your live website listing at signing.</li>
+                <li>An installer sign-off with a photo for every pre-installed product.</li>
+                <li>The signed disclosures and e-sign consent (IP, timestamp, content hash).</li>
+                <li>All chained into a tamper-evident record you can hand to counsel or a regulator.</li>
+              </ul>
+            </>
+          }
           chips={["97 dealer groups warned, Mar 2026", "Buyers pay ~$1,117 to skip the games"]}
           punch="Priced in ink, not pencil."
         />
@@ -561,7 +576,7 @@ const PowerPillar = ({
   icon: IconType;
   eyebrow: string;
   title: string;
-  body: string;
+  body: React.ReactNode;
   chips: string[];
   punch: string;
 }) => (
@@ -571,7 +586,7 @@ const PowerPillar = ({
     </div>
     <p className="mt-5 text-[11px] font-bold uppercase tracking-[0.16em] text-blue-600">{eyebrow}</p>
     <h3 className="mt-1.5 font-display text-2xl font-black tracking-tight text-slate-900">{title}</h3>
-    <p className="mt-3 text-sm leading-relaxed text-slate-600">{body}</p>
+    <div className="mt-3 text-sm leading-relaxed text-slate-600">{body}</div>
     <div className="mt-5 flex flex-wrap gap-2">
       {chips.map((c) => (
         <span key={c} className="inline-flex items-center gap-1.5 rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-700">
