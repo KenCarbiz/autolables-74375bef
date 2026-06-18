@@ -637,7 +637,7 @@ serve(async (req) => {
           renderSource = "firecrawl";
           if (r.html) {
             html = r.html;
-            result = extractAdvertised(r.html, fetchUrl, row.vin);
+            result = extractAdvertised(r.html, fetchUrl, row.vin, cfg.labels);
           }
           // Fall back to Firecrawl's structured extract, but only when the VIN
           // it read matches the target — never trust a price off the wrong car.
