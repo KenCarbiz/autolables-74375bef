@@ -341,8 +341,8 @@ const Inventory = () => {
       ) : filtered.length === 0 ? (
         <EmptyState onAdd={() => setShowAdd(true)} total={rows.length} />
       ) : (
-        <div className="rounded-xl border border-border bg-card overflow-hidden">
-          <table className="w-full text-sm">
+        <div className="rounded-xl border border-border bg-card overflow-x-auto">
+          <table className="w-full min-w-[820px] text-sm">
             <thead className="bg-muted/50 text-[11px] uppercase tracking-wide text-muted-foreground">
               <tr>
                 <th className="text-left px-3 py-2 font-semibold">Vehicle</th>
@@ -486,7 +486,7 @@ const RowAction = ({ label, title, tone = "default", onClick }: RowActionProps) 
     <button
       onClick={onClick}
       title={title}
-      className={`h-7 px-2 rounded-md text-[10px] font-bold tracking-wide uppercase transition-all whitespace-nowrap hidden md:inline-flex items-center ${cls}`}
+      className={`h-7 px-2 rounded-md text-[10px] font-bold tracking-wide uppercase transition-all whitespace-nowrap inline-flex items-center ${cls}`}
     >
       {label}
     </button>
@@ -494,8 +494,8 @@ const RowAction = ({ label, title, tone = "default", onClick }: RowActionProps) 
 };
 
 const InventorySkeleton = () => (
-  <div className="rounded-xl border border-border bg-card overflow-hidden">
-    <table className="w-full text-sm">
+  <div className="rounded-xl border border-border bg-card overflow-x-auto">
+    <table className="w-full min-w-[820px] text-sm">
       <thead className="bg-muted/50 text-[11px] uppercase tracking-wide text-muted-foreground">
         <tr>
           <th className="text-left px-3 py-2 font-semibold">Vehicle</th>

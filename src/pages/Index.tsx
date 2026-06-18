@@ -917,7 +917,7 @@ const Index = () => {
     const rtSummary = summarizeRedTeam(rtFindings);
     if (rtSummary.blocker) {
       const top = rtFindings.filter((f) => f.severity === "fail").slice(0, 2).map((f) => f.rule).join(" \u2022 ");
-      toast.error(`Compliance red-team blocked: ${top}${rtSummary.fail > 2 ? " \u2026" : ""}`);
+      toast.error(`Compliance check \u2014 fix first: ${top}${rtSummary.fail > 2 ? " \u2026" : ""}`);
       if (user) log({
         store_id: currentStore?.id || "",
         user_id: user.id,
@@ -934,31 +934,29 @@ const Index = () => {
       return;
     }
 
-    // Price-integrity hard-block: the all-in price (selling + doc fee +
-    // pre-installed items) must reconcile to the scraped advertised price.
-    // Per the FTC-honor rule, signing is blocked unless this verifies. A
-    // missing advertised price (untracked) also blocks — the dealer must
-    // re-scrape or capture the advertised price first.
+    // Price check (Compliance Pro). Don't dead-end the deal — if the all-in
+    // price doesn't reconcile to the advertised price, explain it in plain
+    // English and let a manager send anyway with a logged override, so F&I is
+    // never stuck in front of a customer. The audit trail records the override.
+    let priceOverridden = false;
     if (settings.feature_price_verification && priceIntegrity.status !== "ok") {
-      toast.error(`Price integrity: ${priceIntegrity.reason}`);
+      const proceed = window.confirm(
+        `${priceIntegrity.reason}\n\nSend to the customer anyway? This override is recorded with your name on the deal's audit trail.`,
+      );
+      if (!proceed) {
+        if (user) log({
+          store_id: currentStore?.id || "", user_id: user.id,
+          action: "price_integrity_block", entity_type: "addendum", entity_id: vehicle.vin,
+          details: { source: "handleSendToCustomer", status: priceIntegrity.status, expected_online: priceIntegrity.expectedOnline, advertised: priceIntegrity.advertised, delta: priceIntegrity.delta },
+        });
+        return;
+      }
+      priceOverridden = true;
       if (user) log({
-        store_id: currentStore?.id || "",
-        user_id: user.id,
-        action: "price_integrity_block",
-        entity_type: "addendum",
-        entity_id: vehicle.vin,
-        details: {
-          source: "handleSendToCustomer",
-          status: priceIntegrity.status,
-          selling_price: priceIntegrity.sellingPrice,
-          doc_fee: priceIntegrity.docFee,
-          included_total: priceIntegrity.includedTotal,
-          expected_online: priceIntegrity.expectedOnline,
-          advertised: priceIntegrity.advertised,
-          delta: priceIntegrity.delta,
-        },
+        store_id: currentStore?.id || "", user_id: user.id,
+        action: "price_integrity_block", entity_type: "addendum", entity_id: vehicle.vin,
+        details: { source: "handleSendToCustomer", override: true, by: user.email, status: priceIntegrity.status, expected_online: priceIntegrity.expectedOnline, advertised: priceIntegrity.advertised, delta: priceIntegrity.delta },
       });
-      return;
     }
 
     setSaving(true);
@@ -989,6 +987,14 @@ const Index = () => {
       // VIN before the customer can sign.
       expected_total: priceIntegrity.expectedOnline,
       scraped_advertised_price: advertisedForVin?.advertised_price ?? null,
+      // Manager override: mark verified so the server gate lets the customer
+      // sign; the override is already on the audit trail above.
+      ...(priceOverridden ? {
+        price_verified: true,
+        price_verification_status: "verified",
+        price_verification_method: "manager_override",
+        price_verified_at: new Date().toISOString(),
+      } : {}),
       status: "draft" as const,
       signing_token: token,
     };
@@ -1020,7 +1026,7 @@ const Index = () => {
     // disagrees with the client gate (e.g. the advertised price just moved),
     // hold the link.
     const addendumId = (inserted as { id?: string } | null)?.id || "";
-    if (addendumId && settings.feature_price_verification) {
+    if (addendumId && settings.feature_price_verification && !priceOverridden) {
       const { data: verifyStatus, error: verifyErr } = await (supabase as any)
         .rpc("verify_addendum_price", { _addendum_id: addendumId, _tolerance: 50 });
       // Tolerate a not-yet-applied migration (function missing): fall back to
@@ -1154,13 +1160,15 @@ const Index = () => {
     // Completing an in-person signature is itself a sign event — gate it on the
     // same price-integrity rule as the remote flow. Plain drafts save freely.
     if (fullySigned && settings.feature_price_verification && priceIntegrity.status !== "ok") {
-      toast.error(`Cannot finalize signatures — price integrity: ${priceIntegrity.reason}`);
+      const proceed = window.confirm(
+        `${priceIntegrity.reason}\n\nFinalize these signatures anyway? This override is recorded with your name on the deal's audit trail.`,
+      );
       if (user) log({
         store_id: currentStore?.id || "", user_id: user.id,
         action: "price_integrity_block", entity_type: "addendum", entity_id: vehicle.vin,
-        details: { source: "handleSave", status: priceIntegrity.status, expected_online: priceIntegrity.expectedOnline, advertised: priceIntegrity.advertised, delta: priceIntegrity.delta },
+        details: { source: "handleSave", override: proceed, by: user.email, status: priceIntegrity.status, expected_online: priceIntegrity.expectedOnline, advertised: priceIntegrity.advertised, delta: priceIntegrity.delta },
       });
-      return;
+      if (!proceed) return;
     }
 
     setSaving(true);
@@ -1362,7 +1370,7 @@ const Index = () => {
               className="inline-flex items-center gap-1.5 h-9 px-3 rounded-md bg-teal text-primary-foreground text-sm font-medium hover:opacity-90 transition-opacity disabled:opacity-50"
             >
               <Send className="w-3.5 h-3.5" />
-              Ready for Signatures
+              Send to Customer
             </button>
           )}
           <button

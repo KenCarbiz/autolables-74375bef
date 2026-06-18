@@ -54,10 +54,10 @@ const ComplianceRedTeamPanel = ({
         <div className="flex-1 min-w-0 text-left">
           <p className="text-body-sm font-semibold">
             {summary.blocker
-              ? `Compliance red-team: ${summary.fail} blocker${summary.fail === 1 ? "" : "s"} to clear`
+              ? `Compliance check: ${summary.fail} item${summary.fail === 1 ? "" : "s"} to fix`
               : summary.warn > 0
-                ? `Compliance red-team: ${summary.warn} warning${summary.warn === 1 ? "" : "s"} to review`
-                : "Compliance red-team clean"}
+                ? `Compliance check: ${summary.warn} note${summary.warn === 1 ? "" : "s"} to review`
+                : "Compliance check passed"}
           </p>
           <p className="text-caption opacity-80">
             {summary.total} check{summary.total === 1 ? "" : "s"} · {summary.fail} fail · {summary.warn} warn · {summary.pass} pass
