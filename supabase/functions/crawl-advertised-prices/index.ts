@@ -612,16 +612,17 @@ serve(async (req) => {
         }).then(() => undefined, () => undefined);
         continue;
       }
-      const fetchUrl = normalizeVdpUrl(row.source_url);
+      const cfg = await getTenantScrapeSettings(row.tenant_id);
+      const fetchUrl = maybeNormalize(row.source_url, cfg.stripFinance);
       const res = await fetch(fetchUrl, {
         method: "GET",
         headers: FETCH_HEADERS,
         signal: AbortSignal.timeout(12000),
       });
       let html = res.ok ? await res.text() : "";
-      let result: AdResult = (res.ok && !looksLikeChallenge(html, res.headers, res.status))
-        ? extractAdvertised(html, fetchUrl, row.vin)
-        : { price: null, source: "none", gated: false, reason: "bot_challenge", msrp: null, candidates: [] };
+      let result: AdResult & { matched_label?: string | null } = (res.ok && !looksLikeChallenge(html, res.headers, res.status))
+        ? extractAdvertised(html, fetchUrl, row.vin, cfg.labels)
+        : { price: null, source: "none", gated: false, reason: "bot_challenge", msrp: null, candidates: [], matched_label: null };
 
       // Escalate to Firecrawl when the cheap path is walled or empty — this is
       // what makes JS-rendered dealer sites + marketplaces return a real price,
