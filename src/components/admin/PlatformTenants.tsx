@@ -193,6 +193,9 @@ export const PlatformTenants = () => {
           tenant={editing}
           onClose={() => setEditing(null)}
           onSaved={() => { setEditing(null); toast.success("Dealership details saved"); }}
+          currentTier={(tierByTenant.get(editing.id) as PlanTier | undefined) ?? "essential"}
+          marketcheckOn={!!mcByTenant.get(editing.id)?.enabled}
+          onSetTier={(tier) => changeTier(editing, tier)}
         />
       )}
 
@@ -211,8 +214,8 @@ export const PlatformTenants = () => {
           onCta={q || filter !== "all" ? undefined : () => setCreating(true)}
         />
       ) : (
-        <div className="rounded-xl border border-border bg-card overflow-hidden">
-          <table className="w-full text-sm">
+        <div className="rounded-xl border border-border bg-card overflow-x-auto">
+          <table className="w-full min-w-[920px] text-sm">
             <thead className="bg-muted/50 text-[11px] uppercase tracking-wide text-muted-foreground">
               <tr>
                 <SortHeader label="Dealer"        sortKey="name"          activeKey={sortPag.sortKey} dir={sortPag.sortDir} onToggle={sortPag.toggleSort} />
@@ -564,14 +567,21 @@ const TenantDetailsDrawer = ({
   tenant,
   onClose,
   onSaved,
+  currentTier,
+  onSetTier,
+  marketcheckOn,
 }: {
   tenant: TenantSummary;
   onClose: () => void;
   onSaved: () => void;
+  currentTier: PlanTier;
+  onSetTier: (tier: PlanTier) => Promise<void> | void;
+  marketcheckOn?: boolean;
 }) => {
   const [form, setForm] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [savingTier, setSavingTier] = useState(false);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [mirror, setMirror] = useState<{ id: string | null; profile: Record<string, any> | null; synced_at: string | null; source: string } | null>(null);
   const [resyncing, setResyncing] = useState(false);
@@ -645,6 +655,30 @@ const TenantDetailsDrawer = ({
             <p className="text-[11px] text-muted-foreground">{tenant.name}</p>
           </div>
           <button onClick={onClose} className="text-muted-foreground hover:text-foreground"><X className="w-4 h-4" /></button>
+        </div>
+
+        {/* Plan tier — picking Compliance Pro turns on price verification +
+            the MarketCheck scrape for this dealer. */}
+        <div className="mx-4 mt-4 rounded-lg border border-border p-3">
+          <div className="flex items-center justify-between gap-2">
+            <div>
+              <p className="text-[11px] font-bold uppercase tracking-wider text-foreground">Plan tier</p>
+              <p className="text-[10px] text-muted-foreground mt-0.5">
+                Compliance Pro enables price verification + the website scrape.
+                {marketcheckOn ? " Scrape is on." : ""}
+              </p>
+            </div>
+            <select
+              value={currentTier}
+              disabled={savingTier}
+              onChange={async (e) => { setSavingTier(true); await onSetTier(e.target.value as PlanTier); setSavingTier(false); }}
+              className="h-9 rounded-md border border-border bg-background px-2 text-xs font-semibold text-foreground disabled:opacity-50"
+            >
+              <option value="essential">Essential</option>
+              <option value="unlimited">Unlimited</option>
+              <option value="compliance_pro">Compliance Pro</option>
+            </select>
+          </div>
         </div>
 
         <div className={`mx-4 mt-4 rounded-lg border-2 p-3 ${pct === 100 ? "border-emerald-500 bg-emerald-50" : "border-amber-300 bg-amber-50/60"}`}>
