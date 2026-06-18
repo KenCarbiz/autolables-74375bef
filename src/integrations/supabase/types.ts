@@ -413,6 +413,8 @@ export type Database = {
           created_at: string
           id: string
           notes: string | null
+          screenshot_bucket: string
+          screenshot_sha256: string | null
           screenshot_url: string | null
           source_channel: string
           source_url: string | null
@@ -428,6 +430,8 @@ export type Database = {
           created_at?: string
           id?: string
           notes?: string | null
+          screenshot_bucket?: string
+          screenshot_sha256?: string | null
           screenshot_url?: string | null
           source_channel?: string
           source_url?: string | null
@@ -443,6 +447,8 @@ export type Database = {
           created_at?: string
           id?: string
           notes?: string | null
+          screenshot_bucket?: string
+          screenshot_sha256?: string | null
           screenshot_url?: string | null
           source_channel?: string
           source_url?: string | null
