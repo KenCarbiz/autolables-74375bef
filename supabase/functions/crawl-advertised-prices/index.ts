@@ -154,7 +154,17 @@ const normalizeVdpUrl = (raw: string): string => {
 // "largest dollar on the page" heuristic, which grabbed the MSRP off a price
 // stack and produced false "ad != sticker" drift on every discounted car.
 // For Call-for-Price pages it records nothing rather than guess the MSRP.
-const extractAdvertised = (html: string, url: string, targetVin: string): AdResult => {
+//
+// `customLabels` are dealer-configured price labels in priority order
+// ("Harte Deal", "Internet Price", …). They run BEFORE the generic DOM
+// heuristic and short-circuit on the first label that has a dollar amount
+// adjacent — that's the dealer's brand for the advertised selling price.
+const extractAdvertised = (
+  html: string,
+  url: string,
+  targetVin: string,
+  customLabels: string[] = [],
+): AdResult & { matched_label?: string | null } => {
   const target = normVin(targetVin);
   const pageVins = collectVins(html, url);
   const candidates: PriceCandidate[] = [];
@@ -231,8 +241,29 @@ const extractAdvertised = (html: string, url: string, targetVin: string): AdResu
     }
   }
 
-  // Tier C: labeled DOM price — the price-stack final line, by LABEL not size.
+  // Tier C0: dealer-configured custom labels (e.g. "Harte Deal"). First label
+  // with a dollar amount within 80 chars wins — short-circuits BEFORE the
+  // generic heuristic so a brand-specific label like "Harte Deal" can't lose
+  // to "MSRP" or anything else on the page.
   const text = html.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").toLowerCase();
+  const labels = (customLabels || [])
+    .map((l) => l.trim().toLowerCase()).filter(Boolean);
+  for (const lbl of labels) {
+    // Escape regex metacharacters in the user-supplied label.
+    const esc = lbl.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const re = new RegExp(`${esc}[^$]{0,80}\\$\\s?(\\d{1,3}(?:,\\d{3})+|\\d{4,6})(?:\\.\\d{2})?`, "i");
+    const m = text.match(re);
+    const v = m ? norm(m[1]) : null;
+    if (sane(v)) {
+      candidates.push({ value: v, label: `custom:${lbl}`, source: "dom_label" });
+      if (msrp != null && v < msrp * 0.3) {
+        return { price: null, source: "none", gated: false, reason: "implausible_vs_msrp", msrp, candidates, matched_label: lbl };
+      }
+      return { price: v, source: "dom_label", gated: false, reason: null, msrp, candidates, matched_label: lbl };
+    }
+  }
+
+  // Tier C: labeled DOM price — the price-stack final line, by LABEL not size.
   const GATE = ["call for price", "please call", "contact us for price", "unlock price", "click for price", "sign in to see price"];
   const MONTHLY = ["/mo", "per month", "mo.", "lease", " apr", "due at signing", "est. payment", "for 24", "for 36", "for 48", "for 60", "for 72", "for 84"];
   const GOOD = ["internet price", "sale price", "final price", "your price", "e-price", "eprice", "selling price", "special price"];
@@ -242,6 +273,7 @@ const extractAdvertised = (html: string, url: string, targetVin: string): AdResu
   const moneyRe = /([a-z .,'-]{0,40})\$\s?(\d{1,3}(?:,\d{3})+|\d{4,6})(?:\.\d{2})?/g;
   let best: number | null = null;
   let bestScore = -1;
+  let bestLabel = "";
   let mm: RegExpExecArray | null;
   moneyRe.lastIndex = 0;
   while ((mm = moneyRe.exec(text))) {
@@ -256,7 +288,9 @@ const extractAdvertised = (html: string, url: string, targetVin: string): AdResu
     const idx = GOOD.findIndex((g) => ctx.includes(g));
     const s = idx === -1 ? 0 : 10 - idx;
     candidates.push({ value: val, label: ctx.trim() || "(unlabeled)", source: "dom_label" });
-    if (s > bestScore || (s === bestScore && best != null && val < best)) { best = val; bestScore = s; }
+    if (s > bestScore || (s === bestScore && best != null && val < best)) {
+      best = val; bestScore = s; bestLabel = ctx.trim();
+    }
   }
   if (best != null) {
     if (msrp != null && best < msrp * 0.3) {
@@ -267,7 +301,7 @@ const extractAdvertised = (html: string, url: string, targetVin: string): AdResu
     if (bestScore === 0 && msrp == null) {
       return { price: null, source: "none", gated: false, reason: "unlabeled_price_only", msrp, candidates };
     }
-    return { price: best, source: "dom_label", gated: false, reason: null, msrp, candidates };
+    return { price: best, source: "dom_label", gated: false, reason: null, msrp, candidates, matched_label: bestLabel || null };
   }
 
   // Tier D: gate / give up — never guess MSRP.
@@ -397,12 +431,13 @@ serve(async (req) => {
     auth: { persistSession: false, autoRefreshToken: false },
   });
 
-  let body: { limit?: number; tenant_id?: string; discover?: boolean; vin?: string } = {};
+  let body: { limit?: number; tenant_id?: string; discover?: boolean; vin?: string; test_url?: string } = {};
   try { body = await req.json(); } catch { /* empty body OK */ }
   const targetVin = body.vin ? normVin(body.vin) : null;
   // Firecrawl is metered — cap renders per run. A single-VIN re-scrape (the
-  // Ready-for-Signatures verify) gets a small dedicated budget.
-  let renderBudget = FIRECRAWL_KEY ? (targetVin ? 3 : 30) : 0;
+  // Ready-for-Signatures verify) gets a small dedicated budget, and the
+  // dealer "Test" button gets exactly one render.
+  let renderBudget = FIRECRAWL_KEY ? (body.test_url ? 1 : (targetVin ? 3 : 30)) : 0;
 
   // ── Auth gate ────────────────────────────────────────────────
   // Two callers: (1) the nightly cron with the service-role key — full
@@ -439,6 +474,90 @@ serve(async (req) => {
     // Pin the batch to the caller's tenant and keep manual runs bounded.
     body.tenant_id = tenantId;
     body.limit = Math.min(body.limit ?? 300, 500);
+  }
+
+  // ── Per-tenant scrape settings ──────────────────────────────
+  // dealer_profiles.settings.vdp_price_labels (comma-separated, priority
+  // order) and .vdp_strip_finance_params (default true) configure the
+  // extractor. Cached in a Map so the per-row loop doesn't refetch.
+  const settingsCache = new Map<string, { labels: string[]; stripFinance: boolean }>();
+  const getTenantScrapeSettings = async (tenantId: string) => {
+    const cached = settingsCache.get(tenantId);
+    if (cached) return cached;
+    const { data } = await admin.from("dealer_profiles").select("settings").eq("tenant_id", tenantId).maybeSingle();
+    // deno-lint-ignore no-explicit-any
+    const s: any = data?.settings || {};
+    const labels = String(s.vdp_price_labels || "").split(",").map((x: string) => x.trim()).filter(Boolean);
+    const stripFinance = s.vdp_strip_finance_params !== false;
+    const out = { labels, stripFinance };
+    settingsCache.set(tenantId, out);
+    return out;
+  };
+  const maybeNormalize = (url: string, stripFinance: boolean) => stripFinance ? normalizeVdpUrl(url) : url;
+
+  // ── "Test" mode ─────────────────────────────────────────────
+  // Dealer admin clicked "Test" next to the price-labels setting. Run the
+  // full extractor against one URL (cheap fetch first, escalate to Firecrawl
+  // if walled), return everything we found, and write nothing.
+  if (body.test_url) {
+    if (!body.tenant_id) {
+      return new Response(JSON.stringify({ error: "tenant_id required for test" }), {
+        status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+    if (!isUrlSafe(body.test_url)) {
+      return new Response(JSON.stringify({ test: { error: "URL blocked by SSRF guard" } }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+    const cfg = await getTenantScrapeSettings(body.tenant_id);
+    const fetchUrl = maybeNormalize(body.test_url, cfg.stripFinance);
+    let html = "";
+    let rendered = false;
+    let httpStatus = 0;
+    try {
+      const r = await fetch(fetchUrl, { headers: FETCH_HEADERS, signal: AbortSignal.timeout(12000) });
+      httpStatus = r.status;
+      const raw = r.ok ? await r.text() : "";
+      const challenged = looksLikeChallenge(raw, r.headers, r.status);
+      html = (!r.ok || challenged) ? "" : raw;
+    } catch { /* fall through */ }
+    let result: AdResult & { matched_label?: string | null } = html
+      ? extractAdvertised(html, fetchUrl, "", cfg.labels)
+      : { price: null, source: "none", gated: false, reason: "bot_challenge", msrp: null, candidates: [], matched_label: null };
+    if (result.price == null && renderBudget > 0) {
+      renderBudget--;
+      const fr = await firecrawlRender(fetchUrl);
+      if (fr) {
+        rendered = true;
+        if (fr.html) {
+          result = extractAdvertised(fr.html, fetchUrl, "", cfg.labels);
+        }
+        if (result.price == null && fr.jsonPrice != null && sane(fr.jsonPrice)) {
+          if (result.msrp != null && fr.jsonPrice < result.msrp * 0.3) {
+            result = { ...result, reason: "implausible_vs_msrp" };
+          } else {
+            result = { ...result, price: fr.jsonPrice, source: "jsonld", reason: null };
+          }
+        }
+      }
+    }
+    return new Response(JSON.stringify({
+      ok: true,
+      test: {
+        price: result.price,
+        matched_label: result.matched_label ?? null,
+        source: result.source,
+        reason: result.reason,
+        rendered,
+        http_status: httpStatus,
+        msrp: result.msrp,
+        candidates: result.candidates.slice(0, 30),
+        configured_labels: cfg.labels,
+        strip_finance_params: cfg.stripFinance,
+        fetch_url: fetchUrl,
+      },
+    }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
   }
 
   const limit = Math.max(1, Math.min(body.limit ?? 200, 1000));
@@ -493,16 +612,17 @@ serve(async (req) => {
         }).then(() => undefined, () => undefined);
         continue;
       }
-      const fetchUrl = normalizeVdpUrl(row.source_url);
+      const cfg = await getTenantScrapeSettings(row.tenant_id);
+      const fetchUrl = maybeNormalize(row.source_url, cfg.stripFinance);
       const res = await fetch(fetchUrl, {
         method: "GET",
         headers: FETCH_HEADERS,
         signal: AbortSignal.timeout(12000),
       });
       let html = res.ok ? await res.text() : "";
-      let result: AdResult = (res.ok && !looksLikeChallenge(html, res.headers, res.status))
-        ? extractAdvertised(html, fetchUrl, row.vin)
-        : { price: null, source: "none", gated: false, reason: "bot_challenge", msrp: null, candidates: [] };
+      let result: AdResult & { matched_label?: string | null } = (res.ok && !looksLikeChallenge(html, res.headers, res.status))
+        ? extractAdvertised(html, fetchUrl, row.vin, cfg.labels)
+        : { price: null, source: "none", gated: false, reason: "bot_challenge", msrp: null, candidates: [], matched_label: null };
 
       // Escalate to Firecrawl when the cheap path is walled or empty — this is
       // what makes JS-rendered dealer sites + marketplaces return a real price,
@@ -517,7 +637,7 @@ serve(async (req) => {
           renderSource = "firecrawl";
           if (r.html) {
             html = r.html;
-            result = extractAdvertised(r.html, fetchUrl, row.vin);
+            result = extractAdvertised(r.html, fetchUrl, row.vin, cfg.labels);
           }
           // Fall back to Firecrawl's structured extract, but only when the VIN
           // it read matches the target — never trust a price off the wrong car.
@@ -694,11 +814,12 @@ serve(async (req) => {
           const vin = vinFromUrl(vdp);
           if (!vin || !knownVins.has(vin)) continue; // only verify our own inventory
           try {
-            const fetchVdp = normalizeVdpUrl(vdp);
+            const cfg = await getTenantScrapeSettings(tenantId);
+            const fetchVdp = maybeNormalize(vdp, cfg.stripFinance);
             const r = await fetch(fetchVdp, { headers: FETCH_HEADERS, signal: AbortSignal.timeout(12000) });
             const html = r.ok ? await r.text() : "";
             if (!r.ok || looksLikeChallenge(html, r.headers, r.status)) { crawledThisTenant++; continue; }
-            const result = extractAdvertised(html, fetchVdp, vin);
+            const result = extractAdvertised(html, fetchVdp, vin, cfg.labels);
             if (result.gated || result.reason === "vin_mismatch" || result.price == null) { crawledThisTenant++; continue; }
             const k = `${vin}|${channel}`;
             const prev = latestByVinChannel.get(k);
