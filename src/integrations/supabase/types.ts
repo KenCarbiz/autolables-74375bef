@@ -2673,6 +2673,18 @@ export type Database = {
           vehicle_ymm: string
         }[]
       }
+      get_cron_job_status: {
+        Args: { _jobname: string }
+        Returns: {
+          active: boolean
+          jobname: string
+          last_end: string
+          last_message: string
+          last_start: string
+          last_status: string
+          schedule: string
+        }[]
+      }
       get_deal_token: {
         Args: { _token: string }
         Returns: {
