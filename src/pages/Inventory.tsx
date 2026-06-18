@@ -6,6 +6,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useTenant } from "@/contexts/TenantContext";
 import { useDealerSettings } from "@/contexts/DealerSettingsContext";
+import PageTabs, { VEHICLES_TABS } from "@/components/layout/PageTabs";
 import { useGetReady } from "@/hooks/useGetReady";
 import { usedSafetyInspectionForm } from "@/data/safetyInspection";
 import { useVinDecode } from "@/hooks/useVinDecode";
@@ -200,6 +201,7 @@ const Inventory = () => {
 
   return (
     <div className="p-4 lg:p-6 max-w-[1400px] mx-auto space-y-4">
+      <PageTabs tabs={VEHICLES_TABS} />
       {/* Operational header — actions live here, not in a marketing hero. */}
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 pt-1">
         <div>

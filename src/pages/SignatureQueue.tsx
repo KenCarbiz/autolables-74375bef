@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
+import PageTabs, { DEALS_TABS } from "@/components/layout/PageTabs";
 import { useNavigate } from "react-router-dom";
 import { format } from "date-fns";
 import { ArrowLeft, PenLine, ExternalLink, Link2, ChevronDown, ChevronRight, CheckCircle2, Send, Pencil } from "lucide-react";
@@ -219,14 +220,10 @@ const SignatureQueue = () => {
   return (
     <div className="min-h-screen bg-background">
       <div className="max-w-4xl mx-auto p-4 md:p-8">
-        <div className="flex items-center gap-3 mb-6">
-          <button onClick={() => navigate("/addendum")} className="p-2 rounded-md hover:bg-muted transition-colors">
-            <ArrowLeft className="w-5 h-5" />
-          </button>
-          <div>
-            <h1 className="text-xl font-bold font-barlow-condensed text-foreground">Waiting for Signatures</h1>
-            <p className="text-[12px] text-muted-foreground">Locked deals, confirmed and queued for the customer to sign.</p>
-          </div>
+        <PageTabs tabs={DEALS_TABS} className="mb-5" />
+        <div className="mb-6">
+          <h1 className="text-xl font-bold font-barlow-condensed text-foreground">Out for Signature</h1>
+          <p className="text-[12px] text-muted-foreground">Locked deals, confirmed and queued for the customer to sign.</p>
         </div>
 
         {isLoading ? (

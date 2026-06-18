@@ -6,6 +6,7 @@ import { useNavigate } from "react-router-dom";
 import { format } from "date-fns";
 import { Search, FileText, ArrowLeft, Eye, Plus, Printer, ShieldCheck, Mail, Pencil, Truck } from "lucide-react";
 import EmptyState from "@/components/ui/empty-state";
+import PageTabs, { DEALS_TABS } from "@/components/layout/PageTabs";
 import { toast } from "sonner";
 
 export type DealStage = "saved" | "signed" | "delivered";
@@ -97,12 +98,10 @@ const SavedAddendums = ({ stage = "saved" }: { stage?: DealStage }) => {
   return (
     <div className="min-h-screen bg-background">
       <div className="max-w-6xl mx-auto p-4 md:p-8">
+        <PageTabs tabs={DEALS_TABS} className="mb-5" />
         {/* Header */}
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-3">
-            <button onClick={() => navigate("/addendum")} className="p-2 rounded-md hover:bg-muted transition-colors">
-              <ArrowLeft className="w-5 h-5" />
-            </button>
             <h1 className="text-2xl font-bold font-barlow-condensed text-foreground">{meta.title}</h1>
           </div>
           <button onClick={() => navigate("/addendum")} className="font-semibold text-[13px] px-5 py-2 rounded-md bg-primary text-primary-foreground hover:opacity-85">

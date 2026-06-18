@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useVinScan } from "@/contexts/VinScanContext";
+import PageTabs, { VEHICLES_TABS } from "@/components/layout/PageTabs";
 import { format } from "date-fns";
 import {
   ScanLine, Car, Printer, Trash2, CheckCircle2,
@@ -172,6 +173,7 @@ const LotCaptureQueue = () => {
 
   return (
     <div className="p-4 lg:p-6 max-w-[1400px] mx-auto space-y-4">
+      <PageTabs tabs={VEHICLES_TABS} />
       {/* Operational header — workspace, not a marketing hero. */}
       <div className="flex items-end justify-between gap-4 flex-wrap pt-1">
         <div>
