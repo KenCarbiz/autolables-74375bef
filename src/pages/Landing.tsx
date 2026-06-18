@@ -1,3 +1,4 @@
+import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import Seo from "@/components/Seo";
@@ -20,8 +21,9 @@ import {
   BadgeCheck,
   Tag,
   CheckCircle2,
+  Camera,
+  RefreshCw,
 } from "lucide-react";
-import { useState } from "react";
 
 // ──────────────────────────────────────────────────────────────
 // Landing — Wave 35. Pre-launch / waitlist positioning.
