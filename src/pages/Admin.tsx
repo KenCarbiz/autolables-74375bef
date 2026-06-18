@@ -536,15 +536,60 @@ const Admin = () => {
 
         <div className="p-4 lg:p-6">
 
-        {/* Current section label — the left sidebar is the nav. We just
-            echo the active section's name here so the user knows which
-            panel they're looking at. No in-page tab strip. */}
-        <div className="mb-4 flex items-center gap-2 text-xs text-muted-foreground">
-          <span className="inline-flex items-center gap-1.5 h-7 px-2.5 rounded-full bg-muted font-semibold text-foreground">
-            {tabs.find((t) => t.id === tab)?.label || "Section"}
-          </span>
-          <span className="hidden sm:inline">— pick any section from the left sidebar to switch.</span>
-        </div>
+        {/* Grouped section nav. Collapses the flat tab set into ~6 groups a
+            manager uses (+ Advanced). Each group maps to existing ?tab= keys,
+            so every deep link still resolves; this is a presentation layer only. */}
+        {(() => {
+          const labelFor = (id: AdminTab) => tabs.find((t) => t.id === id)?.label || id;
+          const availIds = new Set(tabs.map((t) => t.id));
+          const groupDefs: { id: string; label: string; ids: AdminTab[] }[] = [
+            { id: "home", label: "Home", ids: ["home"] },
+            { id: "setup", label: "Branding & Setup", ids: ["branding"] },
+            { id: "products", label: "Products", ids: ["products", "rules"] },
+            { id: "reports", label: "Reports", ids: ["analytics", "leads", "funnel"] },
+            { id: "compliance", label: "Compliance", ids: ["audit", "files"] },
+            { id: "advanced", label: "Advanced", ids: ["settings", "queue", "getready", "inventory", "invoices", "warranty"] },
+          ];
+          const groups = groupDefs
+            .map((g) => ({ ...g, ids: g.ids.filter((id) => availIds.has(id)) }))
+            .filter((g) => g.ids.length > 0);
+          const activeGroup = groups.find((g) => g.ids.includes(tab)) || groups[0];
+          return (
+            <div className="mb-4 space-y-2">
+              <div className="overflow-x-auto">
+                <div className="inline-flex items-center gap-1 rounded-xl border border-border bg-card p-1">
+                  {groups.map((g) => {
+                    const active = g.id === activeGroup?.id;
+                    return (
+                      <button
+                        key={g.id}
+                        onClick={() => setTab(g.ids[0])}
+                        className={`h-8 px-3.5 rounded-lg text-[13px] font-semibold whitespace-nowrap transition-colors ${active ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted"}`}
+                      >
+                        {g.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+              {activeGroup && activeGroup.ids.length > 1 && (
+                <div className="overflow-x-auto">
+                  <div className="inline-flex items-center gap-1">
+                    {activeGroup.ids.map((id) => (
+                      <button
+                        key={id}
+                        onClick={() => setTab(id)}
+                        className={`h-7 px-3 rounded-md text-[12px] font-semibold whitespace-nowrap transition-colors ${id === tab ? "bg-blue-50 text-[#2563EB]" : "text-muted-foreground hover:bg-muted"}`}
+                      >
+                        {labelFor(id)}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          );
+        })()}
 
         {/* ─── Home Tab ─── */}
         {tab === "home" && (() => {
