@@ -431,12 +431,13 @@ serve(async (req) => {
     auth: { persistSession: false, autoRefreshToken: false },
   });
 
-  let body: { limit?: number; tenant_id?: string; discover?: boolean; vin?: string } = {};
+  let body: { limit?: number; tenant_id?: string; discover?: boolean; vin?: string; test_url?: string } = {};
   try { body = await req.json(); } catch { /* empty body OK */ }
   const targetVin = body.vin ? normVin(body.vin) : null;
   // Firecrawl is metered — cap renders per run. A single-VIN re-scrape (the
-  // Ready-for-Signatures verify) gets a small dedicated budget.
-  let renderBudget = FIRECRAWL_KEY ? (targetVin ? 3 : 30) : 0;
+  // Ready-for-Signatures verify) gets a small dedicated budget, and the
+  // dealer "Test" button gets exactly one render.
+  let renderBudget = FIRECRAWL_KEY ? (body.test_url ? 1 : (targetVin ? 3 : 30)) : 0;
 
   // ── Auth gate ────────────────────────────────────────────────
   // Two callers: (1) the nightly cron with the service-role key — full
