@@ -730,9 +730,48 @@ const AppShell = ({ children }: AppShellProps) => {
         {/* Page content — only this swaps on route change. Chrome
             above (topbar + breadcrumb) and the sidebar stay
             mounted and visually still. */}
-        <main className="flex-1 overflow-y-auto">
+        <main className="flex-1 overflow-y-auto pb-16 lg:pb-0">
           {children}
         </main>
+
+        {/* Mobile bottom tab bar — thumb-reachable daily nav. Hidden on
+            desktop (lg:) where the sidebar is persistent. The center Scan is
+            the device-aware VIN capture. */}
+        <nav className="lg:hidden fixed bottom-0 inset-x-0 z-40 border-t border-border bg-card/95 backdrop-blur-xl no-print">
+          <div className="grid grid-cols-5 h-16">
+            {[
+              { label: "Home", to: "/dashboard", icon: LayoutDashboard, match: ["/dashboard"] },
+              { label: "Vehicles", to: "/inventory", icon: Car, match: ["/inventory", "/queue"] },
+              { label: "Scan", to: "__scan__", icon: ScanLine, match: [] as string[] },
+              { label: "Deals", to: "/saved", icon: FolderOpen, match: ["/saved", "/signatures", "/signed", "/delivered"] },
+              { label: "Create", to: "/addendum", icon: FileText, match: ["/addendum", "/new-car-sticker", "/used-car-sticker", "/cpo-sheet", "/trade-up", "/buyers-guide", "/description-writer"] },
+            ].map((t) => {
+              const isScan = t.to === "__scan__";
+              const active = !isScan && t.match.some((m) => location.pathname === m);
+              const Icon = t.icon;
+              if (isScan) {
+                return (
+                  <button key="scan" onClick={openScan} className="relative flex flex-col items-center justify-center">
+                    <span className="absolute -top-4 flex h-12 w-12 items-center justify-center rounded-full bg-[#2563EB] text-white shadow-lg shadow-[#2563EB]/30 ring-4 ring-card">
+                      <Icon className="h-5 w-5" />
+                    </span>
+                    <span className="mt-7 text-[10px] font-semibold text-muted-foreground">{t.label}</span>
+                  </button>
+                );
+              }
+              return (
+                <button
+                  key={t.to}
+                  onClick={() => navigate(t.to)}
+                  className={`flex flex-col items-center justify-center gap-0.5 ${active ? "text-[#2563EB]" : "text-muted-foreground"}`}
+                >
+                  <Icon className="h-5 w-5" />
+                  <span className="text-[10px] font-semibold">{t.label}</span>
+                </button>
+              );
+            })}
+          </div>
+        </nav>
       </div>
 
       {/* Command Palette — global ⌘K / Ctrl+K */}
