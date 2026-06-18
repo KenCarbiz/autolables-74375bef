@@ -476,6 +476,90 @@ serve(async (req) => {
     body.limit = Math.min(body.limit ?? 300, 500);
   }
 
+  // ── Per-tenant scrape settings ──────────────────────────────
+  // dealer_profiles.settings.vdp_price_labels (comma-separated, priority
+  // order) and .vdp_strip_finance_params (default true) configure the
+  // extractor. Cached in a Map so the per-row loop doesn't refetch.
+  const settingsCache = new Map<string, { labels: string[]; stripFinance: boolean }>();
+  const getTenantScrapeSettings = async (tenantId: string) => {
+    const cached = settingsCache.get(tenantId);
+    if (cached) return cached;
+    const { data } = await admin.from("dealer_profiles").select("settings").eq("tenant_id", tenantId).maybeSingle();
+    // deno-lint-ignore no-explicit-any
+    const s: any = data?.settings || {};
+    const labels = String(s.vdp_price_labels || "").split(",").map((x: string) => x.trim()).filter(Boolean);
+    const stripFinance = s.vdp_strip_finance_params !== false;
+    const out = { labels, stripFinance };
+    settingsCache.set(tenantId, out);
+    return out;
+  };
+  const maybeNormalize = (url: string, stripFinance: boolean) => stripFinance ? normalizeVdpUrl(url) : url;
+
+  // ── "Test" mode ─────────────────────────────────────────────
+  // Dealer admin clicked "Test" next to the price-labels setting. Run the
+  // full extractor against one URL (cheap fetch first, escalate to Firecrawl
+  // if walled), return everything we found, and write nothing.
+  if (body.test_url) {
+    if (!body.tenant_id) {
+      return new Response(JSON.stringify({ error: "tenant_id required for test" }), {
+        status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+    if (!isUrlSafe(body.test_url)) {
+      return new Response(JSON.stringify({ test: { error: "URL blocked by SSRF guard" } }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+    const cfg = await getTenantScrapeSettings(body.tenant_id);
+    const fetchUrl = maybeNormalize(body.test_url, cfg.stripFinance);
+    let html = "";
+    let rendered = false;
+    let httpStatus = 0;
+    try {
+      const r = await fetch(fetchUrl, { headers: FETCH_HEADERS, signal: AbortSignal.timeout(12000) });
+      httpStatus = r.status;
+      const raw = r.ok ? await r.text() : "";
+      const challenged = looksLikeChallenge(raw, r.headers, r.status);
+      html = (!r.ok || challenged) ? "" : raw;
+    } catch { /* fall through */ }
+    let result: AdResult & { matched_label?: string | null } = html
+      ? extractAdvertised(html, fetchUrl, "", cfg.labels)
+      : { price: null, source: "none", gated: false, reason: "bot_challenge", msrp: null, candidates: [], matched_label: null };
+    if (result.price == null && renderBudget > 0) {
+      renderBudget--;
+      const fr = await firecrawlRender(fetchUrl);
+      if (fr) {
+        rendered = true;
+        if (fr.html) {
+          result = extractAdvertised(fr.html, fetchUrl, "", cfg.labels);
+        }
+        if (result.price == null && fr.jsonPrice != null && sane(fr.jsonPrice)) {
+          if (result.msrp != null && fr.jsonPrice < result.msrp * 0.3) {
+            result = { ...result, reason: "implausible_vs_msrp" };
+          } else {
+            result = { ...result, price: fr.jsonPrice, source: "jsonld", reason: null };
+          }
+        }
+      }
+    }
+    return new Response(JSON.stringify({
+      ok: true,
+      test: {
+        price: result.price,
+        matched_label: result.matched_label ?? null,
+        source: result.source,
+        reason: result.reason,
+        rendered,
+        http_status: httpStatus,
+        msrp: result.msrp,
+        candidates: result.candidates.slice(0, 30),
+        configured_labels: cfg.labels,
+        strip_finance_params: cfg.stripFinance,
+        fetch_url: fetchUrl,
+      },
+    }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+  }
+
   const limit = Math.max(1, Math.min(body.limit ?? 200, 1000));
 
   // Pull rows with a real source_url, newest first, and dedupe to the
