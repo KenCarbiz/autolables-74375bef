@@ -439,6 +439,8 @@ const FEATURES = [
   { icon: Signature, title: "Digital signing", body: "Customer signs on their phone via QR. Every signature is cryptographically logged for audits." },
   { icon: FileText, title: "Buyers Guide", body: "FTC As-Is / Implied / Warranty guides in English + Spanish. Satisfies federal and state requirements." },
   { icon: BarChart3, title: "Live analytics", body: "Product acceptance rates, revenue per addendum, top hooks — every signal that matters." },
+  { icon: Camera, title: "Installer accountability", body: "If it's advertised as installed, an installer signs and photographs it — or the customer is free to decline it." },
+  { icon: RefreshCw, title: "Nightly sync", body: "Inventory and advertised prices sync automatically every night, so new vehicles arrive ready for the disclosure addendum." },
 ];
 
 const PowerGrid = () => (
