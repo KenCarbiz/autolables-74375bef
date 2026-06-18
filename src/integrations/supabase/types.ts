@@ -846,6 +846,39 @@ export type Database = {
         }
         Relationships: []
       }
+      evidence_receipts: {
+        Row: {
+          chain_root: string
+          created_at: string
+          generated_by: string | null
+          id: string
+          manifest: Json
+          packet_version: string
+          tenant_id: string
+          vin: string
+        }
+        Insert: {
+          chain_root: string
+          created_at?: string
+          generated_by?: string | null
+          id?: string
+          manifest: Json
+          packet_version?: string
+          tenant_id: string
+          vin: string
+        }
+        Update: {
+          chain_root?: string
+          created_at?: string
+          generated_by?: string | null
+          id?: string
+          manifest?: Json
+          packet_version?: string
+          tenant_id?: string
+          vin?: string
+        }
+        Relationships: []
+      }
       get_ready_records: {
         Row: {
           accessories_to_install: Json
@@ -2800,6 +2833,15 @@ export type Database = {
           _signing_location: Json
           _signing_token: string
           _user_agent: string
+        }
+        Returns: string
+      }
+      record_evidence_receipt: {
+        Args: {
+          _chain_root: string
+          _manifest: Json
+          _packet_version?: string
+          _vin: string
         }
         Returns: string
       }
