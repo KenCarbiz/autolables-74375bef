@@ -250,7 +250,7 @@ const VehicleFile = () => {
                   className="h-9 px-4 rounded-md bg-primary text-primary-foreground text-sm font-semibold inline-flex items-center gap-1.5"
                 >
                   <Globe className="w-4 h-4" />
-                  Publish shopper page
+                  Set up sticker &amp; publish
                 </button>
               )}
             </div>

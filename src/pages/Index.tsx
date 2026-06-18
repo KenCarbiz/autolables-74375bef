@@ -1513,16 +1513,24 @@ const Index = () => {
               provenInstallProofs: installProofs.map((p) => ({ product_name: p.product_name || "", verified: p.is_verified !== false })),
             })}
           />
-          {/* Wave 4.3 — per-state disclosure pack for the dealer's state */}
-          <StateRewriterPanel
-            state={settings.doc_fee_state || settings.dealer_state || null}
-            input={{
-              vehiclePrice: undefined,
-              docFeeAmount: settings.doc_fee_enabled ? settings.doc_fee_amount : undefined,
-              vehicleCondition,
-              saleConductedInSpanish: false,
-            }}
-          />
+          {/* Per-state disclosure pack — collapsed by default so it isn't a
+              wall of legal text above the dealer's work; one tap to review. */}
+          <details className="rounded-xl border border-slate-200 bg-white overflow-hidden">
+            <summary className="cursor-pointer select-none px-4 py-3 text-body-sm font-semibold text-slate-700">
+              State disclosures &amp; consumer-rights preview
+            </summary>
+            <div className="px-1 pb-1">
+              <StateRewriterPanel
+                state={settings.doc_fee_state || settings.dealer_state || null}
+                input={{
+                  vehiclePrice: undefined,
+                  docFeeAmount: settings.doc_fee_enabled ? settings.doc_fee_amount : undefined,
+                  vehicleCondition,
+                  saleConductedInSpanish: false,
+                }}
+              />
+            </div>
+          </details>
         </div>
       )}
 

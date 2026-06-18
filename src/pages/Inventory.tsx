@@ -237,15 +237,17 @@ const Inventory = () => {
             <Upload className="w-4 h-4 stroke-2" />
             CSV Import
           </button>
-          <button
-            onClick={runPriceScrape}
-            disabled={scraping}
-            title="Crawl your website and marketplaces (CARFAX, CarGurus, Cars.com, AutoTrader, Capital One) and record each site's advertised price per VIN"
-            className="h-9 px-4 rounded-xl border border-border bg-card hover:bg-muted text-foreground inline-flex items-center gap-2 text-sm font-medium transition-colors whitespace-nowrap disabled:opacity-50"
-          >
-            <RefreshCw className={`w-4 h-4 stroke-2 ${scraping ? "animate-spin" : ""}`} />
-            {scraping ? "Scraping…" : "Verify prices"}
-          </button>
+          {settings.feature_price_verification && (
+            <button
+              onClick={runPriceScrape}
+              disabled={scraping}
+              title="Crawl your website and marketplaces (CARFAX, CarGurus, Cars.com, AutoTrader, Capital One) and record each site's advertised price per VIN"
+              className="h-9 px-4 rounded-xl border border-border bg-card hover:bg-muted text-foreground inline-flex items-center gap-2 text-sm font-medium transition-colors whitespace-nowrap disabled:opacity-50"
+            >
+              <RefreshCw className={`w-4 h-4 stroke-2 ${scraping ? "animate-spin" : ""}`} />
+              {scraping ? "Scraping…" : "Verify prices"}
+            </button>
+          )}
         </div>
       </div>
 
@@ -430,9 +432,9 @@ const Inventory = () => {
                         />
                       ) : (
                         <RowAction
-                          label="Publish"
+                          label="Make sticker"
                           tone="blue"
-                          title="Publish to the shopper portal"
+                          title="Build the window sticker — the shopper page publishes from there"
                           onClick={(e) => { e.stopPropagation(); navigate(`/vehicle-file/${r.id}?tab=labels`); }}
                         />
                       )}
