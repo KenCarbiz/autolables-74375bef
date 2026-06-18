@@ -39,6 +39,32 @@ Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
   if (req.method !== "POST") return json(405, { error: "method_not_allowed" });
 
+  // ── Auth gate ─ require a valid Supabase user JWT (or service role).
+  const supabaseUrl = Deno.env.get("SUPABASE_URL") || "";
+  const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
+  const jwt = (req.headers.get("Authorization") || "").replace(/^Bearer\s+/i, "");
+  if (!jwt) return json(401, { error: "missing bearer token" });
+  if (jwt !== serviceKey) {
+    if (!supabaseUrl || !serviceKey) return json(500, { error: "supabase not configured" });
+    try {
+      const { createClient } = await import("https://esm.sh/@supabase/supabase-js@2.45.0");
+      const admin = createClient(supabaseUrl, serviceKey, {
+        auth: { persistSession: false, autoRefreshToken: false },
+      });
+      const { data: userRes, error: userErr } = await admin.auth.getUser(jwt);
+      if (userErr || !userRes?.user) return json(401, { error: "invalid token" });
+      const { data: mem } = await admin
+        .from("tenant_members")
+        .select("tenant_id")
+        .eq("user_id", userRes.user.id)
+        .not("accepted_at", "is", null)
+        .limit(1);
+      if (!mem || mem.length === 0) return json(403, { error: "no tenant membership" });
+    } catch {
+      return json(401, { error: "invalid token" });
+    }
+  }
+
   const apiKey = Deno.env.get("FIRECRAWL_API_KEY_1") || Deno.env.get("FIRECRAWL_API_KEY");
   if (!apiKey) return json(200, { error: "not_configured" });
 
