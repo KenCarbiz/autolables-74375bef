@@ -3,6 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useTenant } from "@/contexts/TenantContext";
 import { ShieldCheck, AlertTriangle, ExternalLink, Globe } from "lucide-react";
 import { toast } from "sonner";
+import CronStatusBadge from "@/components/admin/CronStatusBadge";
 
 // PriceIntegrityPanel — reconciles each VIN's lot/sticker price
 // (vehicle_listings.price) against the latest advertised price per
@@ -133,6 +134,8 @@ export const PriceIntegrityPanel = () => {
           conduct behind the FTC's March 2026 letters — advertise one price, charge another. Catch it here first.
         </p>
       </div>
+
+      <CronStatusBadge jobName="crawl-advertised-prices" label="Website crawl" />
 
       {/* Website monitoring setup */}
       <div className="rounded-2xl border border-border bg-card p-4 space-y-2">

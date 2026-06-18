@@ -4,6 +4,7 @@ import { useTenant } from "@/contexts/TenantContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
 import { RefreshCw, Loader2, Database, ShieldCheck, Lock } from "lucide-react";
+import CronStatusBadge from "@/components/admin/CronStatusBadge";
 
 // MarketcheckSyncCard — per-tenant nightly inventory sync control.
 // Super admin grants/revokes the capability (allowed); the dealership turns it
@@ -106,15 +107,18 @@ export default function MarketcheckSyncCard() {
         verifies against.
       </p>
 
-      {/* Super-admin capability grant */}
+      {/* Super-admin capability grant + cron health */}
       {isAdmin && (
-        <label className="flex items-center justify-between rounded-xl border border-amber-200 bg-amber-50/60 px-4 py-3">
-          <span className="flex items-center gap-2 text-sm font-semibold text-amber-900">
-            <ShieldCheck className="w-4 h-4" /> Allow this dealer to use MarketCheck (super admin)
-          </span>
-          <input type="checkbox" checked={cfg.allowed} onChange={(e) => toggleAllowed(e.target.checked)}
-            className="h-5 w-5 rounded border-border" />
-        </label>
+        <>
+          <CronStatusBadge jobName="marketcheck-sync" label="MarketCheck" />
+          <label className="flex items-center justify-between rounded-xl border border-amber-200 bg-amber-50/60 px-4 py-3">
+            <span className="flex items-center gap-2 text-sm font-semibold text-amber-900">
+              <ShieldCheck className="w-4 h-4" /> Allow this dealer to use MarketCheck (super admin)
+            </span>
+            <input type="checkbox" checked={cfg.allowed} onChange={(e) => toggleAllowed(e.target.checked)}
+              className="h-5 w-5 rounded border-border" />
+          </label>
+        </>
       )}
 
       {!cfg.allowed ? (
