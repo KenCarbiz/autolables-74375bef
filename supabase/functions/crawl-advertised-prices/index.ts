@@ -814,11 +814,12 @@ serve(async (req) => {
           const vin = vinFromUrl(vdp);
           if (!vin || !knownVins.has(vin)) continue; // only verify our own inventory
           try {
-            const fetchVdp = normalizeVdpUrl(vdp);
+            const cfg = await getTenantScrapeSettings(tenantId);
+            const fetchVdp = maybeNormalize(vdp, cfg.stripFinance);
             const r = await fetch(fetchVdp, { headers: FETCH_HEADERS, signal: AbortSignal.timeout(12000) });
             const html = r.ok ? await r.text() : "";
             if (!r.ok || looksLikeChallenge(html, r.headers, r.status)) { crawledThisTenant++; continue; }
-            const result = extractAdvertised(html, fetchVdp, vin);
+            const result = extractAdvertised(html, fetchVdp, vin, cfg.labels);
             if (result.gated || result.reason === "vin_mismatch" || result.price == null) { crawledThisTenant++; continue; }
             const k = `${vin}|${channel}`;
             const prev = latestByVinChannel.get(k);
