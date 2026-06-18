@@ -602,6 +602,39 @@ const Index = () => {
     }
   };
 
+  // Dealer-uploaded website evidence (screenshot / PDF) for the VIN defense
+  // file. Stored in the private price-evidence bucket and recorded as an
+  // advertised_prices snapshot so it lands in the per-VIN audit packet.
+  const uploadPriceEvidence = async (file: File, price?: number) => {
+    const vin = vehicle.vin.toUpperCase().trim();
+    if (!vin || !tenant?.id) { toast.error("Enter the VIN first"); return; }
+    const ext = (file.name.split(".").pop() || "png").toLowerCase().replace(/[^a-z0-9]/g, "") || "png";
+    const path = `${tenant.id}/${vin}/manual-${Date.now()}.${ext}`;
+    const up = await supabase.storage.from("price-evidence")
+      .upload(path, file, { upsert: true, contentType: file.type || undefined });
+    if (up.error) { toast.error("Upload failed: " + up.error.message); return; }
+    const adv = price && price > 0
+      ? price
+      : (advertisedForVin?.advertised_price ?? (priceIntegrity.expectedOnline || vehiclePriceNum || 0));
+    const row: Record<string, unknown> = {
+      store_id: currentStore?.id || "",
+      vin,
+      source_channel: "website",
+      source_url: "",
+      advertised_price: adv,
+      captured_by: "dealer_manual",
+      screenshot_url: path,
+      notes: "Dealer-uploaded website evidence (VIN defense)",
+    };
+    let insErr = (await (supabase as any).from("advertised_prices").insert(row)).error;
+    if (insErr && /screenshot_url/i.test(insErr.message || "")) {
+      const { screenshot_url, ...rest } = row;
+      insErr = (await (supabase as any).from("advertised_prices").insert(rest)).error;
+    }
+    if (insErr) { toast.error("Saved the file, but recording it failed: " + insErr.message); return; }
+    toast.success("Website evidence attached to this VIN's defense file");
+  };
+
   // Re-scrape the dealer website for this single VIN (Firecrawl-backed crawl).
   const rescrapeVin = async () => {
     if (!vehicle.vin.trim() || !tenant?.id) { toast.error("Enter the VIN first"); return; }
@@ -1440,6 +1473,7 @@ const Index = () => {
             onCaptureAdvertised={captureAdvertised}
             onRescrape={rescrapeVin}
             rescraping={rescraping}
+            onUploadEvidence={uploadPriceEvidence}
           />
           <ComplianceRedTeamPanel
             findings={runComplianceRedTeam({

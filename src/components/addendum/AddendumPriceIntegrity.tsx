@@ -1,6 +1,6 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { motion } from "framer-motion";
-import { ShieldCheck, AlertTriangle, XCircle, DollarSign, RefreshCw } from "lucide-react";
+import { ShieldCheck, AlertTriangle, XCircle, DollarSign, RefreshCw, Upload } from "lucide-react";
 import type { PriceIntegrityAssessment, AdvertisedSource } from "@/hooks/useAdvertisedPrices";
 
 // AddendumPriceIntegrity — the per-deal FTC price gate the dealer sees
@@ -28,6 +28,7 @@ export default function AddendumPriceIntegrity({
   onCaptureAdvertised,
   onRescrape,
   rescraping = false,
+  onUploadEvidence,
   className = "",
 }: {
   assessment: PriceIntegrityAssessment;
@@ -38,9 +39,13 @@ export default function AddendumPriceIntegrity({
   onCaptureAdvertised?: (price: number, source: AdvertisedSource) => void | Promise<void>;
   onRescrape?: () => void | Promise<void>;
   rescraping?: boolean;
+  onUploadEvidence?: (file: File, price?: number) => void | Promise<void>;
   className?: string;
 }) {
   const [capture, setCapture] = useState("");
+  const [evidencePrice, setEvidencePrice] = useState("");
+  const [uploading, setUploading] = useState(false);
+  const fileRef = useRef<HTMLInputElement>(null);
   const a = assessment;
 
   const tone =
@@ -78,6 +83,20 @@ export default function AddendumPriceIntegrity({
           <p className="text-body-sm font-semibold">{title}</p>
           <p className="text-caption opacity-80">{a.reason}</p>
         </div>
+        {/* Always-available last-minute delivery check — re-scrapes the live
+            website price and captures a fresh evidence screenshot. */}
+        {onRescrape && vin && (
+          <button
+            type="button"
+            onClick={onRescrape}
+            disabled={rescraping}
+            title="Re-scrape the live website price now and capture a screenshot for the VIN defense file"
+            className="shrink-0 inline-flex items-center gap-1.5 h-8 px-3 rounded-md bg-white/70 border border-current/20 text-[12px] font-semibold hover:bg-white disabled:opacity-50"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 ${rescraping ? "animate-spin" : ""}`} />
+            {rescraping ? "Verifying…" : "Verify price now"}
+          </button>
+        )}
       </div>
 
       <div className="p-4 space-y-3">
@@ -180,18 +199,53 @@ export default function AddendumPriceIntegrity({
             >
               Capture
             </button>
-            {onRescrape && (
+          </div>
+        )}
+
+        {/* VIN-defense evidence: the dealer can attach their own screenshot or
+            PDF of the website price, stored to the private evidence file. */}
+        {onUploadEvidence && vin && (
+          <div className="rounded-md border border-dashed border-border bg-muted/20 px-3 py-2.5">
+            <p className="text-[12px] font-semibold text-foreground">Attach website price evidence (VIN defense)</p>
+            <p className="text-[11px] text-muted-foreground mt-0.5">
+              Optional: upload your own screenshot or PDF of the live listing. Add the advertised price shown so it
+              records as a verified snapshot.
+            </p>
+            <input
+              ref={fileRef}
+              type="file"
+              accept="image/*,application/pdf"
+              className="hidden"
+              onChange={async (e) => {
+                const f = e.target.files?.[0];
+                if (!f) return;
+                setUploading(true);
+                const n = parseFloat(evidencePrice.replace(/[^0-9.]/g, ""));
+                try { await onUploadEvidence(f, n > 0 ? n : undefined); setEvidencePrice(""); }
+                finally { setUploading(false); if (fileRef.current) fileRef.current.value = ""; }
+              }}
+            />
+            <div className="mt-2 flex items-center gap-2">
+              <div className="relative w-40">
+                <DollarSign className="w-4 h-4 absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                <input
+                  inputMode="decimal"
+                  value={evidencePrice}
+                  onChange={(e) => setEvidencePrice(e.target.value)}
+                  placeholder="Advertised price"
+                  className="w-full h-9 rounded-md border border-border bg-background pl-8 pr-3 text-sm tabular-nums"
+                />
+              </div>
               <button
                 type="button"
-                onClick={onRescrape}
-                disabled={rescraping}
-                title="Re-scrape the dealer website for this VIN"
-                className="h-9 px-2.5 rounded-md border border-border text-sm inline-flex items-center gap-1.5 hover:bg-muted disabled:opacity-50"
+                onClick={() => fileRef.current?.click()}
+                disabled={uploading}
+                className="h-9 px-3 rounded-md border border-border text-sm font-semibold inline-flex items-center gap-1.5 hover:bg-muted disabled:opacity-50"
               >
-                <RefreshCw className={`w-3.5 h-3.5 ${rescraping ? "animate-spin" : ""}`} />
-                Re-scrape
+                {uploading ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Upload className="w-3.5 h-3.5" />}
+                {uploading ? "Uploading…" : "Upload screenshot / PDF"}
               </button>
-            )}
+            </div>
           </div>
         )}
       </div>
