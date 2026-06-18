@@ -154,7 +154,17 @@ const normalizeVdpUrl = (raw: string): string => {
 // "largest dollar on the page" heuristic, which grabbed the MSRP off a price
 // stack and produced false "ad != sticker" drift on every discounted car.
 // For Call-for-Price pages it records nothing rather than guess the MSRP.
-const extractAdvertised = (html: string, url: string, targetVin: string): AdResult => {
+//
+// `customLabels` are dealer-configured price labels in priority order
+// ("Harte Deal", "Internet Price", …). They run BEFORE the generic DOM
+// heuristic and short-circuit on the first label that has a dollar amount
+// adjacent — that's the dealer's brand for the advertised selling price.
+const extractAdvertised = (
+  html: string,
+  url: string,
+  targetVin: string,
+  customLabels: string[] = [],
+): AdResult & { matched_label?: string | null } => {
   const target = normVin(targetVin);
   const pageVins = collectVins(html, url);
   const candidates: PriceCandidate[] = [];
