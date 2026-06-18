@@ -25,6 +25,7 @@ import { InventoryFeedHealth } from "@/components/admin/InventoryFeedHealth";
 import { OpenSigningsList } from "@/components/admin/OpenSigningsList";
 import { AddonElectionsPanel } from "@/components/admin/AddonElectionsPanel";
 import { PriceIntegrityPanel } from "@/components/admin/PriceIntegrityPanel";
+import MarketcheckSyncCard from "@/components/admin/MarketcheckSyncCard";
 import { useEmailDistribution } from "@/hooks/useEmailDistribution";
 import { ProductIcon, PRODUCT_ICON_KEYS } from "@/components/addendum/productIcons";
 import { STATE_DOC_FEES } from "@/data/docFees";
@@ -2428,6 +2429,7 @@ const Admin = () => {
         {/* ─── Audit Log Tab ─── */}
         {tab === "audit" && (
           <div className="space-y-4">
+            <MarketcheckSyncCard />
             <PriceIntegrityPanel />
             <div className="flex items-center justify-between flex-wrap gap-2">
               <div>
