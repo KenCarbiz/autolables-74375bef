@@ -45,6 +45,10 @@ export interface RedTeamDraft extends ComplianceDraft {
   esignConsentAccepted?: boolean;
   listingUnlocked?: boolean;
   vehicleCondition?: "new" | "used" | "cpo";
+  // Verified installer proofs (signature + photo) on file for this VIN. When
+  // provided (dealer build context), every pre-installed product must match a
+  // verified proof or it cannot remain in the advertised price.
+  provenInstallProofs?: Array<{ product_name: string; verified: boolean }>;
 }
 
 // Words that should not appear in current addendum copy because the
@@ -90,6 +94,35 @@ export const runComplianceRedTeam = (draft: RedTeamDraft): ComplianceFinding[] =
       citation: "UETA §12; state per-item sign-off rules for add-ons.",
       suggestion: `Re-open the sign flow and have the customer initial: ${unsigned.slice(0, 3).map((p) => p.name).join(", ")}${unsigned.length > 3 ? "…" : ""}`,
     });
+  }
+
+  // ─── Pre-installed products require a verified install proof ──
+  // FTC: a product advertised as installed/included must be substantiated by
+  // a verifiable installer sign-off WITH a photo. Absent that, it cannot stay
+  // in the advertised price — reclassify to customer-elected so the buyer may
+  // decline it. Only runs in the dealer build context (proofs supplied).
+  if (draft.provenInstallProofs !== undefined) {
+    const verifiedNames = new Set(
+      draft.provenInstallProofs
+        .filter((p) => p.verified)
+        .map((p) => (p.product_name || "").trim().toLowerCase())
+        .filter(Boolean),
+    );
+    const installedLines = (draft.products || []).filter((p) => p.badge_type === "installed");
+    const unproven = installedLines.filter((p) => {
+      const pn = (p.name || "").toLowerCase();
+      return ![...verifiedNames].some((n) => n.length >= 4 && (pn === n || pn.includes(n) || n.includes(pn)));
+    });
+    if (unproven.length > 0) {
+      findings.push({
+        id: "installed-without-verified-proof",
+        severity: "fail",
+        rule: "Pre-installed products require a verified install proof with a photo",
+        message: `${unproven.length} pre-installed product(s) have no verified, photographed installer sign-off: ${unproven.slice(0, 3).map((p) => p.name).join(", ")}${unproven.length > 3 ? "…" : ""}.`,
+        citation: "FTC Act §5 — an item advertised as installed/included must be substantiated; otherwise it is a customer-elected add-on the buyer may decline.",
+        suggestion: "Have the installer scan the Get-Ready QR to record a signed, photographed proof, OR set the line's Sale Method to Customer Elected (the buyer may opt out).",
+      });
+    }
   }
 
   // ─── Missing benefit justification (Wave 16) ────────────────

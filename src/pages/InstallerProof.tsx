@@ -3,6 +3,8 @@ import { useParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Camera, Check, Loader2 } from "lucide-react";
+import SignaturePad from "@/components/addendum/SignaturePad";
+import { fetchClientIp } from "@/lib/esign";
 
 // Public installer proof-of-installation page. The detail shop / vendor
 // scans the QR on the car, identifies themselves, confirms what protection
@@ -26,6 +28,7 @@ const InstallerProof = () => {
   const [notes, setNotes] = useState("");
   const [photoFile, setPhotoFile] = useState<File | null>(null);
   const [photoPreview, setPhotoPreview] = useState<string>("");
+  const [sig, setSig] = useState<{ data: string; type: "draw" | "type" }>({ data: "", type: "draw" });
   const fileRef = useRef<HTMLInputElement>(null);
 
   const onPickPhoto = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -39,9 +42,12 @@ const InstallerProof = () => {
     if (!token) { toast.error("Invalid install link."); return; }
     if (!installerName.trim()) { toast.error("Please enter your name."); return; }
     if (!productName.trim()) { toast.error("Please enter what you installed."); return; }
+    // A verifiable proof needs BOTH a photo and a signature — an in-price
+    // product can only stay pre-installed when the install is substantiated.
+    if (!photoFile) { toast.error("A photo of the installed equipment is required."); return; }
+    if (!sig.data) { toast.error("Please sign to certify this installation."); return; }
     setSubmitting(true);
 
-    // Upload the photo first (best-effort; the proof still records without it).
     let photoPath: string | null = null;
     if (photoFile) {
       const safe = photoFile.name.replace(/[^a-zA-Z0-9._-]/g, "_");
@@ -51,8 +57,13 @@ const InstallerProof = () => {
         .upload(path, photoFile, { upsert: false });
       if (!upErr) photoPath = path;
     }
+    if (!photoPath) { setSubmitting(false); toast.error("Photo upload failed — please retry."); return; }
 
-    const { error } = await (supabase as any).rpc("record_install_proof", {
+    const installerIp = await fetchClientIp().catch(() => null);
+
+    // Use the verification overload (signature + IP). Fall back to the legacy
+    // 8-arg signature if the new overload hasn't propagated yet.
+    let error = (await (supabase as any).rpc("record_install_proof", {
       _install_token: token,
       _product_id: null,
       _product_name: productName.trim(),
@@ -61,7 +72,22 @@ const InstallerProof = () => {
       _installed_at: new Date(installedAt).toISOString(),
       _photo_path: photoPath,
       _notes: notes.trim() || null,
-    });
+      _installer_signature_data: sig.data,
+      _installer_signature_type: sig.type,
+      _installer_ip: installerIp,
+    })).error;
+    if (error && /record_install_proof|function|does not exist|argument/i.test(error.message || "")) {
+      error = (await (supabase as any).rpc("record_install_proof", {
+        _install_token: token,
+        _product_id: null,
+        _product_name: productName.trim(),
+        _installer_name: installerName.trim(),
+        _installer_company: company.trim() || null,
+        _installed_at: new Date(installedAt).toISOString(),
+        _photo_path: photoPath,
+        _notes: notes.trim() || null,
+      })).error;
+    }
 
     setSubmitting(false);
     if (error) {
@@ -139,6 +165,14 @@ const InstallerProof = () => {
             <textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={2} placeholder="Anything worth recording"
               className="w-full rounded-xl border-2 border-slate-300 px-4 py-2.5 text-sm bg-white text-slate-900" />
           </Field>
+
+          <SignaturePad
+            label="Installer signature"
+            subtitle="Sign to certify you installed this on the vehicle"
+            value={sig.data}
+            type={sig.type}
+            onChange={(data, type) => setSig({ data, type })}
+          />
         </div>
 
         <button onClick={submit} disabled={submitting}

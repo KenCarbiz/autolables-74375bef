@@ -195,6 +195,54 @@ describe("FTC Buyers Guide requirement for used", () => {
   });
 });
 
+describe("pre-installed products require a verified install proof", () => {
+  it("FAILS a pre-installed product with no verified proof on file", () => {
+    const findings = runComplianceRedTeam({
+      ...baseDraft,
+      products: [{ id: "p1", name: "Ceramic Coating", price: 999, badge_type: "installed" }],
+      provenInstallProofs: [],
+    });
+    const f = findings.find((x) => x.id === "installed-without-verified-proof");
+    expect(f?.severity).toBe("fail");
+    expect(f?.message).toMatch(/1 pre-installed/);
+  });
+
+  it("PASSES when a verified proof matches the product name", () => {
+    const findings = runComplianceRedTeam({
+      ...baseDraft,
+      products: [{ id: "p1", name: "Ceramic Coating", price: 999, badge_type: "installed" }],
+      provenInstallProofs: [{ product_name: "Ceramic Coating", verified: true }],
+    });
+    expect(findings.find((x) => x.id === "installed-without-verified-proof")).toBeUndefined();
+  });
+
+  it("still FAILS when a matching proof exists but is unverified (no photo/signature)", () => {
+    const findings = runComplianceRedTeam({
+      ...baseDraft,
+      products: [{ id: "p1", name: "Ceramic Coating", price: 999, badge_type: "installed" }],
+      provenInstallProofs: [{ product_name: "Ceramic Coating", verified: false }],
+    });
+    expect(findings.find((x) => x.id === "installed-without-verified-proof")?.severity).toBe("fail");
+  });
+
+  it("does not apply to customer-elected (optional) lines", () => {
+    const findings = runComplianceRedTeam({
+      ...baseDraft,
+      products: [{ id: "p1", name: "Ceramic Coating", price: 999, badge_type: "optional" }],
+      provenInstallProofs: [],
+    });
+    expect(findings.find((x) => x.id === "installed-without-verified-proof")).toBeUndefined();
+  });
+
+  it("does not run on the customer-side surfaces (no proof data supplied)", () => {
+    const findings = runComplianceRedTeam({
+      ...baseDraft,
+      products: [{ id: "p1", name: "Ceramic Coating", price: 999, badge_type: "installed" }],
+    });
+    expect(findings.find((x) => x.id === "installed-without-verified-proof")).toBeUndefined();
+  });
+});
+
 describe("summarizeRedTeam blocker flag", () => {
   it("sets blocker=true when any fail is present", () => {
     const findings = runComplianceRedTeam({

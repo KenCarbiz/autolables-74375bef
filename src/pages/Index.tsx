@@ -388,7 +388,7 @@ const Index = () => {
   // defaults to Customer Elected (a fresh car with nothing installed yet is
   // the customer's choice). Before any proof exists, defaulting is unchanged.
   // The dealer can always override per line with the Sale Method control.
-  const [installProofs, setInstallProofs] = useState<{ product_name: string | null }[]>([]);
+  const [installProofs, setInstallProofs] = useState<{ product_name: string | null; is_verified?: boolean }[]>([]);
   useEffect(() => {
     const vin = vehicle.vin?.trim();
     const tid = currentStore?.id;
@@ -397,17 +397,32 @@ const Index = () => {
     if (!vin || viewMode || !tid) { setInstallProofs([]); return; }
     let cancelled = false;
     (async () => {
-      const { data } = await (supabase as any)
+      // Pull is_verified when present; fall back gracefully if the column
+      // hasn't propagated yet (treat any proof as verified in that window).
+      let res = await (supabase as any)
         .from("install_proofs")
-        .select("product_name")
+        .select("product_name, is_verified")
         .eq("vehicle_vin", vin)
         .eq("tenant_id", tid);
-      if (!cancelled) setInstallProofs((data as { product_name: string | null }[]) || []);
+      if (res.error && /is_verified/i.test(res.error.message || "")) {
+        res = await (supabase as any)
+          .from("install_proofs").select("product_name").eq("vehicle_vin", vin).eq("tenant_id", tid);
+      }
+      if (!cancelled) setInstallProofs((res.data as { product_name: string | null; is_verified?: boolean }[]) || []);
     })();
     return () => { cancelled = true; };
   }, [vehicle.vin, viewMode, currentStore?.id]);
+  // Only a VERIFIED proof (installer signature + photo) lets a line default to
+  // Pre-Installed. A bare/photoless proof must not flip a product into the
+  // advertised price — FTC substantiation. (When is_verified is absent because
+  // the column hasn't migrated, undefined is treated as verified.)
   const provenNames = useMemo(
-    () => new Set(installProofs.map((p) => (p.product_name || "").trim().toLowerCase()).filter(Boolean)),
+    () => new Set(
+      installProofs
+        .filter((p) => p.is_verified !== false)
+        .map((p) => (p.product_name || "").trim().toLowerCase())
+        .filter(Boolean),
+    ),
     [installProofs],
   );
   const proofRegime = provenNames.size > 0;
@@ -864,6 +879,7 @@ const Index = () => {
       spanishVersion: false,
       customerName: composeName(customerInfo.buyer_first_name, customerInfo.buyer_middle_initial, customerInfo.buyer_last_name, customerInfo.buyer_suffix),
       initialsByProductId: initials,
+      provenInstallProofs: installProofs.map((p) => ({ product_name: p.product_name || "", verified: p.is_verified !== false })),
     });
     const rtSummary = summarizeRedTeam(rtFindings);
     if (rtSummary.blocker) {
@@ -1450,6 +1466,7 @@ const Index = () => {
               customerName: composeName(customerInfo.buyer_first_name, customerInfo.buyer_middle_initial, customerInfo.buyer_last_name, customerInfo.buyer_suffix),
               initialsByProductId: initials,
               vehicleCondition,
+              provenInstallProofs: installProofs.map((p) => ({ product_name: p.product_name || "", verified: p.is_verified !== false })),
             })}
           />
           {/* Wave 4.3 — per-state disclosure pack for the dealer's state */}
