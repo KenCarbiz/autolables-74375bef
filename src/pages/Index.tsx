@@ -59,6 +59,21 @@ const PAPER_WIDTHS: Record<string, string> = {
 // an explicit confirm.
 type SaleMode = "pre_installed" | "customer_elected" | "upgrade";
 
+// Columns added by later migrations the live schema may not have applied yet.
+// Saves strip these and retry so a propagating migration never blocks a write.
+const OPTIONAL_ADDENDUM_COLS = [
+  "customer_info", "selling_price", "vehicle_price", "expected_total",
+  "scraped_advertised_price", "price_verification_delta", "price_verified",
+  "price_verified_at", "price_verification_status", "price_verification_method",
+] as const;
+const stripOptionalCols = (p: Record<string, unknown>) => {
+  const c = { ...p };
+  for (const k of OPTIONAL_ADDENDUM_COLS) delete c[k];
+  return c;
+};
+const isMissingOptionalCol = (e: { message?: string } | null) =>
+  !!e && OPTIONAL_ADDENDUM_COLS.some((k) => new RegExp(k, "i").test(e.message || ""));
+
 const SALE_MODE_META: Record<SaleMode, { label: string; badge: string; dot: string }> = {
   pre_installed:    { label: "Pre-Installed",    badge: "bg-blue-600 text-white border-blue-700",     dot: "bg-blue-500" },
   customer_elected: { label: "Customer Elected", badge: "bg-orange-500 text-white border-orange-600", dot: "bg-orange-500" },
@@ -921,6 +936,10 @@ const Index = () => {
       // Advertised/website baseline the all-in math reconciles against, so the
       // signer pages (which can't read dealer settings) show the right number.
       vehicle_price: advertisedForVin?.advertised_price ?? (vehiclePriceNum || null),
+      // All-in total the server verifies against the advertised price for this
+      // VIN before the customer can sign.
+      expected_total: priceIntegrity.expectedOnline,
+      scraped_advertised_price: advertisedForVin?.advertised_price ?? null,
       status: "draft" as const,
       signing_token: token,
     };
@@ -928,38 +947,53 @@ const Index = () => {
     // so "Ready for Signatures" doesn't create a duplicate in Saved Addendums.
     let inserted: { id?: string } | null = null;
     let error: { message: string } | null = null;
-    const missingCol = (e: { message?: string } | null) =>
-      !!e && /(customer_info|selling_price|vehicle_price)/i.test(e.message || "");
-    // Drop any not-yet-migrated optional columns and retry so a propagating
-    // schema never blocks the signing link.
-    const stripOptional = (p: any) => {
-      const { customer_info, selling_price, vehicle_price, ...rest } = p;
-      return rest;
-    };
     if (currentId) {
       let res = await supabase.from("addendums").update(payload as any).eq("id", currentId);
-      if (missingCol(res.error)) {
-        res = await supabase.from("addendums").update(stripOptional(payload) as any).eq("id", currentId);
+      if (isMissingOptionalCol(res.error)) {
+        res = await supabase.from("addendums").update(stripOptionalCols(payload) as any).eq("id", currentId);
       }
       error = res.error;
       inserted = { id: currentId };
     } else {
       let res = await supabase.from("addendums").insert([payload as any]).select("id").single();
-      if (missingCol(res.error)) {
-        res = await supabase.from("addendums").insert([stripOptional(payload) as any]).select("id").single();
+      if (isMissingOptionalCol(res.error)) {
+        res = await supabase.from("addendums").insert([stripOptionalCols(payload) as any]).select("id").single();
       }
       error = res.error;
       inserted = res.data as { id?: string } | null;
       if (inserted?.id) setCurrentId(inserted.id);
     }
+    if (error) { setSaving(false); toast.error(error.message); return; }
+
+    // Server-authoritative price verification: the RPC re-reads the advertised
+    // price for this VIN and flips price_verified, which the signing RPC + the
+    // addendums trigger require before any signature is accepted. If the server
+    // disagrees with the client gate (e.g. the advertised price just moved),
+    // hold the link.
+    const addendumId = (inserted as { id?: string } | null)?.id || "";
+    if (addendumId) {
+      const { data: verifyStatus, error: verifyErr } = await (supabase as any)
+        .rpc("verify_addendum_price", { _addendum_id: addendumId, _tolerance: 50 });
+      // Tolerate a not-yet-applied migration (function missing): fall back to
+      // the client gate, which already confirmed status === "ok" above.
+      const fnMissing = !!verifyErr && /verify_addendum_price|function|does not exist/i.test(verifyErr.message || "");
+      if (!fnMissing && (verifyErr || (verifyStatus && verifyStatus !== "verified"))) {
+        setSaving(false);
+        toast.error("Price verification failed on the server — re-scrape or capture the advertised price and try again.");
+        if (user) log({
+          store_id: currentStore?.id || "", user_id: user.id,
+          action: "price_integrity_block", entity_type: "addendum", entity_id: vehicle.vin,
+          details: { source: "verify_addendum_price", status: verifyStatus || "error", expected_total: priceIntegrity.expectedOnline },
+        });
+        return;
+      }
+    }
     setSaving(false);
-    if (error) { toast.error(error.message); return; }
 
     // Lock + version the deal: "Ready for Signatures" snapshots the line
     // items/prices/disclosures, mints a human version label, flips
     // lifecycle_status, and logs the ready_for_signature event. Fire-and-
     // forget so a propagating migration never blocks link delivery.
-    const addendumId = (inserted as { id?: string } | null)?.id || "";
     const version = `A-${new Date().toISOString().slice(0, 10).replace(/-/g, "")}-${token.slice(0, 4).toUpperCase()}`;
     if (addendumId) {
       (supabase as any)
@@ -1065,9 +1099,22 @@ const Index = () => {
       return;
     }
 
-    setSaving(true);
     const now = new Date().toISOString();
     const fullySigned = !!customerSig.data && !!employeeSig.data;
+
+    // Completing an in-person signature is itself a sign event — gate it on the
+    // same price-integrity rule as the remote flow. Plain drafts save freely.
+    if (fullySigned && priceIntegrity.status !== "ok") {
+      toast.error(`Cannot finalize signatures — price integrity: ${priceIntegrity.reason}`);
+      if (user) log({
+        store_id: currentStore?.id || "", user_id: user.id,
+        action: "price_integrity_block", entity_type: "addendum", entity_id: vehicle.vin,
+        details: { source: "handleSave", status: priceIntegrity.status, expected_online: priceIntegrity.expectedOnline, advertised: priceIntegrity.advertised, delta: priceIntegrity.delta },
+      });
+      return;
+    }
+
+    setSaving(true);
     const payload = {
       created_by: user.id,
       vehicle_ymm: vehicle.ymm || null,
@@ -1097,32 +1144,36 @@ const Index = () => {
       total_with_optional: grandTotalWithFee,
       selling_price: sellingPrice,
       vehicle_price: advertisedForVin?.advertised_price ?? (vehiclePriceNum || null),
+      expected_total: priceIntegrity.expectedOnline,
+      scraped_advertised_price: advertisedForVin?.advertised_price ?? null,
       status: fullySigned ? "signed" : "draft",
+      // The DB trigger refuses a 'signed' write unless price_verified is true.
+      // The in-person path is dealer-attended and already gated above, so mark
+      // it verified with the reconciled figures.
+      ...(fullySigned ? {
+        price_verified: true,
+        price_verified_at: now,
+        price_verification_status: "verified",
+        price_verification_method: "dealer_manual",
+        price_verification_delta: priceIntegrity.delta,
+      } : {}),
     };
     // Update the existing row when continuing a draft, else insert a new one
     // (with a signing token) so re-saving keeps ONE entry in Saved Addendums.
     let inserted: { id?: string } | null = null;
     let error: { message: string } | null = null;
-    // Resilient write: if an optional column hasn't been migrated yet, drop it
-    // and retry so the save still succeeds (degrades to name/email + totals).
-    const missingCol = (e: { message?: string } | null) =>
-      !!e && /(customer_info|selling_price|vehicle_price)/i.test(e.message || "");
-    const stripOptional = (p: any) => {
-      const { customer_info, selling_price, vehicle_price, ...rest } = p;
-      return rest;
-    };
     if (currentId) {
       let res = await supabase.from("addendums").update(payload as any).eq("id", currentId);
-      if (missingCol(res.error)) {
-        res = await supabase.from("addendums").update(stripOptional(payload) as any).eq("id", currentId);
+      if (isMissingOptionalCol(res.error)) {
+        res = await supabase.from("addendums").update(stripOptionalCols(payload) as any).eq("id", currentId);
       }
       error = res.error;
       inserted = { id: currentId };
     } else {
       const seed = { ...payload, signing_token: crypto.randomUUID() };
       let res = await supabase.from("addendums").insert([seed as any]).select("id").single();
-      if (missingCol(res.error)) {
-        res = await supabase.from("addendums").insert([stripOptional(seed) as any]).select("id").single();
+      if (isMissingOptionalCol(res.error)) {
+        res = await supabase.from("addendums").insert([stripOptionalCols(seed) as any]).select("id").single();
       }
       error = res.error;
       inserted = res.data as { id?: string } | null;

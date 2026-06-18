@@ -277,6 +277,14 @@ const MobileSigning = () => {
   };
 
   const handleSubmit = async () => {
+    // Price-integrity gate: the server refuses to sign an unverified deal, so
+    // surface it clearly here rather than letting the customer complete the
+    // form and fail at submit.
+    const pv = addendum as { price_verified?: boolean; price_verification_status?: string } | null;
+    if (pv && pv.price_verification_status && pv.price_verification_status !== "verified" && !pv.price_verified) {
+      toast.error("This addendum is awaiting price verification by the dealership. Please ask them to confirm the advertised price before signing.");
+      return;
+    }
     if (!esignConsent) {
       toast.error("Please accept the Electronic Records Disclosure before signing.");
       return;
@@ -518,6 +526,12 @@ const MobileSigning = () => {
 
     setSubmitting(false);
     if (error) {
+      // A price-not-verified rejection is intentional — never fall through to a
+      // direct update that would bypass the gate. Surface it to the customer.
+      if (/price not verified|check_violation/i.test(error.message || "")) {
+        toast.error("This addendum is awaiting price verification by the dealership. Please ask them to confirm the advertised price before signing.");
+        return;
+      }
       // Fall back to the legacy direct-update path if the RPC isn't
       // deployed yet (e.g. migration still propagating in Lovable).
       // eslint-disable-next-line no-console

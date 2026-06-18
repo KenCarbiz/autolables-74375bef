@@ -163,7 +163,12 @@ const SavedAddendums = ({ stage = "saved" }: { stage?: DealStage }) => {
                       <td className="px-4 py-3 font-mono text-xs">{a.vehicle_vin || "—"}</td>
                       <td className="px-4 py-3">{a.customer_name || "—"}</td>
                       <td className="px-4 py-3">{a.total_with_optional != null ? `$${Number(a.total_with_optional).toFixed(2)}` : "—"}</td>
-                      <td className="px-4 py-3"><StatusBadge status={a.status} /></td>
+                      <td className="px-4 py-3">
+                        <div className="flex flex-col items-start gap-1">
+                          <StatusBadge status={a.status} />
+                          {a.status !== "signed" && <PriceVerifyChip status={(a as any).price_verification_status} delta={(a as any).price_verification_delta} />}
+                        </div>
+                      </td>
                       <td className="px-4 py-3">
                         {/* Wave 15.5 — next-action exits. The
                             "View" only path was a dead end; an
@@ -256,6 +261,31 @@ const StatusBadge = ({ status }: { status: string }) => {
   return (
     <span className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${styles[status] || styles.draft}`}>
       {status}
+    </span>
+  );
+};
+
+// Per-deal price-integrity state in the queue. A draft cannot be signed until
+// this reads "verified" — pending/mismatch rows need a dealer fix.
+const PriceVerifyChip = ({ status, delta }: { status?: string | null; delta?: number | null }) => {
+  if (!status || status === "pending" || status === "untracked") {
+    return (
+      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-amber-100 text-amber-700">
+        Price unverified
+      </span>
+    );
+  }
+  if (status === "mismatch") {
+    const d = typeof delta === "number" ? `${delta > 0 ? "+" : "−"}$${Math.abs(Math.round(delta)).toLocaleString()}` : "";
+    return (
+      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-red-100 text-red-700" title="Fix the selling price or reclassify a pre-installed item">
+        Price mismatch {d}
+      </span>
+    );
+  }
+  return (
+    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-emerald-100 text-emerald-700">
+      <ShieldCheck className="w-3 h-3" /> Price verified
     </span>
   );
 };

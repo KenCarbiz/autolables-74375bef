@@ -261,6 +261,11 @@ const CustomerReview = () => {
   };
 
   const handleSubmit = async () => {
+    const pv = addendum as { price_verified?: boolean; price_verification_status?: string } | null;
+    if (pv && pv.price_verification_status && pv.price_verification_status !== "verified" && !pv.price_verified) {
+      toast.error("This addendum is awaiting price verification by the dealership. Please ask them to confirm the advertised price before signing.");
+      return;
+    }
     if (!esignConsent) { toast.error("Please accept the Electronic Records Disclosure."); return; }
     const missingInitials = products.filter((p) => needsInitials(p) && !initials[p.id]?.trim());
     if (missingInitials.length > 0) { toast.error(`Please initial all ${missingInitials.length} item(s).`); return; }
@@ -432,6 +437,11 @@ const CustomerReview = () => {
 
     setSubmitting(false);
     if (error) {
+      // Price-not-verified is an intentional rejection — do not bypass it.
+      if (/price not verified|check_violation/i.test(error.message || "")) {
+        toast.error("This addendum is awaiting price verification by the dealership. Please ask them to confirm the advertised price before signing.");
+        return;
+      }
       const { error: legacyErr } = await supabase
         .from("addendums")
         .update({
