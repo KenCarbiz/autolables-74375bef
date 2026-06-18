@@ -42,12 +42,16 @@ serve(async (req) => {
   const supabaseUrl = Deno.env.get("SUPABASE_URL");
   const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
   if (!supabaseUrl || !serviceKey) return json({ error: "supabase not configured" }, 500);
-  if (jwt !== serviceKey) {
-    const admin = createClient(supabaseUrl, serviceKey, {
-      auth: { persistSession: false, autoRefreshToken: false },
-    });
+
+  const isServiceRole = jwt === serviceKey;
+  let callerUserId: string | null = null;
+  const admin = createClient(supabaseUrl, serviceKey, {
+    auth: { persistSession: false, autoRefreshToken: false },
+  });
+  if (!isServiceRole) {
     const { data: userRes, error: userErr } = await admin.auth.getUser(jwt);
     if (userErr || !userRes?.user) return json({ error: "invalid token" }, 401);
+    callerUserId = userRes.user.id;
   }
 
   const sid = Deno.env.get("TWILIO_ACCOUNT_SID");
@@ -66,6 +70,47 @@ serve(async (req) => {
   const body = (payload.body || "").trim();
   if (!to) return json({ success: false, error: "Invalid phone number" }, 400);
   if (!body) return json({ success: false, error: "Empty message" }, 400);
+
+  // ── Recipient allowlist for user-JWT callers ───────────────
+  // Mirrors send-email: user-JWT callers may only text phone numbers
+  // already stored against a tenant they are an accepted member of.
+  // Service-role callers (cron, internal jobs) bypass this gate.
+  if (!isServiceRole && callerUserId) {
+    const { data: memberships } = await admin
+      .from("tenant_members")
+      .select("tenant_id")
+      .eq("user_id", callerUserId)
+      .not("accepted_at", "is", null);
+    const tenantIds = (memberships || []).map((m: { tenant_id: string }) => m.tenant_id);
+    if (tenantIds.length === 0) {
+      return json({ success: false, error: "caller has no tenant memberships" }, 403);
+    }
+    const allow = new Set<string>();
+    const collect = (rows: Array<Record<string, unknown>> | null, field: string) => {
+      for (const r of rows || []) {
+        const v = r[field];
+        if (typeof v !== "string") continue;
+        const norm = toE164(v);
+        if (norm) allow.add(norm);
+      }
+    };
+    const [leadsRes, signRes, dealRes] = await Promise.all([
+      admin.from("leads").select("phone").in("tenant_id", tenantIds),
+      admin.from("addendum_signings").select("signer_phone").in("tenant_id", tenantIds),
+      admin.from("deal_signing_tokens").select("customer_phone").in("tenant_id", tenantIds),
+    ]);
+    collect(leadsRes.data as Array<Record<string, unknown>> | null, "phone");
+    collect(signRes.data as Array<Record<string, unknown>> | null, "signer_phone");
+    collect(dealRes.data as Array<Record<string, unknown>> | null, "customer_phone");
+
+    if (!allow.has(to)) {
+      return json({
+        success: false,
+        error: "recipient_not_allowed",
+        message: "user-JWT senders may only text contacts within their tenants",
+      }, 403);
+    }
+  }
 
   const form = new URLSearchParams({ To: to, Body: body });
   if (messagingServiceSid) form.set("MessagingServiceSid", messagingServiceSid);
