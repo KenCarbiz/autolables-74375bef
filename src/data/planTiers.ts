@@ -59,6 +59,8 @@ export const PLAN_DEFINITIONS: PlanDefinition[] = [
       "Unlimited VINs",
       "Product rules engine",
       "Leads + analytics",
+      "Website price verification + nightly scrape",
+      "Per-VIN tamper-evident defense file",
       "Digital signing + audit vault",
       "Prep + install compliance gate",
       "50-state disclosure engine",
@@ -87,6 +89,9 @@ export const PLAN_DEFINITIONS: PlanDefinition[] = [
       "Onboarding assist",
     ],
     notIncluded: [
+      "Website price verification — hard signing gate",
+      "Nightly MarketCheck inventory + advertised-price sync",
+      "Per-VIN tamper-evident defense file",
       "Digital signing + tamper-evident audit vault",
       "Prep + install compliance gate",
       "50-state disclosure engine (CA SB 766, NY, FL, etc.)",
@@ -102,6 +107,11 @@ export const PLAN_DEFINITIONS: PlanDefinition[] = [
     priceNote: "per rooftop / month",
     features: [
       "Everything in Unlimited, plus:",
+      "Website price verification — hard signing gate (a deal can't be signed out of price integrity)",
+      "Nightly MarketCheck inventory + advertised-price sync (baseline 300 VINs; add-ons available)",
+      "Live re-scrape + website price screenshot evidence",
+      "Per-VIN tamper-evident defense file (SHA-256 chain root)",
+      "Verified installer sign-off + photo on pre-installed products",
       "50-state disclosure engine (CA, NY, FL, TX, IL, MA, NJ, +44)",
       "California SB 766 ready (effective Oct 1, 2026)",
       "Prep + install compliance gate (foreman sign-off with photos)",
@@ -141,6 +151,8 @@ export const TIER_FEATURE_FLAGS: Record<PlanTier, Partial<DealerSettings>> = {
     feature_sms: false,
     feature_ai_descriptions: false,
     feature_blackbook: false,
+    feature_price_verification: false,
+    feature_marketcheck_sync: false,
     privacy_notice_enabled: false,
   },
   unlimited: {
@@ -163,6 +175,8 @@ export const TIER_FEATURE_FLAGS: Record<PlanTier, Partial<DealerSettings>> = {
     feature_sms: false,
     feature_ai_descriptions: true,
     feature_blackbook: false,
+    feature_price_verification: false,
+    feature_marketcheck_sync: false,
     privacy_notice_enabled: true,
   },
   compliance_pro: {
@@ -185,9 +199,33 @@ export const TIER_FEATURE_FLAGS: Record<PlanTier, Partial<DealerSettings>> = {
     feature_sms: true,
     feature_ai_descriptions: true,
     feature_blackbook: true,
+    feature_price_verification: true,
+    feature_marketcheck_sync: true,
     privacy_notice_enabled: true,
   },
 };
+
+// ── Scrape add-on bands. The website verification stack is metered (MarketCheck
+// + Firecrawl bill per call), so Compliance Pro bundles a baseline and extra
+// nightly VIN volume is sold per rooftop. Each band maps directly to
+// marketcheck_sync_config.max_vehicles so billing == config.
+export interface ScrapeBand {
+  id: string;
+  name: string;
+  maxVehicles: number;   // nightly VIN ceiling (marketcheck_sync_config.max_vehicles)
+  price: string;         // per rooftop / month
+  note: string;
+}
+
+// Baseline included with Compliance Pro before any add-on.
+export const COMPLIANCE_PRO_INCLUDED_VINS = 300;
+
+export const SCRAPE_ADDON_BANDS: ScrapeBand[] = [
+  { id: "included", name: "Included", maxVehicles: COMPLIANCE_PRO_INCLUDED_VINS, price: "—", note: "Bundled with Compliance Pro" },
+  { id: "band_500", name: "+500 VINs", maxVehicles: 800, price: "$99", note: "Mid-size rooftop" },
+  { id: "band_2000", name: "+2,000 VINs", maxVehicles: 2300, price: "$199", note: "Large rooftop" },
+  { id: "band_6000", name: "+6,000 VINs", maxVehicles: 6300, price: "$299", note: "Mega-store / group rooftop" },
+];
 
 export const applyTierPreset = (tier: PlanTier): Partial<DealerSettings> => {
   return TIER_FEATURE_FLAGS[tier];

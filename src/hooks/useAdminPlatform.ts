@@ -1,6 +1,7 @@
 import { useCallback } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { applyTierPreset, type PlanTier } from "@/data/planTiers";
 
 // ──────────────────────────────────────────────────────────────
 // useAdminPlatform — data + mutations for the platform-admin
@@ -132,6 +133,37 @@ export const useAdminPlatform = () => {
       });
       if (error) return false;
       await qc.invalidateQueries({ queryKey: ["admin", "marketcheck"] });
+      return true;
+    },
+    [qc]
+  );
+
+  // Set a tenant's plan tier: applies the tier's feature-flag preset to the
+  // dealer's settings, grants/revokes the MarketCheck scrape (premium only),
+  // and stamps the autolabels entitlement. One super-admin action provisions
+  // the whole tier, cross-tenant, with no impersonation.
+  const setTenantTier = useCallback(
+    async (tenantId: string, tier: PlanTier): Promise<boolean> => {
+      const patch = applyTierPreset(tier);
+      const { error: e1 } = await (supabase as any).rpc("admin_set_tenant_features", {
+        _tenant_id: tenantId,
+        _patch: patch,
+      });
+      if (e1) return false;
+      await (supabase as any).rpc("set_marketcheck_allowed", {
+        _tenant_id: tenantId,
+        _allowed: tier === "compliance_pro",
+      });
+      await (supabase as any).rpc("admin_override_entitlement", {
+        _tenant_id: tenantId,
+        _app_slug: "autolabels",
+        _plan_tier: tier,
+        _status: "active",
+        _expires_at: null,
+        _seat_limit: null,
+      });
+      await qc.invalidateQueries({ queryKey: ["admin", "marketcheck"] });
+      await qc.invalidateQueries({ queryKey: ["admin", "entitlements"] });
       return true;
     },
     [qc]
@@ -278,6 +310,7 @@ export const useAdminPlatform = () => {
     entitlements,
     marketcheck,
     setMarketcheckAllowed,
+    setTenantTier,
     setTenantActive,
     overrideEntitlement,
     setMemberRole,

@@ -939,7 +939,7 @@ const Index = () => {
     // Per the FTC-honor rule, signing is blocked unless this verifies. A
     // missing advertised price (untracked) also blocks — the dealer must
     // re-scrape or capture the advertised price first.
-    if (priceIntegrity.status !== "ok") {
+    if (settings.feature_price_verification && priceIntegrity.status !== "ok") {
       toast.error(`Price integrity: ${priceIntegrity.reason}`);
       if (user) log({
         store_id: currentStore?.id || "",
@@ -1020,7 +1020,7 @@ const Index = () => {
     // disagrees with the client gate (e.g. the advertised price just moved),
     // hold the link.
     const addendumId = (inserted as { id?: string } | null)?.id || "";
-    if (addendumId) {
+    if (addendumId && settings.feature_price_verification) {
       const { data: verifyStatus, error: verifyErr } = await (supabase as any)
         .rpc("verify_addendum_price", { _addendum_id: addendumId, _tolerance: 50 });
       // Tolerate a not-yet-applied migration (function missing): fall back to
@@ -1153,7 +1153,7 @@ const Index = () => {
 
     // Completing an in-person signature is itself a sign event — gate it on the
     // same price-integrity rule as the remote flow. Plain drafts save freely.
-    if (fullySigned && priceIntegrity.status !== "ok") {
+    if (fullySigned && settings.feature_price_verification && priceIntegrity.status !== "ok") {
       toast.error(`Cannot finalize signatures — price integrity: ${priceIntegrity.reason}`);
       if (user) log({
         store_id: currentStore?.id || "", user_id: user.id,
@@ -1196,10 +1196,10 @@ const Index = () => {
       expected_total: priceIntegrity.expectedOnline,
       scraped_advertised_price: advertisedForVin?.advertised_price ?? null,
       status: fullySigned ? "signed" : "draft",
-      // The DB trigger refuses a 'signed' write unless price_verified is true.
-      // The in-person path is dealer-attended and already gated above, so mark
-      // it verified with the reconciled figures.
-      ...(fullySigned ? {
+      // The DB trigger refuses a 'signed' write unless price_verified is true,
+      // but only for tenants entitled to price verification. The in-person path
+      // is dealer-attended and already gated above, so mark it verified.
+      ...(fullySigned && settings.feature_price_verification ? {
         price_verified: true,
         price_verified_at: now,
         price_verification_status: "verified",
@@ -1464,17 +1464,19 @@ const Index = () => {
           lists what a regulator would flag before the customer signs. */}
       {!viewMode && (
         <div style={{ maxWidth: paperWidth }} className="mx-auto mb-3 no-print space-y-3">
-          <AddendumPriceIntegrity
-            assessment={priceIntegrity}
-            sellingPrice={sellingPrice}
-            onSellingPriceChange={setSellingPrice}
-            docFeeLabel={getDocFeeTerminology(settings.doc_fee_state || settings.dealer_state || "")}
-            vin={vehicle.vin}
-            onCaptureAdvertised={captureAdvertised}
-            onRescrape={rescrapeVin}
-            rescraping={rescraping}
-            onUploadEvidence={uploadPriceEvidence}
-          />
+          {settings.feature_price_verification && (
+            <AddendumPriceIntegrity
+              assessment={priceIntegrity}
+              sellingPrice={sellingPrice}
+              onSellingPriceChange={setSellingPrice}
+              docFeeLabel={getDocFeeTerminology(settings.doc_fee_state || settings.dealer_state || "")}
+              vin={vehicle.vin}
+              onCaptureAdvertised={captureAdvertised}
+              onRescrape={rescrapeVin}
+              rescraping={rescraping}
+              onUploadEvidence={uploadPriceEvidence}
+            />
+          )}
           <ComplianceRedTeamPanel
             findings={runComplianceRedTeam({
               state: settings.doc_fee_state || settings.dealer_state || "",

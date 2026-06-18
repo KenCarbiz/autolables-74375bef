@@ -1,5 +1,12 @@
 import { useMemo, useState, useEffect } from "react";
 import { useAdminPlatform, type TenantSummary } from "@/hooks/useAdminPlatform";
+import type { PlanTier } from "@/data/planTiers";
+
+const TIER_LABEL: Record<PlanTier, string> = {
+  essential: "Essential",
+  unlimited: "Unlimited",
+  compliance_pro: "Compliance Pro",
+};
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Building2, Search, Power, PowerOff, Calendar, Users, AppWindow, Plus, X, Pencil, Database } from "lucide-react";
@@ -23,11 +30,12 @@ const sourceBadge = (source: TenantSummary["source"]) => {
 };
 
 export const PlatformTenants = () => {
-  const { tenants, setTenantActive, createTenant, marketcheck, setMarketcheckAllowed } = useAdminPlatform();
+  const { tenants, setTenantActive, createTenant, marketcheck, setTenantTier, entitlements } = useAdminPlatform();
   const [q, setQ] = useState("");
   const [filter, setFilter] = useState<"all" | "active" | "inactive">("all");
   const [creating, setCreating] = useState(false);
   const [editing, setEditing] = useState<TenantSummary | null>(null);
+  const [savingTier, setSavingTier] = useState<string | null>(null);
 
   // tenant_id -> MarketCheck grant/state, joined client-side for the grid.
   const mcByTenant = useMemo(() => {
@@ -36,11 +44,21 @@ export const PlatformTenants = () => {
     return m;
   }, [marketcheck.data]);
 
-  const toggleMarketcheck = async (t: TenantSummary) => {
-    const cur = mcByTenant.get(t.id)?.allowed ?? false;
-    const ok = await setMarketcheckAllowed(t.id, !cur);
-    if (ok) toast.success(`MarketCheck ${cur ? "revoked for" : "granted to"} ${t.name}`);
-    else toast.error("Could not update MarketCheck access");
+  // tenant_id -> current autolabels plan tier (latest entitlement row wins).
+  const tierByTenant = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const e of entitlements.data || []) {
+      if (e.app_slug === "autolabels" && !m.has(e.tenant_id)) m.set(e.tenant_id, e.plan_tier);
+    }
+    return m;
+  }, [entitlements.data]);
+
+  const changeTier = async (t: TenantSummary, tier: PlanTier) => {
+    setSavingTier(t.id);
+    const ok = await setTenantTier(t.id, tier);
+    setSavingTier(null);
+    if (ok) toast.success(`${t.name} set to ${TIER_LABEL[tier]}${tier === "compliance_pro" ? " — scrape + price verification enabled" : ""}`);
+    else toast.error("Could not change the plan tier");
   };
 
   const rows = useMemo(() => {
@@ -203,7 +221,7 @@ export const PlatformTenants = () => {
                 <SortHeader label="Members"       sortKey="member_count"  activeKey={sortPag.sortKey} dir={sortPag.sortDir} onToggle={sortPag.toggleSort} />
                 <SortHeader label="Created"       sortKey="created_at"    activeKey={sortPag.sortKey} dir={sortPag.sortDir} onToggle={sortPag.toggleSort} />
                 <SortHeader label="Last activity" sortKey="last_activity" activeKey={sortPag.sortKey} dir={sortPag.sortDir} onToggle={sortPag.toggleSort} />
-                <th className="px-3 py-2 text-left font-semibold">MarketCheck</th>
+                <th className="px-3 py-2 text-left font-semibold">Plan</th>
                 <SortHeader label="Status"        sortKey="status"        activeKey={sortPag.sortKey} dir={sortPag.sortDir} onToggle={sortPag.toggleSort} align="right" />
               </tr>
             </thead>
@@ -251,22 +269,28 @@ export const PlatformTenants = () => {
                   <td className={rowClass}>
                     {(() => {
                       const mc = mcByTenant.get(t.id);
-                      const granted = mc?.allowed ?? false;
+                      const current = (tierByTenant.get(t.id) as PlanTier | undefined) ?? "essential";
                       return (
-                        <button
-                          onClick={() => toggleMarketcheck(t)}
-                          title={granted
-                            ? `MarketCheck granted${mc?.enabled ? " · dealer enabled" : " · dealer not enabled yet"}${mc?.last_run_at ? ` · last run ${formatDate(mc.last_run_at)}` : ""}`
-                            : "Grant MarketCheck nightly inventory scrape to this dealer"}
-                          className={`inline-flex items-center gap-1.5 text-[11px] font-semibold px-2.5 h-7 rounded-md border ${
-                            granted
-                              ? "border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100"
-                              : "border-border text-muted-foreground hover:bg-muted"
-                          }`}
-                        >
-                          <Database className="w-3 h-3" />
-                          {granted ? (mc?.enabled ? "Granted · on" : "Granted") : "Grant"}
-                        </button>
+                        <div className="flex items-center gap-1.5">
+                          <select
+                            value={current}
+                            disabled={savingTier === t.id}
+                            onChange={(e) => changeTier(t, e.target.value as PlanTier)}
+                            className="h-7 rounded-md border border-border bg-background px-1.5 text-[11px] font-semibold text-foreground disabled:opacity-50"
+                          >
+                            <option value="essential">Essential</option>
+                            <option value="unlimited">Unlimited</option>
+                            <option value="compliance_pro">Compliance Pro</option>
+                          </select>
+                          {mc?.allowed && (
+                            <span
+                              title={`MarketCheck scrape ${mc.enabled ? "on" : "granted, dealer not enabled yet"}${mc.last_run_at ? ` · last run ${formatDate(mc.last_run_at)}` : ""}`}
+                              className={`inline-flex items-center gap-1 text-[10px] font-semibold ${mc.enabled ? "text-emerald-600" : "text-amber-600"}`}
+                            >
+                              <Database className="w-3 h-3" />
+                            </span>
+                          )}
+                        </div>
                       );
                     })()}
                   </td>

@@ -161,6 +161,10 @@ export interface DealerSettings {
   feature_sms: boolean;
   feature_ai_descriptions: boolean;
   feature_blackbook: boolean;
+  // Compliance Pro premium stack (gated by tier). When off, the addendum flow
+  // runs without the price-integrity gate / scrape verification.
+  feature_price_verification: boolean;
+  feature_marketcheck_sync: boolean;
   // Addendum sizing & product defaults
   addendum_paper_size: "letter" | "legal" | "half-sheet" | "addendum-strip" | "addendum-half" | "monroney" | "custom";
   addendum_custom_width: string;   // inches
@@ -237,6 +241,8 @@ export const DEFAULT_SETTINGS: DealerSettings = {
   feature_sms: true,
   feature_ai_descriptions: true,
   feature_blackbook: false,
+  feature_price_verification: false,
+  feature_marketcheck_sync: false,
   addendum_paper_size: "letter",
   addendum_custom_width: "8.5",
   addendum_custom_height: "11",
