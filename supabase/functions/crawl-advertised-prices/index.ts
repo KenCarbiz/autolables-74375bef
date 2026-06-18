@@ -261,18 +261,28 @@ async function firecrawlRender(url: string): Promise<RenderResult | null> {
 
 // Download Firecrawl's (ephemeral) screenshot and persist it to our private
 // price-evidence bucket so the per-VIN defendable file holds the actual image
-// of the advertised page at capture time. Returns the storage path.
+// of the advertised page at capture time. Returns the storage path + the
+// sha256 of the bytes so the addendum row can prove the file hasn't been
+// swapped after capture.
+const PRICE_EVIDENCE_BUCKET = "price-evidence";
+interface CapturedScreenshot { path: string; sha256: string; bucket: string; }
+async function sha256Hex(bytes: Uint8Array): Promise<string> {
+  const digest = await crypto.subtle.digest("SHA-256", bytes);
+  return Array.from(new Uint8Array(digest))
+    .map((b) => b.toString(16).padStart(2, "0")).join("");
+}
 // deno-lint-ignore no-explicit-any
-async function captureScreenshot(admin: any, screenshotUrl: string | null, tenantId: string, vin: string): Promise<string | null> {
+async function captureScreenshot(admin: any, screenshotUrl: string | null, tenantId: string, vin: string): Promise<CapturedScreenshot | null> {
   if (!screenshotUrl) return null;
   try {
     const img = await fetch(screenshotUrl, { signal: AbortSignal.timeout(20000) });
     if (!img.ok) return null;
     const bytes = new Uint8Array(await img.arrayBuffer());
     const path = `${tenantId}/${normVin(vin)}/${Date.now()}.png`;
-    const { error } = await admin.storage.from("price-evidence").upload(path, bytes, { contentType: "image/png", upsert: true });
+    const { error } = await admin.storage.from(PRICE_EVIDENCE_BUCKET).upload(path, bytes, { contentType: "image/png", upsert: true });
     if (error) return null;
-    return path;
+    const sha256 = await sha256Hex(bytes);
+    return { path, sha256, bucket: PRICE_EVIDENCE_BUCKET };
   } catch { return null; }
 }
 
