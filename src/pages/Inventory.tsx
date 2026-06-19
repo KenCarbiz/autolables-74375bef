@@ -429,7 +429,7 @@ const Inventory = () => {
                         </td>
                         <td className="px-3 py-2.5 text-right" onClick={(e) => e.stopPropagation()}>
                           <span className="tabular-nums font-medium text-foreground">{r.price ? `$${r.price.toLocaleString()}` : "—"}</span>
-                          {r.vin && r.price ? <div className="mt-0.5 flex justify-end"><AdvertisedPriceBand vin={r.vin} stickerPrice={r.price} compact /></div> : null}
+                          {r.vin && r.price ? <div className="mt-0.5 flex justify-end"><AdvertisedPriceBand vin={r.vin} stickerPrice={r.price} docFee={settings.doc_fee_amount} compact /></div> : null}
                         </td>
                         <td className="px-3 py-2.5 text-right tabular-nums text-muted-foreground">{r.mileage ? `${r.mileage.toLocaleString()} mi` : "—"}</td>
                         <td className="px-3 py-2.5 text-xs text-muted-foreground whitespace-nowrap">{relativeDay(r.updated_at)}</td>

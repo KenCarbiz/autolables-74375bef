@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Check, AlertTriangle, TrendingUp, Plus, X, ExternalLink } from "lucide-react";
+import { Check, AlertTriangle, Plus, X, ExternalLink } from "lucide-react";
 import { toast } from "sonner";
 import {
   useAdvertisedPrices,
@@ -28,6 +28,9 @@ interface Props {
   vin: string;
   stickerPrice: number | null | undefined;
   storeId?: string;
+  // Dealer doc/conveyance fee (already baked into the MarketCheck advertised
+  // price). When set we surface the breakdown: advertised = selling + doc fee.
+  docFee?: number;
   // Compact mode renders just a small chip + the click target,
   // for use inside an inventory row. Default false renders the
   // full band with reason text.
@@ -37,7 +40,7 @@ interface Props {
 const fmtMoney = (n: number) =>
   n.toLocaleString(undefined, { style: "currency", currency: "USD", maximumFractionDigits: 0 });
 
-export const AdvertisedPriceBand = ({ vin, stickerPrice, storeId = "", compact = false }: Props) => {
+export const AdvertisedPriceBand = ({ vin, stickerPrice, storeId = "", docFee = 0, compact = false }: Props) => {
   const { byVin, captureSnapshot, capturing } = useAdvertisedPrices(storeId);
   const { user } = useAuth();
   const [expanded, setExpanded] = useState(false);
@@ -45,19 +48,31 @@ export const AdvertisedPriceBand = ({ vin, stickerPrice, storeId = "", compact =
   const sticker = stickerPrice ?? 0;
   const ap = vin ? byVin.get(vin.toUpperCase()) : undefined;
   const drift = assessDrift(sticker, ap);
+  // MarketCheck pulls the dealer's ACTUAL advertised price into the listing
+  // price, so when there's no manually-captured snapshot we recognize the
+  // listing price itself as the advertised price — it already includes the
+  // dealer's doc/conveyance fee.
+  const feedAdvertised = !ap && sticker > 0;
+  const sellingBeforeFee = docFee > 0 ? sticker - docFee : null;
+  const docNote = feedAdvertised
+    ? (docFee > 0
+        ? `Advertised ${fmtMoney(sticker)} · incl. ${fmtMoney(docFee)} doc fee · selling ${fmtMoney(sellingBeforeFee!)}`
+        : `Advertised ${fmtMoney(sticker)}`)
+    : "";
 
+  const positive = drift.status === "match" || feedAdvertised;
   const toneClass =
-    drift.status === "match"     ? "border-emerald-200 bg-emerald-50/70 text-emerald-900"
+    positive                     ? "border-emerald-200 bg-emerald-50/70 text-emerald-900"
     : drift.status === "drift"   ? "border-rose-300 bg-rose-50/70 text-rose-900"
-    :                              "border-border bg-muted/30 text-muted-foreground";
+    :                              "border-red-200 bg-red-50/70 text-red-700";
 
   const icon =
-    drift.status === "match" ? <Check className="w-3.5 h-3.5" strokeWidth={2.5} />
+    positive ? <Check className="w-3.5 h-3.5" strokeWidth={2.5} />
     : drift.status === "drift" ? <AlertTriangle className="w-3.5 h-3.5" strokeWidth={2.5} />
-    : <TrendingUp className="w-3.5 h-3.5" strokeWidth={2} />;
+    : <X className="w-3.5 h-3.5" strokeWidth={2.5} />;
 
   const label =
-    drift.status === "match"     ? "Sticker = Advertised"
+    positive                     ? "Advertised price on file"
     : drift.status === "drift"   ? "Price drift"
     :                              "No advertised price on file";
 
@@ -68,10 +83,13 @@ export const AdvertisedPriceBand = ({ vin, stickerPrice, storeId = "", compact =
           type="button"
           onClick={(e) => { e.stopPropagation(); setExpanded(e2 => !e2); }}
           className={`inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-[0.12em] px-1.5 py-0.5 rounded border ${toneClass}`}
-          title={drift.reason}
+          title={feedAdvertised ? docNote : drift.reason}
         >
           {icon}
           {label}
+          {feedAdvertised && docFee > 0 && (
+            <span className="font-mono normal-case tracking-normal ml-1">incl {fmtMoney(docFee)} doc</span>
+          )}
           {drift.status === "drift" && (
             <span className="font-mono normal-case tracking-normal ml-1">
               {drift.delta > 0 ? "+" : "−"}{fmtMoney(drift.abs_delta)}
@@ -113,7 +131,14 @@ export const AdvertisedPriceBand = ({ vin, stickerPrice, storeId = "", compact =
           <div className="min-w-0">
             <p className="text-[11px] font-bold uppercase tracking-[0.14em]">{label}</p>
             <p className="text-[11px] opacity-80 leading-tight mt-0.5">
-              Sticker {fmtMoney(sticker)}
+              {feedAdvertised ? (
+                <>
+                  Advertised {fmtMoney(sticker)}
+                  {docFee > 0 && <>{" · "}incl. {fmtMoney(docFee)} doc fee{" · "}selling {fmtMoney(sellingBeforeFee!)}</>}
+                </>
+              ) : (
+                <>Sticker {fmtMoney(sticker)}</>
+              )}
               {ap && (
                 <>
                   {" · "}
