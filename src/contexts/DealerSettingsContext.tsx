@@ -4,6 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useTenant } from "@/contexts/TenantContext";
 import { mapAutocurbProfile } from "@/lib/autocurbProfile";
+import type { DealerProgram } from "@/lib/dealerPrograms";
 
 // A configurable internal recon/service the dealer routes to a responsible
 // party. Non-customer charge — tracked as the store's own cost.
@@ -118,6 +119,10 @@ export interface DealerSettings {
   // Marketing assets shown to shoppers (packet / stickers / portal).
   why_buy_here: string;            // dealership value prop / why buy here
   warranty_programs: string;       // warranty programs offered (free text)
+  // Structured dealer value-proposition programs (10yr/100k powertrain,
+  // lifetime powertrain, free maintenance, …) with FTC-style value/offer/
+  // benefit/disclosure, optional finance requirement, and placement toggles.
+  dealer_programs: DealerProgram[];
   // Dealer-configurable condition terms (comma-separated). The dealer can use
   // their own labels (e.g. "OEM CPO", "Dealer CPO"); each maps to a canonical
   // new/used/cpo value under the hood for storage + compliance gating.
@@ -210,6 +215,7 @@ export const DEFAULT_SETTINGS: DealerSettings = {
   vdp_strip_finance_params: true,
   why_buy_here: "",
   warranty_programs: "",
+  dealer_programs: [],
   vehicle_conditions: "New, Demo, Used, CPO",
   get_ready_services: [
     { name: "Reconditioning / mechanical", responsible_name: "Service Dept.", responsible_email: "", cost: "" },

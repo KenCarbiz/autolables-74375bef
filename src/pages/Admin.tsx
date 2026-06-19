@@ -16,6 +16,7 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { useVinScan } from "@/contexts/VinScanContext";
 import { toast } from "sonner";
 import { AccessoryInstallPanel } from "@/components/admin/AccessoryInstallPanel";
+import DealerProgramsPanel from "@/components/admin/DealerProgramsPanel";
 import { GetReadySheet } from "@/components/admin/GetReadySheet";
 import type { GetReadyRecord } from "@/hooks/useGetReady";
 import { EmailDistributionPanel } from "@/components/admin/EmailDistributionPanel";
@@ -98,7 +99,7 @@ interface Product {
   icon_type?: string;
 }
 
-type AdminTab = "home" | "products" | "rules" | "settings" | "branding" | "analytics" | "leads" | "funnel" | "audit" | "queue" | "files" | "getready" | "inventory" | "invoices" | "warranty" | "team";
+type AdminTab = "home" | "products" | "rules" | "settings" | "branding" | "programs" | "analytics" | "leads" | "funnel" | "audit" | "queue" | "files" | "getready" | "inventory" | "invoices" | "warranty" | "team";
 
 const emptyProduct = {
   name: "",
@@ -175,7 +176,7 @@ const FEATURE_TOGGLES: { key: keyof DealerSettings; label: string; description: 
   { key: "feature_ai_descriptions", label: "AI Descriptions", description: "Generate vehicle descriptions automatically", status: "coming_soon" },
 ];
 
-const VALID_TABS: AdminTab[] = ["home", "products", "rules", "settings", "branding", "analytics", "leads", "funnel", "audit", "queue", "files", "getready", "inventory", "invoices", "warranty", "team"];
+const VALID_TABS: AdminTab[] = ["home", "products", "rules", "settings", "branding", "programs", "analytics", "leads", "funnel", "audit", "queue", "files", "getready", "inventory", "invoices", "warranty", "team"];
 
 const Admin = () => {
   const queryClient = useQueryClient();
@@ -537,6 +538,7 @@ const Admin = () => {
     ...(settings.feature_product_rules ? [{ id: "rules" as const, label: "Rules" }] : []),
     { id: "settings", label: "Settings" },
     { id: "branding", label: "Branding" },
+    { id: "programs", label: "Programs" },
     ...(settings.feature_analytics ? [{ id: "analytics" as const, label: "Analytics" }] : []),
     ...(settings.feature_lead_capture ? [{ id: "leads" as const, label: "Leads" }] : []),
     { id: "funnel", label: "Signing Funnel" },
@@ -587,7 +589,7 @@ const Admin = () => {
           const availIds = new Set(tabs.map((t) => t.id));
           const groupDefs: { id: string; label: string; ids: AdminTab[] }[] = [
             { id: "home", label: "Home", ids: ["home"] },
-            { id: "setup", label: "Branding & Setup", ids: ["branding"] },
+            { id: "setup", label: "Branding & Setup", ids: ["branding", "programs"] },
             { id: "products", label: "Products", ids: ["products", "rules"] },
             { id: "team", label: "Team", ids: ["team"] },
             { id: "reports", label: "Reports", ids: ["analytics", "leads", "funnel"] },
@@ -1329,6 +1331,8 @@ const Admin = () => {
         )}
 
         {/* ─── Branding Tab ─── */}
+        {tab === "programs" && <DealerProgramsPanel />}
+
         {tab === "branding" && (
           <div>
             <div className="bg-card rounded-lg p-4 shadow-sm mb-4">
