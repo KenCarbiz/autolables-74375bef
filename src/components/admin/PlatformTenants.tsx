@@ -1,6 +1,7 @@
 import { useMemo, useState, useEffect } from "react";
 import { useAdminPlatform, type TenantSummary } from "@/hooks/useAdminPlatform";
 import type { PlanTier } from "@/data/planTiers";
+import { planTierOptions } from "@/data/planTiers";
 
 const TIER_LABEL: Record<PlanTier, string> = {
   essential: "Essential",
@@ -468,7 +469,7 @@ const CreateTenantForm = ({ onClose, onCreate }: CreateFormProps) => {
       </div>
       <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
         <Select label="App" value={appSlug} onChange={setAppSlug} options={["autolabels", "autocurb", "autoframe", "autovideo"]} />
-        <Select label="Plan tier" value={planTier} onChange={setPlanTier} options={["base", "pro", "starter", "essential", "professional", "unlimited", "enterprise"]} />
+        <Select label="Plan tier" value={planTier} onChange={setPlanTier} options={planTierOptions(planTier)} />
         <div>
           <label className="text-[10px] font-semibold text-muted-foreground uppercase tracking-label">
             Trial length

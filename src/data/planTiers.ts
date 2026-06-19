@@ -15,6 +15,24 @@ import type { DealerSettings } from "@/contexts/DealerSettingsContext";
 
 export type PlanTier = "essential" | "unlimited" | "compliance_pro";
 
+// Canonical AutoLabels plan-tier identifiers — the single source of truth for
+// every tier dropdown (platform-admin entitlements + tenant tier). Order is
+// cheapest → most complete.
+export const PLAN_TIER_IDS: PlanTier[] = ["essential", "unlimited", "compliance_pro"];
+
+export const PLAN_TIER_LABELS: Record<PlanTier, string> = {
+  essential: "Essential",
+  unlimited: "Unlimited",
+  compliance_pro: "Compliance Pro",
+};
+
+// Merge an existing (possibly legacy) value into the canonical list so a tenant
+// already set to a retired tier still shows its current value in a dropdown.
+export const planTierOptions = (current?: string | null): string[] =>
+  current && !(PLAN_TIER_IDS as string[]).includes(current)
+    ? [current, ...PLAN_TIER_IDS]
+    : [...PLAN_TIER_IDS];
+
 // ── Per-tier monthly VIN ceiling. null = unlimited.
 export const TIER_VIN_LIMITS: Record<PlanTier, number | null> = {
   essential: 75,

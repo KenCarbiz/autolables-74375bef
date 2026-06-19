@@ -4,10 +4,10 @@ import { toast } from "sonner";
 import { CreditCard, Search, Zap } from "lucide-react";
 import { SortHeader, TablePagination, useSortAndPaginate, toCsv, downloadCsv, useTableDensity, DensityToggle } from "./tablePrimitives";
 import { TableEmptyState } from "./TableEmptyState";
+import { planTierOptions } from "@/data/planTiers";
 
 const APP_SLUGS = ["autolabels", "autocurb", "autoframe", "autovideo"] as const;
 const STATUSES: EntitlementRow["status"][] = ["trial", "active", "canceled", "past_due", "paused"];
-const PLAN_TIERS = ["starter", "essential", "professional", "unlimited", "enterprise"];
 
 const formatDate = (s: string | null) => {
   if (!s) return "—";
@@ -269,7 +269,7 @@ const EntRow = ({ row, tenantName, editing, rowClass, onEdit, onClose, onSubmit 
       <td className={`${rowClass} uppercase text-xs tracking-wider`}>{row.app_slug}</td>
       <td className={rowClass}>
         <select value={planTier} onChange={(e) => setPlanTier(e.target.value)} className="h-8 px-2 rounded-md border border-border bg-background text-xs">
-          {PLAN_TIERS.map((p) => <option key={p} value={p}>{p}</option>)}
+          {planTierOptions(row.plan_tier).map((p) => <option key={p} value={p}>{p}</option>)}
         </select>
       </td>
       <td className={rowClass}>
@@ -351,7 +351,7 @@ const QuickOverride = ({ tenants, onClose, onSubmit }: QuickProps) => {
           {APP_SLUGS.map((s) => <option key={s} value={s}>{s}</option>)}
         </select>
         <select value={planTier} onChange={(e) => setPlanTier(e.target.value)} className="h-9 px-2 rounded-md border border-border bg-background text-sm">
-          {PLAN_TIERS.map((p) => <option key={p} value={p}>{p}</option>)}
+          {planTierOptions(planTier).map((p) => <option key={p} value={p}>{p}</option>)}
         </select>
         <select value={status} onChange={(e) => setStatus(e.target.value as EntitlementRow["status"])} className="h-9 px-2 rounded-md border border-border bg-background text-sm">
           {STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}
