@@ -129,13 +129,6 @@ const AppShell = ({ children }: AppShellProps) => {
       return next;
     });
   };
-  const [darkMode, setDarkMode] = useState(() => {
-    if (typeof window !== "undefined") {
-      return localStorage.getItem("dark_mode") === "true" ||
-        document.documentElement.classList.contains("dark");
-    }
-    return false;
-  });
   // Sections start with sensible defaults, but any section whose
   // items include the current route is force-opened below so links
   // are actually visible while you're on the matching page.
