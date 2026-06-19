@@ -170,9 +170,10 @@ serve(async (req) => {
     const { data: isAdmin } = await admin.from("user_roles")
       .select("role").eq("user_id", userId).eq("role", "admin").maybeSingle();
     // A global dealer lookup is not tenant-scoped — it just searches MarketCheck
-    // by geography, so it requires a platform admin but no tenant_id/membership.
+    // by geography. Any authenticated user may run it (it powers both the
+    // platform tenant drawer and the dealer's own Admin setup card).
     if (body.lookup) {
-      if (!isAdmin) return json(403, { error: "admin only" });
+      // ok — authenticated is enough
     } else {
       if (!body.tenant_id) return json(400, { error: "tenant_id required" });
       if (!isAdmin) {
