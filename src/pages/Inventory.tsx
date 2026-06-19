@@ -14,7 +14,7 @@ import { useVinDecode } from "@/hooks/useVinDecode";
 import { toast } from "sonner";
 import {
   Plus, Search, Upload, Car, FileText, Printer, Signature, ScanLine,
-  X, CheckCircle2, AlertTriangle, RefreshCw, MoreVertical, Gauge,
+  X, CheckCircle2, AlertTriangle, RefreshCw, MoreVertical, Gauge, Building2,
   ShieldCheck, ClipboardList, ExternalLink, Trash2, Wrench,
   ChevronLeft, ChevronRight, Eye, CircleDollarSign, FileSignature,
 } from "lucide-react";
@@ -363,6 +363,9 @@ const Inventory = () => {
     // "total" clears everything (done above)
   };
 
+  const dealerName = (settings.dealer_name && settings.dealer_name !== "Your Dealership" && settings.dealer_name) || (tenant?.name && tenant.name !== "AutoLabels.io" && tenant.name) || "Your Dealership";
+  const dealerLoc = [settings.dealer_city, settings.dealer_state].filter(Boolean).join(", ");
+
   return (
     <div className="p-4 lg:p-6 max-w-[1600px] mx-auto space-y-5">
       <PageTabs tabs={VEHICLES_TABS} />
@@ -375,31 +378,18 @@ const Inventory = () => {
             Inventory
           </div>
           <h1 className="mt-0.5 text-2xl lg:text-[28px] font-display font-semibold tracking-tight text-foreground">
-            Manage your inventory
+            Inventory Command Center
           </h1>
           <p className="text-sm text-muted-foreground mt-0.5">
-            Every sticker, addendum, prep sign-off, and customer signature attaches to a vehicle file here.
+            Manage, optimize, and publish your inventory with confidence.
           </p>
         </div>
-        <div className="flex items-stretch gap-2 flex-wrap">
-          <button onClick={() => setShowAdd(true)} className="h-9 px-4 rounded-xl bg-blue-600 hover:bg-blue-700 text-white inline-flex items-center gap-2 text-sm font-semibold shadow-sm shadow-blue-600/30 ring-1 ring-inset ring-white/15 transition-colors whitespace-nowrap">
-            <Plus className="w-4 h-4 stroke-2" /> Add Vehicle
-          </button>
-          <button onClick={openScan} className="h-9 px-4 rounded-xl border border-border bg-card hover:bg-muted text-foreground inline-flex items-center gap-2 text-sm font-medium transition-colors whitespace-nowrap">
-            <ScanLine className="w-4 h-4 stroke-2" /> Scan VIN
-          </button>
-          {settings.feature_price_verification && (
-            <button onClick={runPriceScrape} disabled={scraping} className="h-9 px-4 rounded-xl border border-border bg-card hover:bg-muted text-foreground inline-flex items-center gap-2 text-sm font-medium transition-colors whitespace-nowrap disabled:opacity-50">
-              <RefreshCw className={`w-4 h-4 stroke-2 ${scraping ? "animate-spin" : ""}`} /> {scraping ? "Scraping…" : "Verify prices"}
-            </button>
-          )}
-        </div>
+        <DealerInfoCard name={dealerName} location={dealerLoc} at={lastSync.at} total={counts.total} />
       </div>
 
       <div className="flex flex-col xl:flex-row gap-5">
         {/* Main column */}
         <div className="flex-1 min-w-0 space-y-5">
-          <SyncStatusBar at={lastSync.at} status={lastSync.status} total={counts.total} />
           <ExecKpiStrip counts={counts} onMetric={onHealthMetric} onMarket={runMarketBatch} />
 
           {/* Search + selects */}
@@ -542,6 +532,7 @@ const Inventory = () => {
               <QuickAction icon={FileSignature} label="New Addendum" onClick={() => navigate("/addendum")} />
               <QuickAction icon={ShieldCheck} label="Check Recalls" onClick={runRecallBatch} />
               <QuickAction icon={CircleDollarSign} label="Check Market Prices" onClick={runMarketBatch} />
+              {settings.feature_price_verification && <QuickAction icon={RefreshCw} label={scraping ? "Verifying…" : "Verify Prices"} onClick={runPriceScrape} />}
               <QuickAction icon={Upload} label="CSV Import" onClick={() => setShowImport(true)} />
             </div>
           </SideCard>
@@ -764,19 +755,32 @@ const StatusDonut = ({ published, draft, archived, total }: { published: number;
   );
 };
 
-// ── Last-sync status bar ───────────────────────────────────────
-const SyncStatusBar = ({ at, status, total }: { at: string | null; status: Record<string, unknown> | null; total: number }) => {
+// ── Header dealer info card (matches the v3 executive toolbar) ──
+const DealerInfoCard = ({ name, location, at, total }: { name: string; location: string; at: string | null; total: number }) => {
   const synced = !!at;
-  const ageH = at ? (Date.now() - new Date(at).getTime()) / 3600000 : Infinity;
-  const healthy = synced && ageH < 30;
-  const time = at ? new Date(at).toLocaleString(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }) : "Never";
-  const matched = (status?.matched_dealer as string) || "";
+  const d = at ? new Date(at) : null;
+  const sameDay = d ? d.toDateString() === new Date().toDateString() : false;
+  const when = d ? (sameDay ? `${d.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" })} today` : d.toLocaleDateString(undefined, { month: "short", day: "numeric" })) : "Never";
   return (
-    <div className="rounded-2xl border border-border bg-card shadow-sm px-4 py-3 flex items-center gap-3 flex-wrap">
-      <span className={`w-2.5 h-2.5 rounded-full ${synced ? (healthy ? "bg-emerald-500" : "bg-amber-500") : "bg-slate-300"}`} />
-      <p className="text-sm"><span className="font-semibold text-foreground">Inventory last synced</span><span className="text-muted-foreground"> · {time}</span></p>
-      <span className="text-xs text-muted-foreground">{total.toLocaleString()} vehicles{matched ? ` · ${matched}` : ""}</span>
-      <span className={`ml-auto text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded ${synced ? "bg-emerald-100 text-emerald-700" : "bg-slate-100 text-slate-600"}`}>{synced ? "MarketCheck connected" : "Not synced"}</span>
+    <div className="rounded-2xl border border-border bg-card shadow-sm px-4 py-3 flex items-center gap-4 flex-wrap">
+      <div className="flex items-center gap-2.5 min-w-0">
+        <span className="w-9 h-9 rounded-xl bg-blue-600/10 text-blue-700 flex items-center justify-center shrink-0"><Building2 className="w-5 h-5" /></span>
+        <div className="min-w-0">
+          <p className="font-display font-semibold text-foreground leading-tight truncate">{name}</p>
+          {location && <p className="text-[11px] text-muted-foreground">{location}</p>}
+        </div>
+      </div>
+      <div className="h-9 w-px bg-border hidden sm:block" />
+      <div>
+        <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Last synced</p>
+        <p className="text-xs font-semibold text-foreground inline-flex items-center gap-1.5">
+          <span className={`w-1.5 h-1.5 rounded-full ${synced ? "bg-emerald-500" : "bg-slate-300"}`} />
+          {when} · {total.toLocaleString()} vehicles
+        </p>
+      </div>
+      <span className={`inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider px-2 py-1 rounded-lg ${synced ? "bg-emerald-100 text-emerald-700" : "bg-slate-100 text-slate-600"}`}>
+        <CheckCircle2 className="w-3 h-3" /> MarketCheck {synced ? "connected" : "—"}
+      </span>
     </div>
   );
 };
@@ -812,7 +816,7 @@ const ExecKpi = ({ label, value, sub, icon: Icon, tone, onClick }: { label: stri
 };
 
 interface KpiCounts {
-  health: number; total: number; readyToPublish: number; newCount: number; usedCount: number;
+  health: number; avgReadiness: number; total: number; readyToPublish: number; newCount: number; usedCount: number;
   published: number; needsAttention: number; openRecallVehicles: number; priceVerify: number; avgBelowMarket: number;
 }
 const ExecKpiStrip = ({ counts, onMetric, onMarket }: { counts: KpiCounts; onMetric: (k: string) => void; onMarket: () => void }) => {
@@ -822,7 +826,7 @@ const ExecKpiStrip = ({ counts, onMetric, onMarket }: { counts: KpiCounts; onMet
       <button onClick={() => onMetric("ready")} className="shrink-0 min-w-[210px] xl:min-w-0 text-left rounded-2xl border border-border bg-card shadow-sm p-4 hover:shadow-md hover:border-foreground/15 transition-all">
         <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">Inventory Readiness</p>
         <div className="flex items-center gap-3 mt-2">
-          <BigRing pct={counts.health} />
+          <BigRing pct={counts.avgReadiness} />
           <div className="min-w-0">
             <p className="text-sm font-semibold text-foreground leading-tight">Ready to publish</p>
             <p className="text-[11px] text-muted-foreground">{counts.readyToPublish} of {counts.total} vehicles</p>
