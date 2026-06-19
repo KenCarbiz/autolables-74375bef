@@ -609,7 +609,7 @@ const AppShell = ({ children }: AppShellProps) => {
             {/* Centre: command-palette as a prominent global search bar */}
             <button
               onClick={() => setPaletteOpen(true)}
-              className="hidden md:flex flex-1 min-w-0 max-w-2xl mx-auto items-center gap-2.5 h-11 px-4 rounded-2xl border border-border bg-card hover:bg-muted/60 hover:border-foreground/15 text-sm shadow-sm transition-all"
+              className="hidden md:flex flex-1 min-w-0 max-w-[580px] mx-auto items-center gap-2.5 h-11 px-4 rounded-2xl border border-border bg-card hover:bg-muted/60 hover:border-foreground/15 text-sm shadow-sm transition-all"
               title="Command palette (⌘K)"
             >
               <Search className="w-4 h-4 text-muted-foreground flex-shrink-0" />
@@ -631,36 +631,38 @@ const AppShell = ({ children }: AppShellProps) => {
                   Device-aware: camera on phone/tablet, QR hand-off on desktop. */}
               <button
                 onClick={openScan}
-                className="h-9 px-3.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white inline-flex items-center gap-1.5 text-[13px] font-semibold shadow-sm shadow-blue-600/30 ring-1 ring-inset ring-white/15 transition-colors"
+                className="h-9 px-3 rounded-xl border border-border bg-card hover:bg-muted text-foreground inline-flex items-center gap-1.5 text-[13px] font-medium transition-colors"
                 title="Scan a VIN — camera on phone/tablet, QR hand-off on desktop"
               >
                 <ScanLine className="w-4 h-4 stroke-2" />
-                <span className="hidden sm:inline">Scan VIN</span>
+                <span className="hidden lg:inline">Scan VIN</span>
               </button>
 
-              {/* Dealer · sync · MarketCheck status cards */}
+              {/* Unified system-status card: dealer · sync · MarketCheck */}
               {tenant?.name && (
-                <div className="hidden xl:flex items-center gap-2">
-                  <div className="flex items-center gap-2 h-11 px-3 rounded-xl border border-border bg-card">
-                    <Building2 className="w-4 h-4 text-blue-700 shrink-0" />
+                <div className="hidden xl:flex items-stretch h-[52px] rounded-xl border border-border bg-card shadow-sm overflow-hidden">
+                  <div className="flex items-center gap-2.5 px-4">
+                    <span className="w-7 h-7 rounded-lg bg-blue-600/10 text-blue-700 flex items-center justify-center shrink-0"><Building2 className="w-4 h-4" /></span>
                     <div className="leading-tight min-w-0">
-                      <p className="text-[11px] font-bold text-foreground truncate max-w-[130px]">{tenant.name}</p>
+                      <p className="text-xs font-bold text-foreground truncate max-w-[130px]">{tenant.name}</p>
                       {dealerLoc && <p className="text-[10px] text-muted-foreground">{dealerLoc}</p>}
                     </div>
                   </div>
-                  <div className="flex items-center gap-2 h-11 px-3 rounded-xl border border-border bg-card">
-                    <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />
+                  <div className="w-px bg-border my-2.5" />
+                  <div className="flex items-center gap-2 px-4">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" />
                     <div className="leading-tight">
-                      <p className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground">Inventory last synced</p>
-                      <p className="text-[11px] font-semibold text-foreground">{syncWhen}</p>
-                      {syncInfo.count != null && <p className="text-[10px] font-semibold text-emerald-600">{syncInfo.count} vehicles updated</p>}
+                      <p className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground">Last synced</p>
+                      <p className="text-xs font-semibold text-foreground">{syncWhen}</p>
+                      {syncInfo.count != null && <p className="text-[10px] font-medium text-emerald-600">{syncInfo.count} vehicles updated</p>}
                     </div>
                   </div>
-                  <div className="flex items-center gap-2 h-11 px-3 rounded-xl border border-border bg-card">
+                  <div className="w-px bg-border my-2.5" />
+                  <div className="flex items-center gap-2 px-4">
                     <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />
                     <div className="leading-tight">
-                      <p className="text-[11px] font-bold text-foreground">MarketCheck</p>
-                      <p className="text-[10px] text-muted-foreground">Connected</p>
+                      <p className="text-xs font-bold text-foreground">MarketCheck</p>
+                      <p className="text-[10px] font-medium text-emerald-600">Connected</p>
                     </div>
                   </div>
                 </div>
