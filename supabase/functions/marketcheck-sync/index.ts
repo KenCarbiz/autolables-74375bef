@@ -318,7 +318,6 @@ serve(async (req) => {
       }
 
       const synRows = Math.min(SYND_MAX_ROWS, Math.max(50, cfg.max_vehicles));
-      const maxPages = Math.ceil(cfg.max_vehicles / synRows) + 1;
       let numFound = 0;
       let httpStatus = 0;
 
@@ -369,19 +368,25 @@ serve(async (req) => {
         continue;
       }
 
-      outer:
-      for (let page = 0; page < maxPages; page++) {
+      // Page by the ACTUAL number of rows returned, not the requested size — a
+      // low-tier MarketCheck key silently caps rows (e.g. to 10) even when we
+      // ask for more, so we must advance `start` by what we really got and keep
+      // going until we've covered num_found (or hit the per-run cap).
+      let start = 0;
+      let pageGuard = 0;
+      pages:
+      while (tenantSeen < cfg.max_vehicles && pageGuard < 500) {
         {
-          if (tenantSeen >= cfg.max_vehicles) break;
-          const pageData = page === 0
+          pageGuard++;
+          const pageData = start === 0
             ? firstPage
-            : await syndPage(chosen.param, chosen.value, synRows, page * synRows);
+            : await syndPage(chosen.param, chosen.value, synRows, start);
           const listings: MCListing[] = pageData.listings;
           numFound = pageData.numFound || numFound;
           if (listings.length === 0) break;
 
           for (const l of listings) {
-            if (tenantSeen >= cfg.max_vehicles) break outer;
+            if (tenantSeen >= cfg.max_vehicles) break pages;
             const vin = normVin(l.vin);
             if (!vin || vin.length < 11) continue;
             tenantSeen++; seen++;
@@ -449,7 +454,8 @@ serve(async (req) => {
               }
             }
           }
-          if ((page + 1) * synRows >= numFound) break;
+          start += listings.length;
+          if (start >= numFound) break;
         }
       }
 
