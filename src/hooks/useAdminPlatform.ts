@@ -74,9 +74,11 @@ export const summarizeMarketcheckDiag = (diags?: MarketcheckDiag[]): string => {
     if (d.write_error) parts.push(`write error: ${d.write_error}`);
     return parts.join(" · ");
   }
-  // Nothing matched — show what each combo returned so the param can be pinned.
+  // Nothing matched — lead with the server's explanation, then show what each
+  // probe returned so the right param/entitlement can be pinned.
   const tried = (d.attempts || []).map((a) => `${a.param}=${a.id}→http ${a.http}/${a.num_found} found`);
-  return `No feed returned cars. Tried: ${tried.join(" | ") || "none"}`;
+  const head = d.note ? d.note : "No syndication feed returned cars.";
+  return `${head} Tried: ${tried.join(" | ") || "none"}`;
 };
 
 export interface MarketcheckRow {
