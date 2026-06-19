@@ -189,17 +189,35 @@ const Inventory = () => {
       .limit(500);
     // Resilient cascade: drop only the columns that aren't migrated yet, so a
     // missing newest column never knocks out the older enrichment (e.g. photos).
-    let { data, error } = await runSelect(`${baseCols},hero_image_url,recall_status,open_recall_count,market_position,market_value`);
-    if (error && /market_position|market_value/.test(error.message || "")) {
-      ({ data, error } = await runSelect(`${baseCols},hero_image_url,recall_status,open_recall_count`));
-    }
-    if (error && /hero_image_url|recall_status|open_recall_count/.test(error.message || "")) {
-      ({ data, error } = await runSelect(baseCols));
+    // Resilient cascade: any schema/column error (e.g. a not-yet-migrated column
+    // or a stale PostgREST schema cache right after a deploy) drops the newest
+    // columns and retries, so it never blanks the page over a missing column.
+    const isSchemaErr = (e: { message?: string; code?: string } | null) =>
+      !!e && (/column|does not exist|schema cache/i.test(e.message || "") || ["42703", "PGRST204", "42P01"].includes(e.code || ""));
+    let data: unknown = null;
+    let error: { message?: string; code?: string } | null = null;
+    try {
+      for (const cols of [
+        `${baseCols},hero_image_url,recall_status,open_recall_count,market_position,market_value`,
+        `${baseCols},hero_image_url,recall_status,open_recall_count`,
+        baseCols,
+      ]) {
+        const res = await runSelect(cols);
+        if (!res.error) { data = res.data; error = null; break; }
+        error = res.error;
+        if (!isSchemaErr(res.error)) break; // genuine error → stop retrying
+      }
+    } catch (e) {
+      error = { message: e instanceof Error ? e.message : "network error" };
     }
     if (error) {
-      toast.error("Failed to load inventory");
-      setRows([]);
-    } else {
+      // Preserve the last good rows on a transient re-load failure; only blank
+      // + toast on the very first load when there is nothing to show.
+      setRows((prev) => { if (prev.length === 0) toast.error("Couldn't refresh inventory — retrying shortly."); return prev; });
+      setLoading(false);
+      return;
+    }
+    {
       let rows = (data || []) as VehicleRow[];
       const vins = rows.map((r) => r.vin).filter(Boolean);
       const adVins = new Set<string>();
