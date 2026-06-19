@@ -52,6 +52,7 @@ export interface MarketcheckRow {
   allowed: boolean;
   enabled: boolean;
   source: string;
+  dealer_id?: string;
   max_vehicles?: number;
   frequency?: string;
   day_of_week?: number;
@@ -119,9 +120,14 @@ export const useAdminPlatform = () => {
   const marketcheck = useQuery({
     queryKey: ["admin", "marketcheck"],
     queryFn: async (): Promise<MarketcheckRow[]> => {
-      const { data, error } = await (supabase as any)
+      const baseSel = "tenant_id, allowed, enabled, source, max_vehicles, frequency, day_of_week, run_hour, last_run_at, last_status";
+      // dealer_id may not exist on older schemas — fall back without it.
+      let { data, error } = await (supabase as any)
         .from("marketcheck_sync_config")
-        .select("tenant_id, allowed, enabled, source, max_vehicles, frequency, day_of_week, run_hour, last_run_at, last_status");
+        .select(baseSel + ", dealer_id");
+      if (error && /dealer_id/i.test(error.message || "")) {
+        ({ data, error } = await (supabase as any).from("marketcheck_sync_config").select(baseSel));
+      }
       if (error) throw error;
       return (data as MarketcheckRow[]) || [];
     },

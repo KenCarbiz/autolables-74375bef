@@ -38,6 +38,7 @@ const MC_KEY = Deno.env.get("MARKETCHECK_API_KEY_1") || Deno.env.get("MARKETCHEC
 // cars. Syndication is keyed on MarketCheck's internal dealer_id.
 const MC_BASE = "https://api.marketcheck.com/v2";
 const SYND_ENDPOINT = `${MC_BASE}/dealerships/inventory`;
+const SEARCH_ENDPOINT = `${MC_BASE}/search/car/active`;
 const DEALERS_ENDPOINT = `${MC_BASE}/dealers/car`;
 const ROWS = 50;
 
@@ -65,6 +66,29 @@ async function resolveDealerId(
     return { id: id || null, found: dealers.length, status: res.status, matchedName: hit?.seller_name ?? null };
   } catch {
     return { id: null, found: 0, status: 0 };
+  }
+}
+
+// Pull one page of a dealer's active inventory. A dealer_id from the Dealer
+// Search API pairs canonically with the Inventory Search API; the dealership
+// syndication feed is a separate product that may return nothing for that id.
+// So callers probe both and use whichever feed actually answers.
+async function fetchPage(
+  feed: "search" | "syndication", dealerId: string, start: number,
+): Promise<{ listings: MCListing[]; numFound: number; http: number }> {
+  const base = feed === "syndication" ? SYND_ENDPOINT : SEARCH_ENDPOINT;
+  const url = `${base}?api_key=${encodeURIComponent(MC_KEY)}`
+    + `&dealer_id=${encodeURIComponent(dealerId)}&rows=${ROWS}&start=${start}`;
+  try {
+    const res = await fetch(url, { signal: AbortSignal.timeout(30000) });
+    if (!res.ok) return { listings: [], numFound: 0, http: res.status };
+    // deno-lint-ignore no-explicit-any
+    const data: any = await res.json().catch(() => ({}));
+    const listings: MCListing[] = Array.isArray(data?.listings) ? data.listings : [];
+    const numFound = typeof data?.num_found === "number" ? data.num_found : listings.length;
+    return { listings, numFound, http: res.status };
+  } catch {
+    return { listings: [], numFound: 0, http: 0 };
   }
 }
 
@@ -181,12 +205,14 @@ serve(async (req) => {
     return json(200, { ok: true, http: res.status, dealers });
   }
 
-  // ── Pick configs: allowed + enabled + source. Manual run targets one tenant
-  // and bypasses the schedule (force). Cron runs all tenants due this hour. ──
+  // ── Pick configs: allowed + enabled, and either a website domain OR a
+  // resolved dealer_id (a dealer chosen from the finder has an id but may have
+  // no domain). Manual run targets one tenant and bypasses the schedule (force).
+  // Cron runs all tenants due this hour. ──
   const baseCols = "tenant_id, allowed, enabled, source, max_vehicles, frequency, day_of_week, run_hour, last_run_at";
   const mkQuery = (cols: string) => {
     let q = admin.from("marketcheck_sync_config").select(cols)
-      .eq("allowed", true).eq("enabled", true).neq("source", "");
+      .eq("allowed", true).eq("enabled", true);
     if (body.tenant_id) q = q.eq("tenant_id", body.tenant_id);
     return q;
   };
@@ -199,8 +225,9 @@ serve(async (req) => {
   if (cErr) return json(500, { error: cErr.message });
 
   const now = new Date();
-  const due = (configs || []).filter((c: SyncConfig) =>
-    (body.force && body.tenant_id) ? true : isDue(c, now));
+  const due = (configs || [])
+    .filter((c: SyncConfig) => toSourceHost(c.source) || (c.dealer_id || "").trim())
+    .filter((c: SyncConfig) => (body.force && body.tenant_id) ? true : isDue(c, now));
 
   let tenantsSynced = 0, newVehicles = 0, listingsUpserted = 0, pricesRecorded = 0, seen = 0;
   const errors: Array<{ tenant_id: string; error: string }> = [];
@@ -208,7 +235,10 @@ serve(async (req) => {
 
   for (const cfg of due as SyncConfig[]) {
     const source = toSourceHost(cfg.source);
-    if (!source) continue;
+    const manualDealerId = (cfg.dealer_id || "").trim();
+    // A domain OR a chosen dealer_id is enough — the finder gives an id even
+    // when MarketCheck has no website on file for the rooftop.
+    if (!source && !manualDealerId) continue;
     let tenantSeen = 0, tenantNew = 0, tenantPrices = 0;
     let firstWriteErr: string | null = null;
     const liveVins = new Set<string>();
@@ -248,18 +278,32 @@ serve(async (req) => {
       const maxPages = Math.ceil(cfg.max_vehicles / ROWS) + 1;
       let numFound = 0;
       let httpStatus = 0;
+
+      // Probe both feeds on page 0 and lock onto whichever returns this dealer's
+      // cars: the Inventory Search API (canonical for a Dealer Search id) or the
+      // dealership syndication feed. Record both so a zero pull is debuggable.
+      const searchProbe = await fetchPage("search", dealerId, 0);
+      const syndProbe = searchProbe.listings.length > 0
+        ? { listings: [] as MCListing[], numFound: 0, http: 0 }
+        : await fetchPage("syndication", dealerId, 0);
+      const feed: "search" | "syndication" =
+        searchProbe.listings.length > 0 ? "search"
+          : syndProbe.listings.length > 0 ? "syndication" : "search";
+      httpStatus = feed === "syndication" ? syndProbe.http : searchProbe.http;
+      const probe = {
+        feed, search_http: searchProbe.http, search_found: searchProbe.numFound,
+        synd_http: syndProbe.http, synd_found: syndProbe.numFound,
+      };
+
       outer:
       for (let page = 0; page < maxPages; page++) {
         {
           if (tenantSeen >= cfg.max_vehicles) break;
-          const url = `${SYND_ENDPOINT}?api_key=${encodeURIComponent(MC_KEY)}`
-            + `&dealer_id=${encodeURIComponent(dealerId)}&rows=${ROWS}&start=${page * ROWS}`;
-          const res = await fetch(url, { signal: AbortSignal.timeout(30000) });
-          if (page === 0) httpStatus = res.status;
-          if (!res.ok) { errors.push({ tenant_id: cfg.tenant_id, error: `mc syndication http ${res.status}` }); break; }
-          const data = await res.json().catch(() => ({}));
-          const listings: MCListing[] = Array.isArray(data?.listings) ? data.listings : [];
-          numFound = typeof data?.num_found === "number" ? data.num_found : numFound;
+          const pageData = page === 0
+            ? (feed === "syndication" ? syndProbe : searchProbe)
+            : await fetchPage(feed, dealerId, page * ROWS);
+          const listings: MCListing[] = pageData.listings;
+          numFound = pageData.numFound || numFound;
           if (listings.length === 0) break;
 
           for (const l of listings) {
@@ -348,7 +392,7 @@ serve(async (req) => {
 
       tenantsSynced++;
       const status = { ran_at: now.toISOString(), seen: tenantSeen, new_vehicles: tenantNew, prices_recorded: tenantPrices, dealer_id: dealerId, num_found: numFound, http: httpStatus, removed: pruned?.listings_deleted ?? 0 };
-      diagnostics.push({ tenant_id: cfg.tenant_id, source, dealer_id: dealerId, matched_dealer: resolveInfo?.matchedName ?? "(manual id)", resolved: !cfg.dealer_id, num_found: numFound, http: httpStatus, seen: tenantSeen, listings_written: listingsUpserted, removed: pruned?.listings_deleted ?? 0, write_error: firstWriteErr });
+      diagnostics.push({ tenant_id: cfg.tenant_id, source, dealer_id: dealerId, matched_dealer: resolveInfo?.matchedName ?? "(manual id)", resolved: !cfg.dealer_id, num_found: numFound, http: httpStatus, seen: tenantSeen, listings_written: listingsUpserted, removed: pruned?.listings_deleted ?? 0, write_error: firstWriteErr, ...probe });
       await admin.from("marketcheck_sync_config")
         .update({ last_run_at: now.toISOString(), last_status: status })
         .eq("tenant_id", cfg.tenant_id);
