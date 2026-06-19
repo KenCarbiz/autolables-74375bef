@@ -47,6 +47,38 @@ export interface EntitlementRow {
   seat_limit: number | null;
 }
 
+// Shape of one tenant's entry in the marketcheck-sync diagnostics array. Used
+// to turn a wrong/zero pull into a readable explanation in the admin UI.
+export interface MarketcheckDiag {
+  error?: string;
+  note?: string;
+  dealer_record?: string;
+  dealer_listing_count?: number | null;
+  mc_ids?: string[];
+  chosen?: { param: string; id: string } | null;
+  num_found?: number;
+  seen?: number;
+  listings_written?: number;
+  write_error?: string | null;
+  attempts?: Array<{ feed: string; param: string; id: string; http: number; num_found: number; got: number }>;
+}
+
+// Condense a diagnostics array into a one-or-two-line human summary.
+export const summarizeMarketcheckDiag = (diags?: MarketcheckDiag[]): string => {
+  const d = diags?.[0];
+  if (!d) return "";
+  if (d.error === "no_dealer_id") return d.note || "No MarketCheck dealer matched — set the dealer ID.";
+  if (d.chosen) {
+    const who = d.dealer_record ? `${d.dealer_record}` : `id ${d.chosen.id}`;
+    const parts = [`Matched ${who} via ${d.chosen.param}=${d.chosen.id}`, `${d.num_found ?? d.seen ?? 0} in feed`, `${d.listings_written ?? 0} written`];
+    if (d.write_error) parts.push(`write error: ${d.write_error}`);
+    return parts.join(" · ");
+  }
+  // Nothing matched — show what each combo returned so the param can be pinned.
+  const tried = (d.attempts || []).map((a) => `${a.param}=${a.id}→http ${a.http}/${a.num_found} found`);
+  return `No feed returned cars. Tried: ${tried.join(" | ") || "none"}`;
+};
+
 export interface MarketcheckRow {
   tenant_id: string;
   allowed: boolean;
@@ -190,10 +222,12 @@ export const useAdminPlatform = () => {
     async (tenantId: string): Promise<{ ok: boolean; message: string }> => {
       const { data, error } = await supabase.functions.invoke("marketcheck-sync", { body: { tenant_id: tenantId, force: true } });
       if (error) return { ok: false, message: "Sync failed — check the MarketCheck key / domain." };
-      const r = (data || {}) as { error?: string; listings_seen?: number; new_vehicles?: number; prices_recorded?: number };
+      const r = (data || {}) as { error?: string; listings_seen?: number; new_vehicles?: number; prices_recorded?: number; diagnostics?: MarketcheckDiag[] };
       if (r.error === "not_configured") return { ok: false, message: "MARKETCHECK_API_KEY_1 is not set on the server." };
       await qc.invalidateQueries({ queryKey: ["admin", "marketcheck"] });
-      return { ok: true, message: `Synced ${r.listings_seen ?? 0} vehicles · ${r.new_vehicles ?? 0} new · ${r.prices_recorded ?? 0} price updates` };
+      const head = `Synced ${r.listings_seen ?? 0} vehicles · ${r.new_vehicles ?? 0} new · ${r.prices_recorded ?? 0} price updates`;
+      const diag = summarizeMarketcheckDiag(r.diagnostics);
+      return { ok: (r.listings_seen ?? 0) > 0, message: diag ? `${head}\n${diag}` : head };
     },
     [qc]
   );

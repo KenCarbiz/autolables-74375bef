@@ -811,7 +811,7 @@ const TenantDetailsDrawer = ({
                 {mcSaving ? "Saving…" : "Save"}
               </button>
               <button
-                onClick={async () => { if (!mcSource.trim() && !mcDealerId.trim()) { toast.error("Pick a dealer (or enter the website domain) first"); return; } setMcRunning(true); const r = await onRunMarketcheck(); setMcRunning(false); toast[r.ok ? "success" : "error"](r.message); }}
+                onClick={async () => { if (!mcSource.trim() && !mcDealerId.trim()) { toast.error("Pick a dealer (or enter the website domain) first"); return; } setMcRunning(true); const r = await onRunMarketcheck(); setMcRunning(false); const [title, ...rest] = r.message.split("\n"); toast[r.ok ? "success" : "error"](title, rest.length ? { description: rest.join(" "), duration: 12000 } : undefined); }}
                 disabled={mcRunning}
                 className="h-9 px-3 rounded-md border border-border text-xs font-semibold hover:bg-muted disabled:opacity-50"
               >

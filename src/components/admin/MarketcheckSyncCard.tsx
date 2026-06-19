@@ -5,6 +5,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
 import { RefreshCw, Loader2, Database, Lock } from "lucide-react";
 import CronStatusBadge from "@/components/admin/CronStatusBadge";
+import { summarizeMarketcheckDiag, type MarketcheckDiag } from "@/hooks/useAdminPlatform";
 
 // MarketcheckSyncCard — per-tenant nightly inventory sync control.
 // Super admin grants/revokes the capability (allowed); the dealership turns it
@@ -104,9 +105,11 @@ export default function MarketcheckSyncCard() {
     });
     setRunning(false);
     if (error) { toast.error("Sync failed — check the MarketCheck key / domain"); return; }
-    const r = (data || {}) as { new_vehicles?: number; listings_seen?: number; prices_recorded?: number; error?: string };
+    const r = (data || {}) as { new_vehicles?: number; listings_seen?: number; prices_recorded?: number; error?: string; diagnostics?: MarketcheckDiag[] };
     if (r.error === "not_configured") { toast.error("MARKETCHECK_API_KEY_1 is not set on the server"); return; }
-    toast.success(`Synced ${r.listings_seen ?? 0} vehicles · ${r.new_vehicles ?? 0} new · ${r.prices_recorded ?? 0} price updates`);
+    const seen = r.listings_seen ?? 0;
+    const diag = summarizeMarketcheckDiag(r.diagnostics);
+    toast[seen > 0 ? "success" : "error"](`Synced ${seen} vehicles · ${r.new_vehicles ?? 0} new · ${r.prices_recorded ?? 0} price updates`, diag ? { description: diag, duration: 12000 } : undefined);
     load();
   };
 
