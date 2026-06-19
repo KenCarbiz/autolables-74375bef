@@ -157,6 +157,9 @@ export interface VehicleListing {
   market_position?: string | null;
   market_payload?: { listingPrice?: number | null; low?: number | null; high?: number | null; belowMarket?: number } | null;
 
+  // Packet curation — per-vehicle module visibility for the public page.
+  packet_modules?: Record<string, boolean> | null;
+
   prep_status: { all_accessories_installed?: boolean; foreman_signed_at?: string } | null;
   status: "draft" | "published" | "archived";
   published_at: string | null;

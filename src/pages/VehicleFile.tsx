@@ -17,6 +17,7 @@ import { formatPhone, composeName } from "@/components/addendum/CustomerInfoSect
 import EmptyState from "@/components/ui/empty-state";
 import { InstallProofList } from "@/components/admin/InstallProofList";
 import { useVehicleSpecs } from "@/hooks/useVehicleSpecs";
+import { PACKET_MODULES, packetVisible } from "@/lib/packetModules";
 
 // ──────────────────────────────────────────────────────────────
 // VehicleFile — /vehicle-file/:id
@@ -71,6 +72,7 @@ interface VehicleRow {
   hero_image_url: string | null;
   photos: string[] | null;
   mc_attributes: Record<string, unknown> | null;
+  packet_modules: Record<string, boolean> | null;
   recall_status: string | null;
   recall_checked_at: string | null;
   open_recall_count: number | null;
@@ -1059,18 +1061,28 @@ const ScanInfoPanel = ({ vehicle, onReload }: { vehicle: VehicleRow; onReload: (
   const [records, setRecords] = useState<ServiceRecord[]>(vehicle.service_records || []);
   const [warranty, setWarranty] = useState<WarrantyInfo>(vehicle.warranty_info || {});
   const [accessories, setAccessories] = useState<AvailableAccessory[]>(vehicle.available_accessories || []);
+  const [packetModules, setPacketModules] = useState<Record<string, boolean>>(vehicle.packet_modules || {});
   const [saving, setSaving] = useState(false);
+
+  const toggleModule = (id: string) =>
+    setPacketModules((prev) => ({ ...prev, [id]: prev[id] === false }));
 
   const save = async () => {
     setSaving(true);
-    const { error } = await (supabase as any)
+    // packet_modules may not be migrated everywhere yet; retry without it on a
+    // schema error so saving scan content never breaks.
+    const base = {
+      service_records: records.filter((r) => r.date || r.type || r.notes || r.mileage),
+      warranty_info: warranty,
+      available_accessories: accessories.filter((a) => a.name.trim()),
+    };
+    let { error } = await (supabase as any)
       .from("vehicle_listings")
-      .update({
-        service_records: records.filter((r) => r.date || r.type || r.notes || r.mileage),
-        warranty_info: warranty,
-        available_accessories: accessories.filter((a) => a.name.trim()),
-      })
+      .update({ ...base, packet_modules: packetModules })
       .eq("id", vehicle.id);
+    if (error && /column|schema cache|packet_modules/i.test(error.message || "")) {
+      ({ error } = await (supabase as any).from("vehicle_listings").update(base).eq("id", vehicle.id));
+    }
     setSaving(false);
     if (error) { toast.error("Could not save scan info"); return; }
     toast.success("Scan info saved");
@@ -1091,6 +1103,34 @@ const ScanInfoPanel = ({ vehicle, onReload }: { vehicle: VehicleRow; onReload: (
           <Save className="w-4 h-4" /> {saving ? "Saving…" : "Save"}
         </button>
       </div>
+
+      {/* Packet curation — which customer-facing modules show on /v/:slug */}
+      <section className="rounded-2xl border border-border bg-card p-4 space-y-3">
+        <div>
+          <h3 className="text-sm font-bold text-foreground">Customer packet modules</h3>
+          <p className="text-[11px] text-muted-foreground mt-0.5">Choose what the shopper sees. Recall, price, and verified installs always show.</p>
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+          {PACKET_MODULES.map((m) => {
+            const on = packetVisible({ packet_modules: packetModules }, m.id);
+            return (
+              <button
+                key={m.id}
+                onClick={() => toggleModule(m.id)}
+                className={`flex items-start justify-between gap-2 rounded-xl border p-3 text-left transition ${on ? "border-blue-200 bg-blue-50/40" : "border-border bg-muted/30 opacity-70"}`}
+              >
+                <div className="min-w-0">
+                  <p className="text-[13px] font-semibold text-foreground">{m.label}</p>
+                  <p className="text-[10.5px] text-muted-foreground leading-tight mt-0.5">{m.desc}</p>
+                </div>
+                <span className={`mt-0.5 inline-flex h-5 w-9 flex-shrink-0 items-center rounded-full px-0.5 transition-colors ${on ? "bg-blue-600 justify-end" : "bg-slate-300 justify-start"}`}>
+                  <span className="h-4 w-4 rounded-full bg-white shadow" />
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      </section>
 
       {/* Service history */}
       <section className="rounded-2xl border border-border bg-card p-4 space-y-3">

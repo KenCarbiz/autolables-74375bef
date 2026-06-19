@@ -42,6 +42,7 @@ import PublicLanguageToggle from "@/components/layout/PublicLanguageToggle";
 import VehicleInsights from "@/components/listing/VehicleInsights";
 import MarketValueReport from "@/components/listing/MarketValueReport";
 import { listingOptions } from "@/lib/vehicleInsights";
+import { packetVisible } from "@/lib/packetModules";
 
 // ──────────────────────────────────────────────────────────────
 // PublicListing — the shopper-facing window sticker. Mounted at
@@ -282,7 +283,7 @@ const PublicListingBody = () => {
         {/* Vehicle insights — shopper-facing "why this is a great buy"
             ribbon (below-market, one-owner, clean title, no recalls, MPG)
             built from the MarketCheck enrichment. Self-hides when empty. */}
-        <VehicleInsights listing={listing} />
+        {packetVisible(listing, "insights") && <VehicleInsights listing={listing} />}
 
         {/* Recall banner — only shows if the campaign data has
             anything actionable. Clear listings don't need the visual
@@ -303,20 +304,20 @@ const PublicListingBody = () => {
 
         {/* Market value report — shopper-facing transparency: where this
             price sits in the local market range. Self-hides without data. */}
-        <MarketValueReport listing={listing} />
+        {packetVisible(listing, "marketValue") && <MarketValueReport listing={listing} />}
 
         {/* Key specs grid — pulls from listing.key_specs */}
         <KeySpecs listing={listing} />
 
         {/* Factory options & equipment — decoded from the inventory feed */}
-        <FactoryOptions listing={listing} />
+        {packetVisible(listing, "factoryOptions") && <FactoryOptions listing={listing} />}
 
         {/* Photos gallery — only renders if the listing has photos */}
-        <PhotosGallery listing={listing} />
+        {packetVisible(listing, "photos") && <PhotosGallery listing={listing} />}
 
         {/* Description — long-form vehicle write-up if the dealer
             filled one in (or the VDP scraper did). */}
-        {listing.description && (
+        {packetVisible(listing, "description") && listing.description && (
           <section className="rounded-2xl border border-border bg-card shadow-premium p-5">
             <h2 className="text-sm font-semibold text-foreground mb-2">{L.about_this_vehicle}</h2>
             <p className="text-[12px] text-slate-700 leading-relaxed whitespace-pre-wrap">
@@ -332,7 +333,7 @@ const PublicListingBody = () => {
 
         {/* Payment estimator — client-side, default APR/term from
             the listing record. Shoppers can tweak inputs inline. */}
-        {listing.payment_estimate && typeof listing.price === "number" && (
+        {packetVisible(listing, "payment") && listing.payment_estimate && typeof listing.price === "number" && (
           <PaymentEstimator
             price={listing.price}
             estimate={listing.payment_estimate}
@@ -340,7 +341,7 @@ const PublicListingBody = () => {
         )}
 
         {/* Videos */}
-        {listing.videos?.length > 0 && (
+        {packetVisible(listing, "videos") && listing.videos?.length > 0 && (
           <section className="rounded-2xl border border-border bg-card shadow-premium p-5">
             <div className="flex items-center gap-2 mb-3">
               <Play className="w-4 h-4 text-[#1E90FF]" />
@@ -409,7 +410,7 @@ const PublicListingBody = () => {
             that the protection is really on this vehicle. */}
         <VerifiedInstallsPublic slug={listing.slug} />
 
-        <ScanExtras listing={listing} />
+        {packetVisible(listing, "warranty") && <ScanExtras listing={listing} />}
 
         {/* Dealer value props */}
         {listing.value_props?.length > 0 && (
@@ -460,7 +461,7 @@ const PublicListingBody = () => {
             sticker, and anything else the dealer attached. These
             are the legally required artifacts a shopper should be
             able to take with them. */}
-        <ProgramDocuments listing={listing} />
+        {packetVisible(listing, "documents") && <ProgramDocuments listing={listing} />}
 
         {/* "Your Protection" block removed — the Trust Band above
             already shows the same receipts with hashed proof. The
