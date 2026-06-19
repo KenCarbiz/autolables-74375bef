@@ -807,8 +807,8 @@ const FAQS = [
     a: "Your sticker printer, addendum builder, Buyers Guide template, and signing pad — plus the spreadsheet you use to reconcile site prices to lot prices.",
   },
   {
-    q: "Do I need to swap my DMS?",
-    a: "No. AutoLabels reads from your existing DMS / inventory feed and writes back signed deal jackets. We don't replace your DMS.",
+    q: "Where does my vehicle data come from?",
+    a: "Either your existing inventory feed, or our nightly inventory and advertised-price update that pulls your live listings and site pricing. Nothing to install or swap — your vehicles and prices flow in automatically.",
   },
 ];
 
