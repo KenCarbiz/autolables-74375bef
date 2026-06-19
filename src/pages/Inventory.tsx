@@ -48,6 +48,8 @@ interface VehicleRow {
   hero_image_url?: string | null;
   recall_status?: string | null;
   open_recall_count?: number | null;
+  market_position?: string | null;
+  market_value?: number | null;
 }
 
 interface ActivityRow { id: string; action: string; created_at: string; details: Record<string, unknown> | null; }
@@ -132,6 +134,19 @@ const Inventory = () => {
     } catch { toast.error("Recall batch failed"); }
   };
 
+  const runMarketBatch = async () => {
+    if (!tenant?.id) { toast.error("No active dealership"); return; }
+    toast.info("Checking market pricing across inventory…");
+    try {
+      const { data, error } = await supabase.functions.invoke("marketcheck-market-pricing", { body: { tenant_id: tenant.id, batch: true } });
+      if (error) throw error;
+      const d = (data || {}) as { checked?: number; greatDeals?: number; error?: string };
+      if (d.error === "not_configured") { toast.error("Market pricing isn't configured (MarketCheck key)."); return; }
+      toast.success(`Market pricing: ${d.checked ?? 0} checked · ${d.greatDeals ?? 0} great deals`);
+      load();
+    } catch { toast.error("Market pricing batch failed"); }
+  };
+
   const deleteVehicle = async (r: VehicleRow) => {
     if (!window.confirm(`Remove ${r.ymm || r.vin} from inventory? This deletes the vehicle file.`)) return;
     const { error } = await (supabase as any).from("vehicle_listings").delete().eq("id", r.id);
@@ -159,8 +174,8 @@ const Inventory = () => {
       .order("updated_at", { ascending: false })
       .limit(500);
     // Resilient to the not-yet-migrated enrichment columns.
-    let { data, error } = await runSelect(`${baseCols},hero_image_url,recall_status,open_recall_count`);
-    if (error && /hero_image_url|recall_status|open_recall_count/.test(error.message || "")) {
+    let { data, error } = await runSelect(`${baseCols},hero_image_url,recall_status,open_recall_count,market_position,market_value`);
+    if (error && /hero_image_url|recall_status|open_recall_count|market_position|market_value/.test(error.message || "")) {
       ({ data, error } = await runSelect(baseCols));
     }
     if (error) {
@@ -430,6 +445,7 @@ const Inventory = () => {
                         <td className="px-3 py-2.5 text-right" onClick={(e) => e.stopPropagation()}>
                           <span className="tabular-nums font-medium text-foreground">{r.price ? `$${r.price.toLocaleString()}` : "—"}</span>
                           {r.vin && r.price ? <div className="mt-0.5 flex justify-end"><AdvertisedPriceBand vin={r.vin} stickerPrice={r.price} docFee={settings.doc_fee_amount} compact /></div> : null}
+                          {r.market_position ? <div className="mt-0.5 flex justify-end"><MarketChip position={r.market_position} /></div> : null}
                         </td>
                         <td className="px-3 py-2.5 text-right tabular-nums text-muted-foreground">{r.mileage ? `${r.mileage.toLocaleString()} mi` : "—"}</td>
                         <td className="px-3 py-2.5 text-xs text-muted-foreground whitespace-nowrap">{relativeDay(r.updated_at)}</td>
@@ -472,6 +488,7 @@ const Inventory = () => {
               <QuickAction icon={Printer} label="New Car Sticker" onClick={() => navigate("/new-car-sticker")} />
               <QuickAction icon={FileSignature} label="New Addendum" onClick={() => navigate("/addendum")} />
               <QuickAction icon={ShieldCheck} label="Check Recalls" onClick={runRecallBatch} />
+              <QuickAction icon={CircleDollarSign} label="Check Market Prices" onClick={runMarketBatch} />
               <QuickAction icon={Upload} label="CSV Import" onClick={() => setShowImport(true)} />
             </div>
           </SideCard>
@@ -751,6 +768,19 @@ const VehicleCard = ({ r, signal, readiness, onOpen, onSticker, onView, items }:
       </div>
     </div>
   );
+};
+
+const MARKET_CHIP: Record<string, { label: string; cls: string }> = {
+  great_deal:   { label: "Great Deal",   cls: "bg-emerald-100 text-emerald-700" },
+  good_deal:    { label: "Good Deal",    cls: "bg-emerald-100 text-emerald-700" },
+  fair_deal:    { label: "Fair Price",   cls: "bg-blue-100 text-blue-700" },
+  above_market: { label: "Above Market", cls: "bg-amber-100 text-amber-700" },
+};
+const MarketChip = ({ position }: { position?: string | null }) => {
+  if (!position || position === "unknown") return null;
+  const c = MARKET_CHIP[position];
+  if (!c) return null;
+  return <span className={`inline-flex items-center text-[10px] font-semibold px-1.5 py-0.5 rounded ${c.cls}`}>{c.label}</span>;
 };
 
 const RecallChip = ({ status, open }: { status?: string | null; open?: number | null }) => {

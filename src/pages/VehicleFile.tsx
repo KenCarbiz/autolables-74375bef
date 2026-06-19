@@ -74,6 +74,9 @@ interface VehicleRow {
   recall_checked_at: string | null;
   open_recall_count: number | null;
   recall_payload: { recalls?: RecallItem[] } | null;
+  market_value: number | null;
+  market_position: string | null;
+  market_payload: { listingPrice?: number | null; low?: number | null; high?: number | null; belowMarket?: number } | null;
   created_at: string;
   updated_at: string;
 }
@@ -616,6 +619,9 @@ const OverviewPanel = ({ vehicle, onTab }: { vehicle: VehicleRow; onTab: (t: Tab
 
         {/* Recall */}
         <RecallCard vehicle={vehicle} />
+
+        {/* Market pricing */}
+        <MarketPricingCard vehicle={vehicle} />
 
         {/* Shopper portal preview */}
         <Card title="Shopper Portal Preview" className="md:col-span-2 lg:col-span-1">
@@ -1940,6 +1946,68 @@ const RecallCard = ({ vehicle }: { vehicle: VehicleRow }) => {
         <span className="w-9 h-9 rounded-xl bg-muted text-muted-foreground flex items-center justify-center shrink-0"><ShieldCheck className="w-5 h-5" /></span>
         <div><p className="text-sm font-semibold text-foreground">Not checked yet</p><p className="text-[11px] text-muted-foreground">Recall status has not been checked yet.</p></div>
       </div>
+    </Card>
+  );
+};
+
+// MarketCheck market pricing + price position.
+const MARKET_LABEL: Record<string, { label: string; cls: string; dot: string }> = {
+  great_deal:   { label: "Great Deal",   cls: "text-emerald-700 bg-emerald-100", dot: "bg-emerald-500" },
+  good_deal:    { label: "Good Deal",    cls: "text-emerald-700 bg-emerald-100", dot: "bg-emerald-500" },
+  fair_deal:    { label: "Fair Price",   cls: "text-blue-700 bg-blue-100",       dot: "bg-blue-500" },
+  above_market: { label: "Above Market", cls: "text-amber-700 bg-amber-100",     dot: "bg-amber-500" },
+  unknown:      { label: "Not checked",  cls: "text-muted-foreground bg-muted",  dot: "bg-slate-400" },
+};
+
+const MarketPricingCard = ({ vehicle }: { vehicle: VehicleRow }) => {
+  const [pos, setPos] = useState<string>(vehicle.market_position || "unknown");
+  const [market, setMarket] = useState<number | null>(vehicle.market_value);
+  const [below, setBelow] = useState<number>(vehicle.market_payload?.belowMarket ?? 0);
+  const [checking, setChecking] = useState(false);
+
+  const run = async () => {
+    if (!vehicle.vin) { toast.error("No VIN to check"); return; }
+    if (!vehicle.price) { toast.error("Set a price on this vehicle first"); return; }
+    setChecking(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("marketcheck-market-pricing", { body: { vin: vehicle.vin, tenant_id: vehicle.tenant_id } });
+      if (error) throw error;
+      const d = (data || {}) as { error?: string; position?: string; marketValue?: number | null; belowMarket?: number };
+      if (d.error === "not_configured") toast.error("Market pricing isn't configured yet (MarketCheck key).");
+      else if (!d.marketValue) toast.error("Couldn't get a market value right now. Try again.");
+      else { setPos(d.position || "unknown"); setMarket(d.marketValue ?? null); setBelow(d.belowMarket ?? 0); toast.success("Market price updated"); }
+    } catch { toast.error("Market pricing check failed"); }
+    finally { setChecking(false); }
+  };
+
+  const cfg = MARKET_LABEL[pos] || MARKET_LABEL.unknown;
+  const action = (
+    <button onClick={run} disabled={checking} className="text-[11px] font-semibold text-blue-600 hover:underline disabled:opacity-50">
+      {checking ? "Checking…" : market ? "Refresh" : "Check market price"}
+    </button>
+  );
+
+  return (
+    <Card title="Market Pricing" action={action}>
+      {market ? (
+        <div className="space-y-2">
+          <span className={`inline-flex items-center gap-1.5 text-[11px] font-bold px-2 py-1 rounded-lg ${cfg.cls}`}>
+            <span className={`w-1.5 h-1.5 rounded-full ${cfg.dot}`} />
+            {cfg.label}
+            {below > 0 ? ` · $${below.toLocaleString()} below market` : below < 0 ? ` · $${(-below).toLocaleString()} above market` : ""}
+          </span>
+          <div className="flex items-center justify-between text-sm pt-1">
+            <span className="text-muted-foreground">Your price</span>
+            <span className="font-semibold tabular-nums text-foreground">{vehicle.price ? `$${vehicle.price.toLocaleString()}` : "—"}</span>
+          </div>
+          <div className="flex items-center justify-between text-sm">
+            <span className="text-muted-foreground">Market value</span>
+            <span className="font-semibold tabular-nums text-foreground">${market.toLocaleString()}</span>
+          </div>
+        </div>
+      ) : (
+        <p className="text-sm text-muted-foreground">No market price yet. Run a check to compare this vehicle's price to the MarketCheck market value and position.</p>
+      )}
     </Card>
   );
 };
