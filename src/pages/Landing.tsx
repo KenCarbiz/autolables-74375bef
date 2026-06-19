@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import Seo from "@/components/Seo";
@@ -186,7 +186,7 @@ const Hero = ({ onDemo }: { onWaitlist: () => void; onDemo: () => void }) => (
       </div>
 
       <div className="relative">
-        <ComplianceStatusCard />
+        <HeroVisual />
       </div>
     </div>
   </section>
@@ -275,6 +275,122 @@ const ComplianceStatusCard = () => (
     </div>
   </div>
 );
+
+// The second hero pillar: the complete, auto-built vehicle file the scraper
+// produces from the dealer's inventory feed — factory options, fuel economy,
+// one-owner / clean-title flags, days-on-market, and live market position,
+// all sticker-ready with zero data entry.
+const VehicleFileCard = () => (
+  <div className="relative overflow-hidden rounded-2xl border border-slate-200 bg-white ring-1 ring-slate-900/[0.04] shadow-[0_2px_4px_-1px_rgba(15,23,42,0.06),0_20px_40px_-12px_rgba(15,23,42,0.16),0_40px_90px_-30px_rgba(11,32,65,0.28)]">
+    <div
+      aria-hidden
+      className="pointer-events-none absolute inset-0 z-0 bg-[linear-gradient(to_right,rgba(15,23,42,0.03)_1px,transparent_1px),linear-gradient(to_bottom,rgba(15,23,42,0.03)_1px,transparent_1px)] bg-[size:22px_22px] [mask-image:linear-gradient(to_bottom,#000,transparent_88%)]"
+    />
+    <div className="relative z-10">
+      <div className="border-b border-slate-100 bg-gradient-to-b from-slate-50 to-white px-5 pb-3.5 pt-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2.5">
+            <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-[#0B2041] text-white shadow-sm ring-1 ring-white/10">
+              <BadgeCheck className="h-4 w-4" />
+            </span>
+            <div className="leading-none">
+              <p className="font-display text-[13px] font-black tracking-tight text-slate-900">Vehicle file</p>
+              <p className="mt-1 font-mono text-[10px] tracking-tight text-slate-400">VIN &hellip;331335 &middot; auto-built from your feed</p>
+            </div>
+          </div>
+          <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-200/70 bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold tracking-wide text-emerald-700">
+            <span className="relative flex h-1.5 w-1.5">
+              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-60" />
+              <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-emerald-500" />
+            </span>
+            Synced
+          </span>
+        </div>
+      </div>
+
+      <div className="px-5 pb-5 pt-4">
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <p className="font-display text-[15px] font-black tracking-tight text-slate-900">2027 INFINITI QX60 LUXE</p>
+            <p className="mt-0.5 text-[11px] text-slate-500">Deep Emerald &middot; Graphite leather</p>
+          </div>
+          <div className="flex-shrink-0 text-right">
+            <p className="font-display text-[15px] font-black tracking-tight text-slate-900 tabular-nums">$58,835</p>
+            <p className="text-[10px] font-semibold text-emerald-600">$2,444 below market</p>
+          </div>
+        </div>
+
+        <div className="mt-3 flex flex-wrap gap-1.5">
+          {["One owner", "Clean title", "No open recalls"].map((b) => (
+            <span key={b} className="inline-flex items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50/70 px-2 py-0.5 text-[10.5px] font-semibold text-emerald-700">
+              <CheckCircle2 className="h-3 w-3" /> {b}
+            </span>
+          ))}
+        </div>
+
+        <div className="mt-3 grid grid-cols-2 gap-2">
+          <FileStat label="Market position" value="Good Deal" tone="emerald" />
+          <FileStat label="Days on market" value="12 days" />
+          <FileStat label="Fuel economy" value="20 / 26 mpg" />
+          <FileStat label="MSRP" value="$62,335" />
+        </div>
+
+        <div className="mt-3 rounded-xl border border-slate-200 bg-slate-50/40 px-3.5 py-3">
+          <p className="mb-2 font-mono text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-400">Factory options &middot; decoded</p>
+          <div className="flex flex-wrap gap-1.5">
+            {["Premium Pkg", "Heated Seats", "Bose Audio", "360 Camera", "ProPILOT Assist"].map((o) => (
+              <span key={o} className="inline-flex items-center rounded-md border border-slate-200 bg-white px-1.5 py-0.5 text-[10.5px] font-medium text-slate-700">{o}</span>
+            ))}
+            <span className="inline-flex items-center rounded-md border border-slate-200 bg-white px-1.5 py-0.5 text-[10.5px] font-semibold text-[#2563EB]">+17 more</span>
+          </div>
+        </div>
+
+        <p className="mt-3 flex items-center gap-1.5 text-[11px] text-slate-500">
+          <Sparkles className="h-3.5 w-3.5 text-[#2563EB]" /> Sticker-ready in seconds &mdash; every field pulled from your inventory feed.
+        </p>
+      </div>
+    </div>
+  </div>
+);
+
+const FileStat = ({ label, value, tone }: { label: string; value: string; tone?: "emerald" }) => (
+  <div className="rounded-xl border border-slate-200 bg-white px-3 py-2.5">
+    <p className="text-[10px] font-medium uppercase tracking-wide text-slate-400">{label}</p>
+    <p className={`mt-0.5 text-[13px] font-bold tabular-nums ${tone === "emerald" ? "text-emerald-600" : "text-slate-900"}`}>{value}</p>
+  </div>
+);
+
+// Two-pillar hero visual: the compliance defense file and the auto-built
+// vehicle file, on a slow auto-advance that pauses on hover or manual select.
+const HERO_VIEWS = [
+  { id: "compliance", label: "Compliance file" },
+  { id: "vehicle", label: "Vehicle file" },
+];
+const HeroVisual = () => {
+  const [view, setView] = useState(0);
+  const [paused, setPaused] = useState(false);
+  useEffect(() => {
+    if (paused) return;
+    const t = setInterval(() => setView((v) => (v + 1) % HERO_VIEWS.length), 7000);
+    return () => clearInterval(t);
+  }, [paused]);
+  return (
+    <div onMouseEnter={() => setPaused(true)} onMouseLeave={() => setPaused(false)}>
+      <div className="mb-3 inline-flex items-center gap-0.5 rounded-full border border-slate-200 bg-white p-0.5 shadow-sm">
+        {HERO_VIEWS.map((hv, i) => (
+          <button
+            key={hv.id}
+            onClick={() => { setView(i); setPaused(true); }}
+            className={`rounded-full px-3 py-1 text-[11px] font-semibold transition-colors ${i === view ? "bg-[#0B2041] text-white" : "text-slate-500 hover:text-slate-800"}`}
+          >
+            {hv.label}
+          </button>
+        ))}
+      </div>
+      {view === 0 ? <ComplianceStatusCard /> : <VehicleFileCard />}
+    </div>
+  );
+};
 
 const StatusRow = ({
   label, sub, mono, chip = "Verified", tone = "emerald",
