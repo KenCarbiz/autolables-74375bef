@@ -125,7 +125,7 @@ const ProcessDashboard = () => {
           .neq("status", "signed"),
         (supabase as any)
           .from("addendum_signings")
-          .select("id, vin, signer_name, signed_at, content_hash")
+          .select("id, addendum_id, vin, signer_name, signed_at, content_hash")
           .order("signed_at", { ascending: false })
           .limit(6),
         (supabase as any)
@@ -435,13 +435,16 @@ const ProcessDashboard = () => {
             <div className="md:hidden space-y-2">
               {signings.recent.map(r => (
                 <div key={r.id} className="rounded-xl border border-border bg-card p-3 flex items-center justify-between gap-3">
-                  <div className="min-w-0">
+                  <button
+                    onClick={() => r.addendum_id ? navigate(`/addendum?id=${r.addendum_id}`) : navigate(`/compliance?vin=${encodeURIComponent(r.vin || "")}`)}
+                    className="min-w-0 text-left"
+                  >
                     <p className="text-sm font-semibold text-foreground truncate">{r.signer_name || "Buyer"}</p>
                     <p className="text-[11px] text-muted-foreground mt-0.5 font-mono">
                       …{(r.vin || "").slice(-8)}
                       {r.signed_at ? ` · ${new Date(r.signed_at).toLocaleDateString(undefined, { month: "short", day: "numeric" })}` : ""}
                     </p>
-                  </div>
+                  </button>
                   <button
                     onClick={() => navigate(`/compliance?vin=${encodeURIComponent(r.vin || "")}`)}
                     className="shrink-0 inline-flex items-center gap-1.5 text-[11px] font-semibold px-2.5 h-8 rounded-md text-emerald-700 hover:bg-emerald-50"
@@ -466,7 +469,11 @@ const ProcessDashboard = () => {
                 </thead>
                 <tbody className="divide-y divide-border">
                   {signings.recent.map(r => (
-                    <tr key={r.id}>
+                    <tr
+                      key={r.id}
+                      onClick={() => r.addendum_id ? navigate(`/addendum?id=${r.addendum_id}`) : navigate(`/compliance?vin=${encodeURIComponent(r.vin || "")}`)}
+                      className="cursor-pointer hover:bg-muted/30 transition-colors"
+                    >
                       <td className="px-4 py-2.5 text-xs text-muted-foreground whitespace-nowrap">
                         {r.signed_at ? new Date(r.signed_at).toLocaleString(undefined, {
                           month: "short", day: "numeric", hour: "2-digit", minute: "2-digit",
@@ -479,7 +486,7 @@ const ProcessDashboard = () => {
                       </td>
                       <td className="px-4 py-2.5 text-right">
                         <button
-                          onClick={() => navigate(`/compliance?vin=${encodeURIComponent(r.vin || "")}`)}
+                          onClick={(e) => { e.stopPropagation(); navigate(`/compliance?vin=${encodeURIComponent(r.vin || "")}`); }}
                           className="inline-flex items-center gap-1.5 text-[11px] font-semibold px-2.5 h-7 rounded-md text-emerald-700 hover:bg-emerald-50"
                         >
                           <ShieldCheck className="w-3 h-3" /> Defend
