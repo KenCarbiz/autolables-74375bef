@@ -572,17 +572,17 @@ const AppShell = ({ children }: AppShellProps) => {
               </div>
             </div>
 
-            {/* Centre: command-palette as a full-width search bar */}
+            {/* Centre: command-palette as a prominent global search bar */}
             <button
               onClick={() => setPaletteOpen(true)}
-              className="hidden md:flex flex-1 min-w-0 max-w-xl items-center gap-2 h-10 px-3.5 rounded-xl border border-border bg-muted/60 hover:bg-muted text-sm transition-colors"
+              className="hidden md:flex flex-1 min-w-0 max-w-2xl mx-auto items-center gap-2.5 h-11 px-4 rounded-2xl border border-border bg-card hover:bg-muted/60 hover:border-foreground/15 text-sm shadow-sm transition-all"
               title="Command palette (⌘K)"
             >
               <Search className="w-4 h-4 text-muted-foreground flex-shrink-0" />
               <span className="flex-1 text-left text-muted-foreground truncate">
-                Search vehicles, VIN, customers…
+                Search VIN, stock #, make, model, trim, customer…
               </span>
-              <kbd className="inline-flex items-center justify-center h-5 min-w-[28px] px-1.5 rounded-md bg-card border border-border text-[10px] font-mono text-muted-foreground tracking-wider">
+              <kbd className="inline-flex items-center justify-center h-5 min-w-[28px] px-1.5 rounded-md bg-muted border border-border text-[10px] font-mono text-muted-foreground tracking-wider">
                 ⌘K
               </kbd>
             </button>
