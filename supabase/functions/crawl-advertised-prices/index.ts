@@ -119,6 +119,19 @@ const norm = (raw: unknown): number | null => {
 };
 const sane = (n: number | null): n is number => n != null && n >= 1000 && n <= 500000;
 
+// Pull the dealer's hero photo (og:image / twitter:image) off the VDP so the
+// inventory thumbnail and vehicle-file hero show the real car. Handles both
+// meta attribute orders and resolves a relative URL against the page.
+const extractHeroImage = (html: string, baseUrl: string): string | null => {
+  const m =
+    html.match(/<meta[^>]+(?:property|name)=["'](?:og:image(?::secure_url)?|twitter:image)["'][^>]+content=["']([^"']+)["']/i) ||
+    html.match(/<meta[^>]+content=["']([^"']+)["'][^>]+(?:property|name)=["'](?:og:image(?::secure_url)?|twitter:image)["']/i);
+  let url = (m?.[1] || "").trim();
+  if (!url) return null;
+  try { url = new URL(url, baseUrl).toString(); } catch { /* keep as-is */ }
+  return /^https?:\/\//i.test(url) ? url : null;
+};
+
 // Generic selling-price labels appended after each dealer's configured labels.
 // These are advertised-price brands (never MSRP/retail), so running them in the
 // custom-label tier is safe and lets common sites resolve without per-dealer
@@ -709,6 +722,16 @@ serve(async (req) => {
           }
         }
       }
+
+      // Capture the dealer's hero photo for the vehicle file — isolated so a
+      // not-yet-migrated hero_image_url column can never affect price logic.
+      try {
+        const hero = extractHeroImage(html, fetchUrl);
+        if (hero) {
+          await admin.from("vehicle_listings").update({ hero_image_url: hero })
+            .eq("tenant_id", row.tenant_id).eq("vin", row.vin).is("hero_image_url", null);
+        }
+      } catch { /* hero_image_url column may not be migrated yet */ }
 
       if (result.reason === "bot_challenge" && result.price == null) {
         skipped++;

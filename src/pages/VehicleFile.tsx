@@ -67,6 +67,7 @@ interface VehicleRow {
   service_records: ServiceRecord[] | null;
   warranty_info: WarrantyInfo | null;
   available_accessories: AvailableAccessory[] | null;
+  hero_image_url: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -219,7 +220,11 @@ const VehicleFile = () => {
               vehicle.condition === "cpo" ? "from-violet-500/15 to-violet-600/5 text-violet-600" :
               "from-slate-400/15 to-slate-500/5 text-slate-500"
             }`}>
-              <Car className="w-16 h-16" strokeWidth={1.25} />
+              {vehicle.hero_image_url ? (
+                <img src={vehicle.hero_image_url} alt={vehicle.ymm || "vehicle"} className="w-full h-full object-cover" />
+              ) : (
+                <Car className="w-16 h-16" strokeWidth={1.25} />
+              )}
             </div>
 
             <div className="flex-1 p-5 min-w-0">

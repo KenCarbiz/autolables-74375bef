@@ -170,6 +170,7 @@ interface MCListing {
   stock_no?: string; miles?: number; source?: string;
   inventory_type?: string; is_certified?: boolean; vdp_url?: string;
   build?: { year?: number; make?: string; model?: string; trim?: string };
+  media?: { photo_links?: string[]; photo_links_cached?: string[] };
   // deno-lint-ignore no-explicit-any
   dealer?: any;
 }
@@ -526,6 +527,11 @@ serve(async (req) => {
               // own page (Your Price / <Dealer> Deal).
               source_url: l.vdp_url || null,
             };
+            // First-pass photo from the feed; the crawler later upgrades this to
+            // the dealer's own og:image. Only set when present so we never null
+            // out a better image captured by a previous run.
+            const feedPhoto = l.media?.photo_links_cached?.[0] || l.media?.photo_links?.[0] || null;
+            if (feedPhoto) patch.hero_image_url = feedPhoto;
             if (vl) {
               const { error } = await admin.from("vehicle_listings").update(patch).eq("id", vl.id);
               if (!error) listingsUpserted++; else if (!firstWriteErr) firstWriteErr = error.message;

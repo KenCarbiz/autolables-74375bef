@@ -55,6 +55,7 @@ interface VehicleRow {
   created_at: string;
   updated_at: string;
   stock_number?: string | null;
+  hero_image_url?: string | null;
 }
 
 type StatusFilter = "all" | "draft" | "published" | "archived";
@@ -153,14 +154,19 @@ const Inventory = () => {
   const load = async () => {
     if (!tenant?.id) return;
     setLoading(true);
-    const { data, error } = await (supabase as any)
+    const baseCols = "id,vin,ymm,trim,mileage,condition,price,status,slug,published_at,view_count,created_at,updated_at";
+    const runSelect = (cols: string) => (supabase as any)
       .from("vehicle_listings")
-      .select(
-        "id,vin,ymm,trim,mileage,condition,price,status,slug,published_at,view_count,created_at,updated_at"
-      )
+      .select(cols)
       .or(`tenant_id.eq.${tenant.id},tenant_id.is.null`)
       .order("updated_at", { ascending: false })
       .limit(500);
+    // Resilient to the not-yet-migrated hero_image_url column: retry without it
+    // so the inventory still loads in the window before the migration applies.
+    let { data, error } = await runSelect(`${baseCols},hero_image_url`);
+    if (error && /hero_image_url/.test(error.message || "")) {
+      ({ data, error } = await runSelect(baseCols));
+    }
     if (error) {
       toast.error("Failed to load inventory");
       setRows([]);
@@ -686,7 +692,11 @@ const VehicleCard = ({
         {/* Thumbnail + identity */}
         <div className="flex items-center gap-3 lg:w-[300px] shrink-0 min-w-0">
           <div className={`w-[120px] h-20 rounded-xl bg-gradient-to-br ${thumbTint} flex items-center justify-center shrink-0 overflow-hidden`}>
-            <Car className="w-8 h-8" strokeWidth={1.5} />
+            {r.hero_image_url ? (
+              <img src={r.hero_image_url} alt={r.ymm || "vehicle"} loading="lazy" className="w-full h-full object-cover" />
+            ) : (
+              <Car className="w-8 h-8" strokeWidth={1.5} />
+            )}
           </div>
           <div className="min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
