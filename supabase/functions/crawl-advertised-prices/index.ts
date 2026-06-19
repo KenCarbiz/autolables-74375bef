@@ -51,7 +51,10 @@ interface LatestRow {
   source_url: string;
   source_label: string;
   advertised_price: number;
-  snapshot_at: string;
+  snapshot_at: string | null;
+  // A seed row has no prior snapshot (advertised_price 0): it comes from a
+  // synced vehicle_listing whose VDP url we crawl to capture a FIRST price.
+  seed?: boolean;
 }
 
 // SSRF guard — reject private/loopback/link-local/cloud-metadata hosts.
@@ -115,6 +118,15 @@ const norm = (raw: unknown): number | null => {
   return Number.isFinite(n) ? n : null;
 };
 const sane = (n: number | null): n is number => n != null && n >= 1000 && n <= 500000;
+
+// Generic selling-price labels appended after each dealer's configured labels.
+// These are advertised-price brands (never MSRP/retail), so running them in the
+// custom-label tier is safe and lets common sites resolve without per-dealer
+// setup. Dealer-specific brands (e.g. "Harte Deal") still come from config.
+const DEFAULT_PRICE_LABELS = [
+  "Your Price", "Sale Price", "Selling Price", "Internet Price",
+  "Special Price", "E-Price", "ePrice", "Deal Price", "Our Price",
+];
 
 const REJECT_PRICE_TYPES = ["msrp", "listprice", "invoiceprice", "strikethroughprice", "regularprice"];
 const MSRP_PRICE_TYPES = ["msrp", "listprice", "regularprice", "strikethroughprice"];
@@ -487,7 +499,16 @@ serve(async (req) => {
     const { data } = await admin.from("dealer_profiles").select("settings").eq("tenant_id", tenantId).maybeSingle();
     // deno-lint-ignore no-explicit-any
     const s: any = data?.settings || {};
-    const labels = String(s.vdp_price_labels || "").split(",").map((x: string) => x.trim()).filter(Boolean);
+    const custom = String(s.vdp_price_labels || "").split(",").map((x: string) => x.trim()).filter(Boolean);
+    // Dealer's configured labels win priority; generic selling-price labels run
+    // after so common sites still resolve. Dedupe case-insensitively.
+    const seenLbl = new Set<string>();
+    const labels = [...custom, ...DEFAULT_PRICE_LABELS].filter((l) => {
+      const k = l.toLowerCase();
+      if (seenLbl.has(k)) return false;
+      seenLbl.add(k);
+      return true;
+    });
     const stripFinance = s.vdp_strip_finance_params !== false;
     const out = { labels, stripFinance };
     settingsCache.set(tenantId, out);
@@ -593,6 +614,39 @@ serve(async (req) => {
     rows.push(r);
     if (rows.length >= limit) break;
   }
+
+  // Seed pass: synced vehicle_listings that carry a VDP source_url but have no
+  // advertised_prices snapshot yet (MarketCheck delivered the car without a feed
+  // price). Crawl the dealer's own VDP to capture a FIRST advertised price.
+  if (rows.length < limit) {
+    const pricedKeys = new Set<string>();
+    for (const r of (all || []) as LatestRow[]) {
+      pricedKeys.add(r.tenant_id + "|" + (r.vin || "").toUpperCase());
+    }
+    let seedQuery = admin
+      .from("vehicle_listings")
+      .select("tenant_id, store_id, vin, source_url")
+      .neq("source_url", "")
+      .not("source_url", "is", null)
+      .limit(2000);
+    if (body.tenant_id) seedQuery = seedQuery.eq("tenant_id", body.tenant_id);
+    const { data: seedRows } = await seedQuery;
+    for (const s of (seedRows || []) as Array<{ tenant_id: string; store_id: string | null; vin: string; source_url: string }>) {
+      const vin = (s.vin || "").toUpperCase();
+      if (!vin || !s.source_url) continue;
+      if (targetVin && vin !== targetVin) continue;
+      const k = s.tenant_id + "|" + vin;
+      if (pricedKeys.has(k) || seen.has(k)) continue;
+      seen.add(k);
+      rows.push({
+        id: "", tenant_id: s.tenant_id, store_id: s.store_id || "", vin: s.vin,
+        source_url: s.source_url, source_label: "website", advertised_price: 0,
+        snapshot_at: null, seed: true,
+      });
+      if (rows.length >= limit) break;
+    }
+  }
+
   let updated = 0;
   let unchanged = 0;
   let failed = 0;
@@ -714,7 +768,9 @@ serve(async (req) => {
         screenshot_url: screenshot?.path ?? null,
         screenshot_sha256: screenshot?.sha256 ?? null,
         screenshot_bucket: screenshot?.bucket ?? PRICE_EVIDENCE_BUCKET,
-        notes: `${renderSource ? "Rendered" : "Nightly"} crawl (${result.source}) · previous $${row.advertised_price.toLocaleString()} → $${newPrice.toLocaleString()}`,
+        notes: row.seed
+          ? `First crawl (${result.source})${result.matched_label ? ` · ${result.matched_label}` : ""} · $${newPrice.toLocaleString()}`
+          : `${renderSource ? "Rendered" : "Nightly"} crawl (${result.source}) · previous $${row.advertised_price.toLocaleString()} → $${newPrice.toLocaleString()}`,
       };
       let insErr = (await admin.from("advertised_prices").insert(insRow)).error;
       // Resilient to a not-yet-applied screenshot_url / sha256 / bucket column.

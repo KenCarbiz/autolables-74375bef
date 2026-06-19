@@ -521,6 +521,10 @@ serve(async (req) => {
             const patch: Record<string, unknown> = {
               tenant_id: cfg.tenant_id, vin, ymm, trim: b.trim || null,
               mileage: miles || null, condition, price, feed_source: "marketcheck",
+              // Keep the VDP url even when the feed carried no price, so the
+              // advertised-price crawler can seed a first price off the dealer's
+              // own page (Your Price / <Dealer> Deal).
+              source_url: l.vdp_url || null,
             };
             if (vl) {
               const { error } = await admin.from("vehicle_listings").update(patch).eq("id", vl.id);
