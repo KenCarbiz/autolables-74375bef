@@ -212,9 +212,9 @@ const VehicleFile = () => {
           Inventory
         </button>
         <div className="mt-2 rounded-2xl border border-border bg-card shadow-sm overflow-hidden">
-          <div className="flex flex-col lg:flex-row">
+          <div className="flex flex-col md:flex-row">
             {/* Vehicle photo */}
-            <div className={`lg:w-[280px] shrink-0 h-44 lg:h-auto flex items-center justify-center bg-gradient-to-br ${
+            <div className={`md:w-[240px] lg:w-[280px] shrink-0 h-44 md:h-auto flex items-center justify-center bg-gradient-to-br ${
               vehicle.condition === "new" ? "from-blue-500/15 to-blue-600/5 text-blue-600" :
               vehicle.condition === "cpo" ? "from-violet-500/15 to-violet-600/5 text-violet-600" :
               "from-slate-400/15 to-slate-500/5 text-slate-500"
@@ -499,7 +499,7 @@ const OverviewPanel = ({ vehicle, onTab }: { vehicle: VehicleRow; onTab: (t: Tab
 
   return (
     <div className="space-y-4">
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {/* Vehicle readiness */}
         <Card title="Vehicle Readiness" action={<span className={`text-[11px] font-bold px-2 py-0.5 rounded-full ${gradeCls}`}>{pct}% · {grade}</span>}>
           <div className="h-2 rounded-full bg-muted overflow-hidden">
@@ -543,7 +543,7 @@ const OverviewPanel = ({ vehicle, onTab }: { vehicle: VehicleRow; onTab: (t: Tab
         </Card>
 
         {/* Quick actions */}
-        <Card title="Quick Actions">
+        <Card title="Quick Actions" className="md:col-span-2 lg:col-span-1">
           <div className="space-y-1.5">
             {quick.map((a) => (
               <button
@@ -562,7 +562,7 @@ const OverviewPanel = ({ vehicle, onTab }: { vehicle: VehicleRow; onTab: (t: Tab
         </Card>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {/* Equipment */}
         <Card title="Equipment & Details" action={<button onClick={() => onTab("scan")} className="text-[11px] font-semibold text-blue-600 hover:underline">Edit</button>}>
           {equip.length > 0 ? (
@@ -608,7 +608,7 @@ const OverviewPanel = ({ vehicle, onTab }: { vehicle: VehicleRow; onTab: (t: Tab
         </Card>
 
         {/* Shopper portal preview */}
-        <Card title="Shopper Portal Preview">
+        <Card title="Shopper Portal Preview" className="md:col-span-2 lg:col-span-1">
           {vehicle.status === "published" ? (
             <div className="space-y-3">
               <div className="flex items-start gap-3">
@@ -1815,8 +1815,8 @@ const JumpTo = ({ path, reason }: { path: string; reason: string }) => {
   );
 };
 
-const Card = ({ title, children, action }: { title: string; children: React.ReactNode; action?: React.ReactNode }) => (
-  <div className="rounded-2xl border border-border bg-card shadow-sm p-4 space-y-2">
+const Card = ({ title, children, action, className = "" }: { title: string; children: React.ReactNode; action?: React.ReactNode; className?: string }) => (
+  <div className={`rounded-2xl border border-border bg-card shadow-sm p-4 space-y-2 ${className}`}>
     <div className="flex items-center justify-between">
       <h3 className="text-xs font-bold uppercase tracking-label text-muted-foreground">{title}</h3>
       {action}
