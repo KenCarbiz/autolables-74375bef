@@ -524,6 +524,19 @@ const Index = () => {
     [vehicleDetails.price],
   );
   const advertisedForVin = vehicle.vin ? byVin.get(vehicle.vin.toUpperCase()) : undefined;
+  // The scraped/MarketCheck listing price IS the advertised price for this VIN
+  // (it already includes the doc fee). When no manual snapshot exists, fall back
+  // to it so the disclosure auto-populates the advertised price from the last
+  // dealersite scrape — the dealership then enters the agreed selling price to
+  // run the FTC reconciliation gate.
+  const advertisedEffective = useMemo(
+    () => advertisedForVin ?? (vehiclePriceNum > 0 ? {
+      id: "", vin: (vehicle.vin || "").toUpperCase(), source_url: "",
+      source_label: "website" as AdvertisedSource, advertised_price: vehiclePriceNum,
+      snapshot_at: new Date().toISOString(), captured_by: "marketcheck", notes: "",
+    } : undefined),
+    [advertisedForVin, vehiclePriceNum, vehicle.vin],
+  );
 
   const installed = displayProducts.filter((p) => p.badge_type === "installed");
   const optional = displayProducts.filter((p) => p.badge_type === "optional");
@@ -553,9 +566,9 @@ const Index = () => {
         price_in_advertised: (p as { price_in_advertised?: boolean }).price_in_advertised,
         removable: (p as { removable?: boolean }).removable,
       })),
-      advertised: advertisedForVin,
+      advertised: advertisedEffective,
     }),
-    [sellingPrice, docFeeAmount, displayProducts, advertisedForVin],
+    [sellingPrice, docFeeAmount, displayProducts, advertisedEffective],
   );
 
   // Manual capture of the advertised/website price for this VIN — the escape
