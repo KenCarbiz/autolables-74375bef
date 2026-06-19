@@ -40,7 +40,21 @@ const MC_BASE = "https://api.marketcheck.com/v2";
 const SYND_ENDPOINT = `${MC_BASE}/dealerships/inventory`;
 const SEARCH_ENDPOINT = `${MC_BASE}/search/car/active`;
 const DEALERS_ENDPOINT = `${MC_BASE}/dealers/car`;
+const DEALER_DETAILS = `${MC_BASE}/dealer/car`;
 const ROWS = 50;
+
+// MarketCheck exposes a dealer's cars through different endpoints keyed on
+// different identifiers, and the id returned by Dealer Search is NOT the same
+// as the mc_dealer_id / mc_rooftop_id the syndication feed wants (and the plain
+// Inventory Search drops into analytics mode when dealer-scoped). So we try a
+// small matrix of (endpoint, id-parameter) until one returns real listings.
+const FETCH_COMBOS: Array<{ feed: string; base: string; param: string }> = [
+  { feed: "syndication", base: SYND_ENDPOINT, param: "mc_dealer_id" },
+  { feed: "syndication", base: SYND_ENDPOINT, param: "mc_rooftop_id" },
+  { feed: "syndication", base: SYND_ENDPOINT, param: "dealer_id" },
+  { feed: "search", base: SEARCH_ENDPOINT, param: "dealer_id" },
+  { feed: "search", base: SEARCH_ENDPOINT, param: "seller_id" },
+];
 
 // Resolve a MarketCheck dealer_id for a dealer's website domain. The Dealers
 // Search endpoint only filters by GEOGRAPHY (zip/state/radius) — there is no
@@ -69,16 +83,12 @@ async function resolveDealerId(
   }
 }
 
-// Pull one page of a dealer's active inventory. A dealer_id from the Dealer
-// Search API pairs canonically with the Inventory Search API; the dealership
-// syndication feed is a separate product that may return nothing for that id.
-// So callers probe both and use whichever feed actually answers.
-async function fetchPage(
-  feed: "search" | "syndication", dealerId: string, start: number,
+// Pull one page from a specific endpoint + id-parameter combo.
+async function fetchCombo(
+  combo: { base: string; param: string }, id: string, start: number,
 ): Promise<{ listings: MCListing[]; numFound: number; http: number }> {
-  const base = feed === "syndication" ? SYND_ENDPOINT : SEARCH_ENDPOINT;
-  const url = `${base}?api_key=${encodeURIComponent(MC_KEY)}`
-    + `&dealer_id=${encodeURIComponent(dealerId)}&rows=${ROWS}&start=${start}`;
+  const url = `${combo.base}?api_key=${encodeURIComponent(MC_KEY)}`
+    + `&${combo.param}=${encodeURIComponent(id)}&rows=${ROWS}&start=${start}`;
   try {
     const res = await fetch(url, { signal: AbortSignal.timeout(30000) });
     if (!res.ok) return { listings: [], numFound: 0, http: res.status };
@@ -92,8 +102,38 @@ async function fetchPage(
   }
 }
 
+// The Dealer Search id is a dealer-record id; the inventory feeds want mc_*
+// ids. Read the dealer record to harvest every usable identifier so the combo
+// matrix has the right number to try.
+async function resolveMcIds(id: string): Promise<{ ids: string[]; name: string; listingCount: number | null; http: number }> {
+  try {
+    const url = `${DEALER_DETAILS}/${encodeURIComponent(id)}?api_key=${encodeURIComponent(MC_KEY)}`;
+    const res = await fetch(url, { signal: AbortSignal.timeout(15000) });
+    if (!res.ok) return { ids: [], name: "", listingCount: null, http: res.status };
+    // deno-lint-ignore no-explicit-any
+    const d: any = await res.json().catch(() => ({}));
+    const obj = (d?.dealer ?? d ?? {}) as Record<string, unknown>;
+    const ids: string[] = [];
+    for (const k of ["mc_dealer_id", "mc_rooftop_id", "mc_location_id", "mc_website_id", "dealer_id", "id"]) {
+      const v = obj[k];
+      if (v != null && String(v).trim()) ids.push(String(v).trim());
+    }
+    return {
+      ids: [...new Set(ids)],
+      name: String(obj.seller_name ?? obj.name ?? ""),
+      listingCount: typeof obj.listing_count === "number" ? obj.listing_count : null,
+      http: res.status,
+    };
+  } catch {
+    return { ids: [], name: "", listingCount: null, http: 0 };
+  }
+}
+
 const normVin = (s: unknown) => String(s || "").toUpperCase().trim();
-const sane = (n: unknown): n is number => typeof n === "number" && n >= 1000 && n <= 500000;
+// Accept any plausible retail price. A missing / "call for price" / 0 value
+// stays null (we can't show a price that isn't published), but don't drop
+// legitimately cheap or very expensive units.
+const sane = (n: unknown): n is number => typeof n === "number" && n >= 100 && n <= 10_000_000;
 
 const toSourceHost = (raw: string): string => {
   let s = (raw || "").trim().toLowerCase();
@@ -280,29 +320,39 @@ serve(async (req) => {
       let numFound = 0;
       let httpStatus = 0;
 
-      // Probe both feeds on page 0 and lock onto whichever returns this dealer's
-      // cars: the Inventory Search API (canonical for a Dealer Search id) or the
-      // dealership syndication feed. Record both so a zero pull is debuggable.
-      const searchProbe = await fetchPage("search", dealerId, 0);
-      const syndProbe = searchProbe.listings.length > 0
-        ? { listings: [] as MCListing[], numFound: 0, http: 0 }
-        : await fetchPage("syndication", dealerId, 0);
-      const feed: "search" | "syndication" =
-        searchProbe.listings.length > 0 ? "search"
-          : syndProbe.listings.length > 0 ? "syndication" : "search";
-      httpStatus = feed === "syndication" ? syndProbe.http : searchProbe.http;
+      // Build the id candidates: the saved id, plus the mc_* ids from the dealer
+      // record (the saved id is a dealer-record id, not the mc_* id the feeds
+      // want). Then probe the (endpoint, param) matrix on page 0 and lock onto
+      // the first combo that returns real cars. Every attempt is recorded so a
+      // zero pull is debuggable from the response.
+      const mc = await resolveMcIds(dealerId);
+      const idCandidates = [...new Set([dealerId, ...mc.ids])];
+      const attempts: Array<Record<string, unknown>> = [];
+      let chosen: { base: string; param: string; id: string } | null = null;
+      let firstPage: { listings: MCListing[]; numFound: number; http: number } = { listings: [], numFound: 0, http: 0 };
+      probe_loop:
+      for (const cid of idCandidates) {
+        for (const combo of FETCH_COMBOS) {
+          const r = await fetchCombo(combo, cid, 0);
+          attempts.push({ feed: combo.feed, param: combo.param, id: cid, http: r.http, num_found: r.numFound, got: r.listings.length });
+          if (r.listings.length > 0) { chosen = { base: combo.base, param: combo.param, id: cid }; firstPage = r; break probe_loop; }
+        }
+      }
+      httpStatus = chosen ? firstPage.http : (attempts[0]?.http as number ?? 0);
       const probe = {
-        feed, search_http: searchProbe.http, search_found: searchProbe.numFound,
-        synd_http: syndProbe.http, synd_found: syndProbe.numFound,
+        chosen: chosen ? { param: chosen.param, id: chosen.id } : null,
+        mc_ids: mc.ids, dealer_record: mc.name, dealer_listing_count: mc.listingCount,
+        attempts,
       };
 
       outer:
       for (let page = 0; page < maxPages; page++) {
         {
           if (tenantSeen >= cfg.max_vehicles) break;
+          if (!chosen) break;
           const pageData = page === 0
-            ? (feed === "syndication" ? syndProbe : searchProbe)
-            : await fetchPage(feed, dealerId, page * ROWS);
+            ? firstPage
+            : await fetchCombo(chosen, chosen.id, page * ROWS);
           const listings: MCListing[] = pageData.listings;
           numFound = pageData.numFound || numFound;
           if (listings.length === 0) break;

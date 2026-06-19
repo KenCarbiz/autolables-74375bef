@@ -43,6 +43,7 @@ interface VehicleRow {
   view_count: number;
   created_at: string;
   updated_at: string;
+  stock_number?: string | null;
 }
 
 type StatusFilter = "all" | "draft" | "published" | "archived";
@@ -143,16 +144,25 @@ const Inventory = () => {
       const vins = rows.map((r) => r.vin).filter(Boolean);
       if (vins.length) {
         try {
-          const [{ data: delAdd }, { data: delFiles }] = await Promise.all([
+          // vehicle_files holds the stock number (vehicle_listings has none) and
+          // the delivered flag. Join on VIN to surface stock + drop delivered.
+          const [{ data: delAdd }, { data: vfiles }] = await Promise.all([
             (supabase as any).from("addendums").select("vehicle_vin").not("delivered_at", "is", null).in("vehicle_vin", vins),
-            (supabase as any).from("vehicle_files").select("vin").eq("deal_status", "delivered").in("vin", vins),
+            (supabase as any).from("vehicle_files").select("vin, stock_number, deal_status").in("vin", vins),
           ]);
-          const delivered = new Set<string>([
-            ...((delAdd || []).map((r: { vehicle_vin: string }) => (r.vehicle_vin || "").toUpperCase())),
-            ...((delFiles || []).map((r: { vin: string }) => (r.vin || "").toUpperCase())),
-          ]);
-          if (delivered.size) rows = rows.filter((r) => !delivered.has((r.vin || "").toUpperCase()));
-        } catch { /* delivered columns may not be migrated yet; show all */ }
+          const stockByVin = new Map<string, string>();
+          const delivered = new Set<string>(
+            (delAdd || []).map((r: { vehicle_vin: string }) => (r.vehicle_vin || "").toUpperCase())
+          );
+          for (const f of (vfiles || []) as Array<{ vin: string; stock_number: string | null; deal_status: string }>) {
+            const v = (f.vin || "").toUpperCase();
+            if (f.stock_number) stockByVin.set(v, f.stock_number);
+            if (f.deal_status === "delivered") delivered.add(v);
+          }
+          rows = rows
+            .filter((r) => !delivered.has((r.vin || "").toUpperCase()))
+            .map((r) => ({ ...r, stock_number: stockByVin.get((r.vin || "").toUpperCase()) ?? r.stock_number ?? null }));
+        } catch { /* delivered/stock columns may not be migrated yet; show all */ }
       }
       setRows(rows);
     }
@@ -350,6 +360,7 @@ const Inventory = () => {
             <thead className="bg-muted/50 text-[11px] uppercase tracking-wide text-muted-foreground">
               <tr>
                 <th className="text-left px-3 py-2 font-semibold">Vehicle</th>
+                <th className="text-left px-3 py-2 font-semibold">Stock #</th>
                 <th className="text-left px-3 py-2 font-semibold">VIN</th>
                 <th className="text-left px-3 py-2 font-semibold">Condition</th>
                 <th className="text-right px-3 py-2 font-semibold">Mileage</th>
@@ -369,6 +380,7 @@ const Inventory = () => {
                     <div className="font-semibold text-foreground">{r.ymm || "(needs decode)"}</div>
                     <div className="text-[11px] text-muted-foreground">{r.trim || ""}</div>
                   </td>
+                  <td className="px-3 py-2.5 font-mono text-xs">{r.stock_number || "—"}</td>
                   <td className="px-3 py-2.5 font-mono text-xs">{r.vin}</td>
                   <td className="px-3 py-2.5">
                     <span className={`text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded ${
