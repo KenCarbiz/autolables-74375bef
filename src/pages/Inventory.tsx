@@ -341,6 +341,15 @@ const Inventory = () => {
   const safePage = Math.min(page, pageCount);
   const pageRows = filtered.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
   const readinessSpark = pageRows.map(rowReadiness);
+  const topIssue = (() => {
+    const issues = [
+      { label: "Missing Addendums", n: counts.missingAddendum },
+      { label: "Missing Stickers", n: counts.needsSticker },
+      { label: "Price Reviews", n: counts.priceVerify },
+      { label: "Open Recalls", n: counts.openRecallVehicles },
+    ].sort((a, b) => b.n - a.n);
+    return issues[0].n > 0 ? issues[0].label : "All clear";
+  })();
 
   const rowActions = (r: VehicleRow): KebabItem[] => [
     { label: "Open Vehicle", icon: ExternalLink, onClick: () => navigate(`/vehicle-file/${r.id}`) },
@@ -454,7 +463,12 @@ const Inventory = () => {
                         </td>
                         <td className="px-3 py-3 text-right" onClick={(e) => e.stopPropagation()}>
                           <p className="text-base font-bold text-foreground tabular-nums leading-tight">{r.price ? `$${r.price.toLocaleString()}` : "—"}</p>
-                          {r.vin && r.price ? <div className="mt-1 flex justify-end"><AdvertisedPriceBand vin={r.vin} stickerPrice={r.price} docFee={settings.doc_fee_amount} compact /></div> : null}
+                          {r.price ? (
+                            <div className="mt-0.5 leading-tight">
+                              <p className="text-[11px] font-semibold text-emerald-600 inline-flex items-center gap-1"><CheckCircle2 className="w-3 h-3" />Advertised</p>
+                              {settings.doc_fee_amount > 0 && <p className="text-[10px] text-muted-foreground">incl. ${settings.doc_fee_amount.toLocaleString()} doc</p>}
+                            </div>
+                          ) : null}
                         </td>
                         <td className="px-3 py-3" onClick={(e) => e.stopPropagation()}>
                           <PortalChip status={r.status} />
@@ -515,20 +529,22 @@ const Inventory = () => {
           </div>
 
           <SideCard title="Inventory Insights">
-            <ul className="space-y-2.5">
-              <InsightRow icon={Car} label="Total vehicles" value={counts.total} iconTone="blue" />
-              <InsightRow icon={CheckCircle2} label="VIN decoded" value={counts.vinDecoded} tone="emerald" iconTone="emerald" pct={counts.total ? Math.round((counts.vinDecoded / counts.total) * 100) : 0} />
-              <InsightRow icon={Printer} label="Missing stickers" value={counts.needsSticker} tone={counts.needsSticker ? "amber" : "neutral"} iconTone="amber" />
-              <InsightRow icon={FileSignature} label="Missing addendums" value={counts.missingAddendum} tone={counts.missingAddendum ? "amber" : "neutral"} iconTone="red" />
-              <InsightRow icon={ShieldCheck} label="Open recalls" value={counts.openRecallsTotal} tone={counts.openRecallsTotal ? "red" : "emerald"} iconTone={counts.openRecallsTotal ? "red" : "emerald"} />
+            <div className="flex items-end justify-between gap-2">
+              <div className="flex items-baseline gap-1.5">
+                <span className="font-display text-3xl font-semibold text-emerald-600 tabular-nums leading-none">{counts.avgReadiness}%</span>
+                <span className="text-sm font-semibold text-foreground">Ready</span>
+              </div>
+              <Sparkline values={readinessSpark} />
+            </div>
+            <ul className="space-y-2.5 mt-3 pt-3 border-t border-border">
+              <InsightRow icon={Printer} label="Need stickers" value={counts.needsSticker} tone={counts.needsSticker ? "amber" : "neutral"} iconTone="amber" />
+              <InsightRow icon={FileSignature} label="Need addendums" value={counts.missingAddendum} tone={counts.missingAddendum ? "amber" : "neutral"} iconTone="red" />
+              <InsightRow icon={ShieldCheck} label="Open recalls" value={counts.openRecallVehicles} tone={counts.openRecallVehicles ? "red" : "emerald"} iconTone={counts.openRecallVehicles ? "red" : "emerald"} />
               <InsightRow icon={CircleDollarSign} label="Price reviews" value={counts.priceVerify} iconTone="blue" />
             </ul>
-            <div className="mt-3 pt-3 border-t border-border">
-              <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Average Readiness Score</p>
-              <div className="flex items-center justify-between gap-3 mt-1">
-                <span className="font-display text-2xl font-semibold text-emerald-600 tabular-nums leading-none">{counts.avgReadiness}%</span>
-                <Sparkline values={readinessSpark} />
-              </div>
+            <div className="mt-3 pt-3 border-t border-border flex items-center justify-between gap-2">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Top issue</span>
+              <span className="text-xs font-bold text-amber-600">{topIssue}</span>
             </div>
             <p className="text-[11px] font-semibold text-blue-600 mt-3 cursor-default">View full insights →</p>
           </SideCard>
@@ -673,10 +689,10 @@ const ReadinessCell = ({ r, signal, pct }: { r: VehicleRow; signal: RowSignal; p
     <div className="flex items-center gap-2 cursor-help" title={title}>
       <MiniRing pct={pct} />
       <div className="min-w-0 leading-tight">
-        <p className="text-[11px] font-semibold text-foreground">{done} of {checks.length} done</p>
-        <p className={`text-[10px] ${firstMissing ? "text-amber-600" : "text-emerald-600"}`}>
+        <p className={`text-xs font-semibold ${firstMissing ? "text-amber-600" : "text-emerald-600"}`}>
           {firstMissing ? `Missing ${cap(firstMissing.short)}` : "Ready"}
         </p>
+        <p className="text-[10px] text-muted-foreground">{done} / {checks.length} complete</p>
       </div>
     </div>
   );
@@ -836,17 +852,18 @@ const BigRing = ({ pct }: { pct: number }) => {
   );
 };
 
-const ExecKpi = ({ label, value, sub, icon: Icon, tone, onClick, link }: { label: string; value: string | number; sub: string; icon: typeof Car; tone?: "emerald" | "amber" | "red" | "violet"; onClick: () => void; link?: string }) => {
+const ExecKpi = ({ label, value, sub, icon: Icon, tone, onClick, link, prominent }: { label: string; value: string | number; sub: string; icon: typeof Car; tone?: "emerald" | "amber" | "red" | "violet"; onClick: () => void; link?: string; prominent?: boolean }) => {
   const vcls = tone === "emerald" ? "text-emerald-700" : tone === "amber" ? "text-amber-700" : tone === "red" ? "text-red-700" : tone === "violet" ? "text-violet-700" : "text-foreground";
   const ibg = tone === "emerald" ? "bg-emerald-100 text-emerald-700" : tone === "amber" ? "bg-amber-100 text-amber-700" : tone === "red" ? "bg-red-100 text-red-700" : tone === "violet" ? "bg-violet-100 text-violet-700" : "bg-muted text-muted-foreground";
+  const cardBg = prominent && (tone === "red") ? "bg-red-50/70 border-red-200" : prominent ? "bg-amber-50/70 border-amber-200" : "bg-card border-border";
   return (
-    <button onClick={onClick} className="group/k shrink-0 min-w-[170px] lg:min-w-0 text-left rounded-2xl border border-border bg-card shadow-sm p-4 hover:shadow-md hover:border-foreground/15 transition-all">
+    <button onClick={onClick} className={`group/k shrink-0 min-w-[170px] lg:min-w-0 text-left rounded-2xl border shadow-sm p-4 hover:shadow-md hover:border-foreground/15 transition-all ${cardBg}`}>
       <div className="flex items-center justify-between">
         <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">{label}</p>
         <span className={`w-7 h-7 rounded-lg flex items-center justify-center ${ibg}`}><Icon className="w-3.5 h-3.5" strokeWidth={2} /></span>
       </div>
-      <p className={`mt-2 font-display text-2xl font-semibold tabular-nums leading-none ${vcls}`}>{typeof value === "number" ? value.toLocaleString() : value}</p>
-      <p className="text-[11px] mt-1.5 text-muted-foreground truncate">{sub}</p>
+      <p className={`mt-2 font-display ${prominent ? "text-[2rem]" : "text-2xl"} font-semibold tabular-nums leading-none ${vcls}`}>{typeof value === "number" ? value.toLocaleString() : value}</p>
+      <p className={`text-[11px] mt-1.5 truncate ${prominent ? "text-foreground/70 font-semibold" : "text-muted-foreground"}`}>{sub}</p>
       {link && <p className="text-[11px] font-semibold text-blue-600 mt-2 group-hover/k:underline">{link} →</p>}
     </button>
   );
@@ -873,7 +890,7 @@ const ExecKpiStrip = ({ counts, onMetric, onMarket }: { counts: KpiCounts; onMet
       </button>
       <ExecKpi label="Total Vehicles" value={counts.total} sub={`${counts.newCount} new · ${counts.usedCount} used`} icon={Car} onClick={() => onMetric("total")} link="View all vehicles" />
       <ExecKpi label="Published" value={counts.published} sub="live on portal" icon={CheckCircle2} tone="emerald" onClick={() => onMetric("published")} link="View published" />
-      <ExecKpi label="Needs Attention" value={counts.needsAttention} sub="require action" icon={AlertTriangle} tone="amber" onClick={() => onMetric("needs-attention")} link="View list" />
+      <ExecKpi label="Needs Attention" value={counts.needsAttention} sub="require action" icon={AlertTriangle} tone="amber" onClick={() => onMetric("needs-attention")} link="View list" prominent />
       <ExecKpi label="Open Recalls" value={counts.openRecallVehicles} sub="vehicles" icon={ShieldCheck} tone={counts.openRecallVehicles ? "red" : "emerald"} onClick={() => onMetric("open-recalls")} link="View recalls" />
       <ExecKpi label="Price Reviews" value={counts.priceVerify} sub="require review" icon={CircleDollarSign} tone="violet" onClick={() => onMetric("price-reviews")} link="View price reviews" />
       <ExecKpi label="Avg Market Position" value={`$${Math.abs(below).toLocaleString()}`} sub={below >= 0 ? "below market" : "above market"} icon={Gauge} tone={below >= 0 ? "emerald" : "amber"} onClick={onMarket} link="View market report" />
@@ -977,7 +994,7 @@ const PortalChip = ({ status }: { status: VehicleRow["status"] }) =>
       ? <span className="inline-flex items-center text-[10px] font-semibold px-1.5 py-0.5 rounded bg-slate-100 text-slate-600">Archived</span>
       : <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded bg-slate-100 text-slate-600"><span className="w-1.5 h-1.5 rounded-full bg-slate-400" />Draft</span>;
 
-// Clean compliance stack — light status lines, not heavy filled chips.
+// Clean compliance stack — colored status dots for instant scanning.
 const ComplianceCell = ({ r }: { r: VehicleRow }) => {
   const decoded = !!r.ymm;
   const n = r.open_recall_count || 0;
@@ -985,16 +1002,12 @@ const ComplianceCell = ({ r }: { r: VehicleRow }) => {
   const clear = r.recall_status === "clear";
   return (
     <div className="flex flex-col items-start gap-1.5">
-      <span className="inline-flex items-center gap-1.5 text-xs font-medium text-foreground">
-        {decoded ? <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" /> : <X className="w-3.5 h-3.5 text-slate-400" />}
+      <span className="inline-flex items-center gap-2 text-xs font-medium text-foreground">
+        <span className={`w-2.5 h-2.5 rounded-full shrink-0 ${decoded ? "bg-emerald-500" : "bg-slate-300"}`} />
         {decoded ? "VIN Decoded" : "VIN Pending"}
       </span>
-      <span className="inline-flex items-center gap-1.5 text-xs font-medium text-foreground">
-        {open
-          ? <AlertTriangle className={`w-3.5 h-3.5 ${n >= 2 ? "text-red-600" : "text-orange-500"}`} />
-          : clear
-            ? <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
-            : <span className="w-2 h-2 rounded-full bg-slate-300 mx-[3px]" />}
+      <span className="inline-flex items-center gap-2 text-xs font-medium text-foreground">
+        <span className={`w-2.5 h-2.5 rounded-full shrink-0 ${open ? (n >= 2 ? "bg-red-500" : "bg-orange-500") : clear ? "bg-emerald-500" : "bg-slate-300"}`} />
         {open ? `${n} Open Recall${n === 1 ? "" : "s"}` : clear ? "No Open Recalls" : "Recall Pending"}
       </span>
     </div>
