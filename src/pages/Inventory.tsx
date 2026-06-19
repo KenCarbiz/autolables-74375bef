@@ -340,6 +340,7 @@ const Inventory = () => {
   const pageCount = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const safePage = Math.min(page, pageCount);
   const pageRows = filtered.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
+  const readinessSpark = pageRows.map(rowReadiness);
 
   const rowActions = (r: VehicleRow): KebabItem[] => [
     { label: "Open Vehicle", icon: ExternalLink, onClick: () => navigate(`/vehicle-file/${r.id}`) },
@@ -543,14 +544,22 @@ const Inventory = () => {
           </SideCard>
 
           <SideCard title="Inventory Insights">
-            <ul className="space-y-2">
-              <InsightRow icon={Car} label="Total vehicles" value={counts.total} />
-              <InsightRow icon={CheckCircle2} label="VIN decoded" value={counts.vinDecoded} tone="emerald" />
-              <InsightRow icon={Printer} label="Missing stickers" value={counts.needsSticker} tone={counts.needsSticker ? "amber" : "neutral"} />
-              <InsightRow icon={FileSignature} label="Missing addendums" value={counts.missingAddendum} tone={counts.missingAddendum ? "amber" : "neutral"} />
-              <InsightRow icon={ShieldCheck} label="Open recalls" value={counts.openRecallsTotal} tone={counts.openRecallsTotal ? "red" : "emerald"} />
-              <InsightRow icon={Gauge} label="Avg readiness" value={`${counts.avgReadiness}%`} />
+            <ul className="space-y-2.5">
+              <InsightRow icon={Car} label="Total vehicles" value={counts.total} iconTone="blue" />
+              <InsightRow icon={CheckCircle2} label="VIN decoded" value={counts.vinDecoded} tone="emerald" iconTone="emerald" pct={counts.total ? Math.round((counts.vinDecoded / counts.total) * 100) : 0} />
+              <InsightRow icon={Printer} label="Missing stickers" value={counts.needsSticker} tone={counts.needsSticker ? "amber" : "neutral"} iconTone="amber" />
+              <InsightRow icon={FileSignature} label="Missing addendums" value={counts.missingAddendum} tone={counts.missingAddendum ? "amber" : "neutral"} iconTone="red" />
+              <InsightRow icon={ShieldCheck} label="Open recalls" value={counts.openRecallsTotal} tone={counts.openRecallsTotal ? "red" : "emerald"} iconTone={counts.openRecallsTotal ? "red" : "emerald"} />
+              <InsightRow icon={CircleDollarSign} label="Price reviews" value={counts.priceVerify} iconTone="blue" />
             </ul>
+            <div className="mt-3 pt-3 border-t border-border">
+              <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Average Readiness Score</p>
+              <div className="flex items-center justify-between gap-3 mt-1">
+                <span className="font-display text-2xl font-semibold text-emerald-600 tabular-nums leading-none">{counts.avgReadiness}%</span>
+                <Sparkline values={readinessSpark} />
+              </div>
+            </div>
+            <p className="text-[11px] font-semibold text-blue-600 mt-3 cursor-default">View full insights →</p>
           </SideCard>
 
           <SideCard title="Inventory by Status">
@@ -561,19 +570,26 @@ const Inventory = () => {
             {activity.length === 0 ? (
               <p className="text-xs text-muted-foreground">No recent activity yet. Sticker generations, prep sign-offs, and customer signings appear here.</p>
             ) : (
-              <ul className="space-y-2.5">
-                {activity.map((a) => (
-                  <li key={a.id} className="flex items-start gap-2.5">
-                    <span className="w-7 h-7 rounded-lg bg-blue-600/10 text-blue-600 flex items-center justify-center shrink-0 mt-0.5">
-                      <CheckCircle2 className="w-3.5 h-3.5" />
-                    </span>
-                    <div className="min-w-0">
-                      <p className="text-sm font-semibold text-foreground leading-tight">{prettyAction(a.action)}</p>
-                      <p className="text-[11px] text-muted-foreground">{new Date(a.created_at).toLocaleString()}</p>
-                    </div>
-                  </li>
-                ))}
-              </ul>
+              <>
+                <ul className="space-y-2.5">
+                  {activity.map((a) => {
+                    const { icon: Icon, tone } = activityIcon(a.action);
+                    const d = (a.details || {}) as Record<string, unknown>;
+                    const detail = String(d.stock || d.vin || d.customer_name || d.ymm || "").trim();
+                    return (
+                      <li key={a.id} className="flex items-start gap-2.5">
+                        <span className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 mt-0.5 ${tone}`}><Icon className="w-3.5 h-3.5" /></span>
+                        <div className="min-w-0">
+                          <p className="text-sm font-semibold text-foreground leading-tight">{prettyAction(a.action)}</p>
+                          {detail && <p className="text-[11px] text-muted-foreground truncate">{detail}</p>}
+                          <p className="text-[10px] text-muted-foreground">{new Date(a.created_at).toLocaleString()}</p>
+                        </div>
+                      </li>
+                    );
+                  })}
+                </ul>
+                <p className="text-[11px] font-semibold text-blue-600 mt-3 cursor-default">View all activity →</p>
+              </>
             )}
           </SideCard>
 
@@ -584,6 +600,7 @@ const Inventory = () => {
               <HealthStat label="Open issues" value={counts.needsAttention} tone={counts.needsAttention ? "amber" : "emerald"} />
               <HealthStat label={`Market position`} value={`$${Math.abs(counts.avgBelowMarket).toLocaleString()} ${counts.avgBelowMarket >= 0 ? "below" : "above"}`} tone={counts.avgBelowMarket >= 0 ? "emerald" : "amber"} small />
             </div>
+            <p className="text-[11px] font-semibold text-blue-600 mt-3 cursor-default">View dealer health →</p>
           </SideCard>
         </aside>
       </div>
@@ -610,6 +627,16 @@ const PRETTY_ACTION: Record<string, string> = {
   vdp_scraped: "VDP scraped from dealer site",
 };
 const prettyAction = (a: string) => PRETTY_ACTION[a] || a.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+
+const activityIcon = (action: string): { icon: typeof Car; tone: string } => {
+  if (/recall/i.test(action)) return { icon: AlertTriangle, tone: "bg-red-100 text-red-600" };
+  if (/vin|decode/i.test(action)) return { icon: CheckCircle2, tone: "bg-emerald-100 text-emerald-600" };
+  if (/price/i.test(action)) return { icon: CircleDollarSign, tone: "bg-amber-100 text-amber-600" };
+  if (/sticker|print/i.test(action)) return { icon: Printer, tone: "bg-blue-100 text-blue-600" };
+  if (/publish|listing|portal/i.test(action)) return { icon: Eye, tone: "bg-emerald-100 text-emerald-600" };
+  if (/sync|marketcheck/i.test(action)) return { icon: RefreshCw, tone: "bg-blue-100 text-blue-600" };
+  return { icon: CheckCircle2, tone: "bg-blue-600/10 text-blue-600" };
+};
 
 const relativeDay = (iso: string) => {
   const d = new Date(iso);
@@ -710,13 +737,33 @@ const HealthStat = ({ label, value, tone, small }: { label: string; value: strin
   );
 };
 
-const InsightRow = ({ icon: Icon, label, value, tone = "neutral" }: { icon: typeof Car; label: string; value: number | string; tone?: "emerald" | "amber" | "red" | "neutral" }) => {
+const InsightRow = ({ icon: Icon, label, value, tone = "neutral", pct, iconTone }: { icon: typeof Car; label: string; value: number | string; tone?: "emerald" | "amber" | "red" | "neutral"; pct?: number; iconTone?: "emerald" | "amber" | "red" | "blue" }) => {
   const vcls = tone === "emerald" ? "text-emerald-600" : tone === "amber" ? "text-amber-600" : tone === "red" ? "text-red-600" : "text-foreground";
+  const ibg = iconTone === "emerald" ? "bg-emerald-100 text-emerald-600" : iconTone === "amber" ? "bg-amber-100 text-amber-600" : iconTone === "red" ? "bg-red-100 text-red-600" : "bg-blue-600/10 text-blue-600";
   return (
     <li className="flex items-center justify-between gap-2">
-      <span className="inline-flex items-center gap-2 text-xs text-muted-foreground"><Icon className="w-3.5 h-3.5" />{label}</span>
-      <span className={`text-sm font-semibold tabular-nums ${vcls}`}>{value}</span>
+      <span className="inline-flex items-center gap-2 text-xs text-muted-foreground">
+        <span className={`w-6 h-6 rounded-lg flex items-center justify-center shrink-0 ${ibg}`}><Icon className="w-3.5 h-3.5" /></span>
+        {label}
+      </span>
+      <span className="inline-flex items-center gap-1.5">
+        {pct != null && <span className="text-[10px] font-semibold text-emerald-600">{pct}%</span>}
+        <span className={`text-sm font-semibold tabular-nums ${vcls}`}>{value}</span>
+      </span>
     </li>
+  );
+};
+
+const Sparkline = ({ values }: { values: number[] }) => {
+  if (values.length < 2) return <div className="h-7 flex-1" />;
+  const w = 96, h = 28;
+  const max = Math.max(...values, 100), min = Math.min(...values, 0);
+  const range = max - min || 1;
+  const pts = values.map((v, i) => `${(i / (values.length - 1)) * w},${(h - ((v - min) / range) * h).toFixed(1)}`).join(" ");
+  return (
+    <svg width={w} height={h} viewBox={`0 0 ${w} ${h}`} className="text-blue-500 shrink-0" preserveAspectRatio="none">
+      <polyline points={pts} fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
   );
 };
 
