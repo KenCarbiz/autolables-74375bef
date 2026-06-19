@@ -53,7 +53,9 @@ async function resolveDealerId(source: string): Promise<{ id: string | null; fou
     const data: any = await res.json().catch(() => ({}));
     const dealers: any[] = Array.isArray(data?.dealers) ? data.dealers : [];
     const host = (s: unknown) => toSourceHost(String(s || ""));
-    const hit = dealers.find((d) => host(d?.source) === source || host(d?.website) === source) || dealers[0];
+    // EXACT host match only — never fall back to dealers[0], or a group query
+    // pulls the wrong rooftop (e.g. harteinfiniti.com returning the Nissan store).
+    const hit = dealers.find((d) => host(d?.source) === source || host(d?.website) === source);
     const id = hit ? String(hit.id ?? hit.dealer_id ?? hit.mc_dealer_id ?? "") : "";
     return { id: id || null, found: dealers.length, status: res.status };
   } catch {
@@ -165,6 +167,7 @@ serve(async (req) => {
     const source = toSourceHost(cfg.source);
     if (!source) continue;
     let tenantSeen = 0, tenantNew = 0, tenantPrices = 0;
+    let firstWriteErr: string | null = null;
     try {
       // Latest website price per VIN — only append a snapshot when it moved.
       const { data: priceRows } = await admin.from("advertised_prices")
@@ -242,18 +245,22 @@ serve(async (req) => {
             }
 
             // 2) vehicle_listings — sticker / public packet + lot price view.
+            // NOTE: vehicle_listings has no stock_number column (that lives on
+            // vehicle_files); including it fails the whole write.
             const { data: vl } = await admin.from("vehicle_listings")
               .select("id").eq("tenant_id", cfg.tenant_id).eq("vin", vin).maybeSingle();
             const patch: Record<string, unknown> = {
               tenant_id: cfg.tenant_id, vin, ymm, trim: b.trim || null,
-              stock_number: l.stock_no || null, mileage: miles || null, condition, price,
+              mileage: miles || null, condition, price,
             };
-            if (vl) { await admin.from("vehicle_listings").update(patch).eq("id", vl.id); listingsUpserted++; }
-            else {
+            if (vl) {
+              const { error } = await admin.from("vehicle_listings").update(patch).eq("id", vl.id);
+              if (!error) listingsUpserted++; else if (!firstWriteErr) firstWriteErr = error.message;
+            } else {
               const { error } = await admin.from("vehicle_listings").insert({
-                ...patch, slug: makeSlug(vin, ymm || undefined), status: "draft", sticker_snapshot: {},
+                ...patch, store_id: cfg.tenant_id, slug: makeSlug(vin, ymm || undefined), status: "draft", sticker_snapshot: {},
               });
-              if (!error) listingsUpserted++;
+              if (!error) listingsUpserted++; else if (!firstWriteErr) firstWriteErr = error.message;
             }
 
             // 3) advertised_prices — website price snapshot on change.
@@ -278,7 +285,7 @@ serve(async (req) => {
 
       tenantsSynced++;
       const status = { ran_at: now.toISOString(), seen: tenantSeen, new_vehicles: tenantNew, prices_recorded: tenantPrices, dealer_id: dealerId, num_found: numFound, http: httpStatus };
-      diagnostics.push({ tenant_id: cfg.tenant_id, source, dealer_id: dealerId, resolved: !cfg.dealer_id, num_found: numFound, http: httpStatus, seen: tenantSeen });
+      diagnostics.push({ tenant_id: cfg.tenant_id, source, dealer_id: dealerId, resolved: !cfg.dealer_id, num_found: numFound, http: httpStatus, seen: tenantSeen, listings_written: listingsUpserted, write_error: firstWriteErr });
       await admin.from("marketcheck_sync_config")
         .update({ last_run_at: now.toISOString(), last_status: status })
         .eq("tenant_id", cfg.tenant_id);
