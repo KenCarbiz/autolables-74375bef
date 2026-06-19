@@ -59,6 +59,7 @@ type ConditionFilter = "all" | "new" | "used" | "cpo";
 type DerivedFilter = "all" | "needs-sticker" | "missing-addendum" | "price-verify" | "open-recalls";
 
 const PAGE_SIZE = 25;
+const PAGE_SIZE_OPTIONS = [25, 50, 100, 200];
 
 const Inventory = () => {
   const { user } = useAuth();
@@ -95,6 +96,7 @@ const Inventory = () => {
   const [condition, setCondition] = useState<ConditionFilter>("all");
   const [derived, setDerived] = useState<DerivedFilter>("all");
   const [page, setPage] = useState(1);
+  const [perPage, setPerPage] = useState(PAGE_SIZE);
   const [searchParams, setSearchParams] = useSearchParams();
   const [showAdd, setShowAdd] = useState(searchParams.get("add") === "1");
   const [showImport, setShowImport] = useState(false);
@@ -272,7 +274,7 @@ const Inventory = () => {
   };
 
   useEffect(() => { load(); /* eslint-disable-next-line */ }, [tenant?.id]);
-  useEffect(() => { setPage(1); }, [q, status, condition, derived]);
+  useEffect(() => { setPage(1); }, [q, status, condition, derived, perPage]);
 
   const signalFor = (r: VehicleRow) => {
     const v = (r.vin || "").toUpperCase();
@@ -359,9 +361,9 @@ const Inventory = () => {
     };
   }, [rows, addendumVins, byVin]);
 
-  const pageCount = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const pageCount = Math.max(1, Math.ceil(filtered.length / perPage));
   const safePage = Math.min(page, pageCount);
-  const pageRows = filtered.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
+  const pageRows = filtered.slice((safePage - 1) * perPage, safePage * perPage);
   const readinessSpark = pageRows.map(rowReadiness);
   const topIssue = (() => {
     const issues = [
@@ -375,7 +377,7 @@ const Inventory = () => {
 
   const rowActions = (r: VehicleRow): KebabItem[] => [
     { label: "Open Vehicle", icon: ExternalLink, onClick: () => navigate(`/vehicle-file/${r.id}`) },
-    { label: r.condition === "new" ? "New-Car Sticker" : "Used-Car Sticker", icon: Printer, onClick: () => navigate(r.condition === "new" ? "/new-car-sticker" : "/used-car-sticker") },
+    { label: r.condition === "new" ? "New-Car Sticker" : "Used-Car Sticker", icon: Printer, onClick: () => navigate(`${r.condition === "new" ? "/new-car-sticker" : "/used-car-sticker"}?vehicleId=${r.id}`) },
     { label: "Make Sticker", icon: Printer, onClick: () => navigate(`/vehicle-file/${r.id}?tab=labels`) },
     { label: "Send to Get-Ready", icon: Wrench, onClick: () => sendToGetReady(r) },
     { label: "Prep & Install", icon: ClipboardList, onClick: () => navigate(`/vehicle-file/${r.id}?tab=prep`) },
@@ -500,7 +502,7 @@ const Inventory = () => {
                           <div className="flex justify-end items-center gap-1">
                             <div className="hidden md:flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
                               <HoverBtn title="Open vehicle" onClick={() => navigate(`/vehicle-file/${r.id}`)}><ExternalLink className="w-3.5 h-3.5" /></HoverBtn>
-                              <HoverBtn title="Generate sticker" onClick={() => navigate(r.condition === "new" ? "/new-car-sticker" : "/used-car-sticker")}><Printer className="w-3.5 h-3.5" /></HoverBtn>
+                              <HoverBtn title="Generate sticker" onClick={() => navigate(`${r.condition === "new" ? "/new-car-sticker" : "/used-car-sticker"}?vehicleId=${r.id}`)}><Printer className="w-3.5 h-3.5" /></HoverBtn>
                               {r.status === "published" && <HoverBtn title="Preview shopper portal" onClick={() => window.open(`/v/${r.slug}`, "_blank", "noopener")}><Eye className="w-3.5 h-3.5" /></HoverBtn>}
                               <HoverBtn title="Quick recall check" onClick={() => quickRecall(r.vin)}><ShieldCheck className="w-3.5 h-3.5" /></HoverBtn>
                             </div>
@@ -522,14 +524,14 @@ const Inventory = () => {
                     signal={signalFor(r)}
                     readiness={rowReadiness(r)}
                     onOpen={() => navigate(`/vehicle-file/${r.id}`)}
-                    onSticker={() => navigate(r.condition === "new" ? "/new-car-sticker" : "/used-car-sticker")}
+                    onSticker={() => navigate(`${r.condition === "new" ? "/new-car-sticker" : "/used-car-sticker"}?vehicleId=${r.id}`)}
                     onView={() => window.open(`/v/${r.slug}`, "_blank", "noopener")}
                     items={rowActions(r)}
                   />
                 ))}
               </div>
 
-              <Pagination page={safePage} pageCount={pageCount} total={filtered.length} pageSize={PAGE_SIZE} onPage={setPage} />
+              <Pagination page={safePage} pageCount={pageCount} total={filtered.length} pageSize={perPage} onPage={setPage} onPageSize={setPerPage} />
             </>
           )}
         </div>
@@ -1080,7 +1082,7 @@ const KebabMenu = ({ items }: { items: KebabItem[] }) => {
   );
 };
 
-const Pagination = ({ page, pageCount, total, pageSize, onPage }: { page: number; pageCount: number; total: number; pageSize: number; onPage: (p: number) => void }) => {
+const Pagination = ({ page, pageCount, total, pageSize, onPage, onPageSize }: { page: number; pageCount: number; total: number; pageSize: number; onPage: (p: number) => void; onPageSize: (n: number) => void }) => {
   const from = total === 0 ? 0 : (page - 1) * pageSize + 1;
   const to = Math.min(page * pageSize, total);
   const pages = Array.from({ length: pageCount }, (_, i) => i + 1).filter((p) => p === 1 || p === pageCount || Math.abs(p - page) <= 1);
@@ -1089,7 +1091,22 @@ const Pagination = ({ page, pageCount, total, pageSize, onPage }: { page: number
   for (const p of pages) { if (prev && p - prev > 1) withGaps.push("gap"); withGaps.push(p); prev = p; }
   return (
     <div className="flex items-center justify-between gap-3 flex-wrap pt-1">
-      <p className="text-xs text-muted-foreground">Showing <span className="font-semibold text-foreground tabular-nums">{from}</span>–<span className="font-semibold text-foreground tabular-nums">{to}</span> of <span className="font-semibold text-foreground tabular-nums">{total}</span> vehicles</p>
+      <div className="flex items-center gap-3">
+        <p className="text-xs text-muted-foreground">Showing <span className="font-semibold text-foreground tabular-nums">{from}</span>–<span className="font-semibold text-foreground tabular-nums">{to}</span> of <span className="font-semibold text-foreground tabular-nums">{total}</span> vehicles</p>
+        <div className="flex items-center gap-1.5">
+          <label htmlFor="inv-per-page" className="text-xs text-muted-foreground">Per page</label>
+          <select
+            id="inv-per-page"
+            value={pageSize}
+            onChange={(e) => onPageSize(Number(e.target.value))}
+            className="h-8 rounded-lg border border-border bg-card text-foreground text-xs font-medium px-2 outline-none hover:bg-muted transition-colors cursor-pointer"
+          >
+            {PAGE_SIZE_OPTIONS.map((n) => (
+              <option key={n} value={n}>{n}</option>
+            ))}
+          </select>
+        </div>
+      </div>
       {pageCount > 1 && (
         <div className="flex items-center gap-1">
           <button onClick={() => onPage(Math.max(1, page - 1))} disabled={page <= 1} className="w-8 h-8 rounded-lg border border-border bg-card text-foreground inline-flex items-center justify-center disabled:opacity-40 hover:bg-muted transition-colors"><ChevronLeft className="w-4 h-4" /></button>
