@@ -25,8 +25,6 @@ interface Config {
   last_status: { ran_at?: string; seen?: number; new_vehicles?: number; prices_recorded?: number } | null;
 }
 
-interface DealerHit { id: string; name: string; domain: string; city: string; state: string; listings: number | null }
-
 const DOW = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 const DEFAULTS: Omit<Config, "tenant_id"> = {
   allowed: false, enabled: false, source: "", dealer_id: "", max_vehicles: 1000,
@@ -41,11 +39,6 @@ export default function MarketcheckSyncCard() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [running, setRunning] = useState(false);
-  // Find dealer (resolve the exact MarketCheck rooftop by ZIP).
-  const [lkZip, setLkZip] = useState("");
-  const [lkLoading, setLkLoading] = useState(false);
-  const [lkResults, setLkResults] = useState<DealerHit[] | null>(null);
-  const [lkFilter, setLkFilter] = useState("");
 
   const load = useCallback(async () => {
     if (!tenantId) return;
@@ -55,17 +48,6 @@ export default function MarketcheckSyncCard() {
     setCfg(data ? { ...DEFAULTS, ...(data as Config) } : { tenant_id: tenantId, ...DEFAULTS });
     setLoading(false);
   }, [tenantId]);
-
-  const findDealers = async () => {
-    if (!lkZip.trim()) { toast.error("Enter a ZIP to search"); return; }
-    setLkLoading(true);
-    const { data, error } = await supabase.functions.invoke("marketcheck-sync", { body: { lookup: true, zip: lkZip.trim() } });
-    setLkLoading(false);
-    if (error) { toast.error("Dealer lookup failed — redeploy marketcheck-sync if this persists."); return; }
-    const hits = ((data || {}) as { dealers?: DealerHit[] }).dealers || [];
-    setLkResults(hits);
-    if (hits.length === 0) toast.error("No MarketCheck dealers found for that ZIP.");
-  };
 
   useEffect(() => { load(); }, [load]);
 
@@ -87,8 +69,9 @@ export default function MarketcheckSyncCard() {
       _max_vehicles: cfg.max_vehicles, _frequency: cfg.frequency,
       _day_of_week: cfg.day_of_week, _run_hour: cfg.run_hour,
     };
-    // Prefer the 8-arg overload (with dealer_id); fall back if not migrated.
-    let { error } = await (supabase as any).rpc("save_marketcheck_config", { ...base, _dealer_id: (cfg.dealer_id || "").trim() });
+    // The pull scopes by website domain only; clear any stale dealer_id so a
+    // misleading directory id can't be reused.
+    let { error } = await (supabase as any).rpc("save_marketcheck_config", { ...base, _dealer_id: "" });
     if (error && /save_marketcheck_config|function|does not exist|argument/i.test(error.message || "")) {
       ({ error } = await (supabase as any).rpc("save_marketcheck_config", base));
     }
@@ -98,7 +81,7 @@ export default function MarketcheckSyncCard() {
   };
 
   const runNow = async () => {
-    if (!cfg.source.trim() && !(cfg.dealer_id || "").trim()) { toast.error("Pick a dealer (or enter the website domain) first"); return; }
+    if (!cfg.source.trim()) { toast.error("Enter the dealer website domain first"); return; }
     setRunning(true);
     const { data, error } = await supabase.functions.invoke("marketcheck-sync", {
       body: { tenant_id: tenantId, force: true },
@@ -158,62 +141,8 @@ export default function MarketcheckSyncCard() {
             <input value={cfg.source} onChange={(e) => set({ source: e.target.value })}
               placeholder="hartecars.com"
               className="w-full h-10 rounded-md border border-border bg-background px-3 text-sm font-mono" />
-            <p className="text-[11px] text-muted-foreground mt-1">Just the domain — or pin the exact rooftop with Find dealer below.</p>
+            <p className="text-[11px] text-muted-foreground mt-1">Just the website domain — the sync pulls only this dealership's own listings (matched on the domain).</p>
           </div>
-
-          {/* Rooftop pinning (dealer ID + Find dealer) is a platform-admin
-              control — a dealer never needs to touch MarketCheck IDs, and the
-              super admin sets the exact rooftop here or in Platform → Tenants. */}
-          {isAdmin && (
-            <>
-              <div>
-                <label className="block text-[11px] font-bold uppercase tracking-wider text-muted-foreground mb-1">
-                  MarketCheck dealer ID
-                </label>
-                <input value={cfg.dealer_id} onChange={(e) => set({ dealer_id: e.target.value })}
-                  placeholder="The exact rooftop — use Find dealer below"
-                  className="w-full h-10 rounded-md border border-border bg-background px-3 text-sm font-mono" />
-                <p className="text-[11px] text-muted-foreground mt-1">When set, the sync pulls only this rooftop's cars (ignores the domain auto-match).</p>
-              </div>
-
-              {/* Find dealer — search a ZIP, pick the dealership, and its
-                  MarketCheck ID drops into the field above. The reliable way to
-                  avoid pulling a sibling rooftop's inventory. */}
-              <div className="rounded-xl border border-dashed border-border bg-muted/20 p-3 space-y-2">
-                <p className="text-sm font-semibold text-foreground">Find dealer by ZIP</p>
-                <div className="flex items-center gap-2">
-                  <input value={lkZip} onChange={(e) => setLkZip(e.target.value)} placeholder="e.g. 06120" inputMode="numeric"
-                    className="w-32 h-10 rounded-md border border-border bg-background px-3 text-sm font-mono" />
-                  <button onClick={findDealers} disabled={lkLoading || !lkZip.trim()}
-                    className="h-10 px-4 rounded-md bg-primary text-primary-foreground text-sm font-semibold disabled:opacity-50">
-                    {lkLoading ? "Searching…" : "Find dealer"}
-                  </button>
-                </div>
-                {lkResults && lkResults.length > 0 && (
-                  <input value={lkFilter} onChange={(e) => setLkFilter(e.target.value)}
-                    placeholder={`Filter ${lkResults.length} dealers — type "harte"`}
-                    className="w-full h-9 rounded-md border border-border bg-background px-3 text-sm" />
-                )}
-                {lkResults && lkResults.length > 0 && (
-                  <div className="max-h-56 overflow-y-auto divide-y divide-border rounded-md border border-border bg-card">
-                    {lkResults.filter((d) => {
-                      const qq = lkFilter.trim().toLowerCase();
-                      return !qq || (d.name || "").toLowerCase().includes(qq) || (d.domain || "").toLowerCase().includes(qq);
-                    }).map((d) => (
-                      <button key={d.id}
-                        onClick={() => { set({ dealer_id: d.id, source: d.domain || cfg.source }); toast.success(`Selected ${d.name || d.id}`); }}
-                        className={`w-full text-left px-3 py-2 hover:bg-muted ${cfg.dealer_id === d.id ? "bg-emerald-50" : ""}`}>
-                        <p className="text-sm font-semibold text-foreground truncate">{d.name || "(unnamed dealer)"}</p>
-                        <p className="text-[11px] text-muted-foreground truncate font-mono">
-                          id {d.id}{d.domain ? ` · ${d.domain}` : ""}{d.city ? ` · ${d.city}, ${d.state}` : ""}{d.listings != null ? ` · ${d.listings} cars` : ""}
-                        </p>
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </>
-          )}
 
           <div className="grid grid-cols-2 gap-3">
             <div>
