@@ -41,23 +41,28 @@ const SYND_ENDPOINT = `${MC_BASE}/dealerships/inventory`;
 const DEALERS_ENDPOINT = `${MC_BASE}/dealers/car`;
 const ROWS = 50;
 
-// Resolve a MarketCheck dealer_id from the dealer's website domain via the
-// Dealers Search endpoint. Best-effort: returns null if nothing matches, which
-// the caller surfaces as a clear diagnostic.
-async function resolveDealerId(source: string): Promise<{ id: string | null; found: number; status: number }> {
+// Resolve a MarketCheck dealer_id for a dealer's website domain. The Dealers
+// Search endpoint only filters by GEOGRAPHY (zip/state/radius) — there is no
+// domain filter — so we search the dealer's area, then EXACT-match the domain
+// against each dealer's source / inventory_url. Returns null (with a clear
+// diagnostic) rather than guessing the wrong rooftop.
+async function resolveDealerId(
+  source: string, zip?: string | null, state?: string | null,
+): Promise<{ id: string | null; found: number; status: number; matchedName?: string | null }> {
   try {
-    const url = `${DEALERS_ENDPOINT}?api_key=${encodeURIComponent(MC_KEY)}&source=${encodeURIComponent(source)}&rows=10`;
+    const geo = zip ? `&zip=${encodeURIComponent(zip)}&radius=20`
+      : state ? `&state=${encodeURIComponent(state)}` : "";
+    const url = `${DEALERS_ENDPOINT}?api_key=${encodeURIComponent(MC_KEY)}&rows=50${geo}`;
     const res = await fetch(url, { signal: AbortSignal.timeout(20000) });
     if (!res.ok) return { id: null, found: 0, status: res.status };
     // deno-lint-ignore no-explicit-any
     const data: any = await res.json().catch(() => ({}));
     const dealers: any[] = Array.isArray(data?.dealers) ? data.dealers : [];
     const host = (s: unknown) => toSourceHost(String(s || ""));
-    // EXACT host match only — never fall back to dealers[0], or a group query
-    // pulls the wrong rooftop (e.g. harteinfiniti.com returning the Nissan store).
-    const hit = dealers.find((d) => host(d?.source) === source || host(d?.website) === source);
+    const hit = dealers.find((d) =>
+      host(d?.source) === source || host(d?.inventory_url) === source || host(d?.website) === source);
     const id = hit ? String(hit.id ?? hit.dealer_id ?? hit.mc_dealer_id ?? "") : "";
-    return { id: id || null, found: dealers.length, status: res.status };
+    return { id: id || null, found: dealers.length, status: res.status, matchedName: hit?.seller_name ?? null };
   } catch {
     return { id: null, found: 0, status: 0 };
   }
@@ -180,19 +185,23 @@ serve(async (req) => {
         if (!latestWebsite.has(v)) latestWebsite.set(v, r.advertised_price);
       }
 
-      // Resolve the dealer's MarketCheck dealer_id: a manual override on the
-      // config wins; otherwise look it up from the website domain.
+      // Resolve the dealer's MarketCheck dealer_id: a manual override wins;
+      // otherwise look it up by the dealer's area + exact domain match.
       let dealerId = (cfg.dealer_id || "").trim();
-      let resolveInfo: { id: string | null; found: number; status: number } | null = null;
+      let resolveInfo: { id: string | null; found: number; status: number; matchedName?: string | null } | null = null;
       if (!dealerId) {
-        resolveInfo = await resolveDealerId(source);
+        const { data: prof } = await admin.from("dealer_profiles").select("settings").eq("tenant_id", cfg.tenant_id).maybeSingle();
+        const s = (prof?.settings || {}) as Record<string, string>;
+        const zip = s.dealer_zip || s.dealer_postal_code || "";
+        const state = s.dealer_state || s.doc_fee_state || "";
+        resolveInfo = await resolveDealerId(source, zip, state);
         dealerId = resolveInfo.id || "";
       }
       if (!dealerId) {
         diagnostics.push({
-          tenant_id: cfg.tenant_id, source, dealers_matched: resolveInfo?.found ?? 0,
+          tenant_id: cfg.tenant_id, source, dealers_in_area: resolveInfo?.found ?? 0,
           dealers_http: resolveInfo?.status ?? null, error: "no_dealer_id",
-          note: `No MarketCheck dealer matched "${source}". Enter the MarketCheck dealer_id for this rooftop on the tenant.`,
+          note: `No MarketCheck dealer in the area matched "${source}". Set the dealership's ZIP in Branding & Setup, or paste the MarketCheck dealer ID for this rooftop.`,
         });
         continue;
       }
@@ -285,7 +294,7 @@ serve(async (req) => {
 
       tenantsSynced++;
       const status = { ran_at: now.toISOString(), seen: tenantSeen, new_vehicles: tenantNew, prices_recorded: tenantPrices, dealer_id: dealerId, num_found: numFound, http: httpStatus };
-      diagnostics.push({ tenant_id: cfg.tenant_id, source, dealer_id: dealerId, resolved: !cfg.dealer_id, num_found: numFound, http: httpStatus, seen: tenantSeen, listings_written: listingsUpserted, write_error: firstWriteErr });
+      diagnostics.push({ tenant_id: cfg.tenant_id, source, dealer_id: dealerId, matched_dealer: resolveInfo?.matchedName ?? "(manual id)", resolved: !cfg.dealer_id, num_found: numFound, http: httpStatus, seen: tenantSeen, listings_written: listingsUpserted, write_error: firstWriteErr });
       await admin.from("marketcheck_sync_config")
         .update({ last_run_at: now.toISOString(), last_status: status })
         .eq("tenant_id", cfg.tenant_id);
