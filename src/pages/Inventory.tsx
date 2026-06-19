@@ -530,8 +530,9 @@ const Inventory = () => {
 
         {/* Sidebar */}
         <aside className="xl:w-[300px] shrink-0 space-y-4">
-          <SideCard title="Quick Actions">
-            <div className="space-y-1.5">
+          <div className="rounded-[20px] border border-[#EAECEF] bg-white shadow-[0_1px_3px_rgba(16,24,40,0.04)] p-5">
+            <h3 className="text-xs font-bold uppercase tracking-[0.14em] text-muted-foreground mb-4">Quick Actions</h3>
+            <div className="space-y-3">
               <QuickAction icon={Plus} label="Add Vehicle" onClick={() => setShowAdd(true)} />
               <QuickAction icon={ScanLine} label="Scan VIN" onClick={openScan} />
               <QuickAction icon={Printer} label="New Car Sticker" onClick={() => navigate("/new-car-sticker")} />
@@ -541,7 +542,7 @@ const Inventory = () => {
               {settings.feature_price_verification && <QuickAction icon={RefreshCw} label={scraping ? "Verifying…" : "Verify Prices"} onClick={runPriceScrape} />}
               <QuickAction icon={Upload} label="CSV Import" onClick={() => setShowImport(true)} />
             </div>
-          </SideCard>
+          </div>
 
           <SideCard title="Inventory Insights">
             <ul className="space-y-2.5">
@@ -719,11 +720,18 @@ const SideCard = ({ title, children }: { title: string; children: React.ReactNod
   </div>
 );
 
+// Premium navigation pill — matches the reference Quick Actions card exactly:
+// 58px full-pill rows, a 40px soft-blue icon circle, 16px label, right chevron.
 const QuickAction = ({ icon: Icon, label, onClick }: { icon: typeof Car; label: string; onClick: () => void }) => (
-  <button onClick={onClick} className="w-full flex items-center gap-2.5 px-3 h-10 rounded-xl border border-border bg-background hover:bg-muted hover:border-foreground/15 text-sm font-semibold text-foreground transition-colors text-left">
-    <span className="w-7 h-7 rounded-lg bg-blue-600/10 text-blue-600 flex items-center justify-center shrink-0"><Icon className="w-3.5 h-3.5" /></span>
-    <span className="flex-1">{label}</span>
-    <ChevronRight className="w-4 h-4 text-muted-foreground" />
+  <button
+    onClick={onClick}
+    className="w-full flex items-center gap-3 pl-2.5 pr-4 h-[58px] rounded-full border border-[#E8EDF4] bg-[#F8FAFC] hover:bg-white hover:border-blue-500 hover:shadow-sm transition-all duration-200 text-left"
+  >
+    <span className="w-10 h-10 rounded-full bg-[#EAF2FF] text-blue-600 flex items-center justify-center shrink-0">
+      <Icon className="w-[18px] h-[18px]" strokeWidth={2} />
+    </span>
+    <span className="flex-1 text-base font-semibold text-[#111827] truncate">{label}</span>
+    <ChevronRight className="w-[18px] h-[18px] text-[#6B7280] shrink-0" />
   </button>
 );
 
