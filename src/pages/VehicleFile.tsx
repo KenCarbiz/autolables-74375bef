@@ -70,9 +70,15 @@ interface VehicleRow {
   hero_image_url: string | null;
   photos: string[] | null;
   mc_attributes: Record<string, unknown> | null;
+  recall_status: string | null;
+  recall_checked_at: string | null;
+  open_recall_count: number | null;
+  recall_payload: { recalls?: RecallItem[] } | null;
   created_at: string;
   updated_at: string;
 }
+
+interface RecallItem { title?: string; component?: string; reportDate?: string; remedy?: string; status?: string; nhtsaCampaignNumber?: string; }
 
 const VALID_TABS: TabId[] = ["overview", "documents", "scan", "customer", "addendum", "prep", "labels", "sign"];
 
@@ -609,29 +615,7 @@ const OverviewPanel = ({ vehicle, onTab }: { vehicle: VehicleRow; onTab: (t: Tab
         </Card>
 
         {/* Recall */}
-        <Card title="Recall Status">
-          {vehicle.recall_check ? (
-            <div className="flex items-center gap-2.5">
-              <span className="w-9 h-9 rounded-xl bg-emerald-100 text-emerald-600 flex items-center justify-center shrink-0">
-                <ShieldCheck className="w-5 h-5" />
-              </span>
-              <div>
-                <p className="text-sm font-semibold text-foreground">Recall check on file</p>
-                <p className="text-[11px] text-muted-foreground">Last checked {new Date(vehicle.updated_at).toLocaleDateString()}</p>
-              </div>
-            </div>
-          ) : (
-            <div className="flex items-center gap-2.5">
-              <span className="w-9 h-9 rounded-xl bg-amber-100 text-amber-600 flex items-center justify-center shrink-0">
-                <AlertTriangle className="w-5 h-5" />
-              </span>
-              <div>
-                <p className="text-sm font-semibold text-foreground">No recall check yet</p>
-                <p className="text-[11px] text-muted-foreground">Runs automatically on publish; a do-not-drive campaign blocks it.</p>
-              </div>
-            </div>
-          )}
-        </Card>
+        <RecallCard vehicle={vehicle} />
 
         {/* Shopper portal preview */}
         <Card title="Shopper Portal Preview" className="md:col-span-2 lg:col-span-1">
@@ -1881,5 +1865,83 @@ const Item = ({ ok, label, when }: { ok: boolean; label: string; when: string | 
     </span>
   </li>
 );
+
+// MarketCheck AutoRecalls — live 4-state card (clear / open / unknown / error).
+const RecallCard = ({ vehicle }: { vehicle: VehicleRow }) => {
+  const [status, setStatus] = useState<string | null>(vehicle.recall_status);
+  const [checkedAt, setCheckedAt] = useState<string | null>(vehicle.recall_checked_at);
+  const [open, setOpen] = useState<number>(vehicle.open_recall_count ?? 0);
+  const [recalls, setRecalls] = useState<RecallItem[]>(vehicle.recall_payload?.recalls || []);
+  const [checking, setChecking] = useState(false);
+
+  const run = async () => {
+    if (!vehicle.vin) { toast.error("No VIN to check"); return; }
+    setChecking(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("marketcheck-recalls", { body: { vin: vehicle.vin, tenant_id: vehicle.tenant_id } });
+      if (error) throw error;
+      const d = (data || {}) as { error?: string; recallStatus?: string; checkedAt?: string; openRecallCount?: number; recalls?: RecallItem[] };
+      if (d.error === "not_configured") { toast.error("Recall lookup isn't configured yet (MarketCheck AutoRecalls key)."); setStatus("error"); }
+      else if (d.recallStatus === "error") { toast.error("We could not check recalls right now. Try again."); setStatus("error"); }
+      else {
+        setStatus(d.recallStatus || "unknown"); setCheckedAt(d.checkedAt || null); setOpen(d.openRecallCount || 0); setRecalls(d.recalls || []);
+        toast.success((d.openRecallCount || 0) > 0 ? `${d.openRecallCount} open recall${d.openRecallCount === 1 ? "" : "s"} found` : "No active recalls");
+      }
+    } catch { toast.error("We could not check recalls right now. Try again."); setStatus("error"); }
+    finally { setChecking(false); }
+  };
+
+  const btn = (label: string) => (
+    <button onClick={run} disabled={checking} className="text-[11px] font-semibold text-blue-600 hover:underline disabled:opacity-50">{checking ? "Checking…" : label}</button>
+  );
+
+  if (status === "open_recalls" && open > 0) {
+    return (
+      <Card title="Recall Status" action={btn("Check again")}>
+        <div className="flex items-center gap-2.5">
+          <span className="w-9 h-9 rounded-xl bg-red-100 text-red-600 flex items-center justify-center shrink-0"><ShieldAlert className="w-5 h-5" /></span>
+          <div><p className="text-sm font-semibold text-red-700">Open recalls found</p><p className="text-[11px] text-muted-foreground">{open} open recall{open === 1 ? "" : "s"} may require attention before publishing.</p></div>
+        </div>
+        <ul className="mt-2 space-y-2">
+          {recalls.slice(0, 4).map((r, i) => (
+            <li key={i} className="rounded-lg border border-red-200 bg-red-50/50 p-2">
+              <p className="text-xs font-semibold text-foreground">{r.title || "Recall"}</p>
+              <p className="text-[11px] text-muted-foreground">{[r.component, r.reportDate].filter(Boolean).join(" · ")}</p>
+              {r.remedy ? <p className="text-[11px] text-muted-foreground mt-0.5">Remedy: {r.remedy}</p> : null}
+            </li>
+          ))}
+        </ul>
+      </Card>
+    );
+  }
+  if (status === "error") {
+    return (
+      <Card title="Recall Status" action={btn("Try again")}>
+        <div className="flex items-center gap-2.5">
+          <span className="w-9 h-9 rounded-xl bg-amber-100 text-amber-600 flex items-center justify-center shrink-0"><AlertTriangle className="w-5 h-5" /></span>
+          <div><p className="text-sm font-semibold text-foreground">Recall check failed</p><p className="text-[11px] text-muted-foreground">We could not check recalls right now. Try again.</p></div>
+        </div>
+      </Card>
+    );
+  }
+  if (status === "clear") {
+    return (
+      <Card title="Recall Status" action={btn("Check again")}>
+        <div className="flex items-center gap-2.5">
+          <span className="w-9 h-9 rounded-xl bg-emerald-100 text-emerald-600 flex items-center justify-center shrink-0"><ShieldCheck className="w-5 h-5" /></span>
+          <div><p className="text-sm font-semibold text-foreground">No active recalls</p><p className="text-[11px] text-muted-foreground">Last checked {checkedAt ? new Date(checkedAt).toLocaleDateString() : "today"}</p></div>
+        </div>
+      </Card>
+    );
+  }
+  return (
+    <Card title="Recall Status" action={btn("Run recall check")}>
+      <div className="flex items-center gap-2.5">
+        <span className="w-9 h-9 rounded-xl bg-muted text-muted-foreground flex items-center justify-center shrink-0"><ShieldCheck className="w-5 h-5" /></span>
+        <div><p className="text-sm font-semibold text-foreground">Not checked yet</p><p className="text-[11px] text-muted-foreground">Recall status has not been checked yet.</p></div>
+      </div>
+    </Card>
+  );
+};
 
 export default VehicleFile;

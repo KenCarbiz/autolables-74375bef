@@ -46,6 +46,8 @@ interface VehicleRow {
   updated_at: string;
   stock_number?: string | null;
   hero_image_url?: string | null;
+  recall_status?: string | null;
+  open_recall_count?: number | null;
 }
 
 interface ActivityRow { id: string; action: string; created_at: string; details: Record<string, unknown> | null; }
@@ -117,6 +119,19 @@ const Inventory = () => {
     }
   };
 
+  const runRecallBatch = async () => {
+    if (!tenant?.id) { toast.error("No active dealership"); return; }
+    toast.info("Checking recalls across inventory…");
+    try {
+      const { data, error } = await supabase.functions.invoke("marketcheck-recalls", { body: { tenant_id: tenant.id, batch: true } });
+      if (error) throw error;
+      const d = (data || {}) as { checked?: number; openFound?: number; error?: string };
+      if (d.error === "not_configured") { toast.error("Recall lookup isn't configured (MarketCheck AutoRecalls key)."); return; }
+      toast.success(`Recalls checked: ${d.checked ?? 0} vehicles · ${d.openFound ?? 0} with open recalls`);
+      load();
+    } catch { toast.error("Recall batch failed"); }
+  };
+
   const deleteVehicle = async (r: VehicleRow) => {
     if (!window.confirm(`Remove ${r.ymm || r.vin} from inventory? This deletes the vehicle file.`)) return;
     const { error } = await (supabase as any).from("vehicle_listings").delete().eq("id", r.id);
@@ -143,9 +158,9 @@ const Inventory = () => {
       .or(`tenant_id.eq.${tenant.id},tenant_id.is.null`)
       .order("updated_at", { ascending: false })
       .limit(500);
-    // Resilient to the not-yet-migrated hero_image_url column.
-    let { data, error } = await runSelect(`${baseCols},hero_image_url`);
-    if (error && /hero_image_url/.test(error.message || "")) {
+    // Resilient to the not-yet-migrated enrichment columns.
+    let { data, error } = await runSelect(`${baseCols},hero_image_url,recall_status,open_recall_count`);
+    if (error && /hero_image_url|recall_status|open_recall_count/.test(error.message || "")) {
       ({ data, error } = await runSelect(baseCols));
     }
     if (error) {
@@ -400,7 +415,12 @@ const Inventory = () => {
                           <p className="font-mono text-xs text-foreground">{r.stock_number || "—"}</p>
                           <p className="font-mono text-[11px] text-muted-foreground">…{(r.vin || "").slice(-6)}</p>
                         </td>
-                        <td className="px-3 py-2.5"><StatusPill status={r.status} /></td>
+                        <td className="px-3 py-2.5">
+                          <div className="flex flex-col items-start gap-1">
+                            <StatusPill status={r.status} />
+                            <RecallChip status={r.recall_status} open={r.open_recall_count} />
+                          </div>
+                        </td>
                         <td className="px-3 py-2.5">
                           <div className="flex flex-col items-center gap-0.5">
                             <MiniRing pct={rowReadiness(r)} />
@@ -451,6 +471,7 @@ const Inventory = () => {
               <QuickAction icon={ScanLine} label="Scan VIN" onClick={openScan} />
               <QuickAction icon={Printer} label="New Car Sticker" onClick={() => navigate("/new-car-sticker")} />
               <QuickAction icon={FileSignature} label="New Addendum" onClick={() => navigate("/addendum")} />
+              <QuickAction icon={ShieldCheck} label="Check Recalls" onClick={runRecallBatch} />
               <QuickAction icon={Upload} label="CSV Import" onClick={() => setShowImport(true)} />
             </div>
           </SideCard>
@@ -717,6 +738,7 @@ const VehicleCard = ({ r, signal, readiness, onOpen, onSticker, onView, items }:
       </div>
       <div className="flex items-center gap-1.5 mt-2.5 flex-wrap" onClick={(e) => e.stopPropagation()}>
         <StatusPill status={r.status} />
+        <RecallChip status={r.recall_status} open={r.open_recall_count} />
         {!signal.hasAddendum && <span className="text-[11px] font-semibold px-2 py-1 rounded-lg bg-red-100 text-red-700">Addendum Missing</span>}
         <div className="ml-auto flex items-center gap-1.5">
           {r.status === "published" ? (
@@ -729,6 +751,14 @@ const VehicleCard = ({ r, signal, readiness, onOpen, onSticker, onView, items }:
       </div>
     </div>
   );
+};
+
+const RecallChip = ({ status, open }: { status?: string | null; open?: number | null }) => {
+  if (status === "open_recalls" && (open || 0) > 0)
+    return <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded bg-red-100 text-red-700"><AlertTriangle className="w-2.5 h-2.5" />{open} Open Recall{open === 1 ? "" : "s"}</span>;
+  if (status === "clear")
+    return <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700"><ShieldCheck className="w-2.5 h-2.5" />No Recalls</span>;
+  return <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded bg-amber-100 text-amber-700">Recalls Not Checked</span>;
 };
 
 const StatusPill = ({ status }: { status: VehicleRow["status"] }) => {
@@ -868,6 +898,8 @@ const AddVehicleModal = ({ tenantId, userId, onClose, onCreated }: AddProps) => 
       .select().single();
     setSubmitting(false);
     if (error) { toast.error(`Failed: ${error.message}`); return; }
+    // Fire-and-forget recall check for the new VIN (best-effort).
+    supabase.functions.invoke("marketcheck-recalls", { body: { vin: vin.trim().toUpperCase(), tenant_id: tenantId } }).catch(() => {});
     onCreated(data.id);
   };
 
