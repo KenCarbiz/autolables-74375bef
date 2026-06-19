@@ -2103,8 +2103,10 @@ export type Database = {
           id: string
           install_token: string
           key_specs: Json
+          mc_attributes: Json
           mileage: number | null
           payment_estimate: Json | null
+          photo_count: number | null
           photos: Json
           prep_status: Json | null
           price: number | null
@@ -2149,8 +2151,10 @@ export type Database = {
           id?: string
           install_token?: string
           key_specs?: Json
+          mc_attributes?: Json
           mileage?: number | null
           payment_estimate?: Json | null
+          photo_count?: number | null
           photos?: Json
           prep_status?: Json | null
           price?: number | null
@@ -2195,8 +2199,10 @@ export type Database = {
           id?: string
           install_token?: string
           key_specs?: Json
+          mc_attributes?: Json
           mileage?: number | null
           payment_estimate?: Json | null
+          photo_count?: number | null
           photos?: Json
           prep_status?: Json | null
           price?: number | null
@@ -2823,8 +2829,10 @@ export type Database = {
           id: string
           install_token: string
           key_specs: Json
+          mc_attributes: Json
           mileage: number | null
           payment_estimate: Json | null
+          photo_count: number | null
           photos: Json
           prep_status: Json | null
           price: number | null
