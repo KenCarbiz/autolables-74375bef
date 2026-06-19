@@ -14,7 +14,7 @@ import { useVinDecode } from "@/hooks/useVinDecode";
 import { toast } from "sonner";
 import {
   Plus, Search, Upload, Car, FileText, Printer, Signature, ScanLine,
-  X, CheckCircle2, AlertTriangle, RefreshCw, MoreVertical,
+  X, CheckCircle2, AlertTriangle, RefreshCw, MoreVertical, Gauge,
   ShieldCheck, ClipboardList, ExternalLink, Trash2, Wrench,
   ChevronLeft, ChevronRight, Eye, CircleDollarSign, FileSignature,
 } from "lucide-react";
@@ -88,6 +88,7 @@ const Inventory = () => {
   const [rows, setRows] = useState<VehicleRow[]>([]);
   const [addendumVins, setAddendumVins] = useState<Set<string>>(new Set());
   const [activity, setActivity] = useState<ActivityRow[]>([]);
+  const [lastSync, setLastSync] = useState<{ at: string | null; status: Record<string, unknown> | null }>({ at: null, status: null });
   const [loading, setLoading] = useState(true);
   const [q, setQ] = useState("");
   const [status, setStatus] = useState<StatusFilter>("all");
@@ -145,6 +146,19 @@ const Inventory = () => {
       toast.success(`Market pricing: ${d.checked ?? 0} checked · ${d.greatDeals ?? 0} great deals`);
       load();
     } catch { toast.error("Market pricing batch failed"); }
+  };
+
+  const quickRecall = async (vin: string) => {
+    if (!vin) return;
+    toast.info("Checking recalls…");
+    try {
+      const { data, error } = await supabase.functions.invoke("marketcheck-recalls", { body: { vin, tenant_id: tenant?.id } });
+      if (error) throw error;
+      const d = (data || {}) as { openRecallCount?: number; error?: string };
+      if (d.error === "not_configured") { toast.error("Recall lookup isn't configured."); return; }
+      toast.success((d.openRecallCount || 0) > 0 ? `${d.openRecallCount} open recall${d.openRecallCount === 1 ? "" : "s"} found` : "No active recalls");
+      load();
+    } catch { toast.error("Recall check failed"); }
   };
 
   const deleteVehicle = async (r: VehicleRow) => {
@@ -216,6 +230,12 @@ const Inventory = () => {
       setRows(rows);
       setAddendumVins(adVins);
     }
+    // Best-effort last MarketCheck sync status for the sync card.
+    try {
+      const { data: cfg } = await (supabase as any)
+        .from("marketcheck_sync_config").select("last_run_at, last_status").eq("tenant_id", tenant.id).maybeSingle();
+      setLastSync({ at: cfg?.last_run_at ?? null, status: cfg?.last_status ?? null });
+    } catch { setLastSync({ at: null, status: null }); }
     // Best-effort recent activity for the sidebar.
     try {
       const { data: act } = await (supabase as any)
@@ -326,6 +346,15 @@ const Inventory = () => {
     { label: "Delete", icon: Trash2, onClick: () => deleteVehicle(r), danger: true },
   ];
 
+  const onHealthMetric = (key: string) => {
+    setDerived("all"); setStatus("all"); setCondition("all");
+    if (key === "ready") setStatus("published");
+    else if (key === "needs-sticker") setDerived("needs-sticker");
+    else if (key === "missing-addendum") setDerived("missing-addendum");
+    else if (key === "price-verify") setDerived("price-verify");
+    // "total" clears everything (done above)
+  };
+
   return (
     <div className="p-4 lg:p-6 max-w-[1600px] mx-auto space-y-5">
       <PageTabs tabs={VEHICLES_TABS} />
@@ -362,7 +391,8 @@ const Inventory = () => {
       <div className="flex flex-col xl:flex-row gap-5">
         {/* Main column */}
         <div className="flex-1 min-w-0 space-y-5">
-          <InventoryHealth counts={counts} onFilter={(d) => { setStatus("all"); setCondition("all"); setDerived(d); }} />
+          <SyncStatusBar at={lastSync.at} status={lastSync.status} total={counts.total} />
+          <InventoryHealth counts={counts} onMetric={onHealthMetric} />
 
           {/* KPI cards */}
           <div className="flex gap-3 overflow-x-auto pb-1 sm:grid sm:grid-cols-2 lg:grid-cols-4 sm:overflow-visible sm:pb-0">
@@ -414,6 +444,7 @@ const Inventory = () => {
                       <th className="text-left font-semibold px-4 py-2.5">Vehicle</th>
                       <th className="text-left font-semibold px-3 py-2.5">Stock # / VIN</th>
                       <th className="text-left font-semibold px-3 py-2.5">Status</th>
+                      <th className="text-left font-semibold px-3 py-2.5">Portal</th>
                       <th className="text-center font-semibold px-3 py-2.5">Readiness</th>
                       <th className="text-right font-semibold px-3 py-2.5">Price</th>
                       <th className="text-right font-semibold px-3 py-2.5">Mileage</th>
@@ -423,7 +454,7 @@ const Inventory = () => {
                   </thead>
                   <tbody className="divide-y divide-border">
                     {pageRows.map((r) => (
-                      <tr key={r.id} className="hover:bg-muted/30 cursor-pointer transition-colors" onClick={() => navigate(`/vehicle-file/${r.id}`)}>
+                      <tr key={r.id} className="group hover:bg-muted/30 cursor-pointer transition-colors" onClick={() => navigate(`/vehicle-file/${r.id}`)}>
                         <td className="px-4 py-2.5">
                           <div className="flex items-center gap-3">
                             <Thumb r={r} />
@@ -443,14 +474,13 @@ const Inventory = () => {
                         <td className="px-3 py-2.5">
                           <div className="flex flex-col items-start gap-1">
                             <StatusPill status={r.status} />
+                            <VinChip ymm={r.ymm} />
                             <RecallChip status={r.recall_status} open={r.open_recall_count} />
                           </div>
                         </td>
+                        <td className="px-3 py-2.5"><PortalChip status={r.status} /></td>
                         <td className="px-3 py-2.5">
-                          <div className="flex flex-col items-center gap-0.5">
-                            <MiniRing pct={rowReadiness(r)} />
-                            <span className="text-[10px] text-muted-foreground">{readyLabel(rowReadiness(r))}</span>
-                          </div>
+                          <ReadinessCell r={r} signal={signalFor(r)} pct={rowReadiness(r)} />
                         </td>
                         <td className="px-3 py-2.5 text-right" onClick={(e) => e.stopPropagation()}>
                           <span className="tabular-nums font-medium text-foreground">{r.price ? `$${r.price.toLocaleString()}` : "—"}</span>
@@ -460,7 +490,15 @@ const Inventory = () => {
                         <td className="px-3 py-2.5 text-right tabular-nums text-muted-foreground">{r.mileage ? `${r.mileage.toLocaleString()} mi` : "—"}</td>
                         <td className="px-3 py-2.5 text-xs text-muted-foreground whitespace-nowrap">{relativeDay(r.updated_at)}</td>
                         <td className="px-3 py-2.5 text-right" onClick={(e) => e.stopPropagation()}>
-                          <div className="flex justify-end"><KebabMenu items={rowActions(r)} /></div>
+                          <div className="flex justify-end items-center gap-1">
+                            <div className="hidden md:flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                              <HoverBtn title="Open vehicle" onClick={() => navigate(`/vehicle-file/${r.id}`)}><ExternalLink className="w-3.5 h-3.5" /></HoverBtn>
+                              <HoverBtn title="Generate sticker" onClick={() => navigate(r.condition === "new" ? "/new-car-sticker" : "/used-car-sticker")}><Printer className="w-3.5 h-3.5" /></HoverBtn>
+                              {r.status === "published" && <HoverBtn title="Preview shopper portal" onClick={() => window.open(`/v/${r.slug}`, "_blank", "noopener")}><Eye className="w-3.5 h-3.5" /></HoverBtn>}
+                              <HoverBtn title="Quick recall check" onClick={() => quickRecall(r.vin)}><ShieldCheck className="w-3.5 h-3.5" /></HoverBtn>
+                            </div>
+                            <KebabMenu items={rowActions(r)} />
+                          </div>
                         </td>
                       </tr>
                     ))}
@@ -501,6 +539,17 @@ const Inventory = () => {
               <QuickAction icon={CircleDollarSign} label="Check Market Prices" onClick={runMarketBatch} />
               <QuickAction icon={Upload} label="CSV Import" onClick={() => setShowImport(true)} />
             </div>
+          </SideCard>
+
+          <SideCard title="Inventory Insights">
+            <ul className="space-y-2">
+              <InsightRow icon={Car} label="Total vehicles" value={counts.total} />
+              <InsightRow icon={CheckCircle2} label="VIN decoded" value={counts.vinDecoded} tone="emerald" />
+              <InsightRow icon={Printer} label="Missing stickers" value={counts.needsSticker} tone={counts.needsSticker ? "amber" : "neutral"} />
+              <InsightRow icon={FileSignature} label="Missing addendums" value={counts.missingAddendum} tone={counts.missingAddendum ? "amber" : "neutral"} />
+              <InsightRow icon={ShieldCheck} label="Open recalls" value={counts.openRecallsTotal} tone={counts.openRecallsTotal ? "red" : "emerald"} />
+              <InsightRow icon={Gauge} label="Avg readiness" value={`${counts.avgReadiness}%`} />
+            </ul>
           </SideCard>
 
           <SideCard title="Inventory by Status">
@@ -567,13 +616,16 @@ const relativeDay = (iso: string) => {
 };
 
 const Thumb = ({ r }: { r: VehicleRow }) => {
+  const [err, setErr] = useState(false);
   const tint =
     r.condition === "new" ? "from-blue-500/15 to-blue-600/5 text-blue-600" :
     r.condition === "cpo" ? "from-violet-500/15 to-violet-600/5 text-violet-600" :
     "from-slate-400/15 to-slate-500/5 text-slate-500";
   return (
-    <div className={`w-14 h-11 rounded-lg bg-gradient-to-br ${tint} flex items-center justify-center shrink-0 overflow-hidden`}>
-      {r.hero_image_url ? <img src={r.hero_image_url} alt={r.ymm || "vehicle"} loading="lazy" className="w-full h-full object-cover" /> : <Car className="w-5 h-5" strokeWidth={1.5} />}
+    <div className={`w-20 h-[60px] rounded-lg bg-gradient-to-br ${tint} flex items-center justify-center shrink-0 overflow-hidden`}>
+      {r.hero_image_url && !err
+        ? <img src={r.hero_image_url} alt={r.ymm || "vehicle"} loading="lazy" onError={() => setErr(true)} className="w-full h-full object-cover" />
+        : <Car className="w-6 h-6" strokeWidth={1.5} />}
     </div>
   );
 };
@@ -597,6 +649,25 @@ const MiniRing = ({ pct }: { pct: number }) => {
   );
 };
 
+// Readiness ring + hover breakdown (native title so the table's horizontal
+// scroll never clips it).
+const ReadinessCell = ({ r, signal, pct }: { r: VehicleRow; signal: RowSignal; pct: number }) => {
+  const checks = [
+    { label: "Vehicle created", ok: true },
+    { label: "VIN decoded", ok: !!r.ymm },
+    { label: "Sticker / published", ok: signal.stickerDone },
+    { label: "Addendum", ok: signal.hasAddendum },
+    { label: "Price verified", ok: !r.price || signal.priceVerified },
+  ];
+  const title = `${pct}% readiness\n` + checks.map((c) => `${c.ok ? "✓" : "✗"} ${c.label}`).join("\n");
+  return (
+    <div className="flex flex-col items-center gap-0.5 cursor-help" title={title}>
+      <MiniRing pct={pct} />
+      <span className="text-[10px] text-muted-foreground">{readyLabel(pct)}</span>
+    </div>
+  );
+};
+
 // ── Sidebar primitives ─────────────────────────────────────────
 const SideCard = ({ title, children }: { title: string; children: React.ReactNode }) => (
   <div className="rounded-2xl border border-border bg-card shadow-sm p-4">
@@ -612,6 +683,16 @@ const QuickAction = ({ icon: Icon, label, onClick }: { icon: typeof Car; label: 
     <ChevronRight className="w-4 h-4 text-muted-foreground" />
   </button>
 );
+
+const InsightRow = ({ icon: Icon, label, value, tone = "neutral" }: { icon: typeof Car; label: string; value: number | string; tone?: "emerald" | "amber" | "red" | "neutral" }) => {
+  const vcls = tone === "emerald" ? "text-emerald-600" : tone === "amber" ? "text-amber-600" : tone === "red" ? "text-red-600" : "text-foreground";
+  return (
+    <li className="flex items-center justify-between gap-2">
+      <span className="inline-flex items-center gap-2 text-xs text-muted-foreground"><Icon className="w-3.5 h-3.5" />{label}</span>
+      <span className={`text-sm font-semibold tabular-nums ${vcls}`}>{value}</span>
+    </li>
+  );
+};
 
 const StatusDonut = ({ published, draft, archived, total }: { published: number; draft: number; archived: number; total: number }) => {
   const segs = [
@@ -659,12 +740,29 @@ const StatusDonut = ({ published, draft, archived, total }: { published: number;
   );
 };
 
+// ── Last-sync status bar ───────────────────────────────────────
+const SyncStatusBar = ({ at, status, total }: { at: string | null; status: Record<string, unknown> | null; total: number }) => {
+  const synced = !!at;
+  const ageH = at ? (Date.now() - new Date(at).getTime()) / 3600000 : Infinity;
+  const healthy = synced && ageH < 30;
+  const time = at ? new Date(at).toLocaleString(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }) : "Never";
+  const matched = (status?.matched_dealer as string) || "";
+  return (
+    <div className="rounded-2xl border border-border bg-card shadow-sm px-4 py-3 flex items-center gap-3 flex-wrap">
+      <span className={`w-2.5 h-2.5 rounded-full ${synced ? (healthy ? "bg-emerald-500" : "bg-amber-500") : "bg-slate-300"}`} />
+      <p className="text-sm"><span className="font-semibold text-foreground">Inventory last synced</span><span className="text-muted-foreground"> · {time}</span></p>
+      <span className="text-xs text-muted-foreground">{total.toLocaleString()} vehicles{matched ? ` · ${matched}` : ""}</span>
+      <span className={`ml-auto text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded ${synced ? "bg-emerald-100 text-emerald-700" : "bg-slate-100 text-slate-600"}`}>{synced ? "MarketCheck connected" : "Not synced"}</span>
+    </div>
+  );
+};
+
 // ── Inventory health band ──────────────────────────────────────
 const InventoryHealth = ({
-  counts, onFilter,
+  counts, onMetric,
 }: {
   counts: { health: number; total: number; readyToPublish: number; needsSticker: number; missingAddendum: number; priceVerify: number };
-  onFilter: (d: DerivedFilter) => void;
+  onMetric: (key: string) => void;
 }) => {
   const { health } = counts;
   const grade = health >= 90 ? "Excellent" : health >= 75 ? "Good" : health >= 50 ? "Fair" : "Needs attention";
@@ -684,11 +782,11 @@ const InventoryHealth = ({
           </div>
         </div>
         <div className="flex-1 flex gap-3 overflow-x-auto pb-1 sm:grid sm:grid-cols-3 lg:grid-cols-5 sm:overflow-visible sm:pb-0">
-          <HealthMetric icon={Car} tone="neutral" value={counts.total} label="Total Vehicles" />
-          <HealthMetric icon={ShieldCheck} tone="emerald" value={counts.readyToPublish} label="Ready to Publish" />
-          <HealthMetric icon={Printer} tone="amber" value={counts.needsSticker} label="Needs Sticker" onClick={() => onFilter("needs-sticker")} />
-          <HealthMetric icon={FileSignature} tone="red" value={counts.missingAddendum} label="Missing Addendum" onClick={() => onFilter("missing-addendum")} />
-          <HealthMetric icon={CircleDollarSign} tone="amber" value={counts.priceVerify} label="Price Verification" onClick={() => onFilter("price-verify")} />
+          <HealthMetric icon={Car} tone="neutral" value={counts.total} label="Total Vehicles" onClick={() => onMetric("total")} />
+          <HealthMetric icon={ShieldCheck} tone="emerald" value={counts.readyToPublish} label="Ready to Publish" onClick={() => onMetric("ready")} />
+          <HealthMetric icon={Printer} tone="amber" value={counts.needsSticker} label="Needs Sticker" onClick={() => onMetric("needs-sticker")} />
+          <HealthMetric icon={FileSignature} tone="red" value={counts.missingAddendum} label="Missing Addendum" onClick={() => onMetric("missing-addendum")} />
+          <HealthMetric icon={CircleDollarSign} tone="amber" value={counts.priceVerify} label="Price Verification" onClick={() => onMetric("price-verify")} />
         </div>
       </div>
     </div>
@@ -794,17 +892,35 @@ const MarketChip = ({ position }: { position?: string | null }) => {
 };
 
 const RecallChip = ({ status, open }: { status?: string | null; open?: number | null }) => {
-  if (status === "open_recalls" && (open || 0) > 0)
-    return <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded bg-red-100 text-red-700"><AlertTriangle className="w-2.5 h-2.5" />{open} Open Recall{open === 1 ? "" : "s"}</span>;
+  const n = open || 0;
+  // Only show warning colors when a real issue exists; gray for pending/unknown.
+  if (status === "open_recalls" && n > 0) {
+    const cls = n >= 2 ? "bg-red-100 text-red-700" : "bg-orange-100 text-orange-700";
+    return <span className={`inline-flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded ${cls}`}><AlertTriangle className="w-2.5 h-2.5" />{n} Open Recall{n === 1 ? "" : "s"}</span>;
+  }
   if (status === "clear")
     return <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700"><ShieldCheck className="w-2.5 h-2.5" />No Recalls</span>;
-  return <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded bg-amber-100 text-amber-700">Recalls Not Checked</span>;
+  if (status === "error" || status === "unknown")
+    return <span className="inline-flex items-center text-[10px] font-semibold px-1.5 py-0.5 rounded bg-muted text-muted-foreground">Recall Unavailable</span>;
+  return <span className="inline-flex items-center text-[10px] font-semibold px-1.5 py-0.5 rounded bg-muted text-muted-foreground">Recall Pending</span>;
 };
+
+const VinChip = ({ ymm }: { ymm?: string | null }) =>
+  ymm
+    ? <span className="inline-flex items-center text-[10px] font-semibold px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700">VIN Decoded</span>
+    : <span className="inline-flex items-center text-[10px] font-semibold px-1.5 py-0.5 rounded bg-slate-100 text-slate-600">VIN Pending</span>;
+
+const PortalChip = ({ status }: { status: VehicleRow["status"] }) =>
+  status === "published"
+    ? <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700"><span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />Live</span>
+    : status === "archived"
+      ? <span className="inline-flex items-center text-[10px] font-semibold px-1.5 py-0.5 rounded bg-slate-100 text-slate-600">Archived</span>
+      : <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded bg-slate-100 text-slate-600"><span className="w-1.5 h-1.5 rounded-full bg-slate-400" />Draft</span>;
 
 const StatusPill = ({ status }: { status: VehicleRow["status"] }) => {
   const cfg = status === "published" ? { cls: "bg-emerald-100 text-emerald-700", dot: "bg-emerald-500", label: "Published" }
     : status === "archived" ? { cls: "bg-slate-100 text-slate-600", dot: "bg-slate-400", label: "Archived" }
-    : { cls: "bg-amber-100 text-amber-700", dot: "bg-amber-500", label: "Draft" };
+    : { cls: "bg-slate-100 text-slate-600", dot: "bg-slate-400", label: "Draft" };
   return (
     <span className={`inline-flex items-center gap-1.5 text-[11px] font-semibold px-2 py-1 rounded-lg ${cfg.cls}`}>
       <span className={`w-1.5 h-1.5 rounded-full ${cfg.dot}`} />{cfg.label}
@@ -813,6 +929,10 @@ const StatusPill = ({ status }: { status: VehicleRow["status"] }) => {
 };
 
 interface KebabItem { label: string; icon: typeof Car; onClick: () => void; danger?: boolean; }
+
+const HoverBtn = ({ title, onClick, children }: { title: string; onClick: () => void; children: React.ReactNode }) => (
+  <button title={title} onClick={onClick} className="w-7 h-7 rounded-lg border border-border bg-background hover:bg-muted text-muted-foreground hover:text-foreground inline-flex items-center justify-center transition-colors">{children}</button>
+);
 
 const KebabMenu = ({ items }: { items: KebabItem[] }) => {
   const [open, setOpen] = useState(false);
