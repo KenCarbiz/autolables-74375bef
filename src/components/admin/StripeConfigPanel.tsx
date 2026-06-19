@@ -2,6 +2,7 @@ import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { CreditCard, Check, X, RefreshCw, AlertTriangle, ExternalLink, ShieldCheck } from "lucide-react";
+import { PLAN_DEFINITIONS, SCRAPE_ADDON_BANDS } from "@/data/planTiers";
 
 // ──────────────────────────────────────────────────────────────
 // StripeConfigPanel — super-admin Stripe health/setup.
@@ -73,6 +74,31 @@ const StripeConfigPanel = () => {
             <StatusRow ok={status.price_tiers.length > 0} label="Price tiers" detail={status.price_tiers.length > 0 ? status.price_tiers.join(", ") : "No STRIPE_PRICE_AUTOLABELS_* set"} />
           </div>
         )}
+      </div>
+
+      <div className="rounded-2xl border border-border bg-card shadow-sm p-5">
+        <h3 className="text-xs font-bold uppercase tracking-[0.12em] text-muted-foreground mb-1">Plan tiers → Stripe prices</h3>
+        <p className="text-[11px] text-muted-foreground mb-3">Create one Stripe Product + recurring monthly Price per tier, then set each <code className="font-mono">price_…</code> as the matching secret.</p>
+        <div className="space-y-2">
+          {PLAN_DEFINITIONS.map((p) => {
+            const key = `STRIPE_PRICE_AUTOLABELS_${p.tier.toUpperCase()}`;
+            const configured = !!status?.price_tiers?.includes(p.tier);
+            return (
+              <div key={p.tier} className="flex items-center justify-between gap-3 rounded-xl border border-border bg-background p-2.5">
+                <div className="min-w-0">
+                  <p className="text-sm font-semibold text-foreground">{p.name} <span className="text-muted-foreground font-normal">{p.price}/mo</span>{p.includedWithAutocurb ? <span className="text-[10px] text-emerald-600 font-semibold ml-1.5">free w/ Autocurb</span> : null}</p>
+                  <code className="text-[10px] font-mono text-muted-foreground break-all">{key}</code>
+                </div>
+                {status ? (
+                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded shrink-0 ${configured ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"}`}>{configured ? "Configured" : "Not set"}</span>
+                ) : null}
+              </div>
+            );
+          })}
+        </div>
+        <p className="text-[11px] text-muted-foreground mt-3">
+          Metered scrape add-ons (Compliance Pro): {SCRAPE_ADDON_BANDS.filter((b) => b.price !== "—").map((b) => `${b.name} ${b.price}`).join(" · ")} — create these as separate prices if you sell extra nightly VIN volume.
+        </p>
       </div>
 
       <div className="rounded-2xl border border-border bg-card shadow-sm p-5">
