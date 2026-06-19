@@ -154,6 +154,18 @@ export const useAdminPlatform = () => {
     [qc]
   );
 
+  // Look up MarketCheck dealers in an area so the operator can find the right
+  // rooftop's dealer_id (Dealers Search only filters by geography).
+  const lookupMarketcheckDealers = useCallback(
+    async (args: { zip?: string; state?: string }): Promise<Array<{ id: string; name: string; domain: string; city: string; state: string; listings: number | null }>> => {
+      const { data, error } = await supabase.functions.invoke("marketcheck-sync", { body: { lookup: true, zip: args.zip, state: args.state } });
+      if (error) return [];
+      const r = (data || {}) as { dealers?: Array<{ id: string; name: string; domain: string; city: string; state: string; listings: number | null }> };
+      return r.dealers || [];
+    },
+    []
+  );
+
   // Run a single tenant's scrape now (bypasses the schedule).
   const runMarketcheckNow = useCallback(
     async (tenantId: string): Promise<{ ok: boolean; message: string }> => {
@@ -356,6 +368,7 @@ export const useAdminPlatform = () => {
     marketcheck,
     setMarketcheckAllowed,
     saveMarketcheckConfig,
+    lookupMarketcheckDealers,
     runMarketcheckNow,
     setTenantTier,
     setTenantActive,

@@ -262,7 +262,7 @@ export const DEFAULT_SETTINGS: DealerSettings = {
 interface DealerSettingsContextType {
   settings: DealerSettings;
   loading: boolean;
-  updateSettings: (updates: Partial<DealerSettings>) => Promise<void>;
+  updateSettings: (updates: Partial<DealerSettings>) => Promise<boolean>;
   reload: () => Promise<void>;
 }
 
@@ -383,7 +383,7 @@ export const DealerSettingsProvider = ({ children }: { children: ReactNode }) =>
       setSettings(next);
       writeCache(tenantId, next);
       // Only persist to Supabase when we have a real tenant.
-      if (!user || !tenantId) return;
+      if (!user || !tenantId) return false;
       // Supabase returns RLS denials in `error` (it does not throw), so check
       // it explicitly and tell the dealer when a save didn't reach the server —
       // otherwise edits silently live in cache and vanish on reload.
@@ -397,7 +397,9 @@ export const DealerSettingsProvider = ({ children }: { children: ReactNode }) =>
         // eslint-disable-next-line no-console
         console.warn("dealer_profiles upsert failed:", error.message);
         toast.error("Couldn't save to the server — you may not have access to this dealership's settings. Changes are kept locally only.");
+        return false;
       }
+      return true;
     },
     [settings, tenantId, user]
   );

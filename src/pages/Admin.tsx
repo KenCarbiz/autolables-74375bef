@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/contexts/AuthContext";
 import { uploadPhoto } from "@/lib/storage";
@@ -180,7 +180,7 @@ const VALID_TABS: AdminTab[] = ["home", "products", "rules", "settings", "brandi
 const Admin = () => {
   const queryClient = useQueryClient();
   const { user, isAdmin, loading, signOut } = useAuth();
-  const { settings, updateSettings } = useDealerSettings();
+  const { settings, updateSettings, loading: settingsLoading } = useDealerSettings();
   const { rules, addRule, updateRule, deleteRule } = useProductRules();
   const { entries: auditEntries, exportCsv: exportAuditCsv } = useAudit();
   const { currentStore, updateTenant, tenant } = useTenant();
@@ -323,6 +323,45 @@ const Admin = () => {
     default_used_addendum: settings.default_used_addendum,
     default_ftc_warranty: settings.default_ftc_warranty,
   });
+
+  // The branding form is seeded from settings at mount, but settings load
+  // asynchronously — so hydrate the form once they arrive, or the fields look
+  // blank and a save would write the empty defaults back.
+  const brandingHydratedRef = useRef(false);
+  useEffect(() => {
+    if (settingsLoading || brandingHydratedRef.current) return;
+    brandingHydratedRef.current = true;
+    setBranding({
+      dealer_name: settings.dealer_name,
+      dealer_tagline: settings.dealer_tagline,
+      dealer_logo_url: settings.dealer_logo_url,
+      primary_color: settings.primary_color,
+      dealer_address: settings.dealer_address,
+      dealer_city: settings.dealer_city,
+      dealer_state: settings.dealer_state,
+      dealer_zip: settings.dealer_zip,
+      dealer_phone: settings.dealer_phone,
+      dealer_principal: settings.dealer_principal,
+      dealer_license_number: settings.dealer_license_number,
+      dms_provider: settings.dms_provider,
+      new_inventory_url: settings.new_inventory_url,
+      used_inventory_url: settings.used_inventory_url,
+      cargurus_url: settings.cargurus_url,
+      cars_com_url: settings.cars_com_url,
+      autotrader_url: settings.autotrader_url,
+      capital_one_url: settings.capital_one_url,
+      carfax_url: settings.carfax_url,
+      vdp_price_labels: settings.vdp_price_labels,
+      vdp_strip_finance_params: settings.vdp_strip_finance_params,
+      why_buy_here: settings.why_buy_here,
+      warranty_programs: settings.warranty_programs,
+      vehicle_conditions: settings.vehicle_conditions,
+      default_new_addendum: settings.default_new_addendum,
+      default_used_window: settings.default_used_window,
+      default_used_addendum: settings.default_used_addendum,
+      default_ftc_warranty: settings.default_ftc_warranty,
+    });
+  }, [settingsLoading, settings]);
   const [logoUploading, setLogoUploading] = useState(false);
 
   // VDP price-extraction "Test" — runs the scraper against a sample URL
@@ -479,9 +518,11 @@ const Admin = () => {
     setEditingRule(null);
   };
 
-  const handleSaveBranding = () => {
-    updateSettings(branding);
-    toast.success("Branding saved");
+  const handleSaveBranding = async () => {
+    const ok = await updateSettings(branding);
+    if (ok) toast.success("Branding saved");
+    // updateSettings already surfaces a clear error toast when the save is
+    // blocked, so don't double-report here.
   };
 
   const handleToggleFeature = (key: keyof DealerSettings) => {

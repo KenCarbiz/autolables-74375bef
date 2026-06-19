@@ -30,7 +30,7 @@ const sourceBadge = (source: TenantSummary["source"]) => {
 };
 
 export const PlatformTenants = () => {
-  const { tenants, setTenantActive, createTenant, marketcheck, setTenantTier, saveMarketcheckConfig, runMarketcheckNow, entitlements } = useAdminPlatform();
+  const { tenants, setTenantActive, createTenant, marketcheck, setTenantTier, saveMarketcheckConfig, lookupMarketcheckDealers, runMarketcheckNow, entitlements } = useAdminPlatform();
   const [q, setQ] = useState("");
   const [filter, setFilter] = useState<"all" | "active" | "inactive">("all");
   const [creating, setCreating] = useState(false);
@@ -198,6 +198,7 @@ export const PlatformTenants = () => {
           onSetTier={(tier) => changeTier(editing, tier)}
           onSaveMarketcheck={(cfg) => saveMarketcheckConfig({ tenantId: editing.id, ...cfg })}
           onRunMarketcheck={() => runMarketcheckNow(editing.id)}
+          onLookup={(args) => lookupMarketcheckDealers(args)}
         />
       )}
 
@@ -574,6 +575,7 @@ const TenantDetailsDrawer = ({
   marketcheck,
   onSaveMarketcheck,
   onRunMarketcheck,
+  onLookup,
 }: {
   tenant: TenantSummary;
   onClose: () => void;
@@ -583,6 +585,7 @@ const TenantDetailsDrawer = ({
   marketcheck: import("@/hooks/useAdminPlatform").MarketcheckRow | null;
   onSaveMarketcheck: (cfg: { enabled: boolean; source: string; maxVehicles: number; frequency: string; dayOfWeek: number; runHour: number; dealerId?: string }) => Promise<boolean>;
   onRunMarketcheck: () => Promise<{ ok: boolean; message: string }>;
+  onLookup: (args: { zip?: string; state?: string }) => Promise<Array<{ id: string; name: string; domain: string; city: string; state: string; listings: number | null }>>;
 }) => {
   const [form, setForm] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
@@ -597,6 +600,9 @@ const TenantDetailsDrawer = ({
   const [mcDealerId, setMcDealerId] = useState("");
   const [mcSaving, setMcSaving] = useState(false);
   const [mcRunning, setMcRunning] = useState(false);
+  const [lkZip, setLkZip] = useState("");
+  const [lkLoading, setLkLoading] = useState(false);
+  const [lkResults, setLkResults] = useState<Array<{ id: string; name: string; domain: string; city: string; state: string; listings: number | null }> | null>(null);
   useEffect(() => {
     setMcEnabled(!!marketcheck?.enabled);
     setMcSource(marketcheck?.source || "");
@@ -722,9 +728,42 @@ const TenantDetailsDrawer = ({
               <p className="text-[10px] text-muted-foreground mt-1">We auto-find this rooftop's MarketCheck dealer from the domain.</p>
             </div>
             <div>
-              <label className="block text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-1">MarketCheck dealer ID (optional)</label>
-              <input value={mcDealerId} onChange={(e) => setMcDealerId(e.target.value)} placeholder="e.g. 1035095 — only if auto-find fails"
+              <label className="block text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-1">MarketCheck dealer ID</label>
+              <input value={mcDealerId} onChange={(e) => setMcDealerId(e.target.value)} placeholder="The exact rooftop — use Find dealer below"
                 className="w-full h-9 rounded-md border border-border bg-background px-3 text-sm font-mono" />
+            </div>
+
+            {/* Find dealer — the reliable way to pin the exact rooftop. Search a
+                ZIP, pick the dealership, and its MarketCheck ID fills above. */}
+            <div className="rounded-md border border-dashed border-border bg-muted/20 p-2.5 space-y-2">
+              <p className="text-[11px] font-semibold text-foreground">Find dealer by ZIP</p>
+              <div className="flex items-center gap-2">
+                <input value={lkZip} onChange={(e) => setLkZip(e.target.value)} placeholder="e.g. 06120" inputMode="numeric"
+                  className="w-28 h-9 rounded-md border border-border bg-background px-3 text-sm font-mono" />
+                <button
+                  onClick={async () => { setLkLoading(true); const r = await onLookup({ zip: lkZip.trim() }); setLkResults(r); setLkLoading(false); if (r.length === 0) toast.error("No MarketCheck dealers found for that ZIP."); }}
+                  disabled={lkLoading || !lkZip.trim()}
+                  className="h-9 px-3 rounded-md bg-primary text-primary-foreground text-xs font-semibold disabled:opacity-50"
+                >
+                  {lkLoading ? "Searching…" : "Find dealer"}
+                </button>
+              </div>
+              {lkResults && lkResults.length > 0 && (
+                <div className="max-h-56 overflow-y-auto divide-y divide-border rounded-md border border-border bg-card">
+                  {lkResults.map((d) => (
+                    <button
+                      key={d.id}
+                      onClick={() => { setMcDealerId(d.id); setMcSource(d.domain || mcSource); toast.success(`Selected ${d.name || d.id}`); }}
+                      className={`w-full text-left px-2.5 py-2 hover:bg-muted ${mcDealerId === d.id ? "bg-emerald-50" : ""}`}
+                    >
+                      <p className="text-[12px] font-semibold text-foreground truncate">{d.name || "(unnamed dealer)"}</p>
+                      <p className="text-[10px] text-muted-foreground truncate font-mono">
+                        id {d.id}{d.domain ? ` · ${d.domain}` : ""}{d.city ? ` · ${d.city}, ${d.state}` : ""}{d.listings != null ? ` · ${d.listings} cars` : ""}
+                      </p>
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
             <div className="grid grid-cols-3 gap-2">
               <div>

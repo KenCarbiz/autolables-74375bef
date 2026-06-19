@@ -79,10 +79,20 @@ const toSourceHost = (raw: string): string => {
 };
 
 interface MCListing {
-  vin?: string; price?: number; stock_no?: string; miles?: number;
+  vin?: string; price?: number | string; msrp?: number | string;
+  stock_no?: string; miles?: number;
   inventory_type?: string; is_certified?: boolean; vdp_url?: string;
   build?: { year?: number; make?: string; model?: string; trim?: string };
+  // deno-lint-ignore no-explicit-any
+  dealer?: any;
 }
+
+// Coerce a MarketCheck price (sometimes a numeric string) to a sane number.
+const toPrice = (v: unknown): number | null => {
+  if (v == null) return null;
+  const n = typeof v === "number" ? v : parseFloat(String(v).replace(/[^0-9.]/g, ""));
+  return sane(n) ? n : null;
+};
 
 interface SyncConfig {
   tenant_id: string; allowed: boolean; enabled: boolean; source: string;
@@ -123,7 +133,7 @@ serve(async (req) => {
 
   const admin = createClient(supabaseUrl, serviceKey, { auth: { persistSession: false, autoRefreshToken: false } });
 
-  let body: { tenant_id?: string; force?: boolean } = {};
+  let body: { tenant_id?: string; force?: boolean; lookup?: boolean; zip?: string; state?: string } = {};
   try { body = await req.json(); } catch { /* empty body OK */ }
 
   // ── Auth gate: service-role (cron) or a tenant admin/member JWT (manual). ──
@@ -141,6 +151,28 @@ serve(async (req) => {
         .select("tenant_id").eq("user_id", userId).eq("tenant_id", body.tenant_id).maybeSingle();
       if (!membership) return json(403, { error: "not a member of this tenant" });
     }
+  }
+
+  // ── Dealer lookup: list MarketCheck dealers in an area so the operator can
+  // find the right rooftop's dealer_id (Dealers Search only filters by geo). ──
+  if (body.lookup) {
+    const zip = (body.zip || "").trim();
+    const state = (body.state || "").trim();
+    if (!zip && !state) return json(400, { error: "zip_or_state_required" });
+    const geo = zip ? `&zip=${encodeURIComponent(zip)}&radius=25` : `&state=${encodeURIComponent(state)}`;
+    const url = `${DEALERS_ENDPOINT}?api_key=${encodeURIComponent(MC_KEY)}&rows=50${geo}`;
+    const res = await fetch(url, { signal: AbortSignal.timeout(20000) });
+    if (!res.ok) return json(200, { ok: false, http: res.status, dealers: [] });
+    // deno-lint-ignore no-explicit-any
+    const data: any = await res.json().catch(() => ({}));
+    // deno-lint-ignore no-explicit-any
+    const dealers = (Array.isArray(data?.dealers) ? data.dealers : []).map((d: any) => ({
+      id: String(d.id ?? d.dealer_id ?? d.mc_dealer_id ?? ""),
+      name: d.seller_name ?? d.name ?? "",
+      domain: toSourceHost(d.source ?? d.inventory_url ?? d.website ?? ""),
+      city: d.city ?? "", state: d.state ?? "", listings: d.listing_count ?? d.inventory_count ?? null,
+    })).filter((d: { id: string }) => d.id);
+    return json(200, { ok: true, http: res.status, dealers });
   }
 
   // ── Pick configs: allowed + enabled + source. Manual run targets one tenant
@@ -228,7 +260,8 @@ serve(async (req) => {
             const vin = normVin(l.vin);
             if (!vin || vin.length < 11) continue;
             tenantSeen++; seen++;
-            const price = sane(l.price) ? (l.price as number) : null;
+            const price = toPrice(l.price);
+            const stockNo = String(l.stock_no ?? (l.dealer && l.dealer.stock_no) ?? "").trim();
             const b = l.build || {};
             const ymm = [b.year, b.make, b.model].filter(Boolean).join(" ") || null;
             const condition = l.is_certified ? "cpo" : (l.inventory_type === "new" ? "new" : "used");
@@ -242,13 +275,13 @@ serve(async (req) => {
             if (vf) {
               await admin.from("vehicle_files").update({
                 year: String(b.year || ""), make: b.make || "", model: b.model || "",
-                trim: b.trim || "", stock_number: l.stock_no || "", condition, mileage: miles,
+                trim: b.trim || "", stock_number: stockNo, condition, mileage: miles,
               }).eq("id", vf.id);
             } else {
               const { error } = await admin.from("vehicle_files").insert({
                 tenant_id: cfg.tenant_id, vin,
                 year: String(b.year || ""), make: b.make || "", model: b.model || "",
-                trim: b.trim || "", stock_number: l.stock_no || "", condition, mileage: miles,
+                trim: b.trim || "", stock_number: stockNo, condition, mileage: miles,
               });
               if (!error) { tenantNew++; newVehicles++; }
             }
