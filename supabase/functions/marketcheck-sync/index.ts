@@ -143,13 +143,19 @@ serve(async (req) => {
     const { data: ures, error: uerr } = await admin.auth.getUser(auth);
     const userId = ures?.user?.id;
     if (uerr || !userId) return json(401, { error: "authentication required" });
-    if (!body.tenant_id) return json(400, { error: "tenant_id required" });
     const { data: isAdmin } = await admin.from("user_roles")
       .select("role").eq("user_id", userId).eq("role", "admin").maybeSingle();
-    if (!isAdmin) {
-      const { data: membership } = await admin.from("tenant_members")
-        .select("tenant_id").eq("user_id", userId).eq("tenant_id", body.tenant_id).maybeSingle();
-      if (!membership) return json(403, { error: "not a member of this tenant" });
+    // A global dealer lookup is not tenant-scoped — it just searches MarketCheck
+    // by geography, so it requires a platform admin but no tenant_id/membership.
+    if (body.lookup) {
+      if (!isAdmin) return json(403, { error: "admin only" });
+    } else {
+      if (!body.tenant_id) return json(400, { error: "tenant_id required" });
+      if (!isAdmin) {
+        const { data: membership } = await admin.from("tenant_members")
+          .select("tenant_id").eq("user_id", userId).eq("tenant_id", body.tenant_id).maybeSingle();
+        if (!membership) return json(403, { error: "not a member of this tenant" });
+      }
     }
   }
 
