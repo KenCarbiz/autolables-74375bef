@@ -145,7 +145,7 @@ const toSourceHost = (raw: string): string => {
 
 interface MCListing {
   vin?: string; price?: number | string; msrp?: number | string;
-  stock_no?: string; miles?: number;
+  stock_no?: string; miles?: number; source?: string;
   inventory_type?: string; is_certified?: boolean; vdp_url?: string;
   build?: { year?: number; make?: string; model?: string; trim?: string };
   // deno-lint-ignore no-explicit-any
@@ -157,6 +157,47 @@ const toPrice = (v: unknown): number | null => {
   if (v == null) return null;
   const n = typeof v === "number" ? v : parseFloat(String(v).replace(/[^0-9.]/g, ""));
   return sane(n) ? n : null;
+};
+
+// ── Rooftop ownership validation ───────────────────────────────────────────
+// A single mc_dealer_id can span many rooftops across states, so a pull MUST be
+// validated: each listing advertises a source domain (and a dealer state); we
+// keep only cars whose domain matches the dealer's configured website (or, when
+// no domain signal exists, whose state matches) and reject the rest.
+const listingHosts = (l: MCListing): string[] => {
+  const out: string[] = [];
+  // deno-lint-ignore no-explicit-any
+  const d: any = l?.dealer || {};
+  for (const v of [l.source, l.vdp_url, d.website, d.source, d.inventory_url]) {
+    const h = toSourceHost(String(v || ""));
+    if (h) out.push(h);
+  }
+  return out;
+};
+// deno-lint-ignore no-explicit-any
+const listingState = (l: MCListing): string => String((l?.dealer as any)?.state || "").trim().toUpperCase();
+
+type Ownership = "match" | "mismatch" | "unknown";
+const classifyListing = (l: MCListing, domain: string, state: string): Ownership => {
+  const hosts = listingHosts(l);
+  if (domain) {
+    if (hosts.includes(domain)) return "match";
+    if (hosts.length > 0) return "mismatch";   // belongs to a different domain
+  }
+  const st = listingState(l);
+  if (state && st) return st === state ? "match" : "mismatch";
+  return "unknown";
+};
+// Fraction of a feed's DECIDED listings (match + mismatch) that are owned. A
+// feed with no domain/state signal at all scores 1 (can't disprove ownership).
+const feedPurity = (listings: MCListing[], domain: string, state: string): number => {
+  let match = 0, mismatch = 0;
+  for (const l of listings) {
+    const c = classifyListing(l, domain, state);
+    if (c === "match") match++; else if (c === "mismatch") mismatch++;
+  }
+  const decided = match + mismatch;
+  return decided === 0 ? 1 : match / decided;
 };
 
 interface SyncConfig {
@@ -299,23 +340,29 @@ serve(async (req) => {
         if (!latestWebsite.has(v)) latestWebsite.set(v, r.advertised_price);
       }
 
-      // Resolve the dealer's MarketCheck dealer_id: a manual override wins;
-      // otherwise look it up by the dealer's area + exact domain match.
+      // Read the dealer profile once: state backstops ownership validation, zip
+      // helps resolve the rooftop when nothing is saved.
+      const { data: prof } = await admin.from("dealer_profiles").select("settings").eq("tenant_id", cfg.tenant_id).maybeSingle();
+      const pset = (prof?.settings || {}) as Record<string, string>;
+      const dealerState = (pset.dealer_state || pset.doc_fee_state || "").trim().toUpperCase();
+
+      // The directory dealer_id is a DIFFERENT id space than the syndication
+      // mc_dealer_id, so passing it as mc_dealer_id silently matches a different
+      // store in another state. The reliable single-rooftop scope is the website
+      // domain (source=). A manual id is kept only as a low-priority, validated
+      // candidate. If no domain is saved, fall back to resolving by area.
       let dealerId = (cfg.dealer_id || "").trim();
       let resolveInfo: { id: string | null; found: number; status: number; matchedName?: string | null } | null = null;
-      if (!dealerId) {
-        const { data: prof } = await admin.from("dealer_profiles").select("settings").eq("tenant_id", cfg.tenant_id).maybeSingle();
-        const s = (prof?.settings || {}) as Record<string, string>;
-        const zip = s.dealer_zip || s.dealer_postal_code || "";
-        const state = s.dealer_state || s.doc_fee_state || "";
-        resolveInfo = await resolveDealerId(source, zip, state);
+      if (!dealerId && !source) {
+        const zip = pset.dealer_zip || pset.dealer_postal_code || "";
+        resolveInfo = await resolveDealerId(source, zip, dealerState);
         dealerId = resolveInfo.id || "";
       }
-      if (!dealerId) {
+      if (!dealerId && !source) {
         diagnostics.push({
           tenant_id: cfg.tenant_id, source, dealers_in_area: resolveInfo?.found ?? 0,
           dealers_http: resolveInfo?.status ?? null, error: "no_dealer_id",
-          note: `No MarketCheck dealer in the area matched "${source}". Set the dealership's ZIP in Branding & Setup, or paste the MarketCheck dealer ID for this rooftop.`,
+          note: `No MarketCheck rooftop matched. Set the dealership's website domain (preferred) or ZIP in Branding & Setup.`,
         });
         continue;
       }
@@ -325,62 +372,79 @@ serve(async (req) => {
       let httpStatus = 0;
 
       const attempts: Array<Record<string, unknown>> = [];
-      const hits: Array<{ param: string; value: string; r: { listings: MCListing[]; numFound: number; http: number } }> = [];
+      const hits: Array<{ param: string; value: string; r: { listings: MCListing[]; numFound: number; http: number }; purity: number }> = [];
+      // Validate every feed against the dealer's domain/state. A feed scoped by
+      // source= is trusted (the API already filtered to the domain); an id-based
+      // feed must be predominantly THIS rooftop's cars or it's rejected as a
+      // wrong/over-broad id match (e.g. a directory id colliding in mc id space).
+      const recordHit = (param: string, value: string, r: { listings: MCListing[]; numFound: number; http: number }, label: string) => {
+        const purity = feedPurity(r.listings, source, dealerState);
+        attempts.push({ feed: label, param, id: value, http: r.http, num_found: r.numFound, got: r.listings.length, purity: Math.round(purity * 100) / 100 });
+        const trusted = param === "source";
+        if (r.listings.length > 0 && (trusted || purity >= 0.6)) hits.push({ param, value, r, purity });
+      };
 
-      // 1) Reuse the identifier that worked last time (cached in last_status) —
-      // one call instead of the whole probe. Metered plans charge per call.
+      // 1) Reuse the validated identifier from last run — one call. A contaminated
+      // id can't survive (recordHit re-validates it).
       const cached = (cfg.last_status || {}) as { mc_param?: string; mc_value?: string };
       if (cached.mc_param && cached.mc_value) {
         const r = await syndPage(cached.mc_param, cached.mc_value, synRows, 0);
-        attempts.push({ feed: "syndication(cached)", param: cached.mc_param, id: cached.mc_value, http: r.http, num_found: r.numFound, got: r.listings.length });
-        if (r.listings.length > 0) hits.push({ param: cached.mc_param, value: cached.mc_value, r });
+        recordHit(cached.mc_param, cached.mc_value, r, "syndication(cached)");
       }
 
-      // 2) Full probe only when the cached identifier didn't answer: resolve the
-      // dealer record (store name + any mc_* ids), then try each id-param against
-      // the saved id + mc_* ids, plus source=<domain>. Keep the largest result.
+      // 2) Full probe when no validated cached hit: source=<domain> first (the
+      // reliable single-rooftop scope), then any saved/resolved id as a
+      // validated fallback.
       let mc: { ids: string[]; name: string; listingCount: number | null; http: number } = { ids: [], name: "", listingCount: null, http: 0 };
       let sample = { listings: [] as MCListing[], numFound: 0, http: 0 };
       if (hits.length === 0) {
-        mc = await resolveMcIds(dealerId);
-        const idVals = [...new Set([dealerId, ...mc.ids])].filter(Boolean);
-        const probes: Array<{ param: string; value: string }> = [];
-        for (const v of idVals) for (const p of SYND_ID_PARAMS) probes.push({ param: p, value: v });
-        if (source) probes.push({ param: "source", value: source });
-        for (const p of probes) {
-          const r = await syndPage(p.param, p.value, synRows, 0);
-          attempts.push({ feed: "syndication", param: p.param, id: p.value, http: r.http, num_found: r.numFound, got: r.listings.length });
-          if (r.listings.length > 0) hits.push({ param: p.param, value: p.value, r });
+        if (source) {
+          const r = await syndPage("source", source, synRows, 0);
+          recordHit("source", source, r, "syndication");
         }
-        // One Inventory Search call as a diagnostic ONLY when nothing else
-        // answered (it returns a ~10-row sample with no price/stock).
+        if (hits.length === 0 && dealerId) {
+          mc = await resolveMcIds(dealerId);
+          const idVals = [...new Set([dealerId, ...mc.ids])].filter(Boolean);
+          for (const v of idVals) for (const p of SYND_ID_PARAMS) {
+            const r = await syndPage(p, v, synRows, 0);
+            recordHit(p, v, r, "syndication");
+          }
+        }
         if (hits.length === 0) {
-          sample = await mcFetch(SEARCH_ENDPOINT, `dealer_id=${encodeURIComponent(dealerId)}&rows=${ROWS}&start=0`);
+          sample = await mcFetch(SEARCH_ENDPOINT, `dealer_id=${encodeURIComponent(dealerId || source)}&rows=${ROWS}&start=0`);
           attempts.push({ feed: "search(sample)", param: "dealer_id", id: dealerId, http: sample.http, num_found: sample.numFound, got: sample.listings.length });
         }
       }
 
-      hits.sort((a, b) => (b.r.numFound || b.r.listings.length) - (a.r.numFound || a.r.listings.length));
+      // Prefer the source=<domain> scope, then highest purity, then largest count.
+      hits.sort((a, b) => {
+        const sc = (b.param === "source" ? 1 : 0) - (a.param === "source" ? 1 : 0);
+        if (sc !== 0) return sc;
+        if (b.purity !== a.purity) return b.purity - a.purity;
+        return (b.r.numFound || b.r.listings.length) - (a.r.numFound || a.r.listings.length);
+      });
       const best = hits[0] || null;
       const chosen: { param: string; value: string } | null = best ? { param: best.param, value: best.value } : null;
       const firstPage = best ? best.r : { listings: [] as MCListing[], numFound: 0, http: 0 };
       httpStatus = best ? firstPage.http : ((attempts[0]?.http as number) ?? 0);
       const probe = {
-        chosen: chosen ? { feed: "syndication", param: chosen.param, id: chosen.value } : null,
-        sample_only: !best && sample.listings.length > 0,
+        chosen: chosen ? { feed: "syndication", param: chosen.param, id: chosen.value, purity: best?.purity } : null,
         mc_ids: mc.ids, dealer_record: mc.name, dealer_listing_count: mc.listingCount,
         attempts,
       };
-      // No syndication feed answered → ingest nothing (never store the stripped
-      // search sample, and never let it prune the real inventory). Say why.
+      // No VALIDATED feed → ingest nothing. Distinguish "cars came back but none
+      // were this rooftop" (wrong/over-broad id) from "no cars at all".
       if (!chosen) {
+        const contaminated = attempts.some((a) => (a.got as number) > 0 && a.feed !== "search(sample)");
         diagnostics.push({
           tenant_id: cfg.tenant_id, source, dealer_id: dealerId,
           dealer_record: mc.name, dealer_listing_count: mc.listingCount, mc_ids: mc.ids,
-          error: sample.listings.length > 0 ? "search_sample_only" : "no_listings", attempts,
-          note: sample.listings.length > 0
-            ? "Only the Inventory Search analytics sample answered (no price/stock). The Dealership Inventory Syndication feed returned no owned cars for this rooftop — the MarketCheck key most likely lacks the Dealership Inventory Syndication entitlement, or the identifier is wrong. No cars ingested."
-            : "No MarketCheck feed returned cars. Verify the dealer id/domain and the key's syndication entitlement.",
+          error: contaminated ? "no_owned_match" : (sample.listings.length > 0 ? "search_sample_only" : "no_listings"), attempts,
+          note: contaminated
+            ? `The syndication feed returned cars, but none matched this rooftop's domain (${source || "unset"})${dealerState ? ` or state (${dealerState})` : ""} — the saved dealer ID points to a different/over-broad dealer. Set the dealership's website domain in Branding & Setup so the pull scopes by source=.`
+            : sample.listings.length > 0
+              ? "Only the Inventory Search analytics sample answered (no price/stock). The syndication feed returned no owned cars — the key may lack the syndication entitlement."
+              : "No MarketCheck feed returned cars. Verify the website domain and the key's syndication entitlement.",
         });
         continue;
       }
@@ -406,6 +470,9 @@ serve(async (req) => {
             if (tenantSeen >= cfg.max_vehicles) break pages;
             const vin = normVin(l.vin);
             if (!vin || vin.length < 11) continue;
+            // Drop any car that positively belongs to a different domain/state —
+            // never ingest another dealer's vehicle into this tenant.
+            if (classifyListing(l, source, dealerState) === "mismatch") continue;
             tenantSeen++; seen++;
             liveVins.add(vin);
             const price = toPrice(l.price);
