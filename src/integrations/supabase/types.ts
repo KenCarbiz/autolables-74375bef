@@ -2099,6 +2099,7 @@ export type Database = {
           factory_sticker_url: string | null
           features: Json
           feed_source: string | null
+          hero_image_url: string | null
           id: string
           install_token: string
           key_specs: Json
@@ -2116,6 +2117,7 @@ export type Database = {
           scrape_source_url: string | null
           service_records: Json
           slug: string
+          source_url: string | null
           status: string
           sticker_snapshot: Json
           store_id: string
@@ -2143,6 +2145,7 @@ export type Database = {
           factory_sticker_url?: string | null
           features?: Json
           feed_source?: string | null
+          hero_image_url?: string | null
           id?: string
           install_token?: string
           key_specs?: Json
@@ -2160,6 +2163,7 @@ export type Database = {
           scrape_source_url?: string | null
           service_records?: Json
           slug: string
+          source_url?: string | null
           status?: string
           sticker_snapshot?: Json
           store_id: string
@@ -2187,6 +2191,7 @@ export type Database = {
           factory_sticker_url?: string | null
           features?: Json
           feed_source?: string | null
+          hero_image_url?: string | null
           id?: string
           install_token?: string
           key_specs?: Json
@@ -2204,6 +2209,7 @@ export type Database = {
           scrape_source_url?: string | null
           service_records?: Json
           slug?: string
+          source_url?: string | null
           status?: string
           sticker_snapshot?: Json
           store_id?: string
@@ -2813,6 +2819,7 @@ export type Database = {
           factory_sticker_url: string | null
           features: Json
           feed_source: string | null
+          hero_image_url: string | null
           id: string
           install_token: string
           key_specs: Json
@@ -2830,6 +2837,7 @@ export type Database = {
           scrape_source_url: string | null
           service_records: Json
           slug: string
+          source_url: string | null
           status: string
           sticker_snapshot: Json
           store_id: string
