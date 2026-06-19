@@ -54,9 +54,10 @@ export default function RecallBanner({
     );
   }
 
-  if (!result || dismissed) {
-    if (dismissed) return null;
-  }
+  if (dismissed) return null;
+  // No result yet (or the lookup returned null — e.g. recall API not
+  // configured / errored): render nothing rather than dereferencing null.
+  if (!result) return null;
 
   if (result.hasStopSale) {
     return (
