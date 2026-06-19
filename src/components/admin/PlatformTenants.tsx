@@ -30,7 +30,7 @@ const sourceBadge = (source: TenantSummary["source"]) => {
 };
 
 export const PlatformTenants = () => {
-  const { tenants, setTenantActive, createTenant, marketcheck, setTenantTier, saveMarketcheckConfig, lookupMarketcheckDealers, runMarketcheckNow, entitlements } = useAdminPlatform();
+  const { tenants, setTenantActive, createTenant, marketcheck, setTenantTier, saveMarketcheckConfig, lookupMarketcheckDealers, clearSyncedInventory, runMarketcheckNow, entitlements } = useAdminPlatform();
   const [q, setQ] = useState("");
   const [filter, setFilter] = useState<"all" | "active" | "inactive">("all");
   const [creating, setCreating] = useState(false);
@@ -199,6 +199,7 @@ export const PlatformTenants = () => {
           onSaveMarketcheck={(cfg) => saveMarketcheckConfig({ tenantId: editing.id, ...cfg })}
           onRunMarketcheck={() => runMarketcheckNow(editing.id)}
           onLookup={(args) => lookupMarketcheckDealers(args)}
+          onClearInventory={() => clearSyncedInventory(editing.id)}
         />
       )}
 
@@ -576,6 +577,7 @@ const TenantDetailsDrawer = ({
   onSaveMarketcheck,
   onRunMarketcheck,
   onLookup,
+  onClearInventory,
 }: {
   tenant: TenantSummary;
   onClose: () => void;
@@ -586,6 +588,7 @@ const TenantDetailsDrawer = ({
   onSaveMarketcheck: (cfg: { enabled: boolean; source: string; maxVehicles: number; frequency: string; dayOfWeek: number; runHour: number; dealerId?: string }) => Promise<boolean>;
   onRunMarketcheck: () => Promise<{ ok: boolean; message: string }>;
   onLookup: (args: { zip?: string; state?: string }) => Promise<Array<{ id: string; name: string; domain: string; city: string; state: string; listings: number | null }>>;
+  onClearInventory: () => Promise<{ ok: boolean; message: string }>;
 }) => {
   const [form, setForm] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
@@ -801,6 +804,12 @@ const TenantDetailsDrawer = ({
                 className="h-9 px-3 rounded-md border border-border text-xs font-semibold hover:bg-muted disabled:opacity-50"
               >
                 {mcRunning ? "Syncing…" : "Sync now"}
+              </button>
+              <button
+                onClick={async () => { if (!confirm("Remove all synced vehicles that don't have a deal? Cars with an addendum are kept. Use this to clear a wrong pull.")) return; const r = await onClearInventory(); toast[r.ok ? "success" : "error"](r.message); }}
+                className="h-9 px-3 rounded-md border border-destructive/40 text-destructive text-xs font-semibold hover:bg-destructive/10"
+              >
+                Clear synced inventory
               </button>
             </div>
             {marketcheck?.last_run_at && (

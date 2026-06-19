@@ -166,6 +166,19 @@ export const useAdminPlatform = () => {
     []
   );
 
+  // One-time clear of a tenant's un-dealt inventory (e.g. a wrong-dealer pull).
+  // Keeps any car that already has a deal.
+  const clearSyncedInventory = useCallback(
+    async (tenantId: string): Promise<{ ok: boolean; message: string }> => {
+      const { data, error } = await (supabase as any).rpc("admin_clear_synced_inventory", { _tenant_id: tenantId });
+      if (error) return { ok: false, message: error.message };
+      const r = (data || {}) as { listings_deleted?: number; files_deleted?: number };
+      await qc.invalidateQueries({ queryKey: ["admin", "marketcheck"] });
+      return { ok: true, message: `Cleared ${r.listings_deleted ?? 0} vehicles (kept anything with a deal)` };
+    },
+    [qc]
+  );
+
   // Run a single tenant's scrape now (bypasses the schedule).
   const runMarketcheckNow = useCallback(
     async (tenantId: string): Promise<{ ok: boolean; message: string }> => {
@@ -369,6 +382,7 @@ export const useAdminPlatform = () => {
     setMarketcheckAllowed,
     saveMarketcheckConfig,
     lookupMarketcheckDealers,
+    clearSyncedInventory,
     runMarketcheckNow,
     setTenantTier,
     setTenantActive,

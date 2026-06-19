@@ -205,6 +205,7 @@ serve(async (req) => {
     if (!source) continue;
     let tenantSeen = 0, tenantNew = 0, tenantPrices = 0;
     let firstWriteErr: string | null = null;
+    const liveVins = new Set<string>();
     try {
       // Latest website price per VIN — only append a snapshot when it moved.
       const { data: priceRows } = await admin.from("advertised_prices")
@@ -260,6 +261,7 @@ serve(async (req) => {
             const vin = normVin(l.vin);
             if (!vin || vin.length < 11) continue;
             tenantSeen++; seen++;
+            liveVins.add(vin);
             const price = toPrice(l.price);
             const stockNo = String(l.stock_no ?? (l.dealer && l.dealer.stock_no) ?? "").trim();
             const b = l.build || {};
@@ -276,12 +278,14 @@ serve(async (req) => {
               await admin.from("vehicle_files").update({
                 year: String(b.year || ""), make: b.make || "", model: b.model || "",
                 trim: b.trim || "", stock_number: stockNo, condition, mileage: miles,
+                feed_source: "marketcheck",
               }).eq("id", vf.id);
             } else {
               const { error } = await admin.from("vehicle_files").insert({
                 tenant_id: cfg.tenant_id, vin,
                 year: String(b.year || ""), make: b.make || "", model: b.model || "",
                 trim: b.trim || "", stock_number: stockNo, condition, mileage: miles,
+                feed_source: "marketcheck",
               });
               if (!error) { tenantNew++; newVehicles++; }
             }
@@ -293,7 +297,7 @@ serve(async (req) => {
               .select("id").eq("tenant_id", cfg.tenant_id).eq("vin", vin).maybeSingle();
             const patch: Record<string, unknown> = {
               tenant_id: cfg.tenant_id, vin, ymm, trim: b.trim || null,
-              mileage: miles || null, condition, price,
+              mileage: miles || null, condition, price, feed_source: "marketcheck",
             };
             if (vl) {
               const { error } = await admin.from("vehicle_listings").update(patch).eq("id", vl.id);
@@ -325,9 +329,20 @@ serve(async (req) => {
         }
       }
 
+      // Replace-on-sync: prune MarketCheck cars that left the feed. Only when we
+      // pulled the FULL inventory (not capped) and got a real result, so a
+      // partial/failed pull never deletes good cars.
+      let pruned: { listings_deleted?: number; files_deleted?: number } | null = null;
+      if (!firstWriteErr && liveVins.size > 0 && numFound > 0 && tenantSeen >= numFound) {
+        const { data: pr } = await admin.rpc("marketcheck_prune_inventory", {
+          _tenant_id: cfg.tenant_id, _live_vins: Array.from(liveVins),
+        });
+        pruned = (pr || null) as { listings_deleted?: number; files_deleted?: number } | null;
+      }
+
       tenantsSynced++;
-      const status = { ran_at: now.toISOString(), seen: tenantSeen, new_vehicles: tenantNew, prices_recorded: tenantPrices, dealer_id: dealerId, num_found: numFound, http: httpStatus };
-      diagnostics.push({ tenant_id: cfg.tenant_id, source, dealer_id: dealerId, matched_dealer: resolveInfo?.matchedName ?? "(manual id)", resolved: !cfg.dealer_id, num_found: numFound, http: httpStatus, seen: tenantSeen, listings_written: listingsUpserted, write_error: firstWriteErr });
+      const status = { ran_at: now.toISOString(), seen: tenantSeen, new_vehicles: tenantNew, prices_recorded: tenantPrices, dealer_id: dealerId, num_found: numFound, http: httpStatus, removed: pruned?.listings_deleted ?? 0 };
+      diagnostics.push({ tenant_id: cfg.tenant_id, source, dealer_id: dealerId, matched_dealer: resolveInfo?.matchedName ?? "(manual id)", resolved: !cfg.dealer_id, num_found: numFound, http: httpStatus, seen: tenantSeen, listings_written: listingsUpserted, removed: pruned?.listings_deleted ?? 0, write_error: firstWriteErr });
       await admin.from("marketcheck_sync_config")
         .update({ last_run_at: now.toISOString(), last_status: status })
         .eq("tenant_id", cfg.tenant_id);
