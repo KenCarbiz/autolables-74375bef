@@ -41,6 +41,8 @@ import {
   CheckCircle2,
   Truck,
   Building2,
+  ExternalLink,
+  Lock,
 } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
 import { useAuth } from "@/contexts/AuthContext";
@@ -53,6 +55,7 @@ import { toast } from "sonner";
 import Logo from "@/components/brand/Logo";
 
 import CommandPalette, { useCommandPalette } from "@/components/layout/CommandPalette";
+import { ALL_PRODUCTS, getSubscribedProducts } from "@/components/layout/AppSwitcher";
 import { VinScanContext, prefersLiveScanner } from "@/contexts/VinScanContext";
 import {
   DropdownMenu,
@@ -312,6 +315,9 @@ const AppShell = ({ children }: AppShellProps) => {
 
   const userInitial = user?.email?.[0]?.toUpperCase() || "U";
   const recentNotifications = entries.slice(-8).reverse();
+  // Autocurb family apps for the in-menu app switcher (lives inside the
+  // user dropdown rather than as a separate top-bar control).
+  const subscribedAppIds = getSubscribedProducts();
   const greeting = (() => {
     const h = new Date().getHours();
     if (h < 12) return "Good morning";
@@ -758,7 +764,7 @@ const AppShell = ({ children }: AppShellProps) => {
                     <ChevronDown className="hidden md:inline-block w-3 h-3 text-muted-foreground group-hover:text-foreground transition-colors" />
                   </button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-56">
+                <DropdownMenuContent align="end" className="w-64">
                   <DropdownMenuLabel>
                     <div>
                       <p className="text-sm font-medium">{user?.email || "Signed in"}</p>
@@ -766,6 +772,42 @@ const AppShell = ({ children }: AppShellProps) => {
                     </div>
                   </DropdownMenuLabel>
                   <DropdownMenuSeparator />
+
+                  {/* Autocurb Family app switcher */}
+                  <DropdownMenuLabel className="text-[10px] uppercase tracking-[0.16em] text-muted-foreground font-bold pt-1">
+                    Autocurb Family
+                  </DropdownMenuLabel>
+                  {ALL_PRODUCTS.map((product) => {
+                    const hasAccess = subscribedAppIds.includes(product.id);
+                    const isCurrent = product.id === "autolabels";
+                    const AppIcon = product.icon;
+                    return (
+                      <DropdownMenuItem
+                        key={product.id}
+                        disabled={!hasAccess}
+                        onClick={() => {
+                          if (!hasAccess || isCurrent) return;
+                          if (product.url.startsWith("http")) window.open(product.url, "_blank");
+                          else navigate(product.url);
+                        }}
+                        className={`gap-2 ${isCurrent ? "bg-accent" : ""} ${!hasAccess ? "opacity-50 cursor-not-allowed" : ""}`}
+                      >
+                        <span className={`w-5 h-5 rounded-md ${product.color} text-white flex items-center justify-center flex-shrink-0`}>
+                          <AppIcon className="w-3 h-3" />
+                        </span>
+                        <span className="flex-1 truncate text-sm">{product.shortName}</span>
+                        {isCurrent ? (
+                          <span className="text-[9px] bg-primary/10 text-primary px-1 py-0.5 rounded font-semibold flex-shrink-0">Current</span>
+                        ) : hasAccess ? (
+                          product.url.startsWith("http") ? <ExternalLink className="w-3 h-3 text-muted-foreground flex-shrink-0" /> : null
+                        ) : (
+                          <Lock className="w-3 h-3 text-muted-foreground flex-shrink-0" />
+                        )}
+                      </DropdownMenuItem>
+                    );
+                  })}
+                  <DropdownMenuSeparator />
+
                   <DropdownMenuItem onClick={handleManageBilling}>
                     <CreditCard className="w-3.5 h-3.5 mr-2" />
                     Manage billing
