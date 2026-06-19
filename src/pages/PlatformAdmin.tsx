@@ -7,7 +7,8 @@ import PlatformEntitlements from "@/components/admin/PlatformEntitlements";
 import PlatformAudit from "@/components/admin/PlatformAudit";
 import RecallRefreshTool from "@/components/admin/RecallRefreshTool";
 import BillingHandshakeDiagnostic from "@/components/admin/BillingHandshakeDiagnostic";
-import { Store, Users, Award, ShieldCheck, RefreshCw, CreditCard } from "lucide-react";
+import StripeConfigPanel from "@/components/admin/StripeConfigPanel";
+import { Store, Users, Award, ShieldCheck, RefreshCw, CreditCard, KeyRound } from "lucide-react";
 
 // ──────────────────────────────────────────────────────────────
 // PlatformAdmin — cross-tenant surfaces (Tenants, Members,
@@ -19,8 +20,8 @@ import { Store, Users, Award, ShieldCheck, RefreshCw, CreditCard } from "lucide-
 // whole route on isAdmin = true.
 // ──────────────────────────────────────────────────────────────
 
-type PlatformTab = "tenants" | "members" | "entitlements" | "audit" | "recalls" | "billing";
-const VALID: PlatformTab[] = ["tenants", "members", "entitlements", "audit", "recalls", "billing"];
+type PlatformTab = "tenants" | "members" | "entitlements" | "audit" | "recalls" | "billing" | "stripe";
+const VALID: PlatformTab[] = ["tenants", "members", "entitlements", "audit", "recalls", "billing", "stripe"];
 
 const TABS: { id: PlatformTab; label: string; icon: typeof Store }[] = [
   { id: "tenants",      label: "Tenants",      icon: Store },
@@ -29,6 +30,7 @@ const TABS: { id: PlatformTab; label: string; icon: typeof Store }[] = [
   { id: "audit",        label: "Platform Audit", icon: ShieldCheck },
   { id: "recalls",      label: "Recall refresh", icon: RefreshCw },
   { id: "billing",      label: "Billing handshake", icon: CreditCard },
+  { id: "stripe",       label: "Stripe config", icon: KeyRound },
 ];
 
 const PlatformAdmin = () => {
@@ -77,6 +79,7 @@ const PlatformAdmin = () => {
         {tab === "audit"        && <PlatformAudit />}
         {tab === "recalls"      && <RecallRefreshTool />}
         {tab === "billing"      && <BillingHandshakeDiagnostic />}
+        {tab === "stripe"       && <StripeConfigPanel />}
       </div>
     </div>
   );
