@@ -169,7 +169,10 @@ interface MCListing {
   vin?: string; price?: number | string; msrp?: number | string;
   stock_no?: string; miles?: number; source?: string;
   inventory_type?: string; is_certified?: boolean; vdp_url?: string;
-  build?: { year?: number; make?: string; model?: string; trim?: string };
+  exterior_color?: string; interior_color?: string;
+  build?: { year?: number; make?: string; model?: string; trim?: string;
+    engine?: string; transmission?: string; drivetrain?: string; fuel_type?: string;
+    body_type?: string; doors?: number; cylinders?: number; vehicle_type?: string };
   media?: { photo_links?: string[]; photo_links_cached?: string[] };
   // deno-lint-ignore no-explicit-any
   dealer?: any;
@@ -527,11 +530,11 @@ serve(async (req) => {
               // own page (Your Price / <Dealer> Deal).
               source_url: l.vdp_url || null,
             };
-            // First-pass photo from the feed; the crawler later upgrades this to
-            // the dealer's own og:image. Only set when present so we never null
-            // out a better image captured by a previous run.
-            const feedPhoto = l.media?.photo_links_cached?.[0] || l.media?.photo_links?.[0] || null;
-            if (feedPhoto) patch.hero_image_url = feedPhoto;
+            // First-pass photos from the feed; the crawler later upgrades the
+            // hero to the dealer's own og:image. Only set hero when present so we
+            // never null out a better image captured by a previous run.
+            const gallery: string[] = (l.media?.photo_links_cached?.length ? l.media.photo_links_cached : l.media?.photo_links) || [];
+            if (gallery[0]) patch.hero_image_url = gallery[0];
             if (vl) {
               const { error } = await admin.from("vehicle_listings").update(patch).eq("id", vl.id);
               if (!error) listingsUpserted++; else if (!firstWriteErr) firstWriteErr = error.message;
@@ -541,6 +544,24 @@ serve(async (req) => {
               });
               if (!error) listingsUpserted++; else if (!firstWriteErr) firstWriteErr = error.message;
             }
+
+            // Best-effort enrichment (full gallery + structured feed attributes),
+            // isolated so a not-yet-migrated column can never break the core
+            // listing write above.
+            try {
+              const mcAttrs = {
+                msrp: toPrice(l.msrp), exterior_color: l.exterior_color || null,
+                interior_color: l.interior_color || null,
+                engine: b.engine || null, transmission: b.transmission || null,
+                drivetrain: b.drivetrain || null, fuel_type: b.fuel_type || null,
+                body_type: b.body_type || null, doors: b.doors ?? null,
+                cylinders: b.cylinders ?? null, vehicle_type: b.vehicle_type || null,
+              };
+              const enrich: Record<string, unknown> = { mc_attributes: mcAttrs };
+              if (gallery.length) { enrich.photos = gallery; enrich.photo_count = gallery.length; }
+              await admin.from("vehicle_listings").update(enrich)
+                .eq("tenant_id", cfg.tenant_id).eq("vin", vin);
+            } catch { /* photos / mc_attributes columns may not be migrated yet */ }
 
             // 3) advertised_prices — website price snapshot on change.
             if (price != null) {

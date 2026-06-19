@@ -68,6 +68,8 @@ interface VehicleRow {
   warranty_info: WarrantyInfo | null;
   available_accessories: AvailableAccessory[] | null;
   hero_image_url: string | null;
+  photos: string[] | null;
+  mc_attributes: Record<string, unknown> | null;
   created_at: string;
   updated_at: string;
 }
@@ -112,6 +114,7 @@ const VehicleFile = () => {
     return q && (VALID_TABS as string[]).includes(q) ? (q as TabId) : "overview";
   })();
   const [tab, setTab] = useState<TabId>(initialTab);
+  const [imgIdx, setImgIdx] = useState(0);
 
   // Keep ?tab= in sync so deep-links + refreshes land on the same tab.
   useEffect(() => {
@@ -200,6 +203,8 @@ const VehicleFile = () => {
   ];
 
   const ready = readinessSummary(vehicle);
+  const gallery: string[] = (vehicle.photos && vehicle.photos.length ? vehicle.photos : (vehicle.hero_image_url ? [vehicle.hero_image_url] : []));
+  const safeImg = gallery.length ? Math.min(imgIdx, gallery.length - 1) : 0;
 
   return (
     <div className="p-4 lg:p-6 max-w-[1400px] mx-auto space-y-4 pb-24 lg:pb-6">
@@ -220,8 +225,17 @@ const VehicleFile = () => {
               vehicle.condition === "cpo" ? "from-violet-500/15 to-violet-600/5 text-violet-600" :
               "from-slate-400/15 to-slate-500/5 text-slate-500"
             }`}>
-              {vehicle.hero_image_url ? (
-                <img src={vehicle.hero_image_url} alt={vehicle.ymm || "vehicle"} className="w-full h-full object-cover" />
+              {gallery.length ? (
+                <div className="relative w-full h-full">
+                  <img src={gallery[safeImg]} alt={vehicle.ymm || "vehicle"} className="w-full h-full object-cover" />
+                  {gallery.length > 1 && (
+                    <>
+                      <button onClick={(e) => { e.stopPropagation(); setImgIdx((safeImg - 1 + gallery.length) % gallery.length); }} aria-label="Previous photo" className="absolute left-1.5 top-1/2 -translate-y-1/2 w-7 h-7 rounded-full bg-black/45 text-white flex items-center justify-center hover:bg-black/65 transition-colors"><ArrowLeft className="w-4 h-4" /></button>
+                      <button onClick={(e) => { e.stopPropagation(); setImgIdx((safeImg + 1) % gallery.length); }} aria-label="Next photo" className="absolute right-1.5 top-1/2 -translate-y-1/2 w-7 h-7 rounded-full bg-black/45 text-white flex items-center justify-center hover:bg-black/65 transition-colors"><ChevronRight className="w-4 h-4" /></button>
+                      <span className="absolute bottom-1.5 left-1.5 text-[10px] font-semibold px-1.5 py-0.5 rounded bg-black/55 text-white tabular-nums">{safeImg + 1} / {gallery.length}</span>
+                    </>
+                  )}
+                </div>
               ) : (
                 <Car className="w-16 h-16" strokeWidth={1.25} />
               )}
@@ -492,15 +506,22 @@ const OverviewPanel = ({ vehicle, onTab }: { vehicle: VehicleRow; onTab: (t: Tab
     { label: vehicle.status === "published" ? "Re-publish / Labels" : "Publish Vehicle", icon: Globe, onClick: () => onTab("labels") },
   ];
 
-  const equip: { label: string; value: string }[] = decoded
-    ? ([
-        ["Year", decoded.year], ["Make", decoded.make], ["Model", decoded.model],
-        ["Trim", decoded.trim], ["Body", decoded.bodyStyle], ["Engine", decoded.engine],
-        ["Fuel", decoded.fuelType],
-      ] as [string, unknown][])
-        .filter(([, v]) => v != null && String(v).trim() !== "")
-        .map(([label, v]) => ({ label, value: String(v) }))
-    : [];
+  // Prefer the richer MarketCheck feed attributes, falling back to the VIN
+  // decode for anything the feed didn't carry.
+  const mc = (vehicle.mc_attributes || {}) as Record<string, unknown>;
+  const equip = ([
+    ["Trim", decoded?.trim ?? null],
+    ["Engine", mc.engine ?? decoded?.engine ?? null],
+    ["Transmission", mc.transmission ?? null],
+    ["Drivetrain", mc.drivetrain ?? null],
+    ["Exterior", mc.exterior_color ?? null],
+    ["Interior", mc.interior_color ?? null],
+    ["Fuel", mc.fuel_type ?? decoded?.fuelType ?? null],
+    ["Body", mc.body_type ?? decoded?.bodyStyle ?? null],
+    ["MSRP", mc.msrp != null ? `$${Number(mc.msrp).toLocaleString()}` : null],
+  ] as [string, unknown][])
+    .filter(([, v]) => v != null && String(v).trim() !== "")
+    .map(([label, v]) => ({ label, value: String(v) }));
 
   return (
     <div className="space-y-4">
