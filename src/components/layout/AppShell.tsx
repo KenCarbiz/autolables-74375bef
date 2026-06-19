@@ -50,7 +50,7 @@ import { useAudit } from "@/contexts/AuditContext";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import Logo from "@/components/brand/Logo";
-import AppSwitcher from "@/components/layout/AppSwitcher";
+
 import CommandPalette, { useCommandPalette } from "@/components/layout/CommandPalette";
 import { VinScanContext, prefersLiveScanner } from "@/contexts/VinScanContext";
 import {
