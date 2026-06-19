@@ -16,6 +16,7 @@ import {
 import { formatPhone, composeName } from "@/components/addendum/CustomerInfoSection";
 import EmptyState from "@/components/ui/empty-state";
 import { InstallProofList } from "@/components/admin/InstallProofList";
+import { useVehicleSpecs } from "@/hooks/useVehicleSpecs";
 
 // ──────────────────────────────────────────────────────────────
 // VehicleFile — /vehicle-file/:id
@@ -473,6 +474,8 @@ const prettyAction = (a: string) =>
 const OverviewPanel = ({ vehicle, onTab }: { vehicle: VehicleRow; onTab: (t: TabId) => void }) => {
   const [events, setEvents] = useState<AuditEvent[]>([]);
   const [loadingEvents, setLoadingEvents] = useState(true);
+  const { fetchSpecs, loading: pullingSpecs } = useVehicleSpecs();
+  const [pulledOptions, setPulledOptions] = useState<string[]>([]);
 
   useEffect(() => {
     let cancelled = false;
@@ -545,7 +548,11 @@ const OverviewPanel = ({ vehicle, onTab }: { vehicle: VehicleRow; onTab: (t: Tab
   const mcStrArr = (v: unknown): string[] => Array.isArray(v)
     ? v.map((x) => typeof x === "string" ? x : (x && typeof x === "object" ? String((x as Record<string, unknown>).name ?? (x as Record<string, unknown>).label ?? (x as Record<string, unknown>).description ?? "") : String(x ?? ""))).filter(Boolean)
     : [];
-  const optionsList = Array.from(new Set([...mcStrArr(mc.options), ...mcStrArr(mc.features)]));
+  const optionsList = Array.from(new Set([...mcStrArr(mc.options), ...mcStrArr(mc.features), ...pulledOptions]));
+  const handlePullSpecs = async () => {
+    const r = await fetchSpecs({ vin: vehicle.vin, tenantId: vehicle.tenant_id, vehicleId: vehicle.id });
+    if (r) setPulledOptions([...r.options, ...r.features]);
+  };
   const dom = mc.dom_active != null ? Number(mc.dom_active) : (mc.dom != null ? Number(mc.dom) : null);
   const insights: { label: string; value: string; tone: "emerald" | "amber" | "neutral" }[] = [];
   if (mc.carfax_1_owner === true) insights.push({ label: "Ownership", value: "One owner", tone: "emerald" });
@@ -657,17 +664,39 @@ const OverviewPanel = ({ vehicle, onTab }: { vehicle: VehicleRow; onTab: (t: Tab
           </Card>
         )}
 
-        {/* Factory equipment & options — feeds the used-car window sticker */}
-        {optionsList.length > 0 && (
-          <Card title="Factory Equipment & Options" action={<span className="text-[11px] font-semibold text-muted-foreground">{optionsList.length}</span>}>
+        {/* Factory equipment & options — feeds the used-car window sticker.
+            The nightly feed carries a partial set; the Pull button decodes the
+            full factory build sheet for this VIN on demand. */}
+        <Card
+          title="Factory Equipment & Options"
+          action={optionsList.length > 0 ? <span className="text-[11px] font-semibold text-muted-foreground">{optionsList.length}</span> : undefined}
+        >
+          {optionsList.length > 0 ? (
             <div className="flex flex-wrap gap-1.5 max-h-56 overflow-auto">
               {optionsList.map((o) => (
                 <span key={o} className="inline-flex items-center text-[11px] font-medium px-2 py-0.5 rounded-full bg-muted text-foreground">{o}</span>
               ))}
             </div>
-            <button onClick={() => onTab("labels")} className="text-[11px] font-semibold text-blue-600 hover:underline mt-2.5">Use on window sticker →</button>
-          </Card>
-        )}
+          ) : (
+            <p className="text-sm text-muted-foreground">
+              No options on the inventory feed yet. Pull the full factory build sheet for
+              this VIN to list every installed option and standard feature.
+            </p>
+          )}
+          <div className="flex items-center gap-3 mt-2.5">
+            <button
+              onClick={handlePullSpecs}
+              disabled={pullingSpecs || !vehicle.vin}
+              className="text-[11px] font-semibold text-blue-600 hover:underline disabled:opacity-50 disabled:no-underline inline-flex items-center gap-1"
+            >
+              <Sparkles className="w-3 h-3" />
+              {pullingSpecs ? "Pulling…" : optionsList.length > 0 ? "Refresh factory options" : "Pull full factory options"}
+            </button>
+            {optionsList.length > 0 && (
+              <button onClick={() => onTab("labels")} className="text-[11px] font-semibold text-blue-600 hover:underline">Use on window sticker →</button>
+            )}
+          </div>
+        </Card>
 
         {/* Recall */}
         <RecallCard vehicle={vehicle} />

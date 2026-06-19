@@ -12,6 +12,7 @@ import { useVehicleListing } from "@/hooks/useVehicleListing";
 import { useRecallLookup } from "@/hooks/useRecallLookup";
 import RecallBanner from "@/components/addendum/RecallBanner";
 import { useVehiclePrefill, VehicleContextHeader } from "@/lib/vehiclePrefill";
+import { useVehicleSpecs } from "@/hooks/useVehicleSpecs";
 import { toast } from "sonner";
 import { PublishPriceGate } from "@/components/inventory/PublishPriceGate";
 import { PrePrintedStickerFrame } from "@/components/sticker/PrePrintedStickerFrame";
@@ -97,6 +98,16 @@ const UsedCarSticker = () => {
       return opts.length > 0 ? opts : [v.bodyStyle, v.drivetrain, v.fuelType, v.engine].filter(Boolean);
     });
   });
+
+  // On-demand full factory-options decode (merges into the equipment list).
+  const { fetchSpecs, loading: pullingSpecs } = useVehicleSpecs();
+  const handlePullSpecs = async () => {
+    const r = await fetchSpecs({ vin: vehicle.vin, tenantId: tenant?.id, vehicleId: prefill.vehicle?.id });
+    if (r) {
+      const opts = [...r.options, ...r.features];
+      if (opts.length) setEquipment((prev) => Array.from(new Set([...prev.filter(Boolean), ...opts])));
+    }
+  };
   // Generate proper tracking code: AC-{STORE}-{VIN6}-{TYPE}-{TIMESTAMP}
   const trackingCode = (() => {
     const storePrefix = (currentStore?.id || "STOR").slice(0, 4).toUpperCase();
@@ -491,6 +502,14 @@ const UsedCarSticker = () => {
 
           <CfgCard title="Equipment (one per line)">
             <textarea value={equipment.join("\n")} onChange={e => setEquipment(e.target.value.split("\n"))} placeholder={"Backup Camera\nBluetooth\nAlloy Wheels"} rows={5} className="w-full px-3 py-2 rounded-md border border-border bg-background text-sm outline-none resize-y" />
+            <button
+              onClick={handlePullSpecs}
+              disabled={pullingSpecs || vehicle.vin.length !== 17}
+              className="mt-2 h-8 px-3 rounded-md border border-border text-xs font-semibold text-blue-600 hover:bg-muted disabled:opacity-50 inline-flex items-center gap-1.5"
+            >
+              <Sparkles className="w-3.5 h-3.5" />
+              {pullingSpecs ? "Pulling…" : "Pull factory options from VIN"}
+            </button>
           </CfgCard>
 
           <CfgCard title="Description">
