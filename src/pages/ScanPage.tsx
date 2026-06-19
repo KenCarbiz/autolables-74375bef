@@ -47,7 +47,12 @@ const ScanPage = () => {
   const [stockNumber, setStockNumber] = useState("");
   const [condition, setCondition] = useState<"new" | "used" | null>(null);
   const [notes, setNotes] = useState("");
-  const [scannerOpen, setScannerOpen] = useState(false);
+  // Open the camera immediately when there's a camera to use — tapping Scan is
+  // meant to start scanning, not land on a form. Falls back to the manual VIN
+  // field (no camera, or the user closes the scanner) on devices without one.
+  const [scannerOpen, setScannerOpen] = useState(
+    () => typeof navigator !== "undefined" && !!navigator.mediaDevices?.getUserMedia
+  );
 
   // Decoded data
   const [decoded, setDecoded] = useState<{
@@ -65,10 +70,11 @@ const ScanPage = () => {
   const [showEquipment, setShowEquipment] = useState(false);
   const [added, setAdded] = useState(false);
 
-  // Auto-focus VIN input on mount
+  // Focus the VIN field whenever the camera isn't up (no camera, or the user
+  // closed the scanner) so manual entry is ready without an extra tap.
   useEffect(() => {
-    vinRef.current?.focus();
-  }, []);
+    if (!scannerOpen) vinRef.current?.focus();
+  }, [scannerOpen]);
 
   // Auto-decode when VIN reaches 17 chars
   useEffect(() => {
