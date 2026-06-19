@@ -2089,6 +2089,7 @@ export type Database = {
         Row: {
           available_accessories: Json
           certification: Json | null
+          closed_recall_count: number | null
           condition: string | null
           created_at: string
           created_by: string | null
@@ -2105,6 +2106,7 @@ export type Database = {
           key_specs: Json
           mc_attributes: Json
           mileage: number | null
+          open_recall_count: number | null
           payment_estimate: Json | null
           photo_count: number | null
           photos: Json
@@ -2112,9 +2114,12 @@ export type Database = {
           price: number | null
           published_at: string | null
           recall_check: Json | null
+          recall_checked_at: string | null
           recall_override_at: string | null
           recall_override_by: string | null
           recall_override_notes: string | null
+          recall_payload: Json | null
+          recall_status: string | null
           scrape_last_synced_at: string | null
           scrape_source_url: string | null
           service_records: Json
@@ -2137,6 +2142,7 @@ export type Database = {
         Insert: {
           available_accessories?: Json
           certification?: Json | null
+          closed_recall_count?: number | null
           condition?: string | null
           created_at?: string
           created_by?: string | null
@@ -2153,6 +2159,7 @@ export type Database = {
           key_specs?: Json
           mc_attributes?: Json
           mileage?: number | null
+          open_recall_count?: number | null
           payment_estimate?: Json | null
           photo_count?: number | null
           photos?: Json
@@ -2160,9 +2167,12 @@ export type Database = {
           price?: number | null
           published_at?: string | null
           recall_check?: Json | null
+          recall_checked_at?: string | null
           recall_override_at?: string | null
           recall_override_by?: string | null
           recall_override_notes?: string | null
+          recall_payload?: Json | null
+          recall_status?: string | null
           scrape_last_synced_at?: string | null
           scrape_source_url?: string | null
           service_records?: Json
@@ -2185,6 +2195,7 @@ export type Database = {
         Update: {
           available_accessories?: Json
           certification?: Json | null
+          closed_recall_count?: number | null
           condition?: string | null
           created_at?: string
           created_by?: string | null
@@ -2201,6 +2212,7 @@ export type Database = {
           key_specs?: Json
           mc_attributes?: Json
           mileage?: number | null
+          open_recall_count?: number | null
           payment_estimate?: Json | null
           photo_count?: number | null
           photos?: Json
@@ -2208,9 +2220,12 @@ export type Database = {
           price?: number | null
           published_at?: string | null
           recall_check?: Json | null
+          recall_checked_at?: string | null
           recall_override_at?: string | null
           recall_override_by?: string | null
           recall_override_notes?: string | null
+          recall_payload?: Json | null
+          recall_status?: string | null
           scrape_last_synced_at?: string | null
           scrape_source_url?: string | null
           service_records?: Json
@@ -2815,6 +2830,7 @@ export type Database = {
         Returns: {
           available_accessories: Json
           certification: Json | null
+          closed_recall_count: number | null
           condition: string | null
           created_at: string
           created_by: string | null
@@ -2831,6 +2847,7 @@ export type Database = {
           key_specs: Json
           mc_attributes: Json
           mileage: number | null
+          open_recall_count: number | null
           payment_estimate: Json | null
           photo_count: number | null
           photos: Json
@@ -2838,9 +2855,12 @@ export type Database = {
           price: number | null
           published_at: string | null
           recall_check: Json | null
+          recall_checked_at: string | null
           recall_override_at: string | null
           recall_override_by: string | null
           recall_override_notes: string | null
+          recall_payload: Json | null
+          recall_status: string | null
           scrape_last_synced_at: string | null
           scrape_source_url: string | null
           service_records: Json
