@@ -213,17 +213,6 @@ const classifyListing = (l: MCListing, domain: string, state: string): Ownership
   if (state && st) return st === state ? "match" : "mismatch";
   return "unknown";
 };
-// Fraction of a feed's DECIDED listings (match + mismatch) that are owned. A
-// feed with no domain/state signal at all scores 1 (can't disprove ownership).
-const feedPurity = (listings: MCListing[], domain: string, state: string): number => {
-  let match = 0, mismatch = 0;
-  for (const l of listings) {
-    const c = classifyListing(l, domain, state);
-    if (c === "match") match++; else if (c === "mismatch") mismatch++;
-  }
-  const decided = match + mismatch;
-  return decided === 0 ? 1 : match / decided;
-};
 
 interface SyncConfig {
   tenant_id: string; allowed: boolean; enabled: boolean; source: string;
@@ -405,10 +394,20 @@ serve(async (req) => {
       // feed must be predominantly THIS rooftop's cars or it's rejected as a
       // wrong/over-broad id match (e.g. a directory id colliding in mc id space).
       const recordHit = (param: string, value: string, r: { listings: MCListing[]; numFound: number; http: number }, label: string) => {
-        const purity = feedPurity(r.listings, source, dealerState);
-        attempts.push({ feed: label, param, id: value, http: r.http, num_found: r.numFound, got: r.listings.length, purity: Math.round(purity * 100) / 100 });
+        let match = 0, mismatch = 0;
+        for (const l of r.listings) {
+          const c = classifyListing(l, source, dealerState);
+          if (c === "match") match++; else if (c === "mismatch") mismatch++;
+        }
+        const decided = match + mismatch;
+        const purity = decided === 0 ? 0 : match / decided;
+        attempts.push({ feed: label, param, id: value, http: r.http, num_found: r.numFound, got: r.listings.length, match, mismatch, purity: Math.round(purity * 100) / 100 });
+        // source=<domain> is trusted (the API already scoped to the domain). Any
+        // id-based feed must show POSITIVE ownership evidence — at least one car
+        // that matches the domain/state and a clean majority — otherwise it's a
+        // wrong/over-broad id match and is rejected (no unverifiable ingest).
         const trusted = param === "source";
-        if (r.listings.length > 0 && (trusted || purity >= 0.6)) hits.push({ param, value, r, purity });
+        if (r.listings.length > 0 && (trusted || (match > 0 && purity >= 0.6))) hits.push({ param, value, r, purity });
       };
 
       // 1) Reuse the validated identifier from last run — one call. A contaminated
