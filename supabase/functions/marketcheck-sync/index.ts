@@ -164,6 +164,9 @@ interface SyncConfig {
   max_vehicles: number; frequency: string; day_of_week: number; run_hour: number;
   last_run_at: string | null;
   dealer_id?: string | null;
+  // The identifier that resolved this rooftop on the last run, cached so we can
+  // skip the multi-call probe (metered MarketCheck plans charge per call).
+  last_status?: { mc_param?: string; mc_value?: string } | null;
 }
 
 const makeSlug = (vin: string, ymm: string | undefined) => {
@@ -251,7 +254,7 @@ serve(async (req) => {
   // resolved dealer_id (a dealer chosen from the finder has an id but may have
   // no domain). Manual run targets one tenant and bypasses the schedule (force).
   // Cron runs all tenants due this hour. ──
-  const baseCols = "tenant_id, allowed, enabled, source, max_vehicles, frequency, day_of_week, run_hour, last_run_at";
+  const baseCols = "tenant_id, allowed, enabled, source, max_vehicles, frequency, day_of_week, run_hour, last_run_at, last_status";
   const mkQuery = (cols: string) => {
     let q = admin.from("marketcheck_sync_config").select(cols)
       .eq("allowed", true).eq("enabled", true);
@@ -321,27 +324,41 @@ serve(async (req) => {
       let numFound = 0;
       let httpStatus = 0;
 
-      // Look up the dealer record (gives the store name + any mc_* ids), then
-      // probe the syndication feed with each identifier param against the saved
-      // id and any mc_* ids, plus source=<domain>. Keep whichever returns the
-      // most owned cars. Every attempt is recorded for debuggability.
-      const mc = await resolveMcIds(dealerId);
-      const idVals = [...new Set([dealerId, ...mc.ids])].filter(Boolean);
-      const probes: Array<{ param: string; value: string }> = [];
-      for (const v of idVals) for (const p of SYND_ID_PARAMS) probes.push({ param: p, value: v });
-      if (source) probes.push({ param: "source", value: source });
-
       const attempts: Array<Record<string, unknown>> = [];
       const hits: Array<{ param: string; value: string; r: { listings: MCListing[]; numFound: number; http: number } }> = [];
-      for (const p of probes) {
-        const r = await syndPage(p.param, p.value, synRows, 0);
-        attempts.push({ feed: "syndication", param: p.param, id: p.value, http: r.http, num_found: r.numFound, got: r.listings.length });
-        if (r.listings.length > 0) hits.push({ param: p.param, value: p.value, r });
+
+      // 1) Reuse the identifier that worked last time (cached in last_status) —
+      // one call instead of the whole probe. Metered plans charge per call.
+      const cached = (cfg.last_status || {}) as { mc_param?: string; mc_value?: string };
+      if (cached.mc_param && cached.mc_value) {
+        const r = await syndPage(cached.mc_param, cached.mc_value, synRows, 0);
+        attempts.push({ feed: "syndication(cached)", param: cached.mc_param, id: cached.mc_value, http: r.http, num_found: r.numFound, got: r.listings.length });
+        if (r.listings.length > 0) hits.push({ param: cached.mc_param, value: cached.mc_value, r });
       }
-      // One Inventory Search call purely as a diagnostic signal (it only returns
-      // a ~10-row analytics sample with no price/stock — never ingested).
-      const sample = await mcFetch(SEARCH_ENDPOINT, `dealer_id=${encodeURIComponent(dealerId)}&rows=${ROWS}&start=0`);
-      attempts.push({ feed: "search(sample)", param: "dealer_id", id: dealerId, http: sample.http, num_found: sample.numFound, got: sample.listings.length });
+
+      // 2) Full probe only when the cached identifier didn't answer: resolve the
+      // dealer record (store name + any mc_* ids), then try each id-param against
+      // the saved id + mc_* ids, plus source=<domain>. Keep the largest result.
+      let mc: { ids: string[]; name: string; listingCount: number | null; http: number } = { ids: [], name: "", listingCount: null, http: 0 };
+      let sample = { listings: [] as MCListing[], numFound: 0, http: 0 };
+      if (hits.length === 0) {
+        mc = await resolveMcIds(dealerId);
+        const idVals = [...new Set([dealerId, ...mc.ids])].filter(Boolean);
+        const probes: Array<{ param: string; value: string }> = [];
+        for (const v of idVals) for (const p of SYND_ID_PARAMS) probes.push({ param: p, value: v });
+        if (source) probes.push({ param: "source", value: source });
+        for (const p of probes) {
+          const r = await syndPage(p.param, p.value, synRows, 0);
+          attempts.push({ feed: "syndication", param: p.param, id: p.value, http: r.http, num_found: r.numFound, got: r.listings.length });
+          if (r.listings.length > 0) hits.push({ param: p.param, value: p.value, r });
+        }
+        // One Inventory Search call as a diagnostic ONLY when nothing else
+        // answered (it returns a ~10-row sample with no price/stock).
+        if (hits.length === 0) {
+          sample = await mcFetch(SEARCH_ENDPOINT, `dealer_id=${encodeURIComponent(dealerId)}&rows=${ROWS}&start=0`);
+          attempts.push({ feed: "search(sample)", param: "dealer_id", id: dealerId, http: sample.http, num_found: sample.numFound, got: sample.listings.length });
+        }
+      }
 
       hits.sort((a, b) => (b.r.numFound || b.r.listings.length) - (a.r.numFound || a.r.listings.length));
       const best = hits[0] || null;
@@ -471,7 +488,7 @@ serve(async (req) => {
       }
 
       tenantsSynced++;
-      const status = { ran_at: now.toISOString(), seen: tenantSeen, new_vehicles: tenantNew, prices_recorded: tenantPrices, dealer_id: dealerId, num_found: numFound, http: httpStatus, removed: pruned?.listings_deleted ?? 0 };
+      const status = { ran_at: now.toISOString(), seen: tenantSeen, new_vehicles: tenantNew, prices_recorded: tenantPrices, dealer_id: dealerId, num_found: numFound, http: httpStatus, removed: pruned?.listings_deleted ?? 0, mc_param: chosen.param, mc_value: chosen.value };
       diagnostics.push({ tenant_id: cfg.tenant_id, source, dealer_id: dealerId, matched_dealer: resolveInfo?.matchedName ?? "(manual id)", resolved: !cfg.dealer_id, num_found: numFound, http: httpStatus, seen: tenantSeen, listings_written: listingsUpserted, removed: pruned?.listings_deleted ?? 0, write_error: firstWriteErr, ...probe });
       await admin.from("marketcheck_sync_config")
         .update({ last_run_at: now.toISOString(), last_status: status })
