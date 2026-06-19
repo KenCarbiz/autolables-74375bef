@@ -40,6 +40,7 @@ import { formatPhone } from "@/components/addendum/CustomerInfoSection";
 import { PublicLocaleProvider, usePublicLocale, fmt } from "@/lib/i18n/public";
 import PublicLanguageToggle from "@/components/layout/PublicLanguageToggle";
 import VehicleInsights from "@/components/listing/VehicleInsights";
+import MarketValueReport from "@/components/listing/MarketValueReport";
 import { listingOptions } from "@/lib/vehicleInsights";
 
 // ──────────────────────────────────────────────────────────────
@@ -299,6 +300,10 @@ const PublicListingBody = () => {
             breakdown is tappable so shoppers can see exactly what's
             in the number. */}
         <PriceBlock listing={listing} />
+
+        {/* Market value report — shopper-facing transparency: where this
+            price sits in the local market range. Self-hides without data. */}
+        <MarketValueReport listing={listing} />
 
         {/* Key specs grid — pulls from listing.key_specs */}
         <KeySpecs listing={listing} />
