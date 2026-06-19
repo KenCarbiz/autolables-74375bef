@@ -48,7 +48,7 @@ const ALL_PRODUCTS: PlatformProduct[] = [
   { id: "autolabels", name: "AutoLabels.io", shortName: "AutoLabels", mark: "LABELS", icon: FileText, url: "/dashboard",                          description: "Dealer labels, stickers & compliance",  color: "bg-primary" },
   { id: "autocurb",   name: "Autocurb",      shortName: "Autocurb",   mark: "CURB",   icon: Sparkles, url: "https://autocurb.io",                  description: "Inventory + lead routing (the mothership)", color: "bg-[#1E90FF]", logo: "/autocurb-logo.svg" },
   { id: "autoframe",  name: "AutoFrame",     shortName: "AutoFrame",  mark: "FRAME",  icon: Camera,   url: "https://autoframe.autolabels.io",     description: "Vehicle photography & background removal", color: "bg-sky-500" },
-  { id: "autovideo",  name: "AutoVideo",     shortName: "AutoVideo",  mark: "VIDEO",  icon: Video,    url: "https://autovideo.autolabels.io",     description: "Video walkarounds & MPI",               color: "bg-indigo-600" },
+  { id: "autovideo",  name: "AutoFilm",      shortName: "AutoFilm",   mark: "FILM",   icon: Video,    url: "https://autovideo.autolabels.io",     description: "Film walkarounds & MPI",                color: "bg-indigo-600" },
 ];
 
 const SUBSCRIPTION_KEY = "platform_subscriptions";
