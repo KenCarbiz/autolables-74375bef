@@ -1974,6 +1974,7 @@ export type Database = {
           deal_qr_token: string
           deal_status: string
           factory_equipment: Json
+          feed_source: string | null
           id: string
           make: string
           market_value: number
@@ -2010,6 +2011,7 @@ export type Database = {
           deal_qr_token?: string
           deal_status?: string
           factory_equipment?: Json
+          feed_source?: string | null
           id?: string
           make?: string
           market_value?: number
@@ -2046,6 +2048,7 @@ export type Database = {
           deal_qr_token?: string
           deal_status?: string
           factory_equipment?: Json
+          feed_source?: string | null
           id?: string
           make?: string
           market_value?: number
@@ -2095,6 +2098,7 @@ export type Database = {
           documents: Json
           factory_sticker_url: string | null
           features: Json
+          feed_source: string | null
           id: string
           install_token: string
           key_specs: Json
@@ -2138,6 +2142,7 @@ export type Database = {
           documents?: Json
           factory_sticker_url?: string | null
           features?: Json
+          feed_source?: string | null
           id?: string
           install_token?: string
           key_specs?: Json
@@ -2181,6 +2186,7 @@ export type Database = {
           documents?: Json
           factory_sticker_url?: string | null
           features?: Json
+          feed_source?: string | null
           id?: string
           install_token?: string
           key_specs?: Json
@@ -2559,6 +2565,10 @@ export type Database = {
         }
         Returns: string
       }
+      admin_clear_synced_inventory: {
+        Args: { _tenant_id: string }
+        Returns: Json
+      }
       admin_create_tenant: {
         Args: {
           _app_slug?: string
@@ -2761,6 +2771,7 @@ export type Database = {
           deal_qr_token: string
           deal_status: string
           factory_equipment: Json
+          feed_source: string | null
           id: string
           make: string
           market_value: number
@@ -2801,6 +2812,7 @@ export type Database = {
           documents: Json
           factory_sticker_url: string | null
           features: Json
+          feed_source: string | null
           id: string
           install_token: string
           key_specs: Json
@@ -2873,6 +2885,10 @@ export type Database = {
       mark_ready_for_signature: {
         Args: { _addendum_id: string; _version_label: string }
         Returns: undefined
+      }
+      marketcheck_prune_inventory: {
+        Args: { _live_vins: string[]; _tenant_id: string }
+        Returns: Json
       }
       merge_scraped_vdp: {
         Args: {
