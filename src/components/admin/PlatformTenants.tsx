@@ -606,6 +606,7 @@ const TenantDetailsDrawer = ({
   const [lkZip, setLkZip] = useState("");
   const [lkLoading, setLkLoading] = useState(false);
   const [lkResults, setLkResults] = useState<Array<{ id: string; name: string; domain: string; city: string; state: string; listings: number | null }> | null>(null);
+  const [lkFilter, setLkFilter] = useState("");
   useEffect(() => {
     setMcEnabled(!!marketcheck?.enabled);
     setMcSource(marketcheck?.source || "");
@@ -752,8 +753,19 @@ const TenantDetailsDrawer = ({
                 </button>
               </div>
               {lkResults && lkResults.length > 0 && (
+                <input
+                  value={lkFilter}
+                  onChange={(e) => setLkFilter(e.target.value)}
+                  placeholder={`Filter ${lkResults.length} dealers — type "harte"`}
+                  className="w-full h-8 rounded-md border border-border bg-background px-2.5 text-xs"
+                />
+              )}
+              {lkResults && lkResults.length > 0 && (
                 <div className="max-h-56 overflow-y-auto divide-y divide-border rounded-md border border-border bg-card">
-                  {lkResults.map((d) => (
+                  {lkResults.filter((d) => {
+                    const q = lkFilter.trim().toLowerCase();
+                    return !q || (d.name || "").toLowerCase().includes(q) || (d.domain || "").toLowerCase().includes(q);
+                  }).map((d) => (
                     <button
                       key={d.id}
                       onClick={() => { setMcDealerId(d.id); setMcSource(d.domain || mcSource); toast.success(`Selected ${d.name || d.id}`); }}
