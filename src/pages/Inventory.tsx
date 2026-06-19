@@ -727,8 +727,8 @@ const AddVehicleModal = ({ tenantId, userId, onClose, onCreated }: AddProps) => 
             <Car className="w-5 h-5 text-primary" />
             Add Vehicle
           </h2>
-          <button onClick={onClose} className="text-muted-foreground hover:text-foreground">
-            <X className="w-4 h-4" />
+          <button onClick={onClose} aria-label="Close" className="shrink-0 inline-flex items-center justify-center w-9 h-9 rounded-full text-muted-foreground hover:text-foreground hover:bg-muted active:scale-95 transition-colors">
+            <X className="w-5 h-5" />
           </button>
         </div>
 
@@ -931,8 +931,8 @@ const CsvImportModal = ({ tenantId, userId, onClose, onImported }: ImportProps) 
             <Upload className="w-5 h-5 text-primary" />
             CSV Import
           </h2>
-          <button onClick={onClose} className="text-muted-foreground hover:text-foreground">
-            <X className="w-4 h-4" />
+          <button onClick={onClose} aria-label="Close" className="shrink-0 inline-flex items-center justify-center w-9 h-9 rounded-full text-muted-foreground hover:text-foreground hover:bg-muted active:scale-95 transition-colors">
+            <X className="w-5 h-5" />
           </button>
         </div>
         <div className="rounded-lg bg-amber-50 border border-amber-200 p-3 text-xs text-amber-900 flex items-start gap-2">

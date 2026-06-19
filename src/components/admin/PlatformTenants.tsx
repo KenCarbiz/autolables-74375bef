@@ -431,8 +431,8 @@ const CreateTenantForm = ({ onClose, onCreate }: CreateFormProps) => {
     <form onSubmit={submit} className="rounded-xl border-2 border-primary bg-card p-4 shadow-lg space-y-3">
       <div className="flex items-center justify-between">
         <h3 className="text-sm font-bold text-foreground">Create a new tenant</h3>
-        <button type="button" onClick={onClose} className="text-muted-foreground hover:text-foreground">
-          <X className="w-4 h-4" />
+        <button type="button" onClick={onClose} aria-label="Close" className="shrink-0 inline-flex items-center justify-center w-9 h-9 rounded-full text-muted-foreground hover:text-foreground hover:bg-muted active:scale-95 transition-colors">
+          <X className="w-5 h-5" />
         </button>
       </div>
       <p className="text-[11px] text-muted-foreground">
@@ -678,7 +678,7 @@ const TenantDetailsDrawer = ({
             <h3 className="text-sm font-bold text-foreground">Dealership details</h3>
             <p className="text-[11px] text-muted-foreground">{tenant.name}</p>
           </div>
-          <button onClick={onClose} className="text-muted-foreground hover:text-foreground"><X className="w-4 h-4" /></button>
+          <button onClick={onClose} aria-label="Close" className="shrink-0 inline-flex items-center justify-center w-9 h-9 rounded-full text-muted-foreground hover:text-foreground hover:bg-muted active:scale-95 transition-colors"><X className="w-5 h-5" /></button>
         </div>
 
         {/* Plan tier — picking Compliance Pro turns on price verification +
