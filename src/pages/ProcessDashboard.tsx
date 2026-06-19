@@ -429,43 +429,68 @@ const ProcessDashboard = () => {
             </p>
           </div>
         ) : (
-          <div className="rounded-xl border border-border bg-card overflow-hidden">
-            <table className="w-full text-sm">
-              <thead className="bg-muted/40 text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
-                <tr>
-                  <th className="text-left px-4 py-2 font-bold">Signed</th>
-                  <th className="text-left px-4 py-2 font-bold">VIN</th>
-                  <th className="text-left px-4 py-2 font-bold">Signer</th>
-                  <th className="text-left px-4 py-2 font-bold">Hash</th>
-                  <th className="text-right px-4 py-2 font-bold">Defense</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border">
-                {signings.recent.map(r => (
-                  <tr key={r.id}>
-                    <td className="px-4 py-2.5 text-xs text-muted-foreground whitespace-nowrap">
-                      {r.signed_at ? new Date(r.signed_at).toLocaleString(undefined, {
-                        month: "short", day: "numeric", hour: "2-digit", minute: "2-digit",
-                      }) : "—"}
-                    </td>
-                    <td className="px-4 py-2.5 font-mono text-xs">{(r.vin || "").slice(-8)}</td>
-                    <td className="px-4 py-2.5 text-sm">{r.signer_name || "Buyer"}</td>
-                    <td className="px-4 py-2.5 font-mono text-[10px] text-muted-foreground truncate max-w-[160px]">
-                      {(r.content_hash || "").slice(0, 12)}…
-                    </td>
-                    <td className="px-4 py-2.5 text-right">
-                      <button
-                        onClick={() => navigate(`/compliance?vin=${encodeURIComponent(r.vin || "")}`)}
-                        className="inline-flex items-center gap-1.5 text-[11px] font-semibold px-2.5 h-7 rounded-md text-emerald-700 hover:bg-emerald-50"
-                      >
-                        <ShieldCheck className="w-3 h-3" /> Defend
-                      </button>
-                    </td>
+          <>
+            {/* Mobile: compact rows — signer + time, VIN, and a Defend exit.
+                The audit hash is forensic detail, kept off the phone glance. */}
+            <div className="md:hidden space-y-2">
+              {signings.recent.map(r => (
+                <div key={r.id} className="rounded-xl border border-border bg-card p-3 flex items-center justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold text-foreground truncate">{r.signer_name || "Buyer"}</p>
+                    <p className="text-[11px] text-muted-foreground mt-0.5 font-mono">
+                      …{(r.vin || "").slice(-8)}
+                      {r.signed_at ? ` · ${new Date(r.signed_at).toLocaleDateString(undefined, { month: "short", day: "numeric" })}` : ""}
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => navigate(`/compliance?vin=${encodeURIComponent(r.vin || "")}`)}
+                    className="shrink-0 inline-flex items-center gap-1.5 text-[11px] font-semibold px-2.5 h-8 rounded-md text-emerald-700 hover:bg-emerald-50"
+                  >
+                    <ShieldCheck className="w-3.5 h-3.5" /> Defend
+                  </button>
+                </div>
+              ))}
+            </div>
+
+            {/* Desktop: full audit table including the chain hash. */}
+            <div className="hidden md:block rounded-xl border border-border bg-card overflow-hidden">
+              <table className="w-full text-sm">
+                <thead className="bg-muted/40 text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
+                  <tr>
+                    <th className="text-left px-4 py-2 font-bold">Signed</th>
+                    <th className="text-left px-4 py-2 font-bold">VIN</th>
+                    <th className="text-left px-4 py-2 font-bold">Signer</th>
+                    <th className="text-left px-4 py-2 font-bold">Hash</th>
+                    <th className="text-right px-4 py-2 font-bold">Defense</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody className="divide-y divide-border">
+                  {signings.recent.map(r => (
+                    <tr key={r.id}>
+                      <td className="px-4 py-2.5 text-xs text-muted-foreground whitespace-nowrap">
+                        {r.signed_at ? new Date(r.signed_at).toLocaleString(undefined, {
+                          month: "short", day: "numeric", hour: "2-digit", minute: "2-digit",
+                        }) : "—"}
+                      </td>
+                      <td className="px-4 py-2.5 font-mono text-xs">{(r.vin || "").slice(-8)}</td>
+                      <td className="px-4 py-2.5 text-sm">{r.signer_name || "Buyer"}</td>
+                      <td className="px-4 py-2.5 font-mono text-[10px] text-muted-foreground truncate max-w-[160px]">
+                        {(r.content_hash || "").slice(0, 12)}…
+                      </td>
+                      <td className="px-4 py-2.5 text-right">
+                        <button
+                          onClick={() => navigate(`/compliance?vin=${encodeURIComponent(r.vin || "")}`)}
+                          className="inline-flex items-center gap-1.5 text-[11px] font-semibold px-2.5 h-7 rounded-md text-emerald-700 hover:bg-emerald-50"
+                        >
+                          <ShieldCheck className="w-3 h-3" /> Defend
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </>
         )}
       </section>
 
