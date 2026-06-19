@@ -518,19 +518,44 @@ const OverviewPanel = ({ vehicle, onTab }: { vehicle: VehicleRow; onTab: (t: Tab
   // Prefer the richer MarketCheck feed attributes, falling back to the VIN
   // decode for anything the feed didn't carry.
   const mc = (vehicle.mc_attributes || {}) as Record<string, unknown>;
+  const mpg = (mc.city_mpg != null || mc.highway_mpg != null)
+    ? `${mc.city_mpg ?? "—"} city / ${mc.highway_mpg ?? "—"} hwy`
+    : null;
   const equip = ([
     ["Trim", decoded?.trim ?? null],
     ["Engine", mc.engine ?? decoded?.engine ?? null],
+    ["Engine size", mc.engine_size ?? null],
+    ["Cylinders", mc.cylinders ?? null],
     ["Transmission", mc.transmission ?? null],
     ["Drivetrain", mc.drivetrain ?? null],
+    ["Fuel", mc.fuel_type ?? decoded?.fuelType ?? null],
+    ["Fuel economy", mpg],
     ["Exterior", mc.exterior_color ?? null],
     ["Interior", mc.interior_color ?? null],
-    ["Fuel", mc.fuel_type ?? decoded?.fuelType ?? null],
     ["Body", mc.body_type ?? decoded?.bodyStyle ?? null],
+    ["Doors", mc.doors ?? null],
+    ["Seating", mc.std_seating ?? null],
     ["MSRP", mc.msrp != null ? `$${Number(mc.msrp).toLocaleString()}` : null],
   ] as [string, unknown][])
     .filter(([, v]) => v != null && String(v).trim() !== "")
     .map(([label, v]) => ({ label, value: String(v) }));
+
+  // Market & history insights from the MarketCheck feed (one-owner, clean
+  // title, days-on-market, price movement, seller type).
+  const mcStrArr = (v: unknown): string[] => Array.isArray(v)
+    ? v.map((x) => typeof x === "string" ? x : (x && typeof x === "object" ? String((x as Record<string, unknown>).name ?? (x as Record<string, unknown>).label ?? (x as Record<string, unknown>).description ?? "") : String(x ?? ""))).filter(Boolean)
+    : [];
+  const optionsList = Array.from(new Set([...mcStrArr(mc.options), ...mcStrArr(mc.features)]));
+  const dom = mc.dom_active != null ? Number(mc.dom_active) : (mc.dom != null ? Number(mc.dom) : null);
+  const insights: { label: string; value: string; tone: "emerald" | "amber" | "neutral" }[] = [];
+  if (mc.carfax_1_owner === true) insights.push({ label: "Ownership", value: "One owner", tone: "emerald" });
+  if (mc.carfax_clean_title === true) insights.push({ label: "Title", value: "Clean title", tone: "emerald" });
+  if (mc.seller_type) { const st = String(mc.seller_type); insights.push({ label: "Seller", value: st.charAt(0).toUpperCase() + st.slice(1), tone: "neutral" }); }
+  if (dom != null && !Number.isNaN(dom)) insights.push({ label: "Days on market", value: `${dom} days`, tone: dom > 60 ? "amber" : "neutral" });
+  if (mc.price_change_percent != null && mc.price_change_percent !== "") {
+    const p = Number(mc.price_change_percent);
+    if (!Number.isNaN(p) && p !== 0) insights.push({ label: "Price change", value: `${p > 0 ? "+" : ""}${p.toFixed(1)}%`, tone: p < 0 ? "emerald" : "amber" });
+  }
 
   return (
     <div className="space-y-4">
@@ -616,6 +641,33 @@ const OverviewPanel = ({ vehicle, onTab }: { vehicle: VehicleRow; onTab: (t: Tab
             </p>
           )}
         </Card>
+
+        {/* Vehicle intelligence — MarketCheck market & history signals */}
+        {insights.length > 0 && (
+          <Card title="Vehicle Intelligence">
+            <div className="grid grid-cols-1 gap-1.5">
+              {insights.map((i) => (
+                <div key={i.label} className="flex items-center justify-between gap-3 text-sm">
+                  <span className="text-muted-foreground">{i.label}</span>
+                  <span className={`font-semibold text-right ${i.tone === "emerald" ? "text-emerald-600" : i.tone === "amber" ? "text-amber-600" : "text-foreground"}`}>{i.value}</span>
+                </div>
+              ))}
+            </div>
+            <p className="text-[10px] text-muted-foreground mt-2 pt-2 border-t border-border">From the MarketCheck feed. Re-run sync to refresh.</p>
+          </Card>
+        )}
+
+        {/* Factory equipment & options — feeds the used-car window sticker */}
+        {optionsList.length > 0 && (
+          <Card title="Factory Equipment & Options" action={<span className="text-[11px] font-semibold text-muted-foreground">{optionsList.length}</span>}>
+            <div className="flex flex-wrap gap-1.5 max-h-56 overflow-auto">
+              {optionsList.map((o) => (
+                <span key={o} className="inline-flex items-center text-[11px] font-medium px-2 py-0.5 rounded-full bg-muted text-foreground">{o}</span>
+              ))}
+            </div>
+            <button onClick={() => onTab("labels")} className="text-[11px] font-semibold text-blue-600 hover:underline mt-2.5">Use on window sticker →</button>
+          </Card>
+        )}
 
         {/* Recall */}
         <RecallCard vehicle={vehicle} />
