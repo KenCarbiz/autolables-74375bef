@@ -13,6 +13,8 @@ import { useRecallLookup } from "@/hooks/useRecallLookup";
 import RecallBanner from "@/components/addendum/RecallBanner";
 import { useVehiclePrefill, VehicleContextHeader } from "@/lib/vehiclePrefill";
 import { useVehicleSpecs } from "@/hooks/useVehicleSpecs";
+import { applicablePrograms } from "@/lib/dealerPrograms";
+import DealerProgramsSticker from "@/components/sticker/DealerProgramsSticker";
 import { toast } from "sonner";
 import { PublishPriceGate } from "@/components/inventory/PublishPriceGate";
 import { PrePrintedStickerFrame } from "@/components/sticker/PrePrintedStickerFrame";
@@ -245,6 +247,7 @@ const UsedCarSticker = () => {
           address: dealerAddress,
           city: currentStore?.city || "",
           state: currentStore?.state || "",
+          programs: applicablePrograms(settings.dealer_programs, "used", "packet"),
         },
         value_props: valueProps
           .filter(vp => vp.name.trim())
@@ -686,6 +689,9 @@ const UsedCarSticker = () => {
                     ))}
                   </div>
                 )}
+
+                {/* Dealer programs (FTC-structured value props) */}
+                <DealerProgramsSticker programs={applicablePrograms(settings.dealer_programs, "used", "sticker")} />
 
                 {/* Installed accessories */}
                 {installed.length > 0 && (

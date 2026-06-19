@@ -41,6 +41,7 @@ import { PublicLocaleProvider, usePublicLocale, fmt } from "@/lib/i18n/public";
 import PublicLanguageToggle from "@/components/layout/PublicLanguageToggle";
 import VehicleInsights from "@/components/listing/VehicleInsights";
 import MarketValueReport from "@/components/listing/MarketValueReport";
+import DealerProgramsSection from "@/components/listing/DealerProgramsSection";
 import { listingOptions } from "@/lib/vehicleInsights";
 import { packetVisible } from "@/lib/packetModules";
 
@@ -284,6 +285,11 @@ const PublicListingBody = () => {
             ribbon (below-market, one-owner, clean title, no recalls, MPG)
             built from the MarketCheck enrichment. Self-hides when empty. */}
         {packetVisible(listing, "insights") && <VehicleInsights listing={listing} />}
+
+        {/* Dealer programs — the tenant's value propositions (10yr/100k
+            powertrain, lifetime powertrain, free maintenance), snapshotted
+            onto the listing at publish. Self-hides when none apply. */}
+        {packetVisible(listing, "programs") && <DealerProgramsSection programs={listing.dealer_snapshot?.programs} />}
 
         {/* Recall banner — only shows if the campaign data has
             anything actionable. Clear listings don't need the visual

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import type { DealerProgram } from "@/lib/dealerPrograms";
 
 // ──────────────────────────────────────────────────────────────
 // useVehicleListing — the public shopper-facing addendum record.
@@ -42,6 +43,9 @@ export interface DealerSnapshot {
   state?: string;
   zip?: string;
   primary_color?: string;
+  // Dealer value-proposition programs snapshotted at publish so the customer
+  // packet shows the programs that applied when the sticker was generated.
+  programs?: DealerProgram[];
 }
 
 export interface ValueProp {

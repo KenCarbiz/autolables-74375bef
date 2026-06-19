@@ -11,6 +11,8 @@ import { useRecallLookup } from "@/hooks/useRecallLookup";
 import RecallBanner from "@/components/addendum/RecallBanner";
 import { useVehiclePrefill, VehicleContextHeader } from "@/lib/vehiclePrefill";
 import { useVehicleSpecs } from "@/hooks/useVehicleSpecs";
+import { applicablePrograms } from "@/lib/dealerPrograms";
+import DealerProgramsSticker from "@/components/sticker/DealerProgramsSticker";
 import { toast } from "sonner";
 import { PublishPriceGate } from "@/components/inventory/PublishPriceGate";
 import { QRCodeSVG } from "qrcode.react";
@@ -198,6 +200,7 @@ const NewCarSticker = () => {
           logo_url: dealerLogo,
           city: currentStore?.city || "",
           state: currentStore?.state || "",
+          programs: applicablePrograms(settings.dealer_programs, "new", "packet"),
         },
         slugSeed: `${(ymm || "car").toLowerCase()}-${vehicle.vin.slice(-6)}`,
         createdBy: user?.id ?? null,
@@ -468,6 +471,9 @@ const NewCarSticker = () => {
                 )}
               </div>
             )}
+
+            {/* Dealer programs (FTC-structured value props) */}
+            <DealerProgramsSticker programs={applicablePrograms(settings.dealer_programs, "new", "sticker")} />
 
             {/* Dealer accessories — installed */}
             {installed.length > 0 && (
