@@ -415,14 +415,15 @@ const Inventory = () => {
                 <table className="w-full text-sm min-w-[820px]">
                   <thead className="bg-muted/40 text-[11px] uppercase tracking-wide text-muted-foreground">
                     <tr>
-                      <th className="text-left font-semibold px-4 py-2.5">Vehicle</th>
-                      <th className="text-left font-semibold px-3 py-2.5">Stock # / VIN</th>
-                      <th className="text-left font-semibold px-3 py-2.5">Readiness</th>
-                      <th className="text-left font-semibold px-3 py-2.5">Compliance</th>
-                      <th className="text-right font-semibold px-3 py-2.5">Market Intelligence</th>
-                      <th className="text-left font-semibold px-3 py-2.5">Publishing</th>
-                      <th className="text-left font-semibold px-3 py-2.5">Updated</th>
-                      <th className="text-right font-semibold px-3 py-2.5">Actions</th>
+                      <th className="text-left font-semibold px-4 py-3">Vehicle</th>
+                      <th className="text-left font-semibold px-3 py-3">Stock # / VIN</th>
+                      <th className="text-left font-semibold px-3 py-3">Status</th>
+                      <th className="text-left font-semibold px-3 py-3">Readiness</th>
+                      <th className="text-left font-semibold px-3 py-3">Compliance</th>
+                      <th className="text-right font-semibold px-3 py-3">Advertised Price</th>
+                      <th className="text-left font-semibold px-3 py-3">Publishing</th>
+                      <th className="text-left font-semibold px-3 py-3">Updated</th>
+                      <th className="text-right font-semibold px-3 py-3">Actions</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-border">
@@ -444,35 +445,21 @@ const Inventory = () => {
                           <p className="font-mono text-xs text-foreground">{r.stock_number || "—"}</p>
                           <p className="font-mono text-[11px] text-muted-foreground">…{(r.vin || "").slice(-6)}</p>
                         </td>
-                        <td className="px-3 py-2.5">
+                        <td className="px-3 py-3"><StatusPill status={r.status} /></td>
+                        <td className="px-3 py-3">
                           <ReadinessCell r={r} signal={signalFor(r)} pct={rowReadiness(r)} />
                         </td>
-                        <td className="px-3 py-2.5">
-                          <div className="flex flex-col items-start gap-1">
-                            <VinChip ymm={r.ymm} />
-                            <RecallChip status={r.recall_status} open={r.open_recall_count} />
-                          </div>
+                        <td className="px-3 py-3">
+                          <ComplianceCell r={r} />
                         </td>
-                        <td className="px-3 py-2.5 text-right" onClick={(e) => e.stopPropagation()}>
-                          <span className="tabular-nums font-semibold text-foreground">{r.price ? `$${r.price.toLocaleString()}` : "—"}</span>
-                          {r.market_position && r.market_value && r.price ? (
-                            <div className="mt-0.5 flex flex-col items-end gap-0.5">
-                              <MarketChip position={r.market_position} />
-                              <span className="text-[10px] text-muted-foreground">
-                                {(Number(r.market_value) - r.price) >= 0
-                                  ? `$${(Number(r.market_value) - r.price).toLocaleString()} below market`
-                                  : `$${Math.abs(Number(r.market_value) - r.price).toLocaleString()} above market`}
-                              </span>
-                            </div>
-                          ) : null}
+                        <td className="px-3 py-3 text-right" onClick={(e) => e.stopPropagation()}>
+                          <p className="text-base font-bold text-foreground tabular-nums leading-tight">{r.price ? `$${r.price.toLocaleString()}` : "—"}</p>
+                          {r.vin && r.price ? <div className="mt-1 flex justify-end"><AdvertisedPriceBand vin={r.vin} stickerPrice={r.price} docFee={settings.doc_fee_amount} compact /></div> : null}
                         </td>
-                        <td className="px-3 py-2.5" onClick={(e) => e.stopPropagation()}>
-                          <div className="flex flex-col items-start gap-1">
-                            <PortalChip status={r.status} />
-                            {r.vin && r.price ? <AdvertisedPriceBand vin={r.vin} stickerPrice={r.price} docFee={settings.doc_fee_amount} compact /> : null}
-                          </div>
+                        <td className="px-3 py-3" onClick={(e) => e.stopPropagation()}>
+                          <PortalChip status={r.status} />
                         </td>
-                        <td className="px-3 py-2.5 text-xs text-muted-foreground whitespace-nowrap">{relativeDay(r.updated_at)}</td>
+                        <td className="px-3 py-3 text-xs text-muted-foreground whitespace-nowrap">{relativeDay(r.updated_at)}</td>
                         <td className="px-3 py-2.5 text-right" onClick={(e) => e.stopPropagation()}>
                           <div className="flex justify-end items-center gap-1">
                             <div className="hidden md:flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -989,6 +976,30 @@ const PortalChip = ({ status }: { status: VehicleRow["status"] }) =>
     : status === "archived"
       ? <span className="inline-flex items-center text-[10px] font-semibold px-1.5 py-0.5 rounded bg-slate-100 text-slate-600">Archived</span>
       : <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded bg-slate-100 text-slate-600"><span className="w-1.5 h-1.5 rounded-full bg-slate-400" />Draft</span>;
+
+// Clean compliance stack — light status lines, not heavy filled chips.
+const ComplianceCell = ({ r }: { r: VehicleRow }) => {
+  const decoded = !!r.ymm;
+  const n = r.open_recall_count || 0;
+  const open = r.recall_status === "open_recalls" && n > 0;
+  const clear = r.recall_status === "clear";
+  return (
+    <div className="flex flex-col items-start gap-1.5">
+      <span className="inline-flex items-center gap-1.5 text-xs font-medium text-foreground">
+        {decoded ? <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" /> : <X className="w-3.5 h-3.5 text-slate-400" />}
+        {decoded ? "VIN Decoded" : "VIN Pending"}
+      </span>
+      <span className="inline-flex items-center gap-1.5 text-xs font-medium text-foreground">
+        {open
+          ? <AlertTriangle className={`w-3.5 h-3.5 ${n >= 2 ? "text-red-600" : "text-orange-500"}`} />
+          : clear
+            ? <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+            : <span className="w-2 h-2 rounded-full bg-slate-300 mx-[3px]" />}
+        {open ? `${n} Open Recall${n === 1 ? "" : "s"}` : clear ? "No Open Recalls" : "Recall Pending"}
+      </span>
+    </div>
+  );
+};
 
 const StatusPill = ({ status }: { status: VehicleRow["status"] }) => {
   const cfg = status === "published" ? { cls: "bg-emerald-100 text-emerald-700", dot: "bg-emerald-500", label: "Published" }
