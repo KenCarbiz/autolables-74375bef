@@ -40,6 +40,7 @@ import {
   PenLine,
   CheckCircle2,
   Truck,
+  Building2,
 } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
 import { useAuth } from "@/contexts/AuthContext";
@@ -348,6 +349,19 @@ const AppShell = ({ children }: AppShellProps) => {
     return () => { cancelled = true; };
   }, [tenant?.id]);
   const dealerLoc = [settings.dealer_city, settings.dealer_state].filter(Boolean).join(", ");
+  // Multi-store group switcher state. "All Locations" is a group-level
+  // view that does not bind a specific rooftop's address into stickers.
+  const [viewAllStores, setViewAllStores] = useState(false);
+  const pickStore = useCallback((s: typeof stores[number]) => {
+    setViewAllStores(false);
+    setCurrentStore(s);
+  }, [setCurrentStore]);
+  const dealerActiveLabel = viewAllStores
+    ? "All Locations"
+    : (currentStore?.name || tenant?.name || "Dealership");
+  const dealerActiveSub = viewAllStores
+    ? `${stores.length} locations`
+    : (dealerLoc || tenant?.name || "");
   const syncWhen = syncInfo.at ? (() => {
     const d = new Date(syncInfo.at);
     const sameDay = d.toDateString() === new Date().toDateString();
@@ -599,26 +613,84 @@ const AppShell = ({ children }: AppShellProps) => {
 
             {/* Right cluster */}
             <div className="flex items-center gap-2 flex-shrink-0">
-              {/* Unified dealership status card — name · location · count · sync · MarketCheck */}
+              {/* Unified operational status block — tenant switcher · sync · MarketCheck.
+                  Visually dominant, grouped into one pill so the dealership selector,
+                  sync state, and feed connection read as a single command surface. */}
               {tenant?.name && (
-                <div className="hidden xl:flex items-center h-11 rounded-xl border border-border bg-card shadow-sm px-3 gap-3">
-                  <div className="flex items-center gap-2 min-w-0">
-                    <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0" aria-hidden />
-                    <div className="leading-tight min-w-0">
-                      <p className="text-[12px] font-semibold text-foreground truncate max-w-[140px]">{tenant.name}</p>
-                      <p className="text-[10px] text-muted-foreground truncate">
-                        {dealerLoc && <span>{dealerLoc} · </span>}
-                        {syncInfo.count != null ? `${syncInfo.count} vehicles` : "—"}
-                      </p>
-                    </div>
-                  </div>
-                  <div className="w-px h-6 bg-border" />
-                  <div className="leading-tight">
+                <div className="hidden xl:flex items-stretch h-11 rounded-xl border border-border bg-card shadow-sm overflow-hidden">
+                  {/* Dealer / tenant switcher */}
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <button
+                        className="flex items-center gap-2.5 h-full px-3 hover:bg-muted/60 transition-colors"
+                        title="Switch dealership / location"
+                      >
+                        <span className="w-7 h-7 rounded-lg bg-[#2563EB]/10 text-[#2563EB] flex items-center justify-center flex-shrink-0">
+                          <Building2 className="w-4 h-4" />
+                        </span>
+                        <div className="leading-tight text-left min-w-0">
+                          <p className="text-[12px] font-semibold text-foreground truncate max-w-[150px]">{dealerActiveLabel}</p>
+                          <p className="text-[10px] text-muted-foreground truncate max-w-[150px]">{dealerActiveSub}</p>
+                        </div>
+                        <ChevronDown className="w-3.5 h-3.5 text-muted-foreground flex-shrink-0" />
+                      </button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="start" className="w-64">
+                      <DropdownMenuLabel className="text-[10px] uppercase tracking-[0.16em] text-muted-foreground">
+                        {tenant.name}
+                      </DropdownMenuLabel>
+                      <DropdownMenuSeparator />
+                      {stores.length > 1 && (
+                        <DropdownMenuItem
+                          onClick={() => setViewAllStores(true)}
+                          className={viewAllStores ? "bg-accent" : ""}
+                        >
+                          <Store className="w-3.5 h-3.5 mr-2 flex-shrink-0" />
+                          <span className="flex-1">All Locations</span>
+                          {viewAllStores && <CheckCircle2 className="w-3.5 h-3.5 text-[#2563EB]" />}
+                        </DropdownMenuItem>
+                      )}
+                      {stores.map((s) => {
+                        const active = !viewAllStores && currentStore?.id === s.id;
+                        const loc = [s.city, s.state].filter(Boolean).join(", ");
+                        return (
+                          <DropdownMenuItem
+                            key={s.id}
+                            onClick={() => pickStore(s)}
+                            className={active ? "bg-accent" : ""}
+                          >
+                            <Store className="w-3.5 h-3.5 mr-2 flex-shrink-0" />
+                            <div className="flex-1 min-w-0">
+                              <p className="truncate">{s.name}</p>
+                              {loc && <p className="text-[10px] text-muted-foreground truncate">{loc}</p>}
+                            </div>
+                            {active && <CheckCircle2 className="w-3.5 h-3.5 text-[#2563EB] flex-shrink-0" />}
+                          </DropdownMenuItem>
+                        );
+                      })}
+                      {stores.length === 0 && (
+                        <DropdownMenuItem disabled>
+                          <Store className="w-3.5 h-3.5 mr-2" />
+                          {tenant.name}
+                        </DropdownMenuItem>
+                      )}
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+
+                  <div className="w-px bg-border my-2" />
+
+                  {/* Sync status */}
+                  <div className="flex flex-col justify-center px-3 leading-tight">
                     <p className="text-[10px] font-medium text-muted-foreground">Last sync</p>
-                    <p className="text-[12px] font-semibold text-foreground tabular-nums">{syncWhen}</p>
+                    <p className="text-[12px] font-semibold text-foreground tabular-nums truncate">
+                      {syncWhen}{syncInfo.count != null ? ` · ${syncInfo.count}` : ""}
+                    </p>
                   </div>
-                  <div className="w-px h-6 bg-border" />
-                  <span className="inline-flex items-center gap-1.5 text-[11px] font-medium text-emerald-700">
+
+                  <div className="w-px bg-border my-2" />
+
+                  {/* MarketCheck connection */}
+                  <span className="flex items-center gap-1.5 px-3 text-[11px] font-medium text-emerald-700">
                     <CheckCircle2 className="w-3.5 h-3.5" />
                     MarketCheck
                   </span>
