@@ -355,8 +355,8 @@ const Inventory = () => {
       {/* Inventory health band */}
       <InventoryHealth counts={counts} onFilter={(d) => { setStatus("all"); setCondition("all"); setDerived(d); }} />
 
-      {/* KPI cards */}
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
+      {/* KPI cards — horizontal scroll on mobile, grid on larger */}
+      <div className="flex gap-3 overflow-x-auto pb-1 md:grid md:grid-cols-3 lg:grid-cols-5 md:overflow-visible md:pb-0">
         <KpiCard icon={Car} label="Total Vehicles" value={counts.total} sub={`${counts.newCount} new · ${counts.usedCount} used`} />
         <KpiCard icon={FileText} label="Drafts" value={counts.draft} accent="amber" sub={counts.draft > 0 ? "not ready to publish" : "all clear"} />
         <KpiCard icon={CheckCircle2} label="Published" value={counts.published} accent="emerald" sub="live on shopper portal" />
@@ -551,7 +551,7 @@ const InventoryHealth = ({
             <div className={`h-full rounded-full ${bar} transition-all`} style={{ width: `${health}%` }} />
           </div>
         </div>
-        <div className="flex-1 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+        <div className="flex-1 flex gap-3 overflow-x-auto pb-1 sm:grid sm:grid-cols-3 lg:grid-cols-5 sm:overflow-visible sm:pb-0">
           <HealthMetric icon={Car} tone="neutral" value={counts.total} label="Total Vehicles" />
           <HealthMetric icon={ShieldCheck} tone="emerald" value={counts.readyToPublish} label="Ready to Publish" />
           <HealthMetric icon={Printer} tone="amber" value={counts.needsSticker} label="Needs Sticker" onClick={() => onFilter("needs-sticker")} />
@@ -578,7 +578,7 @@ const HealthMetric = ({
       type="button"
       onClick={onClick}
       disabled={!onClick}
-      className={`flex items-center gap-2.5 rounded-xl border border-border bg-background p-2.5 text-left ${onClick ? "hover:border-foreground/20 hover:shadow-sm transition-all cursor-pointer" : "cursor-default"}`}
+      className={`flex items-center gap-2.5 rounded-xl border border-border bg-background p-2.5 text-left shrink-0 min-w-[130px] sm:min-w-0 ${onClick ? "hover:border-foreground/20 hover:shadow-sm transition-all cursor-pointer" : "cursor-default"}`}
     >
       <span className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${color}`}>
         <Icon className="w-4 h-4" strokeWidth={2} />
@@ -608,7 +608,7 @@ const KpiCard = ({
     accent === "sky" ? "bg-sky-100 text-sky-700" :
     "bg-muted text-muted-foreground";
   return (
-    <div className="rounded-2xl border border-border bg-card shadow-sm p-4 transition-shadow hover:shadow-md">
+    <div className="rounded-2xl border border-border bg-card shadow-sm p-4 transition-shadow hover:shadow-md shrink-0 min-w-[44vw] sm:min-w-[160px] md:min-w-0">
       <div className="flex items-center justify-between">
         <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">{label}</p>
         <span className={`w-7 h-7 rounded-lg flex items-center justify-center ${iconBg}`}>
