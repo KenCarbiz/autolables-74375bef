@@ -11,6 +11,7 @@ import {
   FileUp, Upload, Printer, Sparkles, Plus, ArrowUpRight,
   AlertTriangle, ShieldCheck, Lock, Unlock, Send, MessageSquare,
   Link as LinkIcon, X, QrCode, Trash2, Save, ShieldAlert, UserRound, Users,
+  ChevronRight, CircleAlert,
 } from "lucide-react";
 import { formatPhone, composeName } from "@/components/addendum/CustomerInfoSection";
 import EmptyState from "@/components/ui/empty-state";
@@ -71,6 +72,30 @@ interface VehicleRow {
 }
 
 const VALID_TABS: TabId[] = ["overview", "documents", "scan", "customer", "addendum", "prep", "labels", "sign"];
+
+interface ReadyCheck { ok: boolean; label: string; when: string | null; blocks?: boolean }
+
+// Single readiness model used by both the header banner and the Overview
+// readiness card, so the two never disagree. `blocks` marks a check that
+// gates publishing to the shopper portal.
+const buildChecks = (v: VehicleRow): ReadyCheck[] => [
+  { ok: true, label: "Vehicle created", when: v.created_at },
+  { ok: !!v.ymm, label: "VIN decoded", when: v.ymm ? v.updated_at : null },
+  { ok: v.status === "published", label: "Sticker generated & published", when: v.published_at, blocks: true },
+  { ok: !!v.recall_check, label: "Recall checked", when: null },
+  { ok: !!v.prep_status?.foreman_signed_at, label: "Prep & install signed off", when: v.prep_status?.foreman_signed_at || null },
+  { ok: (v.documents?.length || 0) > 0, label: "Documents attached", when: null },
+  { ok: (v.service_records?.length || 0) > 0, label: "Service history", when: null },
+  { ok: !!v.warranty_info && Object.keys(v.warranty_info).length > 0, label: "Remaining warranty", when: null },
+  { ok: (v.available_accessories?.length || 0) > 0, label: "Available accessories", when: null },
+];
+
+const readinessSummary = (v: VehicleRow) => {
+  const checks = buildChecks(v);
+  const done = checks.filter((c) => c.ok).length;
+  const pct = Math.round((done / checks.length) * 100);
+  return { checks, done, pct, remaining: checks.filter((c) => !c.ok) };
+};
 
 const VehicleFile = () => {
   const { id } = useParams<{ id: string }>();
@@ -162,9 +187,9 @@ const VehicleFile = () => {
     }
   };
 
-  const tabs: { id: TabId; label: string; icon: typeof Car }[] = [
+  const tabs: { id: TabId; label: string; icon: typeof Car; count?: number }[] = [
     { id: "overview",  label: "Overview",  icon: Car },
-    { id: "documents", label: "Documents", icon: FileUp },
+    { id: "documents", label: "Documents", icon: FileUp, count: vehicle.documents?.length || undefined },
     { id: "scan",      label: "Scan Info", icon: QrCode },
     { id: "customer",  label: "Customer",  icon: UserRound },
     { id: "addendum",  label: "Addendum",  icon: FileText },
@@ -173,8 +198,10 @@ const VehicleFile = () => {
     { id: "sign",      label: "Customer Sign-off", icon: Signature },
   ];
 
+  const ready = readinessSummary(vehicle);
+
   return (
-    <div className="p-4 lg:p-6 max-w-[1400px] mx-auto space-y-4">
+    <div className="p-4 lg:p-6 max-w-[1400px] mx-auto space-y-4 pb-24 lg:pb-6">
       {/* Hero / header */}
       <div>
         <button
@@ -184,101 +211,160 @@ const VehicleFile = () => {
           <ArrowLeft className="w-3 h-3" />
           Inventory
         </button>
-        <div className="mt-2 rounded-2xl border border-border bg-card p-5">
-          <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4">
-            <div className="space-y-1">
-              <div className="flex items-center gap-2 flex-wrap">
-                <span className={`text-[10px] font-bold uppercase tracking-label px-2 py-0.5 rounded ${
-                  vehicle.condition === "new" ? "bg-blue-100 text-blue-700" :
-                  vehicle.condition === "cpo" ? "bg-violet-100 text-violet-700" :
-                  "bg-slate-100 text-slate-700"
-                }`}>{vehicle.condition || "unknown"}</span>
-                <span className={`text-[10px] font-bold uppercase tracking-label px-2 py-0.5 rounded ${
-                  vehicle.status === "published" ? "bg-emerald-100 text-emerald-700" :
-                  vehicle.status === "archived" ? "bg-slate-100 text-slate-500" :
-                  "bg-amber-100 text-amber-700"
-                }`}>{vehicle.status}</span>
-                {vehicle.prep_status?.foreman_signed_at ? (
-                  <span className="text-[10px] font-bold uppercase tracking-label px-2 py-0.5 rounded bg-emerald-100 text-emerald-700 inline-flex items-center gap-1">
-                    <CheckCircle2 className="w-2.5 h-2.5" />
-                    Prep signed
-                  </span>
-                ) : null}
-              </div>
-              <h1 className="text-2xl font-black tracking-tight font-display text-foreground">
-                {vehicle.ymm || "(needs VIN decode)"}
-                {vehicle.trim ? <span className="text-muted-foreground font-normal ml-2">{vehicle.trim}</span> : null}
-              </h1>
-              <div className="flex flex-wrap items-center gap-x-5 gap-y-1 text-xs text-muted-foreground mt-2">
-                <span className="font-mono">{vehicle.vin}</span>
-                {typeof vehicle.mileage === "number" && (
-                  <span className="inline-flex items-center gap-1"><Gauge className="w-3 h-3" /> {vehicle.mileage.toLocaleString()} mi</span>
-                )}
-                {typeof vehicle.price === "number" && (
-                  <span className="inline-flex items-center gap-1"><DollarSign className="w-3 h-3" /> ${vehicle.price.toLocaleString()}</span>
-                )}
-                <span className="inline-flex items-center gap-1">
-                  <Clock className="w-3 h-3" />
-                  Created {new Date(vehicle.created_at).toLocaleDateString()}
-                </span>
-              </div>
+        <div className="mt-2 rounded-2xl border border-border bg-card shadow-sm overflow-hidden">
+          <div className="flex flex-col lg:flex-row">
+            {/* Vehicle photo */}
+            <div className={`lg:w-[280px] shrink-0 h-44 lg:h-auto flex items-center justify-center bg-gradient-to-br ${
+              vehicle.condition === "new" ? "from-blue-500/15 to-blue-600/5 text-blue-600" :
+              vehicle.condition === "cpo" ? "from-violet-500/15 to-violet-600/5 text-violet-600" :
+              "from-slate-400/15 to-slate-500/5 text-slate-500"
+            }`}>
+              <Car className="w-16 h-16" strokeWidth={1.25} />
             </div>
 
-            <div className="flex items-center gap-2 flex-wrap">
-              {vehicle.status === "published" ? (
-                <>
-                  <button
-                    onClick={copyLink}
-                    className="h-9 px-3 rounded-md border border-border text-sm font-semibold inline-flex items-center gap-1.5"
-                  >
-                    <Copy className="w-3.5 h-3.5" />
-                    Copy link
-                  </button>
-                  <a
-                    href={publicUrl}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="h-9 px-3 rounded-md bg-primary text-primary-foreground text-sm font-semibold inline-flex items-center gap-1.5"
-                  >
-                    <ExternalLink className="w-3.5 h-3.5" />
-                    View shopper page
-                  </a>
-                </>
-              ) : (
-                <button
-                  onClick={() => setTab("labels")}
-                  className="h-9 px-4 rounded-md bg-primary text-primary-foreground text-sm font-semibold inline-flex items-center gap-1.5"
-                >
-                  <Globe className="w-4 h-4" />
-                  Set up sticker &amp; publish
-                </button>
-              )}
+            <div className="flex-1 p-5 min-w-0">
+              <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4">
+                <div className="space-y-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className={`text-[10px] font-bold uppercase tracking-label px-2 py-0.5 rounded ${
+                      vehicle.condition === "new" ? "bg-blue-100 text-blue-700" :
+                      vehicle.condition === "cpo" ? "bg-violet-100 text-violet-700" :
+                      "bg-slate-100 text-slate-700"
+                    }`}>{vehicle.condition || "unknown"}</span>
+                    <span className={`text-[10px] font-bold uppercase tracking-label px-2 py-0.5 rounded ${
+                      vehicle.status === "published" ? "bg-emerald-100 text-emerald-700" :
+                      vehicle.status === "archived" ? "bg-slate-100 text-slate-500" :
+                      "bg-amber-100 text-amber-700"
+                    }`}>{vehicle.status}</span>
+                    {vehicle.prep_status?.foreman_signed_at ? (
+                      <span className="text-[10px] font-bold uppercase tracking-label px-2 py-0.5 rounded bg-emerald-100 text-emerald-700 inline-flex items-center gap-1">
+                        <CheckCircle2 className="w-2.5 h-2.5" />
+                        Prep signed
+                      </span>
+                    ) : null}
+                  </div>
+                  <h1 className="text-2xl font-black tracking-tight font-display text-foreground">
+                    {vehicle.ymm || "(needs VIN decode)"}
+                    {vehicle.trim ? <span className="text-muted-foreground font-normal ml-2">{vehicle.trim}</span> : null}
+                  </h1>
+                  <div className="flex flex-wrap items-center gap-x-5 gap-y-1 text-xs text-muted-foreground mt-2">
+                    <span className="font-mono">{vehicle.vin}</span>
+                    {typeof vehicle.mileage === "number" && (
+                      <span className="inline-flex items-center gap-1"><Gauge className="w-3 h-3" /> {vehicle.mileage.toLocaleString()} mi</span>
+                    )}
+                    {typeof vehicle.price === "number" && (
+                      <span className="inline-flex items-center gap-1"><DollarSign className="w-3 h-3" /> ${vehicle.price.toLocaleString()}</span>
+                    )}
+                    <span className="inline-flex items-center gap-1">
+                      <Clock className="w-3 h-3" />
+                      Created {new Date(vehicle.created_at).toLocaleDateString()}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="flex flex-col gap-2 w-full lg:w-56 shrink-0">
+                  {vehicle.status === "published" ? (
+                    <>
+                      <a
+                        href={publicUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="h-10 px-4 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold inline-flex items-center justify-center gap-1.5 shadow-sm shadow-blue-600/30 transition-colors"
+                      >
+                        <ExternalLink className="w-4 h-4" />
+                        View Shopper Page
+                      </a>
+                      <button
+                        onClick={copyLink}
+                        className="h-10 px-4 rounded-xl border border-border bg-background hover:bg-muted text-foreground text-sm font-semibold inline-flex items-center justify-center gap-1.5 transition-colors"
+                      >
+                        <Copy className="w-3.5 h-3.5" />
+                        Copy Link
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      <button
+                        onClick={() => setTab("labels")}
+                        className="h-10 px-4 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold inline-flex items-center justify-center gap-1.5 shadow-sm shadow-blue-600/30 transition-colors"
+                      >
+                        <Printer className="w-4 h-4" />
+                        Generate Sticker
+                      </button>
+                      <button
+                        onClick={() => setTab("labels")}
+                        className="h-10 px-4 rounded-xl border border-border bg-background hover:bg-muted text-foreground text-sm font-semibold inline-flex items-center justify-center gap-1.5 transition-colors"
+                      >
+                        <Globe className="w-3.5 h-3.5" />
+                        Publish to Shopper Portal
+                      </button>
+                    </>
+                  )}
+                </div>
+              </div>
+
+              {/* Readiness status banner */}
+              <div className={`mt-4 rounded-xl border p-3 flex items-center gap-3 flex-wrap ${
+                vehicle.status === "published" ? "border-emerald-200 bg-emerald-50/60" : "border-amber-200 bg-amber-50/60"
+              }`}>
+                <ReadinessRing pct={ready.pct} tone={vehicle.status === "published" ? "emerald" : "amber"} />
+                <div className="min-w-0">
+                  <p className={`text-sm font-bold ${vehicle.status === "published" ? "text-emerald-800" : "text-amber-800"}`}>
+                    {vehicle.status === "published" ? "Published vehicle" : "Draft vehicle"}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    {vehicle.status === "published"
+                      ? "Live on the shopper portal."
+                      : ready.remaining.length === 0
+                        ? "All set — generate the sticker to publish."
+                        : `Not ready to publish · ${ready.remaining.length} task${ready.remaining.length === 1 ? "" : "s"} remaining.`}
+                  </p>
+                </div>
+                {vehicle.status !== "published" && ready.remaining.length > 0 && (
+                  <div className="flex items-center gap-1.5 flex-wrap lg:ml-auto">
+                    {ready.remaining.slice(0, 3).map((c) => (
+                      <span key={c.label} className="inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-1 rounded-lg bg-white text-amber-700 border border-amber-200">
+                        <CircleAlert className="w-3 h-3" />
+                        {c.label}
+                      </span>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         </div>
       </div>
 
-      {/* Tabs */}
-      <div className="flex items-center gap-1 border-b border-border overflow-x-auto">
-        {tabs.map((t) => (
-          <button
-            key={t.id}
-            onClick={() => setTab(t.id)}
-            className={`h-10 px-3 text-xs font-semibold inline-flex items-center gap-1.5 border-b-2 transition-colors whitespace-nowrap ${
-              tab === t.id
-                ? "border-primary text-foreground"
-                : "border-transparent text-muted-foreground hover:text-foreground"
-            }`}
-          >
-            <t.icon className="w-3.5 h-3.5" />
-            {t.label}
-          </button>
-        ))}
+      {/* Tabs — pill style with counts */}
+      <div className="flex items-center gap-1.5 overflow-x-auto pb-1">
+        {tabs.map((t) => {
+          const active = tab === t.id;
+          return (
+            <button
+              key={t.id}
+              onClick={() => setTab(t.id)}
+              className={`h-9 px-3.5 text-xs font-semibold inline-flex items-center gap-1.5 rounded-full border transition-colors whitespace-nowrap ${
+                active
+                  ? "bg-blue-600 text-white border-blue-600"
+                  : "bg-card text-muted-foreground border-border hover:text-foreground hover:bg-muted"
+              }`}
+            >
+              <t.icon className="w-3.5 h-3.5" />
+              {t.label}
+              {typeof t.count === "number" && (
+                <span className={`min-w-[18px] h-[18px] px-1 rounded-full text-[10px] font-bold inline-flex items-center justify-center tabular-nums ${
+                  active ? "bg-white/20 text-white" : "bg-muted text-muted-foreground"
+                }`}>{t.count}</span>
+              )}
+            </button>
+          );
+        })}
       </div>
 
       {/* Panels */}
       <div className="pt-2">
-        {tab === "overview"  && <OverviewPanel vehicle={vehicle} onReload={load} />}
+        {tab === "overview"  && <OverviewPanel vehicle={vehicle} onTab={setTab} />}
         {tab === "documents" && <DocumentsPanel vehicle={vehicle} onReload={load} />}
         {tab === "scan"      && <ScanInfoPanel vehicle={vehicle} onReload={load} />}
         {tab === "customer"  && <CustomerPanel vehicle={vehicle} />}
@@ -286,6 +372,46 @@ const VehicleFile = () => {
         {tab === "prep"      && <PrepPanel vehicle={vehicle} />}
         {tab === "labels"    && <LabelsPanel vehicle={vehicle} />}
         {tab === "sign"      && <SignPanel vehicle={vehicle} />}
+      </div>
+
+      {/* Mobile sticky action bar — thumb-friendly primary actions. */}
+      <div className="lg:hidden fixed bottom-0 inset-x-0 z-30 border-t border-border bg-card/95 backdrop-blur px-4 py-3 space-y-2 shadow-[0_-4px_20px_rgba(0,0,0,0.06)]">
+        {vehicle.status === "published" ? (
+          <div className="flex gap-2">
+            <a
+              href={publicUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="flex-1 h-11 rounded-xl bg-blue-600 text-white text-sm font-semibold inline-flex items-center justify-center gap-1.5 shadow-sm shadow-blue-600/30"
+            >
+              <ExternalLink className="w-4 h-4" />
+              View Shopper Page
+            </a>
+            <button
+              onClick={copyLink}
+              className="h-11 px-4 rounded-xl border border-border bg-background text-foreground text-sm font-semibold inline-flex items-center justify-center"
+            >
+              <Copy className="w-4 h-4" />
+            </button>
+          </div>
+        ) : (
+          <>
+            <button
+              onClick={() => setTab("labels")}
+              className="w-full h-11 rounded-xl bg-blue-600 text-white text-sm font-semibold inline-flex items-center justify-center gap-1.5 shadow-sm shadow-blue-600/30"
+            >
+              <Printer className="w-4 h-4" />
+              Generate Sticker
+            </button>
+            <button
+              onClick={() => setTab("labels")}
+              className="w-full h-11 rounded-xl border border-border bg-background text-foreground text-sm font-semibold inline-flex items-center justify-center gap-1.5"
+            >
+              <Globe className="w-4 h-4" />
+              Publish to Shopper Portal
+            </button>
+          </>
+        )}
       </div>
     </div>
   );
@@ -316,7 +442,7 @@ const PRETTY_ACTION: Record<string, string> = {
 const prettyAction = (a: string) =>
   PRETTY_ACTION[a] || a.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
 
-const OverviewPanel = ({ vehicle }: { vehicle: VehicleRow; onReload: () => void }) => {
+const OverviewPanel = ({ vehicle, onTab }: { vehicle: VehicleRow; onTab: (t: TabId) => void }) => {
   const [events, setEvents] = useState<AuditEvent[]>([]);
   const [loadingEvents, setLoadingEvents] = useState(true);
 
@@ -346,112 +472,178 @@ const OverviewPanel = ({ vehicle }: { vehicle: VehicleRow; onReload: () => void 
     return () => { cancelled = true; };
   }, [vehicle.id, vehicle.vin, vehicle.slug]);
 
-  // Packet completeness — the one "is this vehicle ready?" read.
-  const checks = [
-    { ok: true, label: "Vehicle created", when: vehicle.created_at },
-    { ok: !!vehicle.ymm, label: "VIN decoded", when: vehicle.ymm ? vehicle.updated_at : null },
-    { ok: !!vehicle.recall_check, label: "Recall checked", when: null },
-    { ok: !!vehicle.prep_status?.foreman_signed_at, label: "Prep & install signed off", when: vehicle.prep_status?.foreman_signed_at || null },
-    { ok: (vehicle.documents?.length || 0) > 0, label: "Documents attached", when: null },
-    { ok: (vehicle.service_records?.length || 0) > 0, label: "Service history", when: null },
-    { ok: !!vehicle.warranty_info && Object.keys(vehicle.warranty_info).length > 0, label: "Remaining warranty", when: null },
-    { ok: (vehicle.available_accessories?.length || 0) > 0, label: "Available accessories", when: null },
-    { ok: vehicle.status === "published", label: "Shopper page published", when: vehicle.published_at },
+  const { checks, pct, done, remaining } = readinessSummary(vehicle);
+  const grade = pct === 100 ? "Complete" : pct >= 60 ? "On track" : "Not ready";
+  const gradeCls = pct === 100 ? "text-emerald-600 bg-emerald-100" : pct >= 60 ? "text-blue-600 bg-blue-100" : "text-amber-600 bg-amber-100";
+  const barCls = pct === 100 ? "bg-emerald-500" : pct >= 60 ? "bg-blue-600" : "bg-amber-500";
+  const decoded = (vehicle.sticker_snapshot?.decoded as Record<string, unknown> | undefined) || undefined;
+  const publicUrl = `${window.location.origin}/v/${vehicle.slug}`;
+
+  const quick: { label: string; icon: typeof Car; onClick: () => void }[] = [
+    { label: "Generate Sticker", icon: Printer, onClick: () => onTab("labels") },
+    { label: "Create Addendum", icon: FileText, onClick: () => onTab("addendum") },
+    { label: "Upload Documents", icon: Upload, onClick: () => onTab("documents") },
+    { label: "Customer Sign-off", icon: Signature, onClick: () => onTab("sign") },
+    { label: vehicle.status === "published" ? "Re-publish / Labels" : "Publish Vehicle", icon: Globe, onClick: () => onTab("labels") },
   ];
-  const doneCount = checks.filter((c) => c.ok).length;
-  const pct = Math.round((doneCount / checks.length) * 100);
+
+  const equip: { label: string; value: string }[] = decoded
+    ? ([
+        ["Year", decoded.year], ["Make", decoded.make], ["Model", decoded.model],
+        ["Trim", decoded.trim], ["Body", decoded.bodyStyle], ["Engine", decoded.engine],
+        ["Fuel", decoded.fuelType],
+      ] as [string, unknown][])
+        .filter(([, v]) => v != null && String(v).trim() !== "")
+        .map(([label, v]) => ({ label, value: String(v) }))
+    : [];
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-      <div className="md:col-span-2 space-y-3">
-        <Card title="Activity timeline">
+    <div className="space-y-4">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        {/* Vehicle readiness */}
+        <Card title="Vehicle Readiness" action={<span className={`text-[11px] font-bold px-2 py-0.5 rounded-full ${gradeCls}`}>{pct}% · {grade}</span>}>
+          <div className="h-2 rounded-full bg-muted overflow-hidden">
+            <div className={`h-full rounded-full transition-all ${barCls}`} style={{ width: `${pct}%` }} />
+          </div>
+          <ul className="space-y-2 text-xs mt-2">
+            {checks.map((c) => <Item key={c.label} ok={c.ok} label={c.label} when={c.when} />)}
+          </ul>
+          {remaining.length > 0 && (
+            <p className="text-[11px] font-semibold text-amber-600 pt-1">{remaining.length} task{remaining.length === 1 ? "" : "s"} remaining</p>
+          )}
+        </Card>
+
+        {/* Activity feed */}
+        <Card title="Activity Feed">
           {loadingEvents ? (
             <p className="text-xs text-muted-foreground">Loading events…</p>
           ) : events.length === 0 ? (
             <p className="text-xs text-muted-foreground">
-              No recorded activity yet. Events show up here as stickers are generated,
-              prep is signed off, customers view the shopper page, and the addendum is
-              signed. Every row is served from the append-only audit_log and is
-              defensible in a compliance review.
+              No recorded activity yet. Events appear as stickers are generated, prep is
+              signed off, customers view the shopper page, and the addendum is signed —
+              every row served from the append-only audit_log.
             </p>
           ) : (
-            <ol className="relative border-l-2 border-border pl-4 space-y-3">
-              {events.map((ev) => (
-                <li key={ev.id} className="relative">
-                  <span className="absolute -left-[21px] top-1 w-3 h-3 rounded-full bg-gradient-to-br from-[#3BB4FF] to-[#1E90FF] ring-4 ring-background" />
-                  <div className="text-sm font-semibold text-foreground">
-                    {prettyAction(ev.action)}
-                  </div>
-                  <div className="text-[11px] text-muted-foreground">
-                    {new Date(ev.created_at).toLocaleString()}
-                    {ev.user_email ? ` · ${ev.user_email}` : ""}
-                    {ev.entity_type ? ` · ${ev.entity_type}` : ""}
+            <ul className="space-y-2.5 max-h-72 overflow-auto">
+              {events.slice(0, 12).map((ev) => (
+                <li key={ev.id} className="flex items-start gap-2.5">
+                  <span className="w-7 h-7 rounded-lg bg-blue-600/10 text-blue-600 flex items-center justify-center shrink-0 mt-0.5">
+                    <CheckCircle2 className="w-3.5 h-3.5" />
+                  </span>
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold text-foreground leading-tight">{prettyAction(ev.action)}</p>
+                    <p className="text-[11px] text-muted-foreground">
+                      {new Date(ev.created_at).toLocaleString()}{ev.user_email ? ` · ${ev.user_email}` : ""}
+                    </p>
                   </div>
                 </li>
               ))}
-            </ol>
+            </ul>
           )}
         </Card>
 
-        <Card title="Decoded equipment">
-          {vehicle.sticker_snapshot && Object.keys(vehicle.sticker_snapshot).length > 0 ? (
-            <pre className="text-[11px] font-mono bg-muted/40 rounded p-3 whitespace-pre-wrap break-words max-h-64 overflow-auto">
-              {JSON.stringify(vehicle.sticker_snapshot, null, 2)}
-            </pre>
-          ) : (
-            <p className="text-sm text-muted-foreground">
-              No decoded equipment on file yet. Re-run the VIN decode from the VIN above
-              to auto-populate year / make / model / trim / engine / fuel type.
-            </p>
-          )}
-        </Card>
-
-        <Card title="Recall status">
-          {vehicle.recall_check ? (
-            <pre className="text-[11px] font-mono bg-muted/40 rounded p-3 whitespace-pre-wrap break-words max-h-40 overflow-auto">
-              {JSON.stringify(vehicle.recall_check, null, 2)}
-            </pre>
-          ) : (
-            <p className="text-sm text-muted-foreground">
-              No NHTSA recall check on file. A fresh check runs automatically when you
-              publish the shopper page. Publish is blocked if the VIN has an active
-              do-not-drive campaign without an admin override.
-            </p>
-          )}
+        {/* Quick actions */}
+        <Card title="Quick Actions">
+          <div className="space-y-1.5">
+            {quick.map((a) => (
+              <button
+                key={a.label}
+                onClick={a.onClick}
+                className="w-full flex items-center gap-2.5 px-3 h-10 rounded-xl border border-border bg-background hover:bg-muted hover:border-foreground/15 text-sm font-semibold text-foreground transition-colors text-left"
+              >
+                <span className="w-7 h-7 rounded-lg bg-blue-600/10 text-blue-600 flex items-center justify-center shrink-0">
+                  <a.icon className="w-3.5 h-3.5" />
+                </span>
+                <span className="flex-1">{a.label}</span>
+                <ChevronRight className="w-4 h-4 text-muted-foreground" />
+              </button>
+            ))}
+          </div>
         </Card>
       </div>
 
-      <div className="space-y-3">
-        <Card title="Packet completeness">
-          <div className="mb-3">
-            <div className="flex items-end justify-between mb-1">
-              <span className="text-2xl font-black text-foreground tabular-nums">{pct}%</span>
-              <span className="text-[11px] text-muted-foreground">{doneCount} of {checks.length} complete</span>
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        {/* Equipment */}
+        <Card title="Equipment & Details" action={<button onClick={() => onTab("scan")} className="text-[11px] font-semibold text-blue-600 hover:underline">Edit</button>}>
+          {equip.length > 0 ? (
+            <div className="grid grid-cols-1 gap-1.5">
+              {equip.map((e) => (
+                <div key={e.label} className="flex items-center justify-between gap-3 text-sm">
+                  <span className="text-muted-foreground">{e.label}</span>
+                  <span className="font-medium text-foreground text-right truncate">{e.value}</span>
+                </div>
+              ))}
             </div>
-            <div className="h-2 rounded-full bg-muted overflow-hidden">
-              <div className={`h-full rounded-full transition-all ${pct === 100 ? "bg-emerald-500" : pct >= 60 ? "bg-blue-600" : "bg-amber-500"}`} style={{ width: `${pct}%` }} />
-            </div>
-          </div>
-          <ul className="space-y-2 text-xs">
-            {checks.map((c) => <Item key={c.label} ok={c.ok} label={c.label} when={c.when} />)}
-          </ul>
+          ) : (
+            <p className="text-sm text-muted-foreground">
+              No decoded equipment yet. Re-run the VIN decode to auto-populate year, make,
+              model, trim, engine and fuel type.
+            </p>
+          )}
         </Card>
 
-        <Card title="Public URL">
-          {vehicle.status === "published" ? (
-            <a
-              href={`${window.location.origin}/v/${vehicle.slug}`}
-              target="_blank"
-              rel="noreferrer"
-              className="text-xs text-primary break-all font-mono hover:underline"
-            >
-              {window.location.origin}/v/{vehicle.slug}
-            </a>
+        {/* Recall */}
+        <Card title="Recall Status">
+          {vehicle.recall_check ? (
+            <div className="flex items-center gap-2.5">
+              <span className="w-9 h-9 rounded-xl bg-emerald-100 text-emerald-600 flex items-center justify-center shrink-0">
+                <ShieldCheck className="w-5 h-5" />
+              </span>
+              <div>
+                <p className="text-sm font-semibold text-foreground">Recall check on file</p>
+                <p className="text-[11px] text-muted-foreground">Last checked {new Date(vehicle.updated_at).toLocaleDateString()}</p>
+              </div>
+            </div>
           ) : (
-            <p className="text-xs text-muted-foreground">
-              Not yet published. Published vehicles get a shareable URL,
-              QR code, and embed snippet for the dealer's website.
-            </p>
+            <div className="flex items-center gap-2.5">
+              <span className="w-9 h-9 rounded-xl bg-amber-100 text-amber-600 flex items-center justify-center shrink-0">
+                <AlertTriangle className="w-5 h-5" />
+              </span>
+              <div>
+                <p className="text-sm font-semibold text-foreground">No recall check yet</p>
+                <p className="text-[11px] text-muted-foreground">Runs automatically on publish; a do-not-drive campaign blocks it.</p>
+              </div>
+            </div>
+          )}
+        </Card>
+
+        {/* Shopper portal preview */}
+        <Card title="Shopper Portal Preview">
+          {vehicle.status === "published" ? (
+            <div className="space-y-3">
+              <div className="flex items-start gap-3">
+                <div className="flex-1 rounded-xl border border-border bg-muted/40 h-24 flex items-center justify-center text-muted-foreground">
+                  <Car className="w-8 h-8" strokeWidth={1.25} />
+                </div>
+                <div className="w-20 h-20 rounded-xl border border-border bg-background flex items-center justify-center text-foreground shrink-0">
+                  <QrCode className="w-12 h-12" />
+                </div>
+              </div>
+              <a href={publicUrl} target="_blank" rel="noreferrer" className="block text-xs text-blue-600 font-mono break-all hover:underline">
+                {publicUrl}
+              </a>
+              <div className="grid grid-cols-2 gap-2">
+                <a href={publicUrl} target="_blank" rel="noreferrer" className="h-9 rounded-xl border border-border bg-background hover:bg-muted text-foreground text-xs font-semibold inline-flex items-center justify-center gap-1.5">
+                  <ExternalLink className="w-3.5 h-3.5" /> Preview Page
+                </a>
+                <button onClick={() => onTab("labels")} className="h-9 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold inline-flex items-center justify-center gap-1.5">
+                  <Globe className="w-3.5 h-3.5" /> Manage
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div className="text-center py-2">
+              <div className="w-12 h-12 mx-auto rounded-xl bg-muted flex items-center justify-center text-muted-foreground mb-2">
+                <Globe className="w-6 h-6" />
+              </div>
+              <p className="text-sm text-muted-foreground">
+                Not published yet. Generate the sticker and publish to get a shareable page,
+                QR code, and embed snippet for the dealer's website.
+              </p>
+              <button onClick={() => onTab("labels")} className="mt-3 h-9 px-4 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold inline-flex items-center justify-center gap-1.5">
+                <Printer className="w-3.5 h-3.5" /> Generate Sticker
+              </button>
+            </div>
           )}
         </Card>
       </div>
@@ -1623,12 +1815,34 @@ const JumpTo = ({ path, reason }: { path: string; reason: string }) => {
   );
 };
 
-const Card = ({ title, children }: { title: string; children: React.ReactNode }) => (
-  <div className="rounded-xl border border-border bg-card p-4 space-y-2">
-    <h3 className="text-xs font-bold uppercase tracking-label text-muted-foreground">{title}</h3>
+const Card = ({ title, children, action }: { title: string; children: React.ReactNode; action?: React.ReactNode }) => (
+  <div className="rounded-2xl border border-border bg-card shadow-sm p-4 space-y-2">
+    <div className="flex items-center justify-between">
+      <h3 className="text-xs font-bold uppercase tracking-label text-muted-foreground">{title}</h3>
+      {action}
+    </div>
     {children}
   </div>
 );
+
+// Compact SVG progress ring for the readiness banner.
+const ReadinessRing = ({ pct, tone }: { pct: number; tone: "emerald" | "amber" }) => {
+  const r = 16;
+  const c = 2 * Math.PI * r;
+  const stroke = tone === "emerald" ? "#10B981" : "#F59E0B";
+  return (
+    <div className="relative w-12 h-12 shrink-0">
+      <svg className="w-12 h-12 -rotate-90" viewBox="0 0 40 40">
+        <circle cx="20" cy="20" r={r} fill="none" stroke="currentColor" strokeWidth="4" className="text-muted" />
+        <circle
+          cx="20" cy="20" r={r} fill="none" stroke={stroke} strokeWidth="4" strokeLinecap="round"
+          strokeDasharray={c} strokeDashoffset={c - (c * pct) / 100}
+        />
+      </svg>
+      <span className="absolute inset-0 flex items-center justify-center text-[11px] font-bold tabular-nums text-foreground">{pct}%</span>
+    </div>
+  );
+};
 
 const Item = ({ ok, label, when }: { ok: boolean; label: string; when: string | null }) => (
   <li className="flex items-center justify-between gap-2">
