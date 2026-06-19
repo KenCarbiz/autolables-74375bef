@@ -10,6 +10,7 @@ import { useVehicleListing } from "@/hooks/useVehicleListing";
 import { useRecallLookup } from "@/hooks/useRecallLookup";
 import RecallBanner from "@/components/addendum/RecallBanner";
 import { useVehiclePrefill, VehicleContextHeader } from "@/lib/vehiclePrefill";
+import { useVehicleSpecs } from "@/hooks/useVehicleSpecs";
 import { toast } from "sonner";
 import { PublishPriceGate } from "@/components/inventory/PublishPriceGate";
 import { QRCodeSVG } from "qrcode.react";
@@ -73,6 +74,28 @@ const NewCarSticker = () => {
       return opts.length > 0 ? opts : [v.bodyStyle, v.drivetrain, v.fuelType, v.engine].filter(Boolean);
     });
   });
+
+  // On-demand full factory-options decode (merges options + MPG/engine).
+  const { fetchSpecs, loading: pullingSpecs } = useVehicleSpecs();
+  const handlePullSpecs = async () => {
+    const r = await fetchSpecs({ vin: vehicle.vin, tenantId: tenant?.id, vehicleId: prefill.vehicle?.id });
+    if (r) {
+      const opts = [...r.options, ...r.features];
+      if (opts.length) setEquipment((prev) => Array.from(new Set([...prev.filter(Boolean), ...opts])));
+      const b = r.build || {};
+      const str = (val: unknown) => (val == null || val === "" ? "" : String(val));
+      setVehicle((prev) => ({
+        ...prev,
+        mpgCity: str(b.city_mpg) || prev.mpgCity,
+        mpgHwy: str(b.highway_mpg) || prev.mpgHwy,
+        mpgCombined: str(b.combined_mpg) || prev.mpgCombined,
+        engine: str(b.engine) || prev.engine,
+        transmission: str(b.transmission) || prev.transmission,
+        drivetrain: str(b.drivetrain) || prev.drivetrain,
+        fuelType: str(b.fuel_type) || prev.fuelType,
+      }));
+    }
+  };
 
   const dealerName = currentStore?.name || settings.dealer_name || "Your Dealership";
   const dealerLogo = currentStore?.logo_url || settings.dealer_logo_url || tenant?.logo_url || "";
@@ -354,6 +377,14 @@ const NewCarSticker = () => {
           </CfgCard>
           <CfgCard title="Factory Equipment (one per line)">
             <textarea value={equipment.join("\n")} onChange={e => setEquipment(e.target.value.split("\n"))} placeholder={"ABS\nBackup Camera\nBluetooth\nLane Departure Warning"} rows={5} className="w-full px-3 py-2 rounded-md border border-border bg-background text-sm outline-none resize-y" />
+            <button
+              onClick={handlePullSpecs}
+              disabled={pullingSpecs || vehicle.vin.length !== 17}
+              className="mt-2 h-8 px-3 rounded-md border border-border text-xs font-semibold text-blue-600 hover:bg-muted disabled:opacity-50 inline-flex items-center gap-1.5"
+            >
+              <Sparkles className="w-3.5 h-3.5" />
+              {pullingSpecs ? "Pulling…" : "Pull factory options + MPG from VIN"}
+            </button>
           </CfgCard>
         </div>
 

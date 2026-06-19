@@ -7,6 +7,7 @@ export interface VehicleSpecsResult {
   options: string[];
   features: string[];
   optionCount: number;
+  build: Record<string, unknown>;
 }
 
 // On-demand full factory-options decode for a single VIN via the
@@ -24,10 +25,11 @@ export function useVehicleSpecs() {
           body: { vin: args.vin, tenant_id: args.tenantId || null, vehicle_id: args.vehicleId || null },
         });
         if (error) {
-          toast.error("Couldn't pull factory options");
+          // A 404/non-2xx here usually means the edge function isn't deployed yet.
+          toast.error("Factory-options service isn't available yet — deploy the marketcheck-specs function.");
           return null;
         }
-        const res = data as { ok?: boolean; options?: string[]; features?: string[]; optionCount?: number; error?: string };
+        const res = data as { ok?: boolean; options?: string[]; features?: string[]; optionCount?: number; build?: Record<string, unknown>; error?: string };
         if (!res?.ok) {
           toast.error(res?.error === "not_configured" ? "MarketCheck specs not configured" : "No factory options found for this VIN");
           return null;
@@ -36,7 +38,7 @@ export function useVehicleSpecs() {
         const features = res.features || [];
         const optionCount = res.optionCount ?? options.length + features.length;
         toast.success(optionCount > 0 ? `Pulled ${optionCount} factory options` : "Decode complete — no options listed");
-        return { ok: true, options, features, optionCount };
+        return { ok: true, options, features, optionCount, build: res.build || {} };
       } catch {
         toast.error("Couldn't pull factory options");
         return null;

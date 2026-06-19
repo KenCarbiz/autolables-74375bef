@@ -106,6 +106,18 @@ const UsedCarSticker = () => {
     if (r) {
       const opts = [...r.options, ...r.features];
       if (opts.length) setEquipment((prev) => Array.from(new Set([...prev.filter(Boolean), ...opts])));
+      const b = r.build || {};
+      const str = (v: unknown) => (v == null || v === "" ? "" : String(v));
+      setVehicle((prev) => ({
+        ...prev,
+        mpgCity: str(b.city_mpg) || prev.mpgCity,
+        mpgHwy: str(b.highway_mpg) || prev.mpgHwy,
+        mpgCombined: str(b.combined_mpg) || prev.mpgCombined,
+        engine: str(b.engine) || prev.engine,
+        transmission: str(b.transmission) || prev.transmission,
+        drivetrain: str(b.drivetrain) || prev.drivetrain,
+        fuelType: str(b.fuel_type) || prev.fuelType,
+      }));
     }
   };
   // Generate proper tracking code: AC-{STORE}-{VIN6}-{TYPE}-{TIMESTAMP}

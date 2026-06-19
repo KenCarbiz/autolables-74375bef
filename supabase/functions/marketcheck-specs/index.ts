@@ -126,8 +126,25 @@ Deno.serve(async (req) => {
       const row = rows && rows[0];
       if (row) {
         const prev = (row.mc_attributes || {}) as Record<string, unknown>;
+        // Backfill the decoded build fields (MPG, engine, drivetrain, …) too,
+        // but only when present so we never null out good sync data.
+        const fill: Record<string, unknown> = {};
+        const setIf = (k: string, v: unknown) => { if (v != null && v !== "") fill[k] = v; };
+        setIf("city_mpg", build.city_mpg);
+        setIf("highway_mpg", build.highway_mpg);
+        setIf("combined_mpg", build.combined_mpg);
+        setIf("engine", build.engine);
+        setIf("engine_size", build.engine_size);
+        setIf("cylinders", build.cylinders);
+        setIf("transmission", build.transmission);
+        setIf("drivetrain", build.drivetrain);
+        setIf("fuel_type", build.fuel_type);
+        setIf("body_type", build.body_type);
+        setIf("doors", build.doors);
+        setIf("std_seating", build.std_seating);
         const merged = {
           ...prev,
+          ...fill,
           options: options.length ? options : prev.options ?? null,
           features: features.length ? features : prev.features ?? null,
           specs_decoded_at: new Date().toISOString(),

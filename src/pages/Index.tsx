@@ -158,10 +158,17 @@ const Index = () => {
   // so the artifact stays true-to-paper-size.
   // Default the on-screen preview to 140% on desktop (wider screens) where
   // there's room; phones/tablets stay at 110% so the sheet fits.
-  const [zoom, setZoom] = useState(() =>
-    typeof window !== "undefined" && window.innerWidth >= 1024 ? 1.4 : 1.1,
-  );
-  const defaultZoom = typeof window !== "undefined" && window.innerWidth >= 1024 ? 1.4 : 1.1;
+  // Fit the 8.5in sheet to the available content column so the on-screen
+  // preview reads as a realistic letter page instead of a narrow strip.
+  const defaultZoom = (() => {
+    if (typeof window === "undefined") return 1.3;
+    const w = window.innerWidth;
+    if (w < 1024) return 1.05; // phone/tablet: keep the sheet within reach
+    const avail = w - 340; // sidebar rail + page padding
+    const paperPx = 8.5 * 96;
+    return Math.max(1.3, Math.min(1.85, +(avail / paperPx).toFixed(2)));
+  })();
+  const [zoom, setZoom] = useState(defaultZoom);
   // Language of the disclosure block. FTC Used Car Rule + CA SB 766
   // require the disclosure to be presented in the language the sale
   // is conducted in. Dealer picks per-addendum; "en" is default.
@@ -255,6 +262,10 @@ const Index = () => {
   const paperWidth = settings.addendum_paper_size === "custom"
     ? `${settings.addendum_custom_width || "8.5"}in`
     : PAPER_WIDTHS[settings.addendum_paper_size] || "8.5in";
+  // The sheet is rendered with CSS zoom, so its visual width is paper × zoom.
+  // Match the no-print control bars to that width so they don't sit narrower
+  // than the document and look misaligned.
+  const previewMaxWidth = `${(parseFloat(paperWidth) || 8.5) * zoom}in`;
 
   // Load saved addendum when ?id= is present
   useEffect(() => {
@@ -1312,7 +1323,7 @@ const Index = () => {
   return (
     <div className="bg-muted/30 py-6 px-4 lg:px-8 min-h-[calc(100vh-3.5rem)]">
       {/* Page header + action bar */}
-      <div style={{ maxWidth: paperWidth }} className="mx-auto mb-4 flex items-center justify-between flex-wrap gap-3 no-print">
+      <div style={{ maxWidth: previewMaxWidth }} className="mx-auto mb-4 flex items-center justify-between flex-wrap gap-3 no-print">
         <div>
           <h1 className="text-xl font-semibold tracking-tight font-display text-foreground">
             {viewMode ? "View Addendum" : "New Addendum"}
@@ -1438,7 +1449,7 @@ const Index = () => {
 
       {/* Rules notification */}
       {settings.feature_product_rules && rules.length > 0 && vehicleContext.make && !viewMode && (
-        <div style={{ maxWidth: paperWidth }} className="mx-auto mb-2 no-print">
+        <div style={{ maxWidth: previewMaxWidth }} className="mx-auto mb-2 no-print">
           <div className="bg-teal/10 border border-teal/30 rounded-md px-3 py-1.5 text-[11px] text-teal font-semibold">
             Product rules active — showing {displayProducts?.length || 0} products matching {vehicleContext.year} {vehicleContext.make} {vehicleContext.model}
           </div>
@@ -1448,7 +1459,7 @@ const Index = () => {
       {/* Install-proof default banner — explains why lines auto-defaulted
           once a vendor has verified an installation on this VIN. */}
       {!viewMode && proofRegime && (
-        <div style={{ maxWidth: paperWidth }} className="mx-auto mb-2 no-print">
+        <div style={{ maxWidth: previewMaxWidth }} className="mx-auto mb-2 no-print">
           <div className="bg-emerald-50 border border-emerald-200 rounded-md px-3 py-1.5 text-[11px] text-emerald-800 font-semibold flex items-center gap-1.5">
             <Check className="w-3.5 h-3.5 flex-shrink-0" />
             {provenNames.size} verified installation{provenNames.size === 1 ? "" : "s"} on file for this VIN — matching lines default to Pre-Installed, the rest to Customer Elected. Override any line with its Sale Method badge.
@@ -1459,7 +1470,7 @@ const Index = () => {
       {/* Compliance red-team — Wave 4.2. Runs on every keystroke and
           lists what a regulator would flag before the customer signs. */}
       {!viewMode && (
-        <div style={{ maxWidth: paperWidth }} className="mx-auto mb-3 no-print space-y-3">
+        <div style={{ maxWidth: previewMaxWidth }} className="mx-auto mb-3 no-print space-y-3">
           {settings.feature_price_verification && (
             <AddendumPriceIntegrity
               assessment={priceIntegrity}
