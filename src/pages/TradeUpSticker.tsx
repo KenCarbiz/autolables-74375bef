@@ -4,6 +4,7 @@ import { useDealerSettings } from "@/contexts/DealerSettingsContext";
 import { useVinDecode } from "@/hooks/useVinDecode";
 import { useAudit } from "@/contexts/AuditContext";
 import { useAuth } from "@/contexts/AuthContext";
+import { useVehiclePrefill, VehicleContextHeader } from "@/lib/vehiclePrefill";
 import { QRCodeSVG } from "qrcode.react";
 import { toast } from "sonner";
 import {
@@ -48,6 +49,24 @@ const TradeUpSticker = () => {
   // State
   const [vehicleType, setVehicleType] = useState<"new" | "used">("used");
   const [vehicle, setVehicle] = useState({ year: "", make: "", model: "", trim: "", vin: "", stock: "", mileage: "", price: "" });
+
+  // Prefill from a vehicle file (?vehicleId=…) so the dealer never re-keys
+  // the YMM / VIN / mileage / price for the trade-up hook.
+  const prefill = useVehiclePrefill((v) => {
+    setVehicle((prev) => ({
+      ...prev,
+      year: v.year || prev.year,
+      make: v.make || prev.make,
+      model: v.model || prev.model,
+      trim: v.trim || prev.trim,
+      vin: v.vin || prev.vin,
+      stock: v.stock || prev.stock,
+      mileage: v.mileage || prev.mileage,
+      price: v.price || prev.price,
+    }));
+    if (v.condition === "new") setVehicleType("new");
+    else if (v.condition === "used" || v.condition === "cpo") setVehicleType("used");
+  });
   const [headline, setHeadline] = useState("WHAT'S YOUR CAR WORTH?");
   const [subhead, setSubhead] = useState("TRADE UP TODAY");
   const [offerText, setOfferText] = useState("Get an instant trade-in value and upgrade to a newer vehicle.");
@@ -173,6 +192,8 @@ const TradeUpSticker = () => {
           </button>
         </div>
       </div>
+
+      <VehicleContextHeader state={prefill} />
 
       {/* Template library */}
       <div className="bg-card rounded-xl border border-border shadow-premium overflow-hidden no-print">

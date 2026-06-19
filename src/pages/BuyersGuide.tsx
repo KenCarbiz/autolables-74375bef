@@ -5,6 +5,7 @@ import { useAudit } from "@/contexts/AuditContext";
 import { useTenant } from "@/contexts/TenantContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { resolveBuyersGuideWarranty } from "@/lib/stateCompliance";
+import { useVehiclePrefill, VehicleContextHeader } from "@/lib/vehiclePrefill";
 import { toast } from "sonner";
 
 type GuideType = "as-is" | "implied" | "warranty";
@@ -213,6 +214,21 @@ const BuyersGuide = () => {
   const [warrantyPct, setWarrantyPct] = useState("100%");
   const [coveredSystems, setCoveredSystems] = useState<string[]>(WARRANTY_SYSTEMS);
 
+  // Prefill from a vehicle file (?vehicleId=…) so the dealer never re-keys
+  // the YMM / VIN / mileage / price the Buyers Guide needs.
+  const prefill = useVehiclePrefill((v) => {
+    setVehicle((prev) => ({
+      ...prev,
+      year: v.year || prev.year,
+      make: v.make || prev.make,
+      model: v.model || prev.model,
+      vin: v.vin || prev.vin,
+      stock: v.stock || prev.stock,
+      mileage: v.mileage || prev.mileage,
+      price: v.price || prev.price,
+    }));
+  });
+
   // State-aware warranty box: several states override "As-Is" with a
   // mandatory used-vehicle warranty keyed to price/mileage. Driven by the
   // dealer's operating state + this vehicle's age/mileage/price.
@@ -293,6 +309,11 @@ const BuyersGuide = () => {
 
   return (
     <div className="min-h-screen bg-background py-4 px-2 md:px-4">
+      {prefill.active && (
+        <div className="max-w-[8.5in] mx-auto mb-3">
+          <VehicleContextHeader state={prefill} />
+        </div>
+      )}
       {/* Controls */}
       <div className="max-w-[8.5in] mx-auto mb-3 flex flex-wrap gap-2 items-center no-print">
         <button onClick={() => navigate("/addendum")} className="font-semibold text-[13px] px-5 py-2 rounded-md bg-navy text-primary-foreground tracking-[0.4px] hover:opacity-85">

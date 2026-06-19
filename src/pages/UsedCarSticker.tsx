@@ -11,6 +11,7 @@ import { useZebraPrint } from "@/hooks/useZebraPrint";
 import { useVehicleListing } from "@/hooks/useVehicleListing";
 import { useRecallLookup } from "@/hooks/useRecallLookup";
 import RecallBanner from "@/components/addendum/RecallBanner";
+import { useVehiclePrefill, VehicleContextHeader } from "@/lib/vehiclePrefill";
 import { toast } from "sonner";
 import { PublishPriceGate } from "@/components/inventory/PublishPriceGate";
 import { PrePrintedStickerFrame } from "@/components/sticker/PrePrintedStickerFrame";
@@ -63,6 +64,34 @@ const UsedCarSticker = () => {
   const [valueProps, setValueProps] = useState<{ name: string; value: string }[]>([
     { name: "", value: "No Charge" },
   ]);
+
+  // Prefill from a vehicle file (?vehicleId=…). Seeds the form once so the
+  // dealer never re-keys VIN / YMM / mileage / advertised price / equipment.
+  const prefill = useVehiclePrefill((v) => {
+    setVehicle((prev) => ({
+      ...prev,
+      vin: v.vin || prev.vin,
+      year: v.year || prev.year,
+      make: v.make || prev.make,
+      model: v.model || prev.model,
+      trim: v.trim || prev.trim,
+      stock: v.stock || prev.stock,
+      mileage: v.mileage || prev.mileage,
+      marketValue: v.price || prev.marketValue,
+      color: v.exteriorColor || prev.color,
+      interiorColor: v.interiorColor || prev.interiorColor,
+      engine: v.engine || prev.engine,
+      transmission: v.transmission || prev.transmission,
+      drivetrain: v.drivetrain || prev.drivetrain,
+      fuelType: v.fuelType || prev.fuelType,
+      bodyStyle: v.bodyStyle || prev.bodyStyle,
+    }));
+    setEquipment((prev) =>
+      prev.filter(Boolean).length > 0
+        ? prev
+        : [v.bodyStyle, v.drivetrain, v.fuelType, v.engine].filter(Boolean)
+    );
+  });
   // Generate proper tracking code: AC-{STORE}-{VIN6}-{TYPE}-{TIMESTAMP}
   const trackingCode = (() => {
     const storePrefix = (currentStore?.id || "STOR").slice(0, 4).toUpperCase();
@@ -347,6 +376,7 @@ const UsedCarSticker = () => {
           )}
         </div>
       </div>
+      <VehicleContextHeader state={prefill} />
       {publishedSlug && (
         <div className="no-print rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 flex items-center gap-3">
           <Globe className="w-4 h-4 text-emerald-600 flex-shrink-0" />

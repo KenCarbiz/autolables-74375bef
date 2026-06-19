@@ -9,6 +9,7 @@ import { useProducts } from "@/hooks/useProducts";
 import { useVehicleListing } from "@/hooks/useVehicleListing";
 import { useRecallLookup } from "@/hooks/useRecallLookup";
 import RecallBanner from "@/components/addendum/RecallBanner";
+import { useVehiclePrefill, VehicleContextHeader } from "@/lib/vehiclePrefill";
 import { toast } from "sonner";
 import { PublishPriceGate } from "@/components/inventory/PublishPriceGate";
 import { QRCodeSVG } from "qrcode.react";
@@ -41,6 +42,34 @@ const NewCarSticker = () => {
 
   const [equipment, setEquipment] = useState<string[]>([]);
   const [showEquipment, setShowEquipment] = useState(true);
+
+  // Prefill from a vehicle file (?vehicleId=…). Seeds the form once so the
+  // dealer never re-keys VIN / YMM / MSRP / equipment.
+  const prefill = useVehiclePrefill((v) => {
+    setVehicle((prev) => ({
+      ...prev,
+      vin: v.vin || prev.vin,
+      year: v.year || prev.year,
+      make: v.make || prev.make,
+      model: v.model || prev.model,
+      trim: v.trim || prev.trim,
+      stock: v.stock || prev.stock,
+      msrp: v.msrp || v.price || prev.msrp,
+      engine: v.engine || prev.engine,
+      transmission: v.transmission || prev.transmission,
+      drivetrain: v.drivetrain || prev.drivetrain,
+      fuelType: v.fuelType || prev.fuelType,
+      color: v.exteriorColor || prev.color,
+      interiorColor: v.interiorColor || prev.interiorColor,
+      bodyStyle: v.bodyStyle || prev.bodyStyle,
+      doors: v.doors || prev.doors,
+    }));
+    setEquipment((prev) =>
+      prev.filter(Boolean).length > 0
+        ? prev
+        : [v.bodyStyle, v.drivetrain, v.fuelType, v.engine].filter(Boolean)
+    );
+  });
 
   const dealerName = currentStore?.name || settings.dealer_name || "Your Dealership";
   const dealerLogo = currentStore?.logo_url || settings.dealer_logo_url || tenant?.logo_url || "";
@@ -248,6 +277,8 @@ const NewCarSticker = () => {
           )}
         </div>
       </div>
+
+      <VehicleContextHeader state={prefill} />
 
       {publishedSlug && (
         <div className="no-print rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 flex items-center gap-3">

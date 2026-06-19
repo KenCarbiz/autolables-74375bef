@@ -2,6 +2,7 @@ import { useState, useRef } from "react";
 import { useDealerSettings } from "@/contexts/DealerSettingsContext";
 import { useTenant } from "@/contexts/TenantContext";
 import { useVinDecode } from "@/hooks/useVinDecode";
+import { useVehiclePrefill, VehicleContextHeader } from "@/lib/vehiclePrefill";
 import { toast } from "sonner";
 import { QRCodeSVG } from "qrcode.react";
 import { Printer, Download, ShieldCheck, CheckCircle2, Award } from "lucide-react";
@@ -30,6 +31,26 @@ const CpoSheet = () => {
     "Exchange/return privilege",
   ]);
   const [carfaxUrl, setCarfaxUrl] = useState("");
+
+  // Prefill from a vehicle file (?vehicleId=…). Seeds the form once and
+  // defaults the CPO program from the make so the dealer never re-keys it.
+  const prefill = useVehiclePrefill((v) => {
+    setVehicle((prev) => ({
+      ...prev,
+      vin: v.vin || prev.vin,
+      year: v.year || prev.year,
+      make: v.make || prev.make,
+      model: v.model || prev.model,
+      trim: v.trim || prev.trim,
+      stock: v.stock || prev.stock,
+      mileage: v.mileage || prev.mileage,
+      color: v.exteriorColor || prev.color,
+      engine: v.engine || prev.engine,
+      transmission: v.transmission || prev.transmission,
+      drivetrain: v.drivetrain || prev.drivetrain,
+    }));
+    if (v.make) setCpoProgram((prev) => prev || `${v.make} Certified Pre-Owned`);
+  });
 
   const dealerName = currentStore?.name || settings.dealer_name || "Your Dealership";
   const dealerLogo = currentStore?.logo_url || settings.dealer_logo_url || tenant?.logo_url || "";
@@ -72,6 +93,8 @@ const CpoSheet = () => {
           <button onClick={handlePdf} disabled={generating} className="inline-flex items-center gap-1.5 h-9 px-3 rounded-md bg-primary text-primary-foreground text-sm font-medium hover:opacity-90 disabled:opacity-50"><Download className="w-3.5 h-3.5" /> PDF</button>
         </div>
       </div>
+
+      <VehicleContextHeader state={prefill} />
 
       <div className="grid grid-cols-1 lg:grid-cols-5 gap-5">
         <div className="lg:col-span-2 space-y-4 no-print">

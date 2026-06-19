@@ -891,33 +891,49 @@ const DocumentsPanel = ({ vehicle, onReload }: { vehicle: VehicleRow; onReload: 
 
 const LabelsPanel = ({ vehicle }: { vehicle: VehicleRow }) => {
   const navigate = useNavigate();
-  const links = vehicle.condition === "new"
+  // Carry the vehicle identity into every generator so the destination form
+  // prefills from this file (see useVehiclePrefill). The dealer never re-keys
+  // VIN / YMM / mileage / price that we already have.
+  const go = (path: string) => navigate(`${path}?vehicleId=${vehicle.id}`);
+
+  const hasCore = !!vehicle.vin && !!vehicle.ymm;
+  const hasPrice = vehicle.price != null && vehicle.price > 0;
+  const hasMileage = vehicle.mileage != null && vehicle.mileage > 0;
+  const isCpo = vehicle.condition === "cpo";
+
+  type LabelLink = { path: string; label: string; desc: string; ready: boolean; note: string; disabled?: boolean };
+  const links: LabelLink[] = vehicle.condition === "new"
     ? [
-        { path: "/new-car-sticker", label: "New-car Monroney + Addendum", desc: "Factory-style sticker with dealer-installed accessories and doc fee." },
-        { path: "/buyers-guide",    label: "FTC Buyers Guide", desc: "Required for used sales. Spanish version auto-toggles." },
+        { path: "/new-car-sticker", label: "New-car Monroney + Addendum", desc: "Factory-style sticker with dealer-installed accessories and doc fee.", ready: hasCore, note: hasCore ? "Ready to generate" : "Decode VIN first" },
+        { path: "/buyers-guide",    label: "FTC Buyers Guide", desc: "Spanish version auto-toggles.", ready: hasCore, note: "Needs warranty selection" },
       ]
     : [
-        { path: "/used-car-sticker", label: "Used-car Monroney + Addendum", desc: "Three layouts: full, equipment-only, accessories-only." },
-        { path: "/cpo-sheet",        label: "CPO sheet",  desc: "Certified Pre-Owned disclosure template." },
-        { path: "/buyers-guide",     label: "FTC Buyers Guide", desc: "Required; bilingual (en/es)." },
-        { path: "/trade-up",         label: "Trade-Up sticker", desc: "For demo / courtesy / trade-in display units." },
+        { path: "/used-car-sticker", label: "Used-car Monroney + Addendum", desc: "Three layouts: full, equipment-only, accessories-only.", ready: hasCore && hasPrice, note: hasCore && hasPrice ? "Ready to generate" : !hasPrice ? "Price missing" : "Decode VIN first" },
+        { path: "/cpo-sheet",        label: "CPO Sheet",  desc: "Certified Pre-Owned disclosure template.", ready: isCpo, note: isCpo ? "Ready to generate" : "Available for CPO vehicles only", disabled: !isCpo },
+        { path: "/buyers-guide",     label: "FTC Buyers Guide", desc: "Required; bilingual (en/es).", ready: hasCore, note: "Needs warranty selection" },
+        { path: "/trade-up",         label: "Trade-Up Sticker", desc: "For demo / courtesy / trade-in display units.", ready: hasCore, note: hasCore ? "Ready to generate" : "Decode VIN first" },
       ];
   return (
     <div className="space-y-3">
       <div className="rounded-xl border border-border bg-card p-4">
         <h3 className="text-sm font-bold text-foreground">Generate labels for this vehicle</h3>
         <p className="text-[11px] text-muted-foreground mt-1">
-          Every label pulls VIN, YMM, trim, equipment, and price from this file. When
-          you publish to the shopper portal, the QR on the printed sticker resolves
-          to <span className="font-mono">/v/{vehicle.slug}</span>.
+          Every label opens with VIN, YMM, trim, equipment, and price already pulled
+          from this file. When you publish to the shopper portal, the QR on the printed
+          sticker resolves to <span className="font-mono">/v/{vehicle.slug}</span>.
         </p>
       </div>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
         {links.map((l) => (
           <button
             key={l.path}
-            onClick={() => navigate(l.path)}
-            className="text-left rounded-xl border border-border bg-card p-4 hover:border-primary hover:shadow-premium transition"
+            onClick={() => !l.disabled && go(l.path)}
+            disabled={l.disabled}
+            className={`text-left rounded-xl border bg-card p-4 transition ${
+              l.disabled
+                ? "border-border opacity-55 cursor-not-allowed"
+                : "border-border hover:border-primary hover:shadow-premium"
+            }`}
           >
             <div className="flex items-center justify-between">
               <span className="text-sm font-bold text-foreground inline-flex items-center gap-1.5">
@@ -927,6 +943,14 @@ const LabelsPanel = ({ vehicle }: { vehicle: VehicleRow }) => {
               <Sparkles className="w-3.5 h-3.5 text-primary" />
             </div>
             <p className="text-[11px] text-muted-foreground mt-1">{l.desc}</p>
+            <span
+              className={`mt-2 inline-flex items-center gap-1 text-[10px] font-semibold ${
+                l.disabled ? "text-muted-foreground" : l.ready ? "text-emerald-600" : "text-amber-600"
+              }`}
+            >
+              <span className={`w-1.5 h-1.5 rounded-full ${l.disabled ? "bg-slate-300" : l.ready ? "bg-emerald-500" : "bg-amber-500"}`} />
+              {l.note}
+            </span>
           </button>
         ))}
       </div>
