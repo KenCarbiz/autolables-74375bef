@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { QRCodeSVG } from "qrcode.react";
 import { supabase } from "@/integrations/supabase/client";
 import { useTenant } from "@/contexts/TenantContext";
@@ -91,6 +91,44 @@ export const GetReadySheet = ({
   if (!open) return null;
 
   const installUrl = token ? `${window.location.origin}/install/${token}` : "";
+  const keyTagQrRef = useRef<HTMLDivElement>(null);
+
+  // Print a compact key-tag/hang-tag carrying just the installer QR — attach it
+  // to the keys until the install is verified, then discard. Printed in an
+  // isolated popup so it never disturbs the full recon-slip layout.
+  const printKeyTag = () => {
+    if (!installUrl) return;
+    const svg = keyTagQrRef.current?.innerHTML || "";
+    const who = dealerName || settings.dealer_name || "Dealership";
+    const w = window.open("", "_blank", "width=420,height=620");
+    if (!w) return;
+    w.document.write(`<!doctype html><html><head><title>Installer Key Tag</title>
+      <style>
+        @page { margin: 8mm; }
+        * { box-sizing: border-box; font-family: -apple-system, system-ui, sans-serif; }
+        body { margin: 0; display: flex; justify-content: center; }
+        .tag { width: 2.6in; border: 2px dashed #94a3b8; border-radius: 12px; padding: 14px; text-align: center; }
+        .hole { width: 22px; height: 22px; border: 2px solid #94a3b8; border-radius: 999px; margin: 0 auto 8px; }
+        .ey { font-size: 9px; font-weight: 800; letter-spacing: .16em; text-transform: uppercase; color: #64748b; }
+        .ttl { font-size: 13px; font-weight: 800; margin: 2px 0 8px; }
+        .qr { display: inline-block; border: 1px solid #cbd5e1; padding: 6px; background: #fff; }
+        .meta { font-size: 10px; color: #334155; margin-top: 8px; line-height: 1.4; }
+        .vin { font-family: ui-monospace, monospace; font-weight: 700; }
+        .note { font-size: 9px; color: #b45309; font-weight: 700; margin-top: 8px; }
+      </style></head><body>
+      <div class="tag">
+        <div class="hole"></div>
+        <div class="ey">Installer · scan to verify</div>
+        <div class="ttl">${who}</div>
+        <div class="qr">${svg}</div>
+        <div class="meta">${record.ymm || "Vehicle"}<br/>Stock ${record.stockNumber || "—"}<br/><span class="vin">${record.vin}</span></div>
+        <div class="note">Keep on keys until install is verified, then discard.</div>
+      </div>
+      <script>window.onload=function(){window.print();}</script>
+      </body></html>`);
+    w.document.close();
+  };
+
   const accessories = record.accessoriesToInstall || [];
   const reachedStage = STATUS_STAGE[record.status] ?? 0;
   const blankRows = Math.max(0, 4 - accessories.length);
@@ -245,10 +283,16 @@ export const GetReadySheet = ({
           </div>
         </div>
 
+        {/* Hidden QR source for the key-tag popup (serialized on print). */}
+        <div ref={keyTagQrRef} className="hidden">{installUrl && <QRCodeSVG value={installUrl} size={150} />}</div>
+
         {/* Actions */}
         <div className="gr-noprint flex items-center justify-end gap-2 px-7 pb-6">
           <button onClick={onClose} className="h-10 px-4 rounded-lg border border-slate-200 text-sm font-semibold text-slate-700 hover:bg-slate-50">
             Close
+          </button>
+          <button onClick={printKeyTag} disabled={!installUrl} className="h-10 px-4 rounded-lg border border-slate-300 text-sm font-semibold text-slate-700 hover:bg-slate-50 inline-flex items-center gap-1.5 disabled:opacity-50">
+            <Printer className="w-4 h-4" /> Print key tag
           </button>
           <button onClick={() => window.print()} className="h-10 px-4 rounded-lg bg-slate-950 text-white text-sm font-semibold inline-flex items-center gap-1.5 hover:bg-slate-900">
             <Printer className="w-4 h-4" /> Print slip
