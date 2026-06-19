@@ -147,6 +147,16 @@ export interface VehicleListing {
   payment_estimate: ListingPaymentEstimate | null;
   recall_check: ListingRecallCheck | null;
 
+  // MarketCheck enrichment (already returned by get_vehicle_listing_by_slug's
+  // SELECT *; surfaced here so the shopper page can render insights + options).
+  mc_attributes?: Record<string, unknown> | null;
+  hero_image_url?: string | null;
+  recall_status?: string | null;
+  open_recall_count?: number | null;
+  market_value?: number | null;
+  market_position?: string | null;
+  market_payload?: { listingPrice?: number | null; low?: number | null; high?: number | null; belowMarket?: number } | null;
+
   prep_status: { all_accessories_installed?: boolean; foreman_signed_at?: string } | null;
   status: "draft" | "published" | "archived";
   published_at: string | null;

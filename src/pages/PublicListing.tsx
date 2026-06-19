@@ -39,6 +39,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { formatPhone } from "@/components/addendum/CustomerInfoSection";
 import { PublicLocaleProvider, usePublicLocale, fmt } from "@/lib/i18n/public";
 import PublicLanguageToggle from "@/components/layout/PublicLanguageToggle";
+import VehicleInsights from "@/components/listing/VehicleInsights";
+import { listingOptions } from "@/lib/vehicleInsights";
 
 // ──────────────────────────────────────────────────────────────
 // PublicListing — the shopper-facing window sticker. Mounted at
@@ -276,6 +278,11 @@ const PublicListingBody = () => {
             no VDP on the market shows today. */}
         <TrustBand listing={listing} />
 
+        {/* Vehicle insights — shopper-facing "why this is a great buy"
+            ribbon (below-market, one-owner, clean title, no recalls, MPG)
+            built from the MarketCheck enrichment. Self-hides when empty. */}
+        <VehicleInsights listing={listing} />
+
         {/* Recall banner — only shows if the campaign data has
             anything actionable. Clear listings don't need the visual
             weight; do-not-drive blocks publish upstream so we only
@@ -295,6 +302,9 @@ const PublicListingBody = () => {
 
         {/* Key specs grid — pulls from listing.key_specs */}
         <KeySpecs listing={listing} />
+
+        {/* Factory options & equipment — decoded from the inventory feed */}
+        <FactoryOptions listing={listing} />
 
         {/* Photos gallery — only renders if the listing has photos */}
         <PhotosGallery listing={listing} />
@@ -1193,6 +1203,23 @@ const KeySpecs = ({ listing }: { listing: VehicleListing }) => {
             </div>
           );
         })}
+      </div>
+    </section>
+  );
+};
+
+const FactoryOptions = ({ listing }: { listing: VehicleListing }) => {
+  const options = listingOptions(listing);
+  if (options.length === 0) return null;
+  return (
+    <section className="rounded-2xl border border-border bg-card shadow-premium p-5">
+      <h2 className="text-sm font-semibold text-foreground mb-3">Factory options &amp; equipment</h2>
+      <div className="flex flex-wrap gap-1.5">
+        {options.map((o) => (
+          <span key={o} className="inline-flex items-center text-[12px] font-medium px-2.5 py-1 rounded-full border border-border bg-muted/40 text-slate-700">
+            {o}
+          </span>
+        ))}
       </div>
     </section>
   );
