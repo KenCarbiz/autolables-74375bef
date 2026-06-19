@@ -573,13 +573,15 @@ const AppShell = ({ children }: AppShellProps) => {
           on desktop; on mobile (no lg:), the rail overlays as a
           slide-in so no padding is needed. */}
       <div className={`flex-1 flex flex-col min-w-0 transition-all duration-200 ease-out ${collapsed ? "lg:pl-16" : "lg:pl-64"}`}>
-        {/* Topbar — Autocurb-style clean white surface with hairline
-            border. topbar-navy class kept for backward-compat but
-            now resolves to a light backdrop-blurred panel. */}
+        {/* Topbar — premium SaaS surface, max 72px tall. Aligns the
+            page title with the sidebar logo's left edge (px-4) and
+            keeps a single unified dealer/sync/MarketCheck status card
+            on the right. Theme toggle + app switcher intentionally
+            removed to reduce visual noise. */}
         <header className="sticky top-0 z-20 topbar-navy vt-topbar text-foreground border-b border-border">
-          <div className="flex items-center h-[68px] px-3 lg:px-5 gap-3">
-            {/* Left: hamburger (mobile) + page title */}
-            <div className="flex items-center gap-3 min-w-0 flex-shrink-0">
+          <div className="flex items-center h-[72px] px-3 lg:px-4 gap-4">
+            {/* Left: hamburger (mobile) + page title aligned to logo edge */}
+            <div className="flex items-center gap-3 min-w-0 flex-shrink-0 w-[260px] max-w-[40%]">
               <button
                 onClick={() => setMobileOpen(true)}
                 className="lg:hidden h-9 w-9 rounded-lg border border-border bg-card hover:bg-muted text-foreground inline-flex items-center justify-center transition-colors"
@@ -587,29 +589,19 @@ const AppShell = ({ children }: AppShellProps) => {
                 <Menu className="w-4 h-4" />
               </button>
               <div className="min-w-0 hidden sm:block">
-                <p className="text-lg font-display font-semibold text-foreground truncate leading-tight">
+                <p className="text-[17px] font-display font-semibold text-foreground truncate leading-tight tracking-tight">
                   {pageMeta.title || `${greeting}, ${capitalized}`}
                 </p>
-                {pageMeta.subtitle ? (
+                {pageMeta.subtitle && (
                   <p className="text-xs text-muted-foreground truncate hidden lg:block mt-0.5">{pageMeta.subtitle}</p>
-                ) : (
-                  <div className="flex items-center gap-1.5 mt-0.5">
-                    <span className="inline-flex items-center gap-1 text-[9px] font-bold bg-amber-100 text-amber-800 px-1.5 py-0.5 rounded-sm uppercase tracking-[0.12em]">
-                      <Sparkles className="w-2.5 h-2.5" />
-                      {isAdmin ? "Super Admin" : "Admin"}
-                    </span>
-                    {currentStore?.name && (
-                      <span className="text-[11px] text-muted-foreground truncate">· {currentStore.name}</span>
-                    )}
-                  </div>
                 )}
               </div>
             </div>
 
-            {/* Centre: command-palette as a prominent global search bar */}
+            {/* Centre: dominant search bar */}
             <button
               onClick={() => setPaletteOpen(true)}
-              className="hidden md:flex flex-1 min-w-0 max-w-[580px] mx-auto items-center gap-2.5 h-11 px-4 rounded-2xl border border-border bg-card hover:bg-muted/60 hover:border-foreground/15 text-sm shadow-sm transition-all"
+              className="hidden md:flex flex-1 min-w-0 items-center gap-3 h-11 px-4 rounded-xl border border-border bg-card hover:bg-muted/60 hover:border-foreground/20 text-sm shadow-sm transition-all"
               title="Command palette (⌘K)"
             >
               <Search className="w-4 h-4 text-muted-foreground flex-shrink-0" />
@@ -622,71 +614,53 @@ const AppShell = ({ children }: AppShellProps) => {
             </button>
 
             {/* Right cluster */}
-            <div className="flex items-center gap-1.5 flex-shrink-0 ml-auto">
-              {/* App switcher */}
-              <AppSwitcher currentApp="autolabels" theme="light" />
+            <div className="flex items-center gap-2 flex-shrink-0">
+              {/* Unified dealership status card — name · location · count · sync · MarketCheck */}
+              {tenant?.name && (
+                <div className="hidden xl:flex items-center h-11 rounded-xl border border-border bg-card shadow-sm px-3 gap-3">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0" aria-hidden />
+                    <div className="leading-tight min-w-0">
+                      <p className="text-[12px] font-semibold text-foreground truncate max-w-[140px]">{tenant.name}</p>
+                      <p className="text-[10px] text-muted-foreground truncate">
+                        {dealerLoc && <span>{dealerLoc} · </span>}
+                        {syncInfo.count != null ? `${syncInfo.count} vehicles` : "—"}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="w-px h-6 bg-border" />
+                  <div className="leading-tight">
+                    <p className="text-[10px] font-medium text-muted-foreground">Last sync</p>
+                    <p className="text-[12px] font-semibold text-foreground tabular-nums">{syncWhen}</p>
+                  </div>
+                  <div className="w-px h-6 bg-border" />
+                  <span className="inline-flex items-center gap-1.5 text-[11px] font-medium text-emerald-700">
+                    <CheckCircle2 className="w-3.5 h-3.5" />
+                    MarketCheck
+                  </span>
+                </div>
+              )}
 
-              {/* Persistent Scan VIN — the primary way inventory enters the
-                  platform, so it lives in the top bar on every page.
-                  Device-aware: camera on phone/tablet, QR hand-off on desktop. */}
+              {/* Primary CTA: Scan VIN */}
               <button
                 onClick={openScan}
-                className="h-9 px-3 rounded-xl border border-border bg-card hover:bg-muted text-foreground inline-flex items-center gap-1.5 text-[13px] font-medium transition-colors"
+                className="h-9 px-3.5 rounded-lg bg-[#2563EB] hover:bg-[#1d4ed8] text-white inline-flex items-center gap-1.5 text-[13px] font-semibold shadow-sm transition-colors"
                 title="Scan a VIN — camera on phone/tablet, QR hand-off on desktop"
               >
                 <ScanLine className="w-4 h-4 stroke-2" />
                 <span className="hidden lg:inline">Scan VIN</span>
               </button>
 
-              {/* Unified system-status card: dealer · sync · MarketCheck */}
-              {tenant?.name && (
-                <div className="hidden xl:flex items-stretch h-[52px] rounded-xl border border-border bg-card shadow-sm overflow-hidden">
-                  <div className="flex items-center gap-2.5 px-4">
-                    <span className="w-7 h-7 rounded-lg bg-blue-600/10 text-blue-700 flex items-center justify-center shrink-0"><Building2 className="w-4 h-4" /></span>
-                    <div className="leading-tight min-w-0">
-                      <p className="text-xs font-bold text-foreground truncate max-w-[130px]">{tenant.name}</p>
-                      {dealerLoc && <p className="text-[10px] text-muted-foreground">{dealerLoc}</p>}
-                    </div>
-                  </div>
-                  <div className="w-px bg-border my-2.5" />
-                  <div className="flex items-center gap-2 px-4">
-                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" />
-                    <div className="leading-tight">
-                      <p className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground">Last synced</p>
-                      <p className="text-xs font-semibold text-foreground">{syncWhen}</p>
-                      {syncInfo.count != null && <p className="text-[10px] font-medium text-emerald-600">{syncInfo.count} vehicles updated</p>}
-                    </div>
-                  </div>
-                  <div className="w-px bg-border my-2.5" />
-                  <div className="flex items-center gap-2 px-4">
-                    <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />
-                    <div className="leading-tight">
-                      <p className="text-xs font-bold text-foreground">MarketCheck</p>
-                      <p className="text-[10px] font-medium text-emerald-600">Connected</p>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* Dark mode toggle */}
-              <button
-                onClick={handleToggleDark}
-                className="h-9 w-9 rounded-xl border border-border bg-card hover:bg-muted text-muted-foreground hover:text-foreground inline-flex items-center justify-center transition-colors"
-                title="Toggle dark mode"
-              >
-                {darkMode ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
-              </button>
-
               {/* Notifications */}
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <button
-                    className="relative h-9 w-9 rounded-xl border border-border bg-card hover:bg-muted text-muted-foreground hover:text-foreground inline-flex items-center justify-center transition-colors"
+                    className="relative h-9 w-9 rounded-lg hover:bg-muted text-muted-foreground hover:text-foreground inline-flex items-center justify-center transition-colors"
                     title="Notifications"
                   >
                     <Bell className="w-4 h-4" />
                     {recentNotifications.length > 0 && (
-                      <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-rose-500 ring-2 ring-card" />
+                      <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-rose-500 ring-2 ring-card" />
                     )}
                   </button>
                 </DropdownMenuTrigger>
@@ -699,8 +673,6 @@ const AppShell = ({ children }: AppShellProps) => {
                     </div>
                   ) : (
                     recentNotifications.map(e => {
-                      // Label priority: customer name + stock #, then customer
-                      // name, then VIN — much more recognizable than a raw VIN.
                       const d = (e.details || {}) as Record<string, unknown>;
                       const cust = String(d.customer_name || "").trim();
                       const stock = String(d.stock || d.vehicle_stock || "").trim();
@@ -720,19 +692,12 @@ const AppShell = ({ children }: AppShellProps) => {
                 </DropdownMenuContent>
               </DropdownMenu>
 
-              {/* Divider */}
-              <div className="hidden lg:block w-px h-6 bg-border mx-0.5" />
-
-              {/* User cluster — avatar + name/role stack */}
+              {/* User cluster */}
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <button className="inline-flex items-center gap-2 h-10 pl-1 pr-2 rounded-xl hover:bg-muted transition-colors group">
-                    <span className="w-8 h-8 rounded-full bg-blue-600 text-white flex items-center justify-center text-[11px] font-bold">
+                  <button className="inline-flex items-center gap-2 h-9 pl-1 pr-1.5 rounded-lg hover:bg-muted transition-colors group">
+                    <span className="w-7 h-7 rounded-full bg-[#2563EB] text-white flex items-center justify-center text-[11px] font-bold">
                       {userInitial}
-                    </span>
-                    <span className="hidden md:flex flex-col items-start min-w-0 leading-tight">
-                      <span className="text-xs font-semibold text-foreground truncate max-w-[110px]">{capitalized}</span>
-                      <span className="text-[10px] text-muted-foreground truncate">{isAdmin ? "Admin" : "Member"}</span>
                     </span>
                     <ChevronDown className="hidden md:inline-block w-3 h-3 text-muted-foreground group-hover:text-foreground transition-colors" />
                   </button>
@@ -764,7 +729,6 @@ const AppShell = ({ children }: AppShellProps) => {
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
-
             </div>
           </div>
         </header>
