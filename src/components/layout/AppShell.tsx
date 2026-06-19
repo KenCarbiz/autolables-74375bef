@@ -385,8 +385,9 @@ const AppShell = ({ children }: AppShellProps) => {
           mobileOpen ? "translate-x-0" : "-translate-x-full"
         } ${collapsed ? "lg:w-16 w-64" : "w-64"}`}
       >
-        {/* Sidebar header */}
-        <div className="flex items-center justify-between h-16 px-4 border-b border-sidebar-border flex-shrink-0">
+        {/* Sidebar header — height matches the top command bar (h-[72px]) so
+            the logo bar and the topbar share one baseline. */}
+        <div className="flex items-center justify-between h-[72px] px-4 border-b border-sidebar-border flex-shrink-0">
           {tenant?.logo_url && !["/logo-mark.svg", "/autolabels-mark.svg", "/autolabels-logo.svg", "/favicon.svg"].includes(tenant.logo_url) ? (
             <div className="flex items-center gap-2 min-w-0">
               <img src={tenant.logo_url} alt={tenant.name} className="w-8 h-8 rounded-md object-contain bg-muted p-1 flex-shrink-0" />
