@@ -234,12 +234,6 @@ const AppShell = ({ children }: AppShellProps) => {
     }
   };
 
-  const handleToggleDark = () => {
-    const next = !darkMode;
-    setDarkMode(next);
-    document.documentElement.classList.toggle("dark", next);
-    localStorage.setItem("dark_mode", String(next));
-  };
 
   const toggleSection = (key: string) => {
     setOpenSections({ ...openSections, [key]: !openSections[key] });
