@@ -1,6 +1,6 @@
-import { lazy, Suspense } from "react";
+import { lazy, Suspense, useLayoutEffect } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Navigate, Outlet, Route, Routes } from "react-router-dom";
+import { BrowserRouter, Navigate, Outlet, Route, Routes, useLocation } from "react-router-dom";
 import { MotionConfig } from "framer-motion";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { Toaster } from "@/components/ui/toaster";
@@ -101,6 +101,18 @@ const BodyLoader = () => (
   </div>
 );
 
+// Snap to the top of the page on every route change. The app scrolls the
+// <main> element (id="app-scroll"), not the window, so reset both — and use a
+// layout effect so the new page never paints mid-scroll.
+const ScrollToTop = () => {
+  const { pathname } = useLocation();
+  useLayoutEffect(() => {
+    document.getElementById("app-scroll")?.scrollTo(0, 0);
+    window.scrollTo(0, 0);
+  }, [pathname]);
+  return null;
+};
+
 const App = () => (
   <ErrorBoundary>
   <QueryClientProvider client={queryClient}>
@@ -124,6 +136,7 @@ const App = () => (
             <AuditProvider>
               <BrowserRouter>
                 <ThemeInjector />
+                <ScrollToTop />
                 <Suspense fallback={<PageLoader />}>
                   <Routes>
                       {/* Public routes — no shell */}

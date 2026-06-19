@@ -731,7 +731,7 @@ const AppShell = ({ children }: AppShellProps) => {
         {/* Page content — only this swaps on route change. Chrome
             above (topbar + breadcrumb) and the sidebar stay
             mounted and visually still. */}
-        <main className="flex-1 overflow-y-auto pb-16 lg:pb-0">
+        <main id="app-scroll" className="flex-1 overflow-y-auto pb-16 lg:pb-0">
           {children}
         </main>
 

@@ -138,118 +138,159 @@ const SavedAddendums = ({ stage = "saved" }: { stage?: DealStage }) => {
             }
           />
         ) : (
-          <div className="bg-card rounded-lg shadow-sm overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b bg-muted/50">
-                    <th className="text-left px-4 py-3 font-semibold text-muted-foreground">Date</th>
-                    <th className="text-left px-4 py-3 font-semibold text-muted-foreground">Vehicle</th>
-                    <th className="text-left px-4 py-3 font-semibold text-muted-foreground">Stock #</th>
-                    <th className="text-left px-4 py-3 font-semibold text-muted-foreground">VIN</th>
-                    <th className="text-left px-4 py-3 font-semibold text-muted-foreground">Customer</th>
-                    <th className="text-left px-4 py-3 font-semibold text-muted-foreground">Total</th>
-                    <th className="text-left px-4 py-3 font-semibold text-muted-foreground">Status</th>
-                    <th className="text-left px-4 py-3 font-semibold text-muted-foreground">Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filtered.map((a) => (
-                    <tr key={a.id} className="border-b last:border-0 hover:bg-muted/30">
-                      <td className="px-4 py-3">{format(new Date(a.created_at), "MMM d, yyyy")}</td>
-                      <td className="px-4 py-3">{a.vehicle_ymm || "—"}</td>
-                      <td className="px-4 py-3">{a.vehicle_stock || "—"}</td>
-                      <td className="px-4 py-3 font-mono text-xs">{a.vehicle_vin || "—"}</td>
-                      <td className="px-4 py-3">{a.customer_name || "—"}</td>
-                      <td className="px-4 py-3">{a.total_with_optional != null ? `$${Number(a.total_with_optional).toFixed(2)}` : "—"}</td>
-                      <td className="px-4 py-3">
-                        <div className="flex flex-col items-start gap-1">
-                          <StatusBadge status={a.status} />
-                          {a.status !== "signed" && <PriceVerifyChip status={(a as any).price_verification_status} delta={(a as any).price_verification_delta} />}
-                        </div>
-                      </td>
-                      <td className="px-4 py-3">
-                        {/* Wave 15.5 — next-action exits. The
-                            "View" only path was a dead end; an
-                            archived signed addendum needs Email,
-                            Print, and Defend exits so dealers
-                            can act on the row without leaving
-                            the page. */}
-                        <div className="inline-flex items-center gap-1">
-                          <button
-                            onClick={() => navigate(`/addendum?id=${a.id}`)}
-                            className="inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1.5 rounded-md bg-primary/10 text-primary hover:bg-primary/20 transition-colors"
-                            title="Open in read-only mode"
-                          >
-                            <Eye className="w-3.5 h-3.5" /> View
-                          </button>
-                          <button
-                            onClick={() => navigate(`/addendum?id=${a.id}&edit=1`)}
-                            className="inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
-                            title="Continue editing this addendum"
-                          >
-                            <Pencil className="w-3.5 h-3.5" /> Edit
-                          </button>
-                          <button
-                            onClick={() => {
-                              const mailto = `mailto:${a.customer_email || ""}?subject=${encodeURIComponent(
-                                `Your addendum from us — ${a.vehicle_ymm || "vehicle"}`
-                              )}&body=${encodeURIComponent(
-                                `${window.location.origin}/addendum?id=${a.id}`
-                              )}`;
-                              window.location.href = mailto;
-                            }}
-                            disabled={!a.customer_email}
-                            className="inline-flex items-center justify-center w-8 h-8 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-                            title={a.customer_email ? `Email to ${a.customer_email}` : "No customer email on file"}
-                          >
-                            <Mail className="w-4 h-4" />
-                          </button>
-                          <button
-                            onClick={() => {
-                              const w = window.open(`/addendum?id=${a.id}&print=1`, "_blank");
-                              if (!w) toast.error("Pop-up blocked — allow pop-ups to print");
-                            }}
-                            className="inline-flex items-center justify-center w-8 h-8 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
-                            title="Open in a new tab for printing / save-as-PDF"
-                          >
-                            <Printer className="w-4 h-4" />
-                          </button>
-                          {stage === "signed" && (
-                            <button
-                              onClick={() => deliver.mutate(a)}
-                              disabled={deliver.isPending}
-                              className="inline-flex items-center gap-1.5 text-xs font-semibold px-3 h-8 rounded-lg whitespace-nowrap text-white bg-gradient-to-b from-emerald-500 to-emerald-600 hover:from-emerald-500 hover:to-emerald-700 shadow-sm shadow-emerald-600/30 ring-1 ring-inset ring-white/15 transition-all disabled:opacity-50"
-                              title="Mark the vehicle delivered — stamps the record and removes it from inventory"
-                            >
-                              <Truck className="w-3.5 h-3.5 stroke-2" /> {deliver.isPending ? "Delivering…" : "Mark Delivered"}
-                            </button>
-                          )}
-                          {a.vehicle_vin && (
-                            <button
-                              onClick={() => navigate(`/compliance?vin=${encodeURIComponent(a.vehicle_vin)}`)}
-                              className="inline-flex items-center justify-center w-8 h-8 rounded-md text-emerald-700 hover:bg-emerald-50 transition-colors"
-                              title="Generate the SB 766 / FTC audit-defense packet for this VIN"
-                            >
-                              <ShieldCheck className="w-4 h-4" />
-                            </button>
-                          )}
-                        </div>
-                      </td>
+          <>
+            {/* Mobile: stacked cards so status, total, and every action stay on
+                screen instead of being scrolled off a wide table. */}
+            <div className="md:hidden space-y-3">
+              {filtered.map((a) => (
+                <div key={a.id} className="bg-card rounded-xl border border-border shadow-sm p-4">
+                  <button onClick={() => navigate(`/addendum?id=${a.id}`)} className="w-full text-left">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="font-semibold text-foreground truncate">{a.vehicle_ymm || "Vehicle"}</p>
+                        <p className="text-[11px] text-muted-foreground mt-0.5">
+                          {a.vehicle_stock ? `Stock ${a.vehicle_stock}` : "No stock #"}
+                          {a.vehicle_vin ? ` · …${String(a.vehicle_vin).slice(-8)}` : ""}
+                        </p>
+                      </div>
+                      <span className="text-[11px] text-muted-foreground whitespace-nowrap shrink-0">
+                        {format(new Date(a.created_at), "MMM d")}
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between gap-2 mt-2">
+                      <span className="text-sm text-foreground truncate">{a.customer_name || "No customer yet"}</span>
+                      <span className="text-sm font-semibold tabular-nums shrink-0">
+                        {a.total_with_optional != null ? `$${Number(a.total_with_optional).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : "—"}
+                      </span>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-1.5 mt-2">
+                      <StatusBadge status={a.status} />
+                      {a.status !== "signed" && <PriceVerifyChip status={(a as any).price_verification_status} delta={(a as any).price_verification_delta} />}
+                    </div>
+                  </button>
+                  <div className="mt-3 pt-3 border-t border-border">
+                    <RowActions a={a} stage={stage} navigate={navigate} deliver={deliver} />
+                  </div>
+                </div>
+              ))}
+              <p className="px-1 pt-1 text-xs text-muted-foreground">
+                {filtered.length} addendum{filtered.length !== 1 ? "s" : ""}
+              </p>
+            </div>
+
+            {/* Desktop: full table. */}
+            <div className="hidden md:block bg-card rounded-lg shadow-sm overflow-hidden">
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b bg-muted/50">
+                      <th className="text-left px-4 py-3 font-semibold text-muted-foreground">Date</th>
+                      <th className="text-left px-4 py-3 font-semibold text-muted-foreground">Vehicle</th>
+                      <th className="text-left px-4 py-3 font-semibold text-muted-foreground">Stock #</th>
+                      <th className="text-left px-4 py-3 font-semibold text-muted-foreground">VIN</th>
+                      <th className="text-left px-4 py-3 font-semibold text-muted-foreground">Customer</th>
+                      <th className="text-left px-4 py-3 font-semibold text-muted-foreground">Total</th>
+                      <th className="text-left px-4 py-3 font-semibold text-muted-foreground">Status</th>
+                      <th className="text-left px-4 py-3 font-semibold text-muted-foreground">Actions</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody>
+                    {filtered.map((a) => (
+                      <tr key={a.id} className="border-b last:border-0 hover:bg-muted/30">
+                        <td className="px-4 py-3 whitespace-nowrap">{format(new Date(a.created_at), "MMM d, yyyy")}</td>
+                        <td className="px-4 py-3">{a.vehicle_ymm || "—"}</td>
+                        <td className="px-4 py-3">{a.vehicle_stock || "—"}</td>
+                        <td className="px-4 py-3 font-mono text-xs">{a.vehicle_vin || "—"}</td>
+                        <td className="px-4 py-3">{a.customer_name || "—"}</td>
+                        <td className="px-4 py-3">{a.total_with_optional != null ? `$${Number(a.total_with_optional).toFixed(2)}` : "—"}</td>
+                        <td className="px-4 py-3">
+                          <div className="flex flex-col items-start gap-1">
+                            <StatusBadge status={a.status} />
+                            {a.status !== "signed" && <PriceVerifyChip status={(a as any).price_verification_status} delta={(a as any).price_verification_delta} />}
+                          </div>
+                        </td>
+                        <td className="px-4 py-3">
+                          <RowActions a={a} stage={stage} navigate={navigate} deliver={deliver} />
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <div className="px-4 py-3 border-t text-xs text-muted-foreground">
+                {filtered.length} addendum{filtered.length !== 1 ? "s" : ""}
+              </div>
             </div>
-            <div className="px-4 py-3 border-t text-xs text-muted-foreground">
-              {filtered.length} addendum{filtered.length !== 1 ? "s" : ""}
-            </div>
-          </div>
+          </>
         )}
       </div>
     </div>
   );
 };
+
+// Shared row actions, used by both the desktop table and the mobile cards so
+// the phone layout exposes the same exits (View/Edit/Email/Print/Deliver/Defend)
+// instead of hiding them off the right edge of a wide table.
+const RowActions = ({ a, stage, navigate, deliver }: { a: any; stage: DealStage; navigate: (p: string) => void; deliver: any }) => (
+  <div className="inline-flex items-center gap-1 flex-wrap">
+    <button
+      onClick={() => navigate(`/addendum?id=${a.id}`)}
+      className="inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1.5 rounded-md bg-primary/10 text-primary hover:bg-primary/20 transition-colors"
+      title="Open in read-only mode"
+    >
+      <Eye className="w-3.5 h-3.5" /> View
+    </button>
+    <button
+      onClick={() => navigate(`/addendum?id=${a.id}&edit=1`)}
+      className="inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+      title="Continue editing this addendum"
+    >
+      <Pencil className="w-3.5 h-3.5" /> Edit
+    </button>
+    <button
+      onClick={() => {
+        const mailto = `mailto:${a.customer_email || ""}?subject=${encodeURIComponent(
+          `Your addendum from us — ${a.vehicle_ymm || "vehicle"}`
+        )}&body=${encodeURIComponent(`${window.location.origin}/addendum?id=${a.id}`)}`;
+        window.location.href = mailto;
+      }}
+      disabled={!a.customer_email}
+      className="inline-flex items-center justify-center w-8 h-8 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+      title={a.customer_email ? `Email to ${a.customer_email}` : "No customer email on file"}
+    >
+      <Mail className="w-4 h-4" />
+    </button>
+    <button
+      onClick={() => {
+        const w = window.open(`/addendum?id=${a.id}&print=1`, "_blank");
+        if (!w) toast.error("Pop-up blocked — allow pop-ups to print");
+      }}
+      className="inline-flex items-center justify-center w-8 h-8 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+      title="Open in a new tab for printing / save-as-PDF"
+    >
+      <Printer className="w-4 h-4" />
+    </button>
+    {stage === "signed" && (
+      <button
+        onClick={() => deliver.mutate(a)}
+        disabled={deliver.isPending}
+        className="inline-flex items-center gap-1.5 text-xs font-semibold px-3 h-8 rounded-lg whitespace-nowrap text-white bg-gradient-to-b from-emerald-500 to-emerald-600 hover:from-emerald-500 hover:to-emerald-700 shadow-sm shadow-emerald-600/30 ring-1 ring-inset ring-white/15 transition-all disabled:opacity-50"
+        title="Mark the vehicle delivered — stamps the record and removes it from inventory"
+      >
+        <Truck className="w-3.5 h-3.5 stroke-2" /> {deliver.isPending ? "Delivering…" : "Mark Delivered"}
+      </button>
+    )}
+    {a.vehicle_vin && (
+      <button
+        onClick={() => navigate(`/compliance?vin=${encodeURIComponent(a.vehicle_vin)}`)}
+        className="inline-flex items-center justify-center w-8 h-8 rounded-md text-emerald-700 hover:bg-emerald-50 transition-colors"
+        title="Generate the SB 766 / FTC audit-defense packet for this VIN"
+      >
+        <ShieldCheck className="w-4 h-4" />
+      </button>
+    )}
+  </div>
+);
 
 const StatusBadge = ({ status }: { status: string }) => {
   const styles: Record<string, string> = {
