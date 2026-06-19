@@ -56,7 +56,7 @@ interface ActivityRow { id: string; action: string; created_at: string; details:
 
 type StatusFilter = "all" | "draft" | "published" | "archived";
 type ConditionFilter = "all" | "new" | "used" | "cpo";
-type DerivedFilter = "all" | "needs-sticker" | "missing-addendum" | "price-verify";
+type DerivedFilter = "all" | "needs-sticker" | "missing-addendum" | "price-verify" | "open-recalls";
 
 const PAGE_SIZE = 25;
 
@@ -278,6 +278,7 @@ const Inventory = () => {
         if (derived === "needs-sticker" && s.stickerDone) return false;
         if (derived === "missing-addendum" && s.hasAddendum) return false;
         if (derived === "price-verify" && !s.needsPriceVerify) return false;
+        if (derived === "open-recalls" && !((r.open_recall_count || 0) > 0)) return false;
       }
       if (!lc) return true;
       return (
@@ -300,7 +301,8 @@ const Inventory = () => {
     const usedCount = rows.filter((r) => r.condition === "used").length;
     const cpoCount = rows.filter((r) => r.condition === "cpo").length;
     let needsSticker = 0, missingAddendum = 0, priceVerify = 0, clean = 0;
-    let vinDecoded = 0, openRecallsTotal = 0, readinessSum = 0;
+    let vinDecoded = 0, openRecallsTotal = 0, openRecallVehicles = 0, readinessSum = 0;
+    let needsAttention = 0, marketSum = 0, marketCount = 0;
     for (const r of rows) {
       const s = signalFor(r);
       if (!s.stickerDone) needsSticker++;
@@ -308,7 +310,11 @@ const Inventory = () => {
       if (s.needsPriceVerify) priceVerify++;
       if (s.stickerDone && s.hasAddendum && !s.needsPriceVerify) clean++;
       if (r.ymm) vinDecoded++;
+      const openR = (r.open_recall_count || 0) > 0;
       openRecallsTotal += (r.open_recall_count || 0);
+      if (openR) openRecallVehicles++;
+      if (!s.hasAddendum || s.needsPriceVerify || openR) needsAttention++;
+      if (r.market_value && r.price) { marketSum += (Number(r.market_value) - r.price); marketCount++; }
       readinessSum += rowReadiness(r);
     }
     const total = rows.length;
@@ -324,8 +330,9 @@ const Inventory = () => {
       newCount, usedCount, cpoCount,
       needsSticker, missingAddendum, priceVerify,
       readyToPublish: clean,
-      vinDecoded, openRecallsTotal,
+      vinDecoded, openRecallsTotal, openRecallVehicles, needsAttention,
       avgReadiness: total ? Math.round(readinessSum / total) : 0,
+      avgBelowMarket: marketCount ? Math.round(marketSum / marketCount) : 0,
       health,
     };
   }, [rows, addendumVins, byVin]);
@@ -348,10 +355,11 @@ const Inventory = () => {
 
   const onHealthMetric = (key: string) => {
     setDerived("all"); setStatus("all"); setCondition("all");
-    if (key === "ready") setStatus("published");
+    if (key === "ready" || key === "published") setStatus("published");
     else if (key === "needs-sticker") setDerived("needs-sticker");
-    else if (key === "missing-addendum") setDerived("missing-addendum");
-    else if (key === "price-verify") setDerived("price-verify");
+    else if (key === "missing-addendum" || key === "needs-attention") setDerived("missing-addendum");
+    else if (key === "price-verify" || key === "price-reviews") setDerived("price-verify");
+    else if (key === "open-recalls") setDerived("open-recalls");
     // "total" clears everything (done above)
   };
 
@@ -392,15 +400,7 @@ const Inventory = () => {
         {/* Main column */}
         <div className="flex-1 min-w-0 space-y-5">
           <SyncStatusBar at={lastSync.at} status={lastSync.status} total={counts.total} />
-          <InventoryHealth counts={counts} onMetric={onHealthMetric} />
-
-          {/* KPI cards */}
-          <div className="flex gap-3 overflow-x-auto pb-1 sm:grid sm:grid-cols-2 lg:grid-cols-4 sm:overflow-visible sm:pb-0">
-            <KpiCard icon={Car} label="Total Vehicles" value={counts.total} sub={`${counts.newCount} new · ${counts.usedCount} used`} />
-            <KpiCard icon={FileText} label="Drafts" value={counts.draft} accent="amber" sub="not ready" />
-            <KpiCard icon={CheckCircle2} label="Published" value={counts.published} accent="emerald" sub="live on portal" />
-            <KpiCard icon={Signature} label="Shopper Views" value={counts.totalViews} sub="lifetime" />
-          </div>
+          <ExecKpiStrip counts={counts} onMetric={onHealthMetric} onMarket={runMarketBatch} />
 
           {/* Search + selects */}
           <div className="flex items-center gap-2 flex-wrap">
@@ -444,10 +444,11 @@ const Inventory = () => {
                       <th className="text-left font-semibold px-4 py-2.5">Vehicle</th>
                       <th className="text-left font-semibold px-3 py-2.5">Stock # / VIN</th>
                       <th className="text-left font-semibold px-3 py-2.5">Status</th>
-                      <th className="text-left font-semibold px-3 py-2.5">Portal</th>
                       <th className="text-center font-semibold px-3 py-2.5">Readiness</th>
-                      <th className="text-right font-semibold px-3 py-2.5">Price</th>
-                      <th className="text-right font-semibold px-3 py-2.5">Mileage</th>
+                      <th className="text-left font-semibold px-3 py-2.5">VIN Decode</th>
+                      <th className="text-left font-semibold px-3 py-2.5">Recalls</th>
+                      <th className="text-right font-semibold px-3 py-2.5">Market Position</th>
+                      <th className="text-left font-semibold px-3 py-2.5">Portal</th>
                       <th className="text-left font-semibold px-3 py-2.5">Updated</th>
                       <th className="text-right font-semibold px-3 py-2.5">Actions</th>
                     </tr>
@@ -471,23 +472,27 @@ const Inventory = () => {
                           <p className="font-mono text-xs text-foreground">{r.stock_number || "—"}</p>
                           <p className="font-mono text-[11px] text-muted-foreground">…{(r.vin || "").slice(-6)}</p>
                         </td>
-                        <td className="px-3 py-2.5">
-                          <div className="flex flex-col items-start gap-1">
-                            <StatusPill status={r.status} />
-                            <VinChip ymm={r.ymm} />
-                            <RecallChip status={r.recall_status} open={r.open_recall_count} />
-                          </div>
-                        </td>
-                        <td className="px-3 py-2.5"><PortalChip status={r.status} /></td>
+                        <td className="px-3 py-2.5"><StatusPill status={r.status} /></td>
                         <td className="px-3 py-2.5">
                           <ReadinessCell r={r} signal={signalFor(r)} pct={rowReadiness(r)} />
                         </td>
+                        <td className="px-3 py-2.5"><VinChip ymm={r.ymm} /></td>
+                        <td className="px-3 py-2.5"><RecallChip status={r.recall_status} open={r.open_recall_count} /></td>
                         <td className="px-3 py-2.5 text-right" onClick={(e) => e.stopPropagation()}>
                           <span className="tabular-nums font-medium text-foreground">{r.price ? `$${r.price.toLocaleString()}` : "—"}</span>
+                          {r.market_position && r.market_value && r.price ? (
+                            <div className="mt-0.5 flex flex-col items-end gap-0.5">
+                              <MarketChip position={r.market_position} />
+                              <span className="text-[10px] text-muted-foreground">
+                                {(Number(r.market_value) - r.price) >= 0
+                                  ? `$${(Number(r.market_value) - r.price).toLocaleString()} below market`
+                                  : `$${Math.abs(Number(r.market_value) - r.price).toLocaleString()} above market`}
+                              </span>
+                            </div>
+                          ) : null}
                           {r.vin && r.price ? <div className="mt-0.5 flex justify-end"><AdvertisedPriceBand vin={r.vin} stickerPrice={r.price} docFee={settings.doc_fee_amount} compact /></div> : null}
-                          {r.market_position ? <div className="mt-0.5 flex justify-end"><MarketChip position={r.market_position} /></div> : null}
                         </td>
-                        <td className="px-3 py-2.5 text-right tabular-nums text-muted-foreground">{r.mileage ? `${r.mileage.toLocaleString()} mi` : "—"}</td>
+                        <td className="px-3 py-2.5"><PortalChip status={r.status} /></td>
                         <td className="px-3 py-2.5 text-xs text-muted-foreground whitespace-nowrap">{relativeDay(r.updated_at)}</td>
                         <td className="px-3 py-2.5 text-right" onClick={(e) => e.stopPropagation()}>
                           <div className="flex justify-end items-center gap-1">
@@ -574,6 +579,15 @@ const Inventory = () => {
                 ))}
               </ul>
             )}
+          </SideCard>
+
+          <SideCard title="Dealer Health">
+            <div className="grid grid-cols-2 gap-2.5">
+              <HealthStat label="Compliance score" value={`${counts.health}%`} tone="emerald" />
+              <HealthStat label="Inventory readiness" value={`${counts.avgReadiness}%`} tone="blue" />
+              <HealthStat label="Open issues" value={counts.needsAttention} tone={counts.needsAttention ? "amber" : "emerald"} />
+              <HealthStat label={`Market position`} value={`$${Math.abs(counts.avgBelowMarket).toLocaleString()} ${counts.avgBelowMarket >= 0 ? "below" : "above"}`} tone={counts.avgBelowMarket >= 0 ? "emerald" : "amber"} small />
+            </div>
           </SideCard>
         </aside>
       </div>
@@ -684,6 +698,16 @@ const QuickAction = ({ icon: Icon, label, onClick }: { icon: typeof Car; label: 
   </button>
 );
 
+const HealthStat = ({ label, value, tone, small }: { label: string; value: string | number; tone?: "emerald" | "blue" | "amber"; small?: boolean }) => {
+  const c = tone === "emerald" ? "text-emerald-600" : tone === "blue" ? "text-blue-600" : tone === "amber" ? "text-amber-600" : "text-foreground";
+  return (
+    <div className="rounded-xl border border-border bg-background p-2.5">
+      <p className={`font-display ${small ? "text-sm" : "text-lg"} font-semibold tabular-nums leading-none ${c}`}>{value}</p>
+      <p className="text-[10px] text-muted-foreground mt-1">{label}</p>
+    </div>
+  );
+};
+
 const InsightRow = ({ icon: Icon, label, value, tone = "neutral" }: { icon: typeof Car; label: string; value: number | string; tone?: "emerald" | "amber" | "red" | "neutral" }) => {
   const vcls = tone === "emerald" ? "text-emerald-600" : tone === "amber" ? "text-amber-600" : tone === "red" ? "text-red-600" : "text-foreground";
   return (
@@ -757,66 +781,60 @@ const SyncStatusBar = ({ at, status, total }: { at: string | null; status: Recor
   );
 };
 
-// ── Inventory health band ──────────────────────────────────────
-const InventoryHealth = ({
-  counts, onMetric,
-}: {
-  counts: { health: number; total: number; readyToPublish: number; needsSticker: number; missingAddendum: number; priceVerify: number };
-  onMetric: (key: string) => void;
-}) => {
-  const { health } = counts;
-  const grade = health >= 90 ? "Excellent" : health >= 75 ? "Good" : health >= 50 ? "Fair" : "Needs attention";
-  const bar = health >= 90 ? "bg-emerald-500" : health >= 75 ? "bg-blue-500" : health >= 50 ? "bg-amber-500" : "bg-red-500";
-  const gradeColor = health >= 90 ? "text-emerald-600" : health >= 75 ? "text-blue-600" : health >= 50 ? "text-amber-600" : "text-red-600";
+// ── Executive KPI strip ────────────────────────────────────────
+const BigRing = ({ pct }: { pct: number }) => {
+  const tone = pct >= 80 ? "#10B981" : pct >= 50 ? "#2563EB" : pct >= 30 ? "#F59E0B" : "#EF4444";
+  const r = 16; const c = 2 * Math.PI * r;
   return (
-    <div className="rounded-2xl border border-border bg-card shadow-sm p-4 lg:p-5">
-      <div className="flex flex-col lg:flex-row lg:items-center gap-4 lg:gap-6">
-        <div className="lg:w-64 shrink-0">
-          <p className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Inventory Health</p>
-          <div className="flex items-baseline gap-2 mt-1">
-            <span className="font-display text-3xl font-semibold tabular-nums text-foreground leading-none">{health}%</span>
-            <span className={`text-sm font-semibold ${gradeColor}`}>{grade}</span>
-          </div>
-          <div className="mt-2.5 h-2 rounded-full bg-muted overflow-hidden">
-            <div className={`h-full rounded-full ${bar} transition-all`} style={{ width: `${health}%` }} />
-          </div>
-        </div>
-        <div className="flex-1 flex gap-3 overflow-x-auto pb-1 sm:grid sm:grid-cols-3 lg:grid-cols-5 sm:overflow-visible sm:pb-0">
-          <HealthMetric icon={Car} tone="neutral" value={counts.total} label="Total Vehicles" onClick={() => onMetric("total")} />
-          <HealthMetric icon={ShieldCheck} tone="emerald" value={counts.readyToPublish} label="Ready to Publish" onClick={() => onMetric("ready")} />
-          <HealthMetric icon={Printer} tone="amber" value={counts.needsSticker} label="Needs Sticker" onClick={() => onMetric("needs-sticker")} />
-          <HealthMetric icon={FileSignature} tone="red" value={counts.missingAddendum} label="Missing Addendum" onClick={() => onMetric("missing-addendum")} />
-          <HealthMetric icon={CircleDollarSign} tone="amber" value={counts.priceVerify} label="Price Verification" onClick={() => onMetric("price-verify")} />
-        </div>
-      </div>
+    <div className="relative w-14 h-14 shrink-0">
+      <svg className="w-14 h-14 -rotate-90" viewBox="0 0 40 40">
+        <circle cx="20" cy="20" r={r} fill="none" stroke="currentColor" strokeWidth="4" className="text-muted" />
+        <circle cx="20" cy="20" r={r} fill="none" stroke={tone} strokeWidth="4" strokeLinecap="round" strokeDasharray={c} strokeDashoffset={c - (c * pct) / 100} />
+      </svg>
+      <span className="absolute inset-0 flex items-center justify-center text-xs font-bold tabular-nums text-foreground">{pct}%</span>
     </div>
   );
 };
 
-const HealthMetric = ({ icon: Icon, tone, value, label, onClick }: { icon: typeof Car; tone: "neutral" | "emerald" | "amber" | "red"; value: number; label: string; onClick?: () => void }) => {
-  const color = tone === "emerald" ? "text-emerald-600 bg-emerald-100" : tone === "amber" ? "text-amber-600 bg-amber-100" : tone === "red" ? "text-red-600 bg-red-100" : "text-muted-foreground bg-muted";
+const ExecKpi = ({ label, value, sub, icon: Icon, tone, onClick }: { label: string; value: string | number; sub: string; icon: typeof Car; tone?: "emerald" | "amber" | "red" | "violet"; onClick: () => void }) => {
+  const vcls = tone === "emerald" ? "text-emerald-700" : tone === "amber" ? "text-amber-700" : tone === "red" ? "text-red-700" : tone === "violet" ? "text-violet-700" : "text-foreground";
+  const ibg = tone === "emerald" ? "bg-emerald-100 text-emerald-700" : tone === "amber" ? "bg-amber-100 text-amber-700" : tone === "red" ? "bg-red-100 text-red-700" : tone === "violet" ? "bg-violet-100 text-violet-700" : "bg-muted text-muted-foreground";
   return (
-    <button type="button" onClick={onClick} disabled={!onClick} className={`flex items-center gap-2.5 rounded-xl border border-border bg-background p-2.5 text-left shrink-0 min-w-[130px] sm:min-w-0 ${onClick ? "hover:border-foreground/20 hover:shadow-sm transition-all cursor-pointer" : "cursor-default"}`}>
-      <span className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${color}`}><Icon className="w-4 h-4" strokeWidth={2} /></span>
-      <span className="min-w-0">
-        <span className="block font-display text-lg font-semibold tabular-nums leading-none text-foreground">{value}</span>
-        <span className="block text-[10px] text-muted-foreground mt-1 truncate">{label}</span>
-      </span>
+    <button onClick={onClick} className="shrink-0 min-w-[160px] lg:min-w-0 text-left rounded-2xl border border-border bg-card shadow-sm p-4 hover:shadow-md hover:border-foreground/15 transition-all">
+      <div className="flex items-center justify-between">
+        <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">{label}</p>
+        <span className={`w-7 h-7 rounded-lg flex items-center justify-center ${ibg}`}><Icon className="w-3.5 h-3.5" strokeWidth={2} /></span>
+      </div>
+      <p className={`mt-2 font-display text-2xl font-semibold tabular-nums leading-none ${vcls}`}>{typeof value === "number" ? value.toLocaleString() : value}</p>
+      <p className="text-[11px] mt-1.5 text-muted-foreground truncate">{sub}</p>
     </button>
   );
 };
 
-const KpiCard = ({ icon: Icon, label, value, accent, sub }: { icon: typeof Car; label: string; value: number; accent?: "amber" | "emerald" | "sky"; sub?: string }) => {
-  const valueColor = accent === "amber" ? "text-amber-700" : accent === "emerald" ? "text-emerald-700" : accent === "sky" ? "text-sky-700" : "text-foreground";
-  const iconBg = accent === "amber" ? "bg-amber-100 text-amber-700" : accent === "emerald" ? "bg-emerald-100 text-emerald-700" : accent === "sky" ? "bg-sky-100 text-sky-700" : "bg-muted text-muted-foreground";
+interface KpiCounts {
+  health: number; total: number; readyToPublish: number; newCount: number; usedCount: number;
+  published: number; needsAttention: number; openRecallVehicles: number; priceVerify: number; avgBelowMarket: number;
+}
+const ExecKpiStrip = ({ counts, onMetric, onMarket }: { counts: KpiCounts; onMetric: (k: string) => void; onMarket: () => void }) => {
+  const below = counts.avgBelowMarket;
   return (
-    <div className="rounded-2xl border border-border bg-card shadow-sm p-4 transition-shadow hover:shadow-md shrink-0 min-w-[44vw] sm:min-w-0">
-      <div className="flex items-center justify-between">
-        <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">{label}</p>
-        <span className={`w-7 h-7 rounded-lg flex items-center justify-center ${iconBg}`}><Icon className="w-3.5 h-3.5" strokeWidth={2} /></span>
-      </div>
-      <p className={`mt-2 font-display text-3xl font-semibold tabular-nums leading-none ${valueColor}`}>{value.toLocaleString()}</p>
-      {sub && <p className="text-[11px] mt-1.5 text-muted-foreground truncate">{sub}</p>}
+    <div className="flex gap-3 overflow-x-auto pb-1 xl:grid xl:grid-cols-7 xl:overflow-visible xl:pb-0">
+      <button onClick={() => onMetric("ready")} className="shrink-0 min-w-[210px] xl:min-w-0 text-left rounded-2xl border border-border bg-card shadow-sm p-4 hover:shadow-md hover:border-foreground/15 transition-all">
+        <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">Inventory Readiness</p>
+        <div className="flex items-center gap-3 mt-2">
+          <BigRing pct={counts.health} />
+          <div className="min-w-0">
+            <p className="text-sm font-semibold text-foreground leading-tight">Ready to publish</p>
+            <p className="text-[11px] text-muted-foreground">{counts.readyToPublish} of {counts.total} vehicles</p>
+          </div>
+        </div>
+      </button>
+      <ExecKpi label="Total Vehicles" value={counts.total} sub={`${counts.newCount} new · ${counts.usedCount} used`} icon={Car} onClick={() => onMetric("total")} />
+      <ExecKpi label="Published" value={counts.published} sub="live on portal" icon={CheckCircle2} tone="emerald" onClick={() => onMetric("published")} />
+      <ExecKpi label="Needs Attention" value={counts.needsAttention} sub="require action" icon={AlertTriangle} tone="amber" onClick={() => onMetric("needs-attention")} />
+      <ExecKpi label="Open Recalls" value={counts.openRecallVehicles} sub="vehicles" icon={ShieldCheck} tone={counts.openRecallVehicles ? "red" : "emerald"} onClick={() => onMetric("open-recalls")} />
+      <ExecKpi label="Price Reviews" value={counts.priceVerify} sub="require review" icon={CircleDollarSign} tone="violet" onClick={() => onMetric("price-reviews")} />
+      <ExecKpi label="Avg Market Position" value={`$${Math.abs(below).toLocaleString()}`} sub={below >= 0 ? "below market" : "above market"} icon={Gauge} tone={below >= 0 ? "emerald" : "amber"} onClick={onMarket} />
     </div>
   );
 };
