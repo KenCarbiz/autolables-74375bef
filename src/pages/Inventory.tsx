@@ -433,12 +433,10 @@ const Inventory = () => {
                     <tr>
                       <th className="text-left font-semibold px-4 py-2.5">Vehicle</th>
                       <th className="text-left font-semibold px-3 py-2.5">Stock # / VIN</th>
-                      <th className="text-left font-semibold px-3 py-2.5">Status</th>
-                      <th className="text-center font-semibold px-3 py-2.5">Readiness</th>
-                      <th className="text-left font-semibold px-3 py-2.5">VIN Decode</th>
-                      <th className="text-left font-semibold px-3 py-2.5">Recalls</th>
-                      <th className="text-right font-semibold px-3 py-2.5">Market Position</th>
-                      <th className="text-left font-semibold px-3 py-2.5">Portal</th>
+                      <th className="text-left font-semibold px-3 py-2.5">Readiness</th>
+                      <th className="text-left font-semibold px-3 py-2.5">Compliance</th>
+                      <th className="text-right font-semibold px-3 py-2.5">Market Intelligence</th>
+                      <th className="text-left font-semibold px-3 py-2.5">Publishing</th>
                       <th className="text-left font-semibold px-3 py-2.5">Updated</th>
                       <th className="text-right font-semibold px-3 py-2.5">Actions</th>
                     </tr>
@@ -462,14 +460,17 @@ const Inventory = () => {
                           <p className="font-mono text-xs text-foreground">{r.stock_number || "—"}</p>
                           <p className="font-mono text-[11px] text-muted-foreground">…{(r.vin || "").slice(-6)}</p>
                         </td>
-                        <td className="px-3 py-2.5"><StatusPill status={r.status} /></td>
                         <td className="px-3 py-2.5">
                           <ReadinessCell r={r} signal={signalFor(r)} pct={rowReadiness(r)} />
                         </td>
-                        <td className="px-3 py-2.5"><VinChip ymm={r.ymm} /></td>
-                        <td className="px-3 py-2.5"><RecallChip status={r.recall_status} open={r.open_recall_count} /></td>
+                        <td className="px-3 py-2.5">
+                          <div className="flex flex-col items-start gap-1">
+                            <VinChip ymm={r.ymm} />
+                            <RecallChip status={r.recall_status} open={r.open_recall_count} />
+                          </div>
+                        </td>
                         <td className="px-3 py-2.5 text-right" onClick={(e) => e.stopPropagation()}>
-                          <span className="tabular-nums font-medium text-foreground">{r.price ? `$${r.price.toLocaleString()}` : "—"}</span>
+                          <span className="tabular-nums font-semibold text-foreground">{r.price ? `$${r.price.toLocaleString()}` : "—"}</span>
                           {r.market_position && r.market_value && r.price ? (
                             <div className="mt-0.5 flex flex-col items-end gap-0.5">
                               <MarketChip position={r.market_position} />
@@ -480,9 +481,13 @@ const Inventory = () => {
                               </span>
                             </div>
                           ) : null}
-                          {r.vin && r.price ? <div className="mt-0.5 flex justify-end"><AdvertisedPriceBand vin={r.vin} stickerPrice={r.price} docFee={settings.doc_fee_amount} compact /></div> : null}
                         </td>
-                        <td className="px-3 py-2.5"><PortalChip status={r.status} /></td>
+                        <td className="px-3 py-2.5" onClick={(e) => e.stopPropagation()}>
+                          <div className="flex flex-col items-start gap-1">
+                            <PortalChip status={r.status} />
+                            {r.vin && r.price ? <AdvertisedPriceBand vin={r.vin} stickerPrice={r.price} docFee={settings.doc_fee_amount} compact /> : null}
+                          </div>
+                        </td>
                         <td className="px-3 py-2.5 text-xs text-muted-foreground whitespace-nowrap">{relativeDay(r.updated_at)}</td>
                         <td className="px-3 py-2.5 text-right" onClick={(e) => e.stopPropagation()}>
                           <div className="flex justify-end items-center gap-1">
@@ -606,8 +611,6 @@ const PRETTY_ACTION: Record<string, string> = {
 };
 const prettyAction = (a: string) => PRETTY_ACTION[a] || a.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
 
-const readyLabel = (pct: number) => pct >= 100 ? "Ready" : pct >= 60 ? "Almost" : pct >= 40 ? "In progress" : "Not ready";
-
 const relativeDay = (iso: string) => {
   const d = new Date(iso);
   const today = new Date();
@@ -658,17 +661,25 @@ const MiniRing = ({ pct }: { pct: number }) => {
 // scroll never clips it).
 const ReadinessCell = ({ r, signal, pct }: { r: VehicleRow; signal: RowSignal; pct: number }) => {
   const checks = [
-    { label: "Vehicle created", ok: true },
-    { label: "VIN decoded", ok: !!r.ymm },
-    { label: "Sticker / published", ok: signal.stickerDone },
-    { label: "Addendum", ok: signal.hasAddendum },
-    { label: "Price verified", ok: !r.price || signal.priceVerified },
+    { label: "Vehicle created", short: "vehicle", ok: true },
+    { label: "VIN decoded", short: "VIN decode", ok: !!r.ymm },
+    { label: "Sticker generated", short: "sticker", ok: signal.stickerDone },
+    { label: "Addendum complete", short: "addendum", ok: signal.hasAddendum },
+    { label: "Price verified", short: "price", ok: !r.price || signal.priceVerified },
   ];
+  const done = checks.filter((c) => c.ok).length;
+  const firstMissing = checks.find((c) => !c.ok);
+  const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
   const title = `${pct}% readiness\n` + checks.map((c) => `${c.ok ? "✓" : "✗"} ${c.label}`).join("\n");
   return (
-    <div className="flex flex-col items-center gap-0.5 cursor-help" title={title}>
+    <div className="flex items-center gap-2 cursor-help" title={title}>
       <MiniRing pct={pct} />
-      <span className="text-[10px] text-muted-foreground">{readyLabel(pct)}</span>
+      <div className="min-w-0 leading-tight">
+        <p className="text-[11px] font-semibold text-foreground">{done} of {checks.length} done</p>
+        <p className={`text-[10px] ${firstMissing ? "text-amber-600" : "text-emerald-600"}`}>
+          {firstMissing ? `Missing ${cap(firstMissing.short)}` : "Ready"}
+        </p>
+      </div>
     </div>
   );
 };
@@ -800,17 +811,18 @@ const BigRing = ({ pct }: { pct: number }) => {
   );
 };
 
-const ExecKpi = ({ label, value, sub, icon: Icon, tone, onClick }: { label: string; value: string | number; sub: string; icon: typeof Car; tone?: "emerald" | "amber" | "red" | "violet"; onClick: () => void }) => {
+const ExecKpi = ({ label, value, sub, icon: Icon, tone, onClick, link }: { label: string; value: string | number; sub: string; icon: typeof Car; tone?: "emerald" | "amber" | "red" | "violet"; onClick: () => void; link?: string }) => {
   const vcls = tone === "emerald" ? "text-emerald-700" : tone === "amber" ? "text-amber-700" : tone === "red" ? "text-red-700" : tone === "violet" ? "text-violet-700" : "text-foreground";
   const ibg = tone === "emerald" ? "bg-emerald-100 text-emerald-700" : tone === "amber" ? "bg-amber-100 text-amber-700" : tone === "red" ? "bg-red-100 text-red-700" : tone === "violet" ? "bg-violet-100 text-violet-700" : "bg-muted text-muted-foreground";
   return (
-    <button onClick={onClick} className="shrink-0 min-w-[160px] lg:min-w-0 text-left rounded-2xl border border-border bg-card shadow-sm p-4 hover:shadow-md hover:border-foreground/15 transition-all">
+    <button onClick={onClick} className="group/k shrink-0 min-w-[170px] lg:min-w-0 text-left rounded-2xl border border-border bg-card shadow-sm p-4 hover:shadow-md hover:border-foreground/15 transition-all">
       <div className="flex items-center justify-between">
         <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">{label}</p>
         <span className={`w-7 h-7 rounded-lg flex items-center justify-center ${ibg}`}><Icon className="w-3.5 h-3.5" strokeWidth={2} /></span>
       </div>
       <p className={`mt-2 font-display text-2xl font-semibold tabular-nums leading-none ${vcls}`}>{typeof value === "number" ? value.toLocaleString() : value}</p>
       <p className="text-[11px] mt-1.5 text-muted-foreground truncate">{sub}</p>
+      {link && <p className="text-[11px] font-semibold text-blue-600 mt-2 group-hover/k:underline">{link} →</p>}
     </button>
   );
 };
@@ -832,13 +844,14 @@ const ExecKpiStrip = ({ counts, onMetric, onMarket }: { counts: KpiCounts; onMet
             <p className="text-[11px] text-muted-foreground">{counts.readyToPublish} of {counts.total} vehicles</p>
           </div>
         </div>
+        <p className="text-[11px] font-semibold text-blue-600 mt-2.5">View readiness details →</p>
       </button>
-      <ExecKpi label="Total Vehicles" value={counts.total} sub={`${counts.newCount} new · ${counts.usedCount} used`} icon={Car} onClick={() => onMetric("total")} />
-      <ExecKpi label="Published" value={counts.published} sub="live on portal" icon={CheckCircle2} tone="emerald" onClick={() => onMetric("published")} />
-      <ExecKpi label="Needs Attention" value={counts.needsAttention} sub="require action" icon={AlertTriangle} tone="amber" onClick={() => onMetric("needs-attention")} />
-      <ExecKpi label="Open Recalls" value={counts.openRecallVehicles} sub="vehicles" icon={ShieldCheck} tone={counts.openRecallVehicles ? "red" : "emerald"} onClick={() => onMetric("open-recalls")} />
-      <ExecKpi label="Price Reviews" value={counts.priceVerify} sub="require review" icon={CircleDollarSign} tone="violet" onClick={() => onMetric("price-reviews")} />
-      <ExecKpi label="Avg Market Position" value={`$${Math.abs(below).toLocaleString()}`} sub={below >= 0 ? "below market" : "above market"} icon={Gauge} tone={below >= 0 ? "emerald" : "amber"} onClick={onMarket} />
+      <ExecKpi label="Total Vehicles" value={counts.total} sub={`${counts.newCount} new · ${counts.usedCount} used`} icon={Car} onClick={() => onMetric("total")} link="View all vehicles" />
+      <ExecKpi label="Published" value={counts.published} sub="live on portal" icon={CheckCircle2} tone="emerald" onClick={() => onMetric("published")} link="View published" />
+      <ExecKpi label="Needs Attention" value={counts.needsAttention} sub="require action" icon={AlertTriangle} tone="amber" onClick={() => onMetric("needs-attention")} link="View list" />
+      <ExecKpi label="Open Recalls" value={counts.openRecallVehicles} sub="vehicles" icon={ShieldCheck} tone={counts.openRecallVehicles ? "red" : "emerald"} onClick={() => onMetric("open-recalls")} link="View recalls" />
+      <ExecKpi label="Price Reviews" value={counts.priceVerify} sub="require review" icon={CircleDollarSign} tone="violet" onClick={() => onMetric("price-reviews")} link="View price reviews" />
+      <ExecKpi label="Avg Market Position" value={`$${Math.abs(below).toLocaleString()}`} sub={below >= 0 ? "below market" : "above market"} icon={Gauge} tone={below >= 0 ? "emerald" : "amber"} onClick={onMarket} link="View market report" />
     </div>
   );
 };
