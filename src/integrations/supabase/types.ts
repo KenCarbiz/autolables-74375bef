@@ -1176,6 +1176,7 @@ export type Database = {
           allowed: boolean
           created_at: string
           day_of_week: number
+          dealer_id: string
           enabled: boolean
           frequency: string
           last_run_at: string | null
@@ -1191,6 +1192,7 @@ export type Database = {
           allowed?: boolean
           created_at?: string
           day_of_week?: number
+          dealer_id?: string
           enabled?: boolean
           frequency?: string
           last_run_at?: string | null
@@ -1206,6 +1208,7 @@ export type Database = {
           allowed?: boolean
           created_at?: string
           day_of_week?: number
+          dealer_id?: string
           enabled?: boolean
           frequency?: string
           last_run_at?: string | null
@@ -2962,18 +2965,32 @@ export type Database = {
         Args: { _contact: string; _origin?: string; _vin: string }
         Returns: Json
       }
-      save_marketcheck_config: {
-        Args: {
-          _day_of_week: number
-          _enabled: boolean
-          _frequency: string
-          _max_vehicles: number
-          _run_hour: number
-          _source: string
-          _tenant_id: string
-        }
-        Returns: undefined
-      }
+      save_marketcheck_config:
+        | {
+            Args: {
+              _day_of_week: number
+              _enabled: boolean
+              _frequency: string
+              _max_vehicles: number
+              _run_hour: number
+              _source: string
+              _tenant_id: string
+            }
+            Returns: undefined
+          }
+        | {
+            Args: {
+              _day_of_week: number
+              _dealer_id: string
+              _enabled: boolean
+              _frequency: string
+              _max_vehicles: number
+              _run_hour: number
+              _source: string
+              _tenant_id: string
+            }
+            Returns: undefined
+          }
       schedule_marketcheck_sync: {
         Args: {
           _cron_expr?: string
