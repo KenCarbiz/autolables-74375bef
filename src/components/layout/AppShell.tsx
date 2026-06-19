@@ -19,8 +19,6 @@ import {
   Sparkles,
   ScrollText,
   Wrench,
-  Moon,
-  Sun,
   ChevronDown,
   ChevronLeft,
   ChevronRight,
@@ -42,7 +40,6 @@ import {
   PenLine,
   CheckCircle2,
   Truck,
-  Building2,
 } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
 import { useAuth } from "@/contexts/AuthContext";
