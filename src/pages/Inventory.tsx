@@ -173,9 +173,13 @@ const Inventory = () => {
       .or(`tenant_id.eq.${tenant.id},tenant_id.is.null`)
       .order("updated_at", { ascending: false })
       .limit(500);
-    // Resilient to the not-yet-migrated enrichment columns.
+    // Resilient cascade: drop only the columns that aren't migrated yet, so a
+    // missing newest column never knocks out the older enrichment (e.g. photos).
     let { data, error } = await runSelect(`${baseCols},hero_image_url,recall_status,open_recall_count,market_position,market_value`);
-    if (error && /hero_image_url|recall_status|open_recall_count|market_position|market_value/.test(error.message || "")) {
+    if (error && /market_position|market_value/.test(error.message || "")) {
+      ({ data, error } = await runSelect(`${baseCols},hero_image_url,recall_status,open_recall_count`));
+    }
+    if (error && /hero_image_url|recall_status|open_recall_count/.test(error.message || "")) {
       ({ data, error } = await runSelect(baseCols));
     }
     if (error) {
@@ -276,12 +280,16 @@ const Inventory = () => {
     const usedCount = rows.filter((r) => r.condition === "used").length;
     const cpoCount = rows.filter((r) => r.condition === "cpo").length;
     let needsSticker = 0, missingAddendum = 0, priceVerify = 0, clean = 0;
+    let vinDecoded = 0, openRecallsTotal = 0, readinessSum = 0;
     for (const r of rows) {
       const s = signalFor(r);
       if (!s.stickerDone) needsSticker++;
       if (!s.hasAddendum) missingAddendum++;
       if (s.needsPriceVerify) priceVerify++;
       if (s.stickerDone && s.hasAddendum && !s.needsPriceVerify) clean++;
+      if (r.ymm) vinDecoded++;
+      openRecallsTotal += (r.open_recall_count || 0);
+      readinessSum += rowReadiness(r);
     }
     const total = rows.length;
     const archived = rows.filter((r) => r.status === "archived").length;
@@ -296,6 +304,8 @@ const Inventory = () => {
       newCount, usedCount, cpoCount,
       needsSticker, missingAddendum, priceVerify,
       readyToPublish: clean,
+      vinDecoded, openRecallsTotal,
+      avgReadiness: total ? Math.round(readinessSum / total) : 0,
       health,
     };
   }, [rows, addendumVins, byVin]);
