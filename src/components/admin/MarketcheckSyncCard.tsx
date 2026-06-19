@@ -158,52 +158,59 @@ export default function MarketcheckSyncCard() {
             <p className="text-[11px] text-muted-foreground mt-1">Just the domain — or pin the exact rooftop with Find dealer below.</p>
           </div>
 
-          <div>
-            <label className="block text-[11px] font-bold uppercase tracking-wider text-muted-foreground mb-1">
-              MarketCheck dealer ID
-            </label>
-            <input value={cfg.dealer_id} onChange={(e) => set({ dealer_id: e.target.value })}
-              placeholder="The exact rooftop — use Find dealer below"
-              className="w-full h-10 rounded-md border border-border bg-background px-3 text-sm font-mono" />
-            <p className="text-[11px] text-muted-foreground mt-1">When set, the sync pulls only this rooftop's cars (ignores the domain auto-match).</p>
-          </div>
-
-          {/* Find dealer — search a ZIP, pick the dealership, and its
-              MarketCheck ID drops into the field above. The reliable way to
-              avoid pulling a sibling rooftop's inventory. */}
-          <div className="rounded-xl border border-dashed border-border bg-muted/20 p-3 space-y-2">
-            <p className="text-sm font-semibold text-foreground">Find dealer by ZIP</p>
-            <div className="flex items-center gap-2">
-              <input value={lkZip} onChange={(e) => setLkZip(e.target.value)} placeholder="e.g. 06120" inputMode="numeric"
-                className="w-32 h-10 rounded-md border border-border bg-background px-3 text-sm font-mono" />
-              <button onClick={findDealers} disabled={lkLoading || !lkZip.trim()}
-                className="h-10 px-4 rounded-md bg-primary text-primary-foreground text-sm font-semibold disabled:opacity-50">
-                {lkLoading ? "Searching…" : "Find dealer"}
-              </button>
-            </div>
-            {lkResults && lkResults.length > 0 && (
-              <input value={lkFilter} onChange={(e) => setLkFilter(e.target.value)}
-                placeholder={`Filter ${lkResults.length} dealers — type "harte"`}
-                className="w-full h-9 rounded-md border border-border bg-background px-3 text-sm" />
-            )}
-            {lkResults && lkResults.length > 0 && (
-              <div className="max-h-56 overflow-y-auto divide-y divide-border rounded-md border border-border bg-card">
-                {lkResults.filter((d) => {
-                  const qq = lkFilter.trim().toLowerCase();
-                  return !qq || (d.name || "").toLowerCase().includes(qq) || (d.domain || "").toLowerCase().includes(qq);
-                }).map((d) => (
-                  <button key={d.id}
-                    onClick={() => { set({ dealer_id: d.id, source: d.domain || cfg.source }); toast.success(`Selected ${d.name || d.id}`); }}
-                    className={`w-full text-left px-3 py-2 hover:bg-muted ${cfg.dealer_id === d.id ? "bg-emerald-50" : ""}`}>
-                    <p className="text-sm font-semibold text-foreground truncate">{d.name || "(unnamed dealer)"}</p>
-                    <p className="text-[11px] text-muted-foreground truncate font-mono">
-                      id {d.id}{d.domain ? ` · ${d.domain}` : ""}{d.city ? ` · ${d.city}, ${d.state}` : ""}{d.listings != null ? ` · ${d.listings} cars` : ""}
-                    </p>
-                  </button>
-                ))}
+          {/* Rooftop pinning (dealer ID + Find dealer) is a platform-admin
+              control — a dealer never needs to touch MarketCheck IDs, and the
+              super admin sets the exact rooftop here or in Platform → Tenants. */}
+          {isAdmin && (
+            <>
+              <div>
+                <label className="block text-[11px] font-bold uppercase tracking-wider text-muted-foreground mb-1">
+                  MarketCheck dealer ID
+                </label>
+                <input value={cfg.dealer_id} onChange={(e) => set({ dealer_id: e.target.value })}
+                  placeholder="The exact rooftop — use Find dealer below"
+                  className="w-full h-10 rounded-md border border-border bg-background px-3 text-sm font-mono" />
+                <p className="text-[11px] text-muted-foreground mt-1">When set, the sync pulls only this rooftop's cars (ignores the domain auto-match).</p>
               </div>
-            )}
-          </div>
+
+              {/* Find dealer — search a ZIP, pick the dealership, and its
+                  MarketCheck ID drops into the field above. The reliable way to
+                  avoid pulling a sibling rooftop's inventory. */}
+              <div className="rounded-xl border border-dashed border-border bg-muted/20 p-3 space-y-2">
+                <p className="text-sm font-semibold text-foreground">Find dealer by ZIP</p>
+                <div className="flex items-center gap-2">
+                  <input value={lkZip} onChange={(e) => setLkZip(e.target.value)} placeholder="e.g. 06120" inputMode="numeric"
+                    className="w-32 h-10 rounded-md border border-border bg-background px-3 text-sm font-mono" />
+                  <button onClick={findDealers} disabled={lkLoading || !lkZip.trim()}
+                    className="h-10 px-4 rounded-md bg-primary text-primary-foreground text-sm font-semibold disabled:opacity-50">
+                    {lkLoading ? "Searching…" : "Find dealer"}
+                  </button>
+                </div>
+                {lkResults && lkResults.length > 0 && (
+                  <input value={lkFilter} onChange={(e) => setLkFilter(e.target.value)}
+                    placeholder={`Filter ${lkResults.length} dealers — type "harte"`}
+                    className="w-full h-9 rounded-md border border-border bg-background px-3 text-sm" />
+                )}
+                {lkResults && lkResults.length > 0 && (
+                  <div className="max-h-56 overflow-y-auto divide-y divide-border rounded-md border border-border bg-card">
+                    {lkResults.filter((d) => {
+                      const qq = lkFilter.trim().toLowerCase();
+                      return !qq || (d.name || "").toLowerCase().includes(qq) || (d.domain || "").toLowerCase().includes(qq);
+                    }).map((d) => (
+                      <button key={d.id}
+                        onClick={() => { set({ dealer_id: d.id, source: d.domain || cfg.source }); toast.success(`Selected ${d.name || d.id}`); }}
+                        className={`w-full text-left px-3 py-2 hover:bg-muted ${cfg.dealer_id === d.id ? "bg-emerald-50" : ""}`}>
+                        <p className="text-sm font-semibold text-foreground truncate">{d.name || "(unnamed dealer)"}</p>
+                        <p className="text-[11px] text-muted-foreground truncate font-mono">
+                          id {d.id}{d.domain ? ` · ${d.domain}` : ""}{d.city ? ` · ${d.city}, ${d.state}` : ""}{d.listings != null ? ` · ${d.listings} cars` : ""}
+                        </p>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </>
+          )}
 
           <div className="grid grid-cols-2 gap-3">
             <div>
