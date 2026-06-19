@@ -172,6 +172,7 @@ const AppShell = ({ children }: AppShellProps) => {
       defaultOpen: false,
       items: [
         { label: "Compliance Guide", path: "/compliance", icon: BookOpen },
+        { label: "Prep & Install", path: "/prep", icon: Wrench },
         { label: "Vehicle Files", path: "/admin?tab=files", icon: FolderOpen },
         { label: "Audit Log", path: "/admin?tab=audit", icon: ShieldCheck },
       ],

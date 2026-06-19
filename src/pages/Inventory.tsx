@@ -56,7 +56,7 @@ interface ActivityRow { id: string; action: string; created_at: string; details:
 
 type StatusFilter = "all" | "draft" | "published" | "archived";
 type ConditionFilter = "all" | "new" | "used" | "cpo";
-type DerivedFilter = "all" | "needs-sticker" | "missing-addendum" | "price-verify" | "open-recalls";
+type DerivedFilter = "all" | "needs-sticker" | "missing-addendum" | "price-verify" | "open-recalls" | "needs-attention";
 
 const PAGE_SIZE = 25;
 const PAGE_SIZE_OPTIONS = [25, 50, 100, 200];
@@ -303,6 +303,9 @@ const Inventory = () => {
         if (derived === "missing-addendum" && s.hasAddendum) return false;
         if (derived === "price-verify" && !s.needsPriceVerify) return false;
         if (derived === "open-recalls" && !((r.open_recall_count || 0) > 0)) return false;
+        // Mirror the Needs Attention KPI exactly: missing addendum OR needs
+        // price verification OR has an open recall.
+        if (derived === "needs-attention" && s.hasAddendum && !s.needsPriceVerify && !((r.open_recall_count || 0) > 0)) return false;
       }
       if (!lc) return true;
       return (
@@ -391,7 +394,8 @@ const Inventory = () => {
     setDerived("all"); setStatus("all"); setCondition("all");
     if (key === "ready" || key === "published") setStatus("published");
     else if (key === "needs-sticker") setDerived("needs-sticker");
-    else if (key === "missing-addendum" || key === "needs-attention") setDerived("missing-addendum");
+    else if (key === "needs-attention") setDerived("needs-attention");
+    else if (key === "missing-addendum") setDerived("missing-addendum");
     else if (key === "price-verify" || key === "price-reviews") setDerived("price-verify");
     else if (key === "open-recalls") setDerived("open-recalls");
     // "total" clears everything (done above)
@@ -493,6 +497,7 @@ const Inventory = () => {
                               {settings.doc_fee_amount > 0 && <p className="text-[10px] text-muted-foreground">incl. ${settings.doc_fee_amount.toLocaleString()} doc</p>}
                             </div>
                           ) : null}
+                          {r.market_position && <div className="mt-1 flex justify-end"><MarketChip position={r.market_position} /></div>}
                         </td>
                         <td className="px-3 py-3" onClick={(e) => e.stopPropagation()}>
                           <PortalChip status={r.status} />
@@ -570,7 +575,7 @@ const Inventory = () => {
               <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Top issue</span>
               <span className="text-xs font-bold text-amber-600">{topIssue}</span>
             </div>
-            <p className="text-[11px] font-semibold text-blue-600 mt-3 cursor-default">View full insights →</p>
+            <button onClick={() => onHealthMetric("needs-attention")} className="text-[11px] font-semibold text-blue-600 hover:text-blue-700 mt-3 transition-colors">View items needing attention →</button>
           </SideCard>
 
           <SideCard title="Inventory by Status">
@@ -599,7 +604,7 @@ const Inventory = () => {
                     );
                   })}
                 </ul>
-                <p className="text-[11px] font-semibold text-blue-600 mt-3 cursor-default">View all activity →</p>
+                <button onClick={() => navigate("/admin?tab=audit")} className="text-[11px] font-semibold text-blue-600 hover:text-blue-700 mt-3 transition-colors">View all activity →</button>
               </>
             )}
           </SideCard>
@@ -611,7 +616,7 @@ const Inventory = () => {
               <HealthStat label="Open issues" value={counts.needsAttention} tone={counts.needsAttention ? "amber" : "emerald"} />
               <HealthStat label={`Market position`} value={`$${Math.abs(counts.avgBelowMarket).toLocaleString()} ${counts.avgBelowMarket >= 0 ? "below" : "above"}`} tone={counts.avgBelowMarket >= 0 ? "emerald" : "amber"} small />
             </div>
-            <p className="text-[11px] font-semibold text-blue-600 mt-3 cursor-default">View dealer health →</p>
+            <button onClick={() => navigate("/admin?tab=analytics")} className="text-[11px] font-semibold text-blue-600 hover:text-blue-700 mt-3 transition-colors">View dealer health →</button>
           </SideCard>
         </aside>
       </div>
