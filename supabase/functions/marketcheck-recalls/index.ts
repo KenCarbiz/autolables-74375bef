@@ -70,23 +70,44 @@ function normalize(vin: string, raw: any): Normalized {
   };
 }
 
-// One MarketCheck AutoRecalls call with a timeout and a single retry.
-async function fetchRecalls(vin: string): Promise<{ ok: true; data: Normalized } | { ok: false; reason: string }> {
-  const url = `${MC_BASE}/recall/car/${encodeURIComponent(vin)}?api_key=${encodeURIComponent(MC_KEY)}`;
-  for (let attempt = 0; attempt < 2; attempt++) {
+// Candidate MarketCheck recall endpoints (the path/host has moved across API
+// generations; we try each until one answers so the feature works without a
+// docs round-trip, and report which one matched for diagnostics).
+const recallEndpoints = (vin: string): string[] => {
+  const k = encodeURIComponent(MC_KEY);
+  const v = encodeURIComponent(vin);
+  return [
+    `${MC_BASE}/recall/car/${v}?api_key=${k}`,
+    `https://mc-api.marketcheck.com/v2/recall/car/${v}?api_key=${k}`,
+    `${MC_BASE}/recall/car?api_key=${k}&vin=${v}`,
+    `${MC_BASE}/recalls/car/${v}?api_key=${k}`,
+  ];
+};
+const redact = (u: string) => u.replace(/api_key=[^&]+/, "api_key=***");
+
+interface FetchOk { ok: true; data: Normalized; endpoint: string; raw: unknown }
+interface FetchErr { ok: false; reason: string; tried: { url: string; status: number | string }[] }
+
+// Try each candidate endpoint with a timeout; first one that returns parseable
+// JSON wins. A 404 is treated as "no recalls" (clear) on a path that exists.
+async function fetchRecalls(vin: string): Promise<FetchOk | FetchErr> {
+  const tried: { url: string; status: number | string }[] = [];
+  let sawRateLimit = false;
+  for (const url of recallEndpoints(vin)) {
     try {
       const res = await fetch(url, { signal: AbortSignal.timeout(10000) });
-      if (res.status === 404) return { ok: true, data: normalize(vin, { recalls: [] }) }; // no data = clear
-      if (res.status === 429) { if (attempt === 0) { await new Promise((r) => setTimeout(r, 1200)); continue; } return { ok: false, reason: "rate_limited" }; }
-      if (!res.ok) { if (attempt === 0) { await new Promise((r) => setTimeout(r, 600)); continue; } return { ok: false, reason: `provider_error_${res.status}` }; }
-      const body = await res.json().catch(() => ({}));
-      return { ok: true, data: normalize(vin, body) };
+      tried.push({ url: redact(url), status: res.status });
+      if (res.status === 429) { sawRateLimit = true; continue; }
+      if (res.status === 404) { return { ok: true, data: normalize(vin, { recalls: [] }), endpoint: redact(url), raw: { status: 404 } }; }
+      if (!res.ok) continue;
+      const body = await res.json().catch(() => null);
+      if (body == null) continue;
+      return { ok: true, data: normalize(vin, body), endpoint: redact(url), raw: body };
     } catch (_e) {
-      if (attempt === 0) { await new Promise((r) => setTimeout(r, 600)); continue; }
-      return { ok: false, reason: "timeout_or_network" };
+      tried.push({ url: redact(url), status: "timeout_or_network" });
     }
   }
-  return { ok: false, reason: "unknown" };
+  return { ok: false, reason: sawRateLimit ? "rate_limited" : "no_endpoint_matched", tried };
 }
 
 // deno-lint-ignore no-explicit-any
@@ -136,7 +157,7 @@ Deno.serve(async (req) => {
   if (!validVin(vin)) return json(400, { recallStatus: "error", error: "invalid_vin", note: "VIN must be 17 chars with no I, O, or Q" });
 
   const r = await fetchRecalls(vin);
-  if (!r.ok) return json(200, { vin, recallStatus: "error", error: r.reason });
+  if (!r.ok) return json(200, { vin, recallStatus: "error", error: r.reason, tried: r.tried });
   await persist(admin, tenantId, vin, r.data);
-  return json(200, r.data);
+  return json(200, { ...r.data, endpoint: r.endpoint, ...(body.diagnostic ? { _raw: r.raw } : {}) });
 });

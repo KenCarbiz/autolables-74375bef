@@ -1886,8 +1886,9 @@ const RecallCard = ({ vehicle }: { vehicle: VehicleRow }) => {
     try {
       const { data, error } = await supabase.functions.invoke("marketcheck-recalls", { body: { vin: vehicle.vin, tenant_id: vehicle.tenant_id } });
       if (error) throw error;
-      const d = (data || {}) as { error?: string; recallStatus?: string; checkedAt?: string; openRecallCount?: number; recalls?: RecallItem[] };
+      const d = (data || {}) as { error?: string; recallStatus?: string; checkedAt?: string; openRecallCount?: number; recalls?: RecallItem[]; endpoint?: string };
       if (d.error === "not_configured") { toast.error("Recall lookup isn't configured yet (MarketCheck AutoRecalls key)."); setStatus("error"); }
+      else if (d.error === "no_endpoint_matched") { toast.error("MarketCheck recall endpoint not reachable — likely no AutoRecalls access on the key."); setStatus("error"); }
       else if (d.recallStatus === "error") { toast.error("We could not check recalls right now. Try again."); setStatus("error"); }
       else {
         setStatus(d.recallStatus || "unknown"); setCheckedAt(d.checkedAt || null); setOpen(d.openRecallCount || 0); setRecalls(d.recalls || []);
