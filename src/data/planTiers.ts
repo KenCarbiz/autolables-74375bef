@@ -8,7 +8,7 @@
 // Pricing (per rooftop/month):
 //   - essential      $299 — window stickers + addendums, up to 75 VINs/mo
 //   - unlimited      $599 — unlimited VINs, product rules, analytics
-//   - compliance_pro $999 — full scan-to-signed FTC compliance flow
+//   - compliance_pro $1,499 — full scan-to-signed FTC compliance flow
 // ──────────────────────────────────────────────────────────────
 
 import type { DealerSettings } from "@/contexts/DealerSettingsContext";
@@ -103,7 +103,7 @@ export const PLAN_DEFINITIONS: PlanDefinition[] = [
     tier: "compliance_pro",
     name: "Compliance Pro",
     tagline: "Full scan-to-signed FTC flow for airtight deals.",
-    price: "$999",
+    price: "$1,499",
     priceNote: "per rooftop / month",
     features: [
       "Everything in Unlimited, plus:",

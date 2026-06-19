@@ -769,7 +769,7 @@ const Onboarding = () => {
               <PlanCard
                 tier="compliance_pro"
                 name="Compliance Pro"
-                price="$999/mo"
+                price="$1,499/mo"
                 description="Everything, plus website price verification, nightly inventory sync, and the per-VIN defense file."
                 selected={data.planTier === "compliance_pro"}
                 onClick={() => update("planTier", "compliance_pro")}
