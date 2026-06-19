@@ -1308,11 +1308,11 @@ const Index = () => {
             {viewMode ? "Read-only view of a signed or saved addendum" : "Build, sign, and send a dealer addendum to your customer"}
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           {viewMode && (
             <button
               onClick={() => navigate("/addendum")}
-              className="inline-flex items-center gap-1.5 h-9 px-3 rounded-md border border-border text-sm font-medium hover:bg-muted transition-colors"
+              className="inline-flex items-center justify-center gap-1.5 h-9 px-3.5 rounded-lg border border-border text-sm font-medium whitespace-nowrap shrink-0 hover:bg-muted transition-colors"
             >
               <ArrowLeft className="w-3.5 h-3.5" />
               New
@@ -1321,7 +1321,7 @@ const Index = () => {
           {user && viewMode && currentId && (
             <button
               onClick={() => navigate(`/addendum?id=${currentId}&edit=1`)}
-              className="inline-flex items-center gap-1.5 h-9 px-3 rounded-md bg-primary text-primary-foreground text-sm font-medium hover:opacity-90 transition-opacity"
+              className="inline-flex items-center justify-center gap-1.5 h-9 px-3.5 rounded-lg bg-primary text-primary-foreground text-sm font-medium whitespace-nowrap shrink-0 hover:opacity-90 transition-opacity"
             >
               <Pencil className="w-3.5 h-3.5" />
               Edit
@@ -1331,7 +1331,7 @@ const Index = () => {
             <button
               onClick={handleSave}
               disabled={saving}
-              className="inline-flex items-center gap-1.5 h-9 px-3 rounded-md bg-primary text-primary-foreground text-sm font-medium hover:opacity-90 transition-opacity disabled:opacity-50"
+              className="inline-flex items-center justify-center gap-1.5 h-9 px-3.5 rounded-lg bg-primary text-primary-foreground text-sm font-medium whitespace-nowrap shrink-0 hover:opacity-90 transition-opacity disabled:opacity-50"
               title="Save your progress at any point — it lands in Saved Addendums as a draft"
             >
               <Save className="w-3.5 h-3.5" />
@@ -1342,7 +1342,7 @@ const Index = () => {
             <button
               onClick={handleSendToCustomer}
               disabled={saving}
-              className="inline-flex items-center gap-1.5 h-9 px-3 rounded-md bg-teal text-primary-foreground text-sm font-medium hover:opacity-90 transition-opacity disabled:opacity-50"
+              className="inline-flex items-center justify-center gap-1.5 h-9 px-3.5 rounded-lg bg-teal text-primary-foreground text-sm font-medium whitespace-nowrap shrink-0 hover:opacity-90 transition-opacity disabled:opacity-50"
             >
               <Send className="w-3.5 h-3.5" />
               Send to Customer
@@ -1350,7 +1350,7 @@ const Index = () => {
           )}
           <button
             onClick={handlePrint}
-            className="inline-flex items-center gap-1.5 h-9 px-3 rounded-md border border-border text-sm font-medium hover:bg-muted transition-colors"
+            className="inline-flex items-center justify-center gap-1.5 h-9 px-3.5 rounded-lg border border-border text-sm font-medium whitespace-nowrap shrink-0 hover:bg-muted transition-colors"
           >
             <Printer className="w-3.5 h-3.5" />
             Print
@@ -1358,7 +1358,7 @@ const Index = () => {
           <button
             onClick={handleDownloadPdf}
             disabled={generating}
-            className="inline-flex items-center gap-1.5 h-9 px-3 rounded-md border border-border text-sm font-medium hover:bg-muted transition-colors disabled:opacity-50"
+            className="inline-flex items-center justify-center gap-1.5 h-9 px-3.5 rounded-lg border border-border text-sm font-medium whitespace-nowrap shrink-0 hover:bg-muted transition-colors disabled:opacity-50"
           >
             <Download className="w-3.5 h-3.5" />
             {generating ? "Generating..." : "PDF"}
