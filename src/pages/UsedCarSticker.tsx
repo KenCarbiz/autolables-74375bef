@@ -91,11 +91,11 @@ const UsedCarSticker = () => {
       hp: v.horsepower || prev.hp,
       torque: v.torque || prev.torque,
     }));
-    setEquipment((prev) =>
-      prev.filter(Boolean).length > 0
-        ? prev
-        : [v.bodyStyle, v.drivetrain, v.fuelType, v.engine].filter(Boolean)
-    );
+    setEquipment((prev) => {
+      if (prev.filter(Boolean).length > 0) return prev;
+      const opts = [...v.options, ...v.features];
+      return opts.length > 0 ? opts : [v.bodyStyle, v.drivetrain, v.fuelType, v.engine].filter(Boolean);
+    });
   });
   // Generate proper tracking code: AC-{STORE}-{VIN6}-{TYPE}-{TIMESTAMP}
   const trackingCode = (() => {

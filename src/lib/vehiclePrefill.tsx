@@ -40,6 +40,15 @@ export interface PrefillVehicle {
   mpgCombined: string;
   horsepower: string;
   torque: string;
+  // OEM equipment / options & packages from the feed (when present).
+  features: string[];
+  options: string[];
+  // Market & history signals.
+  daysOnMarket: string;
+  priceChangePercent: string;
+  carfax1Owner: boolean;
+  carfaxCleanTitle: boolean;
+  sellerType: string;
   photos: string[];
   heroImage: string;
   recallStatus: string;
@@ -54,6 +63,20 @@ export interface PrefillVehicle {
 
 const s = (v: unknown): string => (v == null ? "" : String(v));
 const sNum = (v: unknown): string => (v == null || v === "" ? "" : String(v));
+// Feed equipment/options arrive as plain strings or {name|label|description}
+// objects depending on the feed generation — flatten to a clean string list.
+const toStrArr = (v: unknown): string[] =>
+  Array.isArray(v)
+    ? v
+        .map((x) =>
+          typeof x === "string"
+            ? x
+            : x && typeof x === "object"
+              ? String((x as Record<string, unknown>).name ?? (x as Record<string, unknown>).label ?? (x as Record<string, unknown>).description ?? "")
+              : String(x ?? "")
+        )
+        .filter(Boolean)
+    : [];
 
 // "2022 Toyota Tundra SR5" → year/make/model. The trim is stored
 // separately, so model is everything after make.
@@ -110,6 +133,13 @@ function normalizeRow(row: Record<string, any>): PrefillVehicle {
     mpgCombined: sNum(pick(mc, "combined_mpg", "mpg_combined")),
     horsepower: sNum(pick(mc, "horsepower", "hp", "engine_hp")),
     torque: sNum(pick(mc, "torque")),
+    features: toStrArr(pick(mc, "features", "std_equipment")),
+    options: toStrArr(pick(mc, "options", "installed_options")),
+    daysOnMarket: sNum(pick(mc, "dom_active", "dom")),
+    priceChangePercent: sNum(pick(mc, "price_change_percent")),
+    carfax1Owner: pick(mc, "carfax_1_owner") === true,
+    carfaxCleanTitle: pick(mc, "carfax_clean_title") === true,
+    sellerType: s(pick(mc, "seller_type")),
     photos: Array.isArray(row.photos) ? row.photos.map(s).filter(Boolean) : [],
     heroImage: s(row.hero_image_url),
     recallStatus: s(row.recall_status),

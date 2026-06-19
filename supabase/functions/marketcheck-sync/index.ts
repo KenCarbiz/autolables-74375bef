@@ -169,7 +169,19 @@ interface MCListing {
   vin?: string; price?: number | string; msrp?: number | string;
   stock_no?: string; miles?: number; source?: string;
   inventory_type?: string; is_certified?: boolean; vdp_url?: string;
-  exterior_color?: string; interior_color?: string;
+  exterior_color?: string; interior_color?: string; base_ext_color?: string; base_int_color?: string;
+  // Market & history signals MarketCheck carries on each active listing that
+  // we previously ignored — days-on-market, price-change, listing age, and
+  // the CARFAX badge flags (not the full report).
+  dom?: number; dom_active?: number; dom_180?: number;
+  price_change_percent?: number | string; ref_price?: number | string; ref_miles?: number;
+  first_seen_at?: number | string; last_seen_at?: number | string; scraped_at?: number | string;
+  carfax_1_owner?: boolean; carfax_clean_title?: boolean;
+  seller_type?: string; in_transit?: boolean;
+  // OEM equipment / options & packages when the feed carries them.
+  extra?: { features?: unknown[]; options?: unknown[]; [k: string]: unknown };
+  // deno-lint-ignore no-explicit-any
+  options?: any; features?: any;
   build?: { year?: number; make?: string; model?: string; trim?: string;
     engine?: string; engine_size?: number | string; engine_block?: string;
     transmission?: string; drivetrain?: string; fuel_type?: string;
@@ -563,12 +575,26 @@ serve(async (req) => {
                 ...(b as Record<string, unknown>),
                 msrp: toPrice(l.msrp), exterior_color: l.exterior_color || null,
                 interior_color: l.interior_color || null,
+                base_ext_color: l.base_ext_color || null, base_int_color: l.base_int_color || null,
                 engine: b.engine || null, transmission: b.transmission || null,
                 drivetrain: b.drivetrain || null, fuel_type: b.fuel_type || null,
                 body_type: b.body_type || null, doors: b.doors ?? null,
                 cylinders: b.cylinders ?? null, vehicle_type: b.vehicle_type || null,
                 city_mpg: b.city_mpg ?? null, highway_mpg: b.highway_mpg ?? null,
                 engine_size: b.engine_size ?? null,
+                // Market & history signals (days-on-market, price movement,
+                // listing age, CARFAX badge flags, seller type).
+                dom: l.dom ?? null, dom_active: l.dom_active ?? null, dom_180: l.dom_180 ?? null,
+                price_change_percent: l.price_change_percent ?? null,
+                ref_price: toPrice(l.ref_price), ref_miles: l.ref_miles ?? null,
+                first_seen_at: l.first_seen_at ?? null, last_seen_at: l.last_seen_at ?? null,
+                scraped_at: l.scraped_at ?? null,
+                carfax_1_owner: l.carfax_1_owner ?? null, carfax_clean_title: l.carfax_clean_title ?? null,
+                seller_type: l.seller_type || null, in_transit: l.in_transit ?? null,
+                vdp_url: l.vdp_url || null,
+                // OEM equipment / options & packages when present in the feed.
+                features: (l.extra?.features ?? l.features) ?? null,
+                options: (l.extra?.options ?? l.options) ?? null,
               };
               const enrich: Record<string, unknown> = { mc_attributes: mcAttrs };
               if (gallery.length) { enrich.photos = gallery; enrich.photo_count = gallery.length; }
