@@ -486,7 +486,8 @@ const Principles = () => (
 
 const FEATURES = [
   { icon: ShieldCheck, title: "FTC-aligned engine", body: "California SB 766 disclosures, multi-language support, 2-year record retention — built in." },
-  { icon: Scan, title: "VIN decode + scrape", body: "NHTSA free decode or Black Book live market pricing. Or paste a VDP URL and let us scrape it." },
+  { icon: Scan, title: "VIN decode + scrape", body: "Free NHTSA decode, or paste a VDP URL and let us scrape it — VIN, equipment, colors, and price filled in automatically." },
+  { icon: BadgeCheck, title: "Complete vehicle file", body: "Your inventory feed builds a full file per VIN: factory options, fuel economy, one-owner and clean-title flags, days-on-market, and live market position — ready to drop onto a window sticker." },
   { icon: Sparkles, title: "Rules engine", body: "Auto-assign products by year, make, model, trim, body style, or mileage. Set once, apply forever." },
   { icon: Signature, title: "Digital signing", body: "Customer signs on their phone via QR. Every signature is cryptographically logged for audits." },
   { icon: FileText, title: "Buyers Guide", body: "FTC As-Is / Implied / Warranty guides in English + Spanish. Satisfies federal and state requirements." },
