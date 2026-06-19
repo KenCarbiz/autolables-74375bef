@@ -371,23 +371,6 @@ const Inventory = () => {
     <div className="p-4 lg:p-6 max-w-[1600px] mx-auto space-y-5">
       <PageTabs tabs={VEHICLES_TABS} />
 
-      {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-3 pt-1">
-        <div>
-          <div className="inline-flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
-            <Car className="w-3 h-3" />
-            Inventory
-          </div>
-          <h1 className="mt-0.5 text-2xl lg:text-[28px] font-display font-semibold tracking-tight text-foreground">
-            Inventory Command Center
-          </h1>
-          <p className="text-sm text-muted-foreground mt-0.5">
-            Manage, optimize, and publish your inventory with confidence.
-          </p>
-        </div>
-        <DealerInfoCard name={dealerName} location={dealerLoc} at={lastSync.at} total={counts.total} />
-      </div>
-
       <div className="flex flex-col xl:flex-row gap-5">
         {/* Main column */}
         <div className="flex-1 min-w-0 space-y-5">
@@ -530,9 +513,9 @@ const Inventory = () => {
 
         {/* Sidebar */}
         <aside className="xl:w-[300px] shrink-0 space-y-4">
-          <div className="rounded-[20px] border border-[#EAECEF] bg-white shadow-[0_1px_3px_rgba(16,24,40,0.04)] p-5">
-            <h3 className="text-xs font-bold uppercase tracking-[0.14em] text-muted-foreground mb-4">Quick Actions</h3>
-            <div className="space-y-3">
+          <div className="rounded-[20px] border border-[#EAECEF] bg-white shadow-[0_1px_3px_rgba(16,24,40,0.04)] p-4">
+            <h3 className="text-xs font-bold uppercase tracking-[0.14em] text-muted-foreground mb-3">Quick Actions</h3>
+            <div className="space-y-2">
               <QuickAction icon={Plus} label="Add Vehicle" onClick={() => setShowAdd(true)} />
               <QuickAction icon={ScanLine} label="Scan VIN" onClick={openScan} />
               <QuickAction icon={Printer} label="New Car Sticker" onClick={() => navigate("/new-car-sticker")} />
@@ -725,13 +708,13 @@ const SideCard = ({ title, children }: { title: string; children: React.ReactNod
 const QuickAction = ({ icon: Icon, label, onClick }: { icon: typeof Car; label: string; onClick: () => void }) => (
   <button
     onClick={onClick}
-    className="w-full flex items-center gap-3 pl-2.5 pr-4 h-[58px] rounded-full border border-[#E8EDF4] bg-[#F8FAFC] hover:bg-white hover:border-blue-500 hover:shadow-sm transition-all duration-200 text-left"
+    className="w-full flex items-center gap-2.5 pl-2 pr-3.5 h-[46px] rounded-full border border-[#E8EDF4] bg-[#F8FAFC] hover:bg-white hover:border-blue-500 hover:shadow-sm transition-all duration-200 text-left"
   >
-    <span className="w-10 h-10 rounded-full bg-[#EAF2FF] text-blue-600 flex items-center justify-center shrink-0">
-      <Icon className="w-[18px] h-[18px]" strokeWidth={2} />
+    <span className="w-8 h-8 rounded-full bg-[#EAF2FF] text-blue-600 flex items-center justify-center shrink-0">
+      <Icon className="w-4 h-4" strokeWidth={2} />
     </span>
-    <span className="flex-1 text-base font-semibold text-[#111827] truncate">{label}</span>
-    <ChevronRight className="w-[18px] h-[18px] text-[#6B7280] shrink-0" />
+    <span className="flex-1 text-sm font-semibold text-[#111827] truncate">{label}</span>
+    <ChevronRight className="w-4 h-4 text-[#6B7280] shrink-0" />
   </button>
 );
 

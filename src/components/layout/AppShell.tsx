@@ -1,4 +1,4 @@
-import { ReactNode, useState, useCallback, useMemo } from "react";
+import { ReactNode, useState, useCallback, useMemo, useEffect } from "react";
 import { useLocation, useNavigate as useBaseNavigate, Link } from "react-router-dom";
 import { useViewTransitionNavigate } from "@/lib/navigation";
 import {
@@ -42,6 +42,7 @@ import {
   PenLine,
   CheckCircle2,
   Truck,
+  Building2,
 } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
 import { useAuth } from "@/contexts/AuthContext";
@@ -335,6 +336,40 @@ const AppShell = ({ children }: AppShellProps) => {
   const firstName = user?.email?.split("@")[0].split(".")[0] || "there";
   const capitalized = firstName.charAt(0).toUpperCase() + firstName.slice(1);
 
+  // Page title shown directly in the (thicker) top bar, replacing the
+  // breadcrumb strip. Falls back to the last breadcrumb label for routes
+  // without an explicit title (keeps `breadcrumbs` referenced).
+  const pageMeta = (() => {
+    const p = location.pathname;
+    if (p === "/inventory") return { title: "Inventory Command Center", subtitle: "Manage, optimize, and publish your inventory with confidence." };
+    if (p.startsWith("/vehicle-file")) return { title: "Vehicle Command Center", subtitle: "" };
+    const last = breadcrumbs[breadcrumbs.length - 1];
+    return { title: last?.label || "", subtitle: "" };
+  })();
+
+  // Best-effort last MarketCheck sync for the dealer status cards in the top bar.
+  const [syncInfo, setSyncInfo] = useState<{ at: string | null; count: number | null }>({ at: null, count: null });
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      if (!tenant?.id) return;
+      try {
+        const { data } = await (supabase as unknown as { from: (t: string) => { select: (c: string) => { eq: (k: string, v: string) => { maybeSingle: () => Promise<{ data: { last_run_at: string | null; last_status: Record<string, unknown> | null } | null }> } } } })
+          .from("marketcheck_sync_config").select("last_run_at, last_status").eq("tenant_id", tenant.id).maybeSingle();
+        const st = (data?.last_status || {}) as Record<string, unknown>;
+        const count = typeof st.seen === "number" ? st.seen : (typeof st.num_found === "number" ? st.num_found : null);
+        if (!cancelled) setSyncInfo({ at: data?.last_run_at ?? null, count });
+      } catch { /* ignore — cards just show "not synced" */ }
+    })();
+    return () => { cancelled = true; };
+  }, [tenant?.id]);
+  const dealerLoc = [settings.dealer_city, settings.dealer_state].filter(Boolean).join(", ");
+  const syncWhen = syncInfo.at ? (() => {
+    const d = new Date(syncInfo.at);
+    const sameDay = d.toDateString() === new Date().toDateString();
+    return sameDay ? `${d.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })} today` : d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+  })() : "Never";
+
   return (
    <VinScanContext.Provider value={vinScanApi}>
     <div className="min-h-screen bg-background flex">
@@ -542,8 +577,8 @@ const AppShell = ({ children }: AppShellProps) => {
             border. topbar-navy class kept for backward-compat but
             now resolves to a light backdrop-blurred panel. */}
         <header className="sticky top-0 z-20 topbar-navy vt-topbar text-foreground border-b border-border">
-          <div className="flex items-center h-14 px-3 lg:px-5 gap-3">
-            {/* Left: hamburger (mobile) + greeting block */}
+          <div className="flex items-center h-[68px] px-3 lg:px-5 gap-3">
+            {/* Left: hamburger (mobile) + page title */}
             <div className="flex items-center gap-3 min-w-0 flex-shrink-0">
               <button
                 onClick={() => setMobileOpen(true)}
@@ -552,23 +587,22 @@ const AppShell = ({ children }: AppShellProps) => {
                 <Menu className="w-4 h-4" />
               </button>
               <div className="min-w-0 hidden sm:block">
-                <p className="text-sm font-semibold text-foreground truncate leading-tight">
-                  {greeting}, {capitalized}
+                <p className="text-lg font-display font-semibold text-foreground truncate leading-tight">
+                  {pageMeta.title || `${greeting}, ${capitalized}`}
                 </p>
-                <div className="flex items-center gap-1.5 mt-0.5">
-                  <span className="inline-flex items-center gap-1 text-[9px] font-bold bg-amber-100 text-amber-800 px-1.5 py-0.5 rounded-sm uppercase tracking-[0.12em]">
-                    <Sparkles className="w-2.5 h-2.5" />
-                    {isAdmin ? "Super Admin" : "Admin"}
-                  </span>
-                  <span className="hidden lg:inline-flex items-center text-[10px] text-muted-foreground tracking-[0.08em]">
-                    by <span className="ml-1 font-semibold text-foreground/70">Autocurb</span>
-                  </span>
-                  {currentStore?.name && (
-                    <span className="text-[11px] text-muted-foreground truncate">
-                      · {currentStore.name}
+                {pageMeta.subtitle ? (
+                  <p className="text-xs text-muted-foreground truncate hidden lg:block mt-0.5">{pageMeta.subtitle}</p>
+                ) : (
+                  <div className="flex items-center gap-1.5 mt-0.5">
+                    <span className="inline-flex items-center gap-1 text-[9px] font-bold bg-amber-100 text-amber-800 px-1.5 py-0.5 rounded-sm uppercase tracking-[0.12em]">
+                      <Sparkles className="w-2.5 h-2.5" />
+                      {isAdmin ? "Super Admin" : "Admin"}
                     </span>
-                  )}
-                </div>
+                    {currentStore?.name && (
+                      <span className="text-[11px] text-muted-foreground truncate">· {currentStore.name}</span>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
 
@@ -603,6 +637,34 @@ const AppShell = ({ children }: AppShellProps) => {
                 <ScanLine className="w-4 h-4 stroke-2" />
                 <span className="hidden sm:inline">Scan VIN</span>
               </button>
+
+              {/* Dealer · sync · MarketCheck status cards */}
+              {tenant?.name && (
+                <div className="hidden xl:flex items-center gap-2">
+                  <div className="flex items-center gap-2 h-11 px-3 rounded-xl border border-border bg-card">
+                    <Building2 className="w-4 h-4 text-blue-700 shrink-0" />
+                    <div className="leading-tight min-w-0">
+                      <p className="text-[11px] font-bold text-foreground truncate max-w-[130px]">{tenant.name}</p>
+                      {dealerLoc && <p className="text-[10px] text-muted-foreground">{dealerLoc}</p>}
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 h-11 px-3 rounded-xl border border-border bg-card">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />
+                    <div className="leading-tight">
+                      <p className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground">Inventory last synced</p>
+                      <p className="text-[11px] font-semibold text-foreground">{syncWhen}</p>
+                      {syncInfo.count != null && <p className="text-[10px] font-semibold text-emerald-600">{syncInfo.count} vehicles updated</p>}
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 h-11 px-3 rounded-xl border border-border bg-card">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />
+                    <div className="leading-tight">
+                      <p className="text-[11px] font-bold text-foreground">MarketCheck</p>
+                      <p className="text-[10px] text-muted-foreground">Connected</p>
+                    </div>
+                  </div>
+                </div>
+              )}
 
               {/* Dark mode toggle */}
               <button
@@ -705,28 +767,6 @@ const AppShell = ({ children }: AppShellProps) => {
           </div>
         </header>
 
-        {/* Breadcrumbs — sticky below the topbar with backdrop-blur so
-            content scrolls beneath it like a native toolbar.
-            vt-crumbs keeps this strip out of the route cross-fade. */}
-        <div className="sticky top-14 z-10 h-10 flex items-center px-4 lg:px-6 surface-blur vt-crumbs border-b border-border flex-shrink-0">
-          <div className="flex items-center gap-1.5 text-xs overflow-x-auto whitespace-nowrap">
-            {breadcrumbs.map((crumb, i) => (
-              <div key={i} className="flex items-center gap-1.5">
-                {i > 0 && <ChevronRight className="w-3 h-3 text-muted-foreground/50 flex-shrink-0" />}
-                {crumb.path ? (
-                  <Link
-                    to={crumb.path}
-                    className="text-muted-foreground hover:text-foreground transition-colors"
-                  >
-                    {crumb.label}
-                  </Link>
-                ) : (
-                  <span className="text-foreground font-medium">{crumb.label}</span>
-                )}
-              </div>
-            ))}
-          </div>
-        </div>
 
         {/* Page content — only this swaps on route change. Chrome
             above (topbar + breadcrumb) and the sidebar stay
