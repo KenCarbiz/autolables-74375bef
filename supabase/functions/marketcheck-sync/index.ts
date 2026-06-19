@@ -103,6 +103,31 @@ async function mcFetch(base: string, query: string): Promise<{ listings: MCListi
 const syndPage = (param: string, value: string, rows: number, start: number) =>
   mcFetch(SYND_ENDPOINT, `${param}=${encodeURIComponent(value)}&owned=true&rows=${rows}&start=${start}`);
 
+// Resolve a dealer straight from its website domain. Dealers Search supports an
+// inventory_url filter, so this returns the AUTHORITATIVE rooftop for a domain
+// (correct id + verified name/state) without the geo + fuzzy-match guesswork.
+async function resolveByDomain(domain: string): Promise<{ id: string; name: string; state: string; listingCount: number | null; http: number }> {
+  if (!domain) return { id: "", name: "", state: "", listingCount: null, http: 0 };
+  try {
+    const url = `${DEALERS_ENDPOINT}?api_key=${encodeURIComponent(MC_KEY)}&inventory_url=${encodeURIComponent(domain)}&rows=5`;
+    const res = await fetch(url, { signal: AbortSignal.timeout(15000) });
+    if (!res.ok) return { id: "", name: "", state: "", listingCount: null, http: res.status };
+    // deno-lint-ignore no-explicit-any
+    const data: any = await res.json().catch(() => ({}));
+    const dealers: any[] = Array.isArray(data?.dealers) ? data.dealers : [];
+    const host = (s: unknown) => toSourceHost(String(s || ""));
+    const hit = dealers.find((d) => host(d?.inventory_url) === domain || host(d?.source) === domain || host(d?.website) === domain) || dealers[0];
+    if (!hit) return { id: "", name: "", state: "", listingCount: null, http: res.status };
+    return {
+      id: String(hit.id ?? hit.dealer_id ?? ""), name: String(hit.seller_name ?? hit.name ?? ""),
+      state: String(hit.state ?? "").trim().toUpperCase(),
+      listingCount: typeof hit.listing_count === "number" ? hit.listing_count : null, http: res.status,
+    };
+  } catch {
+    return { id: "", name: "", state: "", listingCount: null, http: 0 };
+  }
+}
+
 // The Dealer Search id is a dealer-record id; the inventory feeds want mc_*
 // ids. Read the dealer record to harvest every usable identifier so the combo
 // matrix has the right number to try.
@@ -344,7 +369,9 @@ serve(async (req) => {
       // helps resolve the rooftop when nothing is saved.
       const { data: prof } = await admin.from("dealer_profiles").select("settings").eq("tenant_id", cfg.tenant_id).maybeSingle();
       const pset = (prof?.settings || {}) as Record<string, string>;
-      const dealerState = (pset.dealer_state || pset.doc_fee_state || "").trim().toUpperCase();
+      let dealerState = (pset.dealer_state || pset.doc_fee_state || "").trim().toUpperCase();
+      let verifiedName = "";
+      let verifiedListingCount: number | null = null;
 
       // The directory dealer_id is a DIFFERENT id space than the syndication
       // mc_dealer_id, so passing it as mc_dealer_id silently matches a different
@@ -399,6 +426,12 @@ serve(async (req) => {
       let sample = { listings: [] as MCListing[], numFound: 0, http: 0 };
       if (hits.length === 0) {
         if (source) {
+          // Authoritative rooftop for this domain (verified name + state, used
+          // for the toast and as the validation backstop when no profile state).
+          const dom = await resolveByDomain(source);
+          if (dom.name) verifiedName = dom.name;
+          if (dom.listingCount != null) verifiedListingCount = dom.listingCount;
+          if (!dealerState && dom.state) dealerState = dom.state;
           const r = await syndPage("source", source, synRows, 0);
           recordHit("source", source, r, "syndication");
         }
@@ -429,7 +462,7 @@ serve(async (req) => {
       httpStatus = best ? firstPage.http : ((attempts[0]?.http as number) ?? 0);
       const probe = {
         chosen: chosen ? { feed: "syndication", param: chosen.param, id: chosen.value, purity: best?.purity } : null,
-        mc_ids: mc.ids, dealer_record: mc.name, dealer_listing_count: mc.listingCount,
+        mc_ids: mc.ids, dealer_record: verifiedName || mc.name, dealer_listing_count: verifiedListingCount ?? mc.listingCount,
         attempts,
       };
       // No VALIDATED feed → ingest nothing. Distinguish "cars came back but none
@@ -438,7 +471,7 @@ serve(async (req) => {
         const contaminated = attempts.some((a) => (a.got as number) > 0 && a.feed !== "search(sample)");
         diagnostics.push({
           tenant_id: cfg.tenant_id, source, dealer_id: dealerId,
-          dealer_record: mc.name, dealer_listing_count: mc.listingCount, mc_ids: mc.ids,
+          dealer_record: verifiedName || mc.name, dealer_listing_count: verifiedListingCount ?? mc.listingCount, mc_ids: mc.ids,
           error: contaminated ? "no_owned_match" : (sample.listings.length > 0 ? "search_sample_only" : "no_listings"), attempts,
           note: contaminated
             ? `The syndication feed returned cars, but none matched this rooftop's domain (${source || "unset"})${dealerState ? ` or state (${dealerState})` : ""} — the saved dealer ID points to a different/over-broad dealer. Set the dealership's website domain in Branding & Setup so the pull scopes by source=.`
@@ -556,7 +589,7 @@ serve(async (req) => {
 
       tenantsSynced++;
       const status = { ran_at: now.toISOString(), seen: tenantSeen, new_vehicles: tenantNew, prices_recorded: tenantPrices, dealer_id: dealerId, num_found: numFound, http: httpStatus, removed: pruned?.listings_deleted ?? 0, mc_param: chosen.param, mc_value: chosen.value };
-      diagnostics.push({ tenant_id: cfg.tenant_id, source, dealer_id: dealerId, matched_dealer: resolveInfo?.matchedName ?? "(manual id)", resolved: !cfg.dealer_id, num_found: numFound, http: httpStatus, seen: tenantSeen, listings_written: listingsUpserted, removed: pruned?.listings_deleted ?? 0, write_error: firstWriteErr, ...probe });
+      diagnostics.push({ tenant_id: cfg.tenant_id, source, dealer_id: dealerId, matched_dealer: verifiedName || resolveInfo?.matchedName || mc.name || "(by domain)", resolved: !cfg.dealer_id, num_found: numFound, http: httpStatus, seen: tenantSeen, listings_written: listingsUpserted, removed: pruned?.listings_deleted ?? 0, write_error: firstWriteErr, ...probe });
       await admin.from("marketcheck_sync_config")
         .update({ last_run_at: now.toISOString(), last_status: status })
         .eq("tenant_id", cfg.tenant_id);
