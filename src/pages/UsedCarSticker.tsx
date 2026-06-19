@@ -85,6 +85,11 @@ const UsedCarSticker = () => {
       drivetrain: v.drivetrain || prev.drivetrain,
       fuelType: v.fuelType || prev.fuelType,
       bodyStyle: v.bodyStyle || prev.bodyStyle,
+      mpgCity: v.mpgCity || prev.mpgCity,
+      mpgHwy: v.mpgHwy || prev.mpgHwy,
+      mpgCombined: v.mpgCombined || prev.mpgCombined,
+      hp: v.horsepower || prev.hp,
+      torque: v.torque || prev.torque,
     }));
     setEquipment((prev) =>
       prev.filter(Boolean).length > 0

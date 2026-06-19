@@ -63,6 +63,9 @@ const NewCarSticker = () => {
       interiorColor: v.interiorColor || prev.interiorColor,
       bodyStyle: v.bodyStyle || prev.bodyStyle,
       doors: v.doors || prev.doors,
+      mpgCity: v.mpgCity || prev.mpgCity,
+      mpgHwy: v.mpgHwy || prev.mpgHwy,
+      mpgCombined: v.mpgCombined || prev.mpgCombined,
     }));
     setEquipment((prev) =>
       prev.filter(Boolean).length > 0

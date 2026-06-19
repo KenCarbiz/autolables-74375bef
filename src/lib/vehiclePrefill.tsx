@@ -28,20 +28,32 @@ export interface PrefillVehicle {
   exteriorColor: string;
   interiorColor: string;
   engine: string;
+  engineSize: string;
+  cylinders: string;
   transmission: string;
   drivetrain: string;
   fuelType: string;
   bodyStyle: string;
   doors: string;
+  mpgCity: string;
+  mpgHwy: string;
+  mpgCombined: string;
+  horsepower: string;
+  torque: string;
   photos: string[];
   heroImage: string;
   recallStatus: string;
   openRecallCount: number;
   slug: string;
   warrantyInfo: Record<string, unknown> | null;
+  // Full raw row + the MarketCheck attribute blob, so any future field we
+  // need is already on hand without another round-trip.
+  mcAttributes: Record<string, unknown>;
+  raw: Record<string, unknown>;
 }
 
 const s = (v: unknown): string => (v == null ? "" : String(v));
+const sNum = (v: unknown): string => (v == null || v === "" ? "" : String(v));
 
 // "2022 Toyota Tundra SR5" → year/make/model. The trim is stored
 // separately, so model is everything after make.
@@ -52,6 +64,15 @@ const splitYmm = (ymm: string): { year: string; make: string; model: string } =>
   const make = parts.shift() || "";
   const model = parts.join(" ");
   return { year, make, model };
+};
+
+// Pull the first present key from a bag — MarketCheck's field names drift
+// across feed generations (mpg_city vs city_mpg), so we accept either.
+const pick = (bag: Record<string, unknown>, ...keys: string[]): unknown => {
+  for (const k of keys) {
+    if (bag[k] != null && bag[k] !== "") return bag[k];
+  }
+  return undefined;
 };
 
 // deno-lint-ignore no-explicit-any
@@ -73,35 +94,32 @@ function normalizeRow(row: Record<string, any>): PrefillVehicle {
     isCpo: condition === "cpo",
     mileage: row.mileage != null ? String(row.mileage) : "",
     price: row.price != null ? String(row.price) : "",
-    msrp: mc.msrp != null ? String(mc.msrp) : "",
-    exteriorColor: s(mc.exterior_color),
-    interiorColor: s(mc.interior_color),
-    engine: s(mc.engine),
-    transmission: s(mc.transmission),
-    drivetrain: s(mc.drivetrain),
-    fuelType: s(mc.fuel_type),
-    bodyStyle: s(mc.body_type),
-    doors: mc.doors != null ? String(mc.doors) : "",
+    msrp: sNum(pick(mc, "msrp")),
+    exteriorColor: s(pick(mc, "exterior_color", "ext_color")),
+    interiorColor: s(pick(mc, "interior_color", "int_color")),
+    engine: s(pick(mc, "engine", "engine_description")),
+    engineSize: sNum(pick(mc, "engine_size", "displacement")),
+    cylinders: sNum(pick(mc, "cylinders")),
+    transmission: s(pick(mc, "transmission")),
+    drivetrain: s(pick(mc, "drivetrain", "drive_type")),
+    fuelType: s(pick(mc, "fuel_type")),
+    bodyStyle: s(pick(mc, "body_type", "body_style")),
+    doors: sNum(pick(mc, "doors")),
+    mpgCity: sNum(pick(mc, "city_mpg", "mpg_city")),
+    mpgHwy: sNum(pick(mc, "highway_mpg", "mpg_highway", "mpg_hwy")),
+    mpgCombined: sNum(pick(mc, "combined_mpg", "mpg_combined")),
+    horsepower: sNum(pick(mc, "horsepower", "hp", "engine_hp")),
+    torque: sNum(pick(mc, "torque")),
     photos: Array.isArray(row.photos) ? row.photos.map(s).filter(Boolean) : [],
     heroImage: s(row.hero_image_url),
     recallStatus: s(row.recall_status),
     openRecallCount: typeof row.open_recall_count === "number" ? row.open_recall_count : 0,
     slug: s(row.slug),
     warrantyInfo: (row.warranty_info as Record<string, unknown>) || null,
+    mcAttributes: mc,
+    raw: row,
   };
 }
-
-// Resilient column cascade — newest enrichment columns may not be migrated
-// on every project, so fall back gracefully rather than failing the prefill.
-const COL_SETS = [
-  "id,vin,slug,ymm,trim,mileage,condition,price,status,stock_number,hero_image_url,photos,mc_attributes,recall_status,open_recall_count,warranty_info",
-  "id,vin,slug,ymm,trim,mileage,condition,price,status,stock_number,hero_image_url,photos,mc_attributes",
-  "id,vin,slug,ymm,trim,mileage,condition,price,status,stock_number",
-];
-
-// deno-lint-ignore no-explicit-any
-const isSchemaErr = (e: any) =>
-  !!e && (/column|does not exist|schema cache/i.test(e.message || "") || ["42703", "PGRST204", "42P01"].includes(e.code || ""));
 
 export interface PrefillState {
   active: boolean; // a vehicleId/vin was present in the URL
@@ -125,23 +143,13 @@ export function useVehiclePrefill(onLoad?: (v: PrefillVehicle) => void): Prefill
     if (!active || done.current) return;
     let cancelled = false;
     (async () => {
+      // Mirror VehicleFile's loader exactly (select("*")) so we read the full
+      // row — every column the scraper wrote — and never trip on a column that
+      // isn't present on a given project.
       // deno-lint-ignore no-explicit-any
-      let row: any = null;
-      // deno-lint-ignore no-explicit-any
-      let err: any = null;
-      for (const cols of COL_SETS) {
-        // deno-lint-ignore no-explicit-any
-        let q = (supabase as any).from("vehicle_listings").select(cols);
-        q = vehicleId ? q.eq("id", vehicleId) : q.eq("vin", vinParam);
-        const res = await q.limit(1).maybeSingle();
-        if (!res.error) {
-          row = res.data;
-          err = null;
-          break;
-        }
-        err = res.error;
-        if (!isSchemaErr(res.error)) break;
-      }
+      let q = (supabase as any).from("vehicle_listings").select("*");
+      q = vehicleId ? q.eq("id", vehicleId) : q.eq("vin", vinParam);
+      const { data: row, error: err } = await q.maybeSingle();
       if (cancelled) return;
       if (err) {
         setState({ active, loading: false, error: "Couldn't load this vehicle. Please try again.", vehicle: null });

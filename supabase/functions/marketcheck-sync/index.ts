@@ -171,8 +171,14 @@ interface MCListing {
   inventory_type?: string; is_certified?: boolean; vdp_url?: string;
   exterior_color?: string; interior_color?: string;
   build?: { year?: number; make?: string; model?: string; trim?: string;
-    engine?: string; transmission?: string; drivetrain?: string; fuel_type?: string;
-    body_type?: string; doors?: number; cylinders?: number; vehicle_type?: string };
+    engine?: string; engine_size?: number | string; engine_block?: string;
+    transmission?: string; drivetrain?: string; fuel_type?: string;
+    body_type?: string; doors?: number; cylinders?: number; vehicle_type?: string;
+    city_mpg?: number | string; highway_mpg?: number | string; combined_mpg?: number | string;
+    powertrain_type?: string; std_seating?: number | string; made_in?: string;
+    overall_height?: string; overall_length?: string; overall_width?: string;
+    // deno-lint-ignore no-explicit-any
+    [k: string]: any };
   media?: { photo_links?: string[]; photo_links_cached?: string[] };
   // deno-lint-ignore no-explicit-any
   dealer?: any;
@@ -549,13 +555,20 @@ serve(async (req) => {
             // isolated so a not-yet-migrated column can never break the core
             // listing write above.
             try {
+              // Capture the entire MarketCheck build object so every data point
+              // the feed carries (mpg, engine size, seating, dimensions, …) is
+              // retained for any surface that needs it later, then layer the
+              // normalized aliases the app reads on top.
               const mcAttrs = {
+                ...(b as Record<string, unknown>),
                 msrp: toPrice(l.msrp), exterior_color: l.exterior_color || null,
                 interior_color: l.interior_color || null,
                 engine: b.engine || null, transmission: b.transmission || null,
                 drivetrain: b.drivetrain || null, fuel_type: b.fuel_type || null,
                 body_type: b.body_type || null, doors: b.doors ?? null,
                 cylinders: b.cylinders ?? null, vehicle_type: b.vehicle_type || null,
+                city_mpg: b.city_mpg ?? null, highway_mpg: b.highway_mpg ?? null,
+                engine_size: b.engine_size ?? null,
               };
               const enrich: Record<string, unknown> = { mc_attributes: mcAttrs };
               if (gallery.length) { enrich.photos = gallery; enrich.photo_count = gallery.length; }

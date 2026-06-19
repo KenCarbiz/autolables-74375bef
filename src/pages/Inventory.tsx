@@ -169,8 +169,12 @@ const Inventory = () => {
     setRows((prev) => prev.filter((x) => x.id !== r.id));
   };
 
+  // Open the Add-Vehicle modal whenever ?add=1 arrives — including when the
+  // sidebar button is clicked while already on /inventory (the useState
+  // initializer only runs on first mount, so the effect must flip it too).
   useEffect(() => {
     if (searchParams.get("add") === "1") {
+      setShowAdd(true);
       const next = new URLSearchParams(searchParams);
       next.delete("add");
       setSearchParams(next, { replace: true });
