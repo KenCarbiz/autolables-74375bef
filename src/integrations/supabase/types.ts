@@ -2104,6 +2104,10 @@ export type Database = {
           id: string
           install_token: string
           key_specs: Json
+          market_checked_at: string | null
+          market_payload: Json | null
+          market_position: string | null
+          market_value: number | null
           mc_attributes: Json
           mileage: number | null
           open_recall_count: number | null
@@ -2157,6 +2161,10 @@ export type Database = {
           id?: string
           install_token?: string
           key_specs?: Json
+          market_checked_at?: string | null
+          market_payload?: Json | null
+          market_position?: string | null
+          market_value?: number | null
           mc_attributes?: Json
           mileage?: number | null
           open_recall_count?: number | null
@@ -2210,6 +2218,10 @@ export type Database = {
           id?: string
           install_token?: string
           key_specs?: Json
+          market_checked_at?: string | null
+          market_payload?: Json | null
+          market_position?: string | null
+          market_value?: number | null
           mc_attributes?: Json
           mileage?: number | null
           open_recall_count?: number | null
@@ -2845,6 +2857,10 @@ export type Database = {
           id: string
           install_token: string
           key_specs: Json
+          market_checked_at: string | null
+          market_payload: Json | null
+          market_position: string | null
+          market_value: number | null
           mc_attributes: Json
           mileage: number | null
           open_recall_count: number | null
