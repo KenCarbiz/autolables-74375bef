@@ -47,12 +47,14 @@ const ScanPage = () => {
   const [stockNumber, setStockNumber] = useState("");
   const [condition, setCondition] = useState<"new" | "used" | null>(null);
   const [notes, setNotes] = useState("");
-  // Open the camera immediately when there's a camera to use — tapping Scan is
-  // meant to start scanning, not land on a form. Falls back to the manual VIN
-  // field (no camera, or the user closes the scanner) on devices without one.
-  const [scannerOpen, setScannerOpen] = useState(
-    () => typeof navigator !== "undefined" && !!navigator.mediaDevices?.getUserMedia
-  );
+  // Camera-first on mobile, type-first on desktop. Tapping Scan on a phone is a
+  // physical capture action, so open the camera immediately — but on a laptop a
+  // surprise webcam prompt is wrong, so default there to the manual VIN field.
+  // Gate on a touch-PRIMARY pointer (phone/tablet) plus an available camera.
+  const [scannerOpen, setScannerOpen] = useState(() => {
+    if (typeof navigator === "undefined" || !navigator.mediaDevices?.getUserMedia) return false;
+    return typeof window !== "undefined" && window.matchMedia?.("(pointer: coarse)").matches === true;
+  });
 
   // Decoded data
   const [decoded, setDecoded] = useState<{
