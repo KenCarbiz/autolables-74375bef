@@ -6,8 +6,8 @@
 // right feature flags flip automatically.
 //
 // Pricing (per rooftop/month):
-//   - essential      $199 — window stickers + addendums, up to 75 VINs/mo
-//   - unlimited      $499 — unlimited VINs, product rules, analytics
+//   - essential      $299 — window stickers + addendums, up to 75 VINs/mo
+//   - unlimited      $599 — unlimited VINs, product rules, analytics
 //   - compliance_pro $999 — full scan-to-signed FTC compliance flow
 // ──────────────────────────────────────────────────────────────
 
@@ -40,7 +40,7 @@ export const PLAN_DEFINITIONS: PlanDefinition[] = [
     tier: "essential",
     name: "Essential",
     tagline: "Window stickers + addendums, up to 75 VINs/month. Free with any Autocurb.io subscription.",
-    price: "$199",
+    price: "$299",
     priceNote: "per rooftop / month — or free with Autocurb.io",
     includedWithAutocurb: true,
     features: [
@@ -72,7 +72,7 @@ export const PLAN_DEFINITIONS: PlanDefinition[] = [
     tier: "unlimited",
     name: "Unlimited",
     tagline: "Unlimited vehicles for high-volume dealers.",
-    price: "$499",
+    price: "$599",
     priceNote: "per rooftop / month",
     features: [
       "Everything in Essential, plus:",

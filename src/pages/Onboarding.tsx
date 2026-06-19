@@ -752,7 +752,7 @@ const Onboarding = () => {
               <PlanCard
                 tier="essential"
                 name="Essential"
-                price="$199/mo"
+                price="$299/mo"
                 description="Window stickers + addendums, up to 75 VINs/month. Free with any Autocurb.io subscription."
                 selected={data.planTier === "essential"}
                 onClick={() => update("planTier", "essential")}
@@ -760,7 +760,7 @@ const Onboarding = () => {
               <PlanCard
                 tier="unlimited"
                 name="Unlimited"
-                price="$499/mo"
+                price="$599/mo"
                 description="Unlimited VINs, product rules, inventory, leads + analytics, AI descriptions."
                 recommended
                 selected={data.planTier === "unlimited"}

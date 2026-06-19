@@ -711,8 +711,8 @@ const SocialProof = () => (
 // ──────────────────────────────────────────────────────────────
 
 const TIERS = [
-  { name: "Essential", price: "$199", body: "Single-store dealers. Window stickers, addendums, signing, Buyers Guide, audit log." },
-  { name: "Unlimited", price: "$499", body: "Unlimited VINs, product rules, inventory, leads + analytics, AI descriptions.", featured: true },
+  { name: "Essential", price: "$299", body: "Single-store dealers. Window stickers, addendums, signing, Buyers Guide, audit log." },
+  { name: "Unlimited", price: "$599", body: "Unlimited VINs, product rules, inventory, leads + analytics, AI descriptions.", featured: true },
   { name: "Compliance Pro", price: "$999", body: "Adds website price verification, nightly inventory sync, and the per-VIN tamper-evident defense file." },
 ];
 
