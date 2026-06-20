@@ -28,7 +28,7 @@ import {
 
 // ──────────────────────────────────────────────────────────────
 // Landing — Wave 35. Pre-launch / waitlist positioning.
-// Every CTA is "Schedule a demo" (primary) or "Join Wait List Opening July 1st"
+// Every CTA is "Join Wait List Opening July 1st"
 // (secondary). One card system across the whole page.
 // Legal discipline: "FTC-aligned" (CARS Rule was vacated 1/2025),
 // "documents" consent (never "guarantees compliance"),
