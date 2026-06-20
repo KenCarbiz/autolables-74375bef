@@ -43,6 +43,7 @@ import VehicleInsights from "@/components/listing/VehicleInsights";
 import MarketValueReport from "@/components/listing/MarketValueReport";
 import DealerProgramsSection from "@/components/listing/DealerProgramsSection";
 import OemSticker from "@/components/listing/OemSticker";
+import PassportDocuments from "@/components/listing/PassportDocuments";
 import { listingOptions } from "@/lib/vehicleInsights";
 import { packetVisible } from "@/lib/packetModules";
 
@@ -419,6 +420,9 @@ const PublicListingBody = () => {
         {/* Verified installations — vendor/detail-shop proof (photo + date)
             that the protection is really on this vehicle. */}
         <VerifiedInstallsPublic slug={listing.slug} />
+
+        {/* Published window sticker / addendum documents (published-only). */}
+        {packetVisible(listing, "documents") && <PassportDocuments slug={listing.slug} />}
 
         {packetVisible(listing, "warranty") && <ScanExtras listing={listing} />}
 
