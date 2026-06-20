@@ -3,9 +3,10 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { useDealerSettings } from "@/contexts/DealerSettingsContext";
 import { useTenant } from "@/contexts/TenantContext";
 import {
-  STUDIO_TEMPLATES, TemplateRenderer, type StickerType, type StyleTag,
+  TemplateRenderer, type StickerType, type StyleTag,
   type StickerData, type StickerBranding,
 } from "@/lib/stickerStudio/templates";
+import { useStickerCatalog } from "@/lib/stickerStudio/useStickerCatalog";
 import { LayoutTemplate, Check } from "lucide-react";
 
 // Demo data used only for the gallery thumbnails.
@@ -53,7 +54,8 @@ const StickerStudio = () => {
   const [type, setType] = useState<StickerType | "all">("all");
   const [tag, setTag] = useState<StyleTag | "all">("all");
 
-  const templates = STUDIO_TEMPLATES.filter(
+  const { templates: catalog } = useStickerCatalog();
+  const templates = catalog.filter(
     (t) => (type === "all" || t.config.type === type) && (tag === "all" || t.config.styleTags.includes(tag))
   );
 

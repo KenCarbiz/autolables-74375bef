@@ -4,6 +4,7 @@ import { useDealerSettings } from "@/contexts/DealerSettingsContext";
 import { useTenant } from "@/contexts/TenantContext";
 import { useVehiclePrefill } from "@/lib/vehiclePrefill";
 import { getStudioTemplate, TemplateRenderer, type StickerData, type StickerLineItem } from "@/lib/stickerStudio/templates";
+import { useStickerCatalog } from "@/lib/stickerStudio/useStickerCatalog";
 import { brandingFromSettings } from "@/pages/StickerStudio";
 import { saveStickerToVehicle, publishToPassport } from "@/lib/stickerStudio/api";
 import { ArrowLeft, Printer, Download, Image as ImageIcon, Plus, Trash2, Save, Globe } from "lucide-react";
@@ -15,7 +16,8 @@ const blankItem = (): StickerLineItem => ({ name: "", price: "", note: "" });
 const StickerStudioGenerator = () => {
   const { templateId = "" } = useParams();
   const navigate = useNavigate();
-  const template = getStudioTemplate(templateId);
+  const { byId } = useStickerCatalog();
+  const template = byId(templateId) || getStudioTemplate(templateId);
   const { settings } = useDealerSettings();
   const { tenant } = useTenant();
   const sheetRef = useRef<HTMLDivElement>(null);

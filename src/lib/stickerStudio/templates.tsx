@@ -264,6 +264,23 @@ export const STUDIO_TEMPLATES: StudioTemplate[] = [
 
 export const getStudioTemplate = (id: string) => STUDIO_TEMPLATES.find((t) => t.config.id === id);
 
+// Render engines keyed by sticker type — the catalog (DB rows) maps to one of
+// these so new template variants ship as data, not code.
+export const RENDER_ENGINES: Record<string, (props: TemplateRenderProps) => JSX.Element> = {
+  window: WindowSheet,
+  addendum: AddendumStrip,
+  passport: WindowSheet,
+};
+
+// Merge a stored config override onto the code base config for the type.
+export function buildConfig(type: StickerType, over: Partial<StickerTemplateConfig>): StickerTemplateConfig {
+  return (type === "addendum" ? baseAddendum : baseWindow)(over);
+}
+
+export function templateFromConfig(config: StickerTemplateConfig): StudioTemplate {
+  return { config, Render: RENDER_ENGINES[config.type] || WindowSheet };
+}
+
 // Render a template at its true paper size. `scale` shrinks the whole sheet
 // (used for gallery thumbnails) via CSS transform without changing the layout.
 export function TemplateRenderer({
