@@ -699,6 +699,51 @@ export type Database = {
           },
         ]
       }
+      dealer_print_settings: {
+        Row: {
+          addendum_label_size: string
+          created_at: string
+          id: string
+          label_mode: string
+          location_id: string | null
+          printer_name: string | null
+          scale_percentage: number
+          tenant_id: string
+          updated_at: string
+          window_label_size: string
+          x_offset_inches: number
+          y_offset_inches: number
+        }
+        Insert: {
+          addendum_label_size?: string
+          created_at?: string
+          id?: string
+          label_mode?: string
+          location_id?: string | null
+          printer_name?: string | null
+          scale_percentage?: number
+          tenant_id: string
+          updated_at?: string
+          window_label_size?: string
+          x_offset_inches?: number
+          y_offset_inches?: number
+        }
+        Update: {
+          addendum_label_size?: string
+          created_at?: string
+          id?: string
+          label_mode?: string
+          location_id?: string | null
+          printer_name?: string | null
+          scale_percentage?: number
+          tenant_id?: string
+          updated_at?: string
+          window_label_size?: string
+          x_offset_inches?: number
+          y_offset_inches?: number
+        }
+        Relationships: []
+      }
       dealer_profiles: {
         Row: {
           created_at: string
@@ -734,6 +779,44 @@ export type Database = {
             columns: ["tenant_id"]
             isOneToOne: true
             referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      dealer_sticker_template_prefs: {
+        Row: {
+          created_at: string
+          id: string
+          is_favorite: boolean
+          template_id: string
+          tenant_id: string
+          type: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_favorite?: boolean
+          template_id: string
+          tenant_id: string
+          type: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_favorite?: boolean
+          template_id?: string
+          tenant_id?: string
+          type?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "dealer_sticker_template_prefs_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "sticker_templates"
             referencedColumns: ["id"]
           },
         ]
@@ -774,6 +857,51 @@ export type Database = {
           plan_tier?: string
           status?: string
           updated_at?: string
+        }
+        Relationships: []
+      }
+      dealer_template_customizations: {
+        Row: {
+          accent_color: string | null
+          created_at: string
+          disclaimer_override: string | null
+          id: string
+          logo_enabled: boolean
+          qr_enabled: boolean
+          secondary_color: string | null
+          section_label_overrides: Json
+          template_id: string
+          tenant_id: string
+          updated_at: string
+          value_prop_override: string | null
+        }
+        Insert: {
+          accent_color?: string | null
+          created_at?: string
+          disclaimer_override?: string | null
+          id?: string
+          logo_enabled?: boolean
+          qr_enabled?: boolean
+          secondary_color?: string | null
+          section_label_overrides?: Json
+          template_id: string
+          tenant_id: string
+          updated_at?: string
+          value_prop_override?: string | null
+        }
+        Update: {
+          accent_color?: string | null
+          created_at?: string
+          disclaimer_override?: string | null
+          id?: string
+          logo_enabled?: boolean
+          qr_enabled?: boolean
+          secondary_color?: string | null
+          section_label_overrides?: Json
+          template_id?: string
+          tenant_id?: string
+          updated_at?: string
+          value_prop_override?: string | null
         }
         Relationships: []
       }
@@ -876,6 +1004,72 @@ export type Database = {
           packet_version?: string
           tenant_id?: string
           vin?: string
+        }
+        Relationships: []
+      }
+      generated_documents: {
+        Row: {
+          approved_at: string | null
+          approved_by: string | null
+          created_at: string
+          data_snapshot: Json
+          document_status: string
+          document_type: string
+          generated_by: string | null
+          id: string
+          label_mode: string
+          online_url: string | null
+          pdf_url: string | null
+          png_url: string | null
+          printed_at: string | null
+          published_at: string | null
+          template_id: string
+          tenant_id: string
+          updated_at: string
+          vehicle_id: string | null
+          version: number
+        }
+        Insert: {
+          approved_at?: string | null
+          approved_by?: string | null
+          created_at?: string
+          data_snapshot?: Json
+          document_status?: string
+          document_type: string
+          generated_by?: string | null
+          id?: string
+          label_mode?: string
+          online_url?: string | null
+          pdf_url?: string | null
+          png_url?: string | null
+          printed_at?: string | null
+          published_at?: string | null
+          template_id: string
+          tenant_id: string
+          updated_at?: string
+          vehicle_id?: string | null
+          version?: number
+        }
+        Update: {
+          approved_at?: string | null
+          approved_by?: string | null
+          created_at?: string
+          data_snapshot?: Json
+          document_status?: string
+          document_type?: string
+          generated_by?: string | null
+          id?: string
+          label_mode?: string
+          online_url?: string | null
+          pdf_url?: string | null
+          png_url?: string | null
+          printed_at?: string | null
+          published_at?: string | null
+          template_id?: string
+          tenant_id?: string
+          updated_at?: string
+          vehicle_id?: string | null
+          version?: number
         }
         Relationships: []
       }
@@ -1761,6 +1955,113 @@ export type Database = {
           },
         ]
       }
+      sticker_template_categories: {
+        Row: {
+          created_at: string
+          id: string
+          key: string
+          name: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          key: string
+          name: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          key?: string
+          name?: string
+        }
+        Relationships: []
+      }
+      sticker_template_versions: {
+        Row: {
+          changelog: string | null
+          config: Json
+          id: string
+          published_at: string
+          template_id: string
+          version: number
+        }
+        Insert: {
+          changelog?: string | null
+          config?: Json
+          id?: string
+          published_at?: string
+          template_id: string
+          version: number
+        }
+        Update: {
+          changelog?: string | null
+          config?: Json
+          id?: string
+          published_at?: string
+          template_id?: string
+          version?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sticker_template_versions_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "sticker_templates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      sticker_templates: {
+        Row: {
+          config: Json
+          created_at: string
+          current_version: number
+          deleted_at: string | null
+          id: string
+          is_active: boolean
+          is_featured: boolean
+          name: string
+          preview_url: string | null
+          size: string
+          style_tags: string[]
+          template_key: string
+          type: string
+          updated_at: string
+        }
+        Insert: {
+          config?: Json
+          created_at?: string
+          current_version?: number
+          deleted_at?: string | null
+          id?: string
+          is_active?: boolean
+          is_featured?: boolean
+          name: string
+          preview_url?: string | null
+          size: string
+          style_tags?: string[]
+          template_key: string
+          type: string
+          updated_at?: string
+        }
+        Update: {
+          config?: Json
+          created_at?: string
+          current_version?: number
+          deleted_at?: string | null
+          id?: string
+          is_active?: boolean
+          is_featured?: boolean
+          name?: string
+          preview_url?: string | null
+          size?: string
+          style_tags?: string[]
+          template_key?: string
+          type?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       tenant_members: {
         Row: {
           accepted_at: string | null
@@ -1953,6 +2254,104 @@ export type Database = {
           id?: string
           role?: Database["public"]["Enums"]["app_role"]
           user_id?: string
+        }
+        Relationships: []
+      }
+      vehicle_addendum_items: {
+        Row: {
+          created_at: string
+          description: string | null
+          disclosure_text: string | null
+          display_order: number
+          id: string
+          is_included: boolean
+          is_installed: boolean
+          is_selected: boolean
+          item_type: string
+          name: string
+          price: number
+          updated_at: string
+          vehicle_addendum_id: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          disclosure_text?: string | null
+          display_order?: number
+          id?: string
+          is_included?: boolean
+          is_installed?: boolean
+          is_selected?: boolean
+          item_type: string
+          name: string
+          price?: number
+          updated_at?: string
+          vehicle_addendum_id: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          disclosure_text?: string | null
+          display_order?: number
+          id?: string
+          is_included?: boolean
+          is_installed?: boolean
+          is_selected?: boolean
+          item_type?: string
+          name?: string
+          price?: number
+          updated_at?: string
+          vehicle_addendum_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "vehicle_addendum_items_vehicle_addendum_id_fkey"
+            columns: ["vehicle_addendum_id"]
+            isOneToOne: false
+            referencedRelation: "vehicle_addendums"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      vehicle_addendums: {
+        Row: {
+          available_upgrades_total: number
+          base_msrp: number
+          created_at: string
+          id: string
+          installed_total: number
+          selected_upgrades_total: number
+          status: string
+          tenant_id: string
+          total_msrp: number
+          updated_at: string
+          vehicle_id: string
+        }
+        Insert: {
+          available_upgrades_total?: number
+          base_msrp?: number
+          created_at?: string
+          id?: string
+          installed_total?: number
+          selected_upgrades_total?: number
+          status?: string
+          tenant_id: string
+          total_msrp?: number
+          updated_at?: string
+          vehicle_id: string
+        }
+        Update: {
+          available_upgrades_total?: number
+          base_msrp?: number
+          created_at?: string
+          id?: string
+          installed_total?: number
+          selected_upgrades_total?: number
+          status?: string
+          tenant_id?: string
+          total_msrp?: number
+          updated_at?: string
+          vehicle_id?: string
         }
         Relationships: []
       }
@@ -2352,6 +2751,66 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      waitlist_signups: {
+        Row: {
+          city: string | null
+          created_at: string
+          current_provider: string | null
+          dealership_name: string
+          email: string
+          full_name: string
+          id: string
+          monthly_volume: string | null
+          notes: string | null
+          oem_brands: string | null
+          phone: string | null
+          role: string | null
+          rooftops: string | null
+          source: string | null
+          state: string | null
+          status: string
+          user_agent: string | null
+        }
+        Insert: {
+          city?: string | null
+          created_at?: string
+          current_provider?: string | null
+          dealership_name: string
+          email: string
+          full_name: string
+          id?: string
+          monthly_volume?: string | null
+          notes?: string | null
+          oem_brands?: string | null
+          phone?: string | null
+          role?: string | null
+          rooftops?: string | null
+          source?: string | null
+          state?: string | null
+          status?: string
+          user_agent?: string | null
+        }
+        Update: {
+          city?: string | null
+          created_at?: string
+          current_provider?: string | null
+          dealership_name?: string
+          email?: string
+          full_name?: string
+          id?: string
+          monthly_volume?: string | null
+          notes?: string | null
+          oem_brands?: string | null
+          phone?: string | null
+          role?: string | null
+          rooftops?: string | null
+          source?: string | null
+          state?: string | null
+          status?: string
+          user_agent?: string | null
+        }
+        Relationships: []
       }
       warranty_records: {
         Row: {
