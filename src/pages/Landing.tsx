@@ -121,7 +121,7 @@ const Nav = ({
               onClick={onWaitlist}
               className="inline-flex h-9 items-center gap-1.5 rounded-full bg-[#0B2041] px-4 text-sm font-medium text-white hover:bg-[#13315e]"
             >
-              Schedule a demo <ArrowRight className="h-3.5 w-3.5" />
+              Join Wait List Opening July 1st <ArrowRight className="h-3.5 w-3.5" />
             </button>
           </>
         )}
@@ -163,10 +163,10 @@ const Hero = ({ onDemo }: { onWaitlist: () => void; onDemo: () => void }) => (
         </p>
         <div className="mt-8 flex flex-col items-start gap-3 sm:flex-row">
           <button
-            onClick={onDemo}
+            onClick={onWaitlist}
             className="inline-flex h-12 items-center gap-2 rounded-full bg-[#0B2041] px-6 text-sm font-semibold text-white hover:bg-[#13315e]"
           >
-            Schedule a demo
+            Join Wait List Opening July 1st
             <ArrowRight className="h-4 w-4" />
           </button>
           <a
@@ -726,7 +726,7 @@ const TakeThePowerBack = ({ onWaitlist }: { onWaitlist: () => void }) => (
           onClick={onWaitlist}
           className="inline-flex h-12 items-center gap-2 rounded-full bg-[#0B2041] px-6 text-sm font-semibold text-white hover:bg-[#13315e]"
         >
-          Schedule a demo
+          Join Wait List Opening July 1st
           <ArrowRight className="h-4 w-4" />
         </button>
       </div>
@@ -1019,7 +1019,7 @@ const Footer = ({ onNav, onWaitlist }: { onNav: (to: string) => void; onWaitlist
           onClick={onWaitlist}
           className="inline-flex h-8 items-center gap-1.5 rounded-full bg-[#0B2041] px-3 text-xs font-medium text-white hover:bg-[#13315e]"
         >
-          Schedule a demo
+          Join Wait List Opening July 1st
         </button>
       </div>
       <p className="text-xs text-slate-500">
