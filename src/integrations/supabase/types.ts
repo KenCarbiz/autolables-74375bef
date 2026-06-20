@@ -2110,7 +2110,10 @@ export type Database = {
           market_value: number | null
           mc_attributes: Json
           mileage: number | null
+          oem_sticker_checked_at: string | null
+          oem_sticker_url: string | null
           open_recall_count: number | null
+          packet_modules: Json
           payment_estimate: Json | null
           photo_count: number | null
           photos: Json
@@ -2167,7 +2170,10 @@ export type Database = {
           market_value?: number | null
           mc_attributes?: Json
           mileage?: number | null
+          oem_sticker_checked_at?: string | null
+          oem_sticker_url?: string | null
           open_recall_count?: number | null
+          packet_modules?: Json
           payment_estimate?: Json | null
           photo_count?: number | null
           photos?: Json
@@ -2224,7 +2230,10 @@ export type Database = {
           market_value?: number | null
           mc_attributes?: Json
           mileage?: number | null
+          oem_sticker_checked_at?: string | null
+          oem_sticker_url?: string | null
           open_recall_count?: number | null
+          packet_modules?: Json
           payment_estimate?: Json | null
           photo_count?: number | null
           photos?: Json
@@ -2863,7 +2872,10 @@ export type Database = {
           market_value: number | null
           mc_attributes: Json
           mileage: number | null
+          oem_sticker_checked_at: string | null
+          oem_sticker_url: string | null
           open_recall_count: number | null
+          packet_modules: Json
           payment_estimate: Json | null
           photo_count: number | null
           photos: Json
