@@ -386,7 +386,7 @@ const Inventory = () => {
     { label: "Prep & Install", icon: ClipboardList, onClick: () => navigate(`/vehicle-file/${r.id}?tab=prep`) },
     { label: "Build Addendum", icon: FileText, onClick: () => navigate(`/vehicle-file/${r.id}?tab=addendum`) },
     { label: "Audit Defense", icon: ShieldCheck, onClick: () => navigate(`/compliance?vin=${encodeURIComponent(r.vin || "")}`) },
-    ...(r.status === "published" ? [{ label: "View Shopper Page", icon: Eye, onClick: () => window.open(`/v/${r.slug}`, "_blank", "noopener") }] : []),
+    ...(r.status === "published" ? [{ label: "View Customer Packet", icon: Eye, onClick: () => window.open(`/v/${r.slug}`, "_blank", "noopener") }] : []),
     { label: "Delete", icon: Trash2, onClick: () => deleteVehicle(r), danger: true },
   ];
 
@@ -508,7 +508,7 @@ const Inventory = () => {
                             <div className="hidden md:flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
                               <HoverBtn title="Open vehicle" onClick={() => navigate(`/vehicle-file/${r.id}`)}><ExternalLink className="w-3.5 h-3.5" /></HoverBtn>
                               <HoverBtn title="Generate sticker" onClick={() => navigate(`${r.condition === "new" ? "/new-car-sticker" : "/used-car-sticker"}?vehicleId=${r.id}`)}><Printer className="w-3.5 h-3.5" /></HoverBtn>
-                              {r.status === "published" && <HoverBtn title="Preview shopper portal" onClick={() => window.open(`/v/${r.slug}`, "_blank", "noopener")}><Eye className="w-3.5 h-3.5" /></HoverBtn>}
+                              {r.status === "published" && <HoverBtn title="View customer packet" onClick={() => window.open(`/v/${r.slug}`, "_blank", "noopener")}><Eye className="w-3.5 h-3.5" /></HoverBtn>}
                               <HoverBtn title="Quick recall check" onClick={() => quickRecall(r.vin)}><ShieldCheck className="w-3.5 h-3.5" /></HoverBtn>
                             </div>
                             <KebabMenu items={rowActions(r)} />
