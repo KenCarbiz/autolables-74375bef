@@ -847,7 +847,7 @@ const TIERS: { name: string; price: string; best: string; tagline: string; featu
     name: "Unlimited",
     price: "$599",
     featured: true,
-    best: "High-volume & multi-tool stores",
+    best: "Higher-volume stores",
     tagline: "Everything in Essential, with no VIN cap and the workflow tools a busy store runs on.",
     features: [
       "Everything in Essential, plus:",
@@ -894,7 +894,7 @@ const PricingTeaser = ({
           Simple pricing. Three tiers.
         </h2>
         <p className="mt-5 text-base leading-relaxed text-slate-600">
-          Per rooftop, per month. Free with any Autocurb.io subscription. Cancel anytime.
+          Per rooftop, per month. Free Unlimited plan with any Autocurb.io subscription.
         </p>
       </div>
 
