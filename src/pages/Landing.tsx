@@ -877,7 +877,7 @@ const PricingTeaser = ({
                   onClick={onWaitlist}
                   className="inline-flex h-10 w-full items-center justify-center gap-1.5 rounded-full bg-[#0B2041] px-4 text-sm font-semibold text-white hover:bg-[#13315e]"
                 >
-                  Schedule a demo
+                  Join Wait List Opening July 1st
                   <ArrowRight className="h-3.5 w-3.5" />
                 </button>
               ) : (
@@ -977,7 +977,7 @@ const FinalCTA = ({ onWaitlist, onDemo }: { onWaitlist: () => void; onDemo: () =
       </div>
       <div className="relative">
         <h2 className="font-display text-4xl font-black tracking-tighter sm:text-5xl">
-          Schedule a demo.
+          Join the wait list.
         </h2>
         <p className="mt-5 text-lg text-white/70">Be first in line · Early-access pricing.</p>
         <div className="mt-9 flex flex-wrap items-center justify-center gap-3">
@@ -985,7 +985,7 @@ const FinalCTA = ({ onWaitlist, onDemo }: { onWaitlist: () => void; onDemo: () =
             onClick={onWaitlist}
             className="inline-flex h-12 items-center gap-2 rounded-full bg-white px-6 text-sm font-semibold text-slate-950 hover:bg-white/90"
           >
-            Schedule a demo
+            Join Wait List Opening July 1st
             <ArrowRight className="h-4 w-4" />
           </button>
           <button
