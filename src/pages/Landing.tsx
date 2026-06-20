@@ -1072,6 +1072,8 @@ const Footer = ({ onNav, onWaitlist }: { onNav: (to: string) => void; onWaitlist
             {l.label}
           </a>
         ))}
+        <button onClick={() => onNav("/privacy")} className="hover:text-slate-900">Privacy</button>
+        <button onClick={() => onNav("/terms")} className="hover:text-slate-900">Terms</button>
         <button onClick={() => onNav("/login")} className="hover:text-slate-900">Sign in</button>
         <button
           onClick={onWaitlist}
