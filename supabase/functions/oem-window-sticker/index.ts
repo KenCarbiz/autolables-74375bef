@@ -100,8 +100,8 @@ Deno.serve(async (req) => {
 
   if ("error" in fetched) return json(200, { ok: false, error: fetched.error, provider });
 
-  const admin = createClient(Deno.env.get("SUPABASE_URL") || "", Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "");
   const ext = extFor(fetched.contentType);
+
   const path = `${tenantId || "house"}/${vin}.${ext}`;
   const up = await admin.storage.from("oem-stickers").upload(path, fetched.bytes, {
     contentType: fetched.contentType,
