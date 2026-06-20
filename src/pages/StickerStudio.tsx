@@ -42,7 +42,7 @@ const TYPES: { id: StickerType | "all"; label: string }[] = [
   { id: "window", label: "Window Sticker · 8.5×11" },
   { id: "addendum", label: "Addendum · 4.5×11" },
 ];
-const TAGS: StyleTag[] = ["Modern", "Classic", "Luxury", "SaaS", "Compliance"];
+const TAGS: StyleTag[] = ["Modern", "Luxury", "Classic", "Compliance", "CPO", "EV", "Value", "Passport", "Readability", "SaaS"];
 
 const StickerStudio = () => {
   const navigate = useNavigate();

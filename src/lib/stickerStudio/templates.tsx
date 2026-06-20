@@ -13,7 +13,7 @@ import { QRCodeSVG } from "qrcode.react";
 
 export type StickerType = "window" | "addendum";
 export type StickerSize = "8.5x11" | "4.5x11";
-export type StyleTag = "Modern" | "Classic" | "Luxury" | "SaaS" | "Compliance";
+export type StyleTag = "Modern" | "Classic" | "Luxury" | "SaaS" | "Compliance" | "CPO" | "EV" | "Value" | "Readability" | "Passport";
 
 export interface StickerTemplateConfig {
   id: string;
@@ -33,6 +33,10 @@ export interface StickerTemplateConfig {
   requiredFields: string[];
   optionalFields: string[];
   marginsIn: number;
+  // Optional catalog metadata (surfaced in the gallery / admin).
+  useCase?: string;
+  complianceNote?: string;
+  blackLabelReady?: boolean;
 }
 
 export interface StickerLineItem {
@@ -322,12 +326,26 @@ const baseAddendum = (over: Partial<StickerTemplateConfig>): StickerTemplateConf
 });
 
 export const STUDIO_TEMPLATES: StudioTemplate[] = [
-  { config: baseWindow({ id: "window-modern", name: "Modern Window Sheet", styleTags: ["Modern", "SaaS"], defaultAccent: "#2563EB" }), Render: WindowSheet },
-  { config: baseWindow({ id: "window-classic", name: "Classic Monroney", styleTags: ["Classic", "Compliance"], defaultAccent: "#0B2041", supportsAccent: false }), Render: WindowSheet },
-  { config: baseWindow({ id: "window-luxury", name: "Luxury Showcase", styleTags: ["Luxury"], defaultAccent: "#7c5c1e" }), Render: WindowSheet },
-  { config: baseAddendum({ id: "addendum-modern", name: "Modern Addendum Strip", styleTags: ["Modern", "SaaS"], defaultAccent: "#2563EB" }), Render: AddendumStrip },
-  { config: baseAddendum({ id: "addendum-luxury", name: "Luxury Addendum", styleTags: ["Luxury"], defaultAccent: "#7c5c1e" }), Render: AddendumStrip },
-  { config: baseAddendum({ id: "addendum-compliance", name: "Compliance Addendum", styleTags: ["Compliance", "Classic"], defaultAccent: "#0B2041", supportsAccent: false }), Render: AddendumStrip },
+  // ── Window stickers (8.5 x 11) ──────────────────────────────────────
+  { config: baseWindow({ id: "window-modern", name: "Modern SaaS Blue", styleTags: ["Modern", "SaaS"], defaultAccent: "#2563EB", blackLabelReady: true, useCase: "Everyday used-car window sticker" }), Render: WindowSheet },
+  { config: baseWindow({ id: "window-classic", name: "Classic Monroney", styleTags: ["Classic", "Compliance"], defaultAccent: "#0B2041", supportsAccent: false, useCase: "Factory-style disclosure layout", complianceNote: "Mirrors the Monroney convention; fixed navy scheme." }), Render: WindowSheet },
+  { config: baseWindow({ id: "window-luxury", name: "Luxury Black Label", styleTags: ["Luxury"], defaultAccent: "#7c5c1e", blackLabelReady: true, useCase: "Premium / high-line inventory" }), Render: WindowSheet },
+  { config: baseWindow({ id: "window-ev", name: "EV / Hybrid Focus", styleTags: ["EV", "Modern"], defaultAccent: "#0f766e", blackLabelReady: true, useCase: "Electrified inventory with efficiency emphasis" }), Render: WindowSheet },
+  { config: baseWindow({ id: "window-cpo", name: "CPO Confidence Report", styleTags: ["CPO", "Classic"], defaultAccent: "#047857", useCase: "Certified pre-owned reassurance sheet", complianceNote: "Pair with the manufacturer CPO disclosure." }), Render: WindowSheet },
+  { config: baseWindow({ id: "window-value", name: "Value-First Used Car", styleTags: ["Value", "Modern"], defaultAccent: "#b91c1c", useCase: "Price-forward value messaging" }), Render: WindowSheet },
+  { config: baseWindow({ id: "window-passport", name: "Vehicle Passport Report", styleTags: ["Passport", "Modern"], defaultAccent: "#2563EB", useCase: "Scan-first packet hero with prominent QR" }), Render: WindowSheet },
+  { config: baseWindow({ id: "window-readable", name: "Minimal High-Readability", styleTags: ["Readability", "Classic"], defaultAccent: "#0B2041", supportsAccent: false, useCase: "Maximum legibility, low ink" }), Render: WindowSheet },
+  { config: baseWindow({ id: "window-noir", name: "Executive Noir", styleTags: ["Luxury"], defaultAccent: "#c9a227", blackLabelReady: true, useCase: "Black-label premium for luxury showrooms" }), Render: WindowSheet },
+  // ── Addendum strips (4.5 x 11) ──────────────────────────────────────
+  { config: baseAddendum({ id: "addendum-modern", name: "Clean Addendum Blue", styleTags: ["Modern", "SaaS"], defaultAccent: "#2563EB", blackLabelReady: true, useCase: "Default supplemental addendum" }), Render: AddendumStrip },
+  { config: baseAddendum({ id: "addendum-luxury", name: "Luxury Black Addendum", styleTags: ["Luxury"], defaultAccent: "#7c5c1e", blackLabelReady: true, useCase: "Premium add-on strip" }), Render: AddendumStrip },
+  { config: baseAddendum({ id: "addendum-compliance", name: "Compliance-First Addendum", styleTags: ["Compliance", "Classic"], defaultAccent: "#0B2041", supportsAccent: false, useCase: "Disclosure-forward addendum", complianceNote: "QR required; fixed navy scheme." }), Render: AddendumStrip },
+  { config: baseAddendum({ id: "addendum-value", name: "Value Stack Addendum", styleTags: ["Value", "Modern"], defaultAccent: "#b91c1c", useCase: "Stacked value / savings emphasis" }), Render: AddendumStrip },
+  { config: baseAddendum({ id: "addendum-installed", name: "Installed Equipment Focus", styleTags: ["Modern"], defaultAccent: "#2563EB", maxItems: { installed: 16, upgrades: 6, benefits: 6 }, useCase: "Heavy dealer-installed accessory lists" }), Render: AddendumStrip },
+  { config: baseAddendum({ id: "addendum-passport", name: "QR Passport Addendum", styleTags: ["Passport", "Modern"], defaultAccent: "#2563EB", useCase: "Scan-to-packet addendum" }), Render: AddendumStrip },
+  { config: baseAddendum({ id: "addendum-readable", name: "Narrow High-Readability", styleTags: ["Readability", "Classic"], defaultAccent: "#0B2041", supportsAccent: false, useCase: "Maximum legibility addendum" }), Render: AddendumStrip },
+  { config: baseAddendum({ id: "addendum-lot", name: "Minimal Lot Label", styleTags: ["Readability", "Compliance"], defaultAccent: "#111827", supportsAccent: false, blackLabelReady: true, useCase: "Bare-bones black/white lot label" }), Render: AddendumStrip },
+  { config: baseAddendum({ id: "addendum-noir", name: "Executive Noir Addendum", styleTags: ["Luxury"], defaultAccent: "#c9a227", blackLabelReady: true, useCase: "Black-label premium add-on strip" }), Render: AddendumStrip },
 ];
 
 export const getStudioTemplate = (id: string) => STUDIO_TEMPLATES.find((t) => t.config.id === id);
