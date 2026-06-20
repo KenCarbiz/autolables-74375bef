@@ -827,10 +827,56 @@ const SocialProof = () => (
 // Pricing teaser
 // ──────────────────────────────────────────────────────────────
 
-const TIERS = [
-  { name: "Essential", price: "$299", body: "Single-store dealers. Window stickers, addendums, signing, Buyers Guide, audit log." },
-  { name: "Unlimited", price: "$599", body: "Unlimited VINs, product rules, inventory, leads + analytics, AI descriptions.", featured: true },
-  { name: "Compliance Pro", price: "$1,499", body: "Adds website price verification, nightly inventory sync, and the per-VIN tamper-evident defense file." },
+const TIERS: { name: string; price: string; best: string; tagline: string; features: string[]; featured?: boolean }[] = [
+  {
+    name: "Essential",
+    price: "$299",
+    best: "Single-store dealers",
+    tagline: "Everything one rooftop needs to print compliant labels and close clean, signed deals.",
+    features: [
+      "New + used car window stickers & dealer addendums",
+      "FTC Buyers Guide — English + Spanish",
+      "VIN decode + NHTSA recall & Takata stop-sale banner",
+      "Customer digital signing on any phone via QR",
+      "Shopper vehicle packet (QR + website embed)",
+      "Tamper-evident audit log",
+      "Up to 75 VINs / month · email support",
+    ],
+  },
+  {
+    name: "Unlimited",
+    price: "$599",
+    featured: true,
+    best: "High-volume & multi-tool stores",
+    tagline: "Everything in Essential, with no VIN cap and the workflow tools a busy store runs on.",
+    features: [
+      "Everything in Essential, plus:",
+      "Unlimited VINs",
+      "Product-rules engine — auto-assign add-ons by year, make, model, trim, mileage",
+      "Inventory management, CSV import & mobile lot scanner",
+      "Leads + analytics — acceptance rates & revenue per addendum",
+      "AI vehicle descriptions",
+      "Co-buyer signatures · custom branding kit",
+      "Priority support + onboarding assist",
+    ],
+  },
+  {
+    name: "Compliance Pro",
+    price: "$1,499",
+    best: "Groups that want airtight, audit-ready deals",
+    tagline: "Everything in Unlimited, plus the price-integrity and evidence layer that makes every deal defensible.",
+    features: [
+      "Everything in Unlimited, plus:",
+      "Automatic nightly inventory + advertised-price sync — and a one-click instant price re-check on any VIN, so the number on the deal always matches your live website the moment before the customer signs",
+      "Website price verification as a hard signing gate — a deal can't be signed out of price integrity",
+      "Live re-scrape + timestamped website-price screenshot captured at signing",
+      "Per-VIN tamper-evident defense file (SHA-256 chain)",
+      "Verified installer sign-off + photo on pre-installed products",
+      "50-state disclosure engine (CA SB 766, NY, FL, TX, +44)",
+      "Prep + install compliance gate · multi-language addendums",
+      "DMS webhooks · dedicated success manager",
+    ],
+  },
 ];
 
 const PricingTeaser = ({
@@ -866,12 +912,24 @@ const PricingTeaser = ({
               </span>
             )}
             <h3 className="font-display text-xl font-bold tracking-tight text-slate-900">{t.name}</h3>
+            <p className="mt-1 text-[11px] font-bold uppercase tracking-wider text-blue-600">{t.best}</p>
             <div className="mt-3 flex items-baseline gap-1">
               <span className="font-display text-4xl font-black tracking-tighter text-slate-900">{t.price}</span>
               <span className="text-sm font-medium text-slate-500">/mo</span>
             </div>
-            <p className="mt-3 text-sm leading-relaxed text-slate-600">{t.body}</p>
-            <div className="mt-5">
+            <p className="mt-3 text-sm leading-relaxed text-slate-600">{t.tagline}</p>
+            <ul className="mt-4 space-y-2 border-t border-slate-100 pt-4">
+              {t.features.map((feat) => {
+                const isHeader = feat.endsWith("plus:");
+                return (
+                  <li key={feat} className={`flex items-start gap-2 text-[13px] leading-snug ${isHeader ? "font-semibold text-slate-900" : "text-slate-700"}`}>
+                    {!isHeader && <CheckCircle2 className="mt-0.5 h-4 w-4 flex-shrink-0 text-emerald-500" />}
+                    <span className={isHeader ? "pt-0.5" : ""}>{feat}</span>
+                  </li>
+                );
+              })}
+            </ul>
+            <div className="mt-6">
               {t.featured ? (
                 <button
                   onClick={onWaitlist}

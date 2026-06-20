@@ -126,8 +126,9 @@ export const PLAN_DEFINITIONS: PlanDefinition[] = [
     features: [
       "Everything in Unlimited, plus:",
       "Website price verification — hard signing gate (a deal can't be signed out of price integrity)",
-      "Nightly MarketCheck inventory + advertised-price sync (baseline 300 VINs; add-ons available)",
-      "Live re-scrape + website price screenshot evidence",
+      "Automatic nightly MarketCheck inventory + advertised-price sync (baseline 300 VINs; add-ons available)",
+      "One-click instant price re-check on any VIN — confirm the deal still matches your live website before the customer signs",
+      "Live re-scrape + timestamped website price screenshot evidence",
       "Per-VIN tamper-evident defense file (SHA-256 chain root)",
       "Verified installer sign-off + photo on pre-installed products",
       "50-state disclosure engine (CA, NY, FL, TX, IL, MA, NJ, +44)",
