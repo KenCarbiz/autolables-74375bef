@@ -162,18 +162,26 @@ const Index = () => {
     ? `${settings.addendum_custom_width || "8.5"}in`
     : PAPER_WIDTHS[settings.addendum_paper_size] || "8.5in";
 
-  // Fit the sheet to the available content column so the on-screen preview
-  // reads as a realistic full-size page instead of a narrow strip. Fills ~90%
-  // of the desktop column; on phones it scales down to fit the viewport.
-  const defaultZoom = (() => {
+  // On-screen scale model. "100%" is the comfortable desktop fit — a real
+  // letter page that's ~40% larger than the raw 1:1 sheet — and the zoom
+  // control adjusts UP/DOWN from there. The displayed percentage is relative
+  // to this base, so the addendum always LOADS properly sized at 100% and the
+  // dealer can still go bigger/smaller. Print + PDF always capture at true
+  // paper size regardless of the on-screen scale.
+  const baseScale = (() => {
     if (typeof window === "undefined") return 1.4;
     const paperPx = (parseFloat(paperWidth) || 8.5) * 96;
     const w = window.innerWidth;
-    if (w < 1024) return Math.max(0.5, Math.min(1.1, +(((w - 28) / paperPx)).toFixed(2)));
-    const avail = w - 340; // sidebar rail + page padding
-    return Math.max(1.2, Math.min(2.0, +(((avail * 0.9) / paperPx)).toFixed(2)));
+    // Phones/tablets: fit the sheet within the viewport.
+    if (w < 1024) return Math.max(0.45, Math.min(1.0, +(((w - 24) / paperPx)).toFixed(3)));
+    // Desktop: ~40% larger than raw, capped so it still fits the content column
+    // on narrower laptops instead of overflowing.
+    return Math.max(1.1, Math.min(1.4, +(((w - 300) / paperPx)).toFixed(3)));
   })();
-  const [zoom, setZoom] = useState(defaultZoom);
+  // Displayed zoom percentage (100% = the base fit). Effective CSS scale is
+  // base × (pct/100), so every downstream width/zoom calc stays correct.
+  const [zoomPct, setZoomPct] = useState(100);
+  const zoom = +(baseScale * (zoomPct / 100)).toFixed(3);
   // Language of the disclosure block. FTC Used Car Rule + CA SB 766
   // require the disclosure to be presented in the language the sale
   // is conducted in. Dealer picks per-addendum; "en" is default.
@@ -1390,9 +1398,9 @@ const Index = () => {
           </button>
           {/* On-screen zoom only — print/PDF stay true-to-paper-size. */}
           <div className="inline-flex items-center gap-1 h-9 px-1 rounded-md border border-border" title="Adjust on-screen preview size (does not affect print or PDF)">
-            <button onClick={() => setZoom((z) => Math.max(0.6, +(z - 0.1).toFixed(2)))} className="w-6 h-6 inline-flex items-center justify-center rounded hover:bg-muted text-sm" aria-label="Zoom out">−</button>
-            <button onClick={() => setZoom(defaultZoom)} className="text-xs tabular-nums w-11 text-center text-muted-foreground hover:text-foreground" title="Reset zoom">{Math.round(zoom * 100)}%</button>
-            <button onClick={() => setZoom((z) => Math.min(2, +(z + 0.1).toFixed(2)))} className="w-6 h-6 inline-flex items-center justify-center rounded hover:bg-muted text-sm" aria-label="Zoom in">+</button>
+            <button onClick={() => setZoomPct((p) => Math.max(50, p - 10))} className="w-6 h-6 inline-flex items-center justify-center rounded hover:bg-muted text-sm" aria-label="Zoom out">−</button>
+            <button onClick={() => setZoomPct(100)} className="text-xs tabular-nums w-11 text-center text-muted-foreground hover:text-foreground" title="Reset to 100%">{zoomPct}%</button>
+            <button onClick={() => setZoomPct((p) => Math.min(200, p + 10))} className="w-6 h-6 inline-flex items-center justify-center rounded hover:bg-muted text-sm" aria-label="Zoom in">+</button>
           </div>
           {settings.feature_ink_saving && (
             <label className="flex items-center gap-1.5 text-xs text-muted-foreground cursor-pointer ml-1">
