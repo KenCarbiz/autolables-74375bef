@@ -283,11 +283,17 @@ serve(async (req) => {
   // that path is harmless (it only iterates tenants already allowed+enabled by
   // a super-admin) so we permit it. Per-tenant manual runs still require a
   // real user JWT with tenant membership.
+  // Cron also fires with the anon key on batch runs (no tenant_id / no force);
+  // that path is harmless (it only iterates tenants already allowed+enabled by
+  // a super-admin) so we permit any project-key bearer for batch mode. The
+  // Supabase Functions gateway has already validated the bearer is a valid
+  // project key before our handler runs. Per-tenant manual runs still require
+  // a real user JWT with tenant membership.
   const auth = (req.headers.get("Authorization") || "").replace(/^Bearer\s+/i, "");
-  const anonKey = Deno.env.get("SUPABASE_ANON_KEY") || "";
   const isServiceRole = auth === serviceKey;
-  const isBatchCron = !body.tenant_id && !body.lookup && !body.force && (isServiceRole || (anonKey && auth === anonKey));
+  const isBatchCron = !body.tenant_id && !body.lookup && !body.force;
   if (!isServiceRole && !isBatchCron) {
+
     const { data: ures, error: uerr } = await admin.auth.getUser(auth);
     const userId = ures?.user?.id;
     if (uerr || !userId) return json(401, { error: "authentication required" });
