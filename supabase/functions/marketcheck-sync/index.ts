@@ -279,9 +279,15 @@ serve(async (req) => {
   try { body = await req.json(); } catch { /* empty body OK */ }
 
   // ── Auth gate: service-role (cron) or a tenant admin/member JWT (manual). ──
+  // Cron also fires with the anon key on batch runs (no tenant_id / no force);
+  // that path is harmless (it only iterates tenants already allowed+enabled by
+  // a super-admin) so we permit it. Per-tenant manual runs still require a
+  // real user JWT with tenant membership.
   const auth = (req.headers.get("Authorization") || "").replace(/^Bearer\s+/i, "");
-  const isCron = auth === serviceKey;
-  if (!isCron) {
+  const anonKey = Deno.env.get("SUPABASE_ANON_KEY") || "";
+  const isServiceRole = auth === serviceKey;
+  const isBatchCron = !body.tenant_id && !body.lookup && !body.force && (isServiceRole || (anonKey && auth === anonKey));
+  if (!isServiceRole && !isBatchCron) {
     const { data: ures, error: uerr } = await admin.auth.getUser(auth);
     const userId = ures?.user?.id;
     if (uerr || !userId) return json(401, { error: "authentication required" });
@@ -301,6 +307,7 @@ serve(async (req) => {
       }
     }
   }
+
 
   // ── Dealer lookup: list MarketCheck dealers in an area so the operator can
   // find the right rooftop's dealer_id (Dealers Search only filters by geo). ──
