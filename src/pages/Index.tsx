@@ -156,17 +156,22 @@ const Index = () => {
   const [inkSaving, setInkSaving] = useState(false);
   // On-screen preview zoom only. Print + PDF capture always reset to 1
   // so the artifact stays true-to-paper-size.
-  // Default the on-screen preview to 140% on desktop (wider screens) where
-  // there's room; phones/tablets stay at 110% so the sheet fits.
-  // Fit the 8.5in sheet to the available content column so the on-screen
-  // preview reads as a realistic letter page instead of a narrow strip.
+  // Paper width for the addendum sheet (from the dealer's paper-size setting).
+  // Defined up here so the on-screen zoom can fit it to the column.
+  const paperWidth = settings.addendum_paper_size === "custom"
+    ? `${settings.addendum_custom_width || "8.5"}in`
+    : PAPER_WIDTHS[settings.addendum_paper_size] || "8.5in";
+
+  // Fit the sheet to the available content column so the on-screen preview
+  // reads as a realistic full-size page instead of a narrow strip. Fills ~90%
+  // of the desktop column; on phones it scales down to fit the viewport.
   const defaultZoom = (() => {
-    if (typeof window === "undefined") return 1.3;
+    if (typeof window === "undefined") return 1.4;
+    const paperPx = (parseFloat(paperWidth) || 8.5) * 96;
     const w = window.innerWidth;
-    if (w < 1024) return 1.05; // phone/tablet: keep the sheet within reach
+    if (w < 1024) return Math.max(0.5, Math.min(1.1, +(((w - 28) / paperPx)).toFixed(2)));
     const avail = w - 340; // sidebar rail + page padding
-    const paperPx = 8.5 * 96;
-    return Math.max(1.3, Math.min(1.85, +(avail / paperPx).toFixed(2)));
+    return Math.max(1.2, Math.min(2.0, +(((avail * 0.9) / paperPx)).toFixed(2)));
   })();
   const [zoom, setZoom] = useState(defaultZoom);
   // Language of the disclosure block. FTC Used Car Rule + CA SB 766
@@ -258,10 +263,6 @@ const Index = () => {
     license_number: settings.dealer_license_number || "",
   };
 
-  // Paper size
-  const paperWidth = settings.addendum_paper_size === "custom"
-    ? `${settings.addendum_custom_width || "8.5"}in`
-    : PAPER_WIDTHS[settings.addendum_paper_size] || "8.5in";
   // The sheet is rendered with CSS zoom, so its visual width is paper × zoom.
   // Match the no-print control bars to that width so they don't sit narrower
   // than the document and look misaligned.
