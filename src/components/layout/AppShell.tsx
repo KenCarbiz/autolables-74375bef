@@ -106,6 +106,9 @@ const AppShell = ({ children }: AppShellProps) => {
   const _baseNavigate = useBaseNavigate;
   const [mobileOpen, setMobileOpen] = useState(false);
   const [showMobileQr, setShowMobileQr] = useState(false);
+  // Collapse the mobile header's action row once the content scrolls, so the
+  // long inventory list isn't fighting a tall fixed header for space.
+  const [mScrolled, setMScrolled] = useState(false);
   const { open: paletteOpen, setOpen: setPaletteOpen } = useCommandPalette();
   // Device-aware VIN scan, shared with every page via VinScanContext:
   // live camera on phone/tablet, QR hand-off on desktop.
@@ -356,6 +359,18 @@ const AppShell = ({ children }: AppShellProps) => {
     })();
     return () => { cancelled = true; };
   }, [tenant?.id]);
+
+  // Collapse the mobile header's action row after a little scroll in the main
+  // content area; reset to expanded on route change (each page starts at top).
+  useEffect(() => {
+    const el = document.getElementById("app-scroll");
+    if (!el) return;
+    const onScroll = () => setMScrolled(el.scrollTop > 8);
+    onScroll();
+    el.addEventListener("scroll", onScroll, { passive: true });
+    return () => el.removeEventListener("scroll", onScroll);
+  }, [location.pathname]);
+
   const dealerLoc = [settings.dealer_city, settings.dealer_state].filter(Boolean).join(", ");
   // Multi-store group switcher state. "All Locations" is a group-level
   // view that does not bind a specific rooftop's address into stickers.
@@ -606,7 +621,7 @@ const AppShell = ({ children }: AppShellProps) => {
             Compact: dealer switcher + inline sync/MarketCheck status + a
             full-width Scan / Add action row. Account lives in the hamburger. */}
         <header className="lg:hidden sticky top-0 z-20 topbar-navy text-foreground border-b border-border">
-          <div className="px-3 pt-2 pb-2.5 space-y-2">
+          <div className="px-3 pt-2 pb-2.5">
             <div className="flex items-center gap-2.5">
               <button
                 onClick={() => setMobileOpen(true)}
@@ -616,23 +631,15 @@ const AppShell = ({ children }: AppShellProps) => {
                 <Menu className="w-4 h-4" />
               </button>
 
-              {/* Dealer / tenant switcher */}
+              {/* Dealer / tenant switcher — identity on the left */}
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <button className="flex-1 min-w-0 text-left">
-                    <span className="inline-flex items-center gap-1 max-w-full">
+                    <span className="flex items-center gap-1 max-w-full">
                       <span className="text-[15px] font-display font-bold text-foreground truncate leading-tight">{dealerActiveLabel}</span>
                       <ChevronDown className="w-3.5 h-3.5 text-muted-foreground flex-shrink-0" />
                     </span>
                     <span className="block text-[11px] text-muted-foreground truncate leading-tight">{dealerActiveSub}</span>
-                    <span className="flex items-center gap-3 mt-0.5">
-                      <span className="inline-flex items-center gap-1 text-[10px] text-muted-foreground">
-                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" /> Sync {syncWhen}
-                      </span>
-                      <span className="inline-flex items-center gap-1 text-[10px] font-medium text-emerald-700">
-                        <CheckCircle2 className="w-3 h-3" /> MarketCheck
-                      </span>
-                    </span>
                   </button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="start" className="w-64">
@@ -669,6 +676,18 @@ const AppShell = ({ children }: AppShellProps) => {
                 </DropdownMenuContent>
               </DropdownMenu>
 
+              {/* Operational status — right-aligned to balance the header */}
+              {tenant?.name && (
+                <div className="flex flex-col items-end gap-0.5 flex-shrink-0 leading-none">
+                  <span className="inline-flex items-center gap-1 text-[10px] text-muted-foreground whitespace-nowrap">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" /> Sync {syncWhen}
+                  </span>
+                  <span className="inline-flex items-center gap-1 text-[10px] font-medium text-emerald-700 whitespace-nowrap">
+                    <CheckCircle2 className="w-3 h-3" /> MarketCheck
+                  </span>
+                </div>
+              )}
+
               {/* Notifications */}
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
@@ -701,8 +720,8 @@ const AppShell = ({ children }: AppShellProps) => {
               </DropdownMenu>
             </div>
 
-            {/* Primary actions */}
-            <div className="grid grid-cols-2 gap-2">
+            {/* Primary actions — collapse away once the content scrolls */}
+            <div className={`grid grid-cols-2 gap-2 overflow-hidden transition-all duration-200 ${mScrolled ? "max-h-0 opacity-0 mt-0" : "max-h-16 opacity-100 mt-2"}`}>
               <button onClick={openScan} className="h-12 rounded-xl bg-[#2563EB] hover:bg-[#1d4ed8] text-white inline-flex items-center justify-center gap-2 text-[14px] font-semibold shadow-sm">
                 <ScanLine className="w-4 h-4 stroke-2" /> Scan VIN
               </button>
