@@ -55,7 +55,7 @@ const StickerStudio = () => {
   const [type, setType] = useState<StickerType | "all">("all");
   const [tag, setTag] = useState<StyleTag | "all">("all");
 
-  const { templates: catalog } = useStickerCatalog();
+  const { templates: catalog, byId } = useStickerCatalog();
   const { defaults, setDefault, clearDefault } = useStickerPrefs();
   const templates = catalog
     .filter((t) => (type === "all" || t.config.type === type) && (tag === "all" || t.config.styleTags.includes(tag)))
@@ -70,6 +70,11 @@ const StickerStudio = () => {
     if (defaults[cfgType] === key) clearDefault(cfgType);
     else setDefault(cfgType, key);
   };
+
+  // Dealer's saved defaults, resolved to live templates for the quick-start row.
+  const quickStart = (["window", "addendum"] as StickerType[])
+    .map((ty) => ({ ty, template: defaults[ty] ? byId(defaults[ty]) : undefined }))
+    .filter((q): q is { ty: StickerType; template: NonNullable<ReturnType<typeof byId>> } => !!q.template);
 
   return (
     <div className="p-4 lg:p-6 max-w-[1400px] mx-auto space-y-5">
@@ -96,6 +101,34 @@ const StickerStudio = () => {
           ))}
         </div>
       </div>
+
+      {/* Quick start — jump straight into the dealer's saved default per type */}
+      {quickStart.length > 0 && (
+        <div className="rounded-2xl border border-blue-100 bg-blue-50/40 p-3">
+          <p className="text-[11px] font-semibold uppercase tracking-label text-blue-700 mb-2 inline-flex items-center gap-1">
+            <Star className="w-3.5 h-3.5" fill="currentColor" /> Quick start with your defaults
+          </p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {quickStart.map(({ ty, template }) => (
+              <button
+                key={ty}
+                type="button"
+                onClick={() => open(template.config.id)}
+                className="group flex items-center gap-3 rounded-xl border border-border bg-card p-2.5 text-left hover:border-primary hover:shadow-premium transition"
+              >
+                <div className="rounded-md bg-slate-50 border border-slate-100 overflow-hidden flex items-center justify-center flex-shrink-0" style={{ width: 64, height: 64 }}>
+                  <TemplateRenderer template={template} data={SAMPLE} branding={branding} scale={ty === "addendum" ? 0.12 : 0.072} />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">{ty === "window" ? "Window Sticker" : "Addendum"}</p>
+                  <p className="text-sm font-semibold text-foreground truncate">{template.config.name}</p>
+                </div>
+                <span className="inline-flex items-center gap-1 text-xs font-semibold text-blue-600 flex-shrink-0 pr-1">Generate <Check className="w-3.5 h-3.5" /></span>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Gallery grid */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
