@@ -278,46 +278,39 @@ serve(async (req) => {
   let body: { tenant_id?: string; force?: boolean; lookup?: boolean; zip?: string; state?: string } = {};
   try { body = await req.json(); } catch { /* empty body OK */ }
 
-  // ── Auth gate: service-role (cron) or a tenant admin/member JWT (manual). ──
-  // Cron also fires with the anon key on batch runs (no tenant_id / no force);
-  // that path is harmless (it only iterates tenants already allowed+enabled by
-  // a super-admin) so we permit it. Per-tenant manual runs still require a
-  // real user JWT with tenant membership.
-  // Cron also fires with the anon key on batch runs (no tenant_id / no force);
-  // that path is harmless (it only iterates tenants already allowed+enabled by
-  // a super-admin) so we permit any project-key bearer for batch mode. The
-  // Supabase Functions gateway has already validated the bearer is a valid
-  // project key before our handler runs. Per-tenant manual runs still require
-  // a real user JWT with tenant membership.
+  // ── Auth gate ───────────────────────────────────────────────
+  // Every request must authenticate. Accepted credentials:
+  //   - service-role bearer (manual admin / direct ops)
+  //   - x-cron-secret header (the pg_cron schedule sends this)
+  //   - a real user JWT (tenant member or platform admin)
+  // The previous "anon-key + empty body = batch" bypass is removed so
+  // anonymous callers can no longer trigger paid MarketCheck quota.
   const auth = (req.headers.get("Authorization") || "").replace(/^Bearer\s+/i, "");
-  const isServiceRole = auth === serviceKey;
-  const isBatchCron = !body.tenant_id && !body.lookup && !body.force;
-  // Dedicated cron secret (x-cron-secret) — a stable auth path independent of
-  // the project keys, so a future key rotation can never silently 401 the
-  // schedule. The cron sends it when MARKETCHECK_CRON_SECRET is configured.
+  const isServiceRole = !!serviceKey && auth === serviceKey;
   const cronSecret = Deno.env.get("MARKETCHECK_CRON_SECRET") || "";
   const hasCronSecret = !!cronSecret && (req.headers.get("x-cron-secret") || "") === cronSecret;
-  if (!isServiceRole && !isBatchCron && !hasCronSecret) {
+  const isBatchCron = isServiceRole || hasCronSecret;
 
+  if (!isBatchCron) {
+    // Require a real user JWT — anon/publishable keys are rejected.
     const { data: ures, error: uerr } = await admin.auth.getUser(auth);
     const userId = ures?.user?.id;
     if (uerr || !userId) return json(401, { error: "authentication required" });
     const { data: isAdmin } = await admin.from("user_roles")
       .select("role").eq("user_id", userId).eq("role", "admin").maybeSingle();
-    // A global dealer lookup is not tenant-scoped — it just searches MarketCheck
-    // by geography. Any authenticated user may run it (it powers both the
-    // platform tenant drawer and the dealer's own Admin setup card).
     if (body.lookup) {
-      // ok — authenticated is enough
+      // global dealer lookup — any authenticated user
     } else {
       if (!body.tenant_id) return json(400, { error: "tenant_id required" });
       if (!isAdmin) {
         const { data: membership } = await admin.from("tenant_members")
-          .select("tenant_id").eq("user_id", userId).eq("tenant_id", body.tenant_id).maybeSingle();
+          .select("tenant_id").eq("user_id", userId).eq("tenant_id", body.tenant_id)
+          .not("accepted_at", "is", null).maybeSingle();
         if (!membership) return json(403, { error: "not a member of this tenant" });
       }
     }
   }
+
 
   // Visibility — record every cron/batch invocation so "did the scheduler
   // actually reach the function?" is answerable from the audit log without
