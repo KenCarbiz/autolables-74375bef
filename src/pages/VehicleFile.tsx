@@ -305,7 +305,7 @@ const VehicleFile = () => {
                         className="h-10 px-4 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold inline-flex items-center justify-center gap-1.5 shadow-sm shadow-blue-600/30 transition-colors"
                       >
                         <ExternalLink className="w-4 h-4" />
-                        View Shopper Page
+                        View Customer Packet
                       </a>
                       <button
                         onClick={copyLink}
@@ -418,7 +418,7 @@ const VehicleFile = () => {
               className="flex-1 h-11 rounded-xl bg-blue-600 text-white text-sm font-semibold inline-flex items-center justify-center gap-1.5 shadow-sm shadow-blue-600/30"
             >
               <ExternalLink className="w-4 h-4" />
-              View Shopper Page
+              View Customer Packet
             </a>
             <button
               onClick={copyLink}
@@ -743,7 +743,7 @@ const OverviewPanel = ({ vehicle, onTab }: { vehicle: VehicleRow; onTab: (t: Tab
         <MarketPricingCard vehicle={vehicle} />
 
         {/* Shopper portal preview */}
-        <Card title="Shopper Portal Preview" className="md:col-span-2 lg:col-span-1">
+        <Card title="Customer Packet" className="md:col-span-2 lg:col-span-1">
           {vehicle.status === "published" ? (
             <div className="space-y-3">
               <div className="flex items-start gap-3">
@@ -759,7 +759,7 @@ const OverviewPanel = ({ vehicle, onTab }: { vehicle: VehicleRow; onTab: (t: Tab
               </a>
               <div className="grid grid-cols-2 gap-2">
                 <a href={publicUrl} target="_blank" rel="noreferrer" className="h-9 rounded-xl border border-border bg-background hover:bg-muted text-foreground text-xs font-semibold inline-flex items-center justify-center gap-1.5">
-                  <ExternalLink className="w-3.5 h-3.5" /> Preview Page
+                  <ExternalLink className="w-3.5 h-3.5" /> Open Packet
                 </a>
                 <button onClick={() => onTab("labels")} className="h-9 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold inline-flex items-center justify-center gap-1.5">
                   <Globe className="w-3.5 h-3.5" /> Manage
