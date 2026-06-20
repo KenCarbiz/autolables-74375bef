@@ -164,6 +164,7 @@ const AppShell = ({ children }: AppShellProps) => {
         { label: "New Addendum", path: "/addendum", icon: FileText },
         { label: "New Car Sticker", path: "/new-car-sticker", icon: FileText },
         { label: "Used Car Sticker", path: "/used-car-sticker", icon: Car },
+        { label: "Sticker Studio", path: "/sticker-studio", icon: Sparkles },
         { label: "CPO Info Sheet", path: "/cpo-sheet", icon: Award },
         { label: "Trade-Up Sticker", path: "/trade-up", icon: TrendingUp },
         { label: "Buyers Guide", path: "/buyers-guide", icon: ScrollText, featureKey: "feature_buyers_guide" },
