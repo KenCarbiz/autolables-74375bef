@@ -586,17 +586,19 @@ const AppShell = ({ children }: AppShellProps) => {
             on the right. Theme toggle + app switcher intentionally
             removed to reduce visual noise. */}
         <header className="sticky top-0 z-20 topbar-navy vt-topbar text-foreground border-b border-border">
-          <div className="flex items-center h-[72px] px-3 lg:px-4 gap-4">
-            {/* Left: hamburger (mobile) + page title aligned to logo edge */}
-            <div className="flex items-center gap-3 min-w-0 flex-shrink-0 w-[260px] max-w-[40%]">
+          <div className="flex items-center h-16 lg:h-[72px] px-3 lg:px-4 gap-3 lg:gap-4">
+            {/* Left: hamburger (mobile) + page title aligned to logo edge.
+                On mobile the title fills the row (no search bar there), so the
+                bar reads balanced instead of an empty gap. */}
+            <div className="flex items-center gap-2.5 min-w-0 flex-1 lg:flex-none lg:w-[260px] lg:max-w-[40%]">
               <button
                 onClick={() => setMobileOpen(true)}
-                className="lg:hidden h-9 w-9 rounded-lg border border-border bg-card hover:bg-muted text-foreground inline-flex items-center justify-center transition-colors"
+                className="lg:hidden h-9 w-9 flex-shrink-0 rounded-lg border border-border bg-card hover:bg-muted text-foreground inline-flex items-center justify-center transition-colors"
               >
                 <Menu className="w-4 h-4" />
               </button>
-              <div className="min-w-0 hidden sm:block">
-                <p className="text-[17px] font-display font-semibold text-foreground truncate leading-tight tracking-tight">
+              <div className="min-w-0">
+                <p className="text-[15px] sm:text-[17px] font-display font-semibold text-foreground truncate leading-tight tracking-tight">
                   {pageMeta.title || `${greeting}, ${capitalized}`}
                 </p>
                 {pageMeta.subtitle && (
@@ -621,7 +623,17 @@ const AppShell = ({ children }: AppShellProps) => {
             </button>
 
             {/* Right cluster */}
-            <div className="flex items-center gap-2 flex-shrink-0">
+            <div className="flex items-center gap-1.5 sm:gap-2 flex-shrink-0">
+              {/* Mobile search — the full search bar is desktop-only, so phones
+                  get a compact icon that opens the same command palette. */}
+              <button
+                onClick={() => setPaletteOpen(true)}
+                className="md:hidden h-9 w-9 rounded-lg border border-border bg-card hover:bg-muted text-muted-foreground hover:text-foreground inline-flex items-center justify-center transition-colors"
+                title="Search"
+                aria-label="Search"
+              >
+                <Search className="w-4 h-4" />
+              </button>
               {/* Unified operational status block — tenant switcher · sync · MarketCheck.
                   Visually dominant, grouped into one pill so the dealership selector,
                   sync state, and feed connection read as a single command surface. */}
