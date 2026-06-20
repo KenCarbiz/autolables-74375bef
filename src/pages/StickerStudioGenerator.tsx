@@ -6,6 +6,11 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useDealerDocumentRules } from "@/lib/documentRules";
 import { transitionDocument } from "@/lib/stickerStudio/documentWorkflow";
 import { ensureQrCode } from "@/lib/stickerStudio/qrTracking";
+import { useLatestAddendum } from "@/lib/stickerStudio/useLatestAddendum";
+import { mapProductsToStickerItems } from "@/lib/stickerStudio/addendumMapping";
+import { validateStickerPacketMatch, type PacketContext } from "@/lib/stickerStudio/validateStickerPacketMatch";
+import StickerPacketReviewPanel from "@/components/sticker/StickerPacketReviewPanel";
+import { FileCheck2 } from "lucide-react";
 import { useVehiclePrefill } from "@/lib/vehiclePrefill";
 import { getStudioTemplate, TemplateRenderer, type StickerData, type StickerLineItem, type StickerRenderOptions, type LabelMode } from "@/lib/stickerStudio/templates";
 import { useStickerCatalog } from "@/lib/stickerStudio/useStickerCatalog";
@@ -108,6 +113,10 @@ const StickerStudioGenerator = () => {
 
   // Point the sticker QR at the trackable /q/:token redirect (falls back to the
   // direct passport URL if QR tracking isn't available). Honors the dealer rule.
+  // Latest signing packet for this vehicle — source for "load packet data" and
+  // the sticker-vs-packet review (addendum templates only).
+  const { addendum } = useLatestAddendum(prefill.vehicle?.vin || data.vin);
+
   const qrEnsured = useRef(false);
   const stickerType = template?.config.type;
   useEffect(() => {
@@ -134,6 +143,34 @@ const StickerStudioGenerator = () => {
   }
   const cfg = template.config;
   const setField = (k: keyof StickerData, val: string) => setData((d) => ({ ...d, [k]: val }));
+
+  // Addendum ↔ signing-packet integration (addendum templates only).
+  const isAddendum = cfg.type === "addendum";
+  const loadPacketData = () => {
+    if (!addendum) return;
+    const m = mapProductsToStickerItems(addendum.products);
+    setData((d) => ({
+      ...d,
+      installed: m.installed.length ? m.installed : d.installed,
+      upgrades: m.upgrades.length ? m.upgrades : d.upgrades,
+      benefits: m.benefits.length ? m.benefits : d.benefits,
+    }));
+    toast.success("Loaded items from the signing packet");
+  };
+  // Live consistency check vs the latest packet (used to gate publish).
+  const packetCtx: PacketContext | null = isAddendum && addendum ? {
+    vin: prefill.vehicle?.vin || data.vin,
+    stock: data.stock,
+    vehicleTitle: data.vehicleTitle,
+    products: addendum.products,
+    hasDisclaimer: !!branding.disclaimer,
+    qrRequired: cfg.styleTags.includes("Compliance"),
+    hasQr: !!(cfg.supportsQr && data.qrUrl),
+    signed: !!addendum.signedAt,
+    signedAfterGenerated: false,
+  } : null;
+  const matchBlocked = !!packetCtx && rules.blockPacketOnMismatchFail &&
+    validateStickerPacketMatch(data, packetCtx).status === "blocked";
 
   const setItem = (key: "installed" | "upgrades" | "benefits", i: number, patch: Partial<StickerLineItem>) =>
     setData((d) => ({ ...d, [key]: d[key].map((it, idx) => (idx === i ? { ...it, ...patch } : it)) }));
@@ -226,6 +263,7 @@ const StickerStudioGenerator = () => {
   };
 
   const handlePublish = async () => {
+    if (matchBlocked) { toast.error("Resolve the blocking sticker/packet findings before publishing"); return; }
     const r = await publishToPassport(prefill.vehicle?.id, tenant?.id);
     if (r.ok) {
       setSavedDoc((d) => ({ ...(d || {}), status: "published" }));
@@ -274,7 +312,7 @@ const StickerStudioGenerator = () => {
           <button onClick={handlePng} disabled={generating} className="inline-flex items-center gap-1.5 h-9 px-3 rounded-md border border-border text-sm font-medium hover:bg-muted disabled:opacity-50"><ImageIcon className="w-3.5 h-3.5" /> PNG</button>
           <button onClick={handlePdf} disabled={generating} className="inline-flex items-center gap-1.5 h-9 px-3 rounded-md bg-primary text-primary-foreground text-sm font-medium hover:opacity-90 disabled:opacity-50"><Download className="w-3.5 h-3.5" /> {generating ? "Generating…" : "PDF"}</button>
           <button onClick={handleSave} disabled={generating} className="inline-flex items-center gap-1.5 h-9 px-3 rounded-md border border-border text-sm font-medium hover:bg-muted disabled:opacity-50"><Save className="w-3.5 h-3.5" /> Save to vehicle</button>
-          <button onClick={handlePublish} className="inline-flex items-center gap-1.5 h-9 px-3 rounded-md border border-border text-sm font-medium hover:bg-muted"><Globe className="w-3.5 h-3.5" /> Publish passport</button>
+          <button onClick={handlePublish} disabled={matchBlocked} title={matchBlocked ? "Blocked by sticker/packet review" : undefined} className="inline-flex items-center gap-1.5 h-9 px-3 rounded-md border border-border text-sm font-medium hover:bg-muted disabled:opacity-50"><Globe className="w-3.5 h-3.5" /> Publish passport</button>
         </div>
       </div>
 
@@ -293,6 +331,24 @@ const StickerStudioGenerator = () => {
               </div>
             </div>
           </CfgCard>
+
+          {isAddendum && addendum && (
+            <CfgCard title="Addendum packet">
+              <div className="space-y-2">
+                <div className="flex items-center justify-between gap-2">
+                  <div className="text-[11px] text-muted-foreground">
+                    <span className="font-semibold text-foreground capitalize">{addendum.signedAt ? "Signed" : addendum.status || "Draft"}</span>
+                    {" · "}{addendum.products.length} product{addendum.products.length === 1 ? "" : "s"}
+                    {addendum.customerName ? ` · ${addendum.customerName}` : ""}
+                  </div>
+                  <button onClick={loadPacketData} className="h-8 px-2.5 rounded-md bg-blue-600 text-white text-[11px] font-semibold inline-flex items-center gap-1 hover:bg-blue-700"><FileCheck2 className="w-3.5 h-3.5" /> Load packet items</button>
+                </div>
+                {addendum.signedAt && <p className="text-[10px] text-amber-700">This packet is signed. Material changes require a new addendum version and customer re-review.</p>}
+              </div>
+            </CfgCard>
+          )}
+
+          {packetCtx && <StickerPacketReviewPanel sticker={data} ctx={packetCtx} />}
 
           <CfgCard title="Line items">
             <div className="space-y-3">
