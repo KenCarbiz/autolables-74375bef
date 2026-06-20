@@ -134,7 +134,7 @@ const Nav = ({
 // Hero
 // ──────────────────────────────────────────────────────────────
 
-const Hero = ({ onDemo }: { onWaitlist: () => void; onDemo: () => void }) => (
+const Hero = ({ onWaitlist }: { onWaitlist: () => void; onDemo: () => void }) => (
   <section className="relative isolate overflow-hidden border-b border-slate-100 bg-white">
     <div
       aria-hidden
