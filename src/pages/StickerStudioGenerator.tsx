@@ -5,7 +5,8 @@ import { useTenant } from "@/contexts/TenantContext";
 import { useVehiclePrefill } from "@/lib/vehiclePrefill";
 import { getStudioTemplate, TemplateRenderer, type StickerData, type StickerLineItem } from "@/lib/stickerStudio/templates";
 import { brandingFromSettings } from "@/pages/StickerStudio";
-import { ArrowLeft, Printer, Download, Image as ImageIcon, Plus, Trash2, FileText } from "lucide-react";
+import { saveStickerToVehicle, publishToPassport } from "@/lib/stickerStudio/api";
+import { ArrowLeft, Printer, Download, Image as ImageIcon, Plus, Trash2, Save, Globe } from "lucide-react";
 import { toast } from "sonner";
 
 const ACCENTS = ["#2563EB", "#0B2041", "#7c5c1e", "#0f766e", "#9333ea", "#b91c1c"];
@@ -19,6 +20,7 @@ const StickerStudioGenerator = () => {
   const { tenant } = useTenant();
   const sheetRef = useRef<HTMLDivElement>(null);
   const [generating, setGenerating] = useState(false);
+  const [zoomPreset, setZoomPreset] = useState<"fit" | "50" | "75" | "100">("fit");
 
   // Branding (seeded from dealer settings, editable here).
   const seed = useMemo(() => brandingFromSettings(settings, tenant?.name), [settings, tenant?.name]);
@@ -33,7 +35,7 @@ const StickerStudioGenerator = () => {
     vehicleTitle: "", vin: "", stock: "", mileage: "", msrp: "", price: "",
     installed: [blankItem()], upgrades: [blankItem()], benefits: [blankItem()], notes: "", qrUrl: "",
   });
-  useVehiclePrefill((v) => {
+  const prefill = useVehiclePrefill((v) => {
     const origin = typeof window !== "undefined" ? window.location.origin : "";
     setData((prev) => ({
       ...prev,
@@ -110,9 +112,25 @@ const StickerStudioGenerator = () => {
     } catch { toast.error("PNG failed"); } finally { setGenerating(false); }
   };
 
+  const handleSave = async () => {
+    setGenerating(true);
+    try {
+      const r = await saveStickerToVehicle({ vehicleId: prefill.vehicle?.id, vin: data.vin, templateId: cfg.id, docType: cfg.type });
+      if (r.ok) toast.success("Saved to vehicle file");
+      else toast.error(r.error === "no_vehicle" ? "Open this from a vehicle to save it to the file" : "Couldn't save");
+    } finally { setGenerating(false); }
+  };
+
+  const handlePublish = async () => {
+    const r = await publishToPassport(prefill.vehicle?.id);
+    if (r.ok) toast.success(r.url ? "Published to Vehicle Passport" : "Published");
+    else toast.error(r.error === "no_vehicle" ? "Open this from a vehicle to publish" : "Couldn't publish");
+  };
+
   const input = "w-full h-9 px-2.5 rounded-md border border-border bg-background text-sm outline-none focus:border-primary";
   const label = "text-[10px] font-bold uppercase tracking-wider text-muted-foreground";
-  const previewScale = cfg.type === "addendum" ? 0.9 : 0.62;
+  const fitScale = cfg.type === "addendum" ? 0.9 : 0.62;
+  const previewScale = zoomPreset === "fit" ? fitScale : Number(zoomPreset) / 100;
 
   const ItemEditor = ({ keyName, title }: { keyName: "installed" | "upgrades" | "benefits"; title: string }) => (
     <div className="space-y-1.5">
@@ -142,6 +160,8 @@ const StickerStudioGenerator = () => {
           <button onClick={handlePrint} className="inline-flex items-center gap-1.5 h-9 px-3 rounded-md border border-border text-sm font-medium hover:bg-muted"><Printer className="w-3.5 h-3.5" /> Print</button>
           <button onClick={handlePng} disabled={generating} className="inline-flex items-center gap-1.5 h-9 px-3 rounded-md border border-border text-sm font-medium hover:bg-muted disabled:opacity-50"><ImageIcon className="w-3.5 h-3.5" /> PNG</button>
           <button onClick={handlePdf} disabled={generating} className="inline-flex items-center gap-1.5 h-9 px-3 rounded-md bg-primary text-primary-foreground text-sm font-medium hover:opacity-90 disabled:opacity-50"><Download className="w-3.5 h-3.5" /> {generating ? "Generating…" : "PDF"}</button>
+          <button onClick={handleSave} disabled={generating} className="inline-flex items-center gap-1.5 h-9 px-3 rounded-md border border-border text-sm font-medium hover:bg-muted disabled:opacity-50"><Save className="w-3.5 h-3.5" /> Save to vehicle</button>
+          <button onClick={handlePublish} className="inline-flex items-center gap-1.5 h-9 px-3 rounded-md border border-border text-sm font-medium hover:bg-muted"><Globe className="w-3.5 h-3.5" /> Publish passport</button>
         </div>
       </div>
 
@@ -192,7 +212,16 @@ const StickerStudioGenerator = () => {
 
         {/* Live preview */}
         <div className="lg:col-span-3">
-          <p className="text-[11px] font-semibold uppercase tracking-label text-muted-foreground mb-2 no-print">Live preview — {cfg.size}</p>
+          <div className="flex items-center justify-between mb-2 no-print">
+            <p className="text-[11px] font-semibold uppercase tracking-label text-muted-foreground">Live preview — {cfg.size}</p>
+            <div className="inline-flex items-center gap-0.5 rounded-md border border-border bg-card p-0.5">
+              {(["fit", "50", "75", "100"] as const).map((z) => (
+                <button key={z} onClick={() => setZoomPreset(z)} className={`px-2 h-7 rounded text-[11px] font-semibold transition-colors ${zoomPreset === z ? "bg-blue-600 text-white" : "text-muted-foreground hover:text-foreground"}`}>
+                  {z === "fit" ? "Fit" : `${z}%`}
+                </button>
+              ))}
+            </div>
+          </div>
           <div className="flex justify-center rounded-2xl border border-border bg-slate-100 p-4 overflow-auto">
             <TemplateRenderer template={template} data={data} branding={branding} scale={previewScale} capture={sheetRef} />
           </div>
