@@ -43,6 +43,7 @@ import {
   Building2,
   ExternalLink,
   Lock,
+  LayoutTemplate,
 } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
 import { useAuth } from "@/contexts/AuthContext";
@@ -206,6 +207,7 @@ const AppShell = ({ children }: AppShellProps) => {
         { label: "Platform Audit",     path: "/platform-admin?tab=audit",        icon: ShieldCheck, requireAdmin: true },
         { label: "Recall Refresh",     path: "/platform-admin?tab=recalls",      icon: RefreshCw,   requireAdmin: true },
         { label: "Billing Handshake",  path: "/platform-admin?tab=billing",      icon: CreditCard,  requireAdmin: true },
+        { label: "Sticker Templates",  path: "/platform-admin?tab=templates",    icon: LayoutTemplate, requireAdmin: true },
       ],
     },
   };

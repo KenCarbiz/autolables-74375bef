@@ -8,7 +8,8 @@ import PlatformAudit from "@/components/admin/PlatformAudit";
 import RecallRefreshTool from "@/components/admin/RecallRefreshTool";
 import BillingHandshakeDiagnostic from "@/components/admin/BillingHandshakeDiagnostic";
 import StripeConfigPanel from "@/components/admin/StripeConfigPanel";
-import { Store, Users, Award, ShieldCheck, RefreshCw, CreditCard, KeyRound } from "lucide-react";
+import StickerTemplatesAdminPanel from "@/components/admin/StickerTemplatesAdminPanel";
+import { Store, Users, Award, ShieldCheck, RefreshCw, CreditCard, KeyRound, LayoutTemplate } from "lucide-react";
 
 // ──────────────────────────────────────────────────────────────
 // PlatformAdmin — cross-tenant surfaces (Tenants, Members,
@@ -20,8 +21,8 @@ import { Store, Users, Award, ShieldCheck, RefreshCw, CreditCard, KeyRound } fro
 // whole route on isAdmin = true.
 // ──────────────────────────────────────────────────────────────
 
-type PlatformTab = "tenants" | "members" | "entitlements" | "audit" | "recalls" | "billing" | "stripe";
-const VALID: PlatformTab[] = ["tenants", "members", "entitlements", "audit", "recalls", "billing", "stripe"];
+type PlatformTab = "tenants" | "members" | "entitlements" | "audit" | "recalls" | "billing" | "stripe" | "templates";
+const VALID: PlatformTab[] = ["tenants", "members", "entitlements", "audit", "recalls", "billing", "stripe", "templates"];
 
 const TABS: { id: PlatformTab; label: string; icon: typeof Store }[] = [
   { id: "tenants",      label: "Tenants",      icon: Store },
@@ -31,6 +32,7 @@ const TABS: { id: PlatformTab; label: string; icon: typeof Store }[] = [
   { id: "recalls",      label: "Recall refresh", icon: RefreshCw },
   { id: "billing",      label: "Billing handshake", icon: CreditCard },
   { id: "stripe",       label: "Stripe config", icon: KeyRound },
+  { id: "templates",    label: "Sticker templates", icon: LayoutTemplate },
 ];
 
 const PlatformAdmin = () => {
@@ -80,6 +82,7 @@ const PlatformAdmin = () => {
         {tab === "recalls"      && <RecallRefreshTool />}
         {tab === "billing"      && <BillingHandshakeDiagnostic />}
         {tab === "stripe"       && <StripeConfigPanel />}
+        {tab === "templates"    && <StickerTemplatesAdminPanel />}
       </div>
     </div>
   );
