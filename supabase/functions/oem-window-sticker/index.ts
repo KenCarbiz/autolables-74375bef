@@ -109,8 +109,11 @@ Deno.serve(async (req) => {
   });
   if (up.error) return json(200, { ok: false, error: "storage_failed", detail: up.error.message, provider });
 
-  const { data: pub } = admin.storage.from("oem-stickers").getPublicUrl(path);
-  const stickerUrl = pub.publicUrl;
+  const { data: signed, error: signErr } = await admin.storage.from("oem-stickers")
+    .createSignedUrl(path, 60 * 60 * 24 * 365 * 5); // 5 years
+  if (signErr || !signed?.signedUrl) return json(200, { ok: false, error: "sign_failed", detail: signErr?.message, provider });
+  const stickerUrl = signed.signedUrl;
+
 
   // Persist on the listing (best-effort; columns may not be migrated yet).
   try {
