@@ -73,9 +73,11 @@ serve(async (req) => {
       .from("tenant_members")
       .select("tenant_id, role")
       .eq("user_id", user.id)
+      .not("accepted_at", "is", null)
       .order("role", { ascending: true })
       .limit(1)
       .maybeSingle();
+
 
     if (!membership) {
       return json({ error: "no tenant" }, 404);
