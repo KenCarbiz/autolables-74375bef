@@ -73,6 +73,7 @@ const VehiclePortal = lazy(() => import("./pages/VehiclePortal"));
 const UsedCarSticker = lazy(() => import("./pages/UsedCarSticker"));
 const StickerStudio = lazy(() => import("./pages/StickerStudio"));
 const StickerStudioGenerator = lazy(() => import("./pages/StickerStudioGenerator"));
+const StickerPrint = lazy(() => import("./pages/StickerPrint"));
 const NewCarSticker = lazy(() => import("./pages/NewCarSticker"));
 const CpoSheet = lazy(() => import("./pages/CpoSheet"));
 const DescriptionWriter = lazy(() => import("./pages/DescriptionWriter"));
@@ -167,6 +168,9 @@ const App = () => (
                       <Route path="/about" element={<About />} />
                       <Route path="/trust" element={<Trust />} />
                       <Route path="/brand" element={<BrandGuide />} />
+                      {/* Chrome-free print surface — opened in a new tab by the
+                          Sticker Studio generator for vector print-to-PDF. */}
+                      <Route path="/print/sticker/:templateId" element={<StickerPrint />} />
 
                       {/* Gated layout — one AppShell shared across every
                           dealer route. Only <Outlet /> swaps on navigation,

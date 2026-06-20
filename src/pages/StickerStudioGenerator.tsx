@@ -87,7 +87,17 @@ const StickerStudioGenerator = () => {
     return canvas;
   };
 
-  const handlePrint = () => window.print();
+  // Vector print-to-PDF: hand the resolved template + data to the chrome-free
+  // /print route in a new tab, where the browser renders the real template at
+  // true paper size and its native print dialog saves a pixel-perfect PDF.
+  const handlePrint = () => {
+    try {
+      const key = `sticker-print-${crypto.randomUUID()}`;
+      localStorage.setItem(key, JSON.stringify({ config: cfg, data, branding }));
+      const w = window.open(`/print/sticker/${cfg.id}?h=${key}`, "_blank", "noopener");
+      if (!w) toast.error("Allow pop-ups to open the print view");
+    } catch { toast.error("Couldn't open print view"); }
+  };
 
   const handlePdf = async () => {
     setGenerating(true);
@@ -159,7 +169,7 @@ const StickerStudioGenerator = () => {
           <p className="text-xs text-muted-foreground">{cfg.size} · {cfg.type === "window" ? "Window sticker" : "Addendum sticker"}</p>
         </div>
         <div className="flex gap-2 no-print flex-wrap">
-          <button onClick={handlePrint} className="inline-flex items-center gap-1.5 h-9 px-3 rounded-md border border-border text-sm font-medium hover:bg-muted"><Printer className="w-3.5 h-3.5" /> Print</button>
+          <button onClick={handlePrint} title="Open a print-perfect, vector PDF in a new tab" className="inline-flex items-center gap-1.5 h-9 px-3 rounded-md border border-border text-sm font-medium hover:bg-muted"><Printer className="w-3.5 h-3.5" /> Print / PDF</button>
           <button onClick={handlePng} disabled={generating} className="inline-flex items-center gap-1.5 h-9 px-3 rounded-md border border-border text-sm font-medium hover:bg-muted disabled:opacity-50"><ImageIcon className="w-3.5 h-3.5" /> PNG</button>
           <button onClick={handlePdf} disabled={generating} className="inline-flex items-center gap-1.5 h-9 px-3 rounded-md bg-primary text-primary-foreground text-sm font-medium hover:opacity-90 disabled:opacity-50"><Download className="w-3.5 h-3.5" /> {generating ? "Generating…" : "PDF"}</button>
           <button onClick={handleSave} disabled={generating} className="inline-flex items-center gap-1.5 h-9 px-3 rounded-md border border-border text-sm font-medium hover:bg-muted disabled:opacity-50"><Save className="w-3.5 h-3.5" /> Save to vehicle</button>
