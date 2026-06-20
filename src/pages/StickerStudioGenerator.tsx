@@ -5,6 +5,7 @@ import { useTenant } from "@/contexts/TenantContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { useDealerDocumentRules } from "@/lib/documentRules";
 import { transitionDocument } from "@/lib/stickerStudio/documentWorkflow";
+import { ensureQrCode } from "@/lib/stickerStudio/qrTracking";
 import { useVehiclePrefill } from "@/lib/vehiclePrefill";
 import { getStudioTemplate, TemplateRenderer, type StickerData, type StickerLineItem, type StickerRenderOptions, type LabelMode } from "@/lib/stickerStudio/templates";
 import { useStickerCatalog } from "@/lib/stickerStudio/useStickerCatalog";
@@ -104,6 +105,24 @@ const StickerStudioGenerator = () => {
     });
     seededDefaults.current = true;
   }, [customization]);
+
+  // Point the sticker QR at the trackable /q/:token redirect (falls back to the
+  // direct passport URL if QR tracking isn't available). Honors the dealer rule.
+  const qrEnsured = useRef(false);
+  const stickerType = template?.config.type;
+  useEffect(() => {
+    if (qrEnsured.current || !rules.trackQrScans || !stickerType) return;
+    const v = prefill.vehicle;
+    if (!v?.id || !tenant?.id) return;
+    qrEnsured.current = true;
+    const origin = typeof window !== "undefined" ? window.location.origin : "";
+    const destination = v.slug ? `${origin}/v/${v.slug}` : v.vin ? `${origin}/vehicle/${v.vin}` : "";
+    if (!destination) return;
+    (async () => {
+      const tracked = await ensureQrCode({ tenantId: tenant.id, vehicleId: v.id, stickerType, destinationUrl: destination });
+      if (tracked) setData((prev) => ({ ...prev, qrUrl: tracked }));
+    })();
+  }, [prefill.vehicle, tenant?.id, rules.trackQrScans, stickerType]);
 
   if (!template) {
     return (

@@ -44,6 +44,7 @@ import {
   ExternalLink,
   Lock,
   LayoutTemplate,
+  QrCode,
 } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
 import { useAuth } from "@/contexts/AuthContext";
@@ -193,6 +194,7 @@ const AppShell = ({ children }: AppShellProps) => {
         { label: "Programs", path: "/admin?tab=programs", icon: Award, requireManager: true },
         { label: "Team", path: "/admin?tab=team", icon: Users, requireManager: true },
         { label: "Reports", path: "/admin?tab=analytics", icon: BarChart3, featureKey: "feature_analytics", requireManager: true },
+        { label: "QR Analytics", path: "/dashboard/qr-analytics", icon: QrCode, requireManager: true },
         { label: "Leads", path: "/admin?tab=leads", icon: Users, featureKey: "feature_lead_capture", requireManager: true },
         { label: "Feature Toggles", path: "/admin?tab=settings", icon: ToggleLeft, requireManager: true },
       ],

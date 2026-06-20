@@ -76,6 +76,8 @@ const StickerStudioGenerator = lazy(() => import("./pages/StickerStudioGenerator
 const StickerStudioCustomize = lazy(() => import("./pages/StickerStudioCustomize"));
 const StickerPrint = lazy(() => import("./pages/StickerPrint"));
 const StickerTestLabel = lazy(() => import("./pages/StickerTestLabel"));
+const QrRedirect = lazy(() => import("./pages/QrRedirect"));
+const QrAnalytics = lazy(() => import("./pages/QrAnalytics"));
 const NewCarSticker = lazy(() => import("./pages/NewCarSticker"));
 const CpoSheet = lazy(() => import("./pages/CpoSheet"));
 const DescriptionWriter = lazy(() => import("./pages/DescriptionWriter"));
@@ -174,6 +176,7 @@ const App = () => (
                           Sticker Studio generator for vector print-to-PDF. */}
                       <Route path="/print/sticker/:templateId" element={<StickerPrint />} />
                       <Route path="/print/test-label" element={<StickerTestLabel />} />
+                      <Route path="/q/:token" element={<QrRedirect />} />
 
                       {/* Gated layout — one AppShell shared across every
                           dealer route. Only <Outlet /> swaps on navigation,
@@ -190,6 +193,7 @@ const App = () => (
                             recent signings. /inventory still renders
                             the inventory list directly. */}
                         <Route path="/dashboard" element={<ProcessDashboard />} />
+                        <Route path="/dashboard/qr-analytics" element={<QrAnalytics />} />
                         {/* Wave 21 — Lot Capture Queue: the
                             polished V2 surface for FlowTile #1.
                             /scan still opens the mobile scanner

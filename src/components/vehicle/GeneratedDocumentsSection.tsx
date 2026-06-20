@@ -1,11 +1,12 @@
 import { useAuth } from "@/contexts/AuthContext";
 import { useDealerDocumentRules } from "@/lib/documentRules";
 import { useVehicleDocuments } from "@/lib/stickerStudio/useVehicleDocuments";
+import { useVehicleQrScans } from "@/lib/stickerStudio/useQrAnalytics";
 import {
   transitionDocument, STATUS_META, allowedActions,
   type GeneratedDocument, type DocumentAction, type DocumentStatus,
 } from "@/lib/stickerStudio/documentWorkflow";
-import { FileText, ExternalLink, Printer, Send, Check, X, Globe, Archive, Layers, RefreshCw } from "lucide-react";
+import { FileText, ExternalLink, Printer, Send, Check, X, Globe, Archive, Layers, RefreshCw, QrCode } from "lucide-react";
 import { toast } from "sonner";
 
 // Generated-documents manager for the Vehicle File. Lists every sticker /
@@ -41,6 +42,7 @@ export default function GeneratedDocumentsSection({ vehicleId }: { vehicleId: st
   const manager = isAdmin; // managers/admins approve, publish, override; sales generate + submit + print
   const rules = useDealerDocumentRules();
   const { documents, loading, available, reload } = useVehicleDocuments(vehicleId);
+  const scans = useVehicleQrScans(vehicleId);
 
   // Apply dealer document rules on top of the role-based action set.
   const gatedActions = (status: DocumentStatus): DocumentAction[] =>
@@ -94,7 +96,14 @@ export default function GeneratedDocumentsSection({ vehicleId }: { vehicleId: st
     <div className="space-y-2">
       <div className="flex items-center justify-between">
         <h3 className="text-sm font-bold text-foreground">Generated documents</h3>
-        <button onClick={reload} className="text-[11px] font-semibold text-muted-foreground hover:text-foreground inline-flex items-center gap-1"><RefreshCw className="w-3 h-3" /> Refresh</button>
+        <div className="flex items-center gap-3">
+          {scans.count > 0 && (
+            <span className="text-[11px] text-muted-foreground inline-flex items-center gap-1" title={scans.last ? `Last scan ${new Date(scans.last).toLocaleString()}` : undefined}>
+              <QrCode className="w-3 h-3" /> {scans.count} QR {scans.count === 1 ? "scan" : "scans"}
+            </span>
+          )}
+          <button onClick={reload} className="text-[11px] font-semibold text-muted-foreground hover:text-foreground inline-flex items-center gap-1"><RefreshCw className="w-3 h-3" /> Refresh</button>
+        </div>
       </div>
       <div className="space-y-2">
         {documents.map((doc) => {
