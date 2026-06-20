@@ -2,6 +2,9 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useDealerSettings } from "@/contexts/DealerSettingsContext";
 import { useTenant } from "@/contexts/TenantContext";
+import { useAuth } from "@/contexts/AuthContext";
+import { useDealerDocumentRules } from "@/lib/documentRules";
+import { transitionDocument } from "@/lib/stickerStudio/documentWorkflow";
 import { useVehiclePrefill } from "@/lib/vehiclePrefill";
 import { getStudioTemplate, TemplateRenderer, type StickerData, type StickerLineItem, type StickerRenderOptions, type LabelMode } from "@/lib/stickerStudio/templates";
 import { useStickerCatalog } from "@/lib/stickerStudio/useStickerCatalog";
@@ -23,6 +26,8 @@ const StickerStudioGenerator = () => {
   const baseTemplate = byId(templateId) || getStudioTemplate(templateId);
   const { settings } = useDealerSettings();
   const { tenant } = useTenant();
+  const { user } = useAuth();
+  const rules = useDealerDocumentRules();
   const { customization } = useTemplateCustomization(templateId);
   // Apply order: built-in base -> DB config (already in baseTemplate) -> dealer
   // customization. Vehicle data + UI toggles layer on below.
@@ -179,7 +184,14 @@ const StickerStudioGenerator = () => {
         snapshot: { config: cfg, data, branding, options },
       });
       if (r.ok) {
-        if (r.version) setSavedDoc({ version: r.version, status: "draft" });
+        // Dealer rule: auto-submit a freshly generated doc for manager approval.
+        if (rules.autoSubmitForApproval && r.documentId) {
+          await transitionDocument({
+            doc: { id: r.documentId, tenant_id: tenant?.id || null, vehicle_id: prefill.vehicle?.id || null, template_id: cfg.id, document_type: cfg.type, document_status: "draft", version: r.version || 1 },
+            action: "submit", actorId: user?.id,
+          });
+          setSavedDoc({ version: r.version, status: "pending_approval" });
+        } else if (r.version) setSavedDoc({ version: r.version, status: "draft" });
         toast.success(r.version ? `Saved to vehicle file (v${r.version})` : "Saved to vehicle file");
         // Persist structured addendum state alongside, when this is an addendum.
         if (cfg.type === "addendum" && prefill.vehicle?.id) {

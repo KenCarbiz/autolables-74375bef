@@ -18,6 +18,7 @@ import { toast } from "sonner";
 import { AccessoryInstallPanel } from "@/components/admin/AccessoryInstallPanel";
 import DealerProgramsPanel from "@/components/admin/DealerProgramsPanel";
 import PrintSettingsPanel from "@/components/admin/PrintSettingsPanel";
+import DocumentRulesPanel from "@/components/admin/DocumentRulesPanel";
 import { GetReadySheet } from "@/components/admin/GetReadySheet";
 import type { GetReadyRecord } from "@/hooks/useGetReady";
 import { EmailDistributionPanel } from "@/components/admin/EmailDistributionPanel";
@@ -100,7 +101,7 @@ interface Product {
   icon_type?: string;
 }
 
-type AdminTab = "home" | "products" | "rules" | "settings" | "branding" | "programs" | "analytics" | "leads" | "funnel" | "audit" | "queue" | "files" | "getready" | "inventory" | "invoices" | "warranty" | "team" | "print-settings";
+type AdminTab = "home" | "products" | "rules" | "settings" | "branding" | "programs" | "analytics" | "leads" | "funnel" | "audit" | "queue" | "files" | "getready" | "inventory" | "invoices" | "warranty" | "team" | "print-settings" | "document-rules";
 
 const emptyProduct = {
   name: "",
@@ -177,7 +178,7 @@ const FEATURE_TOGGLES: { key: keyof DealerSettings; label: string; description: 
   { key: "feature_ai_descriptions", label: "AI Descriptions", description: "Generate vehicle descriptions automatically", status: "coming_soon" },
 ];
 
-const VALID_TABS: AdminTab[] = ["home", "products", "rules", "settings", "branding", "programs", "analytics", "leads", "funnel", "audit", "queue", "files", "getready", "inventory", "invoices", "warranty", "team", "print-settings"];
+const VALID_TABS: AdminTab[] = ["home", "products", "rules", "settings", "branding", "programs", "analytics", "leads", "funnel", "audit", "queue", "files", "getready", "inventory", "invoices", "warranty", "team", "print-settings", "document-rules"];
 
 const Admin = () => {
   const queryClient = useQueryClient();
@@ -545,6 +546,7 @@ const Admin = () => {
     { id: "funnel", label: "Signing Funnel" },
     { id: "queue", label: "Print Queue" },
     { id: "print-settings", label: "Print Settings" },
+    { id: "document-rules", label: "Document Rules" },
     { id: "getready", label: "Get-Ready" },
     ...(settings.feature_inventory ? [{ id: "inventory" as const, label: "Inventory" }] : []),
     ...(settings.feature_invoicing ? [{ id: "invoices" as const, label: "Invoices" }] : []),
@@ -596,7 +598,7 @@ const Admin = () => {
             { id: "team", label: "Team", ids: ["team"] },
             { id: "reports", label: "Reports", ids: ["analytics", "leads", "funnel"] },
             { id: "compliance", label: "Compliance", ids: ["audit", "files"] },
-            { id: "advanced", label: "Advanced", ids: ["settings", "queue", "print-settings", "getready", "inventory", "invoices", "warranty"] },
+            { id: "advanced", label: "Advanced", ids: ["settings", "queue", "print-settings", "document-rules", "getready", "inventory", "invoices", "warranty"] },
           ];
           const groups = groupDefs
             .map((g) => ({ ...g, ids: g.ids.filter((id) => availIds.has(id)) }))
@@ -2525,6 +2527,8 @@ const Admin = () => {
         {tab === "team" && <TeamPanel />}
 
         {tab === "print-settings" && <PrintSettingsPanel />}
+
+        {tab === "document-rules" && <DocumentRulesPanel />}
 
         {tab === "audit" && (
           <div className="space-y-4">

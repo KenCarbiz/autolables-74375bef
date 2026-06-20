@@ -5,6 +5,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useTenant } from "@/contexts/TenantContext";
 import { mapAutocurbProfile } from "@/lib/autocurbProfile";
 import type { DealerProgram } from "@/lib/dealerPrograms";
+import type { DocumentRules } from "@/lib/documentRules";
 
 // A configurable internal recon/service the dealer routes to a responsible
 // party. Non-customer charge — tracked as the store's own cost.
@@ -183,6 +184,9 @@ export interface DealerSettings {
   // Compliance
   cars_act_mode: boolean;
   retention_years: number;
+  // Document workflow rules (approval / stale / packet / passport). Stored as
+  // a nested blob; resolved with defaults via getDealerDocumentRules().
+  document_rules?: Partial<DocumentRules>;
   required_languages: string[];
   // Privacy notice (dealer uploads their own)
   privacy_notice_enabled: boolean;

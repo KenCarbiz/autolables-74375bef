@@ -1,4 +1,5 @@
 import { useAuth } from "@/contexts/AuthContext";
+import { useDealerDocumentRules } from "@/lib/documentRules";
 import { useVehicleDocuments } from "@/lib/stickerStudio/useVehicleDocuments";
 import {
   transitionDocument, STATUS_META, allowedActions,
@@ -38,7 +39,16 @@ const ACTION_META: Record<DocumentAction, { label: string; icon: typeof Check }>
 export default function GeneratedDocumentsSection({ vehicleId }: { vehicleId: string }) {
   const { user, isAdmin } = useAuth();
   const manager = isAdmin; // managers/admins approve, publish, override; sales generate + submit + print
+  const rules = useDealerDocumentRules();
   const { documents, loading, available, reload } = useVehicleDocuments(vehicleId);
+
+  // Apply dealer document rules on top of the role-based action set.
+  const gatedActions = (status: DocumentStatus): DocumentAction[] =>
+    allowedActions(status, manager).filter((a) => {
+      if (a === "mark_printed" && !manager && !rules.allowSalesPrintApproved) return false;
+      if (a === "publish" && !manager && rules.requireApprovalBeforePublish) return false;
+      return true;
+    });
 
   if (loading) return <p className="text-xs text-muted-foreground">Loading documents…</p>;
   if (!available) {
@@ -89,7 +99,7 @@ export default function GeneratedDocumentsSection({ vehicleId }: { vehicleId: st
       <div className="space-y-2">
         {documents.map((doc) => {
           const meta = STATUS_META[doc.document_status as DocumentStatus] || STATUS_META.draft;
-          const actions = allowedActions(doc.document_status as DocumentStatus, manager);
+          const actions = gatedActions(doc.document_status as DocumentStatus);
           return (
             <div key={doc.id} className="rounded-xl border border-border bg-card p-3">
               <div className="flex items-start justify-between gap-3 flex-wrap">
