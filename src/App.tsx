@@ -79,6 +79,7 @@ const StickerTestLabel = lazy(() => import("./pages/StickerTestLabel"));
 const QrRedirect = lazy(() => import("./pages/QrRedirect"));
 const QrAnalytics = lazy(() => import("./pages/QrAnalytics"));
 const Reports = lazy(() => import("./pages/Reports"));
+const DocumentReview = lazy(() => import("./pages/DocumentReview"));
 const NewCarSticker = lazy(() => import("./pages/NewCarSticker"));
 const CpoSheet = lazy(() => import("./pages/CpoSheet"));
 const DescriptionWriter = lazy(() => import("./pages/DescriptionWriter"));
@@ -196,6 +197,7 @@ const App = () => (
                         <Route path="/dashboard" element={<ProcessDashboard />} />
                         <Route path="/dashboard/qr-analytics" element={<QrAnalytics />} />
                         <Route path="/dashboard/reports" element={<Reports />} />
+                        <Route path="/dashboard/document-review" element={<DocumentReview />} />
                         {/* Wave 21 — Lot Capture Queue: the
                             polished V2 surface for FlowTile #1.
                             /scan still opens the mobile scanner

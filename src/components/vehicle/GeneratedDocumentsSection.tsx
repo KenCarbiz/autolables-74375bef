@@ -1,7 +1,12 @@
 import { useAuth } from "@/contexts/AuthContext";
 import { useDealerDocumentRules } from "@/lib/documentRules";
+import { useEffect } from "react";
 import { useVehicleDocuments } from "@/lib/stickerStudio/useVehicleDocuments";
 import { useVehicleQrScans } from "@/lib/stickerStudio/useQrAnalytics";
+import { useVehicleStaleFlags } from "@/lib/stickerStudio/useStaleFlags";
+import { reconcileVehicleStale } from "@/lib/stickerStudio/staleDetection";
+import { useTenant } from "@/contexts/TenantContext";
+import { AlertTriangle } from "lucide-react";
 import {
   transitionDocument, STATUS_META, allowedActions,
   type GeneratedDocument, type DocumentAction, type DocumentStatus,
@@ -43,6 +48,16 @@ export default function GeneratedDocumentsSection({ vehicleId }: { vehicleId: st
   const rules = useDealerDocumentRules();
   const { documents, loading, available, reload } = useVehicleDocuments(vehicleId);
   const scans = useVehicleQrScans(vehicleId);
+  const { tenant } = useTenant();
+  const { flags: staleFlags, reload: reloadStale } = useVehicleStaleFlags(vehicleId);
+
+  // Re-check this vehicle's live data against its printed/published stickers.
+  useEffect(() => {
+    if (!vehicleId || !tenant?.id) return;
+    let done = false;
+    (async () => { await reconcileVehicleStale(vehicleId, tenant.id, rules); if (!done) reloadStale(); })();
+    return () => { done = true; };
+  }, [vehicleId, tenant?.id, rules, reloadStale]);
 
   // Apply dealer document rules on top of the role-based action set.
   const gatedActions = (status: DocumentStatus): DocumentAction[] =>
@@ -105,6 +120,19 @@ export default function GeneratedDocumentsSection({ vehicleId }: { vehicleId: st
           <button onClick={reload} className="text-[11px] font-semibold text-muted-foreground hover:text-foreground inline-flex items-center gap-1"><RefreshCw className="w-3 h-3" /> Refresh</button>
         </div>
       </div>
+
+      {staleFlags.length > 0 && (
+        <div className="rounded-xl border border-amber-200 bg-amber-50 p-3">
+          <p className="text-[11px] font-bold uppercase tracking-wide text-amber-700 inline-flex items-center gap-1.5"><AlertTriangle className="w-3.5 h-3.5" /> {staleFlags.length} document {staleFlags.length === 1 ? "issue" : "issues"} need review</p>
+          <ul className="mt-1 space-y-0.5">
+            {staleFlags.slice(0, 4).map((f) => (
+              <li key={f.id} className="text-[11px] text-amber-800">· {f.reason} <span className="opacity-70">(was {String(f.old_value)}, now {String(f.new_value)})</span></li>
+            ))}
+          </ul>
+          <p className="mt-1 text-[10px] text-amber-700">Regenerate the sticker from the current data, or resolve in the Document Review queue.</p>
+        </div>
+      )}
+
       <div className="space-y-2">
         {documents.map((doc) => {
           const meta = STATUS_META[doc.document_status as DocumentStatus] || STATUS_META.draft;
