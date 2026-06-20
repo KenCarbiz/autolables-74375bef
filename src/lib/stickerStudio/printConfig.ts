@@ -24,9 +24,13 @@ export const PAPER: Record<StickerType, PaperSpec> = {
 
 export interface PrintCalibration {
   labelMode: LabelMode;
-  xOffsetIn: number;     // shift right (+) / left (-) to align with pre-cut stock
-  yOffsetIn: number;     // shift down (+) / up (-)
-  scalePct: number;      // fine scale for printer over/under-scan (95–105 typical)
+  xOffsetIn: number;       // shift right (+) / left (-) to align with pre-cut stock
+  yOffsetIn: number;       // shift down (+) / up (-)
+  scalePct: number;        // fine scale for printer over/under-scan (95–105 typical)
+  topSafeMarginIn: number; // safe-area inset from top
+  leftSafeMarginIn: number;// safe-area inset from left/right
+  showCropMarks: boolean;  // print corner + center registration marks
+  showSafeArea: boolean;   // print the dashed safe-area guide
   printerName?: string;
 }
 
@@ -35,17 +39,26 @@ export const DEFAULT_CALIBRATION: PrintCalibration = {
   xOffsetIn: 0,
   yOffsetIn: 0,
   scalePct: 100,
+  topSafeMarginIn: 0.25,
+  leftSafeMarginIn: 0.25,
+  showCropMarks: false,
+  showSafeArea: false,
 };
 
 // Clamp calibration to sane bounds so a bad stored value can't push the sheet
 // off the page or invert it.
 export function normalizeCalibration(c: Partial<PrintCalibration> | null | undefined): PrintCalibration {
-  const clamp = (n: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, Number.isFinite(n) ? n : 0));
+  const clamp = (n: number | undefined, lo: number, hi: number, fb: number) =>
+    Math.min(hi, Math.max(lo, Number.isFinite(n as number) ? (n as number) : fb));
   return {
     labelMode: c?.labelMode === "black" ? "black" : "white",
-    xOffsetIn: clamp(c?.xOffsetIn ?? 0, -1, 1),
-    yOffsetIn: clamp(c?.yOffsetIn ?? 0, -1, 1),
-    scalePct: clamp(c?.scalePct ?? 100, 80, 120),
+    xOffsetIn: clamp(c?.xOffsetIn, -1, 1, 0),
+    yOffsetIn: clamp(c?.yOffsetIn, -1, 1, 0),
+    scalePct: clamp(c?.scalePct, 80, 120, 100),
+    topSafeMarginIn: clamp(c?.topSafeMarginIn, 0, 2, 0.25),
+    leftSafeMarginIn: clamp(c?.leftSafeMarginIn, 0, 2, 0.25),
+    showCropMarks: !!c?.showCropMarks,
+    showSafeArea: !!c?.showSafeArea,
     printerName: c?.printerName,
   };
 }

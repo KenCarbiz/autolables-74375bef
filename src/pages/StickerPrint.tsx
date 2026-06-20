@@ -4,7 +4,8 @@ import {
   templateFromConfig, TemplateRenderer,
   type StickerData, type StickerBranding, type StickerTemplateConfig, type StickerRenderOptions,
 } from "@/lib/stickerStudio/templates";
-import { buildPrintCss, normalizeCalibration, type PrintCalibration } from "@/lib/stickerStudio/printConfig";
+import { buildPrintCss, normalizeCalibration, PAPER, type PrintCalibration } from "@/lib/stickerStudio/printConfig";
+import { PrintGuides } from "@/lib/stickerStudio/PrintGuides";
 
 // Chrome-free, public print surface for a sticker. The generator stashes the
 // resolved template config + data + branding in localStorage under a one-time
@@ -68,11 +69,14 @@ const StickerPrint = () => {
     );
   }
   if (!template || !payload) return null;
+  const cal = normalizeCalibration(payload.calibration);
+  const paper = PAPER[payload.config.type];
 
   return (
     <div className="min-h-screen bg-white flex items-start justify-center p-0">
-      <div className="sticker-print-sheet">
+      <div className="sticker-print-sheet" style={{ position: "relative", width: `${paper.widthIn}in`, height: `${paper.heightIn}in` }}>
         <TemplateRenderer template={template} data={payload.data} branding={payload.branding} scale={1} options={payload.options} />
+        <PrintGuides widthIn={paper.widthIn} heightIn={paper.heightIn} cal={cal} />
       </div>
     </div>
   );
