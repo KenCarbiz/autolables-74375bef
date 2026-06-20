@@ -17,6 +17,7 @@ import { formatPhone, composeName } from "@/components/addendum/CustomerInfoSect
 import EmptyState from "@/components/ui/empty-state";
 import { InstallProofList } from "@/components/admin/InstallProofList";
 import { useVehicleSpecs } from "@/hooks/useVehicleSpecs";
+import { useOemSticker } from "@/hooks/useOemSticker";
 import { PACKET_MODULES, packetVisible } from "@/lib/packetModules";
 
 // ──────────────────────────────────────────────────────────────
@@ -73,6 +74,7 @@ interface VehicleRow {
   photos: string[] | null;
   mc_attributes: Record<string, unknown> | null;
   packet_modules: Record<string, boolean> | null;
+  oem_sticker_url: string | null;
   recall_status: string | null;
   recall_checked_at: string | null;
   open_recall_count: number | null;
@@ -478,6 +480,12 @@ const OverviewPanel = ({ vehicle, onTab }: { vehicle: VehicleRow; onTab: (t: Tab
   const [loadingEvents, setLoadingEvents] = useState(true);
   const { fetchSpecs, loading: pullingSpecs } = useVehicleSpecs();
   const [pulledOptions, setPulledOptions] = useState<string[]>([]);
+  const { fetchSticker, loading: pullingSticker } = useOemSticker();
+  const [oemStickerUrl, setOemStickerUrl] = useState<string | null>(vehicle.oem_sticker_url);
+  const handlePullSticker = async () => {
+    const url = await fetchSticker({ vin: vehicle.vin, tenantId: vehicle.tenant_id, vehicleId: vehicle.id });
+    if (url) setOemStickerUrl(url);
+  };
 
   useEffect(() => {
     let cancelled = false;
@@ -698,6 +706,34 @@ const OverviewPanel = ({ vehicle, onTab }: { vehicle: VehicleRow; onTab: (t: Tab
               <button onClick={() => onTab("labels")} className="text-[11px] font-semibold text-blue-600 hover:underline">Use on window sticker →</button>
             )}
           </div>
+        </Card>
+
+        {/* OEM window sticker — pull the original factory Monroney by VIN */}
+        <Card title="OEM Window Sticker">
+          {oemStickerUrl ? (
+            <a href={oemStickerUrl} target="_blank" rel="noreferrer" className="block rounded-lg border border-border overflow-hidden hover:border-primary transition">
+              {/\.pdf($|\?)/i.test(oemStickerUrl) ? (
+                <div className="p-4 text-center">
+                  <FileText className="w-7 h-7 text-slate-400 mx-auto mb-1.5" />
+                  <p className="text-xs font-semibold text-foreground">View factory Monroney (PDF)</p>
+                </div>
+              ) : (
+                <img src={oemStickerUrl} alt="OEM window sticker" className="w-full h-auto" loading="lazy" />
+              )}
+            </a>
+          ) : (
+            <p className="text-sm text-muted-foreground">
+              Pull the original OEM window sticker by VIN to attach the factory Monroney label to this vehicle's packet.
+            </p>
+          )}
+          <button
+            onClick={handlePullSticker}
+            disabled={pullingSticker || !vehicle.vin}
+            className="text-[11px] font-semibold text-blue-600 hover:underline disabled:opacity-50 disabled:no-underline inline-flex items-center gap-1 mt-2.5"
+          >
+            <Sparkles className="w-3 h-3" />
+            {pullingSticker ? "Pulling…" : oemStickerUrl ? "Re-pull OEM sticker" : "Pull OEM window sticker"}
+          </button>
         </Card>
 
         {/* Recall */}

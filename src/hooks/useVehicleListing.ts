@@ -164,6 +164,10 @@ export interface VehicleListing {
   // Packet curation — per-vehicle module visibility for the public page.
   packet_modules?: Record<string, boolean> | null;
 
+  // OEM Monroney window sticker pulled by VIN + cached in the oem-stickers bucket.
+  oem_sticker_url?: string | null;
+  oem_sticker_checked_at?: string | null;
+
   prep_status: { all_accessories_installed?: boolean; foreman_signed_at?: string } | null;
   status: "draft" | "published" | "archived";
   published_at: string | null;

@@ -42,6 +42,7 @@ import PublicLanguageToggle from "@/components/layout/PublicLanguageToggle";
 import VehicleInsights from "@/components/listing/VehicleInsights";
 import MarketValueReport from "@/components/listing/MarketValueReport";
 import DealerProgramsSection from "@/components/listing/DealerProgramsSection";
+import OemSticker from "@/components/listing/OemSticker";
 import { listingOptions } from "@/lib/vehicleInsights";
 import { packetVisible } from "@/lib/packetModules";
 
@@ -314,6 +315,9 @@ const PublicListingBody = () => {
 
         {/* Key specs grid — pulls from listing.key_specs */}
         <KeySpecs listing={listing} />
+
+        {/* OEM Monroney window sticker — the original factory label */}
+        {packetVisible(listing, "oemSticker") && <OemSticker listing={listing} />}
 
         {/* Factory options & equipment — decoded from the inventory feed */}
         {packetVisible(listing, "factoryOptions") && <FactoryOptions listing={listing} />}
