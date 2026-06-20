@@ -1,6 +1,7 @@
 import { useNavigate } from "react-router-dom";
 import { useQrAnalytics } from "@/lib/stickerStudio/useQrAnalytics";
 import { QrCode, TrendingUp, Smartphone, Monitor, Tablet, ArrowLeft } from "lucide-react";
+import FeatureGate from "@/components/entitlements/FeatureGate";
 
 // Dealer QR scan analytics dashboard (/dashboard/qr-analytics). Reads
 // tenant-scoped qr_scan_events; resilient when the analytics tables aren't
@@ -20,6 +21,7 @@ const QrAnalytics = () => {
         <p className="text-xs text-muted-foreground mt-1">How shoppers are engaging with the QR codes on your printed stickers — last 30 days.</p>
       </div>
 
+      <FeatureGate feature="qr_tracking">
       {!a.available ? (
         <div className="rounded-2xl border border-dashed border-border p-8 text-center">
           <QrCode className="w-8 h-8 text-muted-foreground/40 mx-auto mb-2" />
@@ -86,6 +88,7 @@ const QrAnalytics = () => {
           </div>
         </>
       )}
+      </FeatureGate>
     </div>
   );
 };
