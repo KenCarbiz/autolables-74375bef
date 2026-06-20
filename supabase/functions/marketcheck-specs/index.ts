@@ -84,11 +84,33 @@ Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
   if (!MC_KEY) return json(200, { ok: false, error: "not_configured", note: "Set MARKETCHECK_API_KEY_1" });
 
+  const supabaseUrl = Deno.env.get("SUPABASE_URL") || "";
+  const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
+  const admin = createClient(supabaseUrl, serviceKey, { auth: { persistSession: false, autoRefreshToken: false } });
+
   const body = await req.json().catch(() => ({}));
   const vin = String(body.vin || "").toUpperCase().trim();
   const tenantId: string | null = body.tenant_id || null;
   const vehicleId: string | null = body.vehicle_id || null;
   if (!validVin(vin)) return json(400, { ok: false, error: "invalid_vin" });
+
+  // ── Auth gate: service-role bypasses; otherwise require a signed-in
+  // tenant member or platform admin for the requested tenant.
+  const auth = (req.headers.get("Authorization") || "").replace(/^Bearer\s+/i, "");
+  if (auth !== serviceKey) {
+    const { data: ures, error: uerr } = await admin.auth.getUser(auth);
+    const userId = ures?.user?.id;
+    if (uerr || !userId) return json(401, { ok: false, error: "authentication required" });
+    if (!tenantId) return json(400, { ok: false, error: "tenant_id required" });
+    const { data: isAdmin } = await admin.from("user_roles")
+      .select("role").eq("user_id", userId).eq("role", "admin").maybeSingle();
+    if (!isAdmin) {
+      const { data: membership } = await admin.from("tenant_members")
+        .select("tenant_id").eq("user_id", userId).eq("tenant_id", tenantId).maybeSingle();
+      if (!membership) return json(403, { ok: false, error: "not a member of this tenant" });
+    }
+  }
+
 
   const tried: { url: string; status: number | string }[] = [];
   // deno-lint-ignore no-explicit-any
