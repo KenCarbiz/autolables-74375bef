@@ -1038,19 +1038,13 @@ const FinalCTA = ({ onWaitlist, onDemo }: { onWaitlist: () => void; onDemo: () =
           Join the wait list.
         </h2>
         <p className="mt-5 text-lg text-white/70">Be first in line · Early-access pricing.</p>
-        <div className="mt-9 flex flex-wrap items-center justify-center gap-3">
+        <div className="mt-9 flex items-center justify-center">
           <button
             onClick={onWaitlist}
             className="inline-flex h-12 items-center gap-2 rounded-full bg-white px-6 text-sm font-semibold text-slate-950 hover:bg-white/90"
           >
             Join Wait List Opening July 1st
             <ArrowRight className="h-4 w-4" />
-          </button>
-          <button
-            onClick={onWaitlist}
-            className="inline-flex h-12 items-center gap-2 rounded-full border border-white/20 bg-white/5 px-6 text-sm font-semibold text-white hover:bg-white/10"
-          >
-            Join Wait List Opening July 1st
           </button>
         </div>
       </div>
