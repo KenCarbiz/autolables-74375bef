@@ -64,11 +64,34 @@ Deno.serve(async (req) => {
     return json(200, { ok: false, error: "not_configured", note: "Set VINAUDIT_WINDOW_STICKER_KEY or MONRONEY_LABELS_KEY" });
   }
 
+  const supabaseUrl = Deno.env.get("SUPABASE_URL") || "";
+  const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
+  const admin = createClient(supabaseUrl, serviceKey, { auth: { persistSession: false, autoRefreshToken: false } });
+
   const body = await req.json().catch(() => ({}));
   const vin = String(body.vin || "").toUpperCase().trim();
   const tenantId: string | null = body.tenant_id || null;
   const vehicleId: string | null = body.vehicle_id || null;
   if (!validVin(vin)) return json(400, { ok: false, error: "invalid_vin" });
+
+  // ── Auth gate ────────────────────────────────────────────────
+  // Service-role (cron/admin) bypasses; otherwise require a signed-in
+  // tenant member (or platform admin) for the requested tenant_id.
+  const auth = (req.headers.get("Authorization") || "").replace(/^Bearer\s+/i, "");
+  if (auth !== serviceKey) {
+    const { data: ures, error: uerr } = await admin.auth.getUser(auth);
+    const userId = ures?.user?.id;
+    if (uerr || !userId) return json(401, { ok: false, error: "authentication required" });
+    if (!tenantId) return json(400, { ok: false, error: "tenant_id required" });
+    const { data: isAdmin } = await admin.from("user_roles")
+      .select("role").eq("user_id", userId).eq("role", "admin").maybeSingle();
+    if (!isAdmin) {
+      const { data: membership } = await admin.from("tenant_members")
+        .select("tenant_id").eq("user_id", userId).eq("tenant_id", tenantId).maybeSingle();
+      if (!membership) return json(403, { ok: false, error: "not a member of this tenant" });
+    }
+  }
+
 
   let fetched: Fetched | { error: string };
   let provider = "";
@@ -77,8 +100,8 @@ Deno.serve(async (req) => {
 
   if ("error" in fetched) return json(200, { ok: false, error: fetched.error, provider });
 
-  const admin = createClient(Deno.env.get("SUPABASE_URL") || "", Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "");
   const ext = extFor(fetched.contentType);
+
   const path = `${tenantId || "house"}/${vin}.${ext}`;
   const up = await admin.storage.from("oem-stickers").upload(path, fetched.bytes, {
     contentType: fetched.contentType,
