@@ -47,6 +47,7 @@ const ProcessDashboard = lazy(() => import("./pages/ProcessDashboard"));
 const LotCaptureQueue = lazy(() => import("./pages/LotCaptureQueue"));
 const Index = lazy(() => import("./pages/Index"));
 const Landing = lazy(() => import("./pages/Landing"));
+const Waitlist = lazy(() => import("./pages/Waitlist"));
 const Login = lazy(() => import("./pages/Login"));
 const Admin = lazy(() => import("./pages/Admin"));
 const PlatformAdmin = lazy(() => import("./pages/PlatformAdmin"));
@@ -141,6 +142,7 @@ const App = () => (
                   <Routes>
                       {/* Public routes — no shell */}
                       <Route path="/" element={<Landing />} />
+                      <Route path="/waitlist" element={<Waitlist />} />
                       <Route path="/login" element={<Login />} />
                       {/* Two interchangeable customer signing experiences on
                           the same token: /sign = full single-page document

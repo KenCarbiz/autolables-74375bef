@@ -39,7 +39,7 @@ import {
 const Landing = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
-  const goWaitlist = () => navigate(user ? "/dashboard" : "/onboarding");
+  const goWaitlist = () => navigate(user ? "/dashboard" : "/waitlist");
   const goDemo = () => navigate("/onboarding?intent=demo");
 
   return (
