@@ -101,6 +101,15 @@ export async function saveStickerToVehicle(args: SaveStickerArgs): Promise<ApiRe
         .select("id, version")
         .maybeSingle();
       if (!insErr && doc) {
+        // Keep one live doc per vehicle + type: supersede prior live versions.
+        try {
+          await client.from("generated_documents")
+            .update({ document_status: "superseded" })
+            .eq("vehicle_id", args.vehicleId)
+            .eq("document_type", args.docType)
+            .neq("id", doc.id)
+            .in("document_status", ["draft", "pending_approval", "approved", "printed", "published"]);
+        } catch { /* best-effort */ }
         await logStickerAudit("sticker_generated", {
           tenantId: args.tenantId, entityType: args.docType, entityId: doc.id,
           details: { template_id: args.templateId, version: doc.version, vin: args.vin },
