@@ -6,7 +6,7 @@ import { useTenant } from "@/contexts/TenantContext";
 import { useDealerSettings } from "@/contexts/DealerSettingsContext";
 import { toast } from "sonner";
 import {
-  ArrowLeft, Car, FileText, Wrench, Tag, Signature, Globe,
+  ArrowLeft, Car, FileText, Wrench, Tag, Signature, Globe, Activity,
   CheckCircle2, Clock, Gauge, DollarSign, MapPin, Copy, ExternalLink,
   FileUp, Upload, Printer, Sparkles, Plus, ArrowUpRight,
   AlertTriangle, ShieldCheck, Lock, Unlock, Send, MessageSquare,
@@ -20,6 +20,7 @@ import { useVehicleSpecs } from "@/hooks/useVehicleSpecs";
 import { useOemSticker } from "@/hooks/useOemSticker";
 import { PACKET_MODULES, packetVisible } from "@/lib/packetModules";
 import GeneratedDocumentsSection from "@/components/vehicle/GeneratedDocumentsSection";
+import VehicleEvidenceTimeline from "@/components/vehicle/VehicleEvidenceTimeline";
 
 // ──────────────────────────────────────────────────────────────
 // VehicleFile — /vehicle-file/:id
@@ -31,7 +32,7 @@ import GeneratedDocumentsSection from "@/components/vehicle/GeneratedDocumentsSe
 // child artifact refers to it by id.
 // ──────────────────────────────────────────────────────────────
 
-type TabId = "overview" | "documents" | "scan" | "customer" | "addendum" | "prep" | "labels" | "sign";
+type TabId = "overview" | "documents" | "scan" | "customer" | "addendum" | "prep" | "labels" | "sign" | "history";
 
 interface PersonInfo {
   first_name?: string; middle_initial?: string; last_name?: string; suffix?: string;
@@ -89,7 +90,7 @@ interface VehicleRow {
 
 interface RecallItem { title?: string; component?: string; reportDate?: string; remedy?: string; status?: string; nhtsaCampaignNumber?: string; }
 
-const VALID_TABS: TabId[] = ["overview", "documents", "scan", "customer", "addendum", "prep", "labels", "sign"];
+const VALID_TABS: TabId[] = ["overview", "documents", "scan", "customer", "addendum", "prep", "labels", "sign", "history"];
 
 interface ReadyCheck { ok: boolean; label: string; when: string | null; blocks?: boolean }
 
@@ -215,6 +216,7 @@ const VehicleFile = () => {
     { id: "prep",      label: "Prep & Install", icon: Wrench },
     { id: "labels",    label: "Labels",    icon: Tag },
     { id: "sign",      label: "Customer Sign-off", icon: Signature },
+    { id: "history",   label: "History", icon: Activity },
   ];
 
   const ready = readinessSummary(vehicle);
@@ -406,6 +408,12 @@ const VehicleFile = () => {
         {tab === "prep"      && <PrepPanel vehicle={vehicle} />}
         {tab === "labels"    && <LabelsPanel vehicle={vehicle} />}
         {tab === "sign"      && <SignPanel vehicle={vehicle} />}
+        {tab === "history"   && (
+          <div className="rounded-xl border border-border bg-card p-4">
+            <h3 className="text-sm font-bold text-foreground mb-3">Evidence timeline</h3>
+            <VehicleEvidenceTimeline vehicleId={vehicle.id} vin={vehicle.vin} tenantId={vehicle.tenant_id} vehicleTitle={vehicle.ymm} />
+          </div>
+        )}
       </div>
 
       {/* Mobile sticky action bar — thumb-friendly primary actions. */}
