@@ -73,6 +73,7 @@ const VehiclePortal = lazy(() => import("./pages/VehiclePortal"));
 const UsedCarSticker = lazy(() => import("./pages/UsedCarSticker"));
 const StickerStudio = lazy(() => import("./pages/StickerStudio"));
 const StickerStudioGenerator = lazy(() => import("./pages/StickerStudioGenerator"));
+const StickerStudioCustomize = lazy(() => import("./pages/StickerStudioCustomize"));
 const StickerPrint = lazy(() => import("./pages/StickerPrint"));
 const StickerTestLabel = lazy(() => import("./pages/StickerTestLabel"));
 const NewCarSticker = lazy(() => import("./pages/NewCarSticker"));
@@ -209,6 +210,7 @@ const App = () => (
                         <Route path="/trade-up" element={<TradeUpSticker />} />
                         <Route path="/used-car-sticker" element={<UsedCarSticker />} />
                         <Route path="/sticker-studio" element={<StickerStudio />} />
+                        <Route path="/sticker-studio/customize/:templateId" element={<StickerStudioCustomize />} />
                         <Route path="/sticker-studio/:templateId" element={<StickerStudioGenerator />} />
                         <Route path="/new-car-sticker" element={<NewCarSticker />} />
                         <Route path="/cpo-sheet" element={<CpoSheet />} />

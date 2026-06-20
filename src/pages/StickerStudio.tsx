@@ -8,7 +8,7 @@ import {
 } from "@/lib/stickerStudio/templates";
 import { useStickerCatalog } from "@/lib/stickerStudio/useStickerCatalog";
 import { useStickerPrefs } from "@/lib/stickerStudio/useStickerPrefs";
-import { LayoutTemplate, Check, Star } from "lucide-react";
+import { LayoutTemplate, Check, Star, Paintbrush } from "lucide-react";
 
 // Demo data used only for the gallery thumbnails.
 const SAMPLE: StickerData = {
@@ -166,6 +166,10 @@ const StickerStudio = () => {
                   ))}
                 </div>
               </button>
+              <div className="mt-2 flex items-center gap-2 border-t border-border pt-2">
+                <button type="button" onClick={() => navigate(`/sticker-studio/customize/${t.config.id}`)} className="inline-flex items-center gap-1 text-[11px] font-semibold text-muted-foreground hover:text-foreground"><Paintbrush className="w-3 h-3" /> Customize</button>
+                <button type="button" onClick={() => open(t.config.id)} className="ml-auto inline-flex items-center gap-1 text-[11px] font-semibold text-blue-600">Use template <Check className="w-3 h-3" /></button>
+              </div>
             </div>
           );
         })}

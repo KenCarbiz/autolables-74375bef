@@ -6,6 +6,8 @@ import { useVehiclePrefill } from "@/lib/vehiclePrefill";
 import { getStudioTemplate, TemplateRenderer, type StickerData, type StickerLineItem, type StickerRenderOptions, type LabelMode } from "@/lib/stickerStudio/templates";
 import { useStickerCatalog } from "@/lib/stickerStudio/useStickerCatalog";
 import { useDealerPrintSettings } from "@/lib/stickerStudio/useDealerPrintSettings";
+import { useTemplateCustomization } from "@/lib/stickerStudio/useTemplateCustomization";
+import { applyCustomization } from "@/lib/stickerStudio/customization";
 import { brandingFromSettings } from "@/pages/StickerStudio";
 import { saveStickerToVehicle, publishToPassport, saveAddendumState, type AddendumItemInput } from "@/lib/stickerStudio/api";
 import { ArrowLeft, Printer, Download, Image as ImageIcon, Plus, Trash2, Save, Globe, Sun, Moon, CheckCircle2 } from "lucide-react";
@@ -18,9 +20,17 @@ const StickerStudioGenerator = () => {
   const { templateId = "" } = useParams();
   const navigate = useNavigate();
   const { byId } = useStickerCatalog();
-  const template = byId(templateId) || getStudioTemplate(templateId);
+  const baseTemplate = byId(templateId) || getStudioTemplate(templateId);
   const { settings } = useDealerSettings();
   const { tenant } = useTenant();
+  const { customization } = useTemplateCustomization(templateId);
+  // Apply order: built-in base -> DB config (already in baseTemplate) -> dealer
+  // customization. Vehicle data + UI toggles layer on below.
+  const applied = useMemo(
+    () => (baseTemplate ? applyCustomization(baseTemplate, brandingFromSettings(settings, tenant?.name), customization) : null),
+    [baseTemplate, customization, settings, tenant?.name],
+  );
+  const template = applied?.template ?? baseTemplate;
   const sheetRef = useRef<HTMLDivElement>(null);
   const [generating, setGenerating] = useState(false);
   const [zoomPreset, setZoomPreset] = useState<"fit" | "50" | "75" | "100">("fit");
@@ -30,24 +40,24 @@ const StickerStudioGenerator = () => {
   const [labelMode, setLabelMode] = useState<LabelMode>("white");
   const [totalMsrpMode, setTotalMsrpMode] = useState(false);
   const [showAddendumTotal, setShowAddendumTotal] = useState(true);
-  // Seed label mode from the dealer's saved print default once.
+  // Seed label mode from the dealer's template customization, else the saved
+  // print default, once.
   const seededMode = useRef(false);
   useEffect(() => {
-    if (!seededMode.current && calibration) { setLabelMode(calibration.labelMode); seededMode.current = true; }
-  }, [calibration]);
+    if (seededMode.current) return;
+    const m = applied?.options.labelMode || calibration.labelMode;
+    if (m) { setLabelMode(m); seededMode.current = true; }
+  }, [applied?.options.labelMode, calibration]);
   const options: StickerRenderOptions = useMemo(
-    () => ({ labelMode, totalMsrpMode, showAddendumTotal }),
-    [labelMode, totalMsrpMode, showAddendumTotal],
+    () => ({ labelMode, totalMsrpMode, showAddendumTotal, sectionLabels: applied?.options.sectionLabels }),
+    [labelMode, totalMsrpMode, showAddendumTotal, applied?.options.sectionLabels],
   );
   const [savedDoc, setSavedDoc] = useState<{ version?: number; status?: string } | null>(null);
 
-  // Branding (seeded from dealer settings, editable here).
-  const seed = useMemo(() => brandingFromSettings(settings, tenant?.name), [settings, tenant?.name]);
+  // Branding (seeded from dealer settings + template customization, editable here).
+  const seed = useMemo(() => applied?.branding ?? brandingFromSettings(settings, tenant?.name), [applied?.branding, settings, tenant?.name]);
   const [branding, setBranding] = useState(seed);
   useEffect(() => { setBranding(seed); }, [seed]);
-  useEffect(() => {
-    if (template?.config.supportsAccent) setBranding((b) => ({ ...b, accentColor: template.config.defaultAccent }));
-  }, [template?.config.supportsAccent, template?.config.defaultAccent]);
 
   // Vehicle data (prefilled from ?vehicleId, then editable).
   const [data, setData] = useState<StickerData>({
@@ -70,6 +80,25 @@ const StickerStudioGenerator = () => {
         : prev.installed,
     }));
   });
+
+  // Seed dealer default benefits + addendum wording from the template
+  // customization once, only into an untouched (blank) field.
+  const seededDefaults = useRef(false);
+  useEffect(() => {
+    if (seededDefaults.current || !customization) return;
+    const hasBenefits = customization.defaultBenefits.length > 0;
+    const hasWording = !!customization.defaultAddendumWording;
+    if (!hasBenefits && !hasWording) return;
+    setData((prev) => {
+      const benefitsBlank = prev.benefits.every((b) => !b.name.trim());
+      return {
+        ...prev,
+        benefits: hasBenefits && benefitsBlank ? customization.defaultBenefits.map((n) => ({ name: n })) : prev.benefits,
+        notes: hasWording && !prev.notes ? customization.defaultAddendumWording : prev.notes,
+      };
+    });
+    seededDefaults.current = true;
+  }, [customization]);
 
   if (!template) {
     return (

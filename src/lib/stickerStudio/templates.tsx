@@ -65,17 +65,19 @@ export interface StickerBranding {
   valueProp: string;
   disclaimer: string;
   accentColor: string;
+  secondaryColor?: string; // dealer customization: section-label / accent #2
 }
 
 // Print/output options that change presentation without touching the locked
-// layout: white vs black label stock, a true Total MSRP roll-up, and the
-// addendum totals block toggle. Owned by the generator, frozen into the
-// generated_documents snapshot.
+// layout: white vs black label stock, a true Total MSRP roll-up, the addendum
+// totals block toggle, and dealer section-label overrides. Owned by the
+// generator + dealer customization, frozen into the generated_documents snapshot.
 export type LabelMode = "white" | "black";
 export interface StickerRenderOptions {
   labelMode?: LabelMode;
   totalMsrpMode?: boolean;
   showAddendumTotal?: boolean;
+  sectionLabels?: Partial<Record<"installed" | "benefits" | "upgrades", string>>;
 }
 
 export interface TemplateRenderProps {
@@ -144,6 +146,8 @@ function WindowSheet({ config, data, branding, options }: TemplateRenderProps) {
   const accent = config.supportsAccent ? branding.accentColor : config.defaultAccent;
   const classic = config.styleTags.includes("Classic");
   const pal = palette(options?.labelMode, accent);
+  const labelColor = branding.secondaryColor || accent;
+  const secLabel = (k: "installed" | "benefits" | "upgrades", d: string) => options?.sectionLabels?.[k] || d;
   const installedTotal = sum(data.installed);
   const base = Number(String(data.price || data.msrp || "").replace(/[^0-9.]/g, "")) || 0;
   const total = base + installedTotal;
@@ -194,14 +198,14 @@ function WindowSheet({ config, data, branding, options }: TemplateRenderProps) {
       {/* Body sections — Installed (priced) / Included benefits / Available (optional) */}
       <div className="mt-4 grid grid-cols-2 gap-x-6 gap-y-4">
         {config.sections.includes("installed") && named(data.installed).length > 0 && (
-          <div className="col-span-2"><SectionLabel accent={accent}>Installed Equipment</SectionLabel><ItemRows items={data.installed} accent={accent} pal={pal} max={config.maxItems.installed} /></div>
+          <div className="col-span-2"><SectionLabel accent={labelColor}>{secLabel("installed", "Installed Equipment")}</SectionLabel><ItemRows items={data.installed} accent={accent} pal={pal} max={config.maxItems.installed} /></div>
         )}
         {config.sections.includes("benefits") && named(data.benefits).length > 0 && (
-          <div><SectionLabel accent={accent}>Included Benefits</SectionLabel><ItemRows items={data.benefits} accent={accent} pal={pal} max={config.maxItems.benefits} /></div>
+          <div><SectionLabel accent={labelColor}>{secLabel("benefits", "Included Benefits")}</SectionLabel><ItemRows items={data.benefits} accent={accent} pal={pal} max={config.maxItems.benefits} /></div>
         )}
         {config.sections.includes("upgrades") && named(data.upgrades).length > 0 && (
           <div>
-            <SectionLabel accent={accent}>Available Upgrades</SectionLabel>
+            <SectionLabel accent={labelColor}>{secLabel("upgrades", "Available Upgrades")}</SectionLabel>
             <p className="-mt-1 mb-1 text-[8px] uppercase tracking-wide" style={{ color: pal.faintInk }}>Optional · not included in price</p>
             <ItemRows items={data.upgrades} accent={accent} pal={pal} max={config.maxItems.upgrades} />
           </div>
@@ -234,6 +238,8 @@ function AddendumStrip({ config, data, branding, options }: TemplateRenderProps)
   const accent = config.supportsAccent ? branding.accentColor : config.defaultAccent;
   const luxury = config.styleTags.includes("Luxury");
   const pal = palette(options?.labelMode, accent);
+  const labelColor = branding.secondaryColor || accent;
+  const secLabel = (k: "installed" | "benefits" | "upgrades", d: string) => options?.sectionLabels?.[k] || d;
   const installedTotal = sum(data.installed);
   const selectedUpgrades = options?.totalMsrpMode ? sum(data.upgrades) : 0;
   const base = Number(String(data.msrp || "").replace(/[^0-9.]/g, "")) || 0;
@@ -261,14 +267,14 @@ function AddendumStrip({ config, data, branding, options }: TemplateRenderProps)
 
       <div className="mt-2 space-y-2.5">
         {config.sections.includes("installed") && named(data.installed).length > 0 && (
-          <div><SectionLabel accent={accent}>Installed Equipment</SectionLabel><ItemRows items={data.installed} accent={accent} pal={pal} max={config.maxItems.installed} /></div>
+          <div><SectionLabel accent={labelColor}>{secLabel("installed", "Installed Equipment")}</SectionLabel><ItemRows items={data.installed} accent={accent} pal={pal} max={config.maxItems.installed} /></div>
         )}
         {config.sections.includes("benefits") && named(data.benefits).length > 0 && (
-          <div><SectionLabel accent={accent}>Included Benefits</SectionLabel><ItemRows items={data.benefits} accent={accent} pal={pal} max={config.maxItems.benefits} /></div>
+          <div><SectionLabel accent={labelColor}>{secLabel("benefits", "Included Benefits")}</SectionLabel><ItemRows items={data.benefits} accent={accent} pal={pal} max={config.maxItems.benefits} /></div>
         )}
         {config.sections.includes("upgrades") && named(data.upgrades).length > 0 && (
           <div>
-            <SectionLabel accent={accent}>Available Upgrades</SectionLabel>
+            <SectionLabel accent={labelColor}>{secLabel("upgrades", "Available Upgrades")}</SectionLabel>
             <p className="-mt-1 mb-1 text-[7px] uppercase tracking-wide" style={{ color: pal.faintInk }}>Optional{options?.totalMsrpMode ? "" : " · not in total"}</p>
             <ItemRows items={data.upgrades} accent={accent} pal={pal} max={config.maxItems.upgrades} />
           </div>
