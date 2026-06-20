@@ -50,7 +50,11 @@ export function useTemplateCustomization(templateId: string) {
       if (error) {
         ({ error } = await sb().from("dealer_template_customizations").upsert(base, { onConflict: "tenant_id,template_id" }));
       }
-      if (!error) setHasRow(true);
+      if (!error) {
+        setHasRow(true);
+        const { recordUsageEvent } = await import("@/lib/entitlements/usage");
+        await recordUsageEvent({ tenantId, featureKey: "template_customization", metric: "template_customizations", entityType: "template", entityId: templateId });
+      }
       return { ok: !error, error: error?.message };
     } catch (e) { return { ok: false, error: e instanceof Error ? e.message : "save_failed" }; }
   }, [tenantId, templateId]);

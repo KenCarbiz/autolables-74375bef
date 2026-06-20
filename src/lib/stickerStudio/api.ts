@@ -1,5 +1,6 @@
 import { supabase } from "@/integrations/supabase/client";
 import type { StickerData, StickerBranding, StickerTemplateConfig, StickerRenderOptions } from "./templates";
+import { recordUsageEvent } from "@/lib/entitlements/usage";
 
 // ──────────────────────────────────────────────────────────────────────
 // Sticker Studio API client. PDF/PNG are produced client-side (html2canvas +
@@ -114,6 +115,7 @@ export async function saveStickerToVehicle(args: SaveStickerArgs): Promise<ApiRe
           tenantId: args.tenantId, entityType: args.docType, entityId: doc.id,
           details: { template_id: args.templateId, version: doc.version, vin: args.vin },
         });
+        await recordUsageEvent({ tenantId: args.tenantId, featureKey: args.docType === "window" ? "window_stickers" : "addendum_stickers", metric: "stickers_generated", entityType: args.docType, entityId: doc.id });
         return { ok: true, documentId: doc.id, version: doc.version };
       }
     }
@@ -168,6 +170,7 @@ export async function publishToPassport(vehicleId?: string | null, tenantId?: st
       }
     } catch { /* non-blocking */ }
     await logStickerAudit("passport_published", { tenantId, entityType: "passport", entityId: vehicleId, details: { url } });
+    await recordUsageEvent({ tenantId, featureKey: "vehicle_passport", metric: "documents_published", entityType: "passport", entityId: vehicleId });
     return { ok: true, url };
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : "publish_failed" };

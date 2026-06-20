@@ -2,6 +2,7 @@ import { useFeatureGate } from "@/lib/entitlements/useFeatureGate";
 import { PLAN_FEATURES, FEATURE_LABEL, rankOf, planLabel, type FeatureKey } from "@/lib/entitlements/features";
 import { useEntitlements } from "@/hooks/useEntitlements";
 import { Check, Lock, BadgeCheck } from "lucide-react";
+import UsagePanel from "./UsagePanel";
 
 // Read-only "Enabled features" panel. Shows the dealership's active AutoLabels
 // plan and which feature groups are on/off. Dealers cannot self-enable paid
@@ -23,6 +24,8 @@ export default function EnabledFeaturesPanel() {
           {ent?.status && <p className="text-[10px] text-muted-foreground mt-1 capitalize">{ent.status}{ent.trial_ends_at ? ` · trial ends ${new Date(ent.trial_ends_at).toLocaleDateString()}` : ""}</p>}
         </div>
       </div>
+
+      <UsagePanel />
 
       {PLAN_FEATURES.map((group) => {
         const included = rankOf(group.plan) <= rankOf(plan);

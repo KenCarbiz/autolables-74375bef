@@ -4,6 +4,7 @@ import { useDealerSettings } from "@/contexts/DealerSettingsContext";
 import { useTenant } from "@/contexts/TenantContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { useDealerDocumentRules } from "@/lib/documentRules";
+import { useUsageLimits } from "@/lib/entitlements/useUsageLimits";
 import { transitionDocument } from "@/lib/stickerStudio/documentWorkflow";
 import { ensureQrCode } from "@/lib/stickerStudio/qrTracking";
 import { useLatestAddendum } from "@/lib/stickerStudio/useLatestAddendum";
@@ -34,6 +35,7 @@ const StickerStudioGenerator = () => {
   const { tenant } = useTenant();
   const { user } = useAuth();
   const rules = useDealerDocumentRules();
+  const quota = useUsageLimits();
   const { customization } = useTemplateCustomization(templateId);
   // Apply order: built-in base -> DB config (already in baseTemplate) -> dealer
   // customization. Vehicle data + UI toggles layer on below.
@@ -232,6 +234,15 @@ const StickerStudioGenerator = () => {
   };
 
   const handleSave = async () => {
+    // Quota: hard-block over the monthly cap; warn (but allow) past the soft cap.
+    const qState = quota.state("stickers_generated");
+    if (qState === "blocked") {
+      toast.error("Monthly sticker limit reached for your plan. Contact support to upgrade.");
+      return;
+    }
+    if (qState === "over_soft" || qState === "near") {
+      toast.warning("You're near your monthly sticker limit for this plan.");
+    }
     setGenerating(true);
     try {
       const r = await saveStickerToVehicle({
