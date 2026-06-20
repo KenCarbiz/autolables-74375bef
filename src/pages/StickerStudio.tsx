@@ -7,7 +7,8 @@ import {
   type StickerData, type StickerBranding,
 } from "@/lib/stickerStudio/templates";
 import { useStickerCatalog } from "@/lib/stickerStudio/useStickerCatalog";
-import { LayoutTemplate, Check } from "lucide-react";
+import { useStickerPrefs } from "@/lib/stickerStudio/useStickerPrefs";
+import { LayoutTemplate, Check, Star } from "lucide-react";
 
 // Demo data used only for the gallery thumbnails.
 const SAMPLE: StickerData = {
@@ -55,11 +56,20 @@ const StickerStudio = () => {
   const [tag, setTag] = useState<StyleTag | "all">("all");
 
   const { templates: catalog } = useStickerCatalog();
-  const templates = catalog.filter(
-    (t) => (type === "all" || t.config.type === type) && (tag === "all" || t.config.styleTags.includes(tag))
-  );
+  const { defaults, setDefault, clearDefault } = useStickerPrefs();
+  const templates = catalog
+    .filter((t) => (type === "all" || t.config.type === type) && (tag === "all" || t.config.styleTags.includes(tag)))
+    .sort((a, b) => {
+      const ad = defaults[a.config.type] === a.config.id ? 0 : 1;
+      const bd = defaults[b.config.type] === b.config.id ? 0 : 1;
+      return ad - bd;
+    });
 
   const open = (id: string) => navigate(`/sticker-studio/${id}${vehicleId ? `?vehicleId=${vehicleId}` : ""}`);
+  const toggleDefault = (cfgType: StickerType, key: string) => {
+    if (defaults[cfgType] === key) clearDefault(cfgType);
+    else setDefault(cfgType, key);
+  };
 
   return (
     <div className="p-4 lg:p-6 max-w-[1400px] mx-auto space-y-5">
@@ -89,30 +99,43 @@ const StickerStudio = () => {
 
       {/* Gallery grid */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
-        {templates.map((t) => (
-          <button
-            key={t.config.id}
-            onClick={() => open(t.config.id)}
-            className="group text-left rounded-2xl border border-border bg-card p-3 hover:border-primary hover:shadow-premium transition"
-          >
-            {/* Thumbnail — a true-scale render shrunk to fit the card */}
-            <div className="rounded-lg bg-slate-50 border border-slate-100 overflow-hidden flex items-center justify-center" style={{ height: 220 }}>
-              <TemplateRenderer template={t} data={SAMPLE} branding={branding} scale={t.config.type === "addendum" ? 0.42 : 0.24} />
+        {templates.map((t) => {
+          const isDefault = defaults[t.config.type] === t.config.id;
+          return (
+            <div
+              key={t.config.id}
+              className={`group relative text-left rounded-2xl border bg-card p-3 hover:shadow-premium transition ${isDefault ? "border-blue-500 ring-1 ring-blue-500/30" : "border-border hover:border-primary"}`}
+            >
+              <button
+                type="button"
+                onClick={() => toggleDefault(t.config.type, t.config.id)}
+                title={isDefault ? "Default for this type — click to unset" : "Set as default for this type"}
+                className={`absolute top-2 right-2 z-10 inline-flex items-center justify-center w-7 h-7 rounded-full border transition ${isDefault ? "bg-blue-600 border-blue-600 text-white" : "bg-card/90 border-border text-muted-foreground hover:text-amber-500"}`}
+              >
+                <Star className="w-3.5 h-3.5" fill={isDefault ? "currentColor" : "none"} />
+              </button>
+              <button type="button" onClick={() => open(t.config.id)} className="block w-full text-left">
+                {/* Thumbnail — a true-scale render shrunk to fit the card */}
+                <div className="rounded-lg bg-slate-50 border border-slate-100 overflow-hidden flex items-center justify-center" style={{ height: 220 }}>
+                  <TemplateRenderer template={t} data={SAMPLE} branding={branding} scale={t.config.type === "addendum" ? 0.42 : 0.24} />
+                </div>
+                <div className="mt-2.5 flex items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold text-foreground truncate">{t.config.name}</p>
+                    <p className="text-[11px] text-muted-foreground">{t.config.size} · {t.config.type === "window" ? "Window" : "Addendum"}</p>
+                  </div>
+                  <span className="opacity-0 group-hover:opacity-100 transition-opacity inline-flex items-center gap-1 text-[11px] font-semibold text-blue-600 flex-shrink-0">Use <Check className="w-3 h-3" /></span>
+                </div>
+                <div className="mt-1.5 flex flex-wrap gap-1">
+                  {isDefault && <span className="text-[9px] font-semibold uppercase tracking-wide px-1.5 py-0.5 rounded bg-blue-50 text-blue-700">Default</span>}
+                  {t.config.styleTags.map((g) => (
+                    <span key={g} className="text-[9px] font-semibold uppercase tracking-wide px-1.5 py-0.5 rounded bg-muted text-muted-foreground">{g}</span>
+                  ))}
+                </div>
+              </button>
             </div>
-            <div className="mt-2.5 flex items-start justify-between gap-2">
-              <div className="min-w-0">
-                <p className="text-sm font-semibold text-foreground truncate">{t.config.name}</p>
-                <p className="text-[11px] text-muted-foreground">{t.config.size} · {t.config.type === "window" ? "Window" : "Addendum"}</p>
-              </div>
-              <span className="opacity-0 group-hover:opacity-100 transition-opacity inline-flex items-center gap-1 text-[11px] font-semibold text-blue-600 flex-shrink-0">Use <Check className="w-3 h-3" /></span>
-            </div>
-            <div className="mt-1.5 flex flex-wrap gap-1">
-              {t.config.styleTags.map((g) => (
-                <span key={g} className="text-[9px] font-semibold uppercase tracking-wide px-1.5 py-0.5 rounded bg-muted text-muted-foreground">{g}</span>
-              ))}
-            </div>
-          </button>
-        ))}
+          );
+        })}
       </div>
 
       {templates.length === 0 && (
