@@ -546,6 +546,28 @@ const AppShell = ({ children }: AppShellProps) => {
             collapse/expand pin. The collapse toggle is desktop-
             only (lg:); mobile uses the slide-in close button. */}
         <div className={`border-t border-sidebar-border space-y-1 flex-shrink-0 ${collapsed ? "lg:px-2 p-3" : "p-3"}`}>
+          {/* Account — mobile only (desktop keeps the header avatar menu). */}
+          <div className="lg:hidden pb-1 mb-1 border-b border-sidebar-border">
+            <div className="flex items-center gap-2 px-1 py-1.5">
+              <span className="w-8 h-8 rounded-full bg-[#2563EB] text-white flex items-center justify-center text-[12px] font-bold flex-shrink-0">{userInitial}</span>
+              <div className="min-w-0">
+                <p className="text-[12px] font-semibold text-sidebar-foreground truncate">{user?.email || "Signed in"}</p>
+                <p className="text-[10px] text-sidebar-foreground/55 truncate">{currentStore?.name || tenant?.name}</p>
+              </div>
+            </div>
+            <button onClick={() => { setMobileOpen(false); navigate("/admin?tab=settings"); }} className="w-full flex items-center gap-2.5 rounded-md px-2.5 py-2 text-sm text-sidebar-foreground/80 hover:bg-sidebar-accent">
+              <Settings className="w-4 h-4" /> Settings
+            </button>
+            <button onClick={handleManageBilling} className="w-full flex items-center gap-2.5 rounded-md px-2.5 py-2 text-sm text-sidebar-foreground/80 hover:bg-sidebar-accent">
+              <CreditCard className="w-4 h-4" /> Manage billing
+            </button>
+            <button onClick={() => window.open("https://autolabels.io/help", "_blank")} className="w-full flex items-center gap-2.5 rounded-md px-2.5 py-2 text-sm text-sidebar-foreground/80 hover:bg-sidebar-accent">
+              <HelpCircle className="w-4 h-4" /> Help
+            </button>
+            <button onClick={handleSignOut} className="w-full flex items-center gap-2.5 rounded-md px-2.5 py-2 text-sm text-rose-600 hover:bg-rose-50">
+              <LogOut className="w-4 h-4" /> Sign out
+            </button>
+          </div>
           {/* Collapse / expand pin (desktop only) */}
           <button
             onClick={toggleCollapsed}
@@ -580,12 +602,123 @@ const AppShell = ({ children }: AppShellProps) => {
           on desktop; on mobile (no lg:), the rail overlays as a
           slide-in so no padding is needed. */}
       <div className={`flex-1 flex flex-col min-w-0 transition-all duration-200 ease-out ${collapsed ? "lg:pl-16" : "lg:pl-64"}`}>
+        {/* ── Mobile header — dealership-first task center (lg:hidden) ──
+            Compact: dealer switcher + inline sync/MarketCheck status + a
+            full-width Scan / Add action row. Account lives in the hamburger. */}
+        <header className="lg:hidden sticky top-0 z-20 topbar-navy text-foreground border-b border-border">
+          <div className="px-3 pt-2 pb-2.5 space-y-2">
+            <div className="flex items-center gap-2.5">
+              <button
+                onClick={() => setMobileOpen(true)}
+                className="h-9 w-9 flex-shrink-0 rounded-lg border border-border bg-card hover:bg-muted text-foreground inline-flex items-center justify-center"
+                aria-label="Menu"
+              >
+                <Menu className="w-4 h-4" />
+              </button>
+
+              {/* Dealer / tenant switcher */}
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button className="flex-1 min-w-0 text-left">
+                    <span className="inline-flex items-center gap-1 max-w-full">
+                      <span className="text-[15px] font-display font-bold text-foreground truncate leading-tight">{dealerActiveLabel}</span>
+                      <ChevronDown className="w-3.5 h-3.5 text-muted-foreground flex-shrink-0" />
+                    </span>
+                    <span className="block text-[11px] text-muted-foreground truncate leading-tight">{dealerActiveSub}</span>
+                    <span className="flex items-center gap-3 mt-0.5">
+                      <span className="inline-flex items-center gap-1 text-[10px] text-muted-foreground">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" /> Sync {syncWhen}
+                      </span>
+                      <span className="inline-flex items-center gap-1 text-[10px] font-medium text-emerald-700">
+                        <CheckCircle2 className="w-3 h-3" /> MarketCheck
+                      </span>
+                    </span>
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="start" className="w-64">
+                  <DropdownMenuLabel className="text-[10px] uppercase tracking-[0.16em] text-muted-foreground">{tenant?.name}</DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  {stores.length > 1 && (
+                    <DropdownMenuItem onClick={() => setViewAllStores(true)} className={viewAllStores ? "bg-accent" : ""}>
+                      <Store className="w-3.5 h-3.5 mr-2 flex-shrink-0" />
+                      <span className="flex-1">All Locations</span>
+                      {viewAllStores && <CheckCircle2 className="w-3.5 h-3.5 text-[#2563EB]" />}
+                    </DropdownMenuItem>
+                  )}
+                  {stores.map((s) => {
+                    const active = !viewAllStores && currentStore?.id === s.id;
+                    const loc = [s.city, s.state].filter(Boolean).join(", ");
+                    return (
+                      <DropdownMenuItem key={s.id} onClick={() => pickStore(s)} className={active ? "bg-accent" : ""}>
+                        <Store className="w-3.5 h-3.5 mr-2 flex-shrink-0" />
+                        <div className="flex-1 min-w-0">
+                          <p className="truncate">{s.name}</p>
+                          {loc && <p className="text-[10px] text-muted-foreground truncate">{loc}</p>}
+                        </div>
+                        {active && <CheckCircle2 className="w-3.5 h-3.5 text-[#2563EB] flex-shrink-0" />}
+                      </DropdownMenuItem>
+                    );
+                  })}
+                  {stores.length === 0 && (
+                    <DropdownMenuItem disabled><Store className="w-3.5 h-3.5 mr-2" />{tenant?.name}</DropdownMenuItem>
+                  )}
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={() => navigate("/admin?tab=branding")}>
+                    <Settings className="w-3.5 h-3.5 mr-2" /> Manage locations
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+
+              {/* Notifications */}
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button className="relative h-9 w-9 flex-shrink-0 rounded-lg hover:bg-muted text-muted-foreground hover:text-foreground inline-flex items-center justify-center" aria-label="Notifications">
+                    <Bell className="w-4 h-4" />
+                    {recentNotifications.length > 0 && <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-rose-500 ring-2 ring-card" />}
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-72">
+                  <DropdownMenuLabel>Recent Activity</DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  {recentNotifications.length === 0 ? (
+                    <div className="px-3 py-6 text-center text-xs text-muted-foreground">No recent activity</div>
+                  ) : (
+                    recentNotifications.map((e) => {
+                      const d = (e.details || {}) as Record<string, unknown>;
+                      const cust = String(d.customer_name || "").trim();
+                      const stock = String(d.stock || d.vehicle_stock || "").trim();
+                      const vin = String(d.vin || e.entity_id || "").trim();
+                      const label = cust && stock ? `${cust} · #${stock}` : cust || vin || "—";
+                      return (
+                        <div key={e.id} className="px-3 py-2 text-xs border-b border-border last:border-0">
+                          <p className="font-medium text-foreground capitalize">{e.action.replace(/_/g, " ")}</p>
+                          <p className="text-muted-foreground truncate">{label}</p>
+                        </div>
+                      );
+                    })
+                  )}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
+
+            {/* Primary actions */}
+            <div className="grid grid-cols-2 gap-2">
+              <button onClick={openScan} className="h-12 rounded-xl bg-[#2563EB] hover:bg-[#1d4ed8] text-white inline-flex items-center justify-center gap-2 text-[14px] font-semibold shadow-sm">
+                <ScanLine className="w-4 h-4 stroke-2" /> Scan VIN
+              </button>
+              <button onClick={() => navigate("/inventory?add=1")} className="h-12 rounded-xl border border-border bg-card hover:bg-muted text-foreground inline-flex items-center justify-center gap-2 text-[14px] font-semibold">
+                <Car className="w-4 h-4 stroke-2" /> Add Vehicle
+              </button>
+            </div>
+          </div>
+        </header>
+
         {/* Topbar — premium SaaS surface, max 72px tall. Aligns the
             page title with the sidebar logo's left edge (px-4) and
             keeps a single unified dealer/sync/MarketCheck status card
             on the right. Theme toggle + app switcher intentionally
             removed to reduce visual noise. */}
-        <header className="sticky top-0 z-20 topbar-navy vt-topbar text-foreground border-b border-border">
+        <header className="hidden lg:block sticky top-0 z-20 topbar-navy vt-topbar text-foreground border-b border-border">
           <div className="flex items-center h-16 lg:h-[72px] px-3 lg:px-4 gap-3 lg:gap-4">
             {/* Left: hamburger (mobile) + page title aligned to logo edge.
                 On mobile the title fills the row (no search bar there), so the
@@ -869,20 +1002,11 @@ const AppShell = ({ children }: AppShellProps) => {
               const isScan = t.to === "__scan__";
               const active = !isScan && t.match.some((m) => location.pathname === m);
               const Icon = t.icon;
-              if (isScan) {
-                return (
-                  <button key="scan" onClick={openScan} className="relative flex flex-col items-center justify-center">
-                    <span className="absolute -top-4 flex h-12 w-12 items-center justify-center rounded-full bg-[#2563EB] text-white shadow-lg shadow-[#2563EB]/30 ring-4 ring-card">
-                      <Icon className="h-5 w-5" />
-                    </span>
-                    <span className="mt-7 text-[10px] font-semibold text-muted-foreground">{t.label}</span>
-                  </button>
-                );
-              }
+              // Flat, equal-weight tabs — Scan is a peer, not a floating CTA.
               return (
                 <button
                   key={t.to}
-                  onClick={() => navigate(t.to)}
+                  onClick={() => (isScan ? openScan() : navigate(t.to))}
                   className={`flex flex-col items-center justify-center gap-0.5 ${active ? "text-[#2563EB]" : "text-muted-foreground"}`}
                 >
                   <Icon className="h-5 w-5" />
