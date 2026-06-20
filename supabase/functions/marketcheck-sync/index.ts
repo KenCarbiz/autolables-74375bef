@@ -292,7 +292,12 @@ serve(async (req) => {
   const auth = (req.headers.get("Authorization") || "").replace(/^Bearer\s+/i, "");
   const isServiceRole = auth === serviceKey;
   const isBatchCron = !body.tenant_id && !body.lookup && !body.force;
-  if (!isServiceRole && !isBatchCron) {
+  // Dedicated cron secret (x-cron-secret) — a stable auth path independent of
+  // the project keys, so a future key rotation can never silently 401 the
+  // schedule. The cron sends it when MARKETCHECK_CRON_SECRET is configured.
+  const cronSecret = Deno.env.get("MARKETCHECK_CRON_SECRET") || "";
+  const hasCronSecret = !!cronSecret && (req.headers.get("x-cron-secret") || "") === cronSecret;
+  if (!isServiceRole && !isBatchCron && !hasCronSecret) {
 
     const { data: ures, error: uerr } = await admin.auth.getUser(auth);
     const userId = ures?.user?.id;
@@ -312,6 +317,30 @@ serve(async (req) => {
         if (!membership) return json(403, { error: "not a member of this tenant" });
       }
     }
+  }
+
+  // Visibility — record every cron/batch invocation so "did the scheduler
+  // actually reach the function?" is answerable from the audit log without
+  // net._http_response access. Best-effort; never blocks the sync.
+  if (isServiceRole || isBatchCron || hasCronSecret) {
+    const jwtRole = (() => {
+      try {
+        const p = auth.split(".")[1];
+        return p ? String(JSON.parse(atob(p.replace(/-/g, "+").replace(/_/g, "/"))).role || "unknown") : "none";
+      } catch { return "unknown"; }
+    })();
+    try {
+      await admin.from("audit_log").insert({
+        action: "marketcheck_sync_invoked",
+        entity_type: "marketcheck_sync",
+        entity_id: body.tenant_id || "batch",
+        details: {
+          is_batch: isBatchCron, tenant_id: body.tenant_id ?? null, force: !!body.force,
+          auth_kind: isServiceRole ? "service_role" : hasCronSecret ? "cron_secret" : "batch_key",
+          key_role: jwtRole, at: new Date().toISOString(),
+        },
+      });
+    } catch { /* audit is best-effort */ }
   }
 
 
