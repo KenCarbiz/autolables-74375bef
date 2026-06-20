@@ -19,6 +19,7 @@ import { InstallProofList } from "@/components/admin/InstallProofList";
 import { useVehicleSpecs } from "@/hooks/useVehicleSpecs";
 import { useOemSticker } from "@/hooks/useOemSticker";
 import { PACKET_MODULES, packetVisible } from "@/lib/packetModules";
+import GeneratedDocumentsSection from "@/components/vehicle/GeneratedDocumentsSection";
 
 // ──────────────────────────────────────────────────────────────
 // VehicleFile — /vehicle-file/:id
@@ -1072,6 +1073,24 @@ const LabelsPanel = ({ vehicle }: { vehicle: VehicleRow }) => {
             </span>
           </button>
         ))}
+      </div>
+
+      {/* Sticker Studio — template-based window + addendum stickers */}
+      <div className="rounded-xl border border-border bg-card p-4">
+        <div className="flex items-center justify-between gap-3 flex-wrap">
+          <div>
+            <h3 className="text-sm font-bold text-foreground inline-flex items-center gap-1.5"><Sparkles className="w-3.5 h-3.5 text-primary" /> Sticker Studio</h3>
+            <p className="text-[11px] text-muted-foreground mt-0.5">Pick a template (or your saved default) and generate a window sticker or addendum, prefilled from this file.</p>
+          </div>
+          <button onClick={() => go("/sticker-studio")} className="h-9 px-3.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold inline-flex items-center gap-1.5">
+            <Printer className="w-3.5 h-3.5" /> Open Sticker Studio
+          </button>
+        </div>
+      </div>
+
+      {/* Generated document lifecycle for this vehicle */}
+      <div className="rounded-xl border border-border bg-card p-4">
+        <GeneratedDocumentsSection vehicleId={vehicle.id} />
       </div>
     </div>
   );
