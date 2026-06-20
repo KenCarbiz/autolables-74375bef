@@ -195,6 +195,7 @@ const AppShell = ({ children }: AppShellProps) => {
         { label: "Team", path: "/admin?tab=team", icon: Users, requireManager: true },
         { label: "Reports", path: "/admin?tab=analytics", icon: BarChart3, featureKey: "feature_analytics", requireManager: true },
         { label: "QR Analytics", path: "/dashboard/qr-analytics", icon: QrCode, requireManager: true },
+        { label: "AutoLabels Reports", path: "/dashboard/reports", icon: BarChart3, requireManager: true },
         { label: "Leads", path: "/admin?tab=leads", icon: Users, featureKey: "feature_lead_capture", requireManager: true },
         { label: "Feature Toggles", path: "/admin?tab=settings", icon: ToggleLeft, requireManager: true },
       ],
