@@ -2,8 +2,9 @@ import { useEffect, useMemo, useState } from "react";
 import { useParams, useSearchParams } from "react-router-dom";
 import {
   templateFromConfig, TemplateRenderer,
-  type StickerData, type StickerBranding, type StickerTemplateConfig,
+  type StickerData, type StickerBranding, type StickerTemplateConfig, type StickerRenderOptions,
 } from "@/lib/stickerStudio/templates";
+import { buildPrintCss, normalizeCalibration, type PrintCalibration } from "@/lib/stickerStudio/printConfig";
 
 // Chrome-free, public print surface for a sticker. The generator stashes the
 // resolved template config + data + branding in localStorage under a one-time
@@ -16,6 +17,8 @@ interface PrintPayload {
   config: StickerTemplateConfig;
   data: StickerData;
   branding: StickerBranding;
+  options?: StickerRenderOptions;
+  calibration?: Partial<PrintCalibration>;
   autoprint?: boolean;
 }
 
@@ -39,17 +42,10 @@ const StickerPrint = () => {
   // sheet prints edge-to-edge, and strip the on-screen ring/shadow.
   useEffect(() => {
     if (!payload) return;
-    const { widthIn, heightIn } = payload.config;
+    const cal = normalizeCalibration(payload.calibration);
     const style = document.createElement("style");
     style.setAttribute("data-sticker-print", "true");
-    style.textContent = `
-      @page { size: ${widthIn}in ${heightIn}in; margin: 0; }
-      @media print {
-        html, body { margin: 0 !important; padding: 0 !important; background: #fff !important; }
-        .sticker-print-sheet, .sticker-print-sheet * { box-shadow: none !important; }
-        .sticker-print-sheet * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
-      }
-    `;
+    style.textContent = buildPrintCss(payload.config.type, cal);
     document.head.appendChild(style);
     let t: number | undefined;
     if (payload.autoprint !== false) {
@@ -76,7 +72,7 @@ const StickerPrint = () => {
   return (
     <div className="min-h-screen bg-white flex items-start justify-center p-0">
       <div className="sticker-print-sheet">
-        <TemplateRenderer template={template} data={payload.data} branding={payload.branding} scale={1} />
+        <TemplateRenderer template={template} data={payload.data} branding={payload.branding} scale={1} options={payload.options} />
       </div>
     </div>
   );

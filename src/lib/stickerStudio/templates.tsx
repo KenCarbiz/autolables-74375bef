@@ -67,10 +67,22 @@ export interface StickerBranding {
   accentColor: string;
 }
 
+// Print/output options that change presentation without touching the locked
+// layout: white vs black label stock, a true Total MSRP roll-up, and the
+// addendum totals block toggle. Owned by the generator, frozen into the
+// generated_documents snapshot.
+export type LabelMode = "white" | "black";
+export interface StickerRenderOptions {
+  labelMode?: LabelMode;
+  totalMsrpMode?: boolean;
+  showAddendumTotal?: boolean;
+}
+
 export interface TemplateRenderProps {
   config: StickerTemplateConfig;
   data: StickerData;
   branding: StickerBranding;
+  options?: StickerRenderOptions;
 }
 
 export interface StudioTemplate {
@@ -85,34 +97,60 @@ const money = (v?: string) => {
 };
 const sum = (items: StickerLineItem[]) =>
   items.reduce((s, i) => s + (Number(String(i.price || "").replace(/[^0-9.]/g, "")) || 0), 0);
+const named = (items: StickerLineItem[]) => items.filter((i) => i.name.trim());
+
+// Label-mode palette. Black label = premium dark stock with light text; the
+// accent stays the brand color for prices and rules.
+interface Palette { dark: boolean; sheetBg: string; ink: string; subInk: string; faintInk: string; hair: string; bandBg: string; }
+function palette(mode: LabelMode | undefined, accent: string): Palette {
+  if (mode === "black") {
+    return { dark: true, sheetBg: "#0b0f17", ink: "#f5f7fa", subInk: "#aab3c2", faintInk: "#6b7480", hair: "#232b38", bandBg: `${accent}26` };
+  }
+  return { dark: false, sheetBg: "#ffffff", ink: "#0f172a", subInk: "#475569", faintInk: "#94a3b8", hair: "#e2e8f0", bandBg: `${accent}10` };
+}
 
 // ── Shared building blocks ────────────────────────────────────────────
-const ItemRows = ({ items, accent }: { items: StickerLineItem[]; accent: string }) => (
-  <div className="space-y-1">
-    {items.filter((i) => i.name.trim()).map((i, idx) => (
-      <div key={idx} className="flex items-baseline justify-between gap-3 text-[11px]">
-        <span className="text-slate-800">
-          {i.name}
-          {i.note ? <span className="text-slate-400"> · {i.note}</span> : null}
-        </span>
-        {i.price ? <span className="font-semibold tabular-nums" style={{ color: accent }}>{money(i.price)}</span> : null}
-      </div>
-    ))}
-  </div>
-);
+// Renders up to `max` named items; any remainder collapses to a "+N more"
+// line so a long option list never overflows the fixed-height sheet.
+const ItemRows = ({ items, accent, pal, max }: { items: StickerLineItem[]; accent: string; pal: Palette; max?: number }) => {
+  const all = named(items);
+  const limit = max ?? all.length;
+  const shown = all.slice(0, limit);
+  const overflow = all.length - shown.length;
+  return (
+    <div className="space-y-1">
+      {shown.map((i, idx) => (
+        <div key={idx} className="flex items-baseline justify-between gap-3 text-[11px]">
+          <span style={{ color: pal.ink }}>
+            {i.name}
+            {i.note ? <span style={{ color: pal.faintInk }}> · {i.note}</span> : null}
+          </span>
+          {i.price ? <span className="font-semibold tabular-nums" style={{ color: accent }}>{money(i.price)}</span> : null}
+        </div>
+      ))}
+      {overflow > 0 && (
+        <p className="text-[10px] italic" style={{ color: pal.faintInk }}>+{overflow} more {overflow === 1 ? "item" : "items"} on file</p>
+      )}
+    </div>
+  );
+};
 
 const SectionLabel = ({ children, accent }: { children: React.ReactNode; accent: string }) => (
   <p className="text-[9px] font-bold uppercase tracking-[0.16em] mb-1.5" style={{ color: accent }}>{children}</p>
 );
 
 // ── Window sticker layout (8.5 x 11) ──────────────────────────────────
-function WindowSheet({ config, data, branding }: TemplateRenderProps) {
+function WindowSheet({ config, data, branding, options }: TemplateRenderProps) {
   const accent = config.supportsAccent ? branding.accentColor : config.defaultAccent;
   const classic = config.styleTags.includes("Classic");
+  const pal = palette(options?.labelMode, accent);
   const installedTotal = sum(data.installed);
-  const total = (Number(String(data.price || data.msrp || "").replace(/[^0-9.]/g, "")) || 0) + installedTotal;
+  const base = Number(String(data.price || data.msrp || "").replace(/[^0-9.]/g, "")) || 0;
+  const total = base + installedTotal;
+  const totalMsrp = options?.totalMsrpMode;
+  const bandLabel = totalMsrp ? "Total MSRP" : "Total Price";
   return (
-    <div className="flex h-full flex-col bg-white text-slate-900" style={{ padding: `${config.marginsIn}in` }}>
+    <div className="flex h-full flex-col" data-label-mode={pal.dark ? "black" : "white"} style={{ padding: `${config.marginsIn}in`, backgroundColor: pal.sheetBg, color: pal.ink }}>
       {/* Header */}
       <div className="flex items-center justify-between gap-4 border-b-2 pb-3" style={{ borderColor: accent }}>
         <div className="flex items-center gap-3 min-w-0">
@@ -120,8 +158,8 @@ function WindowSheet({ config, data, branding }: TemplateRenderProps) {
             <img src={branding.logoUrl} alt={branding.dealerName} className="h-12 w-auto object-contain" crossOrigin="anonymous" />
           ) : null}
           <div className="min-w-0">
-            <p className={`font-bold leading-tight ${classic ? "font-serif text-xl" : "text-lg"}`}>{branding.dealerName}</p>
-            <p className="text-[10px] text-slate-500 truncate">{[branding.address, branding.phone, branding.website].filter(Boolean).join(" · ")}</p>
+            <p className={`font-bold leading-tight ${classic ? "font-serif text-xl" : "text-lg"}`} style={{ color: pal.ink }}>{branding.dealerName}</p>
+            <p className="text-[10px] truncate" style={{ color: pal.subInk }}>{[branding.address, branding.phone, branding.website].filter(Boolean).join(" · ")}</p>
           </div>
         </div>
         <span className="rounded px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-white" style={{ backgroundColor: accent }}>
@@ -131,46 +169,59 @@ function WindowSheet({ config, data, branding }: TemplateRenderProps) {
 
       {/* Vehicle title */}
       <div className="mt-3">
-        <p className={`font-black leading-none tracking-tight ${classic ? "font-serif text-3xl" : "text-3xl"}`}>{data.vehicleTitle || "Vehicle"}</p>
-        <div className="mt-1 flex flex-wrap gap-x-4 gap-y-0.5 text-[11px] text-slate-500">
-          {data.stock && <span>Stock # <span className="font-semibold text-slate-800">{data.stock}</span></span>}
-          {data.vin && <span>VIN <span className="font-mono text-slate-800">{data.vin}</span></span>}
-          {data.mileage && <span>Mileage <span className="font-semibold text-slate-800">{Number(data.mileage).toLocaleString()}</span></span>}
+        <p className={`font-black leading-none tracking-tight ${classic ? "font-serif text-3xl" : "text-3xl"}`} style={{ color: pal.ink }}>{data.vehicleTitle || "Vehicle"}</p>
+        <div className="mt-1 flex flex-wrap gap-x-4 gap-y-0.5 text-[11px]" style={{ color: pal.subInk }}>
+          {data.stock && <span>Stock # <span className="font-semibold" style={{ color: pal.ink }}>{data.stock}</span></span>}
+          {data.vin && <span>VIN <span className="font-mono" style={{ color: pal.ink }}>{data.vin}</span></span>}
+          {data.mileage && <span>Mileage <span className="font-semibold" style={{ color: pal.ink }}>{Number(data.mileage).toLocaleString()}</span></span>}
         </div>
       </div>
 
       {/* Price band */}
-      <div className="mt-3 flex items-center justify-between rounded-lg px-4 py-3" style={{ backgroundColor: `${accent}10` }}>
-        <span className="text-[11px] font-bold uppercase tracking-wider text-slate-600">Total Price</span>
+      <div className="mt-3 flex items-center justify-between rounded-lg px-4 py-3" style={{ backgroundColor: pal.bandBg }}>
+        <span className="text-[11px] font-bold uppercase tracking-wider" style={{ color: pal.subInk }}>{bandLabel}</span>
         <span className="font-black text-2xl tabular-nums" style={{ color: accent }}>{money(String(total))}</span>
       </div>
 
-      {/* Body sections */}
+      {/* Total MSRP roll-up — base + installed, itemized */}
+      {totalMsrp && (
+        <div className="mt-2 space-y-0.5 text-[11px]">
+          {base > 0 && <div className="flex justify-between"><span style={{ color: pal.subInk }}>Base MSRP</span><span className="tabular-nums" style={{ color: pal.ink }}>{money(String(base))}</span></div>}
+          {installedTotal > 0 && <div className="flex justify-between"><span style={{ color: pal.subInk }}>Dealer-installed equipment</span><span className="tabular-nums" style={{ color: pal.ink }}>{money(String(installedTotal))}</span></div>}
+        </div>
+      )}
+
+      {/* Body sections — Installed (priced) / Included benefits / Available (optional) */}
       <div className="mt-4 grid grid-cols-2 gap-x-6 gap-y-4">
-        {config.sections.includes("installed") && data.installed.some((i) => i.name.trim()) && (
-          <div className="col-span-2"><SectionLabel accent={accent}>Installed Equipment</SectionLabel><ItemRows items={data.installed} accent={accent} /></div>
+        {config.sections.includes("installed") && named(data.installed).length > 0 && (
+          <div className="col-span-2"><SectionLabel accent={accent}>Installed Equipment</SectionLabel><ItemRows items={data.installed} accent={accent} pal={pal} max={config.maxItems.installed} /></div>
         )}
-        {config.sections.includes("benefits") && data.benefits.some((i) => i.name.trim()) && (
-          <div><SectionLabel accent={accent}>Included Benefits</SectionLabel><ItemRows items={data.benefits} accent={accent} /></div>
+        {config.sections.includes("benefits") && named(data.benefits).length > 0 && (
+          <div><SectionLabel accent={accent}>Included Benefits</SectionLabel><ItemRows items={data.benefits} accent={accent} pal={pal} max={config.maxItems.benefits} /></div>
         )}
-        {config.sections.includes("upgrades") && data.upgrades.some((i) => i.name.trim()) && (
-          <div><SectionLabel accent={accent}>Available Upgrades</SectionLabel><ItemRows items={data.upgrades} accent={accent} /></div>
+        {config.sections.includes("upgrades") && named(data.upgrades).length > 0 && (
+          <div>
+            <SectionLabel accent={accent}>Available Upgrades</SectionLabel>
+            <p className="-mt-1 mb-1 text-[8px] uppercase tracking-wide" style={{ color: pal.faintInk }}>Optional · not included in price</p>
+            <ItemRows items={data.upgrades} accent={accent} pal={pal} max={config.maxItems.upgrades} />
+          </div>
         )}
         {config.sections.includes("notes") && data.notes ? (
-          <div className="col-span-2"><SectionLabel accent={accent}>Notes</SectionLabel><p className="text-[11px] leading-relaxed text-slate-700">{data.notes}</p></div>
+          <div className="col-span-2"><SectionLabel accent={accent}>Notes</SectionLabel><p className="text-[11px] leading-relaxed" style={{ color: pal.subInk }}>{data.notes}</p></div>
         ) : null}
       </div>
 
       {/* Footer */}
-      <div className="mt-auto flex items-end justify-between gap-4 border-t border-slate-200 pt-3">
+      <div className="mt-auto flex items-end justify-between gap-4 border-t pt-3" style={{ borderColor: pal.hair }}>
         <div className="min-w-0">
           {branding.valueProp && <p className="text-[11px] font-semibold" style={{ color: accent }}>{branding.valueProp}</p>}
-          {branding.disclaimer && <p className="mt-1 text-[8px] leading-snug text-slate-400">{branding.disclaimer}</p>}
+          {branding.disclaimer && <p className="mt-1 text-[8px] leading-snug" style={{ color: pal.faintInk }}>{branding.disclaimer}</p>}
         </div>
         {config.supportsQr && data.qrUrl ? (
           <div className="text-center">
-            <div className="border border-slate-200 p-1 bg-white"><QRCodeSVG value={data.qrUrl} size={64} level="M" /></div>
-            <p className="mt-0.5 text-[7px] font-bold uppercase tracking-wider text-slate-400">Scan for details</p>
+            {/* Quiet zone: always a white box around the QR, even on black label */}
+            <div className="bg-white" style={{ padding: "0.18in", border: `1px solid ${pal.hair}` }}><QRCodeSVG value={data.qrUrl} size={64} level="M" /></div>
+            <p className="mt-0.5 text-[7px] font-bold uppercase tracking-wider" style={{ color: pal.faintInk }}>Scan for details</p>
           </div>
         ) : null}
       </div>
@@ -179,57 +230,68 @@ function WindowSheet({ config, data, branding }: TemplateRenderProps) {
 }
 
 // ── Addendum strip layout (4.5 x 11) ──────────────────────────────────
-function AddendumStrip({ config, data, branding }: TemplateRenderProps) {
+function AddendumStrip({ config, data, branding, options }: TemplateRenderProps) {
   const accent = config.supportsAccent ? branding.accentColor : config.defaultAccent;
   const luxury = config.styleTags.includes("Luxury");
+  const pal = palette(options?.labelMode, accent);
   const installedTotal = sum(data.installed);
+  const selectedUpgrades = options?.totalMsrpMode ? sum(data.upgrades) : 0;
   const base = Number(String(data.msrp || "").replace(/[^0-9.]/g, "")) || 0;
-  const total = base + installedTotal;
+  const total = base + installedTotal + selectedUpgrades;
+  const showTotals = config.sections.includes("totals") && options?.showAddendumTotal !== false;
+  // On a black label the header bar uses the accent fill for both luxury and
+  // standard variants so the dealer name stays legible on dark stock.
+  const headerFilled = luxury || pal.dark;
   return (
-    <div className="flex h-full flex-col bg-white text-slate-900" style={{ padding: `${config.marginsIn}in` }}>
-      <div className={`text-center ${luxury ? "text-white" : ""} rounded-t-md px-2 py-2`} style={{ backgroundColor: luxury ? accent : "transparent" }}>
+    <div className="flex h-full flex-col" data-label-mode={pal.dark ? "black" : "white"} style={{ padding: `${config.marginsIn}in`, backgroundColor: pal.sheetBg, color: pal.ink }}>
+      <div className="text-center rounded-t-md px-2 py-2" style={{ backgroundColor: headerFilled ? accent : "transparent", color: headerFilled ? "#fff" : pal.ink }}>
         {config.supportsLogo && branding.showLogo && branding.logoUrl ? (
           <img src={branding.logoUrl} alt={branding.dealerName} className="mx-auto h-10 w-auto object-contain" crossOrigin="anonymous" />
         ) : (
-          <p className={`font-bold ${luxury ? "" : ""} ${luxury ? "font-serif text-lg" : "text-base"}`}>{branding.dealerName}</p>
+          <p className={`font-bold ${luxury ? "font-serif text-lg" : "text-base"}`}>{branding.dealerName}</p>
         )}
-        <p className={`text-[8px] ${luxury ? "text-white/70" : "text-slate-500"}`}>{[branding.phone, branding.website].filter(Boolean).join(" · ")}</p>
+        <p className="text-[8px]" style={{ color: headerFilled ? "rgba(255,255,255,0.7)" : pal.subInk }}>{[branding.phone, branding.website].filter(Boolean).join(" · ")}</p>
       </div>
 
       <div className="mt-2 border-y-2 py-1.5 text-center" style={{ borderColor: accent }}>
         <p className="text-[8px] font-bold uppercase tracking-[0.2em]" style={{ color: accent }}>Supplemental Addendum</p>
-        <p className={`font-black leading-tight ${luxury ? "font-serif text-base" : "text-sm"}`}>{data.vehicleTitle || "Vehicle"}</p>
-        <p className="text-[8px] text-slate-500">{[data.stock && `Stock ${data.stock}`, data.vin && `VIN ${data.vin}`].filter(Boolean).join(" · ")}</p>
+        <p className={`font-black leading-tight ${luxury ? "font-serif text-base" : "text-sm"}`} style={{ color: pal.ink }}>{data.vehicleTitle || "Vehicle"}</p>
+        <p className="text-[8px]" style={{ color: pal.subInk }}>{[data.stock && `Stock ${data.stock}`, data.vin && `VIN ${data.vin}`].filter(Boolean).join(" · ")}</p>
       </div>
 
       <div className="mt-2 space-y-2.5">
-        {config.sections.includes("installed") && data.installed.some((i) => i.name.trim()) && (
-          <div><SectionLabel accent={accent}>Installed Equipment</SectionLabel><ItemRows items={data.installed} accent={accent} /></div>
+        {config.sections.includes("installed") && named(data.installed).length > 0 && (
+          <div><SectionLabel accent={accent}>Installed Equipment</SectionLabel><ItemRows items={data.installed} accent={accent} pal={pal} max={config.maxItems.installed} /></div>
         )}
-        {config.sections.includes("upgrades") && data.upgrades.some((i) => i.name.trim()) && (
-          <div><SectionLabel accent={accent}>Available Upgrades</SectionLabel><ItemRows items={data.upgrades} accent={accent} /></div>
+        {config.sections.includes("benefits") && named(data.benefits).length > 0 && (
+          <div><SectionLabel accent={accent}>Included Benefits</SectionLabel><ItemRows items={data.benefits} accent={accent} pal={pal} max={config.maxItems.benefits} /></div>
         )}
-        {config.sections.includes("benefits") && data.benefits.some((i) => i.name.trim()) && (
-          <div><SectionLabel accent={accent}>Included Benefits</SectionLabel><ItemRows items={data.benefits} accent={accent} /></div>
+        {config.sections.includes("upgrades") && named(data.upgrades).length > 0 && (
+          <div>
+            <SectionLabel accent={accent}>Available Upgrades</SectionLabel>
+            <p className="-mt-1 mb-1 text-[7px] uppercase tracking-wide" style={{ color: pal.faintInk }}>Optional{options?.totalMsrpMode ? "" : " · not in total"}</p>
+            <ItemRows items={data.upgrades} accent={accent} pal={pal} max={config.maxItems.upgrades} />
+          </div>
         )}
       </div>
 
-      {config.sections.includes("totals") && (
-        <div className="mt-2 space-y-0.5 border-t border-slate-200 pt-1.5 text-[11px]">
-          {base > 0 && <div className="flex justify-between"><span className="text-slate-600">Base MSRP</span><span className="tabular-nums">{money(String(base))}</span></div>}
-          {installedTotal > 0 && <div className="flex justify-between"><span className="text-slate-600">Installed equipment</span><span className="tabular-nums">{money(String(installedTotal))}</span></div>}
-          <div className="flex justify-between border-t border-slate-200 pt-1 font-bold"><span>Total Addendum Price</span><span className="tabular-nums" style={{ color: accent }}>{money(String(total))}</span></div>
+      {showTotals && (
+        <div className="mt-2 space-y-0.5 border-t pt-1.5 text-[11px]" style={{ borderColor: pal.hair }}>
+          {base > 0 && <div className="flex justify-between"><span style={{ color: pal.subInk }}>Base MSRP</span><span className="tabular-nums" style={{ color: pal.ink }}>{money(String(base))}</span></div>}
+          {installedTotal > 0 && <div className="flex justify-between"><span style={{ color: pal.subInk }}>Installed equipment</span><span className="tabular-nums" style={{ color: pal.ink }}>{money(String(installedTotal))}</span></div>}
+          {selectedUpgrades > 0 && <div className="flex justify-between"><span style={{ color: pal.subInk }}>Selected upgrades</span><span className="tabular-nums" style={{ color: pal.ink }}>{money(String(selectedUpgrades))}</span></div>}
+          <div className="flex justify-between border-t pt-1 font-bold" style={{ borderColor: pal.hair }}><span style={{ color: pal.ink }}>{options?.totalMsrpMode ? "Total MSRP" : "Total Addendum Price"}</span><span className="tabular-nums" style={{ color: accent }}>{money(String(total))}</span></div>
         </div>
       )}
 
       <div className="mt-auto flex flex-col items-center gap-1.5 pt-2">
         {config.supportsQr && data.qrUrl ? (
           <>
-            <div className="border border-slate-200 p-1 bg-white"><QRCodeSVG value={data.qrUrl} size={72} level="M" /></div>
-            <p className="text-[7px] font-bold uppercase tracking-wider text-slate-400">Scan for the full vehicle packet</p>
+            <div className="bg-white" style={{ padding: "0.16in", border: `1px solid ${pal.hair}` }}><QRCodeSVG value={data.qrUrl} size={72} level="M" /></div>
+            <p className="text-[7px] font-bold uppercase tracking-wider" style={{ color: pal.faintInk }}>Scan for the full vehicle packet</p>
           </>
         ) : null}
-        {branding.disclaimer && <p className="text-center text-[7px] leading-snug text-slate-400">{branding.disclaimer}</p>}
+        {branding.disclaimer && <p className="text-center text-[7px] leading-snug" style={{ color: pal.faintInk }}>{branding.disclaimer}</p>}
       </div>
     </div>
   );
@@ -284,13 +346,14 @@ export function templateFromConfig(config: StickerTemplateConfig): StudioTemplat
 // Render a template at its true paper size. `scale` shrinks the whole sheet
 // (used for gallery thumbnails) via CSS transform without changing the layout.
 export function TemplateRenderer({
-  template, data, branding, scale = 1, capture,
+  template, data, branding, scale = 1, capture, options,
 }: {
   template: StudioTemplate;
   data: StickerData;
   branding: StickerBranding;
   scale?: number;
   capture?: React.Ref<HTMLDivElement>;
+  options?: StickerRenderOptions;
 }) {
   const { config, Render } = template;
   return (
@@ -300,7 +363,7 @@ export function TemplateRenderer({
         style={{ width: `${config.widthIn}in`, height: `${config.heightIn}in`, transform: `scale(${scale})`, transformOrigin: "top left" }}
         className="bg-white shadow-sm ring-1 ring-slate-200"
       >
-        <Render config={config} data={data} branding={branding} />
+        <Render config={config} data={data} branding={branding} options={options} />
       </div>
     </div>
   );

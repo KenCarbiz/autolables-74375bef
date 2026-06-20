@@ -3,11 +3,12 @@ import { useParams, useNavigate } from "react-router-dom";
 import { useDealerSettings } from "@/contexts/DealerSettingsContext";
 import { useTenant } from "@/contexts/TenantContext";
 import { useVehiclePrefill } from "@/lib/vehiclePrefill";
-import { getStudioTemplate, TemplateRenderer, type StickerData, type StickerLineItem } from "@/lib/stickerStudio/templates";
+import { getStudioTemplate, TemplateRenderer, type StickerData, type StickerLineItem, type StickerRenderOptions, type LabelMode } from "@/lib/stickerStudio/templates";
 import { useStickerCatalog } from "@/lib/stickerStudio/useStickerCatalog";
+import { useDealerPrintSettings } from "@/lib/stickerStudio/useDealerPrintSettings";
 import { brandingFromSettings } from "@/pages/StickerStudio";
-import { saveStickerToVehicle, publishToPassport } from "@/lib/stickerStudio/api";
-import { ArrowLeft, Printer, Download, Image as ImageIcon, Plus, Trash2, Save, Globe } from "lucide-react";
+import { saveStickerToVehicle, publishToPassport, saveAddendumState, type AddendumItemInput } from "@/lib/stickerStudio/api";
+import { ArrowLeft, Printer, Download, Image as ImageIcon, Plus, Trash2, Save, Globe, Sun, Moon, CheckCircle2 } from "lucide-react";
 import { toast } from "sonner";
 
 const ACCENTS = ["#2563EB", "#0B2041", "#7c5c1e", "#0f766e", "#9333ea", "#b91c1c"];
@@ -23,6 +24,22 @@ const StickerStudioGenerator = () => {
   const sheetRef = useRef<HTMLDivElement>(null);
   const [generating, setGenerating] = useState(false);
   const [zoomPreset, setZoomPreset] = useState<"fit" | "50" | "75" | "100">("fit");
+
+  // Output options (label stock + total roll-ups), frozen into the saved snapshot.
+  const { calibration } = useDealerPrintSettings();
+  const [labelMode, setLabelMode] = useState<LabelMode>("white");
+  const [totalMsrpMode, setTotalMsrpMode] = useState(false);
+  const [showAddendumTotal, setShowAddendumTotal] = useState(true);
+  // Seed label mode from the dealer's saved print default once.
+  const seededMode = useRef(false);
+  useEffect(() => {
+    if (!seededMode.current && calibration) { setLabelMode(calibration.labelMode); seededMode.current = true; }
+  }, [calibration]);
+  const options: StickerRenderOptions = useMemo(
+    () => ({ labelMode, totalMsrpMode, showAddendumTotal }),
+    [labelMode, totalMsrpMode, showAddendumTotal],
+  );
+  const [savedDoc, setSavedDoc] = useState<{ version?: number; status?: string } | null>(null);
 
   // Branding (seeded from dealer settings, editable here).
   const seed = useMemo(() => brandingFromSettings(settings, tenant?.name), [settings, tenant?.name]);
@@ -93,7 +110,7 @@ const StickerStudioGenerator = () => {
   const handlePrint = () => {
     try {
       const key = `sticker-print-${crypto.randomUUID()}`;
-      localStorage.setItem(key, JSON.stringify({ config: cfg, data, branding }));
+      localStorage.setItem(key, JSON.stringify({ config: cfg, data, branding, options, calibration }));
       const w = window.open(`/print/sticker/${cfg.id}?h=${key}`, "_blank", "noopener");
       if (!w) toast.error("Allow pop-ups to open the print view");
     } catch { toast.error("Couldn't open print view"); }
@@ -127,16 +144,33 @@ const StickerStudioGenerator = () => {
   const handleSave = async () => {
     setGenerating(true);
     try {
-      const r = await saveStickerToVehicle({ vehicleId: prefill.vehicle?.id, vin: data.vin, templateId: cfg.id, docType: cfg.type });
-      if (r.ok) toast.success("Saved to vehicle file");
-      else toast.error(r.error === "no_vehicle" ? "Open this from a vehicle to save it to the file" : "Couldn't save");
+      const r = await saveStickerToVehicle({
+        tenantId: tenant?.id, vehicleId: prefill.vehicle?.id, vin: data.vin,
+        templateId: cfg.id, docType: cfg.type, labelMode, qrUrl: data.qrUrl,
+        snapshot: { config: cfg, data, branding, options },
+      });
+      if (r.ok) {
+        if (r.version) setSavedDoc({ version: r.version, status: "draft" });
+        toast.success(r.version ? `Saved to vehicle file (v${r.version})` : "Saved to vehicle file");
+        // Persist structured addendum state alongside, when this is an addendum.
+        if (cfg.type === "addendum" && prefill.vehicle?.id) {
+          const items: AddendumItemInput[] = [
+            ...data.installed.filter((i) => i.name.trim()).map((i) => ({ itemType: "installed" as const, name: i.name, price: i.price, note: i.note })),
+            ...data.benefits.filter((i) => i.name.trim()).map((i) => ({ itemType: "benefit" as const, name: i.name, price: i.price, note: i.note })),
+            ...data.upgrades.filter((i) => i.name.trim()).map((i) => ({ itemType: "available_upgrade" as const, name: i.name, price: i.price, note: i.note, isSelected: totalMsrpMode })),
+          ];
+          await saveAddendumState({ tenantId: tenant?.id, vehicleId: prefill.vehicle.id, baseMsrp: data.msrp, items });
+        }
+      } else toast.error(r.error === "no_vehicle" ? "Open this from a vehicle to save it to the file" : "Couldn't save");
     } finally { setGenerating(false); }
   };
 
   const handlePublish = async () => {
-    const r = await publishToPassport(prefill.vehicle?.id);
-    if (r.ok) toast.success(r.url ? "Published to Vehicle Passport" : "Published");
-    else toast.error(r.error === "no_vehicle" ? "Open this from a vehicle to publish" : "Couldn't publish");
+    const r = await publishToPassport(prefill.vehicle?.id, tenant?.id);
+    if (r.ok) {
+      setSavedDoc((d) => ({ ...(d || {}), status: "published" }));
+      toast.success(r.url ? "Published to Vehicle Passport" : "Published");
+    } else toast.error(r.error === "no_vehicle" ? "Open this from a vehicle to publish" : "Couldn't publish");
   };
 
   const input = "w-full h-9 px-2.5 rounded-md border border-border bg-background text-sm outline-none focus:border-primary";
@@ -165,7 +199,14 @@ const StickerStudioGenerator = () => {
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
           <button onClick={() => navigate("/sticker-studio")} className="text-[11px] font-semibold text-blue-600 hover:underline inline-flex items-center gap-1"><ArrowLeft className="w-3 h-3" /> Sticker Studio</button>
-          <h1 className="text-xl font-semibold tracking-tight font-display text-foreground">{cfg.name}</h1>
+          <h1 className="text-xl font-semibold tracking-tight font-display text-foreground inline-flex items-center gap-2">
+            {cfg.name}
+            {savedDoc && (
+              <span className={`inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full ${savedDoc.status === "published" ? "bg-emerald-50 text-emerald-700" : "bg-blue-50 text-blue-700"}`}>
+                <CheckCircle2 className="w-3 h-3" /> {savedDoc.status === "published" ? "Published" : `Saved v${savedDoc.version}`}
+              </span>
+            )}
+          </h1>
           <p className="text-xs text-muted-foreground">{cfg.size} · {cfg.type === "window" ? "Window sticker" : "Addendum sticker"}</p>
         </div>
         <div className="flex gap-2 no-print flex-wrap">
@@ -220,6 +261,25 @@ const StickerStudioGenerator = () => {
               )}
             </div>
           </CfgCard>
+
+          <CfgCard title="Output options">
+            <div className="space-y-3">
+              <div>
+                <label className={label}>Label stock</label>
+                <div className="mt-1 inline-flex rounded-md border border-border bg-card p-0.5">
+                  <button onClick={() => setLabelMode("white")} className={`inline-flex items-center gap-1 px-2.5 h-8 rounded text-xs font-semibold ${labelMode === "white" ? "bg-blue-600 text-white" : "text-muted-foreground hover:text-foreground"}`}><Sun className="w-3.5 h-3.5" /> White label</button>
+                  <button onClick={() => setLabelMode("black")} className={`inline-flex items-center gap-1 px-2.5 h-8 rounded text-xs font-semibold ${labelMode === "black" ? "bg-slate-900 text-white" : "text-muted-foreground hover:text-foreground"}`}><Moon className="w-3.5 h-3.5" /> Black label</button>
+                </div>
+              </div>
+              <label className="flex items-center gap-2 text-sm text-foreground"><input type="checkbox" checked={totalMsrpMode} onChange={(e) => setTotalMsrpMode(e.target.checked)} /> Show true Total MSRP roll-up</label>
+              {cfg.type === "addendum" && (
+                <label className="flex items-center gap-2 text-sm text-foreground"><input type="checkbox" checked={showAddendumTotal} onChange={(e) => setShowAddendumTotal(e.target.checked)} /> Show addendum totals block</label>
+              )}
+              {(calibration.xOffsetIn !== 0 || calibration.yOffsetIn !== 0 || calibration.scalePct !== 100) && (
+                <p className="text-[11px] text-muted-foreground">Print calibration active: offset {calibration.xOffsetIn}in / {calibration.yOffsetIn}in · scale {calibration.scalePct}%. Adjust in Print settings.</p>
+              )}
+            </div>
+          </CfgCard>
         </div>
 
         {/* Live preview */}
@@ -234,8 +294,8 @@ const StickerStudioGenerator = () => {
               ))}
             </div>
           </div>
-          <div className="flex justify-center rounded-2xl border border-border bg-slate-100 p-4 overflow-auto">
-            <TemplateRenderer template={template} data={data} branding={branding} scale={previewScale} capture={sheetRef} />
+          <div className={`flex justify-center rounded-2xl border border-border p-4 overflow-auto ${labelMode === "black" ? "bg-slate-800" : "bg-slate-100"}`}>
+            <TemplateRenderer template={template} data={data} branding={branding} scale={previewScale} capture={sheetRef} options={options} />
           </div>
         </div>
       </div>
