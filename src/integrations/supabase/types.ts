@@ -707,7 +707,13 @@ export type Database = {
           label_mode: string
           location_id: string | null
           printer_name: string | null
+          safe_margin_bottom_inches: number
+          safe_margin_left_inches: number
+          safe_margin_right_inches: number
+          safe_margin_top_inches: number
           scale_percentage: number
+          show_crop_marks: boolean
+          show_safe_area: boolean
           tenant_id: string
           updated_at: string
           window_label_size: string
@@ -721,7 +727,13 @@ export type Database = {
           label_mode?: string
           location_id?: string | null
           printer_name?: string | null
+          safe_margin_bottom_inches?: number
+          safe_margin_left_inches?: number
+          safe_margin_right_inches?: number
+          safe_margin_top_inches?: number
           scale_percentage?: number
+          show_crop_marks?: boolean
+          show_safe_area?: boolean
           tenant_id: string
           updated_at?: string
           window_label_size?: string
@@ -735,7 +747,13 @@ export type Database = {
           label_mode?: string
           location_id?: string | null
           printer_name?: string | null
+          safe_margin_bottom_inches?: number
+          safe_margin_left_inches?: number
+          safe_margin_right_inches?: number
+          safe_margin_top_inches?: number
           scale_percentage?: number
+          show_crop_marks?: boolean
+          show_safe_area?: boolean
           tenant_id?: string
           updated_at?: string
           window_label_size?: string
@@ -863,10 +881,13 @@ export type Database = {
       dealer_template_customizations: {
         Row: {
           accent_color: string | null
+          addendum_wording: string | null
           created_at: string
+          default_benefits: Json
           disclaimer_override: string | null
           id: string
           logo_enabled: boolean
+          preferred_label_mode: string | null
           qr_enabled: boolean
           secondary_color: string | null
           section_label_overrides: Json
@@ -877,10 +898,13 @@ export type Database = {
         }
         Insert: {
           accent_color?: string | null
+          addendum_wording?: string | null
           created_at?: string
+          default_benefits?: Json
           disclaimer_override?: string | null
           id?: string
           logo_enabled?: boolean
+          preferred_label_mode?: string | null
           qr_enabled?: boolean
           secondary_color?: string | null
           section_label_overrides?: Json
@@ -891,10 +915,13 @@ export type Database = {
         }
         Update: {
           accent_color?: string | null
+          addendum_wording?: string | null
           created_at?: string
+          default_benefits?: Json
           disclaimer_override?: string | null
           id?: string
           logo_enabled?: boolean
+          preferred_label_mode?: string | null
           qr_enabled?: boolean
           secondary_color?: string | null
           section_label_overrides?: Json
@@ -1018,11 +1045,20 @@ export type Database = {
           generated_by: string | null
           id: string
           label_mode: string
+          last_printed_at: string | null
           online_url: string | null
           pdf_url: string | null
           png_url: string | null
+          print_count: number
           printed_at: string | null
           published_at: string | null
+          rejected_at: string | null
+          rejected_by: string | null
+          rejection_reason: string | null
+          reviewed_at: string | null
+          reviewed_by: string | null
+          superseded_at: string | null
+          superseded_by: string | null
           template_id: string
           tenant_id: string
           updated_at: string
@@ -1039,11 +1075,20 @@ export type Database = {
           generated_by?: string | null
           id?: string
           label_mode?: string
+          last_printed_at?: string | null
           online_url?: string | null
           pdf_url?: string | null
           png_url?: string | null
+          print_count?: number
           printed_at?: string | null
           published_at?: string | null
+          rejected_at?: string | null
+          rejected_by?: string | null
+          rejection_reason?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          superseded_at?: string | null
+          superseded_by?: string | null
           template_id: string
           tenant_id: string
           updated_at?: string
@@ -1060,18 +1105,35 @@ export type Database = {
           generated_by?: string | null
           id?: string
           label_mode?: string
+          last_printed_at?: string | null
           online_url?: string | null
           pdf_url?: string | null
           png_url?: string | null
+          print_count?: number
           printed_at?: string | null
           published_at?: string | null
+          rejected_at?: string | null
+          rejected_by?: string | null
+          rejection_reason?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          superseded_at?: string | null
+          superseded_by?: string | null
           template_id?: string
           tenant_id?: string
           updated_at?: string
           vehicle_id?: string | null
           version?: number
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "generated_documents_superseded_by_fkey"
+            columns: ["superseded_by"]
+            isOneToOne: false
+            referencedRelation: "generated_documents"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       get_ready_records: {
         Row: {
@@ -1891,6 +1953,151 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      qr_codes: {
+        Row: {
+          code: string
+          created_at: string
+          document_id: string | null
+          id: string
+          is_active: boolean
+          label: string | null
+          surface: string | null
+          target_url: string
+          tenant_id: string
+          updated_at: string
+          vehicle_id: string | null
+        }
+        Insert: {
+          code: string
+          created_at?: string
+          document_id?: string | null
+          id?: string
+          is_active?: boolean
+          label?: string | null
+          surface?: string | null
+          target_url: string
+          tenant_id: string
+          updated_at?: string
+          vehicle_id?: string | null
+        }
+        Update: {
+          code?: string
+          created_at?: string
+          document_id?: string | null
+          id?: string
+          is_active?: boolean
+          label?: string | null
+          surface?: string | null
+          target_url?: string
+          tenant_id?: string
+          updated_at?: string
+          vehicle_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "qr_codes_document_id_fkey"
+            columns: ["document_id"]
+            isOneToOne: false
+            referencedRelation: "generated_documents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "qr_codes_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenant_summary"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "qr_codes_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "qr_codes_vehicle_id_fkey"
+            columns: ["vehicle_id"]
+            isOneToOne: false
+            referencedRelation: "vehicle_listings"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      qr_scan_events: {
+        Row: {
+          city: string | null
+          code: string
+          country: string | null
+          id: string
+          ip_hash: string | null
+          qr_code_id: string | null
+          referrer: string | null
+          region: string | null
+          scanned_at: string
+          tenant_id: string | null
+          user_agent: string | null
+          vehicle_id: string | null
+        }
+        Insert: {
+          city?: string | null
+          code: string
+          country?: string | null
+          id?: string
+          ip_hash?: string | null
+          qr_code_id?: string | null
+          referrer?: string | null
+          region?: string | null
+          scanned_at?: string
+          tenant_id?: string | null
+          user_agent?: string | null
+          vehicle_id?: string | null
+        }
+        Update: {
+          city?: string | null
+          code?: string
+          country?: string | null
+          id?: string
+          ip_hash?: string | null
+          qr_code_id?: string | null
+          referrer?: string | null
+          region?: string | null
+          scanned_at?: string
+          tenant_id?: string | null
+          user_agent?: string | null
+          vehicle_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "qr_scan_events_qr_code_id_fkey"
+            columns: ["qr_code_id"]
+            isOneToOne: false
+            referencedRelation: "qr_codes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "qr_scan_events_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenant_summary"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "qr_scan_events_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "qr_scan_events_vehicle_id_fkey"
+            columns: ["vehicle_id"]
+            isOneToOne: false
+            referencedRelation: "vehicle_listings"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       signed_document_archive: {
         Row: {
@@ -3251,6 +3458,19 @@ export type Database = {
         Args: { _store_id: string; _vin: string; _ymm?: string }
         Returns: string
       }
+      get_published_documents_public: {
+        Args: { p_slug: string }
+        Returns: {
+          document_type: string
+          id: string
+          online_url: string
+          pdf_url: string
+          png_url: string
+          published_at: string
+          template_id: string
+          version: number
+        }[]
+      }
       get_reengage_schedule: {
         Args: never
         Returns: {
@@ -3400,6 +3620,16 @@ export type Database = {
           vin: string
           ymm: string
         }[]
+      }
+      log_qr_scan: {
+        Args: {
+          p_code: string
+          p_country?: string
+          p_ip_hash?: string
+          p_referrer?: string
+          p_user_agent?: string
+        }
+        Returns: string
       }
       mark_addendum_executed: {
         Args: { _addendum_id: string }
