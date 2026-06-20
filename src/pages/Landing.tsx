@@ -28,7 +28,7 @@ import {
 
 // ──────────────────────────────────────────────────────────────
 // Landing — Wave 35. Pre-launch / waitlist positioning.
-// Every CTA is "Schedule a demo" (primary) or "Book a demo"
+// Every CTA is "Schedule a demo" (primary) or "Join Wait List Opening July 1st"
 // (secondary). One card system across the whole page.
 // Legal discipline: "FTC-aligned" (CARS Rule was vacated 1/2025),
 // "documents" consent (never "guarantees compliance"),
@@ -882,10 +882,10 @@ const PricingTeaser = ({
                 </button>
               ) : (
                 <button
-                  onClick={onDemo}
+                  onClick={onWaitlist}
                   className="inline-flex h-10 w-full items-center justify-center gap-1.5 rounded-full border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 hover:bg-slate-50"
                 >
-                  Book a demo
+                  Join Wait List Opening July 1st
                 </button>
               )}
             </div>
@@ -898,7 +898,7 @@ const PricingTeaser = ({
           onClick={onWaitlist}
           className="inline-flex h-11 items-center gap-2 rounded-full bg-[#0B2041] px-6 text-sm font-semibold text-white hover:bg-[#13315e]"
         >
-          See pricing &amp; book a demo
+          Join Wait List Opening July 1st
           <ArrowRight className="h-4 w-4" />
         </button>
       </div>
@@ -989,10 +989,10 @@ const FinalCTA = ({ onWaitlist, onDemo }: { onWaitlist: () => void; onDemo: () =
             <ArrowRight className="h-4 w-4" />
           </button>
           <button
-            onClick={onDemo}
+            onClick={onWaitlist}
             className="inline-flex h-12 items-center gap-2 rounded-full border border-white/20 bg-white/5 px-6 text-sm font-semibold text-white hover:bg-white/10"
           >
-            Book a demo
+            Join Wait List Opening July 1st
           </button>
         </div>
       </div>
