@@ -1,5 +1,5 @@
-// Saturday Hero Window Sticker — 8.5x11 portrait
-// Premium AutoLabels Vehicle Intelligence Report layout for /dev/saturday-preview.
+// Saturday Hero Window Sticker -- 8.5x11 portrait
+// Premium AutoLabels Vehicle Passport Pro / Intelligence Report layout.
 // Presentational only: no registry, no signing, no DB writes.
 
 import { QRCodeSVG } from "qrcode.react";
@@ -7,10 +7,12 @@ import type { SaturdaySticker } from "./types";
 
 type Props = { data: SaturdaySticker };
 
-const ink = "#0B1226";
-const blue = "#2563EB";
-const navy = "#08224A";
-const line = "#E2E8F0";
+const ink = "#07142f";
+const blue = "#2563eb";
+const navy = "#071f3f";
+const soft = "#f8fbff";
+const line = "#dbe4f0";
+const green = "#22c55e";
 
 const fmtMoney = (n: string | number | undefined) => {
   if (!n) return "Call for Price";
@@ -19,51 +21,75 @@ const fmtMoney = (n: string | number | undefined) => {
   return `$${Math.round(v).toLocaleString()}`;
 };
 
-const chunk = <T,>(items: T[], size: number) => {
-  const out: T[][] = [];
-  for (let i = 0; i < items.length; i += size) out.push(items.slice(i, i + size));
-  return out;
-};
-
 const Card: React.FC<React.PropsWithChildren<{ className?: string; title?: string }>> = ({ className = "", title, children }) => (
-  <section className={`rounded-[18px] border bg-white ${className}`} style={{ borderColor: line }}>
-    {title ? <div className="px-4 pt-3 text-[15px] font-black tracking-tight" style={{ color: ink }}>{title}</div> : null}
+  <section className={`rounded-[16px] border bg-white ${className}`} style={{ borderColor: line }}>
+    {title ? <div className="px-4 pt-3 text-[13px] font-black uppercase tracking-tight" style={{ color: blue }}>{title}</div> : null}
     {children}
   </section>
 );
 
-const MiniIcon = ({ children, tone = "blue" }: { children: React.ReactNode; tone?: "blue" | "green" | "purple" }) => {
-  const bg = tone === "green" ? "#22C55E" : tone === "purple" ? "#7C3AED" : blue;
-  return <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full text-[22px] font-black text-white" style={{ background: bg }}>{children}</div>;
-};
-
-const QrPanel = ({ url }: { url: string }) => (
-  <div className="flex items-center gap-3 rounded-2xl border bg-white p-3" style={{ borderColor: "#CBD5E1" }}>
-    <div className="rounded-lg bg-white p-2">
-      <QRCodeSVG value={url.startsWith("http") ? url : `https://${url}`} size={88} bgColor="#ffffff" fgColor="#111827" level="M" />
+const QrReport = ({ url }: { url: string }) => (
+  <div className="flex items-center gap-3 rounded-[14px] border bg-white p-2.5" style={{ borderColor: "#cbd5e1" }}>
+    <div className="rounded-lg bg-white p-1.5">
+      <QRCodeSVG value={url.startsWith("http") ? url : `https://${url}`} size={78} bgColor="#ffffff" fgColor="#111827" level="M" />
     </div>
-    <div>
-      <div className="text-[12px] font-black uppercase leading-tight" style={{ color: ink }}>Scan to view full report</div>
-      <div className="mt-1 text-[9px] leading-snug text-slate-500">Photos, disclosures, service notes, pricing analysis & more.</div>
+    <div className="min-w-0">
+      <p className="text-[12px] font-black uppercase leading-[1.05]" style={{ color: ink }}>Scan to view full vehicle report</p>
+      <p className="mt-1 text-[8.5px] leading-tight text-slate-500">Photos, records, pricing analysis & disclosures.</p>
+      <p className="mt-1 text-[9px] font-bold" style={{ color: blue }}>Scan Anytime</p>
     </div>
   </div>
 );
 
-const VehicleImage = () => (
-  <div className="relative flex h-[2.05in] items-center justify-center overflow-hidden rounded-[22px] bg-gradient-to-br from-slate-50 via-white to-blue-50">
-    <div className="absolute inset-0 opacity-70" style={{ background: "radial-gradient(circle at 68% 45%, #dbeafe 0%, transparent 34%), linear-gradient(135deg, transparent 0%, transparent 52%, #eff6ff 52%, #eff6ff 60%, transparent 60%)" }} />
-    <svg className="relative z-10" width="390" height="155" viewBox="0 0 390 155" fill="none" aria-label="Vehicle illustration">
-      <path d="M64 94c13-34 38-51 78-51h98c29 0 56 15 78 45l31 5c13 2 21 13 18 26l-2 11H31l3-14c3-13 14-22 30-22Z" fill="#1F2937" opacity="0.88" />
-      <path d="M132 52h101c24 0 44 12 60 36H90c11-22 25-36 42-36Z" fill="#CBD5E1" />
-      <path d="M143 60h48v28H101c10-16 23-26 42-28ZM202 60h31c19 0 36 9 51 28h-82V60Z" fill="#F8FAFC" />
-      <path d="M72 101h269" stroke="#F8FAFC" strokeWidth="8" strokeLinecap="round" opacity="0.65" />
-      <circle cx="103" cy="121" r="25" fill="#0F172A" />
-      <circle cx="103" cy="121" r="11" fill="#E2E8F0" />
-      <circle cx="291" cy="121" r="25" fill="#0F172A" />
-      <circle cx="291" cy="121" r="11" fill="#E2E8F0" />
-      <path d="M27 132h338" stroke="#94A3B8" strokeWidth="3" opacity="0.35" />
+const AutoLabelsMark = () => (
+  <div className="flex items-center gap-3">
+    <div className="relative flex h-12 w-12 items-center justify-center rounded-[14px] text-[30px] font-black text-white" style={{ background: `linear-gradient(145deg,${blue},#60a5fa)` }}>A</div>
+    <div>
+      <p className="text-[28px] font-black leading-none tracking-[-0.04em]" style={{ color: ink }}>autolabels<span style={{ color: blue }}>.io</span></p>
+      <p className="mt-1 text-[10px] font-semibold text-slate-500">AI-Powered Vehicle Transparency</p>
+    </div>
+  </div>
+);
+
+const VehicleArt = () => (
+  <div className="relative flex h-[1.95in] items-center justify-center overflow-hidden rounded-[22px] bg-gradient-to-br from-white via-blue-50 to-slate-100">
+    <div className="absolute inset-0" style={{ background: "radial-gradient(circle at 70% 45%, #dbeafe 0, transparent 32%), linear-gradient(120deg, transparent 0 55%, rgba(37,99,235,.07) 55% 61%, transparent 61%)" }} />
+    <svg className="relative z-10 drop-shadow-xl" width="390" height="158" viewBox="0 0 390 158" fill="none" aria-label="Vehicle illustration">
+      <path d="M48 102c8-33 37-55 76-55h111c36 0 67 18 91 51l34 7c13 3 21 13 18 25l-3 12H25l4-18c3-12 9-19 19-22Z" fill="#202938" />
+      <path d="M119 57h112c31 0 55 14 73 41H74c12-23 26-37 45-41Z" fill="#94a3b8" />
+      <path d="M133 66h54v31H91c10-17 24-28 42-31ZM202 66h30c22 0 40 10 57 31h-87V66Z" fill="#eef6ff" />
+      <path d="M77 107h254" stroke="#f8fafc" strokeWidth="7" strokeLinecap="round" opacity="0.55" />
+      <path d="M135 52h88" stroke="#f8fafc" strokeWidth="5" strokeLinecap="round" opacity="0.7" />
+      <circle cx="100" cy="127" r="25" fill="#0f172a" />
+      <circle cx="100" cy="127" r="13" fill="#e2e8f0" />
+      <circle cx="296" cy="127" r="25" fill="#0f172a" />
+      <circle cx="296" cy="127" r="13" fill="#e2e8f0" />
+      <path d="M26 143h338" stroke="#94a3b8" strokeWidth="3" opacity="0.35" />
     </svg>
   </div>
+);
+
+const Spec = ({ label, value, sub }: { label: string; value: string; sub?: string }) => (
+  <div className="flex items-center gap-3 border-r px-3 last:border-r-0" style={{ borderColor: line }}>
+    <div className="flex h-9 w-9 items-center justify-center rounded-full border text-[18px] font-black" style={{ borderColor: "#bfdbfe", color: ink }}>{label[0]}</div>
+    <div>
+      <p className="text-[8px] font-black uppercase tracking-wide text-slate-500">{label}</p>
+      <p className="text-[16px] font-black leading-none" style={{ color: ink }}>{value}</p>
+      {sub ? <p className="text-[8px] text-slate-500">{sub}</p> : null}
+    </div>
+  </div>
+);
+
+const BenefitIcon = ({ label, detail, icon }: { label: string; detail: string; icon: string }) => (
+  <div className="border-r px-3 text-center last:border-r-0" style={{ borderColor: line }}>
+    <div className="mx-auto flex h-10 w-10 items-center justify-center rounded-full text-[18px] font-black" style={{ color: blue, background: "#eff6ff" }}>{icon}</div>
+    <p className="mt-1 text-[10px] font-black leading-tight" style={{ color: ink }}>{label}</p>
+    <p className="mt-0.5 text-[8px] leading-tight text-slate-500">{detail}</p>
+  </div>
+);
+
+const Pill = ({ children }: { children: React.ReactNode }) => (
+  <span className="rounded-full border bg-white px-2.5 py-1 text-[9px] font-semibold leading-none" style={{ borderColor: line, color: ink }}>{children}</span>
 );
 
 export const SaturdayHeroWindow: React.FC<Props> = ({ data }) => {
@@ -72,151 +98,139 @@ export const SaturdayHeroWindow: React.FC<Props> = ({ data }) => {
   const interior = specs.find((s) => /interior/i.test(s.label))?.value || "Graphite Leather";
   const engine = specs.find((s) => /engine/i.test(s.label))?.value || "3.5L V6";
   const drivetrain = specs.find((s) => /drive/i.test(s.label))?.value || "AWD";
-  const trans = specs.find((s) => /trans/i.test(s.label))?.value || "9-Speed Auto";
-  const mileage = vehicle.mileage ? `${Number(vehicle.mileage).toLocaleString()} miles` : specs.find((s) => /mileage/i.test(s.label))?.value || "18,426 miles";
-
-  const topFeatures = highlights.slice(0, 10);
-  const featureColumns = chunk(topFeatures, 5);
+  const trans = specs.find((s) => /trans/i.test(s.label))?.value || "9-Speed";
+  const mileage = vehicle.mileage ? Number(vehicle.mileage).toLocaleString() : "18,426";
+  const title = vehicle.title.replace(/^2024\s+/i, "");
+  const featurePills = [...highlights, "Clean History", "No Accidents", "3rd Row Seating", "Remote Start"].slice(0, 14);
 
   return (
     <div
       className="bg-white text-slate-900 shadow-2xl ring-1 ring-slate-200 print:shadow-none"
       style={{ width: "8.5in", height: "11in", fontFamily: "Inter, ui-sans-serif, system-ui, sans-serif" }}
     >
-      <div className="flex h-full flex-col p-[0.24in]">
-        {/* Top brand / compliance / QR */}
-        <header className="grid grid-cols-[1.35fr_0.8fr_1.05fr] items-start gap-5">
-          <div className="flex items-center gap-3">
-            <div className="flex h-14 w-14 items-center justify-center rounded-2xl text-[34px] font-black text-white" style={{ background: `linear-gradient(135deg,${blue},#60A5FA)` }}>A</div>
-            <div>
-              <div className="text-[28px] font-black leading-none tracking-tight" style={{ color: ink }}>autolabels<span style={{ color: blue }}>.io</span></div>
-              <div className="mt-1 text-[10px] font-bold uppercase tracking-[0.22em] text-slate-500">AI-powered vehicle information</div>
-            </div>
-          </div>
+      <div className="flex h-full flex-col p-[0.22in]">
+        <header className="grid grid-cols-[1.25fr_0.7fr_1.05fr] items-start gap-4">
+          <AutoLabelsMark />
           <div className="flex items-start gap-2 pt-1">
-            <div className="flex h-8 w-8 items-center justify-center rounded-full border text-[15px] font-black" style={{ borderColor: blue, color: blue }}>✓</div>
+            <div className="flex h-7 w-7 items-center justify-center rounded-full border text-[14px] font-black" style={{ borderColor: blue, color: blue }}>✓</div>
             <div>
-              <div className="text-[12px] font-black uppercase" style={{ color: ink }}>FTC Compliant</div>
-              <div className="text-[10px] leading-snug text-slate-500">All disclosures delivered digitally and in print.</div>
+              <p className="text-[12px] font-black uppercase" style={{ color: ink }}>FTC Compliant</p>
+              <p className="text-[9px] leading-tight text-slate-500">All disclosures delivered digitally and in print.</p>
             </div>
           </div>
-          <QrPanel url={qrUrl} />
+          <QrReport url={qrUrl} />
         </header>
 
-        {/* Hero */}
-        <section className="mt-5 grid grid-cols-[0.92fr_1.08fr] gap-5">
+        <section className="mt-4 grid grid-cols-[0.98fr_1.02fr] gap-4">
           <div>
-            <div className="text-[23px] font-black leading-none" style={{ color: blue }}>2024</div>
-            <h1 className="mt-1 text-[39px] font-black uppercase leading-[0.98] tracking-[-0.04em]" style={{ color: ink }}>{vehicle.title.replace(/^2024\s+/i, "")}</h1>
-            <div className="mt-5 grid grid-cols-2 gap-x-6 gap-y-4 text-[10px]">
-              <div><div className="font-bold uppercase tracking-wide text-slate-500">Stock Number</div><div className="mt-1 font-black" style={{ color: ink }}>{vehicle.stock}</div></div>
-              <div><div className="font-bold uppercase tracking-wide text-slate-500">VIN</div><div className="mt-1 font-black" style={{ color: ink }}>{vehicle.vin}</div></div>
-              <div><div className="font-bold uppercase tracking-wide text-slate-500">Exterior Color</div><div className="mt-1 font-black" style={{ color: ink }}>{exterior}</div></div>
-              <div><div className="font-bold uppercase tracking-wide text-slate-500">Interior Color</div><div className="mt-1 font-black" style={{ color: ink }}>{interior}</div></div>
+            <div className="mb-2 flex items-center gap-2 text-[12px] font-black uppercase" style={{ color: blue }}><span className="rounded-full border px-2 py-0.5" style={{ borderColor: "#bfdbfe" }}>Vehicle Passport</span></div>
+            <h1 className="text-[41px] font-black uppercase leading-[0.98] tracking-[-0.045em]" style={{ color: ink }}>{title}</h1>
+            <div className="mt-4 grid grid-cols-2 gap-x-7 gap-y-3 text-[9.5px]">
+              <div><p className="font-black uppercase text-slate-500">Stock Number</p><p className="mt-0.5 font-black" style={{ color: ink }}>{vehicle.stock}</p></div>
+              <div><p className="font-black uppercase text-slate-500">VIN</p><p className="mt-0.5 font-black" style={{ color: ink }}>{vehicle.vin}</p></div>
+              <div><p className="font-black uppercase text-slate-500">Exterior</p><p className="mt-0.5 font-black" style={{ color: ink }}>{exterior}</p></div>
+              <div><p className="font-black uppercase text-slate-500">Interior</p><p className="mt-0.5 font-black" style={{ color: ink }}>{interior}</p></div>
             </div>
           </div>
-          <VehicleImage />
+          <VehicleArt />
         </section>
 
-        {/* Snapshot row */}
-        <section className="mt-4 grid grid-cols-[0.82fr_repeat(5,1fr)] items-center rounded-[18px] border bg-white px-4 py-3" style={{ borderColor: line }}>
-          <div className="text-[15px] font-black leading-tight" style={{ color: ink }}>Overall<br />Vehicle<br />Snapshot</div>
-          {[['One Owner', 'Verified', 'blue'], ['Clean History', 'No Accidents', 'green'], ['Dealer Certified', 'Inspected', 'blue'], ['Well Maintained', 'Service Records', 'purple']].map(([a, b, tone]) => (
-            <div key={a} className="flex flex-col items-center border-l px-3 text-center" style={{ borderColor: line }}>
-              <MiniIcon tone={tone as 'blue' | 'green' | 'purple'}>{a.charAt(0)}</MiniIcon>
-              <div className="mt-2 text-[10px] font-black" style={{ color: ink }}>{a}</div>
-              <div className="text-[9px] text-slate-500">{b}</div>
-            </div>
-          ))}
-          <div className="border-l px-3 text-center" style={{ borderColor: line }}>
-            <div className="text-[27px] tracking-[0.08em]" style={{ color: blue }}>★★★★★</div>
-            <div className="mt-1 text-[13px] font-black" style={{ color: ink }}>4.8 OUT OF 5</div>
-            <div className="text-[9px] text-slate-500">1,250+ Customer Reviews</div>
-          </div>
+        <section className="mt-3 grid grid-cols-6 rounded-[16px] border bg-white py-3" style={{ borderColor: line }}>
+          <Spec label="Mileage" value={mileage} sub="Miles" />
+          <Spec label="Fuel Economy" value={`${fuel.city} / ${fuel.highway}`} sub="MPG City / Hwy" />
+          <Spec label="Engine" value={engine} sub="Gasoline" />
+          <Spec label="Drivetrain" value={drivetrain} sub="All Wheel Drive" />
+          <Spec label="Transmission" value={trans} sub="Automatic" />
+          <Spec label="Fuel Type" value="Gasoline" />
         </section>
 
-        {/* Specs row */}
-        <section className="mt-3 grid grid-cols-5 rounded-[18px] border bg-white py-3" style={{ borderColor: line }}>
-          {[
-            ['Mileage', mileage, 'M'],
-            ['Fuel Economy', `${fuel.city} / ${fuel.highway}`, 'F'],
-            ['Engine', engine, 'E'],
-            ['Drivetrain', drivetrain, 'D'],
-            ['Transmission', trans, 'T'],
-          ].map(([label, value, icon]) => (
-            <div key={label} className="flex items-center gap-3 border-r px-4 last:border-r-0" style={{ borderColor: line }}>
-              <div className="text-[30px] font-black" style={{ color: ink }}>{icon}</div>
-              <div><div className="text-[8px] font-black uppercase tracking-wide text-slate-500">{label}</div><div className="text-[18px] font-black leading-none" style={{ color: ink }}>{value}</div></div>
-            </div>
-          ))}
-        </section>
-
-        {/* Core report cards */}
-        <section className="mt-4 grid grid-cols-[1.05fr_1fr_1.18fr] gap-4">
-          <Card className="overflow-hidden text-white" title="">
-            <div className="-m-px rounded-[18px] p-5 text-white" style={{ background: `linear-gradient(145deg,${blue},${navy})` }}>
-              <div className="text-[14px] font-black uppercase tracking-wide">Vehicle Quality Score</div>
-              <div className="mt-4 flex items-end gap-2"><span className="text-[62px] font-black leading-none">93</span><span className="pb-2 text-[18px]">/100</span></div>
-              <div className="mt-2 inline-block rounded-full bg-emerald-400 px-3 py-1 text-[10px] font-black uppercase text-white">Excellent</div>
-              <div className="mt-3 text-[10px] leading-snug text-blue-100">Scores are based on data analysis of history, condition, and value.</div>
-              {['Ownership History', 'Condition', 'Service History', 'Market Value'].map((x, i) => (
-                <div key={x} className="mt-3 grid grid-cols-[1fr_80px] items-center gap-2 text-[9px]"><span>{x}</span><div className="h-1.5 rounded-full bg-white/30"><div className="h-full rounded-full bg-emerald-400" style={{ width: `${92 - i * 5}%` }} /></div></div>
-              ))}
+        <section className="mt-3 grid grid-cols-[1fr_1fr_1.08fr] gap-3">
+          <Card title="Vehicle Confidence Score">
+            <div className="p-4 pt-3 text-center">
+              <div className="mx-auto flex h-[1.18in] w-[1.18in] items-center justify-center rounded-full border-[10px]" style={{ borderColor: green }}>
+                <div><p className="text-[45px] font-black leading-none" style={{ color: ink }}>93</p><p className="text-[12px] font-bold text-slate-500">/100</p></div>
+              </div>
+              <p className="mt-2 text-[13px] font-black uppercase" style={{ color: green }}>Excellent</p>
+              <p className="mx-auto mt-1 max-w-[1.7in] text-[9px] leading-tight text-slate-500">Our AI analyzes 50+ data points to rate this vehicle.</p>
             </div>
           </Card>
 
-          <Card title="Included Ownership Benefits">
-            <div className="space-y-2 p-4 pt-3">
-              {benefits.slice(0, 4).map((b, i) => (
-                <div key={b} className="flex items-center gap-3 rounded-xl border p-2.5" style={{ borderColor: line }}>
-                  <div className="flex h-9 w-9 items-center justify-center rounded-lg text-[18px] font-black" style={{ color: blue, background: '#EFF6FF' }}>{i + 1}</div>
-                  <div><div className="text-[11px] font-black" style={{ color: ink }}>{b}</div><div className="text-[8px] text-slate-500">Included with this vehicle.</div></div>
-                </div>
-              ))}
-              <div className="pt-1 text-center text-[10px] font-semibold" style={{ color: blue }}>See dealer for complete details.</div>
+          <Card title="Price Position">
+            <div className="p-4 pt-3 text-center">
+              <p className="text-[18px] font-black uppercase" style={{ color: green }}>Great Value</p>
+              <p className="mt-1 text-[10px] font-semibold text-slate-500">$1,240 below market average</p>
+              <div className="relative mx-auto mt-5 h-[0.8in] w-[1.75in] overflow-hidden">
+                <div className="absolute bottom-0 left-0 h-[1.55in] w-[1.55in] rounded-full border-[17px]" style={{ borderColor: "#dbe4f0", borderBottomColor: green, borderLeftColor: green, transform: "rotate(-45deg)" }} />
+                <div className="absolute bottom-0 left-[0.82in] h-[0.65in] w-[2px] origin-bottom bg-slate-800" style={{ transform: "rotate(-2deg)" }} />
+              </div>
+              <div className="mt-1 grid grid-cols-3 text-[8px] text-slate-500"><span>Below</span><span>Market</span><span>Above</span></div>
             </div>
           </Card>
 
-          <Card title="Top Features">
-            <div className="grid grid-cols-2 gap-2 p-4 pt-3">
-              {featureColumns.flat().map((h) => (
-                <div key={h} className="rounded-xl border px-3 py-2 text-[10px] font-semibold leading-tight" style={{ borderColor: line, color: ink }}>
-                  <span style={{ color: blue }}>▣</span> {h}
-                </div>
-              ))}
-              <div className="col-span-2 text-center text-[10px] font-semibold text-slate-500">... and more</div>
+          <Card className="overflow-hidden text-white">
+            <div className="h-full rounded-[16px] p-4" style={{ background: `linear-gradient(145deg,${navy},#061326)` }}>
+              <p className="text-[15px] font-black uppercase tracking-tight">Digital Vehicle Passport</p>
+              <p className="mt-2 text-[10px] leading-snug text-blue-100">Verified digital passport with blockchain-secured records.</p>
+              <div className="mt-3 space-y-1.5 text-[10.5px] font-semibold">
+                {['Ownership History Verified', 'Title & Brand Check', 'Odometer Verified', 'Service & Maintenance Records', 'Inspection & Reconditioning'].map((x) => <p key={x}><span style={{ color: green }}>✓</span> {x}</p>)}
+              </div>
+              <div className="mt-3 rounded-full bg-white px-4 py-2 text-center text-[10px] font-black" style={{ color: navy }}>View Full Passport Report</div>
             </div>
           </Card>
         </section>
 
-        {/* Bottom report row */}
-        <section className="mt-4 grid grid-cols-[2.05fr_0.95fr] gap-4">
-          <Card title="Ownership Snapshot (Estimates)">
-            <div className="grid grid-cols-4 gap-0 p-4 pt-3 text-[10px]">
-              {[['Fuel Type', 'Gasoline', 'Annual fuel est. $1,850'], ['Insurance Category', 'Mid-Range', 'Annual estimate $1,450 - $1,750'], ['Warranty Status', 'Powertrain Coverage', 'Expires 09/03/2033 or 100,000 mi'], ['Market Value', 'Great Value', 'Within market range']].map(([a, b, c]) => (
-                <div key={a} className="border-r px-3 last:border-r-0" style={{ borderColor: line }}>
-                  <div className="font-black uppercase tracking-wide text-slate-500">{a}</div><div className="mt-1 font-black" style={{ color: ink }}>{b}</div><div className="mt-3 text-[8px] font-semibold text-slate-500">{c}</div>
-                </div>
-              ))}
+        <section className="mt-3 grid grid-cols-[1.25fr_0.95fr] gap-3">
+          <Card title="Ownership Benefits Included">
+            <div className="grid grid-cols-5 p-3 pt-2">
+              <BenefitIcon icon="S" label="10 Year / 100,000 Mile" detail="Powertrain warranty" />
+              <BenefitIcon icon="M" label="2 Years" detail="Maintenance" />
+              <BenefitIcon icon="R" label="24/7" detail="Roadside assistance" />
+              <BenefitIcon icon="E" label="3 Day / 300 Mile" detail="Exchange policy" />
+              <BenefitIcon icon="C" label="Free CARFAX" detail="Vehicle report" />
+            </div>
+          </Card>
+          <Card title="Dealer Trust Score">
+            <div className="grid grid-cols-[0.42fr_1fr] items-center gap-3 p-4 pt-2">
+              <div className="flex h-16 w-16 items-center justify-center rounded-2xl text-[35px] font-black" style={{ color: blue, background: "#eff6ff" }}>★</div>
+              <div><p className="text-[39px] font-black leading-none" style={{ color: ink }}>4.9 <span className="text-[19px]" style={{ color: blue }}>★★★★★</span></p><p className="mt-1 text-[10px] text-slate-500">Based on 1,250+ verified reviews</p></div>
+            </div>
+          </Card>
+        </section>
+
+        <section className="mt-3 grid grid-cols-[1.18fr_0.82fr] gap-3">
+          <Card title="Vehicle Journey Timeline">
+            <div className="grid grid-cols-5 gap-1 p-4 pt-3 text-center">
+              {['Acquired', 'Inspected', 'Reconditioned', 'Certified', 'Listed'].map((x, i) => <div key={x} className="relative"><div className="mx-auto flex h-10 w-10 items-center justify-center rounded-full border-2 bg-white text-[11px] font-black" style={{ borderColor: i === 4 ? green : blue, color: i === 4 ? green : blue }}>{i + 1}</div><p className="mt-1 text-[9px] font-black uppercase" style={{ color: ink }}>{x}</p><p className="text-[8px] leading-tight text-slate-500">03/0{i + 2}/2024</p></div>)}
+            </div>
+          </Card>
+          <Card title="Vehicle Highlights">
+            <div className="flex flex-wrap gap-1.5 p-3 pt-2">
+              {featurePills.map((h) => <Pill key={h}>{h}</Pill>)}
+            </div>
+          </Card>
+        </section>
+
+        <section className="mt-3 grid grid-cols-[1.25fr_0.62fr_0.82fr] gap-3">
+          <Card>
+            <div className="grid grid-cols-[0.82fr_1fr] items-center p-4">
+              <div><p className="text-[10px] font-black uppercase text-slate-500">Market Price</p><p className="text-[36px] font-black leading-none" style={{ color: ink }}>{fmtMoney(vehicle.price)}</p><p className="mt-2 text-[10px] font-bold text-emerald-600">✓ Within Market Range</p></div>
+              <svg viewBox="0 0 180 55" className="h-[0.62in] w-full"><polyline fill="none" stroke={blue} strokeWidth="3" points="5,40 30,36 52,27 78,29 103,18 130,21 160,10" /><circle cx="160" cy="10" r="5" fill={blue} /></svg>
             </div>
           </Card>
           <Card>
-            <div className="p-4">
-              <div className="text-[11px] font-black uppercase tracking-wide text-slate-500">Market Price</div>
-              <div className="mt-1 text-[40px] font-black leading-none" style={{ color: ink }}>{fmtMoney(vehicle.price)}</div>
-              <div className="mt-3 flex items-center gap-2 text-[11px] font-bold text-emerald-600"><span>✓</span> Within Market Range</div>
-              <div className="mt-2 text-[9px] text-slate-500">Pricing updated today</div>
-            </div>
+            <div className="p-4"><p className="text-[10px] font-black uppercase text-slate-500">Est. Monthly Payment</p><p className="mt-1 text-[26px] font-black" style={{ color: ink }}>$542 <span className="text-[10px]">/mo*</span></p><p className="text-[9px] text-slate-500">Get pre-qualified in minutes.</p></div>
+          </Card>
+          <Card>
+            <div className="p-4"><p className="text-[13px] font-black uppercase" style={{ color: blue }}>Secure. Private. Compliant.</p><p className="mt-2 text-[10px] leading-snug text-slate-500">Your data is protected with enterprise-grade security.</p></div>
           </Card>
         </section>
 
-        {/* Footer */}
-        <footer className="mt-auto grid grid-cols-[1.1fr_repeat(4,0.72fr)_1fr] items-center rounded-[16px] border bg-slate-50 text-center" style={{ borderColor: line }}>
-          <div className="flex items-center gap-2 px-4 py-3 text-left"><div className="text-[34px] font-black" style={{ color: blue }}>A</div><div><div className="text-[15px] font-black" style={{ color: ink }}>autolabels.io</div><div className="text-[9px] text-slate-500">AI-Powered Vehicle Information</div></div></div>
-          {['AI-Powered Accuracy', 'FTC Compliant', 'Real-Time Updates', 'Digital + Print Ready'].map((x) => <div key={x} className="border-l px-2 text-[9px] font-semibold" style={{ borderColor: line, color: ink }}>{x}</div>)}
-          <div className="border-l px-3 text-left text-[9px]" style={{ borderColor: line }}><div className="font-black" style={{ color: blue }}>Questions?</div><div>{dealer.phone}</div><div>{dealer.website}</div></div>
+        <footer className="mt-auto grid grid-cols-[1.05fr_repeat(4,0.72fr)_1fr] items-center rounded-[14px] border bg-slate-50 text-center" style={{ borderColor: line }}>
+          <div className="flex items-center gap-2 px-3 py-2 text-left"><div className="text-[28px] font-black" style={{ color: blue }}>A</div><div><p className="text-[14px] font-black" style={{ color: ink }}>autolabels.io</p><p className="text-[8px] text-slate-500">AI-Powered Vehicle Information Platform</p></div></div>
+          {['AI-Powered', 'FTC Compliant', 'Real-Time', 'Digital + Print'].map((x) => <div key={x} className="border-l px-2 text-[8.5px] font-semibold" style={{ borderColor: line, color: ink }}>{x}</div>)}
+          <div className="border-l px-2 text-left text-[8.5px]" style={{ borderColor: line }}><p className="font-black" style={{ color: blue }}>Questions?</p><p>{dealer.phone}</p><p>{dealer.website}</p></div>
         </footer>
-        <div className="mt-1 text-[7.5px] leading-tight text-slate-500">{disclaimer}</div>
+        <p className="mt-1 text-center text-[7px] leading-tight text-slate-500">{disclaimer}</p>
       </div>
     </div>
   );
