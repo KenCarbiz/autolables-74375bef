@@ -1114,6 +1114,7 @@ export type Database = {
           superseded_at: string | null
           superseded_by: string | null
           template_id: string
+          template_version: number | null
           tenant_id: string
           updated_at: string
           vehicle_id: string | null
@@ -1144,6 +1145,7 @@ export type Database = {
           superseded_at?: string | null
           superseded_by?: string | null
           template_id: string
+          template_version?: number | null
           tenant_id: string
           updated_at?: string
           vehicle_id?: string | null
@@ -1174,6 +1176,7 @@ export type Database = {
           superseded_at?: string | null
           superseded_by?: string | null
           template_id?: string
+          template_version?: number | null
           tenant_id?: string
           updated_at?: string
           vehicle_id?: string | null
