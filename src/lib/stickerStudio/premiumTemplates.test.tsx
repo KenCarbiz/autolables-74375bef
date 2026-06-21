@@ -42,11 +42,11 @@ describe("premium window templates", () => {
   }
 
   it("Executive Noir is dark by default and light under white label", () => {
-    expect(render("window-noir", DATA)).toContain("#0b0f17");          // dark hero
-    expect(render("window-noir", DATA, { labelMode: "white" })).toContain("#faf7f0"); // cream variant
+    expect(render("window-luxury", DATA)).toContain("#0b0f17");          // dark hero
+    expect(render("window-luxury", DATA, { labelMode: "white" })).toContain("#faf7f0"); // cream variant
   });
 
   it("Big Price sticker shows the CALL FOR PRICE fallback", () => {
-    expect(render("window-value", { ...DATA, price: "", msrp: "" })).toContain("CALL FOR PRICE");
+    expect(render("window-bold", { ...DATA, price: "", msrp: "" })).toContain("CALL FOR PRICE");
   });
 });
