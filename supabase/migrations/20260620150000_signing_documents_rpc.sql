@@ -25,7 +25,11 @@ LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $$
          gd.label_mode, gd.pdf_url, gd.png_url, gd.online_url,
          gd.created_at, gd.approved_at, gd.published_at
   FROM public.addendums a
-  JOIN public.vehicle_listings v ON v.vin = a.vehicle_vin AND v.tenant_id = a.tenant_id
+  -- Normalize VIN (case/whitespace) so the right vehicle is never missed; the
+  -- tenant_id equality keeps this strictly within the addendum's own tenant.
+  JOIN public.vehicle_listings v
+    ON upper(btrim(v.vin)) = upper(btrim(a.vehicle_vin))
+   AND v.tenant_id = a.tenant_id
   JOIN public.generated_documents gd ON gd.vehicle_id = v.id
   WHERE a.signing_token = _token
     AND gd.document_status IN ('approved','printed','published')

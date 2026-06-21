@@ -47,8 +47,12 @@ export function detectStale(snapshotData: any, live: any, rules: DocumentRules):
   if (snapshotData.stock && live.stock_number && norm(snapshotData.stock) !== norm(live.stock_number))
     f.push({ field: "stock", reason: "Stock number changed.", severity: "warning", oldValue: snapshotData.stock, newValue: live.stock_number });
 
-  if (snapshotData.vehicleTitle && liveYmm && norm(snapshotData.vehicleTitle).indexOf(norm(liveYmm).split(" ")[0]) === -1 && norm(liveYmm) && !norm(snapshotData.vehicleTitle).includes(norm(liveYmm)))
-    f.push({ field: "vehicle", reason: "Year/make/model differs from the live vehicle.", severity: "warning", oldValue: snapshotData.vehicleTitle, newValue: liveYmm });
+  // Only flag a material model-year change — a fuzzy title compare floods the
+  // queue on harmless formatting/casing differences.
+  const snapYear = (String(snapshotData.vehicleTitle || "").match(/\b(?:19|20)\d{2}\b/) || [])[0];
+  const liveYear = (String(liveYmm || "").match(/\b(?:19|20)\d{2}\b/) || [])[0];
+  if (snapYear && liveYear && snapYear !== liveYear)
+    f.push({ field: "vehicle", reason: "Model year differs from the live vehicle.", severity: "warning", oldValue: snapshotData.vehicleTitle, newValue: liveYmm });
 
   if (rules.staleOnSoldRemoved && (live.status === "sold" || live.status === "removed" || live.is_active === false))
     f.push({ field: "status", reason: `Vehicle is ${live.status || "inactive"} but a sticker is still live.`, severity: "warning", oldValue: "active", newValue: live.status || "inactive" });
