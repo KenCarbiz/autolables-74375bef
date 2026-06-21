@@ -44,16 +44,23 @@ export const SaturdayPremiumAddendum: React.FC<Props> = ({ data }) => {
   const safeUrl = qrUrl.startsWith("http") ? qrUrl : `https://${qrUrl}`;
   const installedTotal = installed.reduce((s, l) => s + Number(String(l.price).replace(/[^\d.]/g, "") || 0), 0);
   const adjustedPrice = Number(String(vehicle.price).replace(/[^\d.]/g, "") || 0) + installedTotal;
+  const priceLabel = vehicle.priceLabel || dealer.pricingLabel || "Asking Price";
 
   return (
     <div className="bg-white text-slate-950 shadow-2xl ring-1 ring-slate-200 print:shadow-none" style={{ width: "4.5in", height: "11in", fontFamily: "Inter, system-ui, sans-serif" }}>
       <div className="flex h-full flex-col p-[0.16in]">
         <header className="overflow-hidden rounded-[16px] text-white" style={{ background: `linear-gradient(135deg,${navy},${blue})` }}>
-          <div className="p-4">
-            <div className="text-[9px] font-black uppercase tracking-[0.32em] text-blue-100">Supplemental Addendum</div>
-            <div className="mt-1 text-[22px] font-black leading-none">{dealer.name}</div>
-            <div className="mt-1 text-[9px] text-blue-100">{dealer.address}</div>
-            <div className="mt-0.5 text-[9px] font-semibold text-blue-50">{dealer.phone} · {dealer.website}</div>
+          <div className="grid grid-cols-[1fr_auto] gap-3 p-3.5">
+            <div className="min-w-0">
+              <div className="text-[8px] font-black uppercase tracking-[0.24em] text-blue-100">Supplemental Addendum</div>
+              <div className="mt-1 max-w-full truncate text-[20px] font-black leading-none tracking-[-0.02em]">{dealer.name}</div>
+              {dealer.slogan ? <div className="mt-1 truncate text-[8px] font-semibold uppercase tracking-[0.12em] text-blue-100">{dealer.slogan}</div> : null}
+            </div>
+            <div className="rounded-[10px] bg-white/14 px-2.5 py-2 text-right text-[8px] font-semibold leading-tight text-blue-50">
+              <div className="max-w-[1.55in] break-words">{dealer.address}</div>
+              <div className="mt-1 whitespace-nowrap">{dealer.phone}</div>
+              <div className="whitespace-nowrap">{dealer.website}</div>
+            </div>
           </div>
           <div className="h-1.5 bg-white/20" />
         </header>
@@ -96,7 +103,7 @@ export const SaturdayPremiumAddendum: React.FC<Props> = ({ data }) => {
         </section>
 
         <section className="mt-3 rounded-[16px] p-4 text-white" style={{ background: `linear-gradient(145deg,${blue},#1d4ed8)` }}>
-          <div className="flex justify-between text-[10px] font-semibold text-blue-100"><span>Asking Price</span><span>{fmtMoney(vehicle.price)}</span></div>
+          <div className="flex justify-between text-[10px] font-semibold text-blue-100"><span>{priceLabel}</span><span>{fmtMoney(vehicle.price)}</span></div>
           <div className="flex justify-between text-[10px] font-semibold text-blue-100"><span>+ Installed Equipment</span><span>{fmtMoney(installedTotal)}</span></div>
           <div className="mt-2 border-t border-white/30 pt-2">
             <div className="text-[9px] font-black uppercase tracking-[0.28em] text-blue-100">Adjusted Total</div>
