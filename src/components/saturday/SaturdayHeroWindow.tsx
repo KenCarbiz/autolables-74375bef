@@ -10,7 +10,7 @@ type Props = { data: SaturdaySticker };
 
 const ink = "#07142f";
 const blue = "#2563eb";
-const navy = "#061a35";
+const navy = "#071f3f";
 const line = "#dbe4f0";
 const green = "#22c55e";
 
@@ -55,17 +55,18 @@ function Header({ qrUrl }: { qrUrl: string }) {
 function VehiclePhoto() {
   return (
     <div className="relative h-[2.36in] overflow-hidden rounded-[24px] bg-gradient-to-br from-white via-slate-50 to-blue-50">
-      <div className="absolute inset-0" style={{ background: "radial-gradient(circle at 72% 43%, rgba(147,197,253,.55) 0, transparent 34%), linear-gradient(115deg, transparent 0 55%, rgba(37,99,235,.055) 55% 62%, transparent 62%)" }} />
-      <svg className="absolute -left-[0.05in] top-[0.03in] drop-shadow-2xl" width="535" height="238" viewBox="0 0 535 238" fill="none" aria-label="vehicle image placeholder">
-        <path d="M50 154c15-59 66-98 134-98h174c56 0 107 31 146 86l31 7c16 4 25 17 21 33l-5 18H22l7-27c4-14 10-19 21-19Z" fill="#263243" />
-        <path d="M182 77h174c49 0 88 24 117 69H108c21-43 45-65 74-69Z" fill="#94a3b8" />
-        <path d="M206 93h86v51H132c19-32 45-49 74-51ZM316 93h42c37 0 67 18 95 51H316V93Z" fill="#f4f8fc" />
-        <path d="M98 162h396" stroke="#f8fafc" strokeWidth="10" strokeLinecap="round" opacity="0.58" />
-        <path d="M206 69h136" stroke="#f8fafc" strokeWidth="7" strokeLinecap="round" opacity="0.72" />
-        <circle cx="138" cy="197" r="38" fill="#0f172a" />
-        <circle cx="138" cy="197" r="18" fill="#e2e8f0" />
-        <circle cx="441" cy="197" r="38" fill="#0f172a" />
-        <circle cx="441" cy="197" r="18" fill="#e2e8f0" />
+      <div className="absolute inset-0" style={{ background: "radial-gradient(circle at 70% 42%, rgba(147,197,253,.45) 0, transparent 36%), linear-gradient(115deg, transparent 0 55%, rgba(37,99,235,.05) 55% 62%, transparent 62%)" }} />
+      <svg className="absolute left-[0.04in] top-[0.14in] drop-shadow-2xl" width="460" height="190" viewBox="0 0 460 190" fill="none" aria-label="vehicle image placeholder">
+        <path d="M45 118c12-45 52-75 106-75h148c45 0 86 25 118 68l28 6c13 3 22 14 19 27l-4 16H23l6-23c3-12 8-18 16-19Z" fill="#273243" />
+        <path d="M150 58h146c39 0 70 19 94 55H91c17-34 37-52 59-55Z" fill="#9aa8b8" />
+        <path d="M170 72h72v40H111c16-25 36-38 59-40ZM264 72h36c30 0 55 15 78 40H264V72Z" fill="#f4f8fc" />
+        <path d="M80 124h335" stroke="#f8fafc" strokeWidth="8" strokeLinecap="round" opacity="0.58" />
+        <path d="M170 51h112" stroke="#f8fafc" strokeWidth="6" strokeLinecap="round" opacity="0.72" />
+        <circle cx="111" cy="155" r="32" fill="#0f172a" />
+        <circle cx="111" cy="155" r="15" fill="#e2e8f0" />
+        <circle cx="372" cy="155" r="32" fill="#0f172a" />
+        <circle cx="372" cy="155" r="15" fill="#e2e8f0" />
+        <path d="M32 174h390" stroke="#94a3b8" strokeWidth="3" opacity="0.35" />
       </svg>
     </div>
   );
@@ -179,7 +180,7 @@ export const SaturdayHeroWindow = ({ data }: Props) => {
       <div className="flex h-full flex-col p-[0.22in]">
         <Header qrUrl={qrUrl} />
 
-        <section className="mt-4 grid grid-cols-[0.88fr_1.12fr] gap-5">
+        <section className="mt-4 grid grid-cols-[0.9fr_1.1fr] gap-5">
           <div>
             <div className="text-[12px] font-black uppercase" style={{ color: blue }}>Vehicle Passport</div>
             <div className="mt-3 text-[27px] font-black leading-none" style={{ color: blue }}>2024</div>
