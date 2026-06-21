@@ -76,6 +76,7 @@ const StickerStudioGenerator = lazy(() => import("./pages/StickerStudioGenerator
 const StickerStudioCustomize = lazy(() => import("./pages/StickerStudioCustomize"));
 const StickerPrint = lazy(() => import("./pages/StickerPrint"));
 const StickerTestLabel = lazy(() => import("./pages/StickerTestLabel"));
+const DevHeroPreview = lazy(() => import("./pages/DevHeroPreview"));
 const QrRedirect = lazy(() => import("./pages/QrRedirect"));
 const QrAnalytics = lazy(() => import("./pages/QrAnalytics"));
 const Reports = lazy(() => import("./pages/Reports"));
