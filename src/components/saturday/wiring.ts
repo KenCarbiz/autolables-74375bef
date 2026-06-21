@@ -1,4 +1,5 @@
-import type { SaturdayAddendumPricingMode, SaturdayDealer, SaturdayDealerTheme, SaturdayMarketData, SaturdayMarketTransparencyMode, SaturdaySticker, SaturdayVehicle } from "./types";
+import type { SaturdayAddendumPricingMode, SaturdayDealer, SaturdayDealerTheme, SaturdayMarketData, SaturdayMarketTransparencyMode, SaturdayPassportMode, SaturdaySticker, SaturdayVehicle } from "./types";
+import { resolveVehicleImageForSticker, type VehicleImagePreference } from "./VehicleImagePipeline";
 
 export const PRICE_LABEL_OPTIONS = [
   "Best Price",
@@ -85,6 +86,7 @@ export type DealerLabelSettings = {
   certificationTiers?: DealerCertificationTier[];
   addendumPricingMode?: SaturdayAddendumPricingMode;
   marketTransparencyMode?: SaturdayMarketTransparencyMode;
+  passportMode?: SaturdayPassportMode;
   defaultLabelPlacement?: LabelPlacementOption;
   theme?: SaturdayDealerTheme;
 };
@@ -109,6 +111,9 @@ export type VehicleInventoryInput = {
   mileage?: number | string;
   condition?: "new" | "used";
   imageUrl?: string;
+  factoryCleanImageUrl?: string;
+  transparentVehicleImageUrl?: string;
+  imagePreference?: VehicleImagePreference;
   newCarImageUrl?: string;
   usedCarPrimaryPhotoUrl?: string;
   apiFallbackImageUrl?: string;
@@ -203,7 +208,7 @@ export const resolvePrintedPriceLabel = (dealer: DealerProfileInput, vehicle: Ve
 };
 
 export const resolveVehicleImage = (vehicle: VehicleInventoryInput): string | undefined => {
-  return vehicle.usedCarPrimaryPhotoUrl || vehicle.newCarImageUrl || vehicle.imageUrl || vehicle.apiFallbackImageUrl;
+  return resolveVehicleImageForSticker(vehicle).url;
 };
 
 export const resolveCertificationTier = (dealer: DealerProfileInput, vehicle: VehicleInventoryInput): DealerCertificationTier | undefined => {
@@ -239,6 +244,7 @@ export const buildSaturdayDealer = (dealer: DealerProfileInput): SaturdayDealer 
   theme: dealer.labelSettings?.theme,
   addendumPricingMode: dealer.labelSettings?.addendumPricingMode,
   marketTransparencyMode: dealer.labelSettings?.marketTransparencyMode,
+  passportMode: dealer.labelSettings?.passportMode,
 });
 
 export const buildSaturdayVehicle = (dealer: DealerProfileInput, vehicle: VehicleInventoryInput, market?: MarketIntelligenceInput): SaturdayVehicle => {
