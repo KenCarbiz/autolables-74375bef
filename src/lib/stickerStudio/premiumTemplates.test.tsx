@@ -12,7 +12,7 @@ const BRAND: StickerBranding = {
   dealerName: "Harte Infiniti", address: "Hartford, CT", phone: "(860) 555-0100", website: "harteinfiniti.com",
   logoUrl: "", showLogo: true, valueProp: "Lifetime powertrain", disclaimer: "See dealer for details.", accentColor: "#2563EB",
 };
-const PREMIUM = ["window-passport", "window-value", "window-noir"];
+const PREMIUM = ["window-premium", "window-bold", "window-luxury"];
 const render = (id: string, data: StickerData, options = {}) => {
   const t = getStudioTemplate(id)!;
   const Render = t.Render;
@@ -42,11 +42,11 @@ describe("premium window templates", () => {
   }
 
   it("Executive Noir is dark by default and light under white label", () => {
-    expect(render("window-noir", DATA)).toContain("#0b0f17");          // dark hero
-    expect(render("window-noir", DATA, { labelMode: "white" })).toContain("#faf7f0"); // cream variant
+    expect(render("window-luxury", DATA)).toContain("#0b0f17");          // dark hero
+    expect(render("window-luxury", DATA, { labelMode: "white" })).toContain("#faf7f0"); // cream variant
   });
 
   it("Big Price sticker shows the CALL FOR PRICE fallback", () => {
-    expect(render("window-value", { ...DATA, price: "", msrp: "" })).toContain("CALL FOR PRICE");
+    expect(render("window-bold", { ...DATA, price: "", msrp: "" })).toContain("CALL FOR PRICE");
   });
 });

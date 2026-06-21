@@ -570,13 +570,12 @@ export const STUDIO_TEMPLATES: StudioTemplate[] = [
   // ── Window stickers (8.5 x 11) ──────────────────────────────────────
   { config: baseWindow({ id: "window-modern", name: "Modern SaaS Blue", styleTags: ["Modern", "SaaS"], defaultAccent: "#2563EB", blackLabelReady: true, useCase: "Everyday used-car window sticker" }), Render: WindowSheet },
   { config: baseWindow({ id: "window-classic", name: "Classic Monroney", styleTags: ["Classic", "Compliance"], defaultAccent: "#0B2041", supportsAccent: false, useCase: "Factory-style disclosure layout", complianceNote: "Mirrors the Monroney convention; fixed navy scheme." }), Render: WindowSheet },
-  { config: baseWindow({ id: "window-luxury", name: "Luxury Black Label", styleTags: ["Luxury"], defaultAccent: "#7c5c1e", blackLabelReady: true, useCase: "Premium / high-line inventory" }), Render: WindowSheet },
+  { config: baseWindow({ id: "window-minimal", name: "Minimal High-Readability", styleTags: ["Readability", "Classic"], defaultAccent: "#0B2041", supportsAccent: false, useCase: "Maximum legibility, low ink" }), Render: WindowSheet },
   { config: baseWindow({ id: "window-ev", name: "EV / Hybrid Focus", styleTags: ["EV", "Modern"], defaultAccent: "#0f766e", blackLabelReady: true, useCase: "Electrified inventory with efficiency emphasis" }), Render: WindowSheet },
   { config: baseWindow({ id: "window-cpo", name: "CPO Confidence Report", styleTags: ["CPO", "Classic"], defaultAccent: "#047857", useCase: "Certified pre-owned reassurance sheet", complianceNote: "Pair with the manufacturer CPO disclosure." }), Render: WindowSheet },
-  { config: baseWindow({ id: "window-value", name: "Big Price Lot Sticker", styleTags: ["Value", "Readability"], defaultAccent: "#b91c1c", blackLabelReady: true, useCase: "High-readability lot sticker: huge price + QR, readable at 6-10 ft" }), Render: BigPriceSheet },
-  { config: baseWindow({ id: "window-passport", name: "Vehicle Passport Premium", styleTags: ["Passport", "Modern"], defaultAccent: "#2563EB", useCase: "Flagship scan-first hero with premium price + QR cards" }), Render: PassportPremiumSheet },
-  { config: baseWindow({ id: "window-readable", name: "Minimal High-Readability", styleTags: ["Readability", "Classic"], defaultAccent: "#0B2041", supportsAccent: false, useCase: "Maximum legibility, low ink" }), Render: WindowSheet },
-  { config: baseWindow({ id: "window-noir", name: "Executive Noir", styleTags: ["Luxury"], defaultAccent: "#c9a227", blackLabelReady: true, useCase: "Luxury black-label hero for high-line inventory" }), Render: ExecutiveNoirSheet },
+  { config: baseWindow({ id: "window-bold", name: "Big Price Lot Sticker", styleTags: ["Value", "Readability"], defaultAccent: "#b91c1c", blackLabelReady: true, useCase: "High-readability lot sticker with huge price and QR, readable at 6-10 ft" }), Render: BigPriceSheet },
+  { config: baseWindow({ id: "window-premium", name: "Vehicle Passport Premium", styleTags: ["Passport", "Modern"], defaultAccent: "#2563EB", useCase: "Flagship scan-first window sticker with premium price + QR cards" }), Render: PassportPremiumSheet },
+  { config: baseWindow({ id: "window-luxury", name: "Executive Noir", styleTags: ["Luxury"], defaultAccent: "#c9a227", blackLabelReady: true, useCase: "Luxury black-label window sticker for high-line inventory" }), Render: ExecutiveNoirSheet },
   // ── Addendum strips (4.5 x 11) ──────────────────────────────────────
   { config: baseAddendum({ id: "addendum-modern", name: "Clean Addendum Blue", styleTags: ["Modern", "SaaS"], defaultAccent: "#2563EB", blackLabelReady: true, useCase: "Default supplemental addendum" }), Render: AddendumStrip },
   { config: baseAddendum({ id: "addendum-luxury", name: "Luxury Black Addendum", styleTags: ["Luxury"], defaultAccent: "#7c5c1e", blackLabelReady: true, useCase: "Premium add-on strip" }), Render: AddendumStrip },
@@ -603,9 +602,9 @@ export const RENDER_ENGINES: Record<string, (props: TemplateRenderProps) => JSX.
 // specific template to a dedicated layout (still data-driven config, no static
 // images); any window template not listed here uses the generic WindowSheet.
 const PREMIUM_RENDERERS: Record<string, (props: TemplateRenderProps) => JSX.Element> = {
-  "window-passport": PassportPremiumSheet,
-  "window-value": BigPriceSheet,
-  "window-noir": ExecutiveNoirSheet,
+  "window-premium": PassportPremiumSheet,
+  "window-bold": BigPriceSheet,
+  "window-luxury": ExecutiveNoirSheet,
 };
 
 // Merge a stored config override onto the code base config for the type.
