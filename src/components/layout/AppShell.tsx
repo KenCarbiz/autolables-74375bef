@@ -156,6 +156,7 @@ const AppShell = ({ children }: AppShellProps) => {
       defaultOpen: true,
       items: [
         { label: "Home", path: "/dashboard", icon: LayoutDashboard },
+        { label: "Setup", path: "/setup", icon: Rocket, requireManager: true },
         { label: "Vehicles", path: "/inventory", icon: Car },
         { label: "Deals", path: "/saved", icon: FolderOpen },
       ],

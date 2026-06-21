@@ -8,6 +8,7 @@ import { useTenant } from "@/contexts/TenantContext";
 import { useVehicleFiles } from "@/hooks/useVehicleFiles";
 import { useGetReady } from "@/hooks/useGetReady";
 import { useAdvertisedPrices, assessDrift } from "@/hooks/useAdvertisedPrices";
+import SetupChecklistWidget from "@/components/dashboard/SetupChecklistWidget";
 import {
   ScanLine, Wrench, Tag, Send, CheckCircle2,
   RotateCcw, ShieldCheck,
@@ -228,6 +229,8 @@ const ProcessDashboard = () => {
             </button>
           </div>
         </div>
+
+        <SetupChecklistWidget />
 
         {/* Four KPI cards — outcome metrics, not feature counts.
             Icon chip top-right, huge metric, soft caption. */}
