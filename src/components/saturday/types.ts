@@ -39,6 +39,15 @@ export type SaturdayDealerTheme = {
   borderColor?: string;
 };
 
+export type SaturdayAddendumPricingMode =
+  | "new_msrp_plus_addendum"
+  | "used_addendum_only"
+  | "used_market_value_plus_addendum"
+  | "used_live_price_plus_addendum"
+  | "passport_live_price_only";
+
+export type SaturdayMarketTransparencyMode = "off" | "print_and_passport" | "passport_only" | "selected_templates_only";
+
 export type SaturdayDealer = {
   name: string;
   address: string;
@@ -54,6 +63,10 @@ export type SaturdayDealer = {
   reviewSources?: SaturdayReviewSource[];
   /** Dealer/OEM color controls for frame, headers, accents, and borders. */
   theme?: SaturdayDealerTheme;
+  /** Controls whether addendum print shows MSRP, addendum-only, market value, live price, or passport-only live price. */
+  addendumPricingMode?: SaturdayAddendumPricingMode;
+  /** Controls whether market transparency appears on print, passport, selected templates, or not at all. */
+  marketTransparencyMode?: SaturdayMarketTransparencyMode;
 };
 
 export type SaturdayVehicle = {
@@ -63,6 +76,7 @@ export type SaturdayVehicle = {
   price: string;
   msrp?: string;
   mileage?: string;
+  condition?: "new" | "used";
   /** Optional per-vehicle override for the price label. Falls back to dealer.pricingLabel. */
   priceLabel?: string;
   /** Optional real inventory photo URL. When absent, templates render a print-safe illustration fallback. */
