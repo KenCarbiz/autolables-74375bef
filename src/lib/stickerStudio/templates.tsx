@@ -318,6 +318,236 @@ function AddendumStrip({ config, data, branding, options }: TemplateRenderProps)
   );
 }
 
+// ── Shared premium building blocks ────────────────────────────────────
+const clamp2: React.CSSProperties = { display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" };
+
+// QR is ALWAYS black-on-white with a white quiet zone (never inverted on dark
+// stock); the surrounding white box gives scanners a clean margin.
+function QrBox({ url, size, caption, captionColor }: { url?: string; size: number; caption?: string; captionColor: string }) {
+  if (!url) return null;
+  return (
+    <div className="text-center">
+      <div className="inline-block bg-white" style={{ padding: `${Math.max(7, Math.round(size * 0.12))}px`, border: "1px solid #e2e8f0", borderRadius: 10 }}>
+        <QRCodeSVG value={url} size={size} level="M" bgColor="#ffffff" fgColor="#0f172a" />
+      </div>
+      {caption ? <p className="mt-1 text-[8px] font-bold uppercase tracking-[0.14em]" style={{ color: captionColor }}>{caption}</p> : null}
+    </div>
+  );
+}
+
+// Best price string: prefer selling price, fall back to MSRP, else null.
+const bestPrice = (data: StickerData) => money(data.price) || money(data.msrp) || "";
+const featureList = (data: StickerData) => named(data.installed);
+
+// ── 1. Vehicle Passport Premium Report (flagship, white SaaS) ─────────
+function PassportPremiumSheet({ config, data, branding, options }: TemplateRenderProps) {
+  const accent = config.supportsAccent ? branding.accentColor : config.defaultAccent;
+  const pal = palette(options?.labelMode, accent);
+  const price = bestPrice(data);
+  const showMsrp = !!money(data.price) && !!money(data.msrp) && money(data.price) !== money(data.msrp);
+  const benefits = named(data.benefits);
+  const features = featureList(data);
+  return (
+    <div className="flex h-full flex-col" data-label-mode={pal.dark ? "black" : "white"} style={{ padding: `${config.marginsIn}in`, backgroundColor: pal.sheetBg, color: pal.ink, fontFeatureSettings: '"tnum"' }}>
+      {/* Header */}
+      <div className="flex items-center justify-between gap-4">
+        <div className="flex items-center gap-3 min-w-0">
+          {config.supportsLogo && branding.showLogo ? <StickerLogo url={branding.logoUrl} alt={branding.dealerName} dark={pal.dark} imgClass="h-11 w-auto object-contain" /> : null}
+          <div className="min-w-0">
+            <p className="text-lg font-bold leading-tight tracking-tight" style={{ color: pal.ink }}>{branding.dealerName}</p>
+            <p className="text-[10px] truncate" style={{ color: pal.subInk }}>{[branding.address, branding.phone, branding.website].filter(Boolean).join("  ·  ")}</p>
+          </div>
+        </div>
+        <span className="rounded-full px-3 py-1 text-[10px] font-bold uppercase tracking-[0.14em] text-white whitespace-nowrap" style={{ backgroundColor: accent }}>Vehicle Passport</span>
+      </div>
+
+      {/* Title + meta chips */}
+      <div className="mt-4">
+        <p className="font-black leading-[1.05] tracking-tight text-[34px]" style={{ ...clamp2, color: pal.ink }}>{data.vehicleTitle || "Vehicle"}</p>
+        <div className="mt-2 flex flex-wrap gap-1.5">
+          {[data.stock && `STOCK ${data.stock}`, data.vin && `VIN ${data.vin}`, data.mileage && `${Number(data.mileage).toLocaleString()} MI`].filter(Boolean).map((c, i) => (
+            <span key={i} className="text-[10px] font-semibold tracking-wide rounded-md px-2 py-1" style={{ backgroundColor: pal.dark ? "#1b2230" : "#f1f5f9", color: pal.subInk }}>{c}</span>
+          ))}
+        </div>
+      </div>
+
+      {/* Price + QR row */}
+      <div className="mt-4 grid grid-cols-5 gap-4">
+        <div className="col-span-3 rounded-2xl p-4 flex flex-col justify-center" style={{ backgroundColor: pal.bandBg, border: `1px solid ${accent}33` }}>
+          <span className="text-[10px] font-bold uppercase tracking-[0.16em]" style={{ color: pal.subInk }}>{money(data.price) ? "Our Price" : "MSRP"}</span>
+          <span className="font-black tabular-nums leading-none text-[44px]" style={{ color: accent }}>{price || "Contact dealer"}</span>
+          {showMsrp && <span className="mt-1 text-[12px]" style={{ color: pal.faintInk }}>MSRP <span className="line-through">{money(data.msrp)}</span></span>}
+        </div>
+        <div className="col-span-2 rounded-2xl p-3 flex flex-col items-center justify-center" style={{ border: `1px solid ${pal.hair}` }}>
+          <QrBox url={data.qrUrl} size={104} caption="Scan the Vehicle Passport" captionColor={pal.faintInk} />
+        </div>
+      </div>
+
+      {/* Transparency strip */}
+      <div className="mt-3 rounded-xl px-3 py-2 text-[10px] flex items-center gap-2" style={{ backgroundColor: pal.dark ? "#141a25" : "#f8fafc", color: pal.subInk }}>
+        <span className="font-bold" style={{ color: accent }}>Verified disclosure</span>
+        <span style={{ color: pal.faintInk }}>· Every claim on this label is backed by the digital Vehicle Passport.</span>
+      </div>
+
+      {/* Body: benefits + features */}
+      <div className="mt-4 grid grid-cols-2 gap-x-6 gap-y-3">
+        {benefits.length > 0 && (
+          <div>
+            <SectionLabel accent={accent}>Included Benefits</SectionLabel>
+            <div className="space-y-1">
+              {benefits.slice(0, config.maxItems.benefits).map((b, i) => (
+                <p key={i} className="text-[11px] flex items-start gap-1.5" style={{ color: pal.ink }}><span style={{ color: accent }}>✓</span>{b.name}</p>
+              ))}
+            </div>
+          </div>
+        )}
+        {features.length > 0 && (
+          <div>
+            <SectionLabel accent={accent}>Key Features</SectionLabel>
+            <ItemRows items={data.installed} accent={accent} pal={pal} max={config.maxItems.installed} />
+          </div>
+        )}
+      </div>
+
+      {/* Footer */}
+      <div className="mt-auto pt-3 border-t" style={{ borderColor: pal.hair }}>
+        {branding.valueProp && <p className="text-[11px] font-semibold" style={{ color: accent }}>{branding.valueProp}</p>}
+        {branding.disclaimer && <p className="mt-1 text-[8px] leading-snug" style={{ color: pal.faintInk }}>{branding.disclaimer}</p>}
+      </div>
+    </div>
+  );
+}
+
+// ── 2. Big Price / Big QR Lot Sticker (max readability) ───────────────
+function BigPriceSheet({ config, data, branding, options }: TemplateRenderProps) {
+  const accent = config.supportsAccent ? branding.accentColor : config.defaultAccent;
+  const pal = palette(options?.labelMode, accent);
+  const price = bestPrice(data);
+  const features = featureList(data).slice(0, 5);
+  return (
+    <div className="flex h-full flex-col text-center" data-label-mode={pal.dark ? "black" : "white"} style={{ padding: `${config.marginsIn}in`, backgroundColor: pal.sheetBg, color: pal.ink }}>
+      {/* Dealer */}
+      <div className="flex items-center justify-center gap-2 pb-2 border-b-2" style={{ borderColor: accent }}>
+        {config.supportsLogo && branding.showLogo ? <StickerLogo url={branding.logoUrl} alt={branding.dealerName} dark={pal.dark} imgClass="h-9 w-auto object-contain" /> : null}
+        <p className="text-base font-extrabold uppercase tracking-wide" style={{ color: pal.ink }}>{branding.dealerName}</p>
+      </div>
+
+      {/* Huge title */}
+      <p className="mt-3 font-black uppercase leading-[0.98] tracking-tight text-[40px]" style={{ ...clamp2, color: pal.ink }}>{data.vehicleTitle || "Vehicle"}</p>
+
+      {/* Huge price */}
+      <div className="mt-3">
+        <span className="block text-[12px] font-bold uppercase tracking-[0.2em]" style={{ color: pal.subInk }}>{money(data.price) ? "Our Price" : money(data.msrp) ? "MSRP" : ""}</span>
+        <span className="block font-black tabular-nums leading-[0.9] text-[88px]" style={{ color: accent }}>{price || "CALL FOR PRICE"}</span>
+      </div>
+
+      {/* 5 key features */}
+      {features.length > 0 && (
+        <div className="mt-3 mx-auto max-w-[6.5in] grid grid-cols-1 gap-1">
+          {features.map((f, i) => (
+            <p key={i} className="text-[15px] font-semibold flex items-center justify-center gap-2" style={{ color: pal.ink }}>
+              <span style={{ color: accent }}>●</span>{f.name}
+            </p>
+          ))}
+        </div>
+      )}
+
+      {/* Big QR */}
+      <div className="mt-auto">
+        <QrBox url={data.qrUrl} size={150} caption="Scan for full details + Vehicle Passport" captionColor={pal.subInk} />
+      </div>
+
+      {/* Footer strip */}
+      <div className="mt-3 pt-2 border-t" style={{ borderColor: pal.hair }}>
+        <div className="flex items-center justify-center gap-x-4 gap-y-0.5 flex-wrap text-[10px]" style={{ color: pal.subInk }}>
+          {data.stock && <span>STOCK <span className="font-bold" style={{ color: pal.ink }}>{data.stock}</span></span>}
+          {data.vin && <span>VIN <span className="font-mono" style={{ color: pal.ink }}>{data.vin}</span></span>}
+          {data.mileage && <span><span className="font-bold" style={{ color: pal.ink }}>{Number(data.mileage).toLocaleString()}</span> mi</span>}
+          {branding.phone && <span className="font-bold" style={{ color: accent }}>{branding.phone}</span>}
+        </div>
+        {branding.disclaimer && <p className="mt-1 text-[8px] leading-snug" style={{ color: pal.faintInk }}>{branding.disclaimer}</p>}
+      </div>
+    </div>
+  );
+}
+
+// ── 3. Executive Noir (luxury black label) ────────────────────────────
+function ExecutiveNoirSheet({ config, data, branding, options }: TemplateRenderProps) {
+  // Dark by default (its hero look); a "white" label choice yields a light
+  // cream-luxury variant. Gold/silver accent from the template config.
+  const dark = options?.labelMode !== "white";
+  const gold = config.supportsAccent ? branding.accentColor : config.defaultAccent;
+  const bg = dark ? "#0b0f17" : "#faf7f0";
+  const ink = dark ? "#f5f2ea" : "#1a1712";
+  const sub = dark ? "#b9b2a2" : "#6b6453";
+  const faint = dark ? "#7a7468" : "#9a917f";
+  const hair = dark ? "#2a2620" : "#e6dfd0";
+  const price = bestPrice(data);
+  const benefits = named(data.benefits);
+  const features = featureList(data).slice(0, 6);
+  return (
+    <div className="flex h-full flex-col" data-label-mode={dark ? "black" : "white"} style={{ padding: `${config.marginsIn}in`, backgroundColor: bg, color: ink }}>
+      {/* Header */}
+      <div className="flex items-center justify-between gap-4 pb-3" style={{ borderBottom: `1px solid ${gold}` }}>
+        <div className="flex items-center gap-3 min-w-0">
+          {config.supportsLogo && branding.showLogo ? <StickerLogo url={branding.logoUrl} alt={branding.dealerName} dark={dark} imgClass="h-10 w-auto object-contain" /> : null}
+          <p className="font-serif text-xl tracking-wide" style={{ color: ink }}>{branding.dealerName}</p>
+        </div>
+        <span className="text-[9px] font-bold uppercase tracking-[0.3em]" style={{ color: gold }}>Executive Collection</span>
+      </div>
+
+      {/* Title */}
+      <div className="mt-5 text-center">
+        <p className="font-serif leading-[1.05] text-[32px]" style={{ ...clamp2, color: ink }}>{data.vehicleTitle || "Vehicle"}</p>
+        <div className="mx-auto mt-3 mb-1" style={{ width: 60, height: 1, backgroundColor: gold }} />
+      </div>
+
+      {/* Price or Passport-Verified */}
+      <div className="mt-2 text-center">
+        {price ? (
+          <>
+            <span className="block text-[10px] font-semibold uppercase tracking-[0.24em]" style={{ color: sub }}>{money(data.price) ? "Offered At" : "Manufacturer's Suggested Retail"}</span>
+            <span className="block font-serif tabular-nums leading-none text-[46px]" style={{ color: gold }}>{price}</span>
+          </>
+        ) : (
+          <span className="inline-block rounded-full px-4 py-1.5 text-[11px] font-bold uppercase tracking-[0.2em]" style={{ border: `1px solid ${gold}`, color: gold }}>Vehicle Passport Verified</span>
+        )}
+      </div>
+
+      {/* Feature highlights */}
+      {features.length > 0 && (
+        <div className="mt-5">
+          <p className="text-[9px] font-bold uppercase tracking-[0.24em] text-center mb-2" style={{ color: gold }}>Distinguished Features</p>
+          <div className="grid grid-cols-2 gap-x-6 gap-y-1.5">
+            {features.map((f, i) => (
+              <p key={i} className="text-[11px] flex items-start gap-2" style={{ color: ink }}><span style={{ color: gold }}>◆</span>{f.name}</p>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Included benefits */}
+      {benefits.length > 0 && (
+        <div className="mt-4 text-center">
+          <p className="text-[9px] font-bold uppercase tracking-[0.24em] mb-1" style={{ color: gold }}>Ownership Benefits</p>
+          <p className="text-[11px]" style={{ color: sub }}>{benefits.slice(0, 4).map((b) => b.name).join("   ·   ")}</p>
+        </div>
+      )}
+
+      {/* QR */}
+      <div className="mt-auto flex items-end justify-between gap-4 pt-4">
+        <div className="text-[9px] leading-relaxed" style={{ color: faint }}>
+          {data.stock && <p>Stock <span style={{ color: sub }}>{data.stock}</span></p>}
+          {data.vin && <p>VIN <span className="font-mono" style={{ color: sub }}>{data.vin}</span></p>}
+          {data.mileage && <p>Mileage <span style={{ color: sub }}>{Number(data.mileage).toLocaleString()}</span></p>}
+        </div>
+        <QrBox url={data.qrUrl} size={92} caption="Vehicle Passport" captionColor={faint} />
+      </div>
+      {branding.disclaimer && <p className="mt-2 text-[7px] leading-snug text-center" style={{ color: faint }}>{branding.disclaimer}</p>}
+    </div>
+  );
+}
+
 // ── Template registry ─────────────────────────────────────────────────
 const baseWindow = (over: Partial<StickerTemplateConfig>): StickerTemplateConfig => ({
   id: "", name: "", type: "window", size: "8.5x11", widthIn: 8.5, heightIn: 11,
@@ -343,10 +573,10 @@ export const STUDIO_TEMPLATES: StudioTemplate[] = [
   { config: baseWindow({ id: "window-luxury", name: "Luxury Black Label", styleTags: ["Luxury"], defaultAccent: "#7c5c1e", blackLabelReady: true, useCase: "Premium / high-line inventory" }), Render: WindowSheet },
   { config: baseWindow({ id: "window-ev", name: "EV / Hybrid Focus", styleTags: ["EV", "Modern"], defaultAccent: "#0f766e", blackLabelReady: true, useCase: "Electrified inventory with efficiency emphasis" }), Render: WindowSheet },
   { config: baseWindow({ id: "window-cpo", name: "CPO Confidence Report", styleTags: ["CPO", "Classic"], defaultAccent: "#047857", useCase: "Certified pre-owned reassurance sheet", complianceNote: "Pair with the manufacturer CPO disclosure." }), Render: WindowSheet },
-  { config: baseWindow({ id: "window-value", name: "Value-First Used Car", styleTags: ["Value", "Modern"], defaultAccent: "#b91c1c", useCase: "Price-forward value messaging" }), Render: WindowSheet },
-  { config: baseWindow({ id: "window-passport", name: "Vehicle Passport Report", styleTags: ["Passport", "Modern"], defaultAccent: "#2563EB", useCase: "Scan-first packet hero with prominent QR" }), Render: WindowSheet },
+  { config: baseWindow({ id: "window-value", name: "Big Price Lot Sticker", styleTags: ["Value", "Readability"], defaultAccent: "#b91c1c", blackLabelReady: true, useCase: "High-readability lot sticker: huge price + QR, readable at 6-10 ft" }), Render: BigPriceSheet },
+  { config: baseWindow({ id: "window-passport", name: "Vehicle Passport Premium", styleTags: ["Passport", "Modern"], defaultAccent: "#2563EB", useCase: "Flagship scan-first hero with premium price + QR cards" }), Render: PassportPremiumSheet },
   { config: baseWindow({ id: "window-readable", name: "Minimal High-Readability", styleTags: ["Readability", "Classic"], defaultAccent: "#0B2041", supportsAccent: false, useCase: "Maximum legibility, low ink" }), Render: WindowSheet },
-  { config: baseWindow({ id: "window-noir", name: "Executive Noir", styleTags: ["Luxury"], defaultAccent: "#c9a227", blackLabelReady: true, useCase: "Black-label premium for luxury showrooms" }), Render: WindowSheet },
+  { config: baseWindow({ id: "window-noir", name: "Executive Noir", styleTags: ["Luxury"], defaultAccent: "#c9a227", blackLabelReady: true, useCase: "Luxury black-label hero for high-line inventory" }), Render: ExecutiveNoirSheet },
   // ── Addendum strips (4.5 x 11) ──────────────────────────────────────
   { config: baseAddendum({ id: "addendum-modern", name: "Clean Addendum Blue", styleTags: ["Modern", "SaaS"], defaultAccent: "#2563EB", blackLabelReady: true, useCase: "Default supplemental addendum" }), Render: AddendumStrip },
   { config: baseAddendum({ id: "addendum-luxury", name: "Luxury Black Addendum", styleTags: ["Luxury"], defaultAccent: "#7c5c1e", blackLabelReady: true, useCase: "Premium add-on strip" }), Render: AddendumStrip },
@@ -369,13 +599,23 @@ export const RENDER_ENGINES: Record<string, (props: TemplateRenderProps) => JSX.
   passport: WindowSheet,
 };
 
+// Premium hero renderers keyed by template id. Lets the DB-backed catalog map a
+// specific template to a dedicated layout (still data-driven config, no static
+// images); any window template not listed here uses the generic WindowSheet.
+const PREMIUM_RENDERERS: Record<string, (props: TemplateRenderProps) => JSX.Element> = {
+  "window-passport": PassportPremiumSheet,
+  "window-value": BigPriceSheet,
+  "window-noir": ExecutiveNoirSheet,
+};
+
 // Merge a stored config override onto the code base config for the type.
 export function buildConfig(type: StickerType, over: Partial<StickerTemplateConfig>): StickerTemplateConfig {
   return (type === "addendum" ? baseAddendum : baseWindow)(over);
 }
 
 export function templateFromConfig(config: StickerTemplateConfig): StudioTemplate {
-  return { config, Render: RENDER_ENGINES[config.type] || WindowSheet };
+  const Render = PREMIUM_RENDERERS[config.id] || RENDER_ENGINES[config.type] || WindowSheet;
+  return { config, Render };
 }
 
 // Render a template at its true paper size. `scale` shrinks the whole sheet

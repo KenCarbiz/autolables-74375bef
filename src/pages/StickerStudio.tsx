@@ -14,9 +14,12 @@ import { LayoutTemplate, Check, Star, Paintbrush } from "lucide-react";
 const SAMPLE: StickerData = {
   vehicleTitle: "2027 INFINITI QX60 LUXE", vin: "5N1AL1F87VC331335", stock: "I21567",
   mileage: "17", msrp: "62335", price: "58835",
-  installed: [{ name: "Ceramic Protection Package", price: "1495" }, { name: "Street Smart VIN Etch", price: "349" }],
+  installed: [
+    { name: "All-Wheel Drive" }, { name: "Bose Premium Audio" }, { name: "Heated & Cooled Seats" },
+    { name: "Panoramic Moonroof" }, { name: "ProPILOT Assist" }, { name: "Captain's Chairs" },
+  ],
   upgrades: [{ name: "Extended Warranty" }],
-  benefits: [{ name: "Lifetime Car Washes" }, { name: "State Inspections" }],
+  benefits: [{ name: "Lifetime Car Washes" }, { name: "State Inspections" }, { name: "Loaner Vehicles" }],
   qrUrl: "https://autolabels.io/v/demo",
 };
 
