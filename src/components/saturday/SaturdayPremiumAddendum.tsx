@@ -104,19 +104,20 @@ export const SaturdayPremiumAddendum: React.FC<Props> = ({ data }) => {
           </div>
         </section>
 
-        <section className="mt-3 grid grid-cols-[0.9in_1fr] items-center gap-3 rounded-[14px] border bg-white p-3" style={{ borderColor: line }}>
-          <div className="rounded-lg bg-white p-1"><QRCodeSVG value={safeUrl} size={74} bgColor="#fff" fgColor="#111827" level="M" /></div>
+        <section className="mt-3 grid grid-cols-[0.95in_1fr] items-center gap-3 rounded-[14px] border bg-white p-3" style={{ borderColor: line }}>
+          <div className="rounded-lg bg-white p-1"><QRCodeSVG value={safeUrl} size={82} bgColor="#fff" fgColor="#111827" level="M" /></div>
           <div>
             <div className="text-[10px] font-black uppercase leading-tight" style={{ color: navy }}>Scan for full Vehicle Passport</div>
-            <div className="mt-1 text-[8.5px] leading-tight text-slate-600">View digital disclosures, photos, service records, and pricing details.</div>
+            <div className="mt-1 text-[8.5px] leading-tight text-slate-600">Digital signing, disclosures, photos, service records, and pricing details are handled securely in AutoLabels.</div>
             <div className="mt-1 text-[8px] font-mono text-slate-500">{qrUrl}</div>
           </div>
         </section>
 
-        <section className="mt-3 rounded-[14px] border p-3 text-center" style={{ borderColor: line }}>
-          <div className="text-[9px] font-black uppercase tracking-[0.18em]" style={{ color: navy }}>Customer Acknowledgment</div>
-          <div className="mt-6 border-t border-slate-300 pt-1 text-left text-[8px] text-slate-500">Customer Signature</div>
-          <div className="mt-5 border-t border-slate-300 pt-1 text-left text-[8px] text-slate-500">Date</div>
+        <section className="mt-3 rounded-[14px] border p-3" style={{ borderColor: line, background: "linear-gradient(180deg,#ffffff,#f8fafc)" }}>
+          <div className="text-[9px] font-black uppercase tracking-[0.18em]" style={{ color: navy }}>Digital Signing Ready</div>
+          <div className="mt-1 text-[8.5px] leading-snug text-slate-600">
+            Customer acknowledgment and signature are captured digitally through AutoLabels. This printed addendum is the vehicle-facing summary.
+          </div>
         </section>
 
         <footer className="mt-auto rounded-[10px] border px-3 py-2 text-[7.5px] leading-snug text-slate-500" style={{ borderColor: line }}>{disclaimer}</footer>
