@@ -4,6 +4,8 @@ import { supabase } from "@/integrations/supabase/client";
 import SignaturePad from "@/components/addendum/SignaturePad";
 import SB766DisclosurePanel from "@/components/addendum/SB766DisclosurePanel";
 import TransactionAuditRecord from "@/components/addendum/TransactionAuditRecord";
+import { useSigningDocuments, signingDocumentRefs } from "@/lib/stickerStudio/useSigningDocuments";
+import SigningDocumentsCards from "@/components/signing/SigningDocumentsCards";
 import { toast } from "sonner";
 import { ChevronLeft, ChevronRight, Check } from "lucide-react";
 import { AddendumDisclosurePacket, type PacketProduct } from "@/components/addendum/AddendumDisclosurePacket";
@@ -67,6 +69,7 @@ const STATUTORY_INITIAL_KEYWORDS = [
 
 const CustomerReview = () => {
   const { token } = useParams<{ token: string }>();
+  const { documents: signingDocs } = useSigningDocuments(token);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
@@ -390,6 +393,7 @@ const CustomerReview = () => {
       customer_name: customerName,
       warranty_ack: warrantyAck,
       sticker_match_ack: stickerMatchAck,
+      generated_documents: signingDocumentRefs(signingDocs),
       payment_confirmed: paymentConfirmed,
       delivery_mileage: deliveryMileage,
       esign_consent_version: consent.version,
@@ -666,7 +670,7 @@ const CustomerReview = () => {
               warrantyAck={warrantyAck} setWarrantyAck={setWarrantyAck}
               deliveryMileage={deliveryMileage} setDeliveryMileage={setDeliveryMileage}
               stickerMatchAck={stickerMatchAck} setStickerMatchAck={setStickerMatchAck}
-              addendum={addendum}
+              addendum={addendum} signingDocs={signingDocs}
               sb766ThreeDayAck={sb766ThreeDayAck} setSb766ThreeDayAck={setSb766ThreeDayAck}
               setSb766Disclosure={setSb766Disclosure}
             />
@@ -1072,7 +1076,7 @@ const DisclosuresStep = ({
   isUsedCar,
   esignConsent, setEsignConsent, showFullConsent, setShowFullConsent,
   warrantyAck, setWarrantyAck, deliveryMileage, setDeliveryMileage,
-  stickerMatchAck, setStickerMatchAck, addendum,
+  stickerMatchAck, setStickerMatchAck, addendum, signingDocs,
   sb766ThreeDayAck, setSb766ThreeDayAck, setSb766Disclosure,
 }: {
   isUsedCar: boolean;
@@ -1082,6 +1086,7 @@ const DisclosuresStep = ({
   deliveryMileage: string; setDeliveryMileage: (v: string) => void;
   stickerMatchAck: boolean; setStickerMatchAck: (v: boolean) => void;
   addendum: any;
+  signingDocs: import("@/lib/stickerStudio/useSigningDocuments").SigningDocument[];
   sb766ThreeDayAck: boolean; setSb766ThreeDayAck: (v: boolean) => void;
   setSb766Disclosure: (v: FinancingDisclosure | null) => void;
 }) => (
@@ -1110,9 +1115,14 @@ const DisclosuresStep = ({
       </>
     )}
 
+    {signingDocs.length > 0 && (
+      <div className="mb-2"><SigningDocumentsCards documents={signingDocs} /></div>
+    )}
     <BigCheck checked={stickerMatchAck} onClick={() => setStickerMatchAck(!stickerMatchAck)}
       title="The sticker matches this addendum"
-      body="This addendum matches the window sticker on the vehicle, I had time to review both, and I understand optional items can be declined with no impact on my purchase or financing." />
+      body={signingDocs.length > 0
+        ? "I have reviewed the vehicle window sticker / addendum documents shown in this packet and acknowledge they match the vehicle and addendum items presented to me. I had time to review both, and I understand optional items can be declined with no impact on my purchase or financing."
+        : "This addendum matches the window sticker on the vehicle, I had time to review both, and I understand optional items can be declined with no impact on my purchase or financing."} />
 
     <SB766DisclosurePanel
       vehicleState={addendum?.vehicle_state}

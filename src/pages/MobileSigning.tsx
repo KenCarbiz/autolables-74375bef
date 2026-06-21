@@ -14,6 +14,8 @@ import {
   fetchGeoloc,
   hashPayload,
 } from "@/lib/esign";
+import { useSigningDocuments, signingDocumentRefs } from "@/lib/stickerStudio/useSigningDocuments";
+import SigningDocumentsCards from "@/components/signing/SigningDocumentsCards";
 import { getStateRule, validateAddendum, summarizeFindings } from "@/lib/stateCompliance";
 import { runComplianceRedTeam, summarizeRedTeam } from "@/lib/complianceRedTeam";
 import { isSb766Applicable, type FinancingDisclosure } from "@/lib/sb766";
@@ -98,6 +100,9 @@ const MobileSigning = () => {
   const [deliveryMileage, setDeliveryMileage] = useState("");
   // Addendum/sticker matching acknowledgment
   const [stickerMatchAck, setStickerMatchAck] = useState(false);
+  // Generated sticker/addendum documents the customer reviews; a reference to
+  // them is frozen into the canonical signed payload (proves what was shown).
+  const { documents: signingDocs } = useSigningDocuments(token);
   // Payment walk — single confirmation that the customer saw the base
   // vehicle price, the add-ons they elected, and the resulting total.
   const [paymentConfirmed, setPaymentConfirmed] = useState(false);
@@ -475,6 +480,7 @@ const MobileSigning = () => {
       customer_name: customerName,
       warranty_ack: warrantyAck,
       sticker_match_ack: stickerMatchAck,
+      generated_documents: signingDocumentRefs(signingDocs),
       payment_confirmed: paymentConfirmed,
       delivery_mileage: deliveryMileage,
       esign_consent_version: consent.version,
@@ -1081,6 +1087,11 @@ const MobileSigning = () => {
         {/* Window Sticker / Addendum Match Acknowledgment */}
         <div className="bg-card rounded-xl p-5 shadow-sm space-y-4">
           <h2 className="text-sm font-bold font-barlow-condensed text-foreground">Addendum Acknowledgment</h2>
+          {signingDocs.length > 0 && (
+            <div className="mb-3">
+              <SigningDocumentsCards documents={signingDocs} />
+            </div>
+          )}
           <button
             onClick={() => setStickerMatchAck(!stickerMatchAck)}
             className={`w-full flex items-start gap-3 p-3 rounded-lg border-2 text-left transition-all ${
@@ -1095,6 +1106,9 @@ const MobileSigning = () => {
             <div className="flex-1 min-w-0">
               <p className="text-sm font-semibold text-foreground">I confirm the sticker matches this addendum</p>
               <p className="text-xs text-muted-foreground mt-0.5 leading-relaxed">
+                {signingDocs.length > 0
+                  ? "I have reviewed the vehicle window sticker / addendum documents shown in this packet, and I acknowledge they match the vehicle and addendum items presented to me. "
+                  : ""}
                 I acknowledge that: (1) this addendum matches the window sticker on the vehicle;
                 (2) I have been given time to review both documents; (3) my initials and signature
                 below constitute acceptance of the products and pricing as disclosed; (4) I understand
