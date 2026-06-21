@@ -613,7 +613,22 @@ export type Database = {
           quantity?: number
           tenant_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "autolabels_usage_events_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenant_summary"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "autolabels_usage_events_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       billing_events: {
         Row: {
@@ -2258,6 +2273,20 @@ export type Database = {
             referencedRelation: "generated_documents"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "stale_document_flags_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenant_summary"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "stale_document_flags_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
         ]
       }
       sticker_template_categories: {
@@ -3590,6 +3619,7 @@ export type Database = {
           png_url: string
           published_at: string
           template_id: string
+          template_version: number
           version: number
         }[]
       }
@@ -3737,11 +3767,11 @@ export type Database = {
       }
       log_qr_scan: {
         Args: {
-          p_code: string
-          p_country?: string
-          p_ip_hash?: string
-          p_referrer?: string
-          p_user_agent?: string
+          _browser?: string
+          _device?: string
+          _referrer?: string
+          _token: string
+          _ua?: string
         }
         Returns: string
       }
