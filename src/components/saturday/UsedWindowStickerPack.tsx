@@ -1,12 +1,12 @@
 // Used Vehicle Window Sticker Pack -- 8.5x11 portrait
-// Core layout families for pre-owned vehicle window stickers.
-// These are tenant-safe and powered by SaturdaySticker data from the dealer/vehicle/passport adapter.
+// Refined after five-agent review: no fake trust data, passport can be disabled,
+// price language adapts to the dealer strategy, and factory-clean imagery remains preferred.
 
+import type { ReactNode } from "react";
 import { QRCodeSVG } from "qrcode.react";
 import type { SaturdayDealerTheme, SaturdaySticker } from "./types";
 
 type Props = { data: SaturdaySticker; theme?: SaturdayDealerTheme; badge?: string };
-
 type Theme = Required<SaturdayDealerTheme> & { name: string };
 
 const DEFAULTS: Record<string, Theme> = {
@@ -21,12 +21,20 @@ const DEFAULTS: Record<string, Theme> = {
 };
 
 const mergeTheme = (base: Theme, override?: SaturdayDealerTheme): Theme => ({ ...base, ...override });
+const passportEnabled = (data: SaturdaySticker) => data.dealer.passportMode !== "disabled";
 const safeUrl = (url: string) => (url.startsWith("http") ? url : `https://${url}`);
-const money = (value?: string | number) => {
-  const n = Number(String(value ?? "").replace(/[^\d.-]/g, ""));
-  return Number.isFinite(n) && n > 0 ? `$${Math.round(n).toLocaleString()}` : "Scan for Live Price";
+const numberFrom = (value?: string | number) => Number(String(value ?? "").replace(/[^\d.-]/g, ""));
+const money = (value?: string | number, fallback = "See Dealer") => {
+  const n = numberFrom(value);
+  return Number.isFinite(n) && n > 0 ? `$${Math.round(n).toLocaleString()}` : fallback;
 };
 const spec = (data: SaturdaySticker, pattern: RegExp, fallback = "") => data.specs.find((s) => pattern.test(s.label))?.value || fallback;
+const priceFallback = (data: SaturdaySticker) => (passportEnabled(data) ? "Scan for Live Price" : "See Dealer");
+const deltaLabel = (delta?: string | number) => {
+  const n = numberFrom(delta);
+  if (!Number.isFinite(n) || n === 0) return "Verified";
+  return `${money(Math.abs(n))} ${n < 0 ? "Below" : "Above"}`;
+};
 
 function CarFallback({ theme }: { theme: Theme }) {
   return (
@@ -44,8 +52,8 @@ function CarFallback({ theme }: { theme: Theme }) {
 function VehicleHero({ data, theme, compact = false }: { data: SaturdaySticker; theme: Theme; compact?: boolean }) {
   return (
     <section className="relative overflow-hidden rounded-[24px] border shadow-[0_14px_30px_rgba(15,23,42,.10)]" style={{ height: compact ? "2.45in" : "3.05in", borderColor: theme.borderColor, background: `linear-gradient(135deg,#fff,${theme.softColor})` }}>
-      {data.vehicle.imageUrl ? <img src={data.vehicle.imageUrl} alt="Vehicle" className="absolute inset-0 h-full w-full object-cover" /> : <CarFallback theme={theme} />}
-      <div className="absolute bottom-3 right-4 rounded-full bg-white/90 px-3 py-1 text-[8px] font-black uppercase tracking-[0.18em] text-slate-500 shadow-sm">Vehicle Passport Ready</div>
+      {data.vehicle.imageUrl ? <img src={data.vehicle.imageUrl} alt="Vehicle" className="absolute inset-0 h-full w-full object-contain p-3" /> : <CarFallback theme={theme} />}
+      {passportEnabled(data) ? <div className="absolute bottom-3 right-4 rounded-full bg-white/90 px-3 py-1 text-[8px] font-black uppercase tracking-[0.18em] text-slate-500 shadow-sm">Passport Ready</div> : null}
     </section>
   );
 }
@@ -56,7 +64,7 @@ function Header({ data, theme, badge = "Used Vehicle Window Sticker" }: Props & 
       <div className="min-w-0">
         <div className="text-[10px] font-black uppercase tracking-[0.24em] opacity-80">{badge}</div>
         <div className="mt-1 truncate text-[30px] font-black leading-none">{data.dealer.name}</div>
-        <div className="mt-1 text-[10px] font-semibold opacity-85">{data.dealer.address} • {data.dealer.phone} • {data.dealer.website}</div>
+        <div className="mt-1 text-[10px] font-semibold opacity-85">{data.dealer.slogan || `${data.dealer.address} • ${data.dealer.phone} • ${data.dealer.website}`}</div>
       </div>
       <div className="rounded-[14px] bg-white/15 px-3 py-2 text-right text-[10px] font-semibold leading-tight">
         <div>Stock: {data.vehicle.stock}</div>
@@ -67,6 +75,16 @@ function Header({ data, theme, badge = "Used Vehicle Window Sticker" }: Props & 
 }
 
 function QRCard({ data, theme, label = "Scan Full Vehicle Passport" }: { data: SaturdaySticker; theme: Theme; label?: string }) {
+  if (!passportEnabled(data)) {
+    return (
+      <section className="rounded-[18px] border bg-white p-3" style={{ borderColor: theme.borderColor }}>
+        <div className="text-[12px] font-black uppercase leading-tight" style={{ color: theme.primaryColor }}>Dealer Contact</div>
+        <div className="mt-2 text-[11px] font-semibold leading-snug text-slate-700">{data.dealer.phone}<br />{data.dealer.website}</div>
+        <div className="mt-2 text-[8.5px] leading-tight text-slate-500">Passport/QR disabled by dealer setting.</div>
+      </section>
+    );
+  }
+
   return (
     <section className="rounded-[18px] border bg-white p-3" style={{ borderColor: theme.borderColor }}>
       <div className="flex items-center gap-3">
@@ -81,8 +99,8 @@ function PriceCard({ data, theme, headline = "Vehicle Value" }: { data: Saturday
   return (
     <section className="rounded-[22px] p-4 text-white shadow-[0_12px_26px_rgba(15,23,42,.16)]" style={{ background: `linear-gradient(145deg,${theme.secondaryColor},${theme.primaryColor})` }}>
       <div className="text-[10px] font-black uppercase tracking-[0.22em] opacity-75">{data.vehicle.priceLabel || data.dealer.pricingLabel || headline}</div>
-      <div className="mt-1 text-[48px] font-black leading-none tracking-[-0.05em]">{money(data.vehicle.price)}</div>
-      <div className="mt-2 text-[10px] font-semibold opacity-80">Passport contains today's live advertised price and supporting details.</div>
+      <div className="mt-1 text-[48px] font-black leading-none tracking-[-0.05em]">{money(data.vehicle.price, priceFallback(data))}</div>
+      <div className="mt-2 text-[10px] font-semibold opacity-80">{passportEnabled(data) ? "Passport contains today's live advertised price and supporting details." : "Confirm current selling price and availability with dealer."}</div>
     </section>
   );
 }
@@ -111,23 +129,27 @@ function Benefits({ data, theme }: { data: SaturdaySticker; theme: Theme }) {
 
 function MarketCard({ data, theme }: { data: SaturdaySticker; theme: Theme }) {
   const market = data.market;
-  return <section className="rounded-[18px] border bg-white p-3" style={{ borderColor: theme.borderColor }}><div className="text-[11px] font-black uppercase" style={{ color: theme.secondaryColor }}>Market Transparency</div><div className="mt-2 grid grid-cols-2 gap-2 text-[9px]"><div><div className="font-black text-slate-500">Market Avg.</div><div className="text-[16px] font-black" style={{ color: theme.primaryColor }}>{money(market?.marketAverage)}</div></div><div><div className="font-black text-slate-500">Position</div><div className="text-[16px] font-black" style={{ color: theme.accentColor }}>{market?.delta ? `${money(Math.abs(Number(market.delta)))} Below` : "Verified"}</div></div><div><div className="font-black text-slate-500">Comps</div><div className="font-black">{market?.comparableCount || "--"}</div></div><div><div className="font-black text-slate-500">Source</div><div className="font-black">{market?.sourceLabel || "Market Data"}</div></div></div></section>;
+  if (!market || data.dealer.marketTransparencyMode === "off") return <Highlights data={data} theme={theme} title="Vehicle Highlights" />;
+  return <section className="rounded-[18px] border bg-white p-3" style={{ borderColor: theme.borderColor }}><div className="text-[11px] font-black uppercase" style={{ color: theme.secondaryColor }}>Market Transparency</div><div className="mt-2 grid grid-cols-2 gap-2 text-[9px]"><div><div className="font-black text-slate-500">Market Avg.</div><div className="text-[16px] font-black" style={{ color: theme.primaryColor }}>{money(market.marketAverage, "Not Provided")}</div></div><div><div className="font-black text-slate-500">Position</div><div className="text-[16px] font-black" style={{ color: theme.accentColor }}>{deltaLabel(market.delta)}</div></div><div><div className="font-black text-slate-500">Comps</div><div className="font-black">{market.comparableCount || "--"}</div></div><div><div className="font-black text-slate-500">Source</div><div className="font-black">{market.sourceLabel || "Market Data"}</div></div></div></section>;
 }
 
-function Highlights({ data, theme }: { data: SaturdaySticker; theme: Theme }) {
-  return <section className="rounded-[18px] border bg-white p-3" style={{ borderColor: theme.borderColor }}><div className="text-[11px] font-black uppercase" style={{ color: theme.secondaryColor }}>Vehicle Highlights</div><div className="mt-2 flex flex-wrap gap-1.5">{data.highlights.slice(0, 14).map((item) => <span key={item} className="rounded-full border px-2 py-1 text-[8.5px] font-semibold" style={{ borderColor: theme.borderColor }}>{item}</span>)}</div></section>;
+function Highlights({ data, theme, title = "Vehicle Highlights" }: { data: SaturdaySticker; theme: Theme; title?: string }) {
+  return <section className="rounded-[18px] border bg-white p-3" style={{ borderColor: theme.borderColor }}><div className="text-[11px] font-black uppercase" style={{ color: theme.secondaryColor }}>{title}</div><div className="mt-2 flex flex-wrap gap-1.5">{data.highlights.slice(0, 14).map((item) => <span key={item} className="rounded-full border px-2 py-1 text-[8.5px] font-semibold" style={{ borderColor: theme.borderColor }}>{item}</span>)}</div></section>;
 }
 
 function TrustCard({ data, theme }: { data: SaturdaySticker; theme: Theme }) {
   const review = data.dealer.reviewSources?.[0];
-  return <section className="rounded-[18px] border bg-white p-3" style={{ borderColor: theme.borderColor }}><div className="text-[11px] font-black uppercase" style={{ color: theme.secondaryColor }}>Dealer Trust</div><div className="mt-1 text-[30px] font-black leading-none" style={{ color: theme.primaryColor }}>{review?.rating || "4.9"} <span className="text-[13px]" style={{ color: theme.accentColor }}>★★★★★</span></div><div className="mt-1 text-[9px] text-slate-500">{review?.reviewCount ? `${review.reviewCount.toLocaleString()} reviews` : "Verified dealer review source"} • {review?.label || "Dealer reviews"}</div></section>;
+  if (!review) {
+    return <section className="rounded-[18px] border bg-white p-3" style={{ borderColor: theme.borderColor }}><div className="text-[11px] font-black uppercase" style={{ color: theme.secondaryColor }}>Dealer Trust</div><div className="mt-2 text-[12px] font-black" style={{ color: theme.primaryColor }}>Dealer-selected source pending</div><div className="mt-1 text-[9px] text-slate-500">No rating is shown unless the dealer supplies or approves a review source.</div></section>;
+  }
+  return <section className="rounded-[18px] border bg-white p-3" style={{ borderColor: theme.borderColor }}><div className="text-[11px] font-black uppercase" style={{ color: theme.secondaryColor }}>Dealer Trust</div><div className="mt-1 text-[30px] font-black leading-none" style={{ color: theme.primaryColor }}>{review.rating ? review.rating.toFixed(1) : "Verified"} {review.rating ? <span className="text-[13px]" style={{ color: theme.accentColor }}>★★★★★</span> : null}</div><div className="mt-1 text-[9px] text-slate-500">{review.reviewCount ? `${review.reviewCount.toLocaleString()} reviews` : "Dealer-selected review source"} • {review.label}</div></section>;
 }
 
 function Footer({ data, theme }: { data: SaturdaySticker; theme: Theme }) {
   return <footer className="mt-auto rounded-[14px] border bg-slate-50 px-3 py-2 text-center text-[7.5px] leading-tight text-slate-500" style={{ borderColor: theme.borderColor }}>{data.disclaimer}</footer>;
 }
 
-function WindowShell({ data, theme, badge, children }: Props & { theme: Theme; children: React.ReactNode }) {
+function WindowShell({ data, theme, badge, children }: Props & { theme: Theme; children: ReactNode }) {
   return <div className="bg-white shadow-2xl ring-1 ring-slate-200 print:shadow-none" style={{ width: "8.5in", height: "11in", fontFamily: "Inter, ui-sans-serif, system-ui, sans-serif" }}><div className="flex h-full flex-col p-[0.22in]"><Header data={data} theme={theme} badge={badge} />{children}<Footer data={data} theme={theme} /></div></div>;
 }
 
@@ -148,7 +170,7 @@ export function UsedWindowLuxuryBlack({ data, theme, badge = "Premium Pre-Owned"
 
 export function UsedWindowCPOFocus({ data, theme, badge = "Certified Pre-Owned" }: Props) {
   const t = mergeTheme(DEFAULTS.cpo, theme || data.dealer.theme);
-  return <WindowShell data={data} theme={t} badge={badge}><main className="mt-3 grid grid-cols-[1fr_1fr] gap-4"><div><h1 className="text-[41px] font-black uppercase leading-[.92]" style={{ color: t.primaryColor }}>{data.vehicle.title}</h1><section className="mt-3 rounded-[22px] border p-4" style={{ borderColor: t.borderColor, background: t.softColor }}><div className="text-[11px] font-black uppercase" style={{ color: t.secondaryColor }}>Certification Coverage</div><div className="mt-1 text-[22px] font-black" style={{ color: t.primaryColor }}>{data.benefits[0] || "Certified Coverage Included"}</div><p className="mt-2 text-[10px] text-slate-600">Coverage, inspection, and eligibility details are verified in the passport.</p></section><div className="mt-3"><PriceCard data={data} theme={t} /></div></div><VehicleHero data={data} theme={t} /></main><section className="mt-3 grid grid-cols-[1fr_1fr_1fr] gap-3"><SpecsGrid data={data} theme={t} /><Benefits data={data} theme={t} /><QRCard data={data} theme={t} /></section><section className="mt-3 grid grid-cols-2 gap-3"><MarketCard data={data} theme={t} /><TrustCard data={data} theme={t} /></section></WindowShell>;
+  return <WindowShell data={data} theme={t} badge={badge}><main className="mt-3 grid grid-cols-[1fr_1fr] gap-4"><div><h1 className="text-[41px] font-black uppercase leading-[.92]" style={{ color: t.primaryColor }}>{data.vehicle.title}</h1><section className="mt-3 rounded-[22px] border p-4" style={{ borderColor: t.borderColor, background: t.softColor }}><div className="text-[11px] font-black uppercase" style={{ color: t.secondaryColor }}>Certification Coverage</div><div className="mt-1 text-[22px] font-black" style={{ color: t.primaryColor }}>{data.benefits[0] || "Certified Coverage Included"}</div><p className="mt-2 text-[10px] text-slate-600">Coverage, inspection, and eligibility details are verified in the passport when enabled.</p></section><div className="mt-3"><PriceCard data={data} theme={t} /></div></div><VehicleHero data={data} theme={t} /></main><section className="mt-3 grid grid-cols-[1fr_1fr_1fr] gap-3"><SpecsGrid data={data} theme={t} /><Benefits data={data} theme={t} /><QRCard data={data} theme={t} /></section><section className="mt-3 grid grid-cols-2 gap-3"><MarketCard data={data} theme={t} /><TrustCard data={data} theme={t} /></section></WindowShell>;
 }
 
 export function UsedWindowMarketTransparency({ data, theme, badge = "Market Transparency" }: Props) {
@@ -158,7 +180,7 @@ export function UsedWindowMarketTransparency({ data, theme, badge = "Market Tran
 
 export function UsedWindowOnePrice({ data, theme, badge = "One Price Store" }: Props) {
   const t = mergeTheme(DEFAULTS.onePrice, theme || data.dealer.theme);
-  return <WindowShell data={data} theme={t} badge={badge}><main className="mt-3"><section className="rounded-[28px] p-5 text-center text-white" style={{ background: `linear-gradient(145deg,${t.secondaryColor},${t.primaryColor})` }}><div className="text-[11px] font-black uppercase tracking-[0.25em] opacity-80">{data.vehicle.priceLabel || "One Price"}</div><div className="text-[64px] font-black leading-none">{money(data.vehicle.price)}</div><div className="mt-1 text-[10px] font-semibold opacity-80">Transparent pricing. Scan to verify live price and passport.</div></section><div className="mt-3 grid grid-cols-[1fr_1fr] gap-4"><VehicleHero data={data} theme={t} compact /><div><h1 className="text-[37px] font-black uppercase leading-[.95]" style={{ color: t.primaryColor }}>{data.vehicle.title}</h1><div className="mt-3"><QRCard data={data} theme={t} /></div></div></div></main><section className="mt-3 grid grid-cols-[1fr_1fr_1fr] gap-3"><SpecsGrid data={data} theme={t} /><Benefits data={data} theme={t} /><TrustCard data={data} theme={t} /></section></WindowShell>;
+  return <WindowShell data={data} theme={t} badge={badge}><main className="mt-3"><section className="rounded-[28px] p-5 text-center text-white" style={{ background: `linear-gradient(145deg,${t.secondaryColor},${t.primaryColor})` }}><div className="text-[11px] font-black uppercase tracking-[0.25em] opacity-80">{data.vehicle.priceLabel || "One Price"}</div><div className="text-[64px] font-black leading-none">{money(data.vehicle.price, priceFallback(data))}</div><div className="mt-1 text-[10px] font-semibold opacity-80">Transparent pricing. {passportEnabled(data) ? "Scan to verify live price and passport." : "Confirm current price with dealer."}</div></section><div className="mt-3 grid grid-cols-[1fr_1fr] gap-4"><VehicleHero data={data} theme={t} compact /><div><h1 className="text-[37px] font-black uppercase leading-[.95]" style={{ color: t.primaryColor }}>{data.vehicle.title}</h1><div className="mt-3"><QRCard data={data} theme={t} /></div></div></div></main><section className="mt-3 grid grid-cols-[1fr_1fr_1fr] gap-3"><SpecsGrid data={data} theme={t} /><Benefits data={data} theme={t} /><TrustCard data={data} theme={t} /></section></WindowShell>;
 }
 
 export function UsedWindowDealerDifference({ data, theme, badge = "Dealer Difference" }: Props) {
