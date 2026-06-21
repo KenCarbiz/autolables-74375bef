@@ -20,6 +20,8 @@ const DATA: SaturdaySticker = {
     mileage: "18426",
     msrp: "52995",
     price: "46995",
+    // Sample real-photo URL for the design preview only. Production will use the dealer inventory photo URL.
+    imageUrl: "https://images.unsplash.com/photo-1606664515524-ed2f786a0bd6?auto=format&fit=crop&w=1400&q=80",
   },
   specs: [
     { label: "Year", value: "2024" },
