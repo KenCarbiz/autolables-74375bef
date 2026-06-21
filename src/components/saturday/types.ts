@@ -15,6 +15,8 @@ export type SaturdayVehicle = {
   price: string;
   msrp?: string;
   mileage?: string;
+  /** Optional real inventory photo URL. When absent, templates render a print-safe illustration fallback. */
+  imageUrl?: string;
 };
 
 export type SaturdaySpec = { label: string; value: string };
