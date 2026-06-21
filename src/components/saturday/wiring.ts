@@ -1,4 +1,4 @@
-import type { SaturdayDealer, SaturdayMarketData, SaturdaySticker, SaturdayVehicle } from "./types";
+import type { SaturdayAddendumPricingMode, SaturdayDealer, SaturdayDealerTheme, SaturdayMarketData, SaturdayMarketTransparencyMode, SaturdaySticker, SaturdayVehicle } from "./types";
 
 export const PRICE_LABEL_OPTIONS = [
   "Best Price",
@@ -41,7 +41,16 @@ export const REVIEW_SOURCE_OPTIONS = [
   "custom",
 ] as const;
 
+export const LABEL_PLACEMENT_OPTIONS = [
+  "inside_window",
+  "outside_window",
+  "adhesive_outside",
+  "static_cling_inside",
+  "paper_sleeve_inside",
+] as const;
+
 export type DealerReviewSourceType = (typeof REVIEW_SOURCE_OPTIONS)[number];
+export type LabelPlacementOption = (typeof LABEL_PLACEMENT_OPTIONS)[number];
 
 export type DealerReviewSelection = {
   type: DealerReviewSourceType;
@@ -74,6 +83,10 @@ export type DealerLabelSettings = {
   valueProps?: string[];
   reviewSource?: DealerReviewSelection;
   certificationTiers?: DealerCertificationTier[];
+  addendumPricingMode?: SaturdayAddendumPricingMode;
+  marketTransparencyMode?: SaturdayMarketTransparencyMode;
+  defaultLabelPlacement?: LabelPlacementOption;
+  theme?: SaturdayDealerTheme;
 };
 
 export type DealerProfileInput = {
@@ -94,6 +107,7 @@ export type VehicleInventoryInput = {
   vin?: string;
   stock?: string;
   mileage?: number | string;
+  condition?: "new" | "used";
   imageUrl?: string;
   newCarImageUrl?: string;
   usedCarPrimaryPhotoUrl?: string;
@@ -103,6 +117,7 @@ export type VehicleInventoryInput = {
     sellingPrice?: number | string;
     websitePrice?: number | string;
     msrp?: number | string;
+    marketValue?: number | string;
     dealerPriceLabelOverride?: string;
   };
   specs?: Record<string, string | number | undefined>;
@@ -147,6 +162,46 @@ export const resolveSellingPrice = (vehicle: VehicleInventoryInput): string | un
   return asString(vehicle.pricing?.websitePrice ?? vehicle.pricing?.advertisedPrice ?? vehicle.pricing?.sellingPrice);
 };
 
+export const resolveMarketValue = (vehicle: VehicleInventoryInput, market?: MarketIntelligenceInput): string | undefined => {
+  return asString(vehicle.pricing?.marketValue ?? market?.marketAverage ?? market?.recentSoldAverage);
+};
+
+export const resolveAddendumPricingMode = (dealer: DealerProfileInput, vehicle: VehicleInventoryInput): SaturdayAddendumPricingMode => {
+  if (dealer.labelSettings?.addendumPricingMode) return dealer.labelSettings.addendumPricingMode;
+  return vehicle.condition === "new" ? "new_msrp_plus_addendum" : "used_market_value_plus_addendum";
+};
+
+export const resolvePrintedBasePrice = (
+  dealer: DealerProfileInput,
+  vehicle: VehicleInventoryInput,
+  market?: MarketIntelligenceInput,
+): string | undefined => {
+  const mode = resolveAddendumPricingMode(dealer, vehicle);
+
+  switch (mode) {
+    case "new_msrp_plus_addendum":
+      return asString(vehicle.pricing?.msrp);
+    case "used_market_value_plus_addendum":
+      return resolveMarketValue(vehicle, market);
+    case "used_live_price_plus_addendum":
+      return resolveSellingPrice(vehicle);
+    case "used_addendum_only":
+    case "passport_live_price_only":
+      return undefined;
+    default:
+      return resolveSellingPrice(vehicle);
+  }
+};
+
+export const resolvePrintedPriceLabel = (dealer: DealerProfileInput, vehicle: VehicleInventoryInput): string => {
+  const mode = resolveAddendumPricingMode(dealer, vehicle);
+  if (mode === "new_msrp_plus_addendum") return "Factory MSRP";
+  if (mode === "used_market_value_plus_addendum") return "Market Value";
+  if (mode === "passport_live_price_only") return "Scan for Live Price";
+  if (mode === "used_addendum_only") return "Installed Equipment";
+  return resolvePriceLabel(dealer, vehicle);
+};
+
 export const resolveVehicleImage = (vehicle: VehicleInventoryInput): string | undefined => {
   return vehicle.usedCarPrimaryPhotoUrl || vehicle.newCarImageUrl || vehicle.imageUrl || vehicle.apiFallbackImageUrl;
 };
@@ -181,19 +236,23 @@ export const buildSaturdayDealer = (dealer: DealerProfileInput): SaturdayDealer 
   pricingLabel: resolvePriceLabel(dealer),
   valueProps: dealer.labelSettings?.valueProps,
   reviewSources: dealer.labelSettings?.reviewSource ? [dealer.labelSettings.reviewSource] : undefined,
+  theme: dealer.labelSettings?.theme,
+  addendumPricingMode: dealer.labelSettings?.addendumPricingMode,
+  marketTransparencyMode: dealer.labelSettings?.marketTransparencyMode,
 });
 
-export const buildSaturdayVehicle = (dealer: DealerProfileInput, vehicle: VehicleInventoryInput): SaturdayVehicle => {
+export const buildSaturdayVehicle = (dealer: DealerProfileInput, vehicle: VehicleInventoryInput, market?: MarketIntelligenceInput): SaturdayVehicle => {
   const title = vehicle.title || [vehicle.year, vehicle.make, vehicle.model, vehicle.trim].filter(Boolean).join(" ");
-  const price = resolveSellingPrice(vehicle);
+  const printedBasePrice = resolvePrintedBasePrice(dealer, vehicle, market);
   return {
     title: title || "Vehicle Details Pending",
     vin: vehicle.vin || "VIN Pending",
     stock: vehicle.stock || "Stock Pending",
     mileage: vehicle.mileage === undefined ? undefined : String(vehicle.mileage),
     msrp: asString(vehicle.pricing?.msrp),
-    price: price || "Call for Price",
-    priceLabel: resolvePriceLabel(dealer, vehicle),
+    condition: vehicle.condition || "used",
+    price: printedBasePrice || "Call for Price",
+    priceLabel: resolvePrintedPriceLabel(dealer, vehicle),
     imageUrl: resolveVehicleImage(vehicle),
   };
 };
@@ -211,7 +270,7 @@ export const buildSaturdayStickerData = (input: {
 
   return {
     dealer: buildSaturdayDealer(input.dealer),
-    vehicle: buildSaturdayVehicle(input.dealer, input.vehicle),
+    vehicle: buildSaturdayVehicle(input.dealer, input.vehicle, input.market),
     specs: [
       { label: "Year", value: String(input.vehicle.year || "") },
       { label: "Mileage", value: input.vehicle.mileage === undefined ? "" : `${input.vehicle.mileage} mi` },
