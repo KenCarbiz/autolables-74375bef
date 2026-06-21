@@ -48,6 +48,8 @@ export type SaturdayAddendumPricingMode =
 
 export type SaturdayMarketTransparencyMode = "off" | "print_and_passport" | "passport_only" | "selected_templates_only";
 
+export type SaturdayPassportMode = "enabled" | "disabled" | "selected_templates_only";
+
 export type SaturdayDealer = {
   name: string;
   address: string;
@@ -67,6 +69,8 @@ export type SaturdayDealer = {
   addendumPricingMode?: SaturdayAddendumPricingMode;
   /** Controls whether market transparency appears on print, passport, selected templates, or not at all. */
   marketTransparencyMode?: SaturdayMarketTransparencyMode;
+  /** Controls whether large window stickers and addendums show/pass through the QR vehicle passport experience. */
+  passportMode?: SaturdayPassportMode;
 };
 
 export type SaturdayVehicle = {
