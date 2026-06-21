@@ -1,0 +1,237 @@
+// OEM and dealer theme presets for used addendum labels.
+// Dealers can use these defaults, override colors, or create their own saved theme.
+
+import type { SaturdayDealerTheme } from "./types";
+
+export type OEMThemePreset = SaturdayDealerTheme & {
+  oem: string;
+  displayName: string;
+  suggestedFamilies: string[];
+};
+
+export const OEM_THEME_PRESETS: Record<string, OEMThemePreset> = {
+  acura: {
+    oem: "Acura",
+    displayName: "Acura Precision Blue",
+    primaryColor: "#0b1f3a",
+    secondaryColor: "#1d4ed8",
+    accentColor: "#9ca3af",
+    softColor: "#f8fafc",
+    borderColor: "#cbd5e1",
+    suggestedFamilies: ["luxury_black", "minimal_compliance"],
+  },
+  audi: {
+    oem: "Audi",
+    displayName: "Audi Graphite Red",
+    primaryColor: "#111827",
+    secondaryColor: "#000000",
+    accentColor: "#bb0a30",
+    softColor: "#f8fafc",
+    borderColor: "#d1d5db",
+    suggestedFamilies: ["luxury_black"],
+  },
+  bmw: {
+    oem: "BMW",
+    displayName: "BMW Motorsport Blue",
+    primaryColor: "#050816",
+    secondaryColor: "#1d4ed8",
+    accentColor: "#38bdf8",
+    softColor: "#eff6ff",
+    borderColor: "#bfdbfe",
+    suggestedFamilies: ["luxury_black", "market_transparency"],
+  },
+  buick: {
+    oem: "Buick",
+    displayName: "Buick Premium Navy",
+    primaryColor: "#071f3f",
+    secondaryColor: "#334155",
+    accentColor: "#d4af37",
+    softColor: "#f8fafc",
+    borderColor: "#d1d5db",
+    suggestedFamilies: ["traditional_oem", "luxury_black"],
+  },
+  cadillac: {
+    oem: "Cadillac",
+    displayName: "Cadillac Crest Black",
+    primaryColor: "#050816",
+    secondaryColor: "#111827",
+    accentColor: "#d4af37",
+    softColor: "#fafafa",
+    borderColor: "#d6d3d1",
+    suggestedFamilies: ["luxury_black"],
+  },
+  chevrolet: {
+    oem: "Chevrolet",
+    displayName: "Chevrolet Blue Gold",
+    primaryColor: "#07376f",
+    secondaryColor: "#0b4a8f",
+    accentColor: "#d4af37",
+    softColor: "#f8fafc",
+    borderColor: "#bfdbfe",
+    suggestedFamilies: ["traditional_oem", "dealer_difference"],
+  },
+  ford: {
+    oem: "Ford",
+    displayName: "Ford Blue Oval",
+    primaryColor: "#003478",
+    secondaryColor: "#0b5cab",
+    accentColor: "#38bdf8",
+    softColor: "#eff6ff",
+    borderColor: "#bfdbfe",
+    suggestedFamilies: ["traditional_oem", "market_transparency"],
+  },
+  genesis: {
+    oem: "Genesis",
+    displayName: "Genesis Luxury Copper",
+    primaryColor: "#111827",
+    secondaryColor: "#1f2937",
+    accentColor: "#b87333",
+    softColor: "#fafaf9",
+    borderColor: "#d6d3d1",
+    suggestedFamilies: ["luxury_black"],
+  },
+  gmc: {
+    oem: "GMC",
+    displayName: "GMC Professional Red",
+    primaryColor: "#7f1d1d",
+    secondaryColor: "#111827",
+    accentColor: "#dc2626",
+    softColor: "#fff7ed",
+    borderColor: "#fecaca",
+    suggestedFamilies: ["traditional_oem", "dealer_difference"],
+  },
+  honda: {
+    oem: "Honda",
+    displayName: "Honda Trust Blue",
+    primaryColor: "#07376f",
+    secondaryColor: "#2563eb",
+    accentColor: "#dc2626",
+    softColor: "#eff6ff",
+    borderColor: "#bfdbfe",
+    suggestedFamilies: ["traditional_oem", "modern_blue"],
+  },
+  hyundai: {
+    oem: "Hyundai",
+    displayName: "Hyundai Modern Blue",
+    primaryColor: "#002c5f",
+    secondaryColor: "#2563eb",
+    accentColor: "#00aad2",
+    softColor: "#eff6ff",
+    borderColor: "#bfdbfe",
+    suggestedFamilies: ["modern_blue", "market_transparency"],
+  },
+  infiniti: {
+    oem: "INFINITI",
+    displayName: "INFINITI Graphite Luxury",
+    primaryColor: "#050816",
+    secondaryColor: "#111827",
+    accentColor: "#d4af37",
+    softColor: "#f8fafc",
+    borderColor: "#d1d5db",
+    suggestedFamilies: ["luxury_black", "cpo_focus"],
+  },
+  kia: {
+    oem: "Kia",
+    displayName: "Kia Modern Graphite",
+    primaryColor: "#111827",
+    secondaryColor: "#334155",
+    accentColor: "#dc2626",
+    softColor: "#f8fafc",
+    borderColor: "#cbd5e1",
+    suggestedFamilies: ["modern_blue", "traditional_oem"],
+  },
+  lexus: {
+    oem: "Lexus",
+    displayName: "Lexus Luxury Silver",
+    primaryColor: "#050816",
+    secondaryColor: "#111827",
+    accentColor: "#c0c0c0",
+    softColor: "#fafafa",
+    borderColor: "#d4d4d8",
+    suggestedFamilies: ["luxury_black", "minimal_compliance"],
+  },
+  mazda: {
+    oem: "Mazda",
+    displayName: "Mazda Soul Red",
+    primaryColor: "#111827",
+    secondaryColor: "#7f1d1d",
+    accentColor: "#dc2626",
+    softColor: "#fef2f2",
+    borderColor: "#fecaca",
+    suggestedFamilies: ["modern_blue", "luxury_black"],
+  },
+  mercedes_benz: {
+    oem: "Mercedes-Benz",
+    displayName: "Mercedes-Benz Executive Silver",
+    primaryColor: "#050816",
+    secondaryColor: "#1f2937",
+    accentColor: "#c0c0c0",
+    softColor: "#fafafa",
+    borderColor: "#d4d4d8",
+    suggestedFamilies: ["luxury_black"],
+  },
+  nissan: {
+    oem: "Nissan",
+    displayName: "Nissan Modern Red",
+    primaryColor: "#111827",
+    secondaryColor: "#374151",
+    accentColor: "#c3002f",
+    softColor: "#f8fafc",
+    borderColor: "#cbd5e1",
+    suggestedFamilies: ["modern_blue", "traditional_oem"],
+  },
+  subaru: {
+    oem: "Subaru",
+    displayName: "Subaru Confidence Blue",
+    primaryColor: "#003478",
+    secondaryColor: "#2563eb",
+    accentColor: "#fbbf24",
+    softColor: "#eff6ff",
+    borderColor: "#bfdbfe",
+    suggestedFamilies: ["traditional_oem", "market_transparency"],
+  },
+  toyota: {
+    oem: "Toyota",
+    displayName: "Toyota Red Trust",
+    primaryColor: "#111827",
+    secondaryColor: "#dc2626",
+    accentColor: "#ef4444",
+    softColor: "#fef2f2",
+    borderColor: "#fecaca",
+    suggestedFamilies: ["traditional_oem", "minimal_compliance"],
+  },
+  volkswagen: {
+    oem: "Volkswagen",
+    displayName: "Volkswagen Clean Blue",
+    primaryColor: "#001e50",
+    secondaryColor: "#2563eb",
+    accentColor: "#60a5fa",
+    softColor: "#eff6ff",
+    borderColor: "#bfdbfe",
+    suggestedFamilies: ["modern_blue", "minimal_compliance"],
+  },
+  volvo: {
+    oem: "Volvo",
+    displayName: "Volvo Scandinavian Blue",
+    primaryColor: "#0f172a",
+    secondaryColor: "#1e3a8a",
+    accentColor: "#60a5fa",
+    softColor: "#f8fafc",
+    borderColor: "#cbd5e1",
+    suggestedFamilies: ["luxury_black", "minimal_compliance"],
+  },
+};
+
+const keyForOEM = (make?: string) =>
+  String(make || "")
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "_")
+    .replace(/^_|_$/g, "");
+
+export const getOEMThemePreset = (make?: string) => OEM_THEME_PRESETS[keyForOEM(make)];
+
+export const mergeDealerAndOEMTheme = (oem?: SaturdayDealerTheme, dealer?: SaturdayDealerTheme): SaturdayDealerTheme => ({
+  ...oem,
+  ...dealer,
+});
