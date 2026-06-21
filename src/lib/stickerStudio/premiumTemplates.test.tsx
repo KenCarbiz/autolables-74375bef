@@ -12,7 +12,7 @@ const BRAND: StickerBranding = {
   dealerName: "Harte Infiniti", address: "Hartford, CT", phone: "(860) 555-0100", website: "harteinfiniti.com",
   logoUrl: "", showLogo: true, valueProp: "Lifetime powertrain", disclaimer: "See dealer for details.", accentColor: "#2563EB",
 };
-const PREMIUM = ["window-passport", "window-value", "window-noir"];
+const PREMIUM = ["window-premium", "window-bold", "window-luxury"];
 const render = (id: string, data: StickerData, options = {}) => {
   const t = getStudioTemplate(id)!;
   const Render = t.Render;
