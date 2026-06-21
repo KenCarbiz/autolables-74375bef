@@ -77,6 +77,7 @@ const StickerStudioCustomize = lazy(() => import("./pages/StickerStudioCustomize
 const StickerPrint = lazy(() => import("./pages/StickerPrint"));
 const StickerTestLabel = lazy(() => import("./pages/StickerTestLabel"));
 const DevHeroPreview = lazy(() => import("./pages/DevHeroPreview"));
+const DevSaturdayPreview = lazy(() => import("./pages/DevSaturdayPreview"));
 const QrRedirect = lazy(() => import("./pages/QrRedirect"));
 const QrAnalytics = lazy(() => import("./pages/QrAnalytics"));
 const Reports = lazy(() => import("./pages/Reports"));
@@ -181,6 +182,7 @@ const App = () => (
                       <Route path="/print/sticker/:templateId" element={<StickerPrint />} />
                       <Route path="/print/test-label" element={<StickerTestLabel />} />
                       <Route path="/dev/hero-preview" element={<DevHeroPreview />} />
+                      <Route path="/dev/saturday-preview" element={<DevSaturdayPreview />} />
                       <Route path="/q/:token" element={<QrRedirect />} />
 
                       {/* Gated layout — one AppShell shared across every
