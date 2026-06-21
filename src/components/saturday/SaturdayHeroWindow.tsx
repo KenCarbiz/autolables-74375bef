@@ -22,8 +22,8 @@ const money = (n?: string | number) => {
 
 function Box({ title, children, className = "" }: { title?: string; children: ReactNode; className?: string }) {
   return (
-    <section className={`rounded-[18px] border bg-white ${className}`} style={{ borderColor: line }}>
-      {title ? <div className="px-4 pt-3 text-[14px] font-black tracking-tight" style={{ color: ink }}>{title}</div> : null}
+    <section className={`rounded-[20px] border bg-white ${className}`} style={{ borderColor: line }}>
+      {title ? <div className="px-4 pt-3 text-[15px] font-black tracking-tight" style={{ color: ink }}>{title}</div> : null}
       {children}
     </section>
   );
@@ -32,13 +32,13 @@ function Box({ title, children, className = "" }: { title?: string; children: Re
 function Header({ qrUrl }: { qrUrl: string }) {
   const safeUrl = qrUrl.startsWith("http") ? qrUrl : `https://${qrUrl}`;
   return (
-    <header className="grid grid-cols-[1.25fr_0.78fr_0.95fr] items-start gap-5">
+    <header className="grid grid-cols-[1.28fr_0.72fr_0.98fr] items-start gap-5">
       <div>
         <div className="flex items-center gap-3">
           <div className="flex h-14 w-14 items-center justify-center rounded-[16px] text-[34px] font-black text-white" style={{ background: `linear-gradient(145deg,${blue},#60a5fa)` }}>A</div>
-          <div className="text-[30px] font-black leading-none tracking-[-0.045em]" style={{ color: ink }}>AUTOLABELS<span style={{ color: blue }}>.IO</span></div>
+          <div className="text-[31px] font-black leading-none tracking-[-0.045em]" style={{ color: ink }}>AUTOLABELS<span style={{ color: blue }}>.IO</span></div>
         </div>
-        <div className="mt-4 text-[25px] font-black leading-none" style={{ color: ink }}>Vehicle Intelligence Report</div>
+        <div className="mt-4 text-[27px] font-black leading-none" style={{ color: ink }}>Vehicle Intelligence Report</div>
         <div className="mt-2 text-[14px] text-slate-500">Generated from live dealer inventory</div>
       </div>
       <div className="flex items-start gap-2 pt-1">
@@ -46,8 +46,8 @@ function Header({ qrUrl }: { qrUrl: string }) {
         <div><div className="text-[13px] font-black uppercase" style={{ color: ink }}>FTC Compliant</div><div className="text-[10px] leading-tight text-slate-500">All disclosures delivered digitally and in print.</div></div>
       </div>
       <div className="flex items-center gap-3 rounded-[16px] border bg-white p-2.5" style={{ borderColor: "#cbd5e1" }}>
-        <QRCodeSVG value={safeUrl} size={82} bgColor="#fff" fgColor="#111827" level="M" />
-        <div><div className="text-[12px] font-black leading-tight" style={{ color: ink }}>Scan to view full disclosures & more</div></div>
+        <QRCodeSVG value={safeUrl} size={84} bgColor="#fff" fgColor="#111827" level="M" />
+        <div><div className="text-[12px] font-black leading-tight" style={{ color: ink }}>Scan to view full disclosures & more</div><div className="mt-1 text-[9px] font-bold" style={{ color: blue }}>Scan Anytime</div></div>
       </div>
     </header>
   );
@@ -55,18 +55,18 @@ function Header({ qrUrl }: { qrUrl: string }) {
 
 function VehiclePhoto() {
   return (
-    <div className="relative h-[2.48in] overflow-hidden rounded-[22px] bg-gradient-to-br from-white via-blue-50 to-slate-100">
-      <div className="absolute inset-0" style={{ background: "radial-gradient(circle at 68% 48%, rgba(147,197,253,.55) 0, transparent 34%), linear-gradient(115deg, transparent 0 55%, rgba(37,99,235,.06) 55% 62%, transparent 62%)" }} />
-      <svg className="absolute -left-[0.04in] top-[0.14in] drop-shadow-2xl" width="520" height="225" viewBox="0 0 520 225" fill="none" aria-label="vehicle image placeholder">
-        <path d="M54 144c13-52 58-86 118-86h158c50 0 94 27 129 77l48 10c17 4 28 17 24 33l-4 18H24l7-27c4-16 11-24 23-25Z" fill="#202938" />
-        <path d="M166 74h159c44 0 79 21 104 62H103c18-36 39-58 63-62Z" fill="#94a3b8" />
-        <path d="M187 88h77v45H123c15-26 36-42 64-45ZM286 88h43c31 0 58 16 82 45H286V88Z" fill="#eef6ff" />
-        <path d="M97 150h358" stroke="#f8fafc" strokeWidth="9" strokeLinecap="round" opacity="0.58" />
-        <path d="M186 68h124" stroke="#f8fafc" strokeWidth="7" strokeLinecap="round" opacity="0.75" />
-        <circle cx="129" cy="182" r="35" fill="#0f172a" />
-        <circle cx="129" cy="182" r="17" fill="#e2e8f0" />
-        <circle cx="404" cy="182" r="35" fill="#0f172a" />
-        <circle cx="404" cy="182" r="17" fill="#e2e8f0" />
+    <div className="relative h-[2.68in] overflow-hidden rounded-[24px] bg-gradient-to-br from-white via-slate-50 to-blue-50">
+      <div className="absolute inset-0" style={{ background: "radial-gradient(circle at 72% 45%, rgba(147,197,253,.55) 0, transparent 34%), linear-gradient(115deg, transparent 0 55%, rgba(37,99,235,.055) 55% 62%, transparent 62%)" }} />
+      <svg className="absolute -left-[0.12in] top-[0.03in] drop-shadow-2xl" width="585" height="255" viewBox="0 0 585 255" fill="none" aria-label="vehicle image placeholder">
+        <path d="M52 166c16-64 72-106 145-106h186c61 0 116 34 159 94l32 7c16 4 26 18 21 34l-5 19H23l7-28c4-14 10-19 22-20Z" fill="#263243" />
+        <path d="M190 82h185c52 0 94 26 125 74H112c22-46 48-70 78-74Z" fill="#94a3b8" />
+        <path d="M215 98h91v55H134c19-34 46-52 81-55ZM330 98h45c39 0 71 19 101 55H330V98Z" fill="#f4f8fc" />
+        <path d="M101 174h414" stroke="#f8fafc" strokeWidth="11" strokeLinecap="round" opacity="0.58" />
+        <path d="M215 73h143" stroke="#f8fafc" strokeWidth="7" strokeLinecap="round" opacity="0.72" />
+        <circle cx="143" cy="212" r="40" fill="#0f172a" />
+        <circle cx="143" cy="212" r="19" fill="#e2e8f0" />
+        <circle cx="458" cy="212" r="40" fill="#0f172a" />
+        <circle cx="458" cy="212" r="19" fill="#e2e8f0" />
       </svg>
     </div>
   );
@@ -98,7 +98,7 @@ function Spec({ label, value, sub }: { label: string; value: string; sub?: strin
 function ScorePanel() {
   return (
     <Box className="overflow-hidden text-white">
-      <div className="h-full rounded-[18px] p-5 text-white" style={{ background: `linear-gradient(150deg,${blue},${navy})` }}>
+      <div className="h-full rounded-[20px] p-5 text-white" style={{ background: `linear-gradient(150deg,${blue},${navy})` }}>
         <div className="text-[15px] font-black uppercase tracking-wide">Vehicle Quality Score</div>
         <div className="mt-4 flex items-end gap-2"><span className="text-[72px] font-black leading-none">93</span><span className="pb-2 text-[18px]">/100</span></div>
         <span className="mt-1 inline-block rounded-full bg-emerald-400 px-3 py-1 text-[10px] font-black uppercase">Excellent</span>
@@ -138,10 +138,10 @@ export const SaturdayHeroWindow = ({ data }: Props) => {
       <div className="flex h-full flex-col p-[0.24in]">
         <Header qrUrl={qrUrl} />
 
-        <section className="mt-5 grid grid-cols-[0.88fr_1.12fr] gap-5">
+        <section className="mt-5 grid grid-cols-[0.86fr_1.14fr] gap-5">
           <div>
-            <div className="text-[27px] font-black leading-none" style={{ color: blue }}>2024</div>
-            <h1 className="mt-2 text-[43px] font-black leading-[0.96] tracking-[-0.05em]" style={{ color: ink }}>{title}</h1>
+            <div className="text-[28px] font-black leading-none" style={{ color: blue }}>2024</div>
+            <h1 className="mt-2 text-[44px] font-black leading-[0.96] tracking-[-0.05em]" style={{ color: ink }}>{title}</h1>
             <div className="mt-5 grid grid-cols-2 gap-x-8 gap-y-4">
               <Meta label="Stock Number" value={vehicle.stock} />
               <Meta label="VIN" value={vehicle.vin} />
