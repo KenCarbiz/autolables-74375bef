@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { QRCodeSVG } from "qrcode.react";
 
 // ──────────────────────────────────────────────────────────────────────
@@ -145,6 +146,16 @@ const SectionLabel = ({ children, accent }: { children: React.ReactNode; accent:
   <p className="text-[9px] font-bold uppercase tracking-[0.16em] mb-1.5" style={{ color: accent }}>{children}</p>
 );
 
+// Print-safe dealer logo. Renders nothing if the URL is missing or fails to
+// load (the dealer name is always shown alongside), and sits in a white chip on
+// dark stock so a dark logo stays visible.
+function StickerLogo({ url, alt, dark, imgClass }: { url?: string; alt: string; dark: boolean; imgClass: string }) {
+  const [failed, setFailed] = useState(false);
+  if (!url || failed) return null;
+  const img = <img src={url} alt={alt} className={imgClass} crossOrigin="anonymous" onError={() => setFailed(true)} />;
+  return dark ? <span className="inline-flex rounded bg-white px-1.5 py-1">{img}</span> : img;
+}
+
 // ── Window sticker layout (8.5 x 11) ──────────────────────────────────
 function WindowSheet({ config, data, branding, options }: TemplateRenderProps) {
   const accent = config.supportsAccent ? branding.accentColor : config.defaultAccent;
@@ -162,8 +173,8 @@ function WindowSheet({ config, data, branding, options }: TemplateRenderProps) {
       {/* Header */}
       <div className="flex items-center justify-between gap-4 border-b-2 pb-3" style={{ borderColor: accent }}>
         <div className="flex items-center gap-3 min-w-0">
-          {config.supportsLogo && branding.showLogo && branding.logoUrl ? (
-            <img src={branding.logoUrl} alt={branding.dealerName} className="h-12 w-auto object-contain" crossOrigin="anonymous" />
+          {config.supportsLogo && branding.showLogo ? (
+            <StickerLogo url={branding.logoUrl} alt={branding.dealerName} dark={pal.dark} imgClass="h-12 w-auto object-contain" />
           ) : null}
           <div className="min-w-0">
             <p className={`font-bold leading-tight ${classic ? "font-serif text-xl" : "text-lg"}`} style={{ color: pal.ink }}>{branding.dealerName}</p>
@@ -256,7 +267,7 @@ function AddendumStrip({ config, data, branding, options }: TemplateRenderProps)
     <div className="flex h-full flex-col" data-label-mode={pal.dark ? "black" : "white"} style={{ padding: `${config.marginsIn}in`, backgroundColor: pal.sheetBg, color: pal.ink }}>
       <div className="text-center rounded-t-md px-2 py-2" style={{ backgroundColor: headerFilled ? accent : "transparent", color: headerFilled ? "#fff" : pal.ink }}>
         {config.supportsLogo && branding.showLogo && branding.logoUrl ? (
-          <img src={branding.logoUrl} alt={branding.dealerName} className="mx-auto h-10 w-auto object-contain" crossOrigin="anonymous" />
+          <StickerLogo url={branding.logoUrl} alt={branding.dealerName} dark={pal.dark || headerFilled} imgClass="mx-auto h-10 w-auto object-contain" />
         ) : (
           <p className={`font-bold ${luxury ? "font-serif text-lg" : "text-base"}`}>{branding.dealerName}</p>
         )}

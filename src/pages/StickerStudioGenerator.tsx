@@ -5,13 +5,14 @@ import { useTenant } from "@/contexts/TenantContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { useDealerDocumentRules } from "@/lib/documentRules";
 import { useUsageLimits } from "@/lib/entitlements/useUsageLimits";
+import { useAssetReadiness } from "@/lib/stickerStudio/useAssetReadiness";
 import { transitionDocument } from "@/lib/stickerStudio/documentWorkflow";
 import { ensureQrCode } from "@/lib/stickerStudio/qrTracking";
 import { useLatestAddendum } from "@/lib/stickerStudio/useLatestAddendum";
 import { mapProductsToStickerItems } from "@/lib/stickerStudio/addendumMapping";
 import { validateStickerPacketMatch, type PacketContext } from "@/lib/stickerStudio/validateStickerPacketMatch";
 import StickerPacketReviewPanel from "@/components/sticker/StickerPacketReviewPanel";
-import { FileCheck2 } from "lucide-react";
+import { FileCheck2, QrCode as QrIcon, AlertTriangle } from "lucide-react";
 import { useVehiclePrefill } from "@/lib/vehiclePrefill";
 import { getStudioTemplate, TemplateRenderer, type StickerData, type StickerLineItem, type StickerRenderOptions, type LabelMode } from "@/lib/stickerStudio/templates";
 import { useStickerCatalog } from "@/lib/stickerStudio/useStickerCatalog";
@@ -173,6 +174,12 @@ const StickerStudioGenerator = () => {
   } : null;
   const matchBlocked = !!packetCtx && rules.blockPacketOnMismatchFail &&
     validateStickerPacketMatch(data, packetCtx).status === "blocked";
+
+  // Asset readiness (logo resolution + QR availability) for the warning row.
+  const assets = useAssetReadiness({
+    logoUrl: branding.logoUrl, logoEnabled: cfg.supportsLogo && branding.showLogo,
+    qrUrl: data.qrUrl, qrSupported: cfg.supportsQr, qrRequired: cfg.styleTags.includes("Compliance"),
+  });
 
   const setItem = (key: "installed" | "upgrades" | "benefits", i: number, patch: Partial<StickerLineItem>) =>
     setData((d) => ({ ...d, [key]: d[key].map((it, idx) => (idx === i ? { ...it, ...patch } : it)) }));
@@ -373,6 +380,22 @@ const StickerStudioGenerator = () => {
             <div className="space-y-2.5">
               {cfg.supportsLogo && (
                 <label className="flex items-center gap-2 text-sm text-foreground"><input type="checkbox" checked={branding.showLogo} onChange={(e) => setBranding((b) => ({ ...b, showLogo: e.target.checked }))} /> Show dealer logo</label>
+              )}
+              {/* Asset readiness — warns before print on a missing/low-res logo or a required-but-missing QR. */}
+              <div className="flex flex-wrap gap-x-3 gap-y-1 text-[11px]">
+                {cfg.supportsLogo && branding.showLogo && (
+                  <span className={`inline-flex items-center gap-1 ${assets.logo === "ready" ? "text-emerald-600" : assets.logo === "low_res" ? "text-amber-600" : "text-muted-foreground"}`}>
+                    <ImageIcon className="w-3 h-3" /> Logo: {assets.logo === "ready" ? "ready" : assets.logo === "low_res" ? `low-res (${assets.logoWidth}px)` : "fallback to name"}
+                  </span>
+                )}
+                {cfg.supportsQr && (
+                  <span className={`inline-flex items-center gap-1 ${assets.qr === "ready" ? "text-emerald-600" : assets.qrBlocking ? "text-rose-600" : "text-muted-foreground"}`}>
+                    <QrIcon className="w-3 h-3" /> QR: {assets.qr === "ready" ? "ready" : assets.qrBlocking ? "required — missing" : "open this from a vehicle"}
+                  </span>
+                )}
+              </div>
+              {assets.qrBlocking && (
+                <p className="text-[10px] text-rose-600 inline-flex items-center gap-1"><AlertTriangle className="w-3 h-3" /> This compliance template requires a QR destination. Open it from a vehicle so the passport URL is set.</p>
               )}
               <div><label className={label}>Value proposition</label><input value={branding.valueProp} onChange={(e) => setBranding((b) => ({ ...b, valueProp: e.target.value }))} placeholder="Lifetime powertrain · Free maintenance" className={input} /></div>
               <div><label className={label}>Disclaimer</label><textarea value={branding.disclaimer} onChange={(e) => setBranding((b) => ({ ...b, disclaimer: e.target.value }))} rows={2} className="w-full px-2.5 py-2 rounded-md border border-border bg-background text-sm outline-none focus:border-primary resize-y" /></div>
