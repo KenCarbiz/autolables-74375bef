@@ -602,9 +602,9 @@ export const RENDER_ENGINES: Record<string, (props: TemplateRenderProps) => JSX.
 // specific template to a dedicated layout (still data-driven config, no static
 // images); any window template not listed here uses the generic WindowSheet.
 const PREMIUM_RENDERERS: Record<string, (props: TemplateRenderProps) => JSX.Element> = {
-  "window-passport": PassportPremiumSheet,
-  "window-value": BigPriceSheet,
-  "window-noir": ExecutiveNoirSheet,
+  "window-premium": PassportPremiumSheet,
+  "window-bold": BigPriceSheet,
+  "window-luxury": ExecutiveNoirSheet,
 };
 
 // Merge a stored config override onto the code base config for the type.
