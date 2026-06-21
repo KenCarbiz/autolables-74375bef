@@ -576,6 +576,45 @@ export type Database = {
         }
         Relationships: []
       }
+      autolabels_usage_events: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          entity_id: string | null
+          entity_type: string | null
+          feature_key: string
+          id: string
+          metadata: Json
+          metric_key: string
+          quantity: number
+          tenant_id: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          entity_id?: string | null
+          entity_type?: string | null
+          feature_key: string
+          id?: string
+          metadata?: Json
+          metric_key: string
+          quantity?: number
+          tenant_id: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          entity_id?: string | null
+          entity_type?: string | null
+          feature_key?: string
+          id?: string
+          metadata?: Json
+          metric_key?: string
+          quantity?: number
+          tenant_id?: string
+        }
+        Relationships: []
+      }
       billing_events: {
         Row: {
           created_at: string
@@ -2162,6 +2201,65 @@ export type Database = {
           },
         ]
       }
+      stale_document_flags: {
+        Row: {
+          changed_field: string | null
+          created_at: string
+          generated_document_id: string | null
+          id: string
+          new_value: Json | null
+          old_value: Json | null
+          reason: string
+          reviewed_at: string | null
+          reviewed_by: string | null
+          severity: string
+          status: string
+          tenant_id: string
+          updated_at: string
+          vehicle_id: string
+        }
+        Insert: {
+          changed_field?: string | null
+          created_at?: string
+          generated_document_id?: string | null
+          id?: string
+          new_value?: Json | null
+          old_value?: Json | null
+          reason: string
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          severity?: string
+          status?: string
+          tenant_id: string
+          updated_at?: string
+          vehicle_id: string
+        }
+        Update: {
+          changed_field?: string | null
+          created_at?: string
+          generated_document_id?: string | null
+          id?: string
+          new_value?: Json | null
+          old_value?: Json | null
+          reason?: string
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          severity?: string
+          status?: string
+          tenant_id?: string
+          updated_at?: string
+          vehicle_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "stale_document_flags_generated_document_id_fkey"
+            columns: ["generated_document_id"]
+            isOneToOne: false
+            referencedRelation: "generated_documents"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       sticker_template_categories: {
         Row: {
           created_at: string
@@ -3477,6 +3575,22 @@ export type Database = {
           active: boolean
           jobid: number
           schedule: string
+        }[]
+      }
+      get_signing_documents: {
+        Args: { _token: string }
+        Returns: {
+          approved_at: string
+          created_at: string
+          document_type: string
+          id: string
+          label_mode: string
+          online_url: string
+          pdf_url: string
+          png_url: string
+          published_at: string
+          template_id: string
+          version: number
         }[]
       }
       get_vehicle_file_by_deal_token: {
