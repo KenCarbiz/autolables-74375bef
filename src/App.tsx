@@ -180,6 +180,7 @@ const App = () => (
                           Sticker Studio generator for vector print-to-PDF. */}
                       <Route path="/print/sticker/:templateId" element={<StickerPrint />} />
                       <Route path="/print/test-label" element={<StickerTestLabel />} />
+                      <Route path="/dev/hero-preview" element={<DevHeroPreview />} />
                       <Route path="/q/:token" element={<QrRedirect />} />
 
                       {/* Gated layout — one AppShell shared across every
