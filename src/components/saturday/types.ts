@@ -26,6 +26,19 @@ export type SaturdayReviewSource = {
   allowAutomatedFetch?: boolean;
 };
 
+export type SaturdayDealerTheme = {
+  /** Main frame/header color chosen by the dealer or inherited from OEM branding. */
+  primaryColor?: string;
+  /** Supporting accent color for highlights, icons, and CTAs. */
+  secondaryColor?: string;
+  /** Premium highlight color for price, savings, or certified badges. */
+  accentColor?: string;
+  /** Soft panel background color. */
+  softColor?: string;
+  /** Border/frame color. */
+  borderColor?: string;
+};
+
 export type SaturdayDealer = {
   name: string;
   address: string;
@@ -39,6 +52,8 @@ export type SaturdayDealer = {
   valueProps?: string[];
   /** Dealer-selected review sources shown on labels/passports. */
   reviewSources?: SaturdayReviewSource[];
+  /** Dealer/OEM color controls for frame, headers, accents, and borders. */
+  theme?: SaturdayDealerTheme;
 };
 
 export type SaturdayVehicle = {
