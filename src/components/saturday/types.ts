@@ -3,6 +3,29 @@
 // These fields are intentionally tenant-safe so the same template can be branded per dealer
 // and hydrated from dealer profile, MarketCheck, Black Book, DMS, CRM, and AutoLabels passport data.
 
+export type SaturdayReviewSourceType =
+  | "google"
+  | "facebook"
+  | "bbb"
+  | "cars_com"
+  | "dealer_rater"
+  | "car_gurus"
+  | "edmunds"
+  | "yelp"
+  | "custom";
+
+export type SaturdayReviewSource = {
+  type: SaturdayReviewSourceType;
+  label: string;
+  rating?: number;
+  reviewCount?: number;
+  profileUrl?: string;
+  /** True when the dealer typed the rating/review count manually instead of AutoLabels fetching it. */
+  manuallyEntered?: boolean;
+  /** True when AutoLabels may attempt an approved fetch/scrape/integration for this source. */
+  allowAutomatedFetch?: boolean;
+};
+
 export type SaturdayDealer = {
   name: string;
   address: string;
@@ -14,6 +37,8 @@ export type SaturdayDealer = {
   pricingLabel?: string;
   /** Optional dealer value propositions shown on buyer-facing labels. */
   valueProps?: string[];
+  /** Dealer-selected review sources shown on labels/passports. */
+  reviewSources?: SaturdayReviewSource[];
 };
 
 export type SaturdayVehicle = {
