@@ -72,6 +72,28 @@ export async function saveStickerToVehicle(args: SaveStickerArgs): Promise<ApiRe
   if (!args.vehicleId) return { ok: false, error: "no_vehicle" };
   const client = sb();
 
+  // Resolve the active template_version for this template_key (string id like
+  // "window-modern"). Joins sticker_templates → sticker_template_versions to
+  // get the latest version. Falls back to 1 for built-in templates.
+  let templateVersion = 1;
+  try {
+    const { data: tpl } = await client
+      .from("sticker_templates")
+      .select("id")
+      .eq("template_key", args.templateId)
+      .maybeSingle();
+    if (tpl?.id) {
+      const { data: ver } = await client
+        .from("sticker_template_versions")
+        .select("version")
+        .eq("template_id", tpl.id)
+        .order("version", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (ver?.version) templateVersion = ver.version;
+    }
+  } catch { /* keep default of 1 */ }
+
   // Production path: generated_documents with a frozen snapshot + version bump.
   try {
     const { data: last, error: readErr } = await client
@@ -84,12 +106,18 @@ export async function saveStickerToVehicle(args: SaveStickerArgs): Promise<ApiRe
       .maybeSingle();
     if (!readErr) {
       const version = (last?.version || 0) + 1;
+      const snapshot = {
+        ...(args.snapshot || {}),
+        template_id: args.templateId,
+        template_version: templateVersion,
+      };
       const { data: doc, error: insErr } = await client
         .from("generated_documents")
         .insert({
           tenant_id: args.tenantId || null,
           vehicle_id: args.vehicleId,
           template_id: args.templateId,
+          template_version: templateVersion,
           document_type: args.docType,
           document_status: "draft",
           version,
@@ -97,7 +125,7 @@ export async function saveStickerToVehicle(args: SaveStickerArgs): Promise<ApiRe
           pdf_url: args.pdfDataUrl || null,
           png_url: args.pngDataUrl || null,
           online_url: args.qrUrl || null,
-          data_snapshot: args.snapshot || {},
+          data_snapshot: snapshot,
         })
         .select("id, version")
         .maybeSingle();
@@ -113,13 +141,14 @@ export async function saveStickerToVehicle(args: SaveStickerArgs): Promise<ApiRe
         } catch { /* best-effort */ }
         await logStickerAudit("sticker_generated", {
           tenantId: args.tenantId, entityType: args.docType, entityId: doc.id,
-          details: { template_id: args.templateId, version: doc.version, vin: args.vin },
+          details: { template_id: args.templateId, template_version: templateVersion, version: doc.version, vin: args.vin },
         });
         await recordUsageEvent({ tenantId: args.tenantId, featureKey: args.docType === "window" ? "window_stickers" : "addendum_stickers", metric: "stickers_generated", entityType: args.docType, entityId: doc.id });
         return { ok: true, documentId: doc.id, version: doc.version };
       }
     }
   } catch { /* fall through to legacy */ }
+
 
   // Fallback path: append a reference to vehicle_listings.documents.
   try {
