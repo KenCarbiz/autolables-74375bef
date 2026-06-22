@@ -98,11 +98,19 @@ export const GetReadySheet = ({
   // isolated popup so it never disturbs the full recon-slip layout.
   const printKeyTag = () => {
     if (!installUrl) return;
-    const svg = keyTagQrRef.current?.innerHTML || "";
+    const esc = (s: string) =>
+      String(s ?? "")
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
     const who = dealerName || settings.dealer_name || "Dealership";
     const w = window.open("", "_blank", "width=420,height=620");
     if (!w) return;
-    w.document.write(`<!doctype html><html><head><title>Installer Key Tag</title>
+    const doc = w.document;
+    doc.open();
+    doc.write(`<!doctype html><html><head><title>Installer Key Tag</title>
       <style>
         @page { margin: 8mm; }
         * { box-sizing: border-box; font-family: -apple-system, system-ui, sans-serif; }
@@ -119,14 +127,19 @@ export const GetReadySheet = ({
       <div class="tag">
         <div class="hole"></div>
         <div class="ey">Installer · scan to verify</div>
-        <div class="ttl">${who}</div>
-        <div class="qr">${svg}</div>
-        <div class="meta">${record.ymm || "Vehicle"}<br/>Stock ${record.stockNumber || "—"}<br/><span class="vin">${record.vin}</span></div>
+        <div class="ttl">${esc(who)}</div>
+        <div class="qr" id="qr-slot"></div>
+        <div class="meta">${esc(record.ymm || "Vehicle")}<br/>Stock ${esc(record.stockNumber || "—")}<br/><span class="vin">${esc(record.vin)}</span></div>
         <div class="note">Keep on keys until install is verified, then discard.</div>
       </div>
-      <script>window.onload=function(){window.print();}</script>
       </body></html>`);
-    w.document.close();
+    doc.close();
+    // Inject the QR SVG via DOM (not string concatenation) so the
+    // popup never parses untrusted HTML for the dynamic values.
+    const slot = doc.getElementById("qr-slot");
+    const svgNode = keyTagQrRef.current?.firstElementChild;
+    if (slot && svgNode) slot.appendChild(svgNode.cloneNode(true));
+    w.setTimeout(() => w.print(), 50);
   };
 
   const accessories = record.accessoriesToInstall || [];
