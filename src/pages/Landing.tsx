@@ -83,6 +83,7 @@ const NAV_LINKS = [
   { label: "The risk", href: "#risk" },
   { label: "Take back power", href: "#power" },
   { label: "How it works", href: "#how" },
+  { label: "Compare", href: "#compare" },
   { label: "Pricing", href: "#pricing" },
   { label: "FAQ", href: "#faq" },
 ];
@@ -1029,7 +1030,7 @@ const TakeThePowerBack = ({ onWaitlist }: { onWaitlist: () => void }) => (
               </ul>
             </>
           }
-          chips={["Blocked at signing on a price mismatch", "A timestamped record at every deal"]}
+          chips={["Blocked at signing on a price mismatch", "FTC warned 97 dealer groups · Mar 2026"]}
           punch="Priced in ink, not pencil."
         />
       </div>

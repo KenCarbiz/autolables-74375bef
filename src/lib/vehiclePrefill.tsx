@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams, Link } from "react-router-dom";
 import { FileText, ArrowLeft, AlertTriangle } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
@@ -158,7 +158,15 @@ export interface PrefillState {
   vehicle: PrefillVehicle | null;
 }
 
-export function useVehiclePrefill(onLoad?: (v: PrefillVehicle) => void): PrefillState {
+// Return type adds an imperative `apply` so callers can run their own prefill
+// logic from an effect (alternative to the onLoad callback) without re-keying
+// the fetch. `apply` is stable across renders so effects keyed on the result
+// don't loop.
+export interface PrefillResult extends PrefillState {
+  apply: (cb: (v: PrefillVehicle) => void) => void;
+}
+
+export function useVehiclePrefill(onLoad?: (v: PrefillVehicle) => void): PrefillResult {
   const [params] = useSearchParams();
   const vehicleId = params.get("vehicleId") || params.get("vehicle_id") || "";
   const vinParam = (params.get("vin") || "").toUpperCase();
@@ -199,7 +207,14 @@ export function useVehiclePrefill(onLoad?: (v: PrefillVehicle) => void): Prefill
     };
   }, [active, vehicleId, vinParam]);
 
-  return state;
+  const apply = useCallback(
+    (cb: (v: PrefillVehicle) => void) => {
+      if (state.vehicle) cb(state.vehicle);
+    },
+    [state.vehicle]
+  );
+
+  return useMemo<PrefillResult>(() => ({ ...state, apply }), [state, apply]);
 }
 
 export function missingVehicleFields(v: PrefillVehicle): string[] {
