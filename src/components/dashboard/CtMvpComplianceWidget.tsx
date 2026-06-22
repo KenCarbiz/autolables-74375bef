@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { AlertTriangle, CheckCircle2, FileText, RefreshCw, ScrollText, ShieldCheck, Signature } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -20,6 +21,8 @@ type CtMvpComplianceWidgetProps = {
   title?: string;
 };
 
+type ActionFilter = "ready" | "missing_ftc" | "missing_k208" | "missing_signature" | "needs_review";
+
 const hasIssue = (row: RunRow, terms: string[]) => {
   const checks = Array.isArray(row.checks) ? row.checks : [];
   return checks.some((check) => {
@@ -29,27 +32,28 @@ const hasIssue = (row: RunRow, terms: string[]) => {
   });
 };
 
-const Stat = ({ icon: Icon, label, value, tone = "slate" }: { icon: typeof ShieldCheck; label: string; value: number; tone?: "emerald" | "amber" | "rose" | "blue" | "slate" }) => {
+const Stat = ({ icon: Icon, label, value, tone = "slate", onClick }: { icon: typeof ShieldCheck; label: string; value: number; tone?: "emerald" | "amber" | "rose" | "blue" | "slate"; onClick?: () => void }) => {
   const tones = {
-    emerald: "border-emerald-200 bg-emerald-50 text-emerald-700",
-    amber: "border-amber-200 bg-amber-50 text-amber-700",
-    rose: "border-rose-200 bg-rose-50 text-rose-700",
-    blue: "border-blue-200 bg-blue-50 text-blue-700",
-    slate: "border-slate-200 bg-slate-50 text-slate-700",
+    emerald: "border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100",
+    amber: "border-amber-200 bg-amber-50 text-amber-700 hover:bg-amber-100",
+    rose: "border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-100",
+    blue: "border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100",
+    slate: "border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100",
   } as const;
 
   return (
-    <div className={`rounded-xl border p-3 ${tones[tone]}`}>
+    <button type="button" onClick={onClick} className={`rounded-xl border p-3 text-left transition ${tones[tone]}`}>
       <div className="flex items-center justify-between gap-3">
         <Icon className="h-4 w-4" />
         <span className="text-xl font-black tabular-nums">{value}</span>
       </div>
       <p className="mt-2 text-[11px] font-bold uppercase tracking-wide">{label}</p>
-    </div>
+    </button>
   );
 };
 
 const CtMvpComplianceWidget = ({ tenantId, title = "CT MVP Compliance" }: CtMvpComplianceWidgetProps) => {
+  const navigate = useNavigate();
   const [rows, setRows] = useState<RunRow[]>([]);
   const [loading, setLoading] = useState(false);
 
@@ -90,6 +94,8 @@ const CtMvpComplianceWidget = ({ tenantId, title = "CT MVP Compliance" }: CtMvpC
     };
   }, [rows]);
 
+  const openActionCenter = (filter: ActionFilter) => navigate(`/compliance-center?filter=${filter}`);
+
   return (
     <section className="rounded-2xl border border-border bg-card p-4 shadow-sm">
       <div className="mb-4 flex items-center justify-between gap-3">
@@ -98,7 +104,7 @@ const CtMvpComplianceWidget = ({ tenantId, title = "CT MVP Compliance" }: CtMvpC
             <ShieldCheck className="h-3.5 w-3.5" /> Compliance
           </div>
           <h2 className="mt-2 text-lg font-black text-foreground">{title}</h2>
-          <p className="text-xs text-muted-foreground">Latest certification run summary across inventory.</p>
+          <p className="text-xs text-muted-foreground">Latest certification run summary across inventory. Click a tile to open the action list.</p>
         </div>
         <button onClick={load} disabled={loading} className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-border px-3 text-xs font-bold hover:bg-muted disabled:opacity-60">
           <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} /> Refresh
@@ -106,11 +112,11 @@ const CtMvpComplianceWidget = ({ tenantId, title = "CT MVP Compliance" }: CtMvpC
       </div>
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
-        <Stat icon={CheckCircle2} label="Certified" value={stats.certified} tone="emerald" />
-        <Stat icon={FileText} label="Missing FTC" value={stats.missingFtc} tone="amber" />
-        <Stat icon={ScrollText} label="Missing K208" value={stats.missingK208} tone="amber" />
-        <Stat icon={Signature} label="Missing signatures" value={stats.missingSignatures} tone="rose" />
-        <Stat icon={AlertTriangle} label="Needs review" value={stats.needsReview} tone="blue" />
+        <Stat icon={CheckCircle2} label="Certified" value={stats.certified} tone="emerald" onClick={() => openActionCenter("ready")} />
+        <Stat icon={FileText} label="Missing FTC" value={stats.missingFtc} tone="amber" onClick={() => openActionCenter("missing_ftc")} />
+        <Stat icon={ScrollText} label="Missing K208" value={stats.missingK208} tone="amber" onClick={() => openActionCenter("missing_k208")} />
+        <Stat icon={Signature} label="Missing signatures" value={stats.missingSignatures} tone="rose" onClick={() => openActionCenter("missing_signature")} />
+        <Stat icon={AlertTriangle} label="Needs review" value={stats.needsReview} tone="blue" onClick={() => openActionCenter("needs_review")} />
       </div>
     </section>
   );
