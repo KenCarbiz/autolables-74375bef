@@ -172,6 +172,7 @@ const AppShell = ({ children }: AppShellProps) => {
         { label: "CPO Info Sheet", path: "/cpo-sheet", icon: Award },
         { label: "Trade-Up Sticker", path: "/trade-up", icon: TrendingUp },
         { label: "Buyers Guide", path: "/buyers-guide", icon: ScrollText, featureKey: "feature_buyers_guide" },
+        { label: "Used Vehicle Docs", path: "/used-vehicle-documents", icon: ScrollText, requireManager: true },
         { label: "Description Writer", path: "/description-writer", icon: Sparkles },
       ],
     },
@@ -477,6 +478,9 @@ const AppShell = ({ children }: AppShellProps) => {
             </button>
             <button onClick={() => navigate("/sticker-studio")} className="flex-shrink-0 h-8 px-3 rounded-md border border-border text-xs font-medium flex items-center gap-1.5">
               <Sparkles className="h-3.5 w-3.5" /> Studio
+            </button>
+            <button onClick={() => navigate("/used-vehicle-documents")} className="flex-shrink-0 h-8 px-3 rounded-md border border-border text-xs font-medium flex items-center gap-1.5">
+              <ScrollText className="h-3.5 w-3.5" /> Used Docs
             </button>
             <button onClick={openScan} className="flex-shrink-0 h-8 px-3 rounded-md border border-border text-xs font-medium flex items-center gap-1.5">
               <ScanLine className="h-3.5 w-3.5" /> Scan
