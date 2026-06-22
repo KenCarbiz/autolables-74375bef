@@ -282,7 +282,7 @@ const AppShell = ({ children }: AppShellProps) => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [location.pathname, location.search]);
 
-  const unreadAudit = entries.filter(e => e.type === "error" || e.type === "warning").length;
+  const unreadAudit = entries.filter(e => e.action === "compliance_block" || e.action === "price_integrity_block").length;
 
   const visibleSections = Object.entries(sections)
     .map(([key, section]) => [key, { ...section, items: filterItems(section.items) }] as const)
