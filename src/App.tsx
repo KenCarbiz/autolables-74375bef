@@ -15,12 +15,6 @@ import ErrorBoundary from "@/components/layout/ErrorBoundary";
 import EntitlementGate from "@/components/layout/EntitlementGate";
 import AdminGate from "@/components/layout/AdminGate";
 
-// Layout routes — AppShell mounts ONCE when entering the gated
-// section and stays mounted across navigation between gated
-// routes. Only the <Outlet /> body swaps, so the sidebar,
-// topbar, store selector, breadcrumb, and command palette never
-// remount. Lazy-loaded child chunks are caught by a local
-// Suspense so the loader appears in the body, not full-screen.
 const GatedLayout = () => (
   <EntitlementGate app="autolabels">
     <AppShell>
@@ -41,7 +35,6 @@ const AdminLayout = () => (
   </AdminGate>
 );
 
-// Lazy-loaded pages — each becomes its own chunk
 const Dashboard = lazy(() => import("./pages/Dashboard"));
 const ProcessDashboard = lazy(() => import("./pages/ProcessDashboard"));
 const LotCaptureQueue = lazy(() => import("./pages/LotCaptureQueue"));
@@ -72,6 +65,7 @@ const BrandGuide = lazy(() => import("./pages/BrandGuide"));
 const ScanPage = lazy(() => import("./pages/ScanPage"));
 const ComplianceCenter = lazy(() => import("./pages/ComplianceCenter"));
 const ComplianceActionCenter = lazy(() => import("./pages/ComplianceActionCenter"));
+const ComplianceInbox = lazy(() => import("./pages/ComplianceInbox"));
 const VehiclePortal = lazy(() => import("./pages/VehiclePortal"));
 const UsedCarSticker = lazy(() => import("./pages/UsedCarSticker"));
 const UsedVehicleDocuments = lazy(() => import("./pages/UsedVehicleDocuments"));
@@ -99,8 +93,6 @@ const NotFound = lazy(() => import("./pages/NotFound"));
 
 const queryClient = new QueryClient();
 
-// Full-screen loader — used only on the very first chunk load
-// before any layout has mounted.
 const PageLoader = () => (
   <div className="min-h-screen flex items-center justify-center bg-background">
     <div className="flex flex-col items-center gap-3">
@@ -110,8 +102,6 @@ const PageLoader = () => (
   </div>
 );
 
-// Body-only loader — lands inside AppShell's main slot so the
-// chrome stays visible while the next page's chunk streams in.
 const BodyLoader = () => (
   <div className="flex items-center justify-center py-24">
     <div className="flex flex-col items-center gap-3">
@@ -121,9 +111,6 @@ const BodyLoader = () => (
   </div>
 );
 
-// Snap to the top of the page on every route change. The app scrolls the
-// <main> element (id="app-scroll"), not the window, so reset both — and use a
-// layout effect so the new page never paints mid-scroll.
 const ScrollToTop = () => {
   const { pathname } = useLocation();
   useLayoutEffect(() => {
@@ -155,7 +142,6 @@ const App = () => (
                 <ScrollToTop />
                 <Suspense fallback={<PageLoader />}>
                   <Routes>
-                      {/* Public routes — no shell */}
                       <Route path="/" element={<Landing />} />
                       <Route path="/waitlist" element={<Waitlist />} />
                       <Route path="/privacy" element={<Privacy />} />
@@ -209,6 +195,7 @@ const App = () => (
                         <Route path="/cpo-sheet" element={<CpoSheet />} />
                         <Route path="/compliance" element={<ComplianceCenter />} />
                         <Route path="/compliance-center" element={<ComplianceActionCenter />} />
+                        <Route path="/compliance-inbox" element={<ComplianceInbox />} />
                         <Route path="/description-writer" element={<DescriptionWriter />} />
                         <Route path="/add-inventory" element={<SaveCarInventory />} />
                         <Route path="/prep" element={<PrepSignOff />} />
