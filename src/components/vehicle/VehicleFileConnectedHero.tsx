@@ -27,7 +27,7 @@ type VehicleHeroData = {
   mileage: number | null;
   price: number | null;
   created_at: string;
-  prep_status: { foreman_signed_at?: string } | null;
+  prep_status?: { foreman_signed_at?: string } | null;
 };
 
 export function VehicleFileConnectedHero({
