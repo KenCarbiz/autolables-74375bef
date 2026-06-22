@@ -158,7 +158,7 @@ export const filterTemplates = (filter: TemplateRegistryFilter = {}) =>
 
 export type TemplateRecommendationInput = TemplateRegistryFilter & {
   limit?: number;
-  storeType?: "franchise" | "independent" | "luxury" | "one_price" | "high_volume" | "commercial";
+  storeType?: "franchise" | "independent" | "luxury" | "one_price" | "high_volume" | "commercial" | "special_finance";
 };
 
 export const recommendTemplates = (input: TemplateRecommendationInput = {}) => {
