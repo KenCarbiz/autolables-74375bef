@@ -1,9 +1,10 @@
 import { useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { useVehicleEvidence, type EvidenceCategory } from "@/lib/stickerStudio/useVehicleEvidence";
 import { logStickerAudit } from "@/lib/stickerStudio/api";
 import FeatureGate from "@/components/entitlements/FeatureGate";
 import VehicleCtMvpStatusCard from "@/components/vehicle/VehicleCtMvpStatusCard";
-import { FileText, PenLine, QrCode, Car, ShieldAlert, Activity, Download, ChevronDown, RefreshCw } from "lucide-react";
+import { FileText, PenLine, QrCode, Car, ShieldAlert, Activity, Download, ChevronDown, RefreshCw, ScrollText } from "lucide-react";
 
 const CATS: { id: EvidenceCategory | "all"; label: string; icon: typeof Activity }[] = [
   { id: "all", label: "All", icon: Activity },
@@ -22,11 +23,19 @@ const dot: Record<EvidenceCategory, string> = {
 const fmt = (d: string) => new Date(d).toLocaleString(undefined, { month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit" });
 
 export default function VehicleEvidenceTimeline({ vehicleId, vin, tenantId, vehicleTitle }: { vehicleId: string; vin?: string | null; tenantId?: string | null; vehicleTitle?: string }) {
+  const navigate = useNavigate();
   const { events, loading, reload } = useVehicleEvidence(vehicleId, vin, tenantId);
   const [cat, setCat] = useState<EvidenceCategory | "all">("all");
   const [open, setOpen] = useState<string | null>(null);
 
   const filtered = useMemo(() => events.filter((e) => cat === "all" || e.category === cat), [events, cat]);
+
+  const launchUsedVehicleDocs = () => {
+    const query = new URLSearchParams();
+    query.set("vehicleId", vehicleId);
+    if (vin) query.set("vin", vin);
+    navigate(`/used-vehicle-documents?${query.toString()}`);
+  };
 
   const exportPacket = () => {
     const packet = {
@@ -46,6 +55,22 @@ export default function VehicleEvidenceTimeline({ vehicleId, vin, tenantId, vehi
   return (
     <div className="space-y-4">
       <VehicleCtMvpStatusCard tenantId={tenantId} vehicleId={vehicleId} vin={vin} />
+
+      <div className="rounded-2xl border border-blue-100 bg-blue-50/70 p-4">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <p className="text-sm font-black text-blue-950">Used vehicle compliance docs</p>
+            <p className="mt-1 text-xs text-blue-800">Generate and save FTC Buyers Guide + Connecticut K208 evidence for this vehicle.</p>
+          </div>
+          <button
+            type="button"
+            onClick={launchUsedVehicleDocs}
+            className="inline-flex h-9 items-center justify-center gap-2 rounded-lg bg-blue-600 px-3 text-xs font-bold text-white hover:bg-blue-700"
+          >
+            <ScrollText className="h-4 w-4" /> Generate FTC / K208
+          </button>
+        </div>
+      </div>
 
       <div className="space-y-3">
         <div className="flex items-center justify-between gap-2 flex-wrap">
