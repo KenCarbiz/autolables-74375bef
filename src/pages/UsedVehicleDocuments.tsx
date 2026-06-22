@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { ArrowLeft, FileText, Printer, ShieldCheck, Languages, Save, Car } from "lucide-react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
@@ -14,7 +14,7 @@ import {
   type UsedVehicleDocumentData,
   type WarrantyMode,
 } from "@/lib/ctMvp/usedVehicleDocuments";
-import { buildPersistenceContext, recordFtcGenerated, recordK208Generated } from "@/lib/ctMvp/productionHooks";
+import { archiveUsedVehicleComplianceElement } from "@/lib/ctMvp/usedVehicleDocumentArchive";
 
 const warrantyOptions: Array<{ value: WarrantyMode; label: string; helper: string }> = [
   { value: "as_is", label: "As Is — No Dealer Warranty", helper: "FTC Buyers Guide as-is box checked" },
@@ -38,6 +38,8 @@ const UsedVehicleDocuments = () => {
   const [params] = useSearchParams();
   const { tenant, currentStore } = useTenant();
   const { user } = useAuth();
+  const ftcArchiveRef = useRef<HTMLDivElement | null>(null);
+  const k208ArchiveRef = useRef<HTMLDivElement | null>(null);
   const [data, setData] = useState<UsedVehicleDocumentData>({
     ...DEFAULT_USED_VEHICLE_DOCUMENT_DATA,
     dealerName: currentStore?.name || tenant?.name || DEFAULT_USED_VEHICLE_DOCUMENT_DATA.dealerName,
@@ -129,14 +131,25 @@ const UsedVehicleDocuments = () => {
       toast.error("Select a dealership workspace before saving evidence");
       return;
     }
+    if (!ftcArchiveRef.current || !k208ArchiveRef.current) {
+      toast.error("Document previews are not ready yet");
+      return;
+    }
+
     setSaving(true);
     try {
-      const context = buildPersistenceContext({
+      const shared = {
         tenantId: tenant.id,
         vehicleId,
-        vin: data.vin,
-        stock: data.stock,
-      });
+        data,
+        createdBy: user?.id || null,
+      };
+
+      const [ftcArchive, k208Archive] = await Promise.all([
+        archiveUsedVehicleComplianceElement({ ...shared, kind: "ftc_buyers_guide", element: ftcArchiveRef.current }),
+        archiveUsedVehicleComplianceElement({ ...shared, kind: "k208_warranty", element: k208ArchiveRef.current }),
+      ]);
+
       const payload = {
         vehicleId,
         dealer: data.dealerName,
@@ -149,27 +162,12 @@ const UsedVehicleDocuments = () => {
         systemsCovered: data.systemsCovered,
         language: data.language,
         savedBy: user?.id || null,
+        archives: { ftc: ftcArchive, k208: k208Archive },
       };
-
-      await recordFtcGenerated(context, {
-        documentId: `ftc-${data.vin || data.stock || Date.now()}`,
-        warrantyMode: data.warrantyMode,
-        language: data.language,
-        systemsCovered: data.systemsCovered,
-        metadata: payload,
-      });
-      await recordK208Generated(context, {
-        documentId: `k208-${data.vin || data.stock || Date.now()}`,
-        warrantyMode: data.warrantyMode,
-        warrantyDuration: data.warrantyDuration,
-        warrantyMiles: data.warrantyMiles,
-        warrantyPercent: data.warrantyPercent,
-        metadata: payload,
-      });
 
       try {
         await (supabase as any).from("audit_log").insert({
-          action: "used_vehicle_documents_saved",
+          action: "used_vehicle_documents_archived",
           entity_type: "vehicle",
           entity_id: vehicleId || data.vin || data.stock || "unknown",
           store_id: tenant.id,
@@ -178,10 +176,15 @@ const UsedVehicleDocuments = () => {
         });
       } catch { /* audit fallback best effort */ }
 
-      toast.success("FTC Buyers Guide and K208 lifecycle evidence saved");
+      const failed = [ftcArchive, k208Archive].filter((archive) => !archive.archived);
+      if (failed.length) {
+        toast.warning("Evidence saved, but one archive upload needs review");
+      } else {
+        toast.success("FTC Buyers Guide and K208 PDFs archived with lifecycle evidence");
+      }
     } catch (err) {
       console.error(err);
-      toast.error("Could not save document evidence");
+      toast.error("Could not archive document evidence");
     } finally {
       setSaving(false);
     }
@@ -215,7 +218,7 @@ const UsedVehicleDocuments = () => {
             <Printer className="h-4 w-4" /> Print Preview
           </button>
           <button onClick={saveEvidence} disabled={saving} className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 text-sm font-bold text-white hover:bg-blue-700 disabled:opacity-60">
-            <Save className="h-4 w-4" /> {saving ? "Saving…" : "Save Evidence"}
+            <Save className="h-4 w-4" /> {saving ? "Archiving…" : "Save + Archive"}
           </button>
         </div>
       </div>
@@ -304,6 +307,11 @@ const UsedVehicleDocuments = () => {
             {preview === "ftc" ? <FtcBuyersGuideDocument data={data} /> : <ConnecticutK208Document data={data} />}
           </div>
         </section>
+      </div>
+
+      <div aria-hidden="true" className="pointer-events-none absolute -left-[12000px] top-0 opacity-0">
+        <div ref={ftcArchiveRef}><FtcBuyersGuideDocument data={data} /></div>
+        <div ref={k208ArchiveRef}><ConnecticutK208Document data={data} /></div>
       </div>
     </div>
   );
