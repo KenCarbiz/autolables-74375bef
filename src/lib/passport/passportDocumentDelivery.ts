@@ -19,6 +19,10 @@ export type PassportDeliverySettings = {
   allow_trade_value_cta: boolean;
   autocurb_trade_enabled: boolean;
   autocurb_trade_url?: string | null;
+  show_dealer_investment_report?: boolean;
+  show_vehicle_health_report?: boolean;
+  show_service_investment_card?: boolean;
+  allow_service_qr_inspection_intake?: boolean;
   email_subject_template?: string | null;
   email_intro_template?: string | null;
   metadata?: Record<string, unknown> | null;
@@ -65,6 +69,10 @@ const defaultSettings = (tenantId: string): PassportDeliverySettings => ({
   notify_sales_team: true,
   allow_trade_value_cta: true,
   autocurb_trade_enabled: false,
+  show_dealer_investment_report: false,
+  show_vehicle_health_report: false,
+  show_service_investment_card: false,
+  allow_service_qr_inspection_intake: false,
 });
 
 export const loadPassportDeliverySettings = async (tenantId?: string | null) => {
@@ -80,7 +88,7 @@ export const loadPassportDeliverySettings = async (tenantId?: string | null) => 
     return defaultSettings(tenantId);
   }
 
-  return ((data as PassportDeliverySettings | null) || defaultSettings(tenantId));
+  return ({ ...defaultSettings(tenantId), ...((data as PassportDeliverySettings | null) || {}) });
 };
 
 export const savePassportDeliverySettings = async (settings: PassportDeliverySettings) => {
@@ -228,69 +236,40 @@ const queuePassportSalesNotification = async (requestId: string, tenantId?: stri
     tenant_id: tenantId || null,
     channel: "sales_notification",
     status: "queued",
-    payload: { purpose: "passport_lead_alert" },
-  });
-  if (error) console.warn("Could not queue sales notification", error);
-};
-
-export const queueAutoCurbTradeHandoff = async (requestId: string, tenantId?: string | null) => {
-  const { error } = await (supabase as any).from("passport_document_delivery_outbox").insert({
-    request_id: requestId,
-    tenant_id: tenantId || null,
-    channel: "autocurb_trade",
-    status: "queued",
-    payload: { purpose: "autocurb_trade_value_handoff" },
+    payload: { purpose: "passport_document_delivery_sales_notification" },
   });
   if (error) throw error;
-};
-
-export const verifyPassportSmsCode = async (requestId: string, code: string) => {
-  const { data, error } = await supabase.functions.invoke("verify-passport-document-request", {
-    body: { requestId, code },
-  });
-  if (error) throw error;
-  return data as { ok: boolean; requestId: string; queuedEmail?: boolean; error?: string };
-};
-
-export const trackPassportTradeValueClicked = async (input: PassportVehicleContext & { requestId?: string | null; autocurbUrl?: string | null }) => {
-  await trackCustomerCtaClicked({
-    tenantId: input.tenantId,
-    storeId: input.storeId,
-    vehicleId: input.vehicleId,
-    vin: input.vin,
-    stock: input.stock,
-    packetId: input.packetId,
-    qrToken: input.qrToken,
-    source: "passport",
-    surface: "vehicle_passport",
-    metadata: {
-      cta: "autocurb_trade_value",
-      request_id: input.requestId || null,
-      autocurb_url: input.autocurbUrl || null,
-      vehicle_of_interest: input.vehicleOfInterest || {},
-    },
-  });
-};
-
-export const buildAutoCurbTradeUrl = (settings: PassportDeliverySettings | null | undefined, input: PassportVehicleContext & { requestId?: string | null }) => {
-  if (!settings?.autocurb_trade_enabled || !settings.autocurb_trade_url) return null;
-  const url = new URL(settings.autocurb_trade_url);
-  if (input.vehicleId) url.searchParams.set("interest_vehicle_id", input.vehicleId);
-  if (input.vin) url.searchParams.set("interest_vin", input.vin);
-  if (input.stock) url.searchParams.set("interest_stock", input.stock);
-  if (input.tenantId) url.searchParams.set("tenant_id", input.tenantId);
-  if (input.requestId) url.searchParams.set("passport_request_id", input.requestId);
-  return url.toString();
 };
 
 const buildAutoCurbHandoff = (settings: PassportDeliverySettings | null | undefined, input: PassportDocumentRequestInput) => {
-  const url = buildAutoCurbTradeUrl(settings, input);
+  if (!settings?.autocurb_trade_enabled) return {};
   return {
-    enabled: !!settings?.autocurb_trade_enabled,
-    trade_url: url,
-    vehicle_of_interest: input.vehicleOfInterest || {},
-    vin: input.vin || null,
-    stock: input.stock || null,
-    vehicle_id: input.vehicleId || null,
+    enabled: true,
+    tradeUrl: settings.autocurb_trade_url || null,
+    vehicle: {
+      tenantId: input.tenantId,
+      storeId: input.storeId,
+      vehicleId: input.vehicleId,
+      vin: input.vin,
+      stock: input.stock,
+      packetId: input.packetId,
+      qrToken: input.qrToken,
+      vehicleOfInterest: input.vehicleOfInterest || {},
+    },
   };
+};
+
+export const trackPassportTradeValueClicked = async (vehicle: PassportVehicleContext) => {
+  await trackCustomerCtaClicked({
+    tenantId: vehicle.tenantId,
+    storeId: vehicle.storeId,
+    vehicleId: vehicle.vehicleId,
+    vin: vehicle.vin,
+    stock: vehicle.stock,
+    packetId: vehicle.packetId,
+    qrToken: vehicle.qrToken,
+    source: "passport",
+    surface: "vehicle_passport",
+    metadata: { cta: "trade" },
+  });
 };
