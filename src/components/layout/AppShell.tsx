@@ -282,7 +282,7 @@ const AppShell = ({ children }: AppShellProps) => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [location.pathname, location.search]);
 
-  const unreadAudit = entries.filter(e => e.type === "error" || e.type === "warning").length;
+  const unreadAudit = entries.filter(e => e.action === "compliance_block" || e.action === "price_integrity_block").length;
 
   const visibleSections = Object.entries(sections)
     .map(([key, section]) => [key, { ...section, items: filterItems(section.items) }] as const)
@@ -304,7 +304,7 @@ const AppShell = ({ children }: AppShellProps) => {
         <aside className={`fixed lg:sticky top-0 left-0 z-50 h-screen bg-card border-r border-border transition-all duration-200 lg:translate-x-0 ${mobileOpen ? "translate-x-0" : "-translate-x-full"} ${collapsed ? "lg:w-20" : "lg:w-64"} w-64 flex flex-col`}>
           <div className="h-16 flex items-center justify-between px-4 border-b border-border flex-shrink-0">
             <Link to="/dashboard" className={`flex items-center gap-3 min-w-0 ${collapsed ? "lg:justify-center lg:w-full" : ""}`}>
-              <Logo size={collapsed ? "sm" : "md"} showText={!collapsed} />
+              <Logo size={collapsed ? 24 : 32} variant={collapsed ? "mark" : "full"} />
             </Link>
             <button onClick={() => setMobileOpen(false)} className="lg:hidden p-1 rounded-md hover:bg-muted">
               <X className="h-5 w-5" />
@@ -425,14 +425,14 @@ const AppShell = ({ children }: AppShellProps) => {
                 <DropdownMenuContent align="end" className="w-64 bg-card">
                   <DropdownMenuLabel>Autocurb Suite</DropdownMenuLabel>
                   <DropdownMenuSeparator />
-                  {getSubscribedProducts(ALL_PRODUCTS, { autolabels: true }).map((p) => (
-                    <DropdownMenuItem key={p.key} asChild>
-                      <a href={p.href} target="_blank" rel="noreferrer" className="cursor-pointer">
+                  {ALL_PRODUCTS.map((p) => (
+                    <DropdownMenuItem key={p.id} asChild>
+                      <a href={p.url} target="_blank" rel="noreferrer" className="cursor-pointer">
                         <div className="w-8 h-8 rounded-md bg-muted flex items-center justify-center mr-2">
-                          {p.key === "autolabels" ? <Tag className="h-4 w-4" /> : p.key === "autocorp" ? <Building2 className="h-4 w-4" /> : p.key === "autocurb" ? <Car className="h-4 w-4" /> : <Truck className="h-4 w-4" />}
+                          {p.id === "autolabels" ? <Tag className="h-4 w-4" /> : p.id === "autocurb" ? <Car className="h-4 w-4" /> : p.id === "autoframe" ? <Building2 className="h-4 w-4" /> : <Truck className="h-4 w-4" />}
                         </div>
                         <div className="flex-1">
-                          <div className="font-medium flex items-center gap-1">{p.name}{p.key !== "autolabels" && <ExternalLink className="h-3 w-3" />}</div>
+                          <div className="font-medium flex items-center gap-1">{p.name}{p.id !== "autolabels" && <ExternalLink className="h-3 w-3" />}</div>
                           <div className="text-xs text-muted-foreground truncate">{p.description}</div>
                         </div>
                       </a>
@@ -519,7 +519,7 @@ const AppShell = ({ children }: AppShellProps) => {
           </div>
         )}
 
-        <CommandPalette open={paletteOpen} onOpenChange={setPaletteOpen} sections={visibleSections} onNavigate={(p) => navigate(p)} />
+        <CommandPalette open={paletteOpen} onOpenChange={setPaletteOpen} />
       </div>
     </VinScanContext.Provider>
   );

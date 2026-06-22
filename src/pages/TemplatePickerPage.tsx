@@ -48,7 +48,7 @@ const capabilityPills = (template: AnyTemplate) => {
   const caps = [
     template.supportsPassport ? "Passport" : "No Passport",
     template.supportsMarketTransparency ? "Market" : undefined,
-    template.supportsCPO ? "CPO" : undefined,
+    "supportsCPO" in template && (template as { supportsCPO?: boolean }).supportsCPO ? "CPO" : undefined,
     template.supportsFactoryCleanImage ? "Factory Image" : undefined,
     "supportsFactoryOptions" in template && template.supportsFactoryOptions ? "Factory Options" : undefined,
     "supportsDealerAccessories" in template && template.supportsDealerAccessories ? "Dealer Accessories" : undefined,

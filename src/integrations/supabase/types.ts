@@ -678,6 +678,201 @@ export type Database = {
           },
         ]
       }
+      ct_mvp_certification_runs: {
+        Row: {
+          certified_at: string
+          checks: Json
+          created_at: string
+          id: string
+          lifecycle_audit: Json
+          ready: boolean
+          required_document_keys: string[]
+          rule_output: Json
+          signature_validation: Json
+          source: string
+          stock: string | null
+          tenant_id: string
+          vehicle_id: string | null
+          vehicle_title: string | null
+          vin: string | null
+        }
+        Insert: {
+          certified_at?: string
+          checks?: Json
+          created_at?: string
+          id?: string
+          lifecycle_audit?: Json
+          ready?: boolean
+          required_document_keys?: string[]
+          rule_output?: Json
+          signature_validation?: Json
+          source?: string
+          stock?: string | null
+          tenant_id: string
+          vehicle_id?: string | null
+          vehicle_title?: string | null
+          vin?: string | null
+        }
+        Update: {
+          certified_at?: string
+          checks?: Json
+          created_at?: string
+          id?: string
+          lifecycle_audit?: Json
+          ready?: boolean
+          required_document_keys?: string[]
+          rule_output?: Json
+          signature_validation?: Json
+          source?: string
+          stock?: string | null
+          tenant_id?: string
+          vehicle_id?: string | null
+          vehicle_title?: string | null
+          vin?: string | null
+        }
+        Relationships: []
+      }
+      ct_mvp_compliance_digest_outbox: {
+        Row: {
+          channel: string
+          created_at: string
+          digest: Json
+          error: string | null
+          id: string
+          recipient_email: string | null
+          sent_at: string | null
+          status: string
+          subject: string
+          summary_text: string
+          tenant_id: string
+          updated_at: string
+        }
+        Insert: {
+          channel?: string
+          created_at?: string
+          digest?: Json
+          error?: string | null
+          id?: string
+          recipient_email?: string | null
+          sent_at?: string | null
+          status?: string
+          subject: string
+          summary_text: string
+          tenant_id: string
+          updated_at?: string
+        }
+        Update: {
+          channel?: string
+          created_at?: string
+          digest?: Json
+          error?: string | null
+          id?: string
+          recipient_email?: string | null
+          sent_at?: string | null
+          status?: string
+          subject?: string
+          summary_text?: string
+          tenant_id?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      customer_engagement_events: {
+        Row: {
+          browser: string | null
+          city: string | null
+          country: string | null
+          created_at: string
+          device_type: string | null
+          document_id: string | null
+          document_title: string | null
+          document_type: string | null
+          event_type: string
+          id: string
+          ip_address: unknown
+          landing_url: string | null
+          metadata: Json
+          occurred_at: string
+          os: string | null
+          packet_id: string | null
+          qr_token: string | null
+          referrer: string | null
+          region: string | null
+          session_id: string
+          source: string
+          stock: string | null
+          store_id: string | null
+          surface: string
+          tenant_id: string | null
+          user_agent: string | null
+          vehicle_id: string | null
+          vin: string | null
+          visitor_id: string | null
+        }
+        Insert: {
+          browser?: string | null
+          city?: string | null
+          country?: string | null
+          created_at?: string
+          device_type?: string | null
+          document_id?: string | null
+          document_title?: string | null
+          document_type?: string | null
+          event_type: string
+          id?: string
+          ip_address?: unknown
+          landing_url?: string | null
+          metadata?: Json
+          occurred_at?: string
+          os?: string | null
+          packet_id?: string | null
+          qr_token?: string | null
+          referrer?: string | null
+          region?: string | null
+          session_id: string
+          source?: string
+          stock?: string | null
+          store_id?: string | null
+          surface?: string
+          tenant_id?: string | null
+          user_agent?: string | null
+          vehicle_id?: string | null
+          vin?: string | null
+          visitor_id?: string | null
+        }
+        Update: {
+          browser?: string | null
+          city?: string | null
+          country?: string | null
+          created_at?: string
+          device_type?: string | null
+          document_id?: string | null
+          document_title?: string | null
+          document_type?: string | null
+          event_type?: string
+          id?: string
+          ip_address?: unknown
+          landing_url?: string | null
+          metadata?: Json
+          occurred_at?: string
+          os?: string | null
+          packet_id?: string | null
+          qr_token?: string | null
+          referrer?: string | null
+          region?: string | null
+          session_id?: string
+          source?: string
+          stock?: string | null
+          store_id?: string | null
+          surface?: string
+          tenant_id?: string | null
+          user_agent?: string | null
+          vehicle_id?: string | null
+          vin?: string | null
+          visitor_id?: string | null
+        }
+        Relationships: []
+      }
       deal_signing_tokens: {
         Row: {
           content_hash: string | null
@@ -752,6 +947,192 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      dealer_branding: {
+        Row: {
+          accent_color: string | null
+          address: string | null
+          branding: Json
+          created_at: string
+          dealer_name: string | null
+          disclaimer: string | null
+          id: string
+          logo_url: string | null
+          phone: string | null
+          primary_color: string | null
+          secondary_color: string | null
+          tagline: string | null
+          tenant_id: string
+          updated_at: string
+          website: string | null
+        }
+        Insert: {
+          accent_color?: string | null
+          address?: string | null
+          branding?: Json
+          created_at?: string
+          dealer_name?: string | null
+          disclaimer?: string | null
+          id?: string
+          logo_url?: string | null
+          phone?: string | null
+          primary_color?: string | null
+          secondary_color?: string | null
+          tagline?: string | null
+          tenant_id: string
+          updated_at?: string
+          website?: string | null
+        }
+        Update: {
+          accent_color?: string | null
+          address?: string | null
+          branding?: Json
+          created_at?: string
+          dealer_name?: string | null
+          disclaimer?: string | null
+          id?: string
+          logo_url?: string | null
+          phone?: string | null
+          primary_color?: string | null
+          secondary_color?: string | null
+          tagline?: string | null
+          tenant_id?: string
+          updated_at?: string
+          website?: string | null
+        }
+        Relationships: []
+      }
+      dealer_cpo_programs: {
+        Row: {
+          created_at: string
+          disclosure: string | null
+          headline: string
+          id: string
+          is_active: boolean
+          is_default: boolean
+          label: string
+          metadata: Json
+          miles: number | null
+          months: number | null
+          price_add_on: number | null
+          program_type: string
+          requires_financing: boolean
+          tenant_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          disclosure?: string | null
+          headline: string
+          id?: string
+          is_active?: boolean
+          is_default?: boolean
+          label: string
+          metadata?: Json
+          miles?: number | null
+          months?: number | null
+          price_add_on?: number | null
+          program_type?: string
+          requires_financing?: boolean
+          tenant_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          disclosure?: string | null
+          headline?: string
+          id?: string
+          is_active?: boolean
+          is_default?: boolean
+          label?: string
+          metadata?: Json
+          miles?: number | null
+          months?: number | null
+          price_add_on?: number | null
+          program_type?: string
+          requires_financing?: boolean
+          tenant_id?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      dealer_passport_settings: {
+        Row: {
+          created_at: string
+          id: string
+          passport_enabled: boolean
+          qr_destination_mode: string
+          settings: Json
+          show_history_signals: boolean
+          show_market_data: boolean
+          show_reconditioning: boolean
+          show_service_records: boolean
+          tenant_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          passport_enabled?: boolean
+          qr_destination_mode?: string
+          settings?: Json
+          show_history_signals?: boolean
+          show_market_data?: boolean
+          show_reconditioning?: boolean
+          show_service_records?: boolean
+          tenant_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          passport_enabled?: boolean
+          qr_destination_mode?: string
+          settings?: Json
+          show_history_signals?: boolean
+          show_market_data?: boolean
+          show_reconditioning?: boolean
+          show_service_records?: boolean
+          tenant_id?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      dealer_price_labels: {
+        Row: {
+          context: string
+          created_at: string
+          id: string
+          is_active: boolean
+          is_default: boolean
+          label: string
+          sort_order: number
+          tenant_id: string
+          updated_at: string
+        }
+        Insert: {
+          context?: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          is_default?: boolean
+          label: string
+          sort_order?: number
+          tenant_id: string
+          updated_at?: string
+        }
+        Update: {
+          context?: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          is_default?: boolean
+          label?: string
+          sort_order?: number
+          tenant_id?: string
+          updated_at?: string
+        }
+        Relationships: []
       }
       dealer_print_settings: {
         Row: {
@@ -854,6 +1235,141 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      dealer_review_sources: {
+        Row: {
+          allow_automated_fetch: boolean
+          created_at: string
+          id: string
+          is_active: boolean
+          is_primary: boolean
+          label: string
+          manually_entered: boolean
+          metadata: Json
+          profile_url: string | null
+          rating: number | null
+          review_count: number | null
+          source_type: string
+          tenant_id: string
+          updated_at: string
+        }
+        Insert: {
+          allow_automated_fetch?: boolean
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          is_primary?: boolean
+          label?: string
+          manually_entered?: boolean
+          metadata?: Json
+          profile_url?: string | null
+          rating?: number | null
+          review_count?: number | null
+          source_type?: string
+          tenant_id: string
+          updated_at?: string
+        }
+        Update: {
+          allow_automated_fetch?: boolean
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          is_primary?: boolean
+          label?: string
+          manually_entered?: boolean
+          metadata?: Json
+          profile_url?: string | null
+          rating?: number | null
+          review_count?: number | null
+          source_type?: string
+          tenant_id?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      dealer_rule_preferences: {
+        Row: {
+          auto_archive_signed_packet: boolean
+          auto_generate_addendum: boolean
+          auto_generate_passport: boolean
+          auto_select_templates: boolean
+          created_at: string
+          id: string
+          require_ftc_buyers_guide: boolean
+          require_k208: boolean
+          rules: Json
+          state: string
+          tenant_id: string
+          updated_at: string
+        }
+        Insert: {
+          auto_archive_signed_packet?: boolean
+          auto_generate_addendum?: boolean
+          auto_generate_passport?: boolean
+          auto_select_templates?: boolean
+          created_at?: string
+          id?: string
+          require_ftc_buyers_guide?: boolean
+          require_k208?: boolean
+          rules?: Json
+          state?: string
+          tenant_id: string
+          updated_at?: string
+        }
+        Update: {
+          auto_archive_signed_packet?: boolean
+          auto_generate_addendum?: boolean
+          auto_generate_passport?: boolean
+          auto_select_templates?: boolean
+          created_at?: string
+          id?: string
+          require_ftc_buyers_guide?: boolean
+          require_k208?: boolean
+          rules?: Json
+          state?: string
+          tenant_id?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      dealer_settings: {
+        Row: {
+          created_at: string
+          dealer_name: string | null
+          default_condition: string | null
+          id: string
+          is_active: boolean
+          legal_name: string | null
+          settings: Json
+          state: string | null
+          tenant_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          dealer_name?: string | null
+          default_condition?: string | null
+          id?: string
+          is_active?: boolean
+          legal_name?: string | null
+          settings?: Json
+          state?: string | null
+          tenant_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          dealer_name?: string | null
+          default_condition?: string | null
+          id?: string
+          is_active?: boolean
+          legal_name?: string | null
+          settings?: Json
+          state?: string | null
+          tenant_id?: string
+          updated_at?: string
+        }
+        Relationships: []
       }
       dealer_sticker_template_prefs: {
         Row: {
@@ -986,6 +1502,51 @@ export type Database = {
         }
         Relationships: []
       }
+      dealer_template_preferences: {
+        Row: {
+          created_at: string
+          dealer_cpo_template: string | null
+          default_addendum_template: string | null
+          default_window_template: string | null
+          id: string
+          luxury_template: string | null
+          new_window_template: string | null
+          oem_cpo_template: string | null
+          settings: Json
+          tenant_id: string
+          updated_at: string
+          used_window_template: string | null
+        }
+        Insert: {
+          created_at?: string
+          dealer_cpo_template?: string | null
+          default_addendum_template?: string | null
+          default_window_template?: string | null
+          id?: string
+          luxury_template?: string | null
+          new_window_template?: string | null
+          oem_cpo_template?: string | null
+          settings?: Json
+          tenant_id: string
+          updated_at?: string
+          used_window_template?: string | null
+        }
+        Update: {
+          created_at?: string
+          dealer_cpo_template?: string | null
+          default_addendum_template?: string | null
+          default_window_template?: string | null
+          id?: string
+          luxury_template?: string | null
+          new_window_template?: string | null
+          oem_cpo_template?: string | null
+          settings?: Json
+          tenant_id?: string
+          updated_at?: string
+          used_window_template?: string | null
+        }
+        Relationships: []
+      }
       demo_requests: {
         Row: {
           created_at: string
@@ -1013,6 +1574,51 @@ export type Database = {
           message?: string | null
           name?: string
           phone?: string | null
+        }
+        Relationships: []
+      }
+      document_lifecycle_events: {
+        Row: {
+          actor_id: string | null
+          actor_name: string | null
+          created_at: string
+          event_type: string
+          id: string
+          metadata: Json
+          occurred_at: string
+          source: string | null
+          stock: string | null
+          tenant_id: string
+          vehicle_id: string | null
+          vin: string | null
+        }
+        Insert: {
+          actor_id?: string | null
+          actor_name?: string | null
+          created_at?: string
+          event_type: string
+          id?: string
+          metadata?: Json
+          occurred_at?: string
+          source?: string | null
+          stock?: string | null
+          tenant_id: string
+          vehicle_id?: string | null
+          vin?: string | null
+        }
+        Update: {
+          actor_id?: string | null
+          actor_name?: string | null
+          created_at?: string
+          event_type?: string
+          id?: string
+          metadata?: Json
+          occurred_at?: string
+          source?: string | null
+          stock?: string | null
+          tenant_id?: string
+          vehicle_id?: string | null
+          vin?: string | null
         }
         Relationships: []
       }
@@ -1622,6 +2228,289 @@ export type Database = {
           },
         ]
       }
+      passport_delivery_settings: {
+        Row: {
+          allow_trade_value_cta: boolean
+          autocurb_trade_enabled: boolean
+          autocurb_trade_url: string | null
+          create_lead: boolean
+          created_at: string
+          email_intro_template: string
+          email_subject_template: string
+          enabled: boolean
+          id: string
+          metadata: Json
+          notify_sales_team: boolean
+          require_customer_name: boolean
+          require_phone: boolean
+          require_sms_verification: boolean
+          tenant_id: string
+          updated_at: string
+        }
+        Insert: {
+          allow_trade_value_cta?: boolean
+          autocurb_trade_enabled?: boolean
+          autocurb_trade_url?: string | null
+          create_lead?: boolean
+          created_at?: string
+          email_intro_template?: string
+          email_subject_template?: string
+          enabled?: boolean
+          id?: string
+          metadata?: Json
+          notify_sales_team?: boolean
+          require_customer_name?: boolean
+          require_phone?: boolean
+          require_sms_verification?: boolean
+          tenant_id: string
+          updated_at?: string
+        }
+        Update: {
+          allow_trade_value_cta?: boolean
+          autocurb_trade_enabled?: boolean
+          autocurb_trade_url?: string | null
+          create_lead?: boolean
+          created_at?: string
+          email_intro_template?: string
+          email_subject_template?: string
+          enabled?: boolean
+          id?: string
+          metadata?: Json
+          notify_sales_team?: boolean
+          require_customer_name?: boolean
+          require_phone?: boolean
+          require_sms_verification?: boolean
+          tenant_id?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      passport_document_delivery_outbox: {
+        Row: {
+          channel: string
+          created_at: string
+          error: string | null
+          id: string
+          payload: Json
+          provider: string | null
+          provider_message_id: string | null
+          recipient: string | null
+          request_id: string
+          sent_at: string | null
+          status: string
+          subject: string | null
+          tenant_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          channel?: string
+          created_at?: string
+          error?: string | null
+          id?: string
+          payload?: Json
+          provider?: string | null
+          provider_message_id?: string | null
+          recipient?: string | null
+          request_id: string
+          sent_at?: string | null
+          status?: string
+          subject?: string | null
+          tenant_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          channel?: string
+          created_at?: string
+          error?: string | null
+          id?: string
+          payload?: Json
+          provider?: string | null
+          provider_message_id?: string | null
+          recipient?: string | null
+          request_id?: string
+          sent_at?: string | null
+          status?: string
+          subject?: string | null
+          tenant_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "passport_document_delivery_outbox_request_id_fkey"
+            columns: ["request_id"]
+            isOneToOne: false
+            referencedRelation: "passport_document_delivery_requests"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      passport_document_delivery_requests: {
+        Row: {
+          autocurb_handoff: Json
+          created_at: string
+          customer_email: string
+          customer_name: string | null
+          customer_phone: string | null
+          customer_trade_intent: Json
+          delivered_at: string | null
+          delivery_status: string
+          id: string
+          ip_address: unknown
+          landing_url: string | null
+          lead_status: string
+          metadata: Json
+          packet_id: string | null
+          qr_token: string | null
+          referrer: string | null
+          requested_at: string
+          requested_documents: Json
+          session_id: string | null
+          source: string
+          stock: string | null
+          store_id: string | null
+          tenant_id: string | null
+          updated_at: string
+          user_agent: string | null
+          vehicle_id: string | null
+          vehicle_of_interest: Json
+          verification_required: boolean
+          verification_status: string
+          verified_at: string | null
+          vin: string | null
+          visitor_id: string | null
+        }
+        Insert: {
+          autocurb_handoff?: Json
+          created_at?: string
+          customer_email: string
+          customer_name?: string | null
+          customer_phone?: string | null
+          customer_trade_intent?: Json
+          delivered_at?: string | null
+          delivery_status?: string
+          id?: string
+          ip_address?: unknown
+          landing_url?: string | null
+          lead_status?: string
+          metadata?: Json
+          packet_id?: string | null
+          qr_token?: string | null
+          referrer?: string | null
+          requested_at?: string
+          requested_documents?: Json
+          session_id?: string | null
+          source?: string
+          stock?: string | null
+          store_id?: string | null
+          tenant_id?: string | null
+          updated_at?: string
+          user_agent?: string | null
+          vehicle_id?: string | null
+          vehicle_of_interest?: Json
+          verification_required?: boolean
+          verification_status?: string
+          verified_at?: string | null
+          vin?: string | null
+          visitor_id?: string | null
+        }
+        Update: {
+          autocurb_handoff?: Json
+          created_at?: string
+          customer_email?: string
+          customer_name?: string | null
+          customer_phone?: string | null
+          customer_trade_intent?: Json
+          delivered_at?: string | null
+          delivery_status?: string
+          id?: string
+          ip_address?: unknown
+          landing_url?: string | null
+          lead_status?: string
+          metadata?: Json
+          packet_id?: string | null
+          qr_token?: string | null
+          referrer?: string | null
+          requested_at?: string
+          requested_documents?: Json
+          session_id?: string | null
+          source?: string
+          stock?: string | null
+          store_id?: string | null
+          tenant_id?: string | null
+          updated_at?: string
+          user_agent?: string | null
+          vehicle_id?: string | null
+          vehicle_of_interest?: Json
+          verification_required?: boolean
+          verification_status?: string
+          verified_at?: string | null
+          vin?: string | null
+          visitor_id?: string | null
+        }
+        Relationships: []
+      }
+      passport_sms_verifications: {
+        Row: {
+          attempts: number
+          code_hash: string
+          created_at: string
+          expires_at: string
+          id: string
+          max_attempts: number
+          metadata: Json
+          phone: string
+          provider: string | null
+          provider_message_id: string | null
+          request_id: string
+          sent_at: string
+          status: string
+          tenant_id: string | null
+          verified_at: string | null
+        }
+        Insert: {
+          attempts?: number
+          code_hash: string
+          created_at?: string
+          expires_at?: string
+          id?: string
+          max_attempts?: number
+          metadata?: Json
+          phone: string
+          provider?: string | null
+          provider_message_id?: string | null
+          request_id: string
+          sent_at?: string
+          status?: string
+          tenant_id?: string | null
+          verified_at?: string | null
+        }
+        Update: {
+          attempts?: number
+          code_hash?: string
+          created_at?: string
+          expires_at?: string
+          id?: string
+          max_attempts?: number
+          metadata?: Json
+          phone?: string
+          provider?: string | null
+          provider_message_id?: string | null
+          request_id?: string
+          sent_at?: string
+          status?: string
+          tenant_id?: string | null
+          verified_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "passport_sms_verifications_request_id_fkey"
+            columns: ["request_id"]
+            isOneToOne: false
+            referencedRelation: "passport_document_delivery_requests"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       platform_bundles: {
         Row: {
           created_at: string
@@ -2155,6 +3044,66 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      signature_evidence: {
+        Row: {
+          consent_text: string | null
+          created_at: string
+          device_label: string | null
+          document_keys: string[]
+          id: string
+          ip_address: string | null
+          metadata: Json
+          role: string
+          signature_image_url: string | null
+          signed_at: string | null
+          signer_email: string | null
+          signer_name: string | null
+          stock: string | null
+          tenant_id: string
+          user_agent: string | null
+          vehicle_id: string | null
+          vin: string | null
+        }
+        Insert: {
+          consent_text?: string | null
+          created_at?: string
+          device_label?: string | null
+          document_keys?: string[]
+          id?: string
+          ip_address?: string | null
+          metadata?: Json
+          role: string
+          signature_image_url?: string | null
+          signed_at?: string | null
+          signer_email?: string | null
+          signer_name?: string | null
+          stock?: string | null
+          tenant_id: string
+          user_agent?: string | null
+          vehicle_id?: string | null
+          vin?: string | null
+        }
+        Update: {
+          consent_text?: string | null
+          created_at?: string
+          device_label?: string | null
+          document_keys?: string[]
+          id?: string
+          ip_address?: string | null
+          metadata?: Json
+          role?: string
+          signature_image_url?: string | null
+          signed_at?: string | null
+          signer_email?: string | null
+          signer_name?: string | null
+          stock?: string | null
+          tenant_id?: string
+          user_agent?: string | null
+          vehicle_id?: string | null
+          vin?: string | null
+        }
+        Relationships: []
       }
       signed_document_archive: {
         Row: {
@@ -3348,6 +4297,58 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      customer_engagement_document_summary: {
+        Row: {
+          document_id: string | null
+          document_title: string | null
+          document_type: string | null
+          downloads: number | null
+          last_opened_at: string | null
+          opens: number | null
+          prints: number | null
+          tenant_id: string | null
+          total_events: number | null
+          unique_sessions: number | null
+          vehicle_id: string | null
+          vin: string | null
+        }
+        Relationships: []
+      }
+      customer_engagement_vehicle_summary: {
+        Row: {
+          cta_clicks: number | null
+          document_opens: number | null
+          first_engaged_at: string | null
+          last_engaged_at: string | null
+          leads: number | null
+          packet_opens: number | null
+          passport_opens: number | null
+          sticker_scans: number | null
+          stock: string | null
+          tenant_id: string | null
+          total_events: number | null
+          unique_sessions: number | null
+          vehicle_id: string | null
+          vin: string | null
+        }
+        Relationships: []
+      }
+      passport_delivery_request_summary: {
+        Row: {
+          delivered_requests: number | null
+          last_requested_at: string | null
+          leads_created: number | null
+          phone_captured: number | null
+          stock: string | null
+          tenant_id: string | null
+          total_requests: number | null
+          trade_intent_count: number | null
+          vehicle_id: string | null
+          verified_requests: number | null
+          vin: string | null
+        }
+        Relationships: []
       }
       tenant_summary: {
         Row: {
