@@ -21,6 +21,7 @@ import {
   Plus,
   Printer,
   RefreshCw,
+  ScanLine,
   Search,
   ShieldCheck,
   Sparkles,
