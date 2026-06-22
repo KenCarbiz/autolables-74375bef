@@ -1,10 +1,14 @@
 import { useMemo, useState } from "react";
-import { CheckCircle2, CircleDashed, FileCheck2, ShieldCheck, Wand2 } from "lucide-react";
+import { CheckCircle2, CircleDashed, FileCheck2, ShieldCheck, Wand2, XCircle } from "lucide-react";
 import {
   DEFAULT_CT_MVP_INPUT,
   evaluateCtMvpRules,
   type CtMvpVehicleInput,
 } from "@/lib/ctMvp/ruleEngine";
+import { certifyCtMvp } from "@/lib/ctMvp/certification";
+import { normalizeVehicle } from "@/lib/inventory/normalizeVehicle";
+
+const nowIso = () => new Date().toISOString();
 
 type FieldProps = {
   label: string;
@@ -31,6 +35,63 @@ const OutputCard = ({ label, value }: { label: string; value: string }) => (
 const AdminSmokeTest = () => {
   const [input, setInput] = useState<CtMvpVehicleInput>(DEFAULT_CT_MVP_INPUT);
   const result = useMemo(() => evaluateCtMvpRules(input), [input]);
+  const certification = useMemo(() => {
+    const vehicle = normalizeVehicle({
+      vin: input.vin,
+      stock: input.stock,
+      year: input.year,
+      make: input.make,
+      model: input.model,
+      mileage: input.mileage,
+      state: input.state,
+      condition: input.condition,
+      cpoStatus: input.cpoStatus,
+      source: "admin-smoke-test",
+    });
+    return certifyCtMvp({
+      vehicle,
+      lifecycleEvents: [
+        { type: "vehicle_normalized", occurredAt: nowIso(), source: "admin-smoke-test" },
+        { type: "window_sticker_generated", occurredAt: nowIso(), source: "admin-smoke-test" },
+        { type: "addendum_generated", occurredAt: nowIso(), source: "admin-smoke-test" },
+        ...(result.ftcBuyersGuide === "required" ? [{ type: "ftc_buyers_guide_generated" as const, occurredAt: nowIso(), source: "admin-smoke-test" }] : []),
+        ...(result.k208 === "required" ? [{ type: "k208_generated" as const, occurredAt: nowIso(), source: "admin-smoke-test" }] : []),
+        ...(result.passportStatus === "enabled" ? [{ type: "passport_generated" as const, occurredAt: nowIso(), source: "admin-smoke-test" }] : []),
+        { type: "customer_signed", occurredAt: nowIso(), source: "admin-smoke-test" },
+        { type: "deal_delivered", occurredAt: nowIso(), source: "admin-smoke-test" },
+        { type: "document_archived", occurredAt: nowIso(), source: "admin-smoke-test" },
+      ],
+      signatureEvidence: [
+        {
+          role: "customer",
+          signerName: "Sample Customer",
+          signedAt: nowIso(),
+          ipAddress: "127.0.0.1",
+          userAgent: "Smoke Test Browser",
+          consentText: "I agree to electronically sign and receive this vehicle document packet.",
+          documentKeys: ["window_sticker", "addendum", ...(result.ftcBuyersGuide === "required" ? ["ftc_buyers_guide"] : []), ...(result.k208 === "required" ? ["k208"] : []), ...(result.passportStatus === "enabled" ? ["passport"] : [])],
+        },
+        {
+          role: "dealer",
+          signerName: "Sample Dealer Rep",
+          signedAt: nowIso(),
+          ipAddress: "127.0.0.1",
+          userAgent: "Smoke Test Browser",
+          consentText: "Dealer representative confirms the generated packet is complete.",
+          documentKeys: ["window_sticker", "addendum", ...(result.ftcBuyersGuide === "required" ? ["ftc_buyers_guide"] : []), ...(result.k208 === "required" ? ["k208"] : []), ...(result.passportStatus === "enabled" ? ["passport"] : [])],
+        },
+        {
+          role: "installer",
+          signerName: "Sample Installer",
+          signedAt: nowIso(),
+          ipAddress: "127.0.0.1",
+          userAgent: "Smoke Test Browser",
+          consentText: "Installer confirms addendum install/proof.",
+          documentKeys: ["addendum"],
+        },
+      ],
+    });
+  }, [input, result.ftcBuyersGuide, result.k208, result.passportStatus]);
 
   const update = <K extends keyof CtMvpVehicleInput>(key: K, value: CtMvpVehicleInput[K]) => {
     setInput((prev) => ({ ...prev, [key]: value }));
@@ -46,7 +107,7 @@ const AdminSmokeTest = () => {
           <h1 className="mt-3 text-2xl font-bold tracking-tight text-foreground">Admin Smoke Test</h1>
           <p className="mt-1 max-w-3xl text-sm text-muted-foreground">
             Enter one vehicle and verify the complete document decision chain: sticker, addendum, FTC Buyers Guide, K208,
-            passport, trust source, and dealer program.
+            passport, trust source, dealer program, lifecycle audit, signatures, packet readiness, and archive readiness.
           </p>
         </div>
         <button
@@ -57,6 +118,24 @@ const AdminSmokeTest = () => {
           <Wand2 className="h-4 w-4" /> Reset sample
         </button>
       </div>
+
+      <section className={`rounded-2xl border p-4 shadow-sm ${certification.ready ? "border-emerald-200 bg-emerald-50" : "border-amber-200 bg-amber-50"}`}>
+        <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+          <div className="flex items-start gap-3">
+            {certification.ready ? <CheckCircle2 className="mt-0.5 h-6 w-6 text-emerald-700" /> : <XCircle className="mt-0.5 h-6 w-6 text-amber-700" />}
+            <div>
+              <p className={`text-sm font-bold uppercase tracking-[0.18em] ${certification.ready ? "text-emerald-800" : "text-amber-800"}`}>MVP Certification</p>
+              <h2 className="mt-1 text-xl font-black text-slate-950">{certification.ready ? "Ready for Connecticut MVP" : "Not ready yet"}</h2>
+              <p className="mt-1 text-sm text-slate-700">{certification.vehicleTitle} · Required docs: {certification.requiredDocumentKeys.join(", ")}</p>
+            </div>
+          </div>
+          <div className="grid grid-cols-3 gap-2 text-center text-xs font-semibold">
+            <div className="rounded-xl bg-white/80 p-3"><div className="text-lg font-black">{certification.lifecycleAudit.complete ? "Yes" : "No"}</div><div>Lifecycle</div></div>
+            <div className="rounded-xl bg-white/80 p-3"><div className="text-lg font-black">{certification.signatureValidation.packetReady ? "Yes" : "No"}</div><div>Packet</div></div>
+            <div className="rounded-xl bg-white/80 p-3"><div className="text-lg font-black">{certification.signatureValidation.archiveReady ? "Yes" : "No"}</div><div>Archive</div></div>
+          </div>
+        </div>
+      </section>
 
       <div className="grid gap-5 lg:grid-cols-[0.95fr_1.25fr]">
         <section className="rounded-2xl border border-border bg-card p-4 shadow-sm">
@@ -69,27 +148,13 @@ const AdminSmokeTest = () => {
           </div>
 
           <div className="grid gap-3 sm:grid-cols-2">
-            <Field label="VIN">
-              <input className={inputClass} value={input.vin} onChange={(e) => update("vin", e.target.value)} />
-            </Field>
-            <Field label="Stock Number">
-              <input className={inputClass} value={input.stock} onChange={(e) => update("stock", e.target.value)} />
-            </Field>
-            <Field label="Year">
-              <input className={inputClass} value={input.year} onChange={(e) => update("year", e.target.value)} />
-            </Field>
-            <Field label="Make">
-              <input className={inputClass} value={input.make} onChange={(e) => update("make", e.target.value)} />
-            </Field>
-            <Field label="Model">
-              <input className={inputClass} value={input.model} onChange={(e) => update("model", e.target.value)} />
-            </Field>
-            <Field label="Mileage">
-              <input className={inputClass} value={input.mileage} onChange={(e) => update("mileage", e.target.value)} />
-            </Field>
-            <Field label="State">
-              <input className={inputClass} value={input.state} onChange={(e) => update("state", e.target.value)} />
-            </Field>
+            <Field label="VIN"><input className={inputClass} value={input.vin} onChange={(e) => update("vin", e.target.value)} /></Field>
+            <Field label="Stock Number"><input className={inputClass} value={input.stock} onChange={(e) => update("stock", e.target.value)} /></Field>
+            <Field label="Year"><input className={inputClass} value={input.year} onChange={(e) => update("year", e.target.value)} /></Field>
+            <Field label="Make"><input className={inputClass} value={input.make} onChange={(e) => update("make", e.target.value)} /></Field>
+            <Field label="Model"><input className={inputClass} value={input.model} onChange={(e) => update("model", e.target.value)} /></Field>
+            <Field label="Mileage"><input className={inputClass} value={input.mileage} onChange={(e) => update("mileage", e.target.value)} /></Field>
+            <Field label="State"><input className={inputClass} value={input.state} onChange={(e) => update("state", e.target.value)} /></Field>
             <Field label="New / Used">
               <select className={selectClass} value={input.condition} onChange={(e) => update("condition", e.target.value as CtMvpVehicleInput["condition"])}>
                 <option value="used">Used</option>
@@ -134,15 +199,15 @@ const AdminSmokeTest = () => {
           </div>
 
           <div className="rounded-2xl border border-border bg-card p-4 shadow-sm">
-            <h2 className="text-base font-semibold text-foreground">Validation Checklist</h2>
-            <p className="mt-1 text-xs text-muted-foreground">This is the master smoke test before automating production workflows.</p>
+            <h2 className="text-base font-semibold text-foreground">Certification Checklist</h2>
+            <p className="mt-1 text-xs text-muted-foreground">This combines rules, lifecycle, signatures, packet readiness, and archive readiness.</p>
             <div className="mt-4 space-y-2">
-              {result.checklist.map((item) => (
-                <div key={item.label} className="flex items-start gap-3 rounded-xl border border-border bg-background p-3">
+              {certification.checks.map((item) => (
+                <div key={item.key} className="flex items-start gap-3 rounded-xl border border-border bg-background p-3">
                   {item.status === "pass" ? (
                     <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600" />
                   ) : (
-                    <CircleDashed className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
+                    <CircleDashed className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
                   )}
                   <div className="min-w-0">
                     <p className="text-sm font-semibold text-foreground">{item.label}</p>
