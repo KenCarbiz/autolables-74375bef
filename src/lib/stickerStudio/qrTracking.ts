@@ -1,4 +1,5 @@
 import { supabase } from "@/integrations/supabase/client";
+import { buildPersistenceContext, recordPassportViewed } from "@/lib/ctMvp/productionHooks";
 
 // QR tracking: a stable /q/:token per vehicle + sticker type that logs a scan
 // then redirects to the Vehicle Passport. Resilient — if the qr_codes table
@@ -75,6 +76,28 @@ export async function logScan(token: string): Promise<string | null> {
       _referrer: typeof document !== "undefined" ? document.referrer || null : null,
       _ua: ua || null,
     });
+
+    // Best-effort CT MVP audit event. The QR RPC remains source of truth for
+    // scan analytics; this writes the compliance lifecycle proof when possible.
+    try {
+      const { data: qr } = await sb()
+        .from("qr_codes")
+        .select("tenant_id, vehicle_id, sticker_type, destination_url")
+        .eq("token", token)
+        .maybeSingle();
+      await recordPassportViewed(buildPersistenceContext({
+        tenantId: qr?.tenant_id,
+        vehicleId: qr?.vehicle_id,
+      }), {
+        token,
+        stickerType: qr?.sticker_type,
+        destinationUrl: qr?.destination_url,
+        device: deviceCategory(ua),
+        browser: browserName(ua),
+        referrer: typeof document !== "undefined" ? document.referrer || null : null,
+      });
+    } catch { /* lifecycle proof is best-effort */ }
+
     return typeof data === "string" ? data : null;
   } catch { return null; }
 }
