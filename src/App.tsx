@@ -73,6 +73,8 @@ const ScanPage = lazy(() => import("./pages/ScanPage"));
 const ComplianceCenter = lazy(() => import("./pages/ComplianceCenter"));
 const VehiclePortal = lazy(() => import("./pages/VehiclePortal"));
 const UsedCarSticker = lazy(() => import("./pages/UsedCarSticker"));
+const UsedVehicleDocuments = lazy(() => import("./pages/UsedVehicleDocuments"));
+const UsedVehicleDocumentsPrint = lazy(() => import("./pages/UsedVehicleDocumentsPrint"));
 const StickerStudio = lazy(() => import("./pages/StickerStudio"));
 const StickerStudioGenerator = lazy(() => import("./pages/StickerStudioGenerator"));
 const StickerStudioCustomize = lazy(() => import("./pages/StickerStudioCustomize"));
@@ -172,6 +174,7 @@ const App = () => (
                       <Route path="/brand" element={<BrandGuide />} />
                       <Route path="/print/sticker/:templateId" element={<StickerPrint />} />
                       <Route path="/print/test-label" element={<StickerTestLabel />} />
+                      <Route path="/print/used-vehicle-documents" element={<UsedVehicleDocumentsPrint />} />
                       <Route path="/dev/hero-preview" element={<DevHeroPreview />} />
                       <Route path="/dev/saturday-preview" element={<DevSaturdayPreview />} />
                       <Route path="/q/:token" element={<QrRedirect />} />
@@ -195,6 +198,7 @@ const App = () => (
                         <Route path="/delivered" element={<SavedAddendums stage="delivered" />} />
                         <Route path="/signatures" element={<SignatureQueue /> } />
                         <Route path="/buyers-guide" element={<BuyersGuide />} />
+                        <Route path="/used-vehicle-documents" element={<UsedVehicleDocuments />} />
                         <Route path="/trade-up" element={<TradeUpSticker />} />
                         <Route path="/used-car-sticker" element={<UsedCarSticker />} />
                         <Route path="/sticker-studio" element={<StickerStudio />} />
