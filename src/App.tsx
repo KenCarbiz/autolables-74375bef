@@ -52,6 +52,7 @@ const Privacy = lazy(() => import("./pages/Privacy"));
 const Terms = lazy(() => import("./pages/Terms"));
 const Login = lazy(() => import("./pages/Login"));
 const Admin = lazy(() => import("./pages/Admin"));
+const AdminSmokeTest = lazy(() => import("./pages/AdminSmokeTest"));
 const PlatformAdmin = lazy(() => import("./pages/PlatformAdmin"));
 const Inventory = lazy(() => import("./pages/Inventory"));
 const VehicleFile = lazy(() => import("./pages/VehicleFile"));
@@ -131,10 +132,6 @@ const ScrollToTop = () => {
 const App = () => (
   <ErrorBoundary>
   <QueryClientProvider client={queryClient}>
-    {/* MotionConfig: Wave 2 motion ladder. All framer-motion
-        components inherit the out-expo easing + 320ms duration.
-        reducedMotion="user" honors prefers-reduced-motion so
-        accessibility users get instant state changes. */}
     <MotionConfig
       reducedMotion="user"
       transition={{
@@ -160,14 +157,9 @@ const App = () => (
                       <Route path="/privacy" element={<Privacy />} />
                       <Route path="/terms" element={<Terms />} />
                       <Route path="/login" element={<Login />} />
-                      {/* Two interchangeable customer signing experiences on
-                          the same token: /sign = full single-page document
-                          (default), /review = guided step-by-step wizard. Each
-                          links to the other so the customer can sign either way. */}
                       <Route path="/sign/:token" element={<MobileSigning />} />
                       <Route path="/review/:token" element={<CustomerReview />} />
                       <Route path="/install/:token" element={<InstallerProof />} />
-                      {/* Buyer recovery path: VIN + contact -> email a fresh signing link */}
                       <Route path="/lookup" element={<SigningLookup />} />
                       <Route path="/onboarding" element={<Onboarding />} />
                       <Route path="/scan" element={<ScanPage />} />
@@ -177,45 +169,25 @@ const App = () => (
                       <Route path="/about" element={<About />} />
                       <Route path="/trust" element={<Trust />} />
                       <Route path="/brand" element={<BrandGuide />} />
-                      {/* Chrome-free print surface — opened in a new tab by the
-                          Sticker Studio generator for vector print-to-PDF. */}
                       <Route path="/print/sticker/:templateId" element={<StickerPrint />} />
                       <Route path="/print/test-label" element={<StickerTestLabel />} />
                       <Route path="/dev/hero-preview" element={<DevHeroPreview />} />
                       <Route path="/dev/saturday-preview" element={<DevSaturdayPreview />} />
                       <Route path="/q/:token" element={<QrRedirect />} />
 
-                      {/* Gated layout — one AppShell shared across every
-                          dealer route. Only <Outlet /> swaps on navigation,
-                          so the sidebar, topbar, store selector, and command
-                          palette stay mounted and visually still. */}
                       <Route element={<GatedLayout />}>
                         <Route path="/addendum" element={<Index />} />
-                        {/* /dashboard and /inventory both land on the
-                            inventory-first view so the sidebar Dashboard
-                            link and the Inventory link converge. */}
-                        {/* Wave 18 — /dashboard is the post-login
-                            Process Dashboard: live counts for the
-                            5-stage flow + compliance defense tiles +
-                            recent signings. /inventory still renders
-                            the inventory list directly. */}
                         <Route path="/dashboard" element={<ProcessDashboard />} />
                         <Route path="/dashboard/qr-analytics" element={<QrAnalytics />} />
                         <Route path="/dashboard/reports" element={<Reports />} />
                         <Route path="/dashboard/document-review" element={<DocumentReview />} />
                         <Route path="/setup" element={<Setup />} />
-                        {/* Wave 21 — Lot Capture Queue: the
-                            polished V2 surface for FlowTile #1.
-                            /scan still opens the mobile scanner
-                            directly; /queue is the triage view. */}
                         <Route path="/queue" element={<LotCaptureQueue />} />
                         <Route path="/inventory" element={<Inventory />} />
                         <Route path="/dashboard-legacy" element={<Navigate to="/dashboard" replace />} />
                         <Route path="/vehicle-file/:id" element={<VehicleFile />} />
-                        {/* /admin hosts dealer settings (products, rules,
-                            branding, leads, queue, files, audit). Tenant
-                            members reach their own settings here. */}
                         <Route path="/admin" element={<Admin />} />
+                        <Route path="/admin/smoke-test" element={<AdminSmokeTest />} />
                         <Route path="/saved" element={<SavedAddendums />} />
                         <Route path="/signed" element={<SavedAddendums stage="signed" />} />
                         <Route path="/delivered" element={<SavedAddendums stage="delivered" />} />
@@ -234,8 +206,6 @@ const App = () => (
                         <Route path="/prep" element={<PrepSignOff />} />
                       </Route>
 
-                      {/* Platform-admin layout — gated on isAdmin role, not
-                          on an app entitlement. Same shared-AppShell pattern. */}
                       <Route element={<AdminLayout />}>
                         <Route path="/platform-admin" element={<PlatformAdmin />} />
                       </Route>
