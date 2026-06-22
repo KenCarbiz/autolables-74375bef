@@ -1,6 +1,6 @@
-import { useMemo, useState } from "react";
-import { ArrowLeft, FileText, Printer, ShieldCheck, Languages, Save } from "lucide-react";
-import { useNavigate } from "react-router-dom";
+import { useEffect, useMemo, useState } from "react";
+import { ArrowLeft, FileText, Printer, ShieldCheck, Languages, Save, Car } from "lucide-react";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 import { useTenant } from "@/contexts/TenantContext";
 import { useAuth } from "@/contexts/AuthContext";
@@ -25,13 +25,77 @@ const warrantyOptions: Array<{ value: WarrantyMode; label: string; helper: strin
 const fieldClass = "h-10 w-full rounded-lg border border-border bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-blue-500/30";
 const labelClass = "text-[11px] font-bold uppercase tracking-wider text-muted-foreground";
 
+const parseYmm = (ymm?: string | null) => {
+  const parts = String(ymm || "").trim().split(/\s+/).filter(Boolean);
+  const year = /^\d{4}$/.test(parts[0] || "") ? parts.shift() || "" : "";
+  const make = parts.shift() || "";
+  const model = parts.join(" ");
+  return { year, make, model };
+};
+
 const UsedVehicleDocuments = () => {
   const navigate = useNavigate();
-  const { tenant } = useTenant();
+  const [params] = useSearchParams();
+  const { tenant, currentStore } = useTenant();
   const { user } = useAuth();
-  const [data, setData] = useState<UsedVehicleDocumentData>(DEFAULT_USED_VEHICLE_DOCUMENT_DATA);
+  const [data, setData] = useState<UsedVehicleDocumentData>({
+    ...DEFAULT_USED_VEHICLE_DOCUMENT_DATA,
+    dealerName: currentStore?.name || tenant?.name || DEFAULT_USED_VEHICLE_DOCUMENT_DATA.dealerName,
+  });
   const [saving, setSaving] = useState(false);
   const [preview, setPreview] = useState<"ftc" | "k208">("ftc");
+  const [vehicleId, setVehicleId] = useState<string | null>(params.get("vehicleId"));
+  const [prefillLoading, setPrefillLoading] = useState(false);
+
+  useEffect(() => {
+    const queryVehicleId = params.get("vehicleId");
+    const queryVin = params.get("vin");
+    const queryStock = params.get("stock");
+    if (queryVin || queryStock) {
+      setData((prev) => ({
+        ...prev,
+        vin: queryVin ? queryVin.toUpperCase() : prev.vin,
+        stock: queryStock || prev.stock,
+      }));
+    }
+    if (!queryVehicleId && !queryVin) return;
+
+    let cancelled = false;
+    (async () => {
+      setPrefillLoading(true);
+      try {
+        let query = (supabase as any)
+          .from("vehicle_listings")
+          .select("id,tenant_id,vin,stock,stock_number,ymm,trim,mileage,price,dealer_snapshot")
+          .limit(1);
+        if (queryVehicleId) query = query.eq("id", queryVehicleId);
+        else if (queryVin) query = query.eq("vin", queryVin.toUpperCase());
+        const { data: row } = await query.maybeSingle();
+        if (!row || cancelled) return;
+        const parsed = parseYmm(row.ymm);
+        setVehicleId(row.id || queryVehicleId || null);
+        setData((prev) => ({
+          ...prev,
+          dealerName: currentStore?.name || tenant?.name || prev.dealerName,
+          dealerAddress: typeof row.dealer_snapshot?.address === "string" ? row.dealer_snapshot.address : prev.dealerAddress,
+          year: parsed.year || prev.year,
+          make: parsed.make || prev.make,
+          model: [parsed.model, row.trim].filter(Boolean).join(" ") || prev.model,
+          vin: row.vin || prev.vin,
+          stock: row.stock || row.stock_number || prev.stock,
+          mileage: typeof row.mileage === "number" ? row.mileage.toLocaleString() : prev.mileage,
+          salePrice: typeof row.price === "number" ? String(row.price) : prev.salePrice,
+        }));
+      } catch (err) {
+        console.error(err);
+        toast.error("Could not prefill vehicle details");
+      } finally {
+        if (!cancelled) setPrefillLoading(false);
+      }
+    })();
+
+    return () => { cancelled = true; };
+  }, [params, currentStore?.name, tenant?.name]);
 
   const suggested = useMemo(() => suggestedCtWarranty(data.salePrice), [data.salePrice]);
 
@@ -69,10 +133,12 @@ const UsedVehicleDocuments = () => {
     try {
       const context = buildPersistenceContext({
         tenantId: tenant.id,
+        vehicleId,
         vin: data.vin,
         stock: data.stock,
       });
       const payload = {
+        vehicleId,
         dealer: data.dealerName,
         vin: data.vin,
         stock: data.stock,
@@ -105,7 +171,7 @@ const UsedVehicleDocuments = () => {
         await (supabase as any).from("audit_log").insert({
           action: "used_vehicle_documents_saved",
           entity_type: "vehicle",
-          entity_id: data.vin || data.stock || "unknown",
+          entity_id: vehicleId || data.vin || data.stock || "unknown",
           store_id: tenant.id,
           user_id: user?.id || null,
           details: payload,
@@ -135,6 +201,11 @@ const UsedVehicleDocuments = () => {
           <p className="mt-1 max-w-3xl text-sm text-muted-foreground">
             Build both used-vehicle documents from one workflow, preview print-ready forms, and save lifecycle evidence for CT MVP certification.
           </p>
+          {vehicleId ? (
+            <p className="mt-2 inline-flex items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-bold text-emerald-800">
+              <Car className="h-3.5 w-3.5" /> Prefilled from vehicle file{prefillLoading ? "…" : ""}
+            </p>
+          ) : null}
         </div>
         <div className="flex flex-wrap gap-2">
           <button onClick={() => setPreview(preview === "ftc" ? "k208" : "ftc")} className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-border bg-card px-4 text-sm font-bold hover:bg-muted">
