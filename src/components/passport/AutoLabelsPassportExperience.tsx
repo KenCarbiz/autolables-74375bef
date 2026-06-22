@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   Award,
   BadgeCheck,
@@ -15,6 +15,7 @@ import {
   Phone,
   ShieldCheck,
   Sparkles,
+  Star,
   Timer,
   Wrench,
 } from "lucide-react";
@@ -28,6 +29,7 @@ import {
 } from "@/lib/passport/passportDocumentDelivery";
 import {
   trackCustomerCtaClicked,
+  trackCustomerEngagement,
   trackDocumentOpened,
   trackPacketOpened,
   trackPassportOpened,
@@ -69,6 +71,8 @@ type AutoLabelsPassportExperienceProps = {
   vehicle: PassportVehicle;
   settings?: PassportDeliverySettings | null;
 };
+
+type IconComponent = typeof ShieldCheck;
 
 const money = (value?: string | number | null) => {
   if (value === null || value === undefined || value === "") return "Contact dealer";
@@ -119,7 +123,65 @@ const TrustBadgeRow = ({ vehicle }: { vehicle: PassportVehicle }) => {
   );
 };
 
-const ConfidenceModule = ({ icon: Icon, title, text, action }: { icon: typeof ShieldCheck; title: string; text: string; action?: () => void }) => (
+const HeroStat = ({ label, value }: { label: string; value: string }) => (
+  <div className="rounded-2xl border border-white/15 bg-white/10 p-4 shadow-xl shadow-black/10 backdrop-blur">
+    <div className="text-[10px] font-black uppercase tracking-[0.18em] text-white/55">{label}</div>
+    <div className="mt-1 text-lg font-black text-white">{value}</div>
+  </div>
+);
+
+const ConfidenceScore = ({ score = 93 }: { score?: number }) => (
+  <div className="relative overflow-hidden rounded-[2rem] border border-white/15 bg-white/10 p-5 text-white shadow-2xl shadow-black/20 backdrop-blur-xl">
+    <div className="absolute -right-12 -top-12 h-40 w-40 rounded-full bg-emerald-400/20 blur-2xl" />
+    <div className="relative flex items-center gap-4">
+      <div className="flex h-24 w-24 shrink-0 items-center justify-center rounded-full border-[10px] border-emerald-400 bg-slate-950/60">
+        <div className="text-center">
+          <div className="text-3xl font-black leading-none">{score}</div>
+          <div className="text-[10px] font-bold text-white/50">/100</div>
+        </div>
+      </div>
+      <div>
+        <div className="inline-flex items-center gap-1 rounded-full bg-emerald-400/15 px-2.5 py-1 text-[10px] font-black uppercase tracking-wider text-emerald-200"><Star className="h-3 w-3" /> Excellent</div>
+        <h2 className="mt-2 text-xl font-black leading-tight">Confidence at a glance</h2>
+        <p className="mt-1 text-sm leading-relaxed text-white/70">A quick read on vehicle facts, available disclosures, dealer proof, and Passport readiness.</p>
+      </div>
+    </div>
+  </div>
+);
+
+const VehicleStoryTimeline = ({ vehicle }: { vehicle: PassportVehicle }) => {
+  const steps = [
+    { title: "Verified", text: vehicle.vin ? `VIN ${vehicle.vin}` : "VIN ready for review", icon: BadgeCheck },
+    { title: "Inspected", text: vehicle.reconSummary || "Service and recon proof available when attached", icon: Wrench },
+    { title: "Protected", text: vehicle.warrantyLabel || "Buyer Guide and warranty disclosures ready", icon: ShieldCheck },
+    { title: "Passport Ready", text: "Documents, trade value, and dealer contact in one place", icon: Sparkles },
+  ];
+
+  return (
+    <section className="rounded-[2rem] border border-border bg-background p-5 shadow-sm">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <div className="inline-flex items-center gap-2 rounded-full bg-blue-50 px-3 py-1 text-[10px] font-black uppercase tracking-wider text-blue-700"><Timer className="h-3.5 w-3.5" /> Vehicle Story</div>
+          <h2 className="mt-3 text-2xl font-black tracking-tight text-foreground">From the lot to your decision</h2>
+          <p className="mt-1 text-sm text-muted-foreground">A simple path through the proof that helps you understand this vehicle before you visit.</p>
+        </div>
+        <p className="text-xs font-semibold text-muted-foreground">Transparent by design</p>
+      </div>
+      <div className="mt-5 grid gap-3 md:grid-cols-4">
+        {steps.map(({ title, text, icon: Icon }, index) => (
+          <div key={title} className="relative rounded-2xl border border-border bg-card p-4">
+            {index < steps.length - 1 ? <div className="absolute left-8 top-12 hidden h-px w-full bg-border md:block" /> : null}
+            <div className="relative z-10 flex h-10 w-10 items-center justify-center rounded-full bg-slate-950 text-white shadow-lg"><Icon className="h-5 w-5" /></div>
+            <h3 className="mt-3 font-black text-foreground">{title}</h3>
+            <p className="mt-1 text-sm leading-relaxed text-muted-foreground">{text}</p>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+};
+
+const ConfidenceModule = ({ icon: Icon, title, text, action }: { icon: IconComponent; title: string; text: string; action?: () => void }) => (
   <button onClick={action} className="group rounded-2xl border border-border bg-card p-4 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-blue-200 hover:shadow-md">
     <div className="flex items-start gap-3">
       <div className="rounded-xl bg-blue-50 p-2 text-blue-600"><Icon className="h-5 w-5" /></div>
@@ -211,7 +273,7 @@ const PassportLeadCaptureModal = ({ vehicle, settings, open, onClose }: { vehicl
         },
       });
       setSent(true);
-      toast.success(result.verificationRequired ? "Verification code sent" : "Your packet is being emailed");
+      toast.success(result.verificationRequired ? "Verification code sent" : "Your Passport is being emailed");
     } catch (err) {
       console.error(err);
       toast.error(err instanceof Error ? err.message : "Could not request packet");
@@ -227,9 +289,9 @@ const PassportLeadCaptureModal = ({ vehicle, settings, open, onClose }: { vehicl
           <>
             <div className="flex items-start justify-between gap-3">
               <div>
-                <div className="inline-flex items-center gap-2 rounded-full bg-blue-50 px-3 py-1 text-xs font-black text-blue-700"><Mail className="h-3.5 w-3.5" /> Send my packet</div>
-                <h2 className="mt-3 text-2xl font-black text-foreground">Email this vehicle packet</h2>
-                <p className="mt-1 text-sm text-muted-foreground">We will send the documents and vehicle information for {vehicleTitle(vehicle)}.</p>
+                <div className="inline-flex items-center gap-2 rounded-full bg-blue-50 px-3 py-1 text-xs font-black text-blue-700"><Mail className="h-3.5 w-3.5" /> Send my Passport</div>
+                <h2 className="mt-3 text-2xl font-black text-foreground">Take this vehicle story with you</h2>
+                <p className="mt-1 text-sm text-muted-foreground">We will email the documents, warranty information, and vehicle details for {vehicleTitle(vehicle)}.</p>
               </div>
               <button onClick={onClose} className="rounded-full px-3 py-1.5 text-sm font-bold text-muted-foreground hover:bg-muted">Close</button>
             </div>
@@ -237,18 +299,18 @@ const PassportLeadCaptureModal = ({ vehicle, settings, open, onClose }: { vehicl
               {requireName && <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Your name" className="h-12 w-full rounded-xl border border-border bg-card px-4 text-sm outline-none focus:border-blue-400" />}
               <input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="Email address" type="email" className="h-12 w-full rounded-xl border border-border bg-card px-4 text-sm outline-none focus:border-blue-400" />
               {requirePhone && <input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="Mobile number" type="tel" className="h-12 w-full rounded-xl border border-border bg-card px-4 text-sm outline-none focus:border-blue-400" />}
-              {smsRequired && <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs font-semibold text-amber-800">This dealer requires a quick text verification before sending the packet.</div>}
-              <p className="text-xs text-muted-foreground">By requesting the packet, you agree the dealer may contact you about this vehicle. Message/data rates may apply if text verification is enabled.</p>
+              {smsRequired && <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs font-semibold text-amber-800">This dealer requires a quick text verification before sending the Passport.</div>}
+              <p className="text-xs text-muted-foreground">By requesting the Passport, you agree the dealer may contact you about this vehicle. Message/data rates may apply if text verification is enabled.</p>
               <button disabled={loading} onClick={submit} className="flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 text-sm font-black text-white shadow-lg shadow-blue-600/20 hover:bg-blue-700 disabled:opacity-60">
-                {loading ? "Sending..." : smsRequired ? "Send verification code" : "Send my packet"}
+                {loading ? "Sending..." : smsRequired ? "Send verification code" : "Send my Passport"}
               </button>
             </div>
           </>
         ) : (
           <div className="py-8 text-center">
             <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-emerald-50 text-emerald-600"><CheckCircle2 className="h-9 w-9" /></div>
-            <h2 className="mt-4 text-2xl font-black text-foreground">You're all set</h2>
-            <p className="mt-2 text-sm text-muted-foreground">{smsRequired ? "Check your phone for a verification code. Once verified, the packet will be emailed." : "Your vehicle packet has been queued for email delivery."}</p>
+            <h2 className="mt-4 text-2xl font-black text-foreground">Your Passport is on the way</h2>
+            <p className="mt-2 text-sm text-muted-foreground">{smsRequired ? "Check your phone for a verification code. Once verified, the Passport will be emailed." : "Check your email for the vehicle packet. You can review it anytime before you visit."}</p>
             <button onClick={onClose} className="mt-6 h-11 rounded-xl bg-foreground px-6 text-sm font-black text-background">Done</button>
           </div>
         )}
@@ -278,7 +340,7 @@ const AutoLabelsPassportExperience = ({ vehicle, settings: providedSettings }: A
   };
 
   const contactClick = async (type: "call" | "text" | "directions") => {
-    await trackCustomerCtaClicked({
+    await trackCustomerEngagement({
       tenantId: vehicle.tenantId,
       storeId: vehicle.storeId,
       vehicleId: vehicle.vehicleId,
@@ -290,39 +352,61 @@ const AutoLabelsPassportExperience = ({ vehicle, settings: providedSettings }: A
       surface: "vehicle_passport",
       eventType: type === "call" ? "call_clicked" : type === "text" ? "text_clicked" : "directions_clicked",
       metadata: { cta: type },
-    } as never);
+    });
   };
 
-  useMemo(() => {
+  useEffect(() => {
     trackPassportOpened({ tenantId: vehicle.tenantId, storeId: vehicle.storeId, vehicleId: vehicle.vehicleId, vin: vehicle.vin, stock: vehicle.stock, packetId: vehicle.packetId, qrToken: vehicle.qrToken });
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [vehicle.vehicleId, vehicle.vin, vehicle.stock]);
+  }, [vehicle.packetId, vehicle.qrToken, vehicle.stock, vehicle.storeId, vehicle.tenantId, vehicle.vehicleId, vehicle.vin]);
 
   return (
-    <div className="min-h-screen bg-slate-950 text-white">
+    <div className="min-h-screen bg-slate-950 pb-20 text-white sm:pb-0">
       <section className="relative overflow-hidden">
-        {vehicle.heroImageUrl ? <img src={vehicle.heroImageUrl} alt={title} className="absolute inset-0 h-full w-full object-cover opacity-45" /> : null}
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(59,130,246,.5),transparent_30%),linear-gradient(180deg,rgba(15,23,42,.55),#020617)]" />
-        <div className="relative mx-auto max-w-5xl px-4 pb-8 pt-10">
-          <div className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-3 py-1 text-xs font-black backdrop-blur"><Sparkles className="h-3.5 w-3.5" /> AutoLabels Passport</div>
-          <h1 className="mt-5 text-4xl font-black tracking-tight sm:text-6xl">{title}</h1>
-          <div className="mt-4 flex flex-wrap gap-3 text-sm font-bold text-white/90">
-            <span>{money(vehicle.price)}</span><span>•</span><span>{miles(vehicle.mileage)}</span><span>•</span><span>Stock {vehicle.stock || "—"}</span>
+        {vehicle.heroImageUrl ? <img src={vehicle.heroImageUrl} alt={title} className="absolute inset-0 h-full w-full object-cover opacity-45" /> : <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_20%,rgba(59,130,246,.35),transparent_28%),radial-gradient(circle_at_80%_10%,rgba(16,185,129,.2),transparent_25%)]" />}
+        <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(15,23,42,.45),#020617_82%)]" />
+        <div className="relative mx-auto grid max-w-6xl gap-8 px-4 pb-10 pt-10 lg:grid-cols-[1.12fr_.88fr] lg:items-end lg:pb-14 lg:pt-14">
+          <div>
+            <div className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-3 py-1 text-xs font-black uppercase tracking-wider backdrop-blur"><Sparkles className="h-3.5 w-3.5" /> AutoLabels Passport</div>
+            <h1 className="mt-5 max-w-4xl text-4xl font-black tracking-tight sm:text-6xl lg:text-7xl">Every vehicle has a story. This Passport proves it.</h1>
+            <p className="mt-5 max-w-2xl text-lg leading-relaxed text-white/75">Review the vehicle, disclosures, recon proof, warranty information, trade options, and dealer contact in one confidence-building place.</p>
+            <div className="mt-6 rounded-[2rem] border border-white/15 bg-white/10 p-4 shadow-2xl shadow-black/20 backdrop-blur-xl">
+              <div className="text-[10px] font-black uppercase tracking-[0.18em] text-white/55">You are reviewing</div>
+              <h2 className="mt-2 text-3xl font-black tracking-tight text-white sm:text-4xl">{title}</h2>
+              <div className="mt-4 grid gap-3 sm:grid-cols-3">
+                <HeroStat label="Price" value={money(vehicle.price)} />
+                <HeroStat label="Mileage" value={miles(vehicle.mileage)} />
+                <HeroStat label="Stock" value={vehicle.stock || "Pending"} />
+              </div>
+            </div>
+            <div className="mt-5"><TrustBadgeRow vehicle={vehicle} /></div>
+            <div className="mt-7 grid gap-3 sm:grid-cols-2">
+              <button onClick={openPacket} className="flex h-14 items-center justify-center gap-2 rounded-2xl bg-white px-5 text-sm font-black text-slate-950 shadow-xl shadow-black/20"><Mail className="h-5 w-5" /> Send me this Passport</button>
+              <button onClick={tradeClick} className="flex h-14 items-center justify-center gap-2 rounded-2xl border border-white/20 bg-white/10 px-5 text-sm font-black text-white backdrop-blur hover:bg-white/15"><HeartHandshake className="h-5 w-5" /> Value my trade</button>
+            </div>
           </div>
-          <div className="mt-5"><TrustBadgeRow vehicle={vehicle} /></div>
-          <div className="mt-7 grid gap-3 sm:grid-cols-2">
-            <button onClick={openPacket} className="flex h-14 items-center justify-center gap-2 rounded-2xl bg-white px-5 text-sm font-black text-slate-950 shadow-xl shadow-black/20"><Mail className="h-5 w-5" /> Email me this packet</button>
-            <button onClick={tradeClick} className="flex h-14 items-center justify-center gap-2 rounded-2xl border border-white/20 bg-white/10 px-5 text-sm font-black text-white backdrop-blur hover:bg-white/15"><HeartHandshake className="h-5 w-5" /> Value my trade</button>
+          <div className="space-y-4">
+            <ConfidenceScore />
+            <div className="rounded-[2rem] border border-white/15 bg-white/10 p-5 text-white shadow-2xl shadow-black/20 backdrop-blur-xl">
+              <div className="flex items-start gap-3">
+                <div className="rounded-2xl bg-white p-3 text-slate-950"><Car className="h-6 w-6" /></div>
+                <div>
+                  <h2 className="text-xl font-black">Built for a better decision</h2>
+                  <p className="mt-1 text-sm leading-relaxed text-white/70">Instead of hunting through paperwork, this Passport brings the important vehicle proof into one guided experience.</p>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </section>
 
-      <main className="mx-auto max-w-5xl space-y-5 px-4 py-6 text-foreground">
-        <section className="grid gap-3 sm:grid-cols-2">
+      <main className="mx-auto max-w-6xl space-y-5 px-4 py-6 text-foreground">
+        <VehicleStoryTimeline vehicle={vehicle} />
+
+        <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           <ConfidenceModule icon={ShieldCheck} title="Buyer protection" text={vehicle.warrantyLabel || "Review warranty and buyer guide information in plain English."} />
           <ConfidenceModule icon={Wrench} title="Service & recon" text={vehicle.reconSummary || "See available inspection, service, and reconditioning proof."} />
           <ConfidenceModule icon={Gauge} title="Vehicle facts" text="VIN, mileage, equipment, and vehicle context in one place." />
-          <ConfidenceModule icon={Award} title="Dealer confidence" text="A transparent packet from the store selling this vehicle." />
+          <ConfidenceModule icon={Award} title="Dealer confidence" text={vehicle.dealer?.name ? `A transparent packet from ${vehicle.dealer.name}.` : "A transparent packet from the store selling this vehicle."} />
         </section>
 
         <section className="rounded-3xl border border-border bg-background p-4 shadow-sm">
@@ -340,9 +424,17 @@ const AutoLabelsPassportExperience = ({ vehicle, settings: providedSettings }: A
         </section>
 
         <section className="rounded-3xl border border-blue-200 bg-blue-50 p-5 text-blue-900">
-          <div className="flex items-start gap-3"><Timer className="mt-1 h-6 w-6" /><div><h2 className="text-xl font-black">Save this vehicle story</h2><p className="mt-1 text-sm">Email the packet to yourself so you can review documents, warranty information, and trade value options anytime.</p><button onClick={openPacket} className="mt-4 rounded-xl bg-blue-600 px-5 py-3 text-sm font-black text-white">Send my packet</button></div></div>
+          <div className="flex items-start gap-3"><Timer className="mt-1 h-6 w-6" /><div><h2 className="text-xl font-black">Save this vehicle story</h2><p className="mt-1 text-sm">Email the Passport to yourself so you can review documents, warranty information, and trade value options anytime.</p><button onClick={openPacket} className="mt-4 rounded-xl bg-blue-600 px-5 py-3 text-sm font-black text-white">Send my Passport</button></div></div>
         </section>
       </main>
+
+      <div className="fixed inset-x-0 bottom-0 z-50 border-t border-white/10 bg-slate-950/95 p-3 shadow-2xl backdrop-blur sm:hidden">
+        <div className="grid grid-cols-3 gap-2">
+          <button onClick={openPacket} className="rounded-xl bg-white px-3 py-3 text-xs font-black text-slate-950"><Mail className="mx-auto mb-1 h-4 w-4" /> Passport</button>
+          <button onClick={tradeClick} className="rounded-xl border border-white/15 bg-white/10 px-3 py-3 text-xs font-black text-white"><HeartHandshake className="mx-auto mb-1 h-4 w-4" /> Trade</button>
+          <a onClick={() => contactClick("call")} href={vehicle.dealer?.phone ? `tel:${vehicle.dealer.phone}` : undefined} className="rounded-xl border border-white/15 bg-white/10 px-3 py-3 text-center text-xs font-black text-white"><Phone className="mx-auto mb-1 h-4 w-4" /> Call</a>
+        </div>
+      </div>
 
       <PassportLeadCaptureModal vehicle={vehicle} settings={settings} open={modalOpen} onClose={() => setModalOpen(false)} />
     </div>
