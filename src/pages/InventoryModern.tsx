@@ -311,7 +311,7 @@ const InventoryModern = () => {
           <DealerCard dealerName={dealerName} vehicles={counts.total} health={counts.health} lastSync={lastSync} marketConnected={marketConnected} />
           <SideCard title="Quick Actions">
             <QuickAction icon={Plus} label="Add Vehicle" onClick={() => navigate("/add-inventory")} />
-            <QuickAction icon={ScanLineIcon} label="Scan VIN" onClick={openScan} />
+            <QuickAction icon={ScanLine} label="Scan VIN" onClick={openScan} />
             <QuickAction icon={Printer} label="New Car Sticker" onClick={() => navigate("/new-car-sticker")} />
             <QuickAction icon={FileText} label="New Addendum" onClick={() => navigate("/addendum")} />
             <QuickAction icon={Sparkles} label="Open Shopper Portal" onClick={() => navigate("/saved")} />
