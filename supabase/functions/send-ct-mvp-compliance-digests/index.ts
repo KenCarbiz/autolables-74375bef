@@ -105,6 +105,17 @@ serve(async (req) => {
     const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
     if (!supabaseUrl || !serviceKey) throw new Error("Supabase service credentials are not configured");
 
+    // Cron-only: require service-role bearer or a matching cron secret so
+    // anonymous callers cannot drain the digest outbox and burn email credits.
+    const auth = (req.headers.get("Authorization") || "").replace(/^Bearer\s+/i, "");
+    const cronSecret = Deno.env.get("CRON_SECRET") || "";
+    const headerSecret = req.headers.get("x-cron-secret") || "";
+    if (auth !== serviceKey && !(cronSecret && headerSecret === cronSecret)) {
+      return new Response(JSON.stringify({ ok: false, error: "not authorized" }), {
+        status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     const supabase = createClient(supabaseUrl, serviceKey, { auth: { persistSession: false } });
     const body = req.method === "POST" ? await req.json().catch(() => ({})) : {};
     const limit = Math.min(Number(body.limit || 25), 100);
