@@ -3522,6 +3522,208 @@ export type Database = {
           },
         ]
       }
+      used_vehicle_inspection_photos: {
+        Row: {
+          caption: string | null
+          category: string | null
+          created_at: string
+          id: string
+          inspection_id: string
+          photo_url: string
+          show_on_passport: boolean
+          stock: string | null
+          tenant_id: string | null
+          vehicle_id: string | null
+          vin: string | null
+        }
+        Insert: {
+          caption?: string | null
+          category?: string | null
+          created_at?: string
+          id?: string
+          inspection_id: string
+          photo_url: string
+          show_on_passport?: boolean
+          stock?: string | null
+          tenant_id?: string | null
+          vehicle_id?: string | null
+          vin?: string | null
+        }
+        Update: {
+          caption?: string | null
+          category?: string | null
+          created_at?: string
+          id?: string
+          inspection_id?: string
+          photo_url?: string
+          show_on_passport?: boolean
+          stock?: string | null
+          tenant_id?: string | null
+          vehicle_id?: string | null
+          vin?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "used_vehicle_inspection_photos_inspection_id_fkey"
+            columns: ["inspection_id"]
+            isOneToOne: false
+            referencedRelation: "used_vehicle_inspections"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      used_vehicle_inspections: {
+        Row: {
+          advisor_name: string | null
+          alignment_status: string | null
+          battery_status: string | null
+          created_at: string
+          customer_visible_notes: string | null
+          fluids_status: string | null
+          front_brakes: string | null
+          id: string
+          inspection_date: string
+          inspection_status: string
+          manager_approval_status: string
+          mileage: number | null
+          qr_token: string | null
+          rear_brakes: string | null
+          recon_summary: string | null
+          road_test_status: string | null
+          show_on_passport: boolean
+          stock: string | null
+          store_id: string | null
+          technician_name: string | null
+          technician_notes: string | null
+          tenant_id: string | null
+          tires_front_left: string | null
+          tires_front_right: string | null
+          tires_rear_left: string | null
+          tires_rear_right: string | null
+          updated_at: string
+          vehicle_id: string | null
+          vin: string | null
+          warning_lights_status: string | null
+        }
+        Insert: {
+          advisor_name?: string | null
+          alignment_status?: string | null
+          battery_status?: string | null
+          created_at?: string
+          customer_visible_notes?: string | null
+          fluids_status?: string | null
+          front_brakes?: string | null
+          id?: string
+          inspection_date?: string
+          inspection_status?: string
+          manager_approval_status?: string
+          mileage?: number | null
+          qr_token?: string | null
+          rear_brakes?: string | null
+          recon_summary?: string | null
+          road_test_status?: string | null
+          show_on_passport?: boolean
+          stock?: string | null
+          store_id?: string | null
+          technician_name?: string | null
+          technician_notes?: string | null
+          tenant_id?: string | null
+          tires_front_left?: string | null
+          tires_front_right?: string | null
+          tires_rear_left?: string | null
+          tires_rear_right?: string | null
+          updated_at?: string
+          vehicle_id?: string | null
+          vin?: string | null
+          warning_lights_status?: string | null
+        }
+        Update: {
+          advisor_name?: string | null
+          alignment_status?: string | null
+          battery_status?: string | null
+          created_at?: string
+          customer_visible_notes?: string | null
+          fluids_status?: string | null
+          front_brakes?: string | null
+          id?: string
+          inspection_date?: string
+          inspection_status?: string
+          manager_approval_status?: string
+          mileage?: number | null
+          qr_token?: string | null
+          rear_brakes?: string | null
+          recon_summary?: string | null
+          road_test_status?: string | null
+          show_on_passport?: boolean
+          stock?: string | null
+          store_id?: string | null
+          technician_name?: string | null
+          technician_notes?: string | null
+          tenant_id?: string | null
+          tires_front_left?: string | null
+          tires_front_right?: string | null
+          tires_rear_left?: string | null
+          tires_rear_right?: string | null
+          updated_at?: string
+          vehicle_id?: string | null
+          vin?: string | null
+          warning_lights_status?: string | null
+        }
+        Relationships: []
+      }
+      used_vehicle_investment_items: {
+        Row: {
+          amount: number | null
+          created_at: string
+          detail: string | null
+          id: string
+          inspection_id: string
+          label: string
+          show_on_passport: boolean
+          source: string
+          stock: string | null
+          tenant_id: string | null
+          vehicle_id: string | null
+          vin: string | null
+        }
+        Insert: {
+          amount?: number | null
+          created_at?: string
+          detail?: string | null
+          id?: string
+          inspection_id: string
+          label: string
+          show_on_passport?: boolean
+          source?: string
+          stock?: string | null
+          tenant_id?: string | null
+          vehicle_id?: string | null
+          vin?: string | null
+        }
+        Update: {
+          amount?: number | null
+          created_at?: string
+          detail?: string | null
+          id?: string
+          inspection_id?: string
+          label?: string
+          show_on_passport?: boolean
+          source?: string
+          stock?: string | null
+          tenant_id?: string | null
+          vehicle_id?: string | null
+          vin?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "used_vehicle_investment_items_inspection_id_fkey"
+            columns: ["inspection_id"]
+            isOneToOne: false
+            referencedRelation: "used_vehicle_inspections"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       user_roles: {
         Row: {
           created_at: string
