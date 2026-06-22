@@ -82,6 +82,8 @@ export type CanonicalInventoryVehicle = VehicleInventoryInput & {
   fuelType?: string;
   certificationType: CanonicalCertificationType;
   isCertified: boolean;
+  cpo?: boolean;
+  manufacturerWarrantyStillApplies?: boolean;
   isCommercial: boolean;
   isDemo: boolean;
   isServiceLoaner: boolean;
