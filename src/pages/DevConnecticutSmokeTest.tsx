@@ -45,7 +45,7 @@ export default function DevConnecticutSmokeTest() {
 
   const result = useMemo(() => {
     const dealer = DEFAULT_DEALER;
-    const fullVehicle = { ...vehicle, title: toVehicleTitle(vehicle) };
+    const fullVehicle = { ...vehicle, title: toVehicleTitle(vehicle) } as VehicleInventoryInput & Record<string, any>;
     const isUsed = fullVehicle.condition !== "new";
 
     const usedWindow = isUsed ? resolveDealerStickerDecision({ dealer, vehicle: fullVehicle, templateKind: "used_window_sticker" }) : undefined;
