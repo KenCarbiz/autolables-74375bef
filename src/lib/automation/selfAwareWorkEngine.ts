@@ -59,8 +59,8 @@ export const classifyVehicle = (vehicle: SelfAwareVehicle, settings: DealerAutom
   const isFactoryCpo = isCpo && (text.includes("factory") || text.includes("manufacturer"));
   const isDemo = settings.enable_demo_detection !== false && (!!vehicle.is_demo || condition === "demo" || text.includes("demo") || text.includes("loaner") || text.includes("program"));
   const isEv = settings.enable_ev_detection !== false && (condition === "ev" || fuel.includes("electric") || fuel.includes("ev") || text.includes("electric"));
-  const isNew = condition === "new" && !isDemo;
-  const isUsed = !isNew || condition === "used" || isCpo || isDemo || title.includes("used");
+  const isNew = (condition as string) === "new" && !isDemo;
+  const isUsed = !isNew || (condition as string) === "used" || isCpo || isDemo || title.includes("used");
 
   return {
     kind: isFactoryCpo ? "factory_cpo" : isCpo ? "cpo" : isDemo ? "demo" : isNew ? "new" : isEv ? "ev" : "used",
