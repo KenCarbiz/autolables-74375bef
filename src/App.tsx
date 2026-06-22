@@ -71,6 +71,7 @@ const Trust = lazy(() => import("./pages/Trust"));
 const BrandGuide = lazy(() => import("./pages/BrandGuide"));
 const ScanPage = lazy(() => import("./pages/ScanPage"));
 const ComplianceCenter = lazy(() => import("./pages/ComplianceCenter"));
+const ComplianceActionCenter = lazy(() => import("./pages/ComplianceActionCenter"));
 const VehiclePortal = lazy(() => import("./pages/VehiclePortal"));
 const UsedCarSticker = lazy(() => import("./pages/UsedCarSticker"));
 const UsedVehicleDocuments = lazy(() => import("./pages/UsedVehicleDocuments"));
@@ -207,6 +208,7 @@ const App = () => (
                         <Route path="/new-car-sticker" element={<NewCarSticker />} />
                         <Route path="/cpo-sheet" element={<CpoSheet />} />
                         <Route path="/compliance" element={<ComplianceCenter />} />
+                        <Route path="/compliance-center" element={<ComplianceActionCenter />} />
                         <Route path="/description-writer" element={<DescriptionWriter />} />
                         <Route path="/add-inventory" element={<SaveCarInventory />} />
                         <Route path="/prep" element={<PrepSignOff />} />
