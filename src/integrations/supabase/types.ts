@@ -2230,6 +2230,8 @@ export type Database = {
       }
       passport_delivery_settings: {
         Row: {
+          allow_customer_visible_reconditioning_notes: boolean
+          allow_customer_visible_service_photos: boolean
           allow_trade_value_cta: boolean
           autocurb_trade_enabled: boolean
           autocurb_trade_url: string | null
@@ -2237,17 +2239,22 @@ export type Database = {
           created_at: string
           email_intro_template: string
           email_subject_template: string
+          enable_reconditioning_workflow: boolean
+          enable_used_car_service_inspection: boolean
           enabled: boolean
           id: string
           metadata: Json
           notify_sales_team: boolean
           require_customer_name: boolean
+          require_manager_approval_for_passport_proof: boolean
           require_phone: boolean
           require_sms_verification: boolean
           tenant_id: string
           updated_at: string
         }
         Insert: {
+          allow_customer_visible_reconditioning_notes?: boolean
+          allow_customer_visible_service_photos?: boolean
           allow_trade_value_cta?: boolean
           autocurb_trade_enabled?: boolean
           autocurb_trade_url?: string | null
@@ -2255,17 +2262,22 @@ export type Database = {
           created_at?: string
           email_intro_template?: string
           email_subject_template?: string
+          enable_reconditioning_workflow?: boolean
+          enable_used_car_service_inspection?: boolean
           enabled?: boolean
           id?: string
           metadata?: Json
           notify_sales_team?: boolean
           require_customer_name?: boolean
+          require_manager_approval_for_passport_proof?: boolean
           require_phone?: boolean
           require_sms_verification?: boolean
           tenant_id: string
           updated_at?: string
         }
         Update: {
+          allow_customer_visible_reconditioning_notes?: boolean
+          allow_customer_visible_service_photos?: boolean
           allow_trade_value_cta?: boolean
           autocurb_trade_enabled?: boolean
           autocurb_trade_url?: string | null
@@ -2273,11 +2285,14 @@ export type Database = {
           created_at?: string
           email_intro_template?: string
           email_subject_template?: string
+          enable_reconditioning_workflow?: boolean
+          enable_used_car_service_inspection?: boolean
           enabled?: boolean
           id?: string
           metadata?: Json
           notify_sales_team?: boolean
           require_customer_name?: boolean
+          require_manager_approval_for_passport_proof?: boolean
           require_phone?: boolean
           require_sms_verification?: boolean
           tenant_id?: string
