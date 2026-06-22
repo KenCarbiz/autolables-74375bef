@@ -28,12 +28,16 @@ import {
   type PassportVehicleContext,
 } from "@/lib/passport/passportDocumentDelivery";
 import {
-  trackCustomerCtaClicked,
   trackCustomerEngagement,
   trackDocumentOpened,
   trackPacketOpened,
   trackPassportOpened,
 } from "@/lib/engagement/customerEngagement";
+import {
+  PassportProofGallery,
+  PassportServiceInvestmentCard,
+  WhyBuyThisVehicleCard,
+} from "@/components/passport/PassportExperienceEnhancements";
 
 type PassportDocument = {
   id?: string | null;
@@ -401,6 +405,9 @@ const AutoLabelsPassportExperience = ({ vehicle, settings: providedSettings }: A
 
       <main className="mx-auto max-w-6xl space-y-5 px-4 py-6 text-foreground">
         <VehicleStoryTimeline vehicle={vehicle} />
+        <PassportServiceInvestmentCard vehicle={vehicle} />
+        <WhyBuyThisVehicleCard vehicle={vehicle} />
+        <PassportProofGallery vehicle={vehicle} />
 
         <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           <ConfidenceModule icon={ShieldCheck} title="Buyer protection" text={vehicle.warrantyLabel || "Review warranty and buyer guide information in plain English."} />
