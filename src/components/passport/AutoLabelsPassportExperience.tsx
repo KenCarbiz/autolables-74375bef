@@ -40,6 +40,11 @@ import {
   VehicleHealthReport,
   WhyBuyThisVehicleCard,
 } from "@/components/passport/PassportExperienceEnhancements";
+import {
+  CustomerPassportProofStory,
+  CustomerTrustDisclosure,
+  hasCustomerProofStory,
+} from "@/components/passport/CustomerPassportProofStory";
 
 type PassportDocument = {
   id?: string | null;
@@ -71,8 +76,11 @@ type PassportVehicle = PassportVehicleContext & {
   warrantyLabel?: string | null;
   reconSummary?: string | null;
   historySummary?: string | null;
-  dealerInvestmentItems?: Array<{ label: string; amount?: number | string | null; detail?: string | null }>;
-  healthItems?: Array<{ label: string; value?: string | null; detail?: string | null }>;
+  customerVisibleNotes?: string | null;
+  reconditioningWorkPerformed?: string | null;
+  dealerInvestmentItems?: Array<{ label: string; amount?: number | string | null; detail?: string | null; showOnPassport?: boolean }>;
+  healthItems?: Array<{ label: string; value?: string | null; detail?: string | null; showOnPassport?: boolean }>;
+  proofPhotos?: Array<{ photoUrl?: string | null; caption?: string | null; category?: string | null; showOnPassport?: boolean }>;
 };
 
 type AutoLabelsPassportExperienceProps = {
@@ -339,6 +347,7 @@ const AutoLabelsPassportExperience = ({ vehicle, settings: providedSettings }: A
   const docs = useMemo(() => vehicle.documents?.length ? vehicle.documents : defaultDocuments, [vehicle.documents]);
   const title = vehicleTitle(vehicle);
   const hasProofData = hasServiceOrInspectionData(vehicle, docs);
+  const showPremiumProofStory = hasCustomerProofStory({ ...vehicle, documents: docs });
   const showDealerInvestment = !!settings?.show_dealer_investment_report || !!vehicle.dealerInvestmentItems?.length;
   const showVehicleHealth = !!settings?.show_vehicle_health_report || !!vehicle.healthItems?.length;
   const showServiceInvestment = !!settings?.show_service_investment_card || hasProofData;
@@ -391,7 +400,7 @@ const AutoLabelsPassportExperience = ({ vehicle, settings: providedSettings }: A
           <div>
             <div className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-3 py-1 text-xs font-black uppercase tracking-wider backdrop-blur"><Sparkles className="h-3.5 w-3.5" /> AutoLabels Passport</div>
             <h1 className="mt-5 max-w-4xl text-4xl font-black tracking-tight sm:text-6xl lg:text-7xl">Every vehicle has a story. This Passport proves it.</h1>
-            <p className="mt-5 max-w-2xl text-lg leading-relaxed text-white/75">Review the vehicle, disclosures, recon proof, warranty information, trade options, and dealer contact in one confidence-building place.</p>
+            <p className="mt-5 max-w-2xl text-lg leading-relaxed text-white/75">Review the vehicle, disclosures, approved proof, warranty information, trade options, and dealer contact in one confidence-building place.</p>
             <div className="mt-6 rounded-[2rem] border border-white/15 bg-white/10 p-4 shadow-2xl shadow-black/20 backdrop-blur-xl">
               <div className="text-[10px] font-black uppercase tracking-[0.18em] text-white/55">You are reviewing</div>
               <h2 className="mt-2 text-3xl font-black tracking-tight text-white sm:text-4xl">{title}</h2>
@@ -424,15 +433,24 @@ const AutoLabelsPassportExperience = ({ vehicle, settings: providedSettings }: A
 
       <main className="mx-auto max-w-6xl space-y-5 px-4 py-6 text-foreground">
         <VehicleStoryTimeline vehicle={vehicle} />
-        {showDealerInvestment && <DealerInvestmentReport vehicle={vehicle} />}
-        {showVehicleHealth && <VehicleHealthReport vehicle={vehicle} />}
-        {showServiceInvestment && <PassportServiceInvestmentCard vehicle={vehicle} />}
+        {showPremiumProofStory ? (
+          <>
+            <CustomerPassportProofStory vehicle={{ ...vehicle, documents: docs }} />
+            <CustomerTrustDisclosure />
+          </>
+        ) : (
+          <>
+            {showDealerInvestment && <DealerInvestmentReport vehicle={vehicle} />}
+            {showVehicleHealth && <VehicleHealthReport vehicle={vehicle} />}
+            {showServiceInvestment && <PassportServiceInvestmentCard vehicle={vehicle} />}
+            <PassportProofGallery vehicle={vehicle} />
+          </>
+        )}
         <WhyBuyThisVehicleCard vehicle={vehicle} />
-        <PassportProofGallery vehicle={vehicle} />
 
         <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           <ConfidenceModule icon={ShieldCheck} title="Buyer protection" text={vehicle.warrantyLabel || "Review warranty and buyer guide information in plain English."} />
-          <ConfidenceModule icon={Wrench} title="Service & recon" text={vehicle.reconSummary || "See available inspection, service, and reconditioning proof."} />
+          <ConfidenceModule icon={Wrench} title="Service & recon" text={showPremiumProofStory ? "Approved service and reconditioning proof is summarized above." : vehicle.reconSummary || "See available inspection, service, and reconditioning proof."} />
           <ConfidenceModule icon={Gauge} title="Vehicle facts" text="VIN, mileage, equipment, and vehicle context in one place." />
           <ConfidenceModule icon={Award} title="Dealer confidence" text={vehicle.dealer?.name ? `A transparent packet from ${vehicle.dealer.name}.` : "A transparent packet from the store selling this vehicle."} />
         </section>
