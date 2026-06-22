@@ -8,6 +8,7 @@ type PassportDocument = {
   type?: string | null;
   title?: string | null;
   status?: string | null;
+  url?: string | null;
 };
 
 type CustomerProofVehicle = {
@@ -27,8 +28,15 @@ type CustomerProofVehicle = {
 
 const hasText = (value?: string | null) => !!value && value.trim().length > 0;
 
+const isApprovedProofDocument = (doc: PassportDocument) =>
+  !!doc.url || doc.status === "signed" || doc.status === "verified";
+
 const hasDoc = (vehicle: CustomerProofVehicle, terms: string[]) =>
-  (vehicle.documents || []).some((doc) => terms.some((term) => `${doc.type || ""} ${doc.title || ""}`.toLowerCase().includes(term)));
+  (vehicle.documents || []).some(
+    (doc) =>
+      isApprovedProofDocument(doc) &&
+      terms.some((term) => `${doc.type || ""} ${doc.title || ""}`.toLowerCase().includes(term)),
+  );
 
 const approvedInvestmentItems = (vehicle: CustomerProofVehicle) =>
   (vehicle.dealerInvestmentItems || []).filter((item) => item.showOnPassport !== false && hasText(item.label || item.detail || ""));
@@ -64,7 +72,7 @@ export function CustomerPassportProofStory({ vehicle }: { vehicle: CustomerProof
     },
     {
       title: "Inspection reviewed",
-      text: health.length ? `${health.length} condition items are available for review.` : "Inspection and service information can be attached by the dealer.",
+      text: health.length ? `${health.length} condition items are available for review.` : "Dealer-approved inspection proof is available for review.",
       icon: ShieldCheck,
       show: health.length > 0 || hasDoc(vehicle, ["inspection", "service"]),
     },
@@ -76,7 +84,7 @@ export function CustomerPassportProofStory({ vehicle }: { vehicle: CustomerProof
     },
     {
       title: "Proof ready",
-      text: photos.length ? `${photos.length} approved proof photos are available.` : "Documents and approved proof are kept together for easy review.",
+      text: photos.length ? `${photos.length} approved proof photos are available.` : "Approved documents and proof are kept together for easy review.",
       icon: FileText,
       show: photos.length > 0 || hasDoc(vehicle, ["buyer", "warranty", "service", "recon"]),
     },
