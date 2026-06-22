@@ -1,6 +1,7 @@
 import { supabase } from "@/integrations/supabase/client";
 import type { StickerData, StickerBranding, StickerTemplateConfig, StickerRenderOptions } from "./templates";
 import { recordUsageEvent } from "@/lib/entitlements/usage";
+import { buildPersistenceContext, recordPassportGenerated, recordStickerGenerated } from "@/lib/ctMvp/productionHooks";
 
 // ──────────────────────────────────────────────────────────────────────
 // Sticker Studio API client. PDF/PNG are produced client-side (html2canvas +
@@ -143,12 +144,19 @@ export async function saveStickerToVehicle(args: SaveStickerArgs): Promise<ApiRe
           tenantId: args.tenantId, entityType: args.docType, entityId: doc.id,
           details: { template_id: args.templateId, template_version: templateVersion, version: doc.version, vin: args.vin },
         });
+        await recordStickerGenerated({
+          tenantId: args.tenantId,
+          vehicleId: args.vehicleId,
+          vin: args.vin,
+          documentType: args.docType,
+          templateId: args.templateId,
+          documentId: doc.id,
+        });
         await recordUsageEvent({ tenantId: args.tenantId, featureKey: args.docType === "window" ? "window_stickers" : "addendum_stickers", metric: "stickers_generated", entityType: args.docType, entityId: doc.id });
         return { ok: true, documentId: doc.id, version: doc.version };
       }
     }
   } catch { /* fall through to legacy */ }
-
 
   // Fallback path: append a reference to vehicle_listings.documents.
   try {
@@ -162,6 +170,13 @@ export async function saveStickerToVehicle(args: SaveStickerArgs): Promise<ApiRe
     };
     const { error } = await client.from("vehicle_listings").update({ documents: [...documents, entry] }).eq("id", args.vehicleId);
     if (error) return { ok: false, error: error.message };
+    await recordStickerGenerated({
+      tenantId: args.tenantId,
+      vehicleId: args.vehicleId,
+      vin: args.vin,
+      documentType: args.docType,
+      templateId: args.templateId,
+    });
     return { ok: true };
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : "save_failed" };
@@ -178,7 +193,7 @@ export async function publishToPassport(vehicleId?: string | null, tenantId?: st
       .from("vehicle_listings")
       .update({ status: "published", published_at: new Date().toISOString() })
       .eq("id", vehicleId)
-      .select("slug")
+      .select("slug, vin, stock_number")
       .maybeSingle();
     if (error) return { ok: false, error: error.message };
     const origin = typeof window !== "undefined" ? window.location.origin : "";
@@ -199,6 +214,12 @@ export async function publishToPassport(vehicleId?: string | null, tenantId?: st
       }
     } catch { /* non-blocking */ }
     await logStickerAudit("passport_published", { tenantId, entityType: "passport", entityId: vehicleId, details: { url } });
+    await recordPassportGenerated(buildPersistenceContext({
+      tenantId,
+      vehicleId,
+      vin: row?.vin,
+      stock: row?.stock_number,
+    }), { url });
     await recordUsageEvent({ tenantId, featureKey: "vehicle_passport", metric: "documents_published", entityType: "passport", entityId: vehicleId });
     return { ok: true, url };
   } catch (e) {
