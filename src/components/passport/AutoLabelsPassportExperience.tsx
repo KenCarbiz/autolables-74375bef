@@ -71,6 +71,8 @@ type PassportVehicle = PassportVehicleContext & {
   warrantyLabel?: string | null;
   reconSummary?: string | null;
   historySummary?: string | null;
+  dealerInvestmentItems?: Array<{ label: string; amount?: number | string | null; detail?: string | null }>;
+  healthItems?: Array<{ label: string; value?: string | null; detail?: string | null }>;
 };
 
 type AutoLabelsPassportExperienceProps = {
@@ -109,6 +111,11 @@ const defaultDocuments: PassportDocument[] = [
   { type: "window_sticker", title: "Original Window Sticker", description: "See factory equipment, options, and MSRP where available.", status: "available" },
   { type: "service_recon", title: "Service & Recon", description: "See available inspection, repair, and recon evidence.", status: "available" },
 ];
+
+const hasServiceOrInspectionData = (vehicle: PassportVehicle, docs: PassportDocument[]) => {
+  const docHit = docs.some((doc) => `${doc.type} ${doc.title}`.toLowerCase().includes("service") || `${doc.type} ${doc.title}`.toLowerCase().includes("recon") || `${doc.type} ${doc.title}`.toLowerCase().includes("inspection"));
+  return !!vehicle.reconSummary || !!vehicle.historySummary || !!vehicle.dealerInvestmentItems?.length || !!vehicle.healthItems?.length || docHit;
+};
 
 const TrustBadgeRow = ({ vehicle }: { vehicle: PassportVehicle }) => {
   const badges = [
@@ -331,6 +338,10 @@ const AutoLabelsPassportExperience = ({ vehicle, settings: providedSettings }: A
 
   const docs = useMemo(() => vehicle.documents?.length ? vehicle.documents : defaultDocuments, [vehicle.documents]);
   const title = vehicleTitle(vehicle);
+  const hasProofData = hasServiceOrInspectionData(vehicle, docs);
+  const showDealerInvestment = !!settings?.show_dealer_investment_report || !!vehicle.dealerInvestmentItems?.length;
+  const showVehicleHealth = !!settings?.show_vehicle_health_report || !!vehicle.healthItems?.length;
+  const showServiceInvestment = !!settings?.show_service_investment_card || hasProofData;
 
   const openPacket = async () => {
     await trackPacketOpened({ tenantId: vehicle.tenantId, storeId: vehicle.storeId, vehicleId: vehicle.vehicleId, vin: vehicle.vin, stock: vehicle.stock, packetId: vehicle.packetId, qrToken: vehicle.qrToken, source: "passport" });
@@ -364,6 +375,12 @@ const AutoLabelsPassportExperience = ({ vehicle, settings: providedSettings }: A
   useEffect(() => {
     trackPassportOpened({ tenantId: vehicle.tenantId, storeId: vehicle.storeId, vehicleId: vehicle.vehicleId, vin: vehicle.vin, stock: vehicle.stock, packetId: vehicle.packetId, qrToken: vehicle.qrToken });
   }, [vehicle.packetId, vehicle.qrToken, vehicle.stock, vehicle.storeId, vehicle.tenantId, vehicle.vehicleId, vehicle.vin]);
+
+  useEffect(() => {
+    if (providedSettings === undefined && vehicle.tenantId) {
+      loadPassportDeliverySettings(vehicle.tenantId).then(setSettings).catch(() => setSettings(null));
+    }
+  }, [providedSettings, vehicle.tenantId]);
 
   return (
     <div className="min-h-screen bg-slate-950 pb-20 text-white sm:pb-0">
@@ -407,9 +424,9 @@ const AutoLabelsPassportExperience = ({ vehicle, settings: providedSettings }: A
 
       <main className="mx-auto max-w-6xl space-y-5 px-4 py-6 text-foreground">
         <VehicleStoryTimeline vehicle={vehicle} />
-        <DealerInvestmentReport vehicle={vehicle} />
-        <VehicleHealthReport vehicle={vehicle} />
-        <PassportServiceInvestmentCard vehicle={vehicle} />
+        {showDealerInvestment && <DealerInvestmentReport vehicle={vehicle} />}
+        {showVehicleHealth && <VehicleHealthReport vehicle={vehicle} />}
+        {showServiceInvestment && <PassportServiceInvestmentCard vehicle={vehicle} />}
         <WhyBuyThisVehicleCard vehicle={vehicle} />
         <PassportProofGallery vehicle={vehicle} />
 
