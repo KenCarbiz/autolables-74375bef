@@ -24,6 +24,7 @@ import {
   Camera,
   RefreshCw,
   Lock,
+  Palette,
 } from "lucide-react";
 
 // ──────────────────────────────────────────────────────────────
@@ -56,6 +57,10 @@ const Landing = () => {
         <Risk />
         <TakeThePowerBack onWaitlist={goWaitlist} />
         <HowItWorks />
+        <AutomationPipeline />
+        <StickerStudioGallery />
+        <VehiclePassportSection />
+        <PrintReady />
         <Principles />
         <PowerGrid />
         <SocialProof />
@@ -158,8 +163,9 @@ const Hero = ({ onWaitlist }: { onWaitlist: () => void; onDemo: () => void }) =>
         </h1>
         <p className="mt-6 max-w-xl text-base leading-relaxed text-slate-600 sm:text-lg">
           One website pricing mistake can trigger an investigation, customer complaints, chargebacks,
-          and a class action. AutoLabels continuously verifies your advertised prices, disclosures,
-          addendums, and customer sign-offs &mdash; before they become problems.
+          and a class action. AutoLabels turns your live inventory into print-ready window stickers,
+          FTC-aligned addendums, QR Vehicle Passports, and signed disclosures &mdash; so every VIN
+          gets one clean record, from website price to lot sticker to customer signature.
         </p>
         <div className="mt-8 flex flex-col items-start gap-3 sm:flex-row">
           <button
@@ -179,6 +185,7 @@ const Hero = ({ onWaitlist }: { onWaitlist: () => void; onDemo: () => void }) =>
         <div className="mt-8 grid grid-cols-1 gap-x-6 gap-y-2.5 sm:grid-cols-2">
           <HeroCheck icon={ShieldCheck} label="Website price monitoring" />
           <HeroCheck icon={FileText} label="FTC-aligned addendums" />
+          <HeroCheck icon={QrCode} label="Window stickers + Vehicle Passports" />
           <HeroCheck icon={Signature} label="Customer digital signatures" />
           <HeroCheck icon={BadgeCheck} label="Legal audit trails" />
           <HeroCheck icon={Building2} label="50-state compliance" />
@@ -479,7 +486,7 @@ const Risk = () => (
         </p>
       </div>
 
-      <div className="mx-auto mt-12 grid max-w-6xl gap-5 sm:grid-cols-2 lg:grid-cols-4" id="power">
+      <div className="mx-auto mt-12 grid max-w-6xl gap-5 sm:grid-cols-2 lg:grid-cols-4">
         <Card icon={Gavel} title="FTC enforcement">
           FTC Act §5 and 16 CFR Part 455 target undisclosed add-ons, bait pricing, and missing consent.
           Investigations begin with a website crawl, not a customer complaint.
@@ -552,6 +559,190 @@ const HowItWorks = () => (
           body="Every scan becomes a lead. Every addendum becomes data. See what's selling, what's stuck, and what's closing — live."
         />
       </div>
+    </div>
+  </section>
+);
+
+// ──────────────────────────────────────────────────────────────
+// Self-aware automation — new inventory queues its own get-ready
+// (recon / detail / vendors) and the correct sticker version, gated
+// by the foreman prep sign-off. Grounded in real features:
+// useGetReady, get_ready_services, install_proofs, usePrepSignOff
+// (listing_unlocked), and the document version-lock.
+// ──────────────────────────────────────────────────────────────
+
+const PIPELINE = [
+  { num: "01", title: "Vehicle arrives", body: "Paste a VDP or VIN, or let the nightly sync pull it in. The file builds itself — decode, equipment, photos, and live market position." },
+  { num: "02", title: "Get-Ready queues itself", body: "Itemized recon, inspection, detail, and accessory installs auto-assign to Service, Lot, Detail, and outside vendors — each with an owner, an email, and a cost." },
+  { num: "03", title: "Installers prove the work", body: "Every item advertised as installed gets an installer signature and a photo. No proof, no claim." },
+  { num: "04", title: "Foreman signs off", body: "The prep gate stays locked. The car can't be listed or published until it's truly ready." },
+  { num: "05", title: "The right sticker goes out", body: "The correct window-sticker version and addendum generate — version-locked — and publish to the Vehicle Passport with its QR." },
+];
+
+const AutomationPipeline = () => (
+  <section id="automation" className="border-b border-slate-100 bg-slate-50/40">
+    <div className="mx-auto max-w-7xl px-6 py-20 lg:px-8">
+      <div className="mx-auto max-w-3xl text-center">
+        <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-blue-600">Self-aware automation</p>
+        <h2 className="mt-3 font-display text-4xl font-black tracking-tighter text-slate-900 sm:text-5xl">
+          A car hits the lot. The system already knows what to do.
+        </h2>
+        <p className="mt-5 text-base leading-relaxed text-slate-600">
+          Point AutoLabels at your inventory &mdash; a VDP URL, a VIN, or your nightly feed &mdash; and it
+          builds the file, queues the get-ready, and lines up the right window-sticker version. Nothing
+          prints until the work is signed off.
+        </p>
+      </div>
+      <div className="mx-auto mt-12 grid max-w-6xl gap-4 sm:grid-cols-2 lg:grid-cols-5">
+        {PIPELINE.map((s) => (
+          <NumberedCard key={s.num} num={s.num} title={s.title} body={s.body} />
+        ))}
+      </div>
+      <div className="mx-auto mt-8 flex max-w-3xl flex-wrap justify-center gap-2">
+        {["Itemized get-ready, not a sticky note.", "Nothing lists until it's ready.", "Every install is proven before it's advertised."].map((c) => (
+          <span key={c} className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-700">
+            <CheckCircle2 className="h-3.5 w-3.5 text-blue-600" /> {c}
+          </span>
+        ))}
+      </div>
+    </div>
+  </section>
+);
+
+// ──────────────────────────────────────────────────────────────
+// Sticker Studio — template gallery (real: 18-template catalog +
+// premium heroes, white/black label, version-locked).
+// ──────────────────────────────────────────────────────────────
+
+const TEMPLATES = [
+  { icon: Sparkles, title: "Vehicle Passport Premium", body: "The flagship scan-first hero: branded header, price and QR cards, and a transparency strip." },
+  { icon: Tag, title: "Big Price Lot Sticker", body: "Huge title, huge price, huge QR — readable across the lot from 6 to 10 feet." },
+  { icon: BadgeCheck, title: "Executive Noir", body: "Luxury black-label with a gold accent for high-line inventory, with a light white-label variant." },
+  { icon: ShieldCheck, title: "Compliance-first", body: "Disclosure-forward addendums with the QR required and a fixed, audit-friendly layout." },
+  { icon: FileText, title: "Classic & Modern", body: "Clean general-purpose window stickers and addendums for everyday used-car inventory." },
+  { icon: Palette, title: "Your brand, every time", body: "Logo, colors, disclaimers, pricing fields, benefits, and the Vehicle Passport link — baked in." },
+];
+
+const StickerStudioGallery = () => (
+  <section id="studio" className="border-b border-slate-100">
+    <div className="mx-auto max-w-7xl px-6 py-20 lg:px-8">
+      <div className="mx-auto max-w-3xl text-center">
+        <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-blue-600">Sticker Studio</p>
+        <h2 className="mt-3 font-display text-4xl font-black tracking-tighter text-slate-900 sm:text-5xl">
+          Pick a template. The sticker builds itself.
+        </h2>
+        <p className="mt-5 text-base leading-relaxed text-slate-600">
+          A growing library of 8.5&times;11 window stickers and 4.5&times;11 addendums &mdash; modern,
+          classic, compliance-first, value, and black-label luxury. Each carries your branding, QR,
+          pricing, disclosures, and the Vehicle Passport link &mdash; and locks the moment it&rsquo;s signed.
+        </p>
+      </div>
+      <div className="mx-auto mt-12 grid max-w-6xl gap-5 md:grid-cols-2 lg:grid-cols-3">
+        {TEMPLATES.map((t) => (
+          <Card key={t.title} icon={t.icon} title={t.title}>{t.body}</Card>
+        ))}
+      </div>
+    </div>
+  </section>
+);
+
+// ──────────────────────────────────────────────────────────────
+// Vehicle Passport — QR is the sales packet + scan analytics
+// (real: /v/:slug published docs + qr_scan_events analytics).
+// ──────────────────────────────────────────────────────────────
+
+const PASSPORT_INCLUDES = [
+  "Vehicle specs, equipment & key features",
+  "Installed dealer equipment & included benefits",
+  "Market value & price transparency",
+  "Recall & remaining-warranty signals",
+  "Buyers Guide & disclosure documents",
+  "Signed forms & audit history",
+];
+
+const VehiclePassportSection = () => (
+  <section id="passport" className="border-b border-slate-100 bg-slate-50/40">
+    <div className="mx-auto max-w-7xl px-6 py-20 lg:px-8">
+      <div className="mx-auto max-w-3xl text-center">
+        <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-blue-600">Vehicle Passport</p>
+        <h2 className="mt-3 font-display text-4xl font-black tracking-tighter text-slate-900 sm:text-5xl">
+          The QR is the new sales packet &mdash; and you see every scan.
+        </h2>
+        <p className="mt-5 text-base leading-relaxed text-slate-600">
+          Scan the sticker and the customer gets a complete digital file for that VIN &mdash; not just a
+          PDF. Give every shopper more confidence before they ever sit at the desk.
+        </p>
+      </div>
+      <div className="mx-auto mt-12 grid max-w-5xl gap-5 lg:grid-cols-2">
+        <div className="rounded-2xl border border-slate-200 bg-white p-8 shadow-sm">
+          <h3 className="inline-flex items-center gap-2 font-display text-lg font-bold text-slate-900">
+            <QrCode className="h-5 w-5 text-blue-600" /> Inside every Passport
+          </h3>
+          <ul className="mt-4 space-y-2.5">
+            {PASSPORT_INCLUDES.map((p) => (
+              <li key={p} className="flex items-start gap-2.5 text-sm text-slate-700">
+                <CheckCircle2 className="mt-0.5 h-4 w-4 flex-shrink-0 text-blue-600" /> {p}
+              </li>
+            ))}
+          </ul>
+        </div>
+        <div className="rounded-2xl border border-blue-200 bg-blue-50/50 p-8">
+          <h3 className="inline-flex items-center gap-2 font-display text-lg font-bold text-slate-900">
+            <BarChart3 className="h-5 w-5 text-blue-600" /> You see every scan
+          </h3>
+          <p className="mt-4 text-sm leading-relaxed text-slate-700">
+            Each sticker carries a tracked QR. Watch scans by vehicle and by sticker type, spot your
+            most-shopped cars, and know which units are getting attention before a lead form is ever
+            filled out.
+          </p>
+          <p className="mt-5 font-display text-base font-bold text-slate-900">
+            The sticker keeps selling after the salesperson goes home.
+          </p>
+        </div>
+      </div>
+    </div>
+  </section>
+);
+
+// ──────────────────────────────────────────────────────────────
+// Print-ready — real dealership print workflow (calibration,
+// PDF/PNG, label modes, QR quiet zone, per-VIN archive).
+// ──────────────────────────────────────────────────────────────
+
+const PRINT_SPECS = [
+  "8.5×11 window stickers",
+  "4.5×11 addendum stickers",
+  "PDF & PNG export",
+  "Black-label & white-label modes",
+  "QR quiet-zone protection",
+  "Logo & color branding",
+  "Printer calibration & crop marks",
+  "Saved archive per VIN",
+  "Version-locked at signing",
+];
+
+const PrintReady = () => (
+  <section id="print" className="border-b border-slate-100">
+    <div className="mx-auto max-w-7xl px-6 py-20 lg:px-8">
+      <div className="mx-auto max-w-3xl text-center">
+        <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-blue-600">Print-ready</p>
+        <h2 className="mt-3 font-display text-4xl font-black tracking-tighter text-slate-900 sm:text-5xl">
+          Built for the printer, not just the browser.
+        </h2>
+        <p className="mt-5 text-base leading-relaxed text-slate-600">
+          Real dealership print workflows, calibrated to your label stock.
+        </p>
+      </div>
+      <div className="mx-auto mt-10 grid max-w-4xl gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        {PRINT_SPECS.map((s) => (
+          <div key={s} className="flex items-center gap-2.5 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-700">
+            <Check className="h-4 w-4 flex-shrink-0 text-blue-600" /> {s}
+          </div>
+        ))}
+      </div>
+      <p className="mx-auto mt-8 max-w-2xl text-center font-display text-base font-bold text-slate-900">
+        Print it, post it, scan it, sign it, and save it &mdash; one record per VIN.
+      </p>
     </div>
   </section>
 );
@@ -689,7 +880,7 @@ const TakeThePowerBack = ({ onWaitlist }: { onWaitlist: () => void }) => (
           eyebrow="Profitable add-on election"
           title="Sell add-ons without fear."
           body="F&I is your most profitable revenue — and your most exposed. AutoLabels captures per-item, informed election: the customer sees each product's price, sees it's optional, sees the benefit, and signs. Every yes is provable."
-          chips={["$2,534 avg F&I gross per vehicle", "Napleton: 83% charged without consent"]}
+          chips={["F&I is your highest-margin revenue", "Per-item, informed, signed election"]}
           punch="Every yes, provable."
         />
         <PowerPillar
@@ -712,7 +903,7 @@ const TakeThePowerBack = ({ onWaitlist }: { onWaitlist: () => void }) => (
               </ul>
             </>
           }
-          chips={["97 dealer groups warned, Mar 2026", "Buyers pay ~$1,117 to skip the games"]}
+          chips={["Blocked at signing on a price mismatch", "A timestamped record at every deal"]}
           punch="Priced in ink, not pencil."
         />
       </div>
