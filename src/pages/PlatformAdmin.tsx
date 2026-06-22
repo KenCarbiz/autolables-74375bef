@@ -9,7 +9,8 @@ import RecallRefreshTool from "@/components/admin/RecallRefreshTool";
 import BillingHandshakeDiagnostic from "@/components/admin/BillingHandshakeDiagnostic";
 import StripeConfigPanel from "@/components/admin/StripeConfigPanel";
 import StickerTemplatesAdminPanel from "@/components/admin/StickerTemplatesAdminPanel";
-import { Store, Users, Award, ShieldCheck, RefreshCw, CreditCard, KeyRound, LayoutTemplate } from "lucide-react";
+import PassportEngagementDashboard from "@/components/admin/PassportEngagementDashboard";
+import { Store, Users, Award, ShieldCheck, RefreshCw, CreditCard, KeyRound, LayoutTemplate, Activity } from "lucide-react";
 
 // ──────────────────────────────────────────────────────────────
 // PlatformAdmin — cross-tenant surfaces (Tenants, Members,
@@ -21,8 +22,8 @@ import { Store, Users, Award, ShieldCheck, RefreshCw, CreditCard, KeyRound, Layo
 // whole route on isAdmin = true.
 // ──────────────────────────────────────────────────────────────
 
-type PlatformTab = "tenants" | "members" | "entitlements" | "audit" | "recalls" | "billing" | "stripe" | "templates";
-const VALID: PlatformTab[] = ["tenants", "members", "entitlements", "audit", "recalls", "billing", "stripe", "templates"];
+type PlatformTab = "tenants" | "members" | "entitlements" | "audit" | "recalls" | "billing" | "stripe" | "templates" | "passport-engagement";
+const VALID: PlatformTab[] = ["tenants", "members", "entitlements", "audit", "recalls", "billing", "stripe", "templates", "passport-engagement"];
 
 const TABS: { id: PlatformTab; label: string; icon: typeof Store }[] = [
   { id: "tenants",      label: "Tenants",      icon: Store },
@@ -33,6 +34,7 @@ const TABS: { id: PlatformTab; label: string; icon: typeof Store }[] = [
   { id: "billing",      label: "Billing handshake", icon: CreditCard },
   { id: "stripe",       label: "Stripe config", icon: KeyRound },
   { id: "templates",    label: "Sticker templates", icon: LayoutTemplate },
+  { id: "passport-engagement", label: "Passport engagement", icon: Activity },
 ];
 
 const PlatformAdmin = () => {
@@ -63,7 +65,7 @@ const PlatformAdmin = () => {
           Platform Control
         </h1>
         <p className="text-sm text-muted-foreground mt-1 max-w-xl">
-          Cross-tenant surfaces: dealers, seat assignments, app entitlements, and the tamper-evident platform audit log.
+          Cross-tenant surfaces: dealers, seat assignments, app entitlements, template libraries, Passport engagement, and the tamper-evident platform audit log.
         </p>
       </div>
 
@@ -83,6 +85,7 @@ const PlatformAdmin = () => {
         {tab === "billing"      && <BillingHandshakeDiagnostic />}
         {tab === "stripe"       && <StripeConfigPanel />}
         {tab === "templates"    && <StickerTemplatesAdminPanel />}
+        {tab === "passport-engagement" && <PassportEngagementDashboard />}
       </div>
     </div>
   );
