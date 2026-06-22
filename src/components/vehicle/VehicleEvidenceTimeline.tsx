@@ -1,7 +1,8 @@
 import { useMemo, useState } from "react";
-import { useVehicleEvidence, type EvidenceCategory, type EvidenceEvent } from "@/lib/stickerStudio/useVehicleEvidence";
+import { useVehicleEvidence, type EvidenceCategory } from "@/lib/stickerStudio/useVehicleEvidence";
 import { logStickerAudit } from "@/lib/stickerStudio/api";
 import FeatureGate from "@/components/entitlements/FeatureGate";
+import VehicleCtMvpStatusCard from "@/components/vehicle/VehicleCtMvpStatusCard";
 import { FileText, PenLine, QrCode, Car, ShieldAlert, Activity, Download, ChevronDown, RefreshCw } from "lucide-react";
 
 const CATS: { id: EvidenceCategory | "all"; label: string; icon: typeof Activity }[] = [
@@ -43,47 +44,51 @@ export default function VehicleEvidenceTimeline({ vehicleId, vin, tenantId, vehi
   };
 
   return (
-    <div className="space-y-3">
-      <div className="flex items-center justify-between gap-2 flex-wrap">
-        <div className="inline-flex rounded-lg border border-border bg-card p-0.5 flex-wrap">
-          {CATS.map((c) => (
-            <button key={c.id} onClick={() => setCat(c.id)} className={`inline-flex items-center gap-1 px-2.5 h-8 rounded-md text-xs font-semibold ${cat === c.id ? "bg-blue-600 text-white" : "text-muted-foreground hover:text-foreground"}`}>
-              <c.icon className="w-3.5 h-3.5" /> {c.label}
-            </button>
-          ))}
-        </div>
-        <div className="flex items-center gap-2">
-          <button onClick={reload} className="text-[11px] font-semibold text-muted-foreground hover:text-foreground inline-flex items-center gap-1"><RefreshCw className="w-3 h-3" /> Refresh</button>
-          <FeatureGate feature="evidence_packet_export" variant="inline">
-            <button onClick={exportPacket} className="inline-flex items-center gap-1.5 h-8 px-3 rounded-md border border-border text-xs font-semibold hover:bg-muted"><Download className="w-3.5 h-3.5" /> Export evidence packet</button>
-          </FeatureGate>
-        </div>
-      </div>
+    <div className="space-y-4">
+      <VehicleCtMvpStatusCard tenantId={tenantId} vehicleId={vehicleId} vin={vin} />
 
-      {loading ? (
-        <p className="text-sm text-muted-foreground">Loading history…</p>
-      ) : filtered.length === 0 ? (
-        <p className="text-sm text-muted-foreground py-6 text-center">No events recorded for this filter yet.</p>
-      ) : (
-        <ol className="relative border-l border-border ml-2">
-          {filtered.map((e) => (
-            <li key={e.id} className="ml-4 pb-3">
-              <span className={`absolute -left-[5px] mt-1.5 w-2.5 h-2.5 rounded-full ${dot[e.category]}`} />
-              <button onClick={() => setOpen(open === e.id ? null : e.id)} className="w-full text-left">
-                <div className="flex items-center justify-between gap-2">
-                  <p className="text-sm font-semibold text-foreground">{e.title}</p>
-                  <span className="text-[10px] text-muted-foreground flex-shrink-0 inline-flex items-center gap-1">{fmt(e.at)} {e.raw && <ChevronDown className={`w-3 h-3 transition-transform ${open === e.id ? "rotate-180" : ""}`} />}</span>
-                </div>
-                {e.detail && <p className="text-[11px] text-muted-foreground">{e.detail}</p>}
-                {e.contentHash && <p className="text-[10px] font-mono text-muted-foreground truncate">hash {e.contentHash.slice(0, 24)}…</p>}
+      <div className="space-y-3">
+        <div className="flex items-center justify-between gap-2 flex-wrap">
+          <div className="inline-flex rounded-lg border border-border bg-card p-0.5 flex-wrap">
+            {CATS.map((c) => (
+              <button key={c.id} onClick={() => setCat(c.id)} className={`inline-flex items-center gap-1 px-2.5 h-8 rounded-md text-xs font-semibold ${cat === c.id ? "bg-blue-600 text-white" : "text-muted-foreground hover:text-foreground"}`}>
+                <c.icon className="w-3.5 h-3.5" /> {c.label}
               </button>
-              {open === e.id && e.raw && (
-                <pre className="mt-1.5 text-[10px] bg-muted/50 border border-border rounded-lg p-2 overflow-x-auto max-h-48">{JSON.stringify(e.raw, null, 2)}</pre>
-              )}
-            </li>
-          ))}
-        </ol>
-      )}
+            ))}
+          </div>
+          <div className="flex items-center gap-2">
+            <button onClick={reload} className="text-[11px] font-semibold text-muted-foreground hover:text-foreground inline-flex items-center gap-1"><RefreshCw className="w-3 h-3" /> Refresh</button>
+            <FeatureGate feature="evidence_packet_export" variant="inline">
+              <button onClick={exportPacket} className="inline-flex items-center gap-1.5 h-8 px-3 rounded-md border border-border text-xs font-semibold hover:bg-muted"><Download className="w-3.5 h-3.5" /> Export evidence packet</button>
+            </FeatureGate>
+          </div>
+        </div>
+
+        {loading ? (
+          <p className="text-sm text-muted-foreground">Loading history…</p>
+        ) : filtered.length === 0 ? (
+          <p className="text-sm text-muted-foreground py-6 text-center">No events recorded for this filter yet.</p>
+        ) : (
+          <ol className="relative border-l border-border ml-2">
+            {filtered.map((e) => (
+              <li key={e.id} className="ml-4 pb-3">
+                <span className={`absolute -left-[5px] mt-1.5 w-2.5 h-2.5 rounded-full ${dot[e.category]}`} />
+                <button onClick={() => setOpen(open === e.id ? null : e.id)} className="w-full text-left">
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="text-sm font-semibold text-foreground">{e.title}</p>
+                    <span className="text-[10px] text-muted-foreground flex-shrink-0 inline-flex items-center gap-1">{fmt(e.at)} {e.raw && <ChevronDown className={`w-3 h-3 transition-transform ${open === e.id ? "rotate-180" : ""}`} />}</span>
+                  </div>
+                  {e.detail && <p className="text-[11px] text-muted-foreground">{e.detail}</p>}
+                  {e.contentHash && <p className="text-[10px] font-mono text-muted-foreground truncate">hash {e.contentHash.slice(0, 24)}…</p>}
+                </button>
+                {open === e.id && e.raw && (
+                  <pre className="mt-1.5 text-[10px] bg-muted/50 border border-border rounded-lg p-2 overflow-x-auto max-h-48">{JSON.stringify(e.raw, null, 2)}</pre>
+                )}
+              </li>
+            ))}
+          </ol>
+        )}
+      </div>
     </div>
   );
 }
