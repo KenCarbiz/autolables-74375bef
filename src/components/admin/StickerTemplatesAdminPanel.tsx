@@ -4,6 +4,7 @@ import {
   buildConfig, templateFromConfig, TemplateRenderer,
   type StickerData, type StickerBranding, type StickerType,
 } from "@/lib/stickerStudio/templates";
+import { saturdayTemplateFromConfig } from "@/lib/stickerStudio/saturdayTemplates";
 import { toast } from "sonner";
 import { LayoutTemplate, Star, Check, History } from "lucide-react";
 
@@ -82,11 +83,13 @@ export default function StickerTemplatesAdminPanel() {
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         {rows.map((r) => {
-          const template = templateFromConfig(buildConfig(r.type as StickerType, { ...(r.config || {}), id: r.template_key, name: r.name }));
+          const cfg = buildConfig(r.type as StickerType, { ...(r.config || {}), id: r.template_key, name: r.name });
+          const template = saturdayTemplateFromConfig(cfg) || templateFromConfig(cfg);
+          const isSaturday = r.template_key.includes("saturday");
           return (
             <div key={r.id} className={`rounded-2xl border bg-card p-3 ${r.is_active ? "border-border" : "border-border opacity-60"}`}>
-              <div className="rounded-lg bg-slate-50 border border-slate-100 overflow-hidden flex items-center justify-center" style={{ height: 180 }}>
-                <TemplateRenderer template={template} data={SAMPLE} branding={BRAND} scale={r.type === "addendum" ? 0.36 : 0.2} />
+              <div className="rounded-lg bg-slate-50 border border-slate-100 overflow-hidden flex items-center justify-center" style={{ height: isSaturday ? 260 : 180 }}>
+                <TemplateRenderer template={template} data={SAMPLE} branding={BRAND} scale={isSaturday ? (r.type === "addendum" ? 0.32 : 0.24) : (r.type === "addendum" ? 0.36 : 0.2)} />
               </div>
               <div className="mt-2.5 flex items-start justify-between gap-2">
                 <div className="min-w-0">
