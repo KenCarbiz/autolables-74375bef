@@ -90,6 +90,7 @@ const SaveCarInventory = lazy(() => import("./pages/SaveCarInventory"));
 const DealSigning = lazy(() => import("./pages/DealSigning"));
 const PublicListing = lazy(() => import("./pages/PublicListing"));
 const PrepSignOff = lazy(() => import("./pages/PrepSignOff"));
+const ServiceInspection = lazy(() => import("./pages/ServiceInspection"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 
 const queryClient = new QueryClient();
@@ -201,6 +202,8 @@ const App = () => (
                         <Route path="/description-writer" element={<DescriptionWriter />} />
                         <Route path="/add-inventory" element={<SaveCarInventory />} />
                         <Route path="/prep" element={<PrepSignOff />} />
+                        <Route path="/service-inspection" element={<ServiceInspection />} />
+                        <Route path="/service-inspection/:qrToken" element={<ServiceInspection />} />
                       </Route>
 
                       <Route element={<AdminLayout />}>
