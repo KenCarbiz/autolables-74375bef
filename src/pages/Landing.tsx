@@ -53,6 +53,7 @@ const Landing = () => {
       <Nav user={user} onWaitlist={goWaitlist} onNav={navigate} />
       <main>
         <Hero onWaitlist={goWaitlist} onDemo={goDemo} />
+        <WhyNow />
         <TrustBand />
         <Risk />
         <TakeThePowerBack onWaitlist={goWaitlist} />
@@ -61,6 +62,7 @@ const Landing = () => {
         <StickerStudioGallery />
         <VehiclePassportSection />
         <PrintReady />
+        <WhereWeFit />
         <Principles />
         <PowerGrid />
         <SocialProof />
@@ -742,6 +744,130 @@ const PrintReady = () => (
       </div>
       <p className="mx-auto mt-8 max-w-2xl text-center font-display text-base font-bold text-slate-900">
         Print it, post it, scan it, sign it, and save it &mdash; one record per VIN.
+      </p>
+    </div>
+  </section>
+);
+
+// ──────────────────────────────────────────────────────────────
+// Why now — single sourced FTC stat (cited, not fabricated). Keeps
+// the urgency factual: links the real March 2026 enforcement action.
+// ──────────────────────────────────────────────────────────────
+
+const WhyNow = () => (
+  <section className="border-b border-slate-100 bg-[#0B2041]">
+    <div className="mx-auto max-w-5xl px-6 py-10 lg:px-8">
+      <div className="flex flex-col items-start gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex items-start gap-3">
+          <span className="mt-0.5 flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg bg-white/10 text-white">
+            <Gavel className="h-4 w-4" />
+          </span>
+          <div>
+            <p className="font-display text-lg font-bold leading-snug text-white sm:text-xl">
+              In March 2026, the FTC warned 97 dealer groups about deceptive pricing.
+              <a
+                href="https://www.ftc.gov/news-events/news/press-releases/2026/03/ftc-warns-97-auto-dealership-groups-about-deceptive-pricing"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="ml-1 align-super text-[10px] font-semibold text-blue-300 underline-offset-2 hover:underline"
+              >
+                FTC, 2026
+              </a>
+            </p>
+            <p className="mt-1.5 text-sm leading-relaxed text-white/70">
+              Enforcement reviews often start with a website crawl, not a customer complaint &mdash; comparing
+              your advertised price to the deal. AutoLabels reconciles the two before that gap becomes a problem.
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+);
+
+// ──────────────────────────────────────────────────────────────
+// Where we fit — category comparison (generalized, no named
+// vendors). Frames the cross-lane differentiation. Compliance-safe:
+// "tamper-evident", "documents", "reconciliation" (never "guarantees"
+// or "legal defense"); a footnote notes capabilities vary by vendor.
+// ──────────────────────────────────────────────────────────────
+
+const FIT_COLS = [
+  "Window sticker + addendum",
+  "QR Vehicle Passport",
+  "Advertised-price reconciliation at signing",
+  "Get-Ready + install proof",
+  "Signed, tamper-evident record",
+];
+const FIT_ROWS: { label: string; cells: (boolean | "partial")[] }[] = [
+  { label: "Digital packet tools", cells: ["partial", true, false, false, false] },
+  { label: "F&I / compliance tools", cells: [false, false, true, false, "partial"] },
+  { label: "Reconditioning tools", cells: [false, false, false, true, false] },
+  { label: "Window-sticker tools", cells: [true, false, false, false, false] },
+  { label: "AutoLabels", cells: [true, true, true, true, true] },
+];
+
+const FitCell = ({ v }: { v: boolean | "partial" }) =>
+  v === true ? (
+    <CheckCircle2 className="mx-auto h-4 w-4 text-emerald-600" />
+  ) : v === "partial" ? (
+    <span className="text-xs font-semibold text-slate-400">partial</span>
+  ) : (
+    <span className="text-slate-300">&mdash;</span>
+  );
+
+const WhereWeFit = () => (
+  <section id="compare" className="border-b border-slate-100 bg-slate-50/40">
+    <div className="mx-auto max-w-7xl px-6 py-20 lg:px-8">
+      <div className="mx-auto max-w-3xl text-center">
+        <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-blue-600">Where AutoLabels fits</p>
+        <h2 className="mt-3 font-display text-4xl font-black tracking-tighter text-slate-900 sm:text-5xl">
+          Four tools&rsquo; jobs. One record.
+        </h2>
+        <p className="mt-5 text-base leading-relaxed text-slate-600">
+          Packet tools show the car. Compliance tools watch the price. Recon tools fix the car. Sticker
+          tools print a label. AutoLabels does all of it &mdash; per VIN, in one tamper-evident record.
+        </p>
+      </div>
+
+      <div className="mx-auto mt-12 max-w-5xl overflow-x-auto rounded-2xl border border-slate-200 bg-white shadow-sm">
+        <table className="w-full min-w-[720px] border-collapse text-sm">
+          <thead>
+            <tr className="border-b border-slate-200">
+              <th className="px-4 py-3 text-left font-display text-xs font-bold uppercase tracking-wide text-slate-500">
+                Category
+              </th>
+              {FIT_COLS.map((c) => (
+                <th key={c} className="px-3 py-3 text-center text-[11px] font-semibold leading-tight text-slate-600">
+                  {c}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {FIT_ROWS.map((r) => {
+              const isUs = r.label === "AutoLabels";
+              return (
+                <tr key={r.label} className={`border-b border-slate-100 last:border-0 ${isUs ? "bg-blue-50/60" : ""}`}>
+                  <td className={`px-4 py-3 text-sm ${isUs ? "font-bold text-[#0B2041]" : "font-medium text-slate-700"}`}>
+                    {r.label}
+                  </td>
+                  {r.cells.map((v, i) => (
+                    <td key={i} className="px-3 py-3 text-center">
+                      <FitCell v={v} />
+                    </td>
+                  ))}
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+
+      <p className="mx-auto mt-4 max-w-3xl text-center text-xs leading-relaxed text-slate-400">
+        Generalized by category; capabilities vary by vendor and plan. AutoLabels documents informed
+        consent and produces a tamper-evident record &mdash; it is FTC-aligned and does not guarantee the
+        outcome of any dispute.
       </p>
     </div>
   </section>
