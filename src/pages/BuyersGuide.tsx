@@ -70,19 +70,19 @@ const BuyersGuide = () => {
   const [customerName, setCustomerName] = useState("");
 
   useEffect(() => {
-    prefill.apply((v) => {
-      setVehicle((prev) => ({
-        ...prev,
-        year: v.year || prev.year,
-        make: v.make || prev.make,
-        model: v.model || prev.model,
-        vin: v.vin || prev.vin,
-        stock: v.stock || prev.stock,
-        mileage: v.mileage || prev.mileage,
-        price: v.price || prev.price,
-      }));
-    });
-  }, [prefill]);
+    const v = prefill.vehicle;
+    if (!v) return;
+    setVehicle((prev) => ({
+      ...prev,
+      year: v.year || prev.year,
+      make: v.make || prev.make,
+      model: v.model || prev.model,
+      vin: v.vin || prev.vin,
+      stock: v.stock || prev.stock,
+      mileage: v.mileage || prev.mileage,
+      price: v.price || prev.price,
+    }));
+  }, [prefill.vehicle]);
 
   const operatingState = ds.dealer_state || ds.doc_fee_state || "";
   const bgResolution = useMemo(
