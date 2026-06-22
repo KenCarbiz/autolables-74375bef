@@ -304,7 +304,7 @@ const AppShell = ({ children }: AppShellProps) => {
         <aside className={`fixed lg:sticky top-0 left-0 z-50 h-screen bg-card border-r border-border transition-all duration-200 lg:translate-x-0 ${mobileOpen ? "translate-x-0" : "-translate-x-full"} ${collapsed ? "lg:w-20" : "lg:w-64"} w-64 flex flex-col`}>
           <div className="h-16 flex items-center justify-between px-4 border-b border-border flex-shrink-0">
             <Link to="/dashboard" className={`flex items-center gap-3 min-w-0 ${collapsed ? "lg:justify-center lg:w-full" : ""}`}>
-              <Logo size={collapsed ? "sm" : "md"} showText={!collapsed} />
+              <Logo size={collapsed ? 24 : 32} variant={collapsed ? "mark" : "full"} />
             </Link>
             <button onClick={() => setMobileOpen(false)} className="lg:hidden p-1 rounded-md hover:bg-muted">
               <X className="h-5 w-5" />
