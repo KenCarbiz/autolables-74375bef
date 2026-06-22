@@ -1,5 +1,4 @@
 import { supabase } from "@/integrations/supabase/client";
-import { buildPersistenceContext, recordFtcGenerated, recordK208Generated } from "@/lib/ctMvp/productionHooks";
 
 export type NightlyComplianceVehicle = {
   id: string;
@@ -58,6 +57,24 @@ const checkHasSignature = async (tenantId: string, vehicle: NightlyComplianceVeh
   return Array.isArray(data) && data.length > 0;
 };
 
+const recordMissingLifecycleIssue = async (
+  tenantId: string,
+  vehicle: NightlyComplianceVehicle,
+  stock: string | null,
+  eventType: "ftc_buyers_guide_missing" | "k208_missing" | "signature_missing",
+  reason: string,
+) => {
+  await (supabase as any).from("document_lifecycle_events").insert({
+    tenant_id: tenantId,
+    vehicle_id: vehicle.id,
+    vin: vehicle.vin,
+    stock,
+    event_type: eventType,
+    source: "nightly-compliance-audit",
+    metadata: { reason, missing: true },
+  });
+};
+
 export const runNightlyCtMvpComplianceAudit = async (tenantId: string): Promise<NightlyComplianceAuditResult> => {
   const { data, error } = await (supabase as any)
     .from("vehicle_listings")
@@ -73,7 +90,6 @@ export const runNightlyCtMvpComplianceAudit = async (tenantId: string): Promise<
 
   for (const vehicle of vehicles) {
     const stock = vehicle.stock || vehicle.stock_number || null;
-    const context = buildPersistenceContext({ tenantId, vehicleId: vehicle.id, vin: vehicle.vin || undefined, stock: stock || undefined });
 
     const hasFtc = await checkHasLifecycle(tenantId, vehicle, ["ftc_buyers_guide_generated", "buyers_guide_generated"]);
     const hasK208 = await checkHasLifecycle(tenantId, vehicle, ["k208_generated"]);
@@ -81,31 +97,17 @@ export const runNightlyCtMvpComplianceAudit = async (tenantId: string): Promise<
 
     if (!hasFtc) {
       issues.push({ vehicleId: vehicle.id, vin: vehicle.vin, stock, issueType: "missing_ftc", label: "Missing FTC Buyers Guide" });
-      await recordFtcGenerated(context, {
-        documentId: `audit-missing-ftc-${vehicle.id}`,
-        metadata: { source: "nightly-compliance-audit", missing: true, reason: "No FTC Buyers Guide lifecycle event found" },
-      });
+      await recordMissingLifecycleIssue(tenantId, vehicle, stock, "ftc_buyers_guide_missing", "No FTC Buyers Guide lifecycle event found");
     }
 
     if (!hasK208) {
       issues.push({ vehicleId: vehicle.id, vin: vehicle.vin, stock, issueType: "missing_k208", label: "Missing K208" });
-      await recordK208Generated(context, {
-        documentId: `audit-missing-k208-${vehicle.id}`,
-        metadata: { source: "nightly-compliance-audit", missing: true, reason: "No K208 lifecycle event found" },
-      });
+      await recordMissingLifecycleIssue(tenantId, vehicle, stock, "k208_missing", "No K208 lifecycle event found");
     }
 
     if (!hasSignature) {
       issues.push({ vehicleId: vehicle.id, vin: vehicle.vin, stock, issueType: "missing_signature", label: "Missing signature evidence" });
-      await (supabase as any).from("document_lifecycle_events").insert({
-        tenant_id: tenantId,
-        vehicle_id: vehicle.id,
-        vin: vehicle.vin,
-        stock,
-        event_type: "signature_missing",
-        source: "nightly-compliance-audit",
-        metadata: { reason: "No signature evidence found" },
-      });
+      await recordMissingLifecycleIssue(tenantId, vehicle, stock, "signature_missing", "No signature evidence found");
     }
   }
 
