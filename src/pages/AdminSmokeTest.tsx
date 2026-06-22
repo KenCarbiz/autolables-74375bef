@@ -1,14 +1,26 @@
 import { useMemo, useState } from "react";
-import { CheckCircle2, CircleDashed, FileCheck2, ShieldCheck, Wand2, XCircle } from "lucide-react";
+import { CheckCircle2, CircleDashed, FileCheck2, Save, ShieldCheck, Wand2, XCircle } from "lucide-react";
+import { toast } from "sonner";
+import { useTenant } from "@/contexts/TenantContext";
 import {
   DEFAULT_CT_MVP_INPUT,
   evaluateCtMvpRules,
   type CtMvpVehicleInput,
 } from "@/lib/ctMvp/ruleEngine";
 import { certifyCtMvp } from "@/lib/ctMvp/certification";
+import { persistCtMvpEvidenceBundle } from "@/lib/ctMvp/persistence";
 import { normalizeVehicle } from "@/lib/inventory/normalizeVehicle";
+import type { DocumentLifecycleEvent } from "@/lib/audit/documentLifecycle";
+import type { SignatureEvidence } from "@/lib/audit/signatureValidation";
 
 const nowIso = () => new Date().toISOString();
+const documentKeysFor = (result: ReturnType<typeof evaluateCtMvpRules>) => [
+  "window_sticker",
+  "addendum",
+  ...(result.ftcBuyersGuide === "required" ? ["ftc_buyers_guide"] : []),
+  ...(result.k208 === "required" ? ["k208"] : []),
+  ...(result.passportStatus === "enabled" ? ["passport"] : []),
+];
 
 type FieldProps = {
   label: string;
@@ -33,68 +45,97 @@ const OutputCard = ({ label, value }: { label: string; value: string }) => (
 );
 
 const AdminSmokeTest = () => {
+  const { tenant } = useTenant();
   const [input, setInput] = useState<CtMvpVehicleInput>(DEFAULT_CT_MVP_INPUT);
+  const [saving, setSaving] = useState(false);
+  const [lastSavedAt, setLastSavedAt] = useState<string | null>(null);
   const result = useMemo(() => evaluateCtMvpRules(input), [input]);
-  const certification = useMemo(() => {
-    const vehicle = normalizeVehicle({
-      vin: input.vin,
-      stock: input.stock,
-      year: input.year,
-      make: input.make,
-      model: input.model,
-      mileage: input.mileage,
-      state: input.state,
-      condition: input.condition,
-      cpoStatus: input.cpoStatus,
-      source: "admin-smoke-test",
-    });
-    return certifyCtMvp({
-      vehicle,
-      lifecycleEvents: [
-        { type: "vehicle_normalized", occurredAt: nowIso(), source: "admin-smoke-test" },
-        { type: "window_sticker_generated", occurredAt: nowIso(), source: "admin-smoke-test" },
-        { type: "addendum_generated", occurredAt: nowIso(), source: "admin-smoke-test" },
-        ...(result.ftcBuyersGuide === "required" ? [{ type: "ftc_buyers_guide_generated" as const, occurredAt: nowIso(), source: "admin-smoke-test" }] : []),
-        ...(result.k208 === "required" ? [{ type: "k208_generated" as const, occurredAt: nowIso(), source: "admin-smoke-test" }] : []),
-        ...(result.passportStatus === "enabled" ? [{ type: "passport_generated" as const, occurredAt: nowIso(), source: "admin-smoke-test" }] : []),
-        { type: "customer_signed", occurredAt: nowIso(), source: "admin-smoke-test" },
-        { type: "deal_delivered", occurredAt: nowIso(), source: "admin-smoke-test" },
-        { type: "document_archived", occurredAt: nowIso(), source: "admin-smoke-test" },
-      ],
-      signatureEvidence: [
-        {
-          role: "customer",
-          signerName: "Sample Customer",
-          signedAt: nowIso(),
-          ipAddress: "127.0.0.1",
-          userAgent: "Smoke Test Browser",
-          consentText: "I agree to electronically sign and receive this vehicle document packet.",
-          documentKeys: ["window_sticker", "addendum", ...(result.ftcBuyersGuide === "required" ? ["ftc_buyers_guide"] : []), ...(result.k208 === "required" ? ["k208"] : []), ...(result.passportStatus === "enabled" ? ["passport"] : [])],
-        },
-        {
-          role: "dealer",
-          signerName: "Sample Dealer Rep",
-          signedAt: nowIso(),
-          ipAddress: "127.0.0.1",
-          userAgent: "Smoke Test Browser",
-          consentText: "Dealer representative confirms the generated packet is complete.",
-          documentKeys: ["window_sticker", "addendum", ...(result.ftcBuyersGuide === "required" ? ["ftc_buyers_guide"] : []), ...(result.k208 === "required" ? ["k208"] : []), ...(result.passportStatus === "enabled" ? ["passport"] : [])],
-        },
-        {
-          role: "installer",
-          signerName: "Sample Installer",
-          signedAt: nowIso(),
-          ipAddress: "127.0.0.1",
-          userAgent: "Smoke Test Browser",
-          consentText: "Installer confirms addendum install/proof.",
-          documentKeys: ["addendum"],
-        },
-      ],
-    });
-  }, [input, result.ftcBuyersGuide, result.k208, result.passportStatus]);
+  const docs = useMemo(() => documentKeysFor(result), [result]);
+  const lifecycleEvents = useMemo<DocumentLifecycleEvent[]>(() => [
+    { type: "vehicle_normalized", occurredAt: nowIso(), source: "admin-smoke-test" },
+    { type: "window_sticker_generated", occurredAt: nowIso(), source: "admin-smoke-test" },
+    { type: "addendum_generated", occurredAt: nowIso(), source: "admin-smoke-test" },
+    ...(result.ftcBuyersGuide === "required" ? [{ type: "ftc_buyers_guide_generated" as const, occurredAt: nowIso(), source: "admin-smoke-test" }] : []),
+    ...(result.k208 === "required" ? [{ type: "k208_generated" as const, occurredAt: nowIso(), source: "admin-smoke-test" }] : []),
+    ...(result.passportStatus === "enabled" ? [{ type: "passport_generated" as const, occurredAt: nowIso(), source: "admin-smoke-test" }] : []),
+    { type: "customer_signed", occurredAt: nowIso(), source: "admin-smoke-test" },
+    { type: "deal_delivered", occurredAt: nowIso(), source: "admin-smoke-test" },
+    { type: "document_archived", occurredAt: nowIso(), source: "admin-smoke-test" },
+  ], [result.ftcBuyersGuide, result.k208, result.passportStatus]);
+  const signatureEvidence = useMemo<SignatureEvidence[]>(() => [
+    {
+      role: "customer",
+      signerName: "Sample Customer",
+      signedAt: nowIso(),
+      ipAddress: "127.0.0.1",
+      userAgent: "Smoke Test Browser",
+      consentText: "I agree to electronically sign and receive this vehicle document packet.",
+      documentKeys: docs,
+    },
+    {
+      role: "dealer",
+      signerName: "Sample Dealer Rep",
+      signedAt: nowIso(),
+      ipAddress: "127.0.0.1",
+      userAgent: "Smoke Test Browser",
+      consentText: "Dealer representative confirms the generated packet is complete.",
+      documentKeys: docs,
+    },
+    {
+      role: "installer",
+      signerName: "Sample Installer",
+      signedAt: nowIso(),
+      ipAddress: "127.0.0.1",
+      userAgent: "Smoke Test Browser",
+      consentText: "Installer confirms addendum install/proof.",
+      documentKeys: ["addendum"],
+    },
+  ], [docs]);
+  const vehicle = useMemo(() => normalizeVehicle({
+    vin: input.vin,
+    stock: input.stock,
+    year: input.year,
+    make: input.make,
+    model: input.model,
+    mileage: input.mileage,
+    state: input.state,
+    condition: input.condition,
+    cpoStatus: input.cpoStatus,
+    source: "admin-smoke-test",
+  }), [input]);
+  const certification = useMemo(() => certifyCtMvp({
+    vehicle,
+    lifecycleEvents,
+    signatureEvidence,
+  }), [vehicle, lifecycleEvents, signatureEvidence]);
 
   const update = <K extends keyof CtMvpVehicleInput>(key: K, value: CtMvpVehicleInput[K]) => {
     setInput((prev) => ({ ...prev, [key]: value }));
+  };
+
+  const saveCertification = async () => {
+    if (!tenant?.id || tenant.id === "house") {
+      toast.error("No active dealer tenant found. Sign in to a dealer account before saving evidence.");
+      return;
+    }
+    setSaving(true);
+    try {
+      await persistCtMvpEvidenceBundle({
+        context: { tenantId: tenant.id, vin: input.vin, stock: input.stock },
+        lifecycleEvents,
+        signatureEvidence,
+        certification,
+        source: "admin-smoke-test",
+      });
+      const savedAt = new Date().toLocaleString();
+      setLastSavedAt(savedAt);
+      toast.success("Smoke-test certification evidence saved.");
+    } catch (error) {
+      console.error(error);
+      toast.error("Could not save smoke-test evidence. Check migrations and tenant permissions.");
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -110,13 +151,24 @@ const AdminSmokeTest = () => {
             passport, trust source, dealer program, lifecycle audit, signatures, packet readiness, and archive readiness.
           </p>
         </div>
-        <button
-          type="button"
-          onClick={() => setInput(DEFAULT_CT_MVP_INPUT)}
-          className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-border bg-card px-4 text-sm font-semibold text-foreground hover:bg-muted"
-        >
-          <Wand2 className="h-4 w-4" /> Reset sample
-        </button>
+        <div className="flex flex-wrap items-center gap-2">
+          {lastSavedAt ? <span className="text-xs font-medium text-muted-foreground">Last saved {lastSavedAt}</span> : null}
+          <button
+            type="button"
+            onClick={saveCertification}
+            disabled={saving}
+            className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 text-sm font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            <Save className="h-4 w-4" /> {saving ? "Saving..." : "Save evidence"}
+          </button>
+          <button
+            type="button"
+            onClick={() => setInput(DEFAULT_CT_MVP_INPUT)}
+            className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-border bg-card px-4 text-sm font-semibold text-foreground hover:bg-muted"
+          >
+            <Wand2 className="h-4 w-4" /> Reset sample
+          </button>
+        </div>
       </div>
 
       <section className={`rounded-2xl border p-4 shadow-sm ${certification.ready ? "border-emerald-200 bg-emerald-50" : "border-amber-200 bg-amber-50"}`}>
