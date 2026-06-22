@@ -519,7 +519,7 @@ const AppShell = ({ children }: AppShellProps) => {
           </div>
         )}
 
-        <CommandPalette open={paletteOpen} onOpenChange={setPaletteOpen} sections={visibleSections} onNavigate={(p) => navigate(p)} />
+        <CommandPalette open={paletteOpen} onOpenChange={setPaletteOpen} />
       </div>
     </VinScanContext.Provider>
   );
