@@ -1,6 +1,9 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { STUDIO_TEMPLATES, buildConfig, templateFromConfig, type StudioTemplate, type StickerType } from "./templates";
+import { STUDIO_SATURDAY_TEMPLATES, saturdayTemplateFromConfig } from "./saturdayTemplates";
+
+const BUILT_IN_TEMPLATES: StudioTemplate[] = [...STUDIO_TEMPLATES, ...STUDIO_SATURDAY_TEMPLATES];
 
 // Database-backed template catalog with a resilient code fallback. Reads active
 // rows from sticker_templates (the archive) and rebuilds each template's config
@@ -8,7 +11,7 @@ import { STUDIO_TEMPLATES, buildConfig, templateFromConfig, type StudioTemplate,
 // migration is applied (or on any error) it returns the built-in registry, so
 // the Sticker Studio always works.
 export function useStickerCatalog(): { templates: StudioTemplate[]; loading: boolean; byId: (id: string) => StudioTemplate | undefined } {
-  const [templates, setTemplates] = useState<StudioTemplate[]>(STUDIO_TEMPLATES);
+  const [templates, setTemplates] = useState<StudioTemplate[]>(BUILT_IN_TEMPLATES);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -26,7 +29,7 @@ export function useStickerCatalog(): { templates: StudioTemplate[]; loading: boo
         const built: StudioTemplate[] = data.map((r: any) => {
           const over = (r.config || {}) as Partial<{ id: string; name: string }>;
           const cfg = buildConfig(r.type as StickerType, { ...(r.config || {}), id: over.id || r.template_key, name: over.name || r.name });
-          return templateFromConfig(cfg);
+          return saturdayTemplateFromConfig(cfg) || templateFromConfig(cfg);
         });
         if (!cancelled && built.length) setTemplates(built);
       } catch {
