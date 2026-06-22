@@ -34,8 +34,10 @@ import {
   trackPassportOpened,
 } from "@/lib/engagement/customerEngagement";
 import {
+  DealerInvestmentReport,
   PassportProofGallery,
   PassportServiceInvestmentCard,
+  VehicleHealthReport,
   WhyBuyThisVehicleCard,
 } from "@/components/passport/PassportExperienceEnhancements";
 
@@ -405,6 +407,8 @@ const AutoLabelsPassportExperience = ({ vehicle, settings: providedSettings }: A
 
       <main className="mx-auto max-w-6xl space-y-5 px-4 py-6 text-foreground">
         <VehicleStoryTimeline vehicle={vehicle} />
+        <DealerInvestmentReport vehicle={vehicle} />
+        <VehicleHealthReport vehicle={vehicle} />
         <PassportServiceInvestmentCard vehicle={vehicle} />
         <WhyBuyThisVehicleCard vehicle={vehicle} />
         <PassportProofGallery vehicle={vehicle} />
