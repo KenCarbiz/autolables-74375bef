@@ -489,7 +489,8 @@ serve(async (req) => {
       .select("role").eq("user_id", userId).eq("role", "admin").maybeSingle();
     if (!isAdmin) {
       const { data: membership } = await admin.from("tenant_members")
-        .select("tenant_id").eq("user_id", userId).eq("tenant_id", tenantId).maybeSingle();
+        .select("tenant_id").eq("user_id", userId).eq("tenant_id", tenantId)
+        .not("accepted_at", "is", null).maybeSingle();
       if (!membership) {
         return new Response(JSON.stringify({ error: "not a member of this tenant" }), {
           status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" },
