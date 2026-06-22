@@ -1,4 +1,8 @@
 import { BadgeCheck, Camera, CheckCircle2, FileText, ShieldCheck, Sparkles, Wrench } from "lucide-react";
+import {
+  CustomerReconditioningCertificate,
+  hasCustomerReconditioningCertificate,
+} from "@/components/passport/CustomerReconditioningCertificate";
 
 type PassportDocument = {
   type?: string | null;
@@ -36,6 +40,7 @@ const approvedPhotos = (vehicle: CustomerProofVehicle) =>
   (vehicle.proofPhotos || []).filter((photo) => photo.showOnPassport !== false && hasText(photo.photoUrl));
 
 export const hasCustomerProofStory = (vehicle: CustomerProofVehicle) =>
+  hasCustomerReconditioningCertificate(vehicle) ||
   hasText(vehicle.reconSummary) ||
   hasText(vehicle.customerVisibleNotes) ||
   hasText(vehicle.reconditioningWorkPerformed) ||
@@ -48,6 +53,7 @@ export function CustomerPassportProofStory({ vehicle }: { vehicle: CustomerProof
   const investments = approvedInvestmentItems(vehicle);
   const health = approvedHealthItems(vehicle);
   const photos = approvedPhotos(vehicle);
+  const showCertificate = hasCustomerReconditioningCertificate(vehicle);
 
   const proofSteps = [
     {
@@ -76,72 +82,76 @@ export function CustomerPassportProofStory({ vehicle }: { vehicle: CustomerProof
     },
   ].filter((step) => step.show);
 
-  if (!proofSteps.length) return null;
+  if (!proofSteps.length && !showCertificate) return null;
 
   return (
-    <section className="overflow-hidden rounded-[2rem] border border-white/10 bg-slate-950 text-white shadow-2xl shadow-slate-950/20">
-      <div className="relative p-5 sm:p-7">
-        <div className="absolute right-0 top-0 h-56 w-56 rounded-full bg-blue-500/20 blur-3xl" />
-        <div className="absolute bottom-0 left-0 h-44 w-44 rounded-full bg-emerald-400/10 blur-3xl" />
-        <div className="relative grid gap-6 lg:grid-cols-[0.9fr_1.1fr] lg:items-start">
-          <div>
-            <div className="inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1 text-[10px] font-black uppercase tracking-wider text-blue-100">
-              <Sparkles className="h-3.5 w-3.5" /> Passport Proof Story
-            </div>
-            <h2 className="mt-4 text-3xl font-black tracking-tight sm:text-4xl">Proof that makes the vehicle easier to trust.</h2>
-            <p className="mt-3 text-sm leading-relaxed text-white/70">
-              This section only shows approved, customer-safe information from the dealership. Internal service notes stay private unless they are reviewed and approved for the Passport.
-            </p>
-            <div className="mt-5 rounded-2xl border border-white/10 bg-white/10 p-4">
-              <div className="text-[10px] font-black uppercase tracking-[0.18em] text-white/45">Dealer transparency</div>
-              <p className="mt-1 text-sm font-bold leading-relaxed text-white/85">
-                {vehicle.dealer?.name ? `${vehicle.dealer.name} organized the important vehicle proof in one place.` : "The dealer organized the important vehicle proof in one place."}
-              </p>
-            </div>
-          </div>
+    <div className="space-y-5">
+      {showCertificate && <CustomerReconditioningCertificate vehicle={vehicle} />}
 
-          <div className="grid gap-3 sm:grid-cols-2">
-            {proofSteps.map(({ title, text, icon: Icon }, index) => (
-              <div key={title} className="rounded-2xl border border-white/10 bg-white/[0.07] p-4 backdrop-blur">
-                <div className="flex items-start gap-3">
-                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white text-slate-950">
-                    <Icon className="h-5 w-5" />
-                  </div>
-                  <div>
-                    <div className="text-[10px] font-black uppercase tracking-wider text-white/40">Step {index + 1}</div>
-                    <h3 className="mt-1 font-black text-white">{title}</h3>
-                    <p className="mt-1 text-sm leading-relaxed text-white/65">{text}</p>
+      <section className="overflow-hidden rounded-[2rem] border border-white/10 bg-slate-950 text-white shadow-2xl shadow-slate-950/20">
+        <div className="relative p-5 sm:p-7">
+          <div className="absolute right-0 top-0 h-56 w-56 rounded-full bg-blue-500/20 blur-3xl" />
+          <div className="absolute bottom-0 left-0 h-44 w-44 rounded-full bg-emerald-400/10 blur-3xl" />
+          <div className="relative grid gap-6 lg:grid-cols-[0.9fr_1.1fr] lg:items-start">
+            <div>
+              <div className="inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1 text-[10px] font-black uppercase tracking-wider text-blue-100">
+                <Sparkles className="h-3.5 w-3.5" /> Passport Proof Story
+              </div>
+              <h2 className="mt-4 text-3xl font-black tracking-tight sm:text-4xl">Proof that makes the vehicle easier to trust.</h2>
+              <p className="mt-3 text-sm leading-relaxed text-white/70">
+                This section only shows approved, customer-safe information from the dealership. Internal service notes stay private unless they are reviewed and approved for the Passport.
+              </p>
+              <div className="mt-5 rounded-2xl border border-white/10 bg-white/10 p-4">
+                <div className="text-[10px] font-black uppercase tracking-[0.18em] text-white/45">Dealer transparency</div>
+                <p className="mt-1 text-sm font-bold leading-relaxed text-white/85">
+                  {vehicle.dealer?.name ? `${vehicle.dealer.name} organized the important vehicle proof in one place.` : "The dealer organized the important vehicle proof in one place."}
+                </p>
+              </div>
+            </div>
+
+            <div className="grid gap-3 sm:grid-cols-2">
+              {proofSteps.map(({ title, text, icon: Icon }, index) => (
+                <div key={title} className="rounded-2xl border border-white/10 bg-white/[0.07] p-4 backdrop-blur">
+                  <div className="flex items-start gap-3">
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white text-slate-950">
+                      <Icon className="h-5 w-5" />
+                    </div>
+                    <div>
+                      <div className="text-[10px] font-black uppercase tracking-wider text-white/40">Step {index + 1}</div>
+                      <h3 className="mt-1 font-black text-white">{title}</h3>
+                      <p className="mt-1 text-sm leading-relaxed text-white/65">{text}</p>
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
+              ))}
+            </div>
           </div>
         </div>
-      </div>
 
-      {(health.length > 0 || investments.length > 0 || photos.length > 0) && (
-        <div className="grid gap-px border-t border-white/10 bg-white/10 lg:grid-cols-3">
-          <ProofSummaryCard
-            icon={ShieldCheck}
-            title="Health signals"
-            value={health.length ? `${health.length} approved` : "Not published"}
-            text={health.length ? "Condition information reviewed for customer presentation." : "Dealer has not published health details for this Passport."}
-          />
-          <ProofSummaryCard
-            icon={Wrench}
-            title="Reconditioning"
-            value={investments.length ? `${investments.length} items` : "Not published"}
-            text={investments.length ? "Approved completed-work items are available." : "Dealer has not published reconditioning items for this Passport."}
-          />
-          <ProofSummaryCard
-            icon={Camera}
-            title="Proof photos"
-            value={photos.length ? `${photos.length} approved` : "Private"}
-            text={photos.length ? "Dealer-approved evidence photos are available." : "Service photos are private unless approved by the dealer."}
-          />
-        </div>
-      )}
-    </section>
+        {(health.length > 0 || investments.length > 0 || photos.length > 0) && (
+          <div className="grid gap-px border-t border-white/10 bg-white/10 lg:grid-cols-3">
+            <ProofSummaryCard
+              icon={ShieldCheck}
+              title="Health signals"
+              value={health.length ? `${health.length} approved` : "Not published"}
+              text={health.length ? "Condition information reviewed for customer presentation." : "Dealer has not published health details for this Passport."}
+            />
+            <ProofSummaryCard
+              icon={Wrench}
+              title="Reconditioning"
+              value={investments.length ? `${investments.length} items` : "Not published"}
+              text={investments.length ? "Approved completed-work items are available." : "Dealer has not published reconditioning items for this Passport."}
+            />
+            <ProofSummaryCard
+              icon={Camera}
+              title="Proof photos"
+              value={photos.length ? `${photos.length} approved` : "Private"}
+              text={photos.length ? "Dealer-approved evidence photos are available." : "Service photos are private unless approved by the dealer."}
+            />
+          </div>
+        )}
+      </section>
+    </div>
   );
 }
 
