@@ -388,7 +388,7 @@ const DescriptionWriter = () => {
             <div className="grid grid-cols-2 gap-3">
               {featureList.slice(0, 10).map((feature) => <FeatureLine key={feature} label={feature} />)}
             </div>
-            <button onClick={handleVinDecode} disabled={decoding} className="mt-5 text-sm font-black text-blue-600">View full decode details →</button>
+            <button onClick={openVinDetails} className="mt-5 text-sm font-black text-blue-600">View full decode details →</button>
           </Card>
         </section>
 
