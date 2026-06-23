@@ -621,8 +621,8 @@ const InventoryModern = () => {
                 </table>
               </div>
 
-              {/* Cards (mobile) */}
-              <div className="md:hidden space-y-2.5">
+              {/* Cards — always on mobile, and on desktop when Grid view is selected */}
+              <div className={`${viewMode === "grid" ? "grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-2.5" : "md:hidden space-y-2.5"}`}>
                 {pageRows.map((r) => (
                   <VehicleCard
                     key={r.id}
