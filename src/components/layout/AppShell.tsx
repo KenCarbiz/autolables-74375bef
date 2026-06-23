@@ -252,10 +252,14 @@ const AppShell = ({ children }: AppShellProps) => {
   const syncWhen = lastMarketCheckSync
     ? (() => {
         const d = new Date(lastMarketCheckSync);
-        const sameDay = d.toDateString() === new Date().toDateString();
-        return sameDay
-          ? `${formatSyncTime(lastMarketCheckSync)} today`
-          : d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+        const today = new Date();
+        const sameDay = d.toDateString() === today.toDateString();
+        const yest = new Date(today); yest.setDate(today.getDate() - 1);
+        const isYest = d.toDateString() === yest.toDateString();
+        const time = formatSyncTime(lastMarketCheckSync);
+        if (sameDay) return `Today · ${time}`;
+        if (isYest) return `Yesterday · ${time}`;
+        return `${d.toLocaleDateString(undefined, { month: "short", day: "numeric" })} · ${time}`;
       })()
     : "Never";
   const accountInitials = (() => {
