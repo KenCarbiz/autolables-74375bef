@@ -418,7 +418,7 @@ const AppShell = ({ children }: AppShellProps) => {
                             key={item.path}
                             onClick={() => { navigate(item.path); setMobileOpen(false); }}
                             title={collapsed ? item.label : undefined}
-                            className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${active ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground hover:bg-muted"} ${collapsed ? "lg:justify-center" : ""}`}
+                            className={`relative w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${active ? "bg-blue-50 text-blue-700 before:absolute before:left-0 before:top-1.5 before:bottom-1.5 before:w-[3px] before:rounded-r-full before:bg-blue-600" : "text-muted-foreground hover:text-foreground hover:bg-muted"} ${collapsed ? "lg:justify-center" : ""}`}
                           >
                             <Icon className="h-4 w-4 flex-shrink-0" />
                             {!collapsed && <span className="truncate">{item.label}</span>}
