@@ -1,17 +1,11 @@
+// Inventory renders the Friday "command center" page (InventoryModern), which is
+// fully responsive on its own: an executive KPI strip + table on tablet/desktop
+// and a card list on mobile. AppShell provides the global mobile header +
+// bottom nav around it, so there is no duplicate chrome.
 import InventoryModern from "./InventoryModern";
-import InventoryMobileRestored from "./InventoryMobileRestored";
 
 function Inventory() {
-  return (
-    <>
-      <div className="lg:hidden">
-        <InventoryMobileRestored />
-      </div>
-      <div className="hidden lg:block">
-        <InventoryModern />
-      </div>
-    </>
-  );
+  return <InventoryModern />;
 }
 
 export default Inventory;
