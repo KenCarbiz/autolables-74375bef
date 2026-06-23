@@ -352,46 +352,45 @@ const AppShell = ({ children }: AppShellProps) => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [location.pathname, location.search]);
 
+  const refreshMarketCheck = useCallback(async () => {
+    if (!tenant?.id) {
+      setMarketCheckConnected(false);
+      setMarketCheckLabel("MarketCheck Pending");
+      setLastMarketCheckSync(null);
+      setMarketCheckCount(null);
+      return;
+    }
+    try {
+      const { data } = await (supabase as any)
+        .from("marketcheck_sync_config")
+        .select("last_run_at,last_status")
+        .eq("tenant_id", tenant.id)
+        .maybeSingle();
+      const connected = !!data?.last_run_at || !!data?.last_status;
+      setMarketCheckConnected(connected);
+      setMarketCheckLabel(connected ? "MarketCheck Connected" : "MarketCheck Pending");
+      // Prefer the DB timestamp; fall back to the most recent local sync
+      // broadcast so the top bar stays accurate even when the sync that
+      // ran writes to advertised_prices instead of marketcheck_sync_config.
+      const localTs = typeof window !== "undefined" ? window.localStorage.getItem(`autolabels:last-sync:${tenant.id}`) : null;
+      const dbTs = data?.last_run_at || null;
+      const winner = !dbTs ? localTs : !localTs ? dbTs : (new Date(localTs) > new Date(dbTs) ? localTs : dbTs);
+      setLastMarketCheckSync(winner);
+      const st = (data?.last_status || {}) as Record<string, unknown>;
+      setMarketCheckCount(typeof st.seen === "number" ? st.seen : (typeof st.num_found === "number" ? st.num_found : null));
+    } catch {
+      setMarketCheckConnected(false);
+      setMarketCheckLabel("MarketCheck Pending");
+      setLastMarketCheckSync(null);
+      setMarketCheckCount(null);
+    }
+  }, [tenant?.id]);
+
   useEffect(() => {
-    let mounted = true;
-    const loadMarketCheck = async () => {
-      if (!tenant?.id) {
-        setMarketCheckConnected(false);
-        setMarketCheckLabel("MarketCheck Pending");
-        setLastMarketCheckSync(null);
-        return;
-      }
-      try {
-        const { data } = await (supabase as any)
-          .from("marketcheck_sync_config")
-          .select("last_run_at,last_status")
-          .eq("tenant_id", tenant.id)
-          .maybeSingle();
-        if (!mounted) return;
-        const connected = !!data?.last_run_at || !!data?.last_status;
-        setMarketCheckConnected(connected);
-        setMarketCheckLabel(connected ? "MarketCheck Connected" : "MarketCheck Pending");
-        // Prefer the DB timestamp; fall back to the most recent local sync
-        // broadcast so the top bar stays accurate even when the sync that
-        // ran writes to advertised_prices instead of marketcheck_sync_config.
-        const localTs = typeof window !== "undefined" ? window.localStorage.getItem(`autolabels:last-sync:${tenant.id}`) : null;
-        const dbTs = data?.last_run_at || null;
-        const winner = !dbTs ? localTs : !localTs ? dbTs : (new Date(localTs) > new Date(dbTs) ? localTs : dbTs);
-        setLastMarketCheckSync(winner);
-        const st = (data?.last_status || {}) as Record<string, unknown>;
-        setMarketCheckCount(typeof st.seen === "number" ? st.seen : (typeof st.num_found === "number" ? st.num_found : null));
-      } catch {
-        if (!mounted) return;
-        setMarketCheckConnected(false);
-        setMarketCheckLabel("MarketCheck Pending");
-        setLastMarketCheckSync(null);
-        setMarketCheckCount(null);
-      }
-    };
-    loadMarketCheck();
-    // Any inventory sync (price scrape / recall batch / market pricing batch)
-    // dispatches "inventory-synced" — update the top bar immediately and
-    // persist the timestamp so a refresh keeps showing the fresh value.
+    refreshMarketCheck();
+    // The AppShell never unmounts between pages, so the badge must actively
+    // re-read: on an in-app sync broadcast, on tab focus, and on a slow poll —
+    // otherwise it shows the mount-time value forever even after a real sync.
     const onSynced = (e: Event) => {
       const detail = (e as CustomEvent).detail as { at?: string } | undefined;
       const at = detail?.at || new Date().toISOString();
@@ -401,12 +400,22 @@ const AppShell = ({ children }: AppShellProps) => {
       setLastMarketCheckSync(at);
       setMarketCheckConnected(true);
       setMarketCheckLabel((prev) => prev === "MarketCheck Pending" ? "MarketCheck Connected" : prev);
-      // Re-pull DB row in the background so any server-side update lands too.
-      loadMarketCheck();
+      refreshMarketCheck();
     };
+    const onFocus = () => refreshMarketCheck();
     window.addEventListener("inventory-synced", onSynced);
-    return () => { mounted = false; window.removeEventListener("inventory-synced", onSynced); };
-  }, [tenant?.id]);
+    window.addEventListener("focus", onFocus);
+    const poll = window.setInterval(refreshMarketCheck, 60_000);
+    return () => {
+      window.removeEventListener("inventory-synced", onSynced);
+      window.removeEventListener("focus", onFocus);
+      window.clearInterval(poll);
+    };
+  }, [refreshMarketCheck]);
+
+  // Re-read on every navigation so the persistent shell's badge stays fresh
+  // as the dealer moves between pages after a sync.
+  useEffect(() => { refreshMarketCheck(); }, [location.pathname, refreshMarketCheck]);
 
   useEffect(() => {
     if (!user) return;
