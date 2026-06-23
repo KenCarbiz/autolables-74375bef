@@ -11,6 +11,7 @@ import {
   Copy,
   Download,
   Edit3,
+  Facebook,
   Gauge,
   Globe,
   History,
@@ -25,7 +26,7 @@ import {
   Wrench,
 } from "lucide-react";
 
-type Platform = "autotrader" | "carscom" | "cargurus" | "facebook" | "truecar" | "edmunds" | "kbb" | "dealercom";
+type Platform = "autotrader" | "carscom" | "cargurus" | "facebook" | "dealerwebsite" | "googleseo";
 type Tone = "professional" | "luxury" | "sporty" | "family" | "value";
 
 type VehicleState = {
@@ -49,9 +50,12 @@ type VehicleState = {
 type PlatformConfig = {
   id: Platform;
   name: string;
-  sub: string;
+  optimizedFor: string;
   logoText: string;
   logoClass: string;
+  logoBg: string;
+  icon?: typeof Sparkles;
+  iconColor?: string;
   brandAccent: string;
   characterLimit: number;
   recommendedLength: string;
@@ -64,10 +68,11 @@ const platformCards: PlatformConfig[] = [
   {
     id: "autotrader",
     name: "AutoTrader",
-    sub: "Premium shopper search format",
+    optimizedFor: "Optimized for AutoTrader",
     logoText: "AutoTrader",
-    logoClass: "text-blue-700 tracking-tight",
-    brandAccent: "border-blue-500 bg-blue-50 shadow-blue-100",
+    logoClass: "text-red-600 italic",
+    logoBg: "bg-white",
+    brandAccent: "border-blue-500 bg-blue-50",
     characterLimit: 4000,
     recommendedLength: "1,200-1,800 characters",
     seoFocus: ["Year", "Make", "Model", "Trim", "Mileage", "Local market"],
@@ -77,10 +82,11 @@ const platformCards: PlatformConfig[] = [
   {
     id: "carscom",
     name: "Cars.com",
-    sub: "Feature-forward retail copy",
+    optimizedFor: "Optimized for Cars.com",
     logoText: "Cars.com",
-    logoClass: "text-purple-700 tracking-tight",
-    brandAccent: "border-purple-500 bg-purple-50 shadow-purple-100",
+    logoClass: "text-purple-700",
+    logoBg: "bg-purple-50",
+    brandAccent: "border-purple-500 bg-purple-50",
     characterLimit: 4000,
     recommendedLength: "1,000-1,600 characters",
     seoFocus: ["Condition", "Features", "Dealer trust", "Availability", "Location"],
@@ -90,10 +96,11 @@ const platformCards: PlatformConfig[] = [
   {
     id: "cargurus",
     name: "CarGurus",
-    sub: "Value and deal focused",
+    optimizedFor: "Optimized for CarGurus",
     logoText: "CarGurus",
-    logoClass: "text-cyan-700 tracking-tight",
-    brandAccent: "border-cyan-500 bg-cyan-50 shadow-cyan-100",
+    logoClass: "text-cyan-700",
+    logoBg: "bg-white",
+    brandAccent: "border-cyan-500 bg-cyan-50",
     characterLimit: 3000,
     recommendedLength: "900-1,400 characters",
     seoFocus: ["Value", "Mileage", "Condition", "Top options", "Shopper confidence"],
@@ -103,10 +110,13 @@ const platformCards: PlatformConfig[] = [
   {
     id: "facebook",
     name: "Facebook Marketplace",
-    sub: "Fast mobile shopper format",
-    logoText: "f Marketplace",
-    logoClass: "text-blue-600 tracking-tight",
-    brandAccent: "border-blue-600 bg-blue-50 shadow-blue-100",
+    optimizedFor: "Optimized for Facebook",
+    logoText: "",
+    logoClass: "",
+    logoBg: "bg-white",
+    icon: Facebook,
+    iconColor: "text-blue-600",
+    brandAccent: "border-blue-600 bg-blue-50",
     characterLimit: 1000,
     recommendedLength: "500-900 characters",
     seoFocus: ["Price/value", "Top features", "Condition", "Quick CTA"],
@@ -114,56 +124,34 @@ const platformCards: PlatformConfig[] = [
     templateInstruction: "Keep it concise, conversational, and easy to read on mobile.",
   },
   {
-    id: "truecar",
-    name: "TrueCar",
-    sub: "Transparent buying language",
-    logoText: "TrueCar",
-    logoClass: "text-blue-800 tracking-tight",
-    brandAccent: "border-blue-500 bg-blue-50 shadow-blue-100",
-    characterLimit: 3500,
-    recommendedLength: "900-1,500 characters",
-    seoFocus: ["Transparency", "Mileage", "Trim", "Equipment", "Dealer credibility"],
-    formattingRules: "Straightforward, trust-first copy that avoids overstatement.",
-    templateInstruction: "Use a transparent, shopper-friendly tone focused on confidence and key facts.",
-  },
-  {
-    id: "edmunds",
-    name: "Edmunds",
-    sub: "Research-minded shoppers",
-    logoText: "Edmunds",
-    logoClass: "text-sky-700 tracking-tight",
-    brandAccent: "border-sky-500 bg-sky-50 shadow-sky-100",
-    characterLimit: 4000,
-    recommendedLength: "1,100-1,700 characters",
-    seoFocus: ["Specs", "Features", "Driving experience", "Ownership confidence"],
-    formattingRules: "Informative copy with helpful details for research-heavy shoppers.",
-    templateInstruction: "Balance key specs, comfort, technology, and ownership benefits.",
-  },
-  {
-    id: "kbb",
-    name: "Kelley Blue Book / KBB",
-    sub: "Trust and value focused",
-    logoText: "KBB",
-    logoClass: "text-blue-900 tracking-[0.28em]",
-    brandAccent: "border-blue-700 bg-blue-50 shadow-blue-100",
-    characterLimit: 3500,
-    recommendedLength: "900-1,500 characters",
-    seoFocus: ["Value", "Condition", "History-ready facts", "Features", "Dealer trust"],
-    formattingRules: "Trust-focused structure with factual, value-oriented language.",
-    templateInstruction: "Write with credibility, value, and shopper reassurance as the priority.",
-  },
-  {
-    id: "dealercom",
-    name: "Dealer.com",
-    sub: "Dealer website SEO format",
-    logoText: "Dealer.com",
-    logoClass: "text-slate-900 tracking-tight",
-    brandAccent: "border-slate-700 bg-slate-50 shadow-slate-100",
+    id: "dealerwebsite",
+    name: "Dealer Website",
+    optimizedFor: "Optimized for your website",
+    logoText: "",
+    logoClass: "",
+    logoBg: "bg-white",
+    icon: Globe,
+    iconColor: "text-slate-700",
+    brandAccent: "border-slate-500 bg-slate-50",
     characterLimit: 5000,
     recommendedLength: "1,500-2,400 characters",
     seoFocus: ["Local SEO", "Year/make/model", "Trim", "Dealer name", "Nearby shoppers"],
     formattingRules: "Longer website-ready SEO copy with local terms and natural keyword placement.",
-    templateInstruction: "Create a dealer website description optimized for Google, local intent, and conversion.",
+    templateInstruction: "Create a dealer website description optimized for the dealer's own site.",
+  },
+  {
+    id: "googleseo",
+    name: "Google SEO",
+    optimizedFor: "Optimized for Google",
+    logoText: "G",
+    logoClass: "text-2xl font-black",
+    logoBg: "bg-white",
+    brandAccent: "border-amber-500 bg-amber-50",
+    characterLimit: 4500,
+    recommendedLength: "1,400-2,200 characters",
+    seoFocus: ["Local SEO", "Long-tail keywords", "Schema cues", "Featured snippets"],
+    formattingRules: "Search-friendly structure with natural keyword density and clear local intent.",
+    templateInstruction: "Write copy that ranks for local Google searches with strong keyword targeting.",
   },
 ];
 
@@ -196,9 +184,11 @@ const DescriptionWriter = () => {
   const [geoCity, setGeoCity] = useState(currentStore?.city || "Manchester");
   const [geoState, setGeoState] = useState(currentStore?.state || "Connecticut");
   const [primaryKeyword, setPrimaryKeyword] = useState("INFINITI QX80 for sale");
+  const [zipCode, setZipCode] = useState("06040");
+  const [radius, setRadius] = useState<number>(25);
   const [includeCallToAction, setIncludeCallToAction] = useState(true);
   const [includeDealerName, setIncludeDealerName] = useState(true);
-  const [selectedFeatures, setSelectedFeatures] = useState<string[]>(featureList.slice(0, 8));
+  const [selectedFeatures, setSelectedFeatures] = useState<string[]>(featureList);
   const [generating, setGenerating] = useState(false);
   const [copied, setCopied] = useState(false);
   const [description, setDescription] = useState("Experience luxury, power, and confidence in this 2025 INFINITI QX80 Sensory AWD. Finished in stunning Majestic White with a refined Graphite interior, this full-size SUV delivers a commanding presence and an exceptional driving experience. Powered by a 5.6L V8 engine paired with a smooth 9-speed automatic transmission and advanced all-wheel drive, the QX80 offers impressive performance in all conditions.\n\nThis QX80 Sensory is loaded with premium features including navigation, Bose premium audio, heated and ventilated seats, tri-zone climate control, panoramic moonroof, 360° around view monitor, ProPILOT Assist, head-up display, wireless Apple CarPlay, and a power liftgate for added convenience.\n\nWith three rows of seating, spacious comfort, and cutting-edge technology, this INFINITI QX80 is the perfect blend of luxury and capability.\n\nVisit Harte INFINITI in Manchester, CT today for a test drive!");
@@ -328,8 +318,8 @@ const DescriptionWriter = () => {
         </section>
 
         <section className="space-y-4">
-          <Card title="Third-Party Marketplace" subtitle="Choose the exact site format before generating the description.">
-            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-2 2xl:grid-cols-3">
+          <Card title="Choose Your Writing Preset" subtitle="Optimized for where you'll publish.">
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
               {platformCards.map((card) => <PresetCard key={card.id} card={card} active={platform === card.id} onClick={() => setPlatform(card.id)} />)}
             </div>
           </Card>
@@ -345,6 +335,15 @@ const DescriptionWriter = () => {
               <SelectLike label="City" value={geoCity} onChange={setGeoCity} />
               <SelectLike label="State" value={geoState} onChange={setGeoState} />
             </div>
+            <div className="mt-4 grid gap-4 md:grid-cols-2">
+              <SelectLike label="Zip Code" value={zipCode} onChange={setZipCode} />
+              <label>
+                <span className="text-sm font-bold text-slate-600">Radius</span>
+                <select value={radius} onChange={(e) => setRadius(Number(e.target.value))} className="mt-2 h-12 w-full rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold outline-none focus:border-blue-400">
+                  {[10, 20, 30, 40, 50, 60, 75, 100].map((mi) => <option key={mi} value={mi}>{mi} miles</option>)}
+                </select>
+              </label>
+            </div>
             <label className="mt-4 block text-sm font-bold text-slate-600">Primary Keyword (Optional)</label>
             <input value={primaryKeyword} onChange={(e) => setPrimaryKeyword(e.target.value)} className="mt-2 h-12 w-full rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold outline-none focus:border-blue-400" />
             <div className="mt-4 flex flex-wrap gap-4">
@@ -355,8 +354,8 @@ const DescriptionWriter = () => {
 
           <Card title={`Selected Features (${selectedFeatures.length} of ${featureList.length * 2})`} action={<button className="text-sm font-black text-blue-600">Edit Features</button>}>
             <div className="flex flex-wrap gap-2">
-              {selectedFeatures.map((feature) => <span key={feature} className="rounded-lg bg-blue-50 px-3 py-2 text-sm font-bold text-blue-700">{feature}</span>)}
-              <button onClick={() => setSelectedFeatures(featureList)} className="rounded-lg bg-slate-100 px-3 py-2 text-sm font-bold text-slate-700">+4 more</button>
+              {selectedFeatures.slice(0, 8).map((feature) => <span key={feature} className="rounded-lg bg-blue-50 px-3 py-2 text-sm font-bold text-blue-700">{feature}</span>)}
+              {selectedFeatures.length > 8 && <span className="rounded-lg bg-slate-100 px-3 py-2 text-sm font-bold text-slate-700">+{selectedFeatures.length - 8} more</span>}
             </div>
           </Card>
         </section>
@@ -376,13 +375,11 @@ const DescriptionWriter = () => {
             </div>
           </Card>
 
-          <RequirementsPanel platform={selectedPlatform} />
-
-          <Card title={`${selectedPlatform.name} Generated Description`} action={<button onClick={generate} disabled={generating} className="inline-flex h-10 items-center gap-2 rounded-xl border border-slate-200 px-4 text-sm font-black text-slate-700"><RotateCcw className="h-4 w-4" /> {generating ? "Generating..." : "Regenerate"}</button>}>
+          <Card title="Generated Description" action={<button onClick={generate} disabled={generating} className="inline-flex h-10 items-center gap-2 rounded-xl border border-slate-200 px-4 text-sm font-black text-slate-700"><RotateCcw className="h-4 w-4" /> {generating ? "Generating..." : "Regenerate"}</button>}>
             <div className="mb-4 grid grid-cols-3 gap-4 text-center">
               <MiniMetric value={wordCount} label="Words" />
               <MiniMetric value={`${readMinutes} min`} label="Read Time" />
-              <MiniMetric value={`${description.length}/${selectedPlatform.characterLimit}`} label="Characters" />
+              <MiniMetric value="A+" label="Strength" tone="emerald" />
             </div>
             <textarea value={description} onChange={(e) => setDescription(e.target.value)} maxLength={selectedPlatform.characterLimit} className="min-h-[315px] w-full rounded-2xl border border-slate-200 bg-white p-4 text-sm font-medium leading-relaxed text-slate-800 outline-none focus:border-blue-400" />
             <div className="mt-4 flex flex-wrap gap-3">
@@ -406,6 +403,7 @@ const DescriptionWriter = () => {
             </div>
           </Card>
         </section>
+
       </main>
 
       <div className="border-t border-slate-200 bg-white py-3 text-center text-sm font-semibold text-slate-500">AI-generated content. Always review for accuracy.</div>
@@ -420,48 +418,26 @@ function Card({ title, subtitle, badge, action, children }: { title: string; sub
 function Spec({ icon: Icon, label, value }: { icon: typeof Sparkles; label: string; value: string }) { return <div className="min-w-0"><div className="flex items-center gap-2 text-xs font-semibold text-slate-500"><Icon className="h-4 w-4" />{label}</div><div className="mt-1 truncate text-sm font-black text-slate-950">{value || "—"}</div></div>; }
 function FeatureLine({ label }: { label: string }) { return <div className="flex items-center gap-2 text-sm font-semibold text-slate-700"><CheckCircle2 className="h-4 w-4 text-emerald-600" /> {label}</div>; }
 function PresetCard({ card, active, onClick }: { card: PlatformConfig; active: boolean; onClick: () => void }) {
+  const Icon = card.icon;
+  const isGoogle = card.id === "googleseo";
   return (
     <button
       onClick={onClick}
-      className={`relative flex min-h-[170px] flex-col items-center rounded-2xl border p-4 text-center shadow-sm transition hover:-translate-y-0.5 hover:shadow-md ${active ? `${card.brandAccent} shadow-lg` : "border-slate-200 bg-white"}`}
+      className={`relative flex min-h-[150px] flex-col items-center justify-center rounded-2xl border p-4 text-center shadow-sm transition hover:-translate-y-0.5 hover:shadow-md ${active ? `${card.brandAccent} ring-2 ring-blue-500` : "border-slate-200 bg-white"}`}
     >
-      <div className="flex h-10 w-[120px] items-center justify-center rounded-xl border border-slate-100 bg-white px-3 shadow-sm">
-        <span className={`block max-w-full truncate text-center text-lg font-black leading-none ${card.logoClass}`}>{card.logoText}</span>
+      <div className={`flex h-14 w-14 items-center justify-center rounded-2xl ${card.logoBg} shadow-sm`}>
+        {Icon ? (
+          <Icon className={`h-8 w-8 ${card.iconColor || "text-slate-700"}`} />
+        ) : isGoogle ? (
+          <span className="text-2xl font-black"><span className="text-blue-500">G</span><span className="text-red-500">o</span><span className="text-amber-500">o</span><span className="text-blue-500">g</span><span className="text-emerald-500">l</span><span className="text-red-500">e</span></span>
+        ) : (
+          <span className={`text-base font-black leading-none ${card.logoClass}`}>{card.logoText}</span>
+        )}
       </div>
-      <div className="mt-4 font-black text-slate-950">{card.name}</div>
-      <div className="mt-1 min-h-[32px] text-xs font-semibold text-slate-500">{card.sub}</div>
-      <div className="mt-auto flex flex-wrap items-center justify-center gap-1.5 pt-3">
-        <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-[10px] font-black uppercase tracking-wide text-emerald-700">SEO Optimized</span>
-        <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[10px] font-black uppercase tracking-wide text-slate-600">Rules Loaded</span>
-      </div>
+      <div className="mt-3 text-base font-black text-slate-950">{card.name}</div>
+      <div className="mt-1 text-xs font-semibold text-slate-500">{card.optimizedFor}</div>
       {active && <CheckCircle2 className="absolute right-3 top-3 h-4 w-4 text-blue-600" />}
     </button>
-  );
-}
-function RequirementsPanel({ platform }: { platform: PlatformConfig }) {
-  return (
-    <Card title={`${platform.name} Requirements`} badge="Loaded">
-      <div className="mb-4 flex items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-3">
-        <div className="flex h-10 w-[120px] items-center justify-center rounded-xl bg-white px-3 shadow-sm">
-          <span className={`block max-w-full truncate text-center text-lg font-black leading-none ${platform.logoClass}`}>{platform.logoText}</span>
-        </div>
-        <div>
-          <div className="text-sm font-black text-slate-950">{platform.name}</div>
-          <div className="text-xs font-semibold text-emerald-700">Requirements Loaded</div>
-        </div>
-      </div>
-      <div className="grid gap-3 text-sm">
-        <Requirement label="Character limit" value={`${platform.characterLimit.toLocaleString()} max`} />
-        <Requirement label="Recommended length" value={platform.recommendedLength} />
-        <Requirement label="Formatting" value={platform.formattingRules} />
-        <div>
-          <div className="text-xs font-black uppercase tracking-wide text-slate-400">SEO focus</div>
-          <div className="mt-2 flex flex-wrap gap-2">
-            {platform.seoFocus.map((focus) => <span key={focus} className="rounded-lg bg-blue-50 px-2.5 py-1 text-xs font-bold text-blue-700">{focus}</span>)}
-          </div>
-        </div>
-      </div>
-    </Card>
   );
 }
 function Requirement({ label, value }: { label: string; value: string }) { return <div><div className="text-xs font-black uppercase tracking-wide text-slate-400">{label}</div><div className="mt-1 font-semibold text-slate-700">{value}</div></div>; }
