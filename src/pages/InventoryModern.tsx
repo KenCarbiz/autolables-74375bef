@@ -109,6 +109,10 @@ const InventoryModern = () => {
   const [derived, setDerived] = useState<DerivedFilter>("all");
   const [page, setPage] = useState(1);
   const [perPage, setPerPage] = useState(PAGE_SIZE);
+  const [sortKey, setSortKey] = useState<SortKey>("updated");
+  const [viewMode, setViewMode] = useState<ViewMode>("list");
+  const [sortMenuOpen, setSortMenuOpen] = useState(false);
+  const [filterMenuOpen, setFilterMenuOpen] = useState(false);
   const [searchParams, setSearchParams] = useSearchParams();
   const [showAdd, setShowAdd] = useState(searchParams.get("add") === "1");
   const [showImport, setShowImport] = useState(false);
