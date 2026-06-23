@@ -7,7 +7,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useTenant } from "@/contexts/TenantContext";
 import { useDealerSettings } from "@/contexts/DealerSettingsContext";
-import { useAdvertisedPrices } from "@/hooks/useAdvertisedPrices";
+import { useAdvertisedPrices, assessDrift, SOURCE_LABELS, type AdvertisedPrice } from "@/hooks/useAdvertisedPrices";
 import { useGetReady } from "@/hooks/useGetReady";
 import { usedSafetyInspectionForm } from "@/data/safetyInspection";
 import { useVinDecode } from "@/hooks/useVinDecode";
@@ -312,8 +312,12 @@ const InventoryModern = () => {
     const v = (r.vin || "").toUpperCase();
     const stickerDone = r.status === "published";
     const hasAddendum = addendumVins.has(v);
-    const priceVerified = byVin.has(v);
-    const needsPriceVerify = r.price != null && !priceVerified;
+    // Verified means the scraped advertised price actually MATCHES the system
+    // price (within tolerance) — not merely that a snapshot exists. A snapshot
+    // that disagrees is a mismatch that needs attention, not "verified".
+    const drift = r.price != null ? assessDrift(r.price, byVin.get(v)) : null;
+    const priceVerified = drift?.status === "match";
+    const needsPriceVerify = r.price != null && drift?.status !== "match";
     return { stickerDone, hasAddendum, priceVerified, needsPriceVerify };
   };
 
@@ -614,7 +618,7 @@ const InventoryModern = () => {
                           <ComplianceCell ymm={r.ymm} recallStatus={r.recall_status} openRecallCount={r.open_recall_count} />
                         </td>
                         <td className="px-3 py-3">
-                          <AdvertisedPriceCell price={r.price} docFee={settings.doc_fee_amount} verified={byVin.has((r.vin || "").toUpperCase())} />
+                          <AdvertisedPriceCell price={r.price} docFee={settings.doc_fee_amount} ap={byVin.get((r.vin || "").toUpperCase())} />
                         </td>
                         <td className="px-3 py-3" onClick={(e) => e.stopPropagation()}>
                           <PortalChip status={r.status} />
@@ -1113,14 +1117,24 @@ const ComplianceCell = ({ ymm, recallStatus, openRecallCount }: { ymm?: string |
 };
 
 // Advertised price cell — $XX,XXX, ✓ Advertised, incl. $XXX doc.
-const AdvertisedPriceCell = ({ price, docFee, verified }: { price?: number | null; docFee?: number | null; verified?: boolean }) => {
+const AdvertisedPriceCell = ({ price, docFee, ap }: { price?: number | null; docFee?: number | null; ap?: AdvertisedPrice }) => {
   if (price == null) return <span className="text-xs text-muted-foreground">—</span>;
+  const drift = assessDrift(price, ap);
   return (
     <div className="leading-tight">
       <p className="text-sm font-bold text-foreground tabular-nums">${price.toLocaleString()}</p>
-      {verified
-        ? <p className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-600 mt-0.5"><CheckCircle2 className="w-3 h-3" />Advertised</p>
-        : <p className="text-[11px] font-semibold text-muted-foreground mt-0.5">Not verified</p>}
+      {drift.status === "match" ? (
+        <p className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-600 mt-0.5"><CheckCircle2 className="w-3 h-3" />Verified</p>
+      ) : drift.status === "drift" ? (
+        <p className="inline-flex items-center gap-1 text-[11px] font-semibold text-red-600 mt-0.5" title={drift.reason}>
+          <AlertTriangle className="w-3 h-3" />Mismatch {drift.delta > 0 ? "+" : "−"}${Math.abs(Math.round(drift.delta)).toLocaleString()}
+        </p>
+      ) : (
+        <p className="text-[11px] font-semibold text-muted-foreground mt-0.5">Not checked</p>
+      )}
+      {drift.advertised != null && (
+        <p className="text-[10px] text-muted-foreground mt-0.5">ad ${drift.advertised.toLocaleString()}{drift.source ? ` · ${SOURCE_LABELS[drift.source] || drift.source}` : ""}</p>
+      )}
       {docFee ? <p className="text-[10px] text-muted-foreground mt-0.5">incl. ${Number(docFee).toLocaleString()} doc</p> : null}
     </div>
   );
