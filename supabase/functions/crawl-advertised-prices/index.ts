@@ -170,16 +170,18 @@ const normalizeVdpUrl = (raw: string): string => {
   try {
     const u = new URL(raw);
     const drop: string[] = [];
-    u.searchParams.forEach((v, k) => {
+    const cashify: string[] = [];
+    u.searchParams.forEach((_v, k) => {
       const key = k.toLowerCase();
       if (!VIEW_PARAMS.has(key)) return;
-      // Keep an explicit cash/retail price view — that's the advertised total
-      // (often doc-fee-inclusive) the dealer wants scraped. Strip only the
-      // finance/lease/incentive views that flip to conditional pricing.
-      if (PRICE_VIEW_KEYS.has(key) && /^(cash|retail|total)$/i.test(v)) return;
-      drop.push(k);
+      // Force the cash/retail total view (often doc-fee-inclusive) the dealer
+      // advertises, instead of the finance/lease conditional pricing the
+      // inventory feed hands us. Other view params are stripped.
+      if (PRICE_VIEW_KEYS.has(key)) cashify.push(k);
+      else drop.push(k);
     });
     drop.forEach((k) => u.searchParams.delete(k));
+    cashify.forEach((k) => u.searchParams.set(k, "cash"));
     return u.toString();
   } catch { return raw; }
 };
@@ -691,13 +693,21 @@ serve(async (req) => {
       }
       const cfg = await getTenantScrapeSettings(row.tenant_id);
       const fetchUrl = maybeNormalize(row.source_url, cfg.stripFinance);
-      const res = await fetch(fetchUrl, {
-        method: "GET",
-        headers: FETCH_HEADERS,
-        signal: AbortSignal.timeout(12000),
-      });
-      let html = res.ok ? await res.text() : "";
-      let result: AdResult & { matched_label?: string | null } = (res.ok && !looksLikeChallenge(html, res.headers, res.status))
+      // The cheap fetch is wrapped so a hard bot-wall (connection reset / 403
+      // challenge that throws) falls through to the Firecrawl escalation below
+      // instead of aborting the row as a permanent failure. Firecrawl renders
+      // like a real browser and gets past the wall.
+      let html = "";
+      try {
+        const res = await fetch(fetchUrl, {
+          method: "GET",
+          headers: FETCH_HEADERS,
+          signal: AbortSignal.timeout(12000),
+        });
+        const raw = res.ok ? await res.text() : "";
+        html = (res.ok && !looksLikeChallenge(raw, res.headers, res.status)) ? raw : "";
+      } catch { html = ""; }
+      let result: AdResult & { matched_label?: string | null } = html
         ? extractAdvertised(html, fetchUrl, row.vin, cfg.labels)
         : { price: null, source: "none", gated: false, reason: "bot_challenge", msrp: null, candidates: [], matched_label: null };
 
