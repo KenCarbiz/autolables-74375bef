@@ -544,6 +544,33 @@ const DescriptionWriter = () => {
       </main>
 
       <div className="border-t border-slate-200 bg-white py-3 text-center text-sm font-semibold text-slate-500">AI-generated content. Always review for accuracy.</div>
+
+      <Dialog open={vinDetailsOpen} onOpenChange={setVinDetailsOpen}>
+        <DialogContent className="max-h-[80vh] max-w-3xl overflow-hidden p-0">
+          <DialogHeader className="border-b border-slate-200 px-6 py-4">
+            <DialogTitle className="text-lg font-black text-slate-950">
+              VIN Decode Details
+              {vehicle.vin && <span className="ml-2 rounded bg-slate-100 px-2 py-0.5 font-mono text-xs font-bold text-slate-700">{vehicle.vin.toUpperCase()}</span>}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="max-h-[60vh] overflow-y-auto px-6 py-4">
+            {loadingVinDetails ? (
+              <div className="flex items-center justify-center py-12 text-slate-500"><Loader2 className="mr-2 h-5 w-5 animate-spin" /> Decoding VIN with NHTSA…</div>
+            ) : vinDetails && Object.keys(vinDetails).length ? (
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                {Object.entries(vinDetails).map(([k, v]) => (
+                  <div key={k} className="rounded-lg border border-slate-100 bg-slate-50/60 px-3 py-2">
+                    <div className="text-[11px] font-black uppercase tracking-wide text-slate-500">{k.replace(/([A-Z])/g, " $1").trim()}</div>
+                    <div className="mt-0.5 text-sm font-bold text-slate-900">{v}</div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="py-12 text-center text-sm font-semibold text-slate-500">No decode data available for this VIN.</div>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
