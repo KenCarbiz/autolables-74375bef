@@ -385,25 +385,16 @@ const AppShell = ({ children }: AppShellProps) => {
             </button>
           </div>
 
-          {/* Quick add / scan — primary inventory entry points */}
-          <div className="flex items-center gap-2 px-3 pt-3">
+          {/* Quick add — primary inventory entry point (full-width pill) */}
+          <div className="px-3 pt-3">
             <button
               onClick={() => navigate("/inventory?add=1")}
-              className={`h-10 inline-flex items-center justify-center gap-2 rounded-full bg-blue-600 text-white text-sm font-semibold shadow-sm hover:bg-blue-700 transition-colors ${collapsed ? "lg:w-full" : "flex-1"}`}
+              className="h-10 w-full inline-flex items-center justify-center gap-2 rounded-full bg-blue-600 text-white text-sm font-semibold shadow-sm hover:bg-blue-700 transition-colors"
               title="Add a vehicle"
             >
               <Plus className="h-4 w-4 stroke-[2.5]" />
               {!collapsed && <span>Add Vehicle</span>}
             </button>
-            {!collapsed && (
-              <button
-                onClick={openScan}
-                className="h-10 w-10 inline-flex items-center justify-center rounded-xl border border-border bg-card hover:bg-muted shrink-0"
-                title="Scan a VIN"
-              >
-                <span className="flex h-7 w-7 items-center justify-center rounded-full bg-blue-100 text-blue-600"><ScanLine className="h-4 w-4 stroke-[2.5]" /></span>
-              </button>
-            )}
           </div>
 
           <nav className="flex-1 overflow-y-auto p-3 space-y-1">
@@ -427,7 +418,7 @@ const AppShell = ({ children }: AppShellProps) => {
                             key={item.path}
                             onClick={() => { navigate(item.path); setMobileOpen(false); }}
                             title={collapsed ? item.label : undefined}
-                            className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${active ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground hover:bg-muted"} ${collapsed ? "lg:justify-center" : ""}`}
+                            className={`relative w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${active ? "bg-blue-50 text-blue-700 before:absolute before:left-0 before:top-1.5 before:bottom-1.5 before:w-[3px] before:rounded-r-full before:bg-blue-600" : "text-muted-foreground hover:text-foreground hover:bg-muted"} ${collapsed ? "lg:justify-center" : ""}`}
                           >
                             <Icon className="h-4 w-4 flex-shrink-0" />
                             {!collapsed && <span className="truncate">{item.label}</span>}

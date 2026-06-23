@@ -427,6 +427,19 @@ const InventoryModern = () => {
             <Pill label="Price Verification" count={counts.priceVerify} tone="amber" active={derived === "price-verify"} onClick={() => { setStatus("all"); setCondition("all"); setDerived("price-verify"); }} />
             <Pill label="Published" count={counts.published} tone="emerald" active={status === "published"} onClick={() => { setDerived("all"); setCondition("all"); setStatus("published"); }} />
             <Pill label="Draft" count={counts.draft} active={status === "draft"} onClick={() => { setDerived("all"); setCondition("all"); setStatus("draft"); }} />
+            <div className="ml-auto flex items-center gap-2">
+              <button className="h-8 px-3 rounded-full border border-dashed border-border bg-card text-xs font-semibold text-foreground inline-flex items-center gap-1 hover:bg-muted">
+                <Plus className="w-3.5 h-3.5 text-blue-600" /> Add Filter
+              </button>
+              <button className="h-8 px-3 rounded-full border border-border bg-card text-xs font-semibold text-foreground inline-flex items-center gap-1.5 hover:bg-muted">
+                Sort: Last Updated
+                <ChevronRight className="w-3.5 h-3.5 rotate-90 text-muted-foreground" />
+              </button>
+              <div className="h-8 inline-flex items-center rounded-lg border border-border bg-card overflow-hidden">
+                <button className="w-8 h-8 inline-flex items-center justify-center text-muted-foreground hover:bg-muted" title="List view"><ClipboardList className="w-4 h-4" /></button>
+                <button className="w-8 h-8 inline-flex items-center justify-center bg-blue-50 text-blue-700" title="Grid view"><Building2 className="w-4 h-4" /></button>
+              </div>
+            </div>
           </div>
 
           {/* List */}
@@ -445,10 +458,9 @@ const InventoryModern = () => {
                       <th className="text-left font-semibold px-3 py-3">Stock / VIN</th>
                       <th className="text-left font-semibold px-3 py-3">Status</th>
                       <th className="text-left font-semibold px-3 py-3">Readiness</th>
-                      <th className="text-left font-semibold px-3 py-3">VIN Decode</th>
-                      <th className="text-left font-semibold px-3 py-3">Recalls</th>
-                      <th className="text-left font-semibold px-3 py-3">Market Position</th>
-                      <th className="text-left font-semibold px-3 py-3">Portal Status</th>
+                      <th className="text-left font-semibold px-3 py-3">Compliance</th>
+                      <th className="text-left font-semibold px-3 py-3">Advertised Price</th>
+                      <th className="text-left font-semibold px-3 py-3">Publishing</th>
                       <th className="text-left font-semibold px-3 py-3">Updated</th>
                       <th className="text-right font-semibold px-3 py-3">Actions</th>
                     </tr>
@@ -472,18 +484,15 @@ const InventoryModern = () => {
                           <p className="font-mono text-xs text-foreground">{r.stock_number || "—"}</p>
                           <p className="font-mono text-[11px] text-muted-foreground">…{(r.vin || "").slice(-6)}</p>
                         </td>
-                        <td className="px-3 py-3"><StatusPill status={r.status} signal={signalFor(r)} /></td>
+                        <td className="px-3 py-3"><SimpleStatusPill status={r.status} /></td>
                         <td className="px-3 py-3">
                           <ReadinessCell r={r} signal={signalFor(r)} pct={rowReadiness(r)} />
                         </td>
                         <td className="px-3 py-3">
-                          <VinDecodeCell ymm={r.ymm} />
+                          <ComplianceCell ymm={r.ymm} recallStatus={r.recall_status} openRecallCount={r.open_recall_count} />
                         </td>
                         <td className="px-3 py-3">
-                          <RecallChip status={r.recall_status} open={r.open_recall_count} />
-                        </td>
-                        <td className="px-3 py-3">
-                          <MarketCell position={r.market_position} price={r.price} value={r.market_value} />
+                          <AdvertisedPriceCell price={r.price} docFee={settings.doc_fee_amount} verified={byVin.has((r.vin || "").toUpperCase())} />
                         </td>
                         <td className="px-3 py-3" onClick={(e) => e.stopPropagation()}>
                           <PortalChip status={r.status} />
@@ -529,52 +538,6 @@ const InventoryModern = () => {
 
         {/* Sidebar */}
         <aside className="xl:w-[300px] shrink-0 space-y-4">
-          <SideCard title="Inventory Insights">
-            <ul className="space-y-3">
-              <InsightStat icon={Car} value={counts.total} label="Total Vehicles" iconTone="blue" onClick={() => onHealthMetric("total")} />
-              <InsightStat icon={CheckCircle2} value={counts.vinDecoded} label="VIN Decoded" iconTone="emerald" badge={counts.total ? `${Math.round((counts.vinDecoded / counts.total) * 100)}%` : undefined} />
-              <InsightStat icon={Printer} value={counts.needsSticker} label="Missing Stickers" iconTone="amber" onClick={() => onHealthMetric("needs-sticker")} />
-              <InsightStat icon={FileText} value={counts.missingAddendum} label="Missing Addendums" iconTone="orange" onClick={() => onHealthMetric("missing-addendum")} />
-              <InsightStat icon={ShieldCheck} value={counts.openRecallVehicles} label="Open Recalls" iconTone="red" onClick={() => onHealthMetric("open-recalls")} />
-              <InsightStat icon={Tag} value={counts.priceVerify} label="Price Reviews" iconTone="violet" onClick={() => onHealthMetric("price-reviews")} />
-            </ul>
-            <div className="mt-4 pt-3 border-t border-border">
-              <p className="text-[11px] font-semibold text-muted-foreground">Average Readiness Score</p>
-              <div className="mt-1 flex items-end justify-between gap-2">
-                <span className="font-display text-3xl font-semibold text-foreground tabular-nums leading-none">{counts.avgReadiness}%</span>
-                <Sparkline values={readinessSpark} />
-              </div>
-              <button onClick={() => navigate("/admin?tab=analytics")} className="text-[11px] font-semibold text-blue-600 hover:text-blue-700 mt-3 transition-colors">View full insights →</button>
-            </div>
-          </SideCard>
-
-          <SideCard title="Recent Activity">
-            {activity.length === 0 ? (
-              <p className="text-xs text-muted-foreground">No recent activity yet. Sticker generations, prep sign-offs, and customer signings appear here.</p>
-            ) : (
-              <>
-                <ul className="space-y-2.5">
-                  {activity.map((a) => {
-                    const { icon: Icon, tone } = activityIcon(a.action);
-                    const d = (a.details || {}) as Record<string, unknown>;
-                    const detail = String(d.stock || d.vin || d.customer_name || d.ymm || "").trim();
-                    return (
-                      <li key={a.id} className="flex items-start gap-2.5">
-                        <span className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 mt-0.5 ${tone}`}><Icon className="w-3.5 h-3.5" /></span>
-                        <div className="min-w-0">
-                          <p className="text-sm font-semibold text-foreground leading-tight">{prettyAction(a.action)}</p>
-                          {detail && <p className="text-[11px] text-muted-foreground truncate">{detail}</p>}
-                          <p className="text-[10px] text-muted-foreground">{new Date(a.created_at).toLocaleString()}</p>
-                        </div>
-                      </li>
-                    );
-                  })}
-                </ul>
-                <button onClick={() => navigate("/admin?tab=audit")} className="text-[11px] font-semibold text-blue-600 hover:text-blue-700 mt-3 transition-colors">View all activity →</button>
-              </>
-            )}
-          </SideCard>
-
           <div className="rounded-[20px] border border-[#EAECEF] bg-white shadow-[0_1px_3px_rgba(16,24,40,0.04)] p-4">
             <h3 className="text-xs font-bold uppercase tracking-[0.14em] text-muted-foreground mb-3">Quick Actions</h3>
             <div className="space-y-2">
@@ -588,6 +551,20 @@ const InventoryModern = () => {
               <QuickAction icon={Upload} label="CSV Import" onClick={() => setShowImport(true)} />
             </div>
           </div>
+
+          <SideCard title="Inventory Insights">
+            <ul className="space-y-3">
+              <InsightStat icon={Car} value={counts.total} label="Total Vehicles" iconTone="blue" onClick={() => onHealthMetric("total")} />
+              <InsightStat icon={CheckCircle2} value={counts.vinDecoded} label="VIN Decoded" iconTone="emerald" badge={counts.total ? `${Math.round((counts.vinDecoded / counts.total) * 100)}%` : undefined} />
+              <InsightStat icon={Printer} value={counts.needsSticker} label="Missing Stickers" iconTone="amber" onClick={() => onHealthMetric("needs-sticker")} />
+              <InsightStat icon={FileText} value={counts.missingAddendum} label="Missing Addendums" iconTone="orange" onClick={() => onHealthMetric("missing-addendum")} />
+              <InsightStat icon={ShieldCheck} value={counts.openRecallVehicles} label="Open Recalls" iconTone="red" onClick={() => onHealthMetric("open-recalls")} />
+              <InsightStat icon={Tag} value={counts.priceVerify} label="Price Reviews" iconTone="violet" onClick={() => onHealthMetric("price-reviews")} />
+            </ul>
+            <div className="mt-4 pt-3 border-t border-border">
+              <button onClick={() => navigate("/admin?tab=analytics")} className="text-[11px] font-semibold text-blue-600 hover:text-blue-700 transition-colors">View full insights →</button>
+            </div>
+          </SideCard>
         </aside>
       </div>
 
@@ -771,7 +748,12 @@ const BigRing = ({ pct }: { pct: number }) => {
 };
 
 const ExecKpi = ({ label, value, sub, icon: Icon, tone, onClick, link }: { label: string; value: string | number; sub: string; icon: typeof Car; tone?: "emerald" | "amber" | "red" | "violet"; onClick: () => void; link?: string }) => {
-  const numCls = tone === "emerald" ? "text-emerald-600" : "text-foreground";
+  const numCls =
+    tone === "emerald" ? "text-emerald-600" :
+    tone === "amber"   ? "text-amber-600" :
+    tone === "red"     ? "text-red-600" :
+    tone === "violet"  ? "text-violet-600" :
+                         "text-foreground";
   const ibg =
     tone === "emerald" ? "bg-emerald-50 text-emerald-600" :
     tone === "amber"   ? "bg-amber-50 text-amber-600" :
@@ -780,11 +762,11 @@ const ExecKpi = ({ label, value, sub, icon: Icon, tone, onClick, link }: { label
                          "bg-slate-100 text-slate-500";
   return (
     <button onClick={onClick} className="group/k shrink-0 min-w-[170px] lg:min-w-0 text-left rounded-2xl border border-border bg-card shadow-sm p-4 hover:shadow-md hover:border-foreground/15 transition-all">
-      <p className="text-[10px] font-bold uppercase tracking-[0.1em] text-muted-foreground whitespace-nowrap">{label}</p>
-      <div className="mt-2.5 flex items-center justify-between gap-2">
-        <p className={`font-display text-[28px] font-semibold tabular-nums leading-none ${numCls}`}>{typeof value === "number" ? value.toLocaleString() : value}</p>
-        <span className={`w-9 h-9 rounded-full flex items-center justify-center shrink-0 ${ibg}`}><Icon className="w-4 h-4" strokeWidth={2} /></span>
+      <div className="flex items-start justify-between gap-2">
+        <p className="text-[10px] font-bold uppercase tracking-[0.1em] text-muted-foreground leading-tight">{label}</p>
+        <span className={`w-7 h-7 rounded-full flex items-center justify-center shrink-0 ${ibg}`}><Icon className="w-3.5 h-3.5" strokeWidth={2} /></span>
       </div>
+      <p className={`font-display text-[32px] font-bold tabular-nums leading-none mt-3 ${numCls}`}>{typeof value === "number" ? value.toLocaleString() : value}</p>
       <p className="text-[11px] mt-2 text-muted-foreground truncate">{sub}</p>
       {link && <p className="text-[11px] font-semibold text-blue-600 mt-2 group-hover/k:underline">{link} →</p>}
     </button>
@@ -932,7 +914,54 @@ const PortalChip = ({ status }: { status: VehicleRow["status"] }) =>
       ? <span className="inline-flex items-center text-[10px] font-semibold px-1.5 py-0.5 rounded bg-slate-100 text-slate-600">Archived</span>
       : <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded bg-slate-100 text-slate-600"><span className="w-1.5 h-1.5 rounded-full bg-slate-400" />Draft</span>;
 
-// Status surfaces the lifecycle state, or — for drafts — the single most
+// Simple status pill — only Draft / Published / Archived.
+const SimpleStatusPill = ({ status }: { status: VehicleRow["status"] }) => {
+  const cfg = status === "published"
+    ? { cls: "bg-slate-100 text-slate-700", dot: "bg-emerald-500", label: "Published" }
+    : status === "archived"
+      ? { cls: "bg-slate-100 text-slate-600", dot: "bg-slate-400", label: "Archived" }
+      : { cls: "bg-slate-100 text-slate-700", dot: "bg-slate-400", label: "Draft" };
+  return (
+    <span className={`inline-flex items-center gap-1.5 text-[11px] font-semibold px-2 py-1 rounded-lg ${cfg.cls}`}>
+      <span className={`w-1.5 h-1.5 rounded-full ${cfg.dot}`} />{cfg.label}
+    </span>
+  );
+};
+
+// Compliance cell — VIN decode + recall status stacked.
+const ComplianceCell = ({ ymm, recallStatus, openRecallCount }: { ymm?: string | null; recallStatus?: string | null; openRecallCount?: number | null }) => {
+  const n = openRecallCount || 0;
+  const recall = recallStatus === "open_recalls" && n > 0
+    ? { cls: "text-amber-600", icon: AlertTriangle, label: `${n} Open Recall${n === 1 ? "" : "s"}` }
+    : recallStatus === "clear"
+      ? { cls: "text-emerald-600", icon: ShieldCheck, label: "No Open Recalls" }
+      : { cls: "text-muted-foreground", icon: ShieldCheck, label: "Recall Pending" };
+  const RecallIcon = recall.icon;
+  return (
+    <div className="leading-tight space-y-0.5">
+      {ymm
+        ? <p className="inline-flex items-center gap-1 text-xs font-semibold text-emerald-600"><CheckCircle2 className="w-3.5 h-3.5" />VIN Decoded</p>
+        : <p className="inline-flex items-center gap-1 text-xs font-semibold text-red-600"><AlertTriangle className="w-3.5 h-3.5" />VIN Decode Failed</p>}
+      <p className={`inline-flex items-center gap-1 text-xs font-semibold ${recall.cls}`}><RecallIcon className="w-3.5 h-3.5" />{recall.label}</p>
+    </div>
+  );
+};
+
+// Advertised price cell — $XX,XXX, ✓ Advertised, incl. $XXX doc.
+const AdvertisedPriceCell = ({ price, docFee, verified }: { price?: number | null; docFee?: number | null; verified?: boolean }) => {
+  if (price == null) return <span className="text-xs text-muted-foreground">—</span>;
+  return (
+    <div className="leading-tight">
+      <p className="text-sm font-bold text-foreground tabular-nums">${price.toLocaleString()}</p>
+      {verified
+        ? <p className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-600 mt-0.5"><CheckCircle2 className="w-3 h-3" />Advertised</p>
+        : <p className="text-[11px] font-semibold text-muted-foreground mt-0.5">Not verified</p>}
+      {docFee ? <p className="text-[10px] text-muted-foreground mt-0.5">incl. ${Number(docFee).toLocaleString()} doc</p> : null}
+    </div>
+  );
+};
+
+
 // pressing action the vehicle needs before it can publish.
 const StatusPill = ({ status, signal }: { status: VehicleRow["status"]; signal?: RowSignal }) => {
   const cfg = status === "published" ? { cls: "bg-emerald-100 text-emerald-700", dot: "bg-emerald-500", label: "Published" }
