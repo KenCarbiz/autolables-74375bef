@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
+import { useQueryClient } from "@tanstack/react-query";
 import { useViewTransitionNavigate } from "@/lib/navigation";
 import { useVinScan } from "@/contexts/VinScanContext";
 import { supabase } from "@/integrations/supabase/client";
@@ -81,6 +82,13 @@ const InventoryModern = () => {
   const { createGetReady } = useGetReady(tenant?.id || "");
   const { settings } = useDealerSettings();
   const { byVin } = useAdvertisedPrices(tenant?.id || "");
+  const queryClient = useQueryClient();
+
+  // Broadcasts to the AppShell top bar so "Synced X ago" updates immediately
+  // after any inventory sync, without waiting for the DB row to round-trip.
+  const broadcastSynced = (kind: "prices" | "recalls" | "market", extra?: Record<string, unknown>) => {
+    window.dispatchEvent(new CustomEvent("inventory-synced", { detail: { at: new Date().toISOString(), kind, ...extra } }));
+  };
 
   const sendToGetReady = async (r: { id: string; vin: string | null; ymm: string | null; condition: string | null }) => {
     const rec = await createGetReady({
@@ -133,6 +141,12 @@ const InventoryModern = () => {
           ? `Price scrape done — ${found} price${found === 1 ? "" : "s"} recorded across sites.`
           : "Price scrape done — no new prices found (sites may be bot-walled or unchanged).",
       );
+      // Refresh the advertised-price cache (the green "Advertised" pill
+      // on each row reads from it) and the page rows + last-sync stamp,
+      // then ping the AppShell so the global "Synced X ago" updates.
+      await queryClient.invalidateQueries({ queryKey: ["advertised_prices", tenant.id] });
+      await load();
+      broadcastSynced("prices", { found });
     } catch (err) {
       toast.error(`Scrape failed: ${err instanceof Error ? err.message : "unknown error"}`);
     } finally {
@@ -149,7 +163,8 @@ const InventoryModern = () => {
       const d = (data || {}) as { checked?: number; openFound?: number; error?: string };
       if (d.error === "not_configured") { toast.error("Recall lookup isn't configured (MarketCheck AutoRecalls key)."); return; }
       toast.success(`Recalls checked: ${d.checked ?? 0} vehicles · ${d.openFound ?? 0} with open recalls`);
-      load();
+      await load();
+      broadcastSynced("recalls", { checked: d.checked, openFound: d.openFound });
     } catch { toast.error("Recall batch failed"); }
   };
 
@@ -162,7 +177,8 @@ const InventoryModern = () => {
       const d = (data || {}) as { checked?: number; greatDeals?: number; error?: string };
       if (d.error === "not_configured") { toast.error("Market pricing isn't configured (MarketCheck key)."); return; }
       toast.success(`Market pricing: ${d.checked ?? 0} checked · ${d.greatDeals ?? 0} great deals`);
-      load();
+      await load();
+      broadcastSynced("market", { checked: d.checked, greatDeals: d.greatDeals });
     } catch { toast.error("Market pricing batch failed"); }
   };
 
