@@ -104,7 +104,7 @@ const platformCards: PlatformConfig[] = [
     id: "facebook",
     name: "Facebook Marketplace",
     sub: "Fast mobile shopper format",
-    logoText: "f Marketplace",
+    logoText: "Facebook Marketplace",
     logoClass: "text-blue-600 tracking-tight",
     brandAccent: "border-blue-600 bg-blue-50 shadow-blue-100",
     characterLimit: 1000,
@@ -141,10 +141,10 @@ const platformCards: PlatformConfig[] = [
   },
   {
     id: "kbb",
-    name: "Kelley Blue Book / KBB",
+    name: "Kelley Blue Book",
     sub: "Trust and value focused",
-    logoText: "KBB",
-    logoClass: "text-blue-900 tracking-[0.28em]",
+    logoText: "Kelley Blue Book",
+    logoClass: "text-blue-900 tracking-tight",
     brandAccent: "border-blue-700 bg-blue-50 shadow-blue-100",
     characterLimit: 3500,
     recommendedLength: "900-1,500 characters",
@@ -423,14 +423,13 @@ function PresetCard({ card, active, onClick }: { card: PlatformConfig; active: b
   return (
     <button
       onClick={onClick}
-      className={`relative flex min-h-[170px] flex-col items-center rounded-2xl border p-4 text-center shadow-sm transition hover:-translate-y-0.5 hover:shadow-md ${active ? `${card.brandAccent} shadow-lg` : "border-slate-200 bg-white"}`}
+      className={`relative flex min-h-[150px] flex-col items-center justify-center rounded-2xl border p-4 text-center shadow-sm transition hover:-translate-y-0.5 hover:shadow-md ${active ? `${card.brandAccent} shadow-lg` : "border-slate-200 bg-white"}`}
     >
-      <div className="flex h-10 w-[120px] items-center justify-center rounded-xl border border-slate-100 bg-white px-3 shadow-sm">
-        <span className={`block max-w-full truncate text-center text-lg font-black leading-none ${card.logoClass}`}>{card.logoText}</span>
+      <div className="flex min-h-12 w-full max-w-[250px] items-center justify-center rounded-xl border border-slate-100 bg-white px-4 py-2 shadow-sm">
+        <span className={`block text-center text-[clamp(1rem,4vw,1.35rem)] font-black leading-tight ${card.logoClass}`}>{card.logoText}</span>
       </div>
-      <div className="mt-4 font-black text-slate-950">{card.name}</div>
-      <div className="mt-1 min-h-[32px] text-xs font-semibold text-slate-500">{card.sub}</div>
-      <div className="mt-auto flex flex-wrap items-center justify-center gap-1.5 pt-3">
+      <div className="mt-5 min-h-[28px] text-sm font-semibold text-slate-500">{card.sub}</div>
+      <div className="mt-6 flex flex-wrap items-center justify-center gap-1.5">
         <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-[10px] font-black uppercase tracking-wide text-emerald-700">SEO Optimized</span>
         <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[10px] font-black uppercase tracking-wide text-slate-600">Rules Loaded</span>
       </div>
@@ -442,8 +441,8 @@ function RequirementsPanel({ platform }: { platform: PlatformConfig }) {
   return (
     <Card title={`${platform.name} Requirements`} badge="Loaded">
       <div className="mb-4 flex items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-3">
-        <div className="flex h-10 w-[120px] items-center justify-center rounded-xl bg-white px-3 shadow-sm">
-          <span className={`block max-w-full truncate text-center text-lg font-black leading-none ${platform.logoClass}`}>{platform.logoText}</span>
+        <div className="flex min-h-10 w-full max-w-[220px] items-center justify-center rounded-xl bg-white px-3 py-2 shadow-sm">
+          <span className={`block text-center text-[clamp(.95rem,3vw,1.15rem)] font-black leading-tight ${platform.logoClass}`}>{platform.logoText}</span>
         </div>
         <div>
           <div className="text-sm font-black text-slate-950">{platform.name}</div>
