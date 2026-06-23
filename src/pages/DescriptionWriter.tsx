@@ -261,19 +261,6 @@ const DescriptionWriter = () => {
 
   return (
     <div className="min-h-screen bg-[#F7F9FC]">
-      <div className="border-b border-slate-200 bg-white px-5 py-4">
-        <div className="mx-auto flex max-w-[1600px] items-center justify-between gap-4">
-          <div>
-            <h1 className="text-2xl font-black tracking-tight text-slate-950">SEO Description Studio</h1>
-            <p className="text-sm font-semibold text-slate-500">AI-powered vehicle descriptions that sell more and rank higher.</p>
-          </div>
-          <div className="flex items-center gap-3">
-            <button className="hidden h-10 items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 text-sm font-black text-slate-700 shadow-sm sm:inline-flex"><Sparkles className="h-4 w-4" /> How it works</button>
-            <button className="hidden h-10 items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 text-sm font-black text-slate-700 shadow-sm sm:inline-flex"><History className="h-4 w-4" /> History</button>
-            <button className="h-10 rounded-xl border border-slate-200 bg-white px-4 text-sm font-black text-slate-700 shadow-sm">{dealerName}<ChevronDown className="ml-2 inline h-4 w-4" /></button>
-          </div>
-        </div>
-      </div>
 
       <div className="border-b border-slate-200 bg-white">
         <div className="mx-auto flex max-w-[1600px] gap-8 overflow-x-auto px-5 py-5">
