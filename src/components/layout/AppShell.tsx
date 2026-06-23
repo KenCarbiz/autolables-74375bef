@@ -22,6 +22,8 @@ import {
   FolderOpen,
   Grid2X2,
   HelpCircle,
+  History,
+  PlayCircle,
   LayoutDashboard,
   LayoutTemplate,
   LogOut,
