@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 420 110" role="img" aria-labelledby="title desc">
+  <title id="title">Cars.com logo</title>
+  <desc id="desc">Cars.com marketplace wordmark asset for AutoLABELS marketplace cards.</desc>
+  <rect width="420" height="110" rx="18" fill="none"/>
+  <circle cx="54" cy="55" r="34" fill="#5326D9"/>
+  <path d="M39 56c0-13 10-23 24-23 8 0 15 3 19 9l-11 8c-2-3-5-5-9-5-6 0-10 5-10 11s4 11 11 11c4 0 7-2 10-5l10 8c-5 6-12 9-21 9-13 0-23-10-23-23z" fill="#fff"/>
+  <text x="105" y="73" font-family="Arial, Helvetica, sans-serif" font-size="62" font-weight="800" fill="#5326D9">Cars.com</text>
+</svg>
