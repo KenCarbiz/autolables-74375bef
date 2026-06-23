@@ -108,6 +108,7 @@ const AppShell = ({ children }: AppShellProps) => {
   const [marketCheckConnected, setMarketCheckConnected] = useState(false);
   const [marketCheckLabel, setMarketCheckLabel] = useState("MarketCheck Pending");
   const [lastMarketCheckSync, setLastMarketCheckSync] = useState<string | null>(null);
+  const [marketCheckCount, setMarketCheckCount] = useState<number | null>(null);
 
   const role = member?.role;
   const isManager = isAdmin || !role || role === "owner" || role === "admin" || role === "manager";
@@ -232,7 +233,7 @@ const AppShell = ({ children }: AppShellProps) => {
 
   const pageTitles: Record<string, { title: string; subtitle: string }> = {
     "/dashboard": { title: "Home", subtitle: "Your dealership command center." },
-    "/inventory": { title: "Inventory", subtitle: "Manage vehicles, labels, readiness, and publishing." },
+    "/inventory": { title: "Inventory Command Center", subtitle: "Manage, optimize, and publish your inventory with confidence." },
     "/saved": { title: "Deals", subtitle: "Review saved addendums, signatures, and delivery status." },
     "/setup": { title: "Setup", subtitle: "Configure your dealership workspace." },
     "/addendum": { title: "New Addendum", subtitle: "Create compliant addendum labels and forms." },
@@ -246,6 +247,20 @@ const AppShell = ({ children }: AppShellProps) => {
   const dealerLocation = [currentStore?.city || (settings as any)?.dealer_city, currentStore?.state || (settings as any)?.dealer_state].filter(Boolean).join(", ") || "Manchester, CT";
   const unreadAudit = entries.filter((entry) => entry.action === "compliance_block" || entry.action === "price_integrity_block").length;
   const inventoryHasOwnMobileChrome = location.pathname === "/inventory";
+  const syncWhen = lastMarketCheckSync
+    ? (() => {
+        const d = new Date(lastMarketCheckSync);
+        const sameDay = d.toDateString() === new Date().toDateString();
+        return sameDay
+          ? `${formatSyncTime(lastMarketCheckSync)} Today`
+          : d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+      })()
+    : "Never";
+  const accountName = (() => {
+    const raw = user?.email?.split("@")[0].split(/[._]/)[0] || "Account";
+    return raw.charAt(0).toUpperCase() + raw.slice(1);
+  })();
+  const accountRole = isAdmin ? "Admin" : (role ? role.charAt(0).toUpperCase() + role.slice(1) : "Member");
 
   useEffect(() => {
     setOpenSections((prev) => {
@@ -283,11 +298,14 @@ const AppShell = ({ children }: AppShellProps) => {
         setMarketCheckConnected(connected);
         setMarketCheckLabel(connected ? "MarketCheck Connected" : "MarketCheck Pending");
         setLastMarketCheckSync(data?.last_run_at || null);
+        const st = (data?.last_status || {}) as Record<string, unknown>;
+        setMarketCheckCount(typeof st.seen === "number" ? st.seen : (typeof st.num_found === "number" ? st.num_found : null));
       } catch {
         if (!mounted) return;
         setMarketCheckConnected(false);
         setMarketCheckLabel("MarketCheck Pending");
         setLastMarketCheckSync(null);
+        setMarketCheckCount(null);
       }
     };
     loadMarketCheck();
@@ -456,25 +474,35 @@ const AppShell = ({ children }: AppShellProps) => {
             </header>
           )}
 
-          <header className="hidden h-16 border-b border-border bg-card/95 backdrop-blur-sm lg:flex items-center justify-between gap-3 px-6 flex-shrink-0">
-            <div className="min-w-0">
+          <header className="hidden h-16 border-b border-border bg-card/95 backdrop-blur-sm lg:flex items-center gap-3 px-6 flex-shrink-0">
+            <div className="min-w-0 shrink-0">
               <h1 className="truncate text-xl font-black tracking-tight text-foreground">{pageMeta.title}</h1>
               <p className="truncate text-xs font-medium text-muted-foreground">{pageMeta.subtitle}</p>
             </div>
 
-            <div className="flex shrink-0 items-center gap-2">
-              <div className={`h-9 items-center gap-2 rounded-full border px-3 text-xs font-black flex ${marketCheckConnected ? "border-emerald-200 bg-emerald-50 text-emerald-700" : "border-amber-200 bg-amber-50 text-amber-700"}`}>
-                <span className={`h-2 w-2 rounded-full ${marketCheckConnected ? "bg-emerald-500" : "bg-amber-500"}`} />
-                {marketCheckLabel}
-              </div>
+            {/* Centre: global search → command palette */}
+            <button
+              onClick={() => setPaletteOpen(true)}
+              className="hidden xl:flex flex-1 min-w-0 max-w-xl mx-auto items-center gap-2.5 h-10 px-4 rounded-2xl border border-border bg-background hover:bg-muted/60 hover:border-foreground/15 text-sm shadow-sm transition-all"
+              title="Search (Cmd/Ctrl + K)"
+            >
+              <Search className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+              <span className="flex-1 text-left text-muted-foreground truncate">Search VIN, stock #, make, model…</span>
+              <kbd className="inline-flex items-center justify-center h-5 min-w-[28px] px-1.5 rounded-md bg-muted border border-border text-[10px] font-mono text-muted-foreground tracking-wider">⌘K</kbd>
+            </button>
 
+            <div className="flex shrink-0 items-center gap-2 ml-auto">
+              {/* Dealer card — doubles as the store switcher when multi-store */}
               {stores.length > 1 ? (
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
-                    <button className="h-9 max-w-[220px] items-center gap-2 rounded-full border border-border bg-background px-3 text-sm font-black hover:bg-muted flex">
-                      <Store className="h-4 w-4 flex-shrink-0 text-primary" />
-                      <span className="truncate">{companyName}</span>
-                      <ChevronsUpDown className="h-3 w-3 flex-shrink-0 text-muted-foreground" />
+                    <button className="hidden xl:flex h-11 items-center gap-2 rounded-xl border border-border bg-card px-3 hover:bg-muted">
+                      <Building2 className="h-4 w-4 shrink-0 text-blue-700" />
+                      <div className="min-w-0 text-left leading-tight">
+                        <p className="truncate max-w-[140px] text-[11px] font-bold text-foreground">{companyName}</p>
+                        {dealerLocation && <p className="text-[10px] text-muted-foreground">{dealerLocation}</p>}
+                      </div>
+                      <ChevronsUpDown className="h-3 w-3 shrink-0 text-muted-foreground" />
                     </button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end" className="w-64 bg-card">
@@ -492,26 +520,49 @@ const AppShell = ({ children }: AppShellProps) => {
                   </DropdownMenuContent>
                 </DropdownMenu>
               ) : (
-                <div className="h-9 max-w-[220px] items-center gap-2 rounded-full border border-border bg-background px-3 text-sm font-black flex">
-                  <Store className="h-4 w-4 flex-shrink-0 text-primary" />
-                  <span className="truncate">{companyName}</span>
+                <div className="hidden xl:flex h-11 items-center gap-2 rounded-xl border border-border bg-card px-3">
+                  <Building2 className="h-4 w-4 shrink-0 text-blue-700" />
+                  <div className="min-w-0 leading-tight">
+                    <p className="truncate max-w-[140px] text-[11px] font-bold text-foreground">{companyName}</p>
+                    {dealerLocation && <p className="text-[10px] text-muted-foreground">{dealerLocation}</p>}
+                  </div>
                 </div>
               )}
 
-              <button onClick={openScan} className="h-9 items-center gap-2 rounded-full bg-primary px-3 text-sm font-black text-primary-foreground hover:opacity-90 flex">
-                <ScanLine className="h-4 w-4" />
-                Scan VIN
-              </button>
+              {/* Inventory last synced */}
+              <div className="hidden xl:flex h-11 items-center gap-2 rounded-xl border border-border bg-card px-3">
+                <CheckCircle2 className={`h-4 w-4 shrink-0 ${marketCheckConnected ? "text-emerald-500" : "text-amber-500"}`} />
+                <div className="leading-tight">
+                  <p className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground">Inventory last synced</p>
+                  <p className="text-[11px] font-semibold text-foreground">{syncWhen}</p>
+                  {marketCheckCount != null && <p className="text-[10px] font-semibold text-emerald-600">{marketCheckCount} vehicles updated</p>}
+                </div>
+              </div>
 
-              <button onClick={() => navigate("/admin?tab=audit")} className="relative p-2 rounded-full hover:bg-muted text-muted-foreground hover:text-foreground">
+              {/* MarketCheck status */}
+              <div className="hidden xl:flex h-11 items-center gap-2 rounded-xl border border-border bg-card px-3">
+                <CheckCircle2 className={`h-4 w-4 shrink-0 ${marketCheckConnected ? "text-emerald-500" : "text-amber-500"}`} />
+                <div className="leading-tight">
+                  <p className="text-[11px] font-bold text-foreground">MarketCheck</p>
+                  <p className="text-[10px] text-muted-foreground">{marketCheckConnected ? "Connected" : "Pending"}</p>
+                </div>
+              </div>
+
+              <button onClick={() => navigate("/admin?tab=audit")} className="relative h-10 w-10 inline-flex items-center justify-center rounded-xl border border-border bg-card text-muted-foreground hover:bg-muted hover:text-foreground" title="Notifications">
                 <Bell className="h-5 w-5" />
-                {unreadAudit > 0 && <span className="absolute -top-0.5 -right-0.5 h-4 min-w-4 px-1 rounded-full bg-destructive text-destructive-foreground text-[10px] flex items-center justify-center">{unreadAudit}</span>}
+                {unreadAudit > 0 && <span className="absolute -top-1 -right-1 h-4 min-w-4 px-1 rounded-full bg-rose-500 text-white text-[10px] font-bold flex items-center justify-center">{unreadAudit}</span>}
               </button>
 
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <button className="h-10 w-10 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-sm font-black shadow-sm">
-                    {user?.email?.charAt(0).toUpperCase() || "U"}
+                  <button className="flex items-center gap-2 rounded-full pl-1 pr-2 py-1 hover:bg-muted">
+                    <span className="h-9 w-9 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-sm font-black shadow-sm">
+                      {user?.email?.charAt(0).toUpperCase() || "U"}
+                    </span>
+                    <span className="hidden 2xl:block min-w-0 text-left leading-tight">
+                      <span className="block truncate max-w-[110px] text-[12px] font-bold text-foreground">{accountName}</span>
+                      <span className="block text-[10px] text-muted-foreground">{accountRole}</span>
+                    </span>
                   </button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-80 bg-card">
