@@ -771,7 +771,12 @@ const BigRing = ({ pct }: { pct: number }) => {
 };
 
 const ExecKpi = ({ label, value, sub, icon: Icon, tone, onClick, link }: { label: string; value: string | number; sub: string; icon: typeof Car; tone?: "emerald" | "amber" | "red" | "violet"; onClick: () => void; link?: string }) => {
-  const numCls = tone === "emerald" ? "text-emerald-600" : "text-foreground";
+  const numCls =
+    tone === "emerald" ? "text-emerald-600" :
+    tone === "amber"   ? "text-amber-600" :
+    tone === "red"     ? "text-red-600" :
+    tone === "violet"  ? "text-violet-600" :
+                         "text-foreground";
   const ibg =
     tone === "emerald" ? "bg-emerald-50 text-emerald-600" :
     tone === "amber"   ? "bg-amber-50 text-amber-600" :
@@ -780,11 +785,11 @@ const ExecKpi = ({ label, value, sub, icon: Icon, tone, onClick, link }: { label
                          "bg-slate-100 text-slate-500";
   return (
     <button onClick={onClick} className="group/k shrink-0 min-w-[170px] lg:min-w-0 text-left rounded-2xl border border-border bg-card shadow-sm p-4 hover:shadow-md hover:border-foreground/15 transition-all">
-      <p className="text-[10px] font-bold uppercase tracking-[0.1em] text-muted-foreground whitespace-nowrap">{label}</p>
-      <div className="mt-2.5 flex items-center justify-between gap-2">
-        <p className={`font-display text-[28px] font-semibold tabular-nums leading-none ${numCls}`}>{typeof value === "number" ? value.toLocaleString() : value}</p>
-        <span className={`w-9 h-9 rounded-full flex items-center justify-center shrink-0 ${ibg}`}><Icon className="w-4 h-4" strokeWidth={2} /></span>
+      <div className="flex items-start justify-between gap-2">
+        <p className="text-[10px] font-bold uppercase tracking-[0.1em] text-muted-foreground leading-tight">{label}</p>
+        <span className={`w-7 h-7 rounded-full flex items-center justify-center shrink-0 ${ibg}`}><Icon className="w-3.5 h-3.5" strokeWidth={2} /></span>
       </div>
+      <p className={`font-display text-[32px] font-bold tabular-nums leading-none mt-3 ${numCls}`}>{typeof value === "number" ? value.toLocaleString() : value}</p>
       <p className="text-[11px] mt-2 text-muted-foreground truncate">{sub}</p>
       {link && <p className="text-[11px] font-semibold text-blue-600 mt-2 group-hover/k:underline">{link} →</p>}
     </button>
