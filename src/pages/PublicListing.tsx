@@ -45,6 +45,7 @@ import DealerProgramsSection from "@/components/listing/DealerProgramsSection";
 import IncentivesSection from "@/components/listing/IncentivesSection";
 import TrustStrip from "@/components/listing/TrustStrip";
 import QuickActionBar from "@/components/listing/QuickActionBar";
+import MarketIntelCards from "@/components/listing/MarketIntelCards";
 import OemSticker from "@/components/listing/OemSticker";
 import PassportDocuments from "@/components/listing/PassportDocuments";
 import { listingOptions } from "@/lib/vehicleInsights";
@@ -284,6 +285,10 @@ const PublicListingBody = () => {
             signature confidence bar). Both wired to real listing data. */}
         <QuickActionBar dealer={dealer} onShare={handleShare} />
         <TrustStrip listing={listing} />
+
+        {/* Market intelligence — gauge, verified-history score, and price
+            confidence. Self-hides per card when the data isn't present. */}
+        <MarketIntelCards listing={listing} />
 
         {/* Trust Band — the defining value of this page. Every chip
             is a hashed receipt, not a marketing claim:

@@ -1290,7 +1290,7 @@ const AddVehicleModal = ({ tenantId, userId, onClose, onCreated }: AddProps) => 
     if (!canSubmit) return;
     setSubmitting(true);
     const ymm = decoded ? [decoded.year, decoded.make, decoded.model].filter(Boolean).join(" ") : null;
-    const slug = makeSlug(`${decoded?.make || ""}-${decoded?.model || vin.slice(-6)}`);
+    const slug = vin.trim().toUpperCase();
     const { data, error } = await (supabase as any)
       .from("vehicle_listings")
       .insert({
@@ -1376,7 +1376,7 @@ const CsvImportModal = ({ tenantId, userId, onClose, onImported }: ImportProps) 
       const model = idx.model >= 0 ? cells[idx.model] : "";
       const ymm = [year, make, model].filter(Boolean).join(" ");
       return {
-        store_id: tenantId, tenant_id: tenantId, vin, slug: makeSlug(`${make}-${model || vin.slice(-6)}`), ymm: ymm || null,
+        store_id: tenantId, tenant_id: tenantId, vin, slug: vin, ymm: ymm || null,
         trim: idx.trim >= 0 ? cells[idx.trim] : null,
         mileage: idx.mileage >= 0 && cells[idx.mileage] ? parseInt(cells[idx.mileage].replace(/[^0-9]/g, ""), 10) : null,
         price: idx.price >= 0 && cells[idx.price] ? parseFloat(cells[idx.price].replace(/[^0-9.]/g, "")) : null,

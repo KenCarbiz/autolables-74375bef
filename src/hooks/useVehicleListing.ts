@@ -218,7 +218,9 @@ export const useVehicleListing = (storeId: string) => {
       slugSeed?: string;
       createdBy?: string | null;
     }): Promise<VehicleListing | null> => {
-      const slug = makeSlug(input.slugSeed || `${input.vin.slice(-6)}-${input.ymm || "veh"}`);
+      // Canonical Passport URL is /v/{VIN}; the slug IS the VIN so the sticker
+      // QR resolves to a stable, predictable address per car.
+      const slug = input.vin.toUpperCase();
       const { data, error } = await (supabase as any)
         .from("vehicle_listings")
         .insert({
