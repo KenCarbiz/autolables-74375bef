@@ -25,7 +25,7 @@ import {
   Wrench,
 } from "lucide-react";
 
-type Platform = "autotrader" | "carscom" | "cargurus" | "facebook" | "truecar" | "edmunds" | "kbb" | "dealercom";
+type Platform = "autotrader" | "carscom" | "cargurus" | "facebook" | "truecar" | "edmunds" | "kbb" | "vauto" | "dealercom";
 type Tone = "professional" | "luxury" | "sporty" | "family" | "value";
 
 type VehicleState = {
@@ -151,6 +151,19 @@ const platformCards: PlatformConfig[] = [
     seoFocus: ["Value", "Condition", "History-ready facts", "Features", "Dealer trust"],
     formattingRules: "Trust-focused structure with factual, value-oriented language.",
     templateInstruction: "Write with credibility, value, and shopper reassurance as the priority.",
+  },
+  {
+    id: "vauto",
+    name: "vAuto",
+    sub: "Inventory merchandising format",
+    logoText: "vAuto",
+    logoClass: "text-orange-600 tracking-tight",
+    brandAccent: "border-orange-500 bg-orange-50 shadow-orange-100",
+    characterLimit: 4000,
+    recommendedLength: "1,000-1,700 characters",
+    seoFocus: ["Merchandising", "Equipment", "Pricing value", "Condition", "Inventory feed"],
+    formattingRules: "Inventory-ready copy with concise equipment highlights, condition language, and feed-safe formatting.",
+    templateInstruction: "Write for vAuto merchandising with clear inventory facts, strong feature highlights, and no unsupported claims.",
   },
   {
     id: "dealercom",
