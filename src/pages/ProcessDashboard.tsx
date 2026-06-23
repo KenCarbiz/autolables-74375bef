@@ -188,11 +188,9 @@ const ProcessDashboard = () => {
     : { tone: "warn" as const, headline: `${attentionCount} item${attentionCount === 1 ? "" : "s"} need${attentionCount === 1 ? "s" : ""} your attention`, sub: `${inFlight} ${inFlight === 1 ? "vehicle" : "vehicles"} in flight · review the action center below` };
 
   return (
-    <div className="p-4 lg:p-8 max-w-[1400px] mx-auto space-y-6">
-      {/* Hero — Autocurb-style outcome-centric landing.
-          White surface, generous whitespace, headline reads as the
-          dealer's status not a feature label. */}
-      <section className="rounded-[18px] bg-card border border-border px-6 lg:px-8 py-6 lg:py-7 shadow-sm">
+    <div className="p-4 lg:p-6 max-w-[1600px] mx-auto space-y-5">
+      {/* Hero — outcome-centric greeting; the dealer's status line. */}
+      <section className="rounded-2xl bg-card border border-border px-5 lg:px-6 py-5 lg:py-6 shadow-sm">
         <div className="flex items-start justify-between gap-4 flex-wrap">
           <div className="min-w-0">
             <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-muted-foreground">
@@ -231,40 +229,42 @@ const ProcessDashboard = () => {
         </div>
 
         <SetupChecklistWidget />
-
-        {/* Four KPI cards — outcome metrics, not feature counts.
-            Icon chip top-right, huge metric, soft caption. */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 lg:gap-4 mt-6">
-          <KpiCard
-            label="In flight"
-            value={inFlight}
-            caption={inFlight === 1 ? "vehicle" : "vehicles"}
-            icon={Activity}
-            iconTone="sky"
-          />
-          <KpiCard
-            label="Needs attention"
-            value={attentionCount}
-            caption={attentionCount === 0 ? "all clear" : (attentionCount === 1 ? "open item" : "open items")}
-            icon={Sparkles}
-            iconTone={attentionCount > 0 ? "amber" : "emerald"}
-          />
-          <KpiCard
-            label="Published listings"
-            value={listings.published}
-            caption={listings.published === 1 ? "live sticker" : "live stickers"}
-            icon={Tag}
-            iconTone="indigo"
-          />
-          <KpiCard
-            label="Signed this week"
-            value={signings.recent.length}
-            caption="audit-defense ready"
-            icon={ShieldCheck}
-            iconTone="emerald"
-          />
-        </div>
       </section>
+
+      <div className="flex flex-col xl:flex-row gap-5">
+        {/* Main column — KPI strip + pipeline + signings worklist */}
+        <div className="flex-1 min-w-0 space-y-5">
+          {/* KPI strip — outcome metrics, inventory-command-center style. */}
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 lg:gap-4">
+            <KpiCard
+              label="In flight"
+              value={inFlight}
+              caption={inFlight === 1 ? "vehicle" : "vehicles"}
+              icon={Activity}
+              iconTone="sky"
+            />
+            <KpiCard
+              label="Needs attention"
+              value={attentionCount}
+              caption={attentionCount === 0 ? "all clear" : (attentionCount === 1 ? "open item" : "open items")}
+              icon={Sparkles}
+              iconTone={attentionCount > 0 ? "amber" : "emerald"}
+            />
+            <KpiCard
+              label="Published listings"
+              value={listings.published}
+              caption={listings.published === 1 ? "live sticker" : "live stickers"}
+              icon={Tag}
+              iconTone="indigo"
+            />
+            <KpiCard
+              label="Signed this week"
+              value={signings.recent.length}
+              caption="audit-defense ready"
+              icon={ShieldCheck}
+              iconTone="emerald"
+            />
+          </div>
 
       {/* Process flow — five numbered tiles tracing the linear
           workflow. The number is the wayfinding cue: "where is
@@ -330,84 +330,6 @@ const ProcessDashboard = () => {
             href="/saved"
             tone="emerald"
             blurb="Completed customer sign-offs · audit-defense ready."
-          />
-        </div>
-      </section>
-
-      {/* Compliance row — separate tiles for the items that don't
-          fit the linear flow but ARE the dealer's job today.
-          Numbered separately (A/B/C) so the dealer reads them as
-          "defense, not flow." */}
-      <section>
-        <div className="flex items-center justify-between mb-2">
-          <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground">
-            Compliance defense
-          </p>
-        </div>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-          <DefenseTile
-            icon={RotateCcw}
-            label="SB 766 returns"
-            count={signings.returnsOpen}
-            empty="no open returns"
-            href="/admin?tab=home"
-            cite="§11713.21 · Oct 1, 2026"
-            tone={signings.returnsOpen > 0 ? "amber" : "neutral"}
-          />
-          <DefenseTile
-            icon={Camera}
-            label="Install photos"
-            count={missingInstallPhotos}
-            empty="all installed items have photos"
-            href="/admin?tab=getready"
-            cite="FTC §5 · install proof"
-            tone={missingInstallPhotos > 0 ? "rose" : "neutral"}
-            countSuffix={missingInstallPhotos === 1 ? "vehicle missing" : "vehicles missing"}
-          />
-          <DefenseTile
-            icon={FileSignature}
-            label="Benefit text"
-            count={missingBenefit}
-            empty="every installed line has benefit copy"
-            href="/admin?tab=products"
-            cite="FTC §5 · CA SB 766"
-            tone={missingBenefit > 0 ? "rose" : "neutral"}
-            countSuffix={missingBenefit === 1 ? "vehicle missing" : "vehicles missing"}
-          />
-        </div>
-
-        {/* Wave 20 — second row dedicated to price-match defense.
-            The 97-letter campaign cited this exact hook. */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mt-3">
-          <DefenseTile
-            icon={TrendingUp}
-            label="Price drift"
-            count={priceDrift.drift}
-            empty="sticker matches advertised on every published VIN"
-            href="/inventory"
-            cite="FTC §5 · March 2026 97-letter campaign"
-            tone={priceDrift.drift > 0 ? "rose" : "neutral"}
-            countSuffix={priceDrift.drift === 1 ? "published VIN" : "published VINs"}
-          />
-          <DefenseTile
-            icon={TrendingUp}
-            label="Untracked price"
-            count={priceDrift.untracked}
-            empty="every published VIN has an advertised price on file"
-            href="/inventory"
-            cite="2-yr retention · CA SB 766 §11713.21"
-            tone={priceDrift.untracked > 0 ? "amber" : "neutral"}
-            countSuffix={priceDrift.untracked === 1 ? "VIN no snapshot" : "VINs no snapshot"}
-          />
-          <DefenseTile
-            icon={ShieldCheck}
-            label="Audit-Defense ready"
-            count={signings.recent.length}
-            empty="—"
-            href="/compliance"
-            cite="self-contained · SHA-256 chain root"
-            tone="neutral"
-            countSuffix="VIN packets last 7d"
           />
         </div>
       </section>
@@ -504,11 +426,77 @@ const ProcessDashboard = () => {
         )}
       </section>
 
-      <ShopperInterest />
+          <ShopperInterest />
+        </div>
 
-      {/* Wave 22 — the original 7-wave plan is complete. The
-          roadmap row is retired; if/when new dimensions land
-          they can be added back. */}
+        {/* Right rail — compliance defense, always in view. */}
+        <aside className="xl:w-[320px] shrink-0 space-y-4">
+          <div className="rounded-2xl border border-border bg-card shadow-sm p-4">
+            <h3 className="text-xs font-bold uppercase tracking-[0.14em] text-muted-foreground mb-3">Compliance defense</h3>
+            <div className="space-y-2.5">
+              <DefenseTile
+                icon={RotateCcw}
+                label="SB 766 returns"
+                count={signings.returnsOpen}
+                empty="no open returns"
+                href="/admin?tab=home"
+                cite="§11713.21 · Oct 1, 2026"
+                tone={signings.returnsOpen > 0 ? "amber" : "neutral"}
+              />
+              <DefenseTile
+                icon={Camera}
+                label="Install photos"
+                count={missingInstallPhotos}
+                empty="all installed items have photos"
+                href="/admin?tab=getready"
+                cite="FTC §5 · install proof"
+                tone={missingInstallPhotos > 0 ? "rose" : "neutral"}
+                countSuffix={missingInstallPhotos === 1 ? "vehicle missing" : "vehicles missing"}
+              />
+              <DefenseTile
+                icon={FileSignature}
+                label="Benefit text"
+                count={missingBenefit}
+                empty="every installed line has benefit copy"
+                href="/admin?tab=products"
+                cite="FTC §5 · CA SB 766"
+                tone={missingBenefit > 0 ? "rose" : "neutral"}
+                countSuffix={missingBenefit === 1 ? "vehicle missing" : "vehicles missing"}
+              />
+              <DefenseTile
+                icon={TrendingUp}
+                label="Price drift"
+                count={priceDrift.drift}
+                empty="sticker matches advertised on every published VIN"
+                href="/inventory"
+                cite="FTC §5 · March 2026 97-letter campaign"
+                tone={priceDrift.drift > 0 ? "rose" : "neutral"}
+                countSuffix={priceDrift.drift === 1 ? "published VIN" : "published VINs"}
+              />
+              <DefenseTile
+                icon={TrendingUp}
+                label="Untracked price"
+                count={priceDrift.untracked}
+                empty="every published VIN has an advertised price on file"
+                href="/inventory"
+                cite="2-yr retention · CA SB 766 §11713.21"
+                tone={priceDrift.untracked > 0 ? "amber" : "neutral"}
+                countSuffix={priceDrift.untracked === 1 ? "VIN no snapshot" : "VINs no snapshot"}
+              />
+              <DefenseTile
+                icon={ShieldCheck}
+                label="Audit-Defense ready"
+                count={signings.recent.length}
+                empty="—"
+                href="/compliance"
+                cite="self-contained · SHA-256 chain root"
+                tone="neutral"
+                countSuffix="VIN packets last 7d"
+              />
+            </div>
+          </div>
+        </aside>
+      </div>
     </div>
   );
 };
