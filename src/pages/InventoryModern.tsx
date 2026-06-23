@@ -497,7 +497,7 @@ const InventoryModern = () => {
                         <td className="px-3 py-3" onClick={(e) => e.stopPropagation()}>
                           <PortalChip status={r.status} />
                         </td>
-                        <td className="px-3 py-3 text-xs text-muted-foreground whitespace-nowrap">{relativeDay(r.updated_at)}</td>
+                        <td className="px-3 py-3">{r.updated_at ? <UpdatedCell iso={r.updated_at} /> : <span className="text-xs text-muted-foreground">—</span>}</td>
                         <td className="px-3 py-2.5 text-right" onClick={(e) => e.stopPropagation()}>
                           <div className="flex justify-end items-center gap-1">
                             <div className="hidden md:flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
