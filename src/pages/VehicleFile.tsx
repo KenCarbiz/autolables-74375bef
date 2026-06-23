@@ -18,6 +18,7 @@ import EmptyState from "@/components/ui/empty-state";
 import { InstallProofList } from "@/components/admin/InstallProofList";
 import { useVehicleSpecs } from "@/hooks/useVehicleSpecs";
 import { PACKET_MODULES, packetVisible } from "@/lib/packetModules";
+import { QRCodeSVG } from "qrcode.react";
 import GeneratedDocumentsSection from "@/components/vehicle/GeneratedDocumentsSection";
 import VehicleEvidenceTimeline from "@/components/vehicle/VehicleEvidenceTimeline";
 
@@ -222,7 +223,7 @@ const VehicleFile = () => {
   const safeImg = gallery.length ? Math.min(imgIdx, gallery.length - 1) : 0;
 
   return (
-    <div className="p-4 lg:px-8 lg:py-6 max-w-[1680px] mx-auto space-y-6 pb-24 lg:pb-8">
+    <div className="p-4 lg:px-7 lg:py-6 max-w-[1500px] mx-auto space-y-5 pb-24 lg:pb-8">
       {/* Hero / header */}
       <div>
         <div className="flex items-center justify-between">
@@ -292,10 +293,10 @@ const VehicleFile = () => {
                       </span>
                     ) : null}
                   </div>
-                  <h1 className="text-3xl lg:text-4xl font-black tracking-tight font-display text-foreground leading-tight">
+                  <h1 className="text-[28px] lg:text-[30px] font-black tracking-tight font-display text-foreground leading-[1.1]">
                     {vehicle.ymm || "(needs VIN decode)"}
-                    {vehicle.trim ? <span className="text-muted-foreground font-normal ml-2">{vehicle.trim}</span> : null}
                   </h1>
+                  {vehicle.trim ? <p className="text-xl text-muted-foreground font-normal leading-tight">{vehicle.trim}</p> : null}
                   <div className="flex flex-wrap items-center gap-x-6 gap-y-1.5 text-sm text-muted-foreground pt-1">
                     <span className="font-mono text-foreground/80">VIN {vehicle.vin}</span>
                     {typeof vehicle.mileage === "number" && (
@@ -349,6 +350,16 @@ const VehicleFile = () => {
                       </button>
                     </>
                   )}
+                  <details className="relative [&_summary::-webkit-details-marker]:hidden">
+                    <summary className="list-none h-12 px-4 rounded-xl border border-border bg-background hover:bg-muted text-foreground text-sm font-bold inline-flex items-center justify-center gap-2 cursor-pointer transition-colors w-full">
+                      <Plus className="w-4 h-4 rotate-45" /> More actions
+                    </summary>
+                    <div className="absolute right-0 mt-2 w-full rounded-xl border border-border bg-card shadow-lg z-20 p-1.5 space-y-0.5">
+                      <button onClick={copyLink} className="w-full text-left text-sm px-3 h-9 rounded-lg hover:bg-muted inline-flex items-center gap-2"><Copy className="w-3.5 h-3.5" /> Copy link</button>
+                      <a href={publicUrl} target="_blank" rel="noreferrer" className="w-full text-left text-sm px-3 h-9 rounded-lg hover:bg-muted inline-flex items-center gap-2"><ExternalLink className="w-3.5 h-3.5" /> Open in new tab</a>
+                      <button onClick={() => setTab("labels")} className="w-full text-left text-sm px-3 h-9 rounded-lg hover:bg-muted inline-flex items-center gap-2"><Printer className="w-3.5 h-3.5" /> Generate sticker</button>
+                    </div>
+                  </details>
                 </div>
               </div>
 
@@ -533,10 +544,9 @@ const OverviewPanel = ({ vehicle, onTab }: { vehicle: VehicleRow; onTab: (t: Tab
     return () => { cancelled = true; };
   }, [vehicle.id, vehicle.vin, vehicle.slug]);
 
-  const { checks, pct, done, remaining } = readinessSummary(vehicle);
-  const grade = pct === 100 ? "Complete" : pct >= 60 ? "On track" : "Not ready";
-  const gradeCls = pct === 100 ? "text-emerald-600 bg-emerald-100" : pct >= 60 ? "text-blue-600 bg-blue-100" : "text-amber-600 bg-amber-100";
-  const barCls = pct === 100 ? "bg-emerald-500" : pct >= 60 ? "bg-blue-600" : "bg-amber-500";
+  const { checks, pct, remaining } = readinessSummary(vehicle);
+  const notReady = pct < 100;
+  const ringTone = pct === 100 ? "#10B981" : pct >= 60 ? "#2563EB" : "#F59E0B";
   const decoded = (vehicle.sticker_snapshot?.decoded as Record<string, unknown> | undefined) || undefined;
   const publicUrl = `${window.location.origin}/v/${vehicle.slug}`;
 
@@ -545,30 +555,19 @@ const OverviewPanel = ({ vehicle, onTab }: { vehicle: VehicleRow; onTab: (t: Tab
     { label: "Create Addendum", icon: FileText, onClick: () => onTab("addendum") },
     { label: "Upload Documents", icon: Upload, onClick: () => onTab("documents") },
     { label: "Customer Sign-off", icon: Signature, onClick: () => onTab("sign") },
-    { label: vehicle.status === "published" ? "Re-publish / Labels" : "Publish Vehicle", icon: Globe, onClick: () => onTab("labels") },
+    { label: "Publish Vehicle", icon: Globe, onClick: () => onTab("labels") },
+    { label: "Open Shopper Portal", icon: ExternalLink, onClick: () => window.open(publicUrl, "_blank", "noopener") },
   ];
 
-  // Prefer the richer MarketCheck feed attributes, falling back to the VIN
-  // decode for anything the feed didn't carry.
   const mc = (vehicle.mc_attributes || {}) as Record<string, unknown>;
-  const mpg = (mc.city_mpg != null || mc.highway_mpg != null)
-    ? `${mc.city_mpg ?? "—"} city / ${mc.highway_mpg ?? "—"} hwy`
-    : null;
-  const equip = ([
-    ["Trim", decoded?.trim ?? null],
+  // Left-column key specs for Vehicle Information.
+  const specs = ([
+    ["Trim", vehicle.trim ?? decoded?.trim ?? null],
     ["Engine", mc.engine ?? decoded?.engine ?? null],
-    ["Engine size", mc.engine_size ?? null],
-    ["Cylinders", mc.cylinders ?? null],
-    ["Transmission", mc.transmission ?? null],
     ["Drivetrain", mc.drivetrain ?? null],
-    ["Fuel", mc.fuel_type ?? decoded?.fuelType ?? null],
-    ["Fuel economy", mpg],
-    ["Exterior", mc.exterior_color ?? null],
-    ["Interior", mc.interior_color ?? null],
-    ["Body", mc.body_type ?? decoded?.bodyStyle ?? null],
-    ["Doors", mc.doors ?? null],
-    ["Seating", mc.std_seating ?? null],
-    ["MSRP", mc.msrp != null ? `$${Number(mc.msrp).toLocaleString()}` : null],
+    ["Exterior Color", mc.exterior_color ?? null],
+    ["Interior Color", mc.interior_color ?? null],
+    ["Fuel Type", mc.fuel_type ?? decoded?.fuelType ?? null],
   ] as [string, unknown][])
     .filter(([, v]) => v != null && String(v).trim() !== "")
     .map(([label, v]) => ({ label, value: String(v) }));
@@ -583,70 +582,96 @@ const OverviewPanel = ({ vehicle, onTab }: { vehicle: VehicleRow; onTab: (t: Tab
     const r = await fetchSpecs({ vin: vehicle.vin, tenantId: vehicle.tenant_id, vehicleId: vehicle.id });
     if (r) setPulledOptions([...r.options, ...r.features]);
   };
-  const dom = mc.dom_active != null ? Number(mc.dom_active) : (mc.dom != null ? Number(mc.dom) : null);
-  const insights: { label: string; value: string; tone: "emerald" | "amber" | "neutral" }[] = [];
-  if (mc.carfax_1_owner === true) insights.push({ label: "Ownership", value: "One owner", tone: "emerald" });
-  if (mc.carfax_clean_title === true) insights.push({ label: "Title", value: "Clean title", tone: "emerald" });
-  if (mc.seller_type) { const st = String(mc.seller_type); insights.push({ label: "Seller", value: st.charAt(0).toUpperCase() + st.slice(1), tone: "neutral" }); }
-  if (dom != null && !Number.isNaN(dom)) insights.push({ label: "Days on market", value: `${dom} days`, tone: dom > 60 ? "amber" : "neutral" });
-  if (mc.price_change_percent != null && mc.price_change_percent !== "") {
-    const p = Number(mc.price_change_percent);
-    if (!Number.isNaN(p) && p !== 0) insights.push({ label: "Price change", value: `${p > 0 ? "+" : ""}${p.toFixed(1)}%`, tone: p < 0 ? "emerald" : "amber" });
-  }
+  // Customer-packet completeness — nine shareable signals.
+  const packetItems: { label: string; ok: boolean }[] = [
+    { label: "VIN decoded", ok: !!vehicle.ymm },
+    { label: "Photos", ok: (vehicle.photos?.length || 0) > 0 },
+    { label: "Description", ok: !!(vehicle as unknown as Record<string, unknown>).description },
+    { label: "Recall checked", ok: !!vehicle.recall_status },
+    { label: "Documents", ok: (vehicle.documents?.length || 0) > 0 },
+    { label: "Sticker published", ok: vehicle.status === "published" },
+    { label: "Warranty info", ok: !!vehicle.warranty_info && Object.keys(vehicle.warranty_info).length > 0 },
+    { label: "Service history", ok: (vehicle.service_records?.length || 0) > 0 },
+    { label: "Accessories", ok: (vehicle.available_accessories?.length || 0) > 0 },
+  ];
+  const packetDone = packetItems.filter((p) => p.ok).length;
+  const packetPct = Math.round((packetDone / packetItems.length) * 100);
 
   return (
     <div className="space-y-6">
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {/* Vehicle readiness */}
-        <Card title="Vehicle Readiness" action={<span className={`text-[11px] font-bold px-2 py-0.5 rounded-full ${gradeCls}`}>{pct}% · {grade}</span>}>
-          <div className="h-2 rounded-full bg-muted overflow-hidden">
-            <div className={`h-full rounded-full transition-all ${barCls}`} style={{ width: `${pct}%` }} />
-          </div>
-          <ul className="space-y-2 text-xs mt-2">
-            {checks.map((c) => <Item key={c.label} ok={c.ok} label={c.label} when={c.when} />)}
-          </ul>
-          {remaining.length > 0 && (
-            <p className="text-[11px] font-semibold text-amber-600 pt-1">{remaining.length} task{remaining.length === 1 ? "" : "s"} remaining</p>
-          )}
-        </Card>
-
-        {/* Activity feed */}
-        <Card title="Activity Feed">
-          {loadingEvents ? (
-            <p className="text-xs text-muted-foreground">Loading events…</p>
-          ) : events.length === 0 ? (
-            <p className="text-xs text-muted-foreground">
-              No recorded activity yet. Events appear as stickers are generated, prep is
-              signed off, customers view the shopper page, and the addendum is signed —
-              every row served from the append-only audit_log.
-            </p>
-          ) : (
-            <ul className="space-y-2.5 max-h-72 overflow-auto">
-              {events.slice(0, 12).map((ev) => (
-                <li key={ev.id} className="flex items-start gap-2.5">
-                  <span className="w-7 h-7 rounded-lg bg-blue-600/10 text-blue-600 flex items-center justify-center shrink-0 mt-0.5">
-                    <CheckCircle2 className="w-3.5 h-3.5" />
+      <div className="grid grid-cols-1 lg:grid-cols-[1.3fr_1fr_1fr] gap-4">
+        {/* Vehicle Readiness */}
+        <Card title="Vehicle Readiness" action={<span className={`text-[11px] font-bold px-2 py-0.5 rounded-full ${notReady ? "bg-amber-100 text-amber-700" : "bg-emerald-100 text-emerald-700"}`}>{pct}% · {notReady ? "Not ready" : "Ready"}</span>}>
+          <div className="flex items-center gap-5">
+            <div className="relative w-[132px] h-[132px] shrink-0">
+              <svg className="w-[132px] h-[132px] -rotate-90" viewBox="0 0 120 120">
+                <circle cx="60" cy="60" r="52" fill="none" stroke="currentColor" strokeWidth="10" className="text-muted" />
+                <circle cx="60" cy="60" r="52" fill="none" stroke={ringTone} strokeWidth="10" strokeLinecap="round" strokeDasharray={2 * Math.PI * 52} strokeDashoffset={2 * Math.PI * 52 * (1 - pct / 100)} />
+              </svg>
+              <div className="absolute inset-0 flex flex-col items-center justify-center">
+                <span className="font-display text-[32px] font-black tabular-nums text-foreground leading-none">{pct}%</span>
+                <span className={`text-xs font-bold ${notReady ? "text-red-500" : "text-emerald-600"}`}>{notReady ? "Not Ready" : "Ready"}</span>
+              </div>
+            </div>
+            <ul className="flex-1 space-y-2 min-w-0">
+              {checks.map((c) => (
+                <li key={c.label} className="flex items-center justify-between gap-2 text-xs">
+                  <span className="inline-flex items-center gap-2 min-w-0">
+                    {c.ok ? <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" /> : <CircleAlert className="w-4 h-4 text-amber-500 shrink-0" />}
+                    <span className={`truncate ${c.ok ? "text-foreground font-medium" : "text-muted-foreground"}`}>{c.label}</span>
                   </span>
-                  <div className="min-w-0">
-                    <p className="text-sm font-semibold text-foreground leading-tight">{prettyAction(ev.action)}</p>
-                    <p className="text-[11px] text-muted-foreground">
-                      {new Date(ev.created_at).toLocaleString()}{ev.user_email ? ` · ${ev.user_email}` : ""}
-                    </p>
-                  </div>
+                  <span className="text-[10px] text-muted-foreground whitespace-nowrap">{c.when ? new Date(c.when).toLocaleDateString() : "pending"}</span>
                 </li>
               ))}
+            </ul>
+          </div>
+          <div className="flex items-center justify-between pt-3 mt-1 border-t border-border">
+            <span className="text-[11px] font-semibold text-amber-600">{remaining.length} task{remaining.length === 1 ? "" : "s"} remaining</span>
+            <button onClick={() => onTab("labels")} className="text-[11px] font-semibold text-blue-600 hover:underline inline-flex items-center gap-1">View all tasks <ChevronRight className="w-3 h-3" /></button>
+          </div>
+        </Card>
+
+        {/* Activity Feed */}
+        <Card title="Activity Feed" action={<button onClick={() => onTab("evidence")} className="text-[11px] font-semibold text-blue-600 hover:underline">View all</button>}>
+          {loadingEvents ? (
+            <p className="text-xs text-muted-foreground">Loading events…</p>
+          ) : (
+            <ul className="max-h-72 overflow-auto -my-1">
+              {events.slice(0, 6).map((ev) => (
+                <li key={ev.id} className="grid grid-cols-[28px_1fr_auto] items-start gap-3 py-2 border-b border-border/60 last:border-0">
+                  <span className="w-7 h-7 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center"><CheckCircle2 className="w-3.5 h-3.5" /></span>
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold text-foreground leading-tight truncate">{prettyAction(ev.action)}</p>
+                    {ev.user_email && <p className="text-[11px] text-muted-foreground truncate">by {ev.user_email}</p>}
+                  </div>
+                  <span className="text-[10px] text-muted-foreground whitespace-nowrap">{new Date(ev.created_at).toLocaleString(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}</span>
+                </li>
+              ))}
+              {remaining.map((c) => (
+                <li key={`req-${c.label}`} className="grid grid-cols-[28px_1fr_auto] items-start gap-3 py-2 border-b border-border/60 last:border-0">
+                  <span className="w-7 h-7 rounded-lg bg-amber-50 text-amber-600 flex items-center justify-center"><AlertTriangle className="w-3.5 h-3.5" /></span>
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold text-foreground leading-tight truncate">{c.label}</p>
+                    <p className="text-[11px] text-amber-600">Action required</p>
+                  </div>
+                  <span className="text-[10px] text-muted-foreground">—</span>
+                </li>
+              ))}
+              {events.length === 0 && remaining.length === 0 && (
+                <li className="text-xs text-muted-foreground py-2">No activity yet.</li>
+              )}
             </ul>
           )}
         </Card>
 
-        {/* Quick actions */}
-        <Card title="Quick Actions" className="md:col-span-2 lg:col-span-1">
-          <div className="space-y-1.5">
+        {/* Quick Actions */}
+        <Card title="Quick Actions">
+          <div className="space-y-2">
             {quick.map((a) => (
               <button
                 key={a.label}
                 onClick={a.onClick}
-                className="w-full flex items-center gap-2.5 px-3 h-10 rounded-xl border border-border bg-background hover:bg-muted hover:border-foreground/15 text-sm font-semibold text-foreground transition-colors text-left"
+                className="w-full flex items-center gap-2.5 px-3 h-10 rounded-lg border border-border bg-card hover:bg-muted hover:border-foreground/15 text-sm font-semibold text-foreground transition-colors text-left"
               >
                 <span className="w-7 h-7 rounded-lg bg-blue-600/10 text-blue-600 flex items-center justify-center shrink-0">
                   <a.icon className="w-3.5 h-3.5" />
@@ -659,119 +684,75 @@ const OverviewPanel = ({ vehicle, onTab }: { vehicle: VehicleRow; onTab: (t: Tab
         </Card>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {/* Equipment */}
-        <Card title="Equipment & Details" action={<button onClick={() => onTab("scan")} className="text-[11px] font-semibold text-blue-600 hover:underline">Edit</button>}>
-          {equip.length > 0 ? (
-            <div className="grid grid-cols-1 gap-1.5">
-              {equip.map((e) => (
-                <div key={e.label} className="flex items-center justify-between gap-3 text-sm">
+      <div className="grid grid-cols-1 lg:grid-cols-[1.3fr_1fr_1fr] gap-4">
+        {/* Vehicle Information — specs + packages */}
+        <Card title="Vehicle Information" action={<button onClick={() => onTab("scan")} className="text-[11px] font-semibold text-blue-600 hover:underline">Edit</button>}>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3">
+            <div className="space-y-2">
+              {specs.length > 0 ? specs.map((e) => (
+                <div key={e.label} className="flex items-center justify-between gap-2 text-sm">
                   <span className="text-muted-foreground">{e.label}</span>
                   <span className="font-medium text-foreground text-right truncate">{e.value}</span>
                 </div>
-              ))}
+              )) : (
+                <p className="text-sm text-muted-foreground">Decode the VIN to populate specs.</p>
+              )}
             </div>
-          ) : (
-            <p className="text-sm text-muted-foreground">
-              No decoded equipment yet. Re-run the VIN decode to auto-populate year, make,
-              model, trim, engine and fuel type.
-            </p>
-          )}
-        </Card>
-
-        {/* Vehicle intelligence — MarketCheck market & history signals */}
-        {insights.length > 0 && (
-          <Card title="Vehicle Intelligence">
-            <div className="grid grid-cols-1 gap-1.5">
-              {insights.map((i) => (
-                <div key={i.label} className="flex items-center justify-between gap-3 text-sm">
-                  <span className="text-muted-foreground">{i.label}</span>
-                  <span className={`font-semibold text-right ${i.tone === "emerald" ? "text-emerald-600" : i.tone === "amber" ? "text-amber-600" : "text-foreground"}`}>{i.value}</span>
-                </div>
-              ))}
+            <div>
+              <p className="text-[11px] font-bold uppercase tracking-wide text-muted-foreground mb-2">Packages &amp; Options</p>
+              {optionsList.length > 0 ? (
+                <ul className="space-y-1.5">
+                  {optionsList.slice(0, 6).map((o) => (
+                    <li key={o} className="flex items-center gap-1.5 text-sm text-foreground"><CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 shrink-0" /><span className="truncate">{o}</span></li>
+                  ))}
+                  {optionsList.length > 6 && (
+                    <li><button onClick={() => onTab("scan")} className="text-[11px] font-semibold text-blue-600 hover:underline">View all ({optionsList.length})</button></li>
+                  )}
+                </ul>
+              ) : (
+                <button onClick={handlePullSpecs} disabled={pullingSpecs || !vehicle.vin} className="text-[11px] font-semibold text-blue-600 hover:underline disabled:opacity-50 inline-flex items-center gap-1"><Sparkles className="w-3 h-3" />{pullingSpecs ? "Pulling…" : "Pull factory options"}</button>
+              )}
             </div>
-            <p className="text-[10px] text-muted-foreground mt-2 pt-2 border-t border-border">From the MarketCheck feed. Re-run sync to refresh.</p>
-          </Card>
-        )}
-
-        {/* Factory equipment & options — feeds the used-car window sticker.
-            The nightly feed carries a partial set; the Pull button decodes the
-            full factory build sheet for this VIN on demand. */}
-        <Card
-          title="Factory Equipment & Options"
-          action={optionsList.length > 0 ? <span className="text-[11px] font-semibold text-muted-foreground">{optionsList.length}</span> : undefined}
-        >
-          {optionsList.length > 0 ? (
-            <div className="flex flex-wrap gap-1.5 max-h-56 overflow-auto">
-              {optionsList.map((o) => (
-                <span key={o} className="inline-flex items-center text-[11px] font-medium px-2 py-0.5 rounded-full bg-muted text-foreground">{o}</span>
-              ))}
-            </div>
-          ) : (
-            <p className="text-sm text-muted-foreground">
-              No options on the inventory feed yet. Pull the full factory build sheet for
-              this VIN to list every installed option and standard feature.
-            </p>
-          )}
-          <div className="flex items-center gap-3 mt-2.5">
-            <button
-              onClick={handlePullSpecs}
-              disabled={pullingSpecs || !vehicle.vin}
-              className="text-[11px] font-semibold text-blue-600 hover:underline disabled:opacity-50 disabled:no-underline inline-flex items-center gap-1"
-            >
-              <Sparkles className="w-3 h-3" />
-              {pullingSpecs ? "Pulling…" : optionsList.length > 0 ? "Refresh factory options" : "Pull full factory options"}
-            </button>
-            {optionsList.length > 0 && (
-              <button onClick={() => onTab("labels")} className="text-[11px] font-semibold text-blue-600 hover:underline">Use on window sticker →</button>
-            )}
           </div>
         </Card>
 
-        {/* Recall */}
-        <RecallCard vehicle={vehicle} />
-
-        {/* Market pricing */}
-        <MarketPricingCard vehicle={vehicle} />
-
-        {/* Shopper portal preview */}
-        <Card title="Shopper Portal Preview" className="md:col-span-2 lg:col-span-1">
-          {vehicle.status === "published" ? (
-            <div className="space-y-3">
-              <div className="flex items-start gap-3">
-                <div className="flex-1 rounded-xl border border-border bg-muted/40 h-24 flex items-center justify-center text-muted-foreground">
-                  <Car className="w-8 h-8" strokeWidth={1.25} />
-                </div>
-                <div className="w-20 h-20 rounded-xl border border-border bg-background flex items-center justify-center text-foreground shrink-0">
-                  <QrCode className="w-12 h-12" />
-                </div>
-              </div>
-              <a href={publicUrl} target="_blank" rel="noreferrer" className="block text-xs text-blue-600 font-mono break-all hover:underline">
-                {publicUrl}
-              </a>
-              <div className="grid grid-cols-2 gap-2">
-                <a href={publicUrl} target="_blank" rel="noreferrer" className="h-9 rounded-xl border border-border bg-background hover:bg-muted text-foreground text-xs font-semibold inline-flex items-center justify-center gap-1.5">
-                  <ExternalLink className="w-3.5 h-3.5" /> Preview Page
-                </a>
-                <button onClick={() => onTab("labels")} className="h-9 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold inline-flex items-center justify-center gap-1.5">
-                  <Globe className="w-3.5 h-3.5" /> Manage
-                </button>
-              </div>
+        {/* Recall + Packet Completeness, stacked */}
+        <div className="space-y-4">
+          <RecallCard vehicle={vehicle} />
+          <Card title="Packet Completeness">
+            <div className="flex items-end justify-between gap-2">
+              <span className="font-display text-3xl font-black tabular-nums text-foreground leading-none">{packetPct}%</span>
+              <span className="text-xs text-muted-foreground">{packetDone} of {packetItems.length} complete</span>
             </div>
-          ) : (
-            <div className="text-center py-2">
-              <div className="w-12 h-12 mx-auto rounded-xl bg-muted flex items-center justify-center text-muted-foreground mb-2">
-                <Globe className="w-6 h-6" />
-              </div>
-              <p className="text-sm text-muted-foreground">
-                Not published yet. Generate the sticker and publish to get a shareable page,
-                QR code, and embed snippet for the dealer's website.
-              </p>
-              <button onClick={() => onTab("labels")} className="mt-3 h-9 px-4 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold inline-flex items-center justify-center gap-1.5">
-                <Printer className="w-3.5 h-3.5" /> Generate Sticker
-              </button>
+            <div className="h-2 rounded-full bg-muted overflow-hidden mt-2">
+              <div className="h-full rounded-full bg-amber-500 transition-all" style={{ width: `${packetPct}%` }} />
             </div>
-          )}
+            <button onClick={() => onTab("scan")} className="text-[11px] font-semibold text-blue-600 hover:underline inline-flex items-center gap-1 mt-1">View details <ChevronRight className="w-3 h-3" /></button>
+          </Card>
+        </div>
+
+        {/* Shopper Portal Preview */}
+        <Card title="Shopper Portal Preview">
+          <div className="flex items-start gap-3">
+            <div className="flex-1 rounded-xl border border-border bg-muted/40 h-24 overflow-hidden flex items-center justify-center text-muted-foreground">
+              {vehicle.hero_image_url || (vehicle.photos && vehicle.photos[0]) ? (
+                <img src={vehicle.hero_image_url || vehicle.photos![0]} alt={vehicle.ymm || "vehicle"} className="w-full h-full object-cover" />
+              ) : (
+                <Car className="w-8 h-8" strokeWidth={1.25} />
+              )}
+            </div>
+            <div className="w-[88px] h-[88px] rounded-xl border border-border bg-white p-1.5 shrink-0 flex items-center justify-center">
+              <QRCodeSVG value={publicUrl} size={72} />
+            </div>
+          </div>
+          <a href={publicUrl} target="_blank" rel="noreferrer" className="block text-xs text-blue-600 font-mono break-all hover:underline bg-blue-50/60 rounded-lg px-2.5 py-1.5">{publicUrl}</a>
+          <div className="grid grid-cols-2 gap-2">
+            <a href={publicUrl} target="_blank" rel="noreferrer" className="h-9 rounded-lg border border-border bg-card hover:bg-muted text-foreground text-xs font-semibold inline-flex items-center justify-center gap-1.5"><ExternalLink className="w-3.5 h-3.5" /> Preview Page</a>
+            <button onClick={() => vehicle.status === "published" ? window.open(publicUrl, "_blank", "noopener") : onTab("labels")} className="h-9 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold inline-flex items-center justify-center gap-1.5">
+              {vehicle.status === "published" ? <><Globe className="w-3.5 h-3.5" /> Open in Shopper Portal</> : <><Printer className="w-3.5 h-3.5" /> Generate Sticker</>}
+            </button>
+          </div>
+          {vehicle.status !== "published" && <p className="text-[10px] text-muted-foreground">Publish to make this page live for shoppers.</p>}
         </Card>
       </div>
     </div>
