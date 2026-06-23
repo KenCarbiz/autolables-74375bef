@@ -545,10 +545,25 @@ const AppShell = ({ children }: AppShellProps) => {
                     </div>
                   )}
                 </div>
-                <button onClick={() => navigate("/admin?tab=audit")} className="relative mt-1 flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl text-slate-950 active:bg-slate-100" aria-label="Recent updates">
-                  <Bell className="h-7 w-7" />
-                  {unreadAudit > 0 && <span className="absolute -right-0.5 -top-1 flex h-6 min-w-6 items-center justify-center rounded-full bg-rose-500 px-1.5 text-xs font-black text-white">{unreadAudit}</span>}
-                </button>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <button className="relative mt-1 flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl text-slate-950 active:bg-slate-100" aria-label="Recent activity">
+                      <Bell className="h-7 w-7" />
+                      {unreadAudit > 0 && <span className="absolute -right-0.5 -top-1 flex h-6 min-w-6 items-center justify-center rounded-full bg-rose-500 px-1.5 text-xs font-black text-white">{unreadAudit}</span>}
+                    </button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-[340px] bg-card p-0">
+                    <div className="flex items-center justify-between px-3 py-2 border-b border-border">
+                      <span className="text-sm font-bold text-foreground">Recent activity</span>
+                      <span className="text-[10px] text-muted-foreground">{recentActivity.length} events</span>
+                    </div>
+                    {renderNotificationsList()}
+                    <DropdownMenuSeparator className="my-0" />
+                    <DropdownMenuItem onClick={() => navigate("/admin?tab=audit")} className="cursor-pointer justify-center py-2 text-xs font-semibold">
+                      View all activity
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
               </div>
 
               <div className="ml-[70px] mt-4 flex flex-wrap items-center gap-3 text-base font-medium text-slate-500">
