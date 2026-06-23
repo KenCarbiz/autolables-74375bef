@@ -89,14 +89,35 @@ serve(async (req) => {
     }
 
     // ── Fetch the listing
+    let lookupSlug = slug;
     const { data, error } = await admin.rpc("get_vehicle_listing_by_slug", { _slug: slug });
     if (error) return json(500, { error: error.message });
-    const row = Array.isArray(data) ? data[0] : data;
+    let row = Array.isArray(data) ? data[0] : data;
+
+    // Canonical Passport URLs are /v/{VIN}. Newer listings store the VIN as
+    // their slug so the RPC matches directly; older listings carry a legacy
+    // slug. When the direct match misses, treat the slug as a VIN: resolve it
+    // to the listing's stored slug and retry — keeping the RPC as the single
+    // source of the returned shape.
+    if (!row) {
+      const { data: byVin } = await admin
+        .from("vehicle_listings")
+        .select("slug")
+        .eq("vin", slug.toUpperCase())
+        .order("published_at", { ascending: false, nullsFirst: false })
+        .limit(1);
+      const alt = Array.isArray(byVin) ? byVin[0] : byVin;
+      if (alt?.slug && alt.slug !== slug) {
+        lookupSlug = alt.slug;
+        const retry = await admin.rpc("get_vehicle_listing_by_slug", { _slug: alt.slug });
+        row = Array.isArray(retry.data) ? retry.data[0] : retry.data;
+      }
+    }
     if (!row) return json(404, { error: "not_found" });
 
     // ── Bump view count + record audit event
     await Promise.all([
-      admin.rpc("increment_listing_view", { _slug: slug }),
+      admin.rpc("increment_listing_view", { _slug: lookupSlug }),
       admin.from("audit_log").insert({
         action: "listing_viewed",
         entity_type: "vehicle_listing",
@@ -104,7 +125,7 @@ serve(async (req) => {
         store_id: row.store_id || null,
         ip_address: ip,
         user_agent: ua,
-        details: { slug },
+        details: { slug: lookupSlug, requested: slug },
       }),
     ]);
 

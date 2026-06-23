@@ -165,8 +165,10 @@ const VehicleFile = () => {
 
   useEffect(() => { load(); /* eslint-disable-next-line */ }, [id]);
 
+  // Canonical Passport URL is /v/{VIN} — the same address the window-sticker
+  // QR encodes — so the link the dealer copies always matches the printed QR.
   const publicUrl = useMemo(
-    () => vehicle ? `${window.location.origin}/v/${vehicle.slug}` : "",
+    () => vehicle ? `${window.location.origin}/v/${(vehicle.vin || vehicle.slug || "").toUpperCase()}` : "",
     [vehicle]
   );
   // The dealer's actual ad/VDP page on their own website (captured from the
@@ -556,7 +558,7 @@ const OverviewPanel = ({ vehicle, onTab }: { vehicle: VehicleRow; onTab: (t: Tab
   const notReady = pct < 100;
   const ringTone = pct === 100 ? "#10B981" : pct >= 60 ? "#2563EB" : "#F59E0B";
   const decoded = (vehicle.sticker_snapshot?.decoded as Record<string, unknown> | undefined) || undefined;
-  const publicUrl = `${window.location.origin}/v/${vehicle.slug}`;
+  const publicUrl = `${window.location.origin}/v/${(vehicle.vin || vehicle.slug || "").toUpperCase()}`;
 
   const quick: { label: string; icon: typeof Car; onClick: () => void }[] = [
     { label: "Generate Sticker", icon: Printer, onClick: () => onTab("labels") },
@@ -1025,7 +1027,7 @@ const LabelsPanel = ({ vehicle }: { vehicle: VehicleRow }) => {
         <p className="text-[11px] text-muted-foreground mt-1">
           Every label opens with VIN, YMM, trim, equipment, and price already pulled
           from this file. When you publish to the shopper portal, the QR on the printed
-          sticker resolves to <span className="font-mono">/v/{vehicle.slug}</span>.
+          sticker resolves to <span className="font-mono">/v/{(vehicle.vin || vehicle.slug || "").toUpperCase()}</span>.
         </p>
       </div>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -1119,7 +1121,7 @@ const ScanInfoPanel = ({ vehicle, onReload }: { vehicle: VehicleRow; onReload: (
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-base font-bold text-foreground">Scan Info</h2>
-          <p className="text-xs text-muted-foreground">Shown to shoppers who scan the window QR at /v/{vehicle.slug}.</p>
+          <p className="text-xs text-muted-foreground">Shown to shoppers who scan the window QR at /v/{(vehicle.vin || vehicle.slug || "").toUpperCase()}.</p>
         </div>
         <button onClick={save} disabled={saving} className="inline-flex items-center gap-1.5 h-9 px-4 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold shadow-sm shadow-blue-600/30 ring-1 ring-inset ring-white/15 disabled:opacity-50">
           <Save className="w-4 h-4" /> {saving ? "Saving…" : "Save"}
