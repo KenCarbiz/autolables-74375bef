@@ -760,7 +760,7 @@ serve(async (req) => {
         await admin.from("audit_log").insert({
           action: "advertised_price_crawl_error", entity_type: "advertised_price",
           entity_id: row.vin, store_id: row.tenant_id,
-          details: { vin: row.vin, url: row.source_url, http_status: res.status, reason: "bot_challenge", rendered: !!renderSource },
+          details: { vin: row.vin, url: row.source_url, http_status: cheapStatus, reason: "bot_challenge", rendered: !!renderSource },
         }).then(() => undefined, () => undefined);
         continue;
       }
