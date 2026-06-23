@@ -613,6 +613,23 @@ const relativeDay = (iso: string) => {
   return d.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
 };
 
+// Two-line "Updated" cell: top is Today/Yesterday/Mon D, bottom is the time.
+const UpdatedCell = ({ iso }: { iso: string }) => {
+  const d = new Date(iso);
+  const today = new Date();
+  const sameDay = d.toDateString() === today.toDateString();
+  const yest = new Date(today); yest.setDate(today.getDate() - 1);
+  const isYest = d.toDateString() === yest.toDateString();
+  const time = d.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
+  const top = sameDay ? "Today" : isYest ? "Yesterday" : d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+  return (
+    <div className="leading-tight whitespace-nowrap">
+      <p className="text-xs font-semibold text-foreground">{top}</p>
+      <p className="text-[11px] text-muted-foreground tabular-nums">{time}</p>
+    </div>
+  );
+};
+
 const Thumb = ({ r }: { r: VehicleRow }) => {
   const [err, setErr] = useState(false);
   const tint =
