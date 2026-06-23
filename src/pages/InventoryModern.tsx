@@ -529,52 +529,6 @@ const InventoryModern = () => {
 
         {/* Sidebar */}
         <aside className="xl:w-[300px] shrink-0 space-y-4">
-          <SideCard title="Inventory Insights">
-            <ul className="space-y-3">
-              <InsightStat icon={Car} value={counts.total} label="Total Vehicles" iconTone="blue" onClick={() => onHealthMetric("total")} />
-              <InsightStat icon={CheckCircle2} value={counts.vinDecoded} label="VIN Decoded" iconTone="emerald" badge={counts.total ? `${Math.round((counts.vinDecoded / counts.total) * 100)}%` : undefined} />
-              <InsightStat icon={Printer} value={counts.needsSticker} label="Missing Stickers" iconTone="amber" onClick={() => onHealthMetric("needs-sticker")} />
-              <InsightStat icon={FileText} value={counts.missingAddendum} label="Missing Addendums" iconTone="orange" onClick={() => onHealthMetric("missing-addendum")} />
-              <InsightStat icon={ShieldCheck} value={counts.openRecallVehicles} label="Open Recalls" iconTone="red" onClick={() => onHealthMetric("open-recalls")} />
-              <InsightStat icon={Tag} value={counts.priceVerify} label="Price Reviews" iconTone="violet" onClick={() => onHealthMetric("price-reviews")} />
-            </ul>
-            <div className="mt-4 pt-3 border-t border-border">
-              <p className="text-[11px] font-semibold text-muted-foreground">Average Readiness Score</p>
-              <div className="mt-1 flex items-end justify-between gap-2">
-                <span className="font-display text-3xl font-semibold text-foreground tabular-nums leading-none">{counts.avgReadiness}%</span>
-                <Sparkline values={readinessSpark} />
-              </div>
-              <button onClick={() => navigate("/admin?tab=analytics")} className="text-[11px] font-semibold text-blue-600 hover:text-blue-700 mt-3 transition-colors">View full insights →</button>
-            </div>
-          </SideCard>
-
-          <SideCard title="Recent Activity">
-            {activity.length === 0 ? (
-              <p className="text-xs text-muted-foreground">No recent activity yet. Sticker generations, prep sign-offs, and customer signings appear here.</p>
-            ) : (
-              <>
-                <ul className="space-y-2.5">
-                  {activity.map((a) => {
-                    const { icon: Icon, tone } = activityIcon(a.action);
-                    const d = (a.details || {}) as Record<string, unknown>;
-                    const detail = String(d.stock || d.vin || d.customer_name || d.ymm || "").trim();
-                    return (
-                      <li key={a.id} className="flex items-start gap-2.5">
-                        <span className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 mt-0.5 ${tone}`}><Icon className="w-3.5 h-3.5" /></span>
-                        <div className="min-w-0">
-                          <p className="text-sm font-semibold text-foreground leading-tight">{prettyAction(a.action)}</p>
-                          {detail && <p className="text-[11px] text-muted-foreground truncate">{detail}</p>}
-                          <p className="text-[10px] text-muted-foreground">{new Date(a.created_at).toLocaleString()}</p>
-                        </div>
-                      </li>
-                    );
-                  })}
-                </ul>
-                <button onClick={() => navigate("/admin?tab=audit")} className="text-[11px] font-semibold text-blue-600 hover:text-blue-700 mt-3 transition-colors">View all activity →</button>
-              </>
-            )}
-          </SideCard>
-
           <div className="rounded-[20px] border border-[#EAECEF] bg-white shadow-[0_1px_3px_rgba(16,24,40,0.04)] p-4">
             <h3 className="text-xs font-bold uppercase tracking-[0.14em] text-muted-foreground mb-3">Quick Actions</h3>
             <div className="space-y-2">
@@ -588,6 +542,20 @@ const InventoryModern = () => {
               <QuickAction icon={Upload} label="CSV Import" onClick={() => setShowImport(true)} />
             </div>
           </div>
+
+          <SideCard title="Inventory Insights">
+            <ul className="space-y-3">
+              <InsightStat icon={Car} value={counts.total} label="Total Vehicles" iconTone="blue" onClick={() => onHealthMetric("total")} />
+              <InsightStat icon={CheckCircle2} value={counts.vinDecoded} label="VIN Decoded" iconTone="emerald" badge={counts.total ? `${Math.round((counts.vinDecoded / counts.total) * 100)}%` : undefined} />
+              <InsightStat icon={Printer} value={counts.needsSticker} label="Missing Stickers" iconTone="amber" onClick={() => onHealthMetric("needs-sticker")} />
+              <InsightStat icon={FileText} value={counts.missingAddendum} label="Missing Addendums" iconTone="orange" onClick={() => onHealthMetric("missing-addendum")} />
+              <InsightStat icon={ShieldCheck} value={counts.openRecallVehicles} label="Open Recalls" iconTone="red" onClick={() => onHealthMetric("open-recalls")} />
+              <InsightStat icon={Tag} value={counts.priceVerify} label="Price Reviews" iconTone="violet" onClick={() => onHealthMetric("price-reviews")} />
+            </ul>
+            <div className="mt-4 pt-3 border-t border-border">
+              <button onClick={() => navigate("/admin?tab=analytics")} className="text-[11px] font-semibold text-blue-600 hover:text-blue-700 transition-colors">View full insights →</button>
+            </div>
+          </SideCard>
         </aside>
       </div>
 
