@@ -184,9 +184,11 @@ const DescriptionWriter = () => {
   const [geoCity, setGeoCity] = useState(currentStore?.city || "Manchester");
   const [geoState, setGeoState] = useState(currentStore?.state || "Connecticut");
   const [primaryKeyword, setPrimaryKeyword] = useState("INFINITI QX80 for sale");
+  const [zipCode, setZipCode] = useState(currentStore?.postal_code || "06040");
+  const [radius, setRadius] = useState<number>(25);
   const [includeCallToAction, setIncludeCallToAction] = useState(true);
   const [includeDealerName, setIncludeDealerName] = useState(true);
-  const [selectedFeatures, setSelectedFeatures] = useState<string[]>(featureList.slice(0, 8));
+  const [selectedFeatures, setSelectedFeatures] = useState<string[]>(featureList);
   const [generating, setGenerating] = useState(false);
   const [copied, setCopied] = useState(false);
   const [description, setDescription] = useState("Experience luxury, power, and confidence in this 2025 INFINITI QX80 Sensory AWD. Finished in stunning Majestic White with a refined Graphite interior, this full-size SUV delivers a commanding presence and an exceptional driving experience. Powered by a 5.6L V8 engine paired with a smooth 9-speed automatic transmission and advanced all-wheel drive, the QX80 offers impressive performance in all conditions.\n\nThis QX80 Sensory is loaded with premium features including navigation, Bose premium audio, heated and ventilated seats, tri-zone climate control, panoramic moonroof, 360° around view monitor, ProPILOT Assist, head-up display, wireless Apple CarPlay, and a power liftgate for added convenience.\n\nWith three rows of seating, spacious comfort, and cutting-edge technology, this INFINITI QX80 is the perfect blend of luxury and capability.\n\nVisit Harte INFINITI in Manchester, CT today for a test drive!");
