@@ -555,8 +555,8 @@ const InventoryModern = () => {
             <EmptyState onAdd={() => setShowAdd(true)} total={rows.length} />
           ) : (
             <>
-              {/* Table (tablet/desktop) */}
-              <div className="hidden md:block rounded-2xl border border-border bg-card shadow-sm overflow-x-auto">
+              {/* Table view (tablet/desktop only when list mode) */}
+              <div className={`${viewMode === "list" ? "hidden md:block" : "hidden"} rounded-2xl border border-border bg-card shadow-sm overflow-x-auto`}>
                 <table className="w-full text-sm min-w-[820px]">
                   <thead className="bg-muted/40 text-[11px] uppercase tracking-wide text-muted-foreground">
                     <tr>
