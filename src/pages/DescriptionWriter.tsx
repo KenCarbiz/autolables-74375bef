@@ -418,48 +418,26 @@ function Card({ title, subtitle, badge, action, children }: { title: string; sub
 function Spec({ icon: Icon, label, value }: { icon: typeof Sparkles; label: string; value: string }) { return <div className="min-w-0"><div className="flex items-center gap-2 text-xs font-semibold text-slate-500"><Icon className="h-4 w-4" />{label}</div><div className="mt-1 truncate text-sm font-black text-slate-950">{value || "—"}</div></div>; }
 function FeatureLine({ label }: { label: string }) { return <div className="flex items-center gap-2 text-sm font-semibold text-slate-700"><CheckCircle2 className="h-4 w-4 text-emerald-600" /> {label}</div>; }
 function PresetCard({ card, active, onClick }: { card: PlatformConfig; active: boolean; onClick: () => void }) {
+  const Icon = card.icon;
+  const isGoogle = card.id === "googleseo";
   return (
     <button
       onClick={onClick}
-      className={`relative flex min-h-[170px] flex-col items-center rounded-2xl border p-4 text-center shadow-sm transition hover:-translate-y-0.5 hover:shadow-md ${active ? `${card.brandAccent} shadow-lg` : "border-slate-200 bg-white"}`}
+      className={`relative flex min-h-[150px] flex-col items-center justify-center rounded-2xl border p-4 text-center shadow-sm transition hover:-translate-y-0.5 hover:shadow-md ${active ? `${card.brandAccent} ring-2 ring-blue-500` : "border-slate-200 bg-white"}`}
     >
-      <div className="flex h-10 w-[120px] items-center justify-center rounded-xl border border-slate-100 bg-white px-3 shadow-sm">
-        <span className={`block max-w-full truncate text-center text-lg font-black leading-none ${card.logoClass}`}>{card.logoText}</span>
+      <div className={`flex h-14 w-14 items-center justify-center rounded-2xl ${card.logoBg} shadow-sm`}>
+        {Icon ? (
+          <Icon className={`h-8 w-8 ${card.iconColor || "text-slate-700"}`} />
+        ) : isGoogle ? (
+          <span className="text-2xl font-black"><span className="text-blue-500">G</span><span className="text-red-500">o</span><span className="text-amber-500">o</span><span className="text-blue-500">g</span><span className="text-emerald-500">l</span><span className="text-red-500">e</span></span>
+        ) : (
+          <span className={`text-base font-black leading-none ${card.logoClass}`}>{card.logoText}</span>
+        )}
       </div>
-      <div className="mt-4 font-black text-slate-950">{card.name}</div>
-      <div className="mt-1 min-h-[32px] text-xs font-semibold text-slate-500">{card.sub}</div>
-      <div className="mt-auto flex flex-wrap items-center justify-center gap-1.5 pt-3">
-        <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-[10px] font-black uppercase tracking-wide text-emerald-700">SEO Optimized</span>
-        <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[10px] font-black uppercase tracking-wide text-slate-600">Rules Loaded</span>
-      </div>
+      <div className="mt-3 text-base font-black text-slate-950">{card.name}</div>
+      <div className="mt-1 text-xs font-semibold text-slate-500">{card.optimizedFor}</div>
       {active && <CheckCircle2 className="absolute right-3 top-3 h-4 w-4 text-blue-600" />}
     </button>
-  );
-}
-function RequirementsPanel({ platform }: { platform: PlatformConfig }) {
-  return (
-    <Card title={`${platform.name} Requirements`} badge="Loaded">
-      <div className="mb-4 flex items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-3">
-        <div className="flex h-10 w-[120px] items-center justify-center rounded-xl bg-white px-3 shadow-sm">
-          <span className={`block max-w-full truncate text-center text-lg font-black leading-none ${platform.logoClass}`}>{platform.logoText}</span>
-        </div>
-        <div>
-          <div className="text-sm font-black text-slate-950">{platform.name}</div>
-          <div className="text-xs font-semibold text-emerald-700">Requirements Loaded</div>
-        </div>
-      </div>
-      <div className="grid gap-3 text-sm">
-        <Requirement label="Character limit" value={`${platform.characterLimit.toLocaleString()} max`} />
-        <Requirement label="Recommended length" value={platform.recommendedLength} />
-        <Requirement label="Formatting" value={platform.formattingRules} />
-        <div>
-          <div className="text-xs font-black uppercase tracking-wide text-slate-400">SEO focus</div>
-          <div className="mt-2 flex flex-wrap gap-2">
-            {platform.seoFocus.map((focus) => <span key={focus} className="rounded-lg bg-blue-50 px-2.5 py-1 text-xs font-bold text-blue-700">{focus}</span>)}
-          </div>
-        </div>
-      </div>
-    </Card>
   );
 }
 function Requirement({ label, value }: { label: string; value: string }) { return <div><div className="text-xs font-black uppercase tracking-wide text-slate-400">{label}</div><div className="mt-1 font-semibold text-slate-700">{value}</div></div>; }
