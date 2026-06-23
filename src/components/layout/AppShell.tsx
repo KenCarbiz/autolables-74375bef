@@ -167,7 +167,7 @@ const AppShell = ({ children }: AppShellProps) => {
         { label: "Trade-Up Sticker", path: "/trade-up", icon: TrendingUp },
         { label: "Buyers Guide", path: "/buyers-guide", icon: ScrollText, featureKey: "feature_buyers_guide" },
         { label: "Used Vehicle Docs", path: "/used-vehicle-documents", icon: ScrollText, requireManager: true },
-        { label: "Description Studio", path: "/description-studio", icon: Sparkles },
+        { label: "Description Writer", path: "/description-writer", icon: Sparkles },
       ],
     },
     compliance: {
