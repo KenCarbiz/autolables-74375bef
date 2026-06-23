@@ -32,17 +32,14 @@ import {
   BookOpen,
   Car,
   Award,
-  Clock,
   CreditCard,
   RefreshCw,
   Search,
   HelpCircle,
-  PenLine,
   CheckCircle2,
   Truck,
   Building2,
   ExternalLink,
-  Lock,
   LayoutTemplate,
   QrCode,
   FileWarning,
@@ -56,9 +53,8 @@ import { useAudit } from "@/contexts/AuditContext";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import Logo from "@/components/brand/Logo";
-
 import CommandPalette, { useCommandPalette } from "@/components/layout/CommandPalette";
-import { ALL_PRODUCTS, getSubscribedProducts } from "@/components/layout/AppSwitcher";
+import { ALL_PRODUCTS } from "@/components/layout/AppSwitcher";
 import { VinScanContext, prefersLiveScanner } from "@/contexts/VinScanContext";
 import {
   DropdownMenu,
@@ -79,8 +75,6 @@ interface NavItem {
   icon: typeof LayoutDashboard;
   badge?: string | number;
   featureKey?: string;
-  // Visibility predicates (fail-open). requireManager = dealership
-  // owner/admin/manager; requireAdmin = platform super-admin.
   requireManager?: boolean;
   requireAdmin?: boolean;
 }
@@ -91,39 +85,37 @@ interface NavSection {
   defaultOpen?: boolean;
 }
 
+const productIcon = (id: string) => {
+  if (id === "autolabels") return Tag;
+  if (id === "autocurb") return Car;
+  if (id === "autoframe") return Building2;
+  return Truck;
+};
+
 const AppShell = ({ children }: AppShellProps) => {
   const { user, isAdmin, signOut } = useAuth();
   const { tenant, currentStore, stores, setCurrentStore } = useTenant();
   const { settings } = useDealerSettings();
   const { member } = useEntitlements();
-  // Dealership role gate. Unknown/missing role fails open to manager so a
-  // slow membership read never hides a manager's nav.
   const role = member?.role;
   const isManager = isAdmin || !role || role === "owner" || role === "admin" || role === "manager";
   const { entries } = useAudit();
   const location = useLocation();
   const navigate = useViewTransitionNavigate();
-  // Keep the base hook import exported in case any legacy code below
-  // still needs the raw version without view transitions.
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const _baseNavigate = useBaseNavigate;
   const [mobileOpen, setMobileOpen] = useState(false);
   const [showMobileQr, setShowMobileQr] = useState(false);
-  // Collapse the mobile header's action row once the content scrolls, so the
-  // long inventory list isn't fighting a tall fixed header for space.
-  const [mScrolled, setMScrolled] = useState(false);
   const { open: paletteOpen, setOpen: setPaletteOpen } = useCommandPalette();
-  // Device-aware VIN scan, shared with every page via VinScanContext:
-  // live camera on phone/tablet, QR hand-off on desktop.
+  const [marketCheckConnected, setMarketCheckConnected] = useState(false);
+  const [marketCheckLabel, setMarketCheckLabel] = useState("MarketCheck Pending");
+
   const openScan = useCallback(() => {
     if (prefersLiveScanner()) navigate("/scan");
     else setShowMobileQr(true);
   }, [navigate]);
   const vinScanApi = useMemo(() => ({ openScan }), [openScan]);
-  // Wave 14.5.1 — collapsible icon-rail. Persisted per-user so a
-  // pinned-collapsed dealer doesn't have to re-collapse every
-  // session. Mobile (lg:) keeps the existing slide-in behaviour;
-  // collapse only applies to the desktop persistent rail.
+
   const [collapsed, setCollapsed] = useState<boolean>(() => {
     if (typeof window !== "undefined") {
       return localStorage.getItem("sidebar_collapsed") === "1";
@@ -139,9 +131,7 @@ const AppShell = ({ children }: AppShellProps) => {
       return next;
     });
   };
-  // Sections start with sensible defaults, but any section whose
-  // items include the current route is force-opened below so links
-  // are actually visible while you're on the matching page.
+
   const [openSections, setOpenSections] = useState<Record<string, boolean>>({
     documents: true,
     inventory: true,
@@ -210,19 +200,17 @@ const AppShell = ({ children }: AppShellProps) => {
       title: "PLATFORM",
       defaultOpen: false,
       items: [
-        { label: "Tenants",            path: "/platform-admin?tab=tenants",      icon: Store,       requireAdmin: true },
-        { label: "Members",            path: "/platform-admin?tab=members",      icon: Users,       requireAdmin: true },
-        { label: "Entitlements",       path: "/platform-admin?tab=entitlements", icon: Award,       requireAdmin: true },
-        { label: "Platform Audit",     path: "/platform-admin?tab=audit",        icon: ShieldCheck, requireAdmin: true },
-        { label: "Recall Refresh",     path: "/platform-admin?tab=recalls",      icon: RefreshCw,   requireAdmin: true },
-        { label: "Billing Handshake",  path: "/platform-admin?tab=billing",      icon: CreditCard,  requireAdmin: true },
-        { label: "Sticker Templates",  path: "/platform-admin?tab=templates",    icon: LayoutTemplate, requireAdmin: true },
+        { label: "Tenants", path: "/platform-admin?tab=tenants", icon: Store, requireAdmin: true },
+        { label: "Members", path: "/platform-admin?tab=members", icon: Users, requireAdmin: true },
+        { label: "Entitlements", path: "/platform-admin?tab=entitlements", icon: Award, requireAdmin: true },
+        { label: "Platform Audit", path: "/platform-admin?tab=audit", icon: ShieldCheck, requireAdmin: true },
+        { label: "Recall Refresh", path: "/platform-admin?tab=recalls", icon: RefreshCw, requireAdmin: true },
+        { label: "Billing Handshake", path: "/platform-admin?tab=billing", icon: CreditCard, requireAdmin: true },
+        { label: "Sticker Templates", path: "/platform-admin?tab=templates", icon: LayoutTemplate, requireAdmin: true },
       ],
     },
   };
 
-  // Compose feature-flag + role gating. Fail-open: only hide when we
-  // positively know the user lacks the role.
   const filterItems = (items: NavItem[]) =>
     items.filter(i =>
       (!i.featureKey || (settings as unknown as Record<string, unknown>)[i.featureKey]) &&
@@ -235,10 +223,6 @@ const AppShell = ({ children }: AppShellProps) => {
     navigate("/login");
   };
 
-  // Manage billing opens the Stripe Customer Portal via the
-  // billing-portal-session edge function. All four apps in the
-  // Autocurb family use the same Stripe Customer, so this works
-  // identically wherever the dealer clicks it.
   const handleManageBilling = async () => {
     try {
       const { data, error } = await supabase.functions.invoke(
@@ -255,7 +239,6 @@ const AppShell = ({ children }: AppShellProps) => {
     }
   };
 
-
   const toggleSection = (key: string) => {
     setOpenSections({ ...openSections, [key]: !openSections[key] });
   };
@@ -267,8 +250,6 @@ const AppShell = ({ children }: AppShellProps) => {
     return location.search === `?${search}`;
   };
 
-  // Force-open any section that contains the active route; this fixes
-  // deep links into collapsed sections (e.g. /setup or /admin?tab=...).
   useEffect(() => {
     setOpenSections(prev => {
       const next = { ...prev };
@@ -282,25 +263,70 @@ const AppShell = ({ children }: AppShellProps) => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [location.pathname, location.search]);
 
+  useEffect(() => {
+    let mounted = true;
+    const loadMarketCheck = async () => {
+      if (!tenant?.id) {
+        setMarketCheckConnected(false);
+        setMarketCheckLabel("MarketCheck Pending");
+        return;
+      }
+      try {
+        const { data } = await (supabase as any)
+          .from("marketcheck_sync_config")
+          .select("last_run_at,last_status")
+          .eq("tenant_id", tenant.id)
+          .maybeSingle();
+        if (!mounted) return;
+        const connected = !!data?.last_run_at || !!data?.last_status;
+        setMarketCheckConnected(connected);
+        setMarketCheckLabel(connected ? "MarketCheck Connected" : "MarketCheck Pending");
+      } catch {
+        if (!mounted) return;
+        setMarketCheckConnected(false);
+        setMarketCheckLabel("MarketCheck Pending");
+      }
+    };
+    loadMarketCheck();
+    return () => { mounted = false; };
+  }, [tenant?.id]);
+
   const unreadAudit = entries.filter(e => e.action === "compliance_block" || e.action === "price_integrity_block").length;
 
   const visibleSections = Object.entries(sections)
     .map(([key, section]) => [key, { ...section, items: filterItems(section.items) }] as const)
     .filter(([, section]) => section.items.length > 0);
 
-  const currentLabel = visibleSections
+  const activeItem = visibleSections
     .flatMap(([, s]) => s.items)
-    .find(i => isActive(i.path))?.label || "Dashboard";
+    .find(i => isActive(i.path));
+
+  const pageTitles: Record<string, { title: string; subtitle: string }> = {
+    "/dashboard": { title: "Home", subtitle: "Your dealership command center." },
+    "/inventory": { title: "Inventory", subtitle: "Manage vehicles, labels, readiness, and publishing." },
+    "/saved": { title: "Deals", subtitle: "Review saved addendums, signatures, and delivery status." },
+    "/setup": { title: "Setup", subtitle: "Configure your dealership workspace." },
+    "/addendum": { title: "New Addendum", subtitle: "Create compliant addendum labels and forms." },
+    "/new-car-sticker": { title: "New Car Sticker", subtitle: "Generate new vehicle window labels." },
+    "/used-car-sticker": { title: "Used Car Sticker", subtitle: "Generate used vehicle buyer-facing labels." },
+    "/sticker-studio": { title: "Sticker Studio", subtitle: "Build and customize label templates." },
+    "/compliance": { title: "Compliance", subtitle: "Track dealership forms, rules, and audit items." },
+  };
+  const pageMeta = pageTitles[location.pathname] || { title: activeItem?.label || "Dashboard", subtitle: "AutoLabels admin workspace." };
+  const companyName = currentStore?.name || tenant?.name || (settings.dealer_name && settings.dealer_name !== "Your Dealership" ? settings.dealer_name : "Select store");
+
+  const openProduct = (url: string) => {
+    if (url.startsWith("http")) window.open(url, "_blank", "noreferrer");
+    else navigate(url);
+  };
 
   const shell = (
     <VinScanContext.Provider value={vinScanApi}>
       <div className="min-h-screen bg-background flex w-full overflow-hidden">
-        {/* Mobile overlay */}
         {mobileOpen && (
           <div className="fixed inset-0 z-40 bg-black/50 lg:hidden" onClick={() => setMobileOpen(false)} />
         )}
 
-        {/* Sidebar */}
         <aside className={`fixed lg:sticky top-0 left-0 z-50 h-screen bg-card border-r border-border transition-all duration-200 lg:translate-x-0 ${mobileOpen ? "translate-x-0" : "-translate-x-full"} ${collapsed ? "lg:w-20" : "lg:w-64"} w-64 flex flex-col`}>
           <div className="h-16 flex items-center justify-between px-4 border-b border-border flex-shrink-0">
             <Link to="/dashboard" className={`flex items-center gap-3 min-w-0 ${collapsed ? "lg:justify-center lg:w-full" : ""}`}>
@@ -363,43 +389,35 @@ const AppShell = ({ children }: AppShellProps) => {
           </div>
         </aside>
 
-        {/* Main */}
         <div className="flex-1 flex flex-col min-w-0 h-screen overflow-hidden">
-          {/* Top bar */}
-          <header className={`h-14 lg:h-16 border-b border-border bg-card/95 backdrop-blur-sm flex items-center justify-between px-4 lg:px-6 flex-shrink-0 transition-transform duration-200 ${mScrolled ? "-translate-y-14 lg:translate-y-0" : "translate-y-0"}`}>
-            <div className="flex items-center gap-3">
+          <header className="h-16 border-b border-border bg-card/95 backdrop-blur-sm flex items-center justify-between gap-3 px-4 lg:px-6 flex-shrink-0">
+            <div className="flex min-w-0 items-center gap-3">
               <button onClick={() => setMobileOpen(true)} className="lg:hidden p-2 rounded-md hover:bg-muted">
                 <Menu className="h-5 w-5" />
               </button>
-              <div>
-                <h1 className="text-lg font-semibold text-foreground hidden sm:block">{currentLabel}</h1>
-                <p className="text-xs text-muted-foreground hidden lg:block">{tenant?.name || "AutoLabels"}{currentStore ? ` · ${currentStore.name}` : ""}</p>
+              <div className="min-w-0">
+                <h1 className="truncate text-lg font-black tracking-tight text-foreground sm:text-xl">{pageMeta.title}</h1>
+                <p className="hidden truncate text-xs font-medium text-muted-foreground md:block">{pageMeta.subtitle}</p>
               </div>
             </div>
 
-            <div className="flex items-center gap-2">
-              <button onClick={openScan} className="h-9 px-3 rounded-lg bg-primary text-primary-foreground text-sm font-medium flex items-center gap-2 hover:opacity-90">
-                <ScanLine className="h-4 w-4" />
-                <span className="hidden sm:inline">Scan VIN</span>
-              </button>
+            <div className="flex shrink-0 items-center gap-2">
+              <div className={`hidden h-9 items-center gap-2 rounded-full border px-3 text-xs font-black lg:flex ${marketCheckConnected ? "border-emerald-200 bg-emerald-50 text-emerald-700" : "border-amber-200 bg-amber-50 text-amber-700"}`}>
+                <span className={`h-2 w-2 rounded-full ${marketCheckConnected ? "bg-emerald-500" : "bg-amber-500"}`} />
+                {marketCheckLabel}
+              </div>
 
-              <button onClick={() => navigate("/admin?tab=audit")} className="relative p-2 rounded-lg hover:bg-muted text-muted-foreground hover:text-foreground">
-                <Bell className="h-5 w-5" />
-                {unreadAudit > 0 && <span className="absolute -top-0.5 -right-0.5 h-4 min-w-4 px-1 rounded-full bg-destructive text-destructive-foreground text-[10px] flex items-center justify-center">{unreadAudit}</span>}
-              </button>
-
-              {/* Store selector */}
-              {stores.length > 0 && (
+              {stores.length > 1 ? (
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
-                    <button className="h-9 px-3 rounded-lg border border-border bg-background text-sm font-medium flex items-center gap-2 hover:bg-muted max-w-[180px]">
-                      <Store className="h-4 w-4 flex-shrink-0" />
-                      <span className="truncate hidden sm:inline">{currentStore?.name || "Select store"}</span>
-                      <ChevronsUpDown className="h-3 w-3 flex-shrink-0" />
+                    <button className="hidden h-9 max-w-[220px] items-center gap-2 rounded-full border border-border bg-background px-3 text-sm font-black hover:bg-muted md:flex">
+                      <Store className="h-4 w-4 flex-shrink-0 text-primary" />
+                      <span className="truncate">{companyName}</span>
+                      <ChevronsUpDown className="h-3 w-3 flex-shrink-0 text-muted-foreground" />
                     </button>
                   </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end" className="w-56 bg-card">
-                    <DropdownMenuLabel>Dealership</DropdownMenuLabel>
+                  <DropdownMenuContent align="end" className="w-64 bg-card">
+                    <DropdownMenuLabel>Switch location</DropdownMenuLabel>
                     <DropdownMenuSeparator />
                     {stores.map((store) => (
                       <DropdownMenuItem key={store.id} onClick={() => setCurrentStore(store)} className="cursor-pointer">
@@ -412,47 +430,54 @@ const AppShell = ({ children }: AppShellProps) => {
                     ))}
                   </DropdownMenuContent>
                 </DropdownMenu>
+              ) : (
+                <div className="hidden h-9 max-w-[220px] items-center gap-2 rounded-full border border-border bg-background px-3 text-sm font-black md:flex">
+                  <Store className="h-4 w-4 flex-shrink-0 text-primary" />
+                  <span className="truncate">{companyName}</span>
+                </div>
               )}
 
-              {/* App switcher */}
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <button className="h-9 px-3 rounded-lg border border-border bg-background text-sm font-medium flex items-center gap-2 hover:bg-muted">
-                    <Package className="h-4 w-4" />
-                    <span className="hidden sm:inline">Apps</span>
-                  </button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-64 bg-card">
-                  <DropdownMenuLabel>Autocurb Suite</DropdownMenuLabel>
-                  <DropdownMenuSeparator />
-                  {ALL_PRODUCTS.map((p) => (
-                    <DropdownMenuItem key={p.id} asChild>
-                      <a href={p.url} target="_blank" rel="noreferrer" className="cursor-pointer">
-                        <div className="w-8 h-8 rounded-md bg-muted flex items-center justify-center mr-2">
-                          {p.id === "autolabels" ? <Tag className="h-4 w-4" /> : p.id === "autocurb" ? <Car className="h-4 w-4" /> : p.id === "autoframe" ? <Building2 className="h-4 w-4" /> : <Truck className="h-4 w-4" />}
-                        </div>
-                        <div className="flex-1">
-                          <div className="font-medium flex items-center gap-1">{p.name}{p.id !== "autolabels" && <ExternalLink className="h-3 w-3" />}</div>
-                          <div className="text-xs text-muted-foreground truncate">{p.description}</div>
-                        </div>
-                      </a>
-                    </DropdownMenuItem>
-                  ))}
-                </DropdownMenuContent>
-              </DropdownMenu>
+              <button onClick={openScan} className="hidden h-9 items-center gap-2 rounded-full bg-primary px-3 text-sm font-black text-primary-foreground hover:opacity-90 sm:flex">
+                <ScanLine className="h-4 w-4" />
+                <span className="hidden lg:inline">Scan VIN</span>
+              </button>
+
+              <button onClick={() => navigate("/admin?tab=audit")} className="relative p-2 rounded-full hover:bg-muted text-muted-foreground hover:text-foreground">
+                <Bell className="h-5 w-5" />
+                {unreadAudit > 0 && <span className="absolute -top-0.5 -right-0.5 h-4 min-w-4 px-1 rounded-full bg-destructive text-destructive-foreground text-[10px] flex items-center justify-center">{unreadAudit}</span>}
+              </button>
 
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <button className="h-9 w-9 rounded-lg bg-primary text-primary-foreground flex items-center justify-center text-sm font-semibold">
+                  <button className="h-10 w-10 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-sm font-black shadow-sm">
                     {user?.email?.charAt(0).toUpperCase() || "U"}
                   </button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-56 bg-card">
+                <DropdownMenuContent align="end" className="w-80 bg-card">
                   <DropdownMenuLabel>
-                    <div className="truncate">{user?.email}</div>
+                    <div className="truncate text-sm font-black">{user?.email}</div>
                     {isAdmin && <div className="text-xs text-primary">Platform Admin</div>}
                   </DropdownMenuLabel>
                   <DropdownMenuSeparator />
+                  <DropdownMenuLabel className="text-[11px] uppercase tracking-wider text-muted-foreground">App switcher</DropdownMenuLabel>
+                  {ALL_PRODUCTS.map((p) => {
+                    const Icon = productIcon(p.id);
+                    return (
+                      <DropdownMenuItem key={p.id} onClick={() => openProduct(p.url)} className="cursor-pointer py-2.5">
+                        <div className="mr-3 flex h-9 w-9 items-center justify-center rounded-xl bg-muted">
+                          <Icon className="h-4 w-4" />
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-1 font-black">{p.name}{p.url.startsWith("http") && <ExternalLink className="h-3 w-3" />}</div>
+                          <div className="truncate text-xs text-muted-foreground">{p.description}</div>
+                        </div>
+                      </DropdownMenuItem>
+                    );
+                  })}
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={() => navigate("/admin?tab=team")} className="cursor-pointer">
+                    <Users className="h-4 w-4 mr-2" /> Profile / Team
+                  </DropdownMenuItem>
                   <DropdownMenuItem onClick={() => navigate("/admin?tab=settings")} className="cursor-pointer">
                     <Settings className="h-4 w-4 mr-2" /> Settings
                   </DropdownMenuItem>
@@ -471,8 +496,7 @@ const AppShell = ({ children }: AppShellProps) => {
             </div>
           </header>
 
-          {/* Mobile secondary bar */}
-          <div className={`lg:hidden border-b border-border bg-card/95 px-3 py-2 flex items-center gap-2 overflow-x-auto transition-all duration-200 ${mScrolled ? "h-0 py-0 border-0 overflow-hidden" : ""}`}>
+          <div className="lg:hidden border-b border-border bg-card/95 px-3 py-2 flex items-center gap-2 overflow-x-auto">
             <button onClick={() => navigate("/addendum")} className="flex-shrink-0 h-8 px-3 rounded-md bg-primary text-primary-foreground text-xs font-medium flex items-center gap-1.5">
               <FileText className="h-3.5 w-3.5" /> Addendum
             </button>
@@ -487,20 +511,11 @@ const AppShell = ({ children }: AppShellProps) => {
             </button>
           </div>
 
-          {/* Content */}
-          <main
-            id="app-scroll"
-            className="flex-1 overflow-y-auto"
-            onScroll={(e) => {
-              const top = (e.currentTarget as HTMLElement).scrollTop;
-              setMScrolled(top > 12);
-            }}
-          >
+          <main id="app-scroll" className="flex-1 overflow-y-auto">
             {children}
           </main>
         </div>
 
-        {/* Desktop QR modal for mobile scan handoff */}
         {showMobileQr && (
           <div className="fixed inset-0 z-[60] bg-black/50 flex items-center justify-center p-4" onClick={() => setShowMobileQr(false)}>
             <div className="bg-card rounded-2xl p-6 max-w-sm w-full text-center" onClick={e => e.stopPropagation()}>
@@ -524,8 +539,6 @@ const AppShell = ({ children }: AppShellProps) => {
     </VinScanContext.Provider>
   );
 
-  // Desktop-only onboarding nudge: if a signed-in user has the house fallback
-  // tenant and isn't already on onboarding, guide them to finish setup.
   useEffect(() => {
     if (!user) return;
     if (tenant?.id !== "house") return;
