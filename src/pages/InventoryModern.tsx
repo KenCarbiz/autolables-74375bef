@@ -676,13 +676,14 @@ const ReadinessCell = ({ r, signal, pct }: { r: VehicleRow; signal: RowSignal; p
   ];
   const missing = checks.filter((c) => !c.ok).length;
   const label = pct >= 100 ? "Ready" : pct >= 80 ? "Almost Ready" : missing <= 1 ? "Missing Items" : "Several Missing";
+  const labelTone = pct >= 100 ? "text-emerald-700" : pct >= 80 ? "text-blue-700" : missing <= 1 ? "text-amber-700" : "text-red-600";
   const title = `${pct}% readiness\n` + checks.map((c) => `${c.ok ? "✓" : "✗"} ${c.label}`).join("\n");
   return (
     <div className="flex items-center gap-2.5 cursor-help" title={title}>
       <MiniRing pct={pct} />
       <div className="min-w-0 leading-tight">
-        <p className="text-[13px] font-semibold text-foreground">{label}</p>
-        {pct < 100 && <p className="text-[11px] font-semibold text-blue-600">View reasons</p>}
+        <p className={`text-xs font-semibold tracking-tight ${labelTone}`}>{label}</p>
+        {pct < 100 && <p className="text-[11px] font-semibold text-blue-600 mt-0.5">View reasons</p>}
       </div>
     </div>
   );
