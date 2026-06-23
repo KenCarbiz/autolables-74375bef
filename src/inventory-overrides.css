@@ -1,0 +1,47 @@
+/* Inventory desktop/tablet row polish
+   Keeps the uploaded weekend-style inventory rows: roomy lines with a true
+   rectangular vehicle photo, softer cards, and cleaner spacing. */
+@media (min-width: 1024px) {
+  main section.overflow-hidden.rounded-3xl.border.border-slate-200.bg-white.shadow-sm > div.grid.cursor-pointer {
+    grid-template-columns: 36px minmax(360px, 1.75fr) minmax(150px, 0.9fr) minmax(115px, 0.7fr) minmax(120px, 0.7fr) minmax(110px, 0.7fr) minmax(110px, 0.65fr) 96px !important;
+    min-height: 118px;
+    padding: 14px 18px !important;
+    background: #fff;
+  }
+
+  main section.overflow-hidden.rounded-3xl.border.border-slate-200.bg-white.shadow-sm > div.grid.cursor-pointer:hover {
+    background: #f8fafc;
+  }
+
+  main section.overflow-hidden.rounded-3xl.border.border-slate-200.bg-white.shadow-sm > div.grid.cursor-pointer img.h-16.w-24.rounded-xl.object-cover {
+    width: 154px !important;
+    height: 92px !important;
+    min-width: 154px;
+    border-radius: 16px !important;
+    object-fit: cover;
+    box-shadow: 0 1px 2px rgba(15, 23, 42, 0.08), 0 10px 20px rgba(15, 23, 42, 0.06);
+  }
+
+  main section.overflow-hidden.rounded-3xl.border.border-slate-200.bg-white.shadow-sm > div.grid.cursor-pointer > div:nth-child(2) {
+    gap: 18px !important;
+  }
+
+  main section.overflow-hidden.rounded-3xl.border.border-slate-200.bg-white.shadow-sm > div.grid.cursor-pointer > div:nth-child(2) > div > div:first-child {
+    font-size: 16px;
+    line-height: 1.25;
+  }
+
+  main section.overflow-hidden.rounded-3xl.border.border-slate-200.bg-white.shadow-sm > div.grid.cursor-pointer > div:nth-child(2) > div > div:nth-child(2) {
+    margin-top: 3px;
+  }
+}
+
+@media (min-width: 768px) and (max-width: 1023px) {
+  main section.overflow-hidden.rounded-3xl.border.border-slate-200.bg-white.shadow-sm > div.grid.cursor-pointer img.h-16.w-24.rounded-xl.object-cover {
+    width: 132px !important;
+    height: 82px !important;
+    min-width: 132px;
+    border-radius: 15px !important;
+    object-fit: cover;
+  }
+}
