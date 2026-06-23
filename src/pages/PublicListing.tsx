@@ -42,6 +42,7 @@ import PublicLanguageToggle from "@/components/layout/PublicLanguageToggle";
 import VehicleInsights from "@/components/listing/VehicleInsights";
 import MarketValueReport from "@/components/listing/MarketValueReport";
 import DealerProgramsSection from "@/components/listing/DealerProgramsSection";
+import IncentivesSection from "@/components/listing/IncentivesSection";
 import OemSticker from "@/components/listing/OemSticker";
 import PassportDocuments from "@/components/listing/PassportDocuments";
 import { listingOptions } from "@/lib/vehicleInsights";
@@ -292,6 +293,10 @@ const PublicListingBody = () => {
             powertrain, lifetime powertrain, free maintenance), snapshotted
             onto the listing at publish. Self-hides when none apply. */}
         {packetVisible(listing, "programs") && <DealerProgramsSection programs={listing.dealer_snapshot?.programs} />}
+
+        {/* OEM incentives — dealer-controlled; self-hides unless the dealer
+            enabled them in Admin > Incentives. */}
+        <IncentivesSection tenantId={listing.tenant_id} vin={listing.vin} dealerCity={dealer.city} dealerState={dealer.state} />
 
         {/* Recall banner — only shows if the campaign data has
             anything actionable. Clear listings don't need the visual
