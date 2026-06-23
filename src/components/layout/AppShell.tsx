@@ -28,6 +28,7 @@ import {
   Menu,
   Package,
   Palette,
+  Plus,
   QrCode,
   RefreshCw,
   Rocket,
@@ -384,6 +385,27 @@ const AppShell = ({ children }: AppShellProps) => {
             </button>
           </div>
 
+          {/* Quick add / scan — primary inventory entry points */}
+          <div className="flex items-center gap-2 px-3 pt-3">
+            <button
+              onClick={() => navigate("/inventory?add=1")}
+              className={`h-10 inline-flex items-center justify-center gap-2 rounded-full bg-blue-600 text-white text-sm font-semibold shadow-sm hover:bg-blue-700 transition-colors ${collapsed ? "lg:w-full" : "flex-1"}`}
+              title="Add a vehicle"
+            >
+              <Plus className="h-4 w-4 stroke-[2.5]" />
+              {!collapsed && <span>Add Vehicle</span>}
+            </button>
+            {!collapsed && (
+              <button
+                onClick={openScan}
+                className="h-10 w-10 inline-flex items-center justify-center rounded-xl border border-border bg-card hover:bg-muted shrink-0"
+                title="Scan a VIN"
+              >
+                <span className="flex h-7 w-7 items-center justify-center rounded-full bg-blue-100 text-blue-600"><ScanLine className="h-4 w-4 stroke-[2.5]" /></span>
+              </button>
+            )}
+          </div>
+
           <nav className="flex-1 overflow-y-auto p-3 space-y-1">
             {visibleSections.map(([key, section]) => {
               const open = section.defaultOpen || openSections[key];
@@ -504,71 +526,73 @@ const AppShell = ({ children }: AppShellProps) => {
             </button>
 
             <div className="flex shrink-0 items-center gap-2 ml-auto">
-              {/* Dealer card — its own card; opens a searchable location switcher */}
-              {stores.length > 1 ? (
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <button className="hidden xl:flex h-11 items-center gap-2 rounded-xl border border-border bg-card px-3 hover:bg-muted">
-                      <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-blue-600/10 text-blue-700 shrink-0"><Building2 className="h-4 w-4" /></span>
-                      <span className="min-w-0 text-left leading-tight">
-                        <span className="block truncate max-w-[150px] text-[12px] font-bold text-foreground">{companyName}</span>
-                        {dealerLocation && <span className="block text-[10px] text-muted-foreground">{dealerLocation}</span>}
-                      </span>
-                      <ChevronDown className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-                    </button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="start" className="w-72 bg-card p-0">
-                    <div className="p-2">
-                      <div className="relative">
-                        <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
-                        <input
-                          value={storeFilter}
-                          onChange={(e) => setStoreFilter(e.target.value)}
-                          onKeyDown={(e) => e.stopPropagation()}
-                          placeholder="Search dealerships…"
-                          className="h-9 w-full rounded-lg border border-border bg-background pl-8 pr-3 text-sm outline-none focus:border-foreground/20"
-                        />
-                      </div>
-                    </div>
-                    <div className="max-h-72 overflow-y-auto px-1 pb-1">
-                      {filteredStores.length === 0 ? (
-                        <p className="px-3 py-6 text-center text-xs text-muted-foreground">No dealerships match.</p>
-                      ) : filteredStores.map((store) => {
-                        const active = store.id === currentStore?.id;
-                        return (
-                          <button
-                            key={store.id}
-                            onClick={() => { setCurrentStore(store); setStoreFilter(""); }}
-                            className={`w-full flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-left hover:bg-muted ${active ? "bg-blue-50/60" : ""}`}
-                          >
-                            <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-600/10 text-blue-700 shrink-0"><Building2 className="h-4 w-4" /></span>
-                            <span className="min-w-0 flex-1 leading-tight">
-                              <span className="block truncate text-[13px] font-semibold text-foreground">{store.name}</span>
-                              {(store.city || store.state) && <span className="block truncate text-[11px] text-muted-foreground">{[store.city, store.state].filter(Boolean).join(", ")}</span>}
-                            </span>
-                            {active && <Check className="h-4 w-4 shrink-0 text-blue-600" />}
-                          </button>
-                        );
-                      })}
-                    </div>
-                    <DropdownMenuSeparator className="my-0" />
-                    <DropdownMenuItem onClick={() => navigate("/admin?tab=home")} className="cursor-pointer gap-2.5 py-2.5">
-                      <Settings className="h-4 w-4 text-muted-foreground" /> Manage Dealerships
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              ) : (
-                <div className="hidden xl:flex h-11 items-center gap-2 rounded-xl border border-border bg-card px-3">
-                  <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-blue-600/10 text-blue-700 shrink-0"><Building2 className="h-4 w-4" /></span>
-                  <span className="min-w-0 leading-tight">
-                    <span className="block truncate max-w-[150px] text-[12px] font-bold text-foreground">{companyName}</span>
-                    {dealerLocation && <span className="block text-[10px] text-muted-foreground">{dealerLocation}</span>}
-                  </span>
-                </div>
-              )}
-
-              {/* Sync + MarketCheck — one card, divider between */}
+              {/* Dealer · last synced · MarketCheck — one card, dashed dividers */}
               <div className="hidden xl:flex h-11 items-stretch rounded-xl border border-border bg-card overflow-hidden">
+                {stores.length > 1 ? (
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <button className="flex items-center gap-2 px-3 hover:bg-muted">
+                        <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-blue-600/10 text-blue-700 shrink-0"><Building2 className="h-4 w-4" /></span>
+                        <span className="min-w-0 text-left leading-tight">
+                          <span className="block truncate max-w-[150px] text-[12px] font-bold text-foreground">{companyName}</span>
+                          {dealerLocation && <span className="block text-[10px] text-muted-foreground">{dealerLocation}</span>}
+                        </span>
+                        <ChevronDown className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                      </button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="start" className="w-72 bg-card p-0">
+                      <div className="p-2">
+                        <div className="relative">
+                          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+                          <input
+                            value={storeFilter}
+                            onChange={(e) => setStoreFilter(e.target.value)}
+                            onKeyDown={(e) => e.stopPropagation()}
+                            placeholder="Search dealerships…"
+                            className="h-9 w-full rounded-lg border border-border bg-background pl-8 pr-3 text-sm outline-none focus:border-foreground/20"
+                          />
+                        </div>
+                      </div>
+                      <div className="max-h-72 overflow-y-auto px-1 pb-1">
+                        {filteredStores.length === 0 ? (
+                          <p className="px-3 py-6 text-center text-xs text-muted-foreground">No dealerships match.</p>
+                        ) : filteredStores.map((store) => {
+                          const active = store.id === currentStore?.id;
+                          return (
+                            <button
+                              key={store.id}
+                              onClick={() => { setCurrentStore(store); setStoreFilter(""); }}
+                              className={`w-full flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-left hover:bg-muted ${active ? "bg-blue-50/60" : ""}`}
+                            >
+                              <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-600/10 text-blue-700 shrink-0"><Building2 className="h-4 w-4" /></span>
+                              <span className="min-w-0 flex-1 leading-tight">
+                                <span className="block truncate text-[13px] font-semibold text-foreground">{store.name}</span>
+                                {(store.city || store.state) && <span className="block truncate text-[11px] text-muted-foreground">{[store.city, store.state].filter(Boolean).join(", ")}</span>}
+                              </span>
+                              {active && <Check className="h-4 w-4 shrink-0 text-blue-600" />}
+                            </button>
+                          );
+                        })}
+                      </div>
+                      <DropdownMenuSeparator className="my-0" />
+                      <DropdownMenuItem onClick={() => navigate("/admin?tab=home")} className="cursor-pointer gap-2.5 py-2.5">
+                        <Settings className="h-4 w-4 text-muted-foreground" /> Manage Dealerships
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                ) : (
+                  <div className="flex items-center gap-2 px-3">
+                    <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-blue-600/10 text-blue-700 shrink-0"><Building2 className="h-4 w-4" /></span>
+                    <span className="min-w-0 leading-tight">
+                      <span className="block truncate max-w-[150px] text-[12px] font-bold text-foreground">{companyName}</span>
+                      {dealerLocation && <span className="block text-[10px] text-muted-foreground">{dealerLocation}</span>}
+                    </span>
+                  </div>
+                )}
+
+                <span className="self-stretch border-l border-dashed border-border" />
+
+                {/* Last synced */}
                 <div className="flex items-center gap-2 px-3">
                   <CheckCircle2 className={`h-4 w-4 shrink-0 ${marketCheckConnected ? "text-emerald-500" : "text-amber-500"}`} />
                   <span className="leading-tight">
@@ -576,7 +600,10 @@ const AppShell = ({ children }: AppShellProps) => {
                     {marketCheckCount != null && <span className="block text-[10px] font-semibold text-emerald-600">{marketCheckCount} vehicles updated</span>}
                   </span>
                 </div>
-                <span className="w-px self-stretch bg-border" />
+
+                <span className="self-stretch border-l border-dashed border-border" />
+
+                {/* MarketCheck */}
                 <div className="flex items-center gap-2 px-3">
                   <CheckCircle2 className={`h-4 w-4 shrink-0 ${marketCheckConnected ? "text-emerald-500" : "text-amber-500"}`} />
                   <span className="leading-tight">
@@ -585,40 +612,6 @@ const AppShell = ({ children }: AppShellProps) => {
                   </span>
                 </div>
               </div>
-
-              {/* App switcher */}
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <button className="hidden lg:inline-flex h-10 items-center gap-1.5 rounded-xl border border-border bg-card px-3 text-foreground hover:bg-muted" title="Switch app">
-                    <Grid2X2 className="h-4 w-4" />
-                    <span className="text-sm font-semibold">Apps</span>
-                    <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
-                  </button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-80 bg-card">
-                  <DropdownMenuLabel className="text-[11px] uppercase tracking-wider text-muted-foreground">Switch app</DropdownMenuLabel>
-                  {ALL_PRODUCTS.map((product) => {
-                    const Icon = productIcon(product.id);
-                    return (
-                      <DropdownMenuItem key={product.id} onClick={() => openProduct(product.url)} className="cursor-pointer py-2.5">
-                        <div className="mr-3 flex h-9 w-9 items-center justify-center rounded-xl bg-muted">
-                          <Icon className="h-4 w-4" />
-                        </div>
-                        <div className="min-w-0 flex-1">
-                          <div className="flex items-center gap-1 font-black">{product.name}{product.url.startsWith("http") && <ExternalLink className="h-3 w-3" />}</div>
-                          <div className="truncate text-xs text-muted-foreground">{product.description}</div>
-                        </div>
-                      </DropdownMenuItem>
-                    );
-                  })}
-                </DropdownMenuContent>
-              </DropdownMenu>
-
-              {/* Scan VIN */}
-              <button onClick={openScan} className="hidden lg:inline-flex h-10 items-center gap-2 rounded-xl border border-border bg-card px-3.5 text-blue-600 hover:bg-blue-50 transition-colors" title="Scan a VIN">
-                <ScanLine className="h-4 w-4 stroke-[2.5]" />
-                <span className="text-sm font-bold">Scan VIN</span>
-              </button>
 
               {/* Notifications */}
               <button onClick={() => navigate("/admin?tab=audit")} className="relative h-10 w-10 inline-flex items-center justify-center rounded-xl text-muted-foreground hover:bg-muted hover:text-foreground" title="Notifications">

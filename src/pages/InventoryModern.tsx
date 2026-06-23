@@ -7,7 +7,6 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useTenant } from "@/contexts/TenantContext";
 import { useDealerSettings } from "@/contexts/DealerSettingsContext";
 import { useAdvertisedPrices } from "@/hooks/useAdvertisedPrices";
-import PageTabs, { VEHICLES_TABS } from "@/components/layout/PageTabs";
 import { useGetReady } from "@/hooks/useGetReady";
 import { usedSafetyInspectionForm } from "@/data/safetyInspection";
 import { useVinDecode } from "@/hooks/useVinDecode";
@@ -398,8 +397,6 @@ const InventoryModern = () => {
 
   return (
     <div className="p-4 lg:p-6 max-w-[1600px] mx-auto space-y-5">
-      <PageTabs tabs={VEHICLES_TABS} />
-
       <div className="flex flex-col xl:flex-row gap-5">
         {/* Main column */}
         <div className="flex-1 min-w-0 space-y-5">
@@ -763,28 +760,32 @@ const BigRing = ({ pct }: { pct: number }) => {
   const tone = pct >= 80 ? "#10B981" : pct >= 50 ? "#2563EB" : pct >= 30 ? "#F59E0B" : "#EF4444";
   const r = 16; const c = 2 * Math.PI * r;
   return (
-    <div className="relative w-14 h-14 shrink-0">
-      <svg className="w-14 h-14 -rotate-90" viewBox="0 0 40 40">
+    <div className="relative w-[68px] h-[68px] shrink-0">
+      <svg className="w-[68px] h-[68px] -rotate-90" viewBox="0 0 40 40">
         <circle cx="20" cy="20" r={r} fill="none" stroke="currentColor" strokeWidth="4" className="text-muted" />
         <circle cx="20" cy="20" r={r} fill="none" stroke={tone} strokeWidth="4" strokeLinecap="round" strokeDasharray={c} strokeDashoffset={c - (c * pct) / 100} />
       </svg>
-      <span className="absolute inset-0 flex items-center justify-center text-xs font-bold tabular-nums text-foreground">{pct}%</span>
+      <span className="absolute inset-0 flex items-center justify-center text-base font-bold tabular-nums text-foreground">{pct}%</span>
     </div>
   );
 };
 
-const ExecKpi = ({ label, value, sub, icon: Icon, tone, onClick, link, prominent }: { label: string; value: string | number; sub: string; icon: typeof Car; tone?: "emerald" | "amber" | "red" | "violet"; onClick: () => void; link?: string; prominent?: boolean }) => {
-  const vcls = tone === "emerald" ? "text-emerald-700" : tone === "amber" ? "text-amber-700" : tone === "red" ? "text-red-700" : tone === "violet" ? "text-violet-700" : "text-foreground";
-  const ibg = tone === "emerald" ? "bg-emerald-100 text-emerald-700" : tone === "amber" ? "bg-amber-100 text-amber-700" : tone === "red" ? "bg-red-100 text-red-700" : tone === "violet" ? "bg-violet-100 text-violet-700" : "bg-muted text-muted-foreground";
-  const cardBg = prominent && (tone === "red") ? "bg-red-50/70 border-red-200" : prominent ? "bg-amber-50/70 border-amber-200" : "bg-card border-border";
+const ExecKpi = ({ label, value, sub, icon: Icon, tone, onClick, link }: { label: string; value: string | number; sub: string; icon: typeof Car; tone?: "emerald" | "amber" | "red" | "violet"; onClick: () => void; link?: string }) => {
+  const numCls = tone === "emerald" ? "text-emerald-600" : "text-foreground";
+  const ibg =
+    tone === "emerald" ? "bg-emerald-50 text-emerald-600" :
+    tone === "amber"   ? "bg-amber-50 text-amber-600" :
+    tone === "red"     ? "bg-red-50 text-red-600" :
+    tone === "violet"  ? "bg-violet-50 text-violet-600" :
+                         "bg-slate-100 text-slate-500";
   return (
-    <button onClick={onClick} className={`group/k shrink-0 min-w-[170px] lg:min-w-0 text-left rounded-2xl border shadow-sm p-4 hover:shadow-md hover:border-foreground/15 transition-all ${cardBg}`}>
-      <div className="flex items-center justify-between">
-        <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">{label}</p>
-        <span className={`w-7 h-7 rounded-lg flex items-center justify-center ${ibg}`}><Icon className="w-3.5 h-3.5" strokeWidth={2} /></span>
+    <button onClick={onClick} className="group/k shrink-0 min-w-[170px] lg:min-w-0 text-left rounded-2xl border border-border bg-card shadow-sm p-4 hover:shadow-md hover:border-foreground/15 transition-all">
+      <p className="text-[10px] font-bold uppercase tracking-[0.1em] text-muted-foreground whitespace-nowrap">{label}</p>
+      <div className="mt-2.5 flex items-center justify-between gap-2">
+        <p className={`font-display text-[28px] font-semibold tabular-nums leading-none ${numCls}`}>{typeof value === "number" ? value.toLocaleString() : value}</p>
+        <span className={`w-9 h-9 rounded-full flex items-center justify-center shrink-0 ${ibg}`}><Icon className="w-4 h-4" strokeWidth={2} /></span>
       </div>
-      <p className={`mt-2 font-display ${prominent ? "text-[2rem]" : "text-2xl"} font-semibold tabular-nums leading-none ${vcls}`}>{typeof value === "number" ? value.toLocaleString() : value}</p>
-      <p className={`text-[11px] mt-1.5 truncate ${prominent ? "text-foreground/70 font-semibold" : "text-muted-foreground"}`}>{sub}</p>
+      <p className="text-[11px] mt-2 text-muted-foreground truncate">{sub}</p>
       {link && <p className="text-[11px] font-semibold text-blue-600 mt-2 group-hover/k:underline">{link} →</p>}
     </button>
   );
@@ -811,7 +812,7 @@ const ExecKpiStrip = ({ counts, onMetric, onMarket }: { counts: KpiCounts; onMet
       </button>
       <ExecKpi label="Total Vehicles" value={counts.total} sub={`${counts.newCount} new • ${counts.usedCount} used`} icon={Car} onClick={() => onMetric("total")} link="View all vehicles" />
       <ExecKpi label="Published" value={counts.published} sub="live on portal" icon={CheckCircle2} tone="emerald" onClick={() => onMetric("published")} link="View published" />
-      <ExecKpi label="Needs Attention" value={counts.needsAttention} sub="require action" icon={AlertCircle} tone="amber" onClick={() => onMetric("needs-attention")} link="View list" prominent />
+      <ExecKpi label="Needs Attention" value={counts.needsAttention} sub="require action" icon={AlertCircle} tone="amber" onClick={() => onMetric("needs-attention")} link="View list" />
       <ExecKpi label="Open Recalls" value={counts.openRecallVehicles} sub="vehicles" icon={ShieldAlert} tone={counts.openRecallVehicles ? "red" : "emerald"} onClick={() => onMetric("open-recalls")} link="View recalls" />
       <ExecKpi label="Price Reviews" value={counts.priceVerify} sub="require review" icon={Tag} tone="violet" onClick={() => onMetric("price-reviews")} link="View price reviews" />
       <ExecKpi label="Avg Market Position" value={`$${Math.abs(below).toLocaleString()}`} sub={below >= 0 ? "below market" : "above market"} icon={TrendingUp} tone={below >= 0 ? "emerald" : "amber"} onClick={onMarket} link="View market report" />
