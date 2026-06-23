@@ -249,6 +249,78 @@ const DescriptionWriter = () => {
     toast.success(`${result.year} ${result.make} ${result.model}`);
   };
 
+  const lookupZip = async (zip: string, { announce = false } = {}) => {
+    const z = zip.trim();
+    if (!/^\d{5}$/.test(z)) {
+      if (announce) toast.error("Enter a 5-digit zip code");
+      return;
+    }
+    if (lastZipLookup.current === z) return;
+    lastZipLookup.current = z;
+    setZipLoading(true);
+    setZipError(null);
+    try {
+      const res = await fetch(`https://api.zippopotam.us/us/${z}`);
+      if (!res.ok) throw new Error("not_found");
+      const json = await res.json();
+      const places: ZipPlace[] = (json.places || []).map((p: any) => ({
+        city: p["place name"],
+        state: p["state"],
+        stateAbbr: p["state abbreviation"],
+      }));
+      setZipPlaces(places);
+      if (places.length > 0) {
+        setGeoCity(places[0].city);
+        setGeoState(places[0].state);
+        if (announce) toast.success(`${places[0].city}, ${places[0].stateAbbr}${places.length > 1 ? ` (+${places.length - 1} more)` : ""}`);
+      }
+    } catch {
+      setZipPlaces([]);
+      setZipError("Zip code not found");
+      if (announce) toast.error("Zip code not found");
+    } finally {
+      setZipLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!/^\d{5}$/.test(zipCode)) return;
+    const t = setTimeout(() => lookupZip(zipCode), 350);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [zipCode]);
+
+  const openVinDetails = async () => {
+    if (vehicle.vin.length !== 17) return toast.error("Enter a 17-character VIN to view decode details");
+    setLoadingVinDetails(true);
+    setVinDetailsOpen(true);
+    try {
+      const res = await fetch(`https://vpic.nhtsa.dot.gov/api/vehicles/DecodeVinValues/${vehicle.vin.toUpperCase()}?format=json`);
+      const json = await res.json();
+      const row = json.Results?.[0] || {};
+      const filtered: Record<string, string> = {};
+      Object.entries(row).forEach(([k, v]) => {
+        const s = String(v ?? "").trim();
+        if (s && s !== "Not Applicable" && k !== "ErrorCode" && k !== "ErrorText" && k !== "AdditionalErrorText") filtered[k] = s;
+      });
+      setVinDetails(filtered);
+    } catch {
+      toast.error("Could not load VIN decode details");
+      setVinDetails(null);
+    } finally {
+      setLoadingVinDetails(false);
+    }
+  };
+
+  const addKeyword = () => {
+    const k = keywordDraft.trim();
+    if (!k) return;
+    if (extraKeywords.includes(k) || k === primaryKeyword) return setKeywordDraft("");
+    setExtraKeywords([...extraKeywords, k]);
+    setKeywordDraft("");
+  };
+
+
   const generate = async () => {
     if (!vehicle.year || !vehicle.make || !vehicle.model) return toast.error("Enter vehicle details first");
     setGenerating(true);
