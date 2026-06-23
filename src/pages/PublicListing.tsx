@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { useParams } from "react-router-dom";
+import { useParams, useNavigate } from "react-router-dom";
 import {
   ChevronLeft, ChevronRight, Share2, Printer, Bookmark,
   FileText, MessageSquare, RefreshCw, ExternalLink, Upload,
@@ -198,6 +198,7 @@ const InquiryModal = ({
 const PublicListingBody = () => {
   const { L } = usePublicLocale();
   const { slug } = useParams<{ slug: string }>();
+  const navigate = useNavigate();
   const { publicUrl } = useVehicleListing("");
 
   const [listing, setListing] = useState<VehicleListing | null>(null);
@@ -509,7 +510,7 @@ const PublicListingBody = () => {
           <div className="mt-5 grid grid-cols-1 lg:grid-cols-[1fr_auto] gap-5 items-end">
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
               {[
-                { icon: FileText,       label: "Documents",     action: () => document.getElementById("overview")?.scrollIntoView({ behavior: "smooth" }) },
+                { icon: FileText,       label: "Documents",     action: () => navigate(`/v/${listing.slug}/documents`) },
                 { icon: MessageSquare,  label: "Contact Dealer", action: () => setInquiryOpen(true) },
                 { icon: RefreshCw,      label: "Value My Trade", action: () => setInquiryOpen(true) },
                 { icon: Share2,         label: "Share Vehicle",  action: handleShare },
