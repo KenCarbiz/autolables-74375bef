@@ -4116,6 +4116,7 @@ export type Database = {
           market_position: string | null
           market_value: number | null
           mc_attributes: Json
+          mc_raw: Json | null
           mileage: number | null
           oem_sticker_checked_at: string | null
           oem_sticker_url: string | null
@@ -4176,6 +4177,7 @@ export type Database = {
           market_position?: string | null
           market_value?: number | null
           mc_attributes?: Json
+          mc_raw?: Json | null
           mileage?: number | null
           oem_sticker_checked_at?: string | null
           oem_sticker_url?: string | null
@@ -4236,6 +4238,7 @@ export type Database = {
           market_position?: string | null
           market_value?: number | null
           mc_attributes?: Json
+          mc_raw?: Json | null
           mileage?: number | null
           oem_sticker_checked_at?: string | null
           oem_sticker_url?: string | null
@@ -4296,6 +4299,48 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      vehicle_value_history: {
+        Row: {
+          below_market: number | null
+          captured_at: string
+          created_at: string
+          id: string
+          listing_price: number | null
+          market_value: number | null
+          payload: Json | null
+          position: string | null
+          source: string | null
+          tenant_id: string | null
+          vin: string
+        }
+        Insert: {
+          below_market?: number | null
+          captured_at?: string
+          created_at?: string
+          id?: string
+          listing_price?: number | null
+          market_value?: number | null
+          payload?: Json | null
+          position?: string | null
+          source?: string | null
+          tenant_id?: string | null
+          vin: string
+        }
+        Update: {
+          below_market?: number | null
+          captured_at?: string
+          created_at?: string
+          id?: string
+          listing_price?: number | null
+          market_value?: number | null
+          payload?: Json | null
+          position?: string | null
+          source?: string | null
+          tenant_id?: string | null
+          vin?: string
+        }
+        Relationships: []
       }
       vin_queue: {
         Row: {
@@ -5032,6 +5077,7 @@ export type Database = {
           market_position: string | null
           market_value: number | null
           mc_attributes: Json
+          mc_raw: Json | null
           mileage: number | null
           oem_sticker_checked_at: string | null
           oem_sticker_url: string | null
