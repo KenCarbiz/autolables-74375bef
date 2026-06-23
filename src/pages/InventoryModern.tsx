@@ -141,6 +141,12 @@ const InventoryModern = () => {
           ? `Price scrape done — ${found} price${found === 1 ? "" : "s"} recorded across sites.`
           : "Price scrape done — no new prices found (sites may be bot-walled or unchanged).",
       );
+      // Refresh the advertised-price cache (the green "Advertised" pill
+      // on each row reads from it) and the page rows + last-sync stamp,
+      // then ping the AppShell so the global "Synced X ago" updates.
+      await queryClient.invalidateQueries({ queryKey: ["advertised_prices", tenant.id] });
+      await load();
+      broadcastSynced("prices", { found });
     } catch (err) {
       toast.error(`Scrape failed: ${err instanceof Error ? err.message : "unknown error"}`);
     } finally {
