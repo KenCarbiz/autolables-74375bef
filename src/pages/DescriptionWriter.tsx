@@ -318,8 +318,8 @@ const DescriptionWriter = () => {
         </section>
 
         <section className="space-y-4">
-          <Card title="Third-Party Marketplace" subtitle="Choose the exact site format before generating the description.">
-            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-2 2xl:grid-cols-3">
+          <Card title="Choose Your Writing Preset" subtitle="Optimized for where you'll publish.">
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
               {platformCards.map((card) => <PresetCard key={card.id} card={card} active={platform === card.id} onClick={() => setPlatform(card.id)} />)}
             </div>
           </Card>
@@ -335,6 +335,15 @@ const DescriptionWriter = () => {
               <SelectLike label="City" value={geoCity} onChange={setGeoCity} />
               <SelectLike label="State" value={geoState} onChange={setGeoState} />
             </div>
+            <div className="mt-4 grid gap-4 md:grid-cols-2">
+              <SelectLike label="Zip Code" value={zipCode} onChange={setZipCode} />
+              <label>
+                <span className="text-sm font-bold text-slate-600">Radius</span>
+                <select value={radius} onChange={(e) => setRadius(Number(e.target.value))} className="mt-2 h-12 w-full rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold outline-none focus:border-blue-400">
+                  {[10, 20, 30, 40, 50, 60, 75, 100].map((mi) => <option key={mi} value={mi}>{mi} miles</option>)}
+                </select>
+              </label>
+            </div>
             <label className="mt-4 block text-sm font-bold text-slate-600">Primary Keyword (Optional)</label>
             <input value={primaryKeyword} onChange={(e) => setPrimaryKeyword(e.target.value)} className="mt-2 h-12 w-full rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold outline-none focus:border-blue-400" />
             <div className="mt-4 flex flex-wrap gap-4">
@@ -345,8 +354,8 @@ const DescriptionWriter = () => {
 
           <Card title={`Selected Features (${selectedFeatures.length} of ${featureList.length * 2})`} action={<button className="text-sm font-black text-blue-600">Edit Features</button>}>
             <div className="flex flex-wrap gap-2">
-              {selectedFeatures.map((feature) => <span key={feature} className="rounded-lg bg-blue-50 px-3 py-2 text-sm font-bold text-blue-700">{feature}</span>)}
-              <button onClick={() => setSelectedFeatures(featureList)} className="rounded-lg bg-slate-100 px-3 py-2 text-sm font-bold text-slate-700">+4 more</button>
+              {selectedFeatures.slice(0, 8).map((feature) => <span key={feature} className="rounded-lg bg-blue-50 px-3 py-2 text-sm font-bold text-blue-700">{feature}</span>)}
+              {selectedFeatures.length > 8 && <span className="rounded-lg bg-slate-100 px-3 py-2 text-sm font-bold text-slate-700">+{selectedFeatures.length - 8} more</span>}
             </div>
           </Card>
         </section>
@@ -366,13 +375,11 @@ const DescriptionWriter = () => {
             </div>
           </Card>
 
-          <RequirementsPanel platform={selectedPlatform} />
-
-          <Card title={`${selectedPlatform.name} Generated Description`} action={<button onClick={generate} disabled={generating} className="inline-flex h-10 items-center gap-2 rounded-xl border border-slate-200 px-4 text-sm font-black text-slate-700"><RotateCcw className="h-4 w-4" /> {generating ? "Generating..." : "Regenerate"}</button>}>
+          <Card title="Generated Description" action={<button onClick={generate} disabled={generating} className="inline-flex h-10 items-center gap-2 rounded-xl border border-slate-200 px-4 text-sm font-black text-slate-700"><RotateCcw className="h-4 w-4" /> {generating ? "Generating..." : "Regenerate"}</button>}>
             <div className="mb-4 grid grid-cols-3 gap-4 text-center">
               <MiniMetric value={wordCount} label="Words" />
               <MiniMetric value={`${readMinutes} min`} label="Read Time" />
-              <MiniMetric value={`${description.length}/${selectedPlatform.characterLimit}`} label="Characters" />
+              <MiniMetric value="A+" label="Strength" tone="emerald" />
             </div>
             <textarea value={description} onChange={(e) => setDescription(e.target.value)} maxLength={selectedPlatform.characterLimit} className="min-h-[315px] w-full rounded-2xl border border-slate-200 bg-white p-4 text-sm font-medium leading-relaxed text-slate-800 outline-none focus:border-blue-400" />
             <div className="mt-4 flex flex-wrap gap-3">
@@ -396,6 +403,7 @@ const DescriptionWriter = () => {
             </div>
           </Card>
         </section>
+
       </main>
 
       <div className="border-t border-slate-200 bg-white py-3 text-center text-sm font-semibold text-slate-500">AI-generated content. Always review for accuracy.</div>
