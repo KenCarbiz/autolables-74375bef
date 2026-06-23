@@ -118,12 +118,14 @@ serve(async (req) => {
           String(veh.model || "").toUpperCase() === ymm.model!.toUpperCase()))
       : offers;
     const incentives = stripPublic(matched);
-    // Best-effort cache (24h) for repeat views of the same VIN + ZIP.
-    await admin.from("incentive_customer_zip_cache").upsert({
-      tenant_id: body.tenant_id, vin: body.vin, customer_zip: body.zip,
-      incentives_data: incentives, pulled_at: new Date().toISOString(),
-      expires_at: new Date(Date.now() + 24 * 3600 * 1000).toISOString(),
-    }, { onConflict: "tenant_id,vin,customer_zip" }).then(() => undefined, () => undefined);
+    // Best-effort cache of the customer-ZIP result on the vehicle cache row.
+    await admin.from("marketcheck_vehicle_cache").upsert({
+      tenant_id: body.tenant_id, vin: body.vin,
+      incentives_customer_zip: incentives,
+      incentives_customer_zip_code: body.zip,
+      incentives_customer_zip_pulled_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    }, { onConflict: "tenant_id,vin" }).then(() => undefined, () => undefined);
     return json({ incentives, count: incentives.length });
   }
 

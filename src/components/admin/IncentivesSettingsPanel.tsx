@@ -32,7 +32,6 @@ export const IncentivesSettingsPanel = () => {
   const [zipMode, setZipMode] = useState<ZipMode>("dealer");
   const [zipOverride, setZipOverride] = useState("");
   const [disclaimer, setDisclaimer] = useState(DEFAULT_DISCLAIMER);
-  const [showOnSticker, setShowOnSticker] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [tableMissing, setTableMissing] = useState(false);
@@ -41,10 +40,9 @@ export const IncentivesSettingsPanel = () => {
     let active = true;
     (async () => {
       if (!tenant?.id) { setLoading(false); return; }
-      // select * so an un-migrated show_on_sticker column doesn't error the read.
       const { data, error } = await (supabase as any)
         .from("tenant_incentive_settings")
-        .select("*")
+        .select("incentives_enabled, incentive_zip_mode, dealer_zip_override, incentives_disclaimer")
         .eq("tenant_id", tenant.id)
         .maybeSingle();
       if (!active) return;
@@ -55,7 +53,6 @@ export const IncentivesSettingsPanel = () => {
         setZipMode((data.incentive_zip_mode as ZipMode) || "dealer");
         setZipOverride(data.dealer_zip_override || "");
         setDisclaimer(data.incentives_disclaimer || DEFAULT_DISCLAIMER);
-        setShowOnSticker(!!data.show_on_sticker);
       }
       setLoading(false);
     })();
@@ -70,24 +67,17 @@ export const IncentivesSettingsPanel = () => {
   const save = async () => {
     if (!tenant?.id) { toast.error("No active dealership"); return; }
     setSaving(true);
-    const base = {
-      tenant_id: tenant.id,
-      incentives_enabled: enabled,
-      incentive_zip_mode: zipMode,
-      dealer_zip_override: zipOverride.trim() || null,
-      incentives_disclaimer: disclaimer.trim() || DEFAULT_DISCLAIMER,
-      updated_by: user?.id || null,
-      updated_at: new Date().toISOString(),
-    };
-    const upsert = (row: Record<string, unknown>) =>
-      (supabase as any).from("tenant_incentive_settings").upsert(row, { onConflict: "tenant_id" });
-    let { error } = await upsert({ ...base, show_on_sticker: showOnSticker });
-    // Retry without the sticker flag if that column hasn't been migrated yet,
-    // so the rest of the settings still save.
-    if (error && /show_on_sticker/i.test(error.message || "")) {
-      ({ error } = await upsert(base));
-      if (!error) { setSaving(false); toast.success("Saved. (Add the show_on_sticker column to enable the sticker option.)"); return; }
-    }
+    const { error } = await (supabase as any)
+      .from("tenant_incentive_settings")
+      .upsert({
+        tenant_id: tenant.id,
+        incentives_enabled: enabled,
+        incentive_zip_mode: zipMode,
+        dealer_zip_override: zipOverride.trim() || null,
+        incentives_disclaimer: disclaimer.trim() || DEFAULT_DISCLAIMER,
+        updated_by: user?.id || null,
+        updated_at: new Date().toISOString(),
+      }, { onConflict: "tenant_id" });
     setSaving(false);
     if (error) { toast.error("Could not save: " + error.message); return; }
     toast.success("Incentive settings saved");
@@ -163,23 +153,7 @@ export const IncentivesSettingsPanel = () => {
               rows={2}
               className="mt-1 w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
             />
-            <p className="text-[11px] text-muted-foreground mt-1">Shown beneath the offers on the passport and window sticker.</p>
-          </div>
-
-          <div className="flex items-center justify-between gap-3 rounded-xl border border-border p-3">
-            <div>
-              <p className="text-sm font-semibold text-foreground">Also print on the window sticker</p>
-              <p className="text-[11px] text-muted-foreground">Adds a dealer-location offers block to the printed sticker. Customer-ZIP lookups stay on the passport via the QR code.</p>
-            </div>
-            <button
-              type="button"
-              role="switch"
-              aria-checked={showOnSticker}
-              onClick={() => setShowOnSticker((v) => !v)}
-              className={`relative h-6 w-11 shrink-0 rounded-full transition-colors ${showOnSticker ? "bg-blue-600" : "bg-slate-300"}`}
-            >
-              <span className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-all ${showOnSticker ? "left-[22px]" : "left-0.5"}`} />
-            </button>
+            <p className="text-[11px] text-muted-foreground mt-1">Shown beneath the offers on the customer passport.</p>
           </div>
         </>
       )}
