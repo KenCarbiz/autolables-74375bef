@@ -756,16 +756,16 @@ const CondBadge = ({ condition }: { condition: "new" | "used" | "cpo" }) => {
   return <span className={`text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded ${cls}`}>{condition}</span>;
 };
 
-const MiniRing = ({ pct }: { pct: number }) => {
+const MiniRing = ({ pct, size = 52 }: { pct: number; size?: number }) => {
   const tone = pct >= 100 ? "#10B981" : pct >= 60 ? "#2563EB" : pct >= 40 ? "#F59E0B" : "#EF4444";
-  const r = 14; const c = 2 * Math.PI * r;
+  const r = 16; const c = 2 * Math.PI * r;
   return (
-    <div className="relative w-10 h-10">
-      <svg className="w-10 h-10 -rotate-90" viewBox="0 0 36 36">
-        <circle cx="18" cy="18" r={r} fill="none" stroke="currentColor" strokeWidth="3.5" className="text-muted" />
-        <circle cx="18" cy="18" r={r} fill="none" stroke={tone} strokeWidth="3.5" strokeLinecap="round" strokeDasharray={c} strokeDashoffset={c - (c * pct) / 100} />
+    <div className="relative shrink-0" style={{ width: size, height: size }}>
+      <svg className="-rotate-90" width={size} height={size} viewBox="0 0 40 40">
+        <circle cx="20" cy="20" r={r} fill="none" stroke="currentColor" strokeWidth="4" className="text-muted" />
+        <circle cx="20" cy="20" r={r} fill="none" stroke={tone} strokeWidth="4" strokeLinecap="round" strokeDasharray={c} strokeDashoffset={c - (c * pct) / 100} />
       </svg>
-      <span className="absolute inset-0 flex items-center justify-center text-[9px] font-bold tabular-nums text-foreground">{pct}%</span>
+      <span className="absolute inset-0 flex items-center justify-center text-[11px] font-bold tabular-nums text-foreground">{pct}%</span>
     </div>
   );
 };
