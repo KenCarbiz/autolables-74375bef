@@ -1052,27 +1052,27 @@ const RecallChip = ({ status, open }: { status?: string | null; open?: number | 
 
 const PortalChip = ({ status }: { status: VehicleRow["status"] }) => {
   const cfg = status === "published"
-    ? { cls: "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200/70", dot: "bg-emerald-500", label: "Live" }
+    ? { dot: "bg-emerald-500", text: "text-emerald-700", label: "Live" }
     : status === "archived"
-      ? { cls: "bg-slate-100 text-slate-600 ring-1 ring-slate-200", dot: "bg-slate-400", label: "Archived" }
-      : { cls: "bg-slate-50 text-slate-700 ring-1 ring-slate-200", dot: "bg-slate-400", label: "Not Live" };
+      ? { dot: "bg-slate-400", text: "text-slate-600", label: "Archived" }
+      : { dot: "bg-slate-300", text: "text-slate-600", label: "Not Live" };
   return (
-    <span className={`inline-flex items-center gap-1.5 text-[11px] font-semibold px-2 py-1 rounded-lg ${cfg.cls}`}>
-      <span className={`w-1.5 h-1.5 rounded-full ${cfg.dot}`} />{cfg.label}
+    <span className={`inline-flex items-center gap-1.5 text-xs font-semibold ${cfg.text}`}>
+      <span className={`w-2 h-2 rounded-full ${cfg.dot}`} />{cfg.label}
     </span>
   );
 };
 
-// Simple status pill — only Draft / Published / Archived.
+// Simple status pill — clean dot + label, no oval background.
 const SimpleStatusPill = ({ status }: { status: VehicleRow["status"] }) => {
   const cfg = status === "published"
-    ? { cls: "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200/70", dot: "bg-emerald-500", label: "Published" }
+    ? { dot: "bg-emerald-500", text: "text-emerald-700", label: "Published" }
     : status === "archived"
-      ? { cls: "bg-slate-100 text-slate-600 ring-1 ring-slate-200", dot: "bg-slate-400", label: "Archived" }
-      : { cls: "bg-amber-50 text-amber-700 ring-1 ring-amber-200/70", dot: "bg-amber-500", label: "Draft" };
+      ? { dot: "bg-slate-400", text: "text-slate-600", label: "Archived" }
+      : { dot: "bg-amber-500", text: "text-amber-700", label: "Draft" };
   return (
-    <span className={`inline-flex items-center gap-1.5 text-[11px] font-semibold px-2 py-1 rounded-lg ${cfg.cls}`}>
-      <span className={`w-1.5 h-1.5 rounded-full ${cfg.dot}`} />{cfg.label}
+    <span className={`inline-flex items-center gap-1.5 text-xs font-semibold ${cfg.text}`}>
+      <span className={`w-2 h-2 rounded-full ${cfg.dot}`} />{cfg.label}
     </span>
   );
 };
