@@ -558,28 +558,42 @@ const PublicListingBody = () => {
           </div>
         </section>
 
-        {/* ══ 5. TRUST BADGE STRIP (6 icons) ════════════════════ */}
-        <section className="bg-white rounded-2xl border border-slate-200 px-4 py-4">
+        {/* ══ 5. TRUST CENTER (2 rows · 12 badges) ══════════════ */}
+        <section className="bg-white rounded-2xl border border-slate-200 px-5 py-5">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-base font-black text-slate-900 tracking-tight">Trust Center</h2>
+            <span className="text-[11px] font-semibold text-emerald-700 inline-flex items-center gap-1">
+              <CheckCircle2 className="w-3.5 h-3.5" /> 12 of 12 Verified
+            </span>
+          </div>
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
             {[
-              { icon: Shield,      label: "No Accident History",  sub: "AutoCheck Verified",          tone: "emerald" },
-              { icon: User,        label: "1-Owner Vehicle",      sub: "Personal Use",                tone: "emerald" },
-              { icon: Wrench,      label: "Full Service History", sub: `${Math.max(serviceCount, 12)} Service Records`, tone: "blue" },
-              { icon: FileText,    label: "Clean Title",          sub: "No Liens or Issues",          tone: "emerald" },
-              { icon: ShieldCheck, label: "Factory Warranty",     sub: warrantyStr || "4 yr / 60,000 mi", tone: "blue" },
-              { icon: RefreshCw,   label: "7-Day Exchange",       sub: "Hassle-Free",                 tone: "emerald" },
+              { icon: Shield,      label: "No Accident History",   sub: "AutoCheck Verified",      tone: "emerald" },
+              { icon: User,        label: "One Owner",             sub: "Personal Use",            tone: "emerald" },
+              { icon: Wrench,      label: "Full Service History",  sub: `${Math.max(serviceCount, 12)} Records`, tone: "blue" },
+              { icon: FileText,    label: "Clean Title",           sub: "No Liens or Issues",      tone: "emerald" },
+              { icon: ShieldCheck, label: "Factory Warranty",      sub: warrantyStr || "4 yr / 60K mi", tone: "blue" },
+              { icon: RefreshCw,   label: "7 Day Exchange",        sub: "Hassle-Free",             tone: "emerald" },
+              { icon: AlertTriangle, label: "No Open Recalls",     sub: recallCount > 0 ? `${recallCount} Open` : "NHTSA Verified", tone: recallCount > 0 ? "warn" : "emerald" },
+              { icon: CheckCircle2, label: "Vehicle Inspection",   sub: "Multi-Point Passed",      tone: "emerald" },
+              { icon: Award,       label: "Dealer Verified",       sub: "AutoLabels Certified",    tone: "blue" },
+              { icon: TrendingDown, label: "Market Verified",      sub: "MarketCheck Powered",     tone: "blue" },
+              { icon: CreditCard,  label: "FTC Transparent Pricing", sub: "No Hidden Fees",        tone: "emerald" },
+              { icon: ShieldCheck, label: "Secure Documents",      sub: "E-SIGN Compliant",        tone: "blue" },
             ].map(({ icon: Icon, label, sub, tone }) => {
               const c = tone === "blue"
-                ? { ic: "text-blue-600 bg-blue-50" }
-                : { ic: "text-emerald-600 bg-emerald-50" };
+                ? { ic: "text-blue-600 bg-blue-50", check: "text-blue-600" }
+                : tone === "warn"
+                ? { ic: "text-amber-600 bg-amber-50", check: "text-amber-600" }
+                : { ic: "text-emerald-600 bg-emerald-50", check: "text-emerald-600" };
               return (
-                <div key={label} className="border border-slate-100 rounded-xl px-3 py-3 flex items-start gap-2.5">
+                <div key={label} className="border border-slate-100 rounded-xl px-3 py-3 flex items-start gap-2.5 hover:border-slate-200 transition-colors">
                   <div className={`w-9 h-9 rounded-lg flex items-center justify-center shrink-0 ${c.ic}`}>
-                    <Icon className="w-4.5 h-4.5" />
+                    <Icon className="w-4 h-4" />
                   </div>
                   <div className="min-w-0">
                     <p className="text-[13px] font-bold text-slate-900 leading-tight">{label}</p>
-                    <p className="text-[11px] text-emerald-700 font-semibold mt-0.5 flex items-center gap-1">
+                    <p className={`text-[11px] font-semibold mt-0.5 flex items-center gap-1 ${c.check}`}>
                       <CheckCircle2 className="w-3 h-3" /> {sub}
                     </p>
                   </div>
