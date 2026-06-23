@@ -573,27 +573,6 @@ const PublicListingBody = () => {
               state={warrantyStr || listing.condition === "new" ? "good" : "neutral"} />
             <TrustBadge icon={RefreshCw} label="7-Day Exchange Policy" sub="Hassle-Free" state="good" />
           </div>
-          {/* Row 2: 6 compact badges */}
-          <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
-            {([
-              { icon: recallCount > 0 ? AlertTriangle : ShieldCheck, label: recallCount > 0 ? `${recallCount} Recall${recallCount > 1 ? "s" : ""}` : "No Recalls", state: recallCount > 0 ? "bad" : "good" },
-              { icon: Gauge, label: belowMarket > 0 ? "Below Market" : "Market Price", state: belowMarket > 0 ? "good" : "neutral" as const },
-              { icon: Award, label: "4.8 Dealer Rating", state: "good" },
-              { icon: CheckCircle2, label: "162-Pt Inspected", state: "good" },
-              { icon: Shield, label: "FTC Aligned", state: "good" },
-              { icon: ShieldCheck, label: "Docs Secured", state: "good" },
-            ] as { icon: React.ElementType; label: string; state: "good" | "warn" | "bad" | "neutral" }[]).map(({ icon: Icon, label, state: s }) => {
-              const cls = { good: "text-emerald-600 bg-emerald-50", warn: "text-amber-600 bg-amber-50", bad: "text-red-600 bg-red-50", neutral: "text-slate-500 bg-slate-100" }[s];
-              return (
-                <div key={label} className="flex flex-col items-center gap-1.5 px-2 py-2.5 bg-slate-50 rounded-xl text-center">
-                  <div className={`w-7 h-7 rounded-lg flex items-center justify-center ${cls}`}>
-                    <Icon className="w-3.5 h-3.5" />
-                  </div>
-                  <p className="text-[10px] font-bold text-slate-700 leading-tight">{label}</p>
-                </div>
-              );
-            })}
-          </div>
         </div>
       </div>
 
