@@ -163,7 +163,8 @@ const InventoryModern = () => {
       const d = (data || {}) as { checked?: number; openFound?: number; error?: string };
       if (d.error === "not_configured") { toast.error("Recall lookup isn't configured (MarketCheck AutoRecalls key)."); return; }
       toast.success(`Recalls checked: ${d.checked ?? 0} vehicles · ${d.openFound ?? 0} with open recalls`);
-      load();
+      await load();
+      broadcastSynced("recalls", { checked: d.checked, openFound: d.openFound });
     } catch { toast.error("Recall batch failed"); }
   };
 
