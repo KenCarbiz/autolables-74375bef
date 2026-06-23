@@ -249,6 +249,61 @@ const AppShell = ({ children }: AppShellProps) => {
   const companyName = currentStore?.name || tenant?.name || (settings.dealer_name && settings.dealer_name !== "Your Dealership" ? settings.dealer_name : "Select store");
   const dealerLocation = [currentStore?.city || (settings as any)?.dealer_city, currentStore?.state || (settings as any)?.dealer_state].filter(Boolean).join(", ") || "Manchester, CT";
   const unreadAudit = entries.filter((entry) => entry.action === "compliance_block" || entry.action === "price_integrity_block").length;
+  const recentActivity = useMemo(
+    () =>
+      [...entries]
+        .sort((a, b) => +new Date(b.created_at) - +new Date(a.created_at))
+        .slice(0, 12),
+    [entries],
+  );
+  const formatActivityLabel = (a: string) =>
+    a.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+  const formatActivityWhen = (iso: string) => {
+    const d = new Date(iso);
+    const diff = (Date.now() - d.getTime()) / 1000;
+    if (diff < 60) return "just now";
+    if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
+    if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
+    if (diff < 86400 * 7) return `${Math.floor(diff / 86400)}d ago`;
+    return d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+  };
+  const activityDot = (action: string) => {
+    if (action.includes("block")) return "bg-rose-500";
+    if (action.includes("signed") || action.includes("published")) return "bg-emerald-500";
+    if (action.includes("created") || action.includes("added")) return "bg-blue-500";
+    if (action.includes("deleted") || action.includes("rejected")) return "bg-rose-400";
+    return "bg-slate-400";
+  };
+  const renderNotificationsList = () => (
+    recentActivity.length === 0 ? (
+      <div className="px-4 py-8 text-center text-xs text-muted-foreground">
+        No recent activity yet. Stickers, signings, and compliance events will show here.
+      </div>
+    ) : (
+      <div className="max-h-[420px] overflow-y-auto py-1">
+        {recentActivity.map((e) => (
+          <button
+            key={e.id}
+            onClick={() => navigate(`/admin?tab=audit&entity=${encodeURIComponent(e.entity_id || "")}`)}
+            className="w-full flex items-start gap-2.5 px-3 py-2 text-left hover:bg-muted/60"
+          >
+            <span className={`mt-1.5 h-2 w-2 rounded-full shrink-0 ${activityDot(e.action)}`} />
+            <span className="min-w-0 flex-1 leading-tight">
+              <span className="block text-[13px] font-semibold text-foreground truncate">
+                {formatActivityLabel(e.action)}
+              </span>
+              <span className="block text-[11px] text-muted-foreground truncate">
+                {e.entity_type}{e.user_email ? ` · ${e.user_email}` : ""}
+              </span>
+            </span>
+            <span className="text-[10px] text-muted-foreground tabular-nums shrink-0 mt-0.5">
+              {formatActivityWhen(e.created_at)}
+            </span>
+          </button>
+        ))}
+      </div>
+    )
+  );
   const inventoryHasOwnMobileChrome = location.pathname === "/inventory";
   const syncWhen = lastMarketCheckSync
     ? (() => {
@@ -490,10 +545,25 @@ const AppShell = ({ children }: AppShellProps) => {
                     </div>
                   )}
                 </div>
-                <button onClick={() => navigate("/admin?tab=audit")} className="relative mt-1 flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl text-slate-950 active:bg-slate-100" aria-label="Recent updates">
-                  <Bell className="h-7 w-7" />
-                  {unreadAudit > 0 && <span className="absolute -right-0.5 -top-1 flex h-6 min-w-6 items-center justify-center rounded-full bg-rose-500 px-1.5 text-xs font-black text-white">{unreadAudit}</span>}
-                </button>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <button className="relative mt-1 flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl text-slate-950 active:bg-slate-100" aria-label="Recent activity">
+                      <Bell className="h-7 w-7" />
+                      {unreadAudit > 0 && <span className="absolute -right-0.5 -top-1 flex h-6 min-w-6 items-center justify-center rounded-full bg-rose-500 px-1.5 text-xs font-black text-white">{unreadAudit}</span>}
+                    </button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-[340px] bg-card p-0">
+                    <div className="flex items-center justify-between px-3 py-2 border-b border-border">
+                      <span className="text-sm font-bold text-foreground">Recent activity</span>
+                      <span className="text-[10px] text-muted-foreground">{recentActivity.length} events</span>
+                    </div>
+                    {renderNotificationsList()}
+                    <DropdownMenuSeparator className="my-0" />
+                    <DropdownMenuItem onClick={() => navigate("/admin?tab=audit")} className="cursor-pointer justify-center py-2 text-xs font-semibold">
+                      View all activity
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
               </div>
 
               <div className="ml-[70px] mt-4 flex flex-wrap items-center gap-3 text-base font-medium text-slate-500">
@@ -610,10 +680,25 @@ const AppShell = ({ children }: AppShellProps) => {
               </div>
 
               {/* Notifications */}
-              <button onClick={() => navigate("/admin?tab=audit")} className="relative h-10 w-10 inline-flex items-center justify-center rounded-xl text-muted-foreground hover:bg-muted hover:text-foreground" title="Notifications">
-                <Bell className="h-5 w-5" />
-                {unreadAudit > 0 && <span className="absolute -top-0.5 -right-0.5 h-4 min-w-4 px-1 rounded-full bg-rose-500 text-white text-[10px] font-bold flex items-center justify-center">{unreadAudit}</span>}
-              </button>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button className="relative h-10 w-10 inline-flex items-center justify-center rounded-xl text-muted-foreground hover:bg-muted hover:text-foreground" title="Recent activity">
+                    <Bell className="h-5 w-5" />
+                    {unreadAudit > 0 && <span className="absolute -top-0.5 -right-0.5 h-4 min-w-4 px-1 rounded-full bg-rose-500 text-white text-[10px] font-bold flex items-center justify-center">{unreadAudit}</span>}
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-[360px] bg-card p-0">
+                  <div className="flex items-center justify-between px-3 py-2 border-b border-border">
+                    <span className="text-sm font-bold text-foreground">Recent activity</span>
+                    <span className="text-[10px] text-muted-foreground">{recentActivity.length} events</span>
+                  </div>
+                  {renderNotificationsList()}
+                  <DropdownMenuSeparator className="my-0" />
+                  <DropdownMenuItem onClick={() => navigate("/admin?tab=audit")} className="cursor-pointer justify-center py-2 text-xs font-semibold">
+                    View all activity
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
 
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
