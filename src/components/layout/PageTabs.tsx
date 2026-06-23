@@ -18,7 +18,7 @@ export default function PageTabs({ tabs, className = "" }: { tabs: PageTab[]; cl
   const current = pathname + search;
   return (
     <div className={`overflow-x-auto no-print ${className}`}>
-      <div className="inline-flex items-center gap-1 rounded-xl border border-border bg-card p-1">
+      <div className="inline-flex items-center gap-1 rounded-xl border border-border bg-muted/60 p-1">
         {tabs.map((t) => {
           const base = t.to.split("?")[0];
           const active = t.to.includes("?") ? current.startsWith(t.to) : pathname === base;
@@ -26,13 +26,13 @@ export default function PageTabs({ tabs, className = "" }: { tabs: PageTab[]; cl
             <button
               key={t.to}
               onClick={() => navigate(t.to)}
-              className={`h-8 px-3.5 rounded-lg text-[13px] font-semibold whitespace-nowrap transition-colors inline-flex items-center gap-1.5 ${
-                active ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted"
+              className={`h-8 px-3.5 rounded-lg text-[13px] font-semibold whitespace-nowrap transition-all inline-flex items-center gap-1.5 ${
+                active ? "bg-card text-foreground shadow-sm ring-1 ring-border" : "text-muted-foreground hover:text-foreground"
               }`}
             >
               {t.label}
               {t.badge != null && (
-                <span className={`text-[10px] font-bold tabular-nums px-1.5 py-0.5 rounded-full ${active ? "bg-white/20" : "bg-muted-foreground/15"}`}>
+                <span className={`text-[10px] font-bold tabular-nums px-1.5 py-0.5 rounded-full ${active ? "bg-primary/10 text-primary" : "bg-muted-foreground/15"}`}>
                   {t.badge}
                 </span>
               )}

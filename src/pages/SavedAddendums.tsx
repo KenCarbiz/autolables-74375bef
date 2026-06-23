@@ -11,10 +11,10 @@ import { toast } from "sonner";
 
 export type DealStage = "saved" | "signed" | "delivered";
 
-const STAGE_META: Record<DealStage, { title: string; empty: string }> = {
-  saved: { title: "Saved Addendums", empty: "Drafts you're still building live here. Start one to fill this list." },
-  signed: { title: "Signed — Awaiting Delivery", empty: "Signed deals appear here until you mark them delivered." },
-  delivered: { title: "Delivered", empty: "Delivered deals are archived here." },
+const STAGE_META: Record<DealStage, { title: string; subtitle: string; empty: string }> = {
+  saved: { title: "Saved Addendums", subtitle: "Drafts you're still building, with live price-integrity checks.", empty: "Drafts you're still building live here. Start one to fill this list." },
+  signed: { title: "Signed — Awaiting Delivery", subtitle: "Signed deals waiting to be marked delivered.", empty: "Signed deals appear here until you mark them delivered." },
+  delivered: { title: "Delivered", subtitle: "Completed, audit-defense-ready deals.", empty: "Delivered deals are archived here." },
 };
 
 const SavedAddendums = ({ stage = "saved" }: { stage?: DealStage }) => {
@@ -88,8 +88,8 @@ const SavedAddendums = ({ stage = "saved" }: { stage?: DealStage }) => {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-background p-4">
         <p className="text-muted-foreground mb-4">Sign in to view saved addendums.</p>
-        <button onClick={() => navigate("/login")} className="font-semibold text-[13px] px-5 py-2 rounded-md bg-primary text-primary-foreground hover:opacity-85">
-          🔑 Login
+        <button onClick={() => navigate("/login")} className="font-semibold text-[13px] px-5 py-2 rounded-lg bg-slate-900 text-white hover:bg-slate-800 transition-colors">
+          Sign in
         </button>
       </div>
     );
@@ -100,12 +100,13 @@ const SavedAddendums = ({ stage = "saved" }: { stage?: DealStage }) => {
       <div className="max-w-6xl mx-auto p-4 md:p-8">
         <PageTabs tabs={DEALS_TABS} className="mb-5" />
         {/* Header */}
-        <div className="flex items-center justify-between mb-6">
-          <div className="flex items-center gap-3">
+        <div className="flex items-center justify-between gap-3 mb-6">
+          <div className="min-w-0">
             <h1 className="text-2xl font-bold font-barlow-condensed text-foreground">{meta.title}</h1>
+            <p className="text-sm text-muted-foreground mt-0.5">{meta.subtitle}</p>
           </div>
-          <button onClick={() => navigate("/addendum")} className="font-semibold text-[13px] px-5 py-2 rounded-md bg-primary text-primary-foreground hover:opacity-85">
-            + New Addendum
+          <button onClick={() => navigate("/addendum")} className="inline-flex items-center gap-2 font-semibold text-[13px] px-4 py-2.5 rounded-xl bg-slate-900 text-white hover:bg-slate-800 shadow-sm transition-colors shrink-0">
+            <Plus className="w-4 h-4" /> New Addendum
           </button>
         </div>
 
@@ -179,7 +180,7 @@ const SavedAddendums = ({ stage = "saved" }: { stage?: DealStage }) => {
             </div>
 
             {/* Desktop: full table. */}
-            <div className="hidden md:block bg-card rounded-lg shadow-sm overflow-hidden">
+            <div className="hidden md:block bg-card rounded-2xl border border-border shadow-sm overflow-hidden">
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead>
@@ -235,7 +236,7 @@ const RowActions = ({ a, stage, navigate, deliver }: { a: any; stage: DealStage;
   <div className="inline-flex items-center gap-1 flex-wrap">
     <button
       onClick={() => navigate(`/addendum?id=${a.id}`)}
-      className="inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1.5 rounded-md bg-primary/10 text-primary hover:bg-primary/20 transition-colors"
+      className="inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1.5 rounded-lg border border-border text-foreground hover:bg-muted transition-colors"
       title="Open in read-only mode"
     >
       <Eye className="w-3.5 h-3.5" /> View
@@ -310,21 +311,21 @@ const StatusBadge = ({ status }: { status: string }) => {
 const PriceVerifyChip = ({ status, delta }: { status?: string | null; delta?: number | null }) => {
   if (!status || status === "pending" || status === "untracked") {
     return (
-      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-amber-100 text-amber-700">
-        Price unverified
+      <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase tracking-wider bg-amber-50 text-amber-700 ring-1 ring-inset ring-amber-200">
+        <span className="w-1.5 h-1.5 rounded-full bg-amber-500" /> Price unverified
       </span>
     );
   }
   if (status === "mismatch") {
     const d = typeof delta === "number" ? `${delta > 0 ? "+" : "−"}$${Math.abs(Math.round(delta)).toLocaleString()}` : "";
     return (
-      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-red-100 text-red-700" title="Fix the selling price or reclassify a pre-installed item">
-        Price mismatch {d}
+      <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase tracking-wider bg-red-50 text-red-700 ring-1 ring-inset ring-red-200" title="Fix the selling price or reclassify a pre-installed item">
+        <span className="w-1.5 h-1.5 rounded-full bg-red-500" /> Price mismatch {d}
       </span>
     );
   }
   return (
-    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-emerald-100 text-emerald-700">
+    <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase tracking-wider bg-emerald-50 text-emerald-700 ring-1 ring-inset ring-emerald-200">
       <ShieldCheck className="w-3 h-3" /> Price verified
     </span>
   );
