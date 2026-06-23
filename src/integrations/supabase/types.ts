@@ -4844,6 +4844,18 @@ export type Database = {
           version: number
         }[]
       }
+      get_tenant_billing: {
+        Args: { _tenant_id: string }
+        Returns: {
+          autocheck_dealer_id: string
+          billing_email: string
+          carfax_dealer_id: string
+          id: string
+          name: string
+          primary_email: string
+          stripe_customer_id: string
+        }[]
+      }
       get_vehicle_file_by_deal_token: {
         Args: { _token: string }
         Returns: {
