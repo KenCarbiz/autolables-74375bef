@@ -912,7 +912,7 @@ const ExecKpiStrip = ({ counts, onMetric, onMarket }: { counts: KpiCounts; onMet
       {/* Premium readiness rectangle */}
       <button
         onClick={() => onMetric("ready")}
-        className="group/r text-left rounded-2xl border border-[#E6EAF2] bg-gradient-to-br from-white via-white to-[#F4F8FF] shadow-[0_1px_2px_rgba(16,24,40,0.04),0_8px_24px_-12px_rgba(37,99,235,0.18)] p-4 hover:shadow-[0_2px_4px_rgba(16,24,40,0.06),0_12px_28px_-12px_rgba(37,99,235,0.25)] hover:border-blue-200 transition-all"
+        className="group/r text-left rounded-2xl border border-[#E6EAF2] bg-gradient-to-br from-white via-white to-[#F4F8FF] shadow-[0_1px_2px_rgba(16,24,40,0.04),0_8px_24px_-12px_rgba(37,99,235,0.18)] p-4 hover:shadow-[0_2px_4px_rgba(16,24,40,0.06),0_12px_28px_-12px_rgba(37,99,235,0.25)] hover:border-blue-200 transition-all flex flex-col h-full"
       >
         <div className="flex items-center justify-between gap-2">
           <p className="inline-flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">
@@ -921,7 +921,7 @@ const ExecKpiStrip = ({ counts, onMetric, onMarket }: { counts: KpiCounts; onMet
           </p>
           <span className="text-[10px] font-bold uppercase tracking-[0.1em] text-blue-600/80">Live</span>
         </div>
-        <div className="mt-3 flex items-center gap-4">
+        <div className="mt-3 flex items-center gap-4 flex-1">
           <BigRing pct={pct} />
           <div className="min-w-0 flex-1">
             <div className="flex items-baseline gap-2">
@@ -931,9 +931,9 @@ const ExecKpiStrip = ({ counts, onMetric, onMarket }: { counts: KpiCounts; onMet
             <div className="mt-2.5 h-1.5 w-full rounded-full bg-slate-100 overflow-hidden">
               <div className={`h-full rounded-full ${barTone} transition-all`} style={{ width: `${Math.max(2, pct)}%`, boxShadow: `0 0 8px ${ringTone}66` }} />
             </div>
-            <p className="text-[11px] font-semibold text-blue-600 mt-2 group-hover/r:underline">View readiness details →</p>
           </div>
         </div>
+        <p className="text-[11px] font-semibold text-blue-600 mt-auto pt-2 group-hover/r:underline">View readiness details →</p>
       </button>
       <ExecKpi label="Total Vehicles" value={counts.total} sub={`${counts.newCount} new • ${counts.usedCount} used`} icon={Car} onClick={() => onMetric("total")} link="View all vehicles" />
       <ExecKpi label="Published" value={counts.published} sub="live on portal" icon={CheckCircle2} tone="emerald" onClick={() => onMetric("published")} link="View published" />
