@@ -122,9 +122,9 @@ const CommandPalette = ({ open, onOpenChange }: CommandPaletteProps) => {
             <TrendingUp className="w-4 h-4 mr-2" />
             New Trade-Up Sticker
           </CommandItem>
-          <CommandItem onSelect={() => go("/description-writer")}>
+          <CommandItem onSelect={() => go("/description-studio")}>
             <Sparkles className="w-4 h-4 mr-2" />
-            Description Writer
+            Description Studio
           </CommandItem>
         </CommandGroup>
 

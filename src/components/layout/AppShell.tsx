@@ -165,7 +165,7 @@ const AppShell = ({ children }: AppShellProps) => {
         { label: "Trade-Up Sticker", path: "/trade-up", icon: TrendingUp },
         { label: "Buyers Guide", path: "/buyers-guide", icon: ScrollText, featureKey: "feature_buyers_guide" },
         { label: "Used Vehicle Docs", path: "/used-vehicle-documents", icon: ScrollText, requireManager: true },
-        { label: "Description Writer", path: "/description-writer", icon: Sparkles },
+        { label: "Description Studio", path: "/description-studio", icon: Sparkles },
       ],
     },
     compliance: {
@@ -243,6 +243,7 @@ const AppShell = ({ children }: AppShellProps) => {
     "/used-car-sticker": { title: "Used Car Sticker", subtitle: "Generate used vehicle buyer-facing labels." },
     "/sticker-studio": { title: "Sticker Studio", subtitle: "Build and customize label templates." },
     "/compliance": { title: "Compliance", subtitle: "Track dealership forms, rules, and audit items." },
+    "/description-studio": { title: "SEO Description Studio", subtitle: "AI-powered vehicle descriptions that sell more and rank higher." },
     "/description-writer": { title: "SEO Description Studio", subtitle: "AI-powered vehicle descriptions that sell more and rank higher." },
   };
   const pageMeta = pageTitles[location.pathname] || { title: activeItem?.label || "Dashboard", subtitle: "AutoLabels admin workspace." };

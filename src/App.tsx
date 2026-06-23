@@ -85,7 +85,7 @@ const DocumentReview = lazy(() => import("./pages/DocumentReview"));
 const Setup = lazy(() => import("./pages/Setup"));
 const NewCarSticker = lazy(() => import("./pages/NewCarSticker"));
 const CpoSheet = lazy(() => import("./pages/CpoSheet"));
-const DescriptionWriter = lazy(() => import("./pages/DescriptionWriter"));
+const DescriptionStudio = lazy(() => import("./pages/DescriptionStudio"));
 const SaveCarInventory = lazy(() => import("./pages/SaveCarInventory"));
 const DealSigning = lazy(() => import("./pages/DealSigning"));
 const PublicListing = lazy(() => import("./pages/PublicListing"));
@@ -199,7 +199,8 @@ const App = () => (
                         <Route path="/compliance" element={<ComplianceCenter />} />
                         <Route path="/compliance-center" element={<ComplianceActionCenter />} />
                         <Route path="/compliance-inbox" element={<ComplianceInbox />} />
-                        <Route path="/description-writer" element={<DescriptionWriter />} />
+                        <Route path="/description-studio" element={<DescriptionStudio />} />
+                        <Route path="/description-writer" element={<DescriptionStudio />} />
                         <Route path="/add-inventory" element={<SaveCarInventory />} />
                         <Route path="/prep" element={<PrepSignOff />} />
                         <Route path="/service-inspection" element={<ServiceInspection />} />
