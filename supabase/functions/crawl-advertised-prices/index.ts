@@ -355,9 +355,17 @@ const FETCH_HEADERS = { "User-Agent": UA, "Accept": "text/html,application/xhtml
 // a full-page screenshot (our FTC evidence image), and an LLM-extracted
 // {price, vin} we accept only when the VIN matches.
 const FIRECRAWL_KEY = Deno.env.get("FIRECRAWL_API_KEY_1") || Deno.env.get("FIRECRAWL_API_KEY") || "";
-const FIRECRAWL_ENDPOINT = "https://api.firecrawl.dev/v1/scrape";
+const FIRECRAWL_ENDPOINT = "https://api.firecrawl.dev/v2/scrape";
 
-interface RenderResult { html: string; screenshotUrl: string | null; jsonPrice: number | null; jsonVin: string | null; }
+interface RenderResult {
+  html: string;
+  screenshotUrl: string | null;
+  jsonPrice: number | null;
+  jsonVin: string | null;
+  ok: boolean;
+  status: number | null;
+  error: string | null;
+}
 
 async function firecrawlRender(url: string): Promise<RenderResult | null> {
   if (!FIRECRAWL_KEY) return null;
@@ -367,28 +375,37 @@ async function firecrawlRender(url: string): Promise<RenderResult | null> {
       headers: { "Authorization": `Bearer ${FIRECRAWL_KEY}`, "Content-Type": "application/json" },
       body: JSON.stringify({
         url,
-        formats: ["html", "screenshot@fullPage", "json"],
-        jsonOptions: {
+        formats: ["html", { type: "screenshot", fullPage: true }, {
+          type: "json",
           prompt: "Extract the vehicle's advertised selling/internet price in USD (not the MSRP) and its 17-character VIN.",
           schema: { type: "object", properties: { price: { type: "number" }, vin: { type: "string" }, currency: { type: "string" } } },
-        },
+        }],
         onlyMainContent: false,
-        waitFor: 3500,
-        timeout: 30000,
+        waitFor: 10000,
+        timeout: 90000,
       }),
-      signal: AbortSignal.timeout(45000),
+      signal: AbortSignal.timeout(110000),
     });
-    if (!res.ok) return null;
+    if (!res.ok) {
+      const body = await res.text().catch(() => "");
+      return { html: "", screenshotUrl: null, jsonPrice: null, jsonVin: null, ok: false, status: res.status, error: body.slice(0, 300) || res.statusText };
+    }
     // deno-lint-ignore no-explicit-any
     const data: any = await res.json();
     const d = data?.data || data;
     return {
       html: d?.html || "",
-      screenshotUrl: d?.screenshot || d?.screenshotUrl || (d?.metadata?.screenshot) || null,
+      screenshotUrl: d?.screenshot || d?.screenshotUrl || d?.actions?.screenshots?.[0] || (d?.metadata?.screenshot) || null,
       jsonPrice: norm(d?.json?.price ?? null),
       jsonVin: d?.json?.vin ? normVin(d.json.vin) : null,
+      ok: true,
+      status: res.status,
+      error: null,
     };
-  } catch { return null; }
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    return { html: "", screenshotUrl: null, jsonPrice: null, jsonVin: null, ok: false, status: null, error: msg.slice(0, 300) };
+  }
 }
 
 // Download Firecrawl's (ephemeral) screenshot and persist it to our private
@@ -560,6 +577,8 @@ serve(async (req) => {
     const fetchUrl = maybeNormalize(body.test_url, cfg.stripFinance);
     let html = "";
     let rendered = false;
+    let renderStatus: number | null = null;
+    let renderError: string | null = null;
     let httpStatus = 0;
     try {
       const r = await fetch(fetchUrl, { headers: FETCH_HEADERS, signal: AbortSignal.timeout(12000) });
@@ -574,7 +593,9 @@ serve(async (req) => {
     if (result.price == null && renderBudget > 0) {
       renderBudget--;
       const fr = await firecrawlRender(fetchUrl);
-      if (fr) {
+      renderStatus = fr?.status ?? null;
+      renderError = fr?.error ?? null;
+      if (fr?.ok) {
         rendered = true;
         if (fr.html) {
           result = extractAdvertised(fr.html, fetchUrl, "", cfg.labels);
@@ -596,6 +617,8 @@ serve(async (req) => {
         source: result.source,
         reason: result.reason,
         rendered,
+        render_status: renderStatus,
+        render_error: renderError,
         http_status: httpStatus,
         msrp: result.msrp,
         candidates: result.candidates.slice(0, 30),
@@ -718,11 +741,15 @@ serve(async (req) => {
       // and it's where we capture the FTC evidence screenshot.
       let screenshot: CapturedScreenshot | null = null;
       let renderSource: string | null = null;
+      let renderStatus: number | null = null;
+      let renderError: string | null = null;
       const cheapFailed = result.price == null && result.reason !== "vin_mismatch" && !result.gated;
       if (cheapFailed && renderBudget > 0) {
         renderBudget--;
         const r = await firecrawlRender(fetchUrl);
-        if (r) {
+        renderStatus = r?.status ?? null;
+        renderError = r?.error ?? null;
+        if (r?.ok) {
           renderSource = "firecrawl";
           if (r.html) {
             html = r.html;
@@ -760,7 +787,7 @@ serve(async (req) => {
         await admin.from("audit_log").insert({
           action: "advertised_price_crawl_error", entity_type: "advertised_price",
           entity_id: row.vin, store_id: row.tenant_id,
-          details: { vin: row.vin, url: row.source_url, http_status: cheapStatus, reason: "bot_challenge", rendered: !!renderSource },
+          details: { vin: row.vin, url: row.source_url, fetch_url: fetchUrl, http_status: cheapStatus, reason: "bot_challenge", rendered: !!renderSource, render_status: renderStatus, render_error: renderError },
         }).then(() => undefined, () => undefined);
         continue;
       }
@@ -790,6 +817,8 @@ serve(async (req) => {
             url: row.source_url,
             reason: result.reason || "no_price_extracted",
             rendered: !!renderSource,
+            render_status: renderStatus,
+            render_error: renderError,
             msrp: result.msrp,
             candidates: result.candidates.slice(0, 12),
           },
