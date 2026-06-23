@@ -2156,6 +2156,57 @@ export type Database = {
           },
         ]
       }
+      marketcheck_vehicle_cache: {
+        Row: {
+          created_at: string
+          id: string
+          incentives_customer_zip: Json
+          incentives_customer_zip_code: string | null
+          incentives_customer_zip_pulled_at: string | null
+          incentives_dealer_zip: Json
+          tenant_id: string
+          updated_at: string
+          vin: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          incentives_customer_zip?: Json
+          incentives_customer_zip_code?: string | null
+          incentives_customer_zip_pulled_at?: string | null
+          incentives_dealer_zip?: Json
+          tenant_id: string
+          updated_at?: string
+          vin: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          incentives_customer_zip?: Json
+          incentives_customer_zip_code?: string | null
+          incentives_customer_zip_pulled_at?: string | null
+          incentives_dealer_zip?: Json
+          tenant_id?: string
+          updated_at?: string
+          vin?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "marketcheck_vehicle_cache_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenant_summary"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "marketcheck_vehicle_cache_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       onboarding_profiles: {
         Row: {
           billing: Json
