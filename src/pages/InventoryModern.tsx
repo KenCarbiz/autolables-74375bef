@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
+import { useQueryClient } from "@tanstack/react-query";
 import { useViewTransitionNavigate } from "@/lib/navigation";
 import { useVinScan } from "@/contexts/VinScanContext";
 import { supabase } from "@/integrations/supabase/client";
