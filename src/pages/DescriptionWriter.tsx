@@ -1,9 +1,10 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useTenant } from "@/contexts/TenantContext";
 import { useDealerSettings } from "@/contexts/DealerSettingsContext";
 import { useVinDecode } from "@/hooks/useVinDecode";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import {
   ArrowRight,
   CheckCircle2,
@@ -16,6 +17,9 @@ import {
   Globe,
   History,
   ImageIcon,
+  Loader2,
+  MapPin,
+  Plus,
   RotateCcw,
   Save,
   Send,
@@ -24,7 +28,10 @@ import {
   Star,
   Target,
   Wrench,
+  X,
 } from "lucide-react";
+
+type ZipPlace = { city: string; state: string; stateAbbr: string };
 
 type Platform = "autotrader" | "carscom" | "cargurus" | "facebook" | "dealerwebsite" | "googleseo";
 type Tone = "professional" | "luxury" | "sporty" | "family" | "value";
