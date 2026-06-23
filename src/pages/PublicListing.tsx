@@ -43,6 +43,8 @@ import VehicleInsights from "@/components/listing/VehicleInsights";
 import MarketValueReport from "@/components/listing/MarketValueReport";
 import DealerProgramsSection from "@/components/listing/DealerProgramsSection";
 import IncentivesSection from "@/components/listing/IncentivesSection";
+import TrustStrip from "@/components/listing/TrustStrip";
+import QuickActionBar from "@/components/listing/QuickActionBar";
 import OemSticker from "@/components/listing/OemSticker";
 import PassportDocuments from "@/components/listing/PassportDocuments";
 import { listingOptions } from "@/lib/vehicleInsights";
@@ -277,6 +279,11 @@ const PublicListingBody = () => {
             below carry the FTC-aligned "advertised = drive-out"
             story. */}
         <HeroSection listing={listing} dealer={dealer} />
+
+        {/* Consumer quick actions + the visual trust badge strip (the
+            signature confidence bar). Both wired to real listing data. */}
+        <QuickActionBar dealer={dealer} onShare={handleShare} />
+        <TrustStrip listing={listing} />
 
         {/* Trust Band — the defining value of this page. Every chip
             is a hashed receipt, not a marketing claim:
