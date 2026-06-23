@@ -302,7 +302,7 @@ function MobileReadinessCard({ percent, ready, total }: { percent: number; ready
           <div className="mt-1 text-[18px] font-semibold leading-snug text-slate-500">{ready} of {total}<br />vehicles</div>
         </div>
       </div>
-      <div className="mt-6 text-[17px] font-black text-blue-700">View readiness details -></div>
+      <div className="mt-6 text-[17px] font-black text-blue-700">View readiness details {'->'}</div>
     </button>
   );
 }
