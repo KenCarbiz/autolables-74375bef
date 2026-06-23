@@ -914,7 +914,54 @@ const PortalChip = ({ status }: { status: VehicleRow["status"] }) =>
       ? <span className="inline-flex items-center text-[10px] font-semibold px-1.5 py-0.5 rounded bg-slate-100 text-slate-600">Archived</span>
       : <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded bg-slate-100 text-slate-600"><span className="w-1.5 h-1.5 rounded-full bg-slate-400" />Draft</span>;
 
-// Status surfaces the lifecycle state, or — for drafts — the single most
+// Simple status pill — only Draft / Published / Archived.
+const SimpleStatusPill = ({ status }: { status: VehicleRow["status"] }) => {
+  const cfg = status === "published"
+    ? { cls: "bg-slate-100 text-slate-700", dot: "bg-emerald-500", label: "Published" }
+    : status === "archived"
+      ? { cls: "bg-slate-100 text-slate-600", dot: "bg-slate-400", label: "Archived" }
+      : { cls: "bg-slate-100 text-slate-700", dot: "bg-slate-400", label: "Draft" };
+  return (
+    <span className={`inline-flex items-center gap-1.5 text-[11px] font-semibold px-2 py-1 rounded-lg ${cfg.cls}`}>
+      <span className={`w-1.5 h-1.5 rounded-full ${cfg.dot}`} />{cfg.label}
+    </span>
+  );
+};
+
+// Compliance cell — VIN decode + recall status stacked.
+const ComplianceCell = ({ ymm, recallStatus, openRecallCount }: { ymm?: string | null; recallStatus?: string | null; openRecallCount?: number | null }) => {
+  const n = openRecallCount || 0;
+  const recall = recallStatus === "open_recalls" && n > 0
+    ? { cls: "text-amber-600", icon: AlertTriangle, label: `${n} Open Recall${n === 1 ? "" : "s"}` }
+    : recallStatus === "clear"
+      ? { cls: "text-emerald-600", icon: ShieldCheck, label: "No Open Recalls" }
+      : { cls: "text-muted-foreground", icon: ShieldCheck, label: "Recall Pending" };
+  const RecallIcon = recall.icon;
+  return (
+    <div className="leading-tight space-y-0.5">
+      {ymm
+        ? <p className="inline-flex items-center gap-1 text-xs font-semibold text-emerald-600"><CheckCircle2 className="w-3.5 h-3.5" />VIN Decoded</p>
+        : <p className="inline-flex items-center gap-1 text-xs font-semibold text-red-600"><AlertTriangle className="w-3.5 h-3.5" />VIN Decode Failed</p>}
+      <p className={`inline-flex items-center gap-1 text-xs font-semibold ${recall.cls}`}><RecallIcon className="w-3.5 h-3.5" />{recall.label}</p>
+    </div>
+  );
+};
+
+// Advertised price cell — $XX,XXX, ✓ Advertised, incl. $XXX doc.
+const AdvertisedPriceCell = ({ price, docFee, verified }: { price?: number | null; docFee?: number | null; verified?: boolean }) => {
+  if (price == null) return <span className="text-xs text-muted-foreground">—</span>;
+  return (
+    <div className="leading-tight">
+      <p className="text-sm font-bold text-foreground tabular-nums">${price.toLocaleString()}</p>
+      {verified
+        ? <p className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-600 mt-0.5"><CheckCircle2 className="w-3 h-3" />Advertised</p>
+        : <p className="text-[11px] font-semibold text-muted-foreground mt-0.5">Not verified</p>}
+      {docFee ? <p className="text-[10px] text-muted-foreground mt-0.5">incl. ${Number(docFee).toLocaleString()} doc</p> : null}
+    </div>
+  );
+};
+
+
 // pressing action the vehicle needs before it can publish.
 const StatusPill = ({ status, signal }: { status: VehicleRow["status"]; signal?: RowSignal }) => {
   const cfg = status === "published" ? { cls: "bg-emerald-100 text-emerald-700", dot: "bg-emerald-500", label: "Published" }
