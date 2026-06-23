@@ -505,18 +505,7 @@ const PublicListingBody = () => {
         <div className="max-w-6xl mx-auto px-4 py-4">
           <p className="text-xs font-bold text-slate-500 uppercase tracking-wide mb-3">Available Offers</p>
           <div className="flex flex-wrap gap-3">
-            {listing.payment_estimate?.apr != null && (
-              <div className="flex items-center gap-3 bg-white border border-blue-200 rounded-xl px-4 py-3 shadow-sm">
-                <CreditCard className="w-5 h-5 text-blue-600 shrink-0" />
-                <div>
-                  <p className="text-xs text-slate-500">Financing Available</p>
-                  <p className="text-sm font-black text-slate-900">{listing.payment_estimate.apr}% APR</p>
-                  {listing.payment_estimate?.monthly != null && (
-                    <p className="text-xs text-emerald-700 font-semibold">Est. {fmt$(listing.payment_estimate.monthly)}/mo</p>
-                  )}
-                </div>
-              </div>
-            )}
+            {/* Financing/payment estimates intentionally omitted — FTC-compliant pricing on this page is advertised price only. */}
             {belowMarket > 0 && (
               <div className="flex items-center gap-3 bg-white border border-emerald-200 rounded-xl px-4 py-3 shadow-sm">
                 <TrendingDown className="w-5 h-5 text-emerald-600 shrink-0" />
