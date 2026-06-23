@@ -246,11 +246,6 @@ const PublicListingBody = () => {
   const highlights = useMemo(() => {
     if (!listing) return [];
     const ks = listing.key_specs || {};
-    if (listing.features && listing.features.length > 0) {
-      return listing.features.filter((f) =>
-        !/blind|backup|camera|alert|warning|apple|android|bluetooth|wifi|navigation|screen|audio|carplay|usb|seat|leather|heat|cool|moonroof|sunroof|wheel|alloy|led|headlight|package|pkg/i.test(f.title)
-      ).slice(0, 8);
-    }
     const rows: { icon: React.ElementType; title: string; subtitle?: string | null }[] = [];
     if (ks.engine) rows.push({ icon: Cog, title: ks.engine, subtitle: "Engine" });
     if (ks.drivetrain) rows.push({ icon: Car, title: ks.drivetrain, subtitle: "Drivetrain" });
@@ -258,6 +253,13 @@ const PublicListingBody = () => {
     if (ks.fuel) rows.push({ icon: Fuel, title: ks.fuel, subtitle: "Fuel" });
     if (ks.body_style) rows.push({ icon: Car, title: ks.body_style, subtitle: "Body Style" });
     if (ks.exterior_color) rows.push({ icon: Wind, title: ks.exterior_color, subtitle: "Color" });
+    if (rows.length < 6 && listing.features && listing.features.length > 0) {
+      const extras = listing.features
+        .filter((f) => !/blind|backup|camera|alert|warning|apple|android|bluetooth|wifi|navigation|screen|audio|carplay|usb/i.test(f.title))
+        .slice(0, 8 - rows.length)
+        .map((f) => ({ icon: (typeof f.icon === "function" ? f.icon : Cog) as React.ElementType, title: f.title, subtitle: f.subtitle ?? null }));
+      rows.push(...extras);
+    }
     return rows.slice(0, 8);
   }, [listing]);
 
