@@ -3363,6 +3363,57 @@ export type Database = {
         }
         Relationships: []
       }
+      tenant_incentive_settings: {
+        Row: {
+          created_at: string
+          dealer_zip_override: string | null
+          id: string
+          incentive_zip_mode: string
+          incentives_disclaimer: string
+          incentives_enabled: boolean
+          tenant_id: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          created_at?: string
+          dealer_zip_override?: string | null
+          id?: string
+          incentive_zip_mode?: string
+          incentives_disclaimer?: string
+          incentives_enabled?: boolean
+          tenant_id: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          created_at?: string
+          dealer_zip_override?: string | null
+          id?: string
+          incentive_zip_mode?: string
+          incentives_disclaimer?: string
+          incentives_enabled?: boolean
+          tenant_id?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tenant_incentive_settings_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: true
+            referencedRelation: "tenant_summary"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tenant_incentive_settings_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: true
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       tenant_members: {
         Row: {
           accepted_at: string | null
