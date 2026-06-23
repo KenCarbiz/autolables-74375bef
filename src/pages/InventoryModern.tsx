@@ -177,7 +177,8 @@ const InventoryModern = () => {
       const d = (data || {}) as { checked?: number; greatDeals?: number; error?: string };
       if (d.error === "not_configured") { toast.error("Market pricing isn't configured (MarketCheck key)."); return; }
       toast.success(`Market pricing: ${d.checked ?? 0} checked · ${d.greatDeals ?? 0} great deals`);
-      load();
+      await load();
+      broadcastSynced("market", { checked: d.checked, greatDeals: d.greatDeals });
     } catch { toast.error("Market pricing batch failed"); }
   };
 
