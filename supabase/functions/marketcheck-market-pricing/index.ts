@@ -35,6 +35,7 @@ interface MarketResult {
   position: "great_deal" | "good_deal" | "fair_deal" | "above_market" | "unknown";
   belowMarket: number; // market - listing (positive = priced below market)
   rawProvider: "marketcheck_predict";
+  raw?: unknown; // the full MarketCheck predict response, kept so nothing is lost
 }
 
 const classify = (listing: number | null, market: number | null): { position: MarketResult["position"]; belowMarket: number } => {
@@ -73,7 +74,7 @@ async function fetchMarket(vin: string, l: Listing): Promise<MarketResult | { er
       const { position, belowMarket } = classify(l.price, market);
       return {
         vin, checkedAt: new Date().toISOString(), listingPrice: l.price, marketValue: market,
-        low, high, position, belowMarket, rawProvider: "marketcheck_predict",
+        low, high, position, belowMarket, rawProvider: "marketcheck_predict", raw: b,
       };
     } catch (_e) {
       if (attempt === 0) { await new Promise((r) => setTimeout(r, 600)); continue; }
@@ -89,10 +90,26 @@ const persist = async (admin: any, tenantId: string | null, vin: string, m: Mark
     market_value: m.marketValue,
     market_position: m.position,
     market_checked_at: m.checkedAt,
-    market_payload: m,
+    market_payload: m,          // full normalized result + raw provider response
+    mc_raw: m,                  // keep the complete payload on the car
   }).eq("vin", vin);
   if (tenantId) q = q.eq("tenant_id", tenantId);
-  try { await q; } catch { /* market_* columns may not be migrated yet */ }
+  try { await q; } catch {
+    // mc_raw column may not be migrated yet — retry without it.
+    let q2 = admin.from("vehicle_listings").update({
+      market_value: m.marketValue, market_position: m.position, market_checked_at: m.checkedAt, market_payload: m,
+    }).eq("vin", vin);
+    if (tenantId) q2 = q2.eq("tenant_id", tenantId);
+    try { await q2; } catch { /* market_* columns may not be migrated yet */ }
+  }
+  // Append a time-series snapshot so value can be charted over time for the
+  // customer. Best-effort: the history table may not be migrated yet.
+  await admin.from("vehicle_value_history").insert({
+    tenant_id: tenantId, vin, source: "market_pricing",
+    market_value: m.marketValue, listing_price: m.listingPrice,
+    position: m.position, below_market: m.belowMarket,
+    payload: m, captured_at: m.checkedAt,
+  }).then(() => undefined, () => undefined);
 };
 
 // deno-lint-ignore no-explicit-any

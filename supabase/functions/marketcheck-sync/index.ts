@@ -637,6 +637,17 @@ serve(async (req) => {
                 .eq("tenant_id", cfg.tenant_id).eq("vin", vin);
             } catch { /* photos / mc_attributes columns may not be migrated yet */ }
 
+            // Keep the complete feed payload on the car and append a value
+            // snapshot so the customer's value can be tracked over time.
+            // Best-effort: the mc_raw column / history table may not exist yet.
+            await admin.from("vehicle_listings").update({ mc_raw: l })
+              .eq("tenant_id", cfg.tenant_id).eq("vin", vin)
+              .then(() => undefined, () => undefined);
+            await admin.from("vehicle_value_history").insert({
+              tenant_id: cfg.tenant_id, vin, source: "marketcheck_sync",
+              listing_price: price ?? null, payload: l, captured_at: new Date().toISOString(),
+            }).then(() => undefined, () => undefined);
+
             // 3) advertised_prices — website price snapshot on change.
             if (price != null) {
               const prev = latestWebsite.get(vin);
