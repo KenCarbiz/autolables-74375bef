@@ -835,10 +835,10 @@ serve(async (req) => {
         tenant_id: row.tenant_id,
         store_id: row.store_id || "",
         vin: row.vin,
-        source_url: row.source_url,
+        source_url: fetchUrl,
         source_channel: row.source_label,
         advertised_price: newPrice,
-        captured_by: renderSource ? "crawler_rendered" : "crawler",
+        captured_by: null,
         screenshot_url: screenshot?.path ?? null,
         screenshot_sha256: screenshot?.sha256 ?? null,
         screenshot_bucket: screenshot?.bucket ?? PRICE_EVIDENCE_BUCKET,
@@ -855,6 +855,13 @@ serve(async (req) => {
       }
       if (insErr) {
         failed++;
+        await admin.from("audit_log").insert({
+          action: "advertised_price_crawl_error",
+          entity_type: "advertised_price",
+          entity_id: row.vin,
+          store_id: row.tenant_id,
+          details: { vin: row.vin, url: row.source_url, fetch_url: fetchUrl, reason: "insert_failed", error: insErr.message, extracted_price: newPrice },
+        }).then(() => undefined, () => undefined);
         continue;
       }
       updated++;
