@@ -246,11 +246,6 @@ const PublicListingBody = () => {
   const highlights = useMemo(() => {
     if (!listing) return [];
     const ks = listing.key_specs || {};
-    if (listing.features && listing.features.length > 0) {
-      return listing.features.filter((f) =>
-        !/blind|backup|camera|alert|warning|apple|android|bluetooth|wifi|navigation|screen|audio|carplay|usb|seat|leather|heat|cool|moonroof|sunroof|wheel|alloy|led|headlight|package|pkg/i.test(f.title)
-      ).slice(0, 8);
-    }
     const rows: { icon: React.ElementType; title: string; subtitle?: string | null }[] = [];
     if (ks.engine) rows.push({ icon: Cog, title: ks.engine, subtitle: "Engine" });
     if (ks.drivetrain) rows.push({ icon: Car, title: ks.drivetrain, subtitle: "Drivetrain" });
@@ -258,6 +253,13 @@ const PublicListingBody = () => {
     if (ks.fuel) rows.push({ icon: Fuel, title: ks.fuel, subtitle: "Fuel" });
     if (ks.body_style) rows.push({ icon: Car, title: ks.body_style, subtitle: "Body Style" });
     if (ks.exterior_color) rows.push({ icon: Wind, title: ks.exterior_color, subtitle: "Color" });
+    if (rows.length < 6 && listing.features && listing.features.length > 0) {
+      const extras = listing.features
+        .filter((f) => !/blind|backup|camera|alert|warning|apple|android|bluetooth|wifi|navigation|screen|audio|carplay|usb/i.test(f.title))
+        .slice(0, 8 - rows.length)
+        .map((f) => ({ icon: (typeof f.icon === "function" ? f.icon : Cog) as React.ElementType, title: f.title, subtitle: f.subtitle ?? null }));
+      rows.push(...extras);
+    }
     return rows.slice(0, 8);
   }, [listing]);
 
@@ -447,8 +449,8 @@ const PublicListingBody = () => {
             <p className="text-sm text-slate-500 mt-1 flex flex-wrap gap-x-3">
               {listing.mileage != null && <span>{listing.mileage.toLocaleString()} mi</span>}
               {ks.exterior_color && <span>{ks.exterior_color}</span>}
-              {(listing as Record<string, unknown>).stock_number && (
-                <span>Stock # {String((listing as Record<string, unknown>).stock_number)}</span>
+              {((listing as unknown as Record<string, unknown>).stock_number) && (
+                <span>Stock # {String((listing as unknown as Record<string, unknown>).stock_number)}</span>
               )}
               {listing.vin && <span>VIN {listing.vin}</span>}
             </p>
@@ -505,18 +507,7 @@ const PublicListingBody = () => {
         <div className="max-w-6xl mx-auto px-4 py-4">
           <p className="text-xs font-bold text-slate-500 uppercase tracking-wide mb-3">Available Offers</p>
           <div className="flex flex-wrap gap-3">
-            {listing.payment_estimate?.apr != null && (
-              <div className="flex items-center gap-3 bg-white border border-blue-200 rounded-xl px-4 py-3 shadow-sm">
-                <CreditCard className="w-5 h-5 text-blue-600 shrink-0" />
-                <div>
-                  <p className="text-xs text-slate-500">Financing Available</p>
-                  <p className="text-sm font-black text-slate-900">{listing.payment_estimate.apr}% APR</p>
-                  {listing.payment_estimate?.monthly != null && (
-                    <p className="text-xs text-emerald-700 font-semibold">Est. {fmt$(listing.payment_estimate.monthly)}/mo</p>
-                  )}
-                </div>
-              </div>
-            )}
+            {/* Financing/payment estimates intentionally omitted — FTC-compliant pricing on this page is advertised price only. */}
             {belowMarket > 0 && (
               <div className="flex items-center gap-3 bg-white border border-emerald-200 rounded-xl px-4 py-3 shadow-sm">
                 <TrendingDown className="w-5 h-5 text-emerald-600 shrink-0" />
@@ -572,27 +563,6 @@ const PublicListingBody = () => {
               sub={warrantyStr || (listing.condition === "new" ? "Complete Manufacturer Coverage" : "See Details")}
               state={warrantyStr || listing.condition === "new" ? "good" : "neutral"} />
             <TrustBadge icon={RefreshCw} label="7-Day Exchange Policy" sub="Hassle-Free" state="good" />
-          </div>
-          {/* Row 2: 6 compact badges */}
-          <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
-            {([
-              { icon: recallCount > 0 ? AlertTriangle : ShieldCheck, label: recallCount > 0 ? `${recallCount} Recall${recallCount > 1 ? "s" : ""}` : "No Recalls", state: recallCount > 0 ? "bad" : "good" },
-              { icon: Gauge, label: belowMarket > 0 ? "Below Market" : "Market Price", state: belowMarket > 0 ? "good" : "neutral" as const },
-              { icon: Award, label: "4.8 Dealer Rating", state: "good" },
-              { icon: CheckCircle2, label: "162-Pt Inspected", state: "good" },
-              { icon: Shield, label: "FTC Aligned", state: "good" },
-              { icon: ShieldCheck, label: "Docs Secured", state: "good" },
-            ] as { icon: React.ElementType; label: string; state: "good" | "warn" | "bad" | "neutral" }[]).map(({ icon: Icon, label, state: s }) => {
-              const cls = { good: "text-emerald-600 bg-emerald-50", warn: "text-amber-600 bg-amber-50", bad: "text-red-600 bg-red-50", neutral: "text-slate-500 bg-slate-100" }[s];
-              return (
-                <div key={label} className="flex flex-col items-center gap-1.5 px-2 py-2.5 bg-slate-50 rounded-xl text-center">
-                  <div className={`w-7 h-7 rounded-lg flex items-center justify-center ${cls}`}>
-                    <Icon className="w-3.5 h-3.5" />
-                  </div>
-                  <p className="text-[10px] font-bold text-slate-700 leading-tight">{label}</p>
-                </div>
-              );
-            })}
           </div>
         </div>
       </div>
