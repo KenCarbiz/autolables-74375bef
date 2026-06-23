@@ -484,18 +484,15 @@ const InventoryModern = () => {
                           <p className="font-mono text-xs text-foreground">{r.stock_number || "—"}</p>
                           <p className="font-mono text-[11px] text-muted-foreground">…{(r.vin || "").slice(-6)}</p>
                         </td>
-                        <td className="px-3 py-3"><StatusPill status={r.status} signal={signalFor(r)} /></td>
+                        <td className="px-3 py-3"><SimpleStatusPill status={r.status} /></td>
                         <td className="px-3 py-3">
                           <ReadinessCell r={r} signal={signalFor(r)} pct={rowReadiness(r)} />
                         </td>
                         <td className="px-3 py-3">
-                          <VinDecodeCell ymm={r.ymm} />
+                          <ComplianceCell ymm={r.ymm} recallStatus={r.recall_status} openRecallCount={r.open_recall_count} />
                         </td>
                         <td className="px-3 py-3">
-                          <RecallChip status={r.recall_status} open={r.open_recall_count} />
-                        </td>
-                        <td className="px-3 py-3">
-                          <MarketCell position={r.market_position} price={r.price} value={r.market_value} />
+                          <AdvertisedPriceCell price={r.price} docFee={settings.doc_fee_amount} verified={byVin.has((r.vin || "").toUpperCase())} />
                         </td>
                         <td className="px-3 py-3" onClick={(e) => e.stopPropagation()}>
                           <PortalChip status={r.status} />
