@@ -1,0 +1,1 @@
+DELETE FROM public.advertised_prices WHERE source_url ILIKE '%example-dealer.com%';
