@@ -502,7 +502,7 @@ const PublicListingBody = () => {
               <p className="text-sm text-slate-500 flex items-center justify-end gap-1.5">
                 {priceLabel} <Info className="w-3.5 h-3.5 text-slate-400" />
               </p>
-              <p className="text-4xl font-black text-slate-900 mt-1">{fmt$(price || undefined)}</p>
+              <p className="text-slate-900 mt-1 leading-none tracking-tight" style={{ fontSize: 56, fontWeight: 800 }}>{fmt$(price || undefined)}</p>
             </div>
           </div>
 
