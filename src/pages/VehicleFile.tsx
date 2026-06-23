@@ -897,13 +897,13 @@ const DocumentsPanel = ({ vehicle, onReload }: { vehicle: VehicleRow; onReload: 
   }, [vehicle.documents]);
 
   return (
-    <div className="space-y-6">
-      <div className="rounded-2xl border border-border bg-card p-4">
+    <div className="space-y-5">
+      <div className="rounded-2xl border border-border bg-card shadow-[0_1px_3px_rgba(0,0,0,0.05)] p-5">
         <GeneratedDocumentsSection vehicleId={vehicle.id} />
       </div>
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
       {slots.map((s) => (
-        <div key={s.type} className="rounded-xl border border-border bg-card p-4 space-y-2">
+        <div key={s.type} className="rounded-2xl border border-border bg-card shadow-[0_1px_3px_rgba(0,0,0,0.05)] p-5 space-y-2">
           <div className="flex items-center justify-between">
             <h3 className="text-sm font-bold text-foreground">{s.label}</h3>
             <span className="text-[10px] text-muted-foreground">{(filesByType[s.type] || []).length} file(s)</span>
@@ -1107,7 +1107,7 @@ const ScanInfoPanel = ({ vehicle, onReload }: { vehicle: VehicleRow; onReload: (
   const labelCls = "text-[10px] font-bold uppercase tracking-wider text-muted-foreground";
 
   return (
-    <div className="space-y-6 max-w-3xl">
+    <div className="space-y-5 max-w-3xl">
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-base font-bold text-foreground">Scan Info</h2>
