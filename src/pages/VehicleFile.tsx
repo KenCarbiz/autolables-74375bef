@@ -595,8 +595,8 @@ const OverviewPanel = ({ vehicle, onTab }: { vehicle: VehicleRow; onTab: (t: Tab
   }
 
   return (
-    <div className="space-y-4">
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+    <div className="space-y-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {/* Vehicle readiness */}
         <Card title="Vehicle Readiness" action={<span className={`text-[11px] font-bold px-2 py-0.5 rounded-full ${gradeCls}`}>{pct}% · {grade}</span>}>
           <div className="h-2 rounded-full bg-muted overflow-hidden">
@@ -659,7 +659,7 @@ const OverviewPanel = ({ vehicle, onTab }: { vehicle: VehicleRow; onTab: (t: Tab
         </Card>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {/* Equipment */}
         <Card title="Equipment & Details" action={<button onClick={() => onTab("scan")} className="text-[11px] font-semibold text-blue-600 hover:underline">Edit</button>}>
           {equip.length > 0 ? (
@@ -916,7 +916,7 @@ const DocumentsPanel = ({ vehicle, onReload }: { vehicle: VehicleRow; onReload: 
   }, [vehicle.documents]);
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-6">
       <div className="rounded-2xl border border-border bg-card p-4">
         <GeneratedDocumentsSection vehicleId={vehicle.id} />
       </div>
@@ -1408,7 +1408,7 @@ const AddendumPanel = ({ vehicle }: { vehicle: VehicleRow }) => {
   };
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-6">
       <div className="flex items-center justify-between gap-3">
         <div>
           <h2 className="text-title font-display font-semibold text-foreground">
@@ -1571,7 +1571,7 @@ const PrepPanel = ({ vehicle }: { vehicle: VehicleRow }) => {
   const unlocked = !!latest?.listing_unlocked;
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-6">
       <div className="flex items-center justify-between gap-3">
         <div>
           <h2 className="text-title font-display font-semibold text-foreground">
@@ -1802,7 +1802,7 @@ const SignPanel = ({ vehicle }: { vehicle: VehicleRow }) => {
   };
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-6">
       <div className="flex items-center justify-between gap-3">
         <div>
           <h2 className="text-title font-display font-semibold text-foreground">
