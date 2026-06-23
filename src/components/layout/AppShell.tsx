@@ -580,16 +580,6 @@ const AppShell = ({ children }: AppShellProps) => {
               <p className="truncate text-xs font-medium text-muted-foreground">{pageMeta.subtitle}</p>
             </div>
 
-            {/* Global search → command palette */}
-            <button
-              onClick={() => setPaletteOpen(true)}
-              className="hidden lg:flex flex-1 min-w-0 max-w-[520px] ml-4 items-center gap-2.5 h-10 px-4 rounded-xl border border-border bg-background hover:bg-muted/60 hover:border-foreground/15 text-sm shadow-sm transition-all"
-              title="Search (Cmd/Ctrl + K)"
-            >
-              <Search className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-              <span className="flex-1 text-left text-muted-foreground truncate">Search VIN, stock #, make, model, trim, customer…</span>
-              <kbd className="hidden sm:inline-flex items-center justify-center h-6 px-2 rounded-md bg-muted border border-border text-[11px] font-medium text-muted-foreground">⌘K</kbd>
-            </button>
 
             <div className="flex shrink-0 items-center gap-2 ml-auto">
               {/* Dealer · last synced · MarketCheck — one card, dashed dividers */}
