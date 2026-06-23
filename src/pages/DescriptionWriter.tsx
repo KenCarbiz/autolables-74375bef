@@ -11,6 +11,7 @@ import {
   Copy,
   Download,
   Edit3,
+  Facebook,
   Gauge,
   Globe,
   History,
