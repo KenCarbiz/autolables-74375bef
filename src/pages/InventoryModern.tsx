@@ -427,6 +427,19 @@ const InventoryModern = () => {
             <Pill label="Price Verification" count={counts.priceVerify} tone="amber" active={derived === "price-verify"} onClick={() => { setStatus("all"); setCondition("all"); setDerived("price-verify"); }} />
             <Pill label="Published" count={counts.published} tone="emerald" active={status === "published"} onClick={() => { setDerived("all"); setCondition("all"); setStatus("published"); }} />
             <Pill label="Draft" count={counts.draft} active={status === "draft"} onClick={() => { setDerived("all"); setCondition("all"); setStatus("draft"); }} />
+            <div className="ml-auto flex items-center gap-2">
+              <button className="h-8 px-3 rounded-full border border-dashed border-border bg-card text-xs font-semibold text-foreground inline-flex items-center gap-1 hover:bg-muted">
+                <Plus className="w-3.5 h-3.5 text-blue-600" /> Add Filter
+              </button>
+              <button className="h-8 px-3 rounded-full border border-border bg-card text-xs font-semibold text-foreground inline-flex items-center gap-1.5 hover:bg-muted">
+                Sort: Last Updated
+                <ChevronRight className="w-3.5 h-3.5 rotate-90 text-muted-foreground" />
+              </button>
+              <div className="h-8 inline-flex items-center rounded-lg border border-border bg-card overflow-hidden">
+                <button className="w-8 h-8 inline-flex items-center justify-center text-muted-foreground hover:bg-muted" title="List view"><ClipboardList className="w-4 h-4" /></button>
+                <button className="w-8 h-8 inline-flex items-center justify-center bg-blue-50 text-blue-700" title="Grid view"><Building2 className="w-4 h-4" /></button>
+              </div>
+            </div>
           </div>
 
           {/* List */}
