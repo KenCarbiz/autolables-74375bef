@@ -370,7 +370,13 @@ const AppShell = ({ children }: AppShellProps) => {
         const connected = !!data?.last_run_at || !!data?.last_status;
         setMarketCheckConnected(connected);
         setMarketCheckLabel(connected ? "MarketCheck Connected" : "MarketCheck Pending");
-        setLastMarketCheckSync(data?.last_run_at || null);
+        // Prefer the DB timestamp; fall back to the most recent local sync
+        // broadcast so the top bar stays accurate even when the sync that
+        // ran writes to advertised_prices instead of marketcheck_sync_config.
+        const localTs = typeof window !== "undefined" ? window.localStorage.getItem(`autolabels:last-sync:${tenant.id}`) : null;
+        const dbTs = data?.last_run_at || null;
+        const winner = !dbTs ? localTs : !localTs ? dbTs : (new Date(localTs) > new Date(dbTs) ? localTs : dbTs);
+        setLastMarketCheckSync(winner);
         const st = (data?.last_status || {}) as Record<string, unknown>;
         setMarketCheckCount(typeof st.seen === "number" ? st.seen : (typeof st.num_found === "number" ? st.num_found : null));
       } catch {
@@ -382,7 +388,23 @@ const AppShell = ({ children }: AppShellProps) => {
       }
     };
     loadMarketCheck();
-    return () => { mounted = false; };
+    // Any inventory sync (price scrape / recall batch / market pricing batch)
+    // dispatches "inventory-synced" — update the top bar immediately and
+    // persist the timestamp so a refresh keeps showing the fresh value.
+    const onSynced = (e: Event) => {
+      const detail = (e as CustomEvent).detail as { at?: string } | undefined;
+      const at = detail?.at || new Date().toISOString();
+      if (tenant?.id) {
+        try { window.localStorage.setItem(`autolabels:last-sync:${tenant.id}`, at); } catch { /* ignore quota */ }
+      }
+      setLastMarketCheckSync(at);
+      setMarketCheckConnected(true);
+      setMarketCheckLabel((prev) => prev === "MarketCheck Pending" ? "MarketCheck Connected" : prev);
+      // Re-pull DB row in the background so any server-side update lands too.
+      loadMarketCheck();
+    };
+    window.addEventListener("inventory-synced", onSynced);
+    return () => { mounted = false; window.removeEventListener("inventory-synced", onSynced); };
   }, [tenant?.id]);
 
   useEffect(() => {
