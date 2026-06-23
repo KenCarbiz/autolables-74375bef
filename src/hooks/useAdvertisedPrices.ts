@@ -227,6 +227,7 @@ export const TOLERANCE_DOLLARS = 50;
 export const assessDrift = (
   sticker: number,
   ap: AdvertisedPrice | undefined,
+  docFee: number = 0,
 ): DriftAssessment => {
   if (!ap) {
     return {
@@ -238,7 +239,14 @@ export const assessDrift = (
       reason: "No advertised price on file. Capture one from your website / AutoTrader / Cars.com to enable drift detection.",
     };
   }
-  const delta = sticker - ap.advertised_price;
+  // The lot/sticker price typically carries the dealer doc fee while the
+  // website advertised price does not. Treat a gap equal to the doc fee as a
+  // MATCH: accept either an exact match or an advertised + docFee match, and
+  // report whichever is the smaller (true) discrepancy.
+  const rawDelta = sticker - ap.advertised_price;
+  const docDelta = sticker - ap.advertised_price - docFee;
+  const delta = Math.abs(docDelta) <= Math.abs(rawDelta) ? docDelta : rawDelta;
+  const matchedWithFee = docFee > 0 && delta === docDelta;
   const abs = Math.abs(delta);
   const pct = ap.advertised_price > 0 ? delta / ap.advertised_price : 0;
   if (abs <= TOLERANCE_DOLLARS) {
@@ -251,7 +259,9 @@ export const assessDrift = (
       pct_delta: pct,
       source: ap.source_label,
       snapshot_at: ap.snapshot_at,
-      reason: `Sticker matches advertised within $${TOLERANCE_DOLLARS} tolerance.`,
+      reason: matchedWithFee
+        ? `Lot price matches the advertised price plus the $${docFee.toLocaleString()} doc fee (within $${TOLERANCE_DOLLARS}).`
+        : `Sticker matches advertised within $${TOLERANCE_DOLLARS} tolerance.`,
     };
   }
   return {
@@ -264,8 +274,8 @@ export const assessDrift = (
     source: ap.source_label,
     snapshot_at: ap.snapshot_at,
     reason: delta > 0
-      ? `Sticker is $${abs.toLocaleString()} HIGHER than the price you're advertising. FTC §5 enforcement hook (March 2026 97-dealer warning letters cited this).`
-      : `Sticker is $${abs.toLocaleString()} LOWER than the price you're advertising. Less risky, but still a mismatch the audit trail will record.`,
+      ? `Lot price is $${abs.toLocaleString()} HIGHER than advertised${docFee > 0 ? " + doc fee" : ""}. FTC §5 enforcement hook (March 2026 97-dealer warning letters cited this).`
+      : `Lot price is $${abs.toLocaleString()} LOWER than advertised${docFee > 0 ? " + doc fee" : ""}. Less risky, but still a mismatch the audit trail will record.`,
   };
 };
 

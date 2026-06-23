@@ -47,7 +47,7 @@ export const AdvertisedPriceBand = ({ vin, stickerPrice, storeId = "", docFee = 
 
   const sticker = stickerPrice ?? 0;
   const ap = vin ? byVin.get(vin.toUpperCase()) : undefined;
-  const drift = assessDrift(sticker, ap);
+  const drift = assessDrift(sticker, ap, docFee);
   // MarketCheck pulls the dealer's ACTUAL advertised price into the listing
   // price, so when there's no manually-captured snapshot we recognize the
   // listing price itself as the advertised price — it already includes the

@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useTenant } from "@/contexts/TenantContext";
+import { useDealerSettings } from "@/contexts/DealerSettingsContext";
 import { ShieldCheck, AlertTriangle, ExternalLink, Globe } from "lucide-react";
 import { toast } from "sonner";
 import CronStatusBadge from "@/components/admin/CronStatusBadge";
@@ -26,6 +27,8 @@ export const PriceIntegrityPanel = () => {
   const [matched, setMatched] = useState(0);
   const [loading, setLoading] = useState(true);
   const { tenant } = useTenant();
+  const { settings } = useDealerSettings();
+  const docFee = settings.doc_fee_amount || 0;
   const patternKey = `vdp_url_pattern:${tenant?.id || "none"}`;
   const [pattern, setPattern] = useState("");
   const [seeding, setSeeding] = useState(false);
@@ -42,23 +45,29 @@ export const PriceIntegrityPanel = () => {
   // crawler then tracks the live website value against it.
   const seedWebsite = async () => {
     const p = pattern.trim();
-    if (!p.includes("{VIN}") && !p.includes("{STOCK}")) {
-      toast.error("Pattern must include {VIN} or {STOCK}");
+    if (!/\{vin\}/i.test(p) && !/\{stock\}/i.test(p)) {
+      toast.error("Pattern must include {VIN}, {vin}, or {STOCK}");
       return;
     }
     localStorage.setItem(patternKey, p);
     setSeeding(true);
     const { data: listings } = await (supabase as any)
       .from("vehicle_listings")
-      .select("vin, stock_number, price")
+      .select("vin, stock_number, price, condition")
       .not("price", "is", null)
       .limit(1000);
-    const rows = ((listings as { vin: string; stock_number: string | null; price: number }[]) || [])
+    // Tokens: {CONDITION} → new/used, {VIN} → uppercase, {vin} → lowercase
+    // (dealer VDP urls are usually lowercase), {STOCK} → stock number.
+    const rows = ((listings as { vin: string; stock_number: string | null; price: number; condition: string | null }[]) || [])
       .filter((l) => l.vin)
       .map((l) => ({
         vin: l.vin.toUpperCase(),
         source_channel: "website",
-        source_url: p.replace(/\{VIN\}/g, l.vin).replace(/\{STOCK\}/g, l.stock_number || ""),
+        source_url: p
+          .replace(/\{CONDITION\}/gi, l.condition === "new" ? "new" : "used")
+          .replace(/\{VIN\}/g, l.vin.toUpperCase())
+          .replace(/\{vin\}/g, l.vin.toLowerCase())
+          .replace(/\{STOCK\}/gi, l.stock_number || ""),
         advertised_price: l.price,
         captured_by: "seed",
         notes: "Seeded website URL for nightly crawl",
@@ -99,7 +108,12 @@ export const PriceIntegrityPanel = () => {
         const lot = lotByVin.get(vin);
         if (lot == null) continue;
         vinsWithAds.add(vin);
-        const delta = a.advertised_price - lot;
+        // The lot price may carry the doc fee while the website advertised
+        // price may not — accept an exact match OR an advertised+docFee match,
+        // and report the smaller (true) gap.
+        const rawDelta = a.advertised_price - lot;
+        const docDelta = a.advertised_price + docFee - lot;
+        const delta = Math.abs(docDelta) <= Math.abs(rawDelta) ? docDelta : rawDelta;
         if (Math.abs(delta) >= TOLERANCE) {
           found.push({ vin, lot, advertised: a.advertised_price, channel: a.source_channel, delta, url: a.source_url });
         } else {
@@ -115,7 +129,7 @@ export const PriceIntegrityPanel = () => {
     return () => {
       active = false;
     };
-  }, []);
+  }, [docFee]);
 
   if (loading) {
     return (
@@ -144,15 +158,18 @@ export const PriceIntegrityPanel = () => {
           <p className="text-sm font-semibold text-foreground">Nightly website monitoring</p>
         </div>
         <p className="text-xs text-muted-foreground">
-          Enter your vehicle-detail-page URL pattern using <code className="font-mono">{"{VIN}"}</code> or{" "}
-          <code className="font-mono">{"{STOCK}"}</code>. We seed a source URL per in-stock vehicle and re-scrape it
-          nightly, flagging any VIN where the live website price drifts from the sticker.
+          Enter your vehicle-detail-page URL pattern. Tokens:{" "}
+          <code className="font-mono">{"{CONDITION}"}</code> (new/used),{" "}
+          <code className="font-mono">{"{vin}"}</code> (lowercase) or <code className="font-mono">{"{VIN}"}</code>,{" "}
+          <code className="font-mono">{"{STOCK}"}</code>. Point it at the cash-price view so the scraped total includes
+          the doc fee. We seed a source URL per in-stock vehicle and re-scrape it nightly, flagging any VIN where the
+          live website price drifts from the lot price.
         </p>
         <div className="flex gap-2">
           <input
             value={pattern}
             onChange={(e) => setPattern(e.target.value)}
-            placeholder="https://www.yourdealer.com/inventory/{VIN}"
+            placeholder="https://www.yourdealer.com/viewdetails/{CONDITION}/{vin}/?type=cash"
             className="flex-1 h-9 rounded-md border border-border bg-background px-3 text-sm font-mono"
           />
           <button

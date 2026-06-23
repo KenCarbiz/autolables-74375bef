@@ -315,7 +315,7 @@ const InventoryModern = () => {
     // Verified means the scraped advertised price actually MATCHES the system
     // price (within tolerance) — not merely that a snapshot exists. A snapshot
     // that disagrees is a mismatch that needs attention, not "verified".
-    const drift = r.price != null ? assessDrift(r.price, byVin.get(v)) : null;
+    const drift = r.price != null ? assessDrift(r.price, byVin.get(v), settings.doc_fee_amount || 0) : null;
     const priceVerified = drift?.status === "match";
     const needsPriceVerify = r.price != null && drift?.status !== "match";
     return { stickerDone, hasAddendum, priceVerified, needsPriceVerify };
@@ -1119,7 +1119,7 @@ const ComplianceCell = ({ ymm, recallStatus, openRecallCount }: { ymm?: string |
 // Advertised price cell — $XX,XXX, ✓ Advertised, incl. $XXX doc.
 const AdvertisedPriceCell = ({ price, docFee, ap }: { price?: number | null; docFee?: number | null; ap?: AdvertisedPrice }) => {
   if (price == null) return <span className="text-xs text-muted-foreground">—</span>;
-  const drift = assessDrift(price, ap);
+  const drift = assessDrift(price, ap, docFee || 0);
   return (
     <div className="leading-tight">
       <p className="text-sm font-bold text-foreground tabular-nums">${price.toLocaleString()}</p>
@@ -1135,7 +1135,7 @@ const AdvertisedPriceCell = ({ price, docFee, ap }: { price?: number | null; doc
       {drift.advertised != null && (
         <p className="text-[10px] text-muted-foreground mt-0.5">ad ${drift.advertised.toLocaleString()}{drift.source ? ` · ${SOURCE_LABELS[drift.source] || drift.source}` : ""}</p>
       )}
-      {docFee ? <p className="text-[10px] text-muted-foreground mt-0.5">incl. ${Number(docFee).toLocaleString()} doc</p> : null}
+      {docFee ? <p className="text-[10px] text-muted-foreground mt-0.5">includes ${Number(docFee).toLocaleString()} doc fee</p> : null}
     </div>
   );
 };

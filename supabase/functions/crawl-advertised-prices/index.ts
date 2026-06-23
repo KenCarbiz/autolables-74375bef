@@ -165,11 +165,20 @@ const VIEW_PARAMS = new Set([
   "type", "viewtype", "view", "paymenttype", "payment", "pricingmode", "pricetype",
   "tab", "mode", "incentive", "incentives", "lease", "finance",
 ]);
+const PRICE_VIEW_KEYS = new Set(["type", "pricetype", "pricingmode", "paymenttype", "payment"]);
 const normalizeVdpUrl = (raw: string): string => {
   try {
     const u = new URL(raw);
     const drop: string[] = [];
-    u.searchParams.forEach((_v, k) => { if (VIEW_PARAMS.has(k.toLowerCase())) drop.push(k); });
+    u.searchParams.forEach((v, k) => {
+      const key = k.toLowerCase();
+      if (!VIEW_PARAMS.has(key)) return;
+      // Keep an explicit cash/retail price view — that's the advertised total
+      // (often doc-fee-inclusive) the dealer wants scraped. Strip only the
+      // finance/lease/incentive views that flip to conditional pricing.
+      if (PRICE_VIEW_KEYS.has(key) && /^(cash|retail|total)$/i.test(v)) return;
+      drop.push(k);
+    });
     drop.forEach((k) => u.searchParams.delete(k));
     return u.toString();
   } catch { return raw; }
