@@ -49,7 +49,7 @@ export default function TradeInModule({
         phone: isEmail ? "" : contact.trim(),
         vehicle_interest: `${ymm || "Vehicle"} (trade-in)`,
         vehicle_vin: vin,
-        source: "trade_in",
+        source: "website",
         status: "new",
         notes: `[intent=trade] Trade VIN/plate: ${tradeVin.trim() || "n/a"} · Mileage: ${mileage.trim() || "n/a"}`,
       });
