@@ -325,7 +325,8 @@ const DescriptionWriter = () => {
     if (!vehicle.year || !vehicle.make || !vehicle.model) return toast.error("Enter vehicle details first");
     setGenerating(true);
     const maxChars = platformLimits[platform];
-    const prompt = `Write an SEO-optimized vehicle description for ${vehicle.year} ${vehicle.make} ${vehicle.model} ${vehicle.trim}. Platform: ${selectedPlatform.name}. Tone: ${tone}. Max ${maxChars} characters. Recommended length: ${selectedPlatform.recommendedLength}. Location: ${geoCity}, ${geoState}. Dealer: ${includeDealerName ? dealerName : "omit"}. Include CTA: ${includeCallToAction}. Features: ${selectedFeatures.join(", ")}. SEO focus: ${selectedPlatform.seoFocus.join(", ")}. Formatting rules: ${selectedPlatform.formattingRules}. Platform instruction: ${selectedPlatform.templateInstruction}. Avoid unverifiable claims and write for retail customers.`;
+    const allKeywords = [primaryKeyword, ...extraKeywords].filter(Boolean).join("; ");
+    const prompt = `Write an SEO-optimized vehicle description for ${vehicle.year} ${vehicle.make} ${vehicle.model} ${vehicle.trim}. Platform: ${selectedPlatform.name}. Tone: ${tone}. Max ${maxChars} characters. Recommended length: ${selectedPlatform.recommendedLength}. Location: ${geoCity}, ${geoState} ${zipCode}. Target keywords: ${allKeywords || "none"}. Dealer: ${includeDealerName ? dealerName : "omit"}. Include CTA: ${includeCallToAction}. Features: ${selectedFeatures.join(", ")}. SEO focus: ${selectedPlatform.seoFocus.join(", ")}. Formatting rules: ${selectedPlatform.formattingRules}. Platform instruction: ${selectedPlatform.templateInstruction}. Avoid unverifiable claims and write for retail customers.`;
     try {
       const { data, error } = await supabase.functions.invoke("ai-description", { body: { vehicle: { ...vehicle, prompt_override: prompt } } });
       if (error) throw error;
