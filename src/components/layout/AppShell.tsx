@@ -616,7 +616,36 @@ const AppShell = ({ children }: AppShellProps) => {
 
 
             <div className="flex shrink-0 items-center gap-2 ml-auto">
-              {/* Dealer · last synced · MarketCheck — one card, dashed dividers */}
+              {(() => {
+                const isDescriptionRoute = location.pathname === "/description-writer" || location.pathname === "/description-studio";
+                if (isDescriptionRoute) {
+                  return (
+                    <div className="hidden xl:flex items-center gap-2">
+                      <button
+                        onClick={() => toast.info("Walkthrough coming soon")}
+                        className="inline-flex h-10 items-center gap-2 rounded-xl border border-border bg-card px-3.5 text-[13px] font-bold text-foreground hover:bg-muted"
+                      >
+                        <PlayCircle className="h-4 w-4 text-blue-600" /> How it works
+                      </button>
+                      <button
+                        onClick={() => navigate("/admin?tab=audit")}
+                        className="inline-flex h-10 items-center gap-2 rounded-xl border border-border bg-card px-3.5 text-[13px] font-bold text-foreground hover:bg-muted"
+                      >
+                        <History className="h-4 w-4 text-slate-500" /> History
+                      </button>
+                      {/* Tenant chip */}
+                      <div className="flex h-11 items-center gap-2 rounded-xl border border-border bg-card px-3">
+                        <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-blue-600/10 text-blue-700 shrink-0"><Building2 className="h-4 w-4" /></span>
+                        <span className="min-w-0 leading-tight">
+                          <span className="block truncate max-w-[150px] text-[12px] font-bold text-foreground">{companyName}</span>
+                          {dealerLocation && <span className="block text-[10px] text-muted-foreground">{dealerLocation}</span>}
+                        </span>
+                      </div>
+                    </div>
+                  );
+                }
+                return (
+              /* Dealer · last synced · MarketCheck — one card, dashed dividers */
               <div className="hidden xl:flex h-11 items-stretch rounded-xl border border-border bg-card overflow-hidden">
                 {stores.length > 1 ? (
                   <DropdownMenu>
@@ -702,6 +731,8 @@ const AppShell = ({ children }: AppShellProps) => {
                   </span>
                 </div>
               </div>
+                );
+              })()}
 
               {/* Notifications */}
               <DropdownMenu>
