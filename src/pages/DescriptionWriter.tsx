@@ -26,7 +26,7 @@ import {
   Wrench,
 } from "lucide-react";
 
-type Platform = "autotrader" | "carscom" | "cargurus" | "facebook" | "truecar" | "edmunds" | "kbb" | "dealercom";
+type Platform = "autotrader" | "carscom" | "cargurus" | "facebook" | "dealerwebsite" | "googleseo";
 type Tone = "professional" | "luxury" | "sporty" | "family" | "value";
 
 type VehicleState = {
