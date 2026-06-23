@@ -110,7 +110,14 @@ serve(async (req) => {
     const ymm = parseYmm(v?.ymm);
     const { offers, error } = await fetchOffers({ zip: body.zip, make: ymm.make, model: ymm.model, year: ymm.year });
     if (error === "not_configured") return json({ error: "not_configured", incentives: [] });
-    const incentives = stripPublic(offers);
+    // MarketCheck's model filter is loose (a QX80 query can return QX60 offers),
+    // so keep only offers that actually list this vehicle's make + model.
+    const matched = ymm.make && ymm.model
+      ? offers.filter((o) => o._vehicles.some((veh) =>
+          String(veh.make || "").toUpperCase() === ymm.make!.toUpperCase() &&
+          String(veh.model || "").toUpperCase() === ymm.model!.toUpperCase()))
+      : offers;
+    const incentives = stripPublic(matched);
     // Best-effort cache (24h) for repeat views of the same VIN + ZIP.
     await admin.from("incentive_customer_zip_cache").upsert({
       tenant_id: body.tenant_id, vin: body.vin, customer_zip: body.zip,
