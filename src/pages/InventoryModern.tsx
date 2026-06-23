@@ -57,6 +57,18 @@ interface ActivityRow { id: string; action: string; created_at: string; details:
 type StatusFilter = "all" | "draft" | "published" | "archived";
 type ConditionFilter = "all" | "new" | "used" | "cpo";
 type DerivedFilter = "all" | "needs-sticker" | "missing-addendum" | "price-verify" | "open-recalls" | "needs-attention";
+type SortKey = "updated" | "created" | "price_desc" | "price_asc" | "year_desc" | "mileage_asc" | "readiness_desc";
+type ViewMode = "list" | "grid";
+
+const SORT_LABEL: Record<SortKey, string> = {
+  updated: "Last Updated",
+  created: "Date Added",
+  price_desc: "Price: High → Low",
+  price_asc: "Price: Low → High",
+  year_desc: "Year: Newest",
+  mileage_asc: "Mileage: Lowest",
+  readiness_desc: "Readiness: Highest",
+};
 
 const PAGE_SIZE = 25;
 const PAGE_SIZE_OPTIONS = [25, 50, 100, 200];
@@ -97,6 +109,10 @@ const InventoryModern = () => {
   const [derived, setDerived] = useState<DerivedFilter>("all");
   const [page, setPage] = useState(1);
   const [perPage, setPerPage] = useState(PAGE_SIZE);
+  const [sortKey, setSortKey] = useState<SortKey>("updated");
+  const [viewMode, setViewMode] = useState<ViewMode>("list");
+  const [sortMenuOpen, setSortMenuOpen] = useState(false);
+  const [filterMenuOpen, setFilterMenuOpen] = useState(false);
   const [searchParams, setSearchParams] = useSearchParams();
   const [showAdd, setShowAdd] = useState(searchParams.get("add") === "1");
   const [showImport, setShowImport] = useState(false);
@@ -294,7 +310,7 @@ const InventoryModern = () => {
 
   const filtered = useMemo(() => {
     const lc = q.trim().toLowerCase();
-    return rows.filter((r) => {
+    const list = rows.filter((r) => {
       if (status !== "all" && r.status !== status) return false;
       if (condition !== "all" && r.condition !== condition) return false;
       if (derived !== "all") {
@@ -303,8 +319,6 @@ const InventoryModern = () => {
         if (derived === "missing-addendum" && s.hasAddendum) return false;
         if (derived === "price-verify" && !s.needsPriceVerify) return false;
         if (derived === "open-recalls" && !((r.open_recall_count || 0) > 0)) return false;
-        // Mirror the Needs Attention KPI exactly: missing addendum OR needs
-        // price verification OR has an open recall.
         if (derived === "needs-attention" && s.hasAddendum && !s.needsPriceVerify && !((r.open_recall_count || 0) > 0)) return false;
       }
       if (!lc) return true;
@@ -315,7 +329,27 @@ const InventoryModern = () => {
         (r.stock_number || "").toLowerCase().includes(lc)
       );
     });
-  }, [rows, q, status, condition, derived, addendumVins, byVin]);
+    const yearOf = (r: VehicleRow) => parseInt((r.ymm || "").match(/\b(19|20)\d{2}\b/)?.[0] || "0", 10);
+    const readinessOf = (r: VehicleRow) => {
+      const s = signalFor(r);
+      const flags = [true, !!r.ymm, s.stickerDone, s.hasAddendum, r.price ? s.priceVerified : true];
+      return flags.filter(Boolean).length;
+    };
+    const sorted = [...list];
+    sorted.sort((a, b) => {
+      switch (sortKey) {
+        case "created": return (new Date(b.created_at).getTime()) - (new Date(a.created_at).getTime());
+        case "price_desc": return (b.price || 0) - (a.price || 0);
+        case "price_asc": return (a.price || Number.MAX_SAFE_INTEGER) - (b.price || Number.MAX_SAFE_INTEGER);
+        case "year_desc": return yearOf(b) - yearOf(a);
+        case "mileage_asc": return (a.mileage || Number.MAX_SAFE_INTEGER) - (b.mileage || Number.MAX_SAFE_INTEGER);
+        case "readiness_desc": return readinessOf(b) - readinessOf(a);
+        case "updated":
+        default: return (new Date(b.updated_at).getTime()) - (new Date(a.updated_at).getTime());
+      }
+    });
+    return sorted;
+  }, [rows, q, status, condition, derived, addendumVins, byVin, sortKey]);
 
   const counts = useMemo(() => {
     const sevenDaysAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
@@ -427,17 +461,89 @@ const InventoryModern = () => {
             <Pill label="Price Verification" count={counts.priceVerify} tone="amber" active={derived === "price-verify"} onClick={() => { setStatus("all"); setCondition("all"); setDerived("price-verify"); }} />
             <Pill label="Published" count={counts.published} tone="emerald" active={status === "published"} onClick={() => { setDerived("all"); setCondition("all"); setStatus("published"); }} />
             <Pill label="Draft" count={counts.draft} active={status === "draft"} onClick={() => { setDerived("all"); setCondition("all"); setStatus("draft"); }} />
-            <div className="ml-auto flex items-center gap-2">
-              <button className="h-8 px-3 rounded-full border border-dashed border-border bg-card text-xs font-semibold text-foreground inline-flex items-center gap-1 hover:bg-muted">
-                <Plus className="w-3.5 h-3.5 text-blue-600" /> Add Filter
-              </button>
-              <button className="h-8 px-3 rounded-full border border-border bg-card text-xs font-semibold text-foreground inline-flex items-center gap-1.5 hover:bg-muted">
-                Sort: Last Updated
-                <ChevronRight className="w-3.5 h-3.5 rotate-90 text-muted-foreground" />
-              </button>
+            <div className="ml-auto flex items-center gap-2 relative">
+              {/* Add Filter — opens a popover with toggle filters */}
+              <div className="relative">
+                <button
+                  onClick={() => { setFilterMenuOpen((v) => !v); setSortMenuOpen(false); }}
+                  className={`h-8 px-3 rounded-full border border-dashed text-xs font-semibold inline-flex items-center gap-1 transition-colors ${filterMenuOpen ? "border-blue-500 bg-blue-50 text-blue-700" : "border-border bg-card text-foreground hover:bg-muted"}`}
+                >
+                  <Plus className="w-3.5 h-3.5 text-blue-600" /> Add Filter
+                  {(status !== "all" || condition !== "all" || derived !== "all") && (
+                    <span className="ml-1 min-w-[16px] h-4 px-1 rounded-full bg-blue-600 text-white text-[10px] font-bold inline-flex items-center justify-center">
+                      {(status !== "all" ? 1 : 0) + (condition !== "all" ? 1 : 0) + (derived !== "all" ? 1 : 0)}
+                    </span>
+                  )}
+                </button>
+                {filterMenuOpen && (
+                  <div className="absolute right-0 top-full mt-1 w-64 rounded-xl border border-border bg-popover shadow-lg z-20 p-3 space-y-2.5">
+                    <div>
+                      <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Status</label>
+                      <select value={status} onChange={(e) => setStatus(e.target.value as StatusFilter)} className="mt-1 w-full h-8 rounded-lg border border-border bg-background text-xs px-2">
+                        <option value="all">All statuses</option><option value="draft">Draft</option><option value="published">Published</option><option value="archived">Archived</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Condition</label>
+                      <select value={condition} onChange={(e) => setCondition(e.target.value as ConditionFilter)} className="mt-1 w-full h-8 rounded-lg border border-border bg-background text-xs px-2">
+                        <option value="all">New &amp; used</option><option value="new">New</option><option value="used">Used</option><option value="cpo">CPO</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Attention</label>
+                      <select value={derived} onChange={(e) => setDerived(e.target.value as DerivedFilter)} className="mt-1 w-full h-8 rounded-lg border border-border bg-background text-xs px-2">
+                        <option value="all">All</option>
+                        <option value="needs-sticker">Needs Sticker</option>
+                        <option value="missing-addendum">Missing Addendum</option>
+                        <option value="price-verify">Price Verification</option>
+                        <option value="open-recalls">Open Recalls</option>
+                        <option value="needs-attention">Needs Attention</option>
+                      </select>
+                    </div>
+                    <div className="flex justify-between pt-1">
+                      <button onClick={() => { setStatus("all"); setCondition("all"); setDerived("all"); }} className="text-[11px] font-semibold text-muted-foreground hover:text-foreground">Clear all</button>
+                      <button onClick={() => setFilterMenuOpen(false)} className="text-[11px] font-semibold text-blue-600 hover:text-blue-700">Done</button>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Sort dropdown */}
+              <div className="relative">
+                <button
+                  onClick={() => { setSortMenuOpen((v) => !v); setFilterMenuOpen(false); }}
+                  className={`h-8 px-3 rounded-full border text-xs font-semibold inline-flex items-center gap-1.5 transition-colors ${sortMenuOpen ? "border-blue-500 bg-blue-50 text-blue-700" : "border-border bg-card text-foreground hover:bg-muted"}`}
+                >
+                  Sort: {SORT_LABEL[sortKey]}
+                  <ChevronRight className="w-3.5 h-3.5 rotate-90 text-muted-foreground" />
+                </button>
+                {sortMenuOpen && (
+                  <div className="absolute right-0 top-full mt-1 w-56 rounded-xl border border-border bg-popover shadow-lg z-20 p-1">
+                    {(Object.keys(SORT_LABEL) as SortKey[]).map((k) => (
+                      <button
+                        key={k}
+                        onClick={() => { setSortKey(k); setSortMenuOpen(false); }}
+                        className={`w-full text-left px-2.5 py-2 rounded-lg text-xs font-medium transition-colors ${k === sortKey ? "bg-blue-50 text-blue-700" : "text-foreground hover:bg-muted"}`}
+                      >
+                        {SORT_LABEL[k]}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* List / Grid toggle */}
               <div className="h-8 inline-flex items-center rounded-lg border border-border bg-card overflow-hidden">
-                <button className="w-8 h-8 inline-flex items-center justify-center text-muted-foreground hover:bg-muted" title="List view"><ClipboardList className="w-4 h-4" /></button>
-                <button className="w-8 h-8 inline-flex items-center justify-center bg-blue-50 text-blue-700" title="Grid view"><Building2 className="w-4 h-4" /></button>
+                <button
+                  onClick={() => setViewMode("list")}
+                  className={`w-8 h-8 inline-flex items-center justify-center transition-colors ${viewMode === "list" ? "bg-blue-50 text-blue-700" : "text-muted-foreground hover:bg-muted"}`}
+                  title="List view"
+                ><ClipboardList className="w-4 h-4" /></button>
+                <button
+                  onClick={() => setViewMode("grid")}
+                  className={`w-8 h-8 inline-flex items-center justify-center transition-colors ${viewMode === "grid" ? "bg-blue-50 text-blue-700" : "text-muted-foreground hover:bg-muted"}`}
+                  title="Grid view"
+                ><Building2 className="w-4 h-4" /></button>
               </div>
             </div>
           </div>
@@ -449,8 +555,8 @@ const InventoryModern = () => {
             <EmptyState onAdd={() => setShowAdd(true)} total={rows.length} />
           ) : (
             <>
-              {/* Table (tablet/desktop) */}
-              <div className="hidden md:block rounded-2xl border border-border bg-card shadow-sm overflow-x-auto">
+              {/* Table view (tablet/desktop only when list mode) */}
+              <div className={`${viewMode === "list" ? "hidden md:block" : "hidden"} rounded-2xl border border-border bg-card shadow-sm overflow-x-auto`}>
                 <table className="w-full text-sm min-w-[820px]">
                   <thead className="bg-muted/40 text-[11px] uppercase tracking-wide text-muted-foreground">
                     <tr>
@@ -515,8 +621,8 @@ const InventoryModern = () => {
                 </table>
               </div>
 
-              {/* Cards (mobile) */}
-              <div className="md:hidden space-y-2.5">
+              {/* Cards — always on mobile, and on desktop when Grid view is selected */}
+              <div className={`${viewMode === "grid" ? "grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-2.5" : "md:hidden space-y-2.5"}`}>
                 {pageRows.map((r) => (
                   <VehicleCard
                     key={r.id}
@@ -650,16 +756,16 @@ const CondBadge = ({ condition }: { condition: "new" | "used" | "cpo" }) => {
   return <span className={`text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded ${cls}`}>{condition}</span>;
 };
 
-const MiniRing = ({ pct }: { pct: number }) => {
+const MiniRing = ({ pct, size = 52 }: { pct: number; size?: number }) => {
   const tone = pct >= 100 ? "#10B981" : pct >= 60 ? "#2563EB" : pct >= 40 ? "#F59E0B" : "#EF4444";
-  const r = 14; const c = 2 * Math.PI * r;
+  const r = 16; const c = 2 * Math.PI * r;
   return (
-    <div className="relative w-10 h-10">
-      <svg className="w-10 h-10 -rotate-90" viewBox="0 0 36 36">
-        <circle cx="18" cy="18" r={r} fill="none" stroke="currentColor" strokeWidth="3.5" className="text-muted" />
-        <circle cx="18" cy="18" r={r} fill="none" stroke={tone} strokeWidth="3.5" strokeLinecap="round" strokeDasharray={c} strokeDashoffset={c - (c * pct) / 100} />
+    <div className="relative shrink-0" style={{ width: size, height: size }}>
+      <svg className="-rotate-90" width={size} height={size} viewBox="0 0 40 40">
+        <circle cx="20" cy="20" r={r} fill="none" stroke="currentColor" strokeWidth="4" className="text-muted" />
+        <circle cx="20" cy="20" r={r} fill="none" stroke={tone} strokeWidth="4" strokeLinecap="round" strokeDasharray={c} strokeDashoffset={c - (c * pct) / 100} />
       </svg>
-      <span className="absolute inset-0 flex items-center justify-center text-[9px] font-bold tabular-nums text-foreground">{pct}%</span>
+      <span className="absolute inset-0 flex items-center justify-center text-[11px] font-bold tabular-nums text-foreground">{pct}%</span>
     </div>
   );
 };
@@ -753,14 +859,14 @@ const Sparkline = ({ values }: { values: number[] }) => {
 // ── Executive KPI strip ────────────────────────────────────────
 const BigRing = ({ pct }: { pct: number }) => {
   const tone = pct >= 80 ? "#10B981" : pct >= 50 ? "#2563EB" : pct >= 30 ? "#F59E0B" : "#EF4444";
-  const r = 16; const c = 2 * Math.PI * r;
+  const r = 17; const c = 2 * Math.PI * r;
   return (
-    <div className="relative w-[68px] h-[68px] shrink-0">
-      <svg className="w-[68px] h-[68px] -rotate-90" viewBox="0 0 40 40">
+    <div className="relative w-[88px] h-[88px] shrink-0">
+      <svg className="w-[88px] h-[88px] -rotate-90" viewBox="0 0 40 40">
         <circle cx="20" cy="20" r={r} fill="none" stroke="currentColor" strokeWidth="4" className="text-muted" />
         <circle cx="20" cy="20" r={r} fill="none" stroke={tone} strokeWidth="4" strokeLinecap="round" strokeDasharray={c} strokeDashoffset={c - (c * pct) / 100} />
       </svg>
-      <span className="absolute inset-0 flex items-center justify-center text-base font-bold tabular-nums text-foreground">{pct}%</span>
+      <span className="absolute inset-0 flex items-center justify-center text-[22px] font-bold tabular-nums text-foreground tracking-tight">{pct}%</span>
     </div>
   );
 };
@@ -779,14 +885,14 @@ const ExecKpi = ({ label, value, sub, icon: Icon, tone, onClick, link }: { label
     tone === "violet"  ? "bg-violet-50 text-violet-600" :
                          "bg-slate-100 text-slate-500";
   return (
-    <button onClick={onClick} className="group/k shrink-0 min-w-[170px] lg:min-w-0 text-left rounded-2xl border border-border bg-card shadow-sm p-4 hover:shadow-md hover:border-foreground/15 transition-all">
+    <button onClick={onClick} className="group/k shrink-0 min-w-[170px] lg:min-w-0 h-full text-left rounded-2xl border border-border bg-card shadow-sm p-4 hover:shadow-md hover:border-foreground/15 transition-all flex flex-col">
       <div className="flex items-start justify-between gap-2">
         <p className="text-[10px] font-bold uppercase tracking-[0.1em] text-muted-foreground leading-tight">{label}</p>
         <span className={`w-7 h-7 rounded-full flex items-center justify-center shrink-0 ${ibg}`}><Icon className="w-3.5 h-3.5" strokeWidth={2} /></span>
       </div>
       <p className={`font-display text-[32px] font-bold tabular-nums leading-none mt-3 ${numCls}`}>{typeof value === "number" ? value.toLocaleString() : value}</p>
       <p className="text-[11px] mt-2 text-muted-foreground truncate">{sub}</p>
-      {link && <p className="text-[11px] font-semibold text-blue-600 mt-2 group-hover/k:underline">{link} →</p>}
+      {link && <p className="text-[11px] font-semibold text-blue-600 mt-auto pt-2 group-hover/k:underline">{link} →</p>}
     </button>
   );
 };
@@ -806,7 +912,7 @@ const ExecKpiStrip = ({ counts, onMetric, onMarket }: { counts: KpiCounts; onMet
       {/* Premium readiness rectangle */}
       <button
         onClick={() => onMetric("ready")}
-        className="group/r text-left rounded-2xl border border-[#E6EAF2] bg-gradient-to-br from-white via-white to-[#F4F8FF] shadow-[0_1px_2px_rgba(16,24,40,0.04),0_8px_24px_-12px_rgba(37,99,235,0.18)] p-4 hover:shadow-[0_2px_4px_rgba(16,24,40,0.06),0_12px_28px_-12px_rgba(37,99,235,0.25)] hover:border-blue-200 transition-all"
+        className="group/r text-left rounded-2xl border border-[#E6EAF2] bg-gradient-to-br from-white via-white to-[#F4F8FF] shadow-[0_1px_2px_rgba(16,24,40,0.04),0_8px_24px_-12px_rgba(37,99,235,0.18)] p-4 hover:shadow-[0_2px_4px_rgba(16,24,40,0.06),0_12px_28px_-12px_rgba(37,99,235,0.25)] hover:border-blue-200 transition-all flex flex-col h-full"
       >
         <div className="flex items-center justify-between gap-2">
           <p className="inline-flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">
@@ -815,7 +921,7 @@ const ExecKpiStrip = ({ counts, onMetric, onMarket }: { counts: KpiCounts; onMet
           </p>
           <span className="text-[10px] font-bold uppercase tracking-[0.1em] text-blue-600/80">Live</span>
         </div>
-        <div className="mt-3 flex items-center gap-4">
+        <div className="mt-3 flex items-center gap-4 flex-1">
           <BigRing pct={pct} />
           <div className="min-w-0 flex-1">
             <div className="flex items-baseline gap-2">
@@ -825,9 +931,9 @@ const ExecKpiStrip = ({ counts, onMetric, onMarket }: { counts: KpiCounts; onMet
             <div className="mt-2.5 h-1.5 w-full rounded-full bg-slate-100 overflow-hidden">
               <div className={`h-full rounded-full ${barTone} transition-all`} style={{ width: `${Math.max(2, pct)}%`, boxShadow: `0 0 8px ${ringTone}66` }} />
             </div>
-            <p className="text-[11px] font-semibold text-blue-600 mt-2 group-hover/r:underline">View readiness details →</p>
           </div>
         </div>
+        <p className="text-[11px] font-semibold text-blue-600 mt-auto pt-2 group-hover/r:underline">View readiness details →</p>
       </button>
       <ExecKpi label="Total Vehicles" value={counts.total} sub={`${counts.newCount} new • ${counts.usedCount} used`} icon={Car} onClick={() => onMetric("total")} link="View all vehicles" />
       <ExecKpi label="Published" value={counts.published} sub="live on portal" icon={CheckCircle2} tone="emerald" onClick={() => onMetric("published")} link="View published" />
@@ -876,7 +982,7 @@ const VehicleCard = ({ r, signal, readiness, onOpen, onSticker, onView, items }:
           </div>
         </div>
         <div className="flex flex-col items-center gap-0.5 shrink-0">
-          <MiniRing pct={readiness} />
+          <MiniRing pct={readiness} size={60} />
         </div>
       </div>
       <div className="flex items-center gap-1.5 mt-2.5 flex-wrap" onClick={(e) => e.stopPropagation()}>
@@ -946,27 +1052,27 @@ const RecallChip = ({ status, open }: { status?: string | null; open?: number | 
 
 const PortalChip = ({ status }: { status: VehicleRow["status"] }) => {
   const cfg = status === "published"
-    ? { cls: "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200/70", dot: "bg-emerald-500", label: "Live" }
+    ? { dot: "bg-emerald-500", text: "text-emerald-700", label: "Live" }
     : status === "archived"
-      ? { cls: "bg-slate-100 text-slate-600 ring-1 ring-slate-200", dot: "bg-slate-400", label: "Archived" }
-      : { cls: "bg-slate-50 text-slate-700 ring-1 ring-slate-200", dot: "bg-slate-400", label: "Not Live" };
+      ? { dot: "bg-slate-400", text: "text-slate-600", label: "Archived" }
+      : { dot: "bg-slate-300", text: "text-slate-600", label: "Not Live" };
   return (
-    <span className={`inline-flex items-center gap-1.5 text-[11px] font-semibold px-2 py-1 rounded-lg ${cfg.cls}`}>
-      <span className={`w-1.5 h-1.5 rounded-full ${cfg.dot}`} />{cfg.label}
+    <span className={`inline-flex items-center gap-1.5 text-xs font-semibold ${cfg.text}`}>
+      <span className={`w-2 h-2 rounded-full ${cfg.dot}`} />{cfg.label}
     </span>
   );
 };
 
-// Simple status pill — only Draft / Published / Archived.
+// Simple status pill — clean dot + label, no oval background.
 const SimpleStatusPill = ({ status }: { status: VehicleRow["status"] }) => {
   const cfg = status === "published"
-    ? { cls: "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200/70", dot: "bg-emerald-500", label: "Published" }
+    ? { dot: "bg-emerald-500", text: "text-emerald-700", label: "Published" }
     : status === "archived"
-      ? { cls: "bg-slate-100 text-slate-600 ring-1 ring-slate-200", dot: "bg-slate-400", label: "Archived" }
-      : { cls: "bg-amber-50 text-amber-700 ring-1 ring-amber-200/70", dot: "bg-amber-500", label: "Draft" };
+      ? { dot: "bg-slate-400", text: "text-slate-600", label: "Archived" }
+      : { dot: "bg-amber-500", text: "text-amber-700", label: "Draft" };
   return (
-    <span className={`inline-flex items-center gap-1.5 text-[11px] font-semibold px-2 py-1 rounded-lg ${cfg.cls}`}>
-      <span className={`w-1.5 h-1.5 rounded-full ${cfg.dot}`} />{cfg.label}
+    <span className={`inline-flex items-center gap-1.5 text-xs font-semibold ${cfg.text}`}>
+      <span className={`w-2 h-2 rounded-full ${cfg.dot}`} />{cfg.label}
     </span>
   );
 };
