@@ -183,6 +183,19 @@ export async function saveStickerToVehicle(args: SaveStickerArgs): Promise<ApiRe
   }
 }
 
+// Flip a specific generated_documents row to 'published' and set its online URL.
+// Called after saveStickerToVehicle() when the listing is already published.
+export async function markDocumentPublished(documentId: string, onlineUrl: string): Promise<ApiResult> {
+  try {
+    const { error } = await sb().from("generated_documents")
+      .update({ document_status: "published", published_at: new Date().toISOString(), online_url: onlineUrl })
+      .eq("id", documentId);
+    return error ? { ok: false, error: error.message } : { ok: true };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "mark_published_failed" };
+  }
+}
+
 // Publish the vehicle's online passport (the QR destination) and mark the most
 // recent generated document published with its online URL.
 export async function publishToPassport(vehicleId?: string | null, tenantId?: string | null): Promise<ApiResult> {

@@ -8,6 +8,8 @@ import { useAudit } from "@/contexts/AuditContext";
 import { useProducts } from "@/hooks/useProducts";
 import { useVehicleListing } from "@/hooks/useVehicleListing";
 import { useRecallLookup } from "@/hooks/useRecallLookup";
+import { saveStickerToVehicle, markDocumentPublished } from "@/lib/stickerStudio/api";
+import { useOemSticker } from "@/hooks/useOemSticker";
 import RecallBanner from "@/components/addendum/RecallBanner";
 import { useVehiclePrefill, VehicleContextHeader } from "@/lib/vehiclePrefill";
 import { useVehicleSpecs } from "@/hooks/useVehicleSpecs";
@@ -28,6 +30,7 @@ const NewCarSticker = () => {
   const { data: products } = useProducts();
   const { createListing, publishListing, publicUrl, embedSnippet } = useVehicleListing(currentStore?.id || "");
   const { lookup: recallLookup } = useRecallLookup();
+  const { fetchSticker: fetchOemSticker } = useOemSticker();
   const cardRef = useRef<HTMLDivElement>(null);
   const [generating, setGenerating] = useState(false);
   const [publishedSlug, setPublishedSlug] = useState<string | null>(null);
@@ -236,6 +239,21 @@ const NewCarSticker = () => {
       setPublishedSlug(listing.slug);
       try { await navigator.clipboard.writeText(publicUrl(listing.slug)); } catch { /* */ }
       toast.success("Published — link copied");
+      // Wire generated sticker into passport documents so it appears on /v/:slug.
+      const url = publicUrl(listing.slug);
+      const saveResult = await saveStickerToVehicle({
+        vehicleId: listing.id,
+        tenantId: tenant?.id || null,
+        vin: vehicle.vin,
+        templateId: "new-car-sticker",
+        docType: "window",
+        qrUrl: url,
+      });
+      if (saveResult.ok && saveResult.documentId) {
+        await markDocumentPublished(saveResult.documentId, url);
+      }
+      // Fetch the OEM Monroney sticker from VinAudit/MonroneyLabels (non-blocking).
+      fetchOemSticker({ vin: vehicle.vin, tenantId: tenant?.id, vehicleId: listing.id });
       if (user) log({
         store_id: currentStore?.id || "",
         user_id: user.id,

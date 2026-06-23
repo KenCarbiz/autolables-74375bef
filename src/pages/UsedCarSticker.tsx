@@ -10,6 +10,7 @@ import { useGpsTracking } from "@/hooks/useGpsTracking";
 import { useZebraPrint } from "@/hooks/useZebraPrint";
 import { useVehicleListing } from "@/hooks/useVehicleListing";
 import { useRecallLookup } from "@/hooks/useRecallLookup";
+import { saveStickerToVehicle, markDocumentPublished } from "@/lib/stickerStudio/api";
 import RecallBanner from "@/components/addendum/RecallBanner";
 import { useVehiclePrefill, VehicleContextHeader } from "@/lib/vehiclePrefill";
 import { useVehicleSpecs } from "@/hooks/useVehicleSpecs";
@@ -282,6 +283,18 @@ const UsedCarSticker = () => {
       if (!result.ok) { toast.error(result.reason || "Created but could not publish"); return; }
       setPublishedSlug(listing.slug);
       const url = publicUrl(listing.slug);
+      // Wire generated sticker into passport documents so it appears on /v/:slug.
+      const saveResult = await saveStickerToVehicle({
+        vehicleId: listing.id,
+        tenantId: tenant?.id || null,
+        vin: vehicle.vin,
+        templateId: "used-car-sticker",
+        docType: "window",
+        qrUrl: url,
+      });
+      if (saveResult.ok && saveResult.documentId) {
+        await markDocumentPublished(saveResult.documentId, url);
+      }
       try { await navigator.clipboard.writeText(url); } catch { /* ignore */ }
       toast.success("Published — link copied");
       if (user) log({
