@@ -1,48 +1,50 @@
-import { ReactNode, useState, useCallback, useMemo, useEffect } from "react";
-import { useLocation, useNavigate as useBaseNavigate, Link } from "react-router-dom";
+import { ReactNode, useCallback, useEffect, useMemo, useState } from "react";
+import { Link, useLocation } from "react-router-dom";
 import { useViewTransitionNavigate } from "@/lib/navigation";
 import {
-  LayoutDashboard,
-  FileText,
-  FolderOpen,
-  Package,
-  Users,
+  Award,
   BarChart3,
-  ShieldCheck,
-  Settings,
   Bell,
-  ChevronsUpDown,
-  LogOut,
-  Store,
-  Menu,
-  X,
-  Sparkles,
-  ScrollText,
-  Wrench,
+  BookOpen,
+  Building2,
+  Car,
+  CheckCircle2,
   ChevronDown,
   ChevronLeft,
   ChevronRight,
-  Rocket,
-  Palette,
-  ToggleLeft,
-  Tag,
-  TrendingUp,
-  ScanLine,
-  Printer,
-  BookOpen,
-  Car,
-  Award,
+  ChevronsUpDown,
   CreditCard,
-  RefreshCw,
-  Search,
-  HelpCircle,
-  CheckCircle2,
-  Truck,
-  Building2,
   ExternalLink,
-  LayoutTemplate,
-  QrCode,
+  FilePlus2,
+  FileText,
   FileWarning,
+  Folder,
+  FolderOpen,
+  Grid2X2,
+  HelpCircle,
+  LayoutDashboard,
+  LayoutTemplate,
+  LogOut,
+  Menu,
+  Package,
+  Palette,
+  QrCode,
+  RefreshCw,
+  Rocket,
+  ScanLine,
+  ScrollText,
+  Search,
+  Settings,
+  ShieldCheck,
+  Sparkles,
+  Store,
+  Tag,
+  ToggleLeft,
+  TrendingUp,
+  Truck,
+  Users,
+  Wrench,
+  X,
 } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
 import { useAuth } from "@/contexts/AuthContext";
@@ -97,18 +99,18 @@ const AppShell = ({ children }: AppShellProps) => {
   const { tenant, currentStore, stores, setCurrentStore } = useTenant();
   const { settings } = useDealerSettings();
   const { member } = useEntitlements();
-  const role = member?.role;
-  const isManager = isAdmin || !role || role === "owner" || role === "admin" || role === "manager";
   const { entries } = useAudit();
   const location = useLocation();
   const navigate = useViewTransitionNavigate();
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const _baseNavigate = useBaseNavigate;
   const [mobileOpen, setMobileOpen] = useState(false);
   const [showMobileQr, setShowMobileQr] = useState(false);
   const { open: paletteOpen, setOpen: setPaletteOpen } = useCommandPalette();
   const [marketCheckConnected, setMarketCheckConnected] = useState(false);
   const [marketCheckLabel, setMarketCheckLabel] = useState("MarketCheck Pending");
+  const [lastMarketCheckSync, setLastMarketCheckSync] = useState<string | null>(null);
+
+  const role = member?.role;
+  const isManager = isAdmin || !role || role === "owner" || role === "admin" || role === "manager";
 
   const openScan = useCallback(() => {
     if (prefersLiveScanner()) navigate("/scan");
@@ -117,26 +119,23 @@ const AppShell = ({ children }: AppShellProps) => {
   const vinScanApi = useMemo(() => ({ openScan }), [openScan]);
 
   const [collapsed, setCollapsed] = useState<boolean>(() => {
-    if (typeof window !== "undefined") {
-      return localStorage.getItem("sidebar_collapsed") === "1";
-    }
+    if (typeof window !== "undefined") return localStorage.getItem("sidebar_collapsed") === "1";
     return false;
   });
+
   const toggleCollapsed = () => {
-    setCollapsed(c => {
-      const next = !c;
-      if (typeof window !== "undefined") {
-        localStorage.setItem("sidebar_collapsed", next ? "1" : "0");
-      }
+    setCollapsed((current) => {
+      const next = !current;
+      if (typeof window !== "undefined") localStorage.setItem("sidebar_collapsed", next ? "1" : "0");
       return next;
     });
   };
 
   const [openSections, setOpenSections] = useState<Record<string, boolean>>({
-    documents: true,
-    inventory: true,
-    admin: true,
+    main: true,
+    create: true,
     compliance: true,
+    settings: true,
     platform: true,
   });
 
@@ -212,94 +211,24 @@ const AppShell = ({ children }: AppShellProps) => {
   };
 
   const filterItems = (items: NavItem[]) =>
-    items.filter(i =>
-      (!i.featureKey || (settings as unknown as Record<string, unknown>)[i.featureKey]) &&
-      (!i.requireManager || isManager) &&
-      (!i.requireAdmin || isAdmin)
+    items.filter((item) =>
+      (!item.featureKey || (settings as unknown as Record<string, unknown>)[item.featureKey]) &&
+      (!item.requireManager || isManager) &&
+      (!item.requireAdmin || isAdmin)
     );
 
-  const handleSignOut = async () => {
-    await signOut();
-    navigate("/login");
-  };
+  const visibleSections = Object.entries(sections)
+    .map(([key, section]) => [key, { ...section, items: filterItems(section.items) }] as const)
+    .filter(([, section]) => section.items.length > 0);
 
-  const handleManageBilling = async () => {
-    try {
-      const { data, error } = await supabase.functions.invoke(
-        "billing-portal-session",
-        { body: { return_url: window.location.href } }
-      );
-      if (error || !data?.url) {
-        toast.error("Couldn't open billing portal");
-        return;
-      }
-      window.location.href = data.url as string;
-    } catch {
-      toast.error("Couldn't open billing portal");
-    }
-  };
-
-  const toggleSection = (key: string) => {
-    setOpenSections({ ...openSections, [key]: !openSections[key] });
-  };
-
-  const isActive = (path: string): boolean => {
+  const isActive = (path: string) => {
     const [pathname, search = ""] = path.split("?");
     if (location.pathname !== pathname) return false;
     if (!search) return true;
     return location.search === `?${search}`;
   };
 
-  useEffect(() => {
-    setOpenSections(prev => {
-      const next = { ...prev };
-      let changed = false;
-      Object.entries(sections).forEach(([key, section]) => {
-        const hasActive = section.items.some(i => isActive(i.path));
-        if (hasActive && !next[key]) { next[key] = true; changed = true; }
-      });
-      return changed ? next : prev;
-    });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [location.pathname, location.search]);
-
-  useEffect(() => {
-    let mounted = true;
-    const loadMarketCheck = async () => {
-      if (!tenant?.id) {
-        setMarketCheckConnected(false);
-        setMarketCheckLabel("MarketCheck Pending");
-        return;
-      }
-      try {
-        const { data } = await (supabase as any)
-          .from("marketcheck_sync_config")
-          .select("last_run_at,last_status")
-          .eq("tenant_id", tenant.id)
-          .maybeSingle();
-        if (!mounted) return;
-        const connected = !!data?.last_run_at || !!data?.last_status;
-        setMarketCheckConnected(connected);
-        setMarketCheckLabel(connected ? "MarketCheck Connected" : "MarketCheck Pending");
-      } catch {
-        if (!mounted) return;
-        setMarketCheckConnected(false);
-        setMarketCheckLabel("MarketCheck Pending");
-      }
-    };
-    loadMarketCheck();
-    return () => { mounted = false; };
-  }, [tenant?.id]);
-
-  const unreadAudit = entries.filter(e => e.action === "compliance_block" || e.action === "price_integrity_block").length;
-
-  const visibleSections = Object.entries(sections)
-    .map(([key, section]) => [key, { ...section, items: filterItems(section.items) }] as const)
-    .filter(([, section]) => section.items.length > 0);
-
-  const activeItem = visibleSections
-    .flatMap(([, s]) => s.items)
-    .find(i => isActive(i.path));
+  const activeItem = visibleSections.flatMap(([, section]) => section.items).find((item) => isActive(item.path));
 
   const pageTitles: Record<string, { title: string; subtitle: string }> = {
     "/dashboard": { title: "Home", subtitle: "Your dealership command center." },
@@ -314,18 +243,106 @@ const AppShell = ({ children }: AppShellProps) => {
   };
   const pageMeta = pageTitles[location.pathname] || { title: activeItem?.label || "Dashboard", subtitle: "AutoLabels admin workspace." };
   const companyName = currentStore?.name || tenant?.name || (settings.dealer_name && settings.dealer_name !== "Your Dealership" ? settings.dealer_name : "Select store");
+  const dealerLocation = [currentStore?.city || (settings as any)?.dealer_city, currentStore?.state || (settings as any)?.dealer_state].filter(Boolean).join(", ") || "Manchester, CT";
+  const unreadAudit = entries.filter((entry) => entry.action === "compliance_block" || entry.action === "price_integrity_block").length;
+  const inventoryHasOwnMobileChrome = location.pathname === "/inventory";
+
+  useEffect(() => {
+    setOpenSections((prev) => {
+      const next = { ...prev };
+      let changed = false;
+      Object.entries(sections).forEach(([key, section]) => {
+        const hasActive = section.items.some((item) => isActive(item.path));
+        if (hasActive && !next[key]) {
+          next[key] = true;
+          changed = true;
+        }
+      });
+      return changed ? next : prev;
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [location.pathname, location.search]);
+
+  useEffect(() => {
+    let mounted = true;
+    const loadMarketCheck = async () => {
+      if (!tenant?.id) {
+        setMarketCheckConnected(false);
+        setMarketCheckLabel("MarketCheck Pending");
+        setLastMarketCheckSync(null);
+        return;
+      }
+      try {
+        const { data } = await (supabase as any)
+          .from("marketcheck_sync_config")
+          .select("last_run_at,last_status")
+          .eq("tenant_id", tenant.id)
+          .maybeSingle();
+        if (!mounted) return;
+        const connected = !!data?.last_run_at || !!data?.last_status;
+        setMarketCheckConnected(connected);
+        setMarketCheckLabel(connected ? "MarketCheck Connected" : "MarketCheck Pending");
+        setLastMarketCheckSync(data?.last_run_at || null);
+      } catch {
+        if (!mounted) return;
+        setMarketCheckConnected(false);
+        setMarketCheckLabel("MarketCheck Pending");
+        setLastMarketCheckSync(null);
+      }
+    };
+    loadMarketCheck();
+    return () => { mounted = false; };
+  }, [tenant?.id]);
+
+  useEffect(() => {
+    if (!user) return;
+    if (tenant?.id !== "house") return;
+    if (location.pathname === "/onboarding") return;
+    const timer = setTimeout(() => {
+      toast.info("Finish setup to activate your dealership workspace", {
+        action: { label: "Continue", onClick: () => navigate("/onboarding") },
+      });
+    }, 800);
+    return () => clearTimeout(timer);
+  }, [user, tenant?.id, location.pathname, navigate]);
+
+  const toggleSection = (key: string) => setOpenSections((prev) => ({ ...prev, [key]: !prev[key] }));
+
+  const handleSignOut = async () => {
+    await signOut();
+    navigate("/login");
+  };
+
+  const handleManageBilling = async () => {
+    try {
+      const { data, error } = await supabase.functions.invoke("billing-portal-session", { body: { return_url: window.location.href } });
+      if (error || !data?.url) {
+        toast.error("Couldn't open billing portal");
+        return;
+      }
+      window.location.href = data.url as string;
+    } catch {
+      toast.error("Couldn't open billing portal");
+    }
+  };
 
   const openProduct = (url: string) => {
     if (url.startsWith("http")) window.open(url, "_blank", "noreferrer");
     else navigate(url);
   };
 
-  const shell = (
+  const bottomNavItems = [
+    { label: "Home", path: "/dashboard", icon: Grid2X2 },
+    { label: "Vehicles", path: "/inventory", icon: Car },
+    { label: "Scan", path: "scan", icon: ScanLine, raised: true },
+    { label: "Deals", path: "/saved", icon: Folder },
+    { label: "Create", path: "/add-inventory", icon: FilePlus2 },
+  ];
+
+  return (
     <VinScanContext.Provider value={vinScanApi}>
       <div className="min-h-screen bg-background flex w-full overflow-hidden">
-        {mobileOpen && (
-          <div className="fixed inset-0 z-40 bg-black/50 lg:hidden" onClick={() => setMobileOpen(false)} />
-        )}
+        {mobileOpen && <div className="fixed inset-0 z-40 bg-black/50 lg:hidden" onClick={() => setMobileOpen(false)} />}
 
         <aside className={`fixed lg:sticky top-0 left-0 z-50 h-screen bg-card border-r border-border transition-all duration-200 lg:translate-x-0 ${mobileOpen ? "translate-x-0" : "-translate-x-full"} ${collapsed ? "lg:w-20" : "lg:w-64"} w-64 flex flex-col`}>
           <div className="h-16 flex items-center justify-between px-4 border-b border-border flex-shrink-0">
@@ -343,10 +360,7 @@ const AppShell = ({ children }: AppShellProps) => {
               return (
                 <div key={key} className="mb-2">
                   {section.title && !collapsed && (
-                    <button
-                      onClick={() => toggleSection(key)}
-                      className="w-full flex items-center justify-between px-3 py-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground hover:text-foreground"
-                    >
+                    <button onClick={() => toggleSection(key)} className="w-full flex items-center justify-between px-3 py-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground hover:text-foreground">
                       {section.title}
                       <ChevronDown className={`h-3 w-3 transition-transform ${open ? "rotate-180" : ""}`} />
                     </button>
@@ -365,9 +379,7 @@ const AppShell = ({ children }: AppShellProps) => {
                           >
                             <Icon className="h-4 w-4 flex-shrink-0" />
                             {!collapsed && <span className="truncate">{item.label}</span>}
-                            {!collapsed && item.badge && (
-                              <span className="ml-auto text-[10px] px-1.5 py-0.5 rounded-full bg-primary-foreground/20">{item.badge}</span>
-                            )}
+                            {!collapsed && item.badge && <span className="ml-auto text-[10px] px-1.5 py-0.5 rounded-full bg-primary-foreground/20">{item.badge}</span>}
                           </button>
                         );
                       })}
@@ -390,19 +402,68 @@ const AppShell = ({ children }: AppShellProps) => {
         </aside>
 
         <div className="flex-1 flex flex-col min-w-0 h-screen overflow-hidden">
-          <header className="h-16 border-b border-border bg-card/95 backdrop-blur-sm flex items-center justify-between gap-3 px-4 lg:px-6 flex-shrink-0">
-            <div className="flex min-w-0 items-center gap-3">
-              <button onClick={() => setMobileOpen(true)} className="lg:hidden p-2 rounded-md hover:bg-muted">
-                <Menu className="h-5 w-5" />
-              </button>
-              <div className="min-w-0">
-                <h1 className="truncate text-lg font-black tracking-tight text-foreground sm:text-xl">{pageMeta.title}</h1>
-                <p className="hidden truncate text-xs font-medium text-muted-foreground md:block">{pageMeta.subtitle}</p>
+          {!inventoryHasOwnMobileChrome && (
+            <header className="lg:hidden shrink-0 border-b border-slate-200 bg-white px-4 pb-4 pt-5">
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex min-w-0 items-center gap-4">
+                  <button onClick={() => setMobileOpen(true)} className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl text-slate-950 active:bg-slate-100" aria-label="Open menu">
+                    <Menu className="h-7 w-7" />
+                  </button>
+                  <div className="h-12 w-px bg-slate-200" />
+                  {stores.length > 1 ? (
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <button className="min-w-0 text-left">
+                          <div className="flex items-center gap-2 text-[24px] font-black leading-none tracking-tight text-slate-950">
+                            <span className="truncate">{companyName}</span>
+                            <ChevronDown className="h-5 w-5 shrink-0" />
+                          </div>
+                          <div className="mt-1 text-lg font-medium text-slate-500">{dealerLocation}</div>
+                        </button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="start" className="w-72 bg-card">
+                        <DropdownMenuLabel>Switch location</DropdownMenuLabel>
+                        <DropdownMenuSeparator />
+                        {stores.map((store) => (
+                          <DropdownMenuItem key={store.id} onClick={() => setCurrentStore(store)} className="cursor-pointer">
+                            <Store className="h-4 w-4 mr-2" />
+                            <div>
+                              <div className="font-medium">{store.name}</div>
+                              <div className="text-xs text-muted-foreground">{store.city}, {store.state}</div>
+                            </div>
+                          </DropdownMenuItem>
+                        ))}
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  ) : (
+                    <div className="min-w-0">
+                      <div className="truncate text-[24px] font-black leading-none tracking-tight text-slate-950">{companyName}</div>
+                      <div className="mt-1 text-lg font-medium text-slate-500">{dealerLocation}</div>
+                    </div>
+                  )}
+                </div>
+                <button onClick={() => navigate("/admin?tab=audit")} className="relative mt-1 flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl text-slate-950 active:bg-slate-100" aria-label="Recent updates">
+                  <Bell className="h-7 w-7" />
+                  {unreadAudit > 0 && <span className="absolute -right-0.5 -top-1 flex h-6 min-w-6 items-center justify-center rounded-full bg-rose-500 px-1.5 text-xs font-black text-white">{unreadAudit}</span>}
+                </button>
               </div>
+
+              <div className="ml-[70px] mt-4 flex flex-wrap items-center gap-3 text-base font-medium text-slate-500">
+                <span className="flex items-center gap-2"><span className="h-2.5 w-2.5 rounded-full bg-emerald-500" /> Last sync: {formatSyncTime(lastMarketCheckSync)}</span>
+                <span className="h-5 w-px bg-slate-300" />
+                <span className="flex items-center gap-2"><CheckCircle2 className={`h-5 w-5 ${marketCheckConnected ? "text-emerald-500" : "text-amber-500"}`} /> {marketCheckLabel}</span>
+              </div>
+            </header>
+          )}
+
+          <header className="hidden h-16 border-b border-border bg-card/95 backdrop-blur-sm lg:flex items-center justify-between gap-3 px-6 flex-shrink-0">
+            <div className="min-w-0">
+              <h1 className="truncate text-xl font-black tracking-tight text-foreground">{pageMeta.title}</h1>
+              <p className="truncate text-xs font-medium text-muted-foreground">{pageMeta.subtitle}</p>
             </div>
 
             <div className="flex shrink-0 items-center gap-2">
-              <div className={`hidden h-9 items-center gap-2 rounded-full border px-3 text-xs font-black lg:flex ${marketCheckConnected ? "border-emerald-200 bg-emerald-50 text-emerald-700" : "border-amber-200 bg-amber-50 text-amber-700"}`}>
+              <div className={`h-9 items-center gap-2 rounded-full border px-3 text-xs font-black flex ${marketCheckConnected ? "border-emerald-200 bg-emerald-50 text-emerald-700" : "border-amber-200 bg-amber-50 text-amber-700"}`}>
                 <span className={`h-2 w-2 rounded-full ${marketCheckConnected ? "bg-emerald-500" : "bg-amber-500"}`} />
                 {marketCheckLabel}
               </div>
@@ -410,7 +471,7 @@ const AppShell = ({ children }: AppShellProps) => {
               {stores.length > 1 ? (
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
-                    <button className="hidden h-9 max-w-[220px] items-center gap-2 rounded-full border border-border bg-background px-3 text-sm font-black hover:bg-muted md:flex">
+                    <button className="h-9 max-w-[220px] items-center gap-2 rounded-full border border-border bg-background px-3 text-sm font-black hover:bg-muted flex">
                       <Store className="h-4 w-4 flex-shrink-0 text-primary" />
                       <span className="truncate">{companyName}</span>
                       <ChevronsUpDown className="h-3 w-3 flex-shrink-0 text-muted-foreground" />
@@ -431,15 +492,15 @@ const AppShell = ({ children }: AppShellProps) => {
                   </DropdownMenuContent>
                 </DropdownMenu>
               ) : (
-                <div className="hidden h-9 max-w-[220px] items-center gap-2 rounded-full border border-border bg-background px-3 text-sm font-black md:flex">
+                <div className="h-9 max-w-[220px] items-center gap-2 rounded-full border border-border bg-background px-3 text-sm font-black flex">
                   <Store className="h-4 w-4 flex-shrink-0 text-primary" />
                   <span className="truncate">{companyName}</span>
                 </div>
               )}
 
-              <button onClick={openScan} className="hidden h-9 items-center gap-2 rounded-full bg-primary px-3 text-sm font-black text-primary-foreground hover:opacity-90 sm:flex">
+              <button onClick={openScan} className="h-9 items-center gap-2 rounded-full bg-primary px-3 text-sm font-black text-primary-foreground hover:opacity-90 flex">
                 <ScanLine className="h-4 w-4" />
-                <span className="hidden lg:inline">Scan VIN</span>
+                Scan VIN
               </button>
 
               <button onClick={() => navigate("/admin?tab=audit")} className="relative p-2 rounded-full hover:bg-muted text-muted-foreground hover:text-foreground">
@@ -460,65 +521,59 @@ const AppShell = ({ children }: AppShellProps) => {
                   </DropdownMenuLabel>
                   <DropdownMenuSeparator />
                   <DropdownMenuLabel className="text-[11px] uppercase tracking-wider text-muted-foreground">App switcher</DropdownMenuLabel>
-                  {ALL_PRODUCTS.map((p) => {
-                    const Icon = productIcon(p.id);
+                  {ALL_PRODUCTS.map((product) => {
+                    const Icon = productIcon(product.id);
                     return (
-                      <DropdownMenuItem key={p.id} onClick={() => openProduct(p.url)} className="cursor-pointer py-2.5">
+                      <DropdownMenuItem key={product.id} onClick={() => openProduct(product.url)} className="cursor-pointer py-2.5">
                         <div className="mr-3 flex h-9 w-9 items-center justify-center rounded-xl bg-muted">
                           <Icon className="h-4 w-4" />
                         </div>
                         <div className="min-w-0 flex-1">
-                          <div className="flex items-center gap-1 font-black">{p.name}{p.url.startsWith("http") && <ExternalLink className="h-3 w-3" />}</div>
-                          <div className="truncate text-xs text-muted-foreground">{p.description}</div>
+                          <div className="flex items-center gap-1 font-black">{product.name}{product.url.startsWith("http") && <ExternalLink className="h-3 w-3" />}</div>
+                          <div className="truncate text-xs text-muted-foreground">{product.description}</div>
                         </div>
                       </DropdownMenuItem>
                     );
                   })}
                   <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={() => navigate("/admin?tab=team")} className="cursor-pointer">
-                    <Users className="h-4 w-4 mr-2" /> Profile / Team
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => navigate("/admin?tab=settings")} className="cursor-pointer">
-                    <Settings className="h-4 w-4 mr-2" /> Settings
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={handleManageBilling} className="cursor-pointer">
-                    <CreditCard className="h-4 w-4 mr-2" /> Billing
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => navigate("/trust")} className="cursor-pointer">
-                    <HelpCircle className="h-4 w-4 mr-2" /> Help & Trust
-                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => navigate("/admin?tab=team")} className="cursor-pointer"><Users className="h-4 w-4 mr-2" /> Profile / Team</DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => navigate("/admin?tab=settings")} className="cursor-pointer"><Settings className="h-4 w-4 mr-2" /> Settings</DropdownMenuItem>
+                  <DropdownMenuItem onClick={handleManageBilling} className="cursor-pointer"><CreditCard className="h-4 w-4 mr-2" /> Billing</DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => navigate("/trust")} className="cursor-pointer"><HelpCircle className="h-4 w-4 mr-2" /> Help & Trust</DropdownMenuItem>
                   <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={handleSignOut} className="cursor-pointer text-destructive">
-                    <LogOut className="h-4 w-4 mr-2" /> Sign out
-                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={handleSignOut} className="cursor-pointer text-destructive"><LogOut className="h-4 w-4 mr-2" /> Sign out</DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
             </div>
           </header>
 
-          <div className="lg:hidden border-b border-border bg-card/95 px-3 py-2 flex items-center gap-2 overflow-x-auto">
-            <button onClick={() => navigate("/addendum")} className="flex-shrink-0 h-8 px-3 rounded-md bg-primary text-primary-foreground text-xs font-medium flex items-center gap-1.5">
-              <FileText className="h-3.5 w-3.5" /> Addendum
-            </button>
-            <button onClick={() => navigate("/sticker-studio")} className="flex-shrink-0 h-8 px-3 rounded-md border border-border text-xs font-medium flex items-center gap-1.5">
-              <Sparkles className="h-3.5 w-3.5" /> Studio
-            </button>
-            <button onClick={() => navigate("/used-vehicle-documents")} className="flex-shrink-0 h-8 px-3 rounded-md border border-border text-xs font-medium flex items-center gap-1.5">
-              <ScrollText className="h-3.5 w-3.5" /> Used Docs
-            </button>
-            <button onClick={openScan} className="flex-shrink-0 h-8 px-3 rounded-md border border-border text-xs font-medium flex items-center gap-1.5">
-              <ScanLine className="h-3.5 w-3.5" /> Scan
-            </button>
-          </div>
-
-          <main id="app-scroll" className="flex-1 overflow-y-auto">
+          <main id="app-scroll" className="flex-1 overflow-y-auto pb-24 lg:pb-0">
             {children}
           </main>
+
+          {!inventoryHasOwnMobileChrome && (
+            <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-slate-200 bg-white/95 px-5 pb-[calc(env(safe-area-inset-bottom)+12px)] pt-3 shadow-[0_-10px_30px_rgba(15,23,42,0.08)] backdrop-blur lg:hidden">
+              <div className="mx-auto grid max-w-[520px] grid-cols-5 items-end gap-1">
+                {bottomNavItems.map((item) => {
+                  const Icon = item.icon;
+                  const active = item.path !== "scan" && location.pathname === item.path;
+                  return (
+                    <button key={item.label} onClick={() => item.path === "scan" ? openScan() : navigate(item.path)} className={`flex flex-col items-center justify-end gap-1 text-[12px] font-bold ${active ? "text-blue-700" : "text-slate-500"}`}>
+                      <span className={`${item.raised ? "-mt-8 flex h-14 w-14 items-center justify-center rounded-full border border-slate-200 bg-white text-blue-700 shadow-lg" : "flex h-7 items-center justify-center"}`}>
+                        <Icon className={item.raised ? "h-7 w-7" : "h-6 w-6"} />
+                      </span>
+                      <span>{item.label}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </nav>
+          )}
         </div>
 
         {showMobileQr && (
           <div className="fixed inset-0 z-[60] bg-black/50 flex items-center justify-center p-4" onClick={() => setShowMobileQr(false)}>
-            <div className="bg-card rounded-2xl p-6 max-w-sm w-full text-center" onClick={e => e.stopPropagation()}>
+            <div className="bg-card rounded-2xl p-6 max-w-sm w-full text-center" onClick={(event) => event.stopPropagation()}>
               <div className="w-12 h-12 mx-auto mb-4 rounded-full bg-primary/10 flex items-center justify-center">
                 <ScanLine className="h-6 w-6 text-primary" />
               </div>
@@ -538,20 +593,15 @@ const AppShell = ({ children }: AppShellProps) => {
       </div>
     </VinScanContext.Provider>
   );
-
-  useEffect(() => {
-    if (!user) return;
-    if (tenant?.id !== "house") return;
-    if (location.pathname === "/onboarding") return;
-    const t = setTimeout(() => {
-      toast.info("Finish setup to activate your dealership workspace", {
-        action: { label: "Continue", onClick: () => navigate("/onboarding") },
-      });
-    }, 800);
-    return () => clearTimeout(t);
-  }, [user, tenant?.id, location.pathname, navigate]);
-
-  return shell;
 };
+
+function formatSyncTime(value: string | null) {
+  if (!value) return "--";
+  try {
+    return new Intl.DateTimeFormat(undefined, { hour: "numeric", minute: "2-digit" }).format(new Date(value));
+  } catch {
+    return "--";
+  }
+}
 
 export default AppShell;
