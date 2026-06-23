@@ -440,11 +440,11 @@ const PublicListingBody = () => {
               <img
                 src={gallery[photoIdx] || gallery[0]} alt={ymm}
                 className="w-full object-cover cursor-zoom-in"
-                style={{ height: 520 }}
+                style={{ height: 500 }}
                 onClick={() => setLightboxOpen(true)}
               />
             ) : (
-              <div className="w-full flex items-center justify-center" style={{ height: 520 }}>
+              <div className="w-full flex items-center justify-center" style={{ height: 500 }}>
                 <Car className="w-24 h-24 text-slate-300" />
               </div>
             )}
@@ -452,7 +452,7 @@ const PublicListingBody = () => {
               {cond.text}
             </span>
             <span className="absolute top-4 right-4 bg-black/70 text-white text-xs font-semibold px-3 py-1.5 rounded-md">
-              Photo {photoIdx + 1} of {Math.max(gallery.length, 24)}
+              Photo {photoIdx + 1} of {gallery.length || 1}
             </span>
             {gallery.length > 1 && (
               <>
