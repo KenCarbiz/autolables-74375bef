@@ -54,6 +54,7 @@ interface VehicleRow {
   tenant_id: string | null;
   vin: string;
   slug: string;
+  source_url: string | null;
   ymm: string | null;
   trim: string | null;
   mileage: number | null;
@@ -168,6 +169,12 @@ const VehicleFile = () => {
     () => vehicle ? `${window.location.origin}/v/${vehicle.slug}` : "",
     [vehicle]
   );
+  // The dealer's actual ad/VDP page on their own website (captured from the
+  // inventory feed); falls back to the AutoLabels shopper page.
+  const adUrl = useMemo(
+    () => (vehicle?.source_url && /^https?:\/\//i.test(vehicle.source_url)) ? vehicle.source_url : "",
+    [vehicle]
+  );
 
   if (loading) {
     return (
@@ -234,15 +241,16 @@ const VehicleFile = () => {
             <ArrowLeft className="w-3.5 h-3.5" />
             Back to Inventory
           </button>
-          {publicUrl && (
+          {(adUrl || publicUrl) && (
             <div className="hidden lg:flex items-center gap-2">
               <a
-                href={publicUrl}
+                href={adUrl || publicUrl}
                 target="_blank"
                 rel="noreferrer"
+                title={adUrl ? "Open this vehicle's ad on the dealership website" : "Open the shopper page"}
                 className="h-9 px-3 rounded-lg border border-border bg-background hover:bg-muted text-xs font-semibold inline-flex items-center gap-1.5"
               >
-                <ExternalLink className="w-3.5 h-3.5" /> Open in new tab
+                <ExternalLink className="w-3.5 h-3.5" /> {adUrl ? "View ad on website" : "Open in new tab"}
               </a>
             </div>
           )}
