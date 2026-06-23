@@ -461,17 +461,89 @@ const InventoryModern = () => {
             <Pill label="Price Verification" count={counts.priceVerify} tone="amber" active={derived === "price-verify"} onClick={() => { setStatus("all"); setCondition("all"); setDerived("price-verify"); }} />
             <Pill label="Published" count={counts.published} tone="emerald" active={status === "published"} onClick={() => { setDerived("all"); setCondition("all"); setStatus("published"); }} />
             <Pill label="Draft" count={counts.draft} active={status === "draft"} onClick={() => { setDerived("all"); setCondition("all"); setStatus("draft"); }} />
-            <div className="ml-auto flex items-center gap-2">
-              <button className="h-8 px-3 rounded-full border border-dashed border-border bg-card text-xs font-semibold text-foreground inline-flex items-center gap-1 hover:bg-muted">
-                <Plus className="w-3.5 h-3.5 text-blue-600" /> Add Filter
-              </button>
-              <button className="h-8 px-3 rounded-full border border-border bg-card text-xs font-semibold text-foreground inline-flex items-center gap-1.5 hover:bg-muted">
-                Sort: Last Updated
-                <ChevronRight className="w-3.5 h-3.5 rotate-90 text-muted-foreground" />
-              </button>
+            <div className="ml-auto flex items-center gap-2 relative">
+              {/* Add Filter — opens a popover with toggle filters */}
+              <div className="relative">
+                <button
+                  onClick={() => { setFilterMenuOpen((v) => !v); setSortMenuOpen(false); }}
+                  className={`h-8 px-3 rounded-full border border-dashed text-xs font-semibold inline-flex items-center gap-1 transition-colors ${filterMenuOpen ? "border-blue-500 bg-blue-50 text-blue-700" : "border-border bg-card text-foreground hover:bg-muted"}`}
+                >
+                  <Plus className="w-3.5 h-3.5 text-blue-600" /> Add Filter
+                  {(status !== "all" || condition !== "all" || derived !== "all") && (
+                    <span className="ml-1 min-w-[16px] h-4 px-1 rounded-full bg-blue-600 text-white text-[10px] font-bold inline-flex items-center justify-center">
+                      {(status !== "all" ? 1 : 0) + (condition !== "all" ? 1 : 0) + (derived !== "all" ? 1 : 0)}
+                    </span>
+                  )}
+                </button>
+                {filterMenuOpen && (
+                  <div className="absolute right-0 top-full mt-1 w-64 rounded-xl border border-border bg-popover shadow-lg z-20 p-3 space-y-2.5">
+                    <div>
+                      <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Status</label>
+                      <select value={status} onChange={(e) => setStatus(e.target.value as StatusFilter)} className="mt-1 w-full h-8 rounded-lg border border-border bg-background text-xs px-2">
+                        <option value="all">All statuses</option><option value="draft">Draft</option><option value="published">Published</option><option value="archived">Archived</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Condition</label>
+                      <select value={condition} onChange={(e) => setCondition(e.target.value as ConditionFilter)} className="mt-1 w-full h-8 rounded-lg border border-border bg-background text-xs px-2">
+                        <option value="all">New &amp; used</option><option value="new">New</option><option value="used">Used</option><option value="cpo">CPO</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Attention</label>
+                      <select value={derived} onChange={(e) => setDerived(e.target.value as DerivedFilter)} className="mt-1 w-full h-8 rounded-lg border border-border bg-background text-xs px-2">
+                        <option value="all">All</option>
+                        <option value="needs-sticker">Needs Sticker</option>
+                        <option value="missing-addendum">Missing Addendum</option>
+                        <option value="price-verify">Price Verification</option>
+                        <option value="open-recalls">Open Recalls</option>
+                        <option value="needs-attention">Needs Attention</option>
+                      </select>
+                    </div>
+                    <div className="flex justify-between pt-1">
+                      <button onClick={() => { setStatus("all"); setCondition("all"); setDerived("all"); }} className="text-[11px] font-semibold text-muted-foreground hover:text-foreground">Clear all</button>
+                      <button onClick={() => setFilterMenuOpen(false)} className="text-[11px] font-semibold text-blue-600 hover:text-blue-700">Done</button>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Sort dropdown */}
+              <div className="relative">
+                <button
+                  onClick={() => { setSortMenuOpen((v) => !v); setFilterMenuOpen(false); }}
+                  className={`h-8 px-3 rounded-full border text-xs font-semibold inline-flex items-center gap-1.5 transition-colors ${sortMenuOpen ? "border-blue-500 bg-blue-50 text-blue-700" : "border-border bg-card text-foreground hover:bg-muted"}`}
+                >
+                  Sort: {SORT_LABEL[sortKey]}
+                  <ChevronRight className="w-3.5 h-3.5 rotate-90 text-muted-foreground" />
+                </button>
+                {sortMenuOpen && (
+                  <div className="absolute right-0 top-full mt-1 w-56 rounded-xl border border-border bg-popover shadow-lg z-20 p-1">
+                    {(Object.keys(SORT_LABEL) as SortKey[]).map((k) => (
+                      <button
+                        key={k}
+                        onClick={() => { setSortKey(k); setSortMenuOpen(false); }}
+                        className={`w-full text-left px-2.5 py-2 rounded-lg text-xs font-medium transition-colors ${k === sortKey ? "bg-blue-50 text-blue-700" : "text-foreground hover:bg-muted"}`}
+                      >
+                        {SORT_LABEL[k]}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* List / Grid toggle */}
               <div className="h-8 inline-flex items-center rounded-lg border border-border bg-card overflow-hidden">
-                <button className="w-8 h-8 inline-flex items-center justify-center text-muted-foreground hover:bg-muted" title="List view"><ClipboardList className="w-4 h-4" /></button>
-                <button className="w-8 h-8 inline-flex items-center justify-center bg-blue-50 text-blue-700" title="Grid view"><Building2 className="w-4 h-4" /></button>
+                <button
+                  onClick={() => setViewMode("list")}
+                  className={`w-8 h-8 inline-flex items-center justify-center transition-colors ${viewMode === "list" ? "bg-blue-50 text-blue-700" : "text-muted-foreground hover:bg-muted"}`}
+                  title="List view"
+                ><ClipboardList className="w-4 h-4" /></button>
+                <button
+                  onClick={() => setViewMode("grid")}
+                  className={`w-8 h-8 inline-flex items-center justify-center transition-colors ${viewMode === "grid" ? "bg-blue-50 text-blue-700" : "text-muted-foreground hover:bg-muted"}`}
+                  title="Grid view"
+                ><Building2 className="w-4 h-4" /></button>
               </div>
             </div>
           </div>
