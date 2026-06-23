@@ -2010,9 +2010,9 @@ const JumpTo = ({ path, reason }: { path: string; reason: string }) => {
 };
 
 const Card = ({ title, children, action, className = "" }: { title: string; children: React.ReactNode; action?: React.ReactNode; className?: string }) => (
-  <div className={`rounded-2xl border border-border bg-card shadow-sm p-4 space-y-2 ${className}`}>
+  <div className={`rounded-2xl border border-border bg-card shadow-[0_1px_3px_rgba(0,0,0,0.05)] hover:shadow-md transition-shadow p-6 space-y-3 ${className}`}>
     <div className="flex items-center justify-between">
-      <h3 className="text-xs font-bold uppercase tracking-label text-muted-foreground">{title}</h3>
+      <h3 className="text-[11px] font-bold uppercase tracking-[0.08em] text-muted-foreground">{title}</h3>
       {action}
     </div>
     {children}
