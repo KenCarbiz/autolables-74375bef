@@ -698,12 +698,14 @@ serve(async (req) => {
       // instead of aborting the row as a permanent failure. Firecrawl renders
       // like a real browser and gets past the wall.
       let html = "";
+      let cheapStatus: number | null = null;
       try {
         const res = await fetch(fetchUrl, {
           method: "GET",
           headers: FETCH_HEADERS,
           signal: AbortSignal.timeout(12000),
         });
+        cheapStatus = res.status;
         const raw = res.ok ? await res.text() : "";
         html = (res.ok && !looksLikeChallenge(raw, res.headers, res.status)) ? raw : "";
       } catch { html = ""; }
@@ -758,7 +760,7 @@ serve(async (req) => {
         await admin.from("audit_log").insert({
           action: "advertised_price_crawl_error", entity_type: "advertised_price",
           entity_id: row.vin, store_id: row.tenant_id,
-          details: { vin: row.vin, url: row.source_url, http_status: res.status, reason: "bot_challenge", rendered: !!renderSource },
+          details: { vin: row.vin, url: row.source_url, http_status: cheapStatus, reason: "bot_challenge", rendered: !!renderSource },
         }).then(() => undefined, () => undefined);
         continue;
       }
