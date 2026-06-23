@@ -21,10 +21,19 @@ import {
   Search,
   ShieldCheck,
   SlidersHorizontal,
+  Store,
   TrendingUp,
   Truck,
 } from "lucide-react";
 import { toast } from "sonner";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 type VehicleRow = {
   id: string;
@@ -48,7 +57,7 @@ type PillTone = "blue" | "amber" | "red" | "purple" | "emerald" | "slate";
 const InventoryMobileRestored = () => {
   const navigate = useViewTransitionNavigate();
   const { openScan } = useVinScan();
-  const { tenant, currentStore } = useTenant();
+  const { tenant, currentStore, stores, setCurrentStore } = useTenant();
   const { settings } = useDealerSettings();
   const [rows, setRows] = useState<VehicleRow[]>([]);
   const [addendumVins, setAddendumVins] = useState<Set<string>>(new Set());
@@ -70,11 +79,7 @@ const InventoryMobileRestored = () => {
       if (!tenant?.id) return;
       try {
         const baseCols = "id,vin,ymm,trim,mileage,condition,price,status,published_at,view_count,updated_at";
-        const selectAttempts = [
-          `${baseCols},stock_number,open_recall_count`,
-          `${baseCols},stock_number`,
-          baseCols,
-        ];
+        const selectAttempts = [`${baseCols},stock_number,open_recall_count`, `${baseCols},stock_number`, baseCols];
         let inventory: VehicleRow[] = [];
 
         for (const cols of selectAttempts) {
@@ -191,21 +196,45 @@ const InventoryMobileRestored = () => {
   const marketConnected = !!lastSync || !!lastSyncStatus;
 
   return (
-    <div className="min-h-screen bg-[#F6F8FB] px-4 pb-28 pt-6">
-      <header className="space-y-4">
+    <div className="min-h-screen bg-[#F6F8FB] px-4 pb-28">
+      <header className="sticky top-0 z-30 -mx-4 border-b border-slate-200 bg-white px-4 pb-4 pt-5 shadow-sm">
         <div className="flex items-start justify-between gap-3">
           <div className="flex min-w-0 items-center gap-4">
             <button className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl text-slate-950 active:bg-slate-100" aria-label="Open menu">
               <Menu className="h-7 w-7" />
             </button>
             <div className="h-12 w-px bg-slate-200" />
-            <div className="min-w-0">
-              <button className="flex max-w-full items-center gap-2 text-left text-[24px] font-black leading-none tracking-tight text-slate-950">
-                <span className="truncate">{dealerName}</span>
-                <ChevronDown className="h-5 w-5 shrink-0" />
-              </button>
-              <div className="mt-1 text-lg font-medium text-slate-500">{dealerCity}</div>
-            </div>
+            {stores.length > 1 ? (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button className="min-w-0 text-left">
+                    <div className="flex max-w-full items-center gap-2 text-[24px] font-black leading-none tracking-tight text-slate-950">
+                      <span className="truncate">{dealerName}</span>
+                      <ChevronDown className="h-5 w-5 shrink-0" />
+                    </div>
+                    <div className="mt-1 text-lg font-medium text-slate-500">{dealerCity}</div>
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="start" className="w-72 bg-card">
+                  <DropdownMenuLabel>Switch location</DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  {stores.map((store) => (
+                    <DropdownMenuItem key={store.id} onClick={() => setCurrentStore(store)} className="cursor-pointer">
+                      <Store className="mr-2 h-4 w-4" />
+                      <div>
+                        <div className="font-medium">{store.name}</div>
+                        <div className="text-xs text-muted-foreground">{store.city}, {store.state}</div>
+                      </div>
+                    </DropdownMenuItem>
+                  ))}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            ) : (
+              <div className="min-w-0">
+                <div className="truncate text-[24px] font-black leading-none tracking-tight text-slate-950">{dealerName}</div>
+                <div className="mt-1 text-lg font-medium text-slate-500">{dealerCity}</div>
+              </div>
+            )}
           </div>
           <button className="relative mt-1 flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl text-slate-950 active:bg-slate-100" aria-label="Notifications">
             <Bell className="h-7 w-7" />
@@ -213,25 +242,25 @@ const InventoryMobileRestored = () => {
           </button>
         </div>
 
-        <div className="ml-[70px] flex flex-wrap items-center gap-3 text-base font-medium text-slate-500">
-          <span className="flex items-center gap-2"><span className="h-2.5 w-2.5 rounded-full bg-emerald-500" /> Last sync: {formatSyncTime(lastSync)}</span>
-          <span className="h-5 w-px bg-slate-300" />
-          <span className="flex items-center gap-2"><CheckCircle2 className="h-5 w-5 text-emerald-500" /> {marketConnected ? "MarketCheck Connected" : "MarketCheck Pending"}</span>
+        <div className="ml-[70px] mt-3 flex items-center gap-3 overflow-hidden whitespace-nowrap text-[13px] font-semibold text-slate-500">
+          <span className="flex shrink-0 items-center gap-2"><span className="h-2.5 w-2.5 rounded-full bg-emerald-500" />Last sync: {formatSyncTime(lastSync)}</span>
+          <span className="h-5 w-px shrink-0 bg-slate-300" />
+          <span className="flex min-w-0 items-center gap-2 truncate"><CheckCircle2 className={`h-5 w-5 shrink-0 ${marketConnected ? "text-emerald-500" : "text-amber-500"}`} /><span className="truncate">{marketConnected ? "MarketCheck Connected" : "MarketCheck Pending"}</span></span>
         </div>
 
-        <div className="grid grid-cols-2 gap-3 pt-5">
-          <button onClick={openScan} className="flex h-[72px] items-center justify-center gap-3 rounded-xl bg-blue-600 px-4 text-[22px] font-black text-white shadow-lg shadow-blue-600/20 active:scale-[0.99]">
-            <ScanLine className="h-8 w-8" />
+        <div className="mt-5 grid grid-cols-2 gap-3">
+          <button onClick={openScan} className="flex h-[64px] items-center justify-center gap-3 rounded-xl bg-blue-600 px-4 text-[20px] font-black text-white shadow-lg shadow-blue-600/20 active:scale-[0.99]">
+            <ScanLine className="h-7 w-7" />
             Scan VIN
           </button>
-          <button onClick={() => navigate("/add-inventory")} className="flex h-[72px] items-center justify-center gap-3 rounded-xl border-2 border-blue-600 bg-white px-4 text-[22px] font-black text-blue-700 active:scale-[0.99]">
-            <Plus className="h-8 w-8" />
+          <button onClick={() => navigate("/add-inventory")} className="flex h-[64px] items-center justify-center gap-3 rounded-xl border-2 border-blue-600 bg-white px-4 text-[20px] font-black text-blue-700 active:scale-[0.99]">
+            <Plus className="h-7 w-7" />
             Add Vehicle
           </button>
         </div>
       </header>
 
-      <section className="-mx-4 mt-6 border-y border-slate-200 bg-white px-4 py-5">
+      <section className="-mx-4 border-y border-slate-200 bg-white px-4 py-5">
         <div className="grid grid-cols-3 rounded-3xl border border-slate-200 bg-white p-2 shadow-sm">
           <button className="rounded-2xl bg-blue-50 px-2 py-4 text-lg font-black text-blue-700">All vehicles</button>
           <button className="rounded-2xl px-2 py-4 text-lg font-black text-slate-600">Lot Queue</button>
@@ -242,7 +271,7 @@ const InventoryMobileRestored = () => {
       <section className="mt-7 grid grid-cols-2 gap-4">
         <MobileReadinessCard percent={counts.health} ready={counts.ready} total={counts.total || 1} />
         <MobileMetricCard title="NEEDS ATTENTION" value={counts.needsSticker} subtitle="require action" link="View list" icon={AlertTriangle} tone="red" onClick={() => setFilter("needs-sticker")} />
-        <MobileMetricCard title="TOTAL VEHICLES" value={counts.total} subtitle={`${counts.newCount} new • ${counts.usedCount} used`} link="View all vehicles" icon={Truck} tone="slate" onClick={() => setFilter("all")} />
+        <MobileMetricCard title="TOTAL VEHICLES" value={counts.total} subtitle={`${counts.newCount} new - ${counts.usedCount} used`} link="View all vehicles" icon={Truck} tone="slate" onClick={() => setFilter("all")} />
         <MobileMetricCard title="OPEN RECALLS" value={counts.openRecalls} subtitle="vehicles" link="View recalls" icon={ShieldCheck} tone="emerald" onClick={() => toast.info("Recall details are synced from MarketCheck.")} />
         <MobileMetricCard title="PRICE REVIEWS" value={counts.priceVerify} subtitle="require review" link="View price reviews" icon={CircleDollarSign} tone="purple" onClick={() => setFilter("price-verify")} />
         <MobileMetricCard title="AVG MARKET POSITION" value="$1,835" subtitle="below market" link="View market report" icon={TrendingUp} tone="emerald" onClick={() => navigate("/dashboard/reports")} />
@@ -354,7 +383,7 @@ function MobileBottomNav({ onScan, onNavigate }: { onScan: () => void; onNavigat
     { label: "Vehicles", icon: Car, active: true, action: () => onNavigate("/inventory") },
     { label: "Scan", icon: ScanLine, active: false, raised: true, action: onScan },
     { label: "Deals", icon: Folder, active: false, action: () => onNavigate("/saved") },
-    { label: "Create", icon: FilePlus2, active: false, action: () => onNavigate("/add-inventory") },
+    { label: "Create", icon: FilePlus2, active: false, action: () => onNavigate("/addendum") },
   ];
 
   return (
