@@ -982,7 +982,7 @@ const VehicleCard = ({ r, signal, readiness, onOpen, onSticker, onView, items }:
           </div>
         </div>
         <div className="flex flex-col items-center gap-0.5 shrink-0">
-          <MiniRing pct={readiness} />
+          <MiniRing pct={readiness} size={60} />
         </div>
       </div>
       <div className="flex items-center gap-1.5 mt-2.5 flex-wrap" onClick={(e) => e.stopPropagation()}>
