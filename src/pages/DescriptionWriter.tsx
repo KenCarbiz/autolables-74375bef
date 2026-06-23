@@ -406,12 +406,51 @@ const DescriptionWriter = () => {
           </Card>
 
           <Card title="SEO Targeting" subtitle="Help us include the right local and market terms.">
-            <div className="grid gap-4 md:grid-cols-2">
-              <SelectLike label="City" value={geoCity} onChange={setGeoCity} />
+            <div className="grid gap-4 md:grid-cols-[160px_1fr_180px]">
+              <label>
+                <span className="text-sm font-bold text-slate-600">Zip Code</span>
+                <div className="relative mt-2">
+                  <input
+                    value={zipCode}
+                    onChange={(e) => setZipCode(e.target.value.replace(/\D/g, "").slice(0, 5))}
+                    onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); lastZipLookup.current = ""; lookupZip(zipCode, { announce: true }); } }}
+                    onBlur={() => lookupZip(zipCode)}
+                    inputMode="numeric"
+                    placeholder="06040"
+                    className="h-12 w-full rounded-xl border border-slate-200 bg-white px-4 pr-9 text-sm font-semibold outline-none focus:border-blue-400"
+                  />
+                  {zipLoading && <Loader2 className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 animate-spin text-slate-400" />}
+                  {!zipLoading && zipPlaces.length > 0 && <MapPin className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-emerald-600" />}
+                </div>
+                {zipError && <span className="mt-1 block text-xs font-semibold text-rose-600">{zipError}</span>}
+              </label>
+
+              <label>
+                <span className="text-sm font-bold text-slate-600">City</span>
+                {zipPlaces.length > 1 ? (
+                  <select
+                    value={geoCity}
+                    onChange={(e) => {
+                      const p = zipPlaces.find((pl) => pl.city === e.target.value);
+                      if (p) { setGeoCity(p.city); setGeoState(p.state); }
+                    }}
+                    className="mt-2 h-12 w-full rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold outline-none focus:border-blue-400"
+                  >
+                    {zipPlaces.map((p) => <option key={p.city} value={p.city}>{p.city}, {p.stateAbbr}</option>)}
+                  </select>
+                ) : (
+                  <input value={geoCity} onChange={(e) => setGeoCity(e.target.value)} className="mt-2 h-12 w-full rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold outline-none focus:border-blue-400" />
+                )}
+              </label>
+
               <SelectLike label="State" value={geoState} onChange={setGeoState} />
             </div>
-            <div className="mt-4 grid gap-4 md:grid-cols-2">
-              <SelectLike label="Zip Code" value={zipCode} onChange={setZipCode} />
+
+            <div className="mt-4 grid gap-4 md:grid-cols-[1fr_180px]">
+              <label>
+                <span className="text-sm font-bold text-slate-600">Primary Keyword (Optional)</span>
+                <input value={primaryKeyword} onChange={(e) => setPrimaryKeyword(e.target.value)} placeholder="e.g. 2025 INFINITI QX80 for sale" className="mt-2 h-12 w-full rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold outline-none focus:border-blue-400" />
+              </label>
               <label>
                 <span className="text-sm font-bold text-slate-600">Radius</span>
                 <select value={radius} onChange={(e) => setRadius(Number(e.target.value))} className="mt-2 h-12 w-full rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold outline-none focus:border-blue-400">
@@ -419,8 +458,30 @@ const DescriptionWriter = () => {
                 </select>
               </label>
             </div>
-            <label className="mt-4 block text-sm font-bold text-slate-600">Primary Keyword (Optional)</label>
-            <input value={primaryKeyword} onChange={(e) => setPrimaryKeyword(e.target.value)} className="mt-2 h-12 w-full rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold outline-none focus:border-blue-400" />
+
+            <div className="mt-4">
+              <span className="text-sm font-bold text-slate-600">Additional Keywords (Optional)</span>
+              <div className="mt-2 flex flex-wrap items-center gap-2 rounded-xl border border-slate-200 bg-white p-2">
+                {extraKeywords.map((k) => (
+                  <span key={k} className="inline-flex items-center gap-1 rounded-lg bg-blue-50 px-2.5 py-1.5 text-xs font-bold text-blue-700">
+                    {k}
+                    <button type="button" onClick={() => setExtraKeywords(extraKeywords.filter((x) => x !== k))} className="text-blue-700/70 hover:text-blue-900"><X className="h-3 w-3" /></button>
+                  </span>
+                ))}
+                <input
+                  value={keywordDraft}
+                  onChange={(e) => setKeywordDraft(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === "Enter" || e.key === ",") { e.preventDefault(); addKeyword(); } }}
+                  placeholder={extraKeywords.length ? "Add another…" : "Add long-tail keywords (press Enter)"}
+                  className="min-w-[180px] flex-1 bg-transparent px-2 py-1.5 text-sm font-semibold outline-none"
+                />
+                {keywordDraft && (
+                  <button type="button" onClick={addKeyword} className="inline-flex items-center gap-1 rounded-lg bg-slate-100 px-2 py-1 text-xs font-black text-slate-700"><Plus className="h-3 w-3" />Add</button>
+                )}
+              </div>
+              <p className="mt-1 text-xs font-semibold text-slate-500">Optional. Add secondary phrases shoppers search for (e.g., "AWD SUV", "luxury family SUV").</p>
+            </div>
+
             <div className="mt-4 flex flex-wrap gap-4">
               <CheckOption checked={includeCallToAction} onClick={() => setIncludeCallToAction(!includeCallToAction)} label="Include call to action" />
               <CheckOption checked={includeDealerName} onClick={() => setIncludeDealerName(!includeDealerName)} label="Include dealer name" />
