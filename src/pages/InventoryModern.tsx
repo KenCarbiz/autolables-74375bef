@@ -310,7 +310,7 @@ const InventoryModern = () => {
 
   const filtered = useMemo(() => {
     const lc = q.trim().toLowerCase();
-    return rows.filter((r) => {
+    const list = rows.filter((r) => {
       if (status !== "all" && r.status !== status) return false;
       if (condition !== "all" && r.condition !== condition) return false;
       if (derived !== "all") {
@@ -319,8 +319,6 @@ const InventoryModern = () => {
         if (derived === "missing-addendum" && s.hasAddendum) return false;
         if (derived === "price-verify" && !s.needsPriceVerify) return false;
         if (derived === "open-recalls" && !((r.open_recall_count || 0) > 0)) return false;
-        // Mirror the Needs Attention KPI exactly: missing addendum OR needs
-        // price verification OR has an open recall.
         if (derived === "needs-attention" && s.hasAddendum && !s.needsPriceVerify && !((r.open_recall_count || 0) > 0)) return false;
       }
       if (!lc) return true;
@@ -331,7 +329,27 @@ const InventoryModern = () => {
         (r.stock_number || "").toLowerCase().includes(lc)
       );
     });
-  }, [rows, q, status, condition, derived, addendumVins, byVin]);
+    const yearOf = (r: VehicleRow) => parseInt((r.ymm || "").match(/\b(19|20)\d{2}\b/)?.[0] || "0", 10);
+    const readinessOf = (r: VehicleRow) => {
+      const s = signalFor(r);
+      const flags = [true, !!r.ymm, s.stickerDone, s.hasAddendum, r.price ? s.priceVerified : true];
+      return flags.filter(Boolean).length;
+    };
+    const sorted = [...list];
+    sorted.sort((a, b) => {
+      switch (sortKey) {
+        case "created": return (new Date(b.created_at).getTime()) - (new Date(a.created_at).getTime());
+        case "price_desc": return (b.price || 0) - (a.price || 0);
+        case "price_asc": return (a.price || Number.MAX_SAFE_INTEGER) - (b.price || Number.MAX_SAFE_INTEGER);
+        case "year_desc": return yearOf(b) - yearOf(a);
+        case "mileage_asc": return (a.mileage || Number.MAX_SAFE_INTEGER) - (b.mileage || Number.MAX_SAFE_INTEGER);
+        case "readiness_desc": return readinessOf(b) - readinessOf(a);
+        case "updated":
+        default: return (new Date(b.updated_at).getTime()) - (new Date(a.updated_at).getTime());
+      }
+    });
+    return sorted;
+  }, [rows, q, status, condition, derived, addendumVins, byVin, sortKey]);
 
   const counts = useMemo(() => {
     const sevenDaysAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
