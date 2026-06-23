@@ -57,6 +57,18 @@ interface ActivityRow { id: string; action: string; created_at: string; details:
 type StatusFilter = "all" | "draft" | "published" | "archived";
 type ConditionFilter = "all" | "new" | "used" | "cpo";
 type DerivedFilter = "all" | "needs-sticker" | "missing-addendum" | "price-verify" | "open-recalls" | "needs-attention";
+type SortKey = "updated" | "created" | "price_desc" | "price_asc" | "year_desc" | "mileage_asc" | "readiness_desc";
+type ViewMode = "list" | "grid";
+
+const SORT_LABEL: Record<SortKey, string> = {
+  updated: "Last Updated",
+  created: "Date Added",
+  price_desc: "Price: High → Low",
+  price_asc: "Price: Low → High",
+  year_desc: "Year: Newest",
+  mileage_asc: "Mileage: Lowest",
+  readiness_desc: "Readiness: Highest",
+};
 
 const PAGE_SIZE = 25;
 const PAGE_SIZE_OPTIONS = [25, 50, 100, 200];
