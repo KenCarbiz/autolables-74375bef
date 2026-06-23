@@ -11,13 +11,15 @@ import {
   FileUp, Upload, Printer, Sparkles, Plus, ArrowUpRight,
   AlertTriangle, ShieldCheck, Lock, Unlock, Send, MessageSquare,
   Link as LinkIcon, X, QrCode, Trash2, Save, ShieldAlert, UserRound, Users,
-  ChevronRight, CircleAlert,
+  ChevronRight, CircleAlert, Activity,
 } from "lucide-react";
 import { formatPhone, composeName } from "@/components/addendum/CustomerInfoSection";
 import EmptyState from "@/components/ui/empty-state";
 import { InstallProofList } from "@/components/admin/InstallProofList";
 import { useVehicleSpecs } from "@/hooks/useVehicleSpecs";
 import { PACKET_MODULES, packetVisible } from "@/lib/packetModules";
+import GeneratedDocumentsSection from "@/components/vehicle/GeneratedDocumentsSection";
+import VehicleEvidenceTimeline from "@/components/vehicle/VehicleEvidenceTimeline";
 
 // ──────────────────────────────────────────────────────────────
 // VehicleFile — /vehicle-file/:id
@@ -29,7 +31,7 @@ import { PACKET_MODULES, packetVisible } from "@/lib/packetModules";
 // child artifact refers to it by id.
 // ──────────────────────────────────────────────────────────────
 
-type TabId = "overview" | "documents" | "scan" | "customer" | "addendum" | "prep" | "labels" | "sign";
+type TabId = "overview" | "documents" | "scan" | "customer" | "addendum" | "prep" | "labels" | "sign" | "evidence";
 
 interface PersonInfo {
   first_name?: string; middle_initial?: string; last_name?: string; suffix?: string;
@@ -86,7 +88,7 @@ interface VehicleRow {
 
 interface RecallItem { title?: string; component?: string; reportDate?: string; remedy?: string; status?: string; nhtsaCampaignNumber?: string; }
 
-const VALID_TABS: TabId[] = ["overview", "documents", "scan", "customer", "addendum", "prep", "labels", "sign"];
+const VALID_TABS: TabId[] = ["overview", "documents", "scan", "customer", "addendum", "prep", "labels", "sign", "evidence"];
 
 interface ReadyCheck { ok: boolean; label: string; when: string | null; blocks?: boolean }
 
@@ -212,6 +214,7 @@ const VehicleFile = () => {
     { id: "prep",      label: "Prep & Install", icon: Wrench },
     { id: "labels",    label: "Labels",    icon: Tag },
     { id: "sign",      label: "Customer Sign-off", icon: Signature },
+    { id: "evidence",  label: "Evidence",  icon: Activity },
   ];
 
   const ready = readinessSummary(vehicle);
@@ -403,6 +406,14 @@ const VehicleFile = () => {
         {tab === "prep"      && <PrepPanel vehicle={vehicle} />}
         {tab === "labels"    && <LabelsPanel vehicle={vehicle} />}
         {tab === "sign"      && <SignPanel vehicle={vehicle} />}
+        {tab === "evidence"  && (
+          <VehicleEvidenceTimeline
+            vehicleId={vehicle.id}
+            vin={vehicle.vin}
+            tenantId={vehicle.tenant_id}
+            vehicleTitle={vehicle.ymm || vehicle.vin}
+          />
+        )}
       </div>
 
       {/* Mobile sticky action bar — thumb-friendly primary actions. */}
@@ -888,7 +899,11 @@ const DocumentsPanel = ({ vehicle, onReload }: { vehicle: VehicleRow; onReload: 
   }, [vehicle.documents]);
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+    <div className="space-y-4">
+      <div className="rounded-2xl border border-border bg-card p-4">
+        <GeneratedDocumentsSection vehicleId={vehicle.id} />
+      </div>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
       {slots.map((s) => (
         <div key={s.type} className="rounded-xl border border-border bg-card p-4 space-y-2">
           <div className="flex items-center justify-between">
@@ -968,6 +983,7 @@ const DocumentsPanel = ({ vehicle, onReload }: { vehicle: VehicleRow; onReload: 
           )}
         </div>
       ))}
+      </div>
     </div>
   );
 };
