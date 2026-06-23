@@ -4,11 +4,10 @@ import {
   ChevronLeft, ChevronRight, Share2, Printer, Bookmark,
   FileText, MessageSquare, RefreshCw, ExternalLink, Upload,
   ShieldCheck, Shield, CheckCircle2, Package, Clock, AlertTriangle,
-  Star, Phone, Mail, MapPin, Globe,
+  Star, Phone, Globe,
   Car, Fuel, Cog, Settings, Wind,
   TrendingDown, User, Wrench, Award,
-  Send, X, Info, Flame, Search, Navigation,
-  BarChart3, Gauge, History, CreditCard,
+  Send, X, Info, Gauge, CreditCard,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Helmet } from "react-helmet-async";
@@ -52,74 +51,6 @@ const deriveVehicleRating = (accidents: number, owners: number, recalls: number,
   return { score: parseFloat(score.toFixed(1)), label };
 };
 
-const deriveDemandScore = (mp: { low?: number | null; high?: number | null } | null | undefined, price: number, similar: number | null) => {
-  // Combine price-vs-market and scarcity into a demand label
-  const scarce = similar != null && similar <= 5;
-  const greatPrice = mp?.low != null && price < (mp.low ?? price);
-  if (scarce && greatPrice) return { label: "Very High Demand", level: 0.9, color: "#dc2626" };
-  if (scarce || greatPrice) return { label: "High Demand", level: 0.75, color: "#ea580c" };
-  if (similar != null && similar > 15) return { label: "Moderate Demand", level: 0.5, color: "#ca8a04" };
-  return { label: "High Demand", level: 0.75, color: "#ea580c" };
-};
-
-function getBuildCategories(listing: VehicleListing) {
-  const ks = listing.key_specs || {};
-  const mc = (listing.mc_attributes || {}) as Record<string, unknown>;
-  const features = listing.features || [];
-
-  const kw = (f: { title: string }, ...terms: string[]) =>
-    terms.some((t) => new RegExp(t, "i").test(f.title));
-
-  const powertrain: string[] = [
-    ks.engine,
-    ks.drivetrain,
-    ks.transmission,
-    ks.fuel,
-    mc.horsepower ? `${mc.horsepower} HP` : null,
-    ks.mpg_city && ks.mpg_hwy ? `${ks.mpg_city}/${ks.mpg_hwy} MPG est.` : null,
-  ].filter(Boolean) as string[];
-
-  const interiorFeats = features.filter((f) =>
-    kw(f, "seat", "leather", "heat", "cool", "moonroof", "sunroof", "memory", "ventilat", "panoram")
-  ).map((f) => f.title);
-
-  const exteriorFeats = features.filter((f) =>
-    kw(f, "wheel", "alloy", "led", "headlight", "roof rail", "liftgate", "tow", "trailer", "mirror")
-  ).map((f) => f.title);
-
-  const safetyFeats = features.filter((f) =>
-    kw(f, "safety", "blind", "backup", "camera", "alert", "warning", "assist", "brake", "lane", "collision", "monitor", "360")
-  ).map((f) => f.title);
-
-  const techFeats = features.filter((f) =>
-    kw(f, "apple", "android", "bluetooth", "wifi", "navigation", "screen", "audio", "carplay", "usb", "wireless", "touch", "bose", "harman")
-  ).map((f) => f.title);
-
-  const pkgFeats = features.filter((f) =>
-    kw(f, "package", "pkg", "edition", "bundle")
-  ).map((f) => f.title);
-
-  const interior: string[] = [
-    ks.interior_color ? `${ks.interior_color} Interior` : null,
-    ...interiorFeats,
-  ].filter(Boolean).slice(0, 6) as string[];
-
-  const exterior: string[] = [
-    ks.exterior_color ? `${ks.exterior_color} Exterior` : null,
-    ks.body_style || null,
-    ...exteriorFeats,
-  ].filter(Boolean).slice(0, 6) as string[];
-
-  return {
-    powertrain: powertrain.slice(0, 6),
-    interior: interior.slice(0, 6),
-    exterior: exterior.slice(0, 6),
-    safety: safetyFeats.slice(0, 6),
-    technology: techFeats.slice(0, 6),
-    packages: pkgFeats.slice(0, 6),
-  };
-}
-
 // ── SVG: Semicircular market gauge ─────────────────────────────
 const MarketGauge = ({ price, avg }: { price: number; avg: number }) => {
   const ratio = avg > 0 ? price / avg : 1;
@@ -148,49 +79,6 @@ const MarketGauge = ({ price, avg }: { price: number; avg: number }) => {
   );
 };
 
-// ── SVG: Demand speedometer ─────────────────────────────────────
-const DemandMeter = ({ level, color }: { level: number; color: string }) => {
-  const angleDeg = level * 180;
-  const rad = ((angleDeg - 180) * Math.PI) / 180;
-  const nx = 50 + 36 * Math.cos(rad);
-  const ny = 50 + 36 * Math.sin(rad);
-  return (
-    <svg viewBox="0 0 100 56" className="w-44">
-      <path d="M 10 50 A 40 40 0 0 1 37 14" fill="none" stroke="#fef08a" strokeWidth="10" strokeLinecap="round" />
-      <path d="M 37 14 A 40 40 0 0 1 63 14" fill="none" stroke="#fb923c" strokeWidth="10" strokeLinecap="round" />
-      <path d="M 63 14 A 40 40 0 0 1 90 50" fill="none" stroke="#dc2626" strokeWidth="10" strokeLinecap="round" />
-      <line x1="50" y1="50" x2={nx.toFixed(1)} y2={ny.toFixed(1)}
-        stroke="#1e293b" strokeWidth="2.5" strokeLinecap="round" />
-      <circle cx="50" cy="50" r="3.5" fill="#1e293b" />
-    </svg>
-  );
-};
-
-// ── Mini vertical bar chart ────────────────────────────────────
-const PriceBars = ({ low, price, high }: { low: number; price: number; high: number }) => {
-  const range = high - low || 1;
-  const bars = [
-    { label: "Low", val: low, h: 30 },
-    { label: "Avg", val: (low + high) / 2, h: 55 },
-    { label: "Yours", val: price, h: Math.max(20, Math.min(70, ((price - low) / range) * 60 + 15)), highlight: true },
-    { label: "High", val: high, h: 80 },
-  ];
-  return (
-    <div className="flex items-end gap-2 h-20 mt-3">
-      {bars.map((b) => (
-        <div key={b.label} className="flex flex-col items-center gap-1 flex-1">
-          <span className="text-[9px] text-slate-500 font-semibold">{fmt$(b.val)}</span>
-          <div
-            className={`w-full rounded-t ${b.highlight ? "bg-blue-500" : "bg-slate-200"}`}
-            style={{ height: b.h }}
-          />
-          <span className={`text-[9px] font-bold ${b.highlight ? "text-blue-600" : "text-slate-400"}`}>{b.label}</span>
-        </div>
-      ))}
-    </div>
-  );
-};
-
 // ── TrustBadge ─────────────────────────────────────────────────
 const TrustBadge = ({
   icon: Icon, label, sub, state,
@@ -215,78 +103,6 @@ const TrustBadge = ({
           {state !== "neutral" && <CheckCircle2 className={`w-3.5 h-3.5 shrink-0 ${c.check}`} />}
         </div>
         <p className="text-xs text-slate-500 truncate">{sub}</p>
-      </div>
-    </div>
-  );
-};
-
-// ── Build category card ─────────────────────────────────────────
-const BuildCard = ({ icon: Icon, title, items }: {
-  icon: React.ElementType; title: string; items: string[];
-}) => (
-  <div className="border border-slate-200 rounded-2xl p-5">
-    <div className="flex items-center gap-2 mb-4">
-      <div className="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center">
-        <Icon className="w-4 h-4 text-slate-600" />
-      </div>
-      <p className="text-sm font-black text-slate-900 uppercase tracking-wide">{title}</p>
-    </div>
-    {items.length > 0 ? (
-      <ul className="space-y-1.5">
-        {items.map((item) => (
-          <li key={item} className="flex items-start gap-2 text-sm text-slate-700">
-            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 mt-0.5 shrink-0" />
-            {item}
-          </li>
-        ))}
-      </ul>
-    ) : (
-      <p className="text-sm text-slate-400 italic">See dealer for full details</p>
-    )}
-  </div>
-);
-
-// ── Document card ───────────────────────────────────────────────
-const DocCard = ({
-  icon: Icon, title, status, date, url,
-}: {
-  icon: React.ElementType; title: string; status: "on_file" | "available" | "pending";
-  date?: string | null; url?: string | null;
-}) => {
-  const statusCfg = {
-    on_file:   { text: "On File",   cls: "text-emerald-700 bg-emerald-50 border-emerald-200" },
-    available: { text: "Available", cls: "text-blue-700 bg-blue-50 border-blue-200" },
-    pending:   { text: "Pending",   cls: "text-amber-700 bg-amber-50 border-amber-200" },
-  }[status];
-  return (
-    <div className="border border-slate-200 rounded-2xl p-4 flex flex-col">
-      <div className="flex items-start gap-3 mb-3">
-        <div className="w-10 h-10 rounded-xl bg-slate-100 flex items-center justify-center shrink-0">
-          <Icon className="w-5 h-5 text-slate-600" />
-        </div>
-        <div className="min-w-0">
-          <p className="text-sm font-bold text-slate-900 leading-tight">{title}</p>
-          {date && <p className="text-xs text-slate-400 mt-0.5">Verified {date}</p>}
-        </div>
-      </div>
-      <div className="flex items-center justify-between mt-auto pt-2 border-t border-slate-100">
-        <span className={`text-xs font-semibold px-2 py-0.5 rounded-full border ${statusCfg.cls}`}>
-          {statusCfg.text}
-        </span>
-        {url ? (
-          <a
-            href={url}
-            target="_blank"
-            rel="noreferrer"
-            className="text-xs font-semibold text-blue-600 hover:underline flex items-center gap-1"
-          >
-            View <ExternalLink className="w-3 h-3" />
-          </a>
-        ) : (
-          <button className="text-xs font-semibold text-blue-600 hover:underline flex items-center gap-1">
-            View <ExternalLink className="w-3 h-3" />
-          </button>
-        )}
       </div>
     </div>
   );
@@ -391,8 +207,6 @@ const PublicListingBody = () => {
   const [photoIdx, setPhotoIdx] = useState(0);
   const [inquiryOpen, setInquiryOpen] = useState(false);
   const [zipInput, setZipInput] = useState("");
-  const [tradeTab, setTradeTab] = useState<"vin" | "plate">("vin");
-  const [tradeInput, setTradeInput] = useState("");
   const [lightboxOpen, setLightboxOpen] = useState(false);
   const [touchStart, setTouchStart] = useState<number | null>(null);
 
@@ -435,7 +249,7 @@ const PublicListingBody = () => {
     if (listing.features && listing.features.length > 0) {
       return listing.features.filter((f) =>
         !/blind|backup|camera|alert|warning|apple|android|bluetooth|wifi|navigation|screen|audio|carplay|usb|seat|leather|heat|cool|moonroof|sunroof|wheel|alloy|led|headlight|package|pkg/i.test(f.title)
-      ).slice(0, 6);
+      ).slice(0, 8);
     }
     const rows: { icon: React.ElementType; title: string; subtitle?: string | null }[] = [];
     if (ks.engine) rows.push({ icon: Cog, title: ks.engine, subtitle: "Engine" });
@@ -444,10 +258,8 @@ const PublicListingBody = () => {
     if (ks.fuel) rows.push({ icon: Fuel, title: ks.fuel, subtitle: "Fuel" });
     if (ks.body_style) rows.push({ icon: Car, title: ks.body_style, subtitle: "Body Style" });
     if (ks.exterior_color) rows.push({ icon: Wind, title: ks.exterior_color, subtitle: "Color" });
-    return rows.slice(0, 6);
+    return rows.slice(0, 8);
   }, [listing]);
-
-  const buildCategories = useMemo(() => listing ? getBuildCategories(listing) : null, [listing]);
 
   useEffect(() => {
     if (!gallery.length) return;
@@ -507,7 +319,6 @@ const PublicListingBody = () => {
   const recallCount = listing.open_recall_count ?? 0;
   const ownerCount = (mc.owner_count as number) ?? null;
   const accidentCount = (mc.accident_count as number) ?? null;
-  const similarCount = (mc.similar_count as number) ?? null;
 
   const warrantyStr = (() => {
     const w = listing.warranty_info;
@@ -518,7 +329,6 @@ const PublicListingBody = () => {
   })();
 
   const rating = deriveVehicleRating(accidentCount ?? 0, ownerCount ?? 1, recallCount, serviceCount);
-  const demand = deriveDemandScore(mp, price, similarCount);
 
   const ymm = listing.ymm || "";
   const [ymmYear, ...ymmRest] = ymm.split(" ");
@@ -531,47 +341,17 @@ const PublicListingBody = () => {
     } catch { /* cancelled */ }
   };
 
-  // Service record timeline events
-  const serviceEvents = (listing.service_records || []).map((r) => ({
-    date: r.date || "On File",
-    type: r.type || "Service",
-    notes: r.notes || "",
-    mileage: r.mileage || null,
-  }));
-
-  // Document cards configuration
-  const today = new Date().toLocaleDateString("en-US", { month: "2-digit", day: "2-digit", year: "numeric" });
-  const docCards = [
-    {
-      icon: FileText, title: "OEM Window Sticker", key: "oem_sticker",
-      status: listing.oem_sticker_url ? "on_file" : "available" as const,
-      url: listing.oem_sticker_url,
-    },
-    {
-      icon: Shield, title: "FTC Buyers Guide", key: "buyers_guide",
-      status: "on_file" as const, date: today, url: null,
-    },
-    {
-      icon: CheckCircle2, title: "Inspection Report", key: "inspection",
-      status: listing.prep_status?.foreman_signed_at ? "on_file" : "available" as const,
-      date: listing.prep_status?.foreman_signed_at
-        ? new Date(listing.prep_status.foreman_signed_at).toLocaleDateString("en-US", { month: "2-digit", day: "2-digit", year: "numeric" })
-        : null,
-      url: null,
-    },
-    {
-      icon: BarChart3, title: "CARFAX Report", key: "carfax",
-      status: "available" as const, url: null,
-    },
-    {
-      icon: ShieldCheck, title: "Factory Warranty", key: "warranty",
-      status: warrantyStr ? "on_file" : "pending" as const, url: null,
-    },
-    {
-      icon: FileText, title: "Addendum Sticker", key: "addendum",
-      status: (listing.documents || []).some((d) => d.type === "sticker") ? "on_file" : "available" as const,
-      url: (listing.documents || []).find((d) => d.type === "sticker")?.url || null,
-    },
+  const specRows: [string, string | null | undefined][] = [
+    ["Trim", listing.trim],
+    ["Mileage", listing.mileage != null ? `${listing.mileage.toLocaleString()} mi` : null],
+    ["Transmission", ks.transmission],
+    ["Drivetrain", ks.drivetrain],
+    ["Engine", ks.engine],
+    ["Exterior Color", ks.exterior_color],
+    ["Interior Color", ks.interior_color],
+    ["Fuel Type", ks.fuel],
+    ks.mpg_city && ks.mpg_hwy ? ["MPG (est.)", `${ks.mpg_city} city / ${ks.mpg_hwy} hwy`] : ["", null],
+    ["VIN", listing.vin],
   ];
 
   // ── Render ─────────────────────────────────────────────────
@@ -602,7 +382,7 @@ const PublicListingBody = () => {
         </div>
       </header>
 
-      {/* ══ 2. HERO CAROUSEL ════════════════════════════════════ */}
+      {/* ══ 2. HERO GALLERY ═════════════════════════════════════ */}
       <div className="relative bg-slate-900 overflow-hidden" style={{ maxHeight: 540 }}>
         {gallery.length > 0 ? (
           <div
@@ -687,14 +467,14 @@ const PublicListingBody = () => {
         </div>
       </div>
 
-      {/* ══ 4. QUICK ACTIONS + OFFERS ════════════════════════════ */}
+      {/* ══ 4. QUICK ACTIONS + ZIP ═══════════════════════════════ */}
       <div className="border-b border-slate-100 bg-white">
         <div className="max-w-6xl mx-auto px-4 py-4 flex flex-col sm:flex-row sm:items-center gap-4">
           <div className="flex gap-2 flex-1 flex-wrap">
             {[
-              { icon: FileText, label: "Documents" },
+              { icon: FileText, label: "Documents", action: () => document.getElementById("overview")?.scrollIntoView({ behavior: "smooth" }) },
               { icon: MessageSquare, label: "Contact Dealer", action: () => setInquiryOpen(true) },
-              { icon: RefreshCw, label: "Value My Trade" },
+              { icon: RefreshCw, label: "Value My Trade", action: () => setInquiryOpen(true) },
               { icon: Share2, label: "Share Vehicle", action: handleShare },
             ].map(({ icon: Icon, label, action }) => (
               <button key={label} onClick={action}
@@ -720,7 +500,7 @@ const PublicListingBody = () => {
         </div>
       </div>
 
-      {/* ══ 4b. AVAILABLE OFFERS ═════════════════════════════════ */}
+      {/* ══ 5. AVAILABLE OFFERS ══════════════════════════════════ */}
       <div className="border-b border-slate-100 bg-slate-50">
         <div className="max-w-6xl mx-auto px-4 py-4">
           <p className="text-xs font-bold text-slate-500 uppercase tracking-wide mb-3">Available Offers</p>
@@ -769,7 +549,7 @@ const PublicListingBody = () => {
         </div>
       </div>
 
-      {/* ══ 5. TRUST STRIP ════════════════════════════════════════ */}
+      {/* ══ 6. TRUST STRIP ════════════════════════════════════════ */}
       <div className="border-b border-slate-200 bg-white">
         <div className="max-w-6xl mx-auto px-4 py-5 space-y-3">
           {/* Row 1: 6 large badges */}
@@ -817,7 +597,7 @@ const PublicListingBody = () => {
         </div>
       </div>
 
-      {/* ══ 6. WHY THIS VEHICLE ══════════════════════════════════ */}
+      {/* ══ 7. WHY THIS VEHICLE ══════════════════════════════════ */}
       <div className="border-b border-slate-200 bg-white">
         <div className="max-w-6xl mx-auto px-4 py-8">
           <h2 className="text-xl font-black text-slate-900 mb-2">Why This Vehicle Stands Out</h2>
@@ -881,24 +661,15 @@ const PublicListingBody = () => {
         </div>
       </div>
 
-      {/* ══ 7. COMPLETE FACTORY BUILD ════════════════════════════ */}
-      {buildCategories && (
-        <div className="border-b border-slate-200 bg-white">
-          <div className="max-w-6xl mx-auto px-4 py-8">
-            <h2 className="text-xl font-black text-slate-900 mb-2">Complete Factory Build &amp; Equipment</h2>
-            <p className="text-sm text-slate-500 mb-6">Full equipment list decoded from factory build data and VIN.</p>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              <BuildCard icon={Cog} title="Powertrain" items={buildCategories.powertrain} />
-              <BuildCard icon={Settings} title="Interior" items={buildCategories.interior} />
-              <BuildCard icon={Car} title="Exterior" items={buildCategories.exterior} />
-              <BuildCard icon={ShieldCheck} title="Safety" items={buildCategories.safety} />
-              <BuildCard icon={Gauge} title="Technology" items={buildCategories.technology} />
-              <BuildCard icon={Award} title="Packages" items={buildCategories.packages} />
-            </div>
-            {highlights.length > 0 && (
-              <div className="mt-6 pt-5 border-t border-slate-100">
-                <h3 className="text-sm font-bold text-slate-700 mb-4">Additional Highlights</h3>
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+      {/* ══ 8. VEHICLE HIGHLIGHTS & OVERVIEW ═════════════════════ */}
+      <div id="overview" className="border-b border-slate-200 bg-white">
+        <div className="max-w-6xl mx-auto px-4 py-8">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-10">
+            {/* Left: Highlights icon grid */}
+            <div>
+              <h2 className="text-xl font-black text-slate-900 mb-5">Vehicle Highlights</h2>
+              {highlights.length > 0 ? (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   {highlights.map((h, i) => {
                     const fl = h as { icon?: string | React.ElementType; title: string; subtitle?: string | null };
                     const Icon = typeof fl.icon === "function" ? (fl.icon as React.ElementType) : Cog;
@@ -907,7 +678,7 @@ const PublicListingBody = () => {
                         <div className="w-9 h-9 rounded-xl bg-slate-100 flex items-center justify-center shrink-0">
                           <Icon className="w-4 h-4 text-slate-600" />
                         </div>
-                        <div>
+                        <div className="min-w-0">
                           <p className="text-sm font-bold text-slate-900 leading-tight">{fl.title}</p>
                           {fl.subtitle && <p className="text-xs text-slate-500">{fl.subtitle}</p>}
                         </div>
@@ -915,353 +686,36 @@ const PublicListingBody = () => {
                     );
                   })}
                 </div>
-              </div>
-            )}
-            <button className="mt-5 text-sm font-semibold text-blue-600 hover:underline flex items-center gap-1">
-              View All Features &amp; Specs <ExternalLink className="w-3.5 h-3.5" />
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* ══ 8. MARKET INTELLIGENCE ═══════════════════════════════ */}
-      {marketAvg > 0 && (
-        <div className="border-b border-slate-200 bg-white">
-          <div className="max-w-6xl mx-auto px-4 py-8">
-            <h2 className="text-xl font-black text-slate-900 mb-2">Market Intelligence</h2>
-            <p className="text-sm text-slate-500 mb-6">Real-time pricing and inventory data from MarketCheck across your region.</p>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-              {/* Market Position */}
-              <div className="border border-slate-200 rounded-2xl p-5">
-                <p className="text-xs font-bold text-slate-500 uppercase tracking-wide mb-1">Market Position</p>
-                <p className="text-lg font-black text-emerald-600 mb-3">
-                  {belowMarket > 0 ? "GREAT PRICE" : marketAvg > 0 && price <= marketAvg ? "GOOD PRICE" : "MARKET PRICE"}
-                </p>
-                <p className="text-3xl font-black text-slate-900">{fmt$(price)}</p>
-                {belowMarket > 0 && (
-                  <p className="text-sm text-emerald-700 font-semibold mt-1">
-                    You save {fmt$(belowMarket)} below market average
-                  </p>
-                )}
-                <div className="mt-4">
-                  <MarketGauge price={price} avg={marketAvg} />
-                </div>
-                {marketLow > 0 && marketHigh > 0 && (
-                  <PriceBars low={marketLow} price={price} high={marketHigh} />
-                )}
-                <button className="mt-4 text-xs font-semibold text-blue-600 hover:underline flex items-center gap-1">
-                  View Full Market Report <ExternalLink className="w-3 h-3" />
-                </button>
-              </div>
-
-              {/* Similar Vehicles Available */}
-              <div className="border border-slate-200 rounded-2xl p-5">
-                <p className="text-xs font-bold text-slate-500 uppercase tracking-wide mb-1">Similar Vehicles Available</p>
-                <p className={`text-lg font-black mb-3 ${similarCount != null && similarCount <= 5 ? "text-red-600" : "text-amber-600"}`}>
-                  {similarCount != null && similarCount <= 5 ? "LOW INVENTORY" : "LIMITED INVENTORY"}
-                </p>
-                <p className="text-3xl font-black text-slate-900">
-                  {similarCount ?? "—"} <span className="text-base font-normal text-slate-500">vehicles</span>
-                </p>
-                <p className="text-sm text-slate-500 mt-1">within 100 miles</p>
-                {/* Scarcity bar chart */}
-                <div className="mt-5 space-y-2">
-                  {[
-                    { label: "This Model + Trim", pct: similarCount != null ? Math.min(100, similarCount * 8) : 30 },
-                    { label: "This Model", pct: similarCount != null ? Math.min(100, similarCount * 15) : 60 },
-                    { label: "Same Price Range", pct: 75 },
-                  ].map(({ label, pct }) => (
-                    <div key={label}>
-                      <div className="flex justify-between text-xs text-slate-500 mb-1">
-                        <span>{label}</span><span>{pct}%</span>
-                      </div>
-                      <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
-                        <div className="h-full bg-blue-500 rounded-full transition-all" style={{ width: `${pct}%` }} />
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* Days to Sell */}
-              <div className="border border-slate-200 rounded-2xl p-5">
-                <p className="text-xs font-bold text-slate-500 uppercase tracking-wide mb-1">Days To Sell (This Model)</p>
-                <p className="text-lg font-black text-blue-600 mb-3">SELLS FAST</p>
-                <p className="text-3xl font-black text-slate-900">
-                  {(mc.days_on_market as number) ?? 22}{" "}
-                  <span className="text-base font-normal text-slate-500">days on market average</span>
-                </p>
-                <div className="my-4">
-                  <DemandMeter level={0.75} color="#2563eb" />
-                  <div className="flex justify-between text-xs text-slate-400 mt-1">
-                    <span>Slow</span><span>Fast</span>
-                  </div>
-                </div>
-                <button className="text-xs font-semibold text-blue-600 hover:underline flex items-center gap-1">
-                  View Mkt Trends <ExternalLink className="w-3 h-3" />
-                </button>
-              </div>
-
-              {/* What Others Paid */}
-              <div className="border border-slate-200 rounded-2xl p-5">
-                <p className="text-xs font-bold text-slate-500 uppercase tracking-wide mb-1">What Others Paid</p>
-                <p className="text-lg font-black text-slate-700 mb-3">AVG SELLING PRICE</p>
-                <p className="text-3xl font-black text-slate-900">{fmt$(marketAvg)}</p>
-                <p className="text-sm text-slate-500 mt-1">in your market last 30 days</p>
-                {marketLow > 0 && marketHigh > 0 && (
-                  <PriceBars low={marketLow} price={price} high={marketHigh} />
-                )}
-                {belowMarket > 0 && (
-                  <div className="mt-4 p-3 bg-emerald-50 rounded-xl border border-emerald-100">
-                    <p className="text-sm font-bold text-emerald-700">
-                      This vehicle is priced {fmt$(belowMarket)} below the average paid in your market.
-                    </p>
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ══ 9. VEHICLE HISTORY & TRANSPARENCY ═══════════════════ */}
-      <div className="border-b border-slate-200 bg-white">
-        <div className="max-w-6xl mx-auto px-4 py-8">
-          <h2 className="text-xl font-black text-slate-900 mb-2">Vehicle History &amp; Transparency</h2>
-          <p className="text-sm text-slate-500 mb-6">Full ownership, service, and event history for this vehicle.</p>
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-            {/* Left: Summary cards */}
-            <div className="space-y-3">
-              {[
-                {
-                  icon: User, title: "Ownership",
-                  value: ownerCount != null ? `${ownerCount}-Owner` : "1-Owner",
-                  detail: "Personal Use",
-                  state: (ownerCount ?? 1) <= 2 ? "good" : "warn",
-                },
-                {
-                  icon: AlertTriangle, title: "Accident History",
-                  value: accidentCount === 0 || accidentCount == null ? "No Accidents" : `${accidentCount} Accident${(accidentCount ?? 1) > 1 ? "s" : ""}`,
-                  detail: accidentCount === 0 || accidentCount == null ? "AutoCheck Verified" : "See Full Report",
-                  state: accidentCount != null && accidentCount > 0 ? "warn" : "good",
-                },
-                {
-                  icon: FileText, title: "Title Status",
-                  value: "Clean Title / No Liens",
-                  detail: "No Brands or Issues",
-                  state: "good",
-                },
-                {
-                  icon: Wrench, title: "Service History",
-                  value: serviceCount > 0 ? `${serviceCount} Records on File` : "Available on Request",
-                  detail: serviceCount > 0 ? "Full History Available" : "Contact Dealer",
-                  state: serviceCount > 0 ? "good" : "neutral",
-                },
-              ].map((item) => {
-                const Icon = item.icon;
-                const colors = {
-                  good: "text-emerald-600 bg-emerald-50",
-                  warn: "text-amber-600 bg-amber-50",
-                  neutral: "text-slate-500 bg-slate-100",
-                }[item.state as string] || "text-slate-500 bg-slate-100";
-                return (
-                  <div key={item.title} className="flex items-center gap-4 p-4 border border-slate-200 rounded-2xl">
-                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${colors}`}>
-                      <Icon className="w-5 h-5" />
-                    </div>
-                    <div className="flex-1">
-                      <p className="text-xs text-slate-500 font-semibold">{item.title}</p>
-                      <p className="text-sm font-black text-slate-900">{item.value}</p>
-                    </div>
-                    <p className="text-xs text-slate-500 text-right">{item.detail}</p>
-                  </div>
-                );
-              })}
-            </div>
-
-            {/* Right: Timeline */}
-            <div>
-              <p className="text-sm font-bold text-slate-700 mb-4">Service &amp; Event Timeline</p>
-              {serviceEvents.length > 0 ? (
-                <div className="relative pl-6">
-                  <div className="absolute left-2.5 top-0 bottom-0 w-0.5 bg-slate-100" />
-                  {serviceEvents.map((ev, i) => (
-                    <div key={i} className="relative mb-5 last:mb-0">
-                      <div className="absolute -left-4 top-1 w-3 h-3 rounded-full bg-blue-500 border-2 border-white shadow" />
-                      <div className="border border-slate-200 rounded-xl p-3.5 ml-1">
-                        <div className="flex items-start justify-between gap-2 mb-1">
-                          <p className="text-xs font-black text-slate-900 uppercase tracking-wide">{ev.type}</p>
-                          <p className="text-[11px] text-slate-400 shrink-0">{ev.date}</p>
-                        </div>
-                        {ev.notes && <p className="text-xs text-slate-600">{ev.notes}</p>}
-                        {ev.mileage && <p className="text-[11px] text-slate-400 mt-1">{Number(ev.mileage).toLocaleString()} mi</p>}
-                      </div>
-                    </div>
-                  ))}
-                </div>
               ) : (
-                <div className="relative pl-6">
-                  <div className="absolute left-2.5 top-0 bottom-0 w-0.5 bg-slate-100" />
-                  {[
-                    { icon: History, label: "Original Sale", date: "On File", sub: "Registered · Original Sale" },
-                    { icon: Wrench, label: "Service Visit", date: "On File", sub: "Oil & Filter Change" },
-                    { icon: CheckCircle2, label: "Vehicle Detailed", date: "On File", sub: "Full Detail & Reconditioning" },
-                    { icon: ShieldCheck, label: "Inspection", date: "On File", sub: "162 Point Inspection Completed" },
-                  ].map((ev, i) => {
-                    const Icon = ev.icon;
-                    return (
-                      <div key={i} className="relative mb-5 last:mb-0">
-                        <div className="absolute -left-4 top-1 w-3 h-3 rounded-full bg-blue-500 border-2 border-white shadow" />
-                        <div className="border border-slate-200 rounded-xl p-3.5 ml-1">
-                          <div className="flex items-start justify-between gap-2 mb-1">
-                            <p className="text-xs font-black text-slate-900 uppercase tracking-wide">{ev.label}</p>
-                            <p className="text-[11px] text-slate-400 shrink-0">{ev.date}</p>
-                          </div>
-                          <p className="text-xs text-slate-600">{ev.sub}</p>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
+                <p className="text-sm text-slate-400 italic">See dealer for full equipment list.</p>
               )}
-              <button className="mt-4 text-sm font-semibold text-blue-600 hover:underline flex items-center gap-1">
-                View Full History Report <ExternalLink className="w-3.5 h-3.5" />
-              </button>
             </div>
-          </div>
-        </div>
-      </div>
 
-      {/* ══ 10. VEHICLE OVERVIEW (description + specs) ═══════════ */}
-      {(listing.description || ks.transmission || ks.exterior_color) && (
-        <div className="border-b border-slate-200 bg-white">
-          <div className="max-w-6xl mx-auto px-4 py-8">
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-              <div className="lg:col-span-2">
-                <h2 className="text-xl font-black text-slate-900 mb-3">Vehicle Overview</h2>
-                {listing.description && (
-                  <p className="text-sm text-slate-600 leading-relaxed mb-5">{listing.description}</p>
-                )}
-                {(ks.transmission || ks.exterior_color || ks.fuel || ks.interior_color) && (
-                  <div className="grid grid-cols-2 gap-x-8 gap-y-2.5 border-t border-slate-100 pt-4">
-                    {[
-                      ["Trim", listing.trim],
-                      ["Transmission", ks.transmission],
-                      ["Exterior Color", ks.exterior_color],
-                      ["Fuel Type", ks.fuel],
-                      ["Interior Color", ks.interior_color],
-                      ks.mpg_city && ks.mpg_hwy ? ["MPG (est.)", `${ks.mpg_city} city / ${ks.mpg_hwy} hwy`] : null,
-                    ].filter(Boolean).map(([label, val]) =>
-                      val ? (
-                        <div key={label} className="flex justify-between text-sm border-b border-slate-50 pb-1.5">
-                          <span className="text-slate-500">{label}</span>
-                          <span className="font-semibold text-slate-900 text-right">{val}</span>
-                        </div>
-                      ) : null,
-                    )}
+            {/* Right: Overview description + spec table + image */}
+            <div>
+              <h2 className="text-xl font-black text-slate-900 mb-3">Vehicle Overview</h2>
+              {listing.description && (
+                <p className="text-sm text-slate-600 leading-relaxed mb-5">{listing.description}</p>
+              )}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-2.5 border-t border-slate-100 pt-4">
+                {specRows.filter(([, val]) => val).map(([label, val]) => (
+                  <div key={label} className="flex justify-between text-sm border-b border-slate-50 pb-1.5">
+                    <span className="text-slate-500">{label}</span>
+                    <span className="font-semibold text-slate-900 text-right truncate ml-2">{val}</span>
                   </div>
-                )}
-              </div>
-              {gallery[1] && (
-                <div className="rounded-2xl overflow-hidden border border-slate-100">
-                  <img src={gallery[1]} alt={ymm} className="w-full h-full object-cover" style={{ maxHeight: 220 }} />
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ══ 11. DOCUMENT CENTER ══════════════════════════════════ */}
-      <div className="border-b border-slate-200 bg-white">
-        <div className="max-w-6xl mx-auto px-4 py-8">
-          <h2 className="text-xl font-black text-slate-900 mb-2">Vehicle Documents</h2>
-          <p className="text-sm text-slate-500 mb-6">All key documents for this vehicle — view, download, or request on file.</p>
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-3 gap-4">
-            {docCards.map((doc) => (
-              <DocCard
-                key={doc.key}
-                icon={doc.icon}
-                title={doc.title}
-                status={doc.status}
-                date={doc.date ?? null}
-                url={doc.url ?? null}
-              />
-            ))}
-          </div>
-          {/* Additional dealer-attached documents */}
-          {(listing.documents || []).filter((d) => d.type !== "sticker").length > 0 && (
-            <div className="mt-5 pt-5 border-t border-slate-100">
-              <p className="text-sm font-bold text-slate-700 mb-3">Additional Documents</p>
-              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
-                {listing.documents.filter((d) => d.type !== "sticker").map((doc) => (
-                  <a key={doc.url} href={doc.url} target="_blank" rel="noreferrer"
-                    className="flex items-center gap-2.5 p-3 border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors">
-                    <FileText className="w-4 h-4 text-slate-500 shrink-0" />
-                    <span className="text-xs font-semibold text-slate-700 truncate">{doc.name}</span>
-                  </a>
                 ))}
               </div>
+              {(gallery[1] || gallery[0]) && (
+                <div className="mt-6 rounded-2xl overflow-hidden border border-slate-100">
+                  <img src={gallery[1] || gallery[0]} alt={ymm} className="w-full object-cover" style={{ maxHeight: 240 }} />
+                </div>
+              )}
             </div>
-          )}
-        </div>
-      </div>
-
-      {/* ══ 12. TRADE VALUE MODULE ═══════════════════════════════ */}
-      <div id="trade-module" className="bg-slate-900">
-        <div className="max-w-6xl mx-auto px-4 py-10">
-          <div className="flex flex-col lg:flex-row items-start justify-between gap-8">
-            <div className="text-white flex-1">
-              <h2 className="text-3xl font-black mb-2">What's Your Trade Worth?</h2>
-              <p className="text-slate-400 text-sm mb-6">Get a real offer in minutes with no obligation.</p>
-              {/* Tab toggle */}
-              <div className="flex bg-slate-800 rounded-xl p-1 gap-1 w-fit mb-4">
-                <button
-                  onClick={() => setTradeTab("vin")}
-                  className={`px-4 py-2 text-sm font-semibold rounded-lg transition-colors ${tradeTab === "vin" ? "bg-white text-slate-900" : "text-slate-400 hover:text-white"}`}
-                >
-                  By VIN
-                </button>
-                <button
-                  onClick={() => setTradeTab("plate")}
-                  className={`px-4 py-2 text-sm font-semibold rounded-lg transition-colors ${tradeTab === "plate" ? "bg-white text-slate-900" : "text-slate-400 hover:text-white"}`}
-                >
-                  By License Plate
-                </button>
-              </div>
-              <div className="flex gap-2">
-                <input
-                  value={tradeInput}
-                  onChange={(e) => setTradeInput(e.target.value)}
-                  placeholder={tradeTab === "vin" ? "Enter VIN Number" : "Enter License Plate"}
-                  className="flex-1 max-w-xs bg-slate-800 border border-slate-700 text-white placeholder-slate-500 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-                <button
-                  onClick={() => {
-                    if (!tradeInput.trim()) { toast.error("Please enter a VIN or license plate"); return; }
-                    toast.success("Connecting to trade valuation — dealer will follow up shortly");
-                  }}
-                  className="bg-blue-600 hover:bg-blue-500 text-white font-bold px-5 py-3 rounded-xl text-sm transition-colors whitespace-nowrap"
-                >
-                  Get My Trade Value
-                </button>
-              </div>
-              <div className="flex gap-4 mt-4 text-xs text-slate-500">
-                <span className="flex items-center gap-1"><ShieldCheck className="w-3.5 h-3.5" />100% Secure</span>
-                <span className="flex items-center gap-1"><CreditCard className="w-3.5 h-3.5" />No Credit Impact</span>
-                <span className="flex items-center gap-1"><CheckCircle2 className="w-3.5 h-3.5" />Real Market Offers</span>
-              </div>
-            </div>
-            {gallery[2] && (
-              <div className="shrink-0 lg:w-64 rounded-2xl overflow-hidden opacity-60">
-                <img src={gallery[2]} alt={ymm} className="w-full h-48 object-cover" />
-              </div>
-            )}
           </div>
         </div>
       </div>
 
-      {/* ══ 13. CUSTOMER REVIEWS ═════════════════════════════════ */}
+      {/* ══ 9. CUSTOMER REVIEWS ═══════════════════════════════════ */}
       <div className="border-b border-slate-200 bg-white">
         <div className="max-w-6xl mx-auto px-4 py-8">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
@@ -1316,7 +770,7 @@ const PublicListingBody = () => {
         </div>
       </div>
 
-      {/* ══ 14. DEALER CTA ═══════════════════════════════════════ */}
+      {/* ══ 10. DEALER CTA ════════════════════════════════════════ */}
       <div className="bg-blue-700">
         <div className="max-w-6xl mx-auto px-4 py-12">
           <div className="flex flex-col lg:flex-row items-start justify-between gap-10">
@@ -1335,8 +789,8 @@ const PublicListingBody = () => {
                   Contact Dealer
                 </button>
                 <button
-                  className="flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-500 border border-white/30 text-white font-bold px-6 py-4 rounded-xl transition-colors text-sm"
-                  onClick={() => document.getElementById("trade-module")?.scrollIntoView({ behavior: "smooth" })}>
+                  onClick={() => setInquiryOpen(true)}
+                  className="flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-500 border border-white/30 text-white font-bold px-6 py-4 rounded-xl transition-colors text-sm">
                   <RefreshCw className="w-5 h-5" />
                   Value My Trade
                 </button>
@@ -1364,7 +818,7 @@ const PublicListingBody = () => {
         </div>
       </div>
 
-      {/* ══ 15. FOOTER ════════════════════════════════════════════ */}
+      {/* ══ 11. FOOTER ════════════════════════════════════════════ */}
       <footer className="border-t border-slate-200 bg-white">
         <div className="max-w-6xl mx-auto px-4 py-5 flex flex-col sm:flex-row items-center justify-between gap-3">
           {(dealer.logo_url as string) ? (
@@ -1388,7 +842,8 @@ const PublicListingBody = () => {
           <p className="text-[10px] text-slate-500">{priceLabel}</p>
           <p className="text-base font-black text-slate-900">{fmt$(price || undefined)}</p>
         </button>
-        <button className="flex-1 h-11 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-xl flex items-center justify-center gap-1.5 transition-colors">
+        <button onClick={() => setInquiryOpen(true)}
+          className="flex-1 h-11 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-xl flex items-center justify-center gap-1.5 transition-colors">
           <RefreshCw className="w-4 h-4" /> Value My Trade
         </button>
         <button onClick={() => setInquiryOpen(true)}
@@ -1397,6 +852,7 @@ const PublicListingBody = () => {
         </button>
       </div>
 
+      {/* ══ Lightbox modal ═══════════════════════════════════════ */}
       {lightboxOpen && gallery.length > 0 && (
         <div
           className="fixed inset-0 z-[60] flex items-center justify-center bg-black/95"
