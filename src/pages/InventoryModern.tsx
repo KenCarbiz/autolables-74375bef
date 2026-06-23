@@ -944,20 +944,26 @@ const RecallChip = ({ status, open }: { status?: string | null; open?: number | 
   return <span className="inline-flex items-center text-[10px] font-semibold px-1.5 py-0.5 rounded bg-muted text-muted-foreground">Recall Pending</span>;
 };
 
-const PortalChip = ({ status }: { status: VehicleRow["status"] }) =>
-  status === "published"
-    ? <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700"><span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />Live</span>
+const PortalChip = ({ status }: { status: VehicleRow["status"] }) => {
+  const cfg = status === "published"
+    ? { cls: "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200/70", dot: "bg-emerald-500", label: "Live" }
     : status === "archived"
-      ? <span className="inline-flex items-center text-[10px] font-semibold px-1.5 py-0.5 rounded bg-slate-100 text-slate-600">Archived</span>
-      : <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded bg-slate-100 text-slate-600"><span className="w-1.5 h-1.5 rounded-full bg-slate-400" />Draft</span>;
+      ? { cls: "bg-slate-100 text-slate-600 ring-1 ring-slate-200", dot: "bg-slate-400", label: "Archived" }
+      : { cls: "bg-slate-50 text-slate-700 ring-1 ring-slate-200", dot: "bg-slate-400", label: "Not Live" };
+  return (
+    <span className={`inline-flex items-center gap-1.5 text-[11px] font-semibold px-2 py-1 rounded-lg ${cfg.cls}`}>
+      <span className={`w-1.5 h-1.5 rounded-full ${cfg.dot}`} />{cfg.label}
+    </span>
+  );
+};
 
 // Simple status pill — only Draft / Published / Archived.
 const SimpleStatusPill = ({ status }: { status: VehicleRow["status"] }) => {
   const cfg = status === "published"
-    ? { cls: "bg-slate-100 text-slate-700", dot: "bg-emerald-500", label: "Published" }
+    ? { cls: "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200/70", dot: "bg-emerald-500", label: "Published" }
     : status === "archived"
-      ? { cls: "bg-slate-100 text-slate-600", dot: "bg-slate-400", label: "Archived" }
-      : { cls: "bg-slate-100 text-slate-700", dot: "bg-slate-400", label: "Draft" };
+      ? { cls: "bg-slate-100 text-slate-600 ring-1 ring-slate-200", dot: "bg-slate-400", label: "Archived" }
+      : { cls: "bg-amber-50 text-amber-700 ring-1 ring-amber-200/70", dot: "bg-amber-500", label: "Draft" };
   return (
     <span className={`inline-flex items-center gap-1.5 text-[11px] font-semibold px-2 py-1 rounded-lg ${cfg.cls}`}>
       <span className={`w-1.5 h-1.5 rounded-full ${cfg.dot}`} />{cfg.label}
