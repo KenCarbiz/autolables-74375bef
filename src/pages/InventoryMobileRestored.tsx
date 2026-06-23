@@ -325,7 +325,7 @@ function MobileMetricCard({ title, value, subtitle, link, icon: Icon, tone, onCl
       </div>
       <div className={`mt-6 text-[48px] font-black leading-none tracking-tight ${toneMap[tone].value}`}>{value}</div>
       <div className="mt-2 text-[18px] font-medium text-slate-500">{subtitle}</div>
-      <div className="mt-8 text-[17px] font-black text-blue-700">{link} -></div>
+      <div className="mt-8 text-[17px] font-black text-blue-700">{link} {'->'}</div>
     </button>
   );
 }
