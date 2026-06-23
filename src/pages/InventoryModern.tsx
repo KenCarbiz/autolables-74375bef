@@ -82,6 +82,13 @@ const InventoryModern = () => {
   const { createGetReady } = useGetReady(tenant?.id || "");
   const { settings } = useDealerSettings();
   const { byVin } = useAdvertisedPrices(tenant?.id || "");
+  const queryClient = useQueryClient();
+
+  // Broadcasts to the AppShell top bar so "Synced X ago" updates immediately
+  // after any inventory sync, without waiting for the DB row to round-trip.
+  const broadcastSynced = (kind: "prices" | "recalls" | "market", extra?: Record<string, unknown>) => {
+    window.dispatchEvent(new CustomEvent("inventory-synced", { detail: { at: new Date().toISOString(), kind, ...extra } }));
+  };
 
   const sendToGetReady = async (r: { id: string; vin: string | null; ymm: string | null; condition: string | null }) => {
     const rec = await createGetReady({
