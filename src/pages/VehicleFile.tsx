@@ -222,20 +222,35 @@ const VehicleFile = () => {
   const safeImg = gallery.length ? Math.min(imgIdx, gallery.length - 1) : 0;
 
   return (
-    <div className="p-4 lg:p-6 max-w-[1400px] mx-auto space-y-4 pb-24 lg:pb-6">
+    <div className="p-4 lg:px-8 lg:py-6 max-w-[1680px] mx-auto space-y-6 pb-24 lg:pb-8">
       {/* Hero / header */}
       <div>
-        <button
-          onClick={() => navigate("/inventory")}
-          className="text-xs text-muted-foreground hover:text-foreground inline-flex items-center gap-1"
-        >
-          <ArrowLeft className="w-3 h-3" />
-          Inventory
-        </button>
-        <div className="mt-2 rounded-2xl border border-border bg-card shadow-sm overflow-hidden">
-          <div className="flex flex-col md:flex-row">
+        <div className="flex items-center justify-between">
+          <button
+            onClick={() => navigate("/inventory")}
+            className="text-xs font-semibold text-muted-foreground hover:text-foreground inline-flex items-center gap-1.5"
+          >
+            <ArrowLeft className="w-3.5 h-3.5" />
+            Back to Inventory
+          </button>
+          {publicUrl && (
+            <div className="hidden lg:flex items-center gap-2">
+              <a
+                href={publicUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="h-9 px-3 rounded-lg border border-border bg-background hover:bg-muted text-xs font-semibold inline-flex items-center gap-1.5"
+              >
+                <ExternalLink className="w-3.5 h-3.5" /> Open in new tab
+              </a>
+            </div>
+          )}
+        </div>
+
+        <div className="mt-3 rounded-2xl border border-border bg-card shadow-sm overflow-hidden">
+          <div className="flex flex-col lg:flex-row gap-0 p-6 lg:p-8">
             {/* Vehicle photo */}
-            <div className={`md:w-[240px] lg:w-[280px] shrink-0 h-44 md:h-auto flex items-center justify-center bg-gradient-to-br ${
+            <div className={`lg:w-[340px] shrink-0 h-52 lg:h-56 rounded-xl overflow-hidden flex items-center justify-center bg-gradient-to-br ${
               vehicle.condition === "new" ? "from-blue-500/15 to-blue-600/5 text-blue-600" :
               vehicle.condition === "cpo" ? "from-violet-500/15 to-violet-600/5 text-violet-600" :
               "from-slate-400/15 to-slate-500/5 text-slate-500"
@@ -256,61 +271,61 @@ const VehicleFile = () => {
               )}
             </div>
 
-            <div className="flex-1 p-5 min-w-0">
-              <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4">
-                <div className="space-y-1 min-w-0">
+            <div className="flex-1 lg:pl-8 pt-5 lg:pt-0 min-w-0 flex flex-col">
+              <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-5">
+                <div className="space-y-2 min-w-0 flex-1">
                   <div className="flex items-center gap-2 flex-wrap">
-                    <span className={`text-[10px] font-bold uppercase tracking-label px-2 py-0.5 rounded ${
+                    <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded ${
                       vehicle.condition === "new" ? "bg-blue-100 text-blue-700" :
                       vehicle.condition === "cpo" ? "bg-violet-100 text-violet-700" :
                       "bg-slate-100 text-slate-700"
                     }`}>{vehicle.condition || "unknown"}</span>
-                    <span className={`text-[10px] font-bold uppercase tracking-label px-2 py-0.5 rounded ${
+                    <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded ${
                       vehicle.status === "published" ? "bg-emerald-100 text-emerald-700" :
                       vehicle.status === "archived" ? "bg-slate-100 text-slate-500" :
                       "bg-amber-100 text-amber-700"
                     }`}>{vehicle.status}</span>
                     {vehicle.prep_status?.foreman_signed_at ? (
-                      <span className="text-[10px] font-bold uppercase tracking-label px-2 py-0.5 rounded bg-emerald-100 text-emerald-700 inline-flex items-center gap-1">
+                      <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-emerald-100 text-emerald-700 inline-flex items-center gap-1">
                         <CheckCircle2 className="w-2.5 h-2.5" />
                         Prep signed
                       </span>
                     ) : null}
                   </div>
-                  <h1 className="text-2xl font-black tracking-tight font-display text-foreground">
+                  <h1 className="text-3xl lg:text-4xl font-black tracking-tight font-display text-foreground leading-tight">
                     {vehicle.ymm || "(needs VIN decode)"}
                     {vehicle.trim ? <span className="text-muted-foreground font-normal ml-2">{vehicle.trim}</span> : null}
                   </h1>
-                  <div className="flex flex-wrap items-center gap-x-5 gap-y-1 text-xs text-muted-foreground mt-2">
-                    <span className="font-mono">{vehicle.vin}</span>
+                  <div className="flex flex-wrap items-center gap-x-6 gap-y-1.5 text-sm text-muted-foreground pt-1">
+                    <span className="font-mono text-foreground/80">VIN {vehicle.vin}</span>
                     {typeof vehicle.mileage === "number" && (
-                      <span className="inline-flex items-center gap-1"><Gauge className="w-3 h-3" /> {vehicle.mileage.toLocaleString()} mi</span>
+                      <span className="inline-flex items-center gap-1"><Gauge className="w-3.5 h-3.5" /> {vehicle.mileage.toLocaleString()} mi</span>
                     )}
                     {typeof vehicle.price === "number" && (
-                      <span className="inline-flex items-center gap-1"><DollarSign className="w-3 h-3" /> ${vehicle.price.toLocaleString()}</span>
+                      <span className="inline-flex items-center gap-1"><DollarSign className="w-3.5 h-3.5" /> ${vehicle.price.toLocaleString()}</span>
                     )}
                     <span className="inline-flex items-center gap-1">
-                      <Clock className="w-3 h-3" />
+                      <Clock className="w-3.5 h-3.5" />
                       Created {new Date(vehicle.created_at).toLocaleDateString()}
                     </span>
                   </div>
                 </div>
 
-                <div className="flex flex-col gap-2 w-full lg:w-56 shrink-0">
+                <div className="flex flex-col gap-2.5 w-full lg:w-[300px] shrink-0">
                   {vehicle.status === "published" ? (
                     <>
                       <a
                         href={publicUrl}
                         target="_blank"
                         rel="noreferrer"
-                        className="h-10 px-4 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold inline-flex items-center justify-center gap-1.5 shadow-sm shadow-blue-600/30 transition-colors"
+                        className="h-12 px-4 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold inline-flex items-center justify-center gap-2 shadow-sm shadow-blue-600/30 transition-colors"
                       >
                         <ExternalLink className="w-4 h-4" />
                         View Shopper Page
                       </a>
                       <button
                         onClick={copyLink}
-                        className="h-10 px-4 rounded-xl border border-border bg-background hover:bg-muted text-foreground text-sm font-semibold inline-flex items-center justify-center gap-1.5 transition-colors"
+                        className="h-12 px-4 rounded-xl border border-border bg-background hover:bg-muted text-foreground text-sm font-bold inline-flex items-center justify-center gap-2 transition-colors"
                       >
                         <Copy className="w-3.5 h-3.5" />
                         Copy Link
@@ -320,14 +335,14 @@ const VehicleFile = () => {
                     <>
                       <button
                         onClick={() => setTab("labels")}
-                        className="h-10 px-4 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold inline-flex items-center justify-center gap-1.5 shadow-sm shadow-blue-600/30 transition-colors"
+                        className="h-12 px-4 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold inline-flex items-center justify-center gap-2 shadow-sm shadow-blue-600/30 transition-colors"
                       >
                         <Printer className="w-4 h-4" />
                         Generate Sticker
                       </button>
                       <button
                         onClick={() => setTab("labels")}
-                        className="h-10 px-4 rounded-xl border border-border bg-background hover:bg-muted text-foreground text-sm font-semibold inline-flex items-center justify-center gap-1.5 transition-colors"
+                        className="h-12 px-4 rounded-xl border border-border bg-background hover:bg-muted text-foreground text-sm font-bold inline-flex items-center justify-center gap-2 transition-colors"
                       >
                         <Globe className="w-3.5 h-3.5" />
                         Publish to Shopper Portal
@@ -338,7 +353,7 @@ const VehicleFile = () => {
               </div>
 
               {/* Readiness status banner */}
-              <div className={`mt-4 rounded-xl border p-3 flex items-center gap-3 flex-wrap ${
+              <div className={`mt-6 rounded-xl border p-4 flex items-center gap-4 flex-wrap ${
                 vehicle.status === "published" ? "border-emerald-200 bg-emerald-50/60" : "border-amber-200 bg-amber-50/60"
               }`}>
                 <ReadinessRing pct={ready.pct} tone={vehicle.status === "published" ? "emerald" : "amber"} />
@@ -351,15 +366,15 @@ const VehicleFile = () => {
                       ? "Live on the shopper portal."
                       : ready.remaining.length === 0
                         ? "All set — generate the sticker to publish."
-                        : `Not ready to publish · ${ready.remaining.length} task${ready.remaining.length === 1 ? "" : "s"} remaining.`}
+                        : "This vehicle is not ready to publish"}
                   </p>
                 </div>
                 {vehicle.status !== "published" && ready.remaining.length > 0 && (
                   <div className="flex items-center gap-1.5 flex-wrap lg:ml-auto">
                     {ready.remaining.slice(0, 3).map((c) => (
-                      <span key={c.label} className="inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-1 rounded-lg bg-white text-amber-700 border border-amber-200">
+                      <span key={c.label} className="inline-flex items-center gap-1 text-[11px] font-semibold px-2.5 py-1 rounded-lg bg-white text-amber-700 border border-amber-200">
                         <CircleAlert className="w-3 h-3" />
-                        {c.label}
+                        {c.label.replace(" generated & published", "").replace(" signed off", "").replace(" attached", "")}
                       </span>
                     ))}
                   </div>
@@ -370,30 +385,32 @@ const VehicleFile = () => {
         </div>
       </div>
 
-      {/* Tabs — pill style with counts */}
-      <div className="flex items-center gap-1.5 overflow-x-auto pb-1">
-        {tabs.map((t) => {
-          const active = tab === t.id;
-          return (
-            <button
-              key={t.id}
-              onClick={() => setTab(t.id)}
-              className={`h-9 px-3.5 text-xs font-semibold inline-flex items-center gap-1.5 rounded-full border transition-colors whitespace-nowrap ${
-                active
-                  ? "bg-blue-600 text-white border-blue-600"
-                  : "bg-card text-muted-foreground border-border hover:text-foreground hover:bg-muted"
-              }`}
-            >
-              <t.icon className="w-3.5 h-3.5" />
-              {t.label}
-              {typeof t.count === "number" && (
-                <span className={`min-w-[18px] h-[18px] px-1 rounded-full text-[10px] font-bold inline-flex items-center justify-center tabular-nums ${
-                  active ? "bg-white/20 text-white" : "bg-muted text-muted-foreground"
-                }`}>{t.count}</span>
-              )}
-            </button>
-          );
-        })}
+      {/* Tabs — underline style */}
+      <div className="border-b border-border">
+        <div className="flex items-center gap-1 overflow-x-auto -mb-px">
+          {tabs.map((t) => {
+            const active = tab === t.id;
+            return (
+              <button
+                key={t.id}
+                onClick={() => setTab(t.id)}
+                className={`h-13 px-4 py-3.5 text-sm font-semibold inline-flex items-center gap-2 border-b-2 transition-colors whitespace-nowrap ${
+                  active
+                    ? "border-blue-600 text-blue-600"
+                    : "border-transparent text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                <t.icon className="w-4 h-4" />
+                {t.label}
+                {typeof t.count === "number" && (
+                  <span className={`min-w-[20px] h-5 px-1.5 rounded-full text-[10px] font-bold inline-flex items-center justify-center tabular-nums ${
+                    active ? "bg-blue-100 text-blue-700" : "bg-muted text-muted-foreground"
+                  }`}>{t.count}</span>
+                )}
+              </button>
+            );
+          })}
+        </div>
       </div>
 
       {/* Panels */}
@@ -578,8 +595,8 @@ const OverviewPanel = ({ vehicle, onTab }: { vehicle: VehicleRow; onTab: (t: Tab
   }
 
   return (
-    <div className="space-y-4">
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+    <div className="space-y-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {/* Vehicle readiness */}
         <Card title="Vehicle Readiness" action={<span className={`text-[11px] font-bold px-2 py-0.5 rounded-full ${gradeCls}`}>{pct}% · {grade}</span>}>
           <div className="h-2 rounded-full bg-muted overflow-hidden">
@@ -642,7 +659,7 @@ const OverviewPanel = ({ vehicle, onTab }: { vehicle: VehicleRow; onTab: (t: Tab
         </Card>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {/* Equipment */}
         <Card title="Equipment & Details" action={<button onClick={() => onTab("scan")} className="text-[11px] font-semibold text-blue-600 hover:underline">Edit</button>}>
           {equip.length > 0 ? (
@@ -899,7 +916,7 @@ const DocumentsPanel = ({ vehicle, onReload }: { vehicle: VehicleRow; onReload: 
   }, [vehicle.documents]);
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-6">
       <div className="rounded-2xl border border-border bg-card p-4">
         <GeneratedDocumentsSection vehicleId={vehicle.id} />
       </div>
@@ -1391,7 +1408,7 @@ const AddendumPanel = ({ vehicle }: { vehicle: VehicleRow }) => {
   };
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-6">
       <div className="flex items-center justify-between gap-3">
         <div>
           <h2 className="text-title font-display font-semibold text-foreground">
@@ -1554,7 +1571,7 @@ const PrepPanel = ({ vehicle }: { vehicle: VehicleRow }) => {
   const unlocked = !!latest?.listing_unlocked;
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-6">
       <div className="flex items-center justify-between gap-3">
         <div>
           <h2 className="text-title font-display font-semibold text-foreground">
@@ -1785,7 +1802,7 @@ const SignPanel = ({ vehicle }: { vehicle: VehicleRow }) => {
   };
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-6">
       <div className="flex items-center justify-between gap-3">
         <div>
           <h2 className="text-title font-display font-semibold text-foreground">
@@ -1993,9 +2010,9 @@ const JumpTo = ({ path, reason }: { path: string; reason: string }) => {
 };
 
 const Card = ({ title, children, action, className = "" }: { title: string; children: React.ReactNode; action?: React.ReactNode; className?: string }) => (
-  <div className={`rounded-2xl border border-border bg-card shadow-sm p-4 space-y-2 ${className}`}>
+  <div className={`rounded-2xl border border-border bg-card shadow-[0_1px_3px_rgba(0,0,0,0.05)] hover:shadow-md transition-shadow p-6 space-y-3 ${className}`}>
     <div className="flex items-center justify-between">
-      <h3 className="text-xs font-bold uppercase tracking-label text-muted-foreground">{title}</h3>
+      <h3 className="text-[11px] font-bold uppercase tracking-[0.08em] text-muted-foreground">{title}</h3>
       {action}
     </div>
     {children}
