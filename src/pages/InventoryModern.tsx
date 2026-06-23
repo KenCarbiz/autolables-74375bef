@@ -458,10 +458,9 @@ const InventoryModern = () => {
                       <th className="text-left font-semibold px-3 py-3">Stock / VIN</th>
                       <th className="text-left font-semibold px-3 py-3">Status</th>
                       <th className="text-left font-semibold px-3 py-3">Readiness</th>
-                      <th className="text-left font-semibold px-3 py-3">VIN Decode</th>
-                      <th className="text-left font-semibold px-3 py-3">Recalls</th>
-                      <th className="text-left font-semibold px-3 py-3">Market Position</th>
-                      <th className="text-left font-semibold px-3 py-3">Portal Status</th>
+                      <th className="text-left font-semibold px-3 py-3">Compliance</th>
+                      <th className="text-left font-semibold px-3 py-3">Advertised Price</th>
+                      <th className="text-left font-semibold px-3 py-3">Publishing</th>
                       <th className="text-left font-semibold px-3 py-3">Updated</th>
                       <th className="text-right font-semibold px-3 py-3">Actions</th>
                     </tr>
