@@ -47,6 +47,7 @@ interface VehicleRow {
   updated_at: string;
   stock_number?: string | null;
   hero_image_url?: string | null;
+  source_url?: string | null;
   recall_status?: string | null;
   open_recall_count?: number | null;
   market_position?: string | null;
@@ -218,7 +219,7 @@ const InventoryModern = () => {
   const load = async () => {
     if (!tenant?.id) return;
     setLoading(true);
-    const baseCols = "id,vin,ymm,trim,mileage,condition,price,status,slug,published_at,view_count,created_at,updated_at";
+    const baseCols = "id,vin,ymm,trim,mileage,condition,price,status,slug,source_url,published_at,view_count,created_at,updated_at";
     const runSelect = (cols: string) => (supabase as any)
       .from("vehicle_listings")
       .select(cols)
@@ -432,6 +433,7 @@ const InventoryModern = () => {
     { label: "Build Addendum", icon: FileText, onClick: () => navigate(`/vehicle-file/${r.id}?tab=addendum`) },
     { label: "Audit Defense", icon: ShieldCheck, onClick: () => navigate(`/compliance?vin=${encodeURIComponent(r.vin || "")}`) },
     ...(r.status === "published" ? [{ label: "View Customer Packet", icon: Eye, onClick: () => window.open(`/v/${r.slug}`, "_blank", "noopener") }] : []),
+    ...(r.source_url && /^https?:\/\//i.test(r.source_url) ? [{ label: "View ad on website", icon: ExternalLink, onClick: () => window.open(r.source_url!, "_blank", "noopener") }] : []),
     { label: "Delete", icon: Trash2, onClick: () => deleteVehicle(r), danger: true },
   ];
 
