@@ -161,30 +161,25 @@ interface AdResult {
 // Normalize a dealer VDP URL before fetching: strip view-mode params that
 // flip the page to incentive-conditional pricing (?type=finance / ?type=lease
 // / ?paymentType=... etc.) so we always read the standard advertised price.
+// Harte Infiniti's canonical VDP is /viewdetails/{inventory-type}/{VIN} with
+// NO query string — the bare URL renders the cash/retail total. Any ?type=
+// variant flips to finance/lease pricing, so we strip all view params.
 const VIEW_PARAMS = new Set([
   "type", "viewtype", "view", "paymenttype", "payment", "pricingmode", "pricetype",
   "tab", "mode", "incentive", "incentives", "lease", "finance",
 ]);
-const PRICE_VIEW_KEYS = new Set(["type", "pricetype", "pricingmode", "paymenttype", "payment"]);
 const normalizeVdpUrl = (raw: string): string => {
   try {
     const u = new URL(raw);
     const drop: string[] = [];
-    const cashify: string[] = [];
     u.searchParams.forEach((_v, k) => {
-      const key = k.toLowerCase();
-      if (!VIEW_PARAMS.has(key)) return;
-      // Force the cash/retail total view (often doc-fee-inclusive) the dealer
-      // advertises, instead of the finance/lease conditional pricing the
-      // inventory feed hands us. Other view params are stripped.
-      if (PRICE_VIEW_KEYS.has(key)) cashify.push(k);
-      else drop.push(k);
+      if (VIEW_PARAMS.has(k.toLowerCase())) drop.push(k);
     });
     drop.forEach((k) => u.searchParams.delete(k));
-    cashify.forEach((k) => u.searchParams.set(k, "cash"));
     return u.toString();
   } catch { return raw; }
 };
+
 
 // Structured, VIN-gated, priceType-aware price extractor. Replaces the old
 // "largest dollar on the page" heuristic, which grabbed the MSRP off a price
