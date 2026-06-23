@@ -8,7 +8,7 @@ export default function QuickActionBar({ dealer, onShare, tradeUrl }: { dealer: 
   const actions = [
     { icon: FileText, label: "Documents", onClick: () => document.getElementById("passport-documents")?.scrollIntoView({ behavior: "smooth" }) },
     { icon: MessageSquare, label: "Contact Dealer", onClick: () => { if (phone) window.location.href = `tel:${phone}`; else document.getElementById("passport-footer")?.scrollIntoView({ behavior: "smooth" }); } },
-    { icon: RefreshCw, label: "Value My Trade", onClick: () => { if (tradeUrl) window.open(tradeUrl, "_blank", "noopener"); else if (phone) window.location.href = `tel:${phone}`; } },
+    { icon: RefreshCw, label: "Value My Trade", onClick: () => { if (tradeUrl) window.open(tradeUrl, "_blank", "noopener"); else document.getElementById("passport-trade")?.scrollIntoView({ behavior: "smooth" }); } },
     { icon: Share2, label: "Share Vehicle", onClick: onShare },
   ];
   return (
