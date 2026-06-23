@@ -3422,6 +3422,7 @@ export type Database = {
           incentive_zip_mode: string
           incentives_disclaimer: string
           incentives_enabled: boolean
+          show_on_sticker: boolean
           tenant_id: string
           updated_at: string
           updated_by: string | null
@@ -3433,6 +3434,7 @@ export type Database = {
           incentive_zip_mode?: string
           incentives_disclaimer?: string
           incentives_enabled?: boolean
+          show_on_sticker?: boolean
           tenant_id: string
           updated_at?: string
           updated_by?: string | null
@@ -3444,6 +3446,7 @@ export type Database = {
           incentive_zip_mode?: string
           incentives_disclaimer?: string
           incentives_enabled?: boolean
+          show_on_sticker?: boolean
           tenant_id?: string
           updated_at?: string
           updated_by?: string | null
