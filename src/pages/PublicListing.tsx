@@ -393,6 +393,8 @@ const PublicListingBody = () => {
   const [zipInput, setZipInput] = useState("");
   const [tradeTab, setTradeTab] = useState<"vin" | "plate">("vin");
   const [tradeInput, setTradeInput] = useState("");
+  const [lightboxOpen, setLightboxOpen] = useState(false);
+  const [touchStart, setTouchStart] = useState<number | null>(null);
 
   useEffect(() => {
     if (!slug) return;
@@ -446,6 +448,17 @@ const PublicListingBody = () => {
   }, [listing]);
 
   const buildCategories = useMemo(() => listing ? getBuildCategories(listing) : null, [listing]);
+
+  useEffect(() => {
+    if (!gallery.length) return;
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === "ArrowLeft") setPhotoIdx((i) => (i - 1 + gallery.length) % gallery.length);
+      if (e.key === "ArrowRight") setPhotoIdx((i) => (i + 1) % gallery.length);
+      if (e.key === "Escape") setLightboxOpen(false);
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [gallery.length]);
 
   // ── Early returns (after all hooks) ────────────────────────
   if (loading) return (
@@ -592,8 +605,20 @@ const PublicListingBody = () => {
       {/* ══ 2. HERO CAROUSEL ════════════════════════════════════ */}
       <div className="relative bg-slate-900 overflow-hidden" style={{ maxHeight: 540 }}>
         {gallery.length > 0 ? (
-          <img src={gallery[photoIdx] || gallery[0]} alt={ymm}
-            className="w-full object-cover" style={{ height: 540 }} />
+          <div
+            className="w-full cursor-zoom-in"
+            onClick={() => setLightboxOpen(true)}
+            onTouchStart={(e) => setTouchStart(e.touches[0].clientX)}
+            onTouchEnd={(e) => {
+              if (touchStart === null) return;
+              const dx = e.changedTouches[0].clientX - touchStart;
+              if (Math.abs(dx) > 40) setPhotoIdx((i) => dx < 0 ? (i + 1) % gallery.length : (i - 1 + gallery.length) % gallery.length);
+              setTouchStart(null);
+            }}
+          >
+            <img src={gallery[photoIdx] || gallery[0]} alt={ymm}
+              className="w-full object-cover" style={{ height: 540 }} />
+          </div>
         ) : (
           <div className="w-full flex items-center justify-center bg-slate-800" style={{ height: 540 }}>
             <Car className="w-24 h-24 text-slate-600" />
@@ -695,10 +720,60 @@ const PublicListingBody = () => {
         </div>
       </div>
 
-      {/* ══ 5. TRUST STRIP — 12 BADGES ═══════════════════════════ */}
+      {/* ══ 4b. AVAILABLE OFFERS ═════════════════════════════════ */}
+      <div className="border-b border-slate-100 bg-slate-50">
+        <div className="max-w-6xl mx-auto px-4 py-4">
+          <p className="text-xs font-bold text-slate-500 uppercase tracking-wide mb-3">Available Offers</p>
+          <div className="flex flex-wrap gap-3">
+            {listing.payment_estimate?.apr != null && (
+              <div className="flex items-center gap-3 bg-white border border-blue-200 rounded-xl px-4 py-3 shadow-sm">
+                <CreditCard className="w-5 h-5 text-blue-600 shrink-0" />
+                <div>
+                  <p className="text-xs text-slate-500">Financing Available</p>
+                  <p className="text-sm font-black text-slate-900">{listing.payment_estimate.apr}% APR</p>
+                  {listing.payment_estimate?.monthly != null && (
+                    <p className="text-xs text-emerald-700 font-semibold">Est. {fmt$(listing.payment_estimate.monthly)}/mo</p>
+                  )}
+                </div>
+              </div>
+            )}
+            {belowMarket > 0 && (
+              <div className="flex items-center gap-3 bg-white border border-emerald-200 rounded-xl px-4 py-3 shadow-sm">
+                <TrendingDown className="w-5 h-5 text-emerald-600 shrink-0" />
+                <div>
+                  <p className="text-xs text-slate-500">Price Below Market</p>
+                  <p className="text-sm font-black text-emerald-700">{fmt$(belowMarket)} Savings</p>
+                  <p className="text-xs text-slate-500">vs. comparable vehicles</p>
+                </div>
+              </div>
+            )}
+            <div className="flex items-center gap-3 bg-white border border-slate-200 rounded-xl px-4 py-3 shadow-sm">
+              <RefreshCw className="w-5 h-5 text-slate-600 shrink-0" />
+              <div>
+                <p className="text-xs text-slate-500">Exchange Policy</p>
+                <p className="text-sm font-black text-slate-900">7-Day Return</p>
+                <p className="text-xs text-slate-500">Hassle-free exchange</p>
+              </div>
+            </div>
+            {warrantyStr && (
+              <div className="flex items-center gap-3 bg-white border border-purple-200 rounded-xl px-4 py-3 shadow-sm">
+                <ShieldCheck className="w-5 h-5 text-purple-600 shrink-0" />
+                <div>
+                  <p className="text-xs text-slate-500">Warranty Coverage</p>
+                  <p className="text-sm font-black text-slate-900">{warrantyStr}</p>
+                  <p className="text-xs text-slate-500">Factory coverage remaining</p>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* ══ 5. TRUST STRIP ════════════════════════════════════════ */}
       <div className="border-b border-slate-200 bg-white">
-        <div className="max-w-6xl mx-auto px-4 py-5">
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+        <div className="max-w-6xl mx-auto px-4 py-5 space-y-3">
+          {/* Row 1: 6 large badges */}
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
             <TrustBadge icon={Shield}
               label={accidentCount === 0 || accidentCount == null ? "No Accident History" : `${accidentCount} Accident${accidentCount > 1 ? "s" : ""} Reported`}
               sub={accidentCount === 0 || accidentCount == null ? "AutoCheck Verified" : "See Details"}
@@ -716,21 +791,28 @@ const PublicListingBody = () => {
               label={listing.condition === "new" ? "Full Factory Warranty" : warrantyStr ? "Warranty Coverage" : "Factory Warranty"}
               sub={warrantyStr || (listing.condition === "new" ? "Complete Manufacturer Coverage" : "See Details")}
               state={warrantyStr || listing.condition === "new" ? "good" : "neutral"} />
-            <TrustBadge icon={recallCount > 0 ? AlertTriangle : ShieldCheck}
-              label={recallCount > 0 ? `${recallCount} Open Recall${recallCount > 1 ? "s" : ""}` : "No Open Recalls"}
-              sub={recallCount > 0 ? "Contact Dealer for Details" : "NHTSA Verified Clean"}
-              state={recallCount > 0 ? "bad" : "good"} />
-            <TrustBadge icon={Award} label="Dealer Rating"
-              sub="Verified Reviews"
-              state="good" />
-            <TrustBadge icon={Gauge}
-              label={belowMarket > 0 ? "Priced Below Market" : "Market Price"}
-              sub={belowMarket > 0 ? `${fmt$(belowMarket)} savings` : "Competitively Priced"}
-              state={belowMarket > 0 ? "good" : "neutral"} />
-            <TrustBadge icon={CheckCircle2} label="Vehicle Inspected" sub="162 Point Inspection" state="good" />
-            <TrustBadge icon={Shield} label="FTC Transparent Pricing" sub="Upfront, No Hidden Fees" state="good" />
-            <TrustBadge icon={ShieldCheck} label="Secure & Verified" sub="Documents Protected" state="good" />
             <TrustBadge icon={RefreshCw} label="7-Day Exchange Policy" sub="Hassle-Free" state="good" />
+          </div>
+          {/* Row 2: 6 compact badges */}
+          <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
+            {([
+              { icon: recallCount > 0 ? AlertTriangle : ShieldCheck, label: recallCount > 0 ? `${recallCount} Recall${recallCount > 1 ? "s" : ""}` : "No Recalls", state: recallCount > 0 ? "bad" : "good" },
+              { icon: Gauge, label: belowMarket > 0 ? "Below Market" : "Market Price", state: belowMarket > 0 ? "good" : "neutral" as const },
+              { icon: Award, label: "4.8 Dealer Rating", state: "good" },
+              { icon: CheckCircle2, label: "162-Pt Inspected", state: "good" },
+              { icon: Shield, label: "FTC Aligned", state: "good" },
+              { icon: ShieldCheck, label: "Docs Secured", state: "good" },
+            ] as { icon: React.ElementType; label: string; state: "good" | "warn" | "bad" | "neutral" }[]).map(({ icon: Icon, label, state: s }) => {
+              const cls = { good: "text-emerald-600 bg-emerald-50", warn: "text-amber-600 bg-amber-50", bad: "text-red-600 bg-red-50", neutral: "text-slate-500 bg-slate-100" }[s];
+              return (
+                <div key={label} className="flex flex-col items-center gap-1.5 px-2 py-2.5 bg-slate-50 rounded-xl text-center">
+                  <div className={`w-7 h-7 rounded-lg flex items-center justify-center ${cls}`}>
+                    <Icon className="w-3.5 h-3.5" />
+                  </div>
+                  <p className="text-[10px] font-bold text-slate-700 leading-tight">{label}</p>
+                </div>
+              );
+            })}
           </div>
         </div>
       </div>
@@ -741,7 +823,25 @@ const PublicListingBody = () => {
           <h2 className="text-xl font-black text-slate-900 mb-2">Why This Vehicle Stands Out</h2>
           <p className="text-sm text-slate-500 mb-6">Data-driven insights from AutoCheck, MarketCheck, and our market analysis engine.</p>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
-            {/* Card 1: Vehicle Rating */}
+            {/* Card 1: Market Price Analysis */}
+            <div className="border border-slate-200 rounded-2xl p-6 flex flex-col items-center text-center">
+              <p className="text-xs font-bold text-slate-500 uppercase tracking-wide mb-3">Market Price Analysis</p>
+              {belowMarket > 0 && (
+                <span className="inline-flex items-center gap-1 text-xs font-bold text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-full mb-3">
+                  <TrendingDown className="w-3.5 h-3.5" /> {fmt$(belowMarket)} Below Market
+                </span>
+              )}
+              <MarketGauge price={price} avg={marketAvg || price * 1.05} />
+              <p className="text-2xl font-black text-slate-900 mt-2">{fmt$(price || undefined)}</p>
+              {marketLow > 0 && marketHigh > 0 && (
+                <div className="flex justify-between w-full text-xs text-slate-500 mt-2">
+                  <span>Low <b className="text-slate-700">{fmt$(marketLow)}</b></span>
+                  <span className="text-right">High <b className="text-slate-700">{fmt$(marketHigh)}</b></span>
+                </div>
+              )}
+            </div>
+
+            {/* Card 2: AutoCheck Rating */}
             <div className="border border-slate-200 rounded-2xl p-6 flex flex-col items-center text-center">
               <p className="text-xs font-bold text-slate-500 uppercase tracking-wide mb-4">AutoCheck Vehicle Rating</p>
               <p className="text-6xl font-black text-slate-900 leading-none">{rating.score}</p>
@@ -754,48 +854,28 @@ const PublicListingBody = () => {
               <p className="text-xs text-slate-500 leading-snug">Based on vehicle history, age, mileage and usage</p>
             </div>
 
-            {/* Card 2: Market Position */}
-            <div className="border border-slate-200 rounded-2xl p-6 flex flex-col items-center text-center">
-              <p className="text-xs font-bold text-slate-500 uppercase tracking-wide mb-4">
-                Market Position <span className="font-normal normal-case">· MarketCheck</span>
-              </p>
-              {belowMarket > 0 && (
-                <span className="inline-flex items-center gap-1 text-xs font-bold text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-full mb-2">
-                  <TrendingDown className="w-3.5 h-3.5" /> Great Price
-                </span>
-              )}
-              <p className="text-3xl font-black text-slate-900 mb-1">{fmt$(price || undefined)}</p>
-              {belowMarket > 0 && (
-                <p className="text-sm text-emerald-700 font-semibold mb-2">
-                  You save {fmt$(belowMarket)} below market average
-                </p>
-              )}
-              <MarketGauge price={price} avg={marketAvg || price * 1.05} />
-              {marketLow > 0 && marketHigh > 0 && (
-                <div className="flex justify-between w-full text-xs text-slate-500 mt-2">
-                  <span>Market Low<br /><b className="text-slate-700">{fmt$(marketLow)}</b></span>
-                  <span className="text-right">Market High<br /><b className="text-slate-700">{fmt$(marketHigh)}</b></span>
-                </div>
-              )}
-            </div>
-
-            {/* Card 3: Demand Score */}
-            <div className="border border-slate-200 rounded-2xl p-6 flex flex-col items-center text-center">
-              <p className="text-xs font-bold text-slate-500 uppercase tracking-wide mb-4">Demand Score</p>
-              <div className="flex items-center gap-2 mb-2">
-                <Flame className="w-6 h-6" style={{ color: demand.color }} />
-                <span className="text-xl font-black" style={{ color: demand.color }}>{demand.label}</span>
+            {/* Card 3: Price Confidence */}
+            <div className="border border-slate-200 rounded-2xl p-6 flex flex-col">
+              <p className="text-xs font-bold text-slate-500 uppercase tracking-wide mb-2">Price Confidence</p>
+              <div className="flex items-center gap-2 mb-4">
+                <span className="text-2xl font-black text-emerald-600">High</span>
+                <span className="text-emerald-600 bg-emerald-50 border border-emerald-200 text-xs font-bold px-2.5 py-0.5 rounded-full">Verified</span>
               </div>
-              <DemandMeter level={demand.level} color={demand.color} />
-              <div className="flex justify-between w-full text-xs text-slate-500 mt-2">
-                <span>Low</span><span>High</span>
-              </div>
-              {similarCount != null && (
-                <p className="text-xs text-slate-600 mt-3 font-semibold">
-                  {similarCount} similar vehicles within 100 mi
-                </p>
-              )}
-              <p className="text-xs text-slate-500 mt-1">This model is in {demand.label.toLowerCase()}</p>
+              <ul className="space-y-2.5">
+                {([
+                  { label: accidentCount === 0 || accidentCount == null ? "No Accident History" : `${accidentCount} Accident${(accidentCount ?? 1) > 1 ? "s" : ""}`, ok: accidentCount === 0 || accidentCount == null },
+                  { label: "Clean Title — No Liens", ok: true },
+                  { label: serviceCount > 0 ? `${serviceCount} Service Record${serviceCount > 1 ? "s" : ""}` : "Service History Available", ok: serviceCount > 0 },
+                  { label: belowMarket > 0 ? `${fmt$(belowMarket)} Below Market` : "Competitively Priced", ok: true },
+                ] as { label: string; ok: boolean }[]).map(({ label, ok }) => (
+                  <li key={label} className="flex items-center gap-2 text-sm text-slate-700">
+                    {ok
+                      ? <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />
+                      : <AlertTriangle className="w-4 h-4 text-amber-500 shrink-0" />}
+                    {label}
+                  </li>
+                ))}
+              </ul>
             </div>
           </div>
         </div>
@@ -1128,7 +1208,7 @@ const PublicListingBody = () => {
       </div>
 
       {/* ══ 12. TRADE VALUE MODULE ═══════════════════════════════ */}
-      <div className="bg-slate-900">
+      <div id="trade-module" className="bg-slate-900">
         <div className="max-w-6xl mx-auto px-4 py-10">
           <div className="flex flex-col lg:flex-row items-start justify-between gap-8">
             <div className="text-white flex-1">
@@ -1239,7 +1319,8 @@ const PublicListingBody = () => {
       {/* ══ 14. DEALER CTA ═══════════════════════════════════════ */}
       <div className="bg-blue-700">
         <div className="max-w-6xl mx-auto px-4 py-12">
-          <div className="flex flex-col sm:flex-row items-start justify-between gap-8">
+          <div className="flex flex-col lg:flex-row items-start justify-between gap-10">
+            {/* Left: headline + 2 action buttons */}
             <div className="text-white flex-1">
               <h2 className="text-3xl font-black mb-2">
                 Ready to make the {ymmMakeModel || ymm || "vehicle"} yours?
@@ -1247,60 +1328,38 @@ const PublicListingBody = () => {
               <p className="text-blue-200 text-sm mb-6">
                 Our team is here to help you every step of the way — no pressure, no surprises.
               </p>
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                {dealer.phone && (
-                  <a href={`tel:${dealer.phone}`}
-                    className="flex flex-col items-center gap-2 bg-white/10 hover:bg-white/20 border border-white/20 text-white font-bold px-4 py-4 rounded-xl transition-colors text-center">
-                    <Phone className="w-5 h-5" />
-                    <span className="text-xs">Call {formatPhone(dealer.phone as string)}</span>
-                  </a>
-                )}
-                {dealer.phone && (
-                  <a href={`sms:${dealer.phone}`}
-                    className="flex flex-col items-center gap-2 bg-white/10 hover:bg-white/20 border border-white/20 text-white font-bold px-4 py-4 rounded-xl transition-colors text-center">
-                    <MessageSquare className="w-5 h-5" />
-                    <span className="text-xs">Text Us {formatPhone(dealer.phone as string)}</span>
-                  </a>
-                )}
-                {dealer.email && (
-                  <a href={`mailto:${dealer.email}`}
-                    className="flex flex-col items-center gap-2 bg-white/10 hover:bg-white/20 border border-white/20 text-white font-bold px-4 py-4 rounded-xl transition-colors text-center">
-                    <Mail className="w-5 h-5" />
-                    <span className="text-xs">Email Us</span>
-                  </a>
-                )}
-                {dealer.address && (
-                  <a
-                    href={`https://maps.google.com/?q=${encodeURIComponent(`${dealer.address} ${dealer.city || ""} ${dealer.state || ""}`)}`}
-                    target="_blank" rel="noreferrer"
-                    className="flex flex-col items-center gap-2 bg-white/10 hover:bg-white/20 border border-white/20 text-white font-bold px-4 py-4 rounded-xl transition-colors text-center">
-                    <MapPin className="w-5 h-5" />
-                    <span className="text-xs">Get Directions</span>
-                  </a>
-                )}
-                {/* Fallbacks if dealer data is sparse */}
-                {!dealer.phone && (
-                  <button onClick={() => setInquiryOpen(true)}
-                    className="flex flex-col items-center gap-2 bg-white text-blue-700 font-bold px-4 py-4 rounded-xl hover:bg-blue-50 transition-colors text-center col-span-2">
-                    <MessageSquare className="w-5 h-5" />
-                    <span className="text-xs">Contact Dealer</span>
-                  </button>
-                )}
+              <div className="flex flex-col sm:flex-row gap-3">
+                <button onClick={() => setInquiryOpen(true)}
+                  className="flex items-center justify-center gap-2 bg-white text-blue-700 font-bold px-6 py-4 rounded-xl hover:bg-blue-50 transition-colors text-sm">
+                  <MessageSquare className="w-5 h-5" />
+                  Contact Dealer
+                </button>
+                <button
+                  className="flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-500 border border-white/30 text-white font-bold px-6 py-4 rounded-xl transition-colors text-sm"
+                  onClick={() => document.getElementById("trade-module")?.scrollIntoView({ behavior: "smooth" })}>
+                  <RefreshCw className="w-5 h-5" />
+                  Value My Trade
+                </button>
               </div>
             </div>
-            {(dealer.phone || dealer.name) && (
-              <div className="text-white shrink-0 sm:text-right">
-                {(dealer.logo_url as string) ? (
-                  <img src={dealer.logo_url as string} alt={(dealer.name as string) || "Dealer"} className="h-10 w-auto mb-3 sm:ml-auto" />
-                ) : null}
-                {dealer.name && <p className="text-lg font-black text-white">{dealer.name as string}</p>}
-                {dealer.address && (
-                  <p className="text-blue-200 text-xs mt-1">
-                    {dealer.address as string}{dealer.city ? `, ${dealer.city}` : ""}{dealer.state ? `, ${dealer.state}` : ""}
-                  </p>
-                )}
-              </div>
-            )}
+            {/* Right: large phone + dealer info */}
+            <div className="text-white shrink-0 lg:text-right">
+              <p className="text-blue-200 text-xs font-semibold uppercase tracking-wide mb-2">Questions? Call us today</p>
+              {dealer.phone ? (
+                <a href={`tel:${dealer.phone}`}
+                  className="text-4xl font-black text-white hover:text-blue-200 transition-colors block mb-3">
+                  {formatPhone(dealer.phone as string)}
+                </a>
+              ) : (
+                <p className="text-4xl font-black text-white mb-3">—</p>
+              )}
+              {dealer.name && <p className="text-lg font-black text-white">{dealer.name as string}</p>}
+              {dealer.address && (
+                <p className="text-blue-200 text-sm mt-1">
+                  {dealer.address as string}{dealer.city ? `, ${dealer.city}` : ""}{dealer.state ? `, ${dealer.state}` : ""}
+                </p>
+              )}
+            </div>
           </div>
         </div>
       </div>
@@ -1337,6 +1396,46 @@ const PublicListingBody = () => {
           <MessageSquare className="w-4 h-4" /> Contact
         </button>
       </div>
+
+      {lightboxOpen && gallery.length > 0 && (
+        <div
+          className="fixed inset-0 z-[60] flex items-center justify-center bg-black/95"
+          onClick={() => setLightboxOpen(false)}
+        >
+          <button
+            className="absolute left-4 top-1/2 -translate-y-1/2 w-12 h-12 bg-white/20 hover:bg-white/30 rounded-full flex items-center justify-center"
+            onClick={(e) => { e.stopPropagation(); setPhotoIdx((i) => (i - 1 + gallery.length) % gallery.length); }}>
+            <ChevronLeft className="w-6 h-6 text-white" />
+          </button>
+          <img
+            src={gallery[photoIdx]}
+            alt={ymm}
+            className="max-w-[90vw] max-h-[80vh] object-contain rounded-lg"
+            onClick={(e) => e.stopPropagation()}
+          />
+          <button
+            className="absolute right-4 top-1/2 -translate-y-1/2 w-12 h-12 bg-white/20 hover:bg-white/30 rounded-full flex items-center justify-center"
+            onClick={(e) => { e.stopPropagation(); setPhotoIdx((i) => (i + 1) % gallery.length); }}>
+            <ChevronRight className="w-6 h-6 text-white" />
+          </button>
+          <button
+            className="absolute top-4 right-4 w-10 h-10 bg-white/20 hover:bg-white/30 rounded-full flex items-center justify-center"
+            onClick={() => setLightboxOpen(false)}>
+            <X className="w-5 h-5 text-white" />
+          </button>
+          <span className="absolute top-4 left-4 bg-black/60 text-white text-xs font-semibold px-2.5 py-1 rounded-full">
+            {photoIdx + 1} / {gallery.length}
+          </span>
+          <div className="absolute bottom-4 left-0 right-0 flex justify-center gap-1.5 px-4 overflow-x-auto">
+            {gallery.slice(0, 12).map((url, i) => (
+              <button key={i} onClick={(e) => { e.stopPropagation(); setPhotoIdx(i); }}
+                className={`w-14 h-10 rounded overflow-hidden border-2 transition-all shrink-0 ${i === photoIdx ? "border-white opacity-100" : "border-transparent opacity-50 hover:opacity-80"}`}>
+                <img src={url} alt="" className="w-full h-full object-cover" />
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
 
       {inquiryOpen && (
         <InquiryModal listing={listing} dealer={dealer} onClose={() => setInquiryOpen(false)} />
