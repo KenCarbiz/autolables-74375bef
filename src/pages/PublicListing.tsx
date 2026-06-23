@@ -438,6 +438,9 @@ const PublicListingBody = () => {
             that the protection is really on this vehicle. */}
         <VerifiedInstallsPublic slug={listing.slug} />
 
+        {/* Anchor target for the Quick Action "Documents" button. */}
+        <div id="passport-documents" className="scroll-mt-20" aria-hidden />
+
         {/* Published window sticker / addendum documents (published-only). */}
         {packetVisible(listing, "documents") && <PassportDocuments slug={listing.slug} />}
 
@@ -500,8 +503,12 @@ const PublicListingBody = () => {
             the sticky CTA bar at the bottom is the single durable
             affordance for both Reserve and Call. */}
 
+        {/* FTC-aligned disclosure card — the transparency statement that
+            anchors the whole Passport. Compliance copy only; always valid. */}
+        <ComplianceDisclosure dealer={dealer} />
+
         {/* Footer */}
-        <footer className="text-center py-6 pb-32 md:pb-6">
+        <footer id="passport-footer" className="text-center py-6 pb-32 md:pb-6 scroll-mt-20">
           <Logo variant="full" size={22} />
           <p className="text-[10px] text-muted-foreground mt-2">
             {L.powered_by} · <Clock className="inline w-2.5 h-2.5 -mt-0.5" /> {L.published}{" "}
@@ -1120,6 +1127,31 @@ const Chip = ({
         <p className="text-[11px] font-semibold truncate">{value}</p>
       </div>
     </div>
+  );
+};
+
+// FTC-aligned compliance disclosure — the transparency contract at the
+// foot of the Passport. Reuses the existing bilingual protection copy so
+// it stays in sync with the buyer's chosen language.
+const ComplianceDisclosure = ({ dealer }: { dealer: DealerMini }) => {
+  const { L } = usePublicLocale();
+  return (
+    <section className="rounded-2xl border border-emerald-200 bg-emerald-50/50 p-5">
+      <div className="flex items-center gap-2 mb-3">
+        <ShieldCheck className="w-4 h-4 text-emerald-600" />
+        <h2 className="text-sm font-bold text-foreground">{L.your_protection}</h2>
+      </div>
+      <div className="space-y-2.5">
+        {L.protection.map((t, i) => (
+          <TrustItem key={i} text={t} />
+        ))}
+      </div>
+      {dealer.name && (
+        <p className="text-[10px] text-emerald-800/70 mt-4 leading-relaxed">
+          {dealer.name} · {L.powered_by}
+        </p>
+      )}
+    </section>
   );
 };
 
