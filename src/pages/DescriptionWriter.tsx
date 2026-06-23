@@ -184,7 +184,7 @@ const DescriptionWriter = () => {
   const [geoCity, setGeoCity] = useState(currentStore?.city || "Manchester");
   const [geoState, setGeoState] = useState(currentStore?.state || "Connecticut");
   const [primaryKeyword, setPrimaryKeyword] = useState("INFINITI QX80 for sale");
-  const [zipCode, setZipCode] = useState(currentStore?.postal_code || "06040");
+  const [zipCode, setZipCode] = useState("06040");
   const [radius, setRadius] = useState<number>(25);
   const [includeCallToAction, setIncludeCallToAction] = useState(true);
   const [includeDealerName, setIncludeDealerName] = useState(true);
