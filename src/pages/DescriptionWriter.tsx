@@ -11,7 +11,6 @@ import {
   Copy,
   Download,
   Edit3,
-  Facebook,
   Gauge,
   Globe,
   History,
@@ -26,7 +25,7 @@ import {
   Wrench,
 } from "lucide-react";
 
-type Platform = "autotrader" | "carscom" | "cargurus" | "facebook" | "website" | "google";
+type Platform = "autotrader" | "carscom" | "cargurus" | "facebook" | "truecar" | "edmunds" | "kbb" | "dealercom";
 type Tone = "professional" | "luxury" | "sporty" | "family" | "value";
 
 type VehicleState = {
@@ -47,23 +46,128 @@ type VehicleState = {
   heroImage?: string;
 };
 
-const platformCards: Array<{ id: Platform; name: string; sub: string; logo: string }> = [
-  { id: "autotrader", name: "AutoTrader", sub: "Optimized for AutoTrader", logo: "▰▰" },
-  { id: "carscom", name: "Cars.com", sub: "Optimized for Cars.com", logo: "Cars.com" },
-  { id: "cargurus", name: "CarGurus", sub: "Optimized for CarGurus", logo: "CarGurus" },
-  { id: "facebook", name: "Facebook Marketplace", sub: "Optimized for Facebook", logo: "f" },
-  { id: "website", name: "Dealer Website", sub: "Optimized for your website", logo: "◎" },
-  { id: "google", name: "Google SEO", sub: "Optimized for Google", logo: "G" },
+type PlatformConfig = {
+  id: Platform;
+  name: string;
+  sub: string;
+  logoText: string;
+  logoClass: string;
+  brandAccent: string;
+  characterLimit: number;
+  recommendedLength: string;
+  seoFocus: string[];
+  formattingRules: string;
+  templateInstruction: string;
+};
+
+const platformCards: PlatformConfig[] = [
+  {
+    id: "autotrader",
+    name: "AutoTrader",
+    sub: "Premium shopper search format",
+    logoText: "AutoTrader",
+    logoClass: "text-blue-700 tracking-tight",
+    brandAccent: "border-blue-500 bg-blue-50 shadow-blue-100",
+    characterLimit: 4000,
+    recommendedLength: "1,200-1,800 characters",
+    seoFocus: ["Year", "Make", "Model", "Trim", "Mileage", "Local market"],
+    formattingRules: "Clean paragraph format with searchable trim, drivetrain, mileage, and location terms.",
+    templateInstruction: "Use a polished retail listing tone with strong equipment highlights and local shopper keywords.",
+  },
+  {
+    id: "carscom",
+    name: "Cars.com",
+    sub: "Feature-forward retail copy",
+    logoText: "Cars.com",
+    logoClass: "text-purple-700 tracking-tight",
+    brandAccent: "border-purple-500 bg-purple-50 shadow-purple-100",
+    characterLimit: 4000,
+    recommendedLength: "1,000-1,600 characters",
+    seoFocus: ["Condition", "Features", "Dealer trust", "Availability", "Location"],
+    formattingRules: "Consumer-friendly paragraphs with confidence-building feature and dealer details.",
+    templateInstruction: "Write benefit-driven copy that is easy for shoppers to scan and compare.",
+  },
+  {
+    id: "cargurus",
+    name: "CarGurus",
+    sub: "Value and deal focused",
+    logoText: "CarGurus",
+    logoClass: "text-cyan-700 tracking-tight",
+    brandAccent: "border-cyan-500 bg-cyan-50 shadow-cyan-100",
+    characterLimit: 3000,
+    recommendedLength: "900-1,400 characters",
+    seoFocus: ["Value", "Mileage", "Condition", "Top options", "Shopper confidence"],
+    formattingRules: "Shorter, direct structure with the strongest value points near the top.",
+    templateInstruction: "Prioritize deal confidence, mileage, condition, options, and a direct call to action.",
+  },
+  {
+    id: "facebook",
+    name: "Facebook Marketplace",
+    sub: "Fast mobile shopper format",
+    logoText: "f Marketplace",
+    logoClass: "text-blue-600 tracking-tight",
+    brandAccent: "border-blue-600 bg-blue-50 shadow-blue-100",
+    characterLimit: 1000,
+    recommendedLength: "500-900 characters",
+    seoFocus: ["Price/value", "Top features", "Condition", "Quick CTA"],
+    formattingRules: "Short mobile-first copy with compact lines and immediate shopper hooks.",
+    templateInstruction: "Keep it concise, conversational, and easy to read on mobile.",
+  },
+  {
+    id: "truecar",
+    name: "TrueCar",
+    sub: "Transparent buying language",
+    logoText: "TrueCar",
+    logoClass: "text-blue-800 tracking-tight",
+    brandAccent: "border-blue-500 bg-blue-50 shadow-blue-100",
+    characterLimit: 3500,
+    recommendedLength: "900-1,500 characters",
+    seoFocus: ["Transparency", "Mileage", "Trim", "Equipment", "Dealer credibility"],
+    formattingRules: "Straightforward, trust-first copy that avoids overstatement.",
+    templateInstruction: "Use a transparent, shopper-friendly tone focused on confidence and key facts.",
+  },
+  {
+    id: "edmunds",
+    name: "Edmunds",
+    sub: "Research-minded shoppers",
+    logoText: "Edmunds",
+    logoClass: "text-sky-700 tracking-tight",
+    brandAccent: "border-sky-500 bg-sky-50 shadow-sky-100",
+    characterLimit: 4000,
+    recommendedLength: "1,100-1,700 characters",
+    seoFocus: ["Specs", "Features", "Driving experience", "Ownership confidence"],
+    formattingRules: "Informative copy with helpful details for research-heavy shoppers.",
+    templateInstruction: "Balance key specs, comfort, technology, and ownership benefits.",
+  },
+  {
+    id: "kbb",
+    name: "Kelley Blue Book / KBB",
+    sub: "Trust and value focused",
+    logoText: "KBB",
+    logoClass: "text-blue-900 tracking-[0.28em]",
+    brandAccent: "border-blue-700 bg-blue-50 shadow-blue-100",
+    characterLimit: 3500,
+    recommendedLength: "900-1,500 characters",
+    seoFocus: ["Value", "Condition", "History-ready facts", "Features", "Dealer trust"],
+    formattingRules: "Trust-focused structure with factual, value-oriented language.",
+    templateInstruction: "Write with credibility, value, and shopper reassurance as the priority.",
+  },
+  {
+    id: "dealercom",
+    name: "Dealer.com",
+    sub: "Dealer website SEO format",
+    logoText: "Dealer.com",
+    logoClass: "text-slate-900 tracking-tight",
+    brandAccent: "border-slate-700 bg-slate-50 shadow-slate-100",
+    characterLimit: 5000,
+    recommendedLength: "1,500-2,400 characters",
+    seoFocus: ["Local SEO", "Year/make/model", "Trim", "Dealer name", "Nearby shoppers"],
+    formattingRules: "Longer website-ready SEO copy with local terms and natural keyword placement.",
+    templateInstruction: "Create a dealer website description optimized for Google, local intent, and conversion.",
+  },
 ];
 
-const platformLimits: Record<Platform, number> = {
-  autotrader: 4000,
-  carscom: 4000,
-  cargurus: 3000,
-  facebook: 1000,
-  website: 5000,
-  google: 4000,
-};
+const platformLimits: Record<Platform, number> = platformCards.reduce((limits, card) => ({ ...limits, [card.id]: card.characterLimit }), {} as Record<Platform, number>);
 
 const featureList = [
   "Navigation System",
@@ -120,6 +224,7 @@ const DescriptionWriter = () => {
   const wordCount = description.trim() ? description.trim().split(/\s+/).length : 0;
   const readMinutes = Math.max(1, Math.round(wordCount / 180));
   const seoScore = useMemo(() => scoreDescription(description, vehicle, geoCity, geoState, selectedFeatures, includeCallToAction), [description, vehicle, geoCity, geoState, selectedFeatures, includeCallToAction]);
+  const selectedPlatform = platformCards.find((card) => card.id === platform) || platformCards[0];
 
   const handleVinDecode = async () => {
     if (vehicle.vin.length !== 17) return toast.error("Enter a 17-character VIN");
@@ -142,15 +247,15 @@ const DescriptionWriter = () => {
     if (!vehicle.year || !vehicle.make || !vehicle.model) return toast.error("Enter vehicle details first");
     setGenerating(true);
     const maxChars = platformLimits[platform];
-    const prompt = `Write an SEO-optimized vehicle description for ${vehicle.year} ${vehicle.make} ${vehicle.model} ${vehicle.trim}. Platform: ${platform}. Tone: ${tone}. Max ${maxChars} characters. Location: ${geoCity}, ${geoState}. Dealer: ${includeDealerName ? dealerName : "omit"}. Include CTA: ${includeCallToAction}. Features: ${selectedFeatures.join(", ")}. Avoid unverifiable claims and write for retail customers.`;
+    const prompt = `Write an SEO-optimized vehicle description for ${vehicle.year} ${vehicle.make} ${vehicle.model} ${vehicle.trim}. Platform: ${selectedPlatform.name}. Tone: ${tone}. Max ${maxChars} characters. Recommended length: ${selectedPlatform.recommendedLength}. Location: ${geoCity}, ${geoState}. Dealer: ${includeDealerName ? dealerName : "omit"}. Include CTA: ${includeCallToAction}. Features: ${selectedFeatures.join(", ")}. SEO focus: ${selectedPlatform.seoFocus.join(", ")}. Formatting rules: ${selectedPlatform.formattingRules}. Platform instruction: ${selectedPlatform.templateInstruction}. Avoid unverifiable claims and write for retail customers.`;
     try {
       const { data, error } = await supabase.functions.invoke("ai-description", { body: { vehicle: { ...vehicle, prompt_override: prompt } } });
       if (error) throw error;
       const next = (data?.description || buildFallback(vehicle, selectedFeatures, dealerName, geoCity, geoState, includeCallToAction)).slice(0, maxChars);
       setDescription(next);
-      toast.success("Description generated");
+      toast.success(`${selectedPlatform.name} description generated`);
     } catch {
-      setDescription(buildFallback(vehicle, selectedFeatures, dealerName, geoCity, geoState, includeCallToAction));
+      setDescription(buildFallback(vehicle, selectedFeatures, dealerName, geoCity, geoState, includeCallToAction).slice(0, maxChars));
       toast.info("Used local description template");
     } finally {
       setGenerating(false);
@@ -223,8 +328,8 @@ const DescriptionWriter = () => {
         </section>
 
         <section className="space-y-4">
-          <Card title="Choose Your Writing Preset" subtitle="Optimized for where you'll publish.">
-            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+          <Card title="Third-Party Marketplace" subtitle="Choose the exact site format before generating the description.">
+            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-2 2xl:grid-cols-3">
               {platformCards.map((card) => <PresetCard key={card.id} card={card} active={platform === card.id} onClick={() => setPlatform(card.id)} />)}
             </div>
           </Card>
@@ -271,13 +376,15 @@ const DescriptionWriter = () => {
             </div>
           </Card>
 
-          <Card title="Generated Description" action={<button onClick={generate} disabled={generating} className="inline-flex h-10 items-center gap-2 rounded-xl border border-slate-200 px-4 text-sm font-black text-slate-700"><RotateCcw className="h-4 w-4" /> {generating ? "Generating..." : "Regenerate"}</button>}>
+          <RequirementsPanel platform={selectedPlatform} />
+
+          <Card title={`${selectedPlatform.name} Generated Description`} action={<button onClick={generate} disabled={generating} className="inline-flex h-10 items-center gap-2 rounded-xl border border-slate-200 px-4 text-sm font-black text-slate-700"><RotateCcw className="h-4 w-4" /> {generating ? "Generating..." : "Regenerate"}</button>}>
             <div className="mb-4 grid grid-cols-3 gap-4 text-center">
               <MiniMetric value={wordCount} label="Words" />
               <MiniMetric value={`${readMinutes} min`} label="Read Time" />
-              <MiniMetric value="A+" label="Strength" tone="emerald" />
+              <MiniMetric value={`${description.length}/${selectedPlatform.characterLimit}`} label="Characters" />
             </div>
-            <textarea value={description} onChange={(e) => setDescription(e.target.value)} className="min-h-[315px] w-full rounded-2xl border border-slate-200 bg-white p-4 text-sm font-medium leading-relaxed text-slate-800 outline-none focus:border-blue-400" />
+            <textarea value={description} onChange={(e) => setDescription(e.target.value)} maxLength={selectedPlatform.characterLimit} className="min-h-[315px] w-full rounded-2xl border border-slate-200 bg-white p-4 text-sm font-medium leading-relaxed text-slate-800 outline-none focus:border-blue-400" />
             <div className="mt-4 flex flex-wrap gap-3">
               <Button onClick={copy} icon={copied ? CheckCircle2 : Copy} label={copied ? "Copied" : "Copy"} />
               <Button onClick={() => downloadText(description)} icon={Download} label="Download .txt" />
@@ -312,7 +419,52 @@ function Card({ title, subtitle, badge, action, children }: { title: string; sub
 
 function Spec({ icon: Icon, label, value }: { icon: typeof Sparkles; label: string; value: string }) { return <div className="min-w-0"><div className="flex items-center gap-2 text-xs font-semibold text-slate-500"><Icon className="h-4 w-4" />{label}</div><div className="mt-1 truncate text-sm font-black text-slate-950">{value || "—"}</div></div>; }
 function FeatureLine({ label }: { label: string }) { return <div className="flex items-center gap-2 text-sm font-semibold text-slate-700"><CheckCircle2 className="h-4 w-4 text-emerald-600" /> {label}</div>; }
-function PresetCard({ card, active, onClick }: { card: { name: string; sub: string; logo: string }; active: boolean; onClick: () => void }) { return <button onClick={onClick} className={`relative rounded-2xl border p-5 text-center transition hover:-translate-y-0.5 hover:shadow-md ${active ? "border-blue-500 bg-blue-50" : "border-slate-200 bg-white"}`}><div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-white text-lg font-black text-blue-600 shadow-sm">{card.logo}</div><div className="mt-4 font-black text-slate-950">{card.name}</div><div className="mt-1 text-xs font-semibold text-slate-500">{card.sub}</div>{active && <CheckCircle2 className="absolute right-3 top-3 h-4 w-4 text-blue-600" />}</button>; }
+function PresetCard({ card, active, onClick }: { card: PlatformConfig; active: boolean; onClick: () => void }) {
+  return (
+    <button
+      onClick={onClick}
+      className={`relative flex min-h-[170px] flex-col items-center rounded-2xl border p-4 text-center shadow-sm transition hover:-translate-y-0.5 hover:shadow-md ${active ? `${card.brandAccent} shadow-lg` : "border-slate-200 bg-white"}`}
+    >
+      <div className="flex h-10 w-[120px] items-center justify-center rounded-xl border border-slate-100 bg-white px-3 shadow-sm">
+        <span className={`block max-w-full truncate text-center text-lg font-black leading-none ${card.logoClass}`}>{card.logoText}</span>
+      </div>
+      <div className="mt-4 font-black text-slate-950">{card.name}</div>
+      <div className="mt-1 min-h-[32px] text-xs font-semibold text-slate-500">{card.sub}</div>
+      <div className="mt-auto flex flex-wrap items-center justify-center gap-1.5 pt-3">
+        <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-[10px] font-black uppercase tracking-wide text-emerald-700">SEO Optimized</span>
+        <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[10px] font-black uppercase tracking-wide text-slate-600">Rules Loaded</span>
+      </div>
+      {active && <CheckCircle2 className="absolute right-3 top-3 h-4 w-4 text-blue-600" />}
+    </button>
+  );
+}
+function RequirementsPanel({ platform }: { platform: PlatformConfig }) {
+  return (
+    <Card title={`${platform.name} Requirements`} badge="Loaded">
+      <div className="mb-4 flex items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-3">
+        <div className="flex h-10 w-[120px] items-center justify-center rounded-xl bg-white px-3 shadow-sm">
+          <span className={`block max-w-full truncate text-center text-lg font-black leading-none ${platform.logoClass}`}>{platform.logoText}</span>
+        </div>
+        <div>
+          <div className="text-sm font-black text-slate-950">{platform.name}</div>
+          <div className="text-xs font-semibold text-emerald-700">Requirements Loaded</div>
+        </div>
+      </div>
+      <div className="grid gap-3 text-sm">
+        <Requirement label="Character limit" value={`${platform.characterLimit.toLocaleString()} max`} />
+        <Requirement label="Recommended length" value={platform.recommendedLength} />
+        <Requirement label="Formatting" value={platform.formattingRules} />
+        <div>
+          <div className="text-xs font-black uppercase tracking-wide text-slate-400">SEO focus</div>
+          <div className="mt-2 flex flex-wrap gap-2">
+            {platform.seoFocus.map((focus) => <span key={focus} className="rounded-lg bg-blue-50 px-2.5 py-1 text-xs font-bold text-blue-700">{focus}</span>)}
+          </div>
+        </div>
+      </div>
+    </Card>
+  );
+}
+function Requirement({ label, value }: { label: string; value: string }) { return <div><div className="text-xs font-black uppercase tracking-wide text-slate-400">{label}</div><div className="mt-1 font-semibold text-slate-700">{value}</div></div>; }
 function SelectLike({ label, value, onChange }: { label: string; value: string; onChange: (value: string) => void }) { return <label><span className="text-sm font-bold text-slate-600">{label}</span><input value={value} onChange={(e) => onChange(e.target.value)} className="mt-2 h-12 w-full rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold outline-none focus:border-blue-400" /></label>; }
 function CheckOption({ checked, onClick, label }: { checked: boolean; onClick: () => void; label: string }) { return <button onClick={onClick} className="inline-flex items-center gap-2 text-sm font-bold text-slate-700"><span className={`flex h-5 w-5 items-center justify-center rounded border ${checked ? "border-blue-600 bg-blue-600 text-white" : "border-slate-300 bg-white"}`}>{checked && <CheckCircle2 className="h-3.5 w-3.5" />}</span>{label}</button>; }
 function ScoreRing({ score }: { score: number }) { return <div className="mx-auto flex h-28 w-28 items-center justify-center rounded-full border-[7px] border-emerald-500 bg-white"><div className="text-center"><div className="text-4xl font-black text-slate-950">{score}</div><div className="text-xs font-bold text-slate-500">/100</div><div className="mt-1 rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-black text-emerald-700">Excellent</div></div></div>; }
