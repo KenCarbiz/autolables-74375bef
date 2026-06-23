@@ -1,9 +1,10 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useTenant } from "@/contexts/TenantContext";
 import { useDealerSettings } from "@/contexts/DealerSettingsContext";
 import { useVinDecode } from "@/hooks/useVinDecode";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import {
   ArrowRight,
   CheckCircle2,
@@ -16,6 +17,9 @@ import {
   Globe,
   History,
   ImageIcon,
+  Loader2,
+  MapPin,
+  Plus,
   RotateCcw,
   Save,
   Send,
@@ -24,7 +28,10 @@ import {
   Star,
   Target,
   Wrench,
+  X,
 } from "lucide-react";
+
+type ZipPlace = { city: string; state: string; stateAbbr: string };
 
 type Platform = "autotrader" | "carscom" | "cargurus" | "facebook" | "dealerwebsite" | "googleseo";
 type Tone = "professional" | "luxury" | "sporty" | "family" | "value";
@@ -184,11 +191,20 @@ const DescriptionWriter = () => {
   const [geoCity, setGeoCity] = useState(currentStore?.city || "Manchester");
   const [geoState, setGeoState] = useState(currentStore?.state || "Connecticut");
   const [primaryKeyword, setPrimaryKeyword] = useState("INFINITI QX80 for sale");
+  const [extraKeywords, setExtraKeywords] = useState<string[]>([]);
+  const [keywordDraft, setKeywordDraft] = useState("");
   const [zipCode, setZipCode] = useState("06040");
+  const [zipPlaces, setZipPlaces] = useState<ZipPlace[]>([]);
+  const [zipLoading, setZipLoading] = useState(false);
+  const [zipError, setZipError] = useState<string | null>(null);
+  const lastZipLookup = useRef<string>("");
   const [radius, setRadius] = useState<number>(25);
   const [includeCallToAction, setIncludeCallToAction] = useState(true);
   const [includeDealerName, setIncludeDealerName] = useState(true);
   const [selectedFeatures, setSelectedFeatures] = useState<string[]>(featureList);
+  const [vinDetails, setVinDetails] = useState<Record<string, string> | null>(null);
+  const [vinDetailsOpen, setVinDetailsOpen] = useState(false);
+  const [loadingVinDetails, setLoadingVinDetails] = useState(false);
   const [generating, setGenerating] = useState(false);
   const [copied, setCopied] = useState(false);
   const [description, setDescription] = useState("Experience luxury, power, and confidence in this 2025 INFINITI QX80 Sensory AWD. Finished in stunning Majestic White with a refined Graphite interior, this full-size SUV delivers a commanding presence and an exceptional driving experience. Powered by a 5.6L V8 engine paired with a smooth 9-speed automatic transmission and advanced all-wheel drive, the QX80 offers impressive performance in all conditions.\n\nThis QX80 Sensory is loaded with premium features including navigation, Bose premium audio, heated and ventilated seats, tri-zone climate control, panoramic moonroof, 360° around view monitor, ProPILOT Assist, head-up display, wireless Apple CarPlay, and a power liftgate for added convenience.\n\nWith three rows of seating, spacious comfort, and cutting-edge technology, this INFINITI QX80 is the perfect blend of luxury and capability.\n\nVisit Harte INFINITI in Manchester, CT today for a test drive!");
@@ -233,11 +249,84 @@ const DescriptionWriter = () => {
     toast.success(`${result.year} ${result.make} ${result.model}`);
   };
 
+  const lookupZip = async (zip: string, { announce = false } = {}) => {
+    const z = zip.trim();
+    if (!/^\d{5}$/.test(z)) {
+      if (announce) toast.error("Enter a 5-digit zip code");
+      return;
+    }
+    if (lastZipLookup.current === z) return;
+    lastZipLookup.current = z;
+    setZipLoading(true);
+    setZipError(null);
+    try {
+      const res = await fetch(`https://api.zippopotam.us/us/${z}`);
+      if (!res.ok) throw new Error("not_found");
+      const json = await res.json();
+      const places: ZipPlace[] = (json.places || []).map((p: any) => ({
+        city: p["place name"],
+        state: p["state"],
+        stateAbbr: p["state abbreviation"],
+      }));
+      setZipPlaces(places);
+      if (places.length > 0) {
+        setGeoCity(places[0].city);
+        setGeoState(places[0].state);
+        if (announce) toast.success(`${places[0].city}, ${places[0].stateAbbr}${places.length > 1 ? ` (+${places.length - 1} more)` : ""}`);
+      }
+    } catch {
+      setZipPlaces([]);
+      setZipError("Zip code not found");
+      if (announce) toast.error("Zip code not found");
+    } finally {
+      setZipLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!/^\d{5}$/.test(zipCode)) return;
+    const t = setTimeout(() => lookupZip(zipCode), 350);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [zipCode]);
+
+  const openVinDetails = async () => {
+    if (vehicle.vin.length !== 17) return toast.error("Enter a 17-character VIN to view decode details");
+    setLoadingVinDetails(true);
+    setVinDetailsOpen(true);
+    try {
+      const res = await fetch(`https://vpic.nhtsa.dot.gov/api/vehicles/DecodeVinValues/${vehicle.vin.toUpperCase()}?format=json`);
+      const json = await res.json();
+      const row = json.Results?.[0] || {};
+      const filtered: Record<string, string> = {};
+      Object.entries(row).forEach(([k, v]) => {
+        const s = String(v ?? "").trim();
+        if (s && s !== "Not Applicable" && k !== "ErrorCode" && k !== "ErrorText" && k !== "AdditionalErrorText") filtered[k] = s;
+      });
+      setVinDetails(filtered);
+    } catch {
+      toast.error("Could not load VIN decode details");
+      setVinDetails(null);
+    } finally {
+      setLoadingVinDetails(false);
+    }
+  };
+
+  const addKeyword = () => {
+    const k = keywordDraft.trim();
+    if (!k) return;
+    if (extraKeywords.includes(k) || k === primaryKeyword) return setKeywordDraft("");
+    setExtraKeywords([...extraKeywords, k]);
+    setKeywordDraft("");
+  };
+
+
   const generate = async () => {
     if (!vehicle.year || !vehicle.make || !vehicle.model) return toast.error("Enter vehicle details first");
     setGenerating(true);
     const maxChars = platformLimits[platform];
-    const prompt = `Write an SEO-optimized vehicle description for ${vehicle.year} ${vehicle.make} ${vehicle.model} ${vehicle.trim}. Platform: ${selectedPlatform.name}. Tone: ${tone}. Max ${maxChars} characters. Recommended length: ${selectedPlatform.recommendedLength}. Location: ${geoCity}, ${geoState}. Dealer: ${includeDealerName ? dealerName : "omit"}. Include CTA: ${includeCallToAction}. Features: ${selectedFeatures.join(", ")}. SEO focus: ${selectedPlatform.seoFocus.join(", ")}. Formatting rules: ${selectedPlatform.formattingRules}. Platform instruction: ${selectedPlatform.templateInstruction}. Avoid unverifiable claims and write for retail customers.`;
+    const allKeywords = [primaryKeyword, ...extraKeywords].filter(Boolean).join("; ");
+    const prompt = `Write an SEO-optimized vehicle description for ${vehicle.year} ${vehicle.make} ${vehicle.model} ${vehicle.trim}. Platform: ${selectedPlatform.name}. Tone: ${tone}. Max ${maxChars} characters. Recommended length: ${selectedPlatform.recommendedLength}. Location: ${geoCity}, ${geoState} ${zipCode}. Target keywords: ${allKeywords || "none"}. Dealer: ${includeDealerName ? dealerName : "omit"}. Include CTA: ${includeCallToAction}. Features: ${selectedFeatures.join(", ")}. SEO focus: ${selectedPlatform.seoFocus.join(", ")}. Formatting rules: ${selectedPlatform.formattingRules}. Platform instruction: ${selectedPlatform.templateInstruction}. Avoid unverifiable claims and write for retail customers.`;
     try {
       const { data, error } = await supabase.functions.invoke("ai-description", { body: { vehicle: { ...vehicle, prompt_override: prompt } } });
       if (error) throw error;
@@ -300,7 +389,7 @@ const DescriptionWriter = () => {
             <div className="grid grid-cols-2 gap-3">
               {featureList.slice(0, 10).map((feature) => <FeatureLine key={feature} label={feature} />)}
             </div>
-            <button onClick={handleVinDecode} disabled={decoding} className="mt-5 text-sm font-black text-blue-600">View full decode details →</button>
+            <button onClick={openVinDetails} className="mt-5 text-sm font-black text-blue-600">View full decode details →</button>
           </Card>
         </section>
 
@@ -318,12 +407,51 @@ const DescriptionWriter = () => {
           </Card>
 
           <Card title="SEO Targeting" subtitle="Help us include the right local and market terms.">
-            <div className="grid gap-4 md:grid-cols-2">
-              <SelectLike label="City" value={geoCity} onChange={setGeoCity} />
+            <div className="grid gap-4 md:grid-cols-[160px_1fr_180px]">
+              <label>
+                <span className="text-sm font-bold text-slate-600">Zip Code</span>
+                <div className="relative mt-2">
+                  <input
+                    value={zipCode}
+                    onChange={(e) => setZipCode(e.target.value.replace(/\D/g, "").slice(0, 5))}
+                    onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); lastZipLookup.current = ""; lookupZip(zipCode, { announce: true }); } }}
+                    onBlur={() => lookupZip(zipCode)}
+                    inputMode="numeric"
+                    placeholder="06040"
+                    className="h-12 w-full rounded-xl border border-slate-200 bg-white px-4 pr-9 text-sm font-semibold outline-none focus:border-blue-400"
+                  />
+                  {zipLoading && <Loader2 className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 animate-spin text-slate-400" />}
+                  {!zipLoading && zipPlaces.length > 0 && <MapPin className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-emerald-600" />}
+                </div>
+                {zipError && <span className="mt-1 block text-xs font-semibold text-rose-600">{zipError}</span>}
+              </label>
+
+              <label>
+                <span className="text-sm font-bold text-slate-600">City</span>
+                {zipPlaces.length > 1 ? (
+                  <select
+                    value={geoCity}
+                    onChange={(e) => {
+                      const p = zipPlaces.find((pl) => pl.city === e.target.value);
+                      if (p) { setGeoCity(p.city); setGeoState(p.state); }
+                    }}
+                    className="mt-2 h-12 w-full rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold outline-none focus:border-blue-400"
+                  >
+                    {zipPlaces.map((p) => <option key={p.city} value={p.city}>{p.city}, {p.stateAbbr}</option>)}
+                  </select>
+                ) : (
+                  <input value={geoCity} onChange={(e) => setGeoCity(e.target.value)} className="mt-2 h-12 w-full rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold outline-none focus:border-blue-400" />
+                )}
+              </label>
+
               <SelectLike label="State" value={geoState} onChange={setGeoState} />
             </div>
-            <div className="mt-4 grid gap-4 md:grid-cols-2">
-              <SelectLike label="Zip Code" value={zipCode} onChange={setZipCode} />
+
+            <div className="mt-4 grid gap-4 md:grid-cols-[1fr_180px]">
+              <label>
+                <span className="text-sm font-bold text-slate-600">Primary Keyword (Optional)</span>
+                <input value={primaryKeyword} onChange={(e) => setPrimaryKeyword(e.target.value)} placeholder="e.g. 2025 INFINITI QX80 for sale" className="mt-2 h-12 w-full rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold outline-none focus:border-blue-400" />
+              </label>
               <label>
                 <span className="text-sm font-bold text-slate-600">Radius</span>
                 <select value={radius} onChange={(e) => setRadius(Number(e.target.value))} className="mt-2 h-12 w-full rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold outline-none focus:border-blue-400">
@@ -331,8 +459,30 @@ const DescriptionWriter = () => {
                 </select>
               </label>
             </div>
-            <label className="mt-4 block text-sm font-bold text-slate-600">Primary Keyword (Optional)</label>
-            <input value={primaryKeyword} onChange={(e) => setPrimaryKeyword(e.target.value)} className="mt-2 h-12 w-full rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold outline-none focus:border-blue-400" />
+
+            <div className="mt-4">
+              <span className="text-sm font-bold text-slate-600">Additional Keywords (Optional)</span>
+              <div className="mt-2 flex flex-wrap items-center gap-2 rounded-xl border border-slate-200 bg-white p-2">
+                {extraKeywords.map((k) => (
+                  <span key={k} className="inline-flex items-center gap-1 rounded-lg bg-blue-50 px-2.5 py-1.5 text-xs font-bold text-blue-700">
+                    {k}
+                    <button type="button" onClick={() => setExtraKeywords(extraKeywords.filter((x) => x !== k))} className="text-blue-700/70 hover:text-blue-900"><X className="h-3 w-3" /></button>
+                  </span>
+                ))}
+                <input
+                  value={keywordDraft}
+                  onChange={(e) => setKeywordDraft(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === "Enter" || e.key === ",") { e.preventDefault(); addKeyword(); } }}
+                  placeholder={extraKeywords.length ? "Add another…" : "Add long-tail keywords (press Enter)"}
+                  className="min-w-[180px] flex-1 bg-transparent px-2 py-1.5 text-sm font-semibold outline-none"
+                />
+                {keywordDraft && (
+                  <button type="button" onClick={addKeyword} className="inline-flex items-center gap-1 rounded-lg bg-slate-100 px-2 py-1 text-xs font-black text-slate-700"><Plus className="h-3 w-3" />Add</button>
+                )}
+              </div>
+              <p className="mt-1 text-xs font-semibold text-slate-500">Optional. Add secondary phrases shoppers search for (e.g., "AWD SUV", "luxury family SUV").</p>
+            </div>
+
             <div className="mt-4 flex flex-wrap gap-4">
               <CheckOption checked={includeCallToAction} onClick={() => setIncludeCallToAction(!includeCallToAction)} label="Include call to action" />
               <CheckOption checked={includeDealerName} onClick={() => setIncludeDealerName(!includeDealerName)} label="Include dealer name" />
@@ -394,6 +544,33 @@ const DescriptionWriter = () => {
       </main>
 
       <div className="border-t border-slate-200 bg-white py-3 text-center text-sm font-semibold text-slate-500">AI-generated content. Always review for accuracy.</div>
+
+      <Dialog open={vinDetailsOpen} onOpenChange={setVinDetailsOpen}>
+        <DialogContent className="max-h-[80vh] max-w-3xl overflow-hidden p-0">
+          <DialogHeader className="border-b border-slate-200 px-6 py-4">
+            <DialogTitle className="text-lg font-black text-slate-950">
+              VIN Decode Details
+              {vehicle.vin && <span className="ml-2 rounded bg-slate-100 px-2 py-0.5 font-mono text-xs font-bold text-slate-700">{vehicle.vin.toUpperCase()}</span>}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="max-h-[60vh] overflow-y-auto px-6 py-4">
+            {loadingVinDetails ? (
+              <div className="flex items-center justify-center py-12 text-slate-500"><Loader2 className="mr-2 h-5 w-5 animate-spin" /> Decoding VIN with NHTSA…</div>
+            ) : vinDetails && Object.keys(vinDetails).length ? (
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                {Object.entries(vinDetails).map(([k, v]) => (
+                  <div key={k} className="rounded-lg border border-slate-100 bg-slate-50/60 px-3 py-2">
+                    <div className="text-[11px] font-black uppercase tracking-wide text-slate-500">{k.replace(/([A-Z])/g, " $1").trim()}</div>
+                    <div className="mt-0.5 text-sm font-bold text-slate-900">{v}</div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="py-12 text-center text-sm font-semibold text-slate-500">No decode data available for this VIN.</div>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
