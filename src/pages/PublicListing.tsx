@@ -112,6 +112,29 @@ const PublicListingBody = () => {
     return () => { mounted = false; };
   }, [slug]);
 
+  // These must run before any conditional return (Rules of Hooks).
+  const gallery = useMemo(() => {
+    if (!listing) return [];
+    const fromPhotos = (listing.photos || []).map((p) => p.url).filter(Boolean);
+    if (fromPhotos.length > 0) return fromPhotos;
+    if (listing.hero_image_url) return [listing.hero_image_url];
+    return [];
+  }, [listing]);
+
+  const highlights = useMemo(() => {
+    if (!listing) return [];
+    const ks = listing.key_specs || {};
+    if (listing.features && listing.features.length > 0) return listing.features.slice(0, 6);
+    const rows: { icon: React.ElementType; title: string; cat: string }[] = [];
+    if (ks.engine) rows.push({ icon: Cog, title: ks.engine, cat: "Engine" });
+    if (ks.drivetrain) rows.push({ icon: Car, title: ks.drivetrain, cat: "Drivetrain" });
+    if (ks.transmission) rows.push({ icon: Settings, title: ks.transmission, cat: "Transmission" });
+    if (ks.fuel) rows.push({ icon: Fuel, title: ks.fuel, cat: "Fuel" });
+    if (ks.body_style) rows.push({ icon: Car, title: ks.body_style, cat: "Body Style" });
+    if (ks.exterior_color) rows.push({ icon: Wind, title: ks.exterior_color, cat: "Color" });
+    return rows.slice(0, 6);
+  }, [listing]);
+
   // ── Loading ─────────────────────────────────────────────────
   if (loading) return (
     <div className="min-h-screen flex items-center justify-center">
@@ -148,14 +171,6 @@ const PublicListingBody = () => {
   const viewUrl = publicUrl(listing.slug);
   const cond = conditionLabel(listing.condition);
 
-  // Gallery: prefer listing.photos, fall back to hero_image_url
-  const gallery = useMemo(() => {
-    const fromPhotos = (listing.photos || []).map((p) => p.url).filter(Boolean);
-    if (fromPhotos.length > 0) return fromPhotos;
-    if (listing.hero_image_url) return [listing.hero_image_url];
-    return [];
-  }, [listing]);
-
   const price = listing.price ?? 0;
   const marketAvg = listing.market_value ?? 0;
   const marketLow = listing.market_payload?.low ?? 0;
@@ -175,19 +190,6 @@ const PublicListingBody = () => {
     const mi = w.factory_miles ? `${(w.factory_miles / 1000).toFixed(0)}K mi` : null;
     return [yrs ? `${yrs} yr` : null, mi].filter(Boolean).join(" / ") || null;
   })();
-
-  // Vehicle highlights from listing.features or key_specs
-  const highlights = useMemo(() => {
-    if (listing.features && listing.features.length > 0) return listing.features.slice(0, 6);
-    const rows: { icon: React.ElementType; title: string; cat: string }[] = [];
-    if (ks.engine) rows.push({ icon: Cog, title: ks.engine, cat: "Engine" });
-    if (ks.drivetrain) rows.push({ icon: Car, title: ks.drivetrain, cat: "Drivetrain" });
-    if (ks.transmission) rows.push({ icon: Settings, title: ks.transmission, cat: "Transmission" });
-    if (ks.fuel) rows.push({ icon: Fuel, title: ks.fuel, cat: "Fuel" });
-    if (ks.body_style) rows.push({ icon: Car, title: ks.body_style, cat: "Body Style" });
-    if (ks.exterior_color) rows.push({ icon: Wind, title: ks.exterior_color, cat: "Color" });
-    return rows.slice(0, 6);
-  }, [listing.features, ks]);
 
   const handleShare = async () => {
     try {
