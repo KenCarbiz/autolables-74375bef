@@ -480,15 +480,14 @@ const AppShell = ({ children }: AppShellProps) => {
               <p className="truncate text-xs font-medium text-muted-foreground">{pageMeta.subtitle}</p>
             </div>
 
-            {/* Centre: global search → command palette */}
+            {/* Global search pill → command palette */}
             <button
               onClick={() => setPaletteOpen(true)}
-              className="hidden xl:flex flex-1 min-w-0 max-w-xl mx-auto items-center gap-2.5 h-10 px-4 rounded-2xl border border-border bg-background hover:bg-muted/60 hover:border-foreground/15 text-sm shadow-sm transition-all"
+              className="hidden lg:flex w-[260px] xl:w-[340px] ml-4 items-center gap-2.5 h-9 px-4 rounded-full border border-border bg-background hover:bg-muted/60 hover:border-foreground/15 text-sm shadow-sm transition-all"
               title="Search (Cmd/Ctrl + K)"
             >
               <Search className="h-4 w-4 text-muted-foreground flex-shrink-0" />
               <span className="flex-1 text-left text-muted-foreground truncate">Search VIN, stock #, make, model…</span>
-              <kbd className="inline-flex items-center justify-center h-5 min-w-[28px] px-1.5 rounded-md bg-muted border border-border text-[10px] font-mono text-muted-foreground tracking-wider">⌘K</kbd>
             </button>
 
             <div className="flex shrink-0 items-center gap-2 ml-auto">
@@ -559,7 +558,7 @@ const AppShell = ({ children }: AppShellProps) => {
                     <span className="h-9 w-9 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-sm font-black shadow-sm">
                       {user?.email?.charAt(0).toUpperCase() || "U"}
                     </span>
-                    <span className="hidden 2xl:block min-w-0 text-left leading-tight">
+                    <span className="hidden xl:block min-w-0 text-left leading-tight">
                       <span className="block truncate max-w-[110px] text-[12px] font-bold text-foreground">{accountName}</span>
                       <span className="block text-[10px] text-muted-foreground">{accountRole}</span>
                     </span>

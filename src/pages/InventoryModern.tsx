@@ -14,9 +14,10 @@ import { useVinDecode } from "@/hooks/useVinDecode";
 import { toast } from "sonner";
 import {
   Plus, Search, Upload, Car, FileText, Printer, Signature, ScanLine,
-  X, CheckCircle2, AlertTriangle, RefreshCw, MoreVertical, Gauge, Building2,
+  X, CheckCircle2, AlertTriangle, RefreshCw, MoreVertical, Building2,
   ShieldCheck, ClipboardList, ExternalLink, Trash2, Wrench,
-  ChevronLeft, ChevronRight, Eye, CircleDollarSign, FileSignature,
+  ChevronLeft, ChevronRight, Eye, CircleDollarSign, FileSignature, Tag,
+  AlertCircle, ShieldAlert, TrendingUp,
 } from "lucide-react";
 import SharedEmptyState from "@/components/ui/empty-state";
 import { AdvertisedPriceBand } from "@/components/inventory/AdvertisedPriceBand";
@@ -368,15 +369,6 @@ const InventoryModern = () => {
   const safePage = Math.min(page, pageCount);
   const pageRows = filtered.slice((safePage - 1) * perPage, safePage * perPage);
   const readinessSpark = pageRows.map(rowReadiness);
-  const topIssue = (() => {
-    const issues = [
-      { label: "Missing Addendums", n: counts.missingAddendum },
-      { label: "Missing Stickers", n: counts.needsSticker },
-      { label: "Price Reviews", n: counts.priceVerify },
-      { label: "Open Recalls", n: counts.openRecallVehicles },
-    ].sort((a, b) => b.n - a.n);
-    return issues[0].n > 0 ? issues[0].label : "All clear";
-  })();
 
   const rowActions = (r: VehicleRow): KebabItem[] => [
     { label: "Open Vehicle", icon: ExternalLink, onClick: () => navigate(`/vehicle-file/${r.id}`) },
@@ -453,12 +445,13 @@ const InventoryModern = () => {
                   <thead className="bg-muted/40 text-[11px] uppercase tracking-wide text-muted-foreground">
                     <tr>
                       <th className="text-left font-semibold px-4 py-3">Vehicle</th>
-                      <th className="text-left font-semibold px-3 py-3">Stock # / VIN</th>
+                      <th className="text-left font-semibold px-3 py-3">Stock / VIN</th>
                       <th className="text-left font-semibold px-3 py-3">Status</th>
                       <th className="text-left font-semibold px-3 py-3">Readiness</th>
-                      <th className="text-left font-semibold px-3 py-3">Compliance</th>
-                      <th className="text-right font-semibold px-3 py-3">Advertised Price</th>
-                      <th className="text-left font-semibold px-3 py-3">Publishing</th>
+                      <th className="text-left font-semibold px-3 py-3">VIN Decode</th>
+                      <th className="text-left font-semibold px-3 py-3">Recalls</th>
+                      <th className="text-left font-semibold px-3 py-3">Market Position</th>
+                      <th className="text-left font-semibold px-3 py-3">Portal Status</th>
                       <th className="text-left font-semibold px-3 py-3">Updated</th>
                       <th className="text-right font-semibold px-3 py-3">Actions</th>
                     </tr>
@@ -482,22 +475,18 @@ const InventoryModern = () => {
                           <p className="font-mono text-xs text-foreground">{r.stock_number || "—"}</p>
                           <p className="font-mono text-[11px] text-muted-foreground">…{(r.vin || "").slice(-6)}</p>
                         </td>
-                        <td className="px-3 py-3"><StatusPill status={r.status} /></td>
+                        <td className="px-3 py-3"><StatusPill status={r.status} signal={signalFor(r)} /></td>
                         <td className="px-3 py-3">
                           <ReadinessCell r={r} signal={signalFor(r)} pct={rowReadiness(r)} />
                         </td>
                         <td className="px-3 py-3">
-                          <ComplianceCell r={r} />
+                          <VinDecodeCell ymm={r.ymm} />
                         </td>
-                        <td className="px-3 py-3 text-right" onClick={(e) => e.stopPropagation()}>
-                          <p className="text-base font-bold text-foreground tabular-nums leading-tight">{r.price ? `$${r.price.toLocaleString()}` : "—"}</p>
-                          {r.price ? (
-                            <div className="mt-0.5 leading-tight">
-                              <p className="text-[11px] font-semibold text-emerald-600 inline-flex items-center gap-1"><CheckCircle2 className="w-3 h-3" />Advertised</p>
-                              {settings.doc_fee_amount > 0 && <p className="text-[10px] text-muted-foreground">incl. ${settings.doc_fee_amount.toLocaleString()} doc</p>}
-                            </div>
-                          ) : null}
-                          {r.market_position && <div className="mt-1 flex justify-end"><MarketChip position={r.market_position} /></div>}
+                        <td className="px-3 py-3">
+                          <RecallChip status={r.recall_status} open={r.open_recall_count} />
+                        </td>
+                        <td className="px-3 py-3">
+                          <MarketCell position={r.market_position} price={r.price} value={r.market_value} />
                         </td>
                         <td className="px-3 py-3" onClick={(e) => e.stopPropagation()}>
                           <PortalChip status={r.status} />
@@ -543,43 +532,23 @@ const InventoryModern = () => {
 
         {/* Sidebar */}
         <aside className="xl:w-[300px] shrink-0 space-y-4">
-          <div className="rounded-[20px] border border-[#EAECEF] bg-white shadow-[0_1px_3px_rgba(16,24,40,0.04)] p-4">
-            <h3 className="text-xs font-bold uppercase tracking-[0.14em] text-muted-foreground mb-3">Quick Actions</h3>
-            <div className="space-y-2">
-              <QuickAction icon={Plus} label="Add Vehicle" onClick={() => setShowAdd(true)} />
-              <QuickAction icon={ScanLine} label="Scan VIN" onClick={openScan} />
-              <QuickAction icon={Printer} label="New Car Sticker" onClick={() => navigate("/new-car-sticker")} />
-              <QuickAction icon={FileSignature} label="New Addendum" onClick={() => navigate("/addendum")} />
-              <QuickAction icon={ShieldCheck} label="Check Recalls" onClick={runRecallBatch} />
-              <QuickAction icon={CircleDollarSign} label="Check Market Prices" onClick={runMarketBatch} />
-              {settings.feature_price_verification && <QuickAction icon={RefreshCw} label={scraping ? "Verifying…" : "Verify Prices"} onClick={runPriceScrape} />}
-              <QuickAction icon={Upload} label="CSV Import" onClick={() => setShowImport(true)} />
-            </div>
-          </div>
-
           <SideCard title="Inventory Insights">
-            <div className="flex items-end justify-between gap-2">
-              <div className="flex items-baseline gap-1.5">
-                <span className="font-display text-3xl font-semibold text-emerald-600 tabular-nums leading-none">{counts.avgReadiness}%</span>
-                <span className="text-sm font-semibold text-foreground">Ready</span>
-              </div>
-              <Sparkline values={readinessSpark} />
-            </div>
-            <ul className="space-y-2.5 mt-3 pt-3 border-t border-border">
-              <InsightRow icon={Printer} label="Need stickers" value={counts.needsSticker} tone={counts.needsSticker ? "amber" : "neutral"} iconTone="amber" />
-              <InsightRow icon={FileSignature} label="Need addendums" value={counts.missingAddendum} tone={counts.missingAddendum ? "amber" : "neutral"} iconTone="red" />
-              <InsightRow icon={ShieldCheck} label="Open recalls" value={counts.openRecallVehicles} tone={counts.openRecallVehicles ? "red" : "emerald"} iconTone={counts.openRecallVehicles ? "red" : "emerald"} />
-              <InsightRow icon={CircleDollarSign} label="Price reviews" value={counts.priceVerify} iconTone="blue" />
+            <ul className="space-y-3">
+              <InsightStat icon={Car} value={counts.total} label="Total Vehicles" iconTone="blue" onClick={() => onHealthMetric("total")} />
+              <InsightStat icon={CheckCircle2} value={counts.vinDecoded} label="VIN Decoded" iconTone="emerald" badge={counts.total ? `${Math.round((counts.vinDecoded / counts.total) * 100)}%` : undefined} />
+              <InsightStat icon={Printer} value={counts.needsSticker} label="Missing Stickers" iconTone="amber" onClick={() => onHealthMetric("needs-sticker")} />
+              <InsightStat icon={FileText} value={counts.missingAddendum} label="Missing Addendums" iconTone="orange" onClick={() => onHealthMetric("missing-addendum")} />
+              <InsightStat icon={ShieldCheck} value={counts.openRecallVehicles} label="Open Recalls" iconTone="red" onClick={() => onHealthMetric("open-recalls")} />
+              <InsightStat icon={Tag} value={counts.priceVerify} label="Price Reviews" iconTone="violet" onClick={() => onHealthMetric("price-reviews")} />
             </ul>
-            <div className="mt-3 pt-3 border-t border-border flex items-center justify-between gap-2">
-              <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Top issue</span>
-              <span className="text-xs font-bold text-amber-600">{topIssue}</span>
+            <div className="mt-4 pt-3 border-t border-border">
+              <p className="text-[11px] font-semibold text-muted-foreground">Average Readiness Score</p>
+              <div className="mt-1 flex items-end justify-between gap-2">
+                <span className="font-display text-3xl font-semibold text-foreground tabular-nums leading-none">{counts.avgReadiness}%</span>
+                <Sparkline values={readinessSpark} />
+              </div>
+              <button onClick={() => navigate("/admin?tab=analytics")} className="text-[11px] font-semibold text-blue-600 hover:text-blue-700 mt-3 transition-colors">View full insights →</button>
             </div>
-            <button onClick={() => onHealthMetric("needs-attention")} className="text-[11px] font-semibold text-blue-600 hover:text-blue-700 mt-3 transition-colors">View items needing attention →</button>
-          </SideCard>
-
-          <SideCard title="Inventory by Status">
-            <StatusDonut published={counts.published} draft={counts.draft} archived={counts.archived} total={counts.total} />
           </SideCard>
 
           <SideCard title="Recent Activity">
@@ -609,15 +578,19 @@ const InventoryModern = () => {
             )}
           </SideCard>
 
-          <SideCard title="Dealer Health">
-            <div className="grid grid-cols-2 gap-2.5">
-              <HealthStat label="Compliance score" value={`${counts.health}%`} tone="emerald" />
-              <HealthStat label="Inventory readiness" value={`${counts.avgReadiness}%`} tone="blue" />
-              <HealthStat label="Open issues" value={counts.needsAttention} tone={counts.needsAttention ? "amber" : "emerald"} />
-              <HealthStat label={`Market position`} value={`$${Math.abs(counts.avgBelowMarket).toLocaleString()} ${counts.avgBelowMarket >= 0 ? "below" : "above"}`} tone={counts.avgBelowMarket >= 0 ? "emerald" : "amber"} small />
+          <div className="rounded-[20px] border border-[#EAECEF] bg-white shadow-[0_1px_3px_rgba(16,24,40,0.04)] p-4">
+            <h3 className="text-xs font-bold uppercase tracking-[0.14em] text-muted-foreground mb-3">Quick Actions</h3>
+            <div className="space-y-2">
+              <QuickAction icon={Plus} label="Add Vehicle" onClick={() => setShowAdd(true)} />
+              <QuickAction icon={ScanLine} label="Scan VIN" onClick={openScan} />
+              <QuickAction icon={Printer} label="New Car Sticker" onClick={() => navigate("/new-car-sticker")} />
+              <QuickAction icon={FileSignature} label="New Addendum" onClick={() => navigate("/addendum")} />
+              <QuickAction icon={ShieldCheck} label="Check Recalls" onClick={runRecallBatch} />
+              <QuickAction icon={CircleDollarSign} label="Check Market Prices" onClick={runMarketBatch} />
+              {settings.feature_price_verification && <QuickAction icon={RefreshCw} label={scraping ? "Verifying…" : "Verify Prices"} onClick={runPriceScrape} />}
+              <QuickAction icon={Upload} label="CSV Import" onClick={() => setShowImport(true)} />
             </div>
-            <button onClick={() => navigate("/admin?tab=analytics")} className="text-[11px] font-semibold text-blue-600 hover:text-blue-700 mt-3 transition-colors">View dealer health →</button>
-          </SideCard>
+          </div>
         </aside>
       </div>
 
@@ -710,18 +683,15 @@ const ReadinessCell = ({ r, signal, pct }: { r: VehicleRow; signal: RowSignal; p
     { label: "Addendum complete", short: "addendum", ok: signal.hasAddendum },
     { label: "Price verified", short: "price", ok: !r.price || signal.priceVerified },
   ];
-  const done = checks.filter((c) => c.ok).length;
-  const firstMissing = checks.find((c) => !c.ok);
-  const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
+  const missing = checks.filter((c) => !c.ok).length;
+  const label = pct >= 100 ? "Ready" : pct >= 80 ? "Almost Ready" : missing <= 1 ? "Missing Items" : "Several Missing";
   const title = `${pct}% readiness\n` + checks.map((c) => `${c.ok ? "✓" : "✗"} ${c.label}`).join("\n");
   return (
-    <div className="flex items-center gap-2 cursor-help" title={title}>
+    <div className="flex items-center gap-2.5 cursor-help" title={title}>
       <MiniRing pct={pct} />
       <div className="min-w-0 leading-tight">
-        <p className={`text-xs font-semibold ${firstMissing ? "text-amber-600" : "text-emerald-600"}`}>
-          {firstMissing ? `Missing ${cap(firstMissing.short)}` : "Ready"}
-        </p>
-        <p className="text-[10px] text-muted-foreground">{done} / {checks.length} complete</p>
+        <p className="text-[13px] font-semibold text-foreground">{label}</p>
+        {pct < 100 && <p className="text-[11px] font-semibold text-blue-600">View reasons</p>}
       </div>
     </div>
   );
@@ -750,29 +720,27 @@ const QuickAction = ({ icon: Icon, label, onClick }: { icon: typeof Car; label: 
   </button>
 );
 
-const HealthStat = ({ label, value, tone, small }: { label: string; value: string | number; tone?: "emerald" | "blue" | "amber"; small?: boolean }) => {
-  const c = tone === "emerald" ? "text-emerald-600" : tone === "blue" ? "text-blue-600" : tone === "amber" ? "text-amber-600" : "text-foreground";
+// Insight row for the rail — icon square + prominent number over a label,
+// with an optional right-aligned percentage badge.
+const InsightStat = ({ icon: Icon, value, label, iconTone, badge, onClick }: { icon: typeof Car; value: number | string; label: string; iconTone: "blue" | "emerald" | "amber" | "orange" | "red" | "violet"; badge?: string; onClick?: () => void }) => {
+  const ibg = {
+    blue: "bg-blue-600/10 text-blue-600",
+    emerald: "bg-emerald-100 text-emerald-600",
+    amber: "bg-amber-100 text-amber-600",
+    orange: "bg-orange-100 text-orange-600",
+    red: "bg-red-100 text-red-600",
+    violet: "bg-violet-100 text-violet-600",
+  }[iconTone];
   return (
-    <div className="rounded-xl border border-border bg-background p-2.5">
-      <p className={`font-display ${small ? "text-sm" : "text-lg"} font-semibold tabular-nums leading-none ${c}`}>{value}</p>
-      <p className="text-[10px] text-muted-foreground mt-1">{label}</p>
-    </div>
-  );
-};
-
-const InsightRow = ({ icon: Icon, label, value, tone = "neutral", pct, iconTone }: { icon: typeof Car; label: string; value: number | string; tone?: "emerald" | "amber" | "red" | "neutral"; pct?: number; iconTone?: "emerald" | "amber" | "red" | "blue" }) => {
-  const vcls = tone === "emerald" ? "text-emerald-600" : tone === "amber" ? "text-amber-600" : tone === "red" ? "text-red-600" : "text-foreground";
-  const ibg = iconTone === "emerald" ? "bg-emerald-100 text-emerald-600" : iconTone === "amber" ? "bg-amber-100 text-amber-600" : iconTone === "red" ? "bg-red-100 text-red-600" : "bg-blue-600/10 text-blue-600";
-  return (
-    <li className="flex items-center justify-between gap-2">
-      <span className="inline-flex items-center gap-2 text-xs text-muted-foreground">
-        <span className={`w-6 h-6 rounded-lg flex items-center justify-center shrink-0 ${ibg}`}><Icon className="w-3.5 h-3.5" /></span>
-        {label}
-      </span>
-      <span className="inline-flex items-center gap-1.5">
-        {pct != null && <span className="text-[10px] font-semibold text-emerald-600">{pct}%</span>}
-        <span className={`text-sm font-semibold tabular-nums ${vcls}`}>{value}</span>
-      </span>
+    <li>
+      <button onClick={onClick} disabled={!onClick} className="w-full flex items-center gap-3 text-left disabled:cursor-default group/i">
+        <span className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${ibg}`}><Icon className="w-4 h-4" strokeWidth={2} /></span>
+        <div className="min-w-0 flex-1">
+          <p className="font-display text-lg font-semibold tabular-nums leading-none text-foreground">{typeof value === "number" ? value.toLocaleString() : value}</p>
+          <p className="text-[11px] text-muted-foreground mt-0.5 group-enabled/i:group-hover/i:text-foreground transition-colors">{label}</p>
+        </div>
+        {badge && <span className="text-[11px] font-bold text-emerald-600 shrink-0">{badge}</span>}
+      </button>
     </li>
   );
 };
@@ -787,82 +755,6 @@ const Sparkline = ({ values }: { values: number[] }) => {
     <svg width={w} height={h} viewBox={`0 0 ${w} ${h}`} className="text-blue-500 shrink-0" preserveAspectRatio="none">
       <polyline points={pts} fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
-  );
-};
-
-const StatusDonut = ({ published, draft, archived, total }: { published: number; draft: number; archived: number; total: number }) => {
-  const segs = [
-    { label: "Published", value: published, color: "#10B981" },
-    { label: "Draft", value: draft, color: "#F59E0B" },
-    { label: "Archived", value: archived, color: "#CBD5E1" },
-  ];
-  const r = 15.9155; const circ = 2 * Math.PI * r;
-  let offset = 0;
-  return (
-    <div className="flex items-center gap-4">
-      <div className="relative w-24 h-24 shrink-0">
-        <svg className="w-24 h-24 -rotate-90" viewBox="0 0 40 40">
-          <circle cx="20" cy="20" r={r} fill="none" stroke="currentColor" strokeWidth="5" className="text-muted" />
-          {total > 0 && segs.map((s, i) => {
-            const frac = s.value / total;
-            const dash = frac * circ;
-            const el = (
-              <circle key={i} cx="20" cy="20" r={r} fill="none" stroke={s.color} strokeWidth="5"
-                strokeDasharray={`${dash} ${circ - dash}`} strokeDashoffset={-offset} />
-            );
-            offset += dash;
-            return el;
-          })}
-        </svg>
-        <div className="absolute inset-0 flex flex-col items-center justify-center">
-          <span className="font-display text-lg font-semibold tabular-nums leading-none text-foreground">{total}</span>
-          <span className="text-[9px] text-muted-foreground">Total</span>
-        </div>
-      </div>
-      <ul className="space-y-1.5 flex-1 min-w-0">
-        {segs.map((s) => (
-          <li key={s.label} className="flex items-center justify-between gap-2 text-xs">
-            <span className="inline-flex items-center gap-1.5 text-muted-foreground">
-              <span className="w-2.5 h-2.5 rounded-full" style={{ background: s.color }} />
-              {s.label}
-            </span>
-            <span className="font-semibold text-foreground tabular-nums">
-              {s.value} <span className="text-muted-foreground font-normal">({total ? Math.round((s.value / total) * 100) : 0}%)</span>
-            </span>
-          </li>
-        ))}
-      </ul>
-    </div>
-  );
-};
-
-// ── Header dealer info card (matches the v3 executive toolbar) ──
-const DealerInfoCard = ({ name, location, at, total }: { name: string; location: string; at: string | null; total: number }) => {
-  const synced = !!at;
-  const d = at ? new Date(at) : null;
-  const sameDay = d ? d.toDateString() === new Date().toDateString() : false;
-  const when = d ? (sameDay ? `${d.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" })} today` : d.toLocaleDateString(undefined, { month: "short", day: "numeric" })) : "Never";
-  return (
-    <div className="rounded-2xl border border-border bg-card shadow-sm px-4 py-3 flex items-center gap-4 flex-wrap">
-      <div className="flex items-center gap-2.5 min-w-0">
-        <span className="w-9 h-9 rounded-xl bg-blue-600/10 text-blue-700 flex items-center justify-center shrink-0"><Building2 className="w-5 h-5" /></span>
-        <div className="min-w-0">
-          <p className="font-display font-semibold text-foreground leading-tight truncate">{name}</p>
-          {location && <p className="text-[11px] text-muted-foreground">{location}</p>}
-        </div>
-      </div>
-      <div className="h-9 w-px bg-border hidden sm:block" />
-      <div>
-        <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Last synced</p>
-        <p className="text-xs font-semibold text-foreground inline-flex items-center gap-1.5">
-          <span className={`w-1.5 h-1.5 rounded-full ${synced ? "bg-emerald-500" : "bg-slate-300"}`} />
-          {when} · {total.toLocaleString()} vehicles
-        </p>
-      </div>
-      <span className={`inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider px-2 py-1 rounded-lg ${synced ? "bg-emerald-100 text-emerald-700" : "bg-slate-100 text-slate-600"}`}>
-        <CheckCircle2 className="w-3 h-3" /> MarketCheck {synced ? "connected" : "—"}
-      </span>
-    </div>
   );
 };
 
@@ -917,12 +809,12 @@ const ExecKpiStrip = ({ counts, onMetric, onMarket }: { counts: KpiCounts; onMet
         </div>
         <p className="text-[11px] font-semibold text-blue-600 mt-2.5">View readiness details →</p>
       </button>
-      <ExecKpi label="Total Vehicles" value={counts.total} sub={`${counts.newCount} new · ${counts.usedCount} used`} icon={Car} onClick={() => onMetric("total")} link="View all vehicles" />
+      <ExecKpi label="Total Vehicles" value={counts.total} sub={`${counts.newCount} new • ${counts.usedCount} used`} icon={Car} onClick={() => onMetric("total")} link="View all vehicles" />
       <ExecKpi label="Published" value={counts.published} sub="live on portal" icon={CheckCircle2} tone="emerald" onClick={() => onMetric("published")} link="View published" />
-      <ExecKpi label="Needs Attention" value={counts.needsAttention} sub="require action" icon={AlertTriangle} tone="amber" onClick={() => onMetric("needs-attention")} link="View list" prominent />
-      <ExecKpi label="Open Recalls" value={counts.openRecallVehicles} sub="vehicles" icon={ShieldCheck} tone={counts.openRecallVehicles ? "red" : "emerald"} onClick={() => onMetric("open-recalls")} link="View recalls" />
-      <ExecKpi label="Price Reviews" value={counts.priceVerify} sub="require review" icon={CircleDollarSign} tone="violet" onClick={() => onMetric("price-reviews")} link="View price reviews" />
-      <ExecKpi label="Avg Market Position" value={`$${Math.abs(below).toLocaleString()}`} sub={below >= 0 ? "below market" : "above market"} icon={Gauge} tone={below >= 0 ? "emerald" : "amber"} onClick={onMarket} link="View market report" />
+      <ExecKpi label="Needs Attention" value={counts.needsAttention} sub="require action" icon={AlertCircle} tone="amber" onClick={() => onMetric("needs-attention")} link="View list" prominent />
+      <ExecKpi label="Open Recalls" value={counts.openRecallVehicles} sub="vehicles" icon={ShieldAlert} tone={counts.openRecallVehicles ? "red" : "emerald"} onClick={() => onMetric("open-recalls")} link="View recalls" />
+      <ExecKpi label="Price Reviews" value={counts.priceVerify} sub="require review" icon={Tag} tone="violet" onClick={() => onMetric("price-reviews")} link="View price reviews" />
+      <ExecKpi label="Avg Market Position" value={`$${Math.abs(below).toLocaleString()}`} sub={below >= 0 ? "below market" : "above market"} icon={TrendingUp} tone={below >= 0 ? "emerald" : "amber"} onClick={onMarket} link="View market report" />
     </div>
   );
 };
@@ -968,7 +860,7 @@ const VehicleCard = ({ r, signal, readiness, onOpen, onSticker, onView, items }:
         </div>
       </div>
       <div className="flex items-center gap-1.5 mt-2.5 flex-wrap" onClick={(e) => e.stopPropagation()}>
-        <StatusPill status={r.status} />
+        <StatusPill status={r.status} signal={signal} />
         <RecallChip status={r.recall_status} open={r.open_recall_count} />
         {!signal.hasAddendum && <span className="text-[11px] font-semibold px-2 py-1 rounded-lg bg-red-100 text-red-700">Addendum Missing</span>}
         <div className="ml-auto flex items-center gap-1.5">
@@ -990,11 +882,32 @@ const MARKET_CHIP: Record<string, { label: string; cls: string }> = {
   fair_deal:    { label: "Fair Price",   cls: "bg-blue-100 text-blue-700" },
   above_market: { label: "Above Market", cls: "bg-amber-100 text-amber-700" },
 };
-const MarketChip = ({ position }: { position?: string | null }) => {
-  if (!position || position === "unknown") return null;
-  const c = MARKET_CHIP[position];
-  if (!c) return null;
-  return <span className={`inline-flex items-center text-[10px] font-semibold px-1.5 py-0.5 rounded ${c.cls}`}>{c.label}</span>;
+// VIN decode status — green "Decoded" once the VIN resolves to a YMM,
+// red "Decode Failed" otherwise.
+const VinDecodeCell = ({ ymm }: { ymm?: string | null }) =>
+  ymm
+    ? <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-emerald-600"><CheckCircle2 className="w-3.5 h-3.5" />Decoded</span>
+    : <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-red-600"><AlertTriangle className="w-3.5 h-3.5" />Decode Failed</span>;
+
+// Market position — deal label over the dollar delta vs. MarketCheck value.
+const MarketCell = ({ position, price, value }: { position?: string | null; price?: number | null; value?: number | null }) => {
+  const delta = price != null && value != null ? Number(value) - price : null;
+  const dealLabel = position === "above_market"
+    ? "Over Market"
+    : position && MARKET_CHIP[position]
+      ? MARKET_CHIP[position].label
+      : delta == null ? null : delta >= 0 ? "Good Deal" : "Over Market";
+  const below = delta == null ? null : delta >= 0;
+  const labelCls = dealLabel === "Over Market" ? "text-red-600" : dealLabel === "Fair Price" ? "text-amber-600" : "text-emerald-600";
+  if (!dealLabel && delta == null) return <span className="text-xs text-muted-foreground">—</span>;
+  return (
+    <div className="leading-tight">
+      {dealLabel && <p className={`text-xs font-semibold ${labelCls}`}>{dealLabel}</p>}
+      {delta != null && (
+        <p className="text-[11px] text-muted-foreground tabular-nums">${Math.abs(delta).toLocaleString()} {below ? "below" : "above"} market</p>
+      )}
+    </div>
+  );
 };
 
 const RecallChip = ({ status, open }: { status?: string | null; open?: number | null }) => {
@@ -1011,11 +924,6 @@ const RecallChip = ({ status, open }: { status?: string | null; open?: number | 
   return <span className="inline-flex items-center text-[10px] font-semibold px-1.5 py-0.5 rounded bg-muted text-muted-foreground">Recall Pending</span>;
 };
 
-const VinChip = ({ ymm }: { ymm?: string | null }) =>
-  ymm
-    ? <span className="inline-flex items-center text-[10px] font-semibold px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700">VIN Decoded</span>
-    : <span className="inline-flex items-center text-[10px] font-semibold px-1.5 py-0.5 rounded bg-slate-100 text-slate-600">VIN Pending</span>;
-
 const PortalChip = ({ status }: { status: VehicleRow["status"] }) =>
   status === "published"
     ? <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700"><span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />Live</span>
@@ -1023,29 +931,14 @@ const PortalChip = ({ status }: { status: VehicleRow["status"] }) =>
       ? <span className="inline-flex items-center text-[10px] font-semibold px-1.5 py-0.5 rounded bg-slate-100 text-slate-600">Archived</span>
       : <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded bg-slate-100 text-slate-600"><span className="w-1.5 h-1.5 rounded-full bg-slate-400" />Draft</span>;
 
-// Clean compliance stack — colored status dots for instant scanning.
-const ComplianceCell = ({ r }: { r: VehicleRow }) => {
-  const decoded = !!r.ymm;
-  const n = r.open_recall_count || 0;
-  const open = r.recall_status === "open_recalls" && n > 0;
-  const clear = r.recall_status === "clear";
-  return (
-    <div className="flex flex-col items-start gap-1.5">
-      <span className="inline-flex items-center gap-2 text-xs font-medium text-foreground">
-        <span className={`w-2.5 h-2.5 rounded-full shrink-0 ${decoded ? "bg-emerald-500" : "bg-slate-300"}`} />
-        {decoded ? "VIN Decoded" : "VIN Pending"}
-      </span>
-      <span className="inline-flex items-center gap-2 text-xs font-medium text-foreground">
-        <span className={`w-2.5 h-2.5 rounded-full shrink-0 ${open ? (n >= 2 ? "bg-red-500" : "bg-orange-500") : clear ? "bg-emerald-500" : "bg-slate-300"}`} />
-        {open ? `${n} Open Recall${n === 1 ? "" : "s"}` : clear ? "No Open Recalls" : "Recall Pending"}
-      </span>
-    </div>
-  );
-};
-
-const StatusPill = ({ status }: { status: VehicleRow["status"] }) => {
+// Status surfaces the lifecycle state, or — for drafts — the single most
+// pressing action the vehicle needs before it can publish.
+const StatusPill = ({ status, signal }: { status: VehicleRow["status"]; signal?: RowSignal }) => {
   const cfg = status === "published" ? { cls: "bg-emerald-100 text-emerald-700", dot: "bg-emerald-500", label: "Published" }
     : status === "archived" ? { cls: "bg-slate-100 text-slate-600", dot: "bg-slate-400", label: "Archived" }
+    : signal && !signal.stickerDone ? { cls: "bg-amber-100 text-amber-700", dot: "bg-amber-500", label: "Needs Sticker" }
+    : signal && !signal.hasAddendum ? { cls: "bg-orange-100 text-orange-700", dot: "bg-orange-500", label: "Needs Addendum" }
+    : signal && signal.needsPriceVerify ? { cls: "bg-violet-100 text-violet-700", dot: "bg-violet-500", label: "Price Review" }
     : { cls: "bg-slate-100 text-slate-600", dot: "bg-slate-400", label: "Draft" };
   return (
     <span className={`inline-flex items-center gap-1.5 text-[11px] font-semibold px-2 py-1 rounded-lg ${cfg.cls}`}>
