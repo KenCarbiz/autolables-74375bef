@@ -680,10 +680,25 @@ const AppShell = ({ children }: AppShellProps) => {
               </div>
 
               {/* Notifications */}
-              <button onClick={() => navigate("/admin?tab=audit")} className="relative h-10 w-10 inline-flex items-center justify-center rounded-xl text-muted-foreground hover:bg-muted hover:text-foreground" title="Notifications">
-                <Bell className="h-5 w-5" />
-                {unreadAudit > 0 && <span className="absolute -top-0.5 -right-0.5 h-4 min-w-4 px-1 rounded-full bg-rose-500 text-white text-[10px] font-bold flex items-center justify-center">{unreadAudit}</span>}
-              </button>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button className="relative h-10 w-10 inline-flex items-center justify-center rounded-xl text-muted-foreground hover:bg-muted hover:text-foreground" title="Recent activity">
+                    <Bell className="h-5 w-5" />
+                    {unreadAudit > 0 && <span className="absolute -top-0.5 -right-0.5 h-4 min-w-4 px-1 rounded-full bg-rose-500 text-white text-[10px] font-bold flex items-center justify-center">{unreadAudit}</span>}
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-[360px] bg-card p-0">
+                  <div className="flex items-center justify-between px-3 py-2 border-b border-border">
+                    <span className="text-sm font-bold text-foreground">Recent activity</span>
+                    <span className="text-[10px] text-muted-foreground">{recentActivity.length} events</span>
+                  </div>
+                  {renderNotificationsList()}
+                  <DropdownMenuSeparator className="my-0" />
+                  <DropdownMenuItem onClick={() => navigate("/admin?tab=audit")} className="cursor-pointer justify-center py-2 text-xs font-semibold">
+                    View all activity
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
 
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
