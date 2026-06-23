@@ -13,13 +13,11 @@ Deno.serve(async (req) => {
   const zip = url.searchParams.get("zip") || "06040";
 
   const targets: Record<string, string> = {
-    oem_search_basic: `https://api.marketcheck.com/v2/search/car/incentive/oem?api_key=${KEY}&zip=${zip}&radius=100&rows=5`,
-    oem_qx80_2025: `https://api.marketcheck.com/v2/search/car/incentive/oem?api_key=${KEY}&zip=${zip}&radius=100&rows=5&make=INFINITI&model=QX80&year=2025&car_type=new`,
-    oem_qx_used: `https://api.marketcheck.com/v2/search/car/incentive/oem?api_key=${KEY}&zip=${zip}&radius=100&rows=5&make=INFINITI&model=QX60&year=2023&car_type=used`,
-    oem_by_make_zip: `https://api.marketcheck.com/v2/incentive/oem?api_key=${KEY}&zip=${zip}&make=INFINITI`,
-    oem_by_make_zip_alt: `https://api.marketcheck.com/v2/incentive/oem/make?api_key=${KEY}&zip=${zip}&make=INFINITI`,
-    incentive_vin_qx80: `https://api.marketcheck.com/v2/incentive/car/5N1AL1FS7TC339685?api_key=${KEY}&zip=${zip}`,
-    incentive_vin_qx: `https://api.marketcheck.com/v2/incentive/car/3PCAJ5BB1PF113139?api_key=${KEY}&zip=${zip}`,
+    infiniti_make_only: `https://api.marketcheck.com/v2/search/car/incentive/oem?api_key=${KEY}&zip=${zip}&radius=500&rows=5&make=INFINITI`,
+    infiniti_make_nat: `https://api.marketcheck.com/v2/search/car/incentive/oem?api_key=${KEY}&rows=5&make=INFINITI`,
+    qx80_no_year: `https://api.marketcheck.com/v2/search/car/incentive/oem?api_key=${KEY}&zip=${zip}&radius=500&rows=5&make=INFINITI&model=QX80`,
+    qx60_no_year: `https://api.marketcheck.com/v2/search/car/incentive/oem?api_key=${KEY}&zip=${zip}&radius=500&rows=5&make=INFINITI&model=QX60`,
+    facets_makes: `https://api.marketcheck.com/v2/search/car/incentive/oem?api_key=${KEY}&zip=${zip}&radius=100&rows=0&facets=make`,
   };
 
   const out: Record<string, unknown> = {};
