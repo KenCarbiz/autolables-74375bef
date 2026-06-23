@@ -29,6 +29,7 @@ import { InventoryFeedHealth } from "@/components/admin/InventoryFeedHealth";
 import { OpenSigningsList } from "@/components/admin/OpenSigningsList";
 import { AddonElectionsPanel } from "@/components/admin/AddonElectionsPanel";
 import { PriceIntegrityPanel } from "@/components/admin/PriceIntegrityPanel";
+import { IncentivesSettingsPanel } from "@/components/admin/IncentivesSettingsPanel";
 import MarketcheckSyncCard from "@/components/admin/MarketcheckSyncCard";
 import TeamPanel from "@/components/admin/TeamPanel";
 import { useEmailDistribution } from "@/hooks/useEmailDistribution";
@@ -102,7 +103,7 @@ interface Product {
   icon_type?: string;
 }
 
-type AdminTab = "home" | "products" | "rules" | "settings" | "branding" | "programs" | "analytics" | "leads" | "funnel" | "audit" | "queue" | "files" | "getready" | "inventory" | "invoices" | "warranty" | "team" | "print-settings" | "document-rules" | "features";
+type AdminTab = "home" | "products" | "rules" | "settings" | "branding" | "programs" | "analytics" | "leads" | "funnel" | "audit" | "queue" | "files" | "getready" | "inventory" | "invoices" | "warranty" | "team" | "print-settings" | "document-rules" | "incentives" | "features";
 
 const emptyProduct = {
   name: "",
@@ -179,7 +180,7 @@ const FEATURE_TOGGLES: { key: keyof DealerSettings; label: string; description: 
   { key: "feature_ai_descriptions", label: "AI Descriptions", description: "Generate vehicle descriptions automatically", status: "coming_soon" },
 ];
 
-const VALID_TABS: AdminTab[] = ["home", "products", "rules", "settings", "branding", "programs", "analytics", "leads", "funnel", "audit", "queue", "files", "getready", "inventory", "invoices", "warranty", "team", "print-settings", "document-rules", "features"];
+const VALID_TABS: AdminTab[] = ["home", "products", "rules", "settings", "branding", "programs", "analytics", "leads", "funnel", "audit", "queue", "files", "getready", "inventory", "invoices", "warranty", "team", "print-settings", "document-rules", "incentives", "features"];
 
 const Admin = () => {
   const queryClient = useQueryClient();
@@ -548,6 +549,7 @@ const Admin = () => {
     { id: "queue", label: "Print Queue" },
     { id: "print-settings", label: "Print Settings" },
     { id: "document-rules", label: "Document Rules" },
+    { id: "incentives", label: "Incentives" },
     { id: "features", label: "Plan & Features" },
     { id: "getready", label: "Get-Ready" },
     ...(settings.feature_inventory ? [{ id: "inventory" as const, label: "Inventory" }] : []),
@@ -595,7 +597,7 @@ const Admin = () => {
           const availIds = new Set(tabs.map((t) => t.id));
           const groupDefs: { id: string; label: string; ids: AdminTab[] }[] = [
             { id: "home", label: "Home", ids: ["home"] },
-            { id: "setup", label: "Branding & Setup", ids: ["branding", "programs"] },
+            { id: "setup", label: "Branding & Setup", ids: ["branding", "programs", "incentives"] },
             { id: "products", label: "Products", ids: ["products", "rules"] },
             { id: "team", label: "Team", ids: ["team"] },
             { id: "reports", label: "Reports", ids: ["analytics", "leads", "funnel"] },
@@ -2531,6 +2533,7 @@ const Admin = () => {
         {tab === "print-settings" && <PrintSettingsPanel />}
 
         {tab === "document-rules" && <DocumentRulesPanel />}
+        {tab === "incentives" && <IncentivesSettingsPanel />}
 
         {tab === "features" && <EnabledFeaturesPanel />}
 
