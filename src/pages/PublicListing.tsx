@@ -47,6 +47,7 @@ import TrustStrip from "@/components/listing/TrustStrip";
 import QuickActionBar from "@/components/listing/QuickActionBar";
 import MarketIntelCards from "@/components/listing/MarketIntelCards";
 import TradeInModule from "@/components/listing/TradeInModule";
+import MarketTimingCard from "@/components/listing/MarketTimingCard";
 import OemSticker from "@/components/listing/OemSticker";
 import PassportDocuments from "@/components/listing/PassportDocuments";
 import { listingOptions } from "@/lib/vehicleInsights";
@@ -331,6 +332,10 @@ const PublicListingBody = () => {
         {/* Market value report — shopper-facing transparency: where this
             price sits in the local market range. Self-hides without data. */}
         {packetVisible(listing, "marketValue") && <MarketValueReport listing={listing} />}
+
+        {/* Market timing — real days-on-market and price-reduction signals
+            from MarketCheck. Self-hides when neither is present. */}
+        <MarketTimingCard listing={listing} />
 
         {/* Trade-in — AutoCurb-powered valuation step. Collects the
             shopper's trade and routes it to the dealer as a lead until
