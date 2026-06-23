@@ -8,11 +8,11 @@ import {
   BookOpen,
   Building2,
   Car,
+  Check,
   CheckCircle2,
   ChevronDown,
   ChevronLeft,
   ChevronRight,
-  ChevronsUpDown,
   CreditCard,
   ExternalLink,
   FilePlus2,
@@ -105,6 +105,7 @@ const AppShell = ({ children }: AppShellProps) => {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [showMobileQr, setShowMobileQr] = useState(false);
   const { open: paletteOpen, setOpen: setPaletteOpen } = useCommandPalette();
+  const [storeFilter, setStoreFilter] = useState("");
   const [marketCheckConnected, setMarketCheckConnected] = useState(false);
   const [marketCheckLabel, setMarketCheckLabel] = useState("MarketCheck Pending");
   const [lastMarketCheckSync, setLastMarketCheckSync] = useState<string | null>(null);
@@ -252,15 +253,26 @@ const AppShell = ({ children }: AppShellProps) => {
         const d = new Date(lastMarketCheckSync);
         const sameDay = d.toDateString() === new Date().toDateString();
         return sameDay
-          ? `${formatSyncTime(lastMarketCheckSync)} Today`
+          ? `${formatSyncTime(lastMarketCheckSync)} today`
           : d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
       })()
     : "Never";
+  const accountInitials = (() => {
+    const local = user?.email?.split("@")[0] || "";
+    const parts = local.split(/[._-]/).filter(Boolean);
+    const letters = parts.length >= 2 ? parts[0][0] + parts[1][0] : local.slice(0, 2);
+    return (letters || "U").toUpperCase();
+  })();
   const accountName = (() => {
     const raw = user?.email?.split("@")[0].split(/[._]/)[0] || "Account";
     return raw.charAt(0).toUpperCase() + raw.slice(1);
   })();
   const accountRole = isAdmin ? "Admin" : (role ? role.charAt(0).toUpperCase() + role.slice(1) : "Member");
+  const filteredStores = stores.filter((s) => {
+    const q = storeFilter.trim().toLowerCase();
+    if (!q) return true;
+    return `${s.name} ${s.city || ""} ${s.state || ""}`.toLowerCase().includes(q);
+  });
 
   useEffect(() => {
     setOpenSections((prev) => {
@@ -480,88 +492,151 @@ const AppShell = ({ children }: AppShellProps) => {
               <p className="truncate text-xs font-medium text-muted-foreground">{pageMeta.subtitle}</p>
             </div>
 
-            {/* Global search pill → command palette */}
+            {/* Global search → command palette */}
             <button
               onClick={() => setPaletteOpen(true)}
-              className="hidden lg:flex w-[260px] xl:w-[340px] ml-4 items-center gap-2.5 h-9 px-4 rounded-full border border-border bg-background hover:bg-muted/60 hover:border-foreground/15 text-sm shadow-sm transition-all"
+              className="hidden lg:flex flex-1 min-w-0 max-w-[520px] ml-4 items-center gap-2.5 h-10 px-4 rounded-xl border border-border bg-background hover:bg-muted/60 hover:border-foreground/15 text-sm shadow-sm transition-all"
               title="Search (Cmd/Ctrl + K)"
             >
               <Search className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-              <span className="flex-1 text-left text-muted-foreground truncate">Search VIN, stock #, make, model…</span>
+              <span className="flex-1 text-left text-muted-foreground truncate">Search VIN, stock #, make, model, trim, customer…</span>
+              <kbd className="hidden sm:inline-flex items-center justify-center h-6 px-2 rounded-md bg-muted border border-border text-[11px] font-medium text-muted-foreground">⌘K</kbd>
             </button>
 
             <div className="flex shrink-0 items-center gap-2 ml-auto">
-              {/* Dealer card — doubles as the store switcher when multi-store */}
+              {/* Dealer card — its own card; opens a searchable location switcher */}
               {stores.length > 1 ? (
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <button className="hidden xl:flex h-11 items-center gap-2 rounded-xl border border-border bg-card px-3 hover:bg-muted">
-                      <Building2 className="h-4 w-4 shrink-0 text-blue-700" />
-                      <div className="min-w-0 text-left leading-tight">
-                        <p className="truncate max-w-[140px] text-[11px] font-bold text-foreground">{companyName}</p>
-                        {dealerLocation && <p className="text-[10px] text-muted-foreground">{dealerLocation}</p>}
-                      </div>
-                      <ChevronsUpDown className="h-3 w-3 shrink-0 text-muted-foreground" />
+                      <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-blue-600/10 text-blue-700 shrink-0"><Building2 className="h-4 w-4" /></span>
+                      <span className="min-w-0 text-left leading-tight">
+                        <span className="block truncate max-w-[150px] text-[12px] font-bold text-foreground">{companyName}</span>
+                        {dealerLocation && <span className="block text-[10px] text-muted-foreground">{dealerLocation}</span>}
+                      </span>
+                      <ChevronDown className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
                     </button>
                   </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end" className="w-64 bg-card">
-                    <DropdownMenuLabel>Switch location</DropdownMenuLabel>
-                    <DropdownMenuSeparator />
-                    {stores.map((store) => (
-                      <DropdownMenuItem key={store.id} onClick={() => setCurrentStore(store)} className="cursor-pointer">
-                        <Store className="h-4 w-4 mr-2" />
-                        <div>
-                          <div className="font-medium">{store.name}</div>
-                          <div className="text-xs text-muted-foreground">{store.city}, {store.state}</div>
-                        </div>
-                      </DropdownMenuItem>
-                    ))}
+                  <DropdownMenuContent align="start" className="w-72 bg-card p-0">
+                    <div className="p-2">
+                      <div className="relative">
+                        <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+                        <input
+                          value={storeFilter}
+                          onChange={(e) => setStoreFilter(e.target.value)}
+                          onKeyDown={(e) => e.stopPropagation()}
+                          placeholder="Search dealerships…"
+                          className="h-9 w-full rounded-lg border border-border bg-background pl-8 pr-3 text-sm outline-none focus:border-foreground/20"
+                        />
+                      </div>
+                    </div>
+                    <div className="max-h-72 overflow-y-auto px-1 pb-1">
+                      {filteredStores.length === 0 ? (
+                        <p className="px-3 py-6 text-center text-xs text-muted-foreground">No dealerships match.</p>
+                      ) : filteredStores.map((store) => {
+                        const active = store.id === currentStore?.id;
+                        return (
+                          <button
+                            key={store.id}
+                            onClick={() => { setCurrentStore(store); setStoreFilter(""); }}
+                            className={`w-full flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-left hover:bg-muted ${active ? "bg-blue-50/60" : ""}`}
+                          >
+                            <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-600/10 text-blue-700 shrink-0"><Building2 className="h-4 w-4" /></span>
+                            <span className="min-w-0 flex-1 leading-tight">
+                              <span className="block truncate text-[13px] font-semibold text-foreground">{store.name}</span>
+                              {(store.city || store.state) && <span className="block truncate text-[11px] text-muted-foreground">{[store.city, store.state].filter(Boolean).join(", ")}</span>}
+                            </span>
+                            {active && <Check className="h-4 w-4 shrink-0 text-blue-600" />}
+                          </button>
+                        );
+                      })}
+                    </div>
+                    <DropdownMenuSeparator className="my-0" />
+                    <DropdownMenuItem onClick={() => navigate("/admin?tab=home")} className="cursor-pointer gap-2.5 py-2.5">
+                      <Settings className="h-4 w-4 text-muted-foreground" /> Manage Dealerships
+                    </DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>
               ) : (
                 <div className="hidden xl:flex h-11 items-center gap-2 rounded-xl border border-border bg-card px-3">
-                  <Building2 className="h-4 w-4 shrink-0 text-blue-700" />
-                  <div className="min-w-0 leading-tight">
-                    <p className="truncate max-w-[140px] text-[11px] font-bold text-foreground">{companyName}</p>
-                    {dealerLocation && <p className="text-[10px] text-muted-foreground">{dealerLocation}</p>}
-                  </div>
+                  <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-blue-600/10 text-blue-700 shrink-0"><Building2 className="h-4 w-4" /></span>
+                  <span className="min-w-0 leading-tight">
+                    <span className="block truncate max-w-[150px] text-[12px] font-bold text-foreground">{companyName}</span>
+                    {dealerLocation && <span className="block text-[10px] text-muted-foreground">{dealerLocation}</span>}
+                  </span>
                 </div>
               )}
 
-              {/* Inventory last synced */}
-              <div className="hidden xl:flex h-11 items-center gap-2 rounded-xl border border-border bg-card px-3">
-                <CheckCircle2 className={`h-4 w-4 shrink-0 ${marketCheckConnected ? "text-emerald-500" : "text-amber-500"}`} />
-                <div className="leading-tight">
-                  <p className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground">Inventory last synced</p>
-                  <p className="text-[11px] font-semibold text-foreground">{syncWhen}</p>
-                  {marketCheckCount != null && <p className="text-[10px] font-semibold text-emerald-600">{marketCheckCount} vehicles updated</p>}
+              {/* Sync + MarketCheck — one card, divider between */}
+              <div className="hidden xl:flex h-11 items-stretch rounded-xl border border-border bg-card overflow-hidden">
+                <div className="flex items-center gap-2 px-3">
+                  <CheckCircle2 className={`h-4 w-4 shrink-0 ${marketCheckConnected ? "text-emerald-500" : "text-amber-500"}`} />
+                  <span className="leading-tight">
+                    <span className="block text-[12px] font-bold text-foreground">Synced {syncWhen}</span>
+                    {marketCheckCount != null && <span className="block text-[10px] font-semibold text-emerald-600">{marketCheckCount} vehicles updated</span>}
+                  </span>
+                </div>
+                <span className="w-px self-stretch bg-border" />
+                <div className="flex items-center gap-2 px-3">
+                  <CheckCircle2 className={`h-4 w-4 shrink-0 ${marketCheckConnected ? "text-emerald-500" : "text-amber-500"}`} />
+                  <span className="leading-tight">
+                    <span className="block text-[12px] font-bold text-foreground">MarketCheck</span>
+                    <span className={`block text-[10px] font-semibold ${marketCheckConnected ? "text-emerald-600" : "text-amber-600"}`}>{marketCheckConnected ? "Connected" : "Pending"}</span>
+                  </span>
                 </div>
               </div>
 
-              {/* MarketCheck status */}
-              <div className="hidden xl:flex h-11 items-center gap-2 rounded-xl border border-border bg-card px-3">
-                <CheckCircle2 className={`h-4 w-4 shrink-0 ${marketCheckConnected ? "text-emerald-500" : "text-amber-500"}`} />
-                <div className="leading-tight">
-                  <p className="text-[11px] font-bold text-foreground">MarketCheck</p>
-                  <p className="text-[10px] text-muted-foreground">{marketCheckConnected ? "Connected" : "Pending"}</p>
-                </div>
-              </div>
+              {/* App switcher */}
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button className="hidden lg:inline-flex h-10 items-center gap-1.5 rounded-xl border border-border bg-card px-3 text-foreground hover:bg-muted" title="Switch app">
+                    <Grid2X2 className="h-4 w-4" />
+                    <span className="text-sm font-semibold">Apps</span>
+                    <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-80 bg-card">
+                  <DropdownMenuLabel className="text-[11px] uppercase tracking-wider text-muted-foreground">Switch app</DropdownMenuLabel>
+                  {ALL_PRODUCTS.map((product) => {
+                    const Icon = productIcon(product.id);
+                    return (
+                      <DropdownMenuItem key={product.id} onClick={() => openProduct(product.url)} className="cursor-pointer py-2.5">
+                        <div className="mr-3 flex h-9 w-9 items-center justify-center rounded-xl bg-muted">
+                          <Icon className="h-4 w-4" />
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-1 font-black">{product.name}{product.url.startsWith("http") && <ExternalLink className="h-3 w-3" />}</div>
+                          <div className="truncate text-xs text-muted-foreground">{product.description}</div>
+                        </div>
+                      </DropdownMenuItem>
+                    );
+                  })}
+                </DropdownMenuContent>
+              </DropdownMenu>
 
-              <button onClick={() => navigate("/admin?tab=audit")} className="relative h-10 w-10 inline-flex items-center justify-center rounded-xl border border-border bg-card text-muted-foreground hover:bg-muted hover:text-foreground" title="Notifications">
+              {/* Scan VIN */}
+              <button onClick={openScan} className="hidden lg:inline-flex h-10 items-center gap-2 rounded-xl border border-border bg-card px-3.5 text-blue-600 hover:bg-blue-50 transition-colors" title="Scan a VIN">
+                <ScanLine className="h-4 w-4 stroke-[2.5]" />
+                <span className="text-sm font-bold">Scan VIN</span>
+              </button>
+
+              {/* Notifications */}
+              <button onClick={() => navigate("/admin?tab=audit")} className="relative h-10 w-10 inline-flex items-center justify-center rounded-xl text-muted-foreground hover:bg-muted hover:text-foreground" title="Notifications">
                 <Bell className="h-5 w-5" />
-                {unreadAudit > 0 && <span className="absolute -top-1 -right-1 h-4 min-w-4 px-1 rounded-full bg-rose-500 text-white text-[10px] font-bold flex items-center justify-center">{unreadAudit}</span>}
+                {unreadAudit > 0 && <span className="absolute -top-0.5 -right-0.5 h-4 min-w-4 px-1 rounded-full bg-rose-500 text-white text-[10px] font-bold flex items-center justify-center">{unreadAudit}</span>}
               </button>
 
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <button className="flex items-center gap-2 rounded-full pl-1 pr-2 py-1 hover:bg-muted">
+                  <button className="flex items-center gap-2 rounded-full pl-1 pr-2 py-1 hover:bg-muted" title={user?.email || "Account"}>
                     <span className="h-9 w-9 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-sm font-black shadow-sm">
-                      {user?.email?.charAt(0).toUpperCase() || "U"}
+                      {accountInitials}
                     </span>
                     <span className="hidden xl:block min-w-0 text-left leading-tight">
                       <span className="block truncate max-w-[110px] text-[12px] font-bold text-foreground">{accountName}</span>
                       <span className="block text-[10px] text-muted-foreground">{accountRole}</span>
                     </span>
+                    <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
                   </button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-80 bg-card">
