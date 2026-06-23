@@ -859,14 +859,14 @@ const Sparkline = ({ values }: { values: number[] }) => {
 // ── Executive KPI strip ────────────────────────────────────────
 const BigRing = ({ pct }: { pct: number }) => {
   const tone = pct >= 80 ? "#10B981" : pct >= 50 ? "#2563EB" : pct >= 30 ? "#F59E0B" : "#EF4444";
-  const r = 16; const c = 2 * Math.PI * r;
+  const r = 17; const c = 2 * Math.PI * r;
   return (
-    <div className="relative w-[68px] h-[68px] shrink-0">
-      <svg className="w-[68px] h-[68px] -rotate-90" viewBox="0 0 40 40">
+    <div className="relative w-[88px] h-[88px] shrink-0">
+      <svg className="w-[88px] h-[88px] -rotate-90" viewBox="0 0 40 40">
         <circle cx="20" cy="20" r={r} fill="none" stroke="currentColor" strokeWidth="4" className="text-muted" />
         <circle cx="20" cy="20" r={r} fill="none" stroke={tone} strokeWidth="4" strokeLinecap="round" strokeDasharray={c} strokeDashoffset={c - (c * pct) / 100} />
       </svg>
-      <span className="absolute inset-0 flex items-center justify-center text-base font-bold tabular-nums text-foreground">{pct}%</span>
+      <span className="absolute inset-0 flex items-center justify-center text-[22px] font-bold tabular-nums text-foreground tracking-tight">{pct}%</span>
     </div>
   );
 };
@@ -885,14 +885,14 @@ const ExecKpi = ({ label, value, sub, icon: Icon, tone, onClick, link }: { label
     tone === "violet"  ? "bg-violet-50 text-violet-600" :
                          "bg-slate-100 text-slate-500";
   return (
-    <button onClick={onClick} className="group/k shrink-0 min-w-[170px] lg:min-w-0 text-left rounded-2xl border border-border bg-card shadow-sm p-4 hover:shadow-md hover:border-foreground/15 transition-all">
+    <button onClick={onClick} className="group/k shrink-0 min-w-[170px] lg:min-w-0 h-full text-left rounded-2xl border border-border bg-card shadow-sm p-4 hover:shadow-md hover:border-foreground/15 transition-all flex flex-col">
       <div className="flex items-start justify-between gap-2">
         <p className="text-[10px] font-bold uppercase tracking-[0.1em] text-muted-foreground leading-tight">{label}</p>
         <span className={`w-7 h-7 rounded-full flex items-center justify-center shrink-0 ${ibg}`}><Icon className="w-3.5 h-3.5" strokeWidth={2} /></span>
       </div>
       <p className={`font-display text-[32px] font-bold tabular-nums leading-none mt-3 ${numCls}`}>{typeof value === "number" ? value.toLocaleString() : value}</p>
       <p className="text-[11px] mt-2 text-muted-foreground truncate">{sub}</p>
-      {link && <p className="text-[11px] font-semibold text-blue-600 mt-2 group-hover/k:underline">{link} →</p>}
+      {link && <p className="text-[11px] font-semibold text-blue-600 mt-auto pt-2 group-hover/k:underline">{link} →</p>}
     </button>
   );
 };
