@@ -497,7 +497,7 @@ const InventoryModern = () => {
                         <td className="px-3 py-3" onClick={(e) => e.stopPropagation()}>
                           <PortalChip status={r.status} />
                         </td>
-                        <td className="px-3 py-3 text-xs text-muted-foreground whitespace-nowrap">{relativeDay(r.updated_at)}</td>
+                        <td className="px-3 py-3">{r.updated_at ? <UpdatedCell iso={r.updated_at} /> : <span className="text-xs text-muted-foreground">—</span>}</td>
                         <td className="px-3 py-2.5 text-right" onClick={(e) => e.stopPropagation()}>
                           <div className="flex justify-end items-center gap-1">
                             <div className="hidden md:flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -613,6 +613,23 @@ const relativeDay = (iso: string) => {
   return d.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
 };
 
+// Two-line "Updated" cell: top is Today/Yesterday/Mon D, bottom is the time.
+const UpdatedCell = ({ iso }: { iso: string }) => {
+  const d = new Date(iso);
+  const today = new Date();
+  const sameDay = d.toDateString() === today.toDateString();
+  const yest = new Date(today); yest.setDate(today.getDate() - 1);
+  const isYest = d.toDateString() === yest.toDateString();
+  const time = d.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
+  const top = sameDay ? "Today" : isYest ? "Yesterday" : d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+  return (
+    <div className="leading-tight whitespace-nowrap">
+      <p className="text-xs font-semibold text-foreground">{top}</p>
+      <p className="text-[11px] text-muted-foreground tabular-nums">{time}</p>
+    </div>
+  );
+};
+
 const Thumb = ({ r }: { r: VehicleRow }) => {
   const [err, setErr] = useState(false);
   const tint =
@@ -659,13 +676,14 @@ const ReadinessCell = ({ r, signal, pct }: { r: VehicleRow; signal: RowSignal; p
   ];
   const missing = checks.filter((c) => !c.ok).length;
   const label = pct >= 100 ? "Ready" : pct >= 80 ? "Almost Ready" : missing <= 1 ? "Missing Items" : "Several Missing";
+  const labelTone = pct >= 100 ? "text-emerald-700" : pct >= 80 ? "text-blue-700" : missing <= 1 ? "text-amber-700" : "text-red-600";
   const title = `${pct}% readiness\n` + checks.map((c) => `${c.ok ? "✓" : "✗"} ${c.label}`).join("\n");
   return (
     <div className="flex items-center gap-2.5 cursor-help" title={title}>
       <MiniRing pct={pct} />
       <div className="min-w-0 leading-tight">
-        <p className="text-[13px] font-semibold text-foreground">{label}</p>
-        {pct < 100 && <p className="text-[11px] font-semibold text-blue-600">View reasons</p>}
+        <p className={`text-xs font-semibold tracking-tight ${labelTone}`}>{label}</p>
+        {pct < 100 && <p className="text-[11px] font-semibold text-blue-600 mt-0.5">View reasons</p>}
       </div>
     </div>
   );
@@ -779,18 +797,37 @@ interface KpiCounts {
 }
 const ExecKpiStrip = ({ counts, onMetric, onMarket }: { counts: KpiCounts; onMetric: (k: string) => void; onMarket: () => void }) => {
   const below = counts.avgBelowMarket;
+  const pct = counts.avgReadiness;
+  const ringTone = pct >= 80 ? "#10B981" : pct >= 50 ? "#2563EB" : pct >= 30 ? "#F59E0B" : "#EF4444";
+  const barTone = pct >= 80 ? "bg-emerald-500" : pct >= 50 ? "bg-blue-500" : pct >= 30 ? "bg-amber-500" : "bg-red-500";
+  const accentDot = pct >= 80 ? "bg-emerald-500" : pct >= 50 ? "bg-blue-500" : pct >= 30 ? "bg-amber-500" : "bg-red-500";
   return (
-    <div className="flex gap-3 overflow-x-auto pb-1 xl:grid xl:grid-cols-7 xl:overflow-visible xl:pb-0">
-      <button onClick={() => onMetric("ready")} className="shrink-0 min-w-[210px] xl:min-w-0 text-left rounded-2xl border border-border bg-card shadow-sm p-4 hover:shadow-md hover:border-foreground/15 transition-all">
-        <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">Inventory Readiness</p>
-        <div className="flex items-center gap-3 mt-2">
-          <BigRing pct={counts.avgReadiness} />
-          <div className="min-w-0">
-            <p className="text-sm font-semibold text-foreground leading-tight">Ready to publish</p>
-            <p className="text-[11px] text-muted-foreground">{counts.readyToPublish} of {counts.total} vehicles</p>
+    <div className="grid gap-3 xl:grid-cols-[1.6fr_repeat(6,1fr)]">
+      {/* Premium readiness rectangle */}
+      <button
+        onClick={() => onMetric("ready")}
+        className="group/r text-left rounded-2xl border border-[#E6EAF2] bg-gradient-to-br from-white via-white to-[#F4F8FF] shadow-[0_1px_2px_rgba(16,24,40,0.04),0_8px_24px_-12px_rgba(37,99,235,0.18)] p-4 hover:shadow-[0_2px_4px_rgba(16,24,40,0.06),0_12px_28px_-12px_rgba(37,99,235,0.25)] hover:border-blue-200 transition-all"
+      >
+        <div className="flex items-center justify-between gap-2">
+          <p className="inline-flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">
+            <span className={`h-1.5 w-1.5 rounded-full ${accentDot}`} />
+            Inventory Readiness
+          </p>
+          <span className="text-[10px] font-bold uppercase tracking-[0.1em] text-blue-600/80">Live</span>
+        </div>
+        <div className="mt-3 flex items-center gap-4">
+          <BigRing pct={pct} />
+          <div className="min-w-0 flex-1">
+            <div className="flex items-baseline gap-2">
+              <p className="font-display text-2xl font-bold text-foreground leading-none tabular-nums">{counts.readyToPublish}</p>
+              <p className="text-xs font-semibold text-muted-foreground">of {counts.total} ready to publish</p>
+            </div>
+            <div className="mt-2.5 h-1.5 w-full rounded-full bg-slate-100 overflow-hidden">
+              <div className={`h-full rounded-full ${barTone} transition-all`} style={{ width: `${Math.max(2, pct)}%`, boxShadow: `0 0 8px ${ringTone}66` }} />
+            </div>
+            <p className="text-[11px] font-semibold text-blue-600 mt-2 group-hover/r:underline">View readiness details →</p>
           </div>
         </div>
-        <p className="text-[11px] font-semibold text-blue-600 mt-2.5">View readiness details →</p>
       </button>
       <ExecKpi label="Total Vehicles" value={counts.total} sub={`${counts.newCount} new • ${counts.usedCount} used`} icon={Car} onClick={() => onMetric("total")} link="View all vehicles" />
       <ExecKpi label="Published" value={counts.published} sub="live on portal" icon={CheckCircle2} tone="emerald" onClick={() => onMetric("published")} link="View published" />
@@ -907,20 +944,26 @@ const RecallChip = ({ status, open }: { status?: string | null; open?: number | 
   return <span className="inline-flex items-center text-[10px] font-semibold px-1.5 py-0.5 rounded bg-muted text-muted-foreground">Recall Pending</span>;
 };
 
-const PortalChip = ({ status }: { status: VehicleRow["status"] }) =>
-  status === "published"
-    ? <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700"><span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />Live</span>
+const PortalChip = ({ status }: { status: VehicleRow["status"] }) => {
+  const cfg = status === "published"
+    ? { cls: "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200/70", dot: "bg-emerald-500", label: "Live" }
     : status === "archived"
-      ? <span className="inline-flex items-center text-[10px] font-semibold px-1.5 py-0.5 rounded bg-slate-100 text-slate-600">Archived</span>
-      : <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded bg-slate-100 text-slate-600"><span className="w-1.5 h-1.5 rounded-full bg-slate-400" />Draft</span>;
+      ? { cls: "bg-slate-100 text-slate-600 ring-1 ring-slate-200", dot: "bg-slate-400", label: "Archived" }
+      : { cls: "bg-slate-50 text-slate-700 ring-1 ring-slate-200", dot: "bg-slate-400", label: "Not Live" };
+  return (
+    <span className={`inline-flex items-center gap-1.5 text-[11px] font-semibold px-2 py-1 rounded-lg ${cfg.cls}`}>
+      <span className={`w-1.5 h-1.5 rounded-full ${cfg.dot}`} />{cfg.label}
+    </span>
+  );
+};
 
 // Simple status pill — only Draft / Published / Archived.
 const SimpleStatusPill = ({ status }: { status: VehicleRow["status"] }) => {
   const cfg = status === "published"
-    ? { cls: "bg-slate-100 text-slate-700", dot: "bg-emerald-500", label: "Published" }
+    ? { cls: "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200/70", dot: "bg-emerald-500", label: "Published" }
     : status === "archived"
-      ? { cls: "bg-slate-100 text-slate-600", dot: "bg-slate-400", label: "Archived" }
-      : { cls: "bg-slate-100 text-slate-700", dot: "bg-slate-400", label: "Draft" };
+      ? { cls: "bg-slate-100 text-slate-600 ring-1 ring-slate-200", dot: "bg-slate-400", label: "Archived" }
+      : { cls: "bg-amber-50 text-amber-700 ring-1 ring-amber-200/70", dot: "bg-amber-500", label: "Draft" };
   return (
     <span className={`inline-flex items-center gap-1.5 text-[11px] font-semibold px-2 py-1 rounded-lg ${cfg.cls}`}>
       <span className={`w-1.5 h-1.5 rounded-full ${cfg.dot}`} />{cfg.label}

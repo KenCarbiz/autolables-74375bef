@@ -252,10 +252,14 @@ const AppShell = ({ children }: AppShellProps) => {
   const syncWhen = lastMarketCheckSync
     ? (() => {
         const d = new Date(lastMarketCheckSync);
-        const sameDay = d.toDateString() === new Date().toDateString();
-        return sameDay
-          ? `${formatSyncTime(lastMarketCheckSync)} today`
-          : d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+        const today = new Date();
+        const sameDay = d.toDateString() === today.toDateString();
+        const yest = new Date(today); yest.setDate(today.getDate() - 1);
+        const isYest = d.toDateString() === yest.toDateString();
+        const time = formatSyncTime(lastMarketCheckSync);
+        if (sameDay) return `Today · ${time}`;
+        if (isYest) return `Yesterday · ${time}`;
+        return `${d.toLocaleDateString(undefined, { month: "short", day: "numeric" })} · ${time}`;
       })()
     : "Never";
   const accountInitials = (() => {
@@ -623,34 +627,44 @@ const AppShell = ({ children }: AppShellProps) => {
                     <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
                   </button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-80 bg-card">
-                  <DropdownMenuLabel>
-                    <div className="truncate text-sm font-black">{user?.email}</div>
-                    {isAdmin && <div className="text-xs text-primary">Platform Admin</div>}
-                  </DropdownMenuLabel>
+                <DropdownMenuContent align="end" className="w-80 bg-card p-2">
+                  <div className="flex items-center gap-3 px-2 py-2.5">
+                    <span className="h-10 w-10 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-sm font-black shadow-sm shrink-0">
+                      {accountInitials}
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <div className="truncate text-sm font-bold text-foreground">{accountName}</div>
+                      <div className="truncate text-[11px] text-muted-foreground">{user?.email}</div>
+                      <div className="mt-1 inline-flex items-center gap-1">
+                        <span className="text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-blue-50 text-blue-700">{accountRole}</span>
+                        {isAdmin && <span className="text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-violet-50 text-violet-700">Platform Admin</span>}
+                      </div>
+                    </div>
+                  </div>
                   <DropdownMenuSeparator />
-                  <DropdownMenuLabel className="text-[11px] uppercase tracking-wider text-muted-foreground">App switcher</DropdownMenuLabel>
+                  <DropdownMenuLabel className="text-[10px] uppercase tracking-[0.14em] text-muted-foreground px-2">Switch app</DropdownMenuLabel>
                   {ALL_PRODUCTS.map((product) => {
                     const Icon = productIcon(product.id);
                     return (
-                      <DropdownMenuItem key={product.id} onClick={() => openProduct(product.url)} className="cursor-pointer py-2.5">
+                      <DropdownMenuItem key={product.id} onClick={() => openProduct(product.url)} className="cursor-pointer py-2 rounded-lg">
                         <div className="mr-3 flex h-9 w-9 items-center justify-center rounded-xl bg-muted">
                           <Icon className="h-4 w-4" />
                         </div>
                         <div className="min-w-0 flex-1">
-                          <div className="flex items-center gap-1 font-black">{product.name}{product.url.startsWith("http") && <ExternalLink className="h-3 w-3" />}</div>
-                          <div className="truncate text-xs text-muted-foreground">{product.description}</div>
+                          <div className="flex items-center gap-1 text-sm font-semibold">{product.name}{product.url.startsWith("http") && <ExternalLink className="h-3 w-3 text-muted-foreground" />}</div>
+                          <div className="truncate text-[11px] text-muted-foreground">{product.description}</div>
                         </div>
                       </DropdownMenuItem>
                     );
                   })}
                   <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={() => navigate("/admin?tab=team")} className="cursor-pointer"><Users className="h-4 w-4 mr-2" /> Profile / Team</DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => navigate("/admin?tab=settings")} className="cursor-pointer"><Settings className="h-4 w-4 mr-2" /> Settings</DropdownMenuItem>
-                  <DropdownMenuItem onClick={handleManageBilling} className="cursor-pointer"><CreditCard className="h-4 w-4 mr-2" /> Billing</DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => navigate("/trust")} className="cursor-pointer"><HelpCircle className="h-4 w-4 mr-2" /> Help & Trust</DropdownMenuItem>
+                  <DropdownMenuLabel className="text-[10px] uppercase tracking-[0.14em] text-muted-foreground px-2">Account</DropdownMenuLabel>
+                  <DropdownMenuItem onClick={() => navigate("/admin?tab=team")} className="cursor-pointer rounded-lg"><Users className="h-4 w-4 mr-2 text-muted-foreground" /> Team & permissions</DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => navigate("/admin?tab=settings")} className="cursor-pointer rounded-lg"><Settings className="h-4 w-4 mr-2 text-muted-foreground" /> Workspace settings</DropdownMenuItem>
+                  <DropdownMenuItem onClick={handleManageBilling} className="cursor-pointer rounded-lg"><CreditCard className="h-4 w-4 mr-2 text-muted-foreground" /> Plan & billing</DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => navigate("/trust")} className="cursor-pointer rounded-lg"><HelpCircle className="h-4 w-4 mr-2 text-muted-foreground" /> Help & trust center</DropdownMenuItem>
                   <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={handleSignOut} className="cursor-pointer text-destructive"><LogOut className="h-4 w-4 mr-2" /> Sign out</DropdownMenuItem>
+                  <DropdownMenuItem onClick={handleSignOut} className="cursor-pointer text-destructive rounded-lg focus:text-destructive"><LogOut className="h-4 w-4 mr-2" /> Sign out</DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
             </div>
