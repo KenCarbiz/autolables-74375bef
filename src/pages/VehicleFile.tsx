@@ -313,7 +313,7 @@ const VehicleFile = () => {
         <div className="mt-3 rounded-2xl border border-border bg-card shadow-sm overflow-hidden">
           <div className="flex flex-col lg:flex-row gap-0 p-5 lg:p-6">
             {/* Vehicle photo */}
-            <div className={`lg:w-[320px] shrink-0 h-52 lg:h-[224px] rounded-2xl overflow-hidden flex items-center justify-center bg-gradient-to-br ${
+            <div className={`lg:w-[340px] shrink-0 h-56 lg:h-[248px] rounded-2xl overflow-hidden flex items-center justify-center bg-gradient-to-br ${
               vehicle.condition === "new" ? "from-blue-500/15 to-blue-600/5 text-blue-600" :
               vehicle.condition === "cpo" ? "from-violet-500/15 to-violet-600/5 text-violet-600" :
               "from-slate-400/15 to-slate-500/5 text-slate-500"
@@ -1221,7 +1221,7 @@ const ScanInfoPanel = ({ vehicle, onReload }: { vehicle: VehicleRow; onReload: (
   })();
 
   return (
-    <div className="space-y-6 max-w-5xl">
+    <div className="space-y-6">
       <TabHeader
         title="Shopper Passport Builder"
         description={<>Choose what appears on the public vehicle passport — scanned at <span className="font-mono text-foreground/70">/v/{(vehicle.vin || vehicle.slug || "").toUpperCase()}</span>.</>}
