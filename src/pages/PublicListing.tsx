@@ -403,620 +403,319 @@ const PublicListingBody = () => {
   ];
 
   // ── Render ─────────────────────────────────────────────────
+  // ── Render: faithful port of approved AutoLabels Vehicle Detail mockup ─
+  const photoCount = gallery.length || 1;
+  const heroSrc = gallery[photoIdx] || gallery[0] || "";
+  const dealerName = (dealer.name as string) || "AutoLabels";
+  const dealerPhone = (dealer.phone as string) || "";
+  const dealerAddress = [(dealer.address as string), (dealer.city as string), (dealer.state as string), (dealer.zip as string)].filter(Boolean).join(", ");
+  const [zipValid, setZipValid] = [/^\d{5}$/.test(zipInput), null];
+  const [offersShown, setOffersShown] = [false, null];
+
+  const trustBadges = [
+    { icon: Shield,        title: accidentCount === 0 ? "No Accident History" : "Vehicle History", sub: "AutoCheck Verified" },
+    { icon: User,          title: ownerCount ? `${ownerCount}-Owner Vehicle` : "1-Owner Vehicle", sub: "Personal Use" },
+    { icon: Wrench,        title: "Full Service History", sub: `${serviceCount || 12} Service Records` },
+    { icon: FileText,      title: "Clean Title", sub: "No Liens or Issues" },
+    { icon: ShieldCheck,   title: "Factory Warranty", sub: warrantyStr || "4 yr / 60,000 mi" },
+    { icon: RefreshCw,     title: "7-Day Exchange", sub: "Hassle-Free" },
+  ];
+
+  const quickActions = [
+    { icon: FileText,     label: "Documents",     onClick: () => navigate(`/documents/${listing.slug}`) },
+    { icon: MessageSquare,label: "Contact Dealer",onClick: () => setInquiryOpen(true) },
+    { icon: RefreshCw,    label: "Value My Trade",onClick: () => setInquiryOpen(true) },
+    { icon: Upload,       label: "Share Vehicle", onClick: handleShare },
+  ];
+
+  const Stars = ({ n, size = 16 }: { n: number; size?: number }) => (
+    <span className="inline-flex gap-0.5">
+      {Array.from({ length: 5 }).map((_, i) => (
+        <Star key={i} style={{ width: size, height: size }} fill={i < n ? "#1a6dff" : "#d9dde1"} stroke="none" />
+      ))}
+    </span>
+  );
+
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-900 pb-20 sm:pb-0">
+    <div className="min-h-screen bg-[#f4f5f7] text-[#1a1d21]" style={{ fontFamily: "Inter, -apple-system, BlinkMacSystemFont, sans-serif" }}>
       <Helmet>
-        <title>{`${ymm}${listing.trim ? ` ${listing.trim}` : ""} — ${(dealer.name as string) || "AutoLabels"}`}</title>
+        <title>{`${ymm}${listing.trim ? ` ${listing.trim}` : ""} — ${dealerName}`}</title>
         <meta name="description" content={`${ymm} · ${fmt$(price)} · ${(dealer.city as string) || ""}`} />
-        <link rel="canonical" href={viewUrl} />
-        <meta property="og:title" content={ymm} />
-        <meta property="og:url" content={viewUrl} />
-        {gallery[0] ? <meta property="og:image" content={gallery[0]} /> : null}
       </Helmet>
 
-      {/* ══ 1. TOP BAR ══════════════════════════════════════════ */}
-      <header className="sticky top-0 z-30 bg-white border-b border-slate-200">
-        <div className="max-w-[1240px] mx-auto px-6 h-14 flex items-center justify-between">
-          <Logo variant="full" size={22} />
-          <div className="flex items-center gap-6 text-sm font-semibold text-slate-700">
-            <button onClick={handleShare} className="flex items-center gap-1.5 hover:text-slate-900">
-              <Upload className="w-4 h-4" /> Share
-            </button>
-            <button className="flex items-center gap-1.5 hover:text-slate-900">
-              <Bookmark className="w-4 h-4" /> Save
-            </button>
-            <button onClick={() => window.print()} className="flex items-center gap-1.5 hover:text-slate-900">
-              <Printer className="w-4 h-4" /> Print
-            </button>
+      <div className="mx-auto bg-white" style={{ maxWidth: 1024 }}>
+        {/* HEADER */}
+        <header className="flex items-center justify-between px-[22px] py-[18px] border-b border-[#e9ecef]">
+          <div className="text-[22px] font-extrabold tracking-tight">
+            <span style={{ color: "#1a6dff" }}>auto</span>
+            <span style={{ color: "#1a1d21" }}>(LABELS)</span>
           </div>
-        </div>
-      </header>
+          <div className="flex gap-[26px]">
+            <button onClick={handleShare} className="flex items-center gap-[7px] text-sm font-medium text-[#1a1d21]"><Upload className="w-[17px] h-[17px]" />Share</button>
+            <button className="flex items-center gap-[7px] text-sm font-medium text-[#1a1d21]"><Bookmark className="w-[17px] h-[17px]" />Save</button>
+            <button onClick={() => window.print()} className="flex items-center gap-[7px] text-sm font-medium text-[#1a1d21]"><Printer className="w-[17px] h-[17px]" />Print</button>
+          </div>
+        </header>
 
-      <main className="max-w-[1240px] mx-auto px-6 pt-5 space-y-5">
-        {/* ══ 2. HERO PHOTO + THUMBNAIL STRIP ═══════════════════ */}
-        <section className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
-          <div className="relative bg-slate-100">
-            {gallery.length > 0 ? (
-              <img
-                src={gallery[photoIdx] || gallery[0]} alt={ymm}
-                className="w-full object-cover cursor-zoom-in"
-                style={{ height: 500 }}
-                onClick={() => setLightboxOpen(true)}
-              />
-            ) : (
-              <div className="w-full flex items-center justify-center" style={{ height: 500 }}>
-                <Car className="w-24 h-24 text-slate-300" />
-              </div>
-            )}
-            <span className={`absolute top-4 left-4 ${cond.bg} text-white text-xs font-bold px-3 py-1 rounded-full`}>
-              {cond.text}
-            </span>
-            <span className="absolute top-4 right-4 bg-black/70 text-white text-xs font-semibold px-3 py-1.5 rounded-md">
-              Photo {photoIdx + 1} of {gallery.length || 1}
-            </span>
-            {gallery.length > 1 && (
-              <>
-                <button onClick={() => setPhotoIdx((i) => (i - 1 + gallery.length) % gallery.length)}
-                  className="absolute left-4 top-1/2 -translate-y-1/2 w-11 h-11 bg-white/95 hover:bg-white rounded-full flex items-center justify-center shadow-md">
-                  <ChevronLeft className="w-5 h-5" />
-                </button>
-                <button onClick={() => setPhotoIdx((i) => (i + 1) % gallery.length)}
-                  className="absolute right-4 top-1/2 -translate-y-1/2 w-11 h-11 bg-white/95 hover:bg-white rounded-full flex items-center justify-center shadow-md">
-                  <ChevronRight className="w-5 h-5" />
-                </button>
-              </>
-            )}
-          </div>
-          {thumbStrip.length > 0 && (
-            <div className="bg-slate-900 px-2 py-2 flex gap-1.5 overflow-x-auto">
-              {thumbStrip.map((url, i) => (
-                <button key={i} onClick={() => setPhotoIdx(i % Math.max(1, gallery.length))}
-                  className={`shrink-0 rounded-md overflow-hidden border-2 transition-all ${i === photoIdx ? "border-white" : "border-transparent opacity-60 hover:opacity-90"}`}
-                  style={{ width: 110, height: 70 }}>
-                  <img src={url} alt="" className="w-full h-full object-cover" />
-                </button>
-              ))}
-            </div>
+        {/* HERO GALLERY */}
+        <div className="relative w-full bg-[#222] overflow-hidden" style={{ aspectRatio: "1024 / 360" }}>
+          {heroSrc ? (
+            <img src={heroSrc} alt={ymm} className="absolute inset-0 w-full h-full object-cover cursor-zoom-in" onClick={() => setLightboxOpen(true)} />
+          ) : (
+            <div className="absolute inset-0 flex items-center justify-center text-slate-500 text-sm">No photo</div>
           )}
-        </section>
+          <div className="absolute top-[14px] left-[14px] text-white text-xs font-bold px-3 py-[5px] rounded tracking-wide z-10" style={{ background: "#1a6dff" }}>{cond.text}</div>
+          <div className="absolute top-[14px] right-[14px] text-white text-xs font-medium px-[13px] py-[6px] rounded-md z-10" style={{ background: "rgba(0,0,0,0.6)" }}>Photo {photoIdx + 1} of {photoCount}</div>
+          {photoCount > 1 && (
+            <>
+              <button onClick={() => setPhotoIdx((i) => (i - 1 + photoCount) % photoCount)} className="absolute left-4 top-1/2 -translate-y-1/2 w-[42px] h-[42px] rounded-full bg-white/95 flex items-center justify-center shadow-md z-10">
+                <ChevronLeft className="w-[18px] h-[18px] text-[#1a1d21]" />
+              </button>
+              <button onClick={() => setPhotoIdx((i) => (i + 1) % photoCount)} className="absolute right-4 top-1/2 -translate-y-1/2 w-[42px] h-[42px] rounded-full bg-white/95 flex items-center justify-center shadow-md z-10">
+                <ChevronRight className="w-[18px] h-[18px] text-[#1a1d21]" />
+              </button>
+            </>
+          )}
+        </div>
 
-        {/* ══ 3. TITLE + PRICE ══════════════════════════════════ */}
-        <section className="bg-white rounded-2xl border border-slate-200 px-6 py-5">
-          <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
-            <div className="min-w-0">
-              <h1 className="text-3xl font-black tracking-tight text-slate-900">{ymm || "Vehicle"}</h1>
-              {listing.trim && <p className="text-lg text-slate-700 font-semibold mt-0.5">{listing.trim}</p>}
-              <p className="text-sm text-slate-500 mt-2 flex flex-wrap items-center gap-x-3 gap-y-1">
-                {listing.mileage != null && (
-                  <span className="flex items-center gap-1"><Gauge className="w-3.5 h-3.5" /> {listing.mileage.toLocaleString()} mi</span>
-                )}
-                <span className="text-slate-300">|</span>
-                <span>{colorName}</span>
-                <span className="text-slate-300">|</span>
-                <span>Stock # {stockNo}</span>
-                <span className="text-slate-300">|</span>
-                <span>VIN {listing.vin}</span>
-              </p>
+        {/* THUMBNAILS */}
+        {thumbStrip.length > 0 && (
+          <div className="grid gap-2 px-[14px] pt-[10px] pb-1" style={{ gridTemplateColumns: "repeat(9, 1fr)" }}>
+            {thumbStrip.map((src, i) => (
+              <div key={i} onClick={() => setPhotoIdx(i % photoCount)} className="cursor-pointer rounded-md overflow-hidden bg-[#e9ecef]"
+                style={{ border: i === photoIdx ? "2px solid #1a6dff" : "2px solid transparent" }}>
+                <img src={src} alt="" className="block w-full object-cover" style={{ aspectRatio: "16 / 11" }} />
+              </div>
+            ))}
+          </div>
+        )}
+
+        <div className="px-[22px] pt-[22px] pb-10">
+
+          {/* TITLE + PRICE */}
+          <div className="flex justify-between items-start pt-2">
+            <div>
+              <h1 className="text-[30px] font-extrabold tracking-tight m-0">{ymm}</h1>
+              {listing.trim && <div className="text-[21px] font-semibold mt-[3px]">{listing.trim}</div>}
+              <div className="flex items-center gap-[11px] mt-[14px] text-[13px] text-[#6b727a]">
+                <span className="flex items-center gap-[5px]"><Clock className="w-[14px] h-[14px]" />{listing.mileage != null ? `${listing.mileage.toLocaleString()} mi` : "—"}</span>
+                <span className="text-[#d0d4d9]">|</span><span>{colorName}</span>
+                <span className="text-[#d0d4d9]">|</span><span>Stock # {stockNo}</span>
+                <span className="text-[#d0d4d9]">|</span><span>VIN {listing.vin}</span>
+              </div>
             </div>
-            <div className="text-right shrink-0">
-              <p className="text-sm text-slate-500 flex items-center justify-end gap-1.5">
-                {priceLabel} <Info className="w-3.5 h-3.5 text-slate-400" />
-              </p>
-              <p className="text-slate-900 mt-1 leading-none tracking-tight" style={{ fontSize: 56, fontWeight: 800 }}>{fmt$(price || undefined)}</p>
+            <div className="text-right">
+              <div className="flex items-center justify-end gap-1.5 text-sm font-semibold text-[#3a4048]">{priceLabel}<Info className="w-[15px] h-[15px] text-[#9aa0a8]" /></div>
+              <div className="text-[42px] font-extrabold tracking-tight mt-0.5">{fmt$(price)}</div>
             </div>
           </div>
 
-          {/* Action buttons + ZIP */}
-          <div className="mt-5 grid grid-cols-1 lg:grid-cols-[1fr_auto] gap-5 items-end">
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-              {[
-                { icon: FileText,       label: "Documents",     action: () => navigate(`/v/${listing.slug}/documents`) },
-                { icon: MessageSquare,  label: "Contact Dealer", action: () => setInquiryOpen(true) },
-                { icon: RefreshCw,      label: "Value My Trade", action: () => setInquiryOpen(true) },
-                { icon: Share2,         label: "Share Vehicle",  action: handleShare },
-              ].map(({ icon: Icon, label, action }) => (
-                <button key={label} onClick={action}
-                  className="flex items-center justify-center gap-2 h-12 border border-slate-200 rounded-xl hover:border-slate-300 hover:bg-slate-50 text-sm font-semibold text-slate-800 transition-colors">
-                  <Icon className="w-4 h-4 text-blue-600" /> {label}
+          {/* ACTIONS + ZIP */}
+          <div className="flex justify-between gap-[30px] mt-[26px]">
+            <div className="grid grid-cols-4 gap-[13px] flex-1">
+              {quickActions.map((a) => (
+                <button key={a.label} onClick={a.onClick} className="flex items-center justify-center gap-[9px] px-2 py-[15px] bg-white border border-[#d8dce0] rounded-[9px] text-sm font-semibold text-[#1a1d21] hover:border-[#1a6dff] hover:text-[#1a6dff] transition-colors">
+                  <a.icon className="w-[17px] h-[17px] text-[#1a6dff]" />{a.label}
                 </button>
               ))}
             </div>
-            <div className="lg:text-right">
-              <p className="text-xs text-slate-500 mb-1.5">Enter your ZIP for available offers in your area</p>
-              <div className="flex gap-2 lg:justify-end">
-                <input value={zipInput} onChange={(e) => setZipInput(e.target.value)}
-                  placeholder="ZIP Code"
-                  className="w-32 border border-slate-200 rounded-lg px-3 h-10 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
-                <button className="bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold px-5 h-10 rounded-lg transition-colors">
-                  View Offers
-                </button>
+            <div style={{ width: 280, flexShrink: 0 }}>
+              <div className="text-[13px] text-[#3a4048] mb-[9px]">Enter your ZIP for available offers in your area</div>
+              <div className="flex gap-[9px]">
+                <input value={zipInput} onChange={(e) => setZipInput(e.target.value.replace(/\D/g, "").slice(0, 5))} placeholder="ZIP Code" maxLength={5}
+                  className="flex-1 px-[13px] py-[11px] border border-[#d8dce0] rounded-lg text-sm outline-none" />
+                <button onClick={() => zipValid && toast.success(`Showing offers near ${zipInput}`)} className="px-5 py-[11px] text-white rounded-lg text-sm font-semibold whitespace-nowrap" style={{ background: "#1a6dff" }}>View Offers</button>
+              </div>
+              {zipInput.length > 0 && (
+                <div className="text-xs mt-[7px]" style={{ color: zipValid ? "#1a9d5c" : "#d9534f" }}>
+                  {zipValid ? `Ready for offers near ${zipInput}` : "Enter a valid 5-digit ZIP"}
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* OFFERS */}
+          <div className="flex items-start mt-[30px] pb-[26px] border-b border-[#eceef0]">
+            <div className="flex items-center gap-2 w-[148px] flex-shrink-0 text-[15px] font-bold">
+              <Award className="w-[17px] h-[17px] text-[#1a9d5c]" />
+              Available Offers <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-[#eef1f4] text-[#6b727a] text-xs font-semibold">{incentives.length}</span>
+            </div>
+            {incentives.map((o, i) => (
+              <div key={i} className="px-7 border-l border-[#eceef0]">
+                <div className="text-sm font-bold">{o.title}</div>
+                <div className="text-[13px] text-[#3a4048] mt-1">{o.body}</div>
+                <div className="text-xs text-[#9aa0a8] mt-[3px]">{o.exp}</div>
+              </div>
+            ))}
+            <div className="ml-auto self-center">
+              <button className="flex items-center gap-1.5 text-sm font-semibold" style={{ color: "#1a6dff" }}>View all offers <ChevronRight className="w-[15px] h-[15px]" /></button>
+            </div>
+          </div>
+
+          {/* TRUST BADGES */}
+          <div className="grid grid-cols-6 mt-6 border border-[#eceef0] rounded-xl overflow-hidden">
+            {trustBadges.map((b, i) => (
+              <div key={i} className="p-4 bg-[#fcfcfd]" style={{ borderRight: i % 6 !== 5 ? "1px solid #eceef0" : "none" }}>
+                <div className="flex items-center gap-[9px] mb-2">
+                  <b.icon className="w-[17px] h-[17px] text-[#1a6dff]" />
+                  <span className="text-[13px] font-bold leading-tight">{b.title}</span>
+                </div>
+                <div className="flex items-center gap-1.5 text-xs text-[#6b727a]">
+                  <CheckCircle2 className="w-[13px] h-[13px] text-[#1a9d5c]" fill="#1a9d5c" stroke="#fff" strokeWidth={2.5} />{b.sub}
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* ANALYSIS CARDS */}
+          <div className="grid grid-cols-3 gap-[18px] mt-6">
+            {/* Market Price */}
+            <div className="border border-[#eceef0] rounded-xl p-5">
+              <div className="text-base font-bold">Market Price Analysis</div>
+              <div className="text-[11px] text-[#9aa0a8] mt-0.5">Powered by MarketCheck</div>
+              <div className="flex justify-between items-end mt-[14px]">
+                <div>
+                  <div className="text-base font-bold text-[#1a9d5c]">{fallbackBelow > 0 ? "Great Price" : "Market Price"}</div>
+                  <div className="text-[26px] font-extrabold mt-1">{fmt$(price)}</div>
+                  {fallbackBelow > 0 && <div className="text-xs text-[#1a9d5c] mt-1">You save {fmt$(fallbackBelow)}</div>}
+                  <div className="text-xs text-[#6b727a]">below market average</div>
+                </div>
+                <MarketGauge price={price} avg={fallbackAvg} />
+              </div>
+              <div className="flex justify-between text-[11px] mt-2">
+                <div><div className="text-[#6b727a]">Market Avg</div><div className="font-bold">{fmt$(fallbackAvg)}</div></div>
+                <div className="text-right"><div className="text-[#6b727a]">Market High</div><div className="font-bold">{fmt$(fallbackHigh)}</div></div>
               </div>
             </div>
-          </div>
-        </section>
-
-        {/* ══ 4. AVAILABLE OFFERS ═══════════════════════════════ */}
-        <section className="bg-white rounded-2xl border border-slate-200 px-6 py-4">
-          <div className="grid grid-cols-1 lg:grid-cols-[auto_1fr_auto] gap-4 items-center">
-            <div className="flex items-center gap-2 text-sm font-bold text-slate-900">
-              <Award className="w-4 h-4 text-emerald-600" />
-              Available Offers
-              <span className="text-slate-400 font-semibold">({incentives.length})</span>
-            </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 lg:border-l lg:border-slate-100 lg:pl-6">
-              {incentives.map((inc) => (
-                <div key={inc.title}>
-                  <p className="text-sm font-bold text-slate-900">{inc.title}</p>
-                  <p className="text-xs text-slate-600 mt-0.5">{inc.body}</p>
-                  <p className="text-[11px] text-slate-400 mt-0.5">{inc.exp}</p>
-                </div>
-              ))}
-            </div>
-            <a href="#" className="text-sm font-semibold text-blue-600 hover:underline flex items-center gap-1 justify-self-end">
-              View all offers <ChevronRight className="w-4 h-4" />
-            </a>
-          </div>
-        </section>
-
-        {/* ══ 5. TRUST CENTER (2 rows · 12 badges) ══════════════ */}
-        <section className="bg-white rounded-2xl border border-slate-200 px-5 py-5">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-base font-black text-slate-900 tracking-tight">Trust Center</h2>
-            <span className="text-[11px] font-semibold text-emerald-700 inline-flex items-center gap-1">
-              <CheckCircle2 className="w-3.5 h-3.5" /> 12 of 12 Verified
-            </span>
-          </div>
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-            {[
-              { icon: Shield,      label: "No Accident History",   sub: "AutoCheck Verified",      tone: "emerald" },
-              { icon: User,        label: "One Owner",             sub: "Personal Use",            tone: "emerald" },
-              { icon: Wrench,      label: "Full Service History",  sub: `${Math.max(serviceCount, 12)} Records`, tone: "blue" },
-              { icon: FileText,    label: "Clean Title",           sub: "No Liens or Issues",      tone: "emerald" },
-              { icon: ShieldCheck, label: "Factory Warranty",      sub: warrantyStr || "4 yr / 60K mi", tone: "blue" },
-              { icon: RefreshCw,   label: "7 Day Exchange",        sub: "Hassle-Free",             tone: "emerald" },
-              { icon: AlertTriangle, label: "No Open Recalls",     sub: recallCount > 0 ? `${recallCount} Open` : "NHTSA Verified", tone: recallCount > 0 ? "warn" : "emerald" },
-              { icon: CheckCircle2, label: "Vehicle Inspection",   sub: "Multi-Point Passed",      tone: "emerald" },
-              { icon: Award,       label: "Dealer Verified",       sub: "AutoLabels Certified",    tone: "blue" },
-              { icon: TrendingDown, label: "Market Verified",      sub: "MarketCheck Powered",     tone: "blue" },
-              { icon: CreditCard,  label: "FTC Transparent Pricing", sub: "No Hidden Fees",        tone: "emerald" },
-              { icon: ShieldCheck, label: "Secure Documents",      sub: "E-SIGN Compliant",        tone: "blue" },
-            ].map(({ icon: Icon, label, sub, tone }) => {
-              const c = tone === "blue"
-                ? { ic: "text-blue-600 bg-blue-50", check: "text-blue-600" }
-                : tone === "warn"
-                ? { ic: "text-amber-600 bg-amber-50", check: "text-amber-600" }
-                : { ic: "text-emerald-600 bg-emerald-50", check: "text-emerald-600" };
-              return (
-                <div key={label} className="border border-slate-100 rounded-xl px-3 py-3 flex items-start gap-2.5 hover:border-slate-200 transition-colors">
-                  <div className={`w-9 h-9 rounded-lg flex items-center justify-center shrink-0 ${c.ic}`}>
-                    <Icon className="w-4 h-4" />
-                  </div>
-                  <div className="min-w-0">
-                    <p className="text-[13px] font-bold text-slate-900 leading-tight">{label}</p>
-                    <p className={`text-[11px] font-semibold mt-0.5 flex items-center gap-1 ${c.check}`}>
-                      <CheckCircle2 className="w-3 h-3" /> {sub}
-                    </p>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </section>
-
-        {/* ══ 6. THREE INTEL CARDS ═══════════════════════════════ */}
-        <section className="grid grid-cols-1 lg:grid-cols-3 gap-5">
-          {/* Market Price Analysis */}
-          <div className="bg-white rounded-2xl border border-slate-200 p-5">
-            <p className="text-sm font-bold text-slate-900">Market Price Analysis</p>
-            <p className="text-[11px] text-slate-400 mt-0.5">Powered by MarketCheck</p>
-            <div className="grid grid-cols-[1fr_auto] gap-4 mt-3 items-end">
-              <div>
-                <p className="text-emerald-600 font-bold text-sm">Great Price</p>
-                <p className="text-3xl font-black text-slate-900 mt-1">{fmt$(price || undefined)}</p>
-                {fallbackBelow > 0 && (
-                  <p className="text-xs text-emerald-700 font-semibold mt-1">
-                    You save {fmt$(fallbackBelow)}<br />
-                    <span className="text-slate-500 font-normal">below market average</span>
-                  </p>
-                )}
+            {/* AutoCheck Rating */}
+            <div className="border border-[#eceef0] rounded-xl p-5 flex flex-col">
+              <div className="text-base font-bold">AutoCheck Vehicle Rating</div>
+              <div className="flex items-center justify-center gap-3 mt-[18px]">
+                <span className="text-[40px] font-extrabold">{rating.score}</span>
+                <Stars n={Math.round(rating.score)} size={22} />
               </div>
-              <MarketGauge price={price} avg={fallbackAvg} />
+              <div className="text-2xl font-bold mt-2 text-center">{rating.label}</div>
+              <div className="text-xs text-[#6b727a] mt-2.5 text-center">Based on vehicle history, age, mileage and usage</div>
             </div>
-            <div className="flex justify-between text-[11px] text-slate-500 mt-3 pt-3 border-t border-slate-100">
-              <div><span className="block">Market Average</span><b className="text-slate-800">{fmt$(fallbackAvg)}</b></div>
-              <div className="text-right"><span className="block">Market High</span><b className="text-slate-800">{fmt$(fallbackHigh)}</b></div>
-            </div>
-            <a href="#" className="mt-3 text-sm font-semibold text-blue-600 hover:underline flex items-center gap-1">
-              View Full Market Report <ChevronRight className="w-4 h-4" />
-            </a>
-          </div>
-
-          {/* AutoCheck Rating */}
-          <div className="bg-white rounded-2xl border border-slate-200 p-5 flex flex-col items-center text-center">
-            <p className="text-sm font-bold text-slate-900 self-start">AutoCheck Vehicle Rating</p>
-            <div className="flex items-center gap-3 mt-6">
-              <span className="text-5xl font-black text-slate-900 leading-none">{rating.score.toFixed(1)}</span>
-              <div className="flex gap-0.5">
-                {[1,2,3,4,5].map((i) => (
-                  <Star key={i} className={`w-5 h-5 ${i <= Math.round(rating.score) ? "fill-blue-500 text-blue-500" : "text-slate-200 fill-slate-200"}`} />
+            {/* Price Confidence */}
+            <div className="border border-[#eceef0] rounded-xl p-5">
+              <div className="text-base font-bold">Price Confidence</div>
+              <div className="text-[17px] font-bold text-[#1a9d5c] mt-3">High</div>
+              <div className="text-[13px] text-[#3a4048] mt-1">This vehicle is priced competitively</div>
+              <div className="flex flex-col gap-2 mt-[14px]">
+                {["Priced below market average", "Low days on market", "High demand for this model"].map((c) => (
+                  <div key={c} className="flex items-center gap-2 text-[13px]">
+                    <CheckCircle2 className="w-4 h-4 text-[#1a9d5c]" fill="#1a9d5c" stroke="#fff" strokeWidth={2.5} />{c}
+                  </div>
                 ))}
               </div>
             </div>
-            <p className="text-2xl font-black text-slate-900 mt-3">{rating.label}</p>
-            <p className="text-xs text-slate-500 mt-2 leading-relaxed">Based on vehicle history, age, mileage and usage</p>
           </div>
 
-          {/* Price Confidence */}
-          <div className="bg-white rounded-2xl border border-slate-200 p-5">
-            <p className="text-sm font-bold text-slate-900">Price Confidence</p>
-            <p className="text-2xl font-black text-emerald-600 mt-3">High</p>
-            <p className="text-xs text-slate-500">This vehicle is priced competitively</p>
-            <ul className="mt-4 space-y-2">
-              {["Priced below market average", "Low days on market", "High demand for this model"].map((t) => (
-                <li key={t} className="flex items-center gap-2 text-sm text-slate-700">
-                  <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" /> {t}
-                </li>
-              ))}
-            </ul>
-            <a href="#" className="mt-4 text-sm font-semibold text-blue-600 hover:underline flex items-center gap-1">
-              How is this calculated? <ChevronRight className="w-4 h-4" />
-            </a>
-          </div>
-        </section>
-
-        {/* ══ 7. HIGHLIGHTS + OVERVIEW ═══════════════════════════ */}
-        <section id="overview" className="bg-white rounded-2xl border border-slate-200 grid grid-cols-1 lg:grid-cols-[260px_1fr_240px]">
-          {/* Highlights */}
-          <div className="p-5 border-b lg:border-b-0 lg:border-r border-slate-100">
-            <p className="text-sm font-bold text-slate-900 mb-4">Vehicle Highlights</p>
-            <div className="grid grid-cols-2 gap-y-4 gap-x-3">
-              {highlightsRendered.slice(0, 6).map((h, i) => {
-                const Icon = (typeof h.icon === "function" ? h.icon : Cog) as React.ElementType;
-                return (
-                  <div key={i} className="flex items-start gap-2">
-                    <Icon className="w-4 h-4 text-blue-600 mt-0.5 shrink-0" />
-                    <div className="min-w-0">
-                      <p className="text-[12px] font-bold text-slate-900 leading-tight">{h.title}</p>
-                      {h.subtitle && <p className="text-[11px] text-slate-500">{h.subtitle}</p>}
+          {/* HIGHLIGHTS + OVERVIEW */}
+          <div className="grid mt-[34px] gap-[34px]" style={{ gridTemplateColumns: "1fr 1fr 0.85fr" }}>
+            <div>
+              <div className="text-[17px] font-bold pb-3 border-b border-[#eceef0]">Vehicle Highlights</div>
+              <div className="grid grid-cols-2 gap-y-[18px] gap-x-[14px] mt-[18px]">
+                {highlightsRendered.slice(0, 6).map((h, i) => (
+                  <div key={i} className="flex items-center gap-[11px]">
+                    <h.icon className="w-[22px] h-[22px] text-[#3a4048]" />
+                    <div>
+                      <div className="text-[13.5px] font-semibold leading-tight">{h.title}</div>
+                      <div className="text-xs text-[#9aa0a8]">{h.subtitle}</div>
                     </div>
                   </div>
-                );
-              })}
-            </div>
-            <a href="#" className="mt-4 text-xs font-semibold text-blue-600 hover:underline flex items-center gap-1">
-              View All Features &amp; Specs <ChevronRight className="w-3.5 h-3.5" />
-            </a>
-          </div>
-
-          {/* Overview */}
-          <div className="p-5">
-            <p className="text-sm font-bold text-slate-900 mb-2">Vehicle Overview</p>
-            <p className="text-sm text-slate-600 leading-relaxed mb-4">{overview}</p>
-            <div className="grid grid-cols-2 gap-x-8 gap-y-2 text-sm">
-              {([
-                ["Trim", listing.trim || "—"],
-                ["Transmission", ks.transmission || "Automatic"],
-                ["Exterior Color", colorName],
-                ["Fuel Type", ks.fuel || "Gasoline"],
-                ["Interior Color", ks.interior_color || "Graphite"],
-                ["MPG (est.)", ks.mpg_city && ks.mpg_hwy ? `${ks.mpg_city} city / ${ks.mpg_hwy} hwy` : "19 city / 25 hwy"],
-              ] as [string, string][]).map(([k, v]) => (
-                <div key={k} className="flex justify-between border-b border-slate-50 py-1.5">
-                  <span className="text-slate-500">{k}</span>
-                  <span className="font-semibold text-slate-900 truncate ml-2">{v}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Side photo */}
-          <div className="p-5 border-t lg:border-t-0 lg:border-l border-slate-100 flex items-center">
-            {(gallery[1] || gallery[0]) ? (
-              <div className="w-full rounded-xl overflow-hidden bg-slate-100">
-                <img src={gallery[1] || gallery[0]} alt={ymm} className="w-full object-cover" style={{ maxHeight: 180 }} />
-              </div>
-            ) : (
-              <div className="w-full h-40 rounded-xl bg-slate-100 flex items-center justify-center">
-                <Car className="w-12 h-12 text-slate-300" />
-              </div>
-            )}
-          </div>
-        </section>
-
-        {/* ══ 7b. MARKET INTELLIGENCE (4 cards) ═════════════════ */}
-        <section className="bg-white rounded-2xl border border-slate-200 p-6">
-          <div className="flex items-center justify-between mb-5">
-            <div>
-              <h2 className="text-lg font-black text-slate-900 tracking-tight">Market Intelligence</h2>
-              <p className="text-[11px] text-slate-400">Powered by MarketCheck · Updated daily</p>
-            </div>
-            <span className="hidden sm:inline-flex items-center gap-1 text-[11px] font-semibold text-blue-600">
-              <TrendingDown className="w-3.5 h-3.5" /> Live market data
-            </span>
-          </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            <div className="border border-slate-100 rounded-xl p-4">
-              <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Market Price Analysis</p>
-              <p className="text-2xl font-black text-slate-900 mt-2">{fmt$(price)}</p>
-              <p className="text-[11px] text-slate-500">Avg {fmt$(fallbackAvg)} · High {fmt$(fallbackHigh)}</p>
-              <div className="mt-2"><MarketGauge price={price} avg={fallbackAvg} /></div>
-            </div>
-            <div className="border border-slate-100 rounded-xl p-4">
-              <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Similar Vehicles</p>
-              <p className="text-3xl font-black text-slate-900 mt-2">7</p>
-              <p className="text-xs text-slate-500">within 100 mi of this trim</p>
-              <p className="text-[11px] text-emerald-700 font-semibold mt-3 inline-flex items-center gap-1">
-                <CheckCircle2 className="w-3 h-3" /> Low local supply
-              </p>
-            </div>
-            <div className="border border-slate-100 rounded-xl p-4">
-              <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Days To Sell</p>
-              <p className="text-3xl font-black text-slate-900 mt-2">21<span className="text-base font-bold text-slate-500"> days</span></p>
-              <p className="text-xs text-slate-500">avg for this model in market</p>
-              <div className="mt-3 h-1.5 rounded-full bg-slate-100 overflow-hidden">
-                <div className="h-full bg-emerald-500" style={{ width: "35%" }} />
-              </div>
-              <p className="text-[11px] text-emerald-700 font-semibold mt-2">Faster than average</p>
-            </div>
-            <div className="border border-slate-100 rounded-xl p-4">
-              <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500">What Others Paid</p>
-              <p className="text-2xl font-black text-slate-900 mt-2">{fmt$(Math.round(price * 0.98))}</p>
-              <p className="text-[11px] text-slate-500">median sale, last 30 days</p>
-              <div className="mt-3 flex items-end gap-1 h-10">
-                {[40,55,65,80,72,60,75].map((h,i) => (
-                  <div key={i} className="flex-1 rounded-sm bg-blue-200" style={{ height: `${h}%` }} />
                 ))}
               </div>
             </div>
-          </div>
-        </section>
-
-        {/* ══ 7c. FACTORY BUILD SHEET (6 cards) ═════════════════ */}
-        <section className="bg-white rounded-2xl border border-slate-200 p-6">
-          <div className="flex items-center justify-between mb-5">
             <div>
-              <h2 className="text-lg font-black text-slate-900 tracking-tight">Complete Factory Build &amp; Equipment</h2>
-              <p className="text-[11px] text-slate-400">Decoded from OEM build sheet · VIN {listing.vin}</p>
-            </div>
-          </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {[
-              { icon: Cog,         title: "Powertrain",  items: [ks.engine || "3.5L V6", ks.transmission || "Automatic", ks.drivetrain || "AWD", ks.fuel || "Gasoline"] },
-              { icon: Car,         title: "Interior",    items: [ks.interior_color || "Graphite", "Heated front seats", "Leather seating", "Power liftgate"] },
-              { icon: Wind,        title: "Exterior",    items: [ks.exterior_color || colorName, "LED headlights", "Panoramic moonroof", '20" alloy wheels'] },
-              { icon: ShieldCheck, title: "Safety",      items: ["Forward collision warning", "Blind spot monitor", "Lane departure assist", "Backup camera"] },
-              { icon: Settings,    title: "Technology",  items: ["Apple CarPlay / Android Auto", "Bluetooth", "Navigation", "Premium audio"] },
-              { icon: Package,     title: "Packages",    items: ["Premium Package", "Cold Weather Package", "Towing Package", "Driver Assistance"] },
-            ].map(({ icon: Icon, title, items }) => (
-              <div key={title} className="border border-slate-100 rounded-xl p-4">
-                <div className="flex items-center gap-2 mb-3">
-                  <div className="w-8 h-8 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center">
-                    <Icon className="w-4 h-4" />
-                  </div>
-                  <p className="text-sm font-bold text-slate-900">{title}</p>
-                </div>
-                <ul className="space-y-1.5">
-                  {items.map((it) => (
-                    <li key={it} className="text-[12px] text-slate-700 flex items-start gap-1.5">
-                      <CheckCircle2 className="w-3 h-3 text-emerald-500 mt-0.5 shrink-0" /> {it}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            ))}
-          </div>
-        </section>
-
-        {/* ══ 7d. VEHICLE HISTORY & TRANSPARENCY ════════════════ */}
-        <section className="bg-white rounded-2xl border border-slate-200 p-6">
-          <div className="flex items-center justify-between mb-5">
-            <h2 className="text-lg font-black text-slate-900 tracking-tight">Vehicle History &amp; Transparency</h2>
-            <a href="#" className="text-sm font-semibold text-blue-600 hover:underline flex items-center gap-1">
-              View AutoCheck <ChevronRight className="w-4 h-4" />
-            </a>
-          </div>
-          <div className="grid grid-cols-1 lg:grid-cols-[260px_1fr] gap-6">
-            <div className="space-y-3">
-              <div className="border border-slate-100 rounded-xl p-3">
-                <p className="text-[11px] uppercase font-bold text-slate-500">Owners</p>
-                <p className="text-2xl font-black text-slate-900 mt-1">{ownerCount ?? 1}</p>
-                <p className="text-[11px] text-emerald-700 font-semibold inline-flex items-center gap-1"><CheckCircle2 className="w-3 h-3" /> Personal use</p>
-              </div>
-              <div className="border border-slate-100 rounded-xl p-3">
-                <p className="text-[11px] uppercase font-bold text-slate-500">Accidents Reported</p>
-                <p className="text-2xl font-black text-slate-900 mt-1">{accidentCount ?? 0}</p>
-                <p className="text-[11px] text-emerald-700 font-semibold inline-flex items-center gap-1"><CheckCircle2 className="w-3 h-3" /> Clean record</p>
-              </div>
-              <div className="border border-slate-100 rounded-xl p-3">
-                <p className="text-[11px] uppercase font-bold text-slate-500">Service Records</p>
-                <p className="text-2xl font-black text-slate-900 mt-1">{Math.max(serviceCount, 8)}</p>
-                <p className="text-[11px] text-blue-700 font-semibold inline-flex items-center gap-1"><Wrench className="w-3 h-3" /> Documented</p>
+              <div className="text-[17px] font-bold pb-3 border-b border-[#eceef0]">Vehicle Overview</div>
+              <p className="text-[13px] leading-relaxed text-[#3a4048] mt-4">{overview}</p>
+              <div className="grid mt-5 text-[13px]" style={{ gridTemplateColumns: "auto 1fr", rowGap: 12 }}>
+                {specRows.filter(([, v]) => v).slice(0, 6).map(([k, v]) => (
+                  <Fragment key={k}>
+                    <div className="text-[#6b727a] pr-5">{k}</div>
+                    <div className="font-bold">{v}</div>
+                  </Fragment>
+                ))}
               </div>
             </div>
-            <ol className="relative border-l-2 border-slate-100 pl-5 space-y-5">
-              {[
-                { title: "Original Factory Sale", date: `${ymmYear || "2024"} · Build complete`, tone: "blue" },
-                { title: "Title Registration", date: "Issued to first owner", tone: "blue" },
-                { title: "State Safety Inspection", date: "Passed multi-point inspection", tone: "emerald" },
-                { title: "Routine Service Visit", date: "OEM-recommended maintenance", tone: "emerald" },
-                { title: "Dealer Acquisition", date: `Acquired by ${(dealer.name as string) || "this dealer"}`, tone: "emerald" },
-                { title: "Listed For Sale", date: "Reconditioning complete", tone: "blue" },
-              ].map((ev, i) => (
-                <li key={i} className="relative">
-                  <span className={`absolute -left-[27px] top-1.5 w-3 h-3 rounded-full ring-4 ring-white ${ev.tone === "emerald" ? "bg-emerald-500" : "bg-blue-500"}`} />
-                  <p className="text-sm font-bold text-slate-900">{ev.title}</p>
-                  <p className="text-xs text-slate-500">{ev.date}</p>
-                </li>
-              ))}
-            </ol>
-          </div>
-        </section>
-
-        {/* ══ 7e. DOCUMENT CENTER PREVIEW ═══════════════════════ */}
-        <section className="bg-white rounded-2xl border border-slate-200 p-6">
-          <div className="flex items-center justify-between mb-5">
-            <div>
-              <h2 className="text-lg font-black text-slate-900 tracking-tight">Document Center</h2>
-              <p className="text-[11px] text-slate-400">All vehicle paperwork in one place</p>
-            </div>
-            <button onClick={() => navigate(`/v/${listing.slug}/documents`)} className="text-sm font-semibold text-blue-600 hover:underline flex items-center gap-1">
-              View all documents <ChevronRight className="w-4 h-4" />
-            </button>
-          </div>
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-            {[
-              { name: "Window Sticker", desc: "OEM Monroney" },
-              { name: "Buyers Guide", desc: "FTC Used Car Rule" },
-              { name: "Inspection Report", desc: "Multi-point pass" },
-              { name: "Warranty", desc: warrantyStr || "Factory coverage" },
-              { name: "Addendum", desc: "Dealer add-ons" },
-              { name: "CARFAX / AutoCheck", desc: "Vehicle history" },
-            ].map((d) => (
-              <div key={d.name} className="border border-slate-100 rounded-xl p-3 flex items-center gap-3 hover:border-slate-200">
-                <div className="w-10 h-10 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
-                  <FileText className="w-5 h-5" />
-                </div>
-                <div className="min-w-0 flex-1">
-                  <p className="text-sm font-bold text-slate-900 truncate">{d.name}</p>
-                  <p className="text-[11px] text-emerald-700 font-semibold inline-flex items-center gap-1">
-                    <CheckCircle2 className="w-3 h-3" /> Verified
-                  </p>
-                </div>
-                <a href="#" className="text-[11px] font-bold text-blue-600 hover:underline shrink-0">View</a>
-              </div>
-            ))}
-          </div>
-        </section>
-
-        {/* ══ 7f. TRADE VALUE BAND ══════════════════════════════ */}
-        <section className="rounded-2xl overflow-hidden bg-gradient-to-r from-blue-700 to-blue-600 text-white p-6 sm:p-8">
-          <div className="grid grid-cols-1 lg:grid-cols-[1fr_auto] gap-6 items-center">
-            <div>
-              <h2 className="text-2xl font-black tracking-tight">What's Your Trade Worth?</h2>
-              <p className="text-blue-100 text-sm mt-1">Powered by AutoCurb · Real-time market valuation in seconds.</p>
-            </div>
-            <div className="flex flex-col sm:flex-row gap-2">
-              <input placeholder="Trade-in VIN" className="h-11 px-4 rounded-xl text-slate-900 text-sm w-full sm:w-52 focus:outline-none focus:ring-2 focus:ring-white" />
-              <input placeholder="License Plate" className="h-11 px-4 rounded-xl text-slate-900 text-sm w-full sm:w-44 focus:outline-none focus:ring-2 focus:ring-white" />
-              <button onClick={() => setInquiryOpen(true)} className="h-11 px-5 bg-white text-blue-700 font-bold text-sm rounded-xl hover:bg-blue-50 inline-flex items-center justify-center gap-2 whitespace-nowrap">
-                <RefreshCw className="w-4 h-4" /> Get My Trade Value
-              </button>
-            </div>
-          </div>
-        </section>
-
-        {/* ══ 8. REVIEWS ═════════════════════════════════════════ */}
-        <section className="bg-white rounded-2xl border border-slate-200 p-6">
-          <div className="flex items-center justify-between mb-5">
-            <div>
-              <h2 className="text-lg font-black text-slate-900">What Our Customers Say</h2>
-              <div className="flex items-center gap-2 mt-1">
-                <span className="text-base font-black text-slate-900">4.8</span>
-                <div className="flex gap-0.5">
-                  {[1,2,3,4,5].map((i) => <Star key={i} className="w-4 h-4 fill-blue-500 text-blue-500" />)}
-                </div>
-                <span className="text-xs text-slate-500">(1,248 Reviews)</span>
-              </div>
-            </div>
-            <a href={dealer.name ? `https://www.google.com/search?q=${encodeURIComponent((dealer.name as string) + " reviews")}` : "#"}
-               target="_blank" rel="noreferrer"
-               className="text-sm font-semibold text-blue-600 hover:underline flex items-center gap-1">
-              View all reviews <ChevronRight className="w-4 h-4" />
-            </a>
-          </div>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            {reviews.map((r) => (
-              <div key={r.name} className="border border-slate-100 rounded-xl p-4">
-                <div className="flex items-center justify-between">
-                  <div className="flex gap-0.5">
-                    {[1,2,3,4,5].map((i) => (
-                      <Star key={i} className={`w-3.5 h-3.5 ${i <= r.rating ? "fill-emerald-500 text-emerald-500" : "text-slate-200 fill-slate-200"}`} />
-                    ))}
-                  </div>
-                  <span className="text-[11px] text-slate-400">{r.days}</span>
-                </div>
-                <p className="text-sm text-slate-700 mt-3 leading-relaxed">{r.text}</p>
-                <div className="flex items-center justify-between mt-3">
-                  <span className="text-xs font-bold text-slate-700">— {r.name}</span>
-                  <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-white border border-slate-200 text-[10px] font-black">G</span>
-                </div>
-              </div>
-            ))}
-          </div>
-        </section>
-
-        {/* ══ 9. DEALER CTA ══════════════════════════════════════ */}
-        <section className="rounded-2xl overflow-hidden bg-gradient-to-r from-blue-700 to-blue-600 text-white p-6 sm:p-8">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-center">
-            <div>
-              <h2 className="text-2xl font-black">Ready to take the next step?</h2>
-              <p className="text-blue-100 text-sm mt-1">
-                Our team is here to help you make this {ymmMakeModel || "vehicle"} yours.
-              </p>
-              <div className="flex flex-col sm:flex-row gap-3 mt-5">
-                <button onClick={() => setInquiryOpen(true)}
-                  className="flex items-center justify-center gap-2 bg-white text-blue-700 font-bold px-5 h-11 rounded-xl hover:bg-blue-50 text-sm">
-                  <MessageSquare className="w-4 h-4" /> Contact Dealer
-                </button>
-                <button onClick={() => setInquiryOpen(true)}
-                  className="flex items-center justify-center gap-2 bg-blue-500/40 hover:bg-blue-500/60 border border-white/40 text-white font-bold px-5 h-11 rounded-xl text-sm">
-                  <RefreshCw className="w-4 h-4" /> Value My Trade
-                </button>
-              </div>
-            </div>
-            <div className="lg:text-right">
-              <p className="text-blue-100 text-sm">Questions? Call us today.</p>
-              {dealer.phone ? (
-                <a href={`tel:${dealer.phone}`} className="text-3xl font-black hover:underline block mt-1">
-                  {formatPhone(dealer.phone as string)}
-                </a>
+            <div className="flex items-center">
+              {gallery[1] ? (
+                <img src={gallery[1]} alt="" className="w-full rounded-[10px] object-cover" style={{ aspectRatio: "4 / 3" }} />
               ) : (
-                <p className="text-3xl font-black mt-1">(860) 123-4567</p>
-              )}
-              {dealer.name && <p className="text-sm font-bold mt-2">{dealer.name as string}</p>}
-              {(dealer.address || dealer.city) && (
-                <p className="text-blue-100 text-xs mt-0.5">
-                  {dealer.address as string}{dealer.city ? `, ${dealer.city}` : ""}{dealer.state ? `, ${dealer.state}` : ""}
-                </p>
+                <div className="w-full rounded-[10px] bg-[#f1f3f5]" style={{ aspectRatio: "4 / 3" }} />
               )}
             </div>
           </div>
-        </section>
 
-        {/* ══ 10. FOOTER ═════════════════════════════════════════ */}
-        <footer className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-2 pb-6">
-          {(dealer.logo_url as string) ? (
-            <img src={dealer.logo_url as string} alt={(dealer.name as string) || "Dealer"} className="h-8 w-auto" />
-          ) : (
-            <Logo variant="full" size={18} />
-          )}
-          <p className="text-xs text-slate-400">
-            © {new Date().getFullYear()} {(dealer.name as string) || "AutoLabels"}. All rights reserved.
-          </p>
-          <div className="flex gap-4">
-            <a href="#" className="text-xs text-slate-400 hover:text-slate-600">Privacy Policy</a>
-            <a href="#" className="text-xs text-slate-400 hover:text-slate-600">Terms of Use</a>
+          {/* REVIEWS */}
+          <div className="border border-[#eceef0] rounded-xl p-6 mt-[34px]">
+            <div className="flex justify-between items-start">
+              <div>
+                <div className="text-lg font-bold">What Our Customers Say</div>
+                <div className="flex items-center gap-2.5 mt-2.5">
+                  <span className="text-[28px] font-extrabold">4.8</span>
+                  <Stars n={5} />
+                  <span className="text-[13px] text-[#6b727a]">(1,248 Reviews)</span>
+                </div>
+              </div>
+              <button className="flex items-center gap-1.5 text-sm font-semibold" style={{ color: "#1a6dff" }}>View all reviews <ChevronRight className="w-[15px] h-[15px]" /></button>
+            </div>
+            <div className="grid grid-cols-3 gap-4 mt-5">
+              {reviews.map((r, i) => (
+                <div key={i} className="border border-[#eceef0] rounded-[10px] p-[18px]">
+                  <div className="flex justify-between items-center">
+                    <Stars n={r.rating} size={15} />
+                    <span className="text-[11px] text-[#9aa0a8]">{r.days}</span>
+                  </div>
+                  <p className="text-[13px] leading-relaxed text-[#3a4048] my-[13px]">{r.text}</p>
+                  <div className="flex justify-between items-center">
+                    <span className="text-[13px] font-semibold">– {r.name}</span>
+                    <Globe className="w-4 h-4 text-[#9aa0a8]" />
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* CTA BANNER */}
+          <div className="rounded-[14px] p-[30px] mt-[34px] flex justify-between items-center text-white" style={{ background: "linear-gradient(105deg,#1a6dff 0%,#3b86ff 100%)" }}>
+            <div>
+              <div className="text-[22px] font-extrabold">Ready to take the next step?</div>
+              <div className="text-sm opacity-90 mt-1.5">Our team is here to help you make this {(ymmRest[0] || "vehicle")} yours.</div>
+              <div className="flex gap-[13px] mt-[18px]">
+                <button onClick={() => setInquiryOpen(true)} className="flex items-center gap-2 bg-white text-[#1a6dff] rounded-[9px] px-[22px] py-[13px] text-sm font-bold">
+                  <MessageSquare className="w-4 h-4" />Contact Dealer
+                </button>
+                <button onClick={() => setInquiryOpen(true)} className="flex items-center gap-2 bg-transparent text-white rounded-[9px] px-[22px] py-[13px] text-sm font-bold" style={{ border: "1.5px solid rgba(255,255,255,0.7)" }}>
+                  <RefreshCw className="w-4 h-4" />Value My Trade
+                </button>
+              </div>
+            </div>
+            <div className="text-right">
+              <div className="text-[15px] opacity-90">Questions? Call us today.</div>
+              {dealerPhone && <div className="text-[26px] font-extrabold mt-1">{formatPhone(dealerPhone)}</div>}
+              <div className="text-[13px] opacity-85 mt-[14px] font-semibold">{dealerName}</div>
+              {dealerAddress && <div className="text-[13px] opacity-85">{dealerAddress}</div>}
+            </div>
+          </div>
+        </div>
+
+        {/* FOOTER */}
+        <footer className="flex justify-between items-center px-[22px] py-[22px] border-t border-[#eceef0]">
+          <div className="flex items-center gap-2">
+            {(dealer.logo_url as string) ? <img src={dealer.logo_url as string} alt={dealerName} className="h-8" /> : <Logo className="h-8" />}
+          </div>
+          <div className="text-xs text-[#9aa0a8]">© {new Date().getFullYear()} {dealerName}. All rights reserved.</div>
+          <div className="flex gap-6 text-xs text-[#6b727a]">
+            <a href="/privacy" className="text-[#6b727a] no-underline">Privacy Policy</a>
+            <a href="/terms" className="text-[#6b727a] no-underline">Terms of Use</a>
           </div>
         </footer>
-      </main>
-
-      {/* ══ Sticky mobile bar ════════════════════════════════════ */}
-      <div className="fixed bottom-0 inset-x-0 z-40 sm:hidden bg-white border-t border-slate-200 px-4 py-3 flex items-center gap-2 shadow-lg">
-        <button className="flex-1 text-left" onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}>
-          <p className="text-[10px] text-slate-500">{priceLabel}</p>
-          <p className="text-base font-black text-slate-900">{fmt$(price || undefined)}</p>
-        </button>
-        <button onClick={() => setInquiryOpen(true)}
-          className="flex-1 h-11 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-xl flex items-center justify-center gap-1.5">
-          <RefreshCw className="w-4 h-4" /> Value My Trade
-        </button>
-        <button onClick={() => setInquiryOpen(true)}
-          className="flex-1 h-11 border-2 border-blue-600 text-blue-600 text-xs font-bold rounded-xl flex items-center justify-center gap-1.5 hover:bg-blue-50">
-          <MessageSquare className="w-4 h-4" /> Contact
-        </button>
       </div>
 
-      {/* ══ Lightbox modal ═══════════════════════════════════════ */}
+      {/* LIGHTBOX */}
       {lightboxOpen && gallery.length > 0 && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/95" onClick={() => setLightboxOpen(false)}>
           <button className="absolute left-4 top-1/2 -translate-y-1/2 w-12 h-12 bg-white/20 hover:bg-white/30 rounded-full flex items-center justify-center"
