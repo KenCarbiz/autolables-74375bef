@@ -481,7 +481,7 @@ const PublicListingBody = () => {
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 flex-1">
               {quickActions.map((a) => (
                 <button key={a.label} onClick={a.onClick}
-                  className="flex items-center justify-center gap-2.5 h-[60px] px-3 bg-white border border-[#E5E7EB] rounded-xl text-[15px] font-semibold hover:border-[#1a6dff] hover:text-[#1a6dff] transition-colors">
+                  className="flex items-center justify-center gap-2.5 h-12 px-3 bg-white border border-[#E5E7EB] rounded-xl text-[15px] font-semibold hover:border-[#1a6dff] hover:text-[#1a6dff] transition-colors">
                   <a.icon className={`w-5 h-5 ${a.label === "Value My Trade" ? "text-[#1a9d5c]" : "text-[#1a6dff]"}`} />{a.label}
                 </button>
               ))}
@@ -490,9 +490,9 @@ const PublicListingBody = () => {
               <div className="text-[13px] text-[#3a4048] mb-2">Enter your ZIP for available offers in your area</div>
               <div className="flex">
                 <input value={zipInput} onChange={(e) => setZipInput(e.target.value.replace(/\D/g, "").slice(0, 5))} placeholder="ZIP Code" maxLength={5} inputMode="numeric"
-                  className="flex-1 min-w-0 h-[60px] px-4 border border-[#E5E7EB] border-r-0 rounded-l-xl text-sm outline-none focus:border-[#1a6dff]" />
+                  className="flex-1 min-w-0 h-12 px-4 border border-[#E5E7EB] border-r-0 rounded-l-xl text-sm outline-none focus:border-[#1a6dff]" />
                 <button onClick={() => zipValid ? toast.success(`Checking offers near ${zipInput}…`) : toast.error("Enter a valid 5-digit ZIP")}
-                  className="h-[60px] px-5 text-white rounded-r-xl text-sm font-semibold whitespace-nowrap bg-[#2563EB] hover:bg-[#1d4fd7] transition-colors">View Offers</button>
+                  className="h-12 px-5 text-white rounded-r-xl text-sm font-semibold whitespace-nowrap bg-[#2563EB] hover:bg-[#1d4fd7] transition-colors">View Offers</button>
               </div>
             </div>
           </div>
