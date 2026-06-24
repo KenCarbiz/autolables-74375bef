@@ -349,7 +349,7 @@ const VehicleFile = () => {
                       "bg-amber-100 text-amber-700"
                     }`}>{vehicle.status}</span>
                   </div>
-                  <h1 className="text-[30px] sm:text-[40px] lg:text-[46px] font-black tracking-[-0.02em] font-display text-foreground leading-[1]">
+                  <h1 className="text-[32px] sm:text-[42px] lg:text-[48px] font-black tracking-[-0.02em] font-display text-foreground leading-[1]">
                     {vehicle.ymm || "(needs VIN decode)"}
                   </h1>
                   {vehicle.trim ? <p className="text-2xl text-slate-600 font-normal leading-tight">{vehicle.trim}</p> : null}
