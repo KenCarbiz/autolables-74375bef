@@ -49,6 +49,7 @@ const AdminSmokeTest = lazy(() => import("./pages/AdminSmokeTest"));
 const AdminCertificationHistory = lazy(() => import("./pages/AdminCertificationHistory"));
 const PlatformAdmin = lazy(() => import("./pages/PlatformAdmin"));
 const Inventory = lazy(() => import("./pages/Inventory"));
+const InventoryCommandCenterV2 = lazy(() => import("./pages/InventoryCommandCenterV2"));
 const VehicleFile = lazy(() => import("./pages/VehicleFile"));
 const SavedAddendums = lazy(() => import("./pages/SavedAddendums"));
 const SignatureQueue = lazy(() => import("./pages/SignatureQueue"));
@@ -187,6 +188,7 @@ const App = () => (
                         <Route path="/setup" element={<Setup />} />
                         <Route path="/queue" element={<LotCaptureQueue />} />
                         <Route path="/inventory" element={<Inventory />} />
+                        <Route path="/inventory-v2" element={<InventoryCommandCenterV2 />} />
                         <Route path="/dashboard-legacy" element={<Navigate to="/dashboard" replace />} />
                         <Route path="/vehicle-file/:id" element={<VehicleFile />} />
                         <Route path="/admin" element={<Admin />} />
