@@ -238,6 +238,7 @@ const AppShell = ({ children }: AppShellProps) => {
   const pageTitles: Record<string, { title: string; subtitle: string }> = {
     "/dashboard": { title: "Home", subtitle: "Your dealership command center." },
     "/inventory": { title: "Inventory Command Center", subtitle: "Manage, optimize, and publish your inventory with confidence." },
+    "/inventory-v2": { title: "Inventory Command Center", subtitle: "Manage, optimize, and publish your inventory with confidence." },
     "/saved": { title: "Deals", subtitle: "Review saved addendums, signatures, and delivery status." },
     "/setup": { title: "Setup", subtitle: "Configure your dealership workspace." },
     "/addendum": { title: "New Addendum", subtitle: "Create compliant addendum labels and forms." },

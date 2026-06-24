@@ -65,15 +65,16 @@ const Ring = ({ pct, size = 76 }: { pct: number; size?: number }) => {
   );
 };
 
-const Kpi = ({ label, value, sub, accent, children }: { label: string; value?: React.ReactNode; sub?: React.ReactNode; accent?: string; children?: React.ReactNode }) => (
-  <div className="rounded-2xl border border-[#e8ebef] bg-white shadow-[0_1px_3px_rgba(16,24,40,0.05)] p-5 min-w-0">
+const Kpi = ({ label, value, sub, accent, cta, children }: { label: string; value?: React.ReactNode; sub?: React.ReactNode; accent?: string; cta?: { label: string; onClick: () => void }; children?: React.ReactNode }) => (
+  <div className="rounded-2xl border border-[#eef1f4] bg-white shadow-[0_1px_2px_rgba(16,24,40,0.04)] p-5 min-w-0 flex flex-col">
     <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">{label}</p>
     {children ?? (
       <>
-        <p className={`text-[28px] font-extrabold leading-none mt-1.5 ${accent || "text-slate-900"}`}>{value}</p>
+        <p className={`text-[34px] font-extrabold leading-none mt-2 ${accent || "text-slate-900"}`}>{value}</p>
         {sub && <div className="text-[11px] text-slate-500 mt-1.5">{sub}</div>}
       </>
     )}
+    {cta && <button onClick={cta.onClick} className="mt-3 text-[12px] font-semibold text-blue-600 inline-flex items-center gap-1 hover:gap-1.5 transition-all self-start">{cta.label} <ArrowRight className="w-3.5 h-3.5" /></button>}
   </div>
 );
 
@@ -97,6 +98,9 @@ const InventoryCommandCenterV2 = () => {
   const [condFilter, setCondFilter] = useState<string>("all");
   const [sort, setSort] = useState<"updated" | "price" | "ymm">("updated");
   const [tab, setTab] = useState<string>("all");
+  const [page, setPage] = useState(1);
+  const [perPage, setPerPage] = useState(25);
+  useEffect(() => { setPage(1); }, [q, statusFilter, condFilter, tab, sort, perPage]);
 
   useEffect(() => {
     if (!tenant?.id) return;
@@ -221,6 +225,7 @@ const InventoryCommandCenterV2 = () => {
     { id: "draft", label: "Draft", n: stats.total - stats.publishedN },
   ];
 
+  const PRIO: Record<Sev, string> = { critical: "High Priority", warn: "Medium Priority", ok: "Low Priority", info: "Priority" };
   const priorities: { icon: React.ElementType; label: string; n: number; sev: Sev; onClick: () => void }[] = [
     { icon: Tag, label: "Missing Stickers", n: stats.missingSticker.length, sev: "critical", onClick: () => setTab("needs_sticker") },
     { icon: FileSignature, label: "Missing Addendums", n: stats.missingAddendum.length, sev: "warn", onClick: () => setTab("missing_addendum") },
@@ -232,13 +237,15 @@ const InventoryCommandCenterV2 = () => {
   const quickActions: { icon: React.ElementType; label: string; onClick: () => void }[] = [
     { icon: Plus, label: "Add Vehicle", onClick: () => navigate("/add-inventory") },
     { icon: ScanLine, label: "Scan VIN", onClick: () => navigate("/add-inventory") },
-    { icon: Printer, label: "New Car Sticker", onClick: () => navigate("/new-car-sticker") },
-    { icon: FileSignature, label: "New Addendum", onClick: () => navigate("/addendum") },
-    { icon: ShieldAlert, label: "Check Recalls", onClick: () => navigate("/inventory") },
-    { icon: TrendingUp, label: "Check Market Prices", onClick: () => navigate("/inventory") },
+    { icon: Printer, label: "Generate Sticker", onClick: () => navigate("/new-car-sticker") },
     { icon: CircleDollarSign, label: "Verify Prices", onClick: () => navigate("/inventory") },
+    { icon: ShieldAlert, label: "Check Recalls", onClick: () => navigate("/inventory") },
     { icon: Upload, label: "CSV Import", onClick: () => navigate("/add-inventory") },
+    { icon: TrendingUp, label: "Publish Vehicles", onClick: () => setTab("draft") },
   ];
+
+  const totalPages = Math.max(1, Math.ceil(visible.length / perPage));
+  const pageRows = visible.slice((page - 1) * perPage, page * perPage);
 
   if (loading) return (
     <div className="min-h-[60vh] flex items-center justify-center"><div className="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" /></div>
@@ -246,16 +253,10 @@ const InventoryCommandCenterV2 = () => {
 
   return (
     <div className="p-4 lg:px-6 lg:py-5 max-w-[1600px] mx-auto">
-      {/* Header — title + admin dashboard settings only. Tenant, sync,
-          MarketCheck, and Add Vehicle live in the global top bar / sidebar. */}
-      <div className="flex items-start justify-between gap-3 mb-5">
-        <div>
-          <div className="flex items-center gap-2">
-            <h1 className="text-2xl font-extrabold tracking-tight">Inventory Command Center</h1>
-            <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-blue-100 text-blue-700">V2 Draft</span>
-          </div>
-          <p className="text-sm text-slate-500">Manage, optimize, and publish your inventory with confidence.</p>
-        </div>
+      {/* The page title now lives in the global AppShell header (pageTitles).
+          This thin row only carries the draft marker + admin settings. */}
+      <div className="flex items-center justify-between gap-3 mb-4">
+        <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-blue-100 text-blue-700">V2 Draft</span>
         <div className="relative shrink-0">
           <button onClick={() => setShowSettings((v) => !v)} className="inline-flex items-center gap-1.5 px-3 h-9 rounded-lg bg-white border border-[#e8ebef] text-sm font-semibold hover:bg-slate-50">
             <Settings className="w-4 h-4 text-slate-500" /> <span className="hidden sm:inline">Dashboard settings</span>
@@ -285,9 +286,9 @@ const InventoryCommandCenterV2 = () => {
       </div>
 
       {/* KPI cards */}
-      <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-7 gap-3 mb-5">
-        <Kpi label="Inventory Readiness">
-          <div className="flex items-center gap-3 mt-1">
+      <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-7 gap-4 mb-6">
+        <Kpi label="Inventory Readiness" cta={{ label: "View readiness", onClick: () => setTab("draft") }}>
+          <div className="flex items-center gap-3 mt-2">
             <Ring pct={stats.avgScore} />
             <div>
               <p className="text-[22px] font-extrabold leading-none">{stats.readyToPublish.length}<span className="text-sm font-bold text-slate-400"> / {stats.total}</span></p>
@@ -295,28 +296,32 @@ const InventoryCommandCenterV2 = () => {
             </div>
           </div>
         </Kpi>
-        <Kpi label="Total Vehicles" value={stats.total} sub={<>{stats.newN} New · {stats.usedN} Used{stats.cpoN ? ` · ${stats.cpoN} CPO` : ""}</>} />
-        <Kpi label="Published" value={stats.publishedN} accent="text-emerald-600" sub="Live on portal" />
-        <Kpi label="Needs Attention" value={stats.needsAttention.length} accent={stats.needsAttention.length ? "text-amber-600" : "text-slate-900"} sub="Require action" />
-        <Kpi label="Open Recalls" value={stats.openRecalls.length} accent={stats.openRecalls.length ? "text-red-600" : "text-emerald-600"} sub="Vehicles" />
-        <Kpi label="Price Reviews" value={stats.priceReview.length} accent="text-violet-600" sub="Require review" />
-        <Kpi label="Market Position" value={stats.avgDelta != null ? fmt$(Math.abs(stats.avgDelta)) : "—"} accent={stats.avgDelta != null && stats.avgDelta >= 0 ? "text-emerald-600" : "text-amber-600"} sub={stats.avgDelta == null ? "No data" : stats.avgDelta >= 0 ? "Below market avg" : "Above market avg"} />
+        <Kpi label="Total Vehicles" value={stats.total} sub={<>{stats.newN} New · {stats.usedN} Used{stats.cpoN ? ` · ${stats.cpoN} CPO` : ""}</>} cta={{ label: "View all", onClick: () => setTab("all") }} />
+        <Kpi label="Published" value={stats.publishedN} accent="text-emerald-600" sub="Live on portal" cta={{ label: "View published", onClick: () => setTab("published") }} />
+        <Kpi label="Needs Attention" value={stats.needsAttention.length} accent={stats.needsAttention.length ? "text-amber-600" : "text-slate-900"} sub="Require action" cta={{ label: "View list", onClick: () => setTab("draft") }} />
+        <Kpi label="Open Recalls" value={stats.openRecalls.length} accent={stats.openRecalls.length ? "text-red-600" : "text-emerald-600"} sub="Vehicles" cta={{ label: "View recalls", onClick: () => setTab("all") }} />
+        <Kpi label="Price Reviews" value={stats.priceReview.length} accent="text-violet-600" sub="Require review" cta={{ label: "View reviews", onClick: () => setTab("price_review") }} />
+        <Kpi label="Market Position" value={stats.avgDelta != null ? fmt$(Math.abs(stats.avgDelta)) : "—"} accent={stats.avgDelta != null && stats.avgDelta >= 0 ? "text-emerald-600" : "text-amber-600"} sub={stats.avgDelta == null ? "No data" : stats.avgDelta >= 0 ? "Below market avg" : "Above market avg"} cta={{ label: "Market report", onClick: () => navigate("/dashboard/reports") }} />
       </div>
 
       {/* Body: main + sidebar */}
       <div className="grid grid-cols-1 xl:grid-cols-[1fr_300px] gap-5">
         <div className="min-w-0 space-y-4">
-          {/* Action Center */}
+          {/* Priority Queue */}
           <div>
-            <h2 className="text-[15px] font-bold mb-2">Today's Priorities</h2>
+            <h2 className="text-[15px] font-bold mb-2">Priority Queue</h2>
             <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-3">
               {priorities.map((p) => {
                 const s = SEV[p.sev];
                 return (
-                  <button key={p.label} onClick={p.onClick} className="text-left rounded-2xl border border-[#e8ebef] bg-white shadow-[0_1px_3px_rgba(16,24,40,0.05)] p-4 hover:shadow-md transition-shadow">
-                    <span className={`w-9 h-9 rounded-xl flex items-center justify-center ${s.bg}`}><p.icon className={`w-4 h-4 ${s.text}`} /></span>
-                    <p className={`text-[26px] font-extrabold leading-none mt-2.5 ${p.n ? s.text : "text-slate-900"}`}>{p.n}</p>
-                    <p className="text-[12px] text-slate-500 mt-1">{p.label}</p>
+                  <button key={p.label} onClick={p.onClick} className="text-left rounded-2xl border border-[#eef1f4] bg-white shadow-[0_1px_2px_rgba(16,24,40,0.04)] p-3.5 hover:shadow-md transition-shadow group">
+                    <div className="flex items-center justify-between">
+                      <span className={`w-8 h-8 rounded-xl flex items-center justify-center ${s.bg}`}><p.icon className={`w-4 h-4 ${s.text}`} /></span>
+                      <ChevronRight className="w-3.5 h-3.5 text-slate-300 group-hover:text-slate-500" />
+                    </div>
+                    <p className={`text-[26px] font-extrabold leading-none mt-2 ${p.n ? s.text : "text-slate-900"}`}>{p.n}</p>
+                    <p className="text-[12px] text-slate-600 font-medium mt-1">{p.label}</p>
+                    <p className={`text-[10px] font-bold uppercase tracking-wide mt-0.5 ${s.text}`}>{PRIO[p.sev]}</p>
                   </button>
                 );
               })}
@@ -350,46 +355,49 @@ const InventoryCommandCenterV2 = () => {
           </div>
 
           {/* Table */}
-          <div className="rounded-2xl border border-[#e8ebef] bg-white overflow-hidden">
-            <div className="hidden lg:grid grid-cols-[1.7fr_0.9fr_1fr_1.3fr_1.1fr_0.8fr_1.1fr] gap-3 px-4 py-2.5 text-[10px] font-bold uppercase tracking-wider text-slate-400 border-b border-[#eef1f4]">
+          <div className="rounded-2xl border border-[#eef1f4] bg-white overflow-hidden">
+            <div className="hidden lg:grid grid-cols-[1.8fr_0.9fr_1fr_1.3fr_1.1fr_0.7fr_1fr] gap-3 px-4 py-2.5 text-[10px] font-bold uppercase tracking-wider text-slate-400 border-b border-[#eef1f4] sticky top-0 z-10 bg-white/95 backdrop-blur">
               <span>Vehicle</span><span>Stock / VIN</span><span>Readiness</span><span>Compliance</span><span>Advertised Price</span><span>Publishing</span><span className="text-right">Actions</span>
             </div>
-            {visible.length === 0 ? (
+            {pageRows.length === 0 ? (
               <div className="py-16 text-center text-sm text-slate-400">No vehicles match these filters.</div>
-            ) : visible.map((r) => {
+            ) : pageRows.map((r) => {
               const s = signalOf(r, addVins.has((r.vin || "").toUpperCase()));
               const pct = Math.round(s.score * 100);
-              const badge: Sev = s.published ? "ok" : pct === 100 ? "ok" : pct >= 50 ? "warn" : "critical";
-              const badgeLabel = s.published ? "Published" : pct === 100 ? "Ready" : pct >= 50 ? "Warning" : "Critical";
+              const tone: Sev = s.published ? "ok" : pct === 100 ? "ok" : pct >= 50 ? "warn" : "critical";
+              const label = s.published ? "Published" : pct === 100 ? "Ready" : pct >= 50 ? "Warning" : "Critical";
               return (
-                <div key={r.id} className="grid grid-cols-1 lg:grid-cols-[1.7fr_0.9fr_1fr_1.3fr_1.1fr_0.8fr_1.1fr] gap-3 px-4 py-3.5 items-center border-b border-[#f4f6f8] last:border-0 hover:bg-slate-50/60">
+                <div key={r.id} className="grid grid-cols-1 lg:grid-cols-[1.8fr_0.9fr_1fr_1.3fr_1.1fr_0.7fr_1fr] gap-3 px-4 py-2.5 items-center border-b border-[#f4f6f8] last:border-0 hover:bg-slate-50/70 transition-colors">
                   {/* Vehicle */}
                   <div className="flex items-center gap-3 min-w-0">
-                    <div className="w-[68px] h-[46px] rounded-lg overflow-hidden bg-slate-100 flex items-center justify-center shrink-0">
-                      {r.hero_image_url ? <img src={r.hero_image_url} alt="" loading="lazy" className="w-full h-full object-cover" /> : <Car className="w-5 h-5 text-slate-300" />}
+                    <div className="w-[56px] h-[38px] rounded-lg overflow-hidden bg-slate-100 flex items-center justify-center shrink-0">
+                      {r.hero_image_url ? <img src={r.hero_image_url} alt="" loading="lazy" className="w-full h-full object-cover" /> : <Car className="w-4 h-4 text-slate-300" />}
                     </div>
                     <div className="min-w-0">
                       <div className="flex items-center gap-1.5">
-                        <p className="font-semibold text-sm truncate">{r.ymm || "(needs decode)"}</p>
+                        <p className="font-semibold text-[13px] truncate">{r.ymm || "(needs decode)"}</p>
                         {r.condition && <span className="text-[9px] font-bold uppercase px-1.5 py-0.5 rounded bg-slate-100 text-slate-600">{r.condition}</span>}
                       </div>
                       {r.trim && <p className="text-[11px] text-slate-400 truncate">{r.trim}</p>}
                     </div>
                   </div>
                   {/* Stock / VIN */}
-                  <div className="text-[12px] text-slate-500 font-mono">
-                    <p>{r.stock_number || "—"}</p><p className="text-slate-400">…{(r.vin || "").slice(-6)}</p>
+                  <div className="text-[12px] font-mono leading-tight">
+                    <p className="text-slate-600">{r.stock_number || "—"}</p><p className="text-slate-400">…{(r.vin || "").slice(-6)}</p>
                   </div>
-                  {/* Readiness */}
-                  <div><Pill sev={badge}>{badgeLabel}{!s.published && ` · ${pct}%`}</Pill></div>
+                  {/* Readiness — ring */}
+                  <div className="flex items-center gap-2" title={`${pct}% ready`}>
+                    <Ring pct={s.published ? 100 : pct} size={34} />
+                    <span className={`text-[11px] font-semibold ${SEV[tone].text}`}>{label}</span>
+                  </div>
                   {/* Compliance */}
-                  <div className="flex flex-wrap gap-1.5">
+                  <div className="flex flex-col gap-1 items-start">
                     {s.decoded ? <Pill sev="ok">VIN Verified</Pill> : <Pill sev="critical">VIN Issue</Pill>}
                     {s.openRecall ? <Pill sev="critical">Recall Pending</Pill> : s.recallClear ? <Pill sev="ok">Recall Clear</Pill> : null}
                     {!s.hasAddendum && <Pill sev="warn">Addendum Missing</Pill>}
                   </div>
                   {/* Price */}
-                  <div className="text-[13px]">
+                  <div className="text-[13px] leading-tight">
                     <p className="font-bold">{fmt$(r.price)}</p>
                     {r.market_position === "above_market" ? <p className="text-[11px] text-amber-600">Above market</p> : r.market_value != null && r.price != null ? <p className="text-[11px] text-emerald-600">{fmt$(r.market_value - r.price)} below</p> : <p className="text-[11px] text-slate-400">Not checked</p>}
                   </div>
@@ -399,34 +407,36 @@ const InventoryCommandCenterV2 = () => {
                   </div>
                   {/* Actions */}
                   <div className="flex items-center justify-end gap-1">
-                    <button onClick={() => openPassport(r)} title="Passport" className="w-8 h-8 rounded-lg border border-[#e8ebef] hover:bg-slate-100 flex items-center justify-center text-slate-500"><Eye className="w-4 h-4" /></button>
-                    <button onClick={() => openFile(r)} title="Edit" className="w-8 h-8 rounded-lg border border-[#e8ebef] hover:bg-slate-100 flex items-center justify-center text-slate-500"><Pencil className="w-4 h-4" /></button>
-                    <button onClick={() => navigate(`/vehicle-file/${r.id}`)} title={s.published ? "Sticker" : "Publish"} className="w-8 h-8 rounded-lg border border-[#e8ebef] hover:bg-slate-100 flex items-center justify-center text-blue-600">{s.published ? <Printer className="w-4 h-4" /> : <ArrowRight className="w-4 h-4" />}</button>
+                    <button onClick={() => openPassport(r)} title="Passport" className="w-8 h-8 rounded-lg hover:bg-slate-100 flex items-center justify-center text-slate-500"><Eye className="w-4 h-4" /></button>
+                    <button onClick={() => openFile(r)} title="Edit" className="w-8 h-8 rounded-lg hover:bg-slate-100 flex items-center justify-center text-slate-500"><Pencil className="w-4 h-4" /></button>
+                    <button onClick={() => navigate(`/vehicle-file/${r.id}`)} title={s.published ? "Sticker" : "Publish"} className="w-8 h-8 rounded-lg hover:bg-slate-100 flex items-center justify-center text-blue-600">{s.published ? <Printer className="w-4 h-4" /> : <ArrowRight className="w-4 h-4" />}</button>
                     <button onClick={() => openFile(r)} title="More" className="w-8 h-8 rounded-lg hover:bg-slate-100 flex items-center justify-center text-slate-400"><MoreVertical className="w-4 h-4" /></button>
                   </div>
                 </div>
               );
             })}
+            {/* Pagination — sticky to the bottom of the viewport while scrolling */}
+            <div className="sticky bottom-0 z-10 flex flex-col sm:flex-row items-center justify-between gap-2 px-4 py-2.5 border-t border-[#eef1f4] bg-white/95 backdrop-blur">
+              <p className="text-[12px] text-slate-500">
+                {visible.length === 0 ? "No vehicles" : `Showing ${(page - 1) * perPage + 1} to ${Math.min(page * perPage, visible.length)} of ${visible.length} vehicles`}
+              </p>
+              <div className="flex items-center gap-1.5">
+                <button onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page <= 1} className="h-8 px-2.5 rounded-lg border border-[#e8ebef] text-[12px] font-semibold disabled:opacity-40 hover:bg-slate-50">Prev</button>
+                <span className="text-[12px] text-slate-500 px-1">Page {page} of {totalPages}</span>
+                <button onClick={() => setPage((p) => Math.min(totalPages, p + 1))} disabled={page >= totalPages} className="h-8 px-2.5 rounded-lg border border-[#e8ebef] text-[12px] font-semibold disabled:opacity-40 hover:bg-slate-50">Next</button>
+                <select value={perPage} onChange={(e) => setPerPage(Number(e.target.value))} className="h-8 px-2 rounded-lg border border-[#e8ebef] text-[12px] bg-white ml-1">
+                  <option value={25}>25 / page</option><option value={50}>50 / page</option><option value={100}>100 / page</option>
+                </select>
+              </div>
+            </div>
           </div>
         </div>
 
-        {/* Right sidebar — Quick Actions (admin opt-in) above Action Center */}
+        {/* Right sidebar — Today's Work Queue, then (admin opt-in) Quick Actions */}
         <aside className="space-y-3">
-          {quickActionsOn && (
-            <div className="rounded-2xl border border-[#e8ebef] bg-white shadow-[0_1px_3px_rgba(16,24,40,0.05)] p-4">
-              <h3 className="text-[14px] font-bold mb-3">Quick Actions</h3>
-              <div className="grid grid-cols-2 gap-2">
-                {quickActions.map((a) => (
-                  <button key={a.label} onClick={a.onClick} className="flex items-center gap-2 px-2.5 h-9 rounded-lg border border-[#eef1f4] hover:bg-slate-50 text-[12px] font-semibold text-left">
-                    <a.icon className="w-4 h-4 text-blue-600 shrink-0" /><span className="truncate">{a.label}</span>
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-          <div className="rounded-2xl border border-[#e8ebef] bg-white shadow-[0_1px_3px_rgba(16,24,40,0.05)] p-4">
+          <div className="rounded-2xl border border-[#eef1f4] bg-white shadow-[0_1px_2px_rgba(16,24,40,0.04)] p-4">
             <div className="flex items-center justify-between mb-1">
-              <h3 className="text-[14px] font-bold">Action Center</h3>
+              <h3 className="text-[14px] font-bold">Today's Work Queue</h3>
               <RefreshCw className="w-3.5 h-3.5 text-slate-300" />
             </div>
             <p className="text-[11px] text-slate-400 mb-3">Your prioritized task queue</p>
@@ -456,6 +466,20 @@ const InventoryCommandCenterV2 = () => {
             </ul>
             <button onClick={() => navigate("/dashboard/reports")} className="w-full mt-3 h-9 rounded-xl border border-[#e8ebef] text-[13px] font-semibold text-blue-600 hover:bg-blue-50 inline-flex items-center justify-center gap-1.5">View full report <ArrowRight className="w-3.5 h-3.5" /></button>
           </div>
+
+          {/* Quick Actions — admin opt-in, below the work queue */}
+          {quickActionsOn && (
+            <div className="rounded-2xl border border-[#eef1f4] bg-white shadow-[0_1px_2px_rgba(16,24,40,0.04)] p-4">
+              <h3 className="text-[14px] font-bold mb-3">Quick Actions</h3>
+              <div className="grid grid-cols-2 gap-2">
+                {quickActions.map((a) => (
+                  <button key={a.label} onClick={a.onClick} className="flex items-center gap-2 px-2.5 h-9 rounded-lg border border-[#eef1f4] hover:bg-slate-50 text-[12px] font-semibold text-left">
+                    <a.icon className="w-4 h-4 text-blue-600 shrink-0" /><span className="truncate">{a.label}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
         </aside>
       </div>
     </div>
