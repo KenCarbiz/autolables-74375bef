@@ -330,10 +330,10 @@ const VehicleFile = () => {
                       </span>
                     ) : null}
                   </div>
-                  <h1 className="text-[28px] lg:text-[30px] font-black tracking-tight font-display text-foreground leading-[1.1]">
+                  <h1 className="text-[30px] lg:text-[34px] font-black tracking-[-0.02em] font-display text-foreground leading-[1.05]">
                     {vehicle.ymm || "(needs VIN decode)"}
                   </h1>
-                  {vehicle.trim ? <p className="text-xl text-muted-foreground font-normal leading-tight">{vehicle.trim}</p> : null}
+                  {vehicle.trim ? <p className="text-lg text-muted-foreground font-medium leading-tight">{vehicle.trim}</p> : null}
                   <div className="flex flex-wrap items-center gap-x-6 gap-y-1.5 text-sm text-muted-foreground pt-1">
                     <span className="font-mono text-foreground/80">VIN {vehicle.vin}</span>
                     {typeof vehicle.mileage === "number" && (
@@ -447,13 +447,13 @@ const VehicleFile = () => {
               <button
                 key={t.id}
                 onClick={() => setTab(t.id)}
-                className={`h-13 px-4 py-3.5 text-sm font-semibold inline-flex items-center gap-2 border-b-2 transition-colors whitespace-nowrap ${
+                className={`px-4 py-3.5 text-sm font-semibold inline-flex items-center gap-2 border-b-2 transition-colors whitespace-nowrap ${
                   active
                     ? "border-blue-600 text-blue-600"
                     : "border-transparent text-muted-foreground hover:text-foreground"
                 }`}
               >
-                <t.icon className="w-4 h-4" />
+                <t.icon className={`w-4 h-4 ${active ? "" : "opacity-70"}`} />
                 {t.label}
                 {typeof t.count === "number" && (
                   <span className={`min-w-[20px] h-5 px-1.5 rounded-full text-[10px] font-bold inline-flex items-center justify-center tabular-nums ${
@@ -592,13 +592,13 @@ const OverviewPanel = ({ vehicle, onTab }: { vehicle: VehicleRow; onTab: (t: Tab
   const decoded = (vehicle.sticker_snapshot?.decoded as Record<string, unknown> | undefined) || undefined;
   const publicUrl = `${window.location.origin}/v/${(vehicle.vin || vehicle.slug || "").toUpperCase()}`;
 
-  const quick: { label: string; icon: typeof Car; onClick: () => void }[] = [
-    { label: "Generate Sticker", icon: Printer, onClick: () => onTab("labels") },
-    { label: "Create Addendum", icon: FileText, onClick: () => onTab("addendum") },
-    { label: "Upload Documents", icon: Upload, onClick: () => onTab("documents") },
-    { label: "Customer Sign-off", icon: Signature, onClick: () => onTab("sign") },
-    { label: "Publish Vehicle", icon: Globe, onClick: () => onTab("labels") },
-    { label: "Open Shopper Portal", icon: ExternalLink, onClick: () => window.open(publicUrl, "_blank", "noopener") },
+  const quick: { label: string; icon: typeof Car; tone: string; onClick: () => void }[] = [
+    { label: "Generate Sticker", icon: Printer, tone: "bg-indigo-50 text-indigo-600", onClick: () => onTab("labels") },
+    { label: "Create Addendum", icon: FileText, tone: "bg-violet-50 text-violet-600", onClick: () => onTab("addendum") },
+    { label: "Upload Documents", icon: Upload, tone: "bg-slate-100 text-slate-600", onClick: () => onTab("documents") },
+    { label: "Customer Sign-off", icon: Signature, tone: "bg-fuchsia-50 text-fuchsia-600", onClick: () => onTab("sign") },
+    { label: "Publish Vehicle", icon: Globe, tone: "bg-emerald-50 text-emerald-600", onClick: () => onTab("labels") },
+    { label: "Open Shopper Portal", icon: ExternalLink, tone: "bg-blue-50 text-blue-600", onClick: () => window.open(publicUrl, "_blank", "noopener") },
   ];
 
   const mc = (vehicle.mc_attributes || {}) as Record<string, unknown>;
@@ -644,15 +644,15 @@ const OverviewPanel = ({ vehicle, onTab }: { vehicle: VehicleRow; onTab: (t: Tab
       <div className="grid grid-cols-1 lg:grid-cols-[1.3fr_1fr_1fr] gap-4">
         {/* Vehicle Readiness */}
         <Card title="Vehicle Readiness" action={<span className={`text-[11px] font-bold px-2 py-0.5 rounded-full ${notReady ? "bg-amber-100 text-amber-700" : "bg-emerald-100 text-emerald-700"}`}>{pct}% · {notReady ? "Not ready" : "Ready"}</span>}>
-          <div className="flex items-center gap-5">
-            <div className="relative w-[132px] h-[132px] shrink-0">
-              <svg className="w-[132px] h-[132px] -rotate-90" viewBox="0 0 120 120">
-                <circle cx="60" cy="60" r="52" fill="none" stroke="currentColor" strokeWidth="10" className="text-muted" />
-                <circle cx="60" cy="60" r="52" fill="none" stroke={ringTone} strokeWidth="10" strokeLinecap="round" strokeDasharray={2 * Math.PI * 52} strokeDashoffset={2 * Math.PI * 52 * (1 - pct / 100)} />
+          <div className="flex items-center gap-6">
+            <div className="relative w-[144px] h-[144px] shrink-0">
+              <svg className="w-[144px] h-[144px] -rotate-90" viewBox="0 0 120 120">
+                <circle cx="60" cy="60" r="52" fill="none" stroke="currentColor" strokeWidth="9" className="text-muted" />
+                <circle cx="60" cy="60" r="52" fill="none" stroke={ringTone} strokeWidth="9" strokeLinecap="round" strokeDasharray={2 * Math.PI * 52} strokeDashoffset={2 * Math.PI * 52 * (1 - pct / 100)} className="transition-[stroke-dashoffset] duration-700" />
               </svg>
               <div className="absolute inset-0 flex flex-col items-center justify-center">
-                <span className="font-display text-[32px] font-black tabular-nums text-foreground leading-none">{pct}%</span>
-                <span className={`text-xs font-bold ${notReady ? "text-red-500" : "text-emerald-600"}`}>{notReady ? "Not Ready" : "Ready"}</span>
+                <span className="font-display text-[36px] font-black tabular-nums text-foreground leading-none">{pct}%</span>
+                <span className={`text-[11px] font-bold uppercase tracking-wide mt-0.5 ${notReady ? "text-amber-600" : "text-emerald-600"}`}>{notReady ? "Not Ready" : "Ready"}</span>
               </div>
             </div>
             <ul className="flex-1 space-y-2 min-w-0">
@@ -679,24 +679,28 @@ const OverviewPanel = ({ vehicle, onTab }: { vehicle: VehicleRow; onTab: (t: Tab
             <p className="text-xs text-muted-foreground">Loading events…</p>
           ) : (
             <ul className="max-h-72 overflow-auto -my-1">
-              {events.slice(0, 6).map((ev) => (
-                <li key={ev.id} className="grid grid-cols-[28px_1fr_auto] items-start gap-3 py-2 border-b border-border/60 last:border-0">
-                  <span className="w-7 h-7 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center"><CheckCircle2 className="w-3.5 h-3.5" /></span>
+              {events.slice(0, 6).map((ev) => {
+                const v = eventVisual(ev.action);
+                const Icon = v.icon;
+                return (
+                <li key={ev.id} className="grid grid-cols-[32px_1fr_auto] items-start gap-3 py-2.5 border-b border-border/60 last:border-0">
+                  <span className={`w-8 h-8 rounded-xl flex items-center justify-center ${v.cls}`}><Icon className="w-4 h-4" /></span>
                   <div className="min-w-0">
                     <p className="text-sm font-semibold text-foreground leading-tight truncate">{prettyAction(ev.action)}</p>
                     {ev.user_email && <p className="text-[11px] text-muted-foreground truncate">by {ev.user_email}</p>}
                   </div>
-                  <span className="text-[10px] text-muted-foreground whitespace-nowrap">{new Date(ev.created_at).toLocaleString(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}</span>
+                  <span className="text-[10px] text-muted-foreground whitespace-nowrap pt-1">{new Date(ev.created_at).toLocaleString(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}</span>
                 </li>
-              ))}
+                );
+              })}
               {remaining.map((c) => (
-                <li key={`req-${c.label}`} className="grid grid-cols-[28px_1fr_auto] items-start gap-3 py-2 border-b border-border/60 last:border-0">
-                  <span className="w-7 h-7 rounded-lg bg-amber-50 text-amber-600 flex items-center justify-center"><AlertTriangle className="w-3.5 h-3.5" /></span>
+                <li key={`req-${c.label}`} className="grid grid-cols-[32px_1fr_auto] items-start gap-3 py-2.5 border-b border-border/60 last:border-0">
+                  <span className="w-8 h-8 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center"><AlertTriangle className="w-4 h-4" /></span>
                   <div className="min-w-0">
                     <p className="text-sm font-semibold text-foreground leading-tight truncate">{c.label}</p>
                     <p className="text-[11px] text-amber-600">Action required</p>
                   </div>
-                  <span className="text-[10px] text-muted-foreground">—</span>
+                  <span className="text-[10px] text-muted-foreground pt-1">—</span>
                 </li>
               ))}
               {events.length === 0 && remaining.length === 0 && (
@@ -713,13 +717,13 @@ const OverviewPanel = ({ vehicle, onTab }: { vehicle: VehicleRow; onTab: (t: Tab
               <button
                 key={a.label}
                 onClick={a.onClick}
-                className="w-full flex items-center gap-2.5 px-3 h-10 rounded-lg border border-border bg-card hover:bg-muted hover:border-foreground/15 text-sm font-semibold text-foreground transition-colors text-left"
+                className="group w-full flex items-center gap-3 px-3 h-12 rounded-xl border border-border/70 bg-card hover:bg-muted/60 hover:border-foreground/15 text-sm font-semibold text-foreground transition-colors text-left"
               >
-                <span className="w-7 h-7 rounded-lg bg-blue-600/10 text-blue-600 flex items-center justify-center shrink-0">
-                  <a.icon className="w-3.5 h-3.5" />
+                <span className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 ${a.tone}`}>
+                  <a.icon className="w-4 h-4" />
                 </span>
                 <span className="flex-1">{a.label}</span>
-                <ChevronRight className="w-4 h-4 text-muted-foreground" />
+                <ChevronRight className="w-4 h-4 text-muted-foreground/60 group-hover:text-muted-foreground group-hover:translate-x-0.5 transition-all" />
               </button>
             ))}
           </div>
@@ -775,16 +779,17 @@ const OverviewPanel = ({ vehicle, onTab }: { vehicle: VehicleRow; onTab: (t: Tab
 
         {/* Shopper Portal Preview */}
         <Card title="Shopper Portal Preview">
-          <div className="flex items-start gap-3">
-            <div className="flex-1 rounded-xl border border-border bg-muted/40 h-24 overflow-hidden flex items-center justify-center text-muted-foreground">
+          <div className="flex items-stretch gap-3">
+            <div className="flex-1 rounded-xl border border-border/70 bg-muted/40 h-32 overflow-hidden flex items-center justify-center text-muted-foreground">
               {vehicle.hero_image_url || (vehicle.photos && vehicle.photos[0]) ? (
                 <img src={vehicle.hero_image_url || vehicle.photos![0]} alt={vehicle.ymm || "vehicle"} className="w-full h-full object-cover" />
               ) : (
-                <Car className="w-8 h-8" strokeWidth={1.25} />
+                <Car className="w-9 h-9" strokeWidth={1.25} />
               )}
             </div>
-            <div className="w-[88px] h-[88px] rounded-xl border border-border bg-white p-1.5 shrink-0 flex items-center justify-center">
-              <QRCodeSVG value={publicUrl} size={72} />
+            <div className="w-32 h-32 rounded-xl border border-border/70 bg-white p-2 shrink-0 flex flex-col items-center justify-center gap-1">
+              <QRCodeSVG value={publicUrl} size={92} />
+              <span className="text-[9px] font-semibold uppercase tracking-wide text-muted-foreground">Scan to view</span>
             </div>
           </div>
           {vehicle.status === "published"
@@ -2039,14 +2044,30 @@ const JumpTo = ({ path, reason }: { path: string; reason: string }) => {
 };
 
 const Card = ({ title, children, action, className = "" }: { title: string; children: React.ReactNode; action?: React.ReactNode; className?: string }) => (
-  <div className={`rounded-2xl border border-border bg-card shadow-[0_1px_3px_rgba(0,0,0,0.05)] hover:shadow-md transition-shadow p-6 space-y-3 ${className}`}>
-    <div className="flex items-center justify-between">
-      <h3 className="text-[11px] font-bold uppercase tracking-[0.08em] text-muted-foreground">{title}</h3>
+  <div className={`rounded-2xl border border-border/70 bg-card shadow-[0_1px_2px_rgba(16,24,40,0.04),0_12px_28px_-16px_rgba(16,24,40,0.12)] hover:shadow-[0_2px_4px_rgba(16,24,40,0.05),0_16px_36px_-18px_rgba(16,24,40,0.16)] transition-shadow p-6 lg:p-7 space-y-4 ${className}`}>
+    <div className="flex items-center justify-between gap-2">
+      <h3 className="text-[11px] font-bold uppercase tracking-[0.1em] text-muted-foreground">{title}</h3>
       {action}
     </div>
     {children}
   </div>
 );
+
+// Maps an audit action to a distinct icon + tone so the activity feed reads
+// as a real timeline (decode vs sticker vs sign vs upload) rather than a wall
+// of identical green checks.
+const eventVisual = (action: string): { icon: typeof CheckCircle2; cls: string } => {
+  const a = (action || "").toLowerCase();
+  if (a.includes("decod") || a.includes("vin")) return { icon: Gauge, cls: "bg-blue-50 text-blue-600" };
+  if (a.includes("sticker") || a.includes("label")) return { icon: Printer, cls: "bg-indigo-50 text-indigo-600" };
+  if (a.includes("publish")) return { icon: Globe, cls: "bg-emerald-50 text-emerald-600" };
+  if (a.includes("addendum")) return { icon: FileText, cls: "bg-violet-50 text-violet-600" };
+  if (a.includes("sign")) return { icon: Signature, cls: "bg-fuchsia-50 text-fuchsia-600" };
+  if (a.includes("upload") || a.includes("document")) return { icon: Upload, cls: "bg-slate-100 text-slate-600" };
+  if (a.includes("recall")) return { icon: AlertTriangle, cls: "bg-amber-50 text-amber-600" };
+  if (a.includes("prep") || a.includes("install")) return { icon: CheckCircle2, cls: "bg-teal-50 text-teal-600" };
+  return { icon: CheckCircle2, cls: "bg-emerald-50 text-emerald-600" };
+};
 
 // Compact SVG progress ring for the readiness banner.
 const ReadinessRing = ({ pct, tone }: { pct: number; tone: "emerald" | "amber" }) => {
