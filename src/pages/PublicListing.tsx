@@ -409,8 +409,7 @@ const PublicListingBody = () => {
   const dealerName = (dealer.name as string) || "AutoLabels";
   const dealerPhone = (dealer.phone as string) || "";
   const dealerAddress = [(dealer.address as string), (dealer.city as string), (dealer.state as string), (dealer.zip as string)].filter(Boolean).join(", ");
-  const [zipValid, setZipValid] = [/^\d{5}$/.test(zipInput), null];
-  const [offersShown, setOffersShown] = [false, null];
+  const zipValid = /^\d{5}$/.test(zipInput);
 
   const trustBadges = [
     { icon: Shield,        title: accidentCount === 0 ? "No Accident History" : "Vehicle History", sub: "AutoCheck Verified" },
