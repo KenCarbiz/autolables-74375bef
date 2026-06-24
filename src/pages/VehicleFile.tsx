@@ -116,6 +116,19 @@ const readinessSummary = (v: VehicleRow) => {
   return { checks, done, pct, remaining: checks.filter((c) => !c.ok) };
 };
 
+// Short pill labels for the readiness status bar's "Missing:" chips.
+const shortCheck = (label: string): string => (({
+  "Vehicle created": "Created",
+  "VIN decoded": "VIN",
+  "Published to shopper portal": "Publish",
+  "Recall checked": "Recall",
+  "Prep & install signed off": "Prep & Install",
+  "Documents attached": "Documents",
+  "Service history": "Service",
+  "Remaining warranty": "Warranty",
+  "Available accessories": "Accessories",
+} as Record<string, string>)[label] || label);
+
 const VehicleFile = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -216,6 +229,16 @@ const VehicleFile = () => {
     }
   };
 
+  const copyVin = async () => {
+    if (!vehicle) return;
+    try {
+      await navigator.clipboard.writeText(vehicle.vin);
+      toast.success("VIN copied");
+    } catch {
+      toast.error("Copy failed — select and copy manually");
+    }
+  };
+
   const publish = async () => {
     if (!vehicle) return;
     setPublishing(true);
@@ -255,6 +278,8 @@ const VehicleFile = () => {
   ];
 
   const ready = readinessSummary(vehicle);
+  const heroMc = (vehicle.mc_attributes || {}) as Record<string, unknown>;
+  const stockNo = (heroMc.stock_no as string) || ((vehicle.sticker_snapshot?.decoded as Record<string, unknown> | undefined)?.stock as string) || null;
   const gallery: string[] = (vehicle.photos && vehicle.photos.length ? vehicle.photos : (vehicle.hero_image_url ? [vehicle.hero_image_url] : []));
   const safeImg = gallery.length ? Math.min(imgIdx, gallery.length - 1) : 0;
 
@@ -286,9 +311,9 @@ const VehicleFile = () => {
         </div>
 
         <div className="mt-3 rounded-2xl border border-border bg-card shadow-sm overflow-hidden">
-          <div className="flex flex-col lg:flex-row gap-0 p-6 lg:p-8">
+          <div className="flex flex-col lg:flex-row gap-0 p-5 lg:p-6">
             {/* Vehicle photo */}
-            <div className={`lg:w-[340px] shrink-0 h-52 lg:h-56 rounded-2xl overflow-hidden flex items-center justify-center bg-gradient-to-br ${
+            <div className={`lg:w-[320px] shrink-0 h-52 lg:h-[224px] rounded-2xl overflow-hidden flex items-center justify-center bg-gradient-to-br ${
               vehicle.condition === "new" ? "from-blue-500/15 to-blue-600/5 text-blue-600" :
               vehicle.condition === "cpo" ? "from-violet-500/15 to-violet-600/5 text-violet-600" :
               "from-slate-400/15 to-slate-500/5 text-slate-500"
@@ -311,11 +336,11 @@ const VehicleFile = () => {
 
             <div className="flex-1 lg:pl-8 pt-5 lg:pt-0 min-w-0 flex flex-col">
               <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-5">
-                <div className="space-y-2 min-w-0 flex-1">
+                <div className="space-y-1.5 min-w-0 flex-1">
                   <div className="flex items-center gap-2 flex-wrap">
                     <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded ${
                       vehicle.condition === "new" ? "bg-blue-100 text-blue-700" :
-                      vehicle.condition === "cpo" ? "bg-violet-100 text-violet-700" :
+                      vehicle.condition === "cpo" ? "bg-emerald-100 text-emerald-700" :
                       "bg-slate-100 text-slate-700"
                     }`}>{vehicle.condition || "unknown"}</span>
                     <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded ${
@@ -323,27 +348,32 @@ const VehicleFile = () => {
                       vehicle.status === "archived" ? "bg-slate-100 text-slate-500" :
                       "bg-amber-100 text-amber-700"
                     }`}>{vehicle.status}</span>
-                    {vehicle.prep_status?.foreman_signed_at ? (
-                      <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-emerald-100 text-emerald-700 inline-flex items-center gap-1">
-                        <CheckCircle2 className="w-2.5 h-2.5" />
-                        Prep signed
-                      </span>
-                    ) : null}
                   </div>
-                  <h1 className="text-[30px] lg:text-[34px] font-black tracking-[-0.02em] font-display text-foreground leading-[1.05]">
+                  <h1 className="text-[30px] sm:text-[40px] lg:text-[46px] font-black tracking-[-0.02em] font-display text-foreground leading-[1]">
                     {vehicle.ymm || "(needs VIN decode)"}
                   </h1>
-                  {vehicle.trim ? <p className="text-lg text-muted-foreground font-medium leading-tight">{vehicle.trim}</p> : null}
-                  <div className="flex flex-wrap items-center gap-x-6 gap-y-1.5 text-sm text-muted-foreground pt-1">
-                    <span className="font-mono text-foreground/80">VIN {vehicle.vin}</span>
+                  {vehicle.trim ? <p className="text-2xl text-slate-600 font-normal leading-tight">{vehicle.trim}</p> : null}
+                  {/* Stock + VIN, one row, with copy */}
+                  <div className="flex flex-wrap items-center gap-x-5 gap-y-1 text-sm pt-0.5">
+                    {stockNo && (
+                      <span className="text-muted-foreground"><span className="font-semibold text-foreground">Stock #</span> {stockNo}</span>
+                    )}
+                    <span className="inline-flex items-center gap-1.5 min-w-0">
+                      <span className="font-semibold text-foreground">VIN</span>
+                      <span className="font-mono text-muted-foreground truncate">{vehicle.vin}</span>
+                      <button onClick={copyVin} title="Copy VIN" aria-label="Copy VIN" className="text-muted-foreground hover:text-foreground shrink-0"><Copy className="w-3.5 h-3.5" /></button>
+                    </span>
+                  </div>
+                  {/* Mileage / price / created */}
+                  <div className="flex flex-wrap items-center gap-x-8 gap-y-1.5 text-sm text-muted-foreground">
                     {typeof vehicle.mileage === "number" && (
-                      <span className="inline-flex items-center gap-1"><Gauge className="w-3.5 h-3.5" /> {vehicle.mileage.toLocaleString()} mi</span>
+                      <span className="inline-flex items-center gap-1.5"><Gauge className="w-4 h-4" /> {vehicle.mileage.toLocaleString()} mi</span>
                     )}
                     {typeof vehicle.price === "number" && (
-                      <span className="inline-flex items-center gap-1"><DollarSign className="w-3.5 h-3.5" /> ${vehicle.price.toLocaleString()}</span>
+                      <span className="inline-flex items-center gap-1.5"><DollarSign className="w-4 h-4" /> ${vehicle.price.toLocaleString()}</span>
                     )}
-                    <span className="inline-flex items-center gap-1">
-                      <Clock className="w-3.5 h-3.5" />
+                    <span className="inline-flex items-center gap-1.5">
+                      <Clock className="w-4 h-4" />
                       Created {new Date(vehicle.created_at).toLocaleDateString()}
                     </span>
                   </div>
@@ -398,9 +428,10 @@ const VehicleFile = () => {
                 </div>
               </div>
 
-              {/* Readiness status banner — bottom-aligns with the photo on
-                  desktop so it reads as one row with the hero image. */}
-              <div className={`mt-5 lg:mt-auto rounded-xl border p-4 flex items-center gap-4 flex-wrap ${
+              {/* Readiness status bar — compact (~72px), bottom-aligned with
+                  the photo. Always communicates remaining work, including for
+                  published vehicles. */}
+              <div className={`mt-5 lg:mt-auto rounded-xl border px-4 py-3 flex items-center gap-4 ${
                 vehicle.status === "published" ? "border-emerald-200 bg-emerald-50/60" : "border-amber-200 bg-amber-50/60"
               }`}>
                 <ReadinessRing pct={ready.pct} tone={vehicle.status === "published" ? "emerald" : "amber"} />
@@ -408,7 +439,7 @@ const VehicleFile = () => {
                   <p className={`text-sm font-bold ${vehicle.status === "published" ? "text-emerald-800" : "text-amber-800"}`}>
                     {vehicle.status === "published" ? "Published vehicle" : "Draft vehicle"}
                   </p>
-                  <p className="text-xs text-muted-foreground">
+                  <p className="text-xs text-muted-foreground truncate">
                     {vehicle.status === "published"
                       ? "Live on the shopper portal."
                       : ready.remaining.length === 0
@@ -416,14 +447,20 @@ const VehicleFile = () => {
                         : "This vehicle is not ready to publish"}
                   </p>
                 </div>
-                {vehicle.status !== "published" && ready.remaining.length > 0 && (
-                  <div className="flex items-center gap-1.5 flex-wrap lg:ml-auto">
-                    {ready.remaining.slice(0, 3).map((c) => (
-                      <span key={c.label} className="inline-flex items-center gap-1 text-[11px] font-semibold px-2.5 py-1 rounded-lg bg-white text-amber-700 border border-amber-200">
-                        <CircleAlert className="w-3 h-3" />
-                        {c.label.replace(" generated & published", "").replace(" signed off", "").replace(" attached", "")}
-                      </span>
-                    ))}
+                {ready.remaining.length > 0 && (
+                  <div className="hidden sm:flex items-center gap-2 lg:ml-auto min-w-0">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground shrink-0">Missing:</span>
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      {ready.remaining.slice(0, 4).map((c) => (
+                        <span key={c.label} className={`inline-flex items-center gap-1.5 h-7 px-2.5 rounded-full bg-white border text-[11px] font-semibold ${c.blocks ? "text-red-700 border-red-200" : "text-amber-700 border-amber-200"}`}>
+                          <span className={`w-1.5 h-1.5 rounded-full ${c.blocks ? "bg-red-500" : "bg-amber-500"}`} />
+                          {shortCheck(c.label)}
+                        </span>
+                      ))}
+                      {ready.remaining.length > 4 && (
+                        <span className="text-[11px] font-semibold text-muted-foreground">+{ready.remaining.length - 4}</span>
+                      )}
+                    </div>
                   </div>
                 )}
               </div>
