@@ -94,6 +94,7 @@ const DescriptionStudio = lazy(() => import("./pages/DescriptionStudio"));
 const SaveCarInventory = lazy(() => import("./pages/SaveCarInventory"));
 const DealSigning = lazy(() => import("./pages/DealSigning"));
 const PublicListing = lazy(() => import("./pages/PublicListing"));
+const VehiclePassportV2 = lazy(() => import("./pages/VehiclePassportV2"));
 const PublicDocuments = lazy(() => import("./pages/PublicDocuments"));
 const PrepSignOff = lazy(() => import("./pages/PrepSignOff"));
 const ServiceInspection = lazy(() => import("./pages/ServiceInspection"));
@@ -163,6 +164,7 @@ const App = () => (
                       <Route path="/scan" element={<ScanPage />} />
                       <Route path="/vehicle/:vin" element={<VehicleVinRedirect />} />
                       <Route path="/v/:slug" element={<PublicListing />} />
+                      <Route path="/passport-v2/:vehicleSlug" element={<VehiclePassportV2 />} />
                       <Route path="/v/:slug/documents" element={<PublicDocuments />} />
                       <Route path="/deal/:token" element={<DealSigning />} />
                       <Route path="/about" element={<About />} />
