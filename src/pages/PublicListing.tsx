@@ -477,12 +477,12 @@ const PublicListingBody = () => {
           </div>
 
           {/* ACTIONS + ZIP */}
-          <div className="flex flex-col lg:flex-row gap-6">
+          <div className="flex flex-col lg:flex-row lg:items-end gap-6">
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 flex-1">
               {quickActions.map((a) => (
                 <button key={a.label} onClick={a.onClick}
-                  className="flex items-center justify-center gap-2 px-2 py-3.5 bg-white border border-[#d8dce0] rounded-[10px] text-sm font-semibold hover:border-[#1a6dff] hover:text-[#1a6dff] transition-colors">
-                  <a.icon className="w-[17px] h-[17px] text-[#1a6dff]" />{a.label}
+                  className="flex items-center justify-center gap-2.5 h-[60px] px-3 bg-white border border-[#E5E7EB] rounded-xl text-[15px] font-semibold hover:border-[#1a6dff] hover:text-[#1a6dff] transition-colors">
+                  <a.icon className={`w-5 h-5 ${a.label === "Value My Trade" ? "text-[#1a9d5c]" : "text-[#1a6dff]"}`} />{a.label}
                 </button>
               ))}
             </div>
@@ -490,27 +490,38 @@ const PublicListingBody = () => {
               <div className="text-[13px] text-[#3a4048] mb-2">Enter your ZIP for available offers in your area</div>
               <div className="flex">
                 <input value={zipInput} onChange={(e) => setZipInput(e.target.value.replace(/\D/g, "").slice(0, 5))} placeholder="ZIP Code" maxLength={5} inputMode="numeric"
-                  className="flex-1 min-w-0 px-3.5 py-2.5 border border-[#d8dce0] border-r-0 rounded-l-lg text-sm outline-none focus:border-[#1a6dff]" />
+                  className="flex-1 min-w-0 h-[60px] px-4 border border-[#E5E7EB] border-r-0 rounded-l-xl text-sm outline-none focus:border-[#1a6dff]" />
                 <button onClick={() => zipValid ? toast.success(`Checking offers near ${zipInput}…`) : toast.error("Enter a valid 5-digit ZIP")}
-                  className="px-5 py-2.5 text-white rounded-r-lg text-sm font-semibold whitespace-nowrap bg-[#1a6dff] hover:bg-[#155fe0] transition-colors">View Offers</button>
+                  className="h-[60px] px-5 text-white rounded-r-xl text-sm font-semibold whitespace-nowrap bg-[#2563EB] hover:bg-[#1d4fd7] transition-colors">View Offers</button>
               </div>
             </div>
           </div>
 
-          {/* OFFERS — only when real incentive data exists */}
+          {/* OFFERS — one unified card; only when real incentive data exists */}
           {offers.length > 0 && (
-            <div className="flex flex-col sm:flex-row sm:items-center gap-4 pb-7 border-b border-[#eceef0]">
-              <div className="flex items-center gap-2 sm:w-[150px] shrink-0 text-[15px] font-bold">
-                <Award className="w-[17px] h-[17px] text-[#1a9d5c]" />
-                Available Offers <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-[#eef1f4] text-[#6b727a] text-xs font-semibold">{offers.length}</span>
-              </div>
-              {offers.map((o, i) => (
-                <div key={i} className="sm:px-6 sm:border-l border-[#eceef0]">
-                  <div className="text-sm font-bold">{o.title}</div>
-                  <div className="text-[13px] text-[#3a4048] mt-0.5">{o.body}</div>
-                  {o.exp && <div className="text-xs text-[#9aa0a8] mt-0.5">{o.exp}</div>}
+            <div className="rounded-xl border border-[#E5E7EB] bg-white overflow-hidden">
+              <div className="flex flex-col sm:flex-row sm:items-stretch sm:min-h-[88px]">
+                {/* Available Offers label */}
+                <div className="flex items-center gap-2 px-5 py-4 sm:w-[220px] shrink-0">
+                  <Award className="w-[18px] h-[18px] text-[#1a9d5c] shrink-0" />
+                  <span className="text-[15px] font-bold">Available Offers</span>
+                  <span className="inline-flex items-center justify-center min-w-[22px] h-[22px] px-1.5 rounded-full border border-[#cbd5e1] text-[#6b727a] text-xs font-semibold">{offers.length}</span>
                 </div>
-              ))}
+                {/* Offer blocks */}
+                {offers.map((o, i) => (
+                  <div key={i} className="flex flex-col justify-center px-8 py-4 sm:border-l border-[#F1F5F9]">
+                    <div className="text-sm font-bold">{o.title}</div>
+                    <div className="text-[13px] text-[#3a4048] mt-0.5">{o.body}</div>
+                    {o.exp && <div className="text-xs text-[#9aa0a8] mt-0.5">{o.exp}</div>}
+                  </div>
+                ))}
+                {/* Spacer + View all link */}
+                <div className="flex items-center justify-end px-6 py-4 sm:ml-auto">
+                  <button className="inline-flex items-center gap-1.5 text-[15px] font-semibold text-[#2563EB] hover:gap-2.5 transition-all">
+                    View all offers <ChevronRight className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
             </div>
           )}
 
