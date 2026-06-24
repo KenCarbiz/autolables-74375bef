@@ -2,11 +2,12 @@ import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useTenant } from "@/contexts/TenantContext";
+import { useDealerSettings } from "@/contexts/DealerSettingsContext";
 import { toast } from "sonner";
 import {
   Car, Search, CheckCircle2, AlertTriangle, ShieldCheck, ShieldAlert, Eye,
   Pencil, Printer, MoreVertical, Plus, Tag, FileSignature, CircleDollarSign,
-  ScanLine, TrendingUp, ArrowRight, RefreshCw, ChevronRight,
+  ScanLine, TrendingUp, ArrowRight, RefreshCw, ChevronRight, Settings, Upload,
 } from "lucide-react";
 
 // ──────────────────────────────────────────────────────────────
@@ -65,7 +66,7 @@ const Ring = ({ pct, size = 76 }: { pct: number; size?: number }) => {
 };
 
 const Kpi = ({ label, value, sub, accent, children }: { label: string; value?: React.ReactNode; sub?: React.ReactNode; accent?: string; children?: React.ReactNode }) => (
-  <div className="rounded-2xl border border-[#e8ebef] bg-white shadow-[0_1px_3px_rgba(16,24,40,0.05)] p-4 min-w-0">
+  <div className="rounded-2xl border border-[#e8ebef] bg-white shadow-[0_1px_3px_rgba(16,24,40,0.05)] p-5 min-w-0">
     <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">{label}</p>
     {children ?? (
       <>
@@ -83,7 +84,10 @@ const Pill = ({ sev, children }: { sev: Sev; children: React.ReactNode }) => {
 
 const InventoryCommandCenterV2 = () => {
   const { tenant } = useTenant();
+  const { settings, updateSettings } = useDealerSettings();
   const navigate = useNavigate();
+  const quickActionsOn = settings.inventory_show_quick_actions;
+  const [showSettings, setShowSettings] = useState(false);
   const [rows, setRows] = useState<VRow[]>([]);
   const [addVins, setAddVins] = useState<Set<string>>(new Set());
   const [lastSync, setLastSync] = useState<{ at: string | null; status: string | null }>({ at: null, status: null });
@@ -225,14 +229,26 @@ const InventoryCommandCenterV2 = () => {
     { icon: ScanLine, label: "VIN Issues", n: stats.vinIssues.length, sev: stats.vinIssues.length ? "critical" : "ok", onClick: () => {} },
   ];
 
+  const quickActions: { icon: React.ElementType; label: string; onClick: () => void }[] = [
+    { icon: Plus, label: "Add Vehicle", onClick: () => navigate("/add-inventory") },
+    { icon: ScanLine, label: "Scan VIN", onClick: () => navigate("/add-inventory") },
+    { icon: Printer, label: "New Car Sticker", onClick: () => navigate("/new-car-sticker") },
+    { icon: FileSignature, label: "New Addendum", onClick: () => navigate("/addendum") },
+    { icon: ShieldAlert, label: "Check Recalls", onClick: () => navigate("/inventory") },
+    { icon: TrendingUp, label: "Check Market Prices", onClick: () => navigate("/inventory") },
+    { icon: CircleDollarSign, label: "Verify Prices", onClick: () => navigate("/inventory") },
+    { icon: Upload, label: "CSV Import", onClick: () => navigate("/add-inventory") },
+  ];
+
   if (loading) return (
     <div className="min-h-[60vh] flex items-center justify-center"><div className="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" /></div>
   );
 
   return (
     <div className="p-4 lg:px-6 lg:py-5 max-w-[1600px] mx-auto">
-      {/* Header */}
-      <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3 mb-5">
+      {/* Header — title + admin dashboard settings only. Tenant, sync,
+          MarketCheck, and Add Vehicle live in the global top bar / sidebar. */}
+      <div className="flex items-start justify-between gap-3 mb-5">
         <div>
           <div className="flex items-center gap-2">
             <h1 className="text-2xl font-extrabold tracking-tight">Inventory Command Center</h1>
@@ -240,11 +256,31 @@ const InventoryCommandCenterV2 = () => {
           </div>
           <p className="text-sm text-slate-500">Manage, optimize, and publish your inventory with confidence.</p>
         </div>
-        <div className="flex items-center gap-2 text-[12px]">
-          {tenant?.name && <span className="inline-flex items-center gap-1.5 px-2.5 h-8 rounded-lg bg-white border border-[#e8ebef] font-semibold"><Car className="w-3.5 h-3.5 text-slate-400" />{tenant.name}</span>}
-          <span className="inline-flex items-center gap-1.5 px-2.5 h-8 rounded-lg bg-white border border-[#e8ebef] text-emerald-700 font-semibold"><CheckCircle2 className="w-3.5 h-3.5" />{syncedLabel}</span>
-          <span className="inline-flex items-center gap-1.5 px-2.5 h-8 rounded-lg bg-white border border-[#e8ebef] text-emerald-700 font-semibold"><TrendingUp className="w-3.5 h-3.5" />MarketCheck</span>
-          <button onClick={() => navigate("/add-inventory")} className="inline-flex items-center gap-1.5 px-3 h-8 rounded-lg bg-blue-600 text-white font-semibold hover:bg-blue-700"><Plus className="w-3.5 h-3.5" /> Add Vehicle</button>
+        <div className="relative shrink-0">
+          <button onClick={() => setShowSettings((v) => !v)} className="inline-flex items-center gap-1.5 px-3 h-9 rounded-lg bg-white border border-[#e8ebef] text-sm font-semibold hover:bg-slate-50">
+            <Settings className="w-4 h-4 text-slate-500" /> <span className="hidden sm:inline">Dashboard settings</span>
+          </button>
+          {showSettings && (
+            <>
+              <div className="fixed inset-0 z-10" onClick={() => setShowSettings(false)} />
+              <div className="absolute right-0 mt-2 w-[330px] rounded-2xl border border-[#e8ebef] bg-white shadow-lg z-20 p-4">
+                <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Dashboard Layout</p>
+                <div className="flex items-start gap-3 mt-3">
+                  <button
+                    onClick={() => updateSettings({ inventory_show_quick_actions: !quickActionsOn })}
+                    role="switch" aria-checked={quickActionsOn} aria-label="Show Quick Actions Panel"
+                    className={`mt-0.5 w-10 h-6 rounded-full flex items-center px-0.5 shrink-0 transition-colors ${quickActionsOn ? "bg-blue-600 justify-end" : "bg-slate-300 justify-start"}`}
+                  >
+                    <span className="w-5 h-5 rounded-full bg-white shadow" />
+                  </button>
+                  <div>
+                    <p className="text-[13px] font-semibold">Show Quick Actions Panel</p>
+                    <p className="text-[11px] text-slate-500 leading-snug mt-0.5">Display a Quick Actions panel on the Inventory Command Center. Recommended for inventory managers who frequently create stickers, addendums, imports, and price checks. Disabled by default for a cleaner executive dashboard.</p>
+                  </div>
+                </div>
+              </div>
+            </>
+          )}
         </div>
       </div>
 
@@ -374,8 +410,20 @@ const InventoryCommandCenterV2 = () => {
           </div>
         </div>
 
-        {/* Right sidebar — Action Center */}
+        {/* Right sidebar — Quick Actions (admin opt-in) above Action Center */}
         <aside className="space-y-3">
+          {quickActionsOn && (
+            <div className="rounded-2xl border border-[#e8ebef] bg-white shadow-[0_1px_3px_rgba(16,24,40,0.05)] p-4">
+              <h3 className="text-[14px] font-bold mb-3">Quick Actions</h3>
+              <div className="grid grid-cols-2 gap-2">
+                {quickActions.map((a) => (
+                  <button key={a.label} onClick={a.onClick} className="flex items-center gap-2 px-2.5 h-9 rounded-lg border border-[#eef1f4] hover:bg-slate-50 text-[12px] font-semibold text-left">
+                    <a.icon className="w-4 h-4 text-blue-600 shrink-0" /><span className="truncate">{a.label}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
           <div className="rounded-2xl border border-[#e8ebef] bg-white shadow-[0_1px_3px_rgba(16,24,40,0.05)] p-4">
             <div className="flex items-center justify-between mb-1">
               <h3 className="text-[14px] font-bold">Action Center</h3>

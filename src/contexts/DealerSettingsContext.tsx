@@ -192,6 +192,9 @@ export interface DealerSettings {
   privacy_notice_enabled: boolean;
   privacy_notice_text: string;
   privacy_notice_url: string;
+  // Inventory Command Center V2 — show the Quick Actions panel in the right
+  // rail. Off by default for a cleaner executive dashboard.
+  inventory_show_quick_actions: boolean;
 }
 
 export const DEFAULT_SETTINGS: DealerSettings = {
@@ -267,6 +270,7 @@ export const DEFAULT_SETTINGS: DealerSettings = {
   privacy_notice_enabled: false,
   privacy_notice_text: "",
   privacy_notice_url: "",
+  inventory_show_quick_actions: false,
 };
 
 interface DealerSettingsContextType {
