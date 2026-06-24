@@ -288,13 +288,13 @@ const VehicleFile = () => {
         <div className="mt-3 rounded-2xl border border-border bg-card shadow-sm overflow-hidden">
           <div className="flex flex-col lg:flex-row gap-0 p-6 lg:p-8">
             {/* Vehicle photo */}
-            <div className={`lg:w-[340px] shrink-0 h-52 lg:h-56 rounded-xl overflow-hidden flex items-center justify-center bg-gradient-to-br ${
+            <div className={`lg:w-[340px] shrink-0 h-52 lg:h-56 rounded-2xl overflow-hidden flex items-center justify-center bg-gradient-to-br ${
               vehicle.condition === "new" ? "from-blue-500/15 to-blue-600/5 text-blue-600" :
               vehicle.condition === "cpo" ? "from-violet-500/15 to-violet-600/5 text-violet-600" :
               "from-slate-400/15 to-slate-500/5 text-slate-500"
             }`}>
               {gallery.length ? (
-                <div className="relative w-full h-full">
+                <div className="relative w-full h-full rounded-2xl overflow-hidden">
                   <img src={gallery[safeImg]} alt={vehicle.ymm || "vehicle"} className="w-full h-full object-cover" />
                   {gallery.length > 1 && (
                     <>
@@ -349,64 +349,58 @@ const VehicleFile = () => {
                   </div>
                 </div>
 
-                <div className="flex flex-col gap-2.5 w-full lg:w-[300px] shrink-0">
+                <div className="flex flex-col gap-2.5 w-full lg:w-[260px] shrink-0">
                   {vehicle.status === "published" ? (
-                    <>
-                      <a
-                        href={publicUrl}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="h-12 px-4 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold inline-flex items-center justify-center gap-2 shadow-sm shadow-blue-600/30 transition-colors"
-                      >
-                        <ExternalLink className="w-4 h-4" />
-                        View Shopper Page
-                      </a>
-                      <button
-                        onClick={copyLink}
-                        className="h-12 px-4 rounded-xl border border-border bg-background hover:bg-muted text-foreground text-sm font-bold inline-flex items-center justify-center gap-2 transition-colors"
-                      >
-                        <Copy className="w-3.5 h-3.5" />
-                        Copy Link
-                      </button>
-                    </>
+                    <a
+                      href={publicUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="h-12 px-4 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold inline-flex items-center justify-center gap-2 shadow-sm shadow-blue-600/30 transition-colors"
+                    >
+                      <ExternalLink className="w-4 h-4" />
+                      View Shopper Page
+                    </a>
                   ) : (
-                    <>
-                      <button
-                        onClick={() => setTab("labels")}
-                        className="h-12 px-4 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold inline-flex items-center justify-center gap-2 shadow-sm shadow-blue-600/30 transition-colors"
-                      >
-                        <Printer className="w-4 h-4" />
-                        Generate Sticker
-                      </button>
-                      <button
-                        onClick={publish}
-                        disabled={publishing}
-                        className="h-12 px-4 rounded-xl border border-border bg-background hover:bg-muted text-foreground text-sm font-bold inline-flex items-center justify-center gap-2 transition-colors disabled:opacity-60"
-                      >
-                        {publishing
-                          ? <div className="w-4 h-4 rounded-full border-2 border-current border-t-transparent animate-spin" />
-                          : <Globe className="w-3.5 h-3.5" />}
-                        Publish to Shopper Portal
-                      </button>
-                    </>
+                    <button
+                      onClick={() => setTab("labels")}
+                      className="h-12 px-4 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold inline-flex items-center justify-center gap-2 shadow-sm shadow-blue-600/30 transition-colors"
+                    >
+                      <Printer className="w-4 h-4" />
+                      Generate Sticker
+                    </button>
                   )}
+                  {/* Secondary actions collapsed behind one "More actions"
+                      control so the hero stack stays two buttons tall. */}
                   <details className="relative [&_summary::-webkit-details-marker]:hidden">
                     <summary className="list-none h-12 px-4 rounded-xl border border-border bg-background hover:bg-muted text-foreground text-sm font-bold inline-flex items-center justify-center gap-2 cursor-pointer transition-colors w-full">
                       <Plus className="w-4 h-4 rotate-45" /> More actions
                     </summary>
                     <div className="absolute right-0 mt-2 w-full rounded-xl border border-border bg-card shadow-lg z-20 p-1.5 space-y-0.5">
-                      <button onClick={copyLink} className="w-full text-left text-sm px-3 h-9 rounded-lg hover:bg-muted inline-flex items-center gap-2"><Copy className="w-3.5 h-3.5" /> Copy link</button>
-                      {vehicle.status === "published" && (
-                        <a href={publicUrl} target="_blank" rel="noreferrer" className="w-full text-left text-sm px-3 h-9 rounded-lg hover:bg-muted inline-flex items-center gap-2"><ExternalLink className="w-3.5 h-3.5" /> Open in new tab</a>
+                      {vehicle.status === "published" ? (
+                        <>
+                          <button onClick={copyLink} className="w-full text-left text-sm px-3 h-9 rounded-lg hover:bg-muted inline-flex items-center gap-2"><Copy className="w-3.5 h-3.5" /> Copy link</button>
+                          <a href={publicUrl} target="_blank" rel="noreferrer" className="w-full text-left text-sm px-3 h-9 rounded-lg hover:bg-muted inline-flex items-center gap-2"><ExternalLink className="w-3.5 h-3.5" /> Open in new tab</a>
+                          <button onClick={() => setTab("labels")} className="w-full text-left text-sm px-3 h-9 rounded-lg hover:bg-muted inline-flex items-center gap-2"><Printer className="w-3.5 h-3.5" /> Generate sticker</button>
+                        </>
+                      ) : (
+                        <>
+                          <button onClick={publish} disabled={publishing} className="w-full text-left text-sm px-3 h-9 rounded-lg hover:bg-muted inline-flex items-center gap-2 disabled:opacity-60">
+                            {publishing
+                              ? <div className="w-3.5 h-3.5 rounded-full border-2 border-current border-t-transparent animate-spin" />
+                              : <Globe className="w-3.5 h-3.5" />}
+                            Publish to Shopper Portal
+                          </button>
+                          <button onClick={copyLink} className="w-full text-left text-sm px-3 h-9 rounded-lg hover:bg-muted inline-flex items-center gap-2"><Copy className="w-3.5 h-3.5" /> Copy link</button>
+                        </>
                       )}
-                      <button onClick={() => setTab("labels")} className="w-full text-left text-sm px-3 h-9 rounded-lg hover:bg-muted inline-flex items-center gap-2"><Printer className="w-3.5 h-3.5" /> Generate sticker</button>
                     </div>
                   </details>
                 </div>
               </div>
 
-              {/* Readiness status banner */}
-              <div className={`mt-6 rounded-xl border p-4 flex items-center gap-4 flex-wrap ${
+              {/* Readiness status banner — bottom-aligns with the photo on
+                  desktop so it reads as one row with the hero image. */}
+              <div className={`mt-5 lg:mt-auto rounded-xl border p-4 flex items-center gap-4 flex-wrap ${
                 vehicle.status === "published" ? "border-emerald-200 bg-emerald-50/60" : "border-amber-200 bg-amber-50/60"
               }`}>
                 <ReadinessRing pct={ready.pct} tone={vehicle.status === "published" ? "emerald" : "amber"} />
