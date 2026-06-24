@@ -858,6 +858,19 @@ const SAFETY_FORM: Record<string, { label: string; desc: string }> = {
   MO: { label: "MO safety inspection", desc: "Missouri safety inspection certificate." },
 };
 
+// Shared tab header — every vehicle-file tab opens with the same
+// title / description / primary-action row so the panels read as one
+// design system.
+const TabHeader = ({ title, description, action }: { title: string; description: React.ReactNode; action?: React.ReactNode }) => (
+  <div className="flex items-start justify-between gap-4">
+    <div className="min-w-0">
+      <h2 className="text-[22px] font-bold tracking-tight text-foreground">{title}</h2>
+      <p className="text-sm text-slate-500 mt-1 max-w-xl">{description}</p>
+    </div>
+    {action && <div className="shrink-0">{action}</div>}
+  </div>
+);
+
 const DocumentsPanel = ({ vehicle, onReload }: { vehicle: VehicleRow; onReload: () => void }) => {
   const [uploading, setUploading] = useState<string | null>(null);
   const { settings } = useDealerSettings();
@@ -981,7 +994,11 @@ const DocumentsPanel = ({ vehicle, onReload }: { vehicle: VehicleRow; onReload: 
   }, [vehicle.documents]);
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-6">
+      <TabHeader
+        title="Documents"
+        description="Files available to shoppers and dealership staff — upload PDFs, links, brochures, reports, and warranty paperwork."
+      />
       <div className="rounded-2xl border border-border bg-card shadow-[0_1px_3px_rgba(0,0,0,0.05)] p-5">
         <GeneratedDocumentsSection vehicleId={vehicle.id} />
       </div>
@@ -1190,68 +1207,98 @@ const ScanInfoPanel = ({ vehicle, onReload }: { vehicle: VehicleRow; onReload: (
   const inputCls = "w-full h-9 px-2.5 rounded-lg border border-border bg-background text-sm text-foreground outline-none focus:border-primary";
   const labelCls = "text-[10px] font-bold uppercase tracking-wider text-muted-foreground";
 
-  return (
-    <div className="space-y-5 max-w-3xl">
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-base font-bold text-foreground">Scan Info</h2>
-          <p className="text-xs text-muted-foreground">Shown to shoppers who scan the window QR at /v/{(vehicle.vin || vehicle.slug || "").toUpperCase()}.</p>
-        </div>
-        <button onClick={save} disabled={saving} className="inline-flex items-center gap-1.5 h-9 px-4 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold shadow-sm shadow-blue-600/30 ring-1 ring-inset ring-white/15 disabled:opacity-50">
-          <Save className="w-4 h-4" /> {saving ? "Saving…" : "Save"}
-        </button>
-      </div>
+  const remainingCoverage = (() => {
+    if (!warranty.in_service_date || !warranty.factory_months) return null;
+    const end = new Date(warranty.in_service_date);
+    end.setMonth(end.getMonth() + warranty.factory_months);
+    const ms = end.getTime() - Date.now();
+    if (Number.isNaN(ms)) return null;
+    if (ms <= 0) return "Factory coverage has expired.";
+    const mo = Math.round(ms / (1000 * 60 * 60 * 24 * 30.44));
+    return mo >= 12
+      ? `~${Math.floor(mo / 12)} yr ${mo % 12} mo of factory coverage remaining`
+      : `~${mo} mo of factory coverage remaining`;
+  })();
 
-      {/* Packet curation — which customer-facing modules show on /v/:slug */}
-      <section className="rounded-2xl border border-border bg-card p-4 space-y-3">
-        <div>
-          <h3 className="text-sm font-bold text-foreground">Customer packet modules</h3>
-          <p className="text-[11px] text-muted-foreground mt-0.5">Choose what the shopper sees. Recall, price, and verified installs always show.</p>
-        </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+  return (
+    <div className="space-y-6 max-w-5xl">
+      <TabHeader
+        title="Shopper Passport Builder"
+        description={<>Choose what appears on the public vehicle passport — scanned at <span className="font-mono text-foreground/70">/v/{(vehicle.vin || vehicle.slug || "").toUpperCase()}</span>.</>}
+        action={
+          <button onClick={save} disabled={saving} className="inline-flex items-center gap-1.5 h-10 px-4 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold shadow-sm shadow-blue-600/30 ring-1 ring-inset ring-white/15 disabled:opacity-50">
+            <Save className="w-4 h-4" /> {saving ? "Saving…" : "Save Changes"}
+          </button>
+        }
+      />
+
+      {/* Passport modules — module cards, same language as Documents */}
+      <div>
+        <h3 className="text-[15px] font-bold text-foreground">Passport Modules</h3>
+        <p className="text-[13px] text-slate-500 mt-0.5">Toggle the sections shoppers see. Recall, price, and verified installs always show.</p>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mt-3">
           {PACKET_MODULES.map((m) => {
             const on = packetVisible({ packet_modules: packetModules }, m.id);
             return (
               <button
                 key={m.id}
                 onClick={() => toggleModule(m.id)}
-                className={`flex items-start justify-between gap-2 rounded-xl border p-3 text-left transition ${on ? "border-blue-200 bg-blue-50/40" : "border-border bg-muted/30 opacity-70"}`}
+                aria-pressed={on}
+                className={`text-left rounded-2xl border bg-card shadow-[0_1px_3px_rgba(0,0,0,0.06)] p-5 flex flex-col gap-3 min-h-[150px] transition hover:shadow-md ${on ? "border-border" : "border-border opacity-75"}`}
               >
-                <div className="min-w-0">
-                  <p className="text-[13px] font-semibold text-foreground">{m.label}</p>
-                  <p className="text-[10.5px] text-muted-foreground leading-tight mt-0.5">{m.desc}</p>
-                </div>
-                <span className={`mt-0.5 inline-flex h-5 w-9 flex-shrink-0 items-center rounded-full px-0.5 transition-colors ${on ? "bg-blue-600 justify-end" : "bg-slate-300 justify-start"}`}>
-                  <span className="h-4 w-4 rounded-full bg-white shadow" />
+                <h4 className="text-sm font-bold text-foreground">{m.label}</h4>
+                <p className="text-[13px] text-slate-500 leading-relaxed flex-1">{m.desc}</p>
+                <span className={`inline-flex items-center gap-1.5 self-start h-7 px-3 rounded-full text-xs font-semibold ${on ? "bg-emerald-50 text-emerald-700 border border-emerald-200" : "bg-slate-100 text-slate-500 border border-slate-200"}`}>
+                  <span className={`w-1.5 h-1.5 rounded-full ${on ? "bg-emerald-500" : "bg-slate-400"}`} /> {on ? "Enabled" : "Disabled"}
                 </span>
               </button>
             );
           })}
         </div>
-      </section>
+      </div>
 
       {/* Service history */}
-      <section className="rounded-2xl border border-border bg-card p-4 space-y-3">
-        <div className="flex items-center justify-between">
-          <p className="text-sm font-bold text-foreground flex items-center gap-1.5"><Wrench className="w-4 h-4 text-muted-foreground" /> Service history</p>
-          <button onClick={() => setRecords((r) => [...r, { date: "", mileage: "", type: "", notes: "" }])} className="inline-flex items-center gap-1 h-8 px-2.5 rounded-lg border border-border text-xs font-semibold hover:bg-muted"><Plus className="w-3.5 h-3.5" /> Add</button>
+      <section className="rounded-2xl border border-border bg-card shadow-[0_1px_3px_rgba(0,0,0,0.06)] p-6 space-y-4">
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <h3 className="text-base font-bold text-foreground flex items-center gap-2"><Wrench className="w-4 h-4 text-muted-foreground" /> Service History</h3>
+            <p className="text-[13px] text-slate-500 mt-0.5">Add service visits, maintenance records, and repair history.</p>
+          </div>
+          <button onClick={() => setRecords((r) => [...r, { date: "", mileage: "", type: "", notes: "" }])} className="shrink-0 inline-flex items-center gap-1.5 h-9 px-3 rounded-lg border border-border text-xs font-semibold hover:bg-muted"><Plus className="w-3.5 h-3.5" /> Add Service Record</button>
         </div>
         {records.length === 0 ? (
-          <p className="text-xs text-muted-foreground">No service records yet.</p>
-        ) : records.map((r, i) => (
-          <div key={i} className="grid grid-cols-[1fr_1fr_1.4fr_2fr_auto] gap-2 items-end">
-            <div><label className={labelCls}>Date</label><input type="date" value={r.date} onChange={(e) => setRecords((p) => p.map((x, j) => j === i ? { ...x, date: e.target.value } : x))} className={inputCls} /></div>
-            <div><label className={labelCls}>Mileage</label><input value={r.mileage} onChange={(e) => setRecords((p) => p.map((x, j) => j === i ? { ...x, mileage: e.target.value } : x))} placeholder="42,000" className={inputCls} /></div>
-            <div><label className={labelCls}>Type</label><input value={r.type} onChange={(e) => setRecords((p) => p.map((x, j) => j === i ? { ...x, type: e.target.value } : x))} placeholder="Oil & filter" className={inputCls} /></div>
-            <div><label className={labelCls}>Notes</label><input value={r.notes} onChange={(e) => setRecords((p) => p.map((x, j) => j === i ? { ...x, notes: e.target.value } : x))} placeholder="Multi-point inspection passed" className={inputCls} /></div>
-            <button onClick={() => setRecords((p) => p.filter((_, j) => j !== i))} className="h-9 w-9 inline-flex items-center justify-center rounded-lg border border-border text-muted-foreground hover:text-destructive hover:border-destructive/40"><Trash2 className="w-4 h-4" /></button>
+          <div className="rounded-xl border border-dashed border-border bg-muted/20 py-8 text-center">
+            <Wrench className="w-6 h-6 text-muted-foreground/50 mx-auto mb-2" />
+            <p className="text-sm font-semibold text-foreground">No service records yet</p>
+            <p className="text-[12px] text-slate-500 mt-0.5">Log oil changes, inspections, and repairs to build buyer confidence.</p>
           </div>
-        ))}
+        ) : (
+          <div className="space-y-2">
+            {records.map((r, i) => (
+              <div key={i} className="grid grid-cols-[1fr_1fr_1.4fr_2fr_auto] gap-2 items-end">
+                <div><label className={labelCls}>Date</label><input type="date" value={r.date} onChange={(e) => setRecords((p) => p.map((x, j) => j === i ? { ...x, date: e.target.value } : x))} className={inputCls} /></div>
+                <div><label className={labelCls}>Mileage</label><input value={r.mileage} onChange={(e) => setRecords((p) => p.map((x, j) => j === i ? { ...x, mileage: e.target.value } : x))} placeholder="42,000" className={inputCls} /></div>
+                <div><label className={labelCls}>Type</label><input value={r.type} onChange={(e) => setRecords((p) => p.map((x, j) => j === i ? { ...x, type: e.target.value } : x))} placeholder="Oil & filter" className={inputCls} /></div>
+                <div><label className={labelCls}>Notes</label><input value={r.notes} onChange={(e) => setRecords((p) => p.map((x, j) => j === i ? { ...x, notes: e.target.value } : x))} placeholder="Multi-point inspection passed" className={inputCls} /></div>
+                <button onClick={() => setRecords((p) => p.filter((_, j) => j !== i))} className="h-9 w-9 inline-flex items-center justify-center rounded-lg border border-border text-muted-foreground hover:text-destructive hover:border-destructive/40"><Trash2 className="w-4 h-4" /></button>
+              </div>
+            ))}
+          </div>
+        )}
       </section>
 
       {/* Remaining warranty */}
-      <section className="rounded-2xl border border-border bg-card p-4 space-y-3">
-        <p className="text-sm font-bold text-foreground flex items-center gap-1.5"><ShieldCheck className="w-4 h-4 text-muted-foreground" /> Remaining warranty</p>
+      <section className="rounded-2xl border border-border bg-card shadow-[0_1px_3px_rgba(0,0,0,0.06)] p-6 space-y-4">
+        <div>
+          <h3 className="text-base font-bold text-foreground flex items-center gap-2"><ShieldCheck className="w-4 h-4 text-muted-foreground" /> Remaining Factory Warranty</h3>
+          <p className="text-[13px] text-slate-500 mt-0.5">In-service date and coverage terms — shoppers see an estimated balance.</p>
+        </div>
+        {remainingCoverage && (
+          <div className="rounded-xl border border-emerald-200 bg-emerald-50/60 px-4 py-3 flex items-center gap-2.5">
+            <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0" />
+            <p className="text-[13px] font-semibold text-emerald-800">{remainingCoverage}</p>
+          </div>
+        )}
         <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
           <div><label className={labelCls}>In-service date</label><input type="date" value={warranty.in_service_date || ""} onChange={(e) => setWarranty((w) => ({ ...w, in_service_date: e.target.value }))} className={inputCls} /></div>
           <div><label className={labelCls}>Factory (months)</label><input type="number" value={warranty.factory_months ?? ""} onChange={(e) => setWarranty((w) => ({ ...w, factory_months: e.target.value ? Number(e.target.value) : undefined }))} placeholder="36" className={inputCls} /></div>
@@ -1264,21 +1311,32 @@ const ScanInfoPanel = ({ vehicle, onReload }: { vehicle: VehicleRow; onReload: (
       </section>
 
       {/* Available accessories */}
-      <section className="rounded-2xl border border-border bg-card p-4 space-y-3">
-        <div className="flex items-center justify-between">
-          <p className="text-sm font-bold text-foreground flex items-center gap-1.5"><Sparkles className="w-4 h-4 text-muted-foreground" /> Available accessories</p>
-          <button onClick={() => setAccessories((a) => [...a, { name: "", price: "", note: "" }])} className="inline-flex items-center gap-1 h-8 px-2.5 rounded-lg border border-border text-xs font-semibold hover:bg-muted"><Plus className="w-3.5 h-3.5" /> Add</button>
+      <section className="rounded-2xl border border-border bg-card shadow-[0_1px_3px_rgba(0,0,0,0.06)] p-6 space-y-4">
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <h3 className="text-base font-bold text-foreground flex items-center gap-2"><Sparkles className="w-4 h-4 text-muted-foreground" /> Available Accessories</h3>
+            <p className="text-[13px] text-slate-500 mt-0.5">Dealer-installed accessories and upgrades the shopper can add.</p>
+          </div>
+          <button onClick={() => setAccessories((a) => [...a, { name: "", price: "", note: "" }])} className="shrink-0 inline-flex items-center gap-1.5 h-9 px-3 rounded-lg border border-border text-xs font-semibold hover:bg-muted"><Plus className="w-3.5 h-3.5" /> Add Accessory</button>
         </div>
         {accessories.length === 0 ? (
-          <p className="text-xs text-muted-foreground">No additional accessories offered yet.</p>
-        ) : accessories.map((a, i) => (
-          <div key={i} className="grid grid-cols-[2fr_1fr_2fr_auto] gap-2 items-end">
-            <div><label className={labelCls}>Accessory</label><input value={a.name} onChange={(e) => setAccessories((p) => p.map((x, j) => j === i ? { ...x, name: e.target.value } : x))} placeholder="All-weather floor liners" className={inputCls} /></div>
-            <div><label className={labelCls}>Price</label><input value={a.price} onChange={(e) => setAccessories((p) => p.map((x, j) => j === i ? { ...x, price: e.target.value } : x))} placeholder="$249" className={inputCls} /></div>
-            <div><label className={labelCls}>Note</label><input value={a.note} onChange={(e) => setAccessories((p) => p.map((x, j) => j === i ? { ...x, note: e.target.value } : x))} placeholder="Custom-fit, installed same day" className={inputCls} /></div>
-            <button onClick={() => setAccessories((p) => p.filter((_, j) => j !== i))} className="h-9 w-9 inline-flex items-center justify-center rounded-lg border border-border text-muted-foreground hover:text-destructive hover:border-destructive/40"><Trash2 className="w-4 h-4" /></button>
+          <div className="rounded-xl border border-dashed border-border bg-muted/20 py-7 px-5 text-center">
+            <Sparkles className="w-6 h-6 text-muted-foreground/50 mx-auto mb-2" />
+            <p className="text-sm font-semibold text-foreground">No accessories added yet</p>
+            <p className="text-[12px] text-slate-500 mt-0.5">Examples: wheel packages · cargo systems · protection packages.</p>
           </div>
-        ))}
+        ) : (
+          <div className="space-y-2">
+            {accessories.map((a, i) => (
+              <div key={i} className="grid grid-cols-[2fr_1fr_2fr_auto] gap-2 items-end">
+                <div><label className={labelCls}>Accessory</label><input value={a.name} onChange={(e) => setAccessories((p) => p.map((x, j) => j === i ? { ...x, name: e.target.value } : x))} placeholder="All-weather floor liners" className={inputCls} /></div>
+                <div><label className={labelCls}>Price</label><input value={a.price} onChange={(e) => setAccessories((p) => p.map((x, j) => j === i ? { ...x, price: e.target.value } : x))} placeholder="$249" className={inputCls} /></div>
+                <div><label className={labelCls}>Note</label><input value={a.note} onChange={(e) => setAccessories((p) => p.map((x, j) => j === i ? { ...x, note: e.target.value } : x))} placeholder="Custom-fit, installed same day" className={inputCls} /></div>
+                <button onClick={() => setAccessories((p) => p.filter((_, j) => j !== i))} className="h-9 w-9 inline-flex items-center justify-center rounded-lg border border-border text-muted-foreground hover:text-destructive hover:border-destructive/40"><Trash2 className="w-4 h-4" /></button>
+              </div>
+            ))}
+          </div>
+        )}
       </section>
     </div>
   );
@@ -1378,16 +1436,16 @@ const CustomerPanel = ({ vehicle }: { vehicle: VehicleRow }) => {
   if (loading) return <p className="text-sm text-muted-foreground">Loading customer record…</p>;
 
   return (
-    <div className="space-y-5 max-w-3xl">
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-base font-bold text-foreground">Customer</h2>
-          <p className="text-xs text-muted-foreground">Captured when the vehicle is sold. Stored on the internal file only — never shown on the public scan.</p>
-        </div>
-        <button onClick={save} disabled={saving} className="inline-flex items-center gap-1.5 h-9 px-4 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold shadow-sm shadow-blue-600/30 ring-1 ring-inset ring-white/15 disabled:opacity-50">
-          <Save className="w-4 h-4" /> {saving ? "Saving…" : "Save"}
-        </button>
-      </div>
+    <div className="space-y-6 max-w-3xl">
+      <TabHeader
+        title="Customer Information"
+        description="Captured when the vehicle is sold. Stored on the internal file only — never shown on the public scan."
+        action={
+          <button onClick={save} disabled={saving} className="inline-flex items-center gap-1.5 h-10 px-4 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold shadow-sm shadow-blue-600/30 ring-1 ring-inset ring-white/15 disabled:opacity-50">
+            <Save className="w-4 h-4" /> {saving ? "Saving…" : "Save"}
+          </button>
+        }
+      />
 
       <section className="rounded-2xl border border-border bg-card p-4 space-y-3">
         <div className="flex items-center justify-between">
