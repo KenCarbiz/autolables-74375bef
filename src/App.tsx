@@ -1,6 +1,6 @@
 import { lazy, Suspense, useLayoutEffect } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Navigate, Outlet, Route, Routes, useLocation } from "react-router-dom";
+import { BrowserRouter, Navigate, Outlet, Route, Routes, useLocation, useParams } from "react-router-dom";
 import { MotionConfig } from "framer-motion";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { Toaster } from "@/components/ui/toaster";
@@ -66,7 +66,12 @@ const ScanPage = lazy(() => import("./pages/ScanPage"));
 const ComplianceCenter = lazy(() => import("./pages/ComplianceCenter"));
 const ComplianceActionCenter = lazy(() => import("./pages/ComplianceActionCenter"));
 const ComplianceInbox = lazy(() => import("./pages/ComplianceInbox"));
-const VehiclePortal = lazy(() => import("./pages/VehiclePortal"));
+// Legacy per-VIN portal is retired — /vehicle/:vin redirects to the single
+// canonical Passport at /v/:vin so there is only one shopper page.
+const VehicleVinRedirect = () => {
+  const { vin } = useParams<{ vin: string }>();
+  return <Navigate to={`/v/${(vin || "").toUpperCase()}`} replace />;
+};
 const UsedCarSticker = lazy(() => import("./pages/UsedCarSticker"));
 const UsedVehicleDocuments = lazy(() => import("./pages/UsedVehicleDocuments"));
 const UsedVehicleDocumentsPrint = lazy(() => import("./pages/UsedVehicleDocumentsPrint"));
@@ -156,7 +161,7 @@ const App = () => (
                       <Route path="/lookup" element={<SigningLookup />} />
                       <Route path="/onboarding" element={<Onboarding />} />
                       <Route path="/scan" element={<ScanPage />} />
-                      <Route path="/vehicle/:vin" element={<VehiclePortal />} />
+                      <Route path="/vehicle/:vin" element={<VehicleVinRedirect />} />
                       <Route path="/v/:slug" element={<PublicListing />} />
                       <Route path="/v/:slug/documents" element={<PublicDocuments />} />
                       <Route path="/deal/:token" element={<DealSigning />} />

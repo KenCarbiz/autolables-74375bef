@@ -119,7 +119,7 @@ const NewCarSticker = () => {
   const signingUrl = publishedSlug
     ? publicUrl(publishedSlug)
     : vehicle.vin
-      ? `${window.location.origin}/vehicle/${vehicle.vin}`
+      ? `${window.location.origin}/v/${vehicle.vin.toUpperCase()}`
       : "";
 
   // Proper tracking code: AC-{STORE}-{VIN6}-NA-{TIMESTAMP}

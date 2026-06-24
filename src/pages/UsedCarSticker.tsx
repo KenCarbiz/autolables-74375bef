@@ -146,12 +146,13 @@ const UsedCarSticker = () => {
   const docFee = settings.doc_fee_enabled ? (settings.doc_fee_amount || 0) : 0;
   const totalPrice = marketVal + installedTotal + docFee;
 
-  // After publish, the QR resolves to the short public slug; otherwise
-  // we fall back to the legacy per-VIN portal.
+  // The QR always points at the canonical Passport at /v/{VIN}. After publish
+  // it resolves to the live page; before publish it shows the not-yet-available
+  // state (drafts are intentionally not exposed to shoppers).
   const signingUrl = publishedSlug
     ? publicUrl(publishedSlug)
     : vehicle.vin
-      ? `${window.location.origin}/vehicle/${vehicle.vin}`
+      ? `${window.location.origin}/v/${vehicle.vin.toUpperCase()}`
       : "";
 
   // Per-dealer used-car print template. In pre-printed mode the dealer's

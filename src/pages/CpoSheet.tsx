@@ -205,7 +205,7 @@ const CpoSheet = () => {
                 <p className="text-[8px] font-bold text-foreground">Scan for full vehicle details</p>
                 {carfaxUrl && <p className="text-[7px] text-blue-600 mt-0.5">Vehicle History Report available</p>}
               </div>
-              {vehicle.vin && <QRCodeSVG value={carfaxUrl || `${window.location.origin}/vehicle/${vehicle.vin}`} size={50} />}
+              {vehicle.vin && <QRCodeSVG value={carfaxUrl || `${window.location.origin}/v/${vehicle.vin}`} size={50} />}
             </div>
 
             <div className="text-center py-1.5 bg-emerald-800 text-white text-[8px] font-semibold">

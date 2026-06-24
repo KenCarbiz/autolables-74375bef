@@ -88,7 +88,7 @@ const StickerStudioGenerator = () => {
       mileage: v.mileage || prev.mileage,
       msrp: v.msrp || prev.msrp,
       price: v.price || prev.price,
-      qrUrl: v.slug ? `${origin}/v/${v.slug}` : v.vin ? `${origin}/vehicle/${v.vin}` : prev.qrUrl,
+      qrUrl: v.slug ? `${origin}/v/${v.slug}` : v.vin ? `${origin}/v/${v.vin}` : prev.qrUrl,
       installed: (v.options.length || v.features.length)
         ? [...v.options, ...v.features].slice(0, 12).map((n) => ({ name: n }))
         : prev.installed,
@@ -128,7 +128,7 @@ const StickerStudioGenerator = () => {
     if (!v?.id || !tenant?.id) return;
     qrEnsured.current = true;
     const origin = typeof window !== "undefined" ? window.location.origin : "";
-    const destination = v.slug ? `${origin}/v/${v.slug}` : v.vin ? `${origin}/vehicle/${v.vin}` : "";
+    const destination = v.slug ? `${origin}/v/${v.slug}` : v.vin ? `${origin}/v/${v.vin}` : "";
     if (!destination) return;
     (async () => {
       const tracked = await ensureQrCode({ tenantId: tenant.id, vehicleId: v.id, stickerType, destinationUrl: destination });

@@ -45,7 +45,7 @@ export const useSyndicationFeed = () => {
             totalAccessories: latest.totals?.accessories_total || 0,
             basePrice: latest.totals?.base_price || 0,
             finalPrice: latest.totals?.final_price || 0,
-            stickerUrl: `${window.location.origin}/vehicle/${f.vin}`,
+            stickerUrl: `${window.location.origin}/v/${f.vin}`,
             signingUrl: latest.signing_url || "",
             lastUpdated: latest.printed_at,
           };
