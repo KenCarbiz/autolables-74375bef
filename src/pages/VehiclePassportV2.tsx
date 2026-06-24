@@ -394,15 +394,26 @@ const VehiclePassportV2 = () => {
               )}
             </div>
 
-            {/* Trust strip */}
+            {/* Trust strip — positive verified signals; unknowns show as a
+                subtle skeleton (never "Not reported"). */}
             <Card className="grid grid-cols-3 sm:grid-cols-6 overflow-hidden">
               {trust.map((b, i) => (
                 <div key={i} className="px-3 py-3 text-center border-r border-b sm:border-b-0 border-[#eef1f4] last:border-r-0 flex flex-col items-center gap-1">
-                  <b.icon className={`w-5 h-5 ${b.ok === false ? "text-red-500" : b.ok ? "text-emerald-600" : "text-slate-400"}`} />
-                  <p className="text-[11px] font-bold leading-tight">{b.t}</p>
-                  <p className="text-[10px] text-slate-500 inline-flex items-center gap-0.5 leading-tight">
-                    {b.ok === true && <CheckCircle2 className="w-2.5 h-2.5 text-emerald-600" />}{b.s}
-                  </p>
+                  {b.ok === null ? (
+                    <>
+                      <span className="w-5 h-5 rounded-full bg-slate-200 animate-pulse" />
+                      <span className="w-16 h-2 rounded bg-slate-200 animate-pulse mt-1" />
+                      <span className="w-10 h-1.5 rounded bg-slate-100 animate-pulse" />
+                    </>
+                  ) : (
+                    <>
+                      <b.icon className={`w-5 h-5 ${b.ok === false ? "text-amber-500" : "text-emerald-600"}`} />
+                      <p className="text-[11px] font-bold leading-tight">{b.t}</p>
+                      <p className="text-[10px] text-slate-500 inline-flex items-center gap-0.5 leading-tight">
+                        {b.ok === true && <CheckCircle2 className="w-2.5 h-2.5 text-emerald-600" />}{b.s}
+                      </p>
+                    </>
+                  )}
                 </div>
               ))}
             </Card>
@@ -441,12 +452,20 @@ const VehiclePassportV2 = () => {
                     </div>
                   </div>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2 mt-3">
-                    {["AutoCheck Verification", "Market Analysis", "Warranty Verification", "NHTSA Recall Check", "OEM Data Verification"].map((label) => (
-                      <div key={label} className="flex items-center justify-between gap-3 py-1">
-                        <span className="text-[12px] text-slate-600">{label}</span>
-                        <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-slate-400">
-                          <span className="w-3 h-3 rounded-full border-2 border-slate-300 border-t-blue-500 animate-spin" /> Loading…
-                        </span>
+                    {[
+                      { label: "AutoCheck Verification", done: verifiedBy.some((v) => v.label === "AutoCheck") },
+                      { label: "Market Analysis", done: verifiedBy.some((v) => v.label === "MarketCheck") },
+                      { label: "Warranty Verification", done: !!warrantyStr },
+                      { label: "NHTSA Recall Check", done: verifiedBy.some((v) => v.label === "NHTSA") },
+                      { label: "OEM Data Verification", done: verifiedBy.some((v) => v.label === "OEM Data") },
+                    ].map((row) => (
+                      <div key={row.label} className="flex items-center justify-between gap-3 py-1">
+                        <span className="text-[12px] text-slate-600">{row.label}</span>
+                        {row.done ? (
+                          <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-emerald-600"><CheckCircle2 className="w-3.5 h-3.5" /> Verified</span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-slate-400"><span className="w-3 h-3 rounded-full border-2 border-slate-300 border-t-blue-500 animate-spin" /> Loading…</span>
+                        )}
                       </div>
                     ))}
                   </div>
@@ -559,12 +578,25 @@ const VehiclePassportV2 = () => {
                 <p className="text-[13px] text-slate-600">{fmt$(belowMarket)} below market average</p>
                 <ul className="mt-2 space-y-1.5 text-[13px]">
                   <li className="flex items-center gap-2"><CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />Priced below market average</li>
+                  <li className="flex items-center gap-2"><CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />Below similar vehicles nearby</li>
                   <li className="flex items-center gap-2"><CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />Backed by live comparables</li>
+                  <li className="flex items-center gap-2"><CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />Independently verified</li>
                 </ul>
+                <p className="text-[10px] text-slate-400 mt-2">Powered by MarketCheck</p>
               </>
             ) : marketAvg != null ? (
-              <><p className="text-lg font-bold text-blue-600 mt-2">Fair Price</p><p className="text-[13px] text-slate-600">Priced in line with the market.</p></>
-            ) : <p className="text-[13px] text-slate-500 mt-3">Pricing confidence currently unavailable.</p>}
+              <>
+                <p className="text-lg font-bold text-blue-600 mt-2">Fair Price</p>
+                <p className="text-[13px] text-slate-600">Priced in line with the local market.</p>
+                <p className="text-[10px] text-slate-400 mt-2">Powered by MarketCheck</p>
+              </>
+            ) : (
+              <div className="mt-4 flex flex-col items-center text-center py-3">
+                <span className="w-9 h-9 rounded-full border-2 border-slate-200 border-t-blue-500 animate-spin mb-2.5" />
+                <p className="text-[13px] font-semibold text-slate-600">Scoring this price…</p>
+                <p className="text-[11px] text-slate-400 mt-0.5">Comparing against live local comparables.</p>
+              </div>
+            )}
           </Card>
         </div>
 
@@ -608,13 +640,17 @@ const VehiclePassportV2 = () => {
           </Card>
 
           <Card className="p-5">
-            <div className="flex items-center justify-between"><SectionTitle>Factory Warranty</SectionTitle><ShieldCheck className="w-4 h-4 text-emerald-600" /></div>
+            <div className="flex items-center justify-between">
+              <SectionTitle>Factory Warranty</SectionTitle>
+              {warrantyStr && <span className="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wide text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-full px-2 py-0.5"><ShieldCheck className="w-3 h-3" /> OEM Verified</span>}
+            </div>
             {warrantyStr ? (() => {
               const milesLeft = warranty.factory_miles != null && listing.mileage != null ? Math.max(0, warranty.factory_miles - listing.mileage) : warranty.factory_miles ?? null;
               const milesPct = warranty.factory_miles && listing.mileage != null ? Math.max(4, 100 - Math.min(100, (listing.mileage / warranty.factory_miles) * 100)) : 65;
-              let yrsLeft: number | null = null;
+              let yrsLeft: number | null = null; let expiry: string | null = null;
               if (warranty.in_service_date && warranty.factory_months) {
                 const end = new Date(warranty.in_service_date); end.setMonth(end.getMonth() + warranty.factory_months);
+                expiry = end.toLocaleDateString();
                 const ms = end.getTime() - Date.now(); yrsLeft = ms > 0 ? ms / (1000 * 60 * 60 * 24 * 365) : 0;
               }
               return (
@@ -627,11 +663,20 @@ const VehiclePassportV2 = () => {
                     {yrsLeft != null && <span><span className="font-bold">{yrsLeft >= 1 ? `${Math.floor(yrsLeft)} yr` : `${Math.round(yrsLeft * 12)} mo`}</span> <span className="text-slate-500">remaining</span></span>}
                     {milesLeft != null && <span><span className="font-bold">{milesLeft.toLocaleString()} mi</span> <span className="text-slate-500">remaining</span></span>}
                   </div>
-                  {warranty.in_service_date && <p className="text-[11px] text-slate-500 mt-2">In-service date: {new Date(warranty.in_service_date).toLocaleDateString()}</p>}
+                  <div className="mt-2 text-[11px] text-slate-500 space-y-0.5">
+                    {warranty.in_service_date && <p>In-service date: {new Date(warranty.in_service_date).toLocaleDateString()}</p>}
+                    {expiry && <p>Estimated expiration: <span className="font-semibold text-slate-700">{expiry}</span></p>}
+                  </div>
                   <p className="text-[10px] text-slate-400 mt-2 leading-snug">Warranty information estimated from OEM data and vehicle history records.</p>
                 </>
               );
-            })() : <p className="text-[13px] text-slate-500 mt-3">Warranty details not provided for this vehicle.</p>}
+            })() : (
+              <div className="mt-4 flex flex-col items-center text-center py-3">
+                <span className="w-9 h-9 rounded-full border-2 border-slate-200 border-t-blue-500 animate-spin mb-2.5" />
+                <p className="text-[13px] font-semibold text-slate-600">Checking factory coverage…</p>
+                <p className="text-[11px] text-slate-400 mt-0.5">Pulling OEM warranty terms for this VIN.</p>
+              </div>
+            )}
           </Card>
 
           <Card className="p-5">
@@ -641,7 +686,17 @@ const VehiclePassportV2 = () => {
                 <div className="flex items-center gap-2 mt-2"><span className="text-2xl font-extrabold">{reviewRating.toFixed(1)}</span><Stars n={reviewRating} />{reviewCount != null && <span className="text-[12px] text-slate-500">({reviewCount.toLocaleString()})</span>}</div>
                 <p className="text-[10px] text-slate-400 mt-3 leading-snug">Reviews shown are dealership or model reviews and may not reflect ownership experience of this specific vehicle.</p>
               </>
-            ) : <p className="text-[13px] text-slate-500 mt-3">Owner reviews are not yet connected for this vehicle.</p>}
+            ) : (
+              <div className="mt-3 flex items-center gap-3">
+                <div className="flex -space-x-1">
+                  {[0, 1, 2].map((i) => <span key={i} className="w-8 h-8 rounded-full bg-slate-100 border-2 border-white animate-pulse" />)}
+                </div>
+                <div>
+                  <p className="text-[13px] font-semibold text-slate-600">Collecting verified reviews…</p>
+                  <p className="text-[11px] text-slate-400">Dealership and model reviews are being gathered for this vehicle.</p>
+                </div>
+              </div>
+            )}
           </Card>
         </div>
 
@@ -694,6 +749,7 @@ const VehiclePassportV2 = () => {
               <button onClick={() => setInquiry("info")} className="h-10 rounded-lg bg-white/15 text-white text-[13px] font-bold inline-flex items-center justify-center gap-1.5 border border-white/40"><Clock className="w-4 h-4" /> Test Drive</button>
               <button onClick={() => setInquiry("trade")} className="col-span-2 h-10 rounded-lg bg-white/15 text-white text-[13px] font-bold inline-flex items-center justify-center gap-1.5 border border-white/40"><RefreshCw className="w-4 h-4" /> Trade Appraisal</button>
             </div>
+            <button onClick={() => setInquiry("info")} className="w-full h-12 mt-2 rounded-xl bg-white text-[#1a6dff] text-[15px] font-extrabold inline-flex items-center justify-center gap-2 hover:bg-white/90 transition-colors shadow-sm"><BadgeCheck className="w-5 h-5" /> Reserve This Vehicle</button>
           </div>
         </div>
 
