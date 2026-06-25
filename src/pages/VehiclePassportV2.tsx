@@ -119,12 +119,29 @@ const InquiryModal = ({ listing, dealer, intent, onClose }: { listing: VehicleLi
 };
 
 const Card = ({ children, className = "" }: { children: React.ReactNode; className?: string }) => (
-  <div className={`rounded-2xl border border-[#e8ebef] bg-white shadow-[0_1px_3px_rgba(16,24,40,0.05)] ${className}`}>{children}</div>
+  <div className={`rounded-2xl border border-[#e8ebef] bg-white shadow-[0_1px_3px_rgba(16,24,40,0.05)] animate-in fade-in-0 slide-in-from-bottom-1 duration-500 ${className}`}>{children}</div>
 );
 
 const SectionTitle = ({ children }: { children: React.ReactNode }) => (
   <h3 className="text-[15px] font-bold text-slate-900">{children}</h3>
 );
+
+// Animated count-up for the confidence score (easeOutCubic).
+const CountUp = ({ value, duration = 900 }: { value: number; duration?: number }) => {
+  const [n, setN] = useState(0);
+  useEffect(() => {
+    let raf = 0;
+    const start = performance.now();
+    const tick = (t: number) => {
+      const p = Math.min(1, (t - start) / duration);
+      setN(Math.round(value * (1 - Math.pow(1 - p, 3))));
+      if (p < 1) raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [value, duration]);
+  return <>{n}</>;
+};
 
 const VehiclePassportV2 = () => {
   const { vehicleSlug } = useParams<{ vehicleSlug: string }>();
@@ -238,16 +255,17 @@ const VehiclePassportV2 = () => {
     : null;
   const confLabel = confScore == null ? "" : confScore >= 90 ? "Excellent" : confScore >= 80 ? "Very Good" : confScore >= 70 ? "Good" : "Fair";
 
+  // Data-source attribution — only sources we actually read from. We have no
+  // AutoCheck/Edmunds integration, so history is labeled by its real source.
   const verifiedBy = [
-    { label: "AutoCheck", on: typeof mc.carfax_clean_title === "boolean" || ownerCount != null },
+    { label: "Vehicle History", on: typeof mc.carfax_clean_title === "boolean" || ownerCount != null },
     { label: "MarketCheck", on: marketAvg != null || Object.keys(mc).length > 0 },
     { label: "NHTSA", on: !!listing.recall_status },
-    { label: "OEM Data", on: Object.keys(mc).length > 0 },
   ].filter((x) => x.on);
 
   // Trust strip badges — always 6 slots, colored by real data.
   const trust = [
-    accidentCount === 0 ? { icon: Shield, t: "No Accidents", s: "AutoCheck Verified", ok: true } : accidentCount ? { icon: Shield, t: `${accidentCount} Accident${accidentCount > 1 ? "s" : ""}`, s: "Reported", ok: false } : { icon: Shield, t: "Accident History", s: "Not reported", ok: null },
+    accidentCount === 0 ? { icon: Shield, t: "No Accidents", s: "History verified", ok: true } : accidentCount ? { icon: Shield, t: `${accidentCount} Accident${accidentCount > 1 ? "s" : ""}`, s: "Reported", ok: false } : { icon: Shield, t: "Accident History", s: "Not reported", ok: null },
     ownerCount === 1 ? { icon: User, t: "One Owner", s: "Personal Use", ok: true } : ownerCount ? { icon: User, t: `${ownerCount} Owners`, s: "History", ok: true } : { icon: User, t: "Ownership", s: "Not reported", ok: null },
     serviceCount > 0 ? { icon: Wrench, t: "Service History", s: `${serviceCount} Records`, ok: true } : { icon: Wrench, t: "Service History", s: "No records", ok: null },
     cleanTitle ? { icon: FileCheck, t: "Clean Title", s: "No Issues", ok: true } : { icon: FileCheck, t: "Title", s: "Not reported", ok: null },
@@ -474,21 +492,11 @@ const VehiclePassportV2 = () => {
             <Card className="grid grid-cols-3 sm:grid-cols-6 overflow-hidden">
               {trust.map((b, i) => (
                 <div key={i} className="px-3 py-3 text-center border-r border-b sm:border-b-0 border-[#eef1f4] last:border-r-0 flex flex-col items-center gap-1">
-                  {b.ok === null ? (
-                    <>
-                      <span className="w-5 h-5 rounded-full bg-slate-200 animate-pulse" />
-                      <span className="w-16 h-2 rounded bg-slate-200 animate-pulse mt-1" />
-                      <span className="w-10 h-1.5 rounded bg-slate-100 animate-pulse" />
-                    </>
-                  ) : (
-                    <>
-                      <b.icon className={`w-5 h-5 ${b.ok === false ? "text-amber-500" : "text-emerald-600"}`} />
-                      <p className="text-[11px] font-bold leading-tight">{b.t}</p>
-                      <p className="text-[10px] text-slate-500 inline-flex items-center gap-0.5 leading-tight">
-                        {b.ok === true && <CheckCircle2 className="w-2.5 h-2.5 text-emerald-600" />}{b.s}
-                      </p>
-                    </>
-                  )}
+                  <b.icon className={`w-5 h-5 ${b.ok === false ? "text-amber-500" : b.ok === null ? "text-slate-300" : "text-emerald-600"}`} />
+                  <p className={`text-[11px] font-bold leading-tight ${b.ok === null ? "text-slate-400" : ""}`}>{b.t}</p>
+                  <p className="text-[10px] text-slate-500 inline-flex items-center gap-0.5 leading-tight">
+                    {b.ok === true && <CheckCircle2 className="w-2.5 h-2.5 text-emerald-600" />}{b.s}
+                  </p>
                 </div>
               ))}
             </Card>
@@ -501,7 +509,7 @@ const VehiclePassportV2 = () => {
                   <div className="flex-1">
                     <p className="text-[12px] font-semibold text-slate-500">AutoLabels Vehicle Confidence Score</p>
                     <div className="flex items-baseline gap-2 mt-0.5">
-                      <span className="text-[34px] font-extrabold leading-none">{confScore}</span>
+                      <span className="text-[34px] font-extrabold leading-none"><CountUp value={confScore} /></span>
                       <span className="text-sm text-slate-400 font-semibold">/ 100</span>
                       <span className="text-base font-bold text-emerald-600 ml-1">{confLabel}</span>
                       <Stars n={confScore / 20} size={16} />
@@ -612,18 +620,13 @@ const VehiclePassportV2 = () => {
           </Card>
         )}
 
-        {/* 5. GREAT BUY + MARKET CARDS */}
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
-          <Card className="p-4 md:p-5">
-            <SectionTitle>Why This Is A Great Buy</SectionTitle>
-            <ul className="mt-3 space-y-2">
-              {(whyBuy.length ? whyBuy : ["Details coming soon"]).map((b, i) => (
-                <li key={i} className="flex items-start gap-2 text-[13px]"><CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />{b}</li>
-              ))}
-            </ul>
-            <button onClick={() => setSpecsOpen(true)} className="mt-3 text-[13px] font-semibold text-[#2563EB] inline-flex items-center gap-1 hover:underline">See full details <ArrowRight className="w-3.5 h-3.5" /></button>
-          </Card>
-
+        {/* 5. MARKET INTELLIGENCE — moved above Why-This-Is-A-Great-Buy so the
+            strongest third-party trust signals land first. */}
+        <div className="space-y-1">
+          <h2 className="text-[17px] font-bold tracking-tight px-0.5">Market Intelligence</h2>
+          <p className="text-[12px] text-slate-500 px-0.5">Independent pricing, demand, and value analysis for this vehicle.</p>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <Card className="p-4 md:p-5">
             <SectionTitle>Market Price Analysis</SectionTitle>
             <p className="text-[11px] text-slate-400 mt-0.5">Powered by MarketCheck</p>
@@ -643,10 +646,7 @@ const VehiclePassportV2 = () => {
                 <p className="text-[10px] text-slate-400 mt-2 leading-snug">Market values provided by MarketCheck and third-party data sources. Actual market conditions may vary.</p>
               </>
             ) : (
-              <div className="mt-4 space-y-2.5">
-                <div className="h-16 bg-slate-100 rounded-lg animate-pulse" />
-                <div className="flex gap-3"><div className="h-7 flex-1 bg-slate-100 rounded animate-pulse" /><div className="h-7 flex-1 bg-slate-100 rounded animate-pulse" /><div className="h-7 flex-1 bg-slate-100 rounded animate-pulse" /></div>
-              </div>
+              <p className="text-[13px] text-slate-500 mt-3">Live market pricing for this vehicle appears here when MarketCheck comparables are available.</p>
             )}
           </Card>
 
@@ -671,9 +671,8 @@ const VehiclePassportV2 = () => {
                 <p className="text-[13px] text-slate-600">{fmt$(belowMarket)} below market average</p>
                 <ul className="mt-2 space-y-1.5 text-[13px]">
                   <li className="flex items-center gap-2"><CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />Priced below market average</li>
-                  <li className="flex items-center gap-2"><CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />Below similar vehicles nearby</li>
-                  <li className="flex items-center gap-2"><CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />Backed by live comparables</li>
-                  <li className="flex items-center gap-2"><CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />Independently verified</li>
+                  <li className="flex items-center gap-2"><CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />Backed by live market comparables</li>
+                  <li className="flex items-center gap-2"><CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />Independently analyzed by MarketCheck</li>
                 </ul>
                 <p className="text-[10px] text-slate-400 mt-2">Powered by MarketCheck</p>
               </>
@@ -684,14 +683,21 @@ const VehiclePassportV2 = () => {
                 <p className="text-[10px] text-slate-400 mt-2">Powered by MarketCheck</p>
               </>
             ) : (
-              <div className="mt-4 space-y-2">
-                <div className="h-5 w-1/2 bg-slate-100 rounded animate-pulse" />
-                <div className="h-3 w-3/4 bg-slate-100 rounded animate-pulse" />
-                <div className="h-3 w-2/3 bg-slate-100 rounded animate-pulse" />
-              </div>
+              <p className="text-[13px] text-slate-500 mt-3">Price confidence appears here once market comparables are available for this vehicle.</p>
             )}
           </Card>
         </div>
+
+        {/* 5b. WHY THIS IS A GREAT BUY — now below Market Intelligence. */}
+        <Card className="p-5 md:p-6">
+          <SectionTitle>Why This Is A Great Buy</SectionTitle>
+          <ul className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2.5">
+            {(whyBuy.length ? whyBuy : ["Details coming soon"]).map((b, i) => (
+              <li key={i} className="flex items-start gap-2.5 text-[14px]"><CheckCircle2 className="w-[18px] h-[18px] text-emerald-600 shrink-0 mt-0.5" />{b}</li>
+            ))}
+          </ul>
+          <button onClick={() => setSpecsOpen(true)} className="mt-4 text-[13px] font-semibold text-[#2563EB] inline-flex items-center gap-1 hover:underline">See full details <ArrowRight className="w-3.5 h-3.5" /></button>
+        </Card>
 
         {/* 6. HISTORY + WARRANTY + REVIEWS */}
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
@@ -700,7 +706,7 @@ const VehiclePassportV2 = () => {
             <ul className="mt-3 space-y-2.5 text-[13px]">
               {[
                 ["One Owner", ownerCount === 1 ? "Personal Use" : ownerCount ? `${ownerCount} owners` : "Not reported", ownerCount === 1],
-                ["No Accidents", accidentCount === 0 ? "AutoCheck Verified" : "Not reported", accidentCount === 0],
+                ["No Accidents", accidentCount === 0 ? "Verified by history" : "Not reported", accidentCount === 0],
                 ["Clean Title", cleanTitle ? "No brands or issues" : "Not reported", cleanTitle],
                 ["Service History", serviceCount > 0 ? `${serviceCount} Records` : "No records", serviceCount > 0],
                 ["No Open Recalls", recallClear ? "0 Open Recalls" : openRecalls ? `${openRecalls} open` : "Not checked", recallClear],
@@ -808,31 +814,45 @@ const VehiclePassportV2 = () => {
           </Card>
         </div>
 
-        {/* 8. WHY BUY FROM DEALER + CONTACT */}
-        <div className="grid grid-cols-1 lg:grid-cols-[1.6fr_1fr] gap-4">
-          <Card className="p-4 md:p-5">
-            <SectionTitle>Why Buy From {dealerName}?</SectionTitle>
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 mt-4">
-              {dealerChips.map((c, i) => (
-                <div key={i} className="flex items-start gap-2.5"><span className="w-9 h-9 rounded-xl bg-blue-50 flex items-center justify-center shrink-0"><c.icon className="w-4 h-4 text-[#1a6dff]" /></span><div><p className="text-[13px] font-bold leading-tight">{c.t}</p><p className="text-[11px] text-slate-500">{c.s}</p></div></div>
-              ))}
-            </div>
-          </Card>
-          <div className="rounded-2xl p-5 md:p-6 text-white flex flex-col justify-center" style={{ background: "linear-gradient(105deg,#1a6dff 0%,#3b86ff 100%)" }}>
-            <p className="text-[15px] opacity-90">Questions? We're here to help.</p>
-            {dealerPhone && <a href={`tel:${dealerPhone}`} className="text-[26px] font-extrabold mt-1 block">{formatPhone(dealerPhone)}</a>}
-            <p className="text-[13px] font-semibold opacity-90 mt-3">{dealerName}</p>
-            {dealerAddress && <p className="text-[13px] opacity-80">{dealerAddress}</p>}
-            <div className="grid grid-cols-2 gap-2 mt-4">
-              <button onClick={() => { if (dealerPhone) window.location.href = `tel:${dealerPhone}`; else setInquiry("info"); }} className="h-10 rounded-lg bg-white text-[#1a6dff] text-[13px] font-bold inline-flex items-center justify-center gap-1.5"><Phone className="w-4 h-4" /> Call Sales</button>
-              <button onClick={() => setInquiry("info")} className="h-10 rounded-lg bg-white/15 text-white text-[13px] font-bold inline-flex items-center justify-center gap-1.5 border border-white/40"><MessageSquare className="w-4 h-4" /> Contact Dealer</button>
-              {dealerPhone && <button onClick={() => { window.location.href = `sms:${dealerPhone.replace(/[^\d+]/g, "")}`; }} className="col-span-2 h-10 rounded-lg bg-white/15 text-white text-[13px] font-bold inline-flex items-center justify-center gap-1.5 border border-white/40"><Send className="w-4 h-4" /> Text Dealer</button>}
-              <button onClick={() => setInquiry("info")} className="col-span-2 h-10 rounded-lg bg-white/15 text-white text-[13px] font-bold inline-flex items-center justify-center gap-1.5 border border-white/40"><Clock className="w-4 h-4" /> Test Drive</button>
-              <button onClick={() => setInquiry("trade")} className="col-span-2 h-10 rounded-lg bg-white/15 text-white text-[13px] font-bold inline-flex items-center justify-center gap-1.5 border border-white/40"><RefreshCw className="w-4 h-4" /> Trade Appraisal</button>
-            </div>
-            <button onClick={() => setInquiry("info")} className="w-full h-12 mt-2 rounded-xl bg-white text-[#1a6dff] text-[15px] font-extrabold inline-flex items-center justify-center gap-2 hover:bg-white/90 transition-colors shadow-sm"><BadgeCheck className="w-5 h-5" /> Reserve This Vehicle</button>
+        {/* 8. WHY BUY FROM THIS DEALERSHIP */}
+        <Card className="p-5 md:p-6">
+          <SectionTitle>Why Buy From {dealerName}?</SectionTitle>
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-5 mt-5">
+            {dealerChips.map((c, i) => (
+              <div key={i} className="flex items-start gap-3"><span className="w-11 h-11 rounded-xl bg-blue-50 flex items-center justify-center shrink-0"><c.icon className="w-5 h-5 text-[#1a6dff]" /></span><div><p className="text-[14px] font-bold leading-tight">{c.t}</p><p className="text-[12px] text-slate-500 mt-0.5">{c.s}</p></div></div>
+            ))}
           </div>
-        </div>
+        </Card>
+
+        {/* 9. FINAL CTA — one premium conversion moment. Reserve is the primary
+            action; Trade is secondary; a specialist card keeps it human. */}
+        <Card className="p-6 md:p-8 text-center">
+          <h2 className="text-[24px] md:text-[28px] font-extrabold tracking-tight">Ready to take the next step?</h2>
+          <p className="text-[14px] text-slate-500 mt-1.5">Choose the option that's best for you.</p>
+
+          <div className="max-w-md mx-auto mt-6 space-y-3">
+            <button onClick={() => setInquiry("info")} className="w-full rounded-2xl bg-[#1a6dff] hover:bg-[#155fe0] text-white px-5 py-4 transition-colors shadow-sm flex items-center justify-center gap-2.5">
+              <ShieldCheck className="w-6 h-6 shrink-0" />
+              <span className="text-left"><span className="block text-[17px] font-extrabold leading-tight">Reserve This Vehicle</span><span className="block text-[12px] font-medium opacity-90">Secure it today with a refundable deposit.</span></span>
+            </button>
+            <button onClick={() => setInquiry("trade")} className="w-full rounded-2xl border-2 border-[#1a6dff] text-[#1a6dff] hover:bg-blue-50 px-5 py-4 transition-colors flex items-center justify-center gap-2.5">
+              <RefreshCw className="w-5 h-5 shrink-0" />
+              <span className="text-left"><span className="block text-[15px] font-extrabold leading-tight">Get a Trade Appraisal</span><span className="block text-[12px] font-medium text-slate-500">Know your trade value in minutes.</span></span>
+            </button>
+          </div>
+
+          <div className="max-w-md mx-auto mt-6 rounded-2xl border border-[#e8ebef] bg-[#fafbfc] p-4 flex items-center gap-4 text-left">
+            <span className="w-12 h-12 rounded-full bg-blue-100 flex items-center justify-center shrink-0"><Users className="w-6 h-6 text-[#1a6dff]" /></span>
+            <div className="min-w-0 flex-1">
+              <p className="text-[14px] font-bold leading-tight">Our specialists are here to help.</p>
+              <p className="text-[12px] text-slate-500">No pressure. Real people. {dealerName}.</p>
+            </div>
+            <div className="flex flex-col gap-1.5 shrink-0">
+              {dealerPhone && <a href={`tel:${dealerPhone}`} className="h-8 px-3 rounded-lg bg-[#1a6dff] text-white text-[12px] font-bold inline-flex items-center justify-center gap-1"><Phone className="w-3.5 h-3.5" /> Call</a>}
+              <button onClick={() => setInquiry("info")} className="h-8 px-3 rounded-lg border border-[#d8dce0] text-[12px] font-bold inline-flex items-center justify-center gap-1"><MessageSquare className="w-3.5 h-3.5" /> Contact</button>
+            </div>
+          </div>
+        </Card>
 
         {/* 9. FOOTER */}
         <footer className="pt-2">
