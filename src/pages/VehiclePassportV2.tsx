@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { useParams } from "react-router-dom";
+import { useParams, useNavigate } from "react-router-dom";
 import {
   ChevronLeft, ChevronRight, Upload, Bookmark, Printer, FileText, MessageSquare,
   RefreshCw, ShieldCheck, Shield, CheckCircle2, Star, Phone, Car, Cog, Fuel,
@@ -128,6 +128,7 @@ const SectionTitle = ({ children }: { children: React.ReactNode }) => (
 
 const VehiclePassportV2 = () => {
   const { vehicleSlug } = useParams<{ vehicleSlug: string }>();
+  const navigate = useNavigate();
   const { publicUrl } = useVehicleListing("");
   const [listing, setListing] = useState<VehicleListing | null>(null);
   const [loading, setLoading] = useState(true);
@@ -318,7 +319,7 @@ const VehiclePassportV2 = () => {
   };
 
   const actions = [
-    { icon: FileText, label: "Documents", green: false, onClick: () => document.getElementById("v2-docs")?.scrollIntoView({ behavior: "smooth" }) },
+    { icon: FileText, label: "Documents", green: false, onClick: () => navigate(`/v/${listing.slug || vehicleSlug}/documents`) },
     { icon: MessageSquare, label: "Contact Dealer", green: false, onClick: () => { if (dealerPhone) window.location.href = `tel:${dealerPhone}`; else setInquiry("info"); } },
     { icon: RefreshCw, label: "Value My Trade", green: true, onClick: () => setInquiry("trade") },
     { icon: Upload, label: "Share Vehicle", green: false, onClick: handleShare },
@@ -807,7 +808,7 @@ const VehiclePassportV2 = () => {
         </div>
 
         {/* 8. WHY BUY FROM DEALER + CONTACT */}
-        <div id="v2-docs" className="grid grid-cols-1 lg:grid-cols-[1.6fr_1fr] gap-4">
+        <div className="grid grid-cols-1 lg:grid-cols-[1.6fr_1fr] gap-4">
           <Card className="p-4 md:p-5">
             <SectionTitle>Why Buy From {dealerName}?</SectionTitle>
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 mt-4">
