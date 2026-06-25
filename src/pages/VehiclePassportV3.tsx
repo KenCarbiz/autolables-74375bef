@@ -19,7 +19,7 @@ import { derivePassport, computePriceHistory, fmt$ } from "@/lib/passportV2Data"
 //
 // Ground-up rebuild against the V3 design board. Tokens (encoded as
 // the SHELL/CARD/etc. constants below) come straight from the spec:
-// 1280px container, #F6F7F9 surface, #E6E8EC borders, 16px card radius,
+// 1600px container (1280 of content beside the sticky rail), #F6F7F9 surface, #E6E8EC borders, 16px card radius,
 // Inter type scale, the documented color system. Data is the same live
 // pipeline as V2 (public-listing-view → derivePassport); only the
 // presentation layer is new. Every link opens a full destination page.
@@ -272,7 +272,7 @@ const VehiclePassportV3 = () => {
 
       {/* Top bar */}
       <header className="border-b border-[#E6E8EC] bg-white">
-        <div className="mx-auto max-w-[1280px] px-4 sm:px-5 h-16 flex items-center justify-between">
+        <div className="mx-auto max-w-[1600px] px-4 sm:px-5 h-16 flex items-center justify-between">
           {listing.dealer_snapshot?.logo_url ? <img src={listing.dealer_snapshot.logo_url as string} alt="" className="h-7" /> : <Logo variant="full" size={22} />}
           <div className="flex items-center gap-3 sm:gap-5">
             <button onClick={handleShare} className={`text-sm font-medium inline-flex items-center gap-1.5 ${TEXT2} hover:text-[#0F172A]`}><Upload className="w-4 h-4" /> <span className="hidden sm:inline">Share</span></button>
@@ -283,7 +283,7 @@ const VehiclePassportV3 = () => {
         </div>
       </header>
 
-      <main className="mx-auto max-w-[1280px] px-4 sm:px-5 py-5 sm:py-6 pb-[calc(76px+env(safe-area-inset-bottom))] lg:pb-6">
+      <main className="mx-auto max-w-[1600px] px-4 sm:px-5 py-5 sm:py-6 pb-[calc(76px+env(safe-area-inset-bottom))] lg:pb-6">
        <div className="lg:grid lg:grid-cols-[minmax(0,1fr)_340px] lg:gap-6 lg:items-start">
         <div className="space-y-6 lg:space-y-7 min-w-0">
         {/* 1–2. TOP ZONE */}
@@ -377,7 +377,7 @@ const VehiclePassportV3 = () => {
             {mi.map((c) => (
               <div key={c.section} className="rounded-xl border border-[#E6E8EC] p-4 flex flex-col">
                 <div className="flex items-center gap-1.5 mb-2"><c.icon className="w-4 h-4 text-[#2563EB]" /><span className="text-[12px] font-semibold text-[#64748B]">{c.title}</span></div>
-                {c.donut != null ? <div className="flex items-center gap-3"><Donut pct={c.donut} label={`${c.donut}`} /><div><p className="text-[15px] font-extrabold text-[#16A34A] leading-tight">{c.strong}</p><p className="text-[11px] text-[#64748B] leading-snug">{c.sub}</p></div></div>
+                {c.donut != null ? <div className="flex flex-col items-center text-center"><Donut pct={c.donut} label={`${c.donut}`} /><p className="text-[14px] font-extrabold text-[#16A34A] leading-tight mt-2">{c.strong}</p><p className="text-[11px] text-[#64748B] leading-snug">{c.sub}</p></div>
                   : <><p className={`text-[16px] font-extrabold leading-tight ${/Great|High|Excellent|^-/.test(String(c.strong)) ? "text-[#16A34A]" : "text-[#0F172A]"}`}>{c.strong}</p><p className="text-[11px] text-[#64748B] leading-snug mt-0.5 flex-1">{c.sub}</p>{c.comps ? <div className="flex gap-1 mt-2">{[0, 1, 2].map((i) => <div key={i} className="flex-1 h-8 rounded bg-[#F1F5F9] flex items-center justify-center"><Car className="w-4 h-4 text-[#94A3B8]" /></div>)}</div> : c.chart}</>}
                 <Link onClick={() => go(c.section)} className="mt-2.5 !text-[12px]">{c.cta}</Link>
               </div>
