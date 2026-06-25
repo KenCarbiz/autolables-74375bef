@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { useParams } from "react-router-dom";
 import {
-  ChevronLeft, ChevronRight, ChevronDown, Upload, Bookmark, Printer, FileText, MessageSquare,  RefreshCw, ShieldCheck, Shield, CheckCircle2, Star, Phone, Car, Cog, Fuel,
+  ChevronLeft, ChevronRight, Upload, Bookmark, Printer, FileText, MessageSquare,
+  RefreshCw, ShieldCheck, Shield, CheckCircle2, Star, Phone, Car, Cog, Fuel,
   Settings, Wind, Award, Wrench, User, FileCheck, Play, Rotate3d, Eye, DollarSign,
   Clock, MapPin, Building2, Users, Truck, Lock, Zap, ArrowRight, Package, X, Send,
   Gauge as GaugeIcon, BadgeCheck, TrendingUp,
@@ -123,28 +124,6 @@ const Card = ({ children, className = "" }: { children: React.ReactNode; classNa
 const SectionTitle = ({ children }: { children: React.ReactNode }) => (
   <h3 className="text-[15px] font-bold text-slate-900">{children}</h3>
 );
-
-// Secondary section that is an accordion on mobile (collapsed by default to
-// cut scrolling) but always fully expanded on desktop (lg+) so the desktop
-// layout is unchanged. `summary` shows under the title when collapsed.
-const MobileCollapse = ({ title, summary, right, children }: { title: string; summary?: React.ReactNode; right?: React.ReactNode; children: React.ReactNode }) => {
-  const [open, setOpen] = useState(false);
-  return (
-    <Card className="p-5">
-      <div className="hidden lg:flex items-center justify-between">
-        <SectionTitle>{title}</SectionTitle>{right}
-      </div>
-      <button onClick={() => setOpen((o) => !o)} className="lg:hidden w-full flex items-center justify-between gap-3 text-left" aria-expanded={open}>
-        <div className="min-w-0">
-          <SectionTitle>{title}</SectionTitle>
-          {!open && summary && <p className="text-[12px] text-slate-500 mt-0.5 truncate">{summary}</p>}
-        </div>
-        <ChevronDown className={`w-4 h-4 text-slate-400 shrink-0 transition-transform ${open ? "rotate-180" : ""}`} />
-      </button>
-      <div className={`${open ? "block" : "hidden"} lg:block`}>{children}</div>
-    </Card>
-  );
-};
 
 const VehiclePassportV2 = () => {
   const { vehicleSlug } = useParams<{ vehicleSlug: string }>();
@@ -340,7 +319,7 @@ const VehiclePassportV2 = () => {
         <title>{`${listing.ymm}${listing.trim ? ` ${listing.trim}` : ""} — ${dealerName} · Passport`}</title>
       </Helmet>
 
-      <div className="mx-auto max-w-[1080px] px-4 sm:px-6 py-5 space-y-5 pb-[calc(72px+env(safe-area-inset-bottom))] lg:pb-5">
+      <div className="mx-auto max-w-[1080px] px-4 sm:px-6 py-5 space-y-5">
         {/* 1. HEADER */}
         <header className="flex items-center justify-between">
           <div className="text-[22px] font-extrabold tracking-tight">
@@ -623,7 +602,8 @@ const VehiclePassportV2 = () => {
 
         {/* 6. HISTORY + WARRANTY + REVIEWS */}
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
-          <MobileCollapse title="Vehicle History Summary" summary="Owner · title · accidents · service · recalls">
+          <Card className="p-5">
+            <SectionTitle>Vehicle History Summary</SectionTitle>
             <ul className="mt-3 space-y-2.5 text-[13px]">
               {[
                 ["One Owner", ownerCount === 1 ? "Personal Use" : ownerCount ? `${ownerCount} owners` : "Not reported", ownerCount === 1],
@@ -638,9 +618,10 @@ const VehiclePassportV2 = () => {
                 </li>
               ))}
             </ul>
-          </MobileCollapse>
+          </Card>
 
-          <MobileCollapse title="Ownership Timeline" summary="In service → dealer → available today">
+          <Card className="p-5">
+            <SectionTitle>Ownership Timeline</SectionTitle>
             <ol className="mt-3 space-y-3 relative border-l-2 border-emerald-100 ml-1.5 pl-4">
               {[
                 warranty.in_service_date ? { d: new Date(warranty.in_service_date).toLocaleDateString(), t: "Placed in service", s: "Factory warranty start" } : null,
@@ -656,9 +637,13 @@ const VehiclePassportV2 = () => {
                 </li>
               ))}
             </ol>
-          </MobileCollapse>
+          </Card>
 
-          <MobileCollapse title="Factory Warranty" summary="Remaining coverage" right={warrantyStr ? <span className="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wide text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-full px-2 py-0.5"><ShieldCheck className="w-3 h-3" /> OEM Verified</span> : undefined}>
+          <Card className="p-5">
+            <div className="flex items-center justify-between">
+              <SectionTitle>Factory Warranty</SectionTitle>
+              {warrantyStr && <span className="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wide text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-full px-2 py-0.5"><ShieldCheck className="w-3 h-3" /> OEM Verified</span>}
+            </div>
             {warrantyStr ? (() => {
               const milesLeft = warranty.factory_miles != null && listing.mileage != null ? Math.max(0, warranty.factory_miles - listing.mileage) : warranty.factory_miles ?? null;
               const milesPct = warranty.factory_miles && listing.mileage != null ? Math.max(4, 100 - Math.min(100, (listing.mileage / warranty.factory_miles) * 100)) : 65;
@@ -692,9 +677,10 @@ const VehiclePassportV2 = () => {
                 <p className="text-[11px] text-slate-400 mt-0.5">Pulling OEM warranty terms for this VIN.</p>
               </div>
             )}
-          </MobileCollapse>
+          </Card>
 
-          <MobileCollapse title="What Owners Say" summary="Verified ratings & reviews">
+          <Card className="p-5">
+            <SectionTitle>What Owners Say</SectionTitle>
             {reviewRating != null ? (
               <>
                 <div className="flex items-center gap-2 mt-2"><span className="text-2xl font-extrabold">{reviewRating.toFixed(1)}</span><Stars n={reviewRating} />{reviewCount != null && <span className="text-[12px] text-slate-500">({reviewCount.toLocaleString()})</span>}</div>
@@ -711,28 +697,30 @@ const VehiclePassportV2 = () => {
                 </div>
               </div>
             )}
-          </MobileCollapse>
+          </Card>
         </div>
 
         {/* 7. HIGHLIGHTS + OVERVIEW + IMAGE */}
         <div className="grid grid-cols-1 lg:grid-cols-[1fr_1.1fr_0.9fr] gap-4">
-          <MobileCollapse title="Vehicle Highlights" summary="Engine, drivetrain & key features">
+          <Card className="p-5">
+            <SectionTitle>Vehicle Highlights</SectionTitle>
             <div className="grid grid-cols-2 gap-y-3 gap-x-3 mt-3">
               {(highlights.length ? highlights : [{ icon: Car, t: listing.ymm || "Vehicle", s: "Model" }]).slice(0, 6).map((h, i) => (
                 <div key={i} className="flex items-center gap-2.5"><h.icon className="w-5 h-5 text-[#1a6dff] shrink-0" /><div className="min-w-0"><div className="text-[13px] font-semibold leading-tight truncate">{h.t}</div><div className="text-[11px] text-slate-400">{h.s}</div></div></div>
               ))}
             </div>
             <button className="mt-3 text-[13px] font-semibold text-[#2563EB] inline-flex items-center gap-1">View all features &amp; specs <ArrowRight className="w-3.5 h-3.5" /></button>
-          </MobileCollapse>
+          </Card>
 
-          <MobileCollapse title="Vehicle Overview" summary="Colors, powertrain & specs">
+          <Card className="p-5">
+            <SectionTitle>Vehicle Overview</SectionTitle>
             <p className="text-[13px] leading-relaxed text-slate-600 mt-3 whitespace-pre-wrap">{overview}</p>
             <div className="mt-4 space-y-2 text-[12px]">
               {specRows.filter(([, v]) => v).map(([k, v]) => (
                 <div key={k} className="flex justify-between gap-4"><span className="text-slate-500">{k}</span><span className="font-semibold text-right">{v}</span></div>
               ))}
             </div>
-          </MobileCollapse>
+          </Card>
 
           <Card className="overflow-hidden flex items-center">
             {(gallery[1] || gallery[0]) ? <img src={gallery[1] || gallery[0]} alt="" className="w-full h-full object-cover aspect-[4/3]" /> : <div className="w-full aspect-[4/3] bg-slate-100 flex items-center justify-center"><Car className="w-10 h-10 text-slate-300" /></div>}
@@ -780,22 +768,6 @@ const VehiclePassportV2 = () => {
             Information is provided by trusted third parties and is accurate to the best of our knowledge. Verify details with the dealer. © {new Date().getFullYear()} {dealerName}. All rights reserved.
           </p>
         </footer>
-      </div>
-
-      {/* Sticky mobile action bar — three highest-converting actions, always
-          reachable. Hidden on desktop; respects the iOS safe area. */}
-      <div className="lg:hidden fixed bottom-0 inset-x-0 z-40 bg-white/95 backdrop-blur border-t border-[#e8ebef] px-3 pt-2 pb-[calc(8px+env(safe-area-inset-bottom))]">
-        <div className="grid grid-cols-3 gap-2">
-          <a href={dealerPhone ? `tel:${dealerPhone}` : undefined} onClick={(e) => { if (!dealerPhone) { e.preventDefault(); setInquiry("info"); } }} className="h-11 rounded-xl bg-[#1a6dff] text-white text-[13px] font-bold inline-flex items-center justify-center gap-1.5">
-            <Phone className="w-4 h-4" /> Call
-          </a>
-          <button onClick={() => setInquiry("info")} className="h-11 rounded-xl border border-[#d8dce0] bg-white text-[#1a1d21] text-[13px] font-bold inline-flex items-center justify-center gap-1.5">
-            <MessageSquare className="w-4 h-4 text-[#1a6dff]" /> Contact
-          </button>
-          <button onClick={() => setInquiry("trade")} className="h-11 rounded-xl border border-[#d8dce0] bg-white text-[#1a1d21] text-[13px] font-bold inline-flex items-center justify-center gap-1.5">
-            <RefreshCw className="w-4 h-4 text-[#1a9d5c]" /> Trade
-          </button>
-        </div>
       </div>
 
       {inquiry && <InquiryModal listing={listing} dealer={dealer} intent={inquiry} onClose={() => setInquiry(null)} />}
