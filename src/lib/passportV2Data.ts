@@ -76,6 +76,10 @@ export interface PassportData {
     certifications: string[];
     storefrontUrl: string;
     reviewSources: { name: string; rating: number | null; quote: string }[];
+    advisorName: string;
+    advisorTitle: string;
+    advisorPhoto: string;
+    advisorResponse: string;
   };
 }
 
@@ -240,6 +244,10 @@ export const derivePassport = (listing: VehicleListing): PassportData => {
       const [name, rating, ...rest] = line.split("|").map((p) => p.trim());
       return { name: name || "", rating: rating ? Number(rating) : null, quote: rest.join(" | ") };
     }).filter((r) => r.name),
+    advisorName: t.advisor_name || "",
+    advisorTitle: t.advisor_title || "",
+    advisorPhoto: t.advisor_photo || "",
+    advisorResponse: t.advisor_response || "",
   };
 
   return {

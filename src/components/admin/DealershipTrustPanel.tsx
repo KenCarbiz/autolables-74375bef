@@ -10,7 +10,8 @@ import { Save } from "lucide-react";
 type TrustKey =
   | "dealer_years_in_business" | "dealer_satisfaction" | "dealer_bbb_rating"
   | "dealer_google_rating" | "dealer_google_count" | "dealer_certifications"
-  | "dealer_storefront_url" | "dealer_review_sources";
+  | "dealer_storefront_url" | "dealer_review_sources"
+  | "dealer_advisor_name" | "dealer_advisor_title" | "dealer_advisor_photo" | "dealer_advisor_response";
 
 const FIELDS: { key: TrustKey; label: string; placeholder: string; hint?: string; wide?: boolean }[] = [
   { key: "dealer_years_in_business", label: "Years in business", placeholder: "45" },
@@ -20,6 +21,13 @@ const FIELDS: { key: TrustKey; label: string; placeholder: string; hint?: string
   { key: "dealer_bbb_rating", label: "BBB rating", placeholder: "A+" },
   { key: "dealer_storefront_url", label: "Dealership photo URL", placeholder: "https://…/storefront.jpg", wide: true },
   { key: "dealer_certifications", label: "Awards & certifications", placeholder: "INFINITI Award of Excellence, 2024 Consumer Satisfaction", hint: "Comma-separated.", wide: true },
+];
+
+const ADVISOR_FIELDS: { key: TrustKey; label: string; placeholder: string }[] = [
+  { key: "dealer_advisor_name", label: "Advisor name", placeholder: "John Smith" },
+  { key: "dealer_advisor_title", label: "Advisor title", placeholder: "Senior Vehicle Specialist" },
+  { key: "dealer_advisor_photo", label: "Advisor photo URL", placeholder: "https://…/advisor.jpg" },
+  { key: "dealer_advisor_response", label: "Typical response time", placeholder: "Usually replies within 5 minutes" },
 ];
 
 const DealershipTrustPanel = () => {
@@ -33,6 +41,10 @@ const DealershipTrustPanel = () => {
     dealer_certifications: settings.dealer_certifications || "",
     dealer_storefront_url: settings.dealer_storefront_url || "",
     dealer_review_sources: settings.dealer_review_sources || "",
+    dealer_advisor_name: settings.dealer_advisor_name || "",
+    dealer_advisor_title: settings.dealer_advisor_title || "",
+    dealer_advisor_photo: settings.dealer_advisor_photo || "",
+    dealer_advisor_response: settings.dealer_advisor_response || "",
   }));
   const [saving, setSaving] = useState(false);
 
@@ -73,6 +85,20 @@ const DealershipTrustPanel = () => {
         <textarea value={cfg.dealer_review_sources} onChange={(e) => set("dealer_review_sources", e.target.value)} rows={5}
           placeholder={"Google | 4.9 | Excellent family SUV. Very smooth ride.\nEdmunds | 4.7 | Quiet, comfortable, and packed with tech.\nCars.com | 4.8 | Luxury feel without the luxury price."}
           className="mt-2 w-full px-3 py-2.5 rounded-lg border border-border bg-background text-sm outline-none focus:border-primary resize-none font-mono text-[12px]" />
+      </div>
+
+      <div className="rounded-2xl border border-border bg-card p-4">
+        <h3 className="text-[14px] font-bold text-foreground">Sales advisor</h3>
+        <p className="text-[12px] text-slate-500 mt-0.5 mb-3">Shown in the passport's conversion panel. Leave blank to show a generic specialist card instead.</p>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          {ADVISOR_FIELDS.map((f) => (
+            <div key={f.key} className={f.key === "dealer_advisor_photo" || f.key === "dealer_advisor_response" ? "sm:col-span-2" : ""}>
+              <label className="text-[13px] font-semibold text-foreground">{f.label}</label>
+              <input value={cfg[f.key]} onChange={(e) => set(f.key, e.target.value)} placeholder={f.placeholder}
+                className="mt-1 w-full h-10 px-3 rounded-lg border border-border bg-background text-sm outline-none focus:border-primary" />
+            </div>
+          ))}
+        </div>
       </div>
     </div>
   );

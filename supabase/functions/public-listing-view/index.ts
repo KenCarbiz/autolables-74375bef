@@ -133,6 +133,10 @@ serve(async (req) => {
           certifications: (s.dealer_certifications as string) || "",
           storefront_url: (s.dealer_storefront_url as string) || "",
           review_sources: (s.dealer_review_sources as string) || "",
+          advisor_name: (s.dealer_advisor_name as string) || "",
+          advisor_title: (s.dealer_advisor_title as string) || "",
+          advisor_photo: (s.dealer_advisor_photo as string) || "",
+          advisor_response: (s.dealer_advisor_response as string) || "",
         };
         if (Object.values(trust).some((v) => v)) row.dealer_trust = trust;
       }

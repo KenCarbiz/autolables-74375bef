@@ -209,6 +209,11 @@ export interface DealerSettings {
   dealer_certifications: string;      // comma-separated award/cert names
   dealer_storefront_url: string;      // dealership photo URL
   dealer_review_sources: string;      // newline list: "Source | rating | quote"
+  // Passport sticky-CTA sales advisor (shown in the conversion rail).
+  dealer_advisor_name: string;
+  dealer_advisor_title: string;       // e.g. "Senior Vehicle Specialist"
+  dealer_advisor_photo: string;       // advisor headshot URL
+  dealer_advisor_response: string;    // e.g. "Usually replies within 5 minutes"
 }
 
 export const DEFAULT_SETTINGS: DealerSettings = {
@@ -294,6 +299,10 @@ export const DEFAULT_SETTINGS: DealerSettings = {
   dealer_certifications: "",
   dealer_storefront_url: "",
   dealer_review_sources: "",
+  dealer_advisor_name: "",
+  dealer_advisor_title: "",
+  dealer_advisor_photo: "",
+  dealer_advisor_response: "",
 };
 
 interface DealerSettingsContextType {
