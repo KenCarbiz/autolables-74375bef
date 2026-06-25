@@ -483,12 +483,28 @@ const VehiclePassportV2 = () => {
         {/* 3. ACTIONS + ZIP */}
         <Card className="p-4">
           <div className="flex flex-col lg:flex-row lg:items-end gap-5">
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 flex-1">
-              {actions.map((a) => (
-                <button key={a.label} onClick={a.onClick} className="h-12 rounded-xl border border-[#e8ebef] bg-white text-[14px] font-semibold inline-flex items-center justify-center gap-2 hover:border-[#1a6dff] hover:text-[#1a6dff] transition-colors">
-                  <a.icon className="w-[18px] h-[18px]" style={{ color: a.green ? GREEN : BLUE }} />{a.label}
+            <div className="flex-1">
+              {/* Mobile (<=768px): one clear primary CTA, lighter secondaries. */}
+              <div className="md:hidden space-y-2.5">
+                <button onClick={() => setInquiry("info")} className="w-full h-12 rounded-xl bg-[#1a6dff] hover:bg-[#155fe0] text-white text-[15px] font-bold inline-flex items-center justify-center gap-2 transition-colors">
+                  <CheckCircle2 className="w-[18px] h-[18px]" /> Check Availability
                 </button>
-              ))}
+                <div className="grid grid-cols-3 gap-2">
+                  {actions.filter((a) => a.label !== "Contact Dealer").map((a) => (
+                    <button key={a.label} onClick={a.onClick} className="h-10 rounded-xl border border-[#e8ebef] bg-white text-[12px] font-semibold inline-flex items-center justify-center gap-1.5 hover:border-[#1a6dff] transition-colors">
+                      <a.icon className="w-4 h-4" style={{ color: a.green ? GREEN : BLUE }} />{a.label === "Value My Trade" ? "Trade" : a.label === "Share Vehicle" ? "Share" : a.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              {/* Tablet + desktop: unchanged 4-up action row. */}
+              <div className="hidden md:grid grid-cols-4 gap-3">
+                {actions.map((a) => (
+                  <button key={a.label} onClick={a.onClick} className="h-12 rounded-xl border border-[#e8ebef] bg-white text-[14px] font-semibold inline-flex items-center justify-center gap-2 hover:border-[#1a6dff] hover:text-[#1a6dff] transition-colors">
+                    <a.icon className="w-[18px] h-[18px]" style={{ color: a.green ? GREEN : BLUE }} />{a.label}
+                  </button>
+                ))}
+              </div>
             </div>
             <div className="lg:w-[300px] shrink-0">
               <div className="text-[12px] text-slate-500 mb-1.5">Enter your ZIP for available offers in your area</div>
