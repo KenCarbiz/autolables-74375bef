@@ -155,7 +155,6 @@ const VehiclePassportV2 = () => {
   const [zip, setZip] = useState("");
   const [lightbox, setLightbox] = useState(false);
   const [showSticky, setShowSticky] = useState(false);
-  const [specsOpen, setSpecsOpen] = useState(false);
 
   useEffect(() => {
     const onScroll = () => setShowSticky(window.scrollY > 320);
@@ -330,17 +329,21 @@ const VehiclePassportV2 = () => {
   const heroSrc = gallery[photoIdx] || gallery[0] || "";
   const photoCount = gallery.length;
 
+  // Navigate to a dedicated Passport V2 detail page (no popups for meaningful
+  // links — every action opens a full page in the V2 design system).
+  const go = (sectionPath: string) => navigate(`/passport-v2/${listing.slug || vehicleSlug}/${sectionPath}`);
+
   const handleShare = async () => {
     try {
-      if (navigator.share) await navigator.share({ title: listing.ymm || "Vehicle", url: viewUrl });
-      else { await navigator.clipboard.writeText(viewUrl); toast.success("Link copied"); }
-    } catch { /* cancelled */ }
+      if (navigator.share) { await navigator.share({ title: listing.ymm || "Vehicle", url: viewUrl }); return; }
+    } catch { return; /* user cancelled native share */ }
+    go("share");
   };
 
   const actions = [
     { icon: FileText, label: "Documents", green: false, onClick: () => navigate(`/v/${listing.slug || vehicleSlug}/documents`) },
-    { icon: MessageSquare, label: "Contact Dealer", green: false, onClick: () => { if (dealerPhone) window.location.href = `tel:${dealerPhone}`; else setInquiry("info"); } },
-    { icon: RefreshCw, label: "Value My Trade", green: true, onClick: () => setInquiry("trade") },
+    { icon: MessageSquare, label: "Contact Dealer", green: false, onClick: () => go("contact") },
+    { icon: RefreshCw, label: "Value My Trade", green: true, onClick: () => go("trade") },
     { icon: Upload, label: "Share Vehicle", green: false, onClick: handleShare },
   ];
 
@@ -364,26 +367,26 @@ const VehiclePassportV2 = () => {
     const map: Record<string, { icon: React.ElementType; onClick: () => void }> = {
       call: { icon: Phone, onClick: call },
       text: { icon: MessageSquare, onClick: text },
-      test_drive: { icon: Clock, onClick: () => setInquiry("info") },
-      todays_price: { icon: DollarSign, onClick: () => setInquiry("info") },
-      contact_dealer: { icon: MessageSquare, onClick: () => setInquiry("info") },
-      trade_appraisal: { icon: RefreshCw, onClick: () => setInquiry("trade") },
-      value_trade: { icon: RefreshCw, onClick: () => setInquiry("trade") },
-      reserve: { icon: BadgeCheck, onClick: () => setInquiry("info") },
-      pre_qualified: { icon: DollarSign, onClick: () => setInquiry("info") },
-      apply_financing: { icon: DollarSign, onClick: () => setInquiry("info") },
-      check_availability: { icon: CheckCircle2, onClick: () => setInquiry("info") },
-      schedule_service: { icon: Clock, onClick: () => setInquiry("info") },
-      payment_options: { icon: DollarSign, onClick: () => setInquiry("info") },
-      calculate_payment: { icon: DollarSign, onClick: () => setInquiry("info") },
+      test_drive: { icon: Clock, onClick: () => go("test-drive") },
+      todays_price: { icon: DollarSign, onClick: () => go("todays-price") },
+      contact_dealer: { icon: MessageSquare, onClick: () => go("contact") },
+      trade_appraisal: { icon: RefreshCw, onClick: () => go("trade") },
+      value_trade: { icon: RefreshCw, onClick: () => go("trade") },
+      reserve: { icon: BadgeCheck, onClick: () => go("reserve") },
+      pre_qualified: { icon: DollarSign, onClick: () => go("todays-price") },
+      apply_financing: { icon: DollarSign, onClick: () => go("todays-price") },
+      check_availability: { icon: CheckCircle2, onClick: () => go("check-availability") },
+      schedule_service: { icon: Clock, onClick: () => go("contact") },
+      payment_options: { icon: DollarSign, onClick: () => go("todays-price") },
+      calculate_payment: { icon: DollarSign, onClick: () => go("todays-price") },
       send_to_phone: { icon: Send, onClick: handleShare },
       save_vehicle: { icon: Bookmark, onClick: () => toast.success("Saved to this device") },
       share_vehicle: { icon: Upload, onClick: handleShare },
       directions: { icon: MapPin, onClick: directions },
-      chat: { icon: MessageSquare, onClick: () => setInquiry("info") },
-      email_dealer: { icon: Send, onClick: () => setInquiry("info") },
+      chat: { icon: MessageSquare, onClick: () => go("contact") },
+      email_dealer: { icon: Send, onClick: () => go("contact") },
     };
-    return map[key] || { icon: CheckCircle2, onClick: () => setInquiry("info") };
+    return map[key] || { icon: CheckCircle2, onClick: () => go("check-availability") };
   };
 
   return (
@@ -503,6 +506,7 @@ const VehiclePassportV2 = () => {
                     <div key={r.label} className="flex items-center gap-2 text-[13px] font-medium text-slate-700"><CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />{r.label}</div>
                   ))}
                 </div>
+                <button onClick={() => go("verification-report")} className="mt-3.5 text-[13px] font-semibold text-emerald-700 inline-flex items-center gap-1 hover:underline">View full verification report <ArrowRight className="w-3.5 h-3.5" /></button>
               </Card>
             )}
 
@@ -556,7 +560,7 @@ const VehiclePassportV2 = () => {
             <div className="flex-1">
               {/* Mobile (<=768px): one clear primary CTA, lighter secondaries. */}
               <div className="lg:hidden space-y-2.5">
-                <button onClick={() => setInquiry("info")} className="w-full h-12 rounded-xl bg-[#1a6dff] hover:bg-[#155fe0] text-white text-[15px] font-bold inline-flex items-center justify-center gap-2 transition-colors">
+                <button onClick={() => go("check-availability")} className="w-full h-12 rounded-xl bg-[#1a6dff] hover:bg-[#155fe0] text-white text-[15px] font-bold inline-flex items-center justify-center gap-2 transition-colors">
                   <CheckCircle2 className="w-[18px] h-[18px]" /> Check Availability
                 </button>
                 <div className="grid grid-cols-3 gap-2">
@@ -580,7 +584,7 @@ const VehiclePassportV2 = () => {
               <div className="text-[12px] text-slate-500 mb-1.5">Enter your ZIP for available offers in your area</div>
               <div className="flex">
                 <input value={zip} onChange={(e) => setZip(e.target.value.replace(/\D/g, "").slice(0, 5))} placeholder="ZIP Code" maxLength={5} inputMode="numeric" className="flex-1 min-w-0 h-12 px-3.5 border border-[#e8ebef] border-r-0 rounded-l-xl text-sm outline-none focus:border-[#1a6dff]" />
-                <button onClick={() => /^\d{5}$/.test(zip) ? toast.success(`Checking offers near ${zip}…`) : toast.error("Enter a valid 5-digit ZIP")} className="h-12 px-4 text-white rounded-r-xl text-sm font-semibold bg-[#2563EB] hover:bg-[#1d4fd7]">View Offers</button>
+                <button onClick={() => /^\d{5}$/.test(zip) ? go(`offers?zip=${zip}`) : toast.error("Enter a valid 5-digit ZIP")} className="h-12 px-4 text-white rounded-r-xl text-sm font-semibold bg-[#2563EB] hover:bg-[#1d4fd7]">View Offers</button>
               </div>
             </div>
           </div>
@@ -603,7 +607,7 @@ const VehiclePassportV2 = () => {
                 </div>
               ))}
               <div className="flex items-center px-6 py-4 sm:ml-auto">
-                <button onClick={() => setInquiry("info")} className="inline-flex items-center gap-1.5 text-[14px] font-semibold text-[#2563EB] hover:underline">View all offers <ArrowRight className="w-4 h-4" /></button>
+                <button onClick={() => go("offers")} className="inline-flex items-center gap-1.5 text-[14px] font-semibold text-[#2563EB] hover:underline">View all offers <ArrowRight className="w-4 h-4" /></button>
               </div>
             </div>
           </Card>
@@ -631,7 +635,7 @@ const VehiclePassportV2 = () => {
                   <span className="text-slate-500">Market average <span className="font-semibold text-slate-700">{fmt$(marketAvg)}</span></span>
                   {belowMarket && belowMarket > 0 && <span className="font-bold text-emerald-600">You save {fmt$(belowMarket)}</span>}
                 </div>
-                <button onClick={() => setInquiry("info")} className="mt-3 text-[13px] font-semibold text-[#2563EB] inline-flex items-center gap-1 hover:underline">View full market report <ArrowRight className="w-3.5 h-3.5" /></button>
+                <button onClick={() => go("market-price")} className="mt-3 text-[13px] font-semibold text-[#2563EB] inline-flex items-center gap-1 hover:underline">View full market report <ArrowRight className="w-3.5 h-3.5" /></button>
                 <p className="text-[10px] text-slate-400 mt-2 leading-snug">Market values provided by MarketCheck and third-party data sources. Actual market conditions may vary.</p>
               </>
             ) : (
@@ -650,6 +654,7 @@ const VehiclePassportV2 = () => {
                 </ul>
               </>
             ) : <p className="text-[13px] text-slate-500 mt-3">Demand data currently unavailable.</p>}
+            <button onClick={() => go("market-demand")} className="mt-3 text-[13px] font-semibold text-[#2563EB] inline-flex items-center gap-1 hover:underline">View report <ArrowRight className="w-3.5 h-3.5" /></button>
           </Card>
 
           <Card className="p-4 md:p-5">
@@ -674,6 +679,7 @@ const VehiclePassportV2 = () => {
             ) : (
               <p className="text-[13px] text-slate-500 mt-3">Price confidence appears here once market comparables are available for this vehicle.</p>
             )}
+            <button onClick={() => go("price-confidence")} className="mt-3 text-[13px] font-semibold text-[#2563EB] inline-flex items-center gap-1 hover:underline">View report <ArrowRight className="w-3.5 h-3.5" /></button>
           </Card>
         </div>
 
@@ -685,7 +691,7 @@ const VehiclePassportV2 = () => {
               <li key={i} className="flex items-start gap-2.5 text-[14px]"><CheckCircle2 className="w-[18px] h-[18px] text-emerald-600 shrink-0 mt-0.5" />{b}</li>
             ))}
           </ul>
-          <button onClick={() => setSpecsOpen(true)} className="mt-4 text-[13px] font-semibold text-[#2563EB] inline-flex items-center gap-1 hover:underline">See full details <ArrowRight className="w-3.5 h-3.5" /></button>
+          <button onClick={() => go("great-buy")} className="mt-4 text-[13px] font-semibold text-[#2563EB] inline-flex items-center gap-1 hover:underline">See full details <ArrowRight className="w-3.5 h-3.5" /></button>
         </Card>
 
         {/* 6. HISTORY + WARRANTY + REVIEWS */}
@@ -706,6 +712,7 @@ const VehiclePassportV2 = () => {
                 </li>
               ))}
             </ul>
+            <button onClick={() => go("vehicle-history")} className="mt-3 text-[13px] font-semibold text-[#2563EB] inline-flex items-center gap-1 hover:underline">View full history report <ArrowRight className="w-3.5 h-3.5" /></button>
           </Card>
 
           <Card className="p-4 md:p-5">
@@ -725,6 +732,7 @@ const VehiclePassportV2 = () => {
                 </li>
               ))}
             </ol>
+            <button onClick={() => go("ownership-timeline")} className="mt-3 text-[13px] font-semibold text-[#2563EB] inline-flex items-center gap-1 hover:underline">View full timeline <ArrowRight className="w-3.5 h-3.5" /></button>
           </Card>
 
           <Card className="p-4 md:p-5">
@@ -761,6 +769,7 @@ const VehiclePassportV2 = () => {
             })() : (
               <p className="text-[13px] text-slate-500 mt-3">Coverage details confirmed at the dealership.</p>
             )}
+            <button onClick={() => go("factory-warranty")} className="mt-3 text-[13px] font-semibold text-[#2563EB] inline-flex items-center gap-1 hover:underline">View warranty details <ArrowRight className="w-3.5 h-3.5" /></button>
           </Card>
 
           <Card className="p-4 md:p-5">
@@ -773,6 +782,7 @@ const VehiclePassportV2 = () => {
             ) : (
               <p className="text-[13px] text-slate-500 mt-3">Independent buyer reviews for this model are shown here when available.</p>
             )}
+            <button onClick={() => go("owner-reviews")} className="mt-3 text-[13px] font-semibold text-[#2563EB] inline-flex items-center gap-1 hover:underline">Read all reviews <ArrowRight className="w-3.5 h-3.5" /></button>
           </Card>
         </div>
 
@@ -785,7 +795,7 @@ const VehiclePassportV2 = () => {
                 <div key={i} className="flex items-center gap-2.5"><h.icon className="w-5 h-5 text-[#1a6dff] shrink-0" /><div className="min-w-0"><div className="text-[13px] font-semibold leading-tight truncate">{h.t}</div><div className="text-[11px] text-slate-400">{h.s}</div></div></div>
               ))}
             </div>
-            <button onClick={() => setSpecsOpen(true)} className="mt-3 text-[13px] font-semibold text-[#2563EB] inline-flex items-center gap-1 hover:underline">View all features &amp; specs <ArrowRight className="w-3.5 h-3.5" /></button>
+            <button onClick={() => go("features")} className="mt-3 text-[13px] font-semibold text-[#2563EB] inline-flex items-center gap-1 hover:underline">View all features &amp; specs <ArrowRight className="w-3.5 h-3.5" /></button>
           </Card>
 
           <Card className="p-4 md:p-5">
@@ -796,6 +806,7 @@ const VehiclePassportV2 = () => {
                 <div key={k} className="flex justify-between gap-4"><span className="text-slate-500">{k}</span><span className="font-semibold text-right">{v}</span></div>
               ))}
             </div>
+            <button onClick={() => go("overview")} className="mt-3 text-[13px] font-semibold text-[#2563EB] inline-flex items-center gap-1 hover:underline">Read full overview <ArrowRight className="w-3.5 h-3.5" /></button>
           </Card>
 
           <Card className="overflow-hidden flex items-center">
@@ -811,6 +822,7 @@ const VehiclePassportV2 = () => {
               <div key={i} className="flex items-start gap-3"><span className="w-11 h-11 rounded-xl bg-blue-50 flex items-center justify-center shrink-0"><c.icon className="w-5 h-5 text-[#1a6dff]" /></span><div><p className="text-[14px] font-bold leading-tight">{c.t}</p><p className="text-[12px] text-slate-500 mt-0.5">{c.s}</p></div></div>
             ))}
           </div>
+          <button onClick={() => go("dealer")} className="mt-4 text-[13px] font-semibold text-[#2563EB] inline-flex items-center gap-1 hover:underline">Learn more about our dealership <ArrowRight className="w-3.5 h-3.5" /></button>
         </Card>
 
         {/* 9. FINAL CTA — one premium conversion moment. Reserve is the primary
@@ -820,11 +832,11 @@ const VehiclePassportV2 = () => {
           <p className="text-[14px] text-slate-500 mt-1.5">Choose the option that's best for you.</p>
 
           <div className="max-w-md mx-auto mt-6 space-y-3">
-            <button onClick={() => setInquiry("info")} className="w-full rounded-2xl bg-[#1a6dff] hover:bg-[#155fe0] text-white px-5 py-4 transition-colors shadow-sm flex items-center justify-center gap-2.5">
+            <button onClick={() => go("reserve")} className="w-full rounded-2xl bg-[#1a6dff] hover:bg-[#155fe0] text-white px-5 py-4 transition-colors shadow-sm flex items-center justify-center gap-2.5">
               <ShieldCheck className="w-6 h-6 shrink-0" />
               <span className="text-left"><span className="block text-[17px] font-extrabold leading-tight">Reserve This Vehicle</span><span className="block text-[12px] font-medium opacity-90">Secure it today with a refundable deposit.</span></span>
             </button>
-            <button onClick={() => setInquiry("trade")} className="w-full rounded-2xl border-2 border-[#1a6dff] text-[#1a6dff] hover:bg-blue-50 px-5 py-4 transition-colors flex items-center justify-center gap-2.5">
+            <button onClick={() => go("trade")} className="w-full rounded-2xl border-2 border-[#1a6dff] text-[#1a6dff] hover:bg-blue-50 px-5 py-4 transition-colors flex items-center justify-center gap-2.5">
               <RefreshCw className="w-5 h-5 shrink-0" />
               <span className="text-left"><span className="block text-[15px] font-extrabold leading-tight">Get a Trade Appraisal</span><span className="block text-[12px] font-medium text-slate-500">Know your trade value in minutes.</span></span>
             </button>
@@ -838,7 +850,7 @@ const VehiclePassportV2 = () => {
             </div>
             <div className="flex flex-col gap-1.5 shrink-0">
               {dealerPhone && <a href={`tel:${dealerPhone}`} className="h-8 px-3 rounded-lg bg-[#1a6dff] text-white text-[12px] font-bold inline-flex items-center justify-center gap-1"><Phone className="w-3.5 h-3.5" /> Call</a>}
-              <button onClick={() => setInquiry("info")} className="h-8 px-3 rounded-lg border border-[#d8dce0] text-[12px] font-bold inline-flex items-center justify-center gap-1"><MessageSquare className="w-3.5 h-3.5" /> Contact</button>
+              <button onClick={() => go("contact")} className="h-8 px-3 rounded-lg border border-[#d8dce0] text-[12px] font-bold inline-flex items-center justify-center gap-1"><MessageSquare className="w-3.5 h-3.5" /> Contact</button>
             </div>
           </div>
         </Card>
@@ -909,49 +921,6 @@ const VehiclePassportV2 = () => {
       )}
 
       {inquiry && <InquiryModal listing={listing} dealer={dealer} intent={inquiry} onClose={() => setInquiry(null)} />}
-
-      {/* Full features & specs — modal drill-down from the Highlights /
-          Great-Buy "view more" affordances. Lists every spec row and the
-          complete feature set, not just the six surfaced inline. */}
-      {specsOpen && (
-        <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center">
-          <div className="absolute inset-0 bg-black/50" onClick={() => setSpecsOpen(false)} />
-          <div className="relative bg-white rounded-t-3xl sm:rounded-3xl w-full sm:max-w-lg max-h-[88vh] flex flex-col shadow-2xl">
-            <div className="flex items-center justify-between px-6 py-4 border-b border-[#e8ebef] shrink-0">
-              <div className="min-w-0">
-                <h2 className="text-lg font-black text-slate-900 truncate">Features &amp; Specs</h2>
-                <p className="text-[12px] text-slate-500 truncate">{listing.ymm}{listing.trim ? ` ${listing.trim}` : ""}</p>
-              </div>
-              <button onClick={() => setSpecsOpen(false)} className="w-8 h-8 rounded-full hover:bg-slate-100 flex items-center justify-center shrink-0"><X className="w-4 h-4" /></button>
-            </div>
-            <div className="overflow-auto px-6 py-5 space-y-6">
-              <div>
-                <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-2">Specifications</p>
-                <div className="space-y-2 text-[13px]">
-                  {specRows.filter(([, v]) => v).map(([k, v]) => (
-                    <div key={k} className="flex justify-between gap-4 border-b border-slate-100 pb-2"><span className="text-slate-500">{k}</span><span className="font-semibold text-right">{v}</span></div>
-                  ))}
-                  {listing.mileage != null && <div className="flex justify-between gap-4 border-b border-slate-100 pb-2"><span className="text-slate-500">Mileage</span><span className="font-semibold text-right">{listing.mileage.toLocaleString()} mi</span></div>}
-                  {listing.vin && <div className="flex justify-between gap-4 border-b border-slate-100 pb-2"><span className="text-slate-500">VIN</span><span className="font-semibold text-right font-mono text-[12px]">{listing.vin}</span></div>}
-                </div>
-              </div>
-              {(listing.features || []).length > 0 && (
-                <div>
-                  <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-2">Features &amp; Equipment ({listing.features.length})</p>
-                  <ul className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-2 text-[13px]">
-                    {listing.features.map((f, i) => (
-                      <li key={i} className="flex items-start gap-2"><CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" /><span><span className="font-semibold">{f.title}</span>{f.subtitle ? <span className="text-slate-500"> — {f.subtitle}</span> : null}</span></li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-            </div>
-            <div className="px-6 py-3 border-t border-[#e8ebef] shrink-0">
-              <button onClick={() => { setSpecsOpen(false); setInquiry("info"); }} className="w-full h-11 rounded-xl bg-[#1a6dff] hover:bg-[#155fe0] text-white text-[14px] font-bold inline-flex items-center justify-center gap-2 transition-colors"><MessageSquare className="w-4 h-4" /> Ask about this vehicle</button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 };
