@@ -13,6 +13,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useVehicleListing, type VehicleListing } from "@/hooks/useVehicleListing";
 import Logo from "@/components/brand/Logo";
 import { formatPhone } from "@/components/addendum/CustomerInfoSection";
+import { resolveStickyButtons } from "@/lib/stickyButtons";
 
 // ──────────────────────────────────────────────────────────────
 // VehiclePassportV2 — /passport-v2/:vehicleSlug
@@ -331,6 +332,39 @@ const VehiclePassportV2 = () => {
     { icon: Truck, t: "Delivery", s: "Available" },
     { icon: ShieldCheck, t: "Customer Commitment", s: "No-pressure" },
   ];
+
+  // Dealer-configurable sticky bottom bar (max 4, default Call/Text/Test
+  // Drive/Today's Price). Config arrives on the listing from the dealer's
+  // settings via public-listing-view.
+  const sticky = resolveStickyButtons((listing as unknown as { sticky_bottom_buttons?: import("@/lib/stickyButtons").StickyBottomButtons }).sticky_bottom_buttons);
+  const stickyAction = (key: string): { icon: React.ElementType; onClick: () => void } => {
+    const call = () => { if (dealerPhone) window.location.href = `tel:${dealerPhone}`; else setInquiry("info"); };
+    const text = () => { if (dealerPhone) window.location.href = `sms:${dealerPhone.replace(/[^\d+]/g, "")}`; else setInquiry("info"); };
+    const directions = () => window.open(`https://maps.google.com/?q=${encodeURIComponent(dealerAddress || dealerName)}`, "_blank", "noopener");
+    const map: Record<string, { icon: React.ElementType; onClick: () => void }> = {
+      call: { icon: Phone, onClick: call },
+      text: { icon: MessageSquare, onClick: text },
+      test_drive: { icon: Clock, onClick: () => setInquiry("info") },
+      todays_price: { icon: DollarSign, onClick: () => setInquiry("info") },
+      contact_dealer: { icon: MessageSquare, onClick: () => setInquiry("info") },
+      trade_appraisal: { icon: RefreshCw, onClick: () => setInquiry("trade") },
+      value_trade: { icon: RefreshCw, onClick: () => setInquiry("trade") },
+      reserve: { icon: BadgeCheck, onClick: () => setInquiry("info") },
+      pre_qualified: { icon: DollarSign, onClick: () => setInquiry("info") },
+      apply_financing: { icon: DollarSign, onClick: () => setInquiry("info") },
+      check_availability: { icon: CheckCircle2, onClick: () => setInquiry("info") },
+      schedule_service: { icon: Clock, onClick: () => setInquiry("info") },
+      payment_options: { icon: DollarSign, onClick: () => setInquiry("info") },
+      calculate_payment: { icon: DollarSign, onClick: () => setInquiry("info") },
+      send_to_phone: { icon: Send, onClick: handleShare },
+      save_vehicle: { icon: Bookmark, onClick: () => toast.success("Saved to this device") },
+      share_vehicle: { icon: Upload, onClick: handleShare },
+      directions: { icon: MapPin, onClick: directions },
+      chat: { icon: MessageSquare, onClick: () => setInquiry("info") },
+      email_dealer: { icon: Send, onClick: () => setInquiry("info") },
+    };
+    return map[key] || { icon: CheckCircle2, onClick: () => setInquiry("info") };
+  };
 
   return (
     <div className="min-h-screen bg-[#f4f5f7] text-[#1a1d21]" style={{ fontFamily: "Inter, -apple-system, BlinkMacSystemFont, sans-serif" }}>
@@ -829,24 +863,24 @@ const VehiclePassportV2 = () => {
         </div>
       </div>
 
-      {/* Sticky bottom action bar — mobile only (≤768px). Respects the iOS
-          safe area; page content is padded so nothing hides behind it. */}
-      <div className="lg:hidden fixed bottom-0 inset-x-0 z-40 bg-white/95 backdrop-blur border-t border-[#e8ebef] px-3 pt-2 pb-[calc(8px+env(safe-area-inset-bottom))]">
-        <div className="grid grid-cols-4 gap-2">
-          <a href={dealerPhone ? `tel:${dealerPhone}` : undefined} onClick={(e) => { if (!dealerPhone) { e.preventDefault(); setInquiry("info"); } }} className="h-11 rounded-xl border border-[#d8dce0] bg-white text-[#1a1d21] text-[11px] font-bold inline-flex flex-col items-center justify-center gap-0.5">
-            <Phone className="w-4 h-4 text-[#1a6dff]" /> Call
-          </a>
-          <button onClick={() => { if (dealerPhone) window.location.href = `sms:${dealerPhone.replace(/[^\d+]/g, "")}`; else setInquiry("info"); }} className="h-11 rounded-xl border border-[#d8dce0] bg-white text-[#1a1d21] text-[11px] font-bold inline-flex flex-col items-center justify-center gap-0.5">
-            <MessageSquare className="w-4 h-4 text-[#1a6dff]" /> Text
-          </button>
-          <button onClick={() => setInquiry("info")} className="h-11 rounded-xl border border-[#d8dce0] bg-white text-[#1a1d21] text-[11px] font-bold inline-flex flex-col items-center justify-center gap-0.5">
-            <Clock className="w-4 h-4 text-[#1a6dff]" /> Test Drive
-          </button>
-          <button onClick={() => setInquiry("info")} className="h-11 rounded-xl bg-[#1a6dff] text-white text-[11px] font-bold inline-flex flex-col items-center justify-center gap-0.5">
-            <DollarSign className="w-4 h-4" /> Today's Price
-          </button>
+      {/* Sticky bottom action bar — mobile only (≤768px), dealer-configurable
+          (up to 4 buttons). Respects the iOS safe area; page content is padded
+          so nothing hides behind it. */}
+      {sticky.enabled && sticky.items.length > 0 && (
+        <div className="lg:hidden fixed bottom-0 inset-x-0 z-40 bg-white/95 backdrop-blur border-t border-[#e8ebef] px-3 pt-2 pb-[calc(8px+env(safe-area-inset-bottom))]">
+          <div className="grid gap-2" style={{ gridTemplateColumns: `repeat(${sticky.items.length}, minmax(0,1fr))` }}>
+            {sticky.items.map((it) => {
+              const a = stickyAction(it.key);
+              const Icon = a.icon;
+              return (
+                <button key={it.key} onClick={a.onClick} className={`h-11 rounded-xl text-[10px] leading-[1.05] font-bold inline-flex flex-col items-center justify-center gap-0.5 text-center px-0.5 ${it.primary ? "bg-[#1a6dff] text-white" : "border border-[#d8dce0] bg-white text-[#1a1d21]"}`}>
+                  <Icon className={`w-4 h-4 ${it.primary ? "" : "text-[#1a6dff]"}`} /> {it.label}
+                </button>
+              );
+            })}
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Fullscreen photo viewer — tap the hero or "All photos" to open. */}
       {lightbox && gallery.length > 0 && (

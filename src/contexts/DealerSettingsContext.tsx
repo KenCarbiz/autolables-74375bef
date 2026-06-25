@@ -6,6 +6,7 @@ import { useTenant } from "@/contexts/TenantContext";
 import { mapAutocurbProfile } from "@/lib/autocurbProfile";
 import type { DealerProgram } from "@/lib/dealerPrograms";
 import type { DocumentRules } from "@/lib/documentRules";
+import { DEFAULT_STICKY_BUTTONS, type StickyBottomButtons } from "@/lib/stickyButtons";
 
 // A configurable internal recon/service the dealer routes to a responsible
 // party. Non-customer charge — tracked as the store's own cost.
@@ -195,6 +196,8 @@ export interface DealerSettings {
   // Inventory Command Center V2 — show the Quick Actions panel in the right
   // rail. Off by default for a cleaner executive dashboard.
   inventory_show_quick_actions: boolean;
+  // Vehicle Passport — dealer-configurable sticky bottom CTA bar (max 4).
+  sticky_bottom_buttons: StickyBottomButtons;
 }
 
 export const DEFAULT_SETTINGS: DealerSettings = {
@@ -271,6 +274,7 @@ export const DEFAULT_SETTINGS: DealerSettings = {
   privacy_notice_text: "",
   privacy_notice_url: "",
   inventory_show_quick_actions: false,
+  sticky_bottom_buttons: DEFAULT_STICKY_BUTTONS,
 };
 
 interface DealerSettingsContextType {

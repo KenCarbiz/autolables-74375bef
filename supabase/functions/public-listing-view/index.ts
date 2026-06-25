@@ -115,6 +115,17 @@ serve(async (req) => {
     }
     if (!row) return json(404, { error: "not_found" });
 
+    // ── Attach the dealer's passport sticky-button config (service role reads
+    // dealer_profiles past RLS) so the anonymous passport can render it.
+    try {
+      if (row.tenant_id) {
+        const { data: prof } = await admin
+          .from("dealer_profiles").select("settings").eq("tenant_id", row.tenant_id).maybeSingle();
+        const sticky = (prof?.settings as { sticky_bottom_buttons?: unknown } | null)?.sticky_bottom_buttons;
+        if (sticky) row.sticky_bottom_buttons = sticky;
+      }
+    } catch { /* config optional — passport falls back to its default bar */ }
+
     // ── Bump view count + record audit event
     await Promise.all([
       admin.rpc("increment_listing_view", { _slug: lookupSlug }),
