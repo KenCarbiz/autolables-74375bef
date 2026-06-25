@@ -43,8 +43,9 @@ const Stars = ({ n, size = 16 }: { n: number; size?: number }) => (
 );
 
 // ── Charts (dependency-free SVG, soft V3 palette) ──────────────
+const FlatBaseline = () => <div className="h-9 mt-2 flex items-center"><div className="w-full border-t border-dashed border-[#E6E8EC]" /></div>;
 const Spark = ({ points, color = GREEN }: { points: number[]; color?: string }) => {
-  if (points.length < 2) return <div className="h-9 mt-2 rounded bg-[#F1F5F9] animate-pulse" />;
+  if (points.length < 2) return <FlatBaseline />;
   const w = 200, h = 40, pad = 3, min = Math.min(...points), max = Math.max(...points), span = Math.max(1, max - min);
   const d = points.map((p, i) => `${(pad + (i / (points.length - 1)) * (w - pad * 2)).toFixed(1)},${(pad + (1 - (p - min) / span) * (h - pad * 2)).toFixed(1)}`);
   return (
@@ -55,7 +56,7 @@ const Spark = ({ points, color = GREEN }: { points: number[]; color?: string }) 
   );
 };
 const Bars = ({ values, color = GREEN }: { values: number[]; color?: string }) => {
-  if (!values.length) return <div className="h-9 mt-2 rounded bg-[#F1F5F9] animate-pulse" />;
+  if (!values.length) return <FlatBaseline />;
   const max = Math.max(...values, 1);
   return (
     <div className="flex items-end gap-[3px] h-9 mt-2">
@@ -385,7 +386,9 @@ const VehiclePassportV3 = () => {
           {/* Highlights */}
           <div className={`${CARD} p-5 flex flex-col`}>
             <H3>Vehicle Highlights</H3>
-            <div className="grid grid-cols-4 gap-y-4 gap-x-2 mt-4">{(highlights.length ? highlights : [{ icon: Car, t: listing.ymm || "Vehicle", s: "Model" }]).slice(0, 8).map((h, i) => <div key={i} className="flex flex-col items-center text-center gap-1.5"><span className="w-10 h-10 rounded-xl bg-blue-50 flex items-center justify-center"><h.icon className="w-5 h-5 text-[#2563EB]" /></span><div className="w-full"><div className="text-[11px] font-bold leading-tight truncate">{h.t}</div><div className="text-[10px] text-[#94A3B8] truncate">{h.s}</div></div></div>)}</div>
+            {highlights.length ? (
+              <div className="grid grid-cols-4 gap-y-4 gap-x-2 mt-4">{highlights.slice(0, 8).map((h, i) => <div key={i} className="flex flex-col items-center text-center gap-1.5"><span className="w-10 h-10 rounded-xl bg-blue-50 flex items-center justify-center"><h.icon className="w-5 h-5 text-[#2563EB]" /></span><div className="w-full"><div className="text-[11px] font-bold leading-tight truncate">{h.t}</div><div className="text-[10px] text-[#94A3B8] truncate">{h.s}</div></div></div>)}</div>
+            ) : <p className="text-[13px] text-[#64748B] mt-3">Equipment highlights appear here as the vehicle's data is decoded.</p>}
             <Link onClick={() => go("features")} className="mt-auto pt-3 self-start">View all features &amp; specs</Link>
           </div>
           {/* Overview */}
@@ -398,7 +401,9 @@ const VehiclePassportV3 = () => {
           {/* Key Specs */}
           <div className={`${CARD} p-5 flex flex-col`}>
             <H3>Key Specifications</H3>
-            <div className="mt-3 space-y-2 text-[13px]">{(d.keySpecs.length ? d.keySpecs : [["Details", "Confirmed at dealership"]] as [string, string][]).slice(0, 8).map(([k, v]) => <div key={k} className="flex justify-between gap-4 border-b border-slate-100 pb-1.5"><span className="text-[#64748B]">{k}</span><span className="font-semibold text-right">{v}</span></div>)}</div>
+            {d.keySpecs.length ? (
+              <div className="mt-3 space-y-2 text-[13px]">{d.keySpecs.slice(0, 8).map(([k, v]) => <div key={k} className="flex justify-between gap-4 border-b border-slate-100 pb-1.5"><span className="text-[#64748B]">{k}</span><span className="font-semibold text-right">{v}</span></div>)}</div>
+            ) : <p className="text-[13px] text-[#64748B] mt-3">Decoded specifications appear here once the vehicle's data is processed.</p>}
             <Link onClick={() => go("specifications")} className="mt-auto pt-3 self-start">View full specs</Link>
           </div>
           {/* Final CTA */}
