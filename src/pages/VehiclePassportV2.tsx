@@ -138,6 +138,7 @@ const VehiclePassportV2 = () => {
   const [zip, setZip] = useState("");
   const [lightbox, setLightbox] = useState(false);
   const [showSticky, setShowSticky] = useState(false);
+  const [specsOpen, setSpecsOpen] = useState(false);
 
   useEffect(() => {
     const onScroll = () => setShowSticky(window.scrollY > 320);
@@ -605,7 +606,7 @@ const VehiclePassportV2 = () => {
                 </div>
               ))}
               <div className="flex items-center px-6 py-4 sm:ml-auto">
-                <span className="inline-flex items-center gap-1.5 text-[14px] font-semibold text-[#2563EB]">View all offers <ArrowRight className="w-4 h-4" /></span>
+                <button onClick={() => setInquiry("info")} className="inline-flex items-center gap-1.5 text-[14px] font-semibold text-[#2563EB] hover:underline">View all offers <ArrowRight className="w-4 h-4" /></button>
               </div>
             </div>
           </Card>
@@ -620,7 +621,7 @@ const VehiclePassportV2 = () => {
                 <li key={i} className="flex items-start gap-2 text-[13px]"><CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />{b}</li>
               ))}
             </ul>
-            <button className="mt-3 text-[13px] font-semibold text-[#2563EB] inline-flex items-center gap-1">See full details <ArrowRight className="w-3.5 h-3.5" /></button>
+            <button onClick={() => setSpecsOpen(true)} className="mt-3 text-[13px] font-semibold text-[#2563EB] inline-flex items-center gap-1 hover:underline">See full details <ArrowRight className="w-3.5 h-3.5" /></button>
           </Card>
 
           <Card className="p-4 md:p-5">
@@ -638,7 +639,7 @@ const VehiclePassportV2 = () => {
                   <span className="text-slate-500">Market average <span className="font-semibold text-slate-700">{fmt$(marketAvg)}</span></span>
                   {belowMarket && belowMarket > 0 && <span className="font-bold text-emerald-600">You save {fmt$(belowMarket)}</span>}
                 </div>
-                <button className="mt-3 text-[13px] font-semibold text-[#2563EB] inline-flex items-center gap-1">View full market report <ArrowRight className="w-3.5 h-3.5" /></button>
+                <button onClick={() => setInquiry("info")} className="mt-3 text-[13px] font-semibold text-[#2563EB] inline-flex items-center gap-1 hover:underline">View full market report <ArrowRight className="w-3.5 h-3.5" /></button>
                 <p className="text-[10px] text-slate-400 mt-2 leading-snug">Market values provided by MarketCheck and third-party data sources. Actual market conditions may vary.</p>
               </>
             ) : (
@@ -789,7 +790,7 @@ const VehiclePassportV2 = () => {
                 <div key={i} className="flex items-center gap-2.5"><h.icon className="w-5 h-5 text-[#1a6dff] shrink-0" /><div className="min-w-0"><div className="text-[13px] font-semibold leading-tight truncate">{h.t}</div><div className="text-[11px] text-slate-400">{h.s}</div></div></div>
               ))}
             </div>
-            <button className="mt-3 text-[13px] font-semibold text-[#2563EB] inline-flex items-center gap-1">View all features &amp; specs <ArrowRight className="w-3.5 h-3.5" /></button>
+            <button onClick={() => setSpecsOpen(true)} className="mt-3 text-[13px] font-semibold text-[#2563EB] inline-flex items-center gap-1 hover:underline">View all features &amp; specs <ArrowRight className="w-3.5 h-3.5" /></button>
           </Card>
 
           <Card className="p-4 md:p-5">
@@ -899,6 +900,49 @@ const VehiclePassportV2 = () => {
       )}
 
       {inquiry && <InquiryModal listing={listing} dealer={dealer} intent={inquiry} onClose={() => setInquiry(null)} />}
+
+      {/* Full features & specs — modal drill-down from the Highlights /
+          Great-Buy "view more" affordances. Lists every spec row and the
+          complete feature set, not just the six surfaced inline. */}
+      {specsOpen && (
+        <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center">
+          <div className="absolute inset-0 bg-black/50" onClick={() => setSpecsOpen(false)} />
+          <div className="relative bg-white rounded-t-3xl sm:rounded-3xl w-full sm:max-w-lg max-h-[88vh] flex flex-col shadow-2xl">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-[#e8ebef] shrink-0">
+              <div className="min-w-0">
+                <h2 className="text-lg font-black text-slate-900 truncate">Features &amp; Specs</h2>
+                <p className="text-[12px] text-slate-500 truncate">{listing.ymm}{listing.trim ? ` ${listing.trim}` : ""}</p>
+              </div>
+              <button onClick={() => setSpecsOpen(false)} className="w-8 h-8 rounded-full hover:bg-slate-100 flex items-center justify-center shrink-0"><X className="w-4 h-4" /></button>
+            </div>
+            <div className="overflow-auto px-6 py-5 space-y-6">
+              <div>
+                <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-2">Specifications</p>
+                <div className="space-y-2 text-[13px]">
+                  {specRows.filter(([, v]) => v).map(([k, v]) => (
+                    <div key={k} className="flex justify-between gap-4 border-b border-slate-100 pb-2"><span className="text-slate-500">{k}</span><span className="font-semibold text-right">{v}</span></div>
+                  ))}
+                  {listing.mileage != null && <div className="flex justify-between gap-4 border-b border-slate-100 pb-2"><span className="text-slate-500">Mileage</span><span className="font-semibold text-right">{listing.mileage.toLocaleString()} mi</span></div>}
+                  {listing.vin && <div className="flex justify-between gap-4 border-b border-slate-100 pb-2"><span className="text-slate-500">VIN</span><span className="font-semibold text-right font-mono text-[12px]">{listing.vin}</span></div>}
+                </div>
+              </div>
+              {(listing.features || []).length > 0 && (
+                <div>
+                  <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-2">Features &amp; Equipment ({listing.features.length})</p>
+                  <ul className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-2 text-[13px]">
+                    {listing.features.map((f, i) => (
+                      <li key={i} className="flex items-start gap-2"><CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" /><span><span className="font-semibold">{f.title}</span>{f.subtitle ? <span className="text-slate-500"> — {f.subtitle}</span> : null}</span></li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
+            <div className="px-6 py-3 border-t border-[#e8ebef] shrink-0">
+              <button onClick={() => { setSpecsOpen(false); setInquiry("info"); }} className="w-full h-11 rounded-xl bg-[#1a6dff] hover:bg-[#155fe0] text-white text-[14px] font-bold inline-flex items-center justify-center gap-2 transition-colors"><MessageSquare className="w-4 h-4" /> Ask about this vehicle</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
