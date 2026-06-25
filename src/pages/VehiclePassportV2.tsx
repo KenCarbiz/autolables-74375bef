@@ -348,7 +348,7 @@ const VehiclePassportV2 = () => {
         <div className="grid grid-cols-1 lg:grid-cols-[420px_1fr] gap-5">
           {/* Gallery */}
           <div className="space-y-3">
-            <div className="relative rounded-2xl overflow-hidden bg-[#1f2227] aspect-[8/7] md:aspect-[4/3]">
+            <div className="relative rounded-2xl overflow-hidden bg-[#1f2227] aspect-[8/7] lg:aspect-[4/3]">
               {heroSrc ? <img src={heroSrc} alt={listing.ymm || "vehicle"} onClick={() => setLightbox(true)} className="absolute inset-0 w-full h-full object-cover cursor-zoom-in" /> : <div className="absolute inset-0 flex items-center justify-center text-slate-500"><Car className="w-14 h-14" strokeWidth={1.25} /></div>}
               {photoCount > 0 && <div className="absolute top-3 left-3 text-white text-xs font-semibold px-2.5 py-1 rounded bg-black/60">{photoIdx + 1} / {photoCount}</div>}
               {photoCount > 1 && (
@@ -497,7 +497,7 @@ const VehiclePassportV2 = () => {
           <div className="flex flex-col lg:flex-row lg:items-end gap-5">
             <div className="flex-1">
               {/* Mobile (<=768px): one clear primary CTA, lighter secondaries. */}
-              <div className="md:hidden space-y-2.5">
+              <div className="lg:hidden space-y-2.5">
                 <button onClick={() => setInquiry("info")} className="w-full h-12 rounded-xl bg-[#1a6dff] hover:bg-[#155fe0] text-white text-[15px] font-bold inline-flex items-center justify-center gap-2 transition-colors">
                   <CheckCircle2 className="w-[18px] h-[18px]" /> Check Availability
                 </button>
@@ -510,7 +510,7 @@ const VehiclePassportV2 = () => {
                 </div>
               </div>
               {/* Tablet + desktop: unchanged 4-up action row. */}
-              <div className="hidden md:grid grid-cols-4 gap-3">
+              <div className="hidden lg:grid grid-cols-4 gap-3">
                 {actions.map((a) => (
                   <button key={a.label} onClick={a.onClick} className="h-12 rounded-xl border border-[#e8ebef] bg-white text-[14px] font-semibold inline-flex items-center justify-center gap-2 hover:border-[#1a6dff] hover:text-[#1a6dff] transition-colors">
                     <a.icon className="w-[18px] h-[18px]" style={{ color: a.green ? GREEN : BLUE }} />{a.label}
@@ -805,7 +805,7 @@ const VehiclePassportV2 = () => {
 
       {/* Sticky bottom action bar — mobile only (≤768px). Respects the iOS
           safe area; page content is padded so nothing hides behind it. */}
-      <div className="md:hidden fixed bottom-0 inset-x-0 z-40 bg-white/95 backdrop-blur border-t border-[#e8ebef] px-3 pt-2 pb-[calc(8px+env(safe-area-inset-bottom))]">
+      <div className="lg:hidden fixed bottom-0 inset-x-0 z-40 bg-white/95 backdrop-blur border-t border-[#e8ebef] px-3 pt-2 pb-[calc(8px+env(safe-area-inset-bottom))]">
         <div className="grid grid-cols-4 gap-2">
           <a href={dealerPhone ? `tel:${dealerPhone}` : undefined} onClick={(e) => { if (!dealerPhone) { e.preventDefault(); setInquiry("info"); } }} className="h-11 rounded-xl border border-[#d8dce0] bg-white text-[#1a1d21] text-[11px] font-bold inline-flex flex-col items-center justify-center gap-0.5">
             <Phone className="w-4 h-4 text-[#1a6dff]" /> Call
