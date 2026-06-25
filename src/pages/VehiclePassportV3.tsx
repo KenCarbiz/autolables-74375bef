@@ -99,6 +99,13 @@ const VehiclePassportV3 = () => {
   const [notFound, setNotFound] = useState(false);
   const [idx, setIdx] = useState(0);
   const [zip, setZip] = useState("");
+  const [showSticky, setShowSticky] = useState(false);
+
+  useEffect(() => {
+    const onScroll = () => setShowSticky(window.scrollY > 360);
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, []);
 
   useEffect(() => {
     if (!vehicleSlug) return;
@@ -192,18 +199,18 @@ const VehiclePassportV3 = () => {
 
       {/* Top bar */}
       <header className="border-b border-[#E6E8EC] bg-white">
-        <div className="mx-auto max-w-[1280px] px-5 h-16 flex items-center justify-between">
+        <div className="mx-auto max-w-[1280px] px-4 sm:px-5 h-16 flex items-center justify-between">
           {listing.dealer_snapshot?.logo_url ? <img src={listing.dealer_snapshot.logo_url as string} alt="" className="h-7" /> : <Logo variant="full" size={22} />}
-          <div className="flex items-center gap-5">
-            <button onClick={handleShare} className={`text-sm font-medium inline-flex items-center gap-1.5 ${TEXT2} hover:text-[#0F172A]`}><Upload className="w-4 h-4" /> Share</button>
-            <button onClick={() => toast.success("Saved to this device")} className={`text-sm font-medium inline-flex items-center gap-1.5 ${TEXT2} hover:text-[#0F172A]`}><Bookmark className="w-4 h-4" /> Save</button>
-            <button onClick={() => window.print()} className={`text-sm font-medium inline-flex items-center gap-1.5 ${TEXT2} hover:text-[#0F172A]`}><Printer className="w-4 h-4" /> Print</button>
-            <button onClick={() => go("check-availability")} className="h-11 px-5 rounded-xl bg-[#2563EB] hover:bg-[#1d4fd7] text-white text-sm font-semibold inline-flex items-center gap-2"><CheckCircle2 className="w-4 h-4" /> Check Availability</button>
+          <div className="flex items-center gap-3 sm:gap-5">
+            <button onClick={handleShare} className={`text-sm font-medium inline-flex items-center gap-1.5 ${TEXT2} hover:text-[#0F172A]`}><Upload className="w-4 h-4" /> <span className="hidden sm:inline">Share</span></button>
+            <button onClick={() => toast.success("Saved to this device")} className={`hidden sm:inline-flex text-sm font-medium items-center gap-1.5 ${TEXT2} hover:text-[#0F172A]`}><Bookmark className="w-4 h-4" /> Save</button>
+            <button onClick={() => window.print()} className={`hidden sm:inline-flex text-sm font-medium items-center gap-1.5 ${TEXT2} hover:text-[#0F172A]`}><Printer className="w-4 h-4" /> Print</button>
+            <button onClick={() => go("check-availability")} className="h-11 px-3.5 sm:px-5 rounded-xl bg-[#2563EB] hover:bg-[#1d4fd7] text-white text-sm font-semibold inline-flex items-center gap-2"><CheckCircle2 className="w-4 h-4" /> <span className="hidden sm:inline">Check Availability</span><span className="sm:hidden">Check</span></button>
           </div>
         </div>
       </header>
 
-      <main className="mx-auto max-w-[1280px] px-5 py-6 space-y-6">
+      <main className="mx-auto max-w-[1280px] px-4 sm:px-5 py-5 sm:py-6 space-y-5 sm:space-y-6 pb-[calc(76px+env(safe-area-inset-bottom))] lg:pb-6">
         {/* 1–2. TOP ZONE */}
         <section className="grid grid-cols-1 lg:grid-cols-[440px_1fr] gap-5">
           {/* Gallery */}
@@ -448,7 +455,7 @@ const VehiclePassportV3 = () => {
               <span className="inline-flex items-center gap-1.5"><DollarSign className="w-3.5 h-3.5 text-[#16A34A]" /> 100% Free</span>
               <span className="inline-flex items-center gap-1.5"><Zap className="w-3.5 h-3.5 text-[#16A34A]" /> Instant Access</span>
             </div>
-            <div className="flex items-center gap-2 text-[12px]">
+            <div className="hidden lg:flex items-center gap-2 text-[12px]">
               {[{ i: Phone, l: "Call", fn: () => d.dealerPhone ? (window.location.href = `tel:${d.dealerPhone}`) : go("contact") }, { i: MessageSquare, l: "Text", fn: () => go("text") }, { i: Clock, l: "Test Drive", fn: () => go("test-drive") }, { i: DollarSign, l: "Today's Price", fn: () => go("todays-price"), primary: true }].map((b) => (
                 <button key={b.l} onClick={b.fn} className={`h-10 px-3 rounded-xl text-[12px] font-bold inline-flex items-center gap-1.5 ${b.primary ? "bg-[#2563EB] text-white" : "border border-[#E6E8EC] text-[#0F172A]"}`}><b.i className={`w-4 h-4 ${b.primary ? "" : "text-[#2563EB]"}`} /> {b.l}</button>
               ))}
@@ -458,6 +465,33 @@ const VehiclePassportV3 = () => {
           <div className="flex items-center justify-center gap-4 text-[11px] font-semibold text-[#64748B] pb-6"><a href="/privacy" className="hover:text-[#2563EB]">Privacy</a><span className="text-slate-300">·</span><a href="/terms" className="hover:text-[#2563EB]">Terms</a></div>
         </footer>
       </main>
+
+      {/* Mobile sticky header — slides in after scrolling past the hero. */}
+      <div className={`lg:hidden fixed top-0 inset-x-0 z-40 bg-white/95 backdrop-blur border-b border-[#E6E8EC] transition-transform duration-200 ${showSticky ? "translate-y-0" : "-translate-y-full"}`}>
+        <div className="h-14 px-3 flex items-center gap-2.5">
+          <button onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })} aria-label="Top" className="w-9 h-9 rounded-full hover:bg-slate-100 flex items-center justify-center shrink-0"><ChevronLeft className="w-5 h-5" /></button>
+          {hero && <img src={hero} alt="" className="w-9 h-9 rounded-lg object-cover shrink-0" />}
+          <div className="min-w-0 flex-1"><p className="text-[13px] font-bold leading-tight truncate">{listing.ymm || "Vehicle"}</p>{price != null && <p className="text-[12px] font-bold text-[#2563EB] leading-tight">{fmt$(price)}</p>}</div>
+          {d.confScore != null && <span className="inline-flex items-center gap-1 text-[11px] font-bold text-[#16A34A] bg-emerald-50 border border-emerald-200 rounded-full px-2 py-1 shrink-0"><ShieldCheck className="w-3 h-3" />{d.confScore}</span>}
+          <button onClick={handleShare} aria-label="Share" className="w-9 h-9 rounded-full hover:bg-slate-100 flex items-center justify-center shrink-0"><Upload className="w-[18px] h-[18px] text-[#64748B]" /></button>
+        </div>
+      </div>
+
+      {/* Mobile sticky bottom nav — quick communication, primary on the right. */}
+      <div className="lg:hidden fixed bottom-0 inset-x-0 z-40 bg-white/95 backdrop-blur border-t border-[#E6E8EC] px-3 pt-2 pb-[calc(8px+env(safe-area-inset-bottom))]">
+        <div className="grid grid-cols-4 gap-2">
+          {[
+            { i: Phone, l: "Call", fn: () => d.dealerPhone ? (window.location.href = `tel:${d.dealerPhone}`) : go("contact") },
+            { i: MessageSquare, l: "Text", fn: () => go("text") },
+            { i: Clock, l: "Test Drive", fn: () => go("test-drive") },
+            { i: DollarSign, l: "Today's Price", fn: () => go("todays-price"), primary: true },
+          ].map((b) => (
+            <button key={b.l} onClick={b.fn} className={`h-11 rounded-xl text-[10px] leading-[1.05] font-bold inline-flex flex-col items-center justify-center gap-0.5 text-center px-0.5 ${b.primary ? "bg-[#2563EB] text-white" : "border border-[#E6E8EC] bg-white text-[#0F172A]"}`}>
+              <b.i className={`w-4 h-4 ${b.primary ? "" : "text-[#2563EB]"}`} /> {b.l}
+            </button>
+          ))}
+        </div>
+      </div>
     </div>
   );
 };
