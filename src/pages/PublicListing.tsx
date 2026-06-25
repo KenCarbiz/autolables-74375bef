@@ -408,14 +408,19 @@ const PublicListingBody = () => {
   const dealerAddress = [(dealer.address as string), (dealer.city as string), (dealer.state as string), (dealer.zip as string)].filter(Boolean).join(", ");
   const zipValid = /^\d{5}$/.test(zipInput);
 
+  // Trust badges — each one shown only when a real signal backs it; no
+  // invented service counts, warranty terms, title claims, or return policies.
+  const titleBrand = String(((mc.title_brand ?? mc.title_status) ?? "") as string).toLowerCase();
+  const titleClean = titleBrand ? /clean|none|clear/.test(titleBrand) : false;
+  const recallChecked = !!(listing as unknown as { recall_check?: { checked_at?: string } }).recall_check?.checked_at;
   const trustBadges = [
-    { icon: Shield,        title: accidentCount === 0 ? "No Accident History" : "Vehicle History", sub: "AutoCheck Verified" },
-    { icon: User,          title: ownerCount ? `${ownerCount}-Owner Vehicle` : "1-Owner Vehicle", sub: "Personal Use" },
-    { icon: Wrench,        title: "Full Service History", sub: `${serviceCount || 12} Service Records` },
-    { icon: FileText,      title: "Clean Title", sub: "No Liens or Issues" },
-    { icon: ShieldCheck,   title: "Factory Warranty", sub: warrantyStr || "4 yr / 60,000 mi" },
-    { icon: RefreshCw,     title: "7-Day Exchange", sub: "Hassle-Free" },
-  ];
+    accidentCount === 0 && { icon: Shield, title: "No Accidents Reported", sub: "Per vehicle history" },
+    ownerCount != null && { icon: User, title: `${ownerCount}-Owner Vehicle`, sub: ownerCount === 1 ? "Personal use" : "Ownership history" },
+    serviceCount > 0 && { icon: Wrench, title: "Service History", sub: `${serviceCount} Service Record${serviceCount > 1 ? "s" : ""}` },
+    titleClean && { icon: FileText, title: "Clean Title", sub: "No branded-title issues on record" },
+    warrantyStr && { icon: ShieldCheck, title: "Factory Warranty", sub: warrantyStr },
+    recallChecked && recallCount === 0 && { icon: ShieldCheck, title: "No Open Recalls", sub: "NHTSA checked" },
+  ].filter(Boolean) as { icon: typeof Shield; title: string; sub: string }[];
 
   const quickActions = [
     { icon: FileText,     label: "Documents",     onClick: () => navigate(`/v/${listing.slug}/documents`) },
@@ -550,10 +555,11 @@ const PublicListingBody = () => {
           </div>
           )}
 
-          {/* TRUST BADGES */}
-          <div className="grid grid-cols-6 mt-6 border border-[#eceef0] rounded-xl overflow-hidden">
+          {/* TRUST BADGES — rendered only when real signals back them. */}
+          {trustBadges.length > 0 && (
+          <div className="grid mt-6 border border-[#eceef0] rounded-xl overflow-hidden" style={{ gridTemplateColumns: `repeat(${trustBadges.length}, minmax(0,1fr))` }}>
             {trustBadges.map((b, i) => (
-              <div key={i} className="p-4 bg-[#fcfcfd]" style={{ borderRight: i % 6 !== 5 ? "1px solid #eceef0" : "none" }}>
+              <div key={i} className="p-4 bg-[#fcfcfd]" style={{ borderRight: i !== trustBadges.length - 1 ? "1px solid #eceef0" : "none" }}>
                 <div className="flex items-center gap-[9px] mb-2">
                   <b.icon className="w-[17px] h-[17px] text-[#1a6dff]" />
                   <span className="text-[13px] font-bold leading-tight">{b.title}</span>
@@ -564,6 +570,7 @@ const PublicListingBody = () => {
               </div>
             ))}
           </div>
+          )}
 
           {/* ANALYSIS CARDS */}
           <div className="grid grid-cols-3 gap-[18px] mt-6">
