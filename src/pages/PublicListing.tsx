@@ -389,19 +389,27 @@ const PublicListingBody = () => {
   const overview = listing.description ||
     `The ${ymm}${listing.trim ? " " + listing.trim : ""} delivers bold design, elevated comfort, and advanced technology for every drive. With a powerful ${ks.engine || "V6"} engine, ${ks.drivetrain || "AWD"} drivetrain, and a thoughtfully crafted cabin, this vehicle is ready for any journey.`;
 
-  // Reviews fallback — kept as 3 visible cards even when no real reviews are wired.
-  const reviews = [
-    { name: "Michael R.", rating: 5, text: "The team was amazing and made the whole process easy.", days: "2 days ago" },
-    { name: "Sarah K.",   rating: 5, text: "Transparent, professional, and great pricing. Highly recommend!", days: "5 days ago" },
-    { name: "James T.",   rating: 5, text: "Best car buying experience I've ever had.", days: "1 week ago" },
-  ];
+  // Reviews — real dealer review data only (no fabricated names/text). The
+  // header rating comes from the dealer snapshot; individual cards render only
+  // when the dealer has real reviews wired.
+  const reviewRating = (dealer.review_rating as number) ?? null;
+  const reviewCount = (dealer.review_count as number) ?? null;
+  const reviewUrl = (dealer.review_url as string) || (dealer.google_url as string) || (dealer.reviews_url as string) || "";
+  const rawReviews = (dealer.reviews as unknown);
+  const reviews = (Array.isArray(rawReviews) ? rawReviews : []).map((r) => r as Record<string, unknown>).map((r) => ({
+    name: (r.name as string) || "Verified buyer",
+    rating: (r.rating as number) ?? 5,
+    text: (r.text as string) || (r.body as string) || "",
+    days: (r.date as string) || (r.days as string) || "",
+  })).filter((r) => r.text).slice(0, 3);
 
-  // Incentives — show two demo cards as fallback so "Available Offers (2)" renders.
-  const make = (ymmRest[0] || "INFINITI").toUpperCase();
-  const incentives = [
-    { title: `${make} Standard APR`, body: "1.9% APR for up to 60 months", exp: "Expires 06/30/2026" },
-    { title: `${make} Customer Cash`, body: "$1,000 Customer Cash",       exp: "Expires 06/30/2026" },
-  ];
+  // Incentives — real offers only (listing or MarketCheck), no demo fallback.
+  const rawOffers = (listing as unknown as { incentives?: unknown }).incentives ?? (mc as { incentives?: unknown }).incentives;
+  const incentives = (Array.isArray(rawOffers) ? rawOffers : []).map((o) => o as Record<string, unknown>).map((o) => ({
+    title: (o.title as string) || (o.program as string) || "Offer",
+    body: (o.summary as string) || (o.description as string) || (o.amount ? `$${Number(o.amount).toLocaleString()}` : ""),
+    exp: o.valid_through ? `Expires ${new Date(o.valid_through as string).toLocaleDateString()}` : "",
+  })).filter((o) => o.body).slice(0, 4);
 
   // ── Render ─────────────────────────────────────────────────
   // ── Render: faithful port of approved AutoLabels Vehicle Detail mockup ─
@@ -534,7 +542,8 @@ const PublicListingBody = () => {
             </div>
           </div>
 
-          {/* OFFERS */}
+          {/* OFFERS — rendered only when the dealer has real incentives. */}
+          {incentives.length > 0 && (
           <div className="flex items-start mt-[30px] pb-[26px] border-b border-[#eceef0]">
             <div className="flex items-center gap-2 w-[148px] flex-shrink-0 text-[15px] font-bold">
               <Award className="w-[17px] h-[17px] text-[#1a9d5c]" />
@@ -548,9 +557,10 @@ const PublicListingBody = () => {
               </div>
             ))}
             <div className="ml-auto self-center">
-              <button className="flex items-center gap-1.5 text-sm font-semibold" style={{ color: "#1a6dff" }}>View all offers <ChevronRight className="w-[15px] h-[15px]" /></button>
+              <button onClick={() => setInquiryOpen(true)} className="flex items-center gap-1.5 text-sm font-semibold hover:underline" style={{ color: "#1a6dff" }}>View all offers <ChevronRight className="w-[15px] h-[15px]" /></button>
             </div>
           </div>
+          )}
 
           {/* TRUST BADGES */}
           <div className="grid grid-cols-6 mt-6 border border-[#eceef0] rounded-xl overflow-hidden">
@@ -649,34 +659,43 @@ const PublicListingBody = () => {
             </div>
           </div>
 
-          {/* REVIEWS */}
+          {/* REVIEWS — real dealer rating/reviews only; honest empty state
+              when the dealer has none wired. */}
           <div className="border border-[#eceef0] rounded-xl p-6 mt-[34px]">
             <div className="flex justify-between items-start">
               <div>
                 <div className="text-lg font-bold">What Our Customers Say</div>
-                <div className="flex items-center gap-2.5 mt-2.5">
-                  <span className="text-[28px] font-extrabold">4.8</span>
-                  <Stars n={5} />
-                  <span className="text-[13px] text-[#6b727a]">(1,248 Reviews)</span>
-                </div>
+                {reviewRating != null && (
+                  <div className="flex items-center gap-2.5 mt-2.5">
+                    <span className="text-[28px] font-extrabold">{reviewRating.toFixed(1)}</span>
+                    <Stars n={Math.round(reviewRating)} />
+                    {reviewCount != null && <span className="text-[13px] text-[#6b727a]">({reviewCount.toLocaleString()} Reviews)</span>}
+                  </div>
+                )}
               </div>
-              <button className="flex items-center gap-1.5 text-sm font-semibold" style={{ color: "#1a6dff" }}>View all reviews <ChevronRight className="w-[15px] h-[15px]" /></button>
+              {(reviewUrl || reviews.length > 0) && (
+                <button onClick={() => reviewUrl ? window.open(reviewUrl, "_blank", "noopener") : setInquiryOpen(true)} className="flex items-center gap-1.5 text-sm font-semibold hover:underline" style={{ color: "#1a6dff" }}>View all reviews <ChevronRight className="w-[15px] h-[15px]" /></button>
+              )}
             </div>
-            <div className="grid grid-cols-3 gap-4 mt-5">
-              {reviews.map((r, i) => (
-                <div key={i} className="border border-[#eceef0] rounded-[10px] p-[18px]">
-                  <div className="flex justify-between items-center">
-                    <Stars n={r.rating} size={15} />
-                    <span className="text-[11px] text-[#9aa0a8]">{r.days}</span>
+            {reviews.length > 0 ? (
+              <div className="grid grid-cols-3 gap-4 mt-5">
+                {reviews.map((r, i) => (
+                  <div key={i} className="border border-[#eceef0] rounded-[10px] p-[18px]">
+                    <div className="flex justify-between items-center">
+                      <Stars n={r.rating} size={15} />
+                      {r.days && <span className="text-[11px] text-[#9aa0a8]">{r.days}</span>}
+                    </div>
+                    <p className="text-[13px] leading-relaxed text-[#3a4048] my-[13px]">{r.text}</p>
+                    <div className="flex justify-between items-center">
+                      <span className="text-[13px] font-semibold">– {r.name}</span>
+                      <Globe className="w-4 h-4 text-[#9aa0a8]" />
+                    </div>
                   </div>
-                  <p className="text-[13px] leading-relaxed text-[#3a4048] my-[13px]">{r.text}</p>
-                  <div className="flex justify-between items-center">
-                    <span className="text-[13px] font-semibold">– {r.name}</span>
-                    <Globe className="w-4 h-4 text-[#9aa0a8]" />
-                  </div>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-[13px] text-[#6b727a] mt-3">Verified dealership reviews appear here when available.</p>
+            )}
           </div>
 
           {/* CTA BANNER */}
