@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate, useLocation } from "react-router-dom";
 import {
   ChevronLeft, Upload, Phone, MessageSquare, Send, CheckCircle2, ShieldCheck,
   TrendingUp, DollarSign, Clock, Car, Wrench, Award, Gauge as GaugeIcon, BadgeCheck,
@@ -657,6 +657,8 @@ const ShareSection = ({ listing, dealerName }: { listing: VehicleListing; dealer
 
 const VehiclePassportV2Detail = () => {
   const { vehicleSlug, section } = useParams<{ vehicleSlug: string; section: string }>();
+  const location = useLocation();
+  const base = location.pathname.startsWith("/passport-v3") ? "passport-v3" : "passport-v2";
   const navigate = useNavigate();
   const [listing, setListing] = useState<VehicleListing | null>(null);
   const [loading, setLoading] = useState(true);
@@ -679,7 +681,7 @@ const VehiclePassportV2Detail = () => {
   const d = useMemo(() => (listing ? derivePassport(listing) : null), [listing]);
   const def = section ? SECTIONS[section] : undefined;
 
-  const back = () => navigate(`/passport-v2/${vehicleSlug}`);
+  const back = () => navigate(`/${base}/${vehicleSlug}`);
 
   if (loading) return <div className="min-h-screen flex items-center justify-center bg-[#f4f5f7]"><div className="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" /></div>;
 
@@ -717,8 +719,8 @@ const VehiclePassportV2Detail = () => {
         <Card className="p-5">
           <p className="text-[13px] font-semibold text-slate-700 mb-3">Ready to move forward?</p>
           <div className="grid grid-cols-2 gap-2.5">
-            <button onClick={() => navigate(`/passport-v2/${vehicleSlug}/reserve`)} className="h-11 rounded-xl bg-[#1a6dff] text-white text-[13px] font-bold inline-flex items-center justify-center gap-1.5"><BadgeCheck className="w-4 h-4" /> Reserve</button>
-            <button onClick={() => navigate(`/passport-v2/${vehicleSlug}/trade`)} className="h-11 rounded-xl border-2 border-[#1a6dff] text-[#1a6dff] text-[13px] font-bold inline-flex items-center justify-center gap-1.5"><GaugeIcon className="w-4 h-4" /> Trade value</button>
+            <button onClick={() => navigate(`/${base}/${vehicleSlug}/reserve`)} className="h-11 rounded-xl bg-[#1a6dff] text-white text-[13px] font-bold inline-flex items-center justify-center gap-1.5"><BadgeCheck className="w-4 h-4" /> Reserve</button>
+            <button onClick={() => navigate(`/${base}/${vehicleSlug}/trade`)} className="h-11 rounded-xl border-2 border-[#1a6dff] text-[#1a6dff] text-[13px] font-bold inline-flex items-center justify-center gap-1.5"><GaugeIcon className="w-4 h-4" /> Trade value</button>
           </div>
           <button onClick={back} className="w-full mt-2.5 h-11 rounded-xl border border-[#e8ebef] text-[13px] font-semibold inline-flex items-center justify-center gap-1.5 hover:border-[#1a6dff]"><ChevronLeft className="w-4 h-4" /> Back to Vehicle Passport</button>
         </Card>
@@ -732,10 +734,10 @@ const VehiclePassportV2Detail = () => {
       <div className="fixed bottom-0 inset-x-0 z-40 bg-white/95 backdrop-blur border-t border-[#e8ebef] px-3 pt-2 pb-[calc(8px+env(safe-area-inset-bottom))]">
         <div className="mx-auto max-w-[760px] grid grid-cols-4 gap-2">
           {[
-            { key: "call", icon: Phone, label: "Call", onClick: () => { if (d.dealerPhone) window.location.href = `tel:${d.dealerPhone}`; else navigate(`/passport-v2/${vehicleSlug}/contact`); } },
-            { key: "text", icon: MessageSquare, label: "Text", onClick: () => navigate(`/passport-v2/${vehicleSlug}/text`) },
-            { key: "td", icon: Clock, label: "Test Drive", onClick: () => navigate(`/passport-v2/${vehicleSlug}/test-drive`) },
-            { key: "price", icon: DollarSign, label: "Today's Price", primary: true, onClick: () => navigate(`/passport-v2/${vehicleSlug}/todays-price`) },
+            { key: "call", icon: Phone, label: "Call", onClick: () => { if (d.dealerPhone) window.location.href = `tel:${d.dealerPhone}`; else navigate(`/${base}/${vehicleSlug}/contact`); } },
+            { key: "text", icon: MessageSquare, label: "Text", onClick: () => navigate(`/${base}/${vehicleSlug}/text`) },
+            { key: "td", icon: Clock, label: "Test Drive", onClick: () => navigate(`/${base}/${vehicleSlug}/test-drive`) },
+            { key: "price", icon: DollarSign, label: "Today's Price", primary: true, onClick: () => navigate(`/${base}/${vehicleSlug}/todays-price`) },
           ].map((b) => (
             <button key={b.key} onClick={b.onClick} className={`h-11 rounded-xl text-[10px] leading-[1.05] font-bold inline-flex flex-col items-center justify-center gap-0.5 text-center px-0.5 ${b.primary ? "bg-[#1a6dff] text-white" : "border border-[#d8dce0] bg-white text-[#1a1d21]"}`}>
               <b.icon className={`w-4 h-4 ${b.primary ? "" : "text-[#1a6dff]"}`} /> {b.label}
