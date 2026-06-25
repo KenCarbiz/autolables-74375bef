@@ -319,7 +319,7 @@ const VehiclePassportV2 = () => {
         <title>{`${listing.ymm}${listing.trim ? ` ${listing.trim}` : ""} — ${dealerName} · Passport`}</title>
       </Helmet>
 
-      <div className="mx-auto max-w-[1080px] px-4 sm:px-6 py-5 space-y-5 pb-[calc(72px+env(safe-area-inset-bottom))] md:pb-5">
+      <div className="mx-auto max-w-[1080px] px-4 sm:px-6 py-5 space-y-4 md:space-y-5 pb-[calc(72px+env(safe-area-inset-bottom))] md:pb-5">
         {/* 1. HEADER */}
         <header className="flex items-center justify-between">
           <div className="text-[22px] font-extrabold tracking-tight">
@@ -336,7 +336,7 @@ const VehiclePassportV2 = () => {
         <div className="grid grid-cols-1 lg:grid-cols-[420px_1fr] gap-5">
           {/* Gallery */}
           <div className="space-y-3">
-            <div className="relative rounded-2xl overflow-hidden bg-[#1f2227] aspect-[4/3]">
+            <div className="relative rounded-2xl overflow-hidden bg-[#1f2227] aspect-[8/7] md:aspect-[4/3]">
               {heroSrc ? <img src={heroSrc} alt={listing.ymm || "vehicle"} className="absolute inset-0 w-full h-full object-cover" /> : <div className="absolute inset-0 flex items-center justify-center text-slate-500"><Car className="w-14 h-14" strokeWidth={1.25} /></div>}
               {photoCount > 0 && <div className="absolute top-3 left-3 text-white text-xs font-semibold px-2.5 py-1 rounded bg-black/60">{photoIdx + 1} / {photoCount}</div>}
               {photoCount > 1 && (
@@ -388,6 +388,11 @@ const VehiclePassportV2 = () => {
                 <div className="text-right shrink-0">
                   <div className="text-[13px] font-semibold text-slate-500">{priceLabel}</div>
                   <div className="text-[34px] font-extrabold tracking-tight leading-none">{fmt$(price)}</div>
+                  {(() => {
+                    const r = 0.0749 / 12, n = 72, principal = price * 0.9;
+                    const m = Math.round((principal * r) / (1 - Math.pow(1 + r, -n)));
+                    return isFinite(m) ? <div className="text-[12px] text-slate-500 mt-0.5" title="Estimated: 72 mo, 7.49% APR, 10% down. With approved credit.">Est. {fmt$(m)}/mo</div> : null;
+                  })()}
                   {msrp != null && <div className="text-[12px] text-slate-500 mt-1">MSRP {fmt$(msrp)}</div>}
                   {saveVsMsrp != null && <div className="text-[13px] font-semibold text-emerald-600">You save {fmt$(saveVsMsrp)}</div>}
                 </div>
