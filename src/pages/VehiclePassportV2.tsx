@@ -338,9 +338,9 @@ const VehiclePassportV2 = () => {
         <title>{`${listing.ymm}${listing.trim ? ` ${listing.trim}` : ""} — ${dealerName} · Passport`}</title>
       </Helmet>
 
-      <div className="mx-auto max-w-[1080px] px-4 sm:px-6 py-5 space-y-4 md:space-y-5 pb-[calc(72px+env(safe-area-inset-bottom))] md:pb-5">
-        {/* 1. HEADER */}
-        <header className="flex items-center justify-between">
+      <div className="mx-auto max-w-[1080px] px-4 sm:px-6 pt-0 lg:pt-5 pb-[calc(72px+env(safe-area-inset-bottom))] md:pb-5 space-y-4 md:space-y-5">
+        {/* 1. HEADER — desktop only; on mobile the full-bleed hero owns the top */}
+        <header className="hidden lg:flex items-center justify-between">
           <div className="text-[22px] font-extrabold tracking-tight">
             {dealer.logo_url ? <img src={dealer.logo_url} alt={dealerName} className="h-7" /> : (<><span style={{ color: BLUE }}>auto</span><span>(LABELS)</span></>)}
           </div>
@@ -352,12 +352,18 @@ const VehiclePassportV2 = () => {
         </header>
 
         {/* 2. HERO — gallery + identity/price/trust */}
-        <div className="grid grid-cols-1 lg:grid-cols-[420px_1fr] gap-5">
+        <div className="grid grid-cols-1 lg:grid-cols-[420px_1fr] gap-5 max-lg:-mt-4">
           {/* Gallery */}
           <div className="space-y-3">
-            <div className="relative rounded-2xl overflow-hidden bg-[#1f2227] aspect-square lg:aspect-[4/3]">
+            {/* Full-bleed on mobile (edge-to-edge, flush to the top under the
+                Dynamic Island); inset rounded card on desktop. */}
+            <div className="relative overflow-hidden bg-[#1f2227] aspect-square lg:aspect-[4/3] -mx-4 sm:-mx-6 lg:mx-0 rounded-none lg:rounded-2xl">
               {heroSrc ? <img src={heroSrc} alt={listing.ymm || "vehicle"} onClick={() => setLightbox(true)} className="absolute inset-0 w-full h-full object-cover cursor-zoom-in" /> : <div className="absolute inset-0 flex items-center justify-center text-slate-500"><Car className="w-14 h-14" strokeWidth={1.25} /></div>}
-              {photoCount > 0 && <div className="absolute top-3 left-3 text-white text-xs font-semibold px-2.5 py-1 rounded bg-black/60">{photoIdx + 1} / {photoCount}</div>}
+              {/* Mobile-only overlay controls, pushed clear of the status bar / island */}
+              <div className="lg:hidden absolute top-0 right-0 p-3 pt-[calc(0.75rem+env(safe-area-inset-top))]">
+                <button onClick={handleShare} aria-label="Share" className="w-9 h-9 rounded-full bg-black/45 backdrop-blur text-white flex items-center justify-center"><Upload className="w-[18px] h-[18px]" /></button>
+              </div>
+              {photoCount > 0 && <div className="absolute left-3 top-[calc(0.75rem+env(safe-area-inset-top))] lg:top-3 text-white text-xs font-semibold px-2.5 py-1 rounded bg-black/60">{photoIdx + 1} / {photoCount}</div>}
               {photoCount > 1 && (
                 <>
                   <button onClick={() => setPhotoIdx((i) => (i - 1 + photoCount) % photoCount)} className="absolute left-3 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full bg-white/95 hover:bg-white flex items-center justify-center shadow"><ChevronLeft className="w-5 h-5" /></button>
