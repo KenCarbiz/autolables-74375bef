@@ -198,6 +198,17 @@ export interface DealerSettings {
   inventory_show_quick_actions: boolean;
   // Vehicle Passport — dealer-configurable sticky bottom CTA bar (max 4).
   sticky_bottom_buttons: StickyBottomButtons;
+  // Vehicle Passport dealership-trust content (dealer-entered; rendered on the
+  // public passport's "Why Buy From This Dealership" + "What Owners Say"). All
+  // optional — each badge/review only shows when the dealer provides it.
+  dealer_years_in_business: string;   // e.g. "45"
+  dealer_satisfaction: string;        // e.g. "98%"
+  dealer_bbb_rating: string;          // e.g. "A+"
+  dealer_google_rating: string;       // e.g. "4.9"
+  dealer_google_count: string;        // e.g. "1248"
+  dealer_certifications: string;      // comma-separated award/cert names
+  dealer_storefront_url: string;      // dealership photo URL
+  dealer_review_sources: string;      // newline list: "Source | rating | quote"
 }
 
 export const DEFAULT_SETTINGS: DealerSettings = {
@@ -275,6 +286,14 @@ export const DEFAULT_SETTINGS: DealerSettings = {
   privacy_notice_url: "",
   inventory_show_quick_actions: false,
   sticky_bottom_buttons: DEFAULT_STICKY_BUTTONS,
+  dealer_years_in_business: "",
+  dealer_satisfaction: "",
+  dealer_bbb_rating: "",
+  dealer_google_rating: "",
+  dealer_google_count: "",
+  dealer_certifications: "",
+  dealer_storefront_url: "",
+  dealer_review_sources: "",
 };
 
 interface DealerSettingsContextType {

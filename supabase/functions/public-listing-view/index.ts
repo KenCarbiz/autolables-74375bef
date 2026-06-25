@@ -121,8 +121,20 @@ serve(async (req) => {
       if (row.tenant_id) {
         const { data: prof } = await admin
           .from("dealer_profiles").select("settings").eq("tenant_id", row.tenant_id).maybeSingle();
-        const sticky = (prof?.settings as { sticky_bottom_buttons?: unknown } | null)?.sticky_bottom_buttons;
-        if (sticky) row.sticky_bottom_buttons = sticky;
+        const s = (prof?.settings ?? {}) as Record<string, unknown>;
+        if (s.sticky_bottom_buttons) row.sticky_bottom_buttons = s.sticky_bottom_buttons;
+        // Dealer-entered passport trust content (badges + multi-source reviews).
+        const trust = {
+          years_in_business: (s.dealer_years_in_business as string) || "",
+          satisfaction: (s.dealer_satisfaction as string) || "",
+          bbb_rating: (s.dealer_bbb_rating as string) || "",
+          google_rating: (s.dealer_google_rating as string) || "",
+          google_count: (s.dealer_google_count as string) || "",
+          certifications: (s.dealer_certifications as string) || "",
+          storefront_url: (s.dealer_storefront_url as string) || "",
+          review_sources: (s.dealer_review_sources as string) || "",
+        };
+        if (Object.values(trust).some((v) => v)) row.dealer_trust = trust;
       }
     } catch { /* config optional — passport falls back to its default bar */ }
 

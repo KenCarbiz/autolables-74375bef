@@ -66,6 +66,17 @@ export interface PassportData {
   valueHistory: { captured_at: string; market_value: number | null; listing_price: number | null; below_market: number | null; position: string | null }[];
   priceChange7d: number | null;   // listing_price delta vs ~7 days ago (negative = drop)
   priceChangeTotal: number | null; // delta since first capture
+  // Dealer-entered trust content (from public-listing-view → dealer_trust)
+  dealerTrust: {
+    yearsInBusiness: string;
+    satisfaction: string;
+    bbbRating: string;
+    googleRating: string;
+    googleCount: string;
+    certifications: string[];
+    storefrontUrl: string;
+    reviewSources: { name: string; rating: number | null; quote: string }[];
+  };
 }
 
 export interface PricePoint { captured_at: string; market_value: number | null; listing_price: number | null; below_market: number | null; position: string | null }
@@ -216,6 +227,21 @@ export const derivePassport = (listing: VehicleListing): PassportData => {
 
   const { valueHistory, priceChange7d, priceChangeTotal } = computePriceHistory(listing);
 
+  const t = (listing as unknown as { dealer_trust?: Record<string, string> }).dealer_trust ?? {};
+  const dealerTrust = {
+    yearsInBusiness: t.years_in_business || "",
+    satisfaction: t.satisfaction || "",
+    bbbRating: t.bbb_rating || "",
+    googleRating: t.google_rating || "",
+    googleCount: t.google_count || "",
+    certifications: (t.certifications || "").split(",").map((c) => c.trim()).filter(Boolean),
+    storefrontUrl: t.storefront_url || "",
+    reviewSources: (t.review_sources || "").split("\n").map((line) => {
+      const [name, rating, ...rest] = line.split("|").map((p) => p.trim());
+      return { name: name || "", rating: rating ? Number(rating) : null, quote: rest.join(" | ") };
+    }).filter((r) => r.name),
+  };
+
   return {
     price, msrp, priceLabel, estMonthly, saveVsMsrp,
     marketAvg, marketLow, marketHigh, belowMarket,
@@ -233,5 +259,6 @@ export const derivePassport = (listing: VehicleListing): PassportData => {
     dealerAddress: [dealer.address, dealer.city, dealer.state, dealer.zip].filter(Boolean).join(", "),
     offers,
     valueHistory, priceChange7d, priceChangeTotal,
+    dealerTrust,
   };
 };

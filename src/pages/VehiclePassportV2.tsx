@@ -351,6 +351,21 @@ const VehiclePassportV2 = () => {
   const reviewRating = (dealer.review_rating as number) ?? null;
   const reviewCount = (dealer.review_count as number) ?? null;
 
+  // Dealer-entered trust content (admin → Passport Trust), attached by the
+  // public-listing-view edge function. Each badge renders only when provided.
+  const trustRaw = (listing as unknown as { dealer_trust?: Record<string, string> }).dealer_trust ?? {};
+  const dealerBadges = [
+    trustRaw.years_in_business ? { v: `${trustRaw.years_in_business}+`, l: "Years in Business" } : null,
+    trustRaw.google_rating ? { v: trustRaw.google_rating, l: trustRaw.google_count ? `Google (${Number(trustRaw.google_count).toLocaleString()})` : "Google Rating", star: true } : null,
+    trustRaw.satisfaction ? { v: trustRaw.satisfaction, l: "Customer Satisfaction" } : null,
+    trustRaw.bbb_rating ? { v: trustRaw.bbb_rating, l: "BBB Rating" } : null,
+  ].filter(Boolean) as { v: string; l: string; star?: boolean }[];
+  const dealerCerts = (trustRaw.certifications || "").split(",").map((c) => c.trim()).filter(Boolean);
+  const reviewSources = (trustRaw.review_sources || "").split("\n").map((line) => {
+    const [name, rating, ...rest] = line.split("|").map((p) => p.trim());
+    return { name: name || "", rating: rating ? Number(rating) : null, quote: rest.join(" | ") };
+  }).filter((r) => r.name);
+
   const heroSrc = gallery[photoIdx] || gallery[0] || "";
   const photoCount = gallery.length;
 
@@ -796,11 +811,21 @@ const VehiclePassportV2 = () => {
 
           <Card className="p-4 md:p-5 flex flex-col">
             <SectionTitle>What Owners Say</SectionTitle>
-            {reviewRating != null ? (
-              <>
-                <div className="flex items-center gap-2 mt-2"><span className="text-2xl font-extrabold">{reviewRating.toFixed(1)}</span><Stars n={reviewRating} />{reviewCount != null && <span className="text-[12px] text-slate-500">({reviewCount.toLocaleString()})</span>}</div>
-                <p className="text-[10px] text-slate-400 mt-3 leading-snug">Reviews shown are dealership or model reviews and may not reflect ownership experience of this specific vehicle.</p>
-              </>
+            {reviewRating != null && (
+              <div className="flex items-center gap-2 mt-2"><span className="text-2xl font-extrabold">{reviewRating.toFixed(1)}</span><Stars n={reviewRating} />{reviewCount != null && <span className="text-[12px] text-slate-500">({reviewCount.toLocaleString()})</span>}</div>
+            )}
+            {reviewSources.length > 0 ? (
+              <div className="mt-3 space-y-3">
+                {reviewSources.slice(0, 3).map((r, i) => (
+                  <div key={i} className="border-b border-slate-100 pb-2.5 last:border-0 last:pb-0">
+                    <div className="flex items-center gap-2"><span className="text-[12px] font-bold">{r.name}</span>{r.rating != null && <Stars n={r.rating} size={13} />}</div>
+                    {r.quote && <p className="text-[12px] text-slate-600 mt-0.5 leading-snug">"{r.quote}"</p>}
+                  </div>
+                ))}
+                <p className="text-[10px] text-slate-400 leading-snug">Reviews reflect dealership or model ratings and may not reflect the ownership experience of this specific vehicle.</p>
+              </div>
+            ) : reviewRating != null ? (
+              <p className="text-[10px] text-slate-400 mt-3 leading-snug">Reviews shown are dealership or model reviews and may not reflect ownership experience of this specific vehicle.</p>
             ) : (
               <p className="text-[13px] text-slate-500 mt-3">Independent buyer reviews for this model are shown here when available.</p>
             )}
@@ -857,6 +882,17 @@ const VehiclePassportV2 = () => {
               <div key={i} className="flex items-start gap-3"><span className="w-11 h-11 rounded-xl bg-blue-50 flex items-center justify-center shrink-0"><c.icon className="w-5 h-5 text-[#1a6dff]" /></span><div><p className="text-[14px] font-bold leading-tight">{c.t}</p><p className="text-[12px] text-slate-500 mt-0.5">{c.s}</p></div></div>
             ))}
           </div>
+          {(dealerBadges.length > 0 || dealerCerts.length > 0 || trustRaw.storefront_url) && (
+            <div className="mt-5 pt-5 border-t border-[#eef1f4] flex flex-wrap items-center gap-x-6 gap-y-4">
+              {trustRaw.storefront_url && <img src={trustRaw.storefront_url} alt={dealerName} className="w-28 h-20 rounded-xl object-cover border border-[#e8ebef]" />}
+              {dealerBadges.map((b, i) => (
+                <div key={i} className="text-center"><p className="text-[20px] font-extrabold text-[#1a6dff] leading-none inline-flex items-center gap-1">{b.v}{b.star && <Star className="w-4 h-4 text-amber-400" fill="#fbbf24" />}</p><p className="text-[11px] text-slate-500 mt-1">{b.l}</p></div>
+              ))}
+              {dealerCerts.map((c, i) => (
+                <span key={`c${i}`} className="inline-flex items-center gap-1.5 text-[12px] font-semibold text-slate-700 bg-slate-100 rounded-full px-3 py-1.5"><Award className="w-3.5 h-3.5 text-[#1a6dff]" />{c}</span>
+              ))}
+            </div>
+          )}
           <button onClick={() => go("dealer")} className="mt-auto pt-4 text-[13px] font-semibold text-[#2563EB] inline-flex items-center gap-1 hover:underline self-start">Learn more about our dealership <ArrowRight className="w-3.5 h-3.5" /></button>
         </Card>
 

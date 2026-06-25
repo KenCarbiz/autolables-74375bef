@@ -393,7 +393,20 @@ const SECTIONS: Record<string, { title: string; render: SectionRender }> = {
     render: ({ d }) => (
       <>
         <SectionHeading icon={Star} title="What Owners Say" subtitle="Reviews for this dealership and model." />
-        {d.reviewRating != null ? (
+        {d.dealerTrust.reviewSources.length > 0 ? (
+          <Card className="p-5">
+            {d.reviewRating != null && <div className="flex items-center gap-3 mb-4 pb-4 border-b border-slate-100"><span className="text-4xl font-extrabold">{d.reviewRating.toFixed(1)}</span><div><Stars n={d.reviewRating} size={18} />{d.reviewCount != null && <p className="text-[13px] text-slate-500 mt-0.5">{d.reviewCount.toLocaleString()} reviews</p>}</div></div>}
+            <div className="space-y-4">
+              {d.dealerTrust.reviewSources.map((r, i) => (
+                <div key={i} className="border-b border-slate-100 pb-4 last:border-0 last:pb-0">
+                  <div className="flex items-center gap-2"><span className="text-[14px] font-bold">{r.name}</span>{r.rating != null && <Stars n={r.rating} size={14} />}</div>
+                  {r.quote && <p className="text-[14px] text-slate-600 mt-1 leading-relaxed">"{r.quote}"</p>}
+                </div>
+              ))}
+            </div>
+            <p className="text-[11px] text-slate-400 mt-4">Reviews reflect dealership or model ratings and may not reflect the ownership experience of this specific vehicle.</p>
+          </Card>
+        ) : d.reviewRating != null ? (
           <Card className="p-5">
             <div className="flex items-center gap-3"><span className="text-4xl font-extrabold">{d.reviewRating.toFixed(1)}</span><div><Stars n={d.reviewRating} size={18} />{d.reviewCount != null && <p className="text-[13px] text-slate-500 mt-0.5">{d.reviewCount.toLocaleString()} reviews</p>}</div></div>
             {d.reviewUrl && <a href={d.reviewUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 mt-4 text-[14px] font-semibold text-[#1a6dff] hover:underline">Read all reviews <ChevronLeft className="w-4 h-4 rotate-180" /></a>}
@@ -469,11 +482,25 @@ const SECTIONS: Record<string, { title: string; render: SectionRender }> = {
         <>
           <SectionHeading icon={Building2} title={d.dealerName} subtitle="Why shoppers buy here." />
           <Card className="p-5">
+            {(d.dealerTrust.storefrontUrl) && <img src={d.dealerTrust.storefrontUrl} alt={d.dealerName} className="w-full h-44 rounded-xl object-cover border border-[#e8ebef] mb-5" />}
+            {(d.dealerTrust.yearsInBusiness || d.dealerTrust.googleRating || d.dealerTrust.satisfaction || d.dealerTrust.bbbRating) && (
+              <div className="flex flex-wrap items-center gap-x-8 gap-y-4 mb-5 pb-5 border-b border-[#eef1f4]">
+                {d.dealerTrust.yearsInBusiness && <div className="text-center"><p className="text-[24px] font-extrabold text-[#1a6dff] leading-none">{d.dealerTrust.yearsInBusiness}+</p><p className="text-[11px] text-slate-500 mt-1">Years in Business</p></div>}
+                {d.dealerTrust.googleRating && <div className="text-center"><p className="text-[24px] font-extrabold text-[#1a6dff] leading-none inline-flex items-center gap-1">{d.dealerTrust.googleRating}<Star className="w-4 h-4 text-amber-400" fill="#fbbf24" /></p><p className="text-[11px] text-slate-500 mt-1">Google{d.dealerTrust.googleCount ? ` (${Number(d.dealerTrust.googleCount).toLocaleString()})` : ""}</p></div>}
+                {d.dealerTrust.satisfaction && <div className="text-center"><p className="text-[24px] font-extrabold text-[#1a6dff] leading-none">{d.dealerTrust.satisfaction}</p><p className="text-[11px] text-slate-500 mt-1">Customer Satisfaction</p></div>}
+                {d.dealerTrust.bbbRating && <div className="text-center"><p className="text-[24px] font-extrabold text-[#1a6dff] leading-none">{d.dealerTrust.bbbRating}</p><p className="text-[11px] text-slate-500 mt-1">BBB Rating</p></div>}
+              </div>
+            )}
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-5">
               {chips.map((c, i) => (
                 <div key={i} className="flex items-start gap-3"><span className="w-11 h-11 rounded-xl bg-blue-50 flex items-center justify-center shrink-0"><c.icon className="w-5 h-5 text-[#1a6dff]" /></span><div><p className="text-[14px] font-bold leading-tight">{c.t}</p><p className="text-[12px] text-slate-500 mt-0.5">{c.s}</p></div></div>
               ))}
             </div>
+            {d.dealerTrust.certifications.length > 0 && (
+              <div className="flex flex-wrap gap-2 mt-5">
+                {d.dealerTrust.certifications.map((c, i) => <span key={i} className="inline-flex items-center gap-1.5 text-[12px] font-semibold text-slate-700 bg-slate-100 rounded-full px-3 py-1.5"><Award className="w-3.5 h-3.5 text-[#1a6dff]" />{c}</span>)}
+              </div>
+            )}
             {(d.dealerPhone || d.dealerAddress) && (
               <div className="mt-5 pt-4 border-t border-slate-100 text-[14px] space-y-1.5">
                 {d.dealerPhone && <a href={`tel:${d.dealerPhone}`} className="flex items-center gap-2 font-semibold text-[#1a6dff]"><Phone className="w-4 h-4" />{formatPhone(d.dealerPhone)}</a>}

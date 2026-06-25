@@ -18,6 +18,7 @@ import { toast } from "sonner";
 import { AccessoryInstallPanel } from "@/components/admin/AccessoryInstallPanel";
 import DealerProgramsPanel from "@/components/admin/DealerProgramsPanel";
 import StickyButtonsPanel from "@/components/admin/StickyButtonsPanel";
+import DealershipTrustPanel from "@/components/admin/DealershipTrustPanel";
 import PrintSettingsPanel from "@/components/admin/PrintSettingsPanel";
 import DocumentRulesPanel from "@/components/admin/DocumentRulesPanel";
 import EnabledFeaturesPanel from "@/components/admin/EnabledFeaturesPanel";
@@ -104,7 +105,7 @@ interface Product {
   icon_type?: string;
 }
 
-type AdminTab = "home" | "products" | "rules" | "settings" | "branding" | "programs" | "analytics" | "leads" | "funnel" | "audit" | "queue" | "files" | "getready" | "inventory" | "invoices" | "warranty" | "team" | "print-settings" | "document-rules" | "incentives" | "features" | "passport-ctas";
+type AdminTab = "home" | "products" | "rules" | "settings" | "branding" | "programs" | "analytics" | "leads" | "funnel" | "audit" | "queue" | "files" | "getready" | "inventory" | "invoices" | "warranty" | "team" | "print-settings" | "document-rules" | "incentives" | "features" | "passport-ctas" | "passport-trust";
 
 const emptyProduct = {
   name: "",
@@ -181,7 +182,7 @@ const FEATURE_TOGGLES: { key: keyof DealerSettings; label: string; description: 
   { key: "feature_ai_descriptions", label: "AI Descriptions", description: "Generate vehicle descriptions automatically", status: "coming_soon" },
 ];
 
-const VALID_TABS: AdminTab[] = ["home", "products", "rules", "settings", "branding", "programs", "analytics", "leads", "funnel", "audit", "queue", "files", "getready", "inventory", "invoices", "warranty", "team", "print-settings", "document-rules", "incentives", "features", "passport-ctas"];
+const VALID_TABS: AdminTab[] = ["home", "products", "rules", "settings", "branding", "programs", "analytics", "leads", "funnel", "audit", "queue", "files", "getready", "inventory", "invoices", "warranty", "team", "print-settings", "document-rules", "incentives", "features", "passport-ctas", "passport-trust"];
 
 const Admin = () => {
   const queryClient = useQueryClient();
@@ -545,6 +546,7 @@ const Admin = () => {
     { id: "branding", label: "Branding" },
     { id: "programs", label: "Programs" },
     { id: "passport-ctas", label: "Passport CTAs" },
+    { id: "passport-trust", label: "Passport Trust" },
     ...(settings.feature_analytics ? [{ id: "analytics" as const, label: "Analytics" }] : []),
     ...(settings.feature_lead_capture ? [{ id: "leads" as const, label: "Leads" }] : []),
     { id: "funnel", label: "Signing Funnel" },
@@ -599,7 +601,7 @@ const Admin = () => {
           const availIds = new Set(tabs.map((t) => t.id));
           const groupDefs: { id: string; label: string; ids: AdminTab[] }[] = [
             { id: "home", label: "Home", ids: ["home"] },
-            { id: "setup", label: "Branding & Setup", ids: ["branding", "programs", "incentives", "passport-ctas"] },
+            { id: "setup", label: "Branding & Setup", ids: ["branding", "programs", "incentives", "passport-ctas", "passport-trust"] },
             { id: "products", label: "Products", ids: ["products", "rules"] },
             { id: "team", label: "Team", ids: ["team"] },
             { id: "reports", label: "Reports", ids: ["analytics", "leads", "funnel"] },
@@ -1343,6 +1345,7 @@ const Admin = () => {
         {/* ─── Branding Tab ─── */}
         {tab === "programs" && <DealerProgramsPanel />}
         {tab === "passport-ctas" && <StickyButtonsPanel />}
+        {tab === "passport-trust" && <DealershipTrustPanel />}
 
         {tab === "branding" && (
           <div>
