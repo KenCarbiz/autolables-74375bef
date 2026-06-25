@@ -595,26 +595,43 @@ const PublicListingBody = () => {
             </div>
             {/* AutoCheck Rating */}
             <div className="border border-[#eceef0] rounded-xl p-5 flex flex-col">
-              <div className="text-base font-bold">AutoCheck Vehicle Rating</div>
+              <div className="text-base font-bold">Vehicle Rating</div>
               <div className="flex items-center justify-center gap-3 mt-[18px]">
                 <span className="text-[40px] font-extrabold">{rating.score}</span>
                 <Stars n={Math.round(rating.score)} size={22} />
               </div>
               <div className="text-2xl font-bold mt-2 text-center">{rating.label}</div>
-              <div className="text-xs text-[#6b727a] mt-2.5 text-center">Based on vehicle history, age, mileage and usage</div>
+              <div className="text-xs text-[#6b727a] mt-2.5 text-center">AutoLabels score based on history, age, mileage and usage</div>
             </div>
-            {/* Price Confidence */}
+            {/* Price Confidence — derived from real pricing + history signals. */}
             <div className="border border-[#eceef0] rounded-xl p-5">
               <div className="text-base font-bold">Price Confidence</div>
-              <div className="text-[17px] font-bold text-[#1a9d5c] mt-3">High</div>
-              <div className="text-[13px] text-[#3a4048] mt-1">This vehicle is priced competitively</div>
-              <div className="flex flex-col gap-2 mt-[14px]">
-                {["Priced below market average", "Low days on market", "High demand for this model"].map((c) => (
-                  <div key={c} className="flex items-center gap-2 text-[13px]">
-                    <CheckCircle2 className="w-4 h-4 text-[#1a9d5c]" fill="#1a9d5c" stroke="#fff" strokeWidth={2.5} />{c}
-                  </div>
-                ))}
-              </div>
+              {(() => {
+                const points: string[] = [];
+                if (belowMarket > 0) points.push("Priced below market average");
+                if (recallCount === 0) points.push("No open safety recalls");
+                if (accidentCount === 0) points.push("No accidents reported");
+                if (ownerCount === 1) points.push("Single owner");
+                if (warrantyStr) points.push("Factory warranty remaining");
+                if (serviceCount > 0) points.push(`${serviceCount} service record${serviceCount > 1 ? "s" : ""} on file`);
+                const level = belowMarket > 0 ? "High" : marketAvg > 0 ? "Fair" : null;
+                if (!level && points.length === 0) {
+                  return <div className="text-[13px] text-[#6b727a] mt-3">Pricing and condition signals appear here as they are confirmed for this vehicle.</div>;
+                }
+                return (
+                  <>
+                    {level && <div className="text-[17px] font-bold text-[#1a9d5c] mt-3">{level}</div>}
+                    {belowMarket > 0 && <div className="text-[13px] text-[#3a4048] mt-1">This vehicle is priced below market average.</div>}
+                    <div className="flex flex-col gap-2 mt-[14px]">
+                      {points.map((c) => (
+                        <div key={c} className="flex items-center gap-2 text-[13px]">
+                          <CheckCircle2 className="w-4 h-4 text-[#1a9d5c]" fill="#1a9d5c" stroke="#fff" strokeWidth={2.5} />{c}
+                        </div>
+                      ))}
+                    </div>
+                  </>
+                );
+              })()}
             </div>
           </div>
 
