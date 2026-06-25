@@ -436,7 +436,7 @@ const VehiclePassportV2 = () => {
             </Card>
 
             {/* Confidence score */}
-            <Card className="p-5">
+            <Card className="p-4 md:p-5">
               {confScore != null ? (
                 <div className="flex flex-col sm:flex-row sm:items-center gap-4">
                   <span className="w-12 h-12 rounded-xl bg-emerald-50 flex items-center justify-center shrink-0"><ShieldCheck className="w-6 h-6 text-emerald-600" /></span>
@@ -553,7 +553,7 @@ const VehiclePassportV2 = () => {
 
         {/* 5. GREAT BUY + MARKET CARDS */}
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
-          <Card className="p-5">
+          <Card className="p-4 md:p-5">
             <SectionTitle>Why This Is A Great Buy</SectionTitle>
             <ul className="mt-3 space-y-2">
               {(whyBuy.length ? whyBuy : ["Details coming soon"]).map((b, i) => (
@@ -563,7 +563,7 @@ const VehiclePassportV2 = () => {
             <button className="mt-3 text-[13px] font-semibold text-[#2563EB] inline-flex items-center gap-1">See full details <ArrowRight className="w-3.5 h-3.5" /></button>
           </Card>
 
-          <Card className="p-5">
+          <Card className="p-4 md:p-5">
             <SectionTitle>Market Price Analysis</SectionTitle>
             <p className="text-[11px] text-slate-400 mt-0.5">Powered by MarketCheck</p>
             {marketAvg != null && price != null ? (
@@ -590,7 +590,7 @@ const VehiclePassportV2 = () => {
             )}
           </Card>
 
-          <Card className="p-5">
+          <Card className="p-4 md:p-5">
             <div className="flex items-center justify-between"><SectionTitle>Market Demand</SectionTitle><TrendingUp className="w-4 h-4 text-emerald-600" /></div>
             {viewCount != null || dom != null ? (
               <>
@@ -603,7 +603,7 @@ const VehiclePassportV2 = () => {
             ) : <p className="text-[13px] text-slate-500 mt-3">Demand data currently unavailable.</p>}
           </Card>
 
-          <Card className="p-5">
+          <Card className="p-4 md:p-5">
             <div className="flex items-center justify-between"><SectionTitle>Price Confidence</SectionTitle><DollarSign className="w-4 h-4 text-emerald-600" /></div>
             {belowMarket && belowMarket > 0 ? (
               <>
@@ -635,7 +635,7 @@ const VehiclePassportV2 = () => {
 
         {/* 6. HISTORY + WARRANTY + REVIEWS */}
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
-          <Card className="p-5">
+          <Card className="p-4 md:p-5">
             <SectionTitle>Vehicle History Summary</SectionTitle>
             <ul className="mt-3 space-y-2.5 text-[13px]">
               {[
@@ -653,7 +653,7 @@ const VehiclePassportV2 = () => {
             </ul>
           </Card>
 
-          <Card className="p-5">
+          <Card className="p-4 md:p-5">
             <SectionTitle>Ownership Timeline</SectionTitle>
             <ol className="mt-3 space-y-3 relative border-l-2 border-emerald-100 ml-1.5 pl-4">
               {[
@@ -672,7 +672,7 @@ const VehiclePassportV2 = () => {
             </ol>
           </Card>
 
-          <Card className="p-5">
+          <Card className="p-4 md:p-5">
             <div className="flex items-center justify-between">
               <SectionTitle>Factory Warranty</SectionTitle>
               {warrantyStr && <span className="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wide text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-full px-2 py-0.5"><ShieldCheck className="w-3 h-3" /> OEM Verified</span>}
@@ -712,7 +712,7 @@ const VehiclePassportV2 = () => {
             )}
           </Card>
 
-          <Card className="p-5">
+          <Card className="p-4 md:p-5">
             <SectionTitle>What Owners Say</SectionTitle>
             {reviewRating != null ? (
               <>
@@ -735,7 +735,7 @@ const VehiclePassportV2 = () => {
 
         {/* 7. HIGHLIGHTS + OVERVIEW + IMAGE */}
         <div className="grid grid-cols-1 lg:grid-cols-[1fr_1.1fr_0.9fr] gap-4">
-          <Card className="p-5">
+          <Card className="p-4 md:p-5">
             <SectionTitle>Vehicle Highlights</SectionTitle>
             <div className="grid grid-cols-2 gap-y-3 gap-x-3 mt-3">
               {(highlights.length ? highlights : [{ icon: Car, t: listing.ymm || "Vehicle", s: "Model" }]).slice(0, 6).map((h, i) => (
@@ -745,7 +745,7 @@ const VehiclePassportV2 = () => {
             <button className="mt-3 text-[13px] font-semibold text-[#2563EB] inline-flex items-center gap-1">View all features &amp; specs <ArrowRight className="w-3.5 h-3.5" /></button>
           </Card>
 
-          <Card className="p-5">
+          <Card className="p-4 md:p-5">
             <SectionTitle>Vehicle Overview</SectionTitle>
             <p className="text-[13px] leading-relaxed text-slate-600 mt-3 whitespace-pre-wrap">{overview}</p>
             <div className="mt-4 space-y-2 text-[12px]">
@@ -762,7 +762,7 @@ const VehiclePassportV2 = () => {
 
         {/* 8. WHY BUY FROM DEALER + CONTACT */}
         <div id="v2-docs" className="grid grid-cols-1 lg:grid-cols-[1.6fr_1fr] gap-4">
-          <Card className="p-5">
+          <Card className="p-4 md:p-5">
             <SectionTitle>Why Buy From {dealerName}?</SectionTitle>
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 mt-4">
               {dealerChips.map((c, i) => (
@@ -770,7 +770,7 @@ const VehiclePassportV2 = () => {
               ))}
             </div>
           </Card>
-          <div className="rounded-2xl p-6 text-white flex flex-col justify-center" style={{ background: "linear-gradient(105deg,#1a6dff 0%,#3b86ff 100%)" }}>
+          <div className="rounded-2xl p-5 md:p-6 text-white flex flex-col justify-center" style={{ background: "linear-gradient(105deg,#1a6dff 0%,#3b86ff 100%)" }}>
             <p className="text-[15px] opacity-90">Questions? We're here to help.</p>
             {dealerPhone && <a href={`tel:${dealerPhone}`} className="text-[26px] font-extrabold mt-1 block">{formatPhone(dealerPhone)}</a>}
             <p className="text-[13px] font-semibold opacity-90 mt-3">{dealerName}</p>
