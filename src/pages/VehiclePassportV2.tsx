@@ -854,7 +854,7 @@ const VehiclePassportV2 = () => {
           </div>
         </Card>
 
-        {/* 9. FOOTER */}
+        {/* 10. FOOTER */}
         <footer className="pt-2">
           <div className="flex flex-col sm:flex-row items-center justify-between gap-4 py-5 border-t border-[#e8ebef]">
             <div>{dealer.logo_url ? <img src={dealer.logo_url} alt={dealerName} className="h-8" /> : <Logo variant="full" size={22} />}</div>
