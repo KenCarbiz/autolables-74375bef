@@ -128,6 +128,33 @@ const CountUp = ({ value, duration = 900 }: { value: number; duration?: number }
   return <>{n}</>;
 };
 
+// Semicircle confidence gauge — score 0..100, emerald fill proportional.
+const ScoreGauge = ({ score, size = 132 }: { score: number; size?: number }) => {
+  const r = 52, cx = 60, cy = 60;
+  const circ = Math.PI * r; // half circumference
+  const pct = Math.max(0, Math.min(100, score)) / 100;
+  return (
+    <div className="relative" style={{ width: size, height: size * 0.62 }}>
+      <svg viewBox="0 0 120 70" className="w-full h-full">
+        <path d={`M ${cx - r} ${cy} A ${r} ${r} 0 0 1 ${cx + r} ${cy}`} fill="none" stroke="#e8ebef" strokeWidth="10" strokeLinecap="round" />
+        <path d={`M ${cx - r} ${cy} A ${r} ${r} 0 0 1 ${cx + r} ${cy}`} fill="none" stroke="#059669" strokeWidth="10" strokeLinecap="round" strokeDasharray={`${circ * pct} ${circ}`} />
+      </svg>
+      <div className="absolute inset-0 flex flex-col items-center justify-end pb-0.5">
+        <span className="text-[26px] font-extrabold leading-none text-slate-900"><CountUp value={score} /><span className="text-[13px] text-slate-400 font-bold">/100</span></span>
+      </div>
+    </div>
+  );
+};
+
+// Minimal sparkline for the market tiles (dependency-free).
+const MiniSpark = ({ points, color = "#059669" }: { points: number[]; color?: string }) => {
+  if (points.length < 2) return null;
+  const w = 120, h = 34, pad = 3;
+  const min = Math.min(...points), max = Math.max(...points), span = Math.max(1, max - min);
+  const d = points.map((p, i) => `${(pad + (i / (points.length - 1)) * (w - pad * 2)).toFixed(1)},${(pad + (1 - (p - min) / span) * (h - pad * 2)).toFixed(1)}`).join(" ");
+  return <svg viewBox={`0 0 ${w} ${h}`} className="w-full h-8 mt-1.5" preserveAspectRatio="none"><polyline points={d} fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg>;
+};
+
 const VehiclePassportV2 = () => {
   const { vehicleSlug } = useParams<{ vehicleSlug: string }>();
   const navigate = useNavigate();
@@ -298,8 +325,10 @@ const VehiclePassportV2 = () => {
 
   const viewCount = listing.view_count ?? null;
   const dom = (mc.dom as number) ?? null;
-  const { priceChange7d } = computePriceHistory(listing);
+  const { priceChange7d, valueHistory } = computePriceHistory(listing);
   const priceChangeStr = priceChange7d != null && priceChange7d !== 0 ? `${priceChange7d < 0 ? "-" : "+"}${fmt$(Math.abs(priceChange7d))}` : null;
+  const priceSeries = valueHistory.filter((h) => h.listing_price != null).map((h) => h.listing_price as number);
+  const marketSeries = valueHistory.filter((h) => h.market_value != null).map((h) => h.market_value as number);
 
   // "Why this is a great buy" bullets — from real signals.
   const whyBuy: string[] = [];
@@ -618,47 +647,65 @@ const VehiclePassportV2 = () => {
         {/* Six compact tiles — each a summary that opens its own full report
             page (no popups). Honest copy when a signal isn't available. */}
         <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3">
-          {[
+          {([
             { icon: DollarSign, title: "Market Price", tone: belowMarket && belowMarket > 0 ? "good" : "neutral",
               value: belowMarket && belowMarket > 0 ? "Great Price" : marketAvg != null ? "Market Price" : "Pending",
               sub: belowMarket && belowMarket > 0 ? `${fmt$(belowMarket)} below market average` : marketAvg != null ? `Market avg ${fmt$(marketAvg)}` : "Awaiting MarketCheck data",
-              cta: "View report", section: "market-price" },
+              cta: "View report", section: "market-price", spark: marketSeries, gauge: null },
             { icon: TrendingUp, title: "Market Demand", tone: (viewCount ?? 0) > 20 ? "good" : "neutral",
               value: (viewCount != null || dom != null) ? ((viewCount ?? 0) > 20 ? "High Interest" : "Active") : "Pending",
               sub: (viewCount != null || dom != null) ? [viewCount != null ? `${viewCount.toLocaleString()} views` : null, dom != null ? `${dom} days on market` : null].filter(Boolean).join(" · ") : "Activity tracked once live",
-              cta: "View report", section: "market-demand" },
+              cta: "View report", section: "market-demand", spark: [], gauge: null },
             { icon: GaugeIcon, title: "Price Confidence", tone: belowMarket && belowMarket > 0 ? "good" : "neutral",
               value: belowMarket && belowMarket > 0 ? "Excellent" : marketAvg != null ? "Fair" : "Pending",
               sub: marketAvg != null ? "Based on live comparables" : "Awaiting MarketCheck data",
-              cta: "View report", section: "price-confidence" },
+              cta: "View report", section: "price-confidence", spark: [], gauge: confScore },
             { icon: Clock, title: "Price History", tone: priceChange7d != null && priceChange7d < 0 ? "good" : "neutral",
               value: priceChangeStr ?? (priceChange7d === 0 ? "No change" : "Trend"),
               sub: priceChange7d != null ? (priceChange7d < 0 ? "Price dropped (7-day)" : priceChange7d > 0 ? "Price up (7-day)" : "Stable (7-day)") : "History builds as we track this VIN",
-              cta: "View history", section: "price-history" },
+              cta: "View history", section: "price-history", spark: priceSeries, gauge: null },
             { icon: Car, title: "Comparable Vehicles", tone: "neutral",
-              value: "Comp set", sub: "Similar vehicles via MarketCheck", cta: "View comp set", section: "comparable-vehicles" },
+              value: "Comp set", sub: "Similar vehicles via MarketCheck", cta: "View comp set", section: "comparable-vehicles", spark: [], gauge: null },
             { icon: Package, title: "Inventory Trend", tone: "neutral",
-              value: "30-Day", sub: "Market supply via MarketCheck", cta: "View trend", section: "inventory-trend" },
-          ].map((t) => (
+              value: "30-Day", sub: "Market supply via MarketCheck", cta: "View trend", section: "inventory-trend", spark: [], gauge: null },
+          ] as { icon: React.ElementType; title: string; tone: string; value: string; sub: string; cta: string; section: string; spark: number[]; gauge: number | null }[]).map((t) => (
             <Card key={t.section} className="p-4 flex flex-col">
               <div className="flex items-center gap-2 mb-2"><t.icon className={`w-4 h-4 ${t.tone === "good" ? "text-emerald-600" : "text-[#1a6dff]"}`} /><span className="text-[12px] font-bold text-slate-700 leading-tight">{t.title}</span></div>
-              <p className={`text-[15px] font-extrabold leading-tight ${t.tone === "good" ? "text-emerald-600" : "text-slate-900"}`}>{t.value}</p>
+              {t.gauge != null ? (
+                <div className="flex items-center gap-2"><div className="w-[64px] shrink-0"><ScoreGauge score={t.gauge} size={64} /></div><p className="text-[14px] font-extrabold text-emerald-600 leading-tight">{t.value}</p></div>
+              ) : (
+                <p className={`text-[15px] font-extrabold leading-tight ${t.tone === "good" ? "text-emerald-600" : "text-slate-900"}`}>{t.value}</p>
+              )}
               <p className="text-[11px] text-slate-500 mt-0.5 leading-snug flex-1">{t.sub}</p>
+              {t.spark.length >= 2 && <MiniSpark points={t.spark} color={t.tone === "good" ? "#059669" : "#1a6dff"} />}
               <button onClick={() => go(t.section)} className="mt-2.5 text-[12px] font-semibold text-[#2563EB] inline-flex items-center gap-1 hover:underline">{t.cta} <ArrowRight className="w-3 h-3" /></button>
             </Card>
           ))}
         </div>
         <p className="text-[10px] text-slate-400 px-0.5">Powered by MarketCheck. Market values are estimates from third-party data and may vary by region and time.</p>
 
-        {/* 5b. WHY THIS IS A GREAT BUY — now below Market Intelligence. */}
+        {/* 5b. WHY THIS IS A GREAT BUY — the primary buying summary, led by the
+            AutoLabels Confidence Score gauge (real, derived from history). */}
         <Card className="p-5 md:p-6">
           <SectionTitle>Why This Is A Great Buy</SectionTitle>
-          <ul className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2.5">
-            {(whyBuy.length ? whyBuy : ["Details coming soon"]).map((b, i) => (
-              <li key={i} className="flex items-start gap-2.5 text-[14px]"><CheckCircle2 className="w-[18px] h-[18px] text-emerald-600 shrink-0 mt-0.5" />{b}</li>
-            ))}
-          </ul>
-          <button onClick={() => go("great-buy")} className="mt-4 text-[13px] font-semibold text-[#2563EB] inline-flex items-center gap-1 hover:underline">See full details <ArrowRight className="w-3.5 h-3.5" /></button>
+          <div className="flex flex-col sm:flex-row sm:items-start gap-5 mt-4">
+            {confScore != null && (
+              <div className="flex items-center gap-4 sm:flex-col sm:items-center shrink-0 rounded-2xl bg-emerald-50/60 border border-emerald-100 p-4 sm:w-[190px]">
+                <ScoreGauge score={confScore} />
+                <div className="sm:text-center">
+                  <p className="text-[11px] font-semibold text-slate-500">AutoLabels Confidence Score</p>
+                  <p className="text-[16px] font-extrabold text-emerald-600 leading-tight">{confLabel} Value</p>
+                  <p className="text-[11px] text-slate-500 mt-0.5">Better than {confScore}% of similar vehicles</p>
+                </div>
+              </div>
+            )}
+            <ul className="flex-1 grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2.5 self-center">
+              {(whyBuy.length ? whyBuy : ["Details coming soon"]).map((b, i) => (
+                <li key={i} className="flex items-start gap-2.5 text-[14px]"><CheckCircle2 className="w-[18px] h-[18px] text-emerald-600 shrink-0 mt-0.5" />{b}</li>
+              ))}
+            </ul>
+          </div>
+          <button onClick={() => go("great-buy")} className="mt-4 text-[13px] font-semibold text-[#2563EB] inline-flex items-center gap-1 hover:underline">See full buying report <ArrowRight className="w-3.5 h-3.5" /></button>
         </Card>
 
         {/* 6. HISTORY + WARRANTY + REVIEWS */}
