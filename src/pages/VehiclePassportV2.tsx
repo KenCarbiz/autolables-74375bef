@@ -710,7 +710,7 @@ const VehiclePassportV2 = () => {
 
         {/* 6. HISTORY + WARRANTY + REVIEWS */}
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
-          <Card className="p-4 md:p-5">
+          <Card className="p-4 md:p-5 flex flex-col">
             <SectionTitle>Vehicle History Summary</SectionTitle>
             <ul className="mt-3 space-y-2.5 text-[13px]">
               {[
@@ -726,55 +726,63 @@ const VehiclePassportV2 = () => {
                 </li>
               ))}
             </ul>
-            <button onClick={() => go("vehicle-history")} className="mt-3 text-[13px] font-semibold text-[#2563EB] inline-flex items-center gap-1 hover:underline">View full history report <ArrowRight className="w-3.5 h-3.5" /></button>
+            <button onClick={() => go("vehicle-history")} className="mt-auto pt-3 text-[13px] font-semibold text-[#2563EB] inline-flex items-center gap-1 hover:underline self-start">View full history report <ArrowRight className="w-3.5 h-3.5" /></button>
           </Card>
 
-          <Card className="p-4 md:p-5">
+          <Card className="p-4 md:p-5 flex flex-col">
             <SectionTitle>Ownership Timeline</SectionTitle>
-            <ol className="mt-3 space-y-3 relative border-l-2 border-emerald-100 ml-1.5 pl-4">
-              {[
-                warranty.in_service_date ? { d: new Date(warranty.in_service_date).toLocaleDateString(), t: "Placed in service", s: "Factory warranty start" } : null,
-                ownerCount != null ? { d: ownerCount === 1 ? "Single owner" : `${ownerCount} owners`, t: ownerCount === 1 ? "One Owner" : "Ownership", s: "Personal use" } : null,
-                serviceCount > 0 ? { d: `${serviceCount} record${serviceCount === 1 ? "" : "s"}`, t: "Service history", s: "Maintained on schedule" } : null,
-                { d: "Now", t: `At ${dealerName}`, s: "Current inventory" },
-                { d: "Today", t: "Available", s: "Ready for delivery" },
-              ].filter(Boolean).map((e, i) => (
+            <ol className="mt-4 space-y-4 relative border-l-2 border-slate-100 ml-1.5 pl-4">
+              {([
+                /^\d{4}$/.test((listing.ymm || "").split(" ")[0]) ? { d: (listing.ymm || "").split(" ")[0], t: "Manufactured", s: "Factory production", c: "bg-slate-400" } : null,
+                warranty.in_service_date ? { d: new Date(warranty.in_service_date).toLocaleDateString(), t: "Placed in service", s: "Factory warranty begins", c: "bg-emerald-500" } : null,
+                ownerCount != null ? { d: ownerCount === 1 ? "Single owner" : `${ownerCount} owners`, t: ownerCount === 1 ? "First owner" : "Ownership", s: "Personal use", c: "bg-emerald-500" } : null,
+                serviceCount > 0 ? { d: `${serviceCount} record${serviceCount === 1 ? "" : "s"}`, t: "Regular service", s: "Maintained on schedule", c: "bg-emerald-500" } : null,
+                (listing.prep_status?.foreman_signed_at) ? { d: new Date(listing.prep_status.foreman_signed_at).toLocaleDateString(), t: "AutoLabels inspected", s: "Multi-point sign-off", c: "bg-emerald-500" } : null,
+                { d: "Now", t: `At ${dealerName}`, s: "Current inventory", c: "bg-emerald-500" },
+                { d: "Today", t: "Ready for you", s: "Available for delivery", c: "bg-[#1a6dff]" },
+              ].filter(Boolean) as { d: string; t: string; s: string; c: string }[]).map((e, i) => (
                 <li key={i} className="relative">
-                  <span className="absolute -left-[22px] top-1 w-3 h-3 rounded-full bg-emerald-500 ring-2 ring-white" />
-                  <p className="text-[12px] font-bold">{(e as { d: string }).d} · {(e as { t: string }).t}</p>
-                  <p className="text-[11px] text-slate-500">{(e as { s: string }).s}</p>
+                  <span className={`absolute -left-[22px] top-1 w-3 h-3 rounded-full ${e.c} ring-2 ring-white`} />
+                  <p className="text-[12px] font-bold">{e.d} · {e.t}</p>
+                  <p className="text-[11px] text-slate-500">{e.s}</p>
                 </li>
               ))}
             </ol>
-            <button onClick={() => go("ownership-timeline")} className="mt-3 text-[13px] font-semibold text-[#2563EB] inline-flex items-center gap-1 hover:underline">View full timeline <ArrowRight className="w-3.5 h-3.5" /></button>
+            <button onClick={() => go("ownership-timeline")} className="mt-auto pt-3 text-[13px] font-semibold text-[#2563EB] inline-flex items-center gap-1 hover:underline self-start">View full timeline <ArrowRight className="w-3.5 h-3.5" /></button>
           </Card>
 
-          <Card className="p-4 md:p-5">
+          <Card className="p-4 md:p-5 flex flex-col">
             <div className="flex items-center justify-between">
               <SectionTitle>Factory Warranty</SectionTitle>
               {warrantyStr && <span className="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wide text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-full px-2 py-0.5"><ShieldCheck className="w-3 h-3" /> OEM Verified</span>}
             </div>
             {warrantyStr ? (() => {
-              const milesLeft = warranty.factory_miles != null && listing.mileage != null ? Math.max(0, warranty.factory_miles - listing.mileage) : warranty.factory_miles ?? null;
-              const milesPct = warranty.factory_miles && listing.mileage != null ? Math.max(4, 100 - Math.min(100, (listing.mileage / warranty.factory_miles) * 100)) : 65;
-              let yrsLeft: number | null = null; let expiry: string | null = null;
+              const milesLeft = warranty.factory_miles != null && listing.mileage != null ? Math.max(0, warranty.factory_miles - listing.mileage) : null;
+              const milesPct = warranty.factory_miles && listing.mileage != null ? Math.max(3, 100 - Math.min(100, (listing.mileage / warranty.factory_miles) * 100)) : null;
+              let monthsLeft: number | null = null; let monthsPct: number | null = null; let expiry: string | null = null;
               if (warranty.in_service_date && warranty.factory_months) {
                 const end = new Date(warranty.in_service_date); end.setMonth(end.getMonth() + warranty.factory_months);
                 expiry = end.toLocaleDateString();
-                const ms = end.getTime() - Date.now(); yrsLeft = ms > 0 ? ms / (1000 * 60 * 60 * 24 * 365) : 0;
+                const ms = end.getTime() - Date.now();
+                monthsLeft = ms > 0 ? Math.round(ms / (1000 * 60 * 60 * 24 * 30.4)) : 0;
+                monthsPct = Math.max(3, Math.min(100, (monthsLeft / warranty.factory_months) * 100));
               }
               return (
                 <>
-                  <p className="text-base font-bold mt-2">Factory warranty remaining</p>
-                  <div className="mt-3 h-2.5 rounded-full bg-slate-100 overflow-hidden">
-                    <div className="h-full rounded-full bg-emerald-500 transition-all" style={{ width: `${milesPct}%` }} />
-                  </div>
-                  <div className="flex items-center gap-5 mt-2.5 text-[13px]">
-                    {yrsLeft != null && <span><span className="font-bold">{yrsLeft >= 1 ? `${Math.floor(yrsLeft)} yr` : `${Math.round(yrsLeft * 12)} mo`}</span> <span className="text-slate-500">remaining</span></span>}
-                    {milesLeft != null && <span><span className="font-bold">{milesLeft.toLocaleString()} mi</span> <span className="text-slate-500">remaining</span></span>}
-                  </div>
-                  <div className="mt-2 text-[11px] text-slate-500 space-y-0.5">
-                    {warranty.in_service_date && <p>In-service date: {new Date(warranty.in_service_date).toLocaleDateString()}</p>}
+                  <p className="text-[13px] text-slate-500 mt-2">{warrantyStr} factory coverage</p>
+                  {monthsPct != null && (
+                    <div className="mt-3">
+                      <div className="flex items-baseline justify-between text-[12px]"><span className="text-slate-500">Time Remaining</span><span className="font-bold">{monthsLeft} <span className="text-slate-400 font-medium">of {warranty.factory_months} mo</span></span></div>
+                      <div className="mt-1 h-2.5 rounded-full bg-slate-100 overflow-hidden"><div className="h-full rounded-full bg-emerald-500 transition-all" style={{ width: `${monthsPct}%` }} /></div>
+                    </div>
+                  )}
+                  {milesPct != null && (
+                    <div className="mt-3">
+                      <div className="flex items-baseline justify-between text-[12px]"><span className="text-slate-500">Mileage Remaining</span><span className="font-bold">{milesLeft!.toLocaleString()} <span className="text-slate-400 font-medium">of {(warranty.factory_miles! / 1000).toFixed(0)}K mi</span></span></div>
+                      <div className="mt-1 h-2.5 rounded-full bg-slate-100 overflow-hidden"><div className="h-full rounded-full bg-emerald-500 transition-all" style={{ width: `${milesPct}%` }} /></div>
+                    </div>
+                  )}
+                  <div className="mt-3 text-[11px] text-slate-500 space-y-0.5">
                     {expiry && <p>Estimated expiration: <span className="font-semibold text-slate-700">{expiry}</span></p>}
                   </div>
                   <p className="text-[10px] text-slate-400 mt-2 leading-snug">Warranty information estimated from OEM data and vehicle history records.</p>
@@ -783,10 +791,10 @@ const VehiclePassportV2 = () => {
             })() : (
               <p className="text-[13px] text-slate-500 mt-3">Coverage details confirmed at the dealership.</p>
             )}
-            <button onClick={() => go("factory-warranty")} className="mt-3 text-[13px] font-semibold text-[#2563EB] inline-flex items-center gap-1 hover:underline">View warranty details <ArrowRight className="w-3.5 h-3.5" /></button>
+            <button onClick={() => go("factory-warranty")} className="mt-auto pt-3 text-[13px] font-semibold text-[#2563EB] inline-flex items-center gap-1 hover:underline self-start">View warranty details <ArrowRight className="w-3.5 h-3.5" /></button>
           </Card>
 
-          <Card className="p-4 md:p-5">
+          <Card className="p-4 md:p-5 flex flex-col">
             <SectionTitle>What Owners Say</SectionTitle>
             {reviewRating != null ? (
               <>
@@ -796,23 +804,23 @@ const VehiclePassportV2 = () => {
             ) : (
               <p className="text-[13px] text-slate-500 mt-3">Independent buyer reviews for this model are shown here when available.</p>
             )}
-            <button onClick={() => go("owner-reviews")} className="mt-3 text-[13px] font-semibold text-[#2563EB] inline-flex items-center gap-1 hover:underline">Read all reviews <ArrowRight className="w-3.5 h-3.5" /></button>
+            <button onClick={() => go("owner-reviews")} className="mt-auto pt-3 text-[13px] font-semibold text-[#2563EB] inline-flex items-center gap-1 hover:underline self-start">Read all reviews <ArrowRight className="w-3.5 h-3.5" /></button>
           </Card>
         </div>
 
         {/* 7. HIGHLIGHTS + OVERVIEW + IMAGE */}
         <div className="grid grid-cols-1 lg:grid-cols-[1fr_1.1fr_0.9fr] gap-4">
-          <Card className="p-4 md:p-5">
+          <Card className="p-4 md:p-5 flex flex-col">
             <SectionTitle>Vehicle Highlights</SectionTitle>
             <div className="grid grid-cols-2 gap-y-3 gap-x-3 mt-3">
               {(highlights.length ? highlights : [{ icon: Car, t: listing.ymm || "Vehicle", s: "Model" }]).slice(0, 6).map((h, i) => (
                 <div key={i} className="flex items-center gap-2.5"><h.icon className="w-5 h-5 text-[#1a6dff] shrink-0" /><div className="min-w-0"><div className="text-[13px] font-semibold leading-tight truncate">{h.t}</div><div className="text-[11px] text-slate-400">{h.s}</div></div></div>
               ))}
             </div>
-            <button onClick={() => go("features")} className="mt-3 text-[13px] font-semibold text-[#2563EB] inline-flex items-center gap-1 hover:underline">View all features &amp; specs <ArrowRight className="w-3.5 h-3.5" /></button>
+            <button onClick={() => go("features")} className="mt-auto pt-3 text-[13px] font-semibold text-[#2563EB] inline-flex items-center gap-1 hover:underline self-start">View all features &amp; specs <ArrowRight className="w-3.5 h-3.5" /></button>
           </Card>
 
-          <Card className="p-4 md:p-5">
+          <Card className="p-4 md:p-5 flex flex-col">
             <SectionTitle>Vehicle Overview</SectionTitle>
             <p className="text-[13px] leading-relaxed text-slate-600 mt-3 whitespace-pre-wrap">{overview}</p>
             <div className="mt-4 space-y-2 text-[12px]">
@@ -820,10 +828,10 @@ const VehiclePassportV2 = () => {
                 <div key={k} className="flex justify-between gap-4"><span className="text-slate-500">{k}</span><span className="font-semibold text-right">{v}</span></div>
               ))}
             </div>
-            <button onClick={() => go("overview")} className="mt-3 text-[13px] font-semibold text-[#2563EB] inline-flex items-center gap-1 hover:underline">Read full overview <ArrowRight className="w-3.5 h-3.5" /></button>
+            <button onClick={() => go("overview")} className="mt-auto pt-3 text-[13px] font-semibold text-[#2563EB] inline-flex items-center gap-1 hover:underline self-start">Read full overview <ArrowRight className="w-3.5 h-3.5" /></button>
           </Card>
 
-          <Card className="p-4 md:p-5">
+          <Card className="p-4 md:p-5 flex flex-col">
             <SectionTitle>Key Specifications</SectionTitle>
             {keySpecs.length > 0 ? (
               <div className="mt-3 space-y-2 text-[13px]">
@@ -832,7 +840,7 @@ const VehiclePassportV2 = () => {
                 ))}
               </div>
             ) : <p className="text-[13px] text-slate-500 mt-3">Decoded specifications appear here once processed.</p>}
-            <button onClick={() => go("specifications")} className="mt-3 text-[13px] font-semibold text-[#2563EB] inline-flex items-center gap-1 hover:underline">View full specs <ArrowRight className="w-3.5 h-3.5" /></button>
+            <button onClick={() => go("specifications")} className="mt-auto pt-3 text-[13px] font-semibold text-[#2563EB] inline-flex items-center gap-1 hover:underline self-start">View full specs <ArrowRight className="w-3.5 h-3.5" /></button>
           </Card>
         </div>
 
