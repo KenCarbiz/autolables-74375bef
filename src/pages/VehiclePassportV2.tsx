@@ -263,15 +263,15 @@ const VehiclePassportV2 = () => {
     { label: "NHTSA", on: !!listing.recall_status },
   ].filter((x) => x.on);
 
-  // Trust strip badges — always 6 slots, colored by real data.
-  const trust = [
-    accidentCount === 0 ? { icon: Shield, t: "No Accidents", s: "History verified", ok: true } : accidentCount ? { icon: Shield, t: `${accidentCount} Accident${accidentCount > 1 ? "s" : ""}`, s: "Reported", ok: false } : { icon: Shield, t: "Accident History", s: "Not reported", ok: null },
-    ownerCount === 1 ? { icon: User, t: "One Owner", s: "Personal Use", ok: true } : ownerCount ? { icon: User, t: `${ownerCount} Owners`, s: "History", ok: true } : { icon: User, t: "Ownership", s: "Not reported", ok: null },
-    serviceCount > 0 ? { icon: Wrench, t: "Service History", s: `${serviceCount} Records`, ok: true } : { icon: Wrench, t: "Service History", s: "No records", ok: null },
-    cleanTitle ? { icon: FileCheck, t: "Clean Title", s: "No Issues", ok: true } : { icon: FileCheck, t: "Title", s: "Not reported", ok: null },
-    warrantyStr ? { icon: ShieldCheck, t: "Factory Warranty", s: warrantyStr, ok: true } : { icon: ShieldCheck, t: "Factory Warranty", s: "Not provided", ok: null },
-    recallClear ? { icon: BadgeCheck, t: "No Open Recalls", s: "0 Open Recalls", ok: true } : openRecalls ? { icon: BadgeCheck, t: `${openRecalls} Open Recall${openRecalls > 1 ? "s" : ""}`, s: "See details", ok: false } : { icon: BadgeCheck, t: "Recalls", s: "Not checked", ok: null },
-  ];
+  // AutoLabels Verified checklist — real verification signals only.
+  const verifyRows = [
+    { label: "VIN Verified", done: !!listing.vin },
+    { label: "Vehicle History", done: typeof mc.carfax_clean_title === "boolean" || ownerCount != null || accidentCount != null },
+    { label: "Recall Verification", done: !!listing.recall_status },
+    { label: "Market Data", done: marketAvg != null || verifiedBy.some((v) => v.label === "MarketCheck") },
+    { label: "Warranty Checked", done: !!warrantyStr },
+    { label: "Service History", done: serviceCount > 0 },
+  ].filter((r) => r.done);
 
   const highlights: { icon: React.ElementType; t: string; s: string }[] = [];
   if (ks.engine) highlights.push({ icon: Cog, t: ks.engine, s: "Engine" });
@@ -487,66 +487,55 @@ const VehiclePassportV2 = () => {
               )}
             </div>
 
-            {/* Trust strip — positive verified signals; unknowns show as a
-                subtle skeleton (never "Not reported"). */}
-            <Card className="grid grid-cols-3 sm:grid-cols-6 overflow-hidden">
-              {trust.map((b, i) => (
-                <div key={i} className="px-3 py-3 text-center border-r border-b sm:border-b-0 border-[#eef1f4] last:border-r-0 flex flex-col items-center gap-1">
-                  <b.icon className={`w-5 h-5 ${b.ok === false ? "text-amber-500" : b.ok === null ? "text-slate-300" : "text-emerald-600"}`} />
-                  <p className={`text-[11px] font-bold leading-tight ${b.ok === null ? "text-slate-400" : ""}`}>{b.t}</p>
-                  <p className="text-[10px] text-slate-500 inline-flex items-center gap-0.5 leading-tight">
-                    {b.ok === true && <CheckCircle2 className="w-2.5 h-2.5 text-emerald-600" />}{b.s}
-                  </p>
+            {/* AutoLabels Verified — green-shield trust card with a two-column
+                checklist of the signals we actually verified. */}
+            {verifyRows.length > 0 && (
+              <Card className="p-4 md:p-5 !border-emerald-200 !bg-emerald-50/40">
+                <div className="flex items-center gap-2.5">
+                  <span className="w-10 h-10 rounded-xl bg-emerald-100 flex items-center justify-center shrink-0"><ShieldCheck className="w-6 h-6 text-emerald-600" /></span>
+                  <div>
+                    <p className="text-[15px] font-extrabold text-slate-900 leading-tight">AutoLabels Verified</p>
+                    <p className="text-[11px] text-slate-500">Independently checked against trusted automotive data.</p>
+                  </div>
                 </div>
-              ))}
-            </Card>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2 mt-3.5">
+                  {verifyRows.map((r) => (
+                    <div key={r.label} className="flex items-center gap-2 text-[13px] font-medium text-slate-700"><CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />{r.label}</div>
+                  ))}
+                </div>
+              </Card>
+            )}
 
-            {/* Confidence score */}
-            <Card className="p-4 md:p-5">
-              {confScore != null ? (
-                <div className="flex flex-col sm:flex-row sm:items-center gap-4">
-                  <span className="w-12 h-12 rounded-xl bg-emerald-50 flex items-center justify-center shrink-0"><ShieldCheck className="w-6 h-6 text-emerald-600" /></span>
-                  <div className="flex-1">
-                    <p className="text-[12px] font-semibold text-slate-500">AutoLabels Vehicle Confidence Score</p>
-                    <div className="flex items-baseline gap-2 mt-0.5">
-                      <span className="text-[34px] font-extrabold leading-none"><CountUp value={confScore} /></span>
-                      <span className="text-sm text-slate-400 font-semibold">/ 100</span>
-                      <span className="text-base font-bold text-emerald-600 ml-1">{confLabel}</span>
-                      <Stars n={confScore / 20} size={16} />
-                    </div>
-                    <p className="text-[12px] text-slate-500 mt-1">Better than {confScore}% of similar vehicles.</p>
+            {/* AutoLabels Confidence Score — prominent score badge, label, stars
+                and the real data sources behind it. */}
+            {confScore != null && (
+              <Card className="p-4 md:p-5">
+                <div className="flex items-center gap-4">
+                  <div className="w-[68px] h-[68px] rounded-2xl bg-emerald-50 border border-emerald-100 flex flex-col items-center justify-center shrink-0 leading-none">
+                    <span className="text-[28px] font-extrabold text-emerald-600"><CountUp value={confScore} /></span>
+                    <span className="text-[9px] font-semibold text-emerald-500/80 -mt-0.5">/ 100</span>
                   </div>
-                  {verifiedBy.length > 0 && (
-                    <div className="sm:border-l sm:pl-4 border-[#eef1f4]">
-                      <p className="text-[11px] text-slate-400 font-semibold mb-1.5">Data verified by</p>
-                      <div className="grid grid-cols-2 gap-x-3 gap-y-1">
-                        {verifiedBy.map((v) => <span key={v.label} className="text-[12px] font-semibold inline-flex items-center gap-1 text-slate-700"><CheckCircle2 className="w-3 h-3 text-emerald-600" />{v.label}</span>)}
-                      </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-[12px] font-semibold text-slate-500">AutoLabels Confidence Score</p>
+                    <div className="flex items-center gap-2 mt-0.5">
+                      <span className="text-[18px] font-extrabold text-slate-900">{confLabel}</span>
+                      <Stars n={confScore / 20} size={15} />
                     </div>
-                  )}
-                </div>
-              ) : (verifiedBy.length > 0 || warrantyStr || listing.recall_status || listing.ymm) ? (
-                <div>
-                  <div className="flex items-center gap-2.5">
-                    <span className="w-9 h-9 rounded-xl bg-emerald-50 flex items-center justify-center shrink-0"><ShieldCheck className="w-5 h-5 text-emerald-600" /></span>
-                    <div>
-                      <p className="text-[14px] font-bold text-slate-900">Vehicle Verified</p>
-                      <p className="text-[11px] text-slate-500">Verified using multiple trusted automotive data sources.</p>
-                    </div>
-                  </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-1.5 mt-3">
-                    {[
-                      { label: "VIN Verified", done: !!listing.ymm },
-                      { label: "Market Data Verified", done: verifiedBy.some((v) => v.label === "MarketCheck") },
-                      { label: "Warranty Checked", done: !!warrantyStr },
-                      { label: "Recall Check Complete", done: !!listing.recall_status },
-                    ].filter((r) => r.done).map((r) => (
-                      <div key={r.label} className="flex items-center gap-2 py-0.5 text-[12px] text-slate-700"><CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />{r.label}</div>
-                    ))}
+                    <p className="text-[12px] text-slate-500 mt-0.5">Better than {confScore}% of similar vehicles.</p>
                   </div>
                 </div>
-              ) : null}
-            </Card>
+                {verifiedBy.length > 0 && (
+                  <div className="mt-3.5 pt-3 border-t border-[#eef1f4]">
+                    <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400 mb-1.5">Data sources</p>
+                    <div className="flex flex-wrap gap-1.5">
+                      {verifiedBy.map((v) => (
+                        <span key={v.label} className="inline-flex items-center gap-1 text-[11px] font-semibold text-slate-700 bg-slate-100 rounded-full px-2.5 py-1"><CheckCircle2 className="w-3 h-3 text-emerald-600" />{v.label}</span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </Card>
+            )}
           </div>
         </div>
 
