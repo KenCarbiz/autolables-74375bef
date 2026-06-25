@@ -135,6 +135,13 @@ const VehiclePassportV2 = () => {
   const [inquiry, setInquiry] = useState<null | "info" | "trade">(null);
   const [zip, setZip] = useState("");
   const [lightbox, setLightbox] = useState(false);
+  const [showSticky, setShowSticky] = useState(false);
+
+  useEffect(() => {
+    const onScroll = () => setShowSticky(window.scrollY > 320);
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, []);
 
   useEffect(() => {
     if (!vehicleSlug) return;
@@ -788,6 +795,20 @@ const VehiclePassportV2 = () => {
             Information is provided by trusted third parties and is accurate to the best of our knowledge. Verify details with the dealer. © {new Date().getFullYear()} {dealerName}. All rights reserved.
           </p>
         </footer>
+      </div>
+
+      {/* Compact sticky header — mobile only, slides in after scrolling past
+          the hero so vehicle + price + share stay reachable. */}
+      <div className={`lg:hidden fixed top-0 inset-x-0 z-40 bg-white/90 backdrop-blur border-b border-[#e8ebef] shadow-sm transition-transform duration-200 ${showSticky ? "translate-y-0" : "-translate-y-full"}`}>
+        <div className="h-14 px-3 flex items-center gap-2.5">
+          <button onClick={() => window.history.length > 1 ? window.history.back() : window.scrollTo({ top: 0, behavior: "smooth" })} aria-label="Back" className="w-9 h-9 rounded-full hover:bg-slate-100 flex items-center justify-center shrink-0"><ChevronLeft className="w-5 h-5" /></button>
+          {heroSrc && <img src={heroSrc} alt="" className="w-9 h-9 rounded-lg object-cover shrink-0" />}
+          <div className="min-w-0 flex-1">
+            <p className="text-[13px] font-bold leading-tight truncate">{listing.ymm || "Vehicle"}</p>
+            {price != null && <p className="text-[12px] font-bold text-[#1a6dff] leading-tight">{fmt$(price)}</p>}
+          </div>
+          <button onClick={handleShare} aria-label="Share" className="w-9 h-9 rounded-full hover:bg-slate-100 flex items-center justify-center shrink-0"><Upload className="w-[18px] h-[18px] text-slate-600" /></button>
+        </div>
       </div>
 
       {/* Sticky bottom action bar — mobile only (≤768px). Respects the iOS
