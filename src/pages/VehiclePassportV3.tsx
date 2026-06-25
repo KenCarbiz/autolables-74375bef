@@ -30,6 +30,8 @@ const GREEN = "#16A34A";
 const CARD = "rounded-2xl border border-[#E6E8EC] bg-white shadow-[0_1px_2px_rgba(0,0,0,0.04),0_8px_24px_rgba(0,0,0,0.05)]";
 const TEXT2 = "text-[#64748B]";
 
+const abbrevDrive = (s: string) => s.replace(/all[- ]?wheel drive/i, "AWD").replace(/front[- ]?wheel drive/i, "FWD").replace(/rear[- ]?wheel drive/i, "RWD").replace(/(four|4)[- ]?wheel drive/i, "4WD");
+
 const H2 = ({ children }: { children: React.ReactNode }) => <h2 className="text-[20px] font-bold leading-7 tracking-tight text-[#0F172A]">{children}</h2>;
 const H3 = ({ children }: { children: React.ReactNode }) => <h3 className="text-[16px] font-semibold leading-6 text-[#0F172A]">{children}</h3>;
 const Link = ({ onClick, children, className = "" }: { onClick: () => void; children: React.ReactNode; className?: string }) => (
@@ -199,10 +201,10 @@ const VehiclePassportV3 = () => {
   const ks = listing.key_specs || {}; const mc = (listing.mc_attributes || {}) as Record<string, unknown>;
   if (ks.engine) highlights.push({ icon: Cog, t: ks.engine, s: "Engine" });
   if (mc.horsepower) highlights.push({ icon: Zap, t: `${mc.horsepower} HP`, s: "Power" });
-  if (ks.drivetrain) highlights.push({ icon: Car, t: ks.drivetrain, s: "Drivetrain" });
-  if (ks.mpg_city && ks.mpg_hwy) highlights.push({ icon: Fuel, t: `${ks.mpg_city}/${ks.mpg_hwy} MPG`, s: "Combined" });
+  if (ks.drivetrain) highlights.push({ icon: Car, t: abbrevDrive(ks.drivetrain), s: "Drivetrain" });
+  if (ks.mpg_city && ks.mpg_hwy) highlights.push({ icon: Fuel, t: `${ks.mpg_city}/${ks.mpg_hwy}`, s: "MPG" });
   else if (ks.fuel) highlights.push({ icon: Fuel, t: ks.fuel, s: "Fuel" });
-  if (ks.transmission) highlights.push({ icon: Settings, t: ks.transmission, s: "Transmission" });
+  if (ks.transmission) highlights.push({ icon: Settings, t: ks.transmission.replace(/\s*automatic/i, "").trim(), s: "Transmission" });
   if (ks.exterior_color) highlights.push({ icon: Wind, t: ks.exterior_color, s: "Exterior" });
   (listing.features || []).forEach((f) => { if (highlights.length < 8) highlights.push({ icon: Award, t: f.title, s: f.subtitle || "Feature" }); });
 
@@ -431,7 +433,7 @@ const VehiclePassportV3 = () => {
           <div className={`${CARD} p-5 flex flex-col`}>
             <H3>Vehicle Highlights</H3>
             {highlights.length ? (
-              <div className="grid grid-cols-4 gap-y-4 gap-x-2 mt-4">{highlights.slice(0, 8).map((h, i) => <div key={i} className="flex flex-col items-center text-center gap-1.5"><span className="w-10 h-10 rounded-xl bg-blue-50 flex items-center justify-center"><h.icon className="w-5 h-5 text-[#2563EB]" /></span><div className="w-full"><div className="text-[11px] font-bold leading-tight truncate">{h.t}</div><div className="text-[10px] text-[#94A3B8] truncate">{h.s}</div></div></div>)}</div>
+              <div className="grid grid-cols-4 gap-y-4 gap-x-2 mt-4">{highlights.slice(0, 8).map((h, i) => <div key={i} className="flex flex-col items-center text-center gap-1.5"><span className="w-10 h-10 rounded-xl bg-blue-50 flex items-center justify-center shrink-0"><h.icon className="w-5 h-5 text-[#2563EB]" /></span><div className="w-full min-w-0"><div className="text-[11px] font-bold leading-tight line-clamp-2 break-words">{h.t}</div><div className="text-[10px] text-[#94A3B8] truncate">{h.s}</div></div></div>)}</div>
             ) : <p className="text-[13px] text-[#64748B] mt-3">Equipment highlights appear here as the vehicle's data is decoded.</p>}
             <Link onClick={() => go("features")} className="mt-auto pt-3 self-start">View all features &amp; specs</Link>
           </div>
