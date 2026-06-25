@@ -89,6 +89,33 @@ const Semi = ({ score }: { score: number }) => {
   );
 };
 
+// Sample data for the labeled design-preview mode (/passport-v3/:slug?preview=1).
+// Never used for real shoppers — only renders when the query flag is present and
+// the page shows a prominent "Sample preview" banner. Lets the layout be judged
+// against the design goal before live data/back-end deploys land.
+const MOCK_LISTING = {
+  id: "mock", slug: "sample", vin: "5N1AL1F83VC332076", ymm: "2027 INFINITI QX60", trim: "LUXE AWD",
+  condition: "new", status: "published", mileage: 17, price: 58140, market_value: 61300,
+  hero_image_url: "https://images.unsplash.com/photo-1606664515524-ed2f786a0bd6?w=900",
+  photos: Array.from({ length: 8 }, () => ({ url: "https://images.unsplash.com/photo-1606664515524-ed2f786a0bd6?w=900" })),
+  videos: [], description: "The 2027 INFINITI QX60 LUXE AWD combines refined luxury, advanced technology, and confident performance in a spacious 3-row SUV. With premium materials, intuitive tech, and family-focused comfort, it is designed for drivers who expect more.",
+  key_specs: { engine: "V6 3.5L", drivetrain: "All-Wheel Drive", transmission: "9-Speed Automatic", fuel: "Gasoline", mpg_city: 20, mpg_hwy: 25, exterior_color: "Graphite Shadow", interior_color: "Graphite" },
+  mc_attributes: { msrp: 61640, horsepower: 295, owner_count: 1, accident_count: 0, carfax_clean_title: true, dom: 45, seating: 7 },
+  market_payload: { high: 64200, low: 56800, belowMarket: 3160 },
+  warranty_info: { factory_months: 48, factory_miles: 60000, in_service_date: "2024-10-01" },
+  recall_status: "clear", open_recall_count: 0, view_count: 89, service_records: [{}, {}, {}],
+  prep_status: { foreman_signed_at: "2025-04-12" },
+  dealer_snapshot: { name: "Harte INFINITI", phone: "8605551234", address: "1 Auto Way", city: "Hartford", state: "CT", zip: "06103", review_rating: 4.8, review_count: 1248 },
+  dealer_trust: { years_in_business: "45", satisfaction: "98%", bbb_rating: "A+", google_rating: "4.9", google_count: "1248", certifications: "INFINITI Award of Excellence, 2024 Consumer Satisfaction", storefront_url: "https://images.unsplash.com/photo-1560179707-f14e90ef3623?w=400", review_sources: "Google | 4.9 | Excellent family SUV. Very smooth ride.\nEdmunds | 4.7 | Quiet, comfortable, and packed with technology.\nCars.com | 4.8 | Luxury feel without the luxury price." },
+  features: [{ title: "3rd Row", subtitle: "Seating" }, { title: "Panoramic", subtitle: "Moonroof" }, { title: "Heated", subtitle: "Seats" }, { title: "Premium", subtitle: "Audio" }],
+  value_history: [
+    { captured_at: "2025-05-01", market_value: 61800, listing_price: 59500, below_market: 2300, position: "good_deal" },
+    { captured_at: "2025-05-15", market_value: 61500, listing_price: 59000, below_market: 2500, position: "good_deal" },
+    { captured_at: "2025-06-01", market_value: 61300, listing_price: 58360, below_market: 2940, position: "great_deal" },
+    { captured_at: "2025-06-20", market_value: 61300, listing_price: 58140, below_market: 3160, position: "great_deal" },
+  ],
+};
+
 // ── Lead modal is intentionally absent — every action routes to a full page ──
 const VehiclePassportV3 = () => {
   const { vehicleSlug } = useParams<{ vehicleSlug: string }>();
@@ -107,8 +134,11 @@ const VehiclePassportV3 = () => {
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
 
+  const isPreview = typeof window !== "undefined" && new URLSearchParams(window.location.search).has("preview");
+
   useEffect(() => {
     if (!vehicleSlug) return;
+    if (isPreview) { setListing(MOCK_LISTING as unknown as VehicleListing); setLoading(false); return; }
     let mounted = true;
     (async () => {
       setLoading(true);
@@ -195,7 +225,11 @@ const VehiclePassportV3 = () => {
 
   return (
     <div className="min-h-screen bg-[#F6F7F9] text-[#0F172A]" style={{ fontFamily: "Inter, -apple-system, BlinkMacSystemFont, sans-serif" }}>
-      <Helmet><title>{`${listing.ymm}${listing.trim ? ` ${listing.trim}` : ""} — Passport`}</title></Helmet>
+      <Helmet><title>{`${listing.ymm}${listing.trim ? ` ${listing.trim}` : ""} — Passport`}</title>{isPreview && <meta name="robots" content="noindex" />}</Helmet>
+
+      {isPreview && (
+        <div className="bg-amber-500 text-white text-center text-[12px] font-bold py-1.5 px-4">SAMPLE PREVIEW — design layout with placeholder data. Not a real listing.</div>
+      )}
 
       {/* Top bar */}
       <header className="border-b border-[#E6E8EC] bg-white">
