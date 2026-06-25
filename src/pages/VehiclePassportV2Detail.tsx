@@ -255,12 +255,7 @@ const SECTIONS: Record<string, { title: string; render: SectionRender }> = {
   },
   "comparable-vehicles": {
     title: "Comparable Vehicles",
-    render: () => (
-      <>
-        <SectionHeading icon={Car} title="Comparable Vehicles" subtitle="Similar vehicles in your area." />
-        <Unavailable what="Comparable listings" hint="A side-by-side comparable set (year, trim, mileage, and price) is sourced from MarketCheck and appears here when available for this vehicle." />
-      </>
-    ),
+    render: ({ slug }) => <CompsSection slug={slug} />,
   },
   "inventory-trend": {
     title: "Inventory Trend",
@@ -562,6 +557,58 @@ const SECTIONS: Record<string, { title: string; render: SectionRender }> = {
     title: "Share This Vehicle",
     render: ({ listing, d }) => <ShareSection listing={listing} dealerName={d.dealerName} />,
   },
+};
+
+// Comparable Vehicles — fetches the marketcheck-comps function on demand.
+const CompsSection = ({ slug }: { slug: string }) => {
+  const [state, setState] = useState<"loading" | "ready" | "empty">("loading");
+  const [data, setData] = useState<{ count: number; startingAt: number | null; median: number | null; comparables: { vin: string | null; price: number | null; miles: number | null; heading: string; trim: string | null; dealer: string; distance: number | null }[] } | null>(null);
+
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      try {
+        const { data: res } = await supabase.functions.invoke("marketcheck-comps", { body: { slug } });
+        if (!mounted) return;
+        if (res && (res as { available?: boolean }).available) { setData(res as typeof data); setState("ready"); }
+        else setState("empty");
+      } catch { if (mounted) setState("empty"); }
+    })();
+    return () => { mounted = false; };
+  }, [slug]);
+
+  return (
+    <>
+      <SectionHeading icon={Car} title="Comparable Vehicles" subtitle="Similar vehicles in your area." />
+      {state === "loading" ? (
+        <Card className="p-5"><div className="space-y-3">{[0, 1, 2].map((i) => <div key={i} className="h-12 bg-slate-100 rounded-xl animate-pulse" />)}</div></Card>
+      ) : state === "empty" || !data ? (
+        <Unavailable what="Comparable listings" hint="A live comparable set (year, trim, mileage, and price) is sourced from MarketCheck and appears here when available for this vehicle and market." />
+      ) : (
+        <>
+          <Card className="p-5 mb-4">
+            <div className="flex flex-wrap items-baseline gap-x-6 gap-y-2">
+              <div><p className="text-[11px] text-slate-500">Comparable vehicles</p><p className="text-[22px] font-extrabold">{data.count.toLocaleString()}</p></div>
+              {data.startingAt != null && <div><p className="text-[11px] text-slate-500">Starting at</p><p className="text-[22px] font-extrabold text-emerald-600">{fmt$(data.startingAt)}</p></div>}
+              {data.median != null && <div><p className="text-[11px] text-slate-500">Median price</p><p className="text-[22px] font-extrabold">{fmt$(data.median)}</p></div>}
+            </div>
+          </Card>
+          <Card className="p-5">
+            <p className="text-[12px] font-bold uppercase tracking-wider text-slate-400 mb-2">Nearby comparables</p>
+            <div className="space-y-3">
+              {data.comparables.map((c, i) => (
+                <div key={i} className="flex items-center justify-between gap-4 border-b border-slate-100 pb-3 last:border-0 last:pb-0">
+                  <div className="min-w-0"><p className="text-[14px] font-semibold truncate">{c.heading}{c.trim ? ` ${c.trim}` : ""}</p><p className="text-[12px] text-slate-500">{[c.miles != null ? `${c.miles.toLocaleString()} mi` : null, c.dealer, c.distance != null ? `${Math.round(c.distance)} mi away` : null].filter(Boolean).join(" · ")}</p></div>
+                  {c.price != null && <span className="text-[15px] font-extrabold shrink-0">{fmt$(c.price)}</span>}
+                </div>
+              ))}
+            </div>
+            <p className="text-[11px] text-slate-400 mt-3">Comparable listings provided by MarketCheck.</p>
+          </Card>
+        </>
+      )}
+    </>
+  );
 };
 
 const ShareSection = ({ listing, dealerName }: { listing: VehicleListing; dealerName: string }) => {
