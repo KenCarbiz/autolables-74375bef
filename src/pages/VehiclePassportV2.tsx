@@ -289,7 +289,7 @@ const VehiclePassportV2 = () => {
   if (ks.transmission) highlights.push({ icon: Settings, t: ks.transmission, s: "Transmission" });
   if (ks.fuel) highlights.push({ icon: Fuel, t: ks.fuel, s: "Fuel" });
   if (ks.exterior_color) highlights.push({ icon: Wind, t: ks.exterior_color, s: "Exterior" });
-  (listing.features || []).forEach((f) => { if (highlights.length < 6) highlights.push({ icon: Award, t: f.title, s: f.subtitle || "Feature" }); });
+  (listing.features || []).forEach((f) => { if (highlights.length < 8) highlights.push({ icon: Award, t: f.title, s: f.subtitle || "Feature" }); });
 
   const overview = listing.description ||
     `The ${listing.ymm}${listing.trim ? " " + listing.trim : ""} pairs a ${ks.engine || "capable"} powertrain with ${ks.drivetrain || "a refined drivetrain"} and a well-equipped cabin.`;
@@ -812,9 +812,12 @@ const VehiclePassportV2 = () => {
         <div className="grid grid-cols-1 lg:grid-cols-[1fr_1.1fr_0.9fr] gap-4">
           <Card className="p-4 md:p-5 flex flex-col">
             <SectionTitle>Vehicle Highlights</SectionTitle>
-            <div className="grid grid-cols-2 gap-y-3 gap-x-3 mt-3">
-              {(highlights.length ? highlights : [{ icon: Car, t: listing.ymm || "Vehicle", s: "Model" }]).slice(0, 6).map((h, i) => (
-                <div key={i} className="flex items-center gap-2.5"><h.icon className="w-5 h-5 text-[#1a6dff] shrink-0" /><div className="min-w-0"><div className="text-[13px] font-semibold leading-tight truncate">{h.t}</div><div className="text-[11px] text-slate-400">{h.s}</div></div></div>
+            <div className="grid grid-cols-4 gap-y-4 gap-x-2 mt-4">
+              {(highlights.length ? highlights : [{ icon: Car, t: listing.ymm || "Vehicle", s: "Model" }]).slice(0, 8).map((h, i) => (
+                <div key={i} className="flex flex-col items-center text-center gap-1.5">
+                  <span className="w-11 h-11 rounded-xl bg-blue-50 flex items-center justify-center"><h.icon className="w-5 h-5 text-[#1a6dff]" /></span>
+                  <div className="min-w-0 w-full"><div className="text-[12px] font-bold leading-tight truncate">{h.t}</div><div className="text-[10px] text-slate-400 leading-tight truncate">{h.s}</div></div>
+                </div>
               ))}
             </div>
             <button onClick={() => go("features")} className="mt-auto pt-3 text-[13px] font-semibold text-[#2563EB] inline-flex items-center gap-1 hover:underline self-start">View all features &amp; specs <ArrowRight className="w-3.5 h-3.5" /></button>
