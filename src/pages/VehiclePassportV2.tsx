@@ -14,6 +14,7 @@ import { useVehicleListing, type VehicleListing } from "@/hooks/useVehicleListin
 import Logo from "@/components/brand/Logo";
 import { formatPhone } from "@/components/addendum/CustomerInfoSection";
 import { resolveStickyButtons } from "@/lib/stickyButtons";
+import { computePriceHistory } from "@/lib/passportV2Data";
 
 // ──────────────────────────────────────────────────────────────
 // VehiclePassportV2 — /passport-v2/:vehicleSlug
@@ -297,6 +298,8 @@ const VehiclePassportV2 = () => {
 
   const viewCount = listing.view_count ?? null;
   const dom = (mc.dom as number) ?? null;
+  const { priceChange7d } = computePriceHistory(listing);
+  const priceChangeStr = priceChange7d != null && priceChange7d !== 0 ? `${priceChange7d < 0 ? "-" : "+"}${fmt$(Math.abs(priceChange7d))}` : null;
 
   // "Why this is a great buy" bullets — from real signals.
   const whyBuy: string[] = [];
@@ -388,7 +391,7 @@ const VehiclePassportV2 = () => {
         <title>{`${listing.ymm}${listing.trim ? ` ${listing.trim}` : ""} — ${dealerName} · Passport`}</title>
       </Helmet>
 
-      <div className="mx-auto max-w-[1080px] px-4 sm:px-6 pt-0 lg:pt-5 pb-[calc(72px+env(safe-area-inset-bottom))] md:pb-5 space-y-4 md:space-y-5">
+      <div className="mx-auto max-w-[1080px] xl:max-w-[1240px] px-4 sm:px-6 pt-0 lg:pt-5 pb-[calc(72px+env(safe-area-inset-bottom))] md:pb-5 space-y-4 md:space-y-5 lg:space-y-6">
         {/* 1. HEADER — desktop only; on mobile the full-bleed hero owns the top */}
         <header className="hidden lg:flex items-center justify-between">
           <div className="text-[22px] font-extrabold tracking-tight">
@@ -628,8 +631,10 @@ const VehiclePassportV2 = () => {
               value: belowMarket && belowMarket > 0 ? "Excellent" : marketAvg != null ? "Fair" : "Pending",
               sub: marketAvg != null ? "Based on live comparables" : "Awaiting MarketCheck data",
               cta: "View report", section: "price-confidence" },
-            { icon: Clock, title: "Price History", tone: "neutral",
-              value: "Trend", sub: "History builds as we track this VIN", cta: "View history", section: "price-history" },
+            { icon: Clock, title: "Price History", tone: priceChange7d != null && priceChange7d < 0 ? "good" : "neutral",
+              value: priceChangeStr ?? (priceChange7d === 0 ? "No change" : "Trend"),
+              sub: priceChange7d != null ? (priceChange7d < 0 ? "Price dropped (7-day)" : priceChange7d > 0 ? "Price up (7-day)" : "Stable (7-day)") : "History builds as we track this VIN",
+              cta: "View history", section: "price-history" },
             { icon: Car, title: "Comparable Vehicles", tone: "neutral",
               value: "Comp set", sub: "Similar vehicles via MarketCheck", cta: "View comp set", section: "comparable-vehicles" },
             { icon: Package, title: "Inventory Trend", tone: "neutral",
@@ -784,18 +789,20 @@ const VehiclePassportV2 = () => {
           </Card>
         </div>
 
-        {/* 8. WHY BUY FROM THIS DEALERSHIP */}
-        <Card className="p-5 md:p-6">
+        {/* 8 + 9. DEALERSHIP TRUST + FINAL CTA — stacked on mobile, paired
+            side-by-side on desktop so the wide layout stays dense. */}
+        <div className="grid lg:grid-cols-2 gap-4 lg:gap-5 lg:items-stretch">
+        <Card className="p-5 md:p-6 flex flex-col">
           <SectionTitle>Why Buy From {dealerName}?</SectionTitle>
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-5 mt-5">
             {dealerChips.map((c, i) => (
               <div key={i} className="flex items-start gap-3"><span className="w-11 h-11 rounded-xl bg-blue-50 flex items-center justify-center shrink-0"><c.icon className="w-5 h-5 text-[#1a6dff]" /></span><div><p className="text-[14px] font-bold leading-tight">{c.t}</p><p className="text-[12px] text-slate-500 mt-0.5">{c.s}</p></div></div>
             ))}
           </div>
-          <button onClick={() => go("dealer")} className="mt-4 text-[13px] font-semibold text-[#2563EB] inline-flex items-center gap-1 hover:underline">Learn more about our dealership <ArrowRight className="w-3.5 h-3.5" /></button>
+          <button onClick={() => go("dealer")} className="mt-auto pt-4 text-[13px] font-semibold text-[#2563EB] inline-flex items-center gap-1 hover:underline self-start">Learn more about our dealership <ArrowRight className="w-3.5 h-3.5" /></button>
         </Card>
 
-        {/* 9. FINAL CTA — one premium conversion moment. Reserve is the primary
+        {/* Final CTA — one premium conversion moment. Reserve is the primary
             action; Trade is secondary; a specialist card keeps it human. */}
         <Card className="p-6 md:p-8 text-center">
           <h2 className="text-[24px] md:text-[28px] font-extrabold tracking-tight">Ready to take the next step?</h2>
@@ -824,6 +831,7 @@ const VehiclePassportV2 = () => {
             </div>
           </div>
         </Card>
+        </div>
 
         {/* 10. FOOTER */}
         <footer className="pt-2">

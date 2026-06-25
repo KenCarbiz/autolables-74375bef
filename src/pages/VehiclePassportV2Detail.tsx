@@ -97,6 +97,27 @@ const LeadForm = ({
   );
 };
 
+// Minimal dependency-free price line chart.
+const Sparkline = ({ points }: { points: number[] }) => {
+  if (points.length < 2) return null;
+  const w = 600, h = 120, pad = 8;
+  const min = Math.min(...points), max = Math.max(...points);
+  const span = Math.max(1, max - min);
+  const coords = points.map((p, i) => {
+    const x = pad + (i / (points.length - 1)) * (w - pad * 2);
+    const y = pad + (1 - (p - min) / span) * (h - pad * 2);
+    return `${x.toFixed(1)},${y.toFixed(1)}`;
+  });
+  const down = points[points.length - 1] <= points[0];
+  const stroke = down ? "#059669" : "#e11d48";
+  return (
+    <svg viewBox={`0 0 ${w} ${h}`} className="w-full h-28 mt-3" preserveAspectRatio="none">
+      <polyline points={coords.join(" ")} fill="none" stroke={stroke} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+      {coords.map((c, i) => { const [x, y] = c.split(","); return <circle key={i} cx={x} cy={y} r="3" fill={stroke} />; })}
+    </svg>
+  );
+};
+
 const SectionHeading = ({ icon: Icon, title, subtitle }: { icon: React.ElementType; title: string; subtitle?: string }) => (
   <div className="flex items-start gap-3 mb-4">
     <span className="w-11 h-11 rounded-2xl bg-blue-50 flex items-center justify-center shrink-0"><Icon className="w-6 h-6 text-[#1a6dff]" /></span>
@@ -199,19 +220,36 @@ const SECTIONS: Record<string, { title: string; render: SectionRender }> = {
   },
   "price-history": {
     title: "Price History",
-    render: ({ listing }) => {
-      const checkedAt = (listing as unknown as { market_checked_at?: string }).market_checked_at;
+    render: ({ d }) => {
+      const pts = d.valueHistory.filter((h) => h.listing_price != null);
       return (
-      <>
-        <SectionHeading icon={Clock} title="Price History" subtitle="How this vehicle's price has moved over time." />
-        {checkedAt ? (
-          <Card className="p-5">
-            <p className="text-[14px] text-slate-700">We began tracking this VIN on {new Date(checkedAt).toLocaleDateString()}.</p>
-            <p className="text-[13px] text-slate-500 mt-2">As we capture additional price points over the coming days, the full trend line and any price drops will appear here.</p>
-            <p className="text-[11px] text-slate-400 mt-3">Powered by MarketCheck price tracking.</p>
-          </Card>
-        ) : <Unavailable what="Price history" hint="Price tracking begins once this vehicle has a MarketCheck valuation on file." />}
-      </>
+        <>
+          <SectionHeading icon={Clock} title="Price History" subtitle="How this vehicle's price has moved over time." />
+          {pts.length >= 2 ? (
+            <>
+              <Card className="p-5 mb-4">
+                <div className="flex flex-wrap items-baseline gap-x-6 gap-y-2">
+                  {d.priceChange7d != null && (
+                    <div><p className="text-[11px] text-slate-500">7-Day change</p><p className={`text-[20px] font-extrabold ${d.priceChange7d < 0 ? "text-emerald-600" : d.priceChange7d > 0 ? "text-rose-600" : "text-slate-900"}`}>{d.priceChange7d === 0 ? "No change" : `${d.priceChange7d < 0 ? "-" : "+"}${fmt$(Math.abs(d.priceChange7d))}`}</p></div>
+                  )}
+                  {d.priceChangeTotal != null && (
+                    <div><p className="text-[11px] text-slate-500">Since first tracked</p><p className={`text-[20px] font-extrabold ${d.priceChangeTotal < 0 ? "text-emerald-600" : d.priceChangeTotal > 0 ? "text-rose-600" : "text-slate-900"}`}>{d.priceChangeTotal === 0 ? "No change" : `${d.priceChangeTotal < 0 ? "-" : "+"}${fmt$(Math.abs(d.priceChangeTotal))}`}</p></div>
+                  )}
+                </div>
+                <Sparkline points={pts.map((p) => p.listing_price as number)} />
+              </Card>
+              <Card className="p-5">
+                <p className="text-[12px] font-bold uppercase tracking-wider text-slate-400 mb-2">Captured prices</p>
+                <div className="space-y-2 text-[14px]">
+                  {[...pts].reverse().map((p, i) => (
+                    <div key={i} className="flex justify-between gap-4 border-b border-slate-100 pb-2"><span className="text-slate-500">{new Date(p.captured_at).toLocaleDateString()}</span><span className="font-semibold">{fmt$(p.listing_price)}</span></div>
+                  ))}
+                </div>
+                <p className="text-[11px] text-slate-400 mt-3">Powered by MarketCheck price tracking.</p>
+              </Card>
+            </>
+          ) : <Unavailable what="Price history" hint="We need at least two captured price points to show a trend. Tracking continues as MarketCheck re-checks this vehicle." />}
+        </>
       );
     },
   },

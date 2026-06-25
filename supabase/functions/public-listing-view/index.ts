@@ -126,6 +126,20 @@ serve(async (req) => {
       }
     } catch { /* config optional — passport falls back to its default bar */ }
 
+    // ── Attach real captured price/market history for this VIN (Passport V2
+    // Price History). Read-only, service role; oldest→newest, capped.
+    try {
+      if (row.vin) {
+        const { data: hist } = await admin
+          .from("vehicle_value_history")
+          .select("captured_at, market_value, listing_price, below_market, position")
+          .eq("vin", String(row.vin).toUpperCase())
+          .order("captured_at", { ascending: true })
+          .limit(60);
+        if (Array.isArray(hist) && hist.length) row.value_history = hist;
+      }
+    } catch { /* history optional — Passport shows a pending state */ }
+
     // ── Bump view count + record audit event
     await Promise.all([
       admin.rpc("increment_listing_view", { _slug: lookupSlug }),

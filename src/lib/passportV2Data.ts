@@ -62,7 +62,38 @@ export interface PassportData {
   dealerAddress: string;
   // Offers
   offers: { title: string; body: string; exp: string }[];
+  // Price history (real captured snapshots from vehicle_value_history)
+  valueHistory: { captured_at: string; market_value: number | null; listing_price: number | null; below_market: number | null; position: string | null }[];
+  priceChange7d: number | null;   // listing_price delta vs ~7 days ago (negative = drop)
+  priceChangeTotal: number | null; // delta since first capture
 }
+
+export interface PricePoint { captured_at: string; market_value: number | null; listing_price: number | null; below_market: number | null; position: string | null }
+
+// Real captured price history (attached to the listing by public-listing-view
+// from the vehicle_value_history table). Returns the series plus 7-day and
+// total listing-price deltas (negative = price drop).
+export const computePriceHistory = (listing: VehicleListing): { valueHistory: PricePoint[]; priceChange7d: number | null; priceChangeTotal: number | null } => {
+  const rawHist = (listing as unknown as { value_history?: unknown }).value_history;
+  const valueHistory: PricePoint[] = (Array.isArray(rawHist) ? rawHist : []).map((h) => h as Record<string, unknown>).map((h) => ({
+    captured_at: String(h.captured_at ?? ""),
+    market_value: h.market_value != null ? Number(h.market_value) : null,
+    listing_price: h.listing_price != null ? Number(h.listing_price) : null,
+    below_market: h.below_market != null ? Number(h.below_market) : null,
+    position: (h.position as string) ?? null,
+  })).filter((h) => h.captured_at);
+  const priced = valueHistory.filter((h) => h.listing_price != null);
+  const latestPrice = priced.length ? priced[priced.length - 1].listing_price! : null;
+  const priceChangeTotal = priced.length >= 2 && latestPrice != null ? latestPrice - priced[0].listing_price! : null;
+  const priceChange7d = (() => {
+    if (priced.length < 2 || latestPrice == null) return null;
+    const latestT = new Date(priced[priced.length - 1].captured_at).getTime();
+    const weekAgo = latestT - 7 * 24 * 60 * 60 * 1000;
+    const prior = [...priced].reverse().find((h) => new Date(h.captured_at).getTime() <= weekAgo) ?? priced[0];
+    return latestPrice - prior.listing_price!;
+  })();
+  return { valueHistory, priceChange7d, priceChangeTotal };
+};
 
 export const derivePassport = (listing: VehicleListing): PassportData => {
   const dealer = (listing.dealer_snapshot || {}) as Record<string, unknown>;
@@ -183,6 +214,8 @@ export const derivePassport = (listing: VehicleListing): PassportData => {
     exp: o.valid_through ? `Expires ${new Date(o.valid_through as string).toLocaleDateString()}` : "",
   })).filter((o) => o.body).slice(0, 6);
 
+  const { valueHistory, priceChange7d, priceChangeTotal } = computePriceHistory(listing);
+
   return {
     price, msrp, priceLabel, estMonthly, saveVsMsrp,
     marketAvg, marketLow, marketHigh, belowMarket,
@@ -199,5 +232,6 @@ export const derivePassport = (listing: VehicleListing): PassportData => {
     dealerPhone: (dealer.phone as string) || "",
     dealerAddress: [dealer.address, dealer.city, dealer.state, dealer.zip].filter(Boolean).join(", "),
     offers,
+    valueHistory, priceChange7d, priceChangeTotal,
   };
 };
