@@ -348,14 +348,16 @@ const VehiclePassportV2 = () => {
         <div className="grid grid-cols-1 lg:grid-cols-[420px_1fr] gap-5">
           {/* Gallery */}
           <div className="space-y-3">
-            <div className="relative rounded-2xl overflow-hidden bg-[#1f2227] aspect-[8/7] lg:aspect-[4/3]">
+            <div className="relative rounded-2xl overflow-hidden bg-[#1f2227] aspect-square lg:aspect-[4/3]">
               {heroSrc ? <img src={heroSrc} alt={listing.ymm || "vehicle"} onClick={() => setLightbox(true)} className="absolute inset-0 w-full h-full object-cover cursor-zoom-in" /> : <div className="absolute inset-0 flex items-center justify-center text-slate-500"><Car className="w-14 h-14" strokeWidth={1.25} /></div>}
               {photoCount > 0 && <div className="absolute top-3 left-3 text-white text-xs font-semibold px-2.5 py-1 rounded bg-black/60">{photoIdx + 1} / {photoCount}</div>}
               {photoCount > 1 && (
                 <>
                   <button onClick={() => setPhotoIdx((i) => (i - 1 + photoCount) % photoCount)} className="absolute left-3 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full bg-white/95 hover:bg-white flex items-center justify-center shadow"><ChevronLeft className="w-5 h-5" /></button>
                   <button onClick={() => setPhotoIdx((i) => (i + 1) % photoCount)} className="absolute right-3 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full bg-white/95 hover:bg-white flex items-center justify-center shadow"><ChevronRight className="w-5 h-5" /></button>
-                  <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/70 to-transparent px-2.5 pt-7 pb-2.5">
+                  {/* Desktop: thumbnail strip. Mobile: clean pagination dots
+                      (no thumbnail strip per the v2 spec). */}
+                  <div className="hidden lg:block absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/70 to-transparent px-2.5 pt-7 pb-2.5">
                     <div className="flex gap-1.5">
                       {gallery.slice(0, 5).map((src, i) => (
                         <button key={i} onClick={() => setPhotoIdx(i)} className="w-12 h-9 rounded-md overflow-hidden bg-[#e9ecef]" style={{ outline: i === photoIdx ? `2px solid ${BLUE}` : "2px solid transparent", outlineOffset: -2 }}>
@@ -366,6 +368,12 @@ const VehiclePassportV2 = () => {
                         <button onClick={() => setPhotoIdx(5)} className="w-12 h-9 rounded-md bg-black/60 text-white text-[11px] font-bold flex items-center justify-center">+{photoCount - 5}</button>
                       )}
                     </div>
+                  </div>
+                  <div className="lg:hidden absolute inset-x-0 bottom-3 flex items-center justify-center gap-1.5">
+                    {gallery.slice(0, 8).map((_, i) => (
+                      <span key={i} className={`rounded-full transition-all ${i === photoIdx ? "w-4 h-1.5 bg-white" : "w-1.5 h-1.5 bg-white/55"}`} />
+                    ))}
+                    {photoCount > 8 && <span className="text-white/70 text-[10px] ml-1 font-semibold">+{photoCount - 8}</span>}
                   </div>
                 </>
               )}
@@ -459,35 +467,27 @@ const VehiclePassportV2 = () => {
                     </div>
                   )}
                 </div>
-              ) : (
+              ) : (verifiedBy.length > 0 || warrantyStr || listing.recall_status || listing.ymm) ? (
                 <div>
                   <div className="flex items-center gap-2.5">
-                    <span className="w-9 h-9 rounded-xl bg-slate-100 flex items-center justify-center shrink-0"><ShieldCheck className="w-5 h-5 text-slate-400" /></span>
+                    <span className="w-9 h-9 rounded-xl bg-emerald-50 flex items-center justify-center shrink-0"><ShieldCheck className="w-5 h-5 text-emerald-600" /></span>
                     <div>
-                      <p className="text-[13px] font-bold text-slate-700">Verifying this vehicle…</p>
-                      <p className="text-[11px] text-slate-400">We're pulling trusted data sources for your confidence score.</p>
+                      <p className="text-[14px] font-bold text-slate-900">Vehicle Verified</p>
+                      <p className="text-[11px] text-slate-500">Verified using multiple trusted automotive data sources.</p>
                     </div>
                   </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2 mt-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-1.5 mt-3">
                     {[
-                      { label: "AutoCheck Verification", done: verifiedBy.some((v) => v.label === "AutoCheck") },
-                      { label: "Market Analysis", done: verifiedBy.some((v) => v.label === "MarketCheck") },
-                      { label: "Warranty Verification", done: !!warrantyStr },
-                      { label: "NHTSA Recall Check", done: verifiedBy.some((v) => v.label === "NHTSA") },
-                      { label: "OEM Data Verification", done: verifiedBy.some((v) => v.label === "OEM Data") },
-                    ].map((row) => (
-                      <div key={row.label} className="flex items-center justify-between gap-3 py-1">
-                        <span className="text-[12px] text-slate-600">{row.label}</span>
-                        {row.done ? (
-                          <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-emerald-600"><CheckCircle2 className="w-3.5 h-3.5" /> Verified</span>
-                        ) : (
-                          <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-slate-400"><span className="w-3 h-3 rounded-full border-2 border-slate-300 border-t-blue-500 animate-spin" /> Loading…</span>
-                        )}
-                      </div>
+                      { label: "VIN Verified", done: !!listing.ymm },
+                      { label: "Market Data Verified", done: verifiedBy.some((v) => v.label === "MarketCheck") },
+                      { label: "Warranty Checked", done: !!warrantyStr },
+                      { label: "Recall Check Complete", done: !!listing.recall_status },
+                    ].filter((r) => r.done).map((r) => (
+                      <div key={r.label} className="flex items-center gap-2 py-0.5 text-[12px] text-slate-700"><CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />{r.label}</div>
                     ))}
                   </div>
                 </div>
-              )}
+              ) : null}
             </Card>
           </div>
         </div>
@@ -582,10 +582,9 @@ const VehiclePassportV2 = () => {
                 <p className="text-[10px] text-slate-400 mt-2 leading-snug">Market values provided by MarketCheck and third-party data sources. Actual market conditions may vary.</p>
               </>
             ) : (
-              <div className="mt-4 flex flex-col items-center text-center py-3">
-                <span className="w-10 h-10 rounded-full border-2 border-slate-200 border-t-blue-500 animate-spin mb-3" />
-                <p className="text-[13px] font-semibold text-slate-600">Pulling live market data…</p>
-                <p className="text-[11px] text-slate-400 mt-0.5">MarketCheck pricing for this vehicle is on the way.</p>
+              <div className="mt-4 space-y-2.5">
+                <div className="h-16 bg-slate-100 rounded-lg animate-pulse" />
+                <div className="flex gap-3"><div className="h-7 flex-1 bg-slate-100 rounded animate-pulse" /><div className="h-7 flex-1 bg-slate-100 rounded animate-pulse" /><div className="h-7 flex-1 bg-slate-100 rounded animate-pulse" /></div>
               </div>
             )}
           </Card>
@@ -624,10 +623,10 @@ const VehiclePassportV2 = () => {
                 <p className="text-[10px] text-slate-400 mt-2">Powered by MarketCheck</p>
               </>
             ) : (
-              <div className="mt-4 flex flex-col items-center text-center py-3">
-                <span className="w-9 h-9 rounded-full border-2 border-slate-200 border-t-blue-500 animate-spin mb-2.5" />
-                <p className="text-[13px] font-semibold text-slate-600">Scoring this price…</p>
-                <p className="text-[11px] text-slate-400 mt-0.5">Comparing against live local comparables.</p>
+              <div className="mt-4 space-y-2">
+                <div className="h-5 w-1/2 bg-slate-100 rounded animate-pulse" />
+                <div className="h-3 w-3/4 bg-slate-100 rounded animate-pulse" />
+                <div className="h-3 w-2/3 bg-slate-100 rounded animate-pulse" />
               </div>
             )}
           </Card>
@@ -704,11 +703,7 @@ const VehiclePassportV2 = () => {
                 </>
               );
             })() : (
-              <div className="mt-4 flex flex-col items-center text-center py-3">
-                <span className="w-9 h-9 rounded-full border-2 border-slate-200 border-t-blue-500 animate-spin mb-2.5" />
-                <p className="text-[13px] font-semibold text-slate-600">Checking factory coverage…</p>
-                <p className="text-[11px] text-slate-400 mt-0.5">Pulling OEM warranty terms for this VIN.</p>
-              </div>
+              <p className="text-[13px] text-slate-500 mt-3">Coverage details confirmed at the dealership.</p>
             )}
           </Card>
 
@@ -720,15 +715,7 @@ const VehiclePassportV2 = () => {
                 <p className="text-[10px] text-slate-400 mt-3 leading-snug">Reviews shown are dealership or model reviews and may not reflect ownership experience of this specific vehicle.</p>
               </>
             ) : (
-              <div className="mt-3 flex items-center gap-3">
-                <div className="flex -space-x-1">
-                  {[0, 1, 2].map((i) => <span key={i} className="w-8 h-8 rounded-full bg-slate-100 border-2 border-white animate-pulse" />)}
-                </div>
-                <div>
-                  <p className="text-[13px] font-semibold text-slate-600">Collecting verified reviews…</p>
-                  <p className="text-[11px] text-slate-400">Dealership and model reviews are being gathered for this vehicle.</p>
-                </div>
-              </div>
+              <p className="text-[13px] text-slate-500 mt-3">Independent buyer reviews for this model are shown here when available.</p>
             )}
           </Card>
         </div>
