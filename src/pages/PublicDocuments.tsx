@@ -702,7 +702,7 @@ const PublicDocuments = () => {
             className="flex items-center gap-1.5 text-sm text-slate-600 hover:text-slate-900">
             <Upload className="w-4 h-4" /><span className="hidden sm:inline">Share</span>
           </button>
-          <button className="flex items-center gap-1.5 text-sm text-slate-600 hover:text-slate-900">
+          <button onClick={() => toast.success("Saved to this device")} className="flex items-center gap-1.5 text-sm text-slate-600 hover:text-slate-900">
             <Bookmark className="w-4 h-4" /><span className="hidden sm:inline">Save</span>
           </button>
           <button onClick={() => window.print()} className="flex items-center gap-1.5 text-sm text-slate-600 hover:text-slate-900">

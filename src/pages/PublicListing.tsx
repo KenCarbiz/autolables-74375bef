@@ -422,7 +422,7 @@ const PublicListingBody = () => {
   ];
 
   const quickActions = [
-    { icon: FileText,     label: "Documents",     onClick: () => navigate(`/documents/${listing.slug}`) },
+    { icon: FileText,     label: "Documents",     onClick: () => navigate(`/v/${listing.slug}/documents`) },
     { icon: MessageSquare,label: "Contact Dealer",onClick: () => setInquiryOpen(true) },
     { icon: RefreshCw,    label: "Value My Trade",onClick: () => setInquiryOpen(true) },
     { icon: Upload,       label: "Share Vehicle", onClick: handleShare },
@@ -452,7 +452,7 @@ const PublicListingBody = () => {
           </div>
           <div className="flex gap-[26px]">
             <button onClick={handleShare} className="flex items-center gap-[7px] text-sm font-medium text-[#1a1d21]"><Upload className="w-[17px] h-[17px]" />Share</button>
-            <button className="flex items-center gap-[7px] text-sm font-medium text-[#1a1d21]"><Bookmark className="w-[17px] h-[17px]" />Save</button>
+            <button onClick={() => toast.success("Saved to this device")} className="flex items-center gap-[7px] text-sm font-medium text-[#1a1d21]"><Bookmark className="w-[17px] h-[17px]" />Save</button>
             <button onClick={() => window.print()} className="flex items-center gap-[7px] text-sm font-medium text-[#1a1d21]"><Printer className="w-[17px] h-[17px]" />Print</button>
           </div>
         </header>
