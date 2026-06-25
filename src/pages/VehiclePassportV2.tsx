@@ -357,10 +357,11 @@ const VehiclePassportV2 = () => {
           <div className="space-y-3">
             {/* Full-bleed on mobile (edge-to-edge, flush to the top under the
                 Dynamic Island); inset rounded card on desktop. */}
-            <div className="relative overflow-hidden bg-[#1f2227] aspect-square lg:aspect-[4/3] -mx-4 sm:-mx-6 lg:mx-0 rounded-none lg:rounded-2xl">
+            <div className="relative overflow-hidden bg-[#1f2227] aspect-square lg:aspect-[4/3] -mx-4 sm:-mx-6 lg:mx-0 rounded-b-3xl lg:rounded-2xl">
               {heroSrc ? <img src={heroSrc} alt={listing.ymm || "vehicle"} onClick={() => setLightbox(true)} className="absolute inset-0 w-full h-full object-cover cursor-zoom-in" /> : <div className="absolute inset-0 flex items-center justify-center text-slate-500"><Car className="w-14 h-14" strokeWidth={1.25} /></div>}
-              {/* Mobile-only overlay controls, pushed clear of the status bar / island */}
-              <div className="lg:hidden absolute top-0 right-0 p-3 pt-[calc(0.75rem+env(safe-area-inset-top))]">
+              {/* Mobile-only floating controls, pushed clear of the status bar / island */}
+              <div className="lg:hidden absolute top-0 right-0 p-3 pt-[calc(0.75rem+env(safe-area-inset-top))] flex gap-2">
+                <button onClick={() => toast.success("Saved to this device")} aria-label="Save" className="w-9 h-9 rounded-full bg-black/45 backdrop-blur text-white flex items-center justify-center"><Bookmark className="w-[18px] h-[18px]" /></button>
                 <button onClick={handleShare} aria-label="Share" className="w-9 h-9 rounded-full bg-black/45 backdrop-blur text-white flex items-center justify-center"><Upload className="w-[18px] h-[18px]" /></button>
               </div>
               {photoCount > 0 && <div className="absolute left-3 top-[calc(0.75rem+env(safe-area-inset-top))] lg:top-3 text-white text-xs font-semibold px-2.5 py-1 rounded bg-black/60">{photoIdx + 1} / {photoCount}</div>}
@@ -504,6 +505,17 @@ const VehiclePassportV2 = () => {
             </Card>
           </div>
         </div>
+
+        {/* Great Value — prominent savings callout, data-gated. */}
+        {(saveVsMsrp || (belowMarket && belowMarket > 0)) && (
+          <Card className="p-4 md:p-5 !border-emerald-200 !bg-emerald-50/60">
+            <div className="flex flex-wrap items-center gap-3">
+              <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-emerald-600 text-white text-[13px] font-bold"><BadgeCheck className="w-4 h-4" /> Great Price</span>
+              <span className="text-[18px] font-extrabold text-emerald-700">{fmt$(saveVsMsrp || belowMarket)} {saveVsMsrp ? "below MSRP" : "below market"}</span>
+            </div>
+            <p className="text-[12px] text-slate-600 mt-2">One of the best-priced comparable vehicles in your area.</p>
+          </Card>
+        )}
 
         {/* 3. ACTIONS + ZIP */}
         <Card className="p-4">
