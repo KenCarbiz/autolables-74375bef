@@ -388,8 +388,11 @@ const VehiclePassportV3 = () => {
           </div>
         </section>
 
-        {/* 7. INFORMATION GRID + FINAL CTA */}
-        <section className="grid grid-cols-1 lg:grid-cols-[1fr_1fr_1fr_1.1fr] gap-5 items-stretch">
+        {/* 7. INFORMATION GRID + FINAL CTA — the three info cards share height
+            with each other; the blue CTA is its own column (taller), matching
+            the goal where it extends below them. */}
+        <section className="grid grid-cols-1 lg:grid-cols-[1fr_360px] gap-5 items-start">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-5 items-stretch">
           {/* Highlights */}
           <div className={`${CARD} p-5 flex flex-col`}>
             <H3>Vehicle Highlights</H3>
@@ -412,6 +415,7 @@ const VehiclePassportV3 = () => {
               <div className="mt-3 space-y-2 text-[13px]">{d.keySpecs.slice(0, 8).map(([k, v]) => <div key={k} className="flex justify-between gap-4 border-b border-slate-100 pb-1.5"><span className="text-[#64748B]">{k}</span><span className="font-semibold text-right">{v}</span></div>)}</div>
             ) : <p className="text-[13px] text-[#64748B] mt-3">Decoded specifications appear here once the vehicle's data is processed.</p>}
             <Link onClick={() => go("specifications")} className="mt-auto pt-3 self-start">View full specs</Link>
+          </div>
           </div>
           {/* Final CTA */}
           <div className="rounded-2xl p-6 text-white flex flex-col" style={{ background: "linear-gradient(160deg,#2563EB 0%,#1e50c8 100%)" }}>
