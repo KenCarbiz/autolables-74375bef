@@ -315,7 +315,6 @@ const PublicListingBody = () => {
   const price = listing.price ?? 0;
   const marketAvg = listing.market_value ?? 0;
   const belowMarket = mp.belowMarket ?? (marketAvg > 0 && price < marketAvg ? marketAvg - price : 0);
-  const marketLow = mp.low ?? 0;
   const marketHigh = mp.high ?? 0;
   const priceLabel = (dealer.price_label as string) || "Our Price";
 
@@ -361,10 +360,6 @@ const PublicListingBody = () => {
   // ── Demo-friendly fallbacks so each section always renders against the target layout
   const colorName = (ks.exterior_color as string) || (mc.exterior_color as string) || "—";
   const stockNo = ((listing as unknown as Record<string, unknown>).stock_number as string) || (mc.stock_no as string) || "—";
-  const fallbackAvg = marketAvg > 0 ? marketAvg : Math.round(price * 1.043);
-  const fallbackBelow = belowMarket > 0 ? belowMarket : Math.max(0, fallbackAvg - price);
-  const fallbackHigh = marketHigh > 0 ? marketHigh : Math.round(price * 1.087);
-  const fallbackLow = marketLow > 0 ? marketLow : Math.round(price * 0.96);
 
   // Thumbnails — pad to 9 by repeating last image so strip always renders.
   const thumbStrip = (() => {
@@ -376,15 +371,8 @@ const PublicListingBody = () => {
     return out;
   })();
 
-  // Highlights fallback for visual parity.
-  const highlightsRendered = highlights.length > 0 ? highlights : [
-    { icon: Cog, title: ks.engine || "3.5L V6", subtitle: "Engine" },
-    { icon: Car, title: ks.drivetrain || "AWD", subtitle: "Drivetrain" },
-    { icon: Settings, title: '20" Alloy Wheels', subtitle: "Wheels" },
-    { icon: Wind, title: "Panoramic Moonroof", subtitle: "Roof" },
-    { icon: ShieldCheck, title: "Heated & Cooled Seats", subtitle: "Comfort" },
-    { icon: Award, title: "ProPILOT Assist 2.0", subtitle: "Safety" },
-  ];
+  // Real highlights only — no invented equipment.
+  const highlightsRendered = highlights;
 
   const overview = listing.description ||
     `The ${ymm}${listing.trim ? " " + listing.trim : ""} delivers bold design, elevated comfort, and advanced technology for every drive. With a powerful ${ks.engine || "V6"} engine, ${ks.drivetrain || "AWD"} drivetrain, and a thoughtfully crafted cabin, this vehicle is ready for any journey.`;
@@ -583,19 +571,27 @@ const PublicListingBody = () => {
             <div className="border border-[#eceef0] rounded-xl p-5">
               <div className="text-base font-bold">Market Price Analysis</div>
               <div className="text-[11px] text-[#9aa0a8] mt-0.5">Powered by MarketCheck</div>
-              <div className="flex justify-between items-end mt-[14px]">
-                <div>
-                  <div className="text-base font-bold text-[#1a9d5c]">{fallbackBelow > 0 ? "Great Price" : "Market Price"}</div>
-                  <div className="text-[26px] font-extrabold mt-1">{fmt$(price)}</div>
-                  {fallbackBelow > 0 && <div className="text-xs text-[#1a9d5c] mt-1">You save {fmt$(fallbackBelow)}</div>}
-                  <div className="text-xs text-[#6b727a]">below market average</div>
+              {marketAvg > 0 ? (
+                <>
+                  <div className="flex justify-between items-end mt-[14px]">
+                    <div>
+                      <div className="text-base font-bold text-[#1a9d5c]">{belowMarket > 0 ? "Great Price" : "Market Price"}</div>
+                      <div className="text-[26px] font-extrabold mt-1">{fmt$(price)}</div>
+                      {belowMarket > 0 && <div className="text-xs text-[#1a9d5c] mt-1">You save {fmt$(belowMarket)} <span className="text-[#6b727a]">below market average</span></div>}
+                    </div>
+                    <MarketGauge price={price} avg={marketAvg} />
+                  </div>
+                  <div className="flex justify-between text-[11px] mt-2">
+                    <div><div className="text-[#6b727a]">Market Avg</div><div className="font-bold">{fmt$(marketAvg)}</div></div>
+                    {marketHigh > 0 && <div className="text-right"><div className="text-[#6b727a]">Market High</div><div className="font-bold">{fmt$(marketHigh)}</div></div>}
+                  </div>
+                </>
+              ) : (
+                <div className="mt-[14px]">
+                  <div className="text-[26px] font-extrabold">{fmt$(price)}</div>
+                  <p className="text-xs text-[#6b727a] mt-1">Market comparison appears here once MarketCheck data is available for this vehicle.</p>
                 </div>
-                <MarketGauge price={price} avg={fallbackAvg} />
-              </div>
-              <div className="flex justify-between text-[11px] mt-2">
-                <div><div className="text-[#6b727a]">Market Avg</div><div className="font-bold">{fmt$(fallbackAvg)}</div></div>
-                <div className="text-right"><div className="text-[#6b727a]">Market High</div><div className="font-bold">{fmt$(fallbackHigh)}</div></div>
-              </div>
+              )}
             </div>
             {/* AutoCheck Rating */}
             <div className="border border-[#eceef0] rounded-xl p-5 flex flex-col">
@@ -626,17 +622,21 @@ const PublicListingBody = () => {
           <div className="grid mt-[34px] gap-[34px]" style={{ gridTemplateColumns: "1fr 1fr 0.85fr" }}>
             <div>
               <div className="text-[17px] font-bold pb-3 border-b border-[#eceef0]">Vehicle Highlights</div>
-              <div className="grid grid-cols-2 gap-y-[18px] gap-x-[14px] mt-[18px]">
-                {highlightsRendered.slice(0, 6).map((h, i) => (
-                  <div key={i} className="flex items-center gap-[11px]">
-                    <h.icon className="w-[22px] h-[22px] text-[#3a4048]" />
-                    <div>
-                      <div className="text-[13.5px] font-semibold leading-tight">{h.title}</div>
-                      <div className="text-xs text-[#9aa0a8]">{h.subtitle}</div>
+              {highlightsRendered.length > 0 ? (
+                <div className="grid grid-cols-2 gap-y-[18px] gap-x-[14px] mt-[18px]">
+                  {highlightsRendered.slice(0, 6).map((h, i) => (
+                    <div key={i} className="flex items-center gap-[11px]">
+                      <h.icon className="w-[22px] h-[22px] text-[#3a4048]" />
+                      <div>
+                        <div className="text-[13.5px] font-semibold leading-tight">{h.title}</div>
+                        <div className="text-xs text-[#9aa0a8]">{h.subtitle}</div>
+                      </div>
                     </div>
-                  </div>
-                ))}
-              </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-[13px] text-[#6b727a] mt-[18px]">Equipment highlights appear here as they are confirmed for this vehicle.</p>
+              )}
             </div>
             <div>
               <div className="text-[17px] font-bold pb-3 border-b border-[#eceef0]">Vehicle Overview</div>
