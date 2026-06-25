@@ -134,6 +134,7 @@ const VehiclePassportV2 = () => {
   const [photoIdx, setPhotoIdx] = useState(0);
   const [inquiry, setInquiry] = useState<null | "info" | "trade">(null);
   const [zip, setZip] = useState("");
+  const [lightbox, setLightbox] = useState(false);
 
   useEffect(() => {
     if (!vehicleSlug) return;
@@ -157,6 +158,17 @@ const VehiclePassportV2 = () => {
     if (listing.hero_image_url) return [listing.hero_image_url];
     return [];
   }, [listing]);
+
+  useEffect(() => {
+    if (!lightbox) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setLightbox(false);
+      else if (e.key === "ArrowLeft") setPhotoIdx((i) => (i - 1 + gallery.length) % gallery.length);
+      else if (e.key === "ArrowRight") setPhotoIdx((i) => (i + 1) % gallery.length);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [lightbox, gallery.length]);
 
   if (loading) return (
     <div className="min-h-screen flex items-center justify-center bg-[#f4f5f7]"><div className="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" /></div>
@@ -337,7 +349,7 @@ const VehiclePassportV2 = () => {
           {/* Gallery */}
           <div className="space-y-3">
             <div className="relative rounded-2xl overflow-hidden bg-[#1f2227] aspect-[8/7] md:aspect-[4/3]">
-              {heroSrc ? <img src={heroSrc} alt={listing.ymm || "vehicle"} className="absolute inset-0 w-full h-full object-cover" /> : <div className="absolute inset-0 flex items-center justify-center text-slate-500"><Car className="w-14 h-14" strokeWidth={1.25} /></div>}
+              {heroSrc ? <img src={heroSrc} alt={listing.ymm || "vehicle"} onClick={() => setLightbox(true)} className="absolute inset-0 w-full h-full object-cover cursor-zoom-in" /> : <div className="absolute inset-0 flex items-center justify-center text-slate-500"><Car className="w-14 h-14" strokeWidth={1.25} /></div>}
               {photoCount > 0 && <div className="absolute top-3 left-3 text-white text-xs font-semibold px-2.5 py-1 rounded bg-black/60">{photoIdx + 1} / {photoCount}</div>}
               {photoCount > 1 && (
                 <>
@@ -359,7 +371,7 @@ const VehiclePassportV2 = () => {
               )}
             </div>
             <div className="grid grid-cols-3 gap-2">
-              <button onClick={() => gallery[0] && window.open(gallery[photoIdx], "_blank")} className="h-11 rounded-xl border border-[#e8ebef] bg-white text-[13px] font-semibold inline-flex items-center justify-center gap-1.5 hover:border-[#1a6dff]"><Eye className="w-4 h-4 text-[#1a6dff]" /> All photos ({photoCount})</button>
+              <button onClick={() => gallery.length && setLightbox(true)} className="h-11 rounded-xl border border-[#e8ebef] bg-white text-[13px] font-semibold inline-flex items-center justify-center gap-1.5 hover:border-[#1a6dff]"><Eye className="w-4 h-4 text-[#1a6dff]" /> All photos ({photoCount})</button>
               {listing.videos?.length ? (
                 <a href={listing.videos[0].url} target="_blank" rel="noreferrer" className="h-11 rounded-xl border border-[#e8ebef] bg-white text-[13px] font-semibold inline-flex items-center justify-center gap-1.5 hover:border-[#1a6dff]"><Play className="w-4 h-4 text-[#1a6dff]" /> Watch video</a>
               ) : <div className="h-11 rounded-xl border border-dashed border-[#e8ebef] bg-[#fafbfc] text-[12px] text-slate-400 inline-flex items-center justify-center gap-1.5"><Play className="w-4 h-4" /> No video</div>}
@@ -809,6 +821,21 @@ const VehiclePassportV2 = () => {
           </button>
         </div>
       </div>
+
+      {/* Fullscreen photo viewer — tap the hero or "All photos" to open. */}
+      {lightbox && gallery.length > 0 && (
+        <div className="fixed inset-0 z-[60] bg-black/95 flex items-center justify-center" onClick={() => setLightbox(false)}>
+          <button onClick={() => setLightbox(false)} className="absolute top-4 right-4 w-10 h-10 rounded-full bg-white/15 hover:bg-white/25 text-white flex items-center justify-center z-10"><X className="w-5 h-5" /></button>
+          <span className="absolute top-5 left-4 text-white text-xs font-semibold px-2.5 py-1 rounded bg-white/15">{photoIdx + 1} / {gallery.length}</span>
+          <img src={gallery[photoIdx]} alt={listing.ymm || "vehicle"} className="max-w-[94vw] max-h-[82vh] object-contain rounded-lg" onClick={(e) => e.stopPropagation()} />
+          {gallery.length > 1 && (
+            <>
+              <button onClick={(e) => { e.stopPropagation(); setPhotoIdx((i) => (i - 1 + gallery.length) % gallery.length); }} className="absolute left-3 top-1/2 -translate-y-1/2 w-11 h-11 rounded-full bg-white/15 hover:bg-white/25 text-white flex items-center justify-center"><ChevronLeft className="w-6 h-6" /></button>
+              <button onClick={(e) => { e.stopPropagation(); setPhotoIdx((i) => (i + 1) % gallery.length); }} className="absolute right-3 top-1/2 -translate-y-1/2 w-11 h-11 rounded-full bg-white/15 hover:bg-white/25 text-white flex items-center justify-center"><ChevronRight className="w-6 h-6" /></button>
+            </>
+          )}
+        </div>
+      )}
 
       {inquiry && <InquiryModal listing={listing} dealer={dealer} intent={inquiry} onClose={() => setInquiry(null)} />}
     </div>
