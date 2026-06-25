@@ -319,7 +319,7 @@ const VehiclePassportV2 = () => {
         <title>{`${listing.ymm}${listing.trim ? ` ${listing.trim}` : ""} — ${dealerName} · Passport`}</title>
       </Helmet>
 
-      <div className="mx-auto max-w-[1080px] px-4 sm:px-6 py-5 space-y-5">
+      <div className="mx-auto max-w-[1080px] px-4 sm:px-6 py-5 space-y-5 pb-[calc(72px+env(safe-area-inset-bottom))] md:pb-5">
         {/* 1. HEADER */}
         <header className="flex items-center justify-between">
           <div className="text-[22px] font-extrabold tracking-tight">
@@ -768,6 +768,25 @@ const VehiclePassportV2 = () => {
             Information is provided by trusted third parties and is accurate to the best of our knowledge. Verify details with the dealer. © {new Date().getFullYear()} {dealerName}. All rights reserved.
           </p>
         </footer>
+      </div>
+
+      {/* Sticky bottom action bar — mobile only (≤768px). Respects the iOS
+          safe area; page content is padded so nothing hides behind it. */}
+      <div className="md:hidden fixed bottom-0 inset-x-0 z-40 bg-white/95 backdrop-blur border-t border-[#e8ebef] px-3 pt-2 pb-[calc(8px+env(safe-area-inset-bottom))]">
+        <div className="grid grid-cols-4 gap-2">
+          <a href={dealerPhone ? `tel:${dealerPhone}` : undefined} onClick={(e) => { if (!dealerPhone) { e.preventDefault(); setInquiry("info"); } }} className="h-11 rounded-xl border border-[#d8dce0] bg-white text-[#1a1d21] text-[11px] font-bold inline-flex flex-col items-center justify-center gap-0.5">
+            <Phone className="w-4 h-4 text-[#1a6dff]" /> Call
+          </a>
+          <button onClick={() => { if (dealerPhone) window.location.href = `sms:${dealerPhone.replace(/[^\d+]/g, "")}`; else setInquiry("info"); }} className="h-11 rounded-xl border border-[#d8dce0] bg-white text-[#1a1d21] text-[11px] font-bold inline-flex flex-col items-center justify-center gap-0.5">
+            <MessageSquare className="w-4 h-4 text-[#1a6dff]" /> Text
+          </button>
+          <button onClick={() => setInquiry("info")} className="h-11 rounded-xl border border-[#d8dce0] bg-white text-[#1a1d21] text-[11px] font-bold inline-flex flex-col items-center justify-center gap-0.5">
+            <Clock className="w-4 h-4 text-[#1a6dff]" /> Test Drive
+          </button>
+          <button onClick={() => setInquiry("info")} className="h-11 rounded-xl bg-[#1a6dff] text-white text-[11px] font-bold inline-flex flex-col items-center justify-center gap-0.5">
+            <DollarSign className="w-4 h-4" /> Today's Price
+          </button>
+        </div>
       </div>
 
       {inquiry && <InquiryModal listing={listing} dealer={dealer} intent={inquiry} onClose={() => setInquiry(null)} />}
