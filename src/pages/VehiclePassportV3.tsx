@@ -287,7 +287,7 @@ const VehiclePassportV3 = () => {
        <div className="lg:grid lg:grid-cols-[minmax(0,1fr)_340px] lg:gap-6 lg:items-start">
         <div className="space-y-6 lg:space-y-7 min-w-0">
         {/* 1–2. TOP ZONE */}
-        <section className="grid grid-cols-1 lg:grid-cols-[440px_1fr] gap-5">
+        <section className="grid grid-cols-1 lg:grid-cols-[minmax(0,380px)_1fr] gap-5">
           {/* Gallery */}
           <div>
             <div className="relative overflow-hidden rounded-2xl bg-[#1f2227] aspect-[4/3]">
