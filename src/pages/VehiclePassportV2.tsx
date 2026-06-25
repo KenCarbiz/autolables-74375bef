@@ -48,22 +48,6 @@ const Stars = ({ n, size = 16 }: { n: number; size?: number }) => (
 );
 
 // Semicircular market gauge with a needle positioned by price vs. band.
-const Gauge = ({ price, low, high }: { price: number; low: number; high: number }) => {
-  const span = Math.max(1, high - low);
-  const t = Math.max(0, Math.min(1, (price - low) / span));
-  const rad = ((t * 180 - 180) * Math.PI) / 180;
-  const nx = 50 + 36 * Math.cos(rad);
-  const ny = 50 + 36 * Math.sin(rad);
-  return (
-    <svg viewBox="0 0 100 56" className="w-full max-w-[220px]">
-      <path d="M 10 50 A 40 40 0 0 1 42 12" fill="none" stroke="#86efac" strokeWidth="9" strokeLinecap="round" />
-      <path d="M 42 12 A 40 40 0 0 1 70 13" fill="none" stroke="#fde047" strokeWidth="9" strokeLinecap="round" />
-      <path d="M 70 13 A 40 40 0 0 1 90 50" fill="none" stroke="#fca5a5" strokeWidth="9" strokeLinecap="round" />
-      <line x1="50" y1="50" x2={nx.toFixed(1)} y2={ny.toFixed(1)} stroke="#0f172a" strokeWidth="2.5" strokeLinecap="round" />
-      <circle cx="50" cy="50" r="3.5" fill="#0f172a" />
-    </svg>
-  );
-};
 
 // deno-lint-ignore no-explicit-any
 const InquiryModal = ({ listing, dealer, intent, onClose }: { listing: VehicleListing; dealer: any; intent: "info" | "trade"; onClose: () => void }) => {
@@ -221,8 +205,6 @@ const VehiclePassportV2 = () => {
   const price = listing.price ?? null;
   const msrp = (mc.msrp as number) ?? null;
   const marketAvg = listing.market_value ?? null;
-  const marketHigh = (mp.high as number) ?? null;
-  const marketLow = (mp.low as number) ?? null;
   const belowMarket = (mp.belowMarket as number) ?? (marketAvg != null && price != null && price < marketAvg ? marketAvg - price : null);
   const priceLabel = (dealer.price_label as string) || "Our Price";
   const saveVsMsrp = msrp != null && price != null && msrp > price ? msrp - price : null;
@@ -293,6 +275,17 @@ const VehiclePassportV2 = () => {
     ["Fuel Type", ks.fuel],
     ks.mpg_city && ks.mpg_hwy ? ["MPG (est.)", `${ks.mpg_city} city / ${ks.mpg_hwy} hwy`] : ["", null],
   ];
+
+  const keySpecs = ([
+    ["Engine", ks.engine],
+    ["Horsepower", mc.horsepower ? `${mc.horsepower} HP` : null],
+    ["Transmission", ks.transmission],
+    ["Drivetrain", ks.drivetrain],
+    ["Fuel Economy", ks.mpg_city && ks.mpg_hwy ? `${ks.mpg_city}/${ks.mpg_hwy} MPG` : ks.fuel || null],
+    ["Exterior Color", ks.exterior_color],
+    ["Interior Color", ks.interior_color],
+    ["Seats", (mc.seating as string | number) ? `${mc.seating}-Passenger` : null],
+  ] as [string, unknown][]).filter(([, v]) => v).map(([k, v]) => [k, String(v)] as [string, string]);
 
   // Real offers only.
   const rawOffers = (listing as unknown as { incentives?: unknown }).incentives ?? (mc as { incentives?: unknown }).incentives;
@@ -619,69 +612,38 @@ const VehiclePassportV2 = () => {
           <h2 className="text-[17px] font-bold tracking-tight px-0.5">Market Intelligence</h2>
           <p className="text-[12px] text-slate-500 px-0.5">Independent pricing, demand, and value analysis for this vehicle.</p>
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <Card className="p-4 md:p-5">
-            <SectionTitle>Market Price Analysis</SectionTitle>
-            <p className="text-[11px] text-slate-400 mt-0.5">Powered by MarketCheck</p>
-            {marketAvg != null && price != null ? (
-              <>
-                <div className="flex justify-center my-2"><Gauge price={price} low={marketLow ?? Math.round(marketAvg * 0.9)} high={marketHigh ?? Math.round(marketAvg * 1.1)} /></div>
-                <div className="grid grid-cols-3 text-center text-[11px]">
-                  <div><div className="text-slate-500">Market Low</div><div className="font-bold">{fmt$(marketLow ?? Math.round(marketAvg * 0.9))}</div></div>
-                  <div><div className="text-slate-500">Our Price</div><div className="font-bold text-emerald-600">{fmt$(price)}</div></div>
-                  <div><div className="text-slate-500">Market High</div><div className="font-bold">{fmt$(marketHigh ?? Math.round(marketAvg * 1.1))}</div></div>
-                </div>
-                <div className="mt-2 flex items-center justify-between text-[12px] rounded-lg bg-slate-50 px-3 py-2">
-                  <span className="text-slate-500">Market average <span className="font-semibold text-slate-700">{fmt$(marketAvg)}</span></span>
-                  {belowMarket && belowMarket > 0 && <span className="font-bold text-emerald-600">You save {fmt$(belowMarket)}</span>}
-                </div>
-                <button onClick={() => go("market-price")} className="mt-3 text-[13px] font-semibold text-[#2563EB] inline-flex items-center gap-1 hover:underline">View full market report <ArrowRight className="w-3.5 h-3.5" /></button>
-                <p className="text-[10px] text-slate-400 mt-2 leading-snug">Market values provided by MarketCheck and third-party data sources. Actual market conditions may vary.</p>
-              </>
-            ) : (
-              <p className="text-[13px] text-slate-500 mt-3">Live market pricing for this vehicle appears here when MarketCheck comparables are available.</p>
-            )}
-          </Card>
-
-          <Card className="p-4 md:p-5">
-            <div className="flex items-center justify-between"><SectionTitle>Market Demand</SectionTitle><TrendingUp className="w-4 h-4 text-emerald-600" /></div>
-            {viewCount != null || dom != null ? (
-              <>
-                <p className="text-lg font-bold text-emerald-600 mt-2">{(viewCount ?? 0) > 20 ? "High Interest" : "Active"}</p>
-                <ul className="mt-2 space-y-1.5 text-[13px]">
-                  {viewCount != null && <li className="flex items-center gap-2"><CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />{viewCount.toLocaleString()} total views</li>}
-                  {dom != null && <li className="flex items-center gap-2"><CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />{dom} days on market</li>}
-                </ul>
-              </>
-            ) : <p className="text-[13px] text-slate-500 mt-3">Demand data currently unavailable.</p>}
-            <button onClick={() => go("market-demand")} className="mt-3 text-[13px] font-semibold text-[#2563EB] inline-flex items-center gap-1 hover:underline">View report <ArrowRight className="w-3.5 h-3.5" /></button>
-          </Card>
-
-          <Card className="p-4 md:p-5">
-            <div className="flex items-center justify-between"><SectionTitle>Price Confidence</SectionTitle><DollarSign className="w-4 h-4 text-emerald-600" /></div>
-            {belowMarket && belowMarket > 0 ? (
-              <>
-                <p className="text-lg font-bold text-emerald-600 mt-2">Excellent Price</p>
-                <p className="text-[13px] text-slate-600">{fmt$(belowMarket)} below market average</p>
-                <ul className="mt-2 space-y-1.5 text-[13px]">
-                  <li className="flex items-center gap-2"><CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />Priced below market average</li>
-                  <li className="flex items-center gap-2"><CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />Backed by live market comparables</li>
-                  <li className="flex items-center gap-2"><CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />Independently analyzed by MarketCheck</li>
-                </ul>
-                <p className="text-[10px] text-slate-400 mt-2">Powered by MarketCheck</p>
-              </>
-            ) : marketAvg != null ? (
-              <>
-                <p className="text-lg font-bold text-blue-600 mt-2">Fair Price</p>
-                <p className="text-[13px] text-slate-600">Priced in line with the local market.</p>
-                <p className="text-[10px] text-slate-400 mt-2">Powered by MarketCheck</p>
-              </>
-            ) : (
-              <p className="text-[13px] text-slate-500 mt-3">Price confidence appears here once market comparables are available for this vehicle.</p>
-            )}
-            <button onClick={() => go("price-confidence")} className="mt-3 text-[13px] font-semibold text-[#2563EB] inline-flex items-center gap-1 hover:underline">View report <ArrowRight className="w-3.5 h-3.5" /></button>
-          </Card>
+        {/* Six compact tiles — each a summary that opens its own full report
+            page (no popups). Honest copy when a signal isn't available. */}
+        <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3">
+          {[
+            { icon: DollarSign, title: "Market Price", tone: belowMarket && belowMarket > 0 ? "good" : "neutral",
+              value: belowMarket && belowMarket > 0 ? "Great Price" : marketAvg != null ? "Market Price" : "Pending",
+              sub: belowMarket && belowMarket > 0 ? `${fmt$(belowMarket)} below market average` : marketAvg != null ? `Market avg ${fmt$(marketAvg)}` : "Awaiting MarketCheck data",
+              cta: "View report", section: "market-price" },
+            { icon: TrendingUp, title: "Market Demand", tone: (viewCount ?? 0) > 20 ? "good" : "neutral",
+              value: (viewCount != null || dom != null) ? ((viewCount ?? 0) > 20 ? "High Interest" : "Active") : "Pending",
+              sub: (viewCount != null || dom != null) ? [viewCount != null ? `${viewCount.toLocaleString()} views` : null, dom != null ? `${dom} days on market` : null].filter(Boolean).join(" · ") : "Activity tracked once live",
+              cta: "View report", section: "market-demand" },
+            { icon: GaugeIcon, title: "Price Confidence", tone: belowMarket && belowMarket > 0 ? "good" : "neutral",
+              value: belowMarket && belowMarket > 0 ? "Excellent" : marketAvg != null ? "Fair" : "Pending",
+              sub: marketAvg != null ? "Based on live comparables" : "Awaiting MarketCheck data",
+              cta: "View report", section: "price-confidence" },
+            { icon: Clock, title: "Price History", tone: "neutral",
+              value: "Trend", sub: "History builds as we track this VIN", cta: "View history", section: "price-history" },
+            { icon: Car, title: "Comparable Vehicles", tone: "neutral",
+              value: "Comp set", sub: "Similar vehicles via MarketCheck", cta: "View comp set", section: "comparable-vehicles" },
+            { icon: Package, title: "Inventory Trend", tone: "neutral",
+              value: "30-Day", sub: "Market supply via MarketCheck", cta: "View trend", section: "inventory-trend" },
+          ].map((t) => (
+            <Card key={t.section} className="p-4 flex flex-col">
+              <div className="flex items-center gap-2 mb-2"><t.icon className={`w-4 h-4 ${t.tone === "good" ? "text-emerald-600" : "text-[#1a6dff]"}`} /><span className="text-[12px] font-bold text-slate-700 leading-tight">{t.title}</span></div>
+              <p className={`text-[15px] font-extrabold leading-tight ${t.tone === "good" ? "text-emerald-600" : "text-slate-900"}`}>{t.value}</p>
+              <p className="text-[11px] text-slate-500 mt-0.5 leading-snug flex-1">{t.sub}</p>
+              <button onClick={() => go(t.section)} className="mt-2.5 text-[12px] font-semibold text-[#2563EB] inline-flex items-center gap-1 hover:underline">{t.cta} <ArrowRight className="w-3 h-3" /></button>
+            </Card>
+          ))}
         </div>
+        <p className="text-[10px] text-slate-400 px-0.5">Powered by MarketCheck. Market values are estimates from third-party data and may vary by region and time.</p>
 
         {/* 5b. WHY THIS IS A GREAT BUY — now below Market Intelligence. */}
         <Card className="p-5 md:p-6">
@@ -809,8 +771,16 @@ const VehiclePassportV2 = () => {
             <button onClick={() => go("overview")} className="mt-3 text-[13px] font-semibold text-[#2563EB] inline-flex items-center gap-1 hover:underline">Read full overview <ArrowRight className="w-3.5 h-3.5" /></button>
           </Card>
 
-          <Card className="overflow-hidden flex items-center">
-            {(gallery[1] || gallery[0]) ? <img src={gallery[1] || gallery[0]} alt="" className="w-full h-full object-cover aspect-[4/3]" /> : <div className="w-full aspect-[4/3] bg-slate-100 flex items-center justify-center"><Car className="w-10 h-10 text-slate-300" /></div>}
+          <Card className="p-4 md:p-5">
+            <SectionTitle>Key Specifications</SectionTitle>
+            {keySpecs.length > 0 ? (
+              <div className="mt-3 space-y-2 text-[13px]">
+                {keySpecs.map(([k, v]) => (
+                  <div key={k} className="flex justify-between gap-4"><span className="text-slate-500">{k}</span><span className="font-semibold text-right">{v}</span></div>
+                ))}
+              </div>
+            ) : <p className="text-[13px] text-slate-500 mt-3">Decoded specifications appear here once processed.</p>}
+            <button onClick={() => go("specifications")} className="mt-3 text-[13px] font-semibold text-[#2563EB] inline-flex items-center gap-1 hover:underline">View full specs <ArrowRight className="w-3.5 h-3.5" /></button>
           </Card>
         </div>
 

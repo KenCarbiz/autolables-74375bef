@@ -197,6 +197,61 @@ const SECTIONS: Record<string, { title: string; render: SectionRender }> = {
       </>
     ),
   },
+  "price-history": {
+    title: "Price History",
+    render: ({ listing }) => {
+      const checkedAt = (listing as unknown as { market_checked_at?: string }).market_checked_at;
+      return (
+      <>
+        <SectionHeading icon={Clock} title="Price History" subtitle="How this vehicle's price has moved over time." />
+        {checkedAt ? (
+          <Card className="p-5">
+            <p className="text-[14px] text-slate-700">We began tracking this VIN on {new Date(checkedAt).toLocaleDateString()}.</p>
+            <p className="text-[13px] text-slate-500 mt-2">As we capture additional price points over the coming days, the full trend line and any price drops will appear here.</p>
+            <p className="text-[11px] text-slate-400 mt-3">Powered by MarketCheck price tracking.</p>
+          </Card>
+        ) : <Unavailable what="Price history" hint="Price tracking begins once this vehicle has a MarketCheck valuation on file." />}
+      </>
+      );
+    },
+  },
+  "comparable-vehicles": {
+    title: "Comparable Vehicles",
+    render: () => (
+      <>
+        <SectionHeading icon={Car} title="Comparable Vehicles" subtitle="Similar vehicles in your area." />
+        <Unavailable what="Comparable listings" hint="A side-by-side comparable set (year, trim, mileage, and price) is sourced from MarketCheck and appears here when available for this vehicle." />
+      </>
+    ),
+  },
+  "inventory-trend": {
+    title: "Inventory Trend",
+    render: () => (
+      <>
+        <SectionHeading icon={Package} title="Inventory Trend" subtitle="Market supply for this model." />
+        <Unavailable what="Inventory trend" hint="30-day inventory movement for comparable vehicles is sourced from MarketCheck and appears here when available." />
+      </>
+    ),
+  },
+  "specifications": {
+    title: "Specifications",
+    render: ({ d, listing }) => (
+      <>
+        <SectionHeading icon={Settings} title="Key Specifications" subtitle={`${listing.ymm}${listing.trim ? ` ${listing.trim}` : ""}`} />
+        {d.keySpecs.length > 0 ? (
+          <Card className="p-5">
+            <div className="space-y-2.5 text-[14px]">
+              {d.keySpecs.map(([k, v]) => (
+                <div key={k} className="flex justify-between gap-4 border-b border-slate-100 pb-2.5"><span className="text-slate-500">{k}</span><span className="font-semibold text-right">{v}</span></div>
+              ))}
+              {listing.mileage != null && <div className="flex justify-between gap-4 border-b border-slate-100 pb-2.5"><span className="text-slate-500">Mileage</span><span className="font-semibold text-right">{listing.mileage.toLocaleString()} mi</span></div>}
+              {listing.vin && <div className="flex justify-between gap-4"><span className="text-slate-500">VIN</span><span className="font-semibold text-right font-mono text-[12px]">{listing.vin}</span></div>}
+            </div>
+          </Card>
+        ) : <Unavailable what="Specifications" hint="Decoded specifications appear here once the vehicle's data is fully processed." />}
+      </>
+    ),
+  },
   "great-buy": {
     title: "Why This Is A Great Buy",
     render: ({ d }) => (

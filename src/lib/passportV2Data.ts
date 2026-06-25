@@ -48,6 +48,7 @@ export interface PassportData {
   // Content
   highlights: Highlight[];
   specRows: [string, string | null | undefined][];
+  keySpecs: [string, string][];
   overview: string;
   whyBuy: string[];
   // Reviews
@@ -150,6 +151,18 @@ export const derivePassport = (listing: VehicleListing): PassportData => {
     ks.mpg_city && ks.mpg_hwy ? ["MPG (est.)", `${ks.mpg_city} city / ${ks.mpg_hwy} hwy`] : ["", null],
   ];
 
+  // Structured key specs (goal's "Key Specifications" card) — real values only.
+  const keySpecs = ([
+    ["Engine", ks.engine],
+    ["Horsepower", mc.horsepower ? `${mc.horsepower} HP` : null],
+    ["Transmission", ks.transmission],
+    ["Drivetrain", ks.drivetrain],
+    ["Fuel Economy", ks.mpg_city && ks.mpg_hwy ? `${ks.mpg_city}/${ks.mpg_hwy} MPG` : ks.fuel || null],
+    ["Exterior Color", ks.exterior_color],
+    ["Interior Color", ks.interior_color],
+    ["Seats", (mc.seating as string | number) ? `${mc.seating}-Passenger` : null],
+  ] as [string, unknown][]).filter(([, v]) => v).map(([k, v]) => [k, String(v)] as [string, string]);
+
   const whyBuy: string[] = [];
   if (saveVsMsrp) whyBuy.push(`Priced ${fmt$(saveVsMsrp)} below MSRP`);
   if (belowMarket && belowMarket > 0) whyBuy.push(`${fmt$(belowMarket)} below market average`);
@@ -177,7 +190,7 @@ export const derivePassport = (listing: VehicleListing): PassportData => {
     ownerCount, accidentCount, cleanTitle, serviceCount, recallClear, openRecalls, hasRecallCheck,
     warranty, warrantyStr,
     confScore, confLabel, verifiedBy, verifyRows,
-    highlights, specRows, overview, whyBuy,
+    highlights, specRows, keySpecs, overview, whyBuy,
     reviewRating: (dealer.review_rating as number) ?? null,
     reviewCount: (dealer.review_count as number) ?? null,
     reviewUrl: (dealer.review_url as string) || (dealer.google_url as string) || (dealer.reviews_url as string) || "",
