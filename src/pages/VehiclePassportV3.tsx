@@ -272,7 +272,7 @@ const VehiclePassportV3 = () => {
 
       {/* Top bar */}
       <header className="border-b border-[#E6E8EC] bg-white">
-        <div className="mx-auto max-w-[1600px] px-4 sm:px-5 h-16 flex items-center justify-between">
+        <div className="mx-auto max-w-[1680px] px-4 sm:px-5 h-16 flex items-center justify-between">
           {listing.dealer_snapshot?.logo_url ? <img src={listing.dealer_snapshot.logo_url as string} alt="" className="h-7" /> : <Logo variant="full" size={22} />}
           <div className="flex items-center gap-3 sm:gap-5">
             <button onClick={handleShare} className={`text-sm font-medium inline-flex items-center gap-1.5 ${TEXT2} hover:text-[#0F172A]`}><Upload className="w-4 h-4" /> <span className="hidden sm:inline">Share</span></button>
@@ -283,8 +283,8 @@ const VehiclePassportV3 = () => {
         </div>
       </header>
 
-      <main className="mx-auto max-w-[1600px] px-4 sm:px-5 py-5 sm:py-6 pb-[calc(76px+env(safe-area-inset-bottom))] lg:pb-6">
-       <div className="lg:grid lg:grid-cols-[minmax(0,1fr)_340px] lg:gap-6 lg:items-start">
+      <main className="mx-auto max-w-[1680px] px-4 sm:px-5 py-5 sm:py-6 pb-[calc(76px+env(safe-area-inset-bottom))] lg:pb-6">
+       <div className="lg:grid lg:grid-cols-[minmax(0,1fr)_340px] lg:gap-8 lg:items-start">
         <div className="space-y-6 lg:space-y-7 min-w-0">
         {/* 1–2. TOP ZONE */}
         <section className="grid grid-cols-1 lg:grid-cols-[minmax(0,380px)_1fr] gap-5">
@@ -387,7 +387,7 @@ const VehiclePassportV3 = () => {
         </section>
 
         {/* 5. PRIMARY TRUST GRID */}
-        <section className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-5 items-stretch">
+        <section className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-5 items-start">
           {/* Why This Is A Great Buy */}
           <div className={`${CARD} p-5 flex flex-col`}>
             <H3>Why This Is A Great Buy</H3>
@@ -398,7 +398,7 @@ const VehiclePassportV3 = () => {
                 <p className="text-[13px] font-extrabold text-[#16A34A] -mt-1">{d.confLabel} Value</p>
               </div>
             )}
-            <ul className="mt-3 space-y-2">{(d.whyBuy.length ? d.whyBuy : ["Details confirmed at the dealership"]).map((b, i) => <li key={i} className="flex items-start gap-2 text-[13px]"><CheckCircle2 className="w-4 h-4 text-[#16A34A] shrink-0 mt-0.5" />{b}</li>)}</ul>
+            <ul className="mt-3 space-y-2">{(d.whyBuy.length ? d.whyBuy.slice(0, 4) : ["Details confirmed at the dealership"]).map((b, i) => <li key={i} className="flex items-start gap-2 text-[13px]"><CheckCircle2 className="w-4 h-4 text-[#16A34A] shrink-0 mt-0.5" />{b}</li>)}</ul>
             <Link onClick={() => go("great-buy")} className="mt-auto pt-3 self-start">See full buying report</Link>
           </div>
 
@@ -465,7 +465,7 @@ const VehiclePassportV3 = () => {
 
         {/* 7. INFORMATION GRID — three equal-height cards (the conversion CTA
             now lives in the sticky right rail). */}
-        <section className="grid grid-cols-1 md:grid-cols-3 gap-5 items-stretch">
+        <section className="grid grid-cols-1 md:grid-cols-3 gap-5 items-start">
           {/* Highlights */}
           <div className={`${CARD} p-5 flex flex-col`}>
             <H3>Vehicle Highlights</H3>
