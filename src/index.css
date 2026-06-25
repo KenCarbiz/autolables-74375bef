@@ -197,6 +197,22 @@
   }
 }
 
+@layer base {
+  /* Tailwind v3 preflight drops the native button pointer cursor; restore it
+     so every clickable control reads as clickable (ui-ux-pro-max: cursor-pointer
+     / disabled-states). Disabled controls show not-allowed. */
+  button:not(:disabled),
+  [role="button"]:not([aria-disabled="true"]),
+  summary,
+  label[for] {
+    cursor: pointer;
+  }
+  button:disabled,
+  [aria-disabled="true"] {
+    cursor: not-allowed;
+  }
+}
+
 @layer utilities {
   .font-barlow-condensed {
     font-family: 'Barlow Condensed', 'Inter', sans-serif;
