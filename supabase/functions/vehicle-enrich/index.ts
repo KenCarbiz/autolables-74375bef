@@ -73,7 +73,7 @@ async function fetchComps(vin: string, condition: string, zip: string | null, li
     const rows: any[] = Array.isArray(b?.listings) ? b.listings : [];
     const comparables = rows.slice(0, 16).map((l) => ({
       vin: l.vin ?? null,
-      ymm: l.heading ?? [l.build?.year, l.build?.make, l.build?.model].filter(Boolean).join(" ") || null,
+      ymm: l.heading ?? ([l.build?.year, l.build?.make, l.build?.model].filter(Boolean).join(" ") || null),
       trim: l.build?.trim ?? null,
       miles: num(l.miles),
       price: num(l.price),
