@@ -101,6 +101,7 @@ const VehiclePassportV3 = lazy(() => import("./pages/VehiclePassportV3"));
 const VehiclePassportVerification = lazy(() => import("./pages/VehiclePassportVerification"));
 const VehiclePassportDocuments = lazy(() => import("./pages/VehiclePassportDocuments"));
 const VehiclePassportGreatBuy = lazy(() => import("./pages/VehiclePassportGreatBuy"));
+const VehiclePassportHistory = lazy(() => import("./pages/VehiclePassportHistory"));
 const PublicDocuments = lazy(() => import("./pages/PublicDocuments"));
 const PrepSignOff = lazy(() => import("./pages/PrepSignOff"));
 const ServiceInspection = lazy(() => import("./pages/ServiceInspection"));
@@ -176,6 +177,7 @@ const App = () => (
                       <Route path="/passport-v3/:vehicleSlug/verification" element={<VehiclePassportVerification />} />
                       <Route path="/passport-v3/:vehicleSlug/documents" element={<VehiclePassportDocuments />} />
                       <Route path="/passport-v3/:vehicleSlug/great-buy" element={<VehiclePassportGreatBuy />} />
+                      <Route path="/passport-v3/:vehicleSlug/vehicle-history" element={<VehiclePassportHistory />} />
                       <Route path="/passport-v3/:vehicleSlug/:section" element={<VehiclePassportV2Detail />} />
                       <Route path="/v/:slug/documents" element={<PublicDocuments />} />
                       <Route path="/deal/:token" element={<DealSigning />} />
