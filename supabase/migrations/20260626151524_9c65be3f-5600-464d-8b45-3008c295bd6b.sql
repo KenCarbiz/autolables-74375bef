@@ -1,0 +1,8 @@
+ALTER TABLE public.vehicle_listings
+  ADD COLUMN IF NOT EXISTS market_meta JSONB,
+  ADD COLUMN IF NOT EXISTS comparables JSONB,
+  ADD COLUMN IF NOT EXISTS blackbook JSONB,
+  ADD COLUMN IF NOT EXISTS recall_payload JSONB,
+  ADD COLUMN IF NOT EXISTS enriched_at TIMESTAMPTZ,
+  ADD COLUMN IF NOT EXISTS history_payload JSONB,
+  ADD COLUMN IF NOT EXISTS in_service_date DATE;
