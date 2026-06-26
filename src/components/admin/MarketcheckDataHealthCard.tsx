@@ -196,15 +196,21 @@ export default function MarketcheckDataHealthCard() {
         </div>
       </div>
 
-      <SyncStatusLine sync={sync} running={fullPull} />
-      {progress && (
+      {/* During a full pull the website re-ingest (one long, opaque call) runs
+          first; hide the generic banner once the enrich loop starts so the
+          progress bar below is the single, continuous indicator. */}
+      <SyncStatusLine sync={sync} running={fullPull && !progress} />
+      {(progress || bulk) && (
         <div className="space-y-1.5">
           <div className="flex items-center justify-between text-xs font-medium text-muted-foreground">
-            <span className="inline-flex items-center gap-1.5"><Loader2 className="w-3.5 h-3.5 animate-spin" /> Enriching every vehicle — comps, recalls, VIN history, Black Book</span>
-            <span className="tabular-nums">{progress.done} / {progress.total}</span>
+            <span className="inline-flex items-center gap-1.5">
+              <Loader2 className="w-3.5 h-3.5 animate-spin" />
+              {progress ? "Enriching every vehicle — comps, recalls, VIN history, Black Book" : "Preparing enrichment…"}
+            </span>
+            {progress && <span className="tabular-nums">{progress.done} / {progress.total}</span>}
           </div>
           <div className="h-1.5 rounded-full bg-muted overflow-hidden">
-            <div className="h-full bg-[#16A34A] transition-all" style={{ width: `${progress.total ? Math.round((progress.done / progress.total) * 100) : 0}%` }} />
+            <div className="h-full bg-[#16A34A] transition-all" style={{ width: `${progress && progress.total ? Math.round((progress.done / progress.total) * 100) : 0}%` }} />
           </div>
         </div>
       )}
@@ -277,7 +283,7 @@ function SyncStatusLine({ sync, running }: { sync: SyncState | null; running: bo
   if (running) {
     return (
       <div className="flex items-center gap-2 rounded-xl border border-border bg-muted/40 px-4 py-2.5 text-sm text-muted-foreground">
-        <Loader2 className="w-4 h-4 animate-spin" /> Pulling full inventory from the dealer website…
+        <Loader2 className="w-4 h-4 animate-spin" /> Step 1 of 2 — pulling full inventory from the dealer website (enrichment starts next)…
       </div>
     );
   }
