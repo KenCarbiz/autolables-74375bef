@@ -386,6 +386,10 @@ serve(async (req) => {
   let tenantsSynced = 0, newVehicles = 0, listingsUpserted = 0, pricesRecorded = 0, seen = 0;
   const errors: Array<{ tenant_id: string; error: string }> = [];
   const diagnostics: Array<Record<string, unknown>> = [];
+  // Vehicles to fully enrich (MarketCheck pricing/comps/recalls + Black Book)
+  // after the inventory pull. Bounded per run to respect provider rate limits.
+  const enrichQueue: { tenant_id: string; vin: string }[] = [];
+  const ENRICH_CAP = Number(Deno.env.get("ENRICH_PER_RUN") || "40");
 
   for (const cfg of due as SyncConfig[]) {
     const source = toSourceHost(cfg.source);
@@ -661,6 +665,8 @@ serve(async (req) => {
                     : `MarketCheck ${l.inventory_type || ""} · $${prev.toLocaleString()} → $${price.toLocaleString()}`,
                 });
                 if (!error) { tenantPrices++; pricesRecorded++; latestWebsite.set(vin, price); }
+                // New or price-changed VIN → queue a full enrichment pull.
+                if (enrichQueue.length < ENRICH_CAP) enrichQueue.push({ tenant_id: cfg.tenant_id, vin });
               }
             }
           }
@@ -695,9 +701,28 @@ serve(async (req) => {
     }
   }
 
+  // ── Full enrichment pass (best-effort, capped, small concurrency) ──
+  // Each new/changed VIN gets MarketCheck pricing + comparables + market stats
+  // + recalls and Black Book values pulled and persisted by vehicle-enrich.
+  let enriched = 0;
+  for (let i = 0; i < enrichQueue.length; i += 4) {
+    const batch = enrichQueue.slice(i, i + 4);
+    await Promise.all(batch.map(async (e) => {
+      try {
+        const r = await fetch(`${supabaseUrl}/functions/v1/vehicle-enrich`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${serviceKey}`, "x-cron-secret": cronSecret },
+          body: JSON.stringify(e), signal: AbortSignal.timeout(30000),
+        });
+        if (r.ok) enriched++;
+      } catch { /* best-effort — a failed enrich leaves the listing's prior data intact */ }
+    }));
+  }
+
   return json(200, {
     ok: true, tenants_due: due.length, tenants_synced: tenantsSynced,
     listings_seen: seen, new_vehicles: newVehicles,
-    listings_upserted: listingsUpserted, prices_recorded: pricesRecorded, errors, diagnostics,
+    listings_upserted: listingsUpserted, prices_recorded: pricesRecorded,
+    enrich_queued: enrichQueue.length, enriched, errors, diagnostics,
   });
 });
