@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import {
   ChevronLeft, ChevronRight, Upload, Bookmark, Printer, FileText, MessageSquare,
@@ -13,6 +13,7 @@ import { useVehicleListing, type VehicleListing } from "@/hooks/useVehicleListin
 import { formatPhone } from "@/components/addendum/CustomerInfoSection";
 import Logo from "@/components/brand/Logo";
 import { derivePassport, computePriceHistory, fmt$ } from "@/lib/passportV2Data";
+import MarketPriceSlideOver from "@/components/passport/MarketPriceSlideOver";
 
 // ──────────────────────────────────────────────────────────────
 // VehiclePassportV3 — /passport-v3/:vehicleSlug
@@ -140,6 +141,9 @@ const VehiclePassportV3 = () => {
   const [idx, setIdx] = useState(0);
   const [zip, setZip] = useState("");
   const [showSticky, setShowSticky] = useState(false);
+  const [marketOpen, setMarketOpen] = useState(false);
+  const marketTriggerRef = useRef<HTMLButtonElement>(null);
+  const closeMarket = () => { setMarketOpen(false); marketTriggerRef.current?.focus(); };
 
   useEffect(() => {
     const onScroll = () => setShowSticky(window.scrollY > 360);
@@ -347,14 +351,21 @@ const VehiclePassportV3 = () => {
         <section className={`${CARD} p-5`}>
           <div className="flex items-center justify-between"><div><H2>Market Intelligence</H2><p className={`text-[13px] ${TEXT2} mt-0.5`}>Independent pricing, demand, and value analysis for this vehicle.</p></div><span className="text-[12px] text-[#94A3B8]">Powered by MarketCheck</span></div>
           <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-4 mt-5">
-            {mi.map((c) => (
-              <div key={c.section} className="rounded-xl border border-[#E6E8EC] p-4 flex flex-col">
+            {mi.map((c) => {
+              const isMarket = c.section === "market-price";
+              return (
+              <div key={c.section} onClick={isMarket ? () => setMarketOpen(true) : undefined} className={`rounded-xl border border-[#E6E8EC] p-4 flex flex-col ${isMarket ? "cursor-pointer hover:border-[#2563EB] transition-colors" : ""}`}>
                 <div className="flex items-center gap-1.5 mb-2"><c.icon className="w-4 h-4 text-[#2563EB]" /><span className="text-[12px] font-semibold text-[#64748B]">{c.title}</span></div>
                 {c.donut != null ? <div className="flex flex-col items-center text-center"><Donut pct={c.donut} label={`${c.donut}`} /><p className="text-[14px] font-extrabold text-[#16A34A] leading-tight mt-2">{c.strong}</p><p className="text-[11px] text-[#64748B] leading-snug">{c.sub}</p></div>
                   : <><p className={`text-[16px] font-extrabold leading-tight ${/Great|High|Excellent|^-/.test(String(c.strong)) ? "text-[#16A34A]" : "text-[#0F172A]"}`}>{c.strong}</p><p className="text-[11px] text-[#64748B] leading-snug mt-0.5 flex-1">{c.sub}</p>{c.comps ? <div className="flex gap-1 mt-2">{[0, 1, 2].map((i) => <div key={i} className="flex-1 h-8 rounded bg-[#F1F5F9] flex items-center justify-center"><Car className="w-4 h-4 text-[#94A3B8]" /></div>)}</div> : c.chart}</>}
-                <Link onClick={() => go(c.section)} className="mt-2.5 !text-[12px]">{c.cta}</Link>
+                {isMarket ? (
+                  <button ref={marketTriggerRef} onClick={(e) => { e.stopPropagation(); setMarketOpen(true); }} className="mt-2.5 text-[12px] font-semibold text-[#2563EB] inline-flex items-center gap-1 hover:underline">{c.cta} <ArrowRight className="w-3.5 h-3.5" /></button>
+                ) : (
+                  <Link onClick={() => go(c.section)} className="mt-2.5 !text-[12px]">{c.cta}</Link>
+                )}
               </div>
-            ))}
+              );
+            })}
           </div>
           <p className="text-[11px] text-[#94A3B8] mt-3">Market values are estimates from third-party data and may vary by region and time.</p>
         </section>
@@ -552,6 +563,17 @@ const VehiclePassportV3 = () => {
           </div>
         </div>
       </div>
+
+      <MarketPriceSlideOver
+        open={marketOpen}
+        onClose={closeMarket}
+        d={d}
+        listing={listing}
+        isPreview={isPreview}
+        onReserve={() => { closeMarket(); go("reserve"); }}
+        onSpecialist={() => { closeMarket(); go("contact"); }}
+        onViewComparables={() => { closeMarket(); go("comparable-vehicles"); }}
+      />
     </div>
   );
 };
