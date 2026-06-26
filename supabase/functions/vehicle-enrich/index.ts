@@ -240,20 +240,30 @@ async function fetchMds(ymm: string | null, condition: string, zip: string | nul
     const year = parts[0] && /^\d{4}$/.test(parts[0]) ? parts[0] : "";
     const make = year ? parts[1] : parts[0];
     const model = year ? parts.slice(2).join(" ") : parts.slice(1).join(" ");
-    const p = new URLSearchParams({ api_key: MC_KEY, car_type: condition === "new" ? "new" : "used" });
-    if (year) p.set("year", year);
-    if (make) p.set("make", make);
-    if (model) p.set("model", model);
-    if (zip) { p.set("zip", zip); p.set("radius", "100"); }
-    const res = await mcFetch(`${MC_BASE}/mds/car?${p.toString()}`, 10000);
-    if (!res || !res.ok) return null;
-    // deno-lint-ignore no-explicit-any
-    const b: any = await res.json().catch(() => ({}));
-    return {
-      mds: num(b.mds ?? b.market_days_supply ?? b.days_supply),
-      count: num(b.count ?? b.inventory_count ?? b.total),
-      checked_at: new Date().toISOString(),
+    const carType = condition === "new" ? "new" : "used";
+    const run = async (opts: { useYear: boolean; useZip: boolean }) => {
+      const p = new URLSearchParams({ api_key: MC_KEY, car_type: carType });
+      if (opts.useYear && year) p.set("year", year);
+      if (make) p.set("make", make);
+      if (model) p.set("model", model);
+      if (opts.useZip && zip) { p.set("zip", zip); p.set("radius", "100"); }
+      const res = await mcFetch(`${MC_BASE}/mds/car?${p.toString()}`, 15000);
+      if (!res || !res.ok) return null;
+      // deno-lint-ignore no-explicit-any
+      const b: any = await res.json().catch(() => ({}));
+      const mds = num(b.mds ?? b.market_days_supply ?? b.days_supply);
+      const count = num(b.count ?? b.inventory_count ?? b.total);
+      return mds != null ? { mds, count } : null;
     };
+    // Days supply needs a recent SALES rate, which a thin/slow local same-year
+    // market may not have (a CPO model sitting 160 days, or a direct-sale brand
+    // like Tesla). Broaden the basis: same-year-local → all-years-local →
+    // national, so a computable figure lands wherever one exists.
+    const r = (await run({ useYear: true, useZip: true }))
+      ?? (await run({ useYear: false, useZip: true }))
+      ?? (await run({ useYear: false, useZip: false }));
+    if (!r) return null;
+    return { mds: r.mds, count: r.count, checked_at: new Date().toISOString() };
   } catch { return null; }
 }
 
