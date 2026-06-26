@@ -36,11 +36,10 @@ type PriceFlag = "ok" | "missing" | "nonpositive" | "equals_msrp";
 const priceFlag = (r: Row): PriceFlag => {
   if (r.price == null) return "missing";
   if (r.price <= 0) return "nonpositive";
-  // A NEW car advertised at MSRP is normal, not a parse error. Only treat
-  // price == MSRP as suspicious for used/CPO, where it usually means the feed
-  // handed us the original sticker instead of the dealer's advertised number.
-  const msrp = r.mc_attributes?.msrp ?? null;
-  if (r.condition !== "new" && msrp != null && msrp > 0 && Math.abs(r.price - msrp) < 1) return "equals_msrp";
+  // NOTE: we deliberately do NOT flag price == MSRP. MarketCheck's msrp field
+  // mirrors the advertised price on used cars (and new cars legitimately list
+  // at MSRP), so that check produced almost entirely false positives. Genuine
+  // advertised-vs-lot-price mismatches are caught by the Price Integrity panel.
   return "ok";
 };
 

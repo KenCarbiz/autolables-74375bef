@@ -389,7 +389,12 @@ serve(async (req) => {
   // Vehicles to fully enrich (MarketCheck pricing/comps/recalls + Black Book)
   // after the inventory pull. Bounded per run to respect provider rate limits.
   const enrichQueue: { tenant_id: string; vin: string; zip?: string }[] = [];
-  const ENRICH_CAP = Number(Deno.env.get("ENRICH_PER_RUN") || "40");
+  // Enrichment runs INLINE in this invocation after the inventory pull, so the
+  // cap must leave the function enough wall-clock to finish — a 113-car ingest
+  // plus 40 enrich calls (6 MarketCheck requests each) overran the edge limit
+  // and the enrich pass got killed mid-run. Keep it small; bulk backfill is the
+  // client "Re-pull incomplete" loop, and the nightly chips away the rest.
+  const ENRICH_CAP = Number(Deno.env.get("ENRICH_PER_RUN") || "10");
 
   for (const cfg of due as SyncConfig[]) {
     const source = toSourceHost(cfg.source);

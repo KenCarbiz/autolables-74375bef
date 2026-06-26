@@ -59,10 +59,21 @@ async function fetchPredict(vin: string, miles: number | null) {
 }
 
 // ── MarketCheck: comparable active listings + price stats + market context ──
-async function fetchComps(vin: string, condition: string, zip: string | null, listingPrice: number | null) {
+// Comparables are SIMILAR cars (same year/make/model in the tenant's market),
+// NOT the subject VIN — searching active listings by `vin` returns only that
+// one car, which is why this used to come back empty. Search by ymm, then drop
+// the subject VIN from the results.
+async function fetchComps(ymm: string | null, condition: string, zip: string | null, listingPrice: number | null, subjectVin: string) {
   try {
-    const p = new URLSearchParams({ api_key: MC_KEY, car_type: condition === "new" ? "new" : "used", rows: "20", sort_by: "price", sort_order: "asc", stats: "price,dom" });
-    p.set("vin", vin);
+    if (!ymm) return null;
+    const parts = ymm.split(/\s+/);
+    const year = parts[0] && /^\d{4}$/.test(parts[0]) ? parts[0] : "";
+    const make = year ? parts[1] : parts[0];
+    const model = year ? parts.slice(2).join(" ") : parts.slice(1).join(" ");
+    const p = new URLSearchParams({ api_key: MC_KEY, car_type: condition === "new" ? "new" : "used", rows: "25", sort_by: "price", sort_order: "asc", stats: "price,dom" });
+    if (year) p.set("year", year);
+    if (make) p.set("make", make);
+    if (model) p.set("model", model);
     const radius = 150;
     if (zip) { p.set("zip", zip); p.set("radius", String(radius)); }
     const res = await fetch(`${MC_BASE}/search/car/active?${p.toString()}`, { signal: AbortSignal.timeout(10000) });
@@ -70,7 +81,7 @@ async function fetchComps(vin: string, condition: string, zip: string | null, li
     // deno-lint-ignore no-explicit-any
     const b: any = await res.json().catch(() => ({}));
     // deno-lint-ignore no-explicit-any
-    const rows: any[] = Array.isArray(b?.listings) ? b.listings : [];
+    const rows: any[] = (Array.isArray(b?.listings) ? b.listings : []).filter((l: any) => String(l.vin || "").toUpperCase() !== subjectVin);
     const comparables = rows.slice(0, 16).map((l) => ({
       vin: l.vin ?? null,
       ymm: l.heading ?? ([l.build?.year, l.build?.make, l.build?.model].filter(Boolean).join(" ") || null),
@@ -267,7 +278,7 @@ serve(async (req) => {
 
   const [predict, comps, mds, history, recalls, blackbook] = await Promise.all([
     fetchPredict(vin, miles),
-    fetchComps(vin, condition, zip, price),
+    fetchComps(ymm, condition, zip, price, vin),
     fetchMds(ymm, condition, zip),
     fetchHistory(vin),
     fetchRecalls(vin),
