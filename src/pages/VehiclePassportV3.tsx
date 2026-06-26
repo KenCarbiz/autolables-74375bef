@@ -19,7 +19,7 @@ import { derivePassport, computePriceHistory, fmt$ } from "@/lib/passportV2Data"
 //
 // Ground-up rebuild against the V3 design board. Tokens (encoded as
 // the SHELL/CARD/etc. constants below) come straight from the spec:
-// 1600px container (1280 of content beside the sticky rail), #F6F7F9 surface, #E6E8EC borders, 16px card radius,
+// 1320px container, #F6F7F9 surface, #E6E8EC borders, 16px card radius,
 // Inter type scale, the documented color system. Data is the same live
 // pipeline as V2 (public-listing-view → derivePassport); only the
 // presentation layer is new. Every link opens a full destination page.
@@ -224,43 +224,6 @@ const VehiclePassportV3 = () => {
   ].filter(Boolean) as { v: string; l: string; star?: boolean }[];
 
   const price = d.price;
-  const adv = d.dealerTrust;
-
-  // Conversion panel — sticky right rail on desktop, inline on mobile.
-  const ctaPanel = (
-    <div className="rounded-2xl p-6 text-white flex flex-col shadow-[0_8px_30px_rgba(37,99,235,0.25)]" style={{ background: "linear-gradient(160deg,#2563EB 0%,#1e50c8 100%)" }}>
-      <h2 className="text-[22px] font-extrabold leading-tight text-center">Ready to take the next step?</h2>
-      <p className="text-[13px] opacity-90 text-center mt-1">Choose the option that works best for you.</p>
-      <button onClick={() => go("reserve")} className="mt-5 w-full rounded-xl bg-white text-[#2563EB] px-4 py-3.5 flex items-center justify-center gap-2 shadow-sm transition-transform hover:-translate-y-0.5"><ShieldCheck className="w-5 h-5" /><span className="text-left"><span className="block text-[15px] font-extrabold leading-tight">Reserve This Vehicle</span><span className="block text-[11px] font-medium text-[#2563EB]/70">Secure it today with a refundable deposit.</span></span></button>
-      <button onClick={() => go("trade")} className="mt-3 w-full rounded-xl bg-white/10 border border-white/40 text-white px-4 py-3.5 flex items-center justify-center gap-2 transition-colors hover:bg-white/20"><RefreshCw className="w-5 h-5" /><span className="text-left"><span className="block text-[14px] font-extrabold leading-tight">Get a Trade Appraisal</span><span className="block text-[11px] font-medium opacity-80">Know your trade value in minutes.</span></span></button>
-
-      <div className="mt-6 pt-5 border-t border-white/20">
-        {adv.advisorName ? (
-          <>
-            <p className="text-[11px] font-semibold uppercase tracking-wider opacity-70 text-center mb-3">Questions? Let's talk.</p>
-            <div className="flex items-center gap-3">
-              {adv.advisorPhoto ? <img src={adv.advisorPhoto} alt={adv.advisorName} className="w-12 h-12 rounded-full object-cover ring-2 ring-white/40 shrink-0" /> : <span className="w-12 h-12 rounded-full bg-white/15 flex items-center justify-center shrink-0"><Users className="w-5 h-5" /></span>}
-              <div className="min-w-0 flex-1">
-                <p className="text-[14px] font-bold leading-tight">{adv.advisorName}</p>
-                {adv.advisorTitle && <p className="text-[11px] opacity-80 leading-tight">{adv.advisorTitle}</p>}
-                {d.reviewRating != null && <div className="mt-0.5"><Stars n={d.reviewRating} size={12} /></div>}
-              </div>
-            </div>
-            {adv.advisorResponse && <p className="text-[11px] opacity-80 mt-2">{adv.advisorResponse}</p>}
-          </>
-        ) : (
-          <div className="flex items-center gap-3">
-            <span className="w-11 h-11 rounded-full bg-white/15 flex items-center justify-center shrink-0"><Users className="w-5 h-5" /></span>
-            <div className="min-w-0 flex-1"><p className="text-[13px] font-bold leading-tight">Our specialists are here to help.</p><p className="text-[11px] opacity-80">No pressure. Real people.</p></div>
-          </div>
-        )}
-        <div className="grid grid-cols-2 gap-2 mt-3">
-          {d.dealerPhone ? <a href={`tel:${d.dealerPhone}`} className="h-9 rounded-lg bg-white/15 border border-white/40 text-[12px] font-bold inline-flex items-center justify-center gap-1 transition-colors hover:bg-white/25"><Phone className="w-3.5 h-3.5" /> {adv.advisorName ? `Call ${adv.advisorName.split(" ")[0]}` : "Call Sales"}</a> : <button onClick={() => go("contact")} className="h-9 rounded-lg bg-white/15 border border-white/40 text-[12px] font-bold inline-flex items-center justify-center gap-1"><Phone className="w-3.5 h-3.5" /> Call Sales</button>}
-          <button onClick={() => go("contact")} className="h-9 rounded-lg bg-white/15 border border-white/40 text-[12px] font-bold inline-flex items-center justify-center gap-1 transition-colors hover:bg-white/25"><MessageSquare className="w-3.5 h-3.5" /> {adv.advisorName ? `Message ${adv.advisorName.split(" ")[0]}` : "Contact"}</button>
-        </div>
-      </div>
-    </div>
-  );
 
   return (
     <div className="min-h-screen bg-[#F6F7F9] text-[#0F172A]" style={{ fontFamily: "Inter, -apple-system, BlinkMacSystemFont, sans-serif" }}>
@@ -272,7 +235,7 @@ const VehiclePassportV3 = () => {
 
       {/* Top bar */}
       <header className="border-b border-[#E6E8EC] bg-white">
-        <div className="mx-auto max-w-[1680px] px-4 sm:px-5 h-16 flex items-center justify-between">
+        <div className="mx-auto max-w-[1320px] px-4 sm:px-5 h-16 flex items-center justify-between">
           {listing.dealer_snapshot?.logo_url ? <img src={listing.dealer_snapshot.logo_url as string} alt="" className="h-7" /> : <Logo variant="full" size={22} />}
           <div className="flex items-center gap-3 sm:gap-5">
             <button onClick={handleShare} className={`text-sm font-medium inline-flex items-center gap-1.5 ${TEXT2} hover:text-[#0F172A]`}><Upload className="w-4 h-4" /> <span className="hidden sm:inline">Share</span></button>
@@ -283,9 +246,7 @@ const VehiclePassportV3 = () => {
         </div>
       </header>
 
-      <main className="mx-auto max-w-[1680px] px-4 sm:px-5 py-5 sm:py-6 pb-[calc(76px+env(safe-area-inset-bottom))] lg:pb-6">
-       <div className="lg:grid lg:grid-cols-[minmax(0,1fr)_340px] lg:gap-8 lg:items-start">
-        <div className="space-y-6 lg:space-y-7 min-w-0">
+      <main className="mx-auto max-w-[1320px] px-4 sm:px-5 py-5 sm:py-6 pb-[calc(76px+env(safe-area-inset-bottom))] lg:pb-6 space-y-6 lg:space-y-7">
         {/* 1–2. TOP ZONE */}
         <section className="grid grid-cols-1 lg:grid-cols-[minmax(0,380px)_1fr] gap-5">
           {/* Gallery */}
@@ -387,7 +348,7 @@ const VehiclePassportV3 = () => {
         </section>
 
         {/* 5. PRIMARY TRUST GRID */}
-        <section className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-5 items-start">
+        <section className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-5 items-stretch">
           {/* Why This Is A Great Buy */}
           <div className={`${CARD} p-5 flex flex-col`}>
             <H3>Why This Is A Great Buy</H3>
@@ -398,7 +359,7 @@ const VehiclePassportV3 = () => {
                 <p className="text-[13px] font-extrabold text-[#16A34A] -mt-1">{d.confLabel} Value</p>
               </div>
             )}
-            <ul className="mt-3 space-y-2">{(d.whyBuy.length ? d.whyBuy.slice(0, 4) : ["Details confirmed at the dealership"]).map((b, i) => <li key={i} className="flex items-start gap-2 text-[13px]"><CheckCircle2 className="w-4 h-4 text-[#16A34A] shrink-0 mt-0.5" />{b}</li>)}</ul>
+            <ul className="mt-3 space-y-2">{(d.whyBuy.length ? d.whyBuy.slice(0, 6) : ["Details confirmed at the dealership"]).map((b, i) => <li key={i} className="flex items-start gap-2 text-[13px]"><CheckCircle2 className="w-4 h-4 text-[#16A34A] shrink-0 mt-0.5" />{b}</li>)}</ul>
             <Link onClick={() => go("great-buy")} className="mt-auto pt-3 self-start">See full buying report</Link>
           </div>
 
@@ -465,7 +426,7 @@ const VehiclePassportV3 = () => {
 
         {/* 7. INFORMATION GRID — three equal-height cards (the conversion CTA
             now lives in the sticky right rail). */}
-        <section className="grid grid-cols-1 md:grid-cols-3 gap-5 items-start">
+        <section className="grid grid-cols-1 lg:grid-cols-[1fr_1fr_1.6fr] gap-5 items-stretch">
           {/* Highlights */}
           <div className={`${CARD} p-5 flex flex-col`}>
             <H3>Vehicle Highlights</H3>
@@ -481,41 +442,22 @@ const VehiclePassportV3 = () => {
             {(gallery[1] || gallery[0]) && <img src={gallery[1] || gallery[0]} alt="" className="w-full aspect-[16/9] object-cover rounded-xl mt-3" />}
             <Link onClick={() => go("overview")} className="mt-auto pt-3 self-start">Read full overview</Link>
           </div>
-          {/* Key Specs */}
+          {/* Why Buy From This Dealership (wider) */}
           <div className={`${CARD} p-5 flex flex-col`}>
-            <H3>Key Specifications</H3>
-            {d.keySpecs.length ? (
-              <div className="mt-3 space-y-2 text-[13px]">{d.keySpecs.slice(0, 8).map(([k, v]) => <div key={k} className="flex justify-between gap-4 border-b border-slate-100 pb-1.5"><span className="text-[#64748B]">{k}</span><span className="font-semibold text-right">{v}</span></div>)}</div>
-            ) : <p className="text-[13px] text-[#64748B] mt-3">Decoded specifications appear here once the vehicle's data is processed.</p>}
-            <Link onClick={() => go("specifications")} className="mt-auto pt-3 self-start">View full specs</Link>
-          </div>
-        </section>
-
-        {/* Conversion CTA — inline on mobile (the sticky rail is desktop-only). */}
-        <div className="lg:hidden">{ctaPanel}</div>
-
-        {/* 8. WHY BUY FROM THIS DEALERSHIP */}
-        <section className={`${CARD} p-6`}>
-          <H2>Why Buy From {d.dealerName}?</H2>
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-5 mt-5">
-            {dealerChips.map((c, i) => <div key={i} className="flex items-start gap-3"><span className="w-10 h-10 rounded-xl bg-blue-50 flex items-center justify-center shrink-0"><c.icon className="w-5 h-5 text-[#2563EB]" /></span><div><p className="text-[13px] font-bold leading-tight">{c.t}</p><p className="text-[11px] text-[#64748B] mt-0.5">{c.s}</p></div></div>)}
-          </div>
-          {(badges.length > 0 || d.dealerTrust.certifications.length > 0 || d.dealerTrust.storefrontUrl) && (
-            <div className="mt-6 pt-6 border-t border-[#E6E8EC] flex flex-wrap items-center gap-x-8 gap-y-4">
-              {d.dealerTrust.storefrontUrl && <img src={d.dealerTrust.storefrontUrl} alt={d.dealerName} className="w-40 h-24 rounded-xl object-cover border border-[#E6E8EC]" />}
-              {badges.map((b, i) => <div key={i} className="text-center"><p className="text-[28px] font-bold text-[#2563EB] leading-none inline-flex items-center gap-1.5">{b.v}{b.star && <Star className="w-4 h-4 text-amber-400" fill="#F59E0B" />}</p><p className="text-[11px] text-[#64748B] mt-1">{b.l}</p></div>)}
-              {d.dealerTrust.certifications.map((c, i) => <span key={`c${i}`} className="inline-flex items-center gap-1.5 text-[12px] font-semibold text-[#0F172A] bg-slate-100 rounded-full px-3 py-1.5"><Award className="w-3.5 h-3.5 text-[#2563EB]" />{c}</span>)}
+            <H3>Why Buy From {d.dealerName}?</H3>
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-5 gap-y-4 mt-4">
+              {dealerChips.map((c, i) => <div key={i} className="flex items-start gap-2.5"><span className="w-9 h-9 rounded-xl bg-blue-50 flex items-center justify-center shrink-0"><c.icon className="w-[18px] h-[18px] text-[#2563EB]" /></span><div className="min-w-0"><p className="text-[12px] font-bold leading-tight">{c.t}</p><p className="text-[10px] text-[#64748B] mt-0.5 truncate">{c.s}</p></div></div>)}
             </div>
-          )}
-          <Link onClick={() => go("dealer")} className="mt-5">Learn more about our dealership</Link>
+            {(badges.length > 0 || d.dealerTrust.certifications.length > 0 || d.dealerTrust.storefrontUrl) && (
+              <div className="mt-5 pt-5 border-t border-[#E6E8EC] flex flex-wrap items-center gap-x-6 gap-y-4">
+                {d.dealerTrust.storefrontUrl && <img src={d.dealerTrust.storefrontUrl} alt={d.dealerName} className="w-28 h-20 rounded-xl object-cover border border-[#E6E8EC]" />}
+                {badges.map((b, i) => <div key={i} className="text-center"><p className="text-[22px] font-bold text-[#2563EB] leading-none inline-flex items-center gap-1">{b.v}{b.star && <Star className="w-3.5 h-3.5 text-amber-400" fill="#F59E0B" />}</p><p className="text-[10px] text-[#64748B] mt-1">{b.l}</p></div>)}
+                {d.dealerTrust.certifications.map((c, i) => <span key={`c${i}`} className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-[#0F172A] bg-slate-100 rounded-full px-2.5 py-1"><Award className="w-3 h-3 text-[#2563EB]" />{c}</span>)}
+              </div>
+            )}
+            <Link onClick={() => go("dealer")} className="mt-auto pt-4 self-start">Learn more about our dealership</Link>
+          </div>
         </section>
-        </div>
-
-        {/* Sticky conversion rail — desktop only. Sticks while the main column
-            scrolls; the grid row ends at the dealership section so it never
-            overlaps the footer. */}
-        <aside className="hidden lg:block lg:sticky lg:top-6 self-start">{ctaPanel}</aside>
-       </div>
 
         {/* Footer */}
         <footer className="pt-2">
@@ -526,7 +468,11 @@ const VehiclePassportV3 = () => {
               <span className="inline-flex items-center gap-1.5"><DollarSign className="w-3.5 h-3.5 text-[#16A34A]" /> 100% Free</span>
               <span className="inline-flex items-center gap-1.5"><Zap className="w-3.5 h-3.5 text-[#16A34A]" /> Instant Access</span>
             </div>
-            <div className="text-[12px] font-semibold text-[#64748B] inline-flex items-center gap-1.5"><ShieldCheck className="w-4 h-4 text-[#2563EB]" /> AutoLabels Customer Passport</div>
+            <div className="hidden lg:flex items-center gap-2 text-[12px]">
+              {[{ i: Phone, l: "Call", fn: () => d.dealerPhone ? (window.location.href = `tel:${d.dealerPhone}`) : go("contact") }, { i: MessageSquare, l: "Text", fn: () => go("text") }, { i: Clock, l: "Test Drive", fn: () => go("test-drive") }, { i: DollarSign, l: "Today's Price", fn: () => go("todays-price"), primary: true }].map((b) => (
+                <button key={b.l} onClick={b.fn} className={`h-10 px-3.5 rounded-xl text-[12px] font-bold inline-flex items-center gap-1.5 transition-colors ${b.primary ? "bg-[#2563EB] text-white hover:bg-[#1d4fd7]" : "border border-[#E6E8EC] text-[#0F172A] hover:border-[#2563EB]"}`}><b.i className={`w-4 h-4 ${b.primary ? "" : "text-[#2563EB]"}`} /> {b.l}</button>
+              ))}
+            </div>
           </div>
           <p className="text-[11px] text-[#94A3B8] text-center pb-2">Information is provided by trusted third parties and is accurate to the best of our knowledge. Verify details with the dealer. © {new Date().getFullYear()} {d.dealerName}. All rights reserved.</p>
           <div className="flex items-center justify-center gap-4 text-[11px] font-semibold text-[#64748B] pb-6"><a href="/privacy" className="hover:text-[#2563EB]">Privacy</a><span className="text-slate-300">·</span><a href="/terms" className="hover:text-[#2563EB]">Terms</a></div>
