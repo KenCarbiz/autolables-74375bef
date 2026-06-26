@@ -121,6 +121,10 @@ const VehiclePassportVerification = () => {
   const [active, setActive] = useState("overview");
   const [open, setOpen] = useState<Record<string, boolean>>({});
   const [modal, setModal] = useState<null | "process" | "sources" | "promise">(null);
+  const [mOpen, setMOpen] = useState<string | null>(null);   // mobile: one accordion at a time
+  const [ringFill, setRingFill] = useState(false);            // mobile: ring fills on load
+
+  useEffect(() => { const r = requestAnimationFrame(() => setRingFill(true)); return () => cancelAnimationFrame(r); }, []);
 
   const isPreview = typeof window !== "undefined" && new URLSearchParams(window.location.search).has("preview");
 
@@ -174,12 +178,121 @@ const VehiclePassportVerification = () => {
     { icon: Database, cls: "text-[#2563EB]", label: "Data sources", value: `${liveSources.length}` },
     { icon: Clock, cls: "text-[#64748B]", label: "Last updated", value: "Today" },
   ];
+  const tier = score >= 90 ? "Excellent" : score >= 75 ? "Very Good" : score >= 60 ? "Good" : "Fair";
+  const isToday = reportTime.toDateString() === new Date().toDateString();
+  const mStatus = (s: Status) =>
+    s === "verified" ? { label: "Verified", cls: "text-[#16A34A]" }
+    : s === "attention" ? { label: "Needs Review", cls: "text-[#D97706]" }
+    : s === "issue" ? { label: "Issue", cls: "text-[#EF4444]" }
+    : { label: "Pending", cls: "text-[#94A3B8]" };
 
   return (
     <div className="min-h-screen bg-[#F6F7F9] text-[#0F172A]" style={{ fontFamily: "Inter, -apple-system, BlinkMacSystemFont, sans-serif" }}>
       <Helmet><title>{`Verification Report — ${listing.ymm} · AutoLabels`}</title><meta name="robots" content="noindex" /></Helmet>
 
-      <div className="lg:grid lg:grid-cols-[260px_1fr]">
+      {/* ── Mobile (<768px) — premium iOS verification experience ── */}
+      <div className="md:hidden bg-[#F6F7F9] pb-[calc(96px+env(safe-area-inset-bottom))]">
+        <div className="bg-white px-5 pt-[calc(12px+env(safe-area-inset-top))] pb-7">
+          <button onClick={back} className="text-[14px] font-semibold text-[#2563EB] inline-flex items-center gap-1.5 -ml-1"><ChevronLeft className="w-[18px] h-[18px]" /> Back to Vehicle Passport</button>
+          <div className="text-center mt-6">
+            <p className="text-[13px] font-semibold text-[#64748B]">AutoLabels Verified Report</p>
+            <p className="text-[12px] text-[#94A3B8] mt-0.5">Verified {isToday ? "Today" : reportTime.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}</p>
+            <div className="relative w-[200px] h-[200px] mx-auto mt-5">
+              <svg viewBox="0 0 160 160" className="w-full h-full -rotate-90">
+                <circle cx="80" cy="80" r="70" fill="none" stroke="#E6E8EC" strokeWidth="12" />
+                <circle cx="80" cy="80" r="70" fill="none" stroke="#16A34A" strokeWidth="12" strokeLinecap="round" strokeDasharray={2 * Math.PI * 70} strokeDashoffset={ringFill ? (2 * Math.PI * 70) * (1 - score / 100) : 2 * Math.PI * 70} style={{ transition: "stroke-dashoffset 1s ease-out" }} />
+              </svg>
+              <div className="absolute inset-0 flex flex-col items-center justify-center"><span className="text-[56px] font-extrabold leading-none text-[#0F172A]">{score}</span><span className="text-[13px] font-bold text-[#94A3B8] mt-1">Trust Score</span></div>
+            </div>
+            <span className="inline-flex items-center gap-1.5 mt-4 px-4 py-1.5 rounded-full bg-emerald-50 text-[#16A34A] text-[14px] font-bold"><CheckCircle2 className="w-[18px] h-[18px]" /> {tier}</span>
+          </div>
+        </div>
+
+        <div className="px-5 mt-5">
+          {hero ? <img src={hero} alt={listing.ymm || ""} className="w-full aspect-[16/10] object-cover rounded-2xl" /> : <div className="w-full aspect-[16/10] rounded-2xl bg-slate-200 flex items-center justify-center"><Car className="w-10 h-10 text-slate-400" /></div>}
+          <h1 className="text-[24px] font-extrabold mt-4 leading-tight">{listing.ymm}</h1>
+          {listing.trim && <p className="text-[15px] font-semibold text-[#64748B]">{listing.trim}</p>}
+          <div className="flex items-center gap-4 mt-2 text-[12px] text-[#94A3B8]"><span>VIN {listing.vin}</span>{listing.mileage != null && <span>{listing.mileage.toLocaleString()} mi</span>}</div>
+        </div>
+
+        <div className="px-5 mt-6 grid grid-cols-3 gap-3">
+          {[
+            { icon: CheckCircle2, cls: "text-[#16A34A]", v: `${counts.verified}`, l: "Verified" },
+            { icon: AlertTriangle, cls: "text-[#D97706]", v: `${counts.attention}`, l: "Needs Review" },
+            { icon: Clock, cls: "text-[#64748B]", v: "Today", l: "Updated" },
+          ].map((m, i) => (
+            <div key={i} className={`${CARD} p-4 text-center`}><m.icon className={`w-6 h-6 mx-auto ${m.cls}`} /><p className="text-[18px] font-extrabold mt-1.5 leading-none">{m.v}</p><p className="text-[11px] text-[#94A3B8] mt-1">{m.l}</p></div>
+          ))}
+        </div>
+
+        <div className="px-5 mt-7">
+          <h2 className="text-[18px] font-bold mb-3">Verification</h2>
+          <div className="space-y-2.5">
+            {rows.map((r) => {
+              const st = mStatus(r.status); const isOpen = mOpen === r.key; const amber = r.status === "attention";
+              return (
+                <div key={r.key} className={`${CARD} overflow-hidden`}>
+                  <button onClick={() => setMOpen(isOpen ? null : r.key)} className="w-full min-h-[64px] flex items-center gap-3 px-4 py-3 text-left">
+                    <span className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${amber ? "bg-amber-50" : "bg-emerald-50"}`}><r.icon className={`w-5 h-5 ${amber ? "text-[#D97706]" : "text-[#16A34A]"}`} /></span>
+                    <div className="min-w-0 flex-1"><p className="text-[15px] font-semibold leading-tight">{r.title}</p><p className="text-[12px] text-[#94A3B8] truncate">{r.desc}</p></div>
+                    <span className={`text-[12px] font-bold shrink-0 ${st.cls}`}>{st.label}</span>
+                    <ChevronDown className={`w-4 h-4 text-[#CBD5E1] shrink-0 transition-transform ${isOpen ? "rotate-180" : ""}`} />
+                  </button>
+                  {isOpen && (
+                    <div className="px-4 pb-4">
+                      <ul className="space-y-2">{r.lines.map((l, i) => <li key={i} className="flex items-start gap-2 text-[13px] text-[#475569]"><CheckCircle2 className="w-4 h-4 text-[#16A34A] shrink-0 mt-0.5" />{l}</li>)}</ul>
+                      {r.note && <div className="mt-3 rounded-xl bg-amber-50 border border-amber-100 p-3 text-[12px] text-[#92400E] flex items-start gap-2"><AlertTriangle className="w-4 h-4 shrink-0 mt-0.5 text-[#D97706]" />{r.note}</div>}
+                      <p className="text-[11px] text-[#94A3B8] mt-2.5">Source: {r.source} · Updated today</p>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        <div className="px-5 mt-7">
+          <h2 className="text-[18px] font-bold mb-3">Why You Can Trust This Report</h2>
+          <div className={`${CARD} p-5`}>
+            <ul className="space-y-3">{[
+              `Verified using ${liveSources.length} independent data source${liveSources.length === 1 ? "" : "s"}`,
+              "OEM VIN validation",
+              "Recall database checked",
+              "Market pricing verified",
+              "Updated today",
+            ].map((t) => <li key={t} className="flex items-start gap-2.5 text-[14px] text-[#0F172A]"><CheckCircle2 className="w-[18px] h-[18px] text-[#16A34A] shrink-0 mt-0.5" />{t}</li>)}</ul>
+          </div>
+        </div>
+
+        <div className="px-5 mt-7">
+          <h2 className="text-[16px] font-bold mb-3">Data Sources</h2>
+          <div className="flex flex-wrap gap-2">{(liveSources.length ? liveSources : [{ label: "Verification pending" }]).map((s, i) => (
+            <span key={i} className="inline-flex items-center gap-1.5 text-[12px] font-semibold text-[#0F172A] bg-white border border-[#E6E8EC] rounded-xl px-3 py-2"><Database className="w-3.5 h-3.5 text-[#2563EB]" />{s.label}</span>
+          ))}</div>
+        </div>
+
+        <div className="px-5 mt-7">
+          <h2 className="text-[16px] font-bold mb-3">Report</h2>
+          <div className={`${CARD} divide-y divide-[#EEF1F4]`}>
+            {[
+              { icon: Download, label: "Download PDF", fn: () => window.print() },
+              { icon: Printer, label: "Print Report", fn: () => window.print() },
+              { icon: Upload, label: "Share Report", fn: share },
+              { icon: ExternalLink, label: "View Vehicle Passport", fn: back },
+            ].map((a, i) => (
+              <button key={i} onClick={a.fn} className="w-full min-h-[56px] flex items-center gap-3 px-4 py-3 text-left active:bg-slate-50"><span className="w-8 h-8 rounded-lg bg-blue-50 flex items-center justify-center shrink-0"><a.icon className="w-4 h-4 text-[#2563EB]" /></span><span className="flex-1 text-[15px] font-semibold">{a.label}</span><ChevronDown className="w-4 h-4 text-[#CBD5E1] -rotate-90" /></button>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* Mobile sticky bottom — Back to Vehicle */}
+      <div className="md:hidden fixed bottom-0 inset-x-0 z-40 bg-white/85 backdrop-blur border-t border-[#E6E8EC] px-4 pt-3 pb-[calc(12px+env(safe-area-inset-bottom))]">
+        <button onClick={back} className="w-full h-[52px] rounded-2xl bg-[#16A34A] active:bg-[#15803d] text-white text-[15px] font-bold inline-flex items-center justify-center gap-2 transition-transform active:scale-[0.99]"><ChevronLeft className="w-5 h-5" /> Back to Vehicle</button>
+      </div>
+
+      {/* Desktop + tablet (≥768px) — unchanged three-column report. */}
+      <div className="hidden md:block lg:grid lg:grid-cols-[260px_1fr]">
         {/* Left sidebar */}
         <aside className="hidden lg:flex flex-col border-r border-[#E6E8EC] bg-white sticky top-0 h-screen overflow-y-auto px-5 py-6">
           <Logo variant="full" size={22} />
