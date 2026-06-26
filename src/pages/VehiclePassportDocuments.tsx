@@ -14,6 +14,7 @@ import { formatPhone } from "@/components/addendum/CustomerInfoSection";
 import Logo from "@/components/brand/Logo";
 import { derivePassport } from "@/lib/passportV2Data";
 import { MOCK_LISTING } from "./VehiclePassportV3";
+import PassportCtaDock from "@/components/passport/PassportCtaDock";
 
 // ──────────────────────────────────────────────────────────────
 // VehiclePassportDocuments — /passport-v3/:vehicleSlug/documents
@@ -311,6 +312,8 @@ const VehiclePassportDocuments = () => {
           </div>
         </div>
       )}
+
+      <PassportCtaDock go={(s) => navigate(pp(s))} dealerPhone={d.dealerPhone || undefined} reviewRating={d.reviewRating} advisor={d.dealerTrust} />
     </div>
   );
 };

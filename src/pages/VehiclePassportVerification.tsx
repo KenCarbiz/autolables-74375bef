@@ -13,6 +13,7 @@ import { type VehicleListing } from "@/hooks/useVehicleListing";
 import Logo from "@/components/brand/Logo";
 import { derivePassport, fmt$, type PassportData } from "@/lib/passportV2Data";
 import { MOCK_LISTING } from "./VehiclePassportV3";
+import PassportCtaDock from "@/components/passport/PassportCtaDock";
 
 // ──────────────────────────────────────────────────────────────
 // VehiclePassportVerification — /passport-v3/:vehicleSlug/verification
@@ -153,6 +154,7 @@ const VehiclePassportVerification = () => {
 
   const score = d.confScore ?? 90;
   const back = () => navigate(`/passport-v3/${listing.slug || vehicleSlug}${isPreview ? "?preview=1" : ""}`);
+  const go = (section: string) => navigate(`/passport-v3/${listing.slug || vehicleSlug}/${section}${isPreview ? "?preview=1" : ""}`);
   const sourcesUsed = [
     { on: !!listing.ymm, label: "OEM / VIN decode" },
     { on: d.accidentCount != null || d.ownerCount != null || d.cleanTitle, label: "Vehicle history" },
@@ -322,6 +324,8 @@ const VehiclePassportVerification = () => {
       {modal === "process" && <Modal title="About our verification process" onClose={() => setModal(null)} body="AutoLabels verifies vehicle information using dealership-provided data, OEM data, marketplace data, recall data, title and brand indicators, vehicle history sources, and internal quality checks. Results are intended to help shoppers understand the vehicle more clearly and should be verified with the dealer before purchase." />}
       {modal === "sources" && <Modal title="Data sources" onClose={() => setModal(null)} body="This report draws on the data sources that have information available for this vehicle — vehicle history records, OEM/VIN decode, NHTSA recall data, MarketCheck market data, and dealer-provided service and media. Only sources that contributed data for this specific vehicle are shown. Availability varies by vehicle and region." />}
       {modal === "promise" && <Modal title="Our Verification Promise" onClose={() => setModal(null)} body="AutoLabels is committed to transparency. We verify every vehicle using trusted third-party data sources and a structured inspection process, and we clearly distinguish verified data from items that still need dealer confirmation. We never present unconfirmed information as verified." />}
+
+      <PassportCtaDock go={go} dealerPhone={d.dealerPhone || undefined} reviewRating={d.reviewRating} advisor={d.dealerTrust} />
     </div>
   );
 };
