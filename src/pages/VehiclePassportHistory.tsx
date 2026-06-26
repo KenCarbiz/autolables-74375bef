@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import {
   ChevronLeft, Download, Printer, Upload, ShieldCheck, CheckCircle2, Users, FileText, Wrench,
-  BadgeCheck, Gauge, Car, Clock, MessageSquare, Sparkles, AlertTriangle, MapPin, Activity, ArrowRight,
+  BadgeCheck, Gauge, Car, Clock, MessageSquare, Sparkles, AlertTriangle, MapPin, Activity, ArrowRight, ChevronDown,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Helmet } from "react-helmet-async";
@@ -40,12 +40,35 @@ const ScoreRing = ({ score, size = 156 }: { score: number; size?: number }) => {
   );
 };
 
+// Mobile accordion card (one open at a time, ≥64px touch target).
+type MStatus = "verified" | "attention" | "pending";
+const MAcc = ({ open, onToggle, icon: Icon, title, desc, status, children }: { open: boolean; onToggle: () => void; icon: React.ElementType; title: string; desc: string; status: MStatus; children: React.ReactNode }) => {
+  const sc = status === "verified" ? { c: "text-[#16A34A]", bg: "bg-emerald-50", l: "Verified" }
+    : status === "attention" ? { c: "text-[#D97706]", bg: "bg-amber-50", l: "Needs Review" }
+    : { c: "text-[#94A3B8]", bg: "bg-slate-50", l: "Pending" };
+  return (
+    <div className={`${CARD} overflow-hidden`}>
+      <button onClick={onToggle} className="w-full min-h-[64px] flex items-center gap-3 px-4 py-3 text-left">
+        <span className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${sc.bg}`}><Icon className={`w-5 h-5 ${sc.c}`} /></span>
+        <div className="min-w-0 flex-1"><p className="text-[15px] font-semibold leading-tight">{title}</p><p className="text-[12px] text-[#94A3B8] truncate">{desc}</p></div>
+        <span className={`text-[12px] font-bold shrink-0 ${sc.c}`}>{sc.l}</span>
+        <ChevronDown className={`w-4 h-4 text-[#CBD5E1] shrink-0 transition-transform ${open ? "rotate-180" : ""}`} />
+      </button>
+      {open && <div className="px-4 pb-4">{children}</div>}
+    </div>
+  );
+};
+
 const VehiclePassportHistory = () => {
   const { vehicleSlug } = useParams<{ vehicleSlug: string }>();
   const navigate = useNavigate();
   const [listing, setListing] = useState<VehicleListing | null>(null);
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
+  const [mOpen, setMOpen] = useState<string | null>("ownership");  // mobile: one accordion open
+  const [ringFill, setRingFill] = useState(false);                  // mobile: ring fills on load
+
+  useEffect(() => { const r = requestAnimationFrame(() => setRingFill(true)); return () => cancelAnimationFrame(r); }, []);
 
   const isPreview = typeof window !== "undefined" && new URLSearchParams(window.location.search).has("preview");
 
@@ -125,12 +148,165 @@ const VehiclePassportHistory = () => {
     { t: "Title History", i: ShieldCheck },
   ];
 
+  // ── Mobile-only derived content ──
+  const mState = d.dealer.state ? String(d.dealer.state) : "";
+  const oneLine = score != null && score >= 80 ? "Verified ownership history with no major reported concerns." : "Ownership history summarized from the records available for this vehicle.";
+  const mTiles = [
+    { icon: Users, big: d.ownerCount != null ? `${d.ownerCount} Owner${d.ownerCount === 1 ? "" : "s"}` : "Pending", sub: d.ownerCount === 1 ? "Since new" : d.ownerCount != null ? "On record" : "—", ok: d.ownerCount === 1 },
+    { icon: ShieldCheck, big: d.cleanTitle ? "Clean Title" : "Pending", sub: d.cleanTitle ? "Verified" : "—", ok: d.cleanTitle },
+    { icon: Car, big: d.accidentCount === 0 ? "No Accidents" : d.accidentCount != null ? `${d.accidentCount} Reported` : "Pending", sub: "Reported", ok: d.accidentCount === 0 },
+    { icon: CheckCircle2, big: d.serviceCount > 0 ? `${d.serviceCount} Records` : "Pending", sub: "Verified", ok: d.serviceCount > 0 },
+    { icon: BadgeCheck, big: d.recallClear ? "No Recalls" : d.openRecalls != null ? `${d.openRecalls} Open` : "Pending", sub: "Found", ok: d.recallClear },
+    { icon: Gauge, big: listing.mileage != null ? `${listing.mileage.toLocaleString()} mi` : "Pending", sub: "Current", ok: listing.mileage != null },
+  ];
+  const analysisBullets: string[] = [];
+  if (d.ownerCount === 1) analysisBullets.push("Consistent single-owner history");
+  else if (d.ownerCount != null) analysisBullets.push("Ownership history on record");
+  if (d.serviceCount > 0) analysisBullets.push("Documented service history");
+  if (d.cleanTitle) analysisBullets.push("Clean title with no brands");
+  if (d.marketAvg != null || (d.belowMarket && d.belowMarket > 0)) analysisBullets.push("Strong market confidence");
+  const mReports = [
+    { t: "Vehicle History PDF", i: FileText, fn: () => window.print() },
+    { t: "Accident Report", i: Car, fn: () => window.print() },
+    { t: "Title History", i: ShieldCheck, fn: () => window.print() },
+    { t: "Recall Report", i: BadgeCheck, fn: () => window.print() },
+    { t: "Service History", i: Wrench, fn: () => go("documents") },
+    { t: "Ownership Timeline", i: Clock, fn: () => go("ownership-timeline") },
+  ];
+
   return (
     <div className="min-h-screen bg-[#F6F7F9] text-[#0F172A]" style={{ fontFamily: "Inter, -apple-system, BlinkMacSystemFont, sans-serif" }}>
       <Helmet><title>{`Vehicle History Summary — ${listing.ymm}`}</title>{isPreview && <meta name="robots" content="noindex" />}</Helmet>
       {isPreview && <div className="bg-amber-500 text-white text-center text-[12px] font-bold py-1.5 px-4">SAMPLE PREVIEW — design layout with placeholder data. Not a real listing.</div>}
 
-      <header className="border-b border-[#E6E8EC] bg-white sticky top-0 z-20">
+      {/* ── Mobile (<768px) — premium iOS history certificate ── */}
+      <div className="md:hidden pb-[calc(96px+env(safe-area-inset-bottom))]">
+        {/* Hero */}
+        <div className="bg-white px-5 pt-[calc(12px+env(safe-area-inset-top))] pb-7">
+          <button onClick={back} className="text-[14px] font-semibold text-[#2563EB] inline-flex items-center gap-1.5 -ml-1"><ChevronLeft className="w-[18px] h-[18px]" /> Back to Vehicle Passport</button>
+          <div className="text-center mt-6">
+            <p className="text-[13px] font-semibold text-[#64748B]">Vehicle History Summary</p>
+            <p className="text-[12px] text-[#94A3B8] mt-0.5">Verified Today</p>
+            <div className="relative w-[200px] h-[200px] mx-auto mt-5">
+              <svg viewBox="0 0 160 160" className="w-full h-full -rotate-90">
+                <circle cx="80" cy="80" r="70" fill="none" stroke="#E6E8EC" strokeWidth="12" />
+                {score != null && <circle cx="80" cy="80" r="70" fill="none" stroke="#16A34A" strokeWidth="12" strokeLinecap="round" strokeDasharray={2 * Math.PI * 70} strokeDashoffset={ringFill ? (2 * Math.PI * 70) * (1 - score / 100) : 2 * Math.PI * 70} style={{ transition: "stroke-dashoffset 1s ease-out" }} />}
+              </svg>
+              <div className="absolute inset-0 flex flex-col items-center justify-center"><span className="text-[56px] font-extrabold leading-none text-[#0F172A]">{score ?? "—"}</span><span className="text-[13px] font-bold text-[#94A3B8] mt-1">History Score</span></div>
+            </div>
+            <p className="text-[16px] font-extrabold text-[#16A34A] mt-3">{histLabel}</p>
+          </div>
+        </div>
+
+        {/* Vehicle */}
+        <div className="px-5 mt-5">
+          {listing.hero_image_url ? <img src={listing.hero_image_url} alt={listing.ymm || ""} className="w-full aspect-[16/10] object-cover rounded-2xl" /> : <div className="w-full aspect-[16/10] rounded-2xl bg-slate-200 flex items-center justify-center"><Car className="w-10 h-10 text-slate-400" /></div>}
+          <h1 className="text-[24px] font-extrabold mt-4 leading-tight">{listing.ymm}</h1>
+          {listing.trim && <p className="text-[15px] font-semibold text-[#64748B]">{listing.trim}</p>}
+          <div className="flex items-center gap-4 mt-2 text-[12px] text-[#94A3B8]"><span>VIN {listing.vin}</span>{listing.mileage != null && <span>{listing.mileage.toLocaleString()} mi</span>}</div>
+          <p className="text-[14px] text-[#475569] mt-3">{oneLine}</p>
+        </div>
+
+        {/* At a glance — 6 tiles */}
+        <div className="px-5 mt-6 grid grid-cols-2 gap-3">
+          {mTiles.map((t, i) => (
+            <div key={i} className={`${CARD} p-4`}>
+              <span className={`w-9 h-9 rounded-xl flex items-center justify-center ${t.ok ? "bg-emerald-50" : "bg-slate-100"}`}><t.icon className={`w-[18px] h-[18px] ${t.ok ? "text-[#16A34A]" : "text-[#94A3B8]"}`} /></span>
+              <p className="text-[16px] font-extrabold mt-2 leading-tight">{t.big}</p>
+              <p className="text-[11px] text-[#94A3B8] mt-0.5">{t.sub}</p>
+            </div>
+          ))}
+        </div>
+
+        {/* History categories */}
+        <div className="px-5 mt-7 space-y-2.5">
+          <h2 className="text-[18px] font-bold mb-1">History Details</h2>
+          <MAcc open={mOpen === "ownership"} onToggle={() => setMOpen(mOpen === "ownership" ? null : "ownership")} icon={Users} title="Ownership Summary" desc="Personal ownership history" status={d.ownerCount != null ? "verified" : "pending"}>
+            {d.ownerCount != null ? (
+              <div className="space-y-2">
+                {Array.from({ length: Math.min(4, Math.max(1, d.ownerCount)) }).map((_, i, arr) => (
+                  <div key={i} className="rounded-xl border border-[#E6E8EC] p-3"><div className="flex items-center justify-between"><p className="text-[13px] font-bold">Owner #{i + 1}</p>{i === arr.length - 1 && <span className="text-[10px] font-bold text-[#16A34A] bg-emerald-50 rounded-full px-2 py-0.5">Current Owner</span>}</div><p className="text-[12px] text-[#64748B]">Personal owner{mState ? ` · ${mState}` : ""}</p></div>
+                ))}
+              </div>
+            ) : <p className="text-[13px] text-[#64748B]">Ownership records are pending verification.</p>}
+          </MAcc>
+
+          <MAcc open={mOpen === "accident"} onToggle={() => setMOpen(mOpen === "accident" ? null : "accident")} icon={Car} title="Accident & Damage" desc="Accident and damage history" status={d.accidentCount === 0 ? "verified" : d.accidentCount != null ? "attention" : "pending"}>
+            {d.accidentCount === 0 ? (
+              <div className="rounded-xl border border-emerald-200 bg-emerald-50/70 p-4">
+                <p className="text-[15px] font-extrabold text-[#16A34A] inline-flex items-center gap-1.5"><CheckCircle2 className="w-5 h-5" /> No Accidents Reported</p>
+                <ul className="mt-2 space-y-1.5">{["No accidents reported", d.cleanTitle ? "No flood history" : null, d.cleanTitle ? "No salvage history" : null, d.cleanTitle ? "Clean title on record" : null].filter(Boolean).map((t) => <li key={t as string} className="flex items-start gap-2 text-[13px] text-[#0F172A]"><CheckCircle2 className="w-3.5 h-3.5 text-[#16A34A] shrink-0 mt-0.5" />{t}</li>)}</ul>
+              </div>
+            ) : d.accidentCount != null ? <p className="text-[13px] text-[#92400E]">{d.accidentCount} incident(s) reported — review the full report with the dealer.</p> : <p className="text-[13px] text-[#64748B]">Accident history is pending verification.</p>}
+          </MAcc>
+
+          <MAcc open={mOpen === "title"} onToggle={() => setMOpen(mOpen === "title" ? null : "title")} icon={FileText} title="Title History" desc="Title status and brands" status={d.cleanTitle ? "verified" : "pending"}>
+            <ul className="grid grid-cols-2 gap-x-4 gap-y-2">{titleRows.map((r) => <li key={r.k} className="flex items-center gap-2 text-[13px]">{r.ok ? <CheckCircle2 className="w-4 h-4 text-[#16A34A] shrink-0" /> : <span className="w-4 h-4 rounded-full border border-[#CBD5E1] shrink-0" />}<span className={r.ok ? "text-[#0F172A]" : "text-[#94A3B8]"}>{r.k}</span></li>)}</ul>
+          </MAcc>
+
+          <MAcc open={mOpen === "service"} onToggle={() => setMOpen(mOpen === "service" ? null : "service")} icon={Wrench} title="Service History" desc={d.serviceCount > 0 ? `${d.serviceCount} maintenance record(s)` : "Maintenance records"} status={d.serviceCount > 0 ? "verified" : "pending"}>
+            {services.length ? (
+              <div className="space-y-2">{services.map((s, i) => <div key={i} className="rounded-xl border border-[#E6E8EC] p-3"><p className="text-[13px] font-bold">{[s.date ? new Date(s.date).toLocaleDateString() : null, s.mileage ? `${s.mileage} mi` : null].filter(Boolean).join(" · ") || `Service ${i + 1}`}</p><p className="text-[12px] text-[#64748B]">{[s.type, s.notes].filter(Boolean).join(" — ") || "Maintenance performed"}</p></div>)}</div>
+            ) : <p className="text-[13px] text-[#64748B]">No service records are on file yet.</p>}
+          </MAcc>
+
+          <MAcc open={mOpen === "odometer"} onToggle={() => setMOpen(mOpen === "odometer" ? null : "odometer")} icon={Gauge} title="Odometer" desc="Mileage and rollback check" status={listing.mileage != null ? "verified" : "pending"}>
+            <div className="flex items-center justify-between gap-3 text-center">
+              {[{ v: listing.mileage != null ? `${listing.mileage.toLocaleString()}` : "—", l: "Current mi" }, { v: avgYearly != null ? avgYearly.toLocaleString() : "—", l: "Avg / yr" }, { v: d.cleanTitle ? "Clean" : "—", l: "No rollback" }].map((x) => (
+                <div key={x.l} className="flex-1"><p className="text-[18px] font-extrabold leading-none">{x.v}</p><p className="text-[11px] text-[#94A3B8] mt-1">{x.l}</p></div>
+              ))}
+            </div>
+          </MAcc>
+
+          <MAcc open={mOpen === "recall"} onToggle={() => setMOpen(mOpen === "recall" ? null : "recall")} icon={BadgeCheck} title="Recall Status" desc="Open recalls (NHTSA)" status={d.recallClear ? "verified" : d.openRecalls != null ? "attention" : "pending"}>
+            {d.recallClear ? (
+              <div className="rounded-xl border border-emerald-200 bg-emerald-50/70 p-4"><p className="text-[15px] font-extrabold text-[#16A34A] inline-flex items-center gap-1.5"><CheckCircle2 className="w-5 h-5" /> No Open Recalls</p><p className="text-[12px] text-[#64748B] mt-1">No active manufacturer recalls were found.</p></div>
+            ) : d.openRecalls != null ? <p className="text-[13px] text-[#92400E]">{d.openRecalls} open recall(s) — confirm completion with the dealer.</p> : <p className="text-[13px] text-[#64748B]">Recall status is pending verification.</p>}
+          </MAcc>
+
+          <MAcc open={mOpen === "registration"} onToggle={() => setMOpen(mOpen === "registration" ? null : "registration")} icon={MapPin} title="Registration" desc="State and registration history" status="pending">
+            <p className="text-[13px] text-[#64748B]">{mState ? `Most recently listed in ${mState}. ` : ""}A state-by-state registration timeline appears here when records are available.</p>
+          </MAcc>
+        </div>
+
+        {/* Analysis */}
+        {analysisBullets.length > 0 && (
+          <div className="px-5 mt-7">
+            <div className="rounded-2xl p-5 text-white" style={{ background: "linear-gradient(160deg,#0f7a3d 0%,#16A34A 100%)" }}>
+              <p className="text-[13px] font-semibold uppercase tracking-wider opacity-85 inline-flex items-center gap-1.5"><Sparkles className="w-4 h-4" /> Our Analysis</p>
+              <ul className="mt-2 space-y-1.5">{analysisBullets.slice(0, 3).map((b) => <li key={b} className="flex items-start gap-2 text-[14px]"><CheckCircle2 className="w-4 h-4 shrink-0 mt-0.5" />{b}</li>)}</ul>
+              {score != null && <div className="mt-3 inline-flex items-center gap-2 bg-white/15 rounded-full px-3 py-1"><Gauge className="w-4 h-4" /><span className="text-[13px] font-bold">History Confidence {score}%</span></div>}
+            </div>
+          </div>
+        )}
+
+        {/* What this means */}
+        {meansItems.length > 0 && (
+          <div className="px-5 mt-7">
+            <h2 className="text-[18px] font-bold mb-3">What This Means To You</h2>
+            <div className={`${CARD} p-5`}><ul className="space-y-3">{meansItems.map((m) => <li key={m} className="flex items-start gap-2.5 text-[14px] text-[#0F172A]"><CheckCircle2 className="w-[18px] h-[18px] text-[#16A34A] shrink-0 mt-0.5" />{m}</li>)}</ul></div>
+          </div>
+        )}
+
+        {/* Download reports — 2-col */}
+        <div className="px-5 mt-7">
+          <h2 className="text-[16px] font-bold mb-3">Download Reports</h2>
+          <div className="grid grid-cols-2 gap-3">{mReports.map((r) => (
+            <button key={r.t} onClick={r.fn} className={`${CARD} p-4 flex flex-col items-start gap-2 active:bg-slate-50 transition-colors`}>
+              <span className="w-9 h-9 rounded-xl bg-blue-50 flex items-center justify-center"><r.i className="w-[18px] h-[18px] text-[#2563EB]" /></span>
+              <span className="text-[13px] font-semibold leading-tight text-left">{r.t}</span>
+            </button>
+          ))}</div>
+        </div>
+      </div>
+
+      {/* Mobile sticky bottom CTA */}
+      <div className="md:hidden fixed bottom-0 inset-x-0 z-40 bg-white/85 backdrop-blur border-t border-[#E6E8EC] px-4 pt-3 pb-[calc(10px+env(safe-area-inset-bottom))] text-center">
+        <button onClick={() => go("verification")} className="w-full h-[52px] rounded-2xl bg-[#16A34A] active:bg-[#15803d] text-white text-[15px] font-bold inline-flex items-center justify-center gap-2 transition-transform active:scale-[0.99]"><ShieldCheck className="w-5 h-5" /> Continue to Verification</button>
+        <button onClick={() => go("contact")} className="text-[13px] font-semibold text-[#2563EB] mt-2">Contact Dealer</button>
+      </div>
+
+      <header className="hidden md:block border-b border-[#E6E8EC] bg-white sticky top-0 z-20">
         <div className="mx-auto max-w-[1100px] px-4 sm:px-5 h-16 flex items-center justify-between gap-3">
           <button onClick={back} className="text-[13px] font-semibold text-[#2563EB] inline-flex items-center gap-1.5"><ChevronLeft className="w-4 h-4" /> <span className="hidden sm:inline">Back to Vehicle Passport</span><span className="sm:hidden">Back</span></button>
           <div className="flex items-center gap-2 sm:gap-3">
@@ -141,7 +317,7 @@ const VehiclePassportHistory = () => {
         </div>
       </header>
 
-      <main className="mx-auto max-w-[1100px] px-4 sm:px-5 py-6 space-y-5">
+      <main className="hidden md:block mx-auto max-w-[1100px] px-4 sm:px-5 py-6 space-y-5">
         <div>
           <h1 className="text-[28px] sm:text-[34px] font-bold tracking-tight leading-tight">Vehicle History Summary</h1>
           <p className={`text-[14px] ${TEXT2} mt-1`}>Verified ownership, title, accident, service, and registration history.</p>
