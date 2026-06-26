@@ -4095,8 +4095,10 @@ export type Database = {
       vehicle_listings: {
         Row: {
           available_accessories: Json
+          blackbook: Json | null
           certification: Json | null
           closed_recall_count: number | null
+          comparables: Json | null
           condition: string | null
           created_at: string
           created_by: string | null
@@ -4104,14 +4106,18 @@ export type Database = {
           default_locale: string
           description: string | null
           documents: Json
+          enriched_at: string | null
           factory_sticker_url: string | null
           features: Json
           feed_source: string | null
           hero_image_url: string | null
+          history_payload: Json | null
           id: string
+          in_service_date: string | null
           install_token: string
           key_specs: Json
           market_checked_at: string | null
+          market_meta: Json | null
           market_payload: Json | null
           market_position: string | null
           market_value: number | null
@@ -4156,8 +4162,10 @@ export type Database = {
         }
         Insert: {
           available_accessories?: Json
+          blackbook?: Json | null
           certification?: Json | null
           closed_recall_count?: number | null
+          comparables?: Json | null
           condition?: string | null
           created_at?: string
           created_by?: string | null
@@ -4165,14 +4173,18 @@ export type Database = {
           default_locale?: string
           description?: string | null
           documents?: Json
+          enriched_at?: string | null
           factory_sticker_url?: string | null
           features?: Json
           feed_source?: string | null
           hero_image_url?: string | null
+          history_payload?: Json | null
           id?: string
+          in_service_date?: string | null
           install_token?: string
           key_specs?: Json
           market_checked_at?: string | null
+          market_meta?: Json | null
           market_payload?: Json | null
           market_position?: string | null
           market_value?: number | null
@@ -4217,8 +4229,10 @@ export type Database = {
         }
         Update: {
           available_accessories?: Json
+          blackbook?: Json | null
           certification?: Json | null
           closed_recall_count?: number | null
+          comparables?: Json | null
           condition?: string | null
           created_at?: string
           created_by?: string | null
@@ -4226,14 +4240,18 @@ export type Database = {
           default_locale?: string
           description?: string | null
           documents?: Json
+          enriched_at?: string | null
           factory_sticker_url?: string | null
           features?: Json
           feed_source?: string | null
           hero_image_url?: string | null
+          history_payload?: Json | null
           id?: string
+          in_service_date?: string | null
           install_token?: string
           key_specs?: Json
           market_checked_at?: string | null
+          market_meta?: Json | null
           market_payload?: Json | null
           market_position?: string | null
           market_value?: number | null
@@ -5056,8 +5074,10 @@ export type Database = {
         Args: { _slug: string }
         Returns: {
           available_accessories: Json
+          blackbook: Json | null
           certification: Json | null
           closed_recall_count: number | null
+          comparables: Json | null
           condition: string | null
           created_at: string
           created_by: string | null
@@ -5065,14 +5085,18 @@ export type Database = {
           default_locale: string
           description: string | null
           documents: Json
+          enriched_at: string | null
           factory_sticker_url: string | null
           features: Json
           feed_source: string | null
           hero_image_url: string | null
+          history_payload: Json | null
           id: string
+          in_service_date: string | null
           install_token: string
           key_specs: Json
           market_checked_at: string | null
+          market_meta: Json | null
           market_payload: Json | null
           market_position: string | null
           market_value: number | null
