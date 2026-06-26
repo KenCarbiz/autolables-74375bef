@@ -57,7 +57,14 @@ async function mcFetch(url: string, timeoutMs: number): Promise<Response | null>
       const res = await fetch(url, { signal: AbortSignal.timeout(timeoutMs) });
       if (res.status === 429 && attempt < backoff.length) { await new Promise((r) => setTimeout(r, backoff[attempt])); continue; }
       return res;
-    } catch { return null; }
+    } catch {
+      // A timeout or transient network error: retry with backoff instead of
+      // giving up. This is what left Days Supply (the slowest call) randomly
+      // grey on a few cars during a big bulk run — the call timed out once and
+      // we bailed. Only return null after the retries are exhausted.
+      if (attempt < backoff.length) { await new Promise((r) => setTimeout(r, backoff[attempt])); continue; }
+      return null;
+    }
   }
   return null;
 }
