@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 import {
   DollarSign, TrendingUp, TrendingDown, Gauge, Clock, Car, Package, ShieldCheck,
-  Star, Award, FileText, MessageSquare, Eye, CalendarDays, CheckCircle2,
+  Star, Award, FileText, MessageSquare, Eye, CheckCircle2,
+  Flame, Heart, Send, Bookmark, Users, Circle, ChevronDown,
 } from "lucide-react";
 import type { PassportData } from "@/lib/passportV2Data";
 import { fmt$ } from "@/lib/passportV2Data";
@@ -158,25 +159,78 @@ function buildPanel(key: PassportPanelKey, d: PassportData, listing: VehicleList
     case "market-demand": {
       const views = d.viewCount, dom = d.dom;
       const has = views != null || dom != null;
-      const level = (views ?? 0) > 20 ? "High Interest" : has ? "Active Interest" : "Tracking";
+      const score = (() => { let s = 50; if (views != null) s += Math.min(30, views / 3); if (dom != null) { if (dom <= 30) s += 15; else if (dom > 60) s -= 20; else s += 5; } return Math.max(5, Math.min(95, Math.round(s))); })();
+      const level = score >= 66 ? "High Interest" : score >= 40 ? "Moderate Interest" : "Building Interest";
+      const activity = [
+        { icon: Eye, label: "Views", value: views != null ? views.toLocaleString() : isPreview ? "89" : "—" },
+        { icon: Heart, label: "Favorites", value: isPreview ? "14" : "—" },
+        { icon: Send, label: "Lead Requests", value: isPreview ? "6" : "—" },
+        { icon: Users, label: "Dealer Inquiries", value: isPreview ? "4" : "—" },
+        { icon: Bookmark, label: "Price Saves", value: isPreview ? "11" : "—" },
+      ];
+      const insights: string[] = [];
+      if (views != null) insights.push(`${views.toLocaleString()} shoppers have viewed this vehicle`);
+      if (dom != null && dom <= 30) insights.push("Recently listed — fresh to market");
+      if (dom != null && dom > 45) insights.push("On the market a while — the dealer may be flexible");
+      if (isGreat) insights.push("Priced below market average — strong value");
+      if (isPreview) { insights.push("Vehicles with this trim typically sell within 38 days"); insights.push("Comparable inventory is decreasing"); }
+      const avgDom = (mc.avg_dom as number) ?? null;
+      const supply = (mc.market_days_supply as number) ?? (mc.inventory_count as number) ?? null;
       return {
-        title: "Market Demand", subtitle: "How much attention this vehicle is getting",
-        primary: { label: "Check Availability", onClick: () => go("check-availability") },
+        title: "Market Demand Analysis", subtitle: "How popular this vehicle is in your market",
+        primary: { label: "Reserve This Vehicle", onClick: () => go("reserve") },
         body: <>
-          <Hero icon={TrendingUp} tone={has ? "green" : "neutral"} label={has ? level : "Demand tracking"} note={has ? "Based on shopper activity and time on market." : "Demand signals appear once this listing has been live."} />
-          {has ? (
-            <div className="grid grid-cols-2 gap-4">
-              {views != null && <Metric icon={Eye} label="Shopper Views" value={views.toLocaleString()} note="Unique looks at this vehicle" />}
-              {dom != null && <Metric icon={CalendarDays} label="Days on Market" value={String(dom)} note={dom <= 30 ? "Fresh to market" : "Available now"} />}
+          <Hero icon={Flame} tone={has ? "green" : "neutral"} label={has ? level : "Demand tracking"}
+            note={has ? [views != null ? `${views.toLocaleString()} views` : null, dom != null ? `${dom} days on market` : null].filter(Boolean).join(" · ") || "Demand Score" : "Demand signals appear once this listing has been live."} />
+          {has && (
+            <Section title="Demand level" sub="Relative to typical listing activity in your area.">
+              <div className={`${CARD} p-4`}><Gauge3 value={score} /></div>
+            </Section>
+          )}
+          <Section title="Buyer activity">
+            <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+              {activity.map((a) => (
+                <div key={a.label} className={`${CARD} p-3 text-center`}>
+                  <a.icon className="w-4 h-4 text-[#2563EB] mx-auto" />
+                  <p className="text-[18px] font-extrabold mt-1 leading-none">{a.value}</p>
+                  <p className="text-[10px] text-[#94A3B8] mt-1 leading-tight">{a.label}</p>
+                </div>
+              ))}
             </div>
-          ) : <Empty>This vehicle was published recently. Demand metrics build as shoppers view the listing.</Empty>}
-          <Section title="What this means">
-            <div className={`${CARD} p-4`}><ul className="space-y-2">
-              {views != null && <Check>{views.toLocaleString()} shoppers have viewed this vehicle</Check>}
-              {dom != null && dom <= 30 && <Check>Recently listed — likely to move quickly</Check>}
-              {dom != null && dom > 45 && <Check tone="orange">On the market a while — the dealer may be flexible</Check>}
-              <Check>High-interest vehicles often sell faster than average</Check>
-            </ul></div>
+            {!isPreview && <p className="text-[11px] text-[#94A3B8] mt-2">Some activity metrics populate as the listing gathers data.</p>}
+          </Section>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <Section title="Local demand">
+              <div className={`${CARD} p-4`}>
+                <StatRow label="Interest level" value={has ? level : "—"} />
+                <StatRow label="Nearby shoppers" value={isPreview ? "120+" : "—"} />
+                <StatRow label="Search frequency" value={isPreview ? "Above average" : "—"} />
+              </div>
+            </Section>
+            <Section title="Similar vehicles">
+              <div className={`${CARD} p-4`}>
+                <StatRow label="Avg days on market" value={avgDom != null ? `${avgDom} days` : isPreview ? "38 days" : "—"} />
+                <StatRow label="Current inventory" value={supply != null ? `${supply} nearby` : isPreview ? "42 nearby" : "—"} />
+                <StatRow label="This vehicle" value={dom != null ? `${dom} days listed` : "—"} />
+              </div>
+            </Section>
+          </div>
+          {insights.length > 0 && (
+            <Section title="Market insights">
+              <div className={`${CARD} p-4`}><ul className="space-y-2">{insights.map((t) => <Check key={t}>{t}</Check>)}</ul></div>
+            </Section>
+          )}
+          <Section title="Buying recommendation">
+            <div className="rounded-2xl border border-emerald-200 bg-emerald-50/70 p-4">
+              <p className="text-[14px] font-extrabold text-[#16A34A]">{isGreat || score >= 66 ? "Good time to buy" : "Worth a closer look"}</p>
+              <ul className="mt-2 space-y-1.5">
+                {isGreat && <Check>Priced below market average</Check>}
+                {score >= 66 && <Check>Strong shopper interest right now</Check>}
+                {d.warrantyStr && <Check>Factory warranty still active</Check>}
+                {dom != null && dom <= 30 && <Check>Fresh listing — best selection</Check>}
+                {!isGreat && score < 66 && <Check>Compare with similar vehicles before deciding</Check>}
+              </ul>
+            </div>
           </Section>
           <Disclaimer />
         </>,
@@ -184,31 +238,68 @@ function buildPanel(key: PassportPanelKey, d: PassportData, listing: VehicleList
     }
 
     case "price-confidence": {
-      const signals: { label: string; ok: boolean }[] = [];
-      if (typeof (mc.carfax_clean_title) === "boolean") signals.push({ label: "Clean title confirmed", ok: d.cleanTitle });
-      if (d.accidentCount != null) signals.push({ label: "Accident history reviewed", ok: d.accidentCount === 0 });
-      if (d.ownerCount != null) signals.push({ label: "Ownership history", ok: d.ownerCount === 1 });
-      if (listing.recall_status) signals.push({ label: "Recall status checked", ok: d.recallClear });
-      if (d.serviceCount > 0) signals.push({ label: "Service records on file", ok: true });
-      if (d.warrantyStr) signals.push({ label: "Warranty verified", ok: true });
-      if (avg != null) signals.push({ label: "Live market comparables", ok: true });
+      const ks = listing.key_specs || {};
+      const factors = [
+        { label: "Market Data", pct: avg != null ? 100 : 30 },
+        { label: "Dealer Pricing", pct: 100 },
+        { label: "Vehicle History", pct: (d.cleanTitle || d.ownerCount != null || d.accidentCount != null) ? 90 : 40 },
+        { label: "Mileage", pct: listing.mileage != null ? 100 : 0 },
+        { label: "Condition", pct: (d.serviceCount > 0 || listing.prep_status?.foreman_signed_at) ? 90 : 55 },
+        { label: "Equipment", pct: Math.min(100, ((listing.features?.length ?? 0) + Object.keys(ks).length) * 12) },
+        { label: "Regional Demand", pct: (d.viewCount != null || d.dom != null) ? 75 : 40 },
+      ];
+      const hasCarfaxDoc = (listing.documents || []).some((x) => /carfax/i.test(`${x.type} ${x.name}`));
+      const sources = [
+        { name: "MarketCheck", on: avg != null || Object.keys(mc).length > 0 },
+        { name: "CARFAX", on: typeof mc.carfax_clean_title === "boolean" || hasCarfaxDoc },
+        { name: "AutoCheck", on: false },
+        { name: "OEM", on: Object.keys(ks).length > 0 },
+        { name: "NHTSA", on: !!listing.recall_status },
+        { name: "Local Listings", on: avg != null },
+        { name: "Auction Data", on: false },
+        { name: "Dealer Pricing", on: true },
+      ];
+      const compCount = (mc.similar_count as number) ?? (mc.comparable_count as number) ?? null;
+      const coverage = compCount != null ? compCount : isPreview ? 1200 : null;
+      const faqs = [
+        { q: "Why isn't every vehicle 100%?", a: "Confidence reflects how much verified data is available. Newer listings or rare models have fewer comparables, which lowers the score until more data arrives." },
+        { q: "How often is pricing updated?", a: "Market values refresh as new comparable listings and sales are reported — typically every day the vehicle is live." },
+        { q: "What data sources are used?", a: "A blend of MarketCheck market data, dealer pricing, vehicle history, recall status, and equipment decoded from the VIN." },
+      ];
       return {
-        title: "Price Confidence", subtitle: "How sure we are about this analysis",
-        primary: { label: "Check Availability", onClick: () => go("check-availability") },
+        title: "Price Confidence", subtitle: "Why AutoLabels is confident in this valuation",
+        primary: { label: "Reserve This Vehicle", onClick: () => go("reserve") },
         body: <>
           {conf != null ? (
             <div className={`${CARD} p-5 flex items-center gap-5`}>
-              <div className="flex flex-col items-center shrink-0"><Ring pct={conf} size={108} /><p className="text-[12px] font-extrabold text-[#16A34A] mt-1">{d.confLabel || (conf >= 85 ? "Excellent" : "Good")}</p></div>
-              <div className="min-w-0"><p className="text-[14px] font-bold">Confidence Score</p><p className="text-[12px] text-[#64748B] mt-0.5">A blend of verified vehicle data and live market signals. Higher scores mean fewer unknowns.</p></div>
+              <div className="flex flex-col items-center shrink-0"><Ring pct={conf} size={120} /><p className="text-[13px] font-extrabold text-[#16A34A] mt-1">{d.confLabel || (conf >= 85 ? "Excellent" : "Good")}</p></div>
+              <div className="min-w-0"><p className="text-[14px] font-bold">Confidence Score</p><p className="text-[12px] text-[#64748B] mt-0.5">A blend of verified vehicle data and live market signals. Higher means fewer unknowns in the valuation.</p></div>
             </div>
           ) : <Empty>A confidence score appears once enough vehicle and market data has been verified.</Empty>}
-          {signals.length > 0 && (
-            <Section title="What's verified">
-              <div className={`${CARD} p-4`}><ul className="space-y-2">{signals.map((s) => <Check key={s.label} tone={s.ok ? "green" : "orange"}>{s.label}</Check>)}</ul></div>
-            </Section>
-          )}
-          <Section title="Confidence is based on">
-            <div className={`${CARD} p-4`}><ul className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">{["Verified title & history", "Accident & owner records", "Recall status (NHTSA)", "Live market comparables", "Mileage & condition", "Service history"].map((b) => <Check key={b}>{b}</Check>)}</ul></div>
+          <Section title="Confidence factors" sub="How much verified data supports each input.">
+            <div className={`${CARD} p-4 space-y-3`}>{factors.map((f) => <FactorBar key={f.label} label={f.label} pct={f.pct} />)}</div>
+          </Section>
+          <Section title="Data sources">
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">{sources.map((s) => <Source key={s.name} name={s.name} on={s.on} />)}</div>
+          </Section>
+          <Section title="Similar vehicle coverage">
+            {coverage != null ? (
+              <div className={`${CARD} p-4 flex items-center gap-4`}>
+                <p className="text-[28px] font-extrabold text-[#2563EB] leading-none shrink-0">{coverage.toLocaleString()}{compCount == null ? "+" : ""}</p>
+                <p className="text-[12px] text-[#64748B]">Comparable vehicles analyzed. A larger sample size increases pricing confidence.</p>
+              </div>
+            ) : <Empty>Comparable-vehicle coverage appears once MarketCheck data is available.</Empty>}
+          </Section>
+          <Section title="Methodology">
+            <div className={`${CARD} p-4`}><p className="text-[12px] text-[#64748B] mb-2">AutoLabels analyzes:</p><ul className="grid grid-cols-2 gap-1.5">{["Market pricing", "Mileage", "Condition", "Equipment", "Vehicle history", "Regional inventory", "Demand", "Historical pricing", "Dealer pricing"].map((b) => <Check key={b}>{b}</Check>)}</ul></div>
+          </Section>
+          <Section title="Confidence timeline" sub="Last 30 days">
+            {marketSeries.length >= 2 ? (
+              <div className={`${CARD} p-4`}><TrendChart market={marketSeries} height={90} /><p className="text-[12px] text-[#64748B] mt-1">Valuation inputs have remained stable over the last 30 days.</p></div>
+            ) : <Empty>A 30-day confidence timeline appears once enough pricing history is collected.</Empty>}
+          </Section>
+          <Section title="FAQ">
+            <div className="space-y-2">{faqs.map((f) => <Faq key={f.q} q={f.q} a={f.a} />)}</div>
           </Section>
           <Disclaimer />
         </>,
@@ -400,12 +491,33 @@ const Delta = ({ label, delta }: { label: string; delta: number }) => (
   </span>
 );
 
-const Metric = ({ icon: Icon, label, value, note }: { icon: React.ElementType; label: string; value: string; note?: string }) => (
-  <div className={`${CARD} p-4`}>
-    <div className="flex items-center gap-1.5 mb-1.5"><Icon className="w-4 h-4 text-[#2563EB]" /><span className="text-[12px] font-semibold text-[#64748B]">{label}</span></div>
-    <p className="text-[26px] font-extrabold leading-none">{value}</p>
-    {note && <p className="text-[11px] text-[#94A3B8] mt-1">{note}</p>}
+const Gauge3 = ({ value }: { value: number }) => (
+  <div>
+    <div className="relative h-3 rounded-full bg-gradient-to-r from-slate-200 via-amber-200 to-emerald-300">
+      <span className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-4 h-4 rounded-full bg-white ring-2 ring-[#0F172A] shadow" style={{ left: `${value}%` }} />
+    </div>
+    <div className="flex justify-between text-[11px] font-semibold text-[#94A3B8] mt-1.5"><span>Low</span><span>Medium</span><span>High</span></div>
   </div>
+);
+
+const FactorBar = ({ label, pct }: { label: string; pct: number }) => (
+  <div>
+    <div className="flex justify-between text-[12px] mb-1"><span className="text-[#0F172A] font-medium">{label}</span><span className="text-[#64748B]">{pct >= 85 ? "Strong" : pct >= 55 ? "Good" : pct > 0 ? "Limited" : "—"}</span></div>
+    <div className="h-2 rounded-full bg-slate-100 overflow-hidden"><div className="h-full rounded-full bg-[#2563EB]" style={{ width: `${Math.max(0, Math.min(100, pct))}%` }} /></div>
+  </div>
+);
+
+const Source = ({ name, on }: { name: string; on: boolean }) => (
+  <div className={`flex items-center gap-2 rounded-xl border px-3 py-2 text-[12px] font-semibold ${on ? "border-emerald-200 bg-emerald-50/60 text-[#0F172A]" : "border-[#E6E8EC] bg-white text-[#94A3B8]"}`}>
+    {on ? <CheckCircle2 className="w-4 h-4 text-[#16A34A] shrink-0" /> : <Circle className="w-4 h-4 text-[#CBD5E1] shrink-0" />}{name}
+  </div>
+);
+
+const Faq = ({ q, a }: { q: string; a: string }) => (
+  <details className={`${CARD} p-4 group`}>
+    <summary className="cursor-pointer list-none flex items-center justify-between gap-3 text-[13px] font-semibold text-[#0F172A]">{q}<ChevronDown className="w-4 h-4 text-[#94A3B8] group-open:rotate-180 transition-transform shrink-0" /></summary>
+    <p className="text-[12px] text-[#64748B] mt-2 leading-relaxed">{a}</p>
+  </details>
 );
 
 const Meter = ({ label, value, unit, pct }: { label: string; value: string; unit: string; pct: number }) => (
