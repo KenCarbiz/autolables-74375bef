@@ -350,7 +350,12 @@ serve(async (req) => {
 
   if (!MC_KEY) return json(200, { ok: false, reason: "marketcheck_not_configured" });
 
-  const body = await req.json().catch(() => ({})) as { tenant_id?: string; vin?: string; zip?: string };
+  const body = await req.json().catch(() => ({})) as { tenant_id?: string; vin?: string; zip?: string; sources?: "all" | "marketcheck" | "blackbook" };
+  // Which providers to run: "all" (default), "marketcheck" (skip Black Book),
+  // or "blackbook" (skip the MarketCheck chain — fills only Black Book values).
+  const sources = body.sources === "marketcheck" || body.sources === "blackbook" ? body.sources : "all";
+  const wantMC = sources !== "blackbook";
+  const wantBB = sources !== "marketcheck";
   const tenantId = body.tenant_id;
   const vin = (body.vin || "").trim().toUpperCase();
   if (!tenantId || !/^[A-HJ-NPR-Z0-9]{17}$/.test(vin)) return json(400, { error: "tenant_id and valid vin required" });
@@ -406,7 +411,7 @@ serve(async (req) => {
 
   // Black Book is a separate provider with its own rate limit, so it runs
   // alongside the MarketCheck chain rather than competing with it.
-  const blackbookP = fetchBlackBook(vin, miles, zip);
+  const blackbookP = wantBB ? fetchBlackBook(vin, miles, zip) : Promise.resolve(null);
 
   // MarketCheck calls run STRICTLY one-at-a-time. Firing them in parallel
   // bursts past MarketCheck's per-second limit and the heaviest call (comps
@@ -414,12 +419,12 @@ serve(async (req) => {
   // land comps on one VIN and not the next. Serialized + the browser's
   // one-VIN-at-a-time loop means a single MarketCheck request in flight at any
   // moment, which can't trip the RPS limit. (fetchRecalls tries MarketCheck
-  // then falls back to free NHTSA.)
-  const predict = await fetchPredict(vin, miles);
-  const comps = await fetchComps(ymm, condition, zip, price, vin);
-  const mds = INCLUDE_MDS ? await fetchMds(ymm, condition, zip) : null;
-  const history = await fetchHistory(vin);
-  const recalls = await fetchRecalls(vin, ymm);
+  // then falls back to free NHTSA.) Skipped entirely on a Black-Book-only run.
+  const predict = wantMC ? await fetchPredict(vin, miles) : null;
+  const comps = wantMC ? await fetchComps(ymm, condition, zip, price, vin) : null;
+  const mds = wantMC && INCLUDE_MDS ? await fetchMds(ymm, condition, zip) : null;
+  const history = wantMC ? await fetchHistory(vin) : null;
+  const recalls = wantMC ? await fetchRecalls(vin, ymm) : null;
   const blackbook = await blackbookP;
 
   const patch: Record<string, unknown> = { enriched_at: new Date().toISOString() };
@@ -466,8 +471,9 @@ serve(async (req) => {
   // Persist (each column already migrated; isolate so a missing column can't 500).
   try { await admin.from("vehicle_listings").update(patch).eq("id", row.id); } catch { /* column not migrated yet */ }
 
-  // Value-history snapshot for the price/market timeline.
-  if (price != null || patch.market_value != null) {
+  // Value-history snapshot for the price/market timeline — only when MarketCheck
+  // ran (a Black-Book-only pass shouldn't append a price/market snapshot).
+  if (wantMC && (price != null || patch.market_value != null)) {
     await admin.from("vehicle_value_history").insert({
       tenant_id: tenantId, vin, source: "vehicle_enrich",
       listing_price: price, market_value: patch.market_value ?? null,

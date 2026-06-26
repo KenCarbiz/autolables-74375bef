@@ -62,6 +62,18 @@ const SIGNALS = [
 
 const CORE = SIGNALS.filter((s) => s.core);
 
+type Sources = "all" | "marketcheck" | "blackbook";
+
+// Whether a car still needs a pass for the given provider scope. For MarketCheck
+// we also treat a missing Days Supply as "needs enrich" — it's a non-core signal
+// that normally lands, so a blank one is a transient miss worth retrying (this is
+// what the straggler-retry pass uses). Black Book only cares about its own value.
+const needsEnrich = (r: Row, sources: Sources): boolean => {
+  if (sources === "blackbook") return !r.blackbook?.available;
+  if (!r.enriched_at) return true;
+  return CORE.some((s) => !s.has(r)) || r.market_meta?.market_days_supply == null;
+};
+
 const SELECT =
   "vin, ymm, condition, price, market_value, market_meta, comparables, history_payload, recall_status, open_recall_count, blackbook, enriched_at, source_url, mc_attributes";
 
@@ -97,28 +109,46 @@ export default function MarketcheckDataHealthCard() {
 
   useEffect(() => { load(); }, [load]);
 
-  // Enrich EVERY incomplete VIN, one at a time. The edge function's inline pass
-  // is bounded by its wall-clock (≈10 cars/run), so a full pull alone leaves the
-  // rest with only price+value. The browser has no such limit: it queries the
-  // fresh incomplete set and walks it sequentially (each vehicle-enrich fans out
-  // ~6-8 MarketCheck requests; sequential keeps us under the rate limit), so a
-  // single action brings the WHOLE inventory to fully-enriched. Returns the count
-  // enriched; reports live progress so the admin can watch it complete.
-  const enrichAllIncomplete = useCallback(async (): Promise<number> => {
+  // Enrich VINs one at a time (sequential keeps us under MarketCheck's rate
+  // limit), driven from the browser so there's no edge wall-clock cap.
+  //   sources: which providers to run — "all", "marketcheck", or "blackbook".
+  //   scope:   "all" = every car in inventory; "incomplete" = only cars that
+  //            still need this provider's data.
+  // After the main pass it re-queries and re-runs any transient stragglers
+  // (e.g. a Days-Supply call that timed out) up to 2 rounds, so a full pull
+  // self-cleans instead of leaving a handful for manual per-car re-pulls.
+  const enrichLoop = useCallback(async (sources: Sources, scope: "all" | "incomplete"): Promise<number> => {
     if (!tenantId) return 0;
-    const { data } = await (supabase as any).from("vehicle_listings").select(SELECT)
-      .eq("tenant_id", tenantId).limit(2000);
-    const incomplete = ((data as Row[]) || []).filter((r) => !r.enriched_at || CORE.some((s) => !s.has(r)));
-    if (!incomplete.length) { setProgress(null); return 0; }
-    setProgress({ done: 0, total: incomplete.length });
-    let done = 0;
-    for (const t of incomplete) {
-      try { await supabase.functions.invoke("vehicle-enrich", { body: { tenant_id: tenantId, vin: t.vin } }); } catch { /* best-effort */ }
-      done++;
-      setProgress({ done, total: incomplete.length });
+    const fetchRows = async (): Promise<Row[]> => {
+      const { data } = await (supabase as any).from("vehicle_listings").select(SELECT).eq("tenant_id", tenantId).limit(2000);
+      return (data as Row[]) || [];
+    };
+    const runBatch = async (list: Row[]) => {
+      setProgress({ done: 0, total: list.length });
+      let done = 0;
+      for (const t of list) {
+        try { await supabase.functions.invoke("vehicle-enrich", { body: { tenant_id: tenantId, vin: t.vin, sources } }); } catch { /* best-effort */ }
+        done++;
+        setProgress({ done, total: list.length });
+      }
+    };
+    const all = await fetchRows();
+    const targets = scope === "all" ? all : all.filter((r) => needsEnrich(r, sources));
+    if (!targets.length) { setProgress(null); return 0; }
+    await runBatch(targets);
+    // Straggler retry for transient misses — skip for Black-Book-only (an
+    // unconfigured Black Book would otherwise look like a permanent straggler
+    // and retry the whole inventory).
+    if (sources !== "blackbook") {
+      const touched = new Set(targets.map((t) => t.vin));
+      for (let round = 0; round < 2; round++) {
+        const stragglers = (await fetchRows()).filter((r) => touched.has(r.vin) && needsEnrich(r, sources));
+        if (!stragglers.length) break;
+        await runBatch(stragglers);
+      }
     }
     setProgress(null);
-    return done;
+    return targets.length;
   }, [tenantId]);
 
   // Re-pull the ENTIRE inventory from the dealer's website via marketcheck-sync
@@ -136,9 +166,21 @@ export default function MarketcheckDataHealthCard() {
     if (seen === 0) { setFullPull(false); toast.error("Pulled 0 vehicles — check the MarketCheck key / domain"); load(); return; }
     toast.success(`Pulled ${seen} vehicles · ${r.new_vehicles ?? 0} new · ${r.prices_recorded ?? 0} price updates · enriching all…`);
     await load();
-    const enriched = await enrichAllIncomplete();
+    const enriched = await enrichLoop("all", "all");
     setFullPull(false);
     toast.success(enriched > 0 ? `Enriched ${enriched} vehicles — inventory is fully up to date` : "Every vehicle was already fully enriched");
+    load();
+  };
+
+  // Run one provider across the WHOLE inventory (no website re-ingest). Lets the
+  // admin refresh just MarketCheck market data, or backfill just Black Book,
+  // without spending the other provider's quota.
+  const runProviderFull = async (sources: Sources, label: string) => {
+    if (!tenantId) return;
+    setBulk(true);
+    const n = await enrichLoop(sources, "all");
+    setBulk(false);
+    toast.success(n > 0 ? `${label}: ran ${n} vehicles` : "No vehicles to run");
     load();
   };
 
@@ -165,7 +207,7 @@ export default function MarketcheckDataHealthCard() {
   const reEnrichStale = async () => {
     if (!tenantId) return;
     setBulk(true);
-    const done = await enrichAllIncomplete();
+    const done = await enrichLoop("all", "incomplete");
     setBulk(false);
     toast.success(done > 0 ? `Enriched ${done} — every vehicle is now complete` : "Every vehicle is fully enriched");
     load();
@@ -198,9 +240,20 @@ export default function MarketcheckDataHealthCard() {
             className="h-9 px-3 rounded-md border border-border text-xs font-semibold inline-flex items-center gap-1.5 hover:bg-muted disabled:opacity-50">
             {bulk ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />} Re-pull incomplete
           </button>
+          <button onClick={() => runProviderFull("marketcheck", "MarketCheck")} disabled={bulk || fullPull || loading || !rows?.length}
+            className="h-9 px-3 rounded-md border border-border text-xs font-semibold inline-flex items-center gap-1.5 hover:bg-muted disabled:opacity-50"
+            title="Run MarketCheck (value, comps, days supply, recalls, history) across the whole inventory — no Black Book">
+            <RefreshCw className="w-3.5 h-3.5" /> Full: MarketCheck
+          </button>
+          <button onClick={() => runProviderFull("blackbook", "Black Book")} disabled={bulk || fullPull || loading || !rows?.length}
+            className="h-9 px-3 rounded-md border border-border text-xs font-semibold inline-flex items-center gap-1.5 hover:bg-muted disabled:opacity-50"
+            title="Run Black Book values across the whole inventory — no MarketCheck quota used">
+            <RefreshCw className="w-3.5 h-3.5" /> Full: Black Book
+          </button>
           <button onClick={rePullInventory} disabled={fullPull || bulk || loading}
-            className="h-9 px-3 rounded-md bg-primary text-primary-foreground text-xs font-semibold inline-flex items-center gap-1.5 disabled:opacity-50">
-            {fullPull ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />} Re-pull full inventory
+            className="h-9 px-3 rounded-md bg-primary text-primary-foreground text-xs font-semibold inline-flex items-center gap-1.5 disabled:opacity-50"
+            title="Re-pull inventory from the dealer website, then run all APIs across every vehicle">
+            {fullPull ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />} Full: all data
           </button>
         </div>
       </div>
