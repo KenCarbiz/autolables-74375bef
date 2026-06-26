@@ -43,15 +43,24 @@ const priceFlag = (r: Row): PriceFlag => {
   return "ok";
 };
 
+// `core: true` marks the signals that a successful enrichment should reliably
+// produce, so they define "fully enriched" and which cars are "incomplete".
+// The rest are display-only — they go grey for legitimate reasons that must NOT
+// brand a car incomplete forever (or the backfill loop never terminates):
+//   • Days supply — MarketCheck MDS is plan-gated / absent for rare ymm
+//   • VIN history — brand-new cars have no prior listings
+//   • Black Book — optional add-on, not configured by default
 const SIGNALS = [
-  { key: "price", label: "Advertised price", has: (r: Row) => priceFlag(r) === "ok" },
-  { key: "value", label: "Market value", has: (r: Row) => r.market_value != null },
-  { key: "comps", label: "Comparables", has: (r: Row) => Array.isArray(r.comparables) && r.comparables.length > 0 },
-  { key: "mds", label: "Days supply", has: (r: Row) => r.market_meta?.market_days_supply != null },
-  { key: "recall", label: "Recalls", has: (r: Row) => !!r.recall_status },
-  { key: "history", label: "VIN history", has: (r: Row) => !!r.history_payload?.available },
-  { key: "blackbook", label: "Black Book", has: (r: Row) => !!r.blackbook?.available },
+  { key: "price", label: "Advertised price", core: true, has: (r: Row) => priceFlag(r) === "ok" },
+  { key: "value", label: "Market value", core: true, has: (r: Row) => r.market_value != null },
+  { key: "comps", label: "Comparables", core: true, has: (r: Row) => Array.isArray(r.comparables) && r.comparables.length > 0 },
+  { key: "mds", label: "Days supply", core: false, has: (r: Row) => r.market_meta?.market_days_supply != null },
+  { key: "recall", label: "Recalls", core: true, has: (r: Row) => !!r.recall_status },
+  { key: "history", label: "VIN history", core: false, has: (r: Row) => !!r.history_payload?.available },
+  { key: "blackbook", label: "Black Book", core: false, has: (r: Row) => !!r.blackbook?.available },
 ] as const;
+
+const CORE = SIGNALS.filter((s) => s.core);
 
 const SELECT =
   "vin, ymm, condition, price, market_value, market_meta, comparables, history_payload, recall_status, open_recall_count, blackbook, enriched_at, source_url, mc_attributes";
@@ -116,7 +125,7 @@ export default function MarketcheckDataHealthCard() {
 
   const reEnrichStale = async () => {
     if (!tenantId || !rows) return;
-    const incomplete = rows.filter((r) => !r.enriched_at || SIGNALS.some((s) => !s.has(r)));
+    const incomplete = rows.filter((r) => !r.enriched_at || CORE.some((s) => !s.has(r)));
     if (!incomplete.length) { toast.success("Every vehicle is fully enriched"); return; }
     const PER_CLICK = 40;                 // matches the server ENRICH_PER_RUN cap
     const targets = incomplete.slice(0, PER_CLICK);
@@ -141,7 +150,7 @@ export default function MarketcheckDataHealthCard() {
   const stats = useMemo(() => {
     if (!rows) return null;
     const total = rows.length;
-    const fully = rows.filter((r) => SIGNALS.every((s) => s.has(r))).length;
+    const fully = rows.filter((r) => CORE.every((s) => s.has(r))).length;
     const never = rows.filter((r) => !r.enriched_at).length;
     const priceProblems = rows.filter((r) => priceFlag(r) !== "ok").length;
     return { total, fully, never, priceProblems };
