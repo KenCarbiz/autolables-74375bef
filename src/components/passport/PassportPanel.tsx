@@ -113,9 +113,12 @@ function buildPanel(key: PassportPanelKey, d: PassportData, listing: VehicleList
         title: "Market Pricing Analysis", subtitle: "How AutoLabels determined this price",
         primary: { label: "Reserve This Vehicle", onClick: () => go("reserve") },
         body: <>
-          <Hero icon={ShieldCheck} tone={isGreat ? "green" : "neutral"} label={isGreat ? "Great Price" : avg != null ? "Market Price" : "Pricing Pending"}
-            value={isGreat ? `${fmt$(below)} Below Market` : undefined}
-            note={conf != null ? `Confidence: ${conf}%` : avg != null ? `Near the ${fmt$(avg)} market average` : "Market comparison appears once MarketCheck data is available."} />
+          <div className="md:hidden"><MHero tone={isGreat ? "green" : "blue"} icon={ShieldCheck} eyebrow={isGreat ? "Great Price" : avg != null ? "Market Price" : "Pricing"} title={isGreat ? `${fmt$(below)} Below Market` : avg != null && price != null ? fmt$(price) : "Pending"} note={conf != null ? `Confidence ${conf}%` : avg != null ? `Near the ${fmt$(avg)} market average` : "Market comparison appears once MarketCheck data is available."} /></div>
+          <div className="hidden md:block">
+            <Hero icon={ShieldCheck} tone={isGreat ? "green" : "neutral"} label={isGreat ? "Great Price" : avg != null ? "Market Price" : "Pricing Pending"}
+              value={isGreat ? `${fmt$(below)} Below Market` : undefined}
+              note={conf != null ? `Confidence: ${conf}%` : avg != null ? `Near the ${fmt$(avg)} market average` : "Market comparison appears once MarketCheck data is available."} />
+          </div>
           {low != null && high != null && avg != null && price != null ? (
             <div className={`${CARD} p-5`}>
               <div className="grid grid-cols-3 text-center mb-1">
@@ -1011,12 +1014,15 @@ function buildPanel(key: PassportPanelKey, d: PassportData, listing: VehicleList
         secondary: { label: "Read all reviews", onClick: () => go("owner-reviews") },
         footerQuestion: "Have questions about ownership?",
         body: <>
+          {rating != null && <div className="md:hidden"><MHero tone="green" icon={Star} ringPct={Math.round((rating / 5) * 100)} eyebrow={`${rating.toFixed(1)} / 5 · ${label}`} title="Owner Reviews" note={[sourceNames.length > 0 ? `Based on ${sourceNames.join(", ")}` : null, d.reviewCount != null ? `${d.reviewCount.toLocaleString()} reviews` : null].filter(Boolean).join(" · ")} /></div>}
+          <div className={rating != null ? "hidden md:block" : undefined}>
           {rating != null ? (
             <div className={`${CARD} p-5 flex items-center gap-4`}>
               <div className="text-center shrink-0"><p className="text-[34px] font-extrabold text-[#2563EB] leading-none">{rating.toFixed(1)}</p><div className="mt-1"><Stars n={rating} /></div>{d.reviewCount != null && <p className="text-[11px] text-[#64748B] mt-1">{d.reviewCount.toLocaleString()} reviews</p>}</div>
               <div className="min-w-0"><p className="text-[15px] font-extrabold text-[#16A34A]">{label}</p>{sourceNames.length > 0 && <p className="text-[12px] text-[#64748B] mt-0.5">Based on {sourceNames.join(", ")}</p>}<p className="text-[11px] text-[#94A3B8] mt-1">AutoLabels aggregates reviews and does not edit or filter them.</p></div>
             </div>
           ) : <Empty>Verified owner reviews appear here once the dealer connects a review source. AutoLabels never fabricates customer reviews.</Empty>}
+          </div>
           {breakdown.length > 0 && (
             <Section title="Rating breakdown"><div className={`${CARD} p-4 space-y-2.5`}>{breakdown.map((b) => <RatingBar key={b.k} label={b.k} score={b.v} />)}</div></Section>
           )}
@@ -1319,6 +1325,7 @@ function buildPanel(key: PassportPanelKey, d: PassportData, listing: VehicleList
         primary: { label: "Reserve This Vehicle", onClick: () => go("reserve") },
         footerQuestion: "Questions about the specifications?", specialistLabel: "Talk to a Product Specialist",
         body: <>
+          <div className="md:hidden"><MHero tone="blue" icon={FileText} eyebrow="Technical Specifications" title={listing.ymm || "Specifications"} note={[ks.engine ? String(ks.engine) : null, ks.drivetrain ? String(ks.drivetrain) : null].filter(Boolean).join(" · ") || "Verified vehicle details"} /></div>
           {hasAny ? (
             <>
               <Section title="Quick specs">
@@ -1348,6 +1355,7 @@ function buildPanel(key: PassportPanelKey, d: PassportData, listing: VehicleList
         primary: { label: "Reserve This Vehicle", onClick: () => go("reserve") },
         footerQuestion: "Questions about the equipment?", specialistLabel: "Talk to a Product Specialist",
         body: <>
+          <div className="md:hidden"><MHero tone="blue" icon={Package} eyebrow="Equipment & Options" title={`${featLabels.length} on this vehicle`} note={accessories.length ? `${accessories.length} dealer add-on${accessories.length === 1 ? "" : "s"} available` : "Factory and dealer equipment"} /></div>
           {hasContent ? (
             <>
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
@@ -1447,6 +1455,7 @@ function buildPanel(key: PassportPanelKey, d: PassportData, listing: VehicleList
         primary: { label: "Contact Dealer", onClick: () => go("contact") },
         secondary: hasHistory ? { label: "View Vehicle History Report", onClick: () => go("vehicle-history") } : undefined,
         body: <>
+          <div className="md:hidden"><MHero tone="green" icon={Clock} eyebrow="Ownership Timeline" title={listing.ymm || "Timeline"} note="Ownership, service, certification, and availability history." /></div>
           {sections.map((s) => <Section key={s.label} title={s.label}><TimelineGroup events={s.events} /></Section>)}
           {hasHistory ? (
             <button onClick={() => go("vehicle-history")} className="w-full h-11 rounded-xl bg-[#2563EB] hover:bg-[#1d4fd7] text-white text-[13px] font-semibold inline-flex items-center justify-center gap-2 transition-colors"><History className="w-4 h-4" /> View Full Vehicle History Report</button>
@@ -1534,6 +1543,30 @@ const WarrantyBar = ({ title, big, pctLabel, pct, expires, tone = "green" }: { t
     </div>
   );
 };
+
+// Shared mobile gradient hero — one look across every slide-out's mobile view.
+const G_GREEN = "linear-gradient(160deg,#0f7a3d 0%,#16A34A 100%)";
+const G_BLUE = "linear-gradient(160deg,#2563EB 0%,#1e50c8 100%)";
+const MHero = ({ tone = "green", icon: Icon, eyebrow, title, note, ringPct, statusLabel }: { tone?: "green" | "blue"; icon?: React.ElementType; eyebrow: string; title: string; note?: string; ringPct?: number; statusLabel?: string }) => (
+  <div className="rounded-2xl p-5 text-white" style={{ background: tone === "blue" ? G_BLUE : G_GREEN }}>
+    {ringPct != null ? (
+      <div className="flex flex-col items-center text-center">
+        <AnimatedRing pct={ringPct} color="#ffffff" />
+        <p className="text-[13px] font-bold opacity-90 mt-2">{eyebrow}</p>
+        <p className="text-[18px] font-extrabold">{title}</p>
+        {note && <p className="text-[13px] opacity-90 mt-2 leading-snug">{note}</p>}
+      </div>
+    ) : (
+      <>
+        <div className="flex items-center gap-3">
+          {Icon && <span className="w-12 h-12 rounded-2xl bg-white/15 flex items-center justify-center shrink-0"><Icon className="w-6 h-6" /></span>}
+          <div className="min-w-0"><p className="text-[13px] font-bold uppercase tracking-wider opacity-95">{eyebrow}</p><p className="text-[24px] font-extrabold leading-tight">{title}</p>{statusLabel && <p className="text-[12px] opacity-90">{statusLabel}</p>}</div>
+        </div>
+        {note && <p className="text-[13px] opacity-90 mt-3 leading-snug">{note}</p>}
+      </>
+    )}
+  </div>
+);
 
 const Seg = ({ options, value, onChange }: { options: { label: string; value: string | number }[]; value: string | number; onChange: (v: string | number) => void }) => (
   <div className="inline-flex rounded-lg border border-[#E6E8EC] bg-white p-0.5 text-[11px] font-semibold">
