@@ -70,19 +70,34 @@ async function fetchComps(ymm: string | null, condition: string, zip: string | n
     const year = parts[0] && /^\d{4}$/.test(parts[0]) ? parts[0] : "";
     const make = year ? parts[1] : parts[0];
     const model = year ? parts.slice(2).join(" ") : parts.slice(1).join(" ");
-    const p = new URLSearchParams({ api_key: MC_KEY, car_type: condition === "new" ? "new" : "used", rows: "25", sort_by: "price", sort_order: "asc", stats: "price,dom" });
-    if (year) p.set("year", year);
-    if (make) p.set("make", make);
-    if (model) p.set("model", model);
-    const radius = 150;
-    if (zip) { p.set("zip", zip); p.set("radius", String(radius)); }
-    const res = await fetch(`${MC_BASE}/search/car/active?${p.toString()}`, { signal: AbortSignal.timeout(10000) });
-    if (!res.ok) return null;
-    // deno-lint-ignore no-explicit-any
-    const b: any = await res.json().catch(() => ({}));
-    // deno-lint-ignore no-explicit-any
-    const rows: any[] = (Array.isArray(b?.listings) ? b.listings : []).filter((l: any) => String(l.vin || "").toUpperCase() !== subjectVin);
-    const comparables = rows.slice(0, 16).map((l) => ({
+    const carType = condition === "new" ? "new" : "used";
+
+    // One MarketCheck active-search pass. Returns null on transport error so the
+    // caller can distinguish "no listings" (retry wider) from "request failed".
+    const run = async (opts: { useYear: boolean; useZip: boolean }) => {
+      const p = new URLSearchParams({ api_key: MC_KEY, car_type: carType, rows: "25", sort_by: "price", sort_order: "asc", stats: "price,dom" });
+      if (opts.useYear && year) p.set("year", year);
+      if (make) p.set("make", make);
+      if (model) p.set("model", model);
+      if (opts.useZip && zip) { p.set("zip", zip); p.set("radius", "150"); }
+      const res = await fetch(`${MC_BASE}/search/car/active?${p.toString()}`, { signal: AbortSignal.timeout(10000) });
+      if (!res.ok) return null;
+      // deno-lint-ignore no-explicit-any
+      const b: any = await res.json().catch(() => ({}));
+      // deno-lint-ignore no-explicit-any
+      const rows: any[] = (Array.isArray(b?.listings) ? b.listings : []).filter((l: any) => String(l.vin || "").toUpperCase() !== subjectVin);
+      return { b, rows, radius: opts.useZip && zip ? 150 : null };
+    };
+
+    // Prefer local same-year comps; widen to national, then to all model years,
+    // so an oddball used trade-in (off-brand, rare config) still gets a price set
+    // instead of an empty Comparables column.
+    let r = await run({ useYear: true, useZip: true });
+    if (r && r.rows.length === 0) r = (await run({ useYear: true, useZip: false })) ?? r;
+    if (r && r.rows.length === 0) r = (await run({ useYear: false, useZip: false })) ?? r;
+    if (!r) return null;
+
+    const comparables = r.rows.slice(0, 16).map((l) => ({
       vin: l.vin ?? null,
       ymm: l.heading ?? ([l.build?.year, l.build?.make, l.build?.model].filter(Boolean).join(" ") || null),
       trim: l.build?.trim ?? null,
@@ -93,17 +108,17 @@ async function fetchComps(ymm: string | null, condition: string, zip: string | n
       dom: num(l.dom),
       image: l.media?.photo_links?.[0] ?? null,
     })).filter((c) => c.price != null);
-    const stats = b?.stats?.price || {};
-    const domStats = b?.stats?.dom || {};
-    const count = num(b?.num_found) ?? comparables.length;
+    const stats = r.b?.stats?.price || {};
+    const domStats = r.b?.stats?.dom || {};
+    const count = num(r.b?.num_found) ?? comparables.length;
     const cheaper = listingPrice != null ? comparables.filter((c) => c.price != null && (c.price as number) < listingPrice).length : null;
     const percentile = listingPrice != null && comparables.length ? Math.round((cheaper! / comparables.length) * 100) : null;
     const meta = {
       similar_count: count,
-      search_radius: zip ? radius : null,
-      price_percentile: percentile,           // % of comps priced below this vehicle
+      search_radius: r.radius,                 // null = widened to national fallback
+      price_percentile: percentile,            // % of comps priced below this vehicle
       avg_dom: num(domStats.mean ?? domStats.median),
-      market_days_supply: null as number | null,  // requires MarketCheck stats plan; left null when absent
+      market_days_supply: null as number | null,  // filled by fetchMds when the plan supports it
       inventory_count: count,
       checked_at: new Date().toISOString(),
     };

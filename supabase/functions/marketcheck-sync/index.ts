@@ -727,22 +727,20 @@ serve(async (req) => {
     }
   }
 
-  // ── Full enrichment pass (best-effort, capped, small concurrency) ──
-  // Each new/changed VIN gets MarketCheck pricing + comparables + market stats
-  // + recalls and Black Book values pulled and persisted by vehicle-enrich.
+  // ── Full enrichment pass (best-effort, capped, SEQUENTIAL) ──
+  // Each VIN's enrich fans out ~6-8 MarketCheck requests; running several VINs
+  // concurrently pushed past MarketCheck's rate limit and comps/history came
+  // back partial. Process one VIN at a time so each gets the full dataset.
   let enriched = 0;
-  for (let i = 0; i < enrichQueue.length; i += 4) {
-    const batch = enrichQueue.slice(i, i + 4);
-    await Promise.all(batch.map(async (e) => {
-      try {
-        const r = await fetch(`${supabaseUrl}/functions/v1/vehicle-enrich`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json", Authorization: `Bearer ${serviceKey}`, "x-cron-secret": cronSecret },
-          body: JSON.stringify(e), signal: AbortSignal.timeout(30000),
-        });
-        if (r.ok) enriched++;
-      } catch { /* best-effort — a failed enrich leaves the listing's prior data intact */ }
-    }));
+  for (const e of enrichQueue) {
+    try {
+      const r = await fetch(`${supabaseUrl}/functions/v1/vehicle-enrich`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${serviceKey}`, "x-cron-secret": cronSecret },
+        body: JSON.stringify(e), signal: AbortSignal.timeout(30000),
+      });
+      if (r.ok) enriched++;
+    } catch { /* best-effort — a failed enrich leaves the listing's prior data intact */ }
   }
 
   return json(200, {

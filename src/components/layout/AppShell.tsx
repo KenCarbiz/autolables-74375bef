@@ -278,6 +278,17 @@ const AppShell = ({ children }: AppShellProps) => {
     if (action.includes("deleted") || action.includes("rejected")) return "bg-rose-400";
     return "bg-slate-400";
   };
+  // For sync events, read the outcome the edge function recorded into details so
+  // the feed shows success vs failure (and the headline counts) at a glance.
+  const syncOutcome = (e: { action: string; details?: Record<string, unknown> }): { ok: boolean; text: string } | null => {
+    if (!/^(marketcheck_sync|autocurb_sync|inventory_sync)/.test(e.action)) return null;
+    const d = (e.details || {}) as Record<string, unknown>;
+    const failed = !!d.error || (d.seen === 0 && !!d.note);
+    if (failed) return { ok: false, text: String(d.note || d.error || "Sync failed") };
+    const seen = typeof d.seen === "number" ? d.seen : (typeof d.num_found === "number" ? d.num_found : null);
+    const nu = typeof d.new_vehicles === "number" ? d.new_vehicles : null;
+    return { ok: true, text: seen != null ? `${seen} vehicles${nu ? ` · ${nu} new` : ""}` : "Completed" };
+  };
   const renderNotificationsList = () => (
     recentActivity.length === 0 ? (
       <div className="px-4 py-8 text-center text-xs text-muted-foreground">
@@ -285,26 +296,34 @@ const AppShell = ({ children }: AppShellProps) => {
       </div>
     ) : (
       <div className="max-h-[420px] overflow-y-auto py-1">
-        {recentActivity.map((e) => (
+        {recentActivity.map((e) => {
+          const outcome = syncOutcome(e as { action: string; details?: Record<string, unknown> });
+          return (
           <button
             key={e.id}
             onClick={() => navigate(`/admin?tab=audit&entity=${encodeURIComponent(e.entity_id || "")}`)}
             className="w-full flex items-start gap-2.5 px-3 py-2 text-left hover:bg-muted/60"
           >
-            <span className={`mt-1.5 h-2 w-2 rounded-full shrink-0 ${activityDot(e.action)}`} />
+            <span className={`mt-1.5 h-2 w-2 rounded-full shrink-0 ${outcome ? (outcome.ok ? "bg-emerald-500" : "bg-rose-500") : activityDot(e.action)}`} />
             <span className="min-w-0 flex-1 leading-tight">
-              <span className="block text-[13px] font-semibold text-foreground truncate">
-                {formatActivityLabel(e.action)}
+              <span className="flex items-center gap-1.5 text-[13px] font-semibold text-foreground">
+                <span className="truncate">{formatActivityLabel(e.action)}</span>
+                {outcome && (
+                  <span className={`shrink-0 text-[9px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded ${outcome.ok ? "bg-emerald-100 text-emerald-700" : "bg-rose-100 text-rose-700"}`}>
+                    {outcome.ok ? "Success" : "Failed"}
+                  </span>
+                )}
               </span>
               <span className="block text-[11px] text-muted-foreground truncate">
-                {e.entity_type}{e.user_email ? ` · ${e.user_email}` : ""}
+                {outcome ? outcome.text : `${e.entity_type}${e.user_email ? ` · ${e.user_email}` : ""}`}
               </span>
             </span>
             <span className="text-[10px] text-muted-foreground tabular-nums shrink-0 mt-0.5">
               {formatActivityWhen(e.created_at)}
             </span>
           </button>
-        ))}
+          );
+        })}
       </div>
     )
   );

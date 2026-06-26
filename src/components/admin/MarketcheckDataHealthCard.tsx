@@ -127,17 +127,16 @@ export default function MarketcheckDataHealthCard() {
     if (!tenantId || !rows) return;
     const incomplete = rows.filter((r) => !r.enriched_at || CORE.some((s) => !s.has(r)));
     if (!incomplete.length) { toast.success("Every vehicle is fully enriched"); return; }
-    const PER_CLICK = 40;                 // matches the server ENRICH_PER_RUN cap
+    const PER_CLICK = 25;
     const targets = incomplete.slice(0, PER_CLICK);
     setBulk(true);
     let done = 0;
-    // Batch 4-concurrent to stay within MarketCheck rate limits while finishing
-    // a click in well under a minute.
-    for (let i = 0; i < targets.length; i += 4) {
-      const batch = targets.slice(i, i + 4);
-      await Promise.all(batch.map(async (t) => {
-        try { await supabase.functions.invoke("vehicle-enrich", { body: { tenant_id: tenantId, vin: t.vin } }); done++; } catch { /* best-effort */ }
-      }));
+    // Process ONE VIN at a time. Each vehicle-enrich fans out ~6-8 MarketCheck
+    // requests; running several cars at once pushed past MarketCheck's rate
+    // limit, so comps/history came back partial on bulk runs while a single
+    // re-pull returned everything. Sequential matches that single-car behavior.
+    for (const t of targets) {
+      try { await supabase.functions.invoke("vehicle-enrich", { body: { tenant_id: tenantId, vin: t.vin } }); done++; } catch { /* best-effort */ }
     }
     setBulk(false);
     const remaining = incomplete.length - done;
