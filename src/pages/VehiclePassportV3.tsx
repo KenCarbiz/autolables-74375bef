@@ -110,6 +110,17 @@ export const MOCK_LISTING = {
   dealer_snapshot: { name: "Harte INFINITI", phone: "8605551234", address: "1 Auto Way", city: "Hartford", state: "CT", zip: "06103", review_rating: 4.8, review_count: 1248 },
   dealer_trust: { years_in_business: "45", satisfaction: "98%", bbb_rating: "A+", google_rating: "4.9", google_count: "1248", certifications: "INFINITI Award of Excellence, 2024 Consumer Satisfaction", storefront_url: "https://images.unsplash.com/photo-1560179707-f14e90ef3623?w=400", review_sources: "Google | 4.9 | Excellent family SUV. Very smooth ride.\nEdmunds | 4.7 | Quiet, comfortable, and packed with technology.\nCars.com | 4.8 | Luxury feel without the luxury price.", advisor_name: "John Smith", advisor_title: "Senior Vehicle Specialist", advisor_photo: "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=200", advisor_response: "Usually replies within 5 minutes" },
   features: [{ title: "3rd Row", subtitle: "Seating" }, { title: "Panoramic", subtitle: "Moonroof" }, { title: "Heated", subtitle: "Seats" }, { title: "Premium", subtitle: "Audio" }],
+  documents: [
+    { type: "purchase_agreement", name: "Purchase Agreement", url: "https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf", uploaded_at: "2025-05-18" },
+    { type: "buyers_order", name: "Buyer's Order", url: "https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf", uploaded_at: "2025-05-18" },
+    { type: "retail_installment", name: "Retail Installment Contract", url: "https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf", uploaded_at: "2025-05-18" },
+    { type: "carfax", name: "CARFAX Vehicle History Report", url: "https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf", uploaded_at: "2025-05-17" },
+    { type: "maintenance_records", name: "Maintenance Records", url: "https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf", uploaded_at: "2025-04-28" },
+    { type: "manufacturer_warranty", name: "Manufacturer Warranty", url: "https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf", uploaded_at: "2025-05-17" },
+    { type: "extended_warranty", name: "Extended Warranty", url: "https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf", uploaded_at: "2025-05-17" },
+    { type: "inspection_checklist", name: "Multi-Point Inspection Checklist", url: "https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf", uploaded_at: "2025-05-12" },
+    { type: "window_sticker", name: "Window Sticker (Monroney)", url: "https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf", uploaded_at: "2025-05-10" },
+  ],
   value_history: [
     { captured_at: "2025-05-01", market_value: 61800, listing_price: 59500, below_market: 2300, position: "good_deal" },
     { captured_at: "2025-05-15", market_value: 61500, listing_price: 59000, below_market: 2500, position: "good_deal" },
@@ -178,7 +189,7 @@ const VehiclePassportV3 = () => {
   const verifyR = d.verifyRows.slice(Math.ceil(d.verifyRows.length / 2));
 
   const actions = [
-    { icon: FileText, label: "Documents", onClick: () => navigate(`/v/${listing.slug || vehicleSlug}/documents`) },
+    { icon: FileText, label: "Documents", onClick: () => go("documents") },
     { icon: MessageSquare, label: "Contact Dealer", onClick: () => go("contact") },
     { icon: RefreshCw, label: "Value My Trade", onClick: () => go("trade") },
     { icon: Upload, label: "Share Vehicle", onClick: handleShare },
