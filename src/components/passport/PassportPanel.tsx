@@ -376,10 +376,55 @@ function buildPanel(key: PassportPanelKey, d: PassportData, listing: VehicleList
         { q: "How often is pricing updated?", a: "Market values refresh as new comparable listings and sales are reported — typically every day the vehicle is live." },
         { q: "What data sources are used?", a: "A blend of MarketCheck market data, dealer pricing, vehicle history, recall status, and equipment decoded from the VIN." },
       ];
+      const connectedCount = sources.filter((s) => s.on).length;
+      const confWord = conf == null ? "" : conf >= 85 ? "High Confidence" : conf >= 70 ? "Good Confidence" : "Fair Confidence";
       return {
         title: "Price Confidence", subtitle: "Why AutoLabels is confident in this valuation",
         primary: { label: "Reserve This Vehicle", onClick: () => go("reserve") },
         body: <>
+          {/* ── Mobile (<768px) — premium confidence dashboard ── */}
+          <div className="md:hidden space-y-4">
+            {conf != null ? (
+              <div className="rounded-2xl p-5 text-white text-center" style={{ background: "linear-gradient(160deg,#0f7a3d 0%,#16A34A 100%)" }}>
+                <div className="flex justify-center"><AnimatedRing pct={conf} color="#ffffff" /></div>
+                <p className="text-[13px] font-bold opacity-90 mt-2">Confidence Score</p>
+                <p className="text-[18px] font-extrabold">{confWord}</p>
+                <p className="text-[13px] opacity-90 mt-2 leading-snug">A {conf}% score means we're confident this vehicle is priced right for the current market.</p>
+              </div>
+            ) : <Empty>A confidence score appears once enough vehicle and market data has been verified.</Empty>}
+
+            <div className="grid grid-cols-3 gap-3">
+              <div className={`${CARD} p-4 text-center`}><p className="text-[18px] font-extrabold leading-none">{coverage != null ? `${coverage >= 1000 ? `${Math.round(coverage / 100) / 10}k` : coverage}${compCount == null ? "+" : ""}` : "—"}</p><p className="text-[10px] text-[#94A3B8] mt-1">Comparables</p></div>
+              <div className={`${CARD} p-4 text-center`}><p className="text-[18px] font-extrabold leading-none">{connectedCount}</p><p className="text-[10px] text-[#94A3B8] mt-1">Data Sources</p></div>
+              <div className={`${CARD} p-4 text-center`}><p className="text-[18px] font-extrabold leading-none">Today</p><p className="text-[10px] text-[#94A3B8] mt-1">Updated</p></div>
+            </div>
+
+            <Section title="Confidence factors">
+              <div className={`${CARD} p-4 space-y-3`}>{factors.map((f) => <FactorBar key={f.label} label={f.label} pct={f.pct} />)}</div>
+            </Section>
+
+            <Section title="Data sources">
+              <div className="grid grid-cols-2 gap-2">{sources.map((s) => <Source key={s.name} name={s.name} on={s.on} />)}</div>
+            </Section>
+
+            {marketSeries.length >= 2 && (
+              <Section title="Confidence timeline" sub="Last 30 days">
+                <div className={`${CARD} p-4`}><TrendChart market={marketSeries} height={90} /><p className="text-[12px] text-[#64748B] mt-1">Valuation inputs have stayed stable over the last 30 days.</p></div>
+              </Section>
+            )}
+
+            <Section title="How we analyze">
+              <div className={`${CARD} p-4`}><ul className="grid grid-cols-2 gap-1.5">{["Market pricing", "Mileage", "Condition", "Equipment", "Vehicle history", "Regional demand", "Historical pricing", "Dealer pricing"].map((b) => <Check key={b}>{b}</Check>)}</ul></div>
+            </Section>
+
+            <Section title="FAQ">
+              <div className="space-y-2">{faqs.map((f) => <Faq key={f.q} q={f.q} a={f.a} />)}</div>
+            </Section>
+            <Disclaimer />
+          </div>
+
+          {/* ── Desktop / tablet (≥768px) — unchanged ── */}
+          <div className="hidden md:block space-y-5">
           {conf != null ? (
             <div className={`${CARD} p-5 flex items-center gap-5`}>
               <div className="flex flex-col items-center shrink-0"><Ring pct={conf} size={120} /><p className="text-[13px] font-extrabold text-[#16A34A] mt-1">{d.confLabel || (conf >= 85 ? "Excellent" : "Good")}</p></div>
@@ -412,6 +457,7 @@ function buildPanel(key: PassportPanelKey, d: PassportData, listing: VehicleList
             <div className="space-y-2">{faqs.map((f) => <Faq key={f.q} q={f.q} a={f.a} />)}</div>
           </Section>
           <Disclaimer />
+          </div>
         </>,
       };
     }
