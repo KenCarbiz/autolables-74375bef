@@ -73,7 +73,7 @@ const CompStrip = ({ comps }: { comps: Comp[] }) => (
   </div>
 );
 
-interface PanelDef { title: string; subtitle: string; body: React.ReactNode; primary?: { label: string; onClick: () => void }; secondary?: { label: string; onClick: () => void } }
+interface PanelDef { title: string; subtitle: string; body: React.ReactNode; primary?: { label: string; onClick: () => void }; secondary?: { label: string; onClick: () => void }; footerQuestion?: string; specialistLabel?: string }
 
 function buildPanel(key: PassportPanelKey, d: PassportData, listing: VehicleListing, isPreview: boolean, go: (s: string) => void, openPanel: (k: PassportPanelKey) => void): PanelDef {
   const price = d.price, avg = d.marketAvg, low = d.marketLow, high = d.marketHigh, below = d.belowMarket;
@@ -463,26 +463,112 @@ function buildPanel(key: PassportPanelKey, d: PassportData, listing: VehicleList
 
     case "factory-warranty": {
       const w = d.warranty;
+      const ks = listing.key_specs || {};
       const milesLeft = w.factory_miles != null && listing.mileage != null ? Math.max(0, w.factory_miles - listing.mileage) : null;
       const milesPct = w.factory_miles && listing.mileage != null ? Math.max(3, 100 - Math.min(100, (listing.mileage / w.factory_miles) * 100)) : null;
-      let monthsLeft: number | null = null, monthsPct: number | null = null, expiry: string | null = null;
-      if (w.in_service_date && w.factory_months) { const end = new Date(w.in_service_date); end.setMonth(end.getMonth() + w.factory_months); expiry = end.toLocaleDateString(); const ms = end.getTime() - Date.now(); monthsLeft = ms > 0 ? Math.round(ms / (1000 * 60 * 60 * 24 * 30.4)) : 0; monthsPct = Math.max(3, Math.min(100, (monthsLeft / w.factory_months) * 100)); }
+      const expFrom = (months?: number) => { if (!w.in_service_date || !months) return { date: null as string | null, left: null as number | null, pct: null as number | null }; const end = new Date(w.in_service_date); end.setMonth(end.getMonth() + months); const ms = end.getTime() - Date.now(); const left = ms > 0 ? Math.round(ms / (1000 * 60 * 60 * 24 * 30.4)) : 0; return { date: end.toLocaleDateString(), left, pct: Math.max(3, Math.min(100, (left / months) * 100)) }; };
+      const basic = expFrom(w.factory_months);
+      const pt = expFrom(w.powertrain_months);
+      const ptMilesLeft = w.powertrain_miles != null && listing.mileage != null ? Math.max(0, w.powertrain_miles - listing.mileage) : null;
+      const ptMilesPct = w.powertrain_miles && listing.mileage != null ? Math.max(3, 100 - Math.min(100, (listing.mileage / w.powertrain_miles) * 100)) : null;
+      const fuel = String(ks.fuel || "").toLowerCase();
+      const isHybrid = /hybrid/.test(fuel), isEV = /electric|ev\b/.test(fuel);
+      const coverageType = w.powertrain_months ? "Powertrain Coverage" : "Basic Coverage";
+      const active = !!(basic.left && basic.left > 0) || !!(milesLeft && milesLeft > 0);
+      const protections = isPreview ? [
+        { t: "Extended Vehicle Service Contract", s: "Bumper-to-bumper protection beyond the factory term.", len: "Up to 7 yr / 100K mi" },
+        { t: "Prepaid Maintenance Plan", s: "Lock in scheduled service at today's pricing.", len: "3 yr / 36K mi" },
+        { t: "Tire & Wheel Protection", s: "Covers road-hazard tire and wheel damage.", len: "Up to 5 yr" },
+        { t: "GAP Coverage", s: "Covers the gap between loan balance and value.", len: "Loan term" },
+      ] : [];
+      const faqs = [
+        { q: "Can I transfer this warranty?", a: "Factory warranties stay with the vehicle, so remaining coverage transfers to you automatically when you buy. Some extended plans are also transferable — ask the dealer." },
+        { q: "Is roadside assistance included?", a: "Many manufacturers bundle roadside assistance with the basic warranty term. Confirm the specifics for this vehicle with the dealer." },
+        { q: "Can I purchase additional coverage?", a: "Yes — extended service contracts and protection plans can be added at purchase. A specialist can walk you through the options and pricing." },
+      ];
       return {
-        title: "Factory Warranty", subtitle: "Coverage remaining on this vehicle",
-        primary: { label: "Check Availability", onClick: () => go("check-availability") },
+        title: "Factory Warranty", subtitle: "See what protection is still included with this vehicle",
+        primary: { label: "Protect This Vehicle", onClick: () => go("protect") },
         secondary: { label: "View full warranty details", onClick: () => go("factory-warranty") },
+        footerQuestion: "Questions about warranty?", specialistLabel: "Talk to a Warranty Specialist",
         body: <>
           {d.warrantyStr ? (
             <>
-              <Hero icon={ShieldCheck} tone="green" label={`${d.warrantyStr} remaining`} note="Factory coverage transfers with the vehicle." />
-              <div className={`${CARD} p-5 space-y-4`}>
-                {monthsPct != null && <Meter label="Time Remaining" value={`${monthsLeft}`} unit={`of ${w.factory_months} mo`} pct={monthsPct} />}
-                {milesPct != null && <Meter label="Mileage Remaining" value={milesLeft!.toLocaleString()} unit={`of ${(w.factory_miles! / 1000).toFixed(0)}K mi`} pct={milesPct} />}
-                {expiry && <p className="text-[12px] text-[#64748B]">Estimated expiration: <span className="font-semibold text-[#0F172A]">{expiry}</span></p>}
+              <div className="rounded-2xl border border-emerald-200 bg-emerald-50/70 p-5">
+                <div className="flex items-center gap-3">
+                  <span className="w-12 h-12 rounded-2xl bg-emerald-100 flex items-center justify-center shrink-0"><ShieldCheck className="w-6 h-6 text-[#16A34A]" /></span>
+                  <div><p className="text-[16px] font-extrabold text-[#16A34A] leading-tight">{active ? "Factory Warranty Active" : "Factory Warranty"}</p><p className="text-[13px] text-[#0F172A] font-semibold">{d.warrantyStr} remaining</p></div>
+                </div>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-4">
+                  <Stat label="Remaining" value={basic.left != null ? `${basic.left} mo` : d.warrantyStr || "—"} tone="green" />
+                  <Stat label="Mileage Left" value={milesLeft != null ? `${milesLeft.toLocaleString()}` : "—"} />
+                  <Stat label="Expires" value={basic.date ?? "—"} />
+                  <Stat label="Coverage" value={coverageType} />
+                </div>
               </div>
-              {w.powertrain_months != null && (
-                <Section title="Powertrain coverage"><div className={`${CARD} p-4`}><StatRow label="Powertrain" value={[w.powertrain_months ? `${Math.round(w.powertrain_months / 12)} yr` : null, w.powertrain_miles ? `${(w.powertrain_miles / 1000).toFixed(0)}K mi` : null].filter(Boolean).join(" / ") || "Included"} /></div></Section>
+              <Section title="Coverage remaining">
+                <div className="space-y-3">
+                  <div className={`${CARD} p-4`}>
+                    <p className="text-[13px] font-bold mb-3">Basic (Bumper-to-Bumper)</p>
+                    <div className="space-y-3">
+                      {basic.pct != null && <Meter label="Time Remaining" value={`${basic.left}`} unit={`of ${w.factory_months} mo`} pct={basic.pct} />}
+                      {milesPct != null && <Meter label="Mileage Remaining" value={milesLeft!.toLocaleString()} unit={`of ${(w.factory_miles! / 1000).toFixed(0)}K mi`} pct={milesPct} />}
+                      {basic.date && <p className="text-[11px] text-[#64748B]">Expires {basic.date}</p>}
+                    </div>
+                  </div>
+                  {(w.powertrain_months != null || w.powertrain_miles != null) && (
+                    <div className={`${CARD} p-4`}>
+                      <p className="text-[13px] font-bold mb-3">Powertrain</p>
+                      <div className="space-y-3">
+                        {pt.pct != null && <Meter label="Time Remaining" value={`${pt.left}`} unit={`of ${w.powertrain_months} mo`} pct={pt.pct} />}
+                        {ptMilesPct != null && <Meter label="Mileage Remaining" value={ptMilesLeft!.toLocaleString()} unit={`of ${(w.powertrain_miles! / 1000).toFixed(0)}K mi`} pct={ptMilesPct} />}
+                        {pt.date && <p className="text-[11px] text-[#64748B]">Expires {pt.date}</p>}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </Section>
+              <Section title="Other coverages">
+                <div className={`${CARD} p-4`}>
+                  <StatRow label="Corrosion / Perforation" value="Varies by manufacturer" />
+                  <StatRow label="Roadside Assistance" value="Confirm with dealer" />
+                  {(isHybrid || isEV) && <StatRow label={isEV ? "EV Battery" : "Hybrid Battery"} value="Extended coverage — confirm terms" />}
+                </div>
+                <p className="text-[11px] text-[#94A3B8] mt-2">Exact terms vary by manufacturer and model year. Confirm specifics with the dealer.</p>
+              </Section>
+              <Section title="Coverage details">
+                <div className={`${CARD} p-4`}>
+                  <StatRow label="Transferable" value="Yes — transfers with the vehicle" />
+                  <StatRow label="Deductible" value="Typically $0 on covered factory repairs" />
+                  <StatRow label="Roadside Included" value="Confirm with dealer" />
+                  <StatRow label="Rental / Loaner" value="Confirm with dealer" />
+                </div>
+              </Section>
+              {protections.length > 0 && (
+                <Section title="Recommended protection options">
+                  <div className="space-y-3">{protections.map((p) => (
+                    <div key={p.t} className={`${CARD} p-4`}>
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0"><p className="text-[13px] font-bold">{p.t}</p><p className="text-[12px] text-[#64748B] mt-0.5">{p.s}</p><p className="text-[11px] text-[#94A3B8] mt-1">{p.len}</p></div>
+                        <button onClick={() => go("protect")} className="text-[12px] font-semibold text-[#2563EB] hover:underline shrink-0">Learn More</button>
+                      </div>
+                    </div>
+                  ))}</div>
+                </Section>
               )}
+              <Section title="Warranty timeline">
+                <ol className="space-y-4 relative border-l-2 border-slate-100 ml-1.5 pl-4">
+                  {([
+                    w.in_service_date ? { d: new Date(w.in_service_date).toLocaleDateString(), t: "Placed in service", s: "Factory warranty begins", c: "bg-emerald-500" } : null,
+                    { d: "Today", t: "Current coverage", s: d.warrantyStr ? `${d.warrantyStr} remaining` : "Active", c: "bg-[#2563EB]" },
+                    basic.date ? { d: basic.date, t: "Basic warranty expires", s: "Bumper-to-bumper ends", c: "bg-slate-400" } : null,
+                    pt.date ? { d: pt.date, t: "Powertrain expires", s: "Powertrain coverage ends", c: "bg-slate-400" } : null,
+                  ].filter(Boolean) as { d: string; t: string; s: string; c: string }[]).map((e, i) => (
+                    <li key={i} className="relative"><span className={`absolute -left-[22px] top-1 w-3 h-3 rounded-full ${e.c} ring-2 ring-white`} /><p className="text-[12px] font-bold">{e.d} · {e.t}</p><p className="text-[11px] text-[#64748B]">{e.s}</p></li>
+                  ))}
+                </ol>
+              </Section>
+              <Section title="FAQ"><div className="space-y-2">{faqs.map((f) => <Faq key={f.q} q={f.q} a={f.a} />)}</div></Section>
             </>
           ) : <Empty>Warranty coverage details are confirmed at the dealership for this vehicle.</Empty>}
           <Disclaimer />
@@ -492,22 +578,63 @@ function buildPanel(key: PassportPanelKey, d: PassportData, listing: VehicleList
 
     case "owner-reviews": {
       const sources = d.dealerTrust.reviewSources;
+      const ks = listing.key_specs || {};
+      const rating = d.reviewRating;
+      const label = rating == null ? "" : rating >= 4.5 ? "Excellent" : rating >= 4 ? "Very Good" : rating >= 3 ? "Good" : "Mixed";
+      const sourceNames = Array.from(new Set(sources.map((s) => s.name))).slice(0, 4);
+      // Per-category breakdown, sentiment, and themes are not in our data model;
+      // they only render behind the SAMPLE PREVIEW banner so we never invent reviews.
+      const breakdown = isPreview ? [
+        { k: "Reliability", v: 4.8 }, { k: "Comfort", v: 4.9 }, { k: "Performance", v: 4.6 },
+        { k: "Technology", v: 4.5 }, { k: "Fuel Economy", v: 4.3 }, { k: "Interior", v: 4.8 },
+        { k: "Safety", v: 4.9 }, { k: "Value", v: 4.6 },
+      ] : [];
+      const loves = isPreview ? ["Ride quality", "Quiet cabin", "Safety features", "Fuel economy"] : [];
+      const mentions = isPreview ? ["Limited cargo behind third row", "Infotainment learning curve"] : [];
+      const themes = isPreview ? ["Reliable", "Family Friendly", "Comfortable", "Excellent Value", "Strong Resale", "Quiet Ride"] : [];
+      const seats = Number((listing.mc_attributes as Record<string, unknown> | null)?.seating) || null;
+      const recs: string[] = [];
+      if (seats && seats >= 6) { recs.push("Families"); recs.push("Road Trips"); }
+      if (Number(ks.mpg_hwy) >= 28) recs.push("Commuters");
+      if (/luxe|autograph|limited|platinum|premium|touring|signature|reserve|titanium|sensory|denali/i.test(listing.trim || "")) recs.push("Luxury Buyers");
+      if (/awd|4wd|4x4/i.test(String(ks.drivetrain || ""))) recs.push("All-Weather Driving");
+      const recsU = Array.from(new Set(recs));
       return {
-        title: "What Owners Say", subtitle: "Verified dealership reviews",
-        primary: { label: "Check Availability", onClick: () => go("check-availability") },
+        title: "What Owners Say", subtitle: "Real owner feedback from trusted automotive sources",
+        primary: { label: "Reserve This Vehicle", onClick: () => go("reserve") },
         secondary: { label: "Read all reviews", onClick: () => go("owner-reviews") },
+        footerQuestion: "Have questions about ownership?",
         body: <>
-          {d.reviewRating != null ? (
+          {rating != null ? (
             <div className={`${CARD} p-5 flex items-center gap-4`}>
-              <div className="text-center shrink-0"><p className="text-[34px] font-extrabold text-[#2563EB] leading-none">{d.reviewRating.toFixed(1)}</p><div className="mt-1"><Stars n={d.reviewRating} /></div>{d.reviewCount != null && <p className="text-[11px] text-[#64748B] mt-1">{d.reviewCount.toLocaleString()} reviews</p>}</div>
-              <div className="min-w-0"><p className="text-[14px] font-bold">{d.dealerName}</p><p className="text-[12px] text-[#64748B] mt-0.5">Aggregated from connected review sources. AutoLabels does not edit or filter reviews.</p></div>
+              <div className="text-center shrink-0"><p className="text-[34px] font-extrabold text-[#2563EB] leading-none">{rating.toFixed(1)}</p><div className="mt-1"><Stars n={rating} /></div>{d.reviewCount != null && <p className="text-[11px] text-[#64748B] mt-1">{d.reviewCount.toLocaleString()} reviews</p>}</div>
+              <div className="min-w-0"><p className="text-[15px] font-extrabold text-[#16A34A]">{label}</p>{sourceNames.length > 0 && <p className="text-[12px] text-[#64748B] mt-0.5">Based on {sourceNames.join(", ")}</p>}<p className="text-[11px] text-[#94A3B8] mt-1">AutoLabels aggregates reviews and does not edit or filter them.</p></div>
             </div>
-          ) : <Empty>Verified dealership reviews appear here once the dealer connects a review source.</Empty>}
+          ) : <Empty>Verified owner reviews appear here once the dealer connects a review source. AutoLabels never fabricates customer reviews.</Empty>}
+          {breakdown.length > 0 && (
+            <Section title="Rating breakdown"><div className={`${CARD} p-4 space-y-2.5`}>{breakdown.map((b) => <RatingBar key={b.k} label={b.k} score={b.v} />)}</div></Section>
+          )}
+          {(loves.length > 0 || mentions.length > 0) && (
+            <Section title="Customer sentiment">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {loves.length > 0 && <div className={`${CARD} p-4`}><p className="text-[12px] font-bold text-[#16A34A] mb-2">Owners love</p><ul className="space-y-1.5">{loves.map((t) => <Check key={t}>{t}</Check>)}</ul></div>}
+                {mentions.length > 0 && <div className={`${CARD} p-4`}><p className="text-[12px] font-bold text-[#EA580C] mb-2">Owners mention</p><ul className="space-y-1.5">{mentions.map((t) => <Check key={t} tone="orange">{t}</Check>)}</ul></div>}
+              </div>
+            </Section>
+          )}
           {sources.length > 0 && (
-            <Section title="From recent reviews">
+            <Section title="Featured reviews">
               <div className="space-y-3">{sources.map((r, i) => (
                 <div key={i} className={`${CARD} p-4`}><div className="flex items-center gap-2"><span className="text-[13px] font-bold">{r.name}</span>{r.rating != null && <Stars n={r.rating} size={13} />}</div>{r.quote && <p className="text-[13px] text-[#64748B] leading-snug mt-1">"{r.quote}"</p>}</div>
               ))}</div>
+            </Section>
+          )}
+          {themes.length > 0 && (
+            <Section title="Common owner themes"><div className="flex flex-wrap gap-2">{themes.map((t) => <Chip key={t}>{t}</Chip>)}</div></Section>
+          )}
+          {recsU.length > 0 && (
+            <Section title="Well suited for" sub="Based on this vehicle's configuration.">
+              <div className="rounded-2xl border border-emerald-200 bg-emerald-50/70 p-4 flex flex-wrap gap-2">{recsU.map((r) => <Chip key={r}>{r}</Chip>)}</div>
             </Section>
           )}
           <Disclaimer />
@@ -517,20 +644,75 @@ function buildPanel(key: PassportPanelKey, d: PassportData, listing: VehicleList
 
     case "highlights": {
       const hs = d.highlights;
+      const ks = listing.key_specs || {};
+      const featLabels = (listing.features || []).map((f) => [f.title, f.subtitle].filter(Boolean).join(" ").trim()).filter(Boolean);
+      const groups: Record<string, string[]> = {};
+      const push = (cat: string, label: string) => { if (!label) return; (groups[cat] ||= []); if (!groups[cat].includes(label)) groups[cat].push(label); };
+      featLabels.forEach((l) => push(categorizeFeature(l), l));
+      if (ks.engine) push("Performance", String(ks.engine));
+      if ((listing.mc_attributes as Record<string, unknown> | null)?.horsepower) push("Performance", `${(listing.mc_attributes as Record<string, unknown>).horsepower} hp`);
+      if (ks.transmission) push("Performance", String(ks.transmission));
+      if (ks.drivetrain) push("Performance", String(ks.drivetrain));
+      if (ks.mpg_city && ks.mpg_hwy) push("Performance", `${ks.mpg_city}/${ks.mpg_hwy} MPG`);
+      if (ks.exterior_color) push("Exterior", `${ks.exterior_color} exterior`);
+      if (ks.interior_color) push("Interior", `${ks.interior_color} interior`);
+      if ((listing.mc_attributes as Record<string, unknown> | null)?.seating) push("Interior", `${(listing.mc_attributes as Record<string, unknown>).seating}-passenger seating`);
+      const orderedGroups = CATEGORY_ORDER.map((name) => [name, groups[name]] as const).filter(([, items]) => items && items.length);
+      const reasons: string[] = [];
+      if (groups.Safety?.length) reasons.push("Advanced safety technology");
+      if (groups.Comfort?.length) reasons.push("Premium comfort and convenience");
+      if (groups.Technology?.length) reasons.push("Modern technology and connectivity");
+      if (/awd|4wd|4x4/i.test(String(ks.drivetrain || ""))) reasons.push("Confident all-weather capability");
+      if (/luxe|autograph|limited|platinum|premium|touring|signature|reserve|titanium|sensory|denali/i.test(listing.trim || "")) reasons.push("Luxury-grade appointments");
+      if (isGreat) reasons.push("Exceptional value versus the market");
+      const accessories = (listing.available_accessories || []).map((a) => a.name).filter(Boolean) as string[];
+      const hasContent = featLabels.length > 0 || orderedGroups.length > 0 || hs.length > 0;
       return {
-        title: "Vehicle Highlights", subtitle: "Standout equipment and features",
-        primary: { label: "Check Availability", onClick: () => go("check-availability") },
+        title: "Vehicle Highlights", subtitle: "Explore the most important features and equipment",
+        primary: { label: "Reserve This Vehicle", onClick: () => go("reserve") },
         secondary: { label: "View key specifications", onClick: () => openPanel("key-specs") },
+        footerQuestion: "Questions about features?", specialistLabel: "Talk to a Product Specialist",
         body: <>
-          {hs.length ? (
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">{hs.map((h) => (
-              <div key={h.key} className={`${CARD} p-4 flex flex-col items-center text-center gap-1.5`}>
-                <span className="w-10 h-10 rounded-xl bg-blue-50 flex items-center justify-center"><Award className="w-5 h-5 text-[#2563EB]" /></span>
-                <p className="text-[12px] font-bold leading-tight">{h.label}</p>
-                <p className="text-[10px] text-[#94A3B8]">{h.sub}</p>
+          {hasContent ? (
+            <>
+              <div className="rounded-2xl overflow-hidden border border-[#E6E8EC] relative">
+                {listing.hero_image_url ? <img src={listing.hero_image_url} alt="" className="w-full aspect-[16/9] object-cover" /> : <div className="w-full aspect-[16/9] bg-[#1f2227] flex items-center justify-center"><Car className="w-12 h-12 text-slate-500" /></div>}
+                <div className="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent flex flex-col justify-end p-5">
+                  <p className="text-white text-[18px] font-extrabold leading-tight">Premium Equipment</p>
+                  <p className="text-white/85 text-[12px]">Everything that makes this vehicle stand out.</p>
+                </div>
               </div>
-            ))}</div>
-          ) : <Empty>Equipment highlights appear here as the vehicle's data is decoded.</Empty>}
+              {hs.length > 0 && (
+                <Section title="Feature gallery">
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">{hs.map((h) => (
+                    <div key={h.key} className={`${CARD} p-4 flex flex-col items-center text-center gap-1.5`}>
+                      <span className="w-10 h-10 rounded-xl bg-blue-50 flex items-center justify-center"><Award className="w-5 h-5 text-[#2563EB]" /></span>
+                      <p className="text-[12px] font-bold leading-tight">{h.label}</p>
+                      <p className="text-[10px] text-[#94A3B8]">{h.sub}</p>
+                    </div>
+                  ))}</div>
+                </Section>
+              )}
+              {orderedGroups.length > 0 && (
+                <Section title="Features by category">
+                  <div className="space-y-2">{orderedGroups.map(([name, items], i) => <Group key={name} title={name} items={items!} defaultOpen={i === 0} />)}</div>
+                </Section>
+              )}
+              {reasons.length > 0 && (
+                <Section title="Top reasons customers love this vehicle">
+                  <div className={`${CARD} p-4`}><ul className="space-y-2">{reasons.map((r) => <Check key={r}>{r}</Check>)}</ul></div>
+                </Section>
+              )}
+              {(featLabels.length > 0 || accessories.length > 0) && (
+                <Section title="Equipment & options">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    {featLabels.length > 0 && <div className={`${CARD} p-4`}><p className="text-[12px] font-bold mb-2">On this vehicle <span className="text-[#94A3B8] font-semibold">{featLabels.length}</span></p><ul className="space-y-1.5">{featLabels.slice(0, 10).map((f) => <Check key={f}>{f}</Check>)}</ul></div>}
+                    {accessories.length > 0 && <div className={`${CARD} p-4`}><p className="text-[12px] font-bold mb-2">Available add-ons <span className="text-[#94A3B8] font-semibold">{accessories.length}</span></p><ul className="space-y-1.5">{accessories.slice(0, 10).map((a) => <li key={a} className="flex items-start gap-2 text-[13px] text-[#0F172A]"><Package className="w-3.5 h-3.5 text-[#2563EB] shrink-0 mt-0.5" />{a}</li>)}</ul></div>}
+                  </div>
+                </Section>
+              )}
+            </>
+          ) : <Empty>Equipment highlights appear here as the vehicle's data is decoded from its VIN.</Empty>}
           <Disclaimer />
         </>,
       };
@@ -760,6 +942,43 @@ function InventoryTrendChart({ isPreview }: { isPreview: boolean }) {
   );
 }
 
+const RatingBar = ({ label, score }: { label: string; score: number }) => (
+  <div className="flex items-center gap-3">
+    <span className="text-[12px] text-[#0F172A] w-24 shrink-0">{label}</span>
+    <div className="flex-1 h-2 rounded-full bg-slate-100 overflow-hidden"><div className="h-full rounded-full bg-[#16A34A]" style={{ width: `${(score / 5) * 100}%` }} /></div>
+    <span className="text-[12px] font-semibold w-8 text-right">{score.toFixed(1)}</span>
+  </div>
+);
+
+const Chip = ({ children }: { children: React.ReactNode }) => (
+  <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-[#0F172A] bg-slate-100 rounded-full px-2.5 py-1">{children}</span>
+);
+
+const Group = ({ title, items, defaultOpen }: { title: string; items: string[]; defaultOpen?: boolean }) => (
+  <details className={`${CARD} overflow-hidden group`} open={defaultOpen}>
+    <summary className="cursor-pointer list-none flex items-center justify-between gap-3 px-4 py-3 text-[13px] font-bold text-[#0F172A]">
+      <span className="inline-flex items-center gap-2">{title} <span className="text-[11px] font-semibold text-[#94A3B8]">{items.length}</span></span>
+      <ChevronDown className="w-4 h-4 text-[#94A3B8] group-open:rotate-180 transition-transform shrink-0" />
+    </summary>
+    <div className="px-4 pb-3 grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1.5">
+      {items.map((it) => <div key={it} className="flex items-start gap-2 text-[12px] text-[#334155]"><CheckCircle2 className="w-3.5 h-3.5 text-[#16A34A] shrink-0 mt-0.5" />{it}</div>)}
+    </div>
+  </details>
+);
+
+// Bucket equipment strings into shopper-facing categories by keyword. Only
+// real features/specs are placed; unmatched items fall to "Additional".
+const FEATURE_CATS: { name: string; re: RegExp }[] = [
+  { name: "Performance", re: /engine|turbo|horsepower|\bhp\b|cylinder|transmission|drivetrain|awd|4wd|4x4|tow|mpg|fuel|hybrid|electric|sport|paddle/i },
+  { name: "Safety", re: /cruise|blind.?spot|lane|camera|cross.?traffic|parking sensor|emergency brak|collision|airbag|assist|360|safety/i },
+  { name: "Technology", re: /navigation|\bnav\b|carplay|android|wireless|wi-?fi|bluetooth|audio|bose|harman|sound|head.?up|\bhud\b|display|screen|usb|charging|digital cluster|infotainment|connect/i },
+  { name: "Comfort", re: /leather|heated|ventilated|cooled|memory|climate|third row|3rd row|massage|lumbar|recline|quiet|comfort|moonroof|panoramic/i },
+  { name: "Exterior", re: /\bled\b|light|sunroof|liftgate|wheel|roof rail|trailer|alloy|spoiler|chrome/i },
+  { name: "Interior", re: /seat|cargo|ambient|cluster|trim|console|storage|capacity|upholstery|cup ?holder/i },
+];
+const CATEGORY_ORDER = ["Performance", "Comfort", "Technology", "Safety", "Exterior", "Interior", "Additional"];
+const categorizeFeature = (label: string) => FEATURE_CATS.find((c) => c.re.test(label))?.name ?? "Additional";
+
 const Meter = ({ label, value, unit, pct }: { label: string; value: string; unit: string; pct: number }) => (
   <div>
     <div className="flex justify-between text-[12px]"><span className="text-[#64748B]">{label}</span><span className="font-bold">{value} <span className="text-[#94A3B8] font-medium">{unit}</span></span></div>
@@ -804,8 +1023,8 @@ export default function PassportPanel({ panel, onClose, openPanel, d, listing, i
   const footer = (def.primary || def.secondary) ? (
     <div className="flex flex-col sm:flex-row sm:items-center gap-3">
       <div className="min-w-0 flex-1">
-        <p className="text-[13px] font-semibold text-[#0F172A] leading-tight">Questions about this vehicle?</p>
-        <button onClick={() => go("contact")} className="mt-0.5 text-[12px] font-semibold text-[#2563EB] inline-flex items-center gap-1.5 hover:underline"><MessageSquare className="w-3.5 h-3.5" /> Talk to a Vehicle Specialist</button>
+        <p className="text-[13px] font-semibold text-[#0F172A] leading-tight">{def.footerQuestion ?? "Questions about this vehicle?"}</p>
+        <button onClick={() => go("contact")} className="mt-0.5 text-[12px] font-semibold text-[#2563EB] inline-flex items-center gap-1.5 hover:underline"><MessageSquare className="w-3.5 h-3.5" /> {def.specialistLabel ?? "Talk to a Vehicle Specialist"}</button>
       </div>
       <div className="shrink-0 flex items-center gap-2">
         {def.secondary && <button onClick={def.secondary.onClick} className="h-11 px-4 rounded-xl border border-[#E6E8EC] bg-white text-[13px] font-semibold text-[#0F172A] hover:border-[#2563EB] transition-colors">{def.secondary.label}</button>}
