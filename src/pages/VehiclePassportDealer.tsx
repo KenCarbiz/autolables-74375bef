@@ -12,6 +12,7 @@ import Logo from "@/components/brand/Logo";
 import { derivePassport } from "@/lib/passportV2Data";
 import { MOCK_LISTING } from "./VehiclePassportV3";
 import { InfoModal, Para, Callout } from "@/components/passport/InfoModal";
+import PassportCtaDock from "@/components/passport/PassportCtaDock";
 
 // ──────────────────────────────────────────────────────────────
 // VehiclePassportDealer — /passport-v3/:vehicleSlug/dealer
@@ -307,6 +308,8 @@ const VehiclePassportDealer = () => {
         <Para>{award} is a recognition this dealership has earned. Awards and certifications reflect performance in areas such as customer satisfaction, sales, or service excellence.</Para>
         <Callout>For the specific criteria and the period this recognition covers, ask the dealership directly.</Callout>
       </InfoModal>
+
+      <PassportCtaDock go={go} dealerPhone={d.dealerPhone || undefined} reviewRating={d.reviewRating} advisor={d.dealerTrust} />
     </div>
   );
 };

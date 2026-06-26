@@ -11,6 +11,7 @@ import { type VehicleListing } from "@/hooks/useVehicleListing";
 import Logo from "@/components/brand/Logo";
 import { derivePassport, fmt$ } from "@/lib/passportV2Data";
 import { MOCK_LISTING } from "./VehiclePassportV3";
+import PassportCtaDock from "@/components/passport/PassportCtaDock";
 
 // ──────────────────────────────────────────────────────────────
 // VehiclePassportGreatBuy — /passport-v3/:vehicleSlug/great-buy
@@ -365,6 +366,8 @@ const VehiclePassportGreatBuy = () => {
           <p className="text-[11px] text-[#94A3B8] mt-0.5 inline-flex items-center gap-1 justify-center"><Sparkles className="w-3 h-3 text-[#2563EB]" /> Powered by AutoLabels AI</p>
         </footer>
       </main>
+
+      <PassportCtaDock go={go} dealerPhone={d.dealerPhone || undefined} reviewRating={d.reviewRating} advisor={d.dealerTrust} />
     </div>
   );
 };
