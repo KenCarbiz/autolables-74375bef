@@ -476,10 +476,108 @@ function buildPanel(key: PassportPanelKey, d: PassportData, listing: VehicleList
         return { date: new Date(h.captured_at).toLocaleDateString(), before: prev, after: cur, delta: cur - prev };
       }).filter((e) => e.delta !== 0).reverse();
       const pctDiff = avg != null && price != null ? Math.round(((price - avg) / avg) * 100) : null;
+      const originalPrice = priced.length ? (priced[0].listing_price as number) : null;
+      const reductions = events.filter((e) => e.delta < 0).length;
+      const savings = total != null && total < 0 ? -total : (d.belowMarket && d.belowMarket > 0 ? d.belowMarket : null);
+      const trendPct = total != null && originalPrice ? Math.round((total / originalPrice) * 1000) / 10 : null;
+      const marketDiff = price != null && avg != null ? price - avg : null;
+      const phPercentile = (mc.price_percentile as number) ?? null;
+      const posLabel = phPercentile != null ? `Top ${Math.max(1, 100 - phPercentile)}% best priced` : isPreview ? "Top 15% best priced similar vehicles" : "Priced below the market average";
+      const goodTime = isGreat || (total != null && total < 0);
       return {
         title: "Price History", subtitle: "See how this vehicle's price has changed over time",
         primary: { label: "Reserve This Vehicle", onClick: () => go("reserve") },
         body: <>
+          {/* ── Mobile (<768px) — premium pricing-intelligence dashboard ── */}
+          <div className="md:hidden space-y-4">
+            <div className="rounded-2xl p-5 text-white" style={{ background: "linear-gradient(160deg,#0f7a3d 0%,#16A34A 100%)" }}>
+              <div className="flex items-center gap-3">
+                <span className="w-12 h-12 rounded-2xl bg-white/15 flex items-center justify-center shrink-0"><TrendingDown className="w-6 h-6" /></span>
+                <div><p className="text-[13px] font-bold uppercase tracking-wider opacity-95">{trendLabel}</p><p className="text-[26px] font-extrabold leading-tight">{savings != null ? fmt$(savings) : price != null ? fmt$(price) : "—"}</p><p className="text-[12px] opacity-90">{d.belowMarket && d.belowMarket > 0 ? "Below market" : savings != null ? "Reduced since listed" : "Current price"}</p></div>
+              </div>
+              <p className="text-[13px] opacity-90 mt-3 leading-snug">{total != null && total < 0 && d.belowMarket && d.belowMarket > 0 ? "This vehicle has been reduced and is currently priced below market value." : total != null && total < 0 ? "This vehicle's asking price has been reduced since it was listed." : "Every price adjustment is recorded for full transparency."}</p>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div className={`${CARD} p-4`}><p className="text-[20px] font-extrabold leading-none">{price != null ? fmt$(price) : "—"}</p><p className="text-[11px] text-[#94A3B8] mt-1">Current Price</p></div>
+              <div className={`${CARD} p-4`}><p className="text-[20px] font-extrabold leading-none text-[#94A3B8]">{originalPrice != null ? fmt$(originalPrice) : "—"}</p><p className="text-[11px] text-[#94A3B8] mt-1">Original Price</p></div>
+              <div className={`${CARD} p-4`}><p className="text-[20px] font-extrabold leading-none">{reductions || (has ? "0" : "—")}</p><p className="text-[11px] text-[#94A3B8] mt-1">Price Reductions</p></div>
+              <div className={`${CARD} p-4`}><p className="text-[20px] font-extrabold leading-none text-[#16A34A]">{savings != null ? fmt$(savings) : "—"}</p><p className="text-[11px] text-[#94A3B8] mt-1">Total Savings</p></div>
+            </div>
+
+            {has ? (
+              <>
+                <Section title="Price trend"><PriceTimeline history={priced} /></Section>
+                {trendPct != null && (
+                  <div className={`${CARD} p-4`}>
+                    <p className="text-[12px] text-[#64748B]">Price Trend</p>
+                    <p className={`text-[18px] font-extrabold inline-flex items-center gap-1.5 ${trendPct <= 0 ? "text-[#16A34A]" : "text-[#EA580C]"}`}>{trendPct <= 0 ? <TrendingDown className="w-4 h-4" /> : <TrendingUp className="w-4 h-4" />} {trendPct <= 0 ? "Down" : "Up"} {Math.abs(trendPct)}%</p>
+                    <p className="text-[12px] text-[#64748B] mt-1 leading-snug">This vehicle's price has {trendPct <= 0 ? "decreased" : "increased"} while the market average stayed relatively stable.</p>
+                  </div>
+                )}
+                <Section title="Price change timeline">
+                  {events.length ? (
+                    <ol className="relative border-l-2 border-emerald-100 ml-1.5 pl-4 space-y-4">{events.map((e, i) => (
+                      <li key={i} className="relative">
+                        <span className={`absolute -left-[22px] top-1 w-3 h-3 rounded-full ring-2 ring-white ${e.delta < 0 ? "bg-emerald-500" : "bg-orange-500"}`} />
+                        <p className="text-[12px] text-[#94A3B8]">{e.date}</p>
+                        <p className={`text-[15px] font-extrabold inline-flex items-center gap-1.5 ${e.delta < 0 ? "text-[#16A34A]" : "text-[#EA580C]"}`}>{e.delta < 0 ? <TrendingDown className="w-4 h-4" /> : <TrendingUp className="w-4 h-4" />} {e.delta < 0 ? "Price Reduced" : "Price Increased"} {e.delta < 0 ? "-" : "+"}{fmt$(Math.abs(e.delta))}</p>
+                        {i === 0 && <p className="text-[12px] text-[#64748B] mt-0.5">Current price {fmt$(e.after)}</p>}
+                      </li>
+                    ))}</ol>
+                  ) : <Empty>No price changes recorded yet — the asking price has held steady.</Empty>}
+                </Section>
+              </>
+            ) : <Empty>Price history will appear here once the asking price has been tracked over time.</Empty>}
+
+            {pctDiff != null && (
+              <Section title="Market comparison">
+                <div className={`${CARD} divide-y divide-[#F1F5F9]`}>
+                  <div className="flex items-center justify-between px-4 py-3"><span className="text-[12px] text-[#64748B]">Market Average</span><span className="text-[15px] font-extrabold">{fmt$(avg)}</span></div>
+                  <div className="flex items-center justify-between px-4 py-3"><span className="text-[12px] text-[#64748B]">Current Vehicle</span><span className="text-[15px] font-extrabold">{fmt$(price)}</span></div>
+                </div>
+                <div className={`mt-2 rounded-2xl border p-4 flex items-center justify-between ${pctDiff <= 0 ? "border-emerald-200 bg-emerald-50/70" : "border-orange-200 bg-orange-50/70"}`}>
+                  <span className="text-[13px] font-bold text-[#0F172A]">Difference</span>
+                  <span className={`text-[14px] font-extrabold ${pctDiff <= 0 ? "text-[#16A34A]" : "text-[#EA580C]"}`}>{marketDiff != null ? `${marketDiff < 0 ? "-" : "+"}${fmt$(Math.abs(marketDiff))}` : ""} · {Math.abs(pctDiff)}% {pctDiff <= 0 ? "Below" : "Above"} Market</span>
+                </div>
+              </Section>
+            )}
+
+            {isGreat && (
+              <Section title="Market position">
+                <div className={`${CARD} p-4 flex items-center gap-3`}>
+                  <span className="w-11 h-11 rounded-2xl bg-emerald-50 flex items-center justify-center shrink-0"><Award className="w-6 h-6 text-[#16A34A]" /></span>
+                  <div><p className="text-[15px] font-extrabold text-[#16A34A]">Excellent Value</p><p className="text-[12px] text-[#64748B]">{posLabel}</p></div>
+                </div>
+              </Section>
+            )}
+
+            <div className="rounded-2xl p-5 text-white" style={{ background: "linear-gradient(160deg,#0f7a3d 0%,#16A34A 100%)" }}>
+              <p className="text-[18px] font-extrabold inline-flex items-center gap-2"><CheckCircle2 className="w-6 h-6" /> {goodTime ? "Excellent Time To Purchase" : "Worth A Closer Look"}</p>
+              <ul className="mt-2.5 space-y-1.5">
+                {isGreat && <li className="flex items-start gap-2 text-[13px]"><CheckCircle2 className="w-4 h-4 shrink-0 mt-0.5" />Below market average</li>}
+                {total != null && total < 0 && <li className="flex items-start gap-2 text-[13px]"><CheckCircle2 className="w-4 h-4 shrink-0 mt-0.5" />Recent price reductions</li>}
+                {goodTime && <li className="flex items-start gap-2 text-[13px]"><CheckCircle2 className="w-4 h-4 shrink-0 mt-0.5" />Strong negotiating position</li>}
+                <li className="flex items-start gap-2 text-[13px]"><CheckCircle2 className="w-4 h-4 shrink-0 mt-0.5" />Competitive market pricing</li>
+              </ul>
+            </div>
+
+            <Section title="Should you buy now?">
+              <div className={`${CARD} p-4`}>
+                <p className={`text-[22px] font-extrabold ${goodTime ? "text-[#16A34A]" : "text-[#0F172A]"}`}>{goodTime ? "Yes." : "Maybe."}</p>
+                <p className="text-[13px] text-[#64748B] mt-1 leading-snug">{goodTime ? "Based on current pricing and recent reductions, this vehicle is a strong buying opportunity. Waiting may reduce available inventory with little added pricing advantage." : "The pricing is reasonable — compare it against similar listings before deciding."}</p>
+              </div>
+            </Section>
+
+            <div className={`${CARD} p-4 flex items-start gap-2.5`}>
+              <ShieldCheck className="w-5 h-5 text-[#16A34A] shrink-0 mt-0.5" />
+              <div><p className="text-[13px] font-bold">Transparent Pricing</p><p className="text-[12px] text-[#64748B]">Every price adjustment is recorded and shown here for complete pricing transparency.</p></div>
+            </div>
+            <Disclaimer />
+          </div>
+
+          {/* ── Desktop / tablet (≥768px) — unchanged ── */}
+          <div className="hidden md:block space-y-5">
           <Hero icon={Clock} tone={total != null && total < 0 ? "green" : "neutral"} label={trendLabel}
             value={price != null ? fmt$(price) : undefined}
             note={total != null && total !== 0 ? `${total < 0 ? "Down" : "Up"} ${fmt$(Math.abs(total))} since listed` : recent != null && recent !== 0 ? `${recent < 0 ? "Down" : "Up"} ${fmt$(Math.abs(recent))} in 7 days` : "Each price change is recorded here."} />
@@ -526,6 +624,7 @@ function buildPanel(key: PassportPanelKey, d: PassportData, listing: VehicleList
             </div>
           </Section>
           <Disclaimer />
+          </div>
         </>,
       };
     }
