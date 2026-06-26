@@ -57,6 +57,7 @@ const BuyersGuide = lazy(() => import("./pages/BuyersGuide"));
 const MobileSigning = lazy(() => import("./pages/MobileSigning"));
 const CustomerReview = lazy(() => import("./pages/CustomerReview"));
 const InstallerProof = lazy(() => import("./pages/InstallerProof"));
+const ServiceSignoff = lazy(() => import("./pages/ServiceSignoff"));
 const SigningLookup = lazy(() => import("./pages/SigningLookup"));
 const Onboarding = lazy(() => import("./pages/Onboarding"));
 const TradeUpSticker = lazy(() => import("./pages/TradeUpSticker"));
@@ -167,6 +168,7 @@ const App = () => (
                       <Route path="/sign/:token" element={<MobileSigning />} />
                       <Route path="/review/:token" element={<CustomerReview />} />
                       <Route path="/install/:token" element={<InstallerProof />} />
+                      <Route path="/inspect/:token" element={<ServiceSignoff />} />
                       <Route path="/lookup" element={<SigningLookup />} />
                       <Route path="/onboarding" element={<Onboarding />} />
                       <Route path="/scan" element={<ScanPage />} />
