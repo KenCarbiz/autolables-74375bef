@@ -224,6 +224,7 @@ const VehiclePassportV3 = () => {
   ].filter(Boolean) as { v: string; l: string; star?: boolean }[];
 
   const price = d.price;
+  const adv = d.dealerTrust;
 
   return (
     <div className="min-h-screen bg-[#F6F7F9] text-[#0F172A]" style={{ fontFamily: "Inter, -apple-system, BlinkMacSystemFont, sans-serif" }}>
@@ -503,6 +504,37 @@ const VehiclePassportV3 = () => {
               <b.i className={`w-4 h-4 ${b.primary ? "" : "text-[#2563EB]"}`} /> {b.l}
             </button>
           ))}
+        </div>
+      </div>
+
+      {/* Desktop sticky CTA — fixed overlay in the right-margin whitespace,
+          outside the content grid so it never reflows or covers page content.
+          Only shown on very wide viewports where that margin actually exists
+          (≈2000px+); hidden otherwise so it can't overlap the centered page. */}
+      <div className="hidden min-[2000px]:block fixed right-6 top-1/2 -translate-y-1/2 w-[330px] z-30">
+        <div className="rounded-2xl p-6 text-white shadow-[0_20px_50px_rgba(37,99,235,0.30)]" style={{ background: "linear-gradient(160deg,#2563EB 0%,#1e50c8 100%)" }}>
+          <h2 className="text-[22px] font-extrabold leading-tight text-center">Ready to take the next step?</h2>
+          <p className="text-[13px] opacity-90 text-center mt-1">Choose the option that works best for you.</p>
+          <button onClick={() => go("reserve")} className="mt-5 w-full rounded-xl bg-white text-[#2563EB] px-4 py-3.5 flex items-center justify-center gap-2 shadow-sm transition-transform hover:-translate-y-0.5"><ShieldCheck className="w-5 h-5" /><span className="text-left"><span className="block text-[15px] font-extrabold leading-tight">Reserve This Vehicle</span><span className="block text-[11px] font-medium text-[#2563EB]/70">Secure it today with a refundable deposit.</span></span></button>
+          <button onClick={() => go("trade")} className="mt-3 w-full rounded-xl bg-white/10 border border-white/40 text-white px-4 py-3.5 flex items-center justify-center gap-2 transition-colors hover:bg-white/20"><RefreshCw className="w-5 h-5" /><span className="text-left"><span className="block text-[14px] font-extrabold leading-tight">Get a Trade Appraisal</span><span className="block text-[11px] font-medium opacity-80">Know your trade value in minutes.</span></span></button>
+          <div className="mt-6 pt-5 border-t border-white/20">
+            <p className="text-[11px] font-semibold uppercase tracking-wider opacity-70 text-center mb-3">Questions? Let's talk.</p>
+            {adv.advisorName ? (
+              <>
+                <div className="flex items-center gap-3">
+                  {adv.advisorPhoto ? <img src={adv.advisorPhoto} alt={adv.advisorName} className="w-12 h-12 rounded-full object-cover ring-2 ring-white/40 shrink-0" /> : <span className="w-12 h-12 rounded-full bg-white/15 flex items-center justify-center shrink-0"><Users className="w-5 h-5" /></span>}
+                  <div className="min-w-0 flex-1"><p className="text-[14px] font-bold leading-tight">{adv.advisorName}</p>{adv.advisorTitle && <p className="text-[11px] opacity-80 leading-tight">{adv.advisorTitle}</p>}{d.reviewRating != null && <div className="mt-0.5"><Stars n={d.reviewRating} size={12} /></div>}</div>
+                </div>
+                {adv.advisorResponse && <p className="text-[11px] opacity-80 mt-2">{adv.advisorResponse}</p>}
+              </>
+            ) : (
+              <div className="flex items-center gap-3"><span className="w-11 h-11 rounded-full bg-white/15 flex items-center justify-center shrink-0"><Users className="w-5 h-5" /></span><div className="min-w-0 flex-1"><p className="text-[13px] font-bold leading-tight">Our specialists are here to help.</p><p className="text-[11px] opacity-80">No pressure. Real people.</p></div></div>
+            )}
+            <div className="grid grid-cols-2 gap-2 mt-3">
+              {d.dealerPhone ? <a href={`tel:${d.dealerPhone}`} className="h-9 rounded-lg bg-white/15 border border-white/40 text-[12px] font-bold inline-flex items-center justify-center gap-1 transition-colors hover:bg-white/25"><Phone className="w-3.5 h-3.5" /> {adv.advisorName ? `Call ${adv.advisorName.split(" ")[0]}` : "Call Sales"}</a> : <button onClick={() => go("contact")} className="h-9 rounded-lg bg-white/15 border border-white/40 text-[12px] font-bold inline-flex items-center justify-center gap-1"><Phone className="w-3.5 h-3.5" /> Call Sales</button>}
+              <button onClick={() => go("contact")} className="h-9 rounded-lg bg-white/15 border border-white/40 text-[12px] font-bold inline-flex items-center justify-center gap-1 transition-colors hover:bg-white/25"><MessageSquare className="w-3.5 h-3.5" /> {adv.advisorName ? `Message ${adv.advisorName.split(" ")[0]}` : "Contact"}</button>
+            </div>
+          </div>
         </div>
       </div>
     </div>
