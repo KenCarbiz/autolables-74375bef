@@ -13,7 +13,8 @@ type TrustKey =
   | "dealer_storefront_url" | "dealer_review_sources"
   | "dealer_advisor_name" | "dealer_advisor_title" | "dealer_advisor_photo" | "dealer_advisor_response"
   | "dealer_family_owned" | "dealer_service_location" | "dealer_service_address" | "dealer_delivery"
-  | "dealer_financing" | "dealer_amenities" | "dealer_services" | "dealer_hours";
+  | "dealer_financing" | "dealer_amenities" | "dealer_services" | "dealer_hours"
+  | "mobile_slideout_cta_variant";
 
 const FIELDS: { key: TrustKey; label: string; placeholder: string; hint?: string; wide?: boolean }[] = [
   { key: "dealer_years_in_business", label: "Years in business", placeholder: "45" },
@@ -55,6 +56,7 @@ const DealershipTrustPanel = () => {
     dealer_amenities: settings.dealer_amenities || "",
     dealer_services: settings.dealer_services || "",
     dealer_hours: settings.dealer_hours || "",
+    mobile_slideout_cta_variant: settings.mobile_slideout_cta_variant || "dealer_availability",
   }));
   const [saving, setSaving] = useState(false);
 
@@ -142,6 +144,16 @@ const DealershipTrustPanel = () => {
           <div className="sm:col-span-2">
             <label className="text-[13px] font-semibold text-foreground">Hours</label>
             <input value={cfg.dealer_hours} onChange={(e) => set("dealer_hours", e.target.value)} placeholder="Mon–Sat 9–7, Sun closed" className="mt-1 w-full h-10 px-3 rounded-lg border border-border bg-background text-sm outline-none focus:border-primary" />
+          </div>
+          <div className="sm:col-span-2">
+            <label className="text-[13px] font-semibold text-foreground">Mobile Slide-Out CTA Style</label>
+            <select value={cfg.mobile_slideout_cta_variant} onChange={(e) => set("mobile_slideout_cta_variant", e.target.value)} className="mt-1 w-full h-10 px-3 rounded-lg border border-border bg-background text-sm outline-none focus:border-primary">
+              <option value="dealer_availability">Dealer Availability CTA — Default</option>
+              <option value="context_aware">Context-Aware CTA</option>
+              <option value="two_button">Two Button Layout</option>
+              <option value="progressive">Progressive CTA</option>
+            </select>
+            <p className="text-[11px] text-slate-400 mt-1">How the bottom action area appears inside mobile Passport slide-outs.</p>
           </div>
         </div>
       </div>

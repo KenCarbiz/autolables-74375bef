@@ -145,6 +145,7 @@ serve(async (req) => {
           amenities: (s.dealer_amenities as string) || "",
           services: (s.dealer_services as string) || "",
           hours: (s.dealer_hours as string) || "",
+          mobile_cta_variant: (s.mobile_slideout_cta_variant as string) || "",
         };
         if (Object.values(trust).some((v) => v)) row.dealer_trust = trust;
       }

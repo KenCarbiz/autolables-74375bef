@@ -225,6 +225,8 @@ export interface DealerSettings {
   dealer_amenities: string;           // comma-separated (e.g. "Customer lounge, Café, EV charging")
   dealer_services: string;            // comma-separated (e.g. "OEM parts, Warranty repairs, State inspection")
   dealer_hours: string;               // free text (e.g. "Mon–Sat 9–7, Sun closed")
+  // Mobile Passport slide-out footer CTA style (default: dealer_availability).
+  mobile_slideout_cta_variant: string; // "context_aware" | "two_button" | "dealer_availability" | "progressive"
 }
 
 export const DEFAULT_SETTINGS: DealerSettings = {
@@ -322,6 +324,7 @@ export const DEFAULT_SETTINGS: DealerSettings = {
   dealer_amenities: "",
   dealer_services: "",
   dealer_hours: "",
+  mobile_slideout_cta_variant: "dealer_availability",
 };
 
 interface DealerSettingsContextType {

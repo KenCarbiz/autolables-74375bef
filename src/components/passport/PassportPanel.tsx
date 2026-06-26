@@ -1568,6 +1568,72 @@ const MHero = ({ tone = "green", icon: Icon, eyebrow, title, note, ringPct, stat
   </div>
 );
 
+// ── Mobile slide-out footer CTA — dealer-configurable variant ──
+interface CtaSignals { greatPrice: boolean; highDemand: boolean; highConf: boolean; highlyRated: boolean; hasWarranty: boolean }
+interface CtaDef { badge: string; btn: string; sub: string; action: "reserve" | "protect"; tone: "green" | "orange" | "blue" }
+const ctaFor = (panelKey: string, s: CtaSignals): CtaDef => {
+  switch (panelKey) {
+    case "market-price": return { badge: s.greatPrice ? "Great Price Available Today" : "Vehicle Available Today", btn: s.greatPrice ? "Lock In This Price" : "Reserve This Vehicle", sub: s.greatPrice ? "This price is below market and ready to lock in." : "Secure this vehicle while it's still available.", action: "reserve", tone: s.greatPrice ? "green" : "blue" };
+    case "market-demand": return { badge: s.highDemand ? "High Demand In Your Market" : "Vehicle Available Today", btn: s.highDemand ? "Claim This Vehicle" : "Reserve This Vehicle", sub: s.highDemand ? "High-demand vehicles go fast." : "Secure this vehicle while it's still available.", action: "reserve", tone: "green" };
+    case "comparable-vehicles": return { badge: "Don't Miss Out", btn: "Reserve This Vehicle", sub: "Similar vehicles in your area are selling fast.", action: "reserve", tone: "blue" };
+    case "inventory-trend": return { badge: "Inventory Is Tightening", btn: "Reserve Before Inventory Drops", sub: "Fewer similar vehicles are available in your area.", action: "reserve", tone: "orange" };
+    case "price-confidence": return { badge: s.highConf ? "Verified Best Value" : "Independently Verified", btn: s.highConf ? "Reserve With Confidence" : "Reserve This Vehicle", sub: "This price has been independently verified.", action: "reserve", tone: "green" };
+    case "factory-warranty": return { badge: s.hasWarranty ? "Warranty Coverage Available" : "Vehicle Available Today", btn: s.hasWarranty ? "Protect This Vehicle" : "Reserve This Vehicle", sub: s.hasWarranty ? "Secure remaining factory protection." : "Secure this vehicle while it's still available.", action: s.hasWarranty ? "protect" : "reserve", tone: "green" };
+    case "owner-reviews": return { badge: s.highlyRated ? "Highly Rated By Owners" : "Trusted Dealer Reviews", btn: "Reserve This Vehicle", sub: "Owners love this vehicle.", action: "reserve", tone: "green" };
+    default: return { badge: "Vehicle Available Today", btn: "Reserve This Vehicle", sub: "Secure this vehicle while it's still available.", action: "reserve", tone: "blue" };
+  }
+};
+const TrustRow = ({ items }: { items: { icon: React.ElementType; t: string }[] }) => (
+  <div className="flex items-start justify-between mt-3 gap-1">{items.map((x) => (
+    <div key={x.t} className="flex flex-col items-center gap-0.5 text-center flex-1"><x.icon className="w-3.5 h-3.5 text-[#94A3B8]" /><span className="text-[9px] text-[#94A3B8] leading-tight">{x.t}</span></div>
+  ))}</div>
+);
+const TRUST_DEFAULT = [{ icon: ShieldCheck, t: "Refundable Deposit" }, { icon: CheckCircle2, t: "Instant Confirmation" }, { icon: BadgeCheck, t: "No Obligation Anytime" }];
+const TRUST_PROGRESSIVE = [{ icon: ShieldCheck, t: "Refundable Deposit" }, { icon: BadgeCheck, t: "Dealer Holds Vehicle" }, { icon: CheckCircle2, t: "Secure Checkout" }];
+
+function MobileCtaFooter({ variant, panelKey, go, signals }: { variant: string; panelKey: string; go: (s: string) => void; signals: CtaSignals }) {
+  const cta = ctaFor(panelKey, signals);
+  const primary = () => go(cta.action === "protect" ? "protect" : "reserve");
+  const toneBadge = cta.tone === "orange" ? "bg-orange-50 border-orange-200 text-[#EA580C]" : cta.tone === "green" ? "bg-emerald-50 border-emerald-200 text-[#16A34A]" : "bg-blue-50 border-blue-200 text-[#2563EB]";
+  const BadgeIcon = cta.tone === "orange" ? Flame : cta.tone === "green" ? CheckCircle2 : ShieldCheck;
+  const BlueBtn = ({ label, sub }: { label: string; sub?: string }) => (
+    <button onClick={primary} className="w-full min-h-[52px] rounded-2xl bg-[#2563EB] active:bg-[#1d4fd7] text-white inline-flex flex-col items-center justify-center transition-all active:scale-[0.99] px-3 py-2">
+      <span className="text-[15px] font-bold inline-flex items-center gap-2"><ShieldCheck className="w-4 h-4" /> {label}</span>
+      {sub && <span className="text-[11px] opacity-85 font-medium leading-tight">{sub}</span>}
+    </button>
+  );
+  const Badge = () => (
+    <div className={`rounded-xl border p-3 mb-3 ${toneBadge}`}><p className="text-[13px] font-bold inline-flex items-center gap-1.5"><BadgeIcon className="w-4 h-4" /> {cta.badge}</p><p className="text-[12px] text-[#64748B] mt-0.5">{cta.sub}</p></div>
+  );
+
+  if (variant === "two_button") {
+    return (
+      <div>
+        <p className="text-[12px] font-semibold text-[#0F172A]">Questions about this vehicle?</p>
+        <button onClick={() => go("contact")} className="text-[12px] font-semibold text-[#2563EB] inline-flex items-center gap-1.5 mb-3"><MessageSquare className="w-3.5 h-3.5" /> Talk to a Vehicle Specialist</button>
+        <BlueBtn label="Reserve This Vehicle" />
+      </div>
+    );
+  }
+  if (variant === "context_aware") {
+    return <div><Badge /><BlueBtn label={cta.btn} /><TrustRow items={TRUST_DEFAULT} /></div>;
+  }
+  if (variant === "progressive") {
+    const chips = [signals.greatPrice ? "Great Price" : null, "Verified Vehicle", signals.highConf ? "High Confidence" : null].filter(Boolean) as string[];
+    return (
+      <div>
+        <p className="text-[11px] font-semibold text-[#94A3B8] uppercase tracking-wider mb-2">You're looking at</p>
+        <div className="flex flex-wrap gap-1.5 mb-3">{chips.map((c) => <span key={c} className="text-[11px] font-semibold text-[#16A34A] bg-emerald-50 border border-emerald-200 rounded-full px-2.5 py-1">{c}</span>)}</div>
+        <button onClick={primary} className="w-full min-h-[52px] rounded-2xl bg-[#2563EB] active:bg-[#1d4fd7] text-white text-[15px] font-bold inline-flex items-center justify-center gap-2 transition-all active:scale-[0.99]">Continue With This Vehicle</button>
+        <p className="text-[11px] text-[#94A3B8] text-center mt-1.5">Review your next steps before reserving.</p>
+        <TrustRow items={TRUST_PROGRESSIVE} />
+      </div>
+    );
+  }
+  // dealer_availability (default)
+  return <div><Badge /><BlueBtn label={cta.btn} sub="Secure this vehicle while it's still available." /><TrustRow items={TRUST_DEFAULT} /></div>;
+}
+
 const Seg = ({ options, value, onChange }: { options: { label: string; value: string | number }[]; value: string | number; onChange: (v: string | number) => void }) => (
   <div className="inline-flex rounded-lg border border-[#E6E8EC] bg-white p-0.5 text-[11px] font-semibold">
     {options.map((o) => <button key={String(o.value)} onClick={() => onChange(o.value)} className={`px-2 py-1 rounded-md transition-colors ${value === o.value ? "bg-[#2563EB] text-white" : "text-[#64748B] hover:text-[#0F172A]"}`}>{o.label}</button>)}
@@ -2019,17 +2085,23 @@ export default function PassportPanel({ panel, onClose, openPanel, d, listing, i
   if (!key) return null;
 
   const def = buildPanel(key, d, listing, isPreview, go, openPanel);
+  const ctaSignals: CtaSignals = { greatPrice: (d.belowMarket ?? 0) > 0, highDemand: (d.viewCount ?? 0) > 20, highConf: (d.confScore ?? 0) >= 85, highlyRated: (d.reviewRating ?? 0) >= 4.5, hasWarranty: !!d.warrantyStr };
+  const ctaVariant = d.dealerTrust.mobileCtaVariant || "dealer_availability";
   const footer = (def.primary || def.secondary) ? (
-    <div className="flex flex-col sm:flex-row sm:items-center gap-3">
-      <div className="min-w-0 flex-1">
-        <p className="text-[13px] font-semibold text-[#0F172A] leading-tight">{def.footerQuestion ?? "Questions about this vehicle?"}</p>
-        <button onClick={() => go("contact")} className="mt-0.5 text-[12px] font-semibold text-[#2563EB] inline-flex items-center gap-1.5 hover:underline"><MessageSquare className="w-3.5 h-3.5" /> {def.specialistLabel ?? "Talk to a Vehicle Specialist"}</button>
+    <>
+      {/* Mobile: dealer-configurable CTA variant. Desktop/tablet: unchanged. */}
+      <div className="md:hidden"><MobileCtaFooter variant={ctaVariant} panelKey={key} go={go} signals={ctaSignals} /></div>
+      <div className="hidden md:flex flex-col sm:flex-row sm:items-center gap-3">
+        <div className="min-w-0 flex-1">
+          <p className="text-[13px] font-semibold text-[#0F172A] leading-tight">{def.footerQuestion ?? "Questions about this vehicle?"}</p>
+          <button onClick={() => go("contact")} className="mt-0.5 text-[12px] font-semibold text-[#2563EB] inline-flex items-center gap-1.5 hover:underline"><MessageSquare className="w-3.5 h-3.5" /> {def.specialistLabel ?? "Talk to a Vehicle Specialist"}</button>
+        </div>
+        <div className="shrink-0 flex items-center gap-2">
+          {def.secondary && <button onClick={def.secondary.onClick} className="h-11 px-4 rounded-xl border border-[#E6E8EC] bg-white text-[13px] font-semibold text-[#0F172A] hover:border-[#2563EB] transition-colors">{def.secondary.label}</button>}
+          {def.primary && <button onClick={def.primary.onClick} className="h-11 px-5 rounded-xl bg-[#2563EB] hover:bg-[#1d4fd7] text-white text-[14px] font-semibold inline-flex items-center justify-center gap-2 transition-colors"><ShieldCheck className="w-4 h-4" /> {def.primary.label}</button>}
+        </div>
       </div>
-      <div className="shrink-0 flex items-center gap-2">
-        {def.secondary && <button onClick={def.secondary.onClick} className="h-11 px-4 rounded-xl border border-[#E6E8EC] bg-white text-[13px] font-semibold text-[#0F172A] hover:border-[#2563EB] transition-colors">{def.secondary.label}</button>}
-        {def.primary && <button onClick={def.primary.onClick} className="h-11 px-5 rounded-xl bg-[#2563EB] hover:bg-[#1d4fd7] text-white text-[14px] font-semibold inline-flex items-center justify-center gap-2 transition-colors"><ShieldCheck className="w-4 h-4" /> {def.primary.label}</button>}
-      </div>
-    </div>
+    </>
   ) : undefined;
 
   return (

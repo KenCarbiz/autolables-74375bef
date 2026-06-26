@@ -88,6 +88,7 @@ export interface PassportData {
     amenities: string[];
     services: string[];
     hours: string;
+    mobileCtaVariant: string;
   };
 }
 
@@ -264,6 +265,7 @@ export const derivePassport = (listing: VehicleListing): PassportData => {
     amenities: (t.amenities || "").split(",").map((a) => a.trim()).filter(Boolean),
     services: (t.services || "").split(",").map((a) => a.trim()).filter(Boolean),
     hours: t.hours || "",
+    mobileCtaVariant: t.mobile_cta_variant || "dealer_availability",
   };
 
   return {
