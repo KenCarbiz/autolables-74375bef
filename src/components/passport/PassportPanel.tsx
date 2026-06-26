@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import {
   DollarSign, TrendingUp, TrendingDown, Gauge, Clock, Car, Package, ShieldCheck,
   Star, Award, FileText, MessageSquare, Eye, CheckCircle2,
-  Flame, Heart, Send, Bookmark, Users, Circle, ChevronDown, MapPin, BadgeCheck, Info, AlertTriangle, History,
+  Flame, Heart, Send, Bookmark, Users, Circle, ChevronDown, MapPin, BadgeCheck, Info, AlertTriangle, History, ArrowRight,
 } from "lucide-react";
 import type { PassportData, PricePoint } from "@/lib/passportV2Data";
 import { fmt$ } from "@/lib/passportV2Data";
@@ -848,6 +848,55 @@ function buildPanel(key: PassportPanelKey, d: PassportData, listing: VehicleList
         secondary: { label: "View full warranty details", onClick: () => go("factory-warranty") },
         footerQuestion: "Questions about warranty?", specialistLabel: "Talk to a Warranty Specialist",
         body: <>
+          {/* ── Mobile (<768px) — focused warranty card ── */}
+          <div className="md:hidden space-y-4">
+            {d.warrantyStr ? (
+              <>
+                <div className="rounded-2xl border border-emerald-200 bg-emerald-50/70 p-5 text-center">
+                  <span className="w-14 h-14 rounded-2xl bg-emerald-100 flex items-center justify-center mx-auto"><ShieldCheck className="w-7 h-7 text-[#16A34A]" /></span>
+                  <p className="text-[13px] font-bold text-[#64748B] mt-3">Factory Warranty</p>
+                  <p className="text-[28px] font-extrabold text-[#16A34A] leading-none mt-1 tracking-wide">{active ? "ACTIVE" : "EXPIRED"}</p>
+                  <p className="text-[13px] text-[#64748B] mt-2">{active ? "This vehicle is still protected by the manufacturer." : "Factory coverage has ended for this vehicle."}</p>
+                  {basic.date && <div className="mt-3"><p className="text-[11px] text-[#94A3B8]">Coverage Ends</p><p className="text-[15px] font-bold">{basic.date}</p></div>}
+                </div>
+
+                {(basic.pct != null || milesPct != null) && (
+                  <WarrantyBar title="Bumper-to-Bumper" big={basic.left != null ? `${basic.left} Months Remaining` : milesLeft != null ? `${milesLeft.toLocaleString()} Miles Remaining` : "Active"} pctLabel={`${Math.round(basic.pct ?? milesPct ?? 0)}% Remaining`} pct={basic.pct ?? milesPct ?? 0} expires={basic.date ?? (w.factory_miles ? `${w.factory_miles.toLocaleString()} mi` : null)} />
+                )}
+                {(ptMilesPct != null || pt.pct != null) && (
+                  <WarrantyBar title="Powertrain" big={ptMilesLeft != null ? `${ptMilesLeft.toLocaleString()} Miles Remaining` : pt.left != null ? `${pt.left} Months Remaining` : "Active"} pctLabel={`${Math.round(ptMilesPct ?? pt.pct ?? 0)}% Remaining`} pct={ptMilesPct ?? pt.pct ?? 0} expires={w.powertrain_miles ? `${w.powertrain_miles.toLocaleString()} Miles` : pt.date} />
+                )}
+
+                {listing.condition === "cpo" && (
+                  <div className={`${CARD} p-5 !border-blue-200 bg-blue-50/40`}>
+                    <p className="text-[13px] font-bold text-[#2563EB] inline-flex items-center gap-1.5"><BadgeCheck className="w-4 h-4" /> Certified Pre-Owned · Powertrain</p>
+                    <p className="text-[12px] text-[#64748B] mt-2">This vehicle includes additional Certified Pre-Owned powertrain coverage.</p>
+                    <p className="text-[11px] text-[#94A3B8] mt-2">This warranty begins after the original factory powertrain warranty expires. Confirm exact CPO terms with the dealer.</p>
+                  </div>
+                )}
+
+                <Section title="What's covered">
+                  <div className="space-y-3">
+                    <div className={`${CARD} p-4 flex items-start gap-3`}><span className="w-2.5 h-2.5 rounded-full bg-[#16A34A] mt-1.5 shrink-0" /><div><p className="text-[14px] font-bold">Bumper-to-Bumper</p><p className="text-[12px] text-[#64748B]">Most vehicle systems and components.</p></div></div>
+                    <div className={`${CARD} p-4 flex items-start gap-3`}><span className="w-2.5 h-2.5 rounded-full bg-[#16A34A] mt-1.5 shrink-0" /><div><p className="text-[14px] font-bold">Powertrain</p><p className="text-[12px] text-[#64748B]">Engine, transmission, and drivetrain.</p></div></div>
+                    <button onClick={() => go("factory-warranty")} className="w-full h-11 rounded-xl border border-[#E6E8EC] bg-white text-[13px] font-bold text-[#2563EB] inline-flex items-center justify-center gap-1.5 hover:border-[#2563EB]">View Full Coverage <ArrowRight className="w-4 h-4" /></button>
+                  </div>
+                </Section>
+
+                <div className={`${CARD} p-5`}>
+                  <p className="text-[15px] font-bold">Need More Protection?</p>
+                  <p className="text-[13px] text-[#64748B] mt-1">Extend your protection before factory coverage expires.</p>
+                  <button onClick={() => go("protect")} className="mt-3 w-full h-11 rounded-xl bg-[#2563EB] hover:bg-[#1d4fd7] text-white text-[13px] font-bold inline-flex items-center justify-center gap-1.5 transition-colors">See Protection Options <ArrowRight className="w-4 h-4" /></button>
+                </div>
+
+                <Section title="FAQ"><div className="space-y-2">{faqs.map((f) => <Faq key={f.q} q={f.q} a={f.a} />)}</div></Section>
+              </>
+            ) : <Empty>Warranty coverage details are confirmed at the dealership for this vehicle.</Empty>}
+            <Disclaimer />
+          </div>
+
+          {/* ── Desktop / tablet (≥768px) — unchanged ── */}
+          <div className="hidden md:block space-y-5">
           {d.warrantyStr ? (
             <>
               <div className="rounded-2xl border border-emerald-200 bg-emerald-50/70 p-5">
@@ -928,6 +977,7 @@ function buildPanel(key: PassportPanelKey, d: PassportData, listing: VehicleList
             </>
           ) : <Empty>Warranty coverage details are confirmed at the dealership for this vehicle.</Empty>}
           <Disclaimer />
+          </div>
         </>,
       };
     }
@@ -1388,6 +1438,21 @@ const AnimatedRing = ({ pct, size = 132, color = GREEN, label }: { pct: number; 
         <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke={color} strokeWidth="9" strokeLinecap="round" strokeDasharray={c} strokeDashoffset={fill ? off : c} style={{ transition: "stroke-dashoffset 900ms ease-out" }} />
       </svg>
       <div className="absolute inset-0 flex flex-col items-center justify-center"><span className="text-[34px] font-extrabold leading-none">{pct}</span>{label && <span className="text-[11px] font-bold opacity-80 mt-0.5">{label}</span>}</div>
+    </div>
+  );
+};
+
+// Large warranty progress bar (fills on mount) for the mobile warranty panel.
+const WarrantyBar = ({ title, big, pctLabel, pct, expires, tone = "green" }: { title: string; big: string; pctLabel: string; pct: number; expires?: string | null; tone?: "green" | "blue" }) => {
+  const [fill, setFill] = useState(false);
+  useEffect(() => { const r = requestAnimationFrame(() => setFill(true)); return () => cancelAnimationFrame(r); }, []);
+  const color = tone === "blue" ? "#2563EB" : "#16A34A";
+  return (
+    <div className={`${CARD} p-5`}>
+      <div className="flex items-center justify-between"><p className="text-[14px] font-bold">{title}</p><span className="text-[12px] font-bold" style={{ color }}>{pctLabel}</span></div>
+      <p className="text-[22px] font-extrabold mt-1 leading-none">{big}</p>
+      <div className="mt-3 h-3.5 rounded-full bg-slate-100 overflow-hidden"><div className="h-full rounded-full" style={{ width: fill ? `${Math.max(3, Math.min(100, pct))}%` : "0%", background: color, transition: "width 900ms ease-out" }} /></div>
+      {expires && <p className="text-[11px] text-[#94A3B8] mt-2">Expires {expires}</p>}
     </div>
   );
 };
