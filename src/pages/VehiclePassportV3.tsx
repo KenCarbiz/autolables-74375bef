@@ -406,7 +406,7 @@ const VehiclePassportV3 = () => {
           </div>
 
           {/* Ownership Timeline */}
-          <div className={`${CARD} p-5 flex flex-col`}>
+          <div onClick={(e) => openPanel("ownership-timeline", e)} className={`${CARD} p-5 flex flex-col cursor-pointer hover:border-[#2563EB] transition-colors`}>
             <H3>Ownership Timeline</H3>
             <ol className="mt-4 space-y-4 relative border-l-2 border-slate-100 ml-1.5 pl-4">
               {([
@@ -418,7 +418,7 @@ const VehiclePassportV3 = () => {
                 { d: "Today", t: "Ready for you", s: "At the dealership", c: "bg-[#2563EB]" },
               ].filter(Boolean) as { d: string; t: string; s: string; c: string }[]).map((e, i) => <li key={i} className="relative"><span className={`absolute -left-[22px] top-1 w-3 h-3 rounded-full ${e.c} ring-2 ring-white`} /><p className="text-[12px] font-bold">{e.d} · {e.t}</p><p className="text-[11px] text-[#64748B]">{e.s}</p></li>)}
             </ol>
-            <Link onClick={() => go("ownership-timeline")} className="mt-auto pt-3 self-start">View full timeline</Link>
+            <Link onClick={() => openPanel("ownership-timeline")} className="mt-auto pt-3 self-start">View full timeline</Link>
           </div>
 
           {/* Factory Warranty */}

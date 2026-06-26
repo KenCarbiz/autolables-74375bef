@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import {
   DollarSign, TrendingUp, TrendingDown, Gauge, Clock, Car, Package, ShieldCheck,
   Star, Award, FileText, MessageSquare, Eye, CheckCircle2,
-  Flame, Heart, Send, Bookmark, Users, Circle, ChevronDown, MapPin, BadgeCheck,
+  Flame, Heart, Send, Bookmark, Users, Circle, ChevronDown, MapPin, BadgeCheck, Info, AlertTriangle, History,
 } from "lucide-react";
 import type { PassportData, PricePoint } from "@/lib/passportV2Data";
 import { fmt$ } from "@/lib/passportV2Data";
@@ -22,7 +22,7 @@ import {
 export type PassportPanelKey =
   | "market-price" | "market-demand" | "price-confidence" | "price-history"
   | "comparable-vehicles" | "inventory-trend" | "factory-warranty"
-  | "owner-reviews" | "highlights" | "overview" | "key-specs" | "equipment";
+  | "owner-reviews" | "highlights" | "overview" | "key-specs" | "equipment" | "ownership-timeline";
 
 interface Comp { ymm: string; trim: string; mileage: number | null; price: number | null; distance: string | null; distNum: number | null; image: string | null; dealer: string | null; dom: number | null }
 
@@ -905,6 +905,74 @@ function buildPanel(key: PassportPanelKey, d: PassportData, listing: VehicleList
         </>,
       };
     }
+
+    case "ownership-timeline": {
+      const w = d.warranty;
+      const year = (listing.ymm || "").match(/\b(19|20)\d{2}\b/)?.[0] ?? null;
+      const fmtDate = (s?: string | Date | null) => s ? new Date(s).toLocaleDateString() : null;
+      const inService = w.in_service_date || null;
+      const prep = listing.prep_status?.foreman_signed_at || null;
+      const updated = (listing as unknown as { updated_at?: string }).updated_at || null;
+      const docs = listing.documents || [];
+      const lastDoc = docs.map((x) => (x as { uploaded_at?: string }).uploaded_at).filter(Boolean).sort().pop() || null;
+      const hasHistory = d.ownerCount != null || d.accidentCount != null || d.cleanTitle || d.serviceCount > 0 || !!listing.recall_status;
+
+      const origin: TEvent[] = [
+        { title: "Manufactured", date: year, source: "OEM model year", status: year ? "estimated" : "unavailable", note: year ? "Model year on record — exact build date pending OEM build data." : "Build date is not available yet." },
+        { title: "Delivered to dealer", status: "unavailable", note: "Dealer delivery date is not available yet." },
+      ];
+      const ownership: TEvent[] = [
+        inService
+          ? { title: d.ownerCount === 1 ? "First owner — placed in service" : "Placed in service", date: fmtDate(inService), source: "Warranty in-service date", status: "verified", note: d.ownerCount === 1 ? "Single owner on record; factory warranty began on this date." : "Factory warranty coverage began on this date." }
+          : d.ownerCount != null
+            ? { title: "Ownership on record", source: "Vehicle history", status: "needs", note: `${d.ownerCount} owner${d.ownerCount === 1 ? "" : "s"} reported; exact dates pending verification.` }
+            : { title: "Ownership history", status: "unavailable", note: "Ownership records are pending verification." },
+        { title: "Registration history", status: "unavailable", note: "State-by-state registration timeline is not available yet." },
+      ];
+      const services = (listing.service_records || []).filter((s) => s && (s.date || s.type || s.mileage));
+      const maintenance: TEvent[] = [
+        ...(services.length
+          ? services.map((s) => ({ title: s.type || "Service performed", date: fmtDate(s.date), mileage: s.mileage ? `${s.mileage} mi` : null, source: "Service record", status: "verified" as TStatus, note: s.notes || "Maintenance performed and recorded." }))
+          : [{ title: "Service records", status: "unavailable" as TStatus, note: "No service records are on file yet." }]),
+        prep
+          ? { title: "Dealer inspection completed", date: fmtDate(prep), source: "AutoLabels prep sign-off", status: "verified", note: "Multi-point inspection sign-off was completed." }
+          : { title: "Dealer inspection", status: "unavailable", note: "Inspection date is not available yet." },
+      ];
+      const verification: TEvent[] = [
+        { title: "VIN verified", status: listing.vin ? "verified" : "unavailable", source: listing.vin ? "VIN decode" : undefined, note: listing.vin ? "Vehicle identification number confirmed." : "VIN not available." },
+        { title: "Market data checked", status: (d.marketAvg != null || d.valueHistory.length > 0) ? "verified" : "unavailable", source: "MarketCheck", note: (d.marketAvg != null || d.valueHistory.length > 0) ? "Pricing compared against live market data." : "Market data pending." },
+        { title: "Recall status checked", status: listing.recall_status ? "verified" : "unavailable", source: "NHTSA", note: listing.recall_status ? (d.recallClear ? "No open recalls found." : "Recall campaign(s) on record.") : "Recall check pending." },
+        { title: "Warranty checked", status: d.warrantyStr ? "verified" : "unavailable", note: d.warrantyStr ? `${d.warrantyStr} of factory coverage confirmed remaining.` : "Warranty details pending." },
+        { title: "Documents uploaded", date: fmtDate(lastDoc), status: docs.length ? "verified" : "unavailable", source: docs.length ? `${docs.length} document${docs.length === 1 ? "" : "s"}` : undefined, note: docs.length ? "Dealer documents are attached to this vehicle." : "No documents uploaded yet." },
+      ];
+      const current: TEvent[] = [
+        { title: "Available today", status: listing.status === "published" ? "verified" : "needs", source: d.dealerName, note: listing.status === "published" ? `Listed and available at ${d.dealerName}.` : "Availability is being confirmed." },
+        { title: "Passport generated", date: fmtDate(updated), status: updated ? "verified" : "estimated", source: "AutoLabels", note: updated ? "This passport was last updated on this date." : "Generated by AutoLabels." },
+      ];
+      const sections: { label: string; events: TEvent[] }[] = [
+        { label: "Origin", events: origin },
+        { label: "Ownership", events: ownership },
+        { label: "Maintenance", events: maintenance },
+        { label: "AutoLabels Verification", events: verification },
+        { label: "Current Status", events: current },
+      ];
+      return {
+        title: "Ownership Timeline",
+        subtitle: "A clear timeline of this vehicle's ownership, service, certification, and availability history.",
+        footerQuestion: "Questions about this vehicle's timeline?",
+        primary: { label: "Contact Dealer", onClick: () => go("contact") },
+        secondary: hasHistory ? { label: "View Vehicle History Report", onClick: () => go("vehicle-history") } : undefined,
+        body: <>
+          {sections.map((s) => <Section key={s.label} title={s.label}><TimelineGroup events={s.events} /></Section>)}
+          {hasHistory ? (
+            <button onClick={() => go("vehicle-history")} className="w-full h-11 rounded-xl bg-[#2563EB] hover:bg-[#1d4fd7] text-white text-[13px] font-semibold inline-flex items-center justify-center gap-2 transition-colors"><History className="w-4 h-4" /> View Full Vehicle History Report</button>
+          ) : (
+            <Empty>Full vehicle history data is not available yet.</Empty>
+          )}
+          <Disclaimer />
+        </>,
+      };
+    }
   }
 }
 
@@ -1139,6 +1207,34 @@ const FEATURE_CATS: { name: string; re: RegExp }[] = [
 const CATEGORY_ORDER = ["Performance", "Comfort", "Technology", "Safety", "Exterior", "Interior", "Additional"];
 const categorizeFeature = (label: string) => FEATURE_CATS.find((c) => c.re.test(label))?.name ?? "Additional";
 
+type TStatus = "verified" | "estimated" | "needs" | "unavailable";
+interface TEvent { title: string; date?: string | null; mileage?: string | null; source?: string | null; status: TStatus; note: string }
+const TL_META: Record<TStatus, { dot: string; text: string; label: string; icon: React.ElementType }> = {
+  verified: { dot: "bg-emerald-500", text: "text-[#16A34A]", label: "Verified", icon: CheckCircle2 },
+  estimated: { dot: "bg-[#2563EB]", text: "text-[#2563EB]", label: "Estimated", icon: Info },
+  needs: { dot: "bg-orange-500", text: "text-[#EA580C]", label: "Needs confirmation", icon: AlertTriangle },
+  unavailable: { dot: "bg-slate-300", text: "text-[#94A3B8]", label: "Not available yet", icon: Circle },
+};
+const TimelineGroup = ({ events }: { events: TEvent[] }) => (
+  <ol className="space-y-4 relative border-l-2 border-slate-100 ml-1.5 pl-4">
+    {events.map((e, i) => {
+      const m = TL_META[e.status];
+      const meta = [e.date, e.mileage, e.source].filter(Boolean).join(" · ");
+      return (
+        <li key={i} className="relative">
+          <span className={`absolute -left-[22px] top-1 w-3 h-3 rounded-full ${m.dot} ring-2 ring-white`} />
+          <div className="flex items-center gap-2 flex-wrap">
+            <p className="text-[13px] font-bold leading-tight">{e.title}</p>
+            <span className={`inline-flex items-center gap-1 text-[10px] font-bold ${m.text}`}><m.icon className="w-3 h-3" />{m.label}</span>
+          </div>
+          {meta && <p className="text-[11px] text-[#94A3B8] mt-0.5">{meta}</p>}
+          <p className="text-[12px] text-[#64748B] mt-0.5">{e.note}</p>
+        </li>
+      );
+    })}
+  </ol>
+);
+
 // Single source of truth for the feature/equipment grouping used by the
 // Highlights, Overview, and Equipment panels — real features + decoded specs.
 const featureGroups = (listing: VehicleListing) => {
@@ -1215,7 +1311,7 @@ export const PANEL_ICON: Record<PassportPanelKey, React.ElementType> = {
   "market-price": DollarSign, "market-demand": TrendingUp, "price-confidence": Gauge,
   "price-history": Clock, "comparable-vehicles": Car, "inventory-trend": Package,
   "factory-warranty": ShieldCheck, "owner-reviews": Star, "highlights": Award,
-  "overview": FileText, "key-specs": FileText, "equipment": Package,
+  "overview": FileText, "key-specs": FileText, "equipment": Package, "ownership-timeline": Clock,
 };
 
 export interface PassportPanelProps {
