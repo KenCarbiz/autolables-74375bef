@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import {
   DollarSign, TrendingUp, TrendingDown, Gauge, Clock, Car, Package, ShieldCheck,
   Star, Award, FileText, MessageSquare, Eye, CheckCircle2,
-  Flame, Heart, Send, Bookmark, Users, Circle, ChevronDown, MapPin, BadgeCheck, Info, AlertTriangle, History, ArrowRight,
+  Flame, Heart, Send, Bookmark, Users, Circle, ChevronDown, MapPin, BadgeCheck, Info, AlertTriangle, History, ArrowRight, Sparkles,
 } from "lucide-react";
 import type { PassportData, PricePoint } from "@/lib/passportV2Data";
 import { fmt$ } from "@/lib/passportV2Data";
@@ -1147,12 +1147,89 @@ function buildPanel(key: PassportPanelKey, d: PassportData, listing: VehicleList
       if (premium) loveReasons.push("Luxury interior appointments");
       if (isGreat) loveReasons.push("Exceptional value versus the market");
       const catIcon: Record<string, React.ElementType> = { Performance: Gauge, Safety: ShieldCheck, Technology: Star, Comfort: Heart, Exterior: Car, Interior: Users };
+      // Mobile command-center data (badges/cards/rows open the dedicated reports).
+      const overviewBadges = ([
+        d.warrantyStr ? { icon: ShieldCheck, label: "Factory Warranty", fn: () => openPanel("factory-warranty") } : null,
+        d.cleanTitle && d.accidentCount === 0 ? { icon: CheckCircle2, label: "Clean History", fn: () => go("vehicle-history") } : null,
+        isGreat ? { icon: BadgeCheck, label: "Great Price", fn: () => openPanel("market-price") } : null,
+        (d.viewCount ?? 0) > 20 ? { icon: Flame, label: "High Demand", fn: () => openPanel("market-demand") } : null,
+      ].filter(Boolean) as { icon: React.ElementType; label: string; fn: () => void }[]).slice(0, 4);
+      const aiTraits = [d.ownerCount === 1 ? "one-owner ownership" : null, d.warrantyStr ? "remaining factory warranty" : null, (d.cleanTitle && d.accidentCount === 0) ? "a clean vehicle history" : null, isGreat ? "below-market pricing" : null, (d.viewCount ?? 0) > 20 ? "strong local demand" : null].filter(Boolean) as string[];
+      const aiSummary = aiTraits.length >= 2 ? `This ${listing.ymm}${listing.trim ? ` ${listing.trim}` : ""} combines ${aiTraits.slice(0, -1).join(", ")} and ${aiTraits[aiTraits.length - 1]} — one of the strongest ${premium ? "luxury " : ""}values currently available.` : (d.overview ? d.overview.split(". ").slice(0, 2).join(". ") : `The ${listing.ymm} pairs capable performance with a well-equipped cabin.`);
+      const snap = ([
+        d.ownerCount === 1 ? { icon: Users, v: "1 Owner", s: "Personal use", fn: () => go("vehicle-history") } : null,
+        d.warrantyStr ? { icon: ShieldCheck, v: d.warrantyStr, s: "Warranty left", fn: () => openPanel("factory-warranty") } : null,
+        listing.mileage != null ? { icon: Gauge, v: listing.mileage.toLocaleString(), s: "Miles", fn: () => openPanel("key-specs") } : null,
+        d.belowMarket && d.belowMarket > 0 ? { icon: BadgeCheck, v: fmt$(d.belowMarket), s: "Below market", fn: () => openPanel("market-price") } : null,
+        drivetrain ? { icon: Car, v: drivetrain, s: "Drivetrain", fn: () => openPanel("key-specs") } : null,
+        d.recallClear ? { icon: CheckCircle2, v: "No Recalls", s: "NHTSA checked", fn: () => go("vehicle-history") } : null,
+      ].filter(Boolean) as { icon: React.ElementType; v: string; s: string; fn: () => void }[]).slice(0, 4);
+      const carousel = (d.highlights.length ? d.highlights.map((h) => ({ t: h.label, s: h.sub })) : Object.values(groups).flat().map((x) => ({ t: x, s: "" }))).slice(0, 12);
+      const explore: { icon: React.ElementType; t: string; s: string; fn: () => void }[] = [
+        { icon: ShieldCheck, t: "Warranty", s: "Coverage remaining", fn: () => openPanel("factory-warranty") },
+        { icon: History, t: "Vehicle History", s: "Ownership, title, accidents", fn: () => go("vehicle-history") },
+        { icon: DollarSign, t: "Market Price", s: "How the price compares", fn: () => openPanel("market-price") },
+        { icon: TrendingUp, t: "Market Demand", s: "Local shopper interest", fn: () => openPanel("market-demand") },
+        { icon: Car, t: "Comparable Vehicles", s: "Similar listings nearby", fn: () => openPanel("comparable-vehicles") },
+        { icon: FileText, t: "Features & Specifications", s: "Equipment and specs", fn: () => openPanel("highlights") },
+        { icon: Clock, t: "Price History", s: "Recent price changes", fn: () => openPanel("price-history") },
+        { icon: Package, t: "Inventory Trends", s: "Local market availability", fn: () => openPanel("inventory-trend") },
+        { icon: Gauge, t: "Price Confidence", s: "Why we're confident", fn: () => openPanel("price-confidence") },
+      ];
       return {
         title: "Vehicle Overview", subtitle: "A complete look at this vehicle's design, technology, and ownership experience",
         primary: { label: "Reserve This Vehicle", onClick: () => go("reserve") },
         secondary: { label: "View specifications", onClick: () => openPanel("key-specs") },
         footerQuestion: "Questions about this vehicle?", specialistLabel: "Talk to a Product Specialist",
         body: <>
+          {/* ── Mobile (<768px) — Passport command center ── */}
+          <div className="md:hidden space-y-5">
+            <div className="relative rounded-2xl overflow-hidden">
+              {listing.hero_image_url ? <img src={listing.hero_image_url} alt="" className="w-full aspect-[4/3] object-cover" /> : <div className="w-full aspect-[4/3] bg-[#1f2227] flex items-center justify-center"><Car className="w-12 h-12 text-slate-500" /></div>}
+              <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/10 to-transparent flex flex-col justify-end p-5">
+                <p className="text-white text-[26px] font-extrabold leading-tight">{listing.ymm}</p>
+                {listing.trim && <p className="text-white/85 text-[14px] font-semibold">{listing.trim}</p>}
+                <div className="flex items-center gap-3 mt-1 text-white/80 text-[12px]">{listing.mileage != null && <span>{listing.mileage.toLocaleString()} mi</span>}{d.reviewRating != null && <span className="inline-flex items-center gap-1"><Star className="w-3.5 h-3.5 text-amber-400" fill="#F59E0B" />{d.reviewRating.toFixed(1)}</span>}</div>
+              </div>
+            </div>
+
+            {overviewBadges.length > 0 && (
+              <div className="grid grid-cols-2 gap-2.5">{overviewBadges.map((b) => (
+                <button key={b.label} onClick={b.fn} className={`${CARD} p-3 flex items-center gap-2 active:bg-slate-50`}><span className="w-8 h-8 rounded-lg bg-emerald-50 flex items-center justify-center shrink-0"><b.icon className="w-4 h-4 text-[#16A34A]" /></span><span className="text-[12px] font-bold leading-tight">{b.label}</span></button>
+              ))}</div>
+            )}
+
+            <div className={`${CARD} p-4 flex items-start gap-3`}>
+              <span className="w-8 h-8 rounded-xl bg-blue-50 flex items-center justify-center shrink-0"><Sparkles className="w-4 h-4 text-[#2563EB]" /></span>
+              <div><p className="text-[11px] font-bold uppercase tracking-wider text-[#94A3B8]">AutoLabels AI Summary</p><p className="text-[14px] text-[#334155] leading-relaxed mt-0.5">{aiSummary}</p></div>
+            </div>
+
+            {snap.length > 0 && (
+              <div className="grid grid-cols-2 gap-3">{snap.map((s, i) => (
+                <button key={i} onClick={s.fn} className={`${CARD} p-4 text-left active:bg-slate-50`}><s.icon className="w-5 h-5 text-[#2563EB]" /><p className="text-[18px] font-extrabold mt-1.5 leading-none">{s.v}</p><p className="text-[11px] text-[#94A3B8] mt-1">{s.s}</p></button>
+              ))}</div>
+            )}
+
+            {carousel.length > 0 && (
+              <div>
+                <h2 className="text-[18px] font-bold mb-3">Why You'll Love This Vehicle</h2>
+                <div className="flex gap-3 overflow-x-auto -mx-1 px-1 pb-1 snap-x">{carousel.map((c, i) => (
+                  <div key={i} className={`shrink-0 w-[120px] ${CARD} p-4 text-center snap-start`}><span className="w-10 h-10 rounded-xl bg-blue-50 flex items-center justify-center mx-auto"><Award className="w-5 h-5 text-[#2563EB]" /></span><p className="text-[12px] font-bold leading-tight mt-2 line-clamp-2">{c.t}</p>{c.s && <p className="text-[10px] text-[#94A3B8] mt-0.5 line-clamp-1">{c.s}</p>}</div>
+                ))}</div>
+              </div>
+            )}
+
+            <div>
+              <h2 className="text-[18px] font-bold mb-3">Explore the Vehicle Passport</h2>
+              <div className={`${CARD} divide-y divide-[#F1F5F9]`}>{explore.map((r) => (
+                <button key={r.t} onClick={r.fn} className="w-full min-h-[56px] flex items-center gap-3 px-4 py-3 text-left active:bg-slate-50"><span className="w-9 h-9 rounded-xl bg-blue-50 flex items-center justify-center shrink-0"><r.icon className="w-[18px] h-[18px] text-[#2563EB]" /></span><div className="min-w-0 flex-1"><p className="text-[14px] font-semibold leading-tight">{r.t}</p><p className="text-[11px] text-[#94A3B8] truncate">{r.s}</p></div><ChevronDown className="w-4 h-4 text-[#CBD5E1] -rotate-90" /></button>
+              ))}</div>
+            </div>
+            <Disclaimer />
+          </div>
+
+          {/* ── Desktop / tablet (≥768px) — unchanged ── */}
+          <div className="hidden md:block space-y-5">
           <div className="rounded-2xl overflow-hidden border border-[#E6E8EC] relative">
             {listing.hero_image_url ? <img src={listing.hero_image_url} alt="" className="w-full aspect-[16/9] object-cover" /> : <div className="w-full aspect-[16/9] bg-[#1f2227] flex items-center justify-center"><Car className="w-12 h-12 text-slate-500" /></div>}
             <div className="absolute inset-0 bg-gradient-to-t from-black/75 to-transparent flex flex-col justify-end p-5">
@@ -1184,6 +1261,7 @@ function buildPanel(key: PassportPanelKey, d: PassportData, listing: VehicleList
           )}
           {!d.overview && story.length === 0 && <Empty>A full overview appears here as this vehicle's OEM data is decoded.</Empty>}
           <Disclaimer />
+          </div>
         </>,
       };
     }
