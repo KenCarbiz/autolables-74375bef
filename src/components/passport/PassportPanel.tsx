@@ -22,7 +22,7 @@ import {
 export type PassportPanelKey =
   | "market-price" | "market-demand" | "price-confidence" | "price-history"
   | "comparable-vehicles" | "inventory-trend" | "factory-warranty"
-  | "owner-reviews" | "highlights" | "overview" | "key-specs";
+  | "owner-reviews" | "highlights" | "overview" | "key-specs" | "equipment";
 
 interface Comp { ymm: string; trim: string; mileage: number | null; price: number | null; distance: string | null; distNum: number | null; image: string | null; dealer: string | null; dom: number | null }
 
@@ -645,19 +645,7 @@ function buildPanel(key: PassportPanelKey, d: PassportData, listing: VehicleList
     case "highlights": {
       const hs = d.highlights;
       const ks = listing.key_specs || {};
-      const featLabels = (listing.features || []).map((f) => [f.title, f.subtitle].filter(Boolean).join(" ").trim()).filter(Boolean);
-      const groups: Record<string, string[]> = {};
-      const push = (cat: string, label: string) => { if (!label) return; (groups[cat] ||= []); if (!groups[cat].includes(label)) groups[cat].push(label); };
-      featLabels.forEach((l) => push(categorizeFeature(l), l));
-      if (ks.engine) push("Performance", String(ks.engine));
-      if ((listing.mc_attributes as Record<string, unknown> | null)?.horsepower) push("Performance", `${(listing.mc_attributes as Record<string, unknown>).horsepower} hp`);
-      if (ks.transmission) push("Performance", String(ks.transmission));
-      if (ks.drivetrain) push("Performance", String(ks.drivetrain));
-      if (ks.mpg_city && ks.mpg_hwy) push("Performance", `${ks.mpg_city}/${ks.mpg_hwy} MPG`);
-      if (ks.exterior_color) push("Exterior", `${ks.exterior_color} exterior`);
-      if (ks.interior_color) push("Interior", `${ks.interior_color} interior`);
-      if ((listing.mc_attributes as Record<string, unknown> | null)?.seating) push("Interior", `${(listing.mc_attributes as Record<string, unknown>).seating}-passenger seating`);
-      const orderedGroups = CATEGORY_ORDER.map((name) => [name, groups[name]] as const).filter(([, items]) => items && items.length);
+      const { groups, ordered: orderedGroups, featLabels, accessories } = featureGroups(listing);
       const reasons: string[] = [];
       if (groups.Safety?.length) reasons.push("Advanced safety technology");
       if (groups.Comfort?.length) reasons.push("Premium comfort and convenience");
@@ -665,7 +653,6 @@ function buildPanel(key: PassportPanelKey, d: PassportData, listing: VehicleList
       if (/awd|4wd|4x4/i.test(String(ks.drivetrain || ""))) reasons.push("Confident all-weather capability");
       if (/luxe|autograph|limited|platinum|premium|touring|signature|reserve|titanium|sensory|denali/i.test(listing.trim || "")) reasons.push("Luxury-grade appointments");
       if (isGreat) reasons.push("Exceptional value versus the market");
-      const accessories = (listing.available_accessories || []).map((a) => a.name).filter(Boolean) as string[];
       const hasContent = featLabels.length > 0 || orderedGroups.length > 0 || hs.length > 0;
       return {
         title: "Vehicle Highlights", subtitle: "Explore the most important features and equipment",
@@ -704,7 +691,7 @@ function buildPanel(key: PassportPanelKey, d: PassportData, listing: VehicleList
                 </Section>
               )}
               {(featLabels.length > 0 || accessories.length > 0) && (
-                <Section title="Equipment & options">
+                <Section title="Equipment & options" action={<button onClick={() => openPanel("equipment")} className="text-[12px] font-semibold text-[#2563EB] hover:underline shrink-0">View all equipment</button>}>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     {featLabels.length > 0 && <div className={`${CARD} p-4`}><p className="text-[12px] font-bold mb-2">On this vehicle <span className="text-[#94A3B8] font-semibold">{featLabels.length}</span></p><ul className="space-y-1.5">{featLabels.slice(0, 10).map((f) => <Check key={f}>{f}</Check>)}</ul></div>}
                     {accessories.length > 0 && <div className={`${CARD} p-4`}><p className="text-[12px] font-bold mb-2">Available add-ons <span className="text-[#94A3B8] font-semibold">{accessories.length}</span></p><ul className="space-y-1.5">{accessories.slice(0, 10).map((a) => <li key={a} className="flex items-start gap-2 text-[13px] text-[#0F172A]"><Package className="w-3.5 h-3.5 text-[#2563EB] shrink-0 mt-0.5" />{a}</li>)}</ul></div>}
@@ -719,28 +706,201 @@ function buildPanel(key: PassportPanelKey, d: PassportData, listing: VehicleList
     }
 
     case "overview": {
+      const ks = listing.key_specs || {};
+      const { groups } = featureGroups(listing);
+      const engine = ks.engine ? String(ks.engine) : null;
+      const hp = mc.horsepower ? `${mc.horsepower} hp` : null;
+      const trans = ks.transmission ? String(ks.transmission) : null;
+      const drivetrain = ks.drivetrain ? String(ks.drivetrain) : null;
+      const mpg = ks.mpg_city && ks.mpg_hwy ? `${ks.mpg_city}/${ks.mpg_hwy} MPG` : null;
+      const premium = /luxe|autograph|limited|platinum|premium|touring|signature|reserve|titanium|sensory|denali/i.test(listing.trim || "");
+      const awd = /awd|4wd|4x4/i.test(String(drivetrain || ""));
+      const seats = Number(mc.seating) || null;
+      const story: { t: string; c: React.ReactNode }[] = [];
+      if (d.overview) story.push({ t: "Overview", c: <p className="whitespace-pre-line">{d.overview}</p> });
+      const perfBits = [engine && `powered by ${engine}`, hp && `producing ${hp}`, trans && `paired with ${trans}`, drivetrain && `driving the ${drivetrain}`].filter(Boolean);
+      if (perfBits.length) story.push({ t: "Performance", c: <p>This vehicle is {perfBits.join(", ")}.{mpg ? ` EPA-estimated ${mpg}.` : ""}</p> });
+      if (premium && groups.Comfort?.length) story.push({ t: "Luxury", c: <p>The {listing.trim} trim is appointed with {groups.Comfort.slice(0, 5).join(", ")}.</p> });
+      if (groups.Technology?.length) story.push({ t: "Technology", c: <p>Connectivity and infotainment include {groups.Technology.join(", ")}.</p> });
+      if (groups.Comfort?.length) story.push({ t: "Comfort", c: <p>Cabin comfort features include {groups.Comfort.join(", ")}.</p> });
+      if (groups.Safety?.length) story.push({ t: "Safety", c: <p>Driver assistance and safety equipment include {groups.Safety.join(", ")}.</p> });
+      if (awd) story.push({ t: "Driving Experience", c: <p>{drivetrain} delivers confident handling and all-weather capability.</p> });
+      const ownBits = [d.warrantyStr && `${d.warrantyStr} of factory warranty remains`, d.recallClear && "no open recalls are reported", d.serviceCount > 0 && `${d.serviceCount} service records are on file`].filter(Boolean) as string[];
+      if (ownBits.length) story.push({ t: "Ownership", c: <p>For peace of mind, {ownBits.join(", ")}.</p> });
+      const recs: { t: string; w: string }[] = [];
+      if (seats && seats >= 6) { recs.push({ t: "Families", w: `Seats ${seats} across a flexible multi-row layout.` }); recs.push({ t: "Road Trips", w: "Spacious, comfortable cabin for long drives." }); }
+      if (Number(ks.mpg_hwy) >= 28) recs.push({ t: "Daily Commuters", w: `Up to ${ks.mpg_hwy} MPG highway eases the daily drive.` });
+      if (premium) { recs.push({ t: "Luxury Buyers", w: `${listing.trim} trim brings premium materials and features.` }); recs.push({ t: "Business Professionals", w: "A refined, professional presence." }); }
+      if (awd) recs.push({ t: "Weekend Adventures", w: `${drivetrain} adds all-weather confidence.` });
+      const exterior = groups.Exterior || [];
+      const interior = Array.from(new Set([...(groups.Interior || []), ...(groups.Comfort || [])]));
+      const loveReasons: string[] = [];
+      if (groups.Safety?.length) loveReasons.push("Advanced safety technology");
+      if (groups.Comfort?.length) loveReasons.push("Premium ride comfort");
+      if (groups.Technology?.length) loveReasons.push("Modern technology and connectivity");
+      if (premium) loveReasons.push("Luxury interior appointments");
+      if (isGreat) loveReasons.push("Exceptional value versus the market");
+      const catIcon: Record<string, React.ElementType> = { Performance: Gauge, Safety: ShieldCheck, Technology: Star, Comfort: Heart, Exterior: Car, Interior: Users };
       return {
-        title: "Vehicle Overview", subtitle: `${listing.ymm || "This vehicle"}${listing.trim ? ` ${listing.trim}` : ""}`,
-        primary: { label: "Check Availability", onClick: () => go("check-availability") },
+        title: "Vehicle Overview", subtitle: "A complete look at this vehicle's design, technology, and ownership experience",
+        primary: { label: "Reserve This Vehicle", onClick: () => go("reserve") },
+        secondary: { label: "View specifications", onClick: () => openPanel("key-specs") },
+        footerQuestion: "Questions about this vehicle?", specialistLabel: "Talk to a Product Specialist",
         body: <>
-          {listing.hero_image_url && <img src={listing.hero_image_url} alt="" className="w-full aspect-[16/9] object-cover rounded-2xl" />}
-          <div className={`${CARD} p-5`}><p className="text-[14px] leading-relaxed text-[#334155] whitespace-pre-line">{d.overview}</p></div>
-          {d.keySpecs.length > 0 && (
-            <Section title="At a glance"><div className={`${CARD} p-4`}>{d.keySpecs.slice(0, 6).map(([k, v]) => <StatRow key={k} label={k} value={v} />)}</div></Section>
+          <div className="rounded-2xl overflow-hidden border border-[#E6E8EC] relative">
+            {listing.hero_image_url ? <img src={listing.hero_image_url} alt="" className="w-full aspect-[16/9] object-cover" /> : <div className="w-full aspect-[16/9] bg-[#1f2227] flex items-center justify-center"><Car className="w-12 h-12 text-slate-500" /></div>}
+            <div className="absolute inset-0 bg-gradient-to-t from-black/75 to-transparent flex flex-col justify-end p-5">
+              <p className="text-white text-[20px] font-extrabold leading-tight">{listing.ymm}</p>
+              {listing.trim && <p className="text-white/85 text-[13px] font-semibold">{listing.trim}</p>}
+              <div className="flex flex-wrap gap-1.5 mt-2">{[engine, drivetrain, trans].filter(Boolean).map((c) => <span key={c as string} className="text-[10px] font-semibold text-white bg-white/15 backdrop-blur rounded-full px-2 py-0.5">{c}</span>)}</div>
+            </div>
+          </div>
+          {story.length > 0 && (
+            <Section title="Vehicle story">
+              <div className="space-y-2">{story.map((s, i) => <Accordion key={s.t} title={s.t} defaultOpen={i === 0}>{s.c}</Accordion>)}</div>
+            </Section>
           )}
+          {recs.length > 0 && (
+            <Section title="Perfect for">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">{recs.map((r) => <div key={r.t} className={`${CARD} p-4`}><p className="text-[13px] font-bold">{r.t}</p><p className="text-[12px] text-[#64748B] mt-0.5">{r.w}</p></div>)}</div>
+            </Section>
+          )}
+          {exterior.length > 0 && (
+            <Section title="Exterior highlights"><div className="grid grid-cols-1 sm:grid-cols-2 gap-3">{exterior.map((e) => <IconCard key={e} icon={catIcon.Exterior} title={e} />)}</div></Section>
+          )}
+          {interior.length > 0 && (
+            <Section title="Interior experience"><div className="grid grid-cols-1 sm:grid-cols-2 gap-3">{interior.map((e) => <IconCard key={e} icon={catIcon.Interior} title={e} />)}</div></Section>
+          )}
+          {loveReasons.length > 0 && (
+            <Section title="Why shoppers love this vehicle">
+              <div className="rounded-2xl border border-emerald-200 bg-emerald-50/70 p-4"><ul className="space-y-2">{loveReasons.map((r) => <Check key={r}>{r}</Check>)}</ul></div>
+            </Section>
+          )}
+          {!d.overview && story.length === 0 && <Empty>A full overview appears here as this vehicle's OEM data is decoded.</Empty>}
           <Disclaimer />
         </>,
       };
     }
 
     case "key-specs": {
+      const ks = listing.key_specs || {};
+      const mcr = mc;
+      const ksr = ks as Record<string, unknown>;
+      const A = (keys: string[]) => specAttr(mcr, ksr, keys);
+      const { groups } = featureGroups(listing);
+      const hp = mcr.horsepower != null ? `${mcr.horsepower} hp` : A(["horsepower"]);
+      const mpg = ks.mpg_city && ks.mpg_hwy ? `${ks.mpg_city}/${ks.mpg_hwy} MPG` : A(["mpg", "combined_mpg"]);
+      const seating = mcr.seating != null ? `${mcr.seating}-passenger` : A(["seating", "seats"]);
+      const quick: [string, string | null][] = [
+        ["Engine", ks.engine ? String(ks.engine) : A(["engine"])],
+        ["Transmission", ks.transmission ? String(ks.transmission) : A(["transmission"])],
+        ["Drivetrain", ks.drivetrain ? String(ks.drivetrain) : A(["drivetrain", "drive_type"])],
+        ["Horsepower", hp],
+        ["Torque", A(["torque"])],
+        ["Fuel Economy", mpg],
+        ["Fuel Type", ks.fuel ? String(ks.fuel) : A(["fuel", "fuel_type"])],
+        ["Towing", A(["towing", "towing_capacity", "max_towing"])],
+        ["Payload", A(["payload", "payload_capacity"])],
+      ];
+      const perfRows: [string, string | null][] = [
+        ["Engine", ks.engine ? String(ks.engine) : A(["engine"])],
+        ["Displacement", A(["displacement", "engine_displacement"])],
+        ["Horsepower", hp],
+        ["Torque", A(["torque"])],
+        ["Transmission", ks.transmission ? String(ks.transmission) : null],
+        ["Drive Type", ks.drivetrain ? String(ks.drivetrain) : A(["drive_type"])],
+        ["Fuel Tank Capacity", A(["fuel_tank", "fuel_capacity", "tank_capacity"])],
+        ["Fuel Economy", mpg],
+        ["0–60 mph", A(["0_60", "zero_to_sixty", "zero_sixty"])],
+        ["Top Speed", A(["top_speed"])],
+      ];
+      const dimRows: [string, string | null][] = [
+        ["Wheelbase", A(["wheelbase"])], ["Length", A(["length", "overall_length"])], ["Width", A(["width", "overall_width"])],
+        ["Height", A(["height", "overall_height"])], ["Ground Clearance", A(["ground_clearance"])], ["Turning Radius", A(["turning_radius"])],
+        ["Cargo Capacity", A(["cargo", "cargo_capacity", "cargo_volume"])], ["Passenger Volume", A(["passenger_volume"])], ["Seating Capacity", seating],
+      ];
+      const wheelRows: [string, string | null][] = [
+        ["Wheel Size", A(["wheel_size", "wheels"])], ["Tire Size", A(["tire_size", "tires"])], ["Spare Tire", A(["spare_tire", "spare"])],
+        ["Wheel Material", A(["wheel_material"])], ["Recommended Tire Pressure", A(["tire_pressure"])],
+      ];
+      const mechRows: [string, string | null][] = [
+        ["Front Suspension", A(["front_suspension"])], ["Rear Suspension", A(["rear_suspension"])], ["Steering", A(["steering"])],
+        ["Brakes", A(["brakes"])], ["Battery", A(["battery"])], ["Alternator", A(["alternator"])], ["Hybrid System", A(["hybrid_system"])],
+        ["EV Battery", A(["ev_battery", "battery_capacity"])], ["Charging", A(["charging", "charge_time"])],
+      ];
+      const safety = groups.Safety || [];
+      const hasAny = quick.some(([, v]) => v);
       return {
-        title: "Key Specifications", subtitle: "Verified vehicle details",
-        primary: { label: "Check Availability", onClick: () => go("check-availability") },
+        title: "Technical Specifications", subtitle: "Everything you need to know about this vehicle's engineering",
+        primary: { label: "Reserve This Vehicle", onClick: () => go("reserve") },
+        footerQuestion: "Questions about the specifications?", specialistLabel: "Talk to a Product Specialist",
         body: <>
-          {d.keySpecs.length ? (
-            <div className={`${CARD} p-5`}>{d.keySpecs.map(([k, v]) => <StatRow key={k} label={k} value={v} />)}</div>
+          {hasAny ? (
+            <>
+              <Section title="Quick specs">
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">{quick.map(([k, v]) => (
+                  <div key={k} className={`${CARD} p-3`}><p className="text-[11px] text-[#94A3B8] leading-tight">{k}</p><p className={`text-[13px] font-extrabold mt-0.5 leading-tight ${v ? "text-[#0F172A]" : "text-[#CBD5E1]"}`}>{v ?? "Pending"}</p></div>
+                ))}</div>
+              </Section>
+              <SpecGroup title="Performance" rows={perfRows} />
+              <SpecGroup title="Dimensions" rows={dimRows} />
+              <SpecGroup title="Wheels & Tires" rows={wheelRows} />
+              <Section title="Safety & driver assistance">
+                {safety.length ? <div className={`${CARD} p-4`}><ul className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">{safety.map((s) => <Check key={s}>{s}</Check>)}</ul></div> : <Empty>Safety equipment appears here as the vehicle's data is decoded.</Empty>}
+              </Section>
+              <SpecGroup title="Mechanical" rows={mechRows} />
+            </>
           ) : <Empty>Specifications appear here as the vehicle's data is decoded from its VIN.</Empty>}
+          <Disclaimer />
+        </>,
+      };
+    }
+
+    case "equipment": {
+      const { ordered, featLabels, accessories } = featureGroups(listing);
+      const hasContent = featLabels.length > 0 || accessories.length > 0 || ordered.length > 0;
+      return {
+        title: "Equipment & Installed Options", subtitle: "Everything included on this vehicle from the factory and dealership",
+        primary: { label: "Reserve This Vehicle", onClick: () => go("reserve") },
+        footerQuestion: "Questions about the equipment?", specialistLabel: "Talk to a Product Specialist",
+        body: <>
+          {hasContent ? (
+            <>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                <Stat label="Factory Equipment" value={`${featLabels.length}`} />
+                <Stat label="Packages" value="Pending" />
+                <Stat label="Dealer Add-ons" value={`${accessories.length}`} />
+                <Stat label="Est. Value" value="Not Available" />
+              </div>
+              {ordered.length > 0 && (
+                <Section title="Equipment categories">
+                  <div className="space-y-2">{ordered.map(([name, items], i) => <Group key={name} title={name} items={items} defaultOpen={i === 0} />)}</div>
+                </Section>
+              )}
+              <Section title="Installed packages">
+                <Empty>Factory package breakdown is pending OEM build-sheet data for this vehicle.</Empty>
+              </Section>
+              {featLabels.length > 0 && (
+                <Section title="Factory options">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">{featLabels.slice(0, 12).map((f) => <IconCard key={f} icon={Award} title={f} />)}</div>
+                </Section>
+              )}
+              {accessories.length > 0 && (
+                <Section title="Dealer accessories available" sub="Add-ons offered by the dealer — not factory-installed.">
+                  <div className="space-y-2">{accessories.map((a) => <div key={a} className={`${CARD} p-3 flex items-center gap-2`}><Package className="w-4 h-4 text-[#2563EB] shrink-0" /><span className="text-[13px] text-[#0F172A]">{a}</span></div>)}</div>
+                </Section>
+              )}
+              <Section title="Build summary">
+                <div className={`${CARD} p-4`}>
+                  <StatRow label="Factory equipment" value={`${featLabels.length} items`} />
+                  <StatRow label="Factory options" value="Pending OEM build sheet" />
+                  <StatRow label="Dealer installed" value={accessories.length ? `${accessories.length} available` : "None reported"} />
+                  <StatRow label="Aftermarket" value="None reported" />
+                </div>
+                <p className="text-[11px] text-[#94A3B8] mt-2">A full factory build sheet with itemized option values requires OEM data and is not yet available for this vehicle.</p>
+              </Section>
+            </>
+          ) : <Empty>Equipment details appear here as the vehicle's build data is decoded.</Empty>}
           <Disclaimer />
         </>,
       };
@@ -979,6 +1139,63 @@ const FEATURE_CATS: { name: string; re: RegExp }[] = [
 const CATEGORY_ORDER = ["Performance", "Comfort", "Technology", "Safety", "Exterior", "Interior", "Additional"];
 const categorizeFeature = (label: string) => FEATURE_CATS.find((c) => c.re.test(label))?.name ?? "Additional";
 
+// Single source of truth for the feature/equipment grouping used by the
+// Highlights, Overview, and Equipment panels — real features + decoded specs.
+const featureGroups = (listing: VehicleListing) => {
+  const ks = listing.key_specs || {};
+  const mc = (listing.mc_attributes || {}) as Record<string, unknown>;
+  const featLabels = (listing.features || []).map((f) => [f.title, f.subtitle].filter(Boolean).join(" ").trim()).filter(Boolean);
+  const groups: Record<string, string[]> = {};
+  const push = (cat: string, label: string) => { if (!label) return; (groups[cat] ||= []); if (!groups[cat].includes(label)) groups[cat].push(label); };
+  featLabels.forEach((l) => push(categorizeFeature(l), l));
+  if (ks.engine) push("Performance", String(ks.engine));
+  if (mc.horsepower) push("Performance", `${mc.horsepower} hp`);
+  if (ks.transmission) push("Performance", String(ks.transmission));
+  if (ks.drivetrain) push("Performance", String(ks.drivetrain));
+  if (ks.mpg_city && ks.mpg_hwy) push("Performance", `${ks.mpg_city}/${ks.mpg_hwy} MPG`);
+  if (ks.exterior_color) push("Exterior", `${ks.exterior_color} exterior`);
+  if (ks.interior_color) push("Interior", `${ks.interior_color} interior`);
+  if (mc.seating) push("Interior", `${mc.seating}-passenger seating`);
+  const ordered = CATEGORY_ORDER.map((n) => [n, groups[n]] as const).filter(([, it]) => it && it.length) as [string, string[]][];
+  const accessories = (listing.available_accessories || []).map((a) => a.name).filter(Boolean) as string[];
+  return { groups, ordered, featLabels, accessories };
+};
+
+// First present, non-empty value across candidate keys in mc_attributes / key_specs.
+const specAttr = (mc: Record<string, unknown>, ks: Record<string, unknown>, keys: string[]): string | null => {
+  for (const k of keys) { const v = mc[k] ?? ks[k]; if (v != null && String(v).trim() !== "") return String(v); }
+  return null;
+};
+
+const Accordion = ({ title, defaultOpen, children }: { title: string; defaultOpen?: boolean; children: React.ReactNode }) => (
+  <details className={`${CARD} overflow-hidden group`} open={defaultOpen}>
+    <summary className="cursor-pointer list-none flex items-center justify-between gap-3 px-4 py-3 text-[13px] font-bold text-[#0F172A]">{title}<ChevronDown className="w-4 h-4 text-[#94A3B8] group-open:rotate-180 transition-transform shrink-0" /></summary>
+    <div className="px-4 pb-3 text-[13px] text-[#334155] leading-relaxed">{children}</div>
+  </details>
+);
+
+const IconCard = ({ icon: Icon, title, sub }: { icon: React.ElementType; title: string; sub?: string }) => (
+  <div className={`${CARD} p-4 flex items-start gap-3`}>
+    <span className="w-9 h-9 rounded-xl bg-blue-50 flex items-center justify-center shrink-0"><Icon className="w-[18px] h-[18px] text-[#2563EB]" /></span>
+    <div className="min-w-0"><p className="text-[12px] font-bold leading-tight">{title}</p>{sub && <p className="text-[11px] text-[#94A3B8] mt-0.5">{sub}</p>}</div>
+  </div>
+);
+
+// Spec section that names which fields are still pending OEM data instead of
+// fabricating numbers (per Batch 4: never invent specifications).
+const SpecGroup = ({ title, rows }: { title: string; rows: [string, string | null][] }) => {
+  const present = rows.filter(([, v]) => v);
+  const missing = rows.filter(([, v]) => !v).map(([k]) => k);
+  return (
+    <Section title={title}>
+      <div className={`${CARD} p-4`}>
+        {present.length ? present.map(([k, v]) => <StatRow key={k} label={k} value={v as string} />) : <p className="text-[12px] text-[#64748B]">Pending OEM data.</p>}
+        {present.length > 0 && missing.length > 0 && <p className="text-[11px] text-[#94A3B8] mt-2">Pending OEM data: {missing.join(", ")}.</p>}
+      </div>
+    </Section>
+  );
+};
+
 const Meter = ({ label, value, unit, pct }: { label: string; value: string; unit: string; pct: number }) => (
   <div>
     <div className="flex justify-between text-[12px]"><span className="text-[#64748B]">{label}</span><span className="font-bold">{value} <span className="text-[#94A3B8] font-medium">{unit}</span></span></div>
@@ -998,7 +1215,7 @@ export const PANEL_ICON: Record<PassportPanelKey, React.ElementType> = {
   "market-price": DollarSign, "market-demand": TrendingUp, "price-confidence": Gauge,
   "price-history": Clock, "comparable-vehicles": Car, "inventory-trend": Package,
   "factory-warranty": ShieldCheck, "owner-reviews": Star, "highlights": Award,
-  "overview": FileText, "key-specs": FileText,
+  "overview": FileText, "key-specs": FileText, "equipment": Package,
 };
 
 export interface PassportPanelProps {
