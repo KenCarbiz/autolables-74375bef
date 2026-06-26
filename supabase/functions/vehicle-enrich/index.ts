@@ -231,20 +231,67 @@ async function fetchMds(ymm: string | null, condition: string, zip: string | nul
   } catch { return null; }
 }
 
-// ── MarketCheck: VIN recall lookup ─────────────────────────────
-async function fetchRecalls(vin: string) {
+// ── Recall lookup: MarketCheck (VIN-specific) → NHTSA (free) fallback ──
+// MarketCheck recalls come from the licensed 3rd-party AutoRecalls product,
+// which returns nothing until that product's terms are accepted in the
+// MarketCheck portal — so it silently failed for most cars. NHTSA's public
+// recallsByVehicle API is free, needs no key, and is the same source the
+// publish gate uses, so we fall back to it (model-level) whenever the
+// MarketCheck VIN call doesn't answer. Result: the recall signal always lands.
+async function fetchRecalls(vin: string, ymm: string | null) {
   try {
     const res = await mcFetch(`${MC_BASE}/recall/car/${encodeURIComponent(vin)}?api_key=${encodeURIComponent(MC_KEY)}`, 10000);
-    if (!res || !res.ok) return null;
+    if (res && res.ok) {
+      // deno-lint-ignore no-explicit-any
+      const b: any = await res.json().catch(() => ({}));
+      // deno-lint-ignore no-explicit-any
+      const list: any[] = Array.isArray(b?.recalls) ? b.recalls : Array.isArray(b) ? b : [];
+      // A valid MarketCheck response (even an empty "no recalls" one) is
+      // authoritative and VIN-specific — prefer it over the model-level fallback.
+      if (Array.isArray(b?.recalls) || Array.isArray(b)) {
+        const open = list.filter((r) => !String(r.status || r.recall_status || "").toLowerCase().includes("close"));
+        return {
+          recall_status: list.length === 0 ? "clear" : open.length ? "open_recalls" : "clear",
+          open_recall_count: open.length,
+          recall_payload: { campaigns: list, checked_at: new Date().toISOString(), source: "marketcheck" },
+        };
+      }
+    }
+  } catch { /* fall through to NHTSA */ }
+  return await fetchNhtsaRecalls(ymm);
+}
+
+// ── NHTSA recallsByVehicle (free, model-level) ─────────────────
+async function fetchNhtsaRecalls(ymm: string | null) {
+  try {
+    if (!ymm) return null;
+    const parts = ymm.split(/\s+/);
+    const year = parts[0] && /^\d{4}$/.test(parts[0]) ? parts[0] : "";
+    const make = year ? parts[1] : parts[0];
+    const model = year ? parts.slice(2).join(" ") : parts.slice(1).join(" ");
+    if (!year || !make || !model) return null;
+    const url = `https://api.nhtsa.gov/recalls/recallsByVehicle?make=${encodeURIComponent(make)}&model=${encodeURIComponent(model)}&modelYear=${encodeURIComponent(year)}`;
+    const res = await fetch(url, { signal: AbortSignal.timeout(10000) });
+    if (!res.ok) return null;
     // deno-lint-ignore no-explicit-any
     const b: any = await res.json().catch(() => ({}));
     // deno-lint-ignore no-explicit-any
-    const list: any[] = Array.isArray(b?.recalls) ? b.recalls : Array.isArray(b) ? b : [];
-    const open = list.filter((r) => !String(r.status || r.recall_status || "").toLowerCase().includes("close"));
+    const list: any[] = Array.isArray(b?.Results) ? b.Results : [];
     return {
-      recall_status: list.length === 0 ? "clear" : open.length ? "open_recalls" : "clear",
-      open_recall_count: open.length,
-      recall_payload: { campaigns: list, checked_at: new Date().toISOString(), source: "marketcheck" },
+      recall_status: list.length === 0 ? "clear" : "open_recalls",
+      open_recall_count: list.length,
+      recall_payload: {
+        // deno-lint-ignore no-explicit-any
+        campaigns: list.map((r: any) => ({
+          campaign: r.NHTSACampaignNumber ?? r.CampaignNumber ?? null,
+          component: r.Component ?? null,
+          summary: r.Summary ?? null,
+          consequence: r.Consequence ?? null,
+          remedy: r.Remedy ?? null,
+        })),
+        checked_at: new Date().toISOString(),
+        source: "nhtsa",
+      },
     };
   } catch { return null; }
 }
@@ -319,7 +366,7 @@ serve(async (req) => {
     fetchComps(ymm, condition, zip, price, vin),
     INCLUDE_MDS ? fetchMds(ymm, condition, zip) : Promise.resolve(null),
     fetchHistory(vin),
-    fetchRecalls(vin),
+    fetchRecalls(vin, ymm),
     fetchBlackBook(vin, miles, zip),
   ]);
 
