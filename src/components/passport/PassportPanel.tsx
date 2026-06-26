@@ -637,10 +637,19 @@ function buildPanel(key: PassportPanelKey, d: PassportData, listing: VehicleList
         title: "Comparable Vehicles", subtitle: "See how this vehicle compares to similar listings in your market",
         primary: { label: "Reserve This Vehicle", onClick: () => go("reserve") },
         body: <>
-          <Hero icon={Car} tone={comps.length ? "blue" : "neutral"} label={comps.length ? `${comps.length} similar vehicles found` : "Comparables pending"}
-            note={comps.length ? [radius != null ? `${radius}-mile radius` : null, "Updated today", avg != null ? `Avg ${fmt$(avg)}` : null].filter(Boolean).join(" · ") : "Comparable listings appear once MarketCheck data is available."} />
-          {comps.length ? <CompExplorer comps={comps} current={current} avg={avg} cleanTitle={d.cleanTitle} oneOwner={d.ownerCount === 1} certified={listing.condition === "cpo"} /> : <Empty>Comparable vehicles will appear here once enough market data is available.</Empty>}
-          <Disclaimer />
+          {/* ── Mobile (<768px) — premium comparison experience ── */}
+          <div className="md:hidden space-y-4">
+            {comps.length ? <MobileCompExplorer comps={comps} current={current} avg={avg} radius={radius} flags={{ certified: listing.condition === "cpo", oneOwner: d.ownerCount === 1, cleanTitle: d.cleanTitle, noAccidents: d.accidentCount === 0, warranty: !!d.warrantyStr, isPreview }} /> : <Empty>Comparable vehicles will appear here once enough market data is available.</Empty>}
+            <Disclaimer />
+          </div>
+
+          {/* ── Desktop / tablet (≥768px) — unchanged ── */}
+          <div className="hidden md:block space-y-5">
+            <Hero icon={Car} tone={comps.length ? "blue" : "neutral"} label={comps.length ? `${comps.length} similar vehicles found` : "Comparables pending"}
+              note={comps.length ? [radius != null ? `${radius}-mile radius` : null, "Updated today", avg != null ? `Avg ${fmt$(avg)}` : null].filter(Boolean).join(" · ") : "Comparable listings appear once MarketCheck data is available."} />
+            {comps.length ? <CompExplorer comps={comps} current={current} avg={avg} cleanTitle={d.cleanTitle} oneOwner={d.ownerCount === 1} certified={listing.condition === "cpo"} /> : <Empty>Comparable vehicles will appear here once enough market data is available.</Empty>}
+            <Disclaimer />
+          </div>
         </>,
       };
     }
@@ -1411,6 +1420,144 @@ function CompExplorer({ comps, current, avg, cleanTitle, oneOwner, certified }: 
         <p className="text-[12px] text-[#64748B]">This vehicle is {current.price <= avg ? "below" : "above"} the {fmt$(avg)} comparable-set average.</p>
       )}
     </>
+  );
+}
+
+// Mobile-only premium comparison experience (same data as CompExplorer).
+interface CompFlags { certified: boolean; oneOwner: boolean; cleanTitle: boolean; noAccidents: boolean; warranty: boolean; isPreview: boolean }
+function MobileCompExplorer({ comps, current, avg, radius, flags }: { comps: Comp[]; current: { ymm: string; trim: string; mileage: number | null; price: number | null; dealer: string; dom: number | null }; avg: number | null; radius: number | null; flags: CompFlags }) {
+  const [sort, setSort] = useState<"match" | "price" | "miles" | "value" | "new">("match");
+  const sorted = useMemo(() => {
+    const by: Record<typeof sort, (a: Comp, b: Comp) => number> = {
+      match: (a, b) => (a.distNum ?? 1e9) - (b.distNum ?? 1e9),
+      price: (a, b) => (a.price ?? 1e12) - (b.price ?? 1e12),
+      miles: (a, b) => (a.mileage ?? 1e9) - (b.mileage ?? 1e9),
+      value: (a, b) => ((a.price ?? 1e12) + (a.mileage ?? 0) * 0.2) - ((b.price ?? 1e12) + (b.mileage ?? 0) * 0.2),
+      new: (a, b) => (a.dom ?? 1e9) - (b.dom ?? 1e9),
+    };
+    return [...comps].sort(by[sort]);
+  }, [comps, sort]);
+  const prices = comps.map((c) => c.price).filter((n): n is number => n != null);
+  const miles = comps.map((c) => c.mileage).filter((n): n is number => n != null);
+  const minPrice = prices.length ? Math.min(...prices) : null;
+  const minMiles = miles.length ? Math.min(...miles) : null;
+  const allPrices = [current.price, ...prices].filter((n): n is number => n != null);
+  const lo = allPrices.length ? Math.min(...allPrices) : null, hi = allPrices.length ? Math.max(...allPrices) : null;
+  const avgComp = prices.length ? Math.round(prices.reduce((a, b) => a + b, 0) / prices.length) : null;
+  const avgMiles = miles.length ? Math.round(miles.reduce((a, b) => a + b, 0) / miles.length) : null;
+  const yourPos = lo != null && hi != null && current.price != null ? Math.max(0, Math.min(100, ((current.price - lo) / Math.max(1, hi - lo)) * 100)) : null;
+  const cheaperCount = comps.filter((c) => c.price != null && current.price != null && current.price <= c.price).length;
+  const topPct = comps.length ? Math.max(5, Math.round(((comps.length - cheaperCount) / comps.length) * 100)) : null;
+  const SORTS: { k: typeof sort; l: string }[] = [{ k: "match", l: "Closest Match" }, { k: "price", l: "Lowest Price" }, { k: "miles", l: "Lowest Mileage" }, { k: "value", l: "Best Value" }, { k: "new", l: "Newest" }];
+  const wins: string[] = [];
+  if (current.mileage != null && avgMiles != null && current.mileage < avgMiles) wins.push("Lower mileage than most comparable vehicles");
+  if (current.price != null && avgComp != null && current.price < avgComp) wins.push("Below the comparable average price");
+  if (flags.certified) wins.push("Certified Pre-Owned");
+  if (flags.oneOwner) wins.push("One owner");
+  if (flags.cleanTitle && flags.noAccidents) wins.push("Clean title and history");
+  if (flags.warranty) wins.push("Factory warranty remaining");
+  const insights = [flags.oneOwner ? "One Owner" : null, flags.cleanTitle ? "Clean History" : null, flags.noAccidents ? "No Accidents" : null, flags.certified ? "Dealer Certified" : null, flags.warranty ? "Factory Warranty" : null].filter(Boolean) as string[];
+  const youCheaper = current.price != null && avgComp != null && current.price <= avgComp;
+
+  const Badge = ({ children, tone = "blue" }: { children: React.ReactNode; tone?: "blue" | "green" | "amber" }) => (
+    <span className={`text-[9px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full ${tone === "green" ? "bg-emerald-100 text-[#16A34A]" : tone === "amber" ? "bg-amber-100 text-[#B45309]" : "bg-blue-100 text-[#2563EB]"}`}>{children}</span>
+  );
+
+  return (
+    <div className="space-y-4">
+      {/* Hero */}
+      <div className="rounded-2xl p-5 text-white" style={{ background: "linear-gradient(160deg,#2563EB 0%,#1e50c8 100%)" }}>
+        <div className="flex items-center gap-3">
+          <span className="w-12 h-12 rounded-2xl bg-white/15 flex items-center justify-center shrink-0"><Car className="w-6 h-6" /></span>
+          <div><p className="text-[24px] font-extrabold leading-tight">{comps.length} Similar Vehicles</p><p className="text-[12px] opacity-90">{[radius != null ? `${radius}-mile radius` : null, "Updated today", avg != null ? `Avg ${fmt$(avg)}` : null].filter(Boolean).join(" · ")}</p></div>
+        </div>
+        <p className="text-[12px] opacity-90 mt-3">Matched on year, make, model, trim, mileage range, and equipment.</p>
+      </div>
+
+      {/* Filter chips */}
+      <div className="flex gap-2 overflow-x-auto -mx-1 px-1 pb-1">
+        {SORTS.map((s) => (
+          <button key={s.k} onClick={() => setSort(s.k)} className={`shrink-0 h-9 px-3.5 rounded-full text-[12px] font-bold transition-colors ${sort === s.k ? "bg-[#2563EB] text-white" : "bg-white border border-[#E6E8EC] text-[#64748B]"}`}>{s.l}</button>
+        ))}
+      </div>
+
+      {/* Your vehicle pinned */}
+      <div className="rounded-2xl border-2 border-[#2563EB] bg-blue-50/40 shadow-[0_8px_30px_rgba(37,99,235,0.12)] p-3 flex items-center gap-3">
+        <div className="w-20 h-16 rounded-xl bg-[#dbe4f5] overflow-hidden shrink-0 flex items-center justify-center"><Car className="w-7 h-7 text-[#2563EB]" /></div>
+        <div className="min-w-0 flex-1">
+          <Badge>Your Vehicle</Badge>
+          <p className="text-[14px] font-bold leading-tight line-clamp-1 mt-1">{current.ymm}</p>
+          {current.trim && <p className="text-[12px] text-[#64748B] line-clamp-1">{current.trim}</p>}
+          <p className="text-[11px] text-[#94A3B8]">{[current.mileage != null ? `${current.mileage.toLocaleString()} mi` : null, current.dom != null ? `${current.dom} days listed` : null].filter(Boolean).join(" · ")}</p>
+        </div>
+        {current.price != null && <p className="text-[16px] font-extrabold shrink-0">{fmt$(current.price)}</p>}
+      </div>
+
+      {/* Comparison cards */}
+      <div className="space-y-3">{sorted.map((c, i) => {
+        const diff = current.price != null && c.price != null ? c.price - current.price : null;
+        const badge = c.price === minPrice && minPrice != null ? { l: "Lowest Price", t: "green" as const } : c.mileage === minMiles && minMiles != null ? { l: "Lowest Mileage", t: "blue" as const } : null;
+        return (
+          <div key={i} className={`${CARD} p-3 flex items-center gap-3`}>
+            <span className="w-6 h-6 rounded-full bg-slate-100 text-[#64748B] text-[12px] font-bold flex items-center justify-center shrink-0">{i + 1}</span>
+            <div className="w-18 h-16 w-[72px] rounded-xl bg-[#eef0f3] overflow-hidden shrink-0 flex items-center justify-center">{c.image ? <img src={c.image} alt="" className="w-full h-full object-cover" /> : <Car className="w-6 h-6 text-[#94A3B8]" />}</div>
+            <div className="min-w-0 flex-1">
+              {badge && <Badge tone={badge.t}>{badge.l}</Badge>}
+              <p className="text-[13px] font-bold leading-tight line-clamp-1 mt-0.5">{c.ymm}</p>
+              <p className="text-[11px] text-[#94A3B8] line-clamp-1">{[c.mileage != null ? `${c.mileage.toLocaleString()} mi` : null, c.dealer, c.distance].filter(Boolean).join(" · ")}</p>
+            </div>
+            <div className="shrink-0 text-right">
+              {c.price != null && <p className="text-[15px] font-extrabold">{fmt$(c.price)}</p>}
+              {diff != null && diff !== 0 && <p className={`text-[11px] font-bold inline-flex items-center gap-0.5 ${diff < 0 ? "text-[#16A34A]" : "text-[#EF4444]"}`}>{diff < 0 ? <TrendingDown className="w-3 h-3" /> : <TrendingUp className="w-3 h-3" />}{fmt$(Math.abs(diff))} {diff < 0 ? "Less" : "More"}</p>}
+            </div>
+          </div>
+        );
+      })}</div>
+
+      {/* Price range slider */}
+      {lo != null && hi != null && yourPos != null && (
+        <Section title="Market price range">
+          <div className={`${CARD} p-4`}>
+            <div className="grid grid-cols-3 text-center mb-1 text-[11px] text-[#64748B]"><span>Lowest {fmt$(lo)}</span><span>Average {fmt$(avgComp ?? avg)}</span><span>Highest {fmt$(hi)}</span></div>
+            <div className="relative pt-6 h-2">
+              <div className="absolute top-6 left-0 right-0 h-2 rounded-full bg-gradient-to-r from-emerald-200 via-amber-100 to-rose-200" />
+              <div className="absolute -translate-x-1/2 text-center" style={{ left: `${yourPos}%`, top: 0 }}><span className="text-[10px] font-bold text-[#2563EB]">YOUR PRICE</span></div>
+              <span className="absolute top-6 -translate-y-0 -translate-x-1/2 w-4 h-4 rounded-full bg-[#2563EB] ring-[3px] ring-white shadow" style={{ left: `${yourPos}%` }} />
+            </div>
+          </div>
+        </Section>
+      )}
+
+      {/* Market position */}
+      {youCheaper && topPct != null && (
+        <div className={`${CARD} p-4 flex items-center gap-3`}>
+          <span className="w-11 h-11 rounded-2xl bg-emerald-50 flex items-center justify-center shrink-0"><Award className="w-6 h-6 text-[#16A34A]" /></span>
+          <div><p className="text-[12px] text-[#64748B]">Market Position</p><p className="text-[16px] font-extrabold text-[#16A34A]">Top {topPct}% · Excellent Value</p></div>
+        </div>
+      )}
+
+      {/* Why this vehicle wins */}
+      {wins.length > 0 && (
+        <Section title="Why this vehicle stands out">
+          <div className={`${CARD} p-4`}><ul className="space-y-2">{wins.map((w) => <Check key={w}>{w}</Check>)}</ul></div>
+        </Section>
+      )}
+
+      {/* Optional insights */}
+      {insights.length > 0 && (
+        <div className="flex flex-wrap gap-2">{insights.map((t) => <span key={t} className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-[#0F172A] bg-emerald-50 border border-emerald-200 rounded-full px-2.5 py-1"><CheckCircle2 className="w-3 h-3 text-[#16A34A]" />{t}</span>)}</div>
+      )}
+
+      {/* Market snapshot */}
+      <Section title="Market summary">
+        <div className={`${CARD} divide-y divide-[#F1F5F9]`}>
+          <div className="flex items-center justify-between px-4 py-3"><span className="text-[12px] text-[#64748B]">Vehicles Compared</span><span className="text-[15px] font-extrabold">{comps.length}</span></div>
+          <div className="flex items-center justify-between px-4 py-3"><span className="text-[12px] text-[#64748B]">Average Price</span><span className="text-[15px] font-extrabold">{avgComp != null ? fmt$(avgComp) : avg != null ? fmt$(avg) : "—"}</span></div>
+          <div className="flex items-center justify-between px-4 py-3"><span className="text-[12px] text-[#64748B]">Average Mileage</span><span className="text-[15px] font-extrabold">{avgMiles != null ? `${avgMiles.toLocaleString()} mi` : "—"}</span></div>
+          <div className="flex items-center justify-between px-4 py-3"><span className="text-[12px] text-[#64748B]">Inventory Trend</span><span className="text-[15px] font-extrabold text-[#16A34A]">{flags.isPreview ? "Declining" : "Tracking"}</span></div>
+        </div>
+      </Section>
+    </div>
   );
 }
 
