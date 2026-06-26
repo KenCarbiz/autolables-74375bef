@@ -4,7 +4,7 @@ import {
   ChevronLeft, ChevronRight, Upload, Bookmark, Printer, FileText, MessageSquare,
   RefreshCw, ShieldCheck, CheckCircle2, Star, Phone, Car, Cog, Fuel, Settings, Wind,
   Award, Wrench, DollarSign, Clock, Building2, Users, Truck, Lock, Zap, ArrowRight,
-  Package, Eye, Play, Rotate3d, TrendingUp, BadgeCheck, Gauge as GaugeIcon, Send,
+  Package, Eye, Play, Rotate3d, TrendingUp, BadgeCheck, Gauge as GaugeIcon, Send, MapPin,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Helmet } from "react-helmet-async";
@@ -13,6 +13,7 @@ import { useVehicleListing, type VehicleListing } from "@/hooks/useVehicleListin
 import { formatPhone } from "@/components/addendum/CustomerInfoSection";
 import Logo from "@/components/brand/Logo";
 import { derivePassport, computePriceHistory, fmt$ } from "@/lib/passportV2Data";
+import { resolveStickyButtons, type StickyBottomButtons } from "@/lib/stickyButtons";
 import PassportPanel, { type PassportPanelKey } from "@/components/passport/PassportPanel";
 import PassportCtaDock from "@/components/passport/PassportCtaDock";
 import PassportInfoModal, { type InfoModalKey } from "@/components/passport/PassportInfoModal";
@@ -206,6 +207,39 @@ const VehiclePassportV3 = () => {
     { icon: RefreshCw, label: "Value My Trade", onClick: () => go("trade") },
     { icon: Upload, label: "Share Vehicle", onClick: handleShare },
   ];
+
+  // Dealer-configurable sticky bar (admin → Passport CTAs). Resolves the chosen
+  // buttons/order/primary/labels; falls back to Call/Text/Test Drive/Today's
+  // Price when unconfigured. Drives both the desktop footer row and mobile bar.
+  const sticky = resolveStickyButtons((listing as unknown as { sticky_bottom_buttons?: StickyBottomButtons }).sticky_bottom_buttons);
+  const stickyAction = (key: string): { icon: React.ElementType; onClick: () => void } => {
+    const call = () => { if (d.dealerPhone) window.location.href = `tel:${d.dealerPhone}`; else go("contact"); };
+    const text = () => { if (d.dealerPhone) window.location.href = `sms:${d.dealerPhone.replace(/[^\d+]/g, "")}`; else go("text"); };
+    const directions = () => window.open(`https://maps.google.com/?q=${encodeURIComponent(d.dealerAddress || d.dealerName)}`, "_blank", "noopener");
+    const map: Record<string, { icon: React.ElementType; onClick: () => void }> = {
+      call: { icon: Phone, onClick: call },
+      text: { icon: MessageSquare, onClick: text },
+      test_drive: { icon: Clock, onClick: () => go("test-drive") },
+      todays_price: { icon: DollarSign, onClick: () => go("todays-price") },
+      contact_dealer: { icon: MessageSquare, onClick: () => go("contact") },
+      trade_appraisal: { icon: RefreshCw, onClick: () => go("trade") },
+      value_trade: { icon: RefreshCw, onClick: () => go("trade") },
+      reserve: { icon: BadgeCheck, onClick: () => go("reserve") },
+      pre_qualified: { icon: DollarSign, onClick: () => go("todays-price") },
+      apply_financing: { icon: DollarSign, onClick: () => go("todays-price") },
+      check_availability: { icon: CheckCircle2, onClick: () => go("check-availability") },
+      schedule_service: { icon: Clock, onClick: () => go("contact") },
+      payment_options: { icon: DollarSign, onClick: () => go("todays-price") },
+      calculate_payment: { icon: DollarSign, onClick: () => go("todays-price") },
+      send_to_phone: { icon: Send, onClick: handleShare },
+      save_vehicle: { icon: Bookmark, onClick: () => toast.success("Saved to this device") },
+      share_vehicle: { icon: Upload, onClick: handleShare },
+      directions: { icon: MapPin, onClick: directions },
+      chat: { icon: MessageSquare, onClick: () => go("contact") },
+      email_dealer: { icon: Send, onClick: () => go("contact") },
+    };
+    return map[key] || { icon: CheckCircle2, onClick: () => go("check-availability") };
+  };
 
   const mi = [
     { icon: DollarSign, title: "Market Price", strong: d.belowMarket && d.belowMarket > 0 ? "Great Price" : d.marketAvg != null ? "Market Price" : "Pending",
@@ -503,9 +537,10 @@ const VehiclePassportV3 = () => {
               <span className="inline-flex items-center gap-1.5"><Zap className="w-3.5 h-3.5 text-[#16A34A]" /> Instant Access</span>
             </div>
             <div className="hidden lg:flex items-center gap-2 text-[12px]">
-              {[{ i: Phone, l: "Call", fn: () => d.dealerPhone ? (window.location.href = `tel:${d.dealerPhone}`) : go("contact") }, { i: MessageSquare, l: "Text", fn: () => go("text") }, { i: Clock, l: "Test Drive", fn: () => go("test-drive") }, { i: DollarSign, l: "Today's Price", fn: () => go("todays-price"), primary: true }].map((b) => (
-                <button key={b.l} onClick={b.fn} className={`h-10 px-3.5 rounded-xl text-[12px] font-bold inline-flex items-center gap-1.5 transition-colors ${b.primary ? "bg-[#2563EB] text-white hover:bg-[#1d4fd7]" : "border border-[#E6E8EC] text-[#0F172A] hover:border-[#2563EB]"}`}><b.i className={`w-4 h-4 ${b.primary ? "" : "text-[#2563EB]"}`} /> {b.l}</button>
-              ))}
+              {sticky.enabled && sticky.items.map((it) => {
+                const a = stickyAction(it.key);
+                return <button key={it.key} onClick={a.onClick} className={`h-10 px-3.5 rounded-xl text-[12px] font-bold inline-flex items-center gap-1.5 transition-colors ${it.primary ? "bg-[#2563EB] text-white hover:bg-[#1d4fd7]" : "border border-[#E6E8EC] text-[#0F172A] hover:border-[#2563EB]"}`}><a.icon className={`w-4 h-4 ${it.primary ? "" : "text-[#2563EB]"}`} /> {it.label}</button>;
+              })}
             </div>
           </div>
           <p className="text-[11px] text-[#94A3B8] text-center pb-2">Information is provided by trusted third parties and is accurate to the best of our knowledge. Verify details with the dealer. © {new Date().getFullYear()} {d.dealerName}. All rights reserved.</p>
@@ -526,21 +561,22 @@ const VehiclePassportV3 = () => {
 
       {/* Mobile sticky bottom CTA — the small-screen counterpart of the desktop
           "Ready to take the next step?" card: blue gradient, rounded top,
-          white actions, Today's Price as the filled primary pill. */}
-      <div className="lg:hidden fixed bottom-0 inset-x-0 z-40 rounded-t-[20px] shadow-[0_-8px_30px_rgba(37,99,235,0.35)] px-3 pt-3 pb-[calc(10px+env(safe-area-inset-bottom))]" style={{ background: "linear-gradient(160deg,#2563EB 0%,#1e50c8 100%)" }}>
-        <div className="grid grid-cols-4 gap-2">
-          {[
-            { i: Phone, l: "Call", fn: () => d.dealerPhone ? (window.location.href = `tel:${d.dealerPhone}`) : go("contact") },
-            { i: MessageSquare, l: "Text", fn: () => go("text") },
-            { i: Clock, l: "Test Drive", fn: () => go("test-drive") },
-            { i: DollarSign, l: "Today's Price", fn: () => go("todays-price"), primary: true },
-          ].map((b) => (
-            <button key={b.l} onClick={b.fn} className={`h-12 rounded-xl text-[10px] leading-[1.05] font-bold inline-flex flex-col items-center justify-center gap-1 text-center px-0.5 transition-transform duration-150 active:scale-95 ${b.primary ? "bg-white text-[#2563EB] shadow-sm" : "bg-white/10 border border-white/40 text-white active:bg-white/20"}`}>
-              <b.i className="w-[18px] h-[18px]" /> {b.l}
-            </button>
-          ))}
+          white actions, primary as the filled white pill. Buttons, order,
+          primary, and labels are dealer-configurable (admin → Passport CTAs). */}
+      {sticky.enabled && sticky.items.length > 0 && (
+        <div className="lg:hidden fixed bottom-0 inset-x-0 z-40 rounded-t-[20px] shadow-[0_-8px_30px_rgba(37,99,235,0.35)] px-3 pt-3 pb-[calc(10px+env(safe-area-inset-bottom))]" style={{ background: "linear-gradient(160deg,#2563EB 0%,#1e50c8 100%)" }}>
+          <div className="grid gap-2" style={{ gridTemplateColumns: `repeat(${sticky.items.length}, minmax(0,1fr))` }}>
+            {sticky.items.map((it) => {
+              const a = stickyAction(it.key);
+              return (
+                <button key={it.key} onClick={a.onClick} className={`h-12 rounded-xl text-[10px] leading-[1.05] font-bold inline-flex flex-col items-center justify-center gap-1 text-center px-0.5 transition-transform duration-150 active:scale-95 ${it.primary ? "bg-white text-[#2563EB] shadow-sm" : "bg-white/10 border border-white/40 text-white active:bg-white/20"}`}>
+                  <a.icon className="w-[18px] h-[18px]" /> {it.label}
+                </button>
+              );
+            })}
+          </div>
         </div>
-      </div>
+      )}
 
       <PassportCtaDock go={go} dealerPhone={d.dealerPhone || undefined} reviewRating={d.reviewRating} advisor={adv} />
 
