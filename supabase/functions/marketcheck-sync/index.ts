@@ -690,6 +690,23 @@ serve(async (req) => {
         pruned = (pr || null) as { listings_deleted?: number; files_deleted?: number } | null;
       }
 
+      // Self-healing enrichment: the price-change gate above only queues new or
+      // re-priced VINs, so a car whose enrichment failed once (or predates the
+      // enrichment feature) would otherwise stay empty forever. Top up the queue
+      // with this tenant's never-enriched VINs, capped per run, so the nightly
+      // steadily backfills the whole lot instead of only churning fresh cars.
+      if (enrichQueue.length < ENRICH_CAP) {
+        const { data: stale } = await admin.from("vehicle_listings")
+          .select("vin").eq("tenant_id", cfg.tenant_id).is("enriched_at", null)
+          .limit(ENRICH_CAP - enrichQueue.length);
+        for (const s of (stale || []) as Array<{ vin: string }>) {
+          const v = normVin(s.vin);
+          if (v && enrichQueue.length < ENRICH_CAP && !enrichQueue.some((e) => e.vin === v && e.tenant_id === cfg.tenant_id)) {
+            enrichQueue.push({ tenant_id: cfg.tenant_id, vin: v, zip: tenantZip || undefined });
+          }
+        }
+      }
+
       tenantsSynced++;
       const status = { ran_at: now.toISOString(), seen: tenantSeen, new_vehicles: tenantNew, prices_recorded: tenantPrices, dealer_id: manualId, num_found: numFound, http: httpStatus, removed: pruned?.listings_deleted ?? 0, mc_param: chosen.param, mc_value: chosen.value, matched_dealer: verifiedName };
       diagnostics.push({ tenant_id: cfg.tenant_id, source, dealer_id: manualId, matched_dealer: verifiedName || "(by domain)", resolved: !cfg.dealer_id, num_found: numFound, http: httpStatus, seen: tenantSeen, listings_written: listingsUpserted, removed: pruned?.listings_deleted ?? 0, write_error: firstWriteErr, ...probe });

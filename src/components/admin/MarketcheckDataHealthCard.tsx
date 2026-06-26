@@ -17,6 +17,7 @@ import { Activity, Loader2, RefreshCw, CheckCircle2, AlertTriangle, MinusCircle 
 interface Row {
   vin: string;
   ymm: string | null;
+  condition: string | null;
   price: number | null;
   market_value: number | null;
   market_meta: { market_days_supply?: number | null; similar_count?: number | null } | null;
@@ -35,8 +36,11 @@ type PriceFlag = "ok" | "missing" | "nonpositive" | "equals_msrp";
 const priceFlag = (r: Row): PriceFlag => {
   if (r.price == null) return "missing";
   if (r.price <= 0) return "nonpositive";
+  // A NEW car advertised at MSRP is normal, not a parse error. Only treat
+  // price == MSRP as suspicious for used/CPO, where it usually means the feed
+  // handed us the original sticker instead of the dealer's advertised number.
   const msrp = r.mc_attributes?.msrp ?? null;
-  if (msrp != null && msrp > 0 && Math.abs(r.price - msrp) < 1) return "equals_msrp";
+  if (r.condition !== "new" && msrp != null && msrp > 0 && Math.abs(r.price - msrp) < 1) return "equals_msrp";
   return "ok";
 };
 
@@ -51,7 +55,7 @@ const SIGNALS = [
 ] as const;
 
 const SELECT =
-  "vin, ymm, price, market_value, market_meta, comparables, history_payload, recall_status, open_recall_count, blackbook, enriched_at, source_url, mc_attributes";
+  "vin, ymm, condition, price, market_value, market_meta, comparables, history_payload, recall_status, open_recall_count, blackbook, enriched_at, source_url, mc_attributes";
 
 interface SyncState {
   last_run_at: string | null;
@@ -113,15 +117,25 @@ export default function MarketcheckDataHealthCard() {
 
   const reEnrichStale = async () => {
     if (!tenantId || !rows) return;
-    const targets = rows.filter((r) => !r.enriched_at || SIGNALS.some((s) => !s.has(r))).slice(0, 25);
-    if (!targets.length) { toast.success("Every vehicle is fully enriched"); return; }
+    const incomplete = rows.filter((r) => !r.enriched_at || SIGNALS.some((s) => !s.has(r)));
+    if (!incomplete.length) { toast.success("Every vehicle is fully enriched"); return; }
+    const PER_CLICK = 40;                 // matches the server ENRICH_PER_RUN cap
+    const targets = incomplete.slice(0, PER_CLICK);
     setBulk(true);
     let done = 0;
-    for (const t of targets) {
-      try { await supabase.functions.invoke("vehicle-enrich", { body: { tenant_id: tenantId, vin: t.vin } }); done++; } catch { /* best-effort */ }
+    // Batch 4-concurrent to stay within MarketCheck rate limits while finishing
+    // a click in well under a minute.
+    for (let i = 0; i < targets.length; i += 4) {
+      const batch = targets.slice(i, i + 4);
+      await Promise.all(batch.map(async (t) => {
+        try { await supabase.functions.invoke("vehicle-enrich", { body: { tenant_id: tenantId, vin: t.vin } }); done++; } catch { /* best-effort */ }
+      }));
     }
     setBulk(false);
-    toast.success(`Re-enriched ${done} of ${targets.length} vehicles`);
+    const remaining = incomplete.length - done;
+    toast.success(remaining > 0
+      ? `Enriched ${done} · ${remaining} still incomplete — click "Re-pull incomplete" again to continue`
+      : `Enriched ${done} — every vehicle is now complete`);
     load();
   };
 
