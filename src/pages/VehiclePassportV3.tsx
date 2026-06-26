@@ -95,7 +95,7 @@ const Semi = ({ score }: { score: number }) => {
 // Never used for real shoppers — only renders when the query flag is present and
 // the page shows a prominent "Sample preview" banner. Lets the layout be judged
 // against the design goal before live data/back-end deploys land.
-const MOCK_LISTING = {
+export const MOCK_LISTING = {
   id: "mock", slug: "sample", vin: "5N1AL1F83VC332076", ymm: "2027 INFINITI QX60", trim: "LUXE AWD",
   condition: "new", status: "published", mileage: 17, price: 58140, market_value: 61300,
   hero_image_url: "https://images.unsplash.com/photo-1606664515524-ed2f786a0bd6?w=900",
@@ -165,7 +165,7 @@ const VehiclePassportV3 = () => {
     <div className="min-h-screen flex items-center justify-center px-6 bg-[#F6F7F9]"><div className="text-center"><Package className="w-12 h-12 text-slate-300 mx-auto mb-4" /><h1 className="text-xl font-bold">Vehicle unavailable</h1><p className="text-sm text-slate-500 mt-2">This listing may have been sold or unpublished.</p></div></div>
   );
 
-  const go = (section: string) => navigate(`/passport-v3/${listing.slug || vehicleSlug}/${section}`);
+  const go = (section: string) => navigate(`/passport-v3/${listing.slug || vehicleSlug}/${section}${isPreview ? "?preview=1" : ""}`);
   const viewUrl = publicUrl(listing.slug);
   const handleShare = async () => { try { if (navigator.share) { await navigator.share({ title: listing.ymm || "Vehicle", url: viewUrl }); return; } } catch { return; } go("share"); };
   const hero = gallery[idx] || gallery[0] || "";
@@ -298,14 +298,14 @@ const VehiclePassportV3 = () => {
               {/* Verification card */}
               {d.verifyRows.length > 0 && (
                 <div className={`${CARD} p-5`}>
-                  <div className="flex items-center gap-2.5">
-                    <span className="w-9 h-9 rounded-xl bg-emerald-50 flex items-center justify-center"><ShieldCheck className="w-5 h-5 text-[#16A34A]" /></span>
+                  <button onClick={() => go("verification")} className="flex items-center gap-2.5 text-left w-full">
+                    <span className="w-9 h-9 rounded-xl bg-emerald-50 flex items-center justify-center shrink-0"><ShieldCheck className="w-5 h-5 text-[#16A34A]" /></span>
                     <div><p className="text-[15px] font-bold">AutoLabels Verified</p><p className="text-[12px] text-[#64748B]">Independently checked against trusted automotive data.</p></div>
-                  </div>
+                  </button>
                   <div className="grid grid-cols-2 gap-x-6 gap-y-2.5 mt-4">
                     {[verifyL, verifyR].map((col, ci) => <div key={ci} className="space-y-2.5">{col.map((r) => <div key={r.label} className="flex items-center gap-2 text-[13px] font-medium text-[#0F172A]"><CheckCircle2 className="w-4 h-4 text-[#16A34A] shrink-0" />{r.label}</div>)}</div>)}
                   </div>
-                  <Link onClick={() => go("verification-report")} className="mt-4">View full verification report</Link>
+                  <Link onClick={() => go("verification")} className="mt-4">View full verification report</Link>
                 </div>
               )}
             </div>

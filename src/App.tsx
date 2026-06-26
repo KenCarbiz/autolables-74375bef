@@ -98,6 +98,7 @@ const PublicListing = lazy(() => import("./pages/PublicListing"));
 const VehiclePassportV2 = lazy(() => import("./pages/VehiclePassportV2"));
 const VehiclePassportV2Detail = lazy(() => import("./pages/VehiclePassportV2Detail"));
 const VehiclePassportV3 = lazy(() => import("./pages/VehiclePassportV3"));
+const VehiclePassportVerification = lazy(() => import("./pages/VehiclePassportVerification"));
 const PublicDocuments = lazy(() => import("./pages/PublicDocuments"));
 const PrepSignOff = lazy(() => import("./pages/PrepSignOff"));
 const ServiceInspection = lazy(() => import("./pages/ServiceInspection"));
@@ -170,6 +171,7 @@ const App = () => (
                       <Route path="/passport-v2/:vehicleSlug" element={<VehiclePassportV2 />} />
                       <Route path="/passport-v2/:vehicleSlug/:section" element={<VehiclePassportV2Detail />} />
                       <Route path="/passport-v3/:vehicleSlug" element={<VehiclePassportV3 />} />
+                      <Route path="/passport-v3/:vehicleSlug/verification" element={<VehiclePassportVerification />} />
                       <Route path="/passport-v3/:vehicleSlug/:section" element={<VehiclePassportV2Detail />} />
                       <Route path="/v/:slug/documents" element={<PublicDocuments />} />
                       <Route path="/deal/:token" element={<DealSigning />} />
