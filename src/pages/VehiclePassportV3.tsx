@@ -275,12 +275,12 @@ const VehiclePassportV3 = () => {
         </div>
       </header>
 
-      <main className="mx-auto max-w-[1320px] px-4 sm:px-5 py-5 sm:py-6 pb-[calc(76px+env(safe-area-inset-bottom))] lg:pb-6 space-y-6 lg:space-y-7">
+      <main className="mx-auto max-w-[1320px] px-4 sm:px-5 py-5 sm:py-6 pb-[calc(92px+env(safe-area-inset-bottom))] lg:pb-6 space-y-6 max-[767px]:space-y-8 lg:space-y-7">
         {/* 1–2. TOP ZONE */}
         <section className="grid grid-cols-1 lg:grid-cols-[minmax(0,380px)_1fr] gap-5">
           {/* Gallery */}
           <div>
-            <div className="relative overflow-hidden rounded-2xl bg-[#1f2227] aspect-[4/3]">
+            <div className="relative overflow-hidden rounded-2xl bg-[#1f2227] aspect-[4/3] max-[767px]:aspect-[5/4]">
               {hero ? <img src={hero} alt={listing.ymm || ""} onClick={() => go("gallery")} className="absolute inset-0 w-full h-full object-cover cursor-zoom-in" /> : <div className="absolute inset-0 flex items-center justify-center text-slate-500"><Car className="w-14 h-14" strokeWidth={1.25} /></div>}
               {photoCount > 0 && <span className="absolute left-3 top-3 text-white text-xs font-semibold px-2.5 py-1 rounded bg-black/60">{idx + 1} / {photoCount}</span>}
               {photoCount > 1 && <>
@@ -382,7 +382,7 @@ const VehiclePassportV3 = () => {
         {/* 5. PRIMARY TRUST GRID */}
         <section className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-5 items-stretch">
           {/* Why This Is A Great Buy */}
-          <div className={`${CARD} p-5 flex flex-col`}>
+          <div className={`${CARD} p-5 flex flex-col max-[767px]:p-6 max-[767px]:ring-1 max-[767px]:ring-blue-200 max-[767px]:shadow-[0_10px_30px_rgba(37,99,235,0.10)]`}>
             <H3>Why This Is A Great Buy</H3>
             {d.confScore != null && (
               <div className="flex flex-col items-center mt-3 rounded-xl bg-emerald-50/60 border border-emerald-100 p-3">
@@ -524,8 +524,10 @@ const VehiclePassportV3 = () => {
         </div>
       </div>
 
-      {/* Mobile sticky bottom nav — quick communication, primary on the right. */}
-      <div className="lg:hidden fixed bottom-0 inset-x-0 z-40 bg-white/95 backdrop-blur border-t border-[#E6E8EC] px-3 pt-2 pb-[calc(8px+env(safe-area-inset-bottom))]">
+      {/* Mobile sticky bottom CTA — the small-screen counterpart of the desktop
+          "Ready to take the next step?" card: blue gradient, rounded top,
+          white actions, Today's Price as the filled primary pill. */}
+      <div className="lg:hidden fixed bottom-0 inset-x-0 z-40 rounded-t-[20px] shadow-[0_-8px_30px_rgba(37,99,235,0.35)] px-3 pt-3 pb-[calc(10px+env(safe-area-inset-bottom))]" style={{ background: "linear-gradient(160deg,#2563EB 0%,#1e50c8 100%)" }}>
         <div className="grid grid-cols-4 gap-2">
           {[
             { i: Phone, l: "Call", fn: () => d.dealerPhone ? (window.location.href = `tel:${d.dealerPhone}`) : go("contact") },
@@ -533,8 +535,8 @@ const VehiclePassportV3 = () => {
             { i: Clock, l: "Test Drive", fn: () => go("test-drive") },
             { i: DollarSign, l: "Today's Price", fn: () => go("todays-price"), primary: true },
           ].map((b) => (
-            <button key={b.l} onClick={b.fn} className={`h-11 rounded-xl text-[10px] leading-[1.05] font-bold inline-flex flex-col items-center justify-center gap-0.5 text-center px-0.5 ${b.primary ? "bg-[#2563EB] text-white" : "border border-[#E6E8EC] bg-white text-[#0F172A]"}`}>
-              <b.i className={`w-4 h-4 ${b.primary ? "" : "text-[#2563EB]"}`} /> {b.l}
+            <button key={b.l} onClick={b.fn} className={`h-12 rounded-xl text-[10px] leading-[1.05] font-bold inline-flex flex-col items-center justify-center gap-1 text-center px-0.5 transition-transform duration-150 active:scale-95 ${b.primary ? "bg-white text-[#2563EB] shadow-sm" : "bg-white/10 border border-white/40 text-white active:bg-white/20"}`}>
+              <b.i className="w-[18px] h-[18px]" /> {b.l}
             </button>
           ))}
         </div>
