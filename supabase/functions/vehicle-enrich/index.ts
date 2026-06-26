@@ -40,13 +40,36 @@ const json = (status: number, body: unknown) =>
 // deno-lint-ignore no-explicit-any
 const num = (v: any): number | null => { if (v == null) return null; const n = Number(String(v).replace(/[^0-9.\-]/g, "")); return Number.isFinite(n) ? n : null; };
 
+// Market Days Supply is plan-gated on MarketCheck — it returns nothing on the
+// Basic tier (the Data Health "Days supply" column stays empty for every car),
+// so firing it on every enrich just burns ~1/6 of the per-VIN call budget for
+// data that never lands. Off by default; set ENRICH_INCLUDE_MDS=true only on a
+// plan that actually serves /mds/car.
+const INCLUDE_MDS = (Deno.env.get("ENRICH_INCLUDE_MDS") || "false").toLowerCase() === "true";
+
+// One 429-aware GET. MarketCheck throttles per second; on a 429 we wait briefly
+// and retry once so a transient rate-limit doesn't get mistaken for "no data"
+// and silently null out a signal — which would mark the car incomplete and
+// trigger a wasteful full re-pull, the opposite of what we want on a metered
+// (Basic) plan. Returns null on transport error or a persistent 429.
+async function mcFetch(url: string, timeoutMs: number): Promise<Response | null> {
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      const res = await fetch(url, { signal: AbortSignal.timeout(timeoutMs) });
+      if (res.status === 429 && attempt === 0) { await new Promise((r) => setTimeout(r, 1500)); continue; }
+      return res;
+    } catch { return null; }
+  }
+  return null;
+}
+
 // ── MarketCheck: predicted market value + range ────────────────
 async function fetchPredict(vin: string, miles: number | null) {
   try {
     const p = new URLSearchParams({ api_key: MC_KEY, vin });
     if (miles != null) p.set("miles", String(miles));
-    const res = await fetch(`${MC_BASE}/predict/car/price?${p.toString()}`, { signal: AbortSignal.timeout(10000) });
-    if (!res.ok) return null;
+    const res = await mcFetch(`${MC_BASE}/predict/car/price?${p.toString()}`, 10000);
+    if (!res || !res.ok) return null;
     // deno-lint-ignore no-explicit-any
     const b: any = await res.json().catch(() => ({}));
     return {
@@ -80,8 +103,8 @@ async function fetchComps(ymm: string | null, condition: string, zip: string | n
       if (make) p.set("make", make);
       if (model) p.set("model", model);
       if (opts.useZip && zip) { p.set("zip", zip); p.set("radius", "150"); }
-      const res = await fetch(`${MC_BASE}/search/car/active?${p.toString()}`, { signal: AbortSignal.timeout(10000) });
-      if (!res.ok) return null;
+      const res = await mcFetch(`${MC_BASE}/search/car/active?${p.toString()}`, 10000);
+      if (!res || !res.ok) return null;
       // deno-lint-ignore no-explicit-any
       const b: any = await res.json().catch(() => ({}));
       // deno-lint-ignore no-explicit-any
@@ -134,8 +157,8 @@ async function fetchComps(ymm: string | null, condition: string, zip: string | n
 // best-effort — absent data stays null and the Passport shows a pending state.
 async function fetchHistory(vin: string) {
   try {
-    const res = await fetch(`${MC_BASE}/history/car/${encodeURIComponent(vin)}?api_key=${encodeURIComponent(MC_KEY)}`, { signal: AbortSignal.timeout(12000) });
-    if (!res.ok) return null;
+    const res = await mcFetch(`${MC_BASE}/history/car/${encodeURIComponent(vin)}?api_key=${encodeURIComponent(MC_KEY)}`, 12000);
+    if (!res || !res.ok) return null;
     // deno-lint-ignore no-explicit-any
     const b: any = await res.json().catch(() => ({}));
     // deno-lint-ignore no-explicit-any
@@ -196,8 +219,8 @@ async function fetchMds(ymm: string | null, condition: string, zip: string | nul
     if (make) p.set("make", make);
     if (model) p.set("model", model);
     if (zip) { p.set("zip", zip); p.set("radius", "150"); }
-    const res = await fetch(`${MC_BASE}/mds/car?${p.toString()}`, { signal: AbortSignal.timeout(10000) });
-    if (!res.ok) return null;
+    const res = await mcFetch(`${MC_BASE}/mds/car?${p.toString()}`, 10000);
+    if (!res || !res.ok) return null;
     // deno-lint-ignore no-explicit-any
     const b: any = await res.json().catch(() => ({}));
     return {
@@ -211,8 +234,8 @@ async function fetchMds(ymm: string | null, condition: string, zip: string | nul
 // ── MarketCheck: VIN recall lookup ─────────────────────────────
 async function fetchRecalls(vin: string) {
   try {
-    const res = await fetch(`${MC_BASE}/recall/car/${encodeURIComponent(vin)}?api_key=${encodeURIComponent(MC_KEY)}`, { signal: AbortSignal.timeout(10000) });
-    if (!res.ok) return null;
+    const res = await mcFetch(`${MC_BASE}/recall/car/${encodeURIComponent(vin)}?api_key=${encodeURIComponent(MC_KEY)}`, 10000);
+    if (!res || !res.ok) return null;
     // deno-lint-ignore no-explicit-any
     const b: any = await res.json().catch(() => ({}));
     // deno-lint-ignore no-explicit-any
@@ -294,7 +317,7 @@ serve(async (req) => {
   const [predict, comps, mds, history, recalls, blackbook] = await Promise.all([
     fetchPredict(vin, miles),
     fetchComps(ymm, condition, zip, price, vin),
-    fetchMds(ymm, condition, zip),
+    INCLUDE_MDS ? fetchMds(ymm, condition, zip) : Promise.resolve(null),
     fetchHistory(vin),
     fetchRecalls(vin),
     fetchBlackBook(vin, miles, zip),
