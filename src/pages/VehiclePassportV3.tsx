@@ -13,7 +13,7 @@ import { useVehicleListing, type VehicleListing } from "@/hooks/useVehicleListin
 import { formatPhone } from "@/components/addendum/CustomerInfoSection";
 import Logo from "@/components/brand/Logo";
 import { derivePassport, computePriceHistory, fmt$ } from "@/lib/passportV2Data";
-import MarketPriceSlideOver from "@/components/passport/MarketPriceSlideOver";
+import PassportPanel, { type PassportPanelKey } from "@/components/passport/PassportPanel";
 
 // ──────────────────────────────────────────────────────────────
 // VehiclePassportV3 — /passport-v3/:vehicleSlug
@@ -141,9 +141,10 @@ const VehiclePassportV3 = () => {
   const [idx, setIdx] = useState(0);
   const [zip, setZip] = useState("");
   const [showSticky, setShowSticky] = useState(false);
-  const [marketOpen, setMarketOpen] = useState(false);
-  const marketTriggerRef = useRef<HTMLButtonElement>(null);
-  const closeMarket = () => { setMarketOpen(false); marketTriggerRef.current?.focus(); };
+  const [activePanel, setActivePanel] = useState<PassportPanelKey | null>(null);
+  const panelTriggerRef = useRef<HTMLElement | null>(null);
+  const openPanel = (key: PassportPanelKey, e?: React.MouseEvent) => { if (e) panelTriggerRef.current = e.currentTarget as HTMLElement; setActivePanel(key); };
+  const closePanel = () => { setActivePanel(null); panelTriggerRef.current?.focus(); };
 
   useEffect(() => {
     const onScroll = () => setShowSticky(window.scrollY > 360);
@@ -351,21 +352,14 @@ const VehiclePassportV3 = () => {
         <section className={`${CARD} p-5`}>
           <div className="flex items-center justify-between"><div><H2>Market Intelligence</H2><p className={`text-[13px] ${TEXT2} mt-0.5`}>Independent pricing, demand, and value analysis for this vehicle.</p></div><span className="text-[12px] text-[#94A3B8]">Powered by MarketCheck</span></div>
           <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-4 mt-5">
-            {mi.map((c) => {
-              const isMarket = c.section === "market-price";
-              return (
-              <div key={c.section} onClick={isMarket ? () => setMarketOpen(true) : undefined} className={`rounded-xl border border-[#E6E8EC] p-4 flex flex-col ${isMarket ? "cursor-pointer hover:border-[#2563EB] transition-colors" : ""}`}>
+            {mi.map((c) => (
+              <div key={c.section} onClick={(e) => openPanel(c.section as PassportPanelKey, e)} className="rounded-xl border border-[#E6E8EC] p-4 flex flex-col cursor-pointer hover:border-[#2563EB] transition-colors">
                 <div className="flex items-center gap-1.5 mb-2"><c.icon className="w-4 h-4 text-[#2563EB]" /><span className="text-[12px] font-semibold text-[#64748B]">{c.title}</span></div>
                 {c.donut != null ? <div className="flex flex-col items-center text-center"><Donut pct={c.donut} label={`${c.donut}`} /><p className="text-[14px] font-extrabold text-[#16A34A] leading-tight mt-2">{c.strong}</p><p className="text-[11px] text-[#64748B] leading-snug">{c.sub}</p></div>
                   : <><p className={`text-[16px] font-extrabold leading-tight ${/Great|High|Excellent|^-/.test(String(c.strong)) ? "text-[#16A34A]" : "text-[#0F172A]"}`}>{c.strong}</p><p className="text-[11px] text-[#64748B] leading-snug mt-0.5 flex-1">{c.sub}</p>{c.comps ? <div className="flex gap-1 mt-2">{[0, 1, 2].map((i) => <div key={i} className="flex-1 h-8 rounded bg-[#F1F5F9] flex items-center justify-center"><Car className="w-4 h-4 text-[#94A3B8]" /></div>)}</div> : c.chart}</>}
-                {isMarket ? (
-                  <button ref={marketTriggerRef} onClick={(e) => { e.stopPropagation(); setMarketOpen(true); }} className="mt-2.5 text-[12px] font-semibold text-[#2563EB] inline-flex items-center gap-1 hover:underline">{c.cta} <ArrowRight className="w-3.5 h-3.5" /></button>
-                ) : (
-                  <Link onClick={() => go(c.section)} className="mt-2.5 !text-[12px]">{c.cta}</Link>
-                )}
+                <button onClick={(e) => { e.stopPropagation(); openPanel(c.section as PassportPanelKey, e); }} className="mt-2.5 text-[12px] font-semibold text-[#2563EB] inline-flex items-center gap-1 hover:underline">{c.cta} <ArrowRight className="w-3.5 h-3.5" /></button>
               </div>
-              );
-            })}
+            ))}
           </div>
           <p className="text-[11px] text-[#94A3B8] mt-3">Market values are estimates from third-party data and may vary by region and time.</p>
         </section>
@@ -433,7 +427,7 @@ const VehiclePassportV3 = () => {
                 {expiry && <p className="text-[11px] text-[#64748B] mt-3">Expires {expiry}</p>}
               </>;
             })() : <p className="text-[13px] text-[#64748B] mt-3">Coverage details confirmed at the dealership.</p>}
-            <Link onClick={() => go("factory-warranty")} className="mt-auto pt-3 self-start">View warranty details</Link>
+            <Link onClick={() => openPanel("factory-warranty")} className="mt-auto pt-3 self-start">View warranty details</Link>
           </div>
 
           {/* What Owners Say */}
@@ -443,7 +437,7 @@ const VehiclePassportV3 = () => {
             {d.dealerTrust.reviewSources.length > 0 ? (
               <div className="mt-3 space-y-3">{d.dealerTrust.reviewSources.slice(0, 3).map((r, i) => <div key={i}><div className="flex items-center gap-2"><span className="text-[12px] font-bold">{r.name}</span>{r.rating != null && <Stars n={r.rating} size={12} />}</div>{r.quote && <p className="text-[12px] text-[#64748B] leading-snug">"{r.quote}"</p>}</div>)}</div>
             ) : <p className="text-[13px] text-[#64748B] mt-3">Verified dealership reviews appear here when the dealer connects a review source.</p>}
-            <Link onClick={() => go("owner-reviews")} className="mt-auto pt-3 self-start">Read all reviews</Link>
+            <Link onClick={() => openPanel("owner-reviews")} className="mt-auto pt-3 self-start">Read all reviews</Link>
           </div>
         </section>
 
@@ -456,14 +450,14 @@ const VehiclePassportV3 = () => {
             {highlights.length ? (
               <div className="grid grid-cols-4 gap-y-4 gap-x-2 mt-4">{highlights.slice(0, 8).map((h, i) => <div key={i} className="flex flex-col items-center text-center gap-1.5"><span className="w-10 h-10 rounded-xl bg-blue-50 flex items-center justify-center shrink-0"><h.icon className="w-5 h-5 text-[#2563EB]" /></span><div className="w-full min-w-0"><div className="text-[11px] font-bold leading-tight line-clamp-2 break-words">{h.t}</div><div className="text-[10px] text-[#94A3B8] truncate">{h.s}</div></div></div>)}</div>
             ) : <p className="text-[13px] text-[#64748B] mt-3">Equipment highlights appear here as the vehicle's data is decoded.</p>}
-            <Link onClick={() => go("features")} className="mt-auto pt-3 self-start">View all features &amp; specs</Link>
+            <Link onClick={() => openPanel("highlights")} className="mt-auto pt-3 self-start">View all features &amp; specs</Link>
           </div>
           {/* Overview */}
           <div className={`${CARD} p-5 flex flex-col`}>
             <H3>Vehicle Overview</H3>
             <p className="text-[13px] leading-relaxed text-[#64748B] mt-3 line-clamp-6">{d.overview}</p>
             {(gallery[1] || gallery[0]) && <img src={gallery[1] || gallery[0]} alt="" className="w-full aspect-[16/9] object-cover rounded-xl mt-3" />}
-            <Link onClick={() => go("overview")} className="mt-auto pt-3 self-start">Read full overview</Link>
+            <Link onClick={() => openPanel("overview")} className="mt-auto pt-3 self-start">Read full overview</Link>
           </div>
           {/* Why Buy From This Dealership (wider) */}
           <div className={`${CARD} p-5 flex flex-col`}>
@@ -564,15 +558,14 @@ const VehiclePassportV3 = () => {
         </div>
       </div>
 
-      <MarketPriceSlideOver
-        open={marketOpen}
-        onClose={closeMarket}
+      <PassportPanel
+        panel={activePanel}
+        onClose={closePanel}
+        openPanel={(key) => setActivePanel(key)}
         d={d}
         listing={listing}
         isPreview={isPreview}
-        onReserve={() => { closeMarket(); go("reserve"); }}
-        onSpecialist={() => { closeMarket(); go("contact"); }}
-        onViewComparables={() => { closeMarket(); go("comparable-vehicles"); }}
+        go={go}
       />
     </div>
   );
