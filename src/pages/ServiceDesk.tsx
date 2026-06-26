@@ -84,12 +84,12 @@ export default function ServiceDesk() {
 function ServiceQrCard({ tenantId, vin }: { tenantId: string; vin: string }) {
   const [token, setToken] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const url = token ? `${window.location.origin}/inspect/${token}` : "";
+  const url = token ? `${window.location.origin}/ready/${token}` : "";
 
   const generate = async () => {
     setBusy(true);
-    const { data, error } = await (supabase as any).rpc("issue_dept_signoff_token", {
-      p_tenant_id: tenantId, p_vin: vin, p_department: "service", p_purpose: "safety_inspection",
+    const { data, error } = await (supabase as any).rpc("issue_vehicle_ready_token", {
+      p_tenant_id: tenantId, p_vin: vin,
     });
     setBusy(false);
     if (error || !data) { toast.error("Could not generate QR"); return; }
@@ -98,8 +98,8 @@ function ServiceQrCard({ tenantId, vin }: { tenantId: string; vin: string }) {
 
   return (
     <div className="rounded-2xl border border-border bg-card p-5 space-y-3">
-      <div className="flex items-center gap-2"><QrCode className="w-4 h-4 text-primary" /><h2 className="font-bold text-foreground">Service inspection QR</h2></div>
-      <p className="text-sm text-muted-foreground">Print or show this to the technician. No login needed; it stops working once they submit.</p>
+      <div className="flex items-center gap-2"><QrCode className="w-4 h-4 text-primary" /><h2 className="font-bold text-foreground">Get-Ready QR (windshield)</h2></div>
+      <p className="text-sm text-muted-foreground">One code for this car. Service, detail, installers, and outside vendors all scan it, pick their station, and sign — no login. Each station locks once signed.</p>
       {!token ? (
         <button onClick={generate} disabled={busy} className="h-10 px-4 rounded-lg bg-primary text-primary-foreground text-sm font-semibold inline-flex items-center gap-2 disabled:opacity-50">
           {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <QrCode className="w-4 h-4" />} Generate QR
