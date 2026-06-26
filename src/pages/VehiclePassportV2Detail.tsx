@@ -584,6 +584,55 @@ const SECTIONS: Record<string, { title: string; render: SectionRender }> = {
     title: "Share This Vehicle",
     render: ({ listing, d }) => <ShareSection listing={listing} dealerName={d.dealerName} />,
   },
+  "gallery": {
+    title: "Photo Gallery",
+    render: ({ listing }) => {
+      const photos = (listing.photos || []).map((p) => p.url).filter(Boolean);
+      const all = photos.length ? photos : listing.hero_image_url ? [listing.hero_image_url] : [];
+      return (
+        <>
+          <SectionHeading icon={Car} title="Photo Gallery" subtitle={all.length ? `${all.length} photo${all.length === 1 ? "" : "s"} of this vehicle.` : "Photos of this vehicle."} />
+          {all.length ? (
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
+              {all.map((src, i) => (
+                <a key={i} href={src} target="_blank" rel="noreferrer" className="block rounded-xl overflow-hidden border border-[#e8ebef] bg-slate-100 aspect-[4/3] hover:opacity-95 transition-opacity">
+                  <img src={src} alt={`${listing.ymm || "Vehicle"} photo ${i + 1}`} loading="lazy" className="w-full h-full object-cover" />
+                </a>
+              ))}
+            </div>
+          ) : <Unavailable what="Vehicle photos" hint="The dealership can add photos to this vehicle's passport." />}
+        </>
+      );
+    },
+  },
+  "protect": {
+    title: "Protect This Vehicle",
+    render: ({ listing }) => (
+      <>
+        <SectionHeading icon={ShieldCheck} title="Protect This Vehicle" subtitle="Coverage options to consider with your purchase." />
+        <Card className="p-5 mb-4">
+          <p className="text-[13px] text-slate-600 mb-3">Ask the dealership about protection products that can extend or add to your coverage:</p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+            {[
+              ["Extended Service Contract", "Coverage beyond the factory warranty term."],
+              ["Prepaid Maintenance", "Lock in scheduled service at today's pricing."],
+              ["Tire & Wheel Protection", "Covers road-hazard tire and wheel damage."],
+              ["GAP Coverage", "Covers the gap between loan balance and value."],
+              ["Appearance Protection", "Interior and exterior surface protection."],
+              ["Certified Warranty Upgrade", "Manufacturer-backed coverage where eligible."],
+            ].map(([t, s]) => (
+              <div key={t} className="rounded-xl border border-[#e8ebef] p-3">
+                <p className="text-[13px] font-bold text-slate-800">{t}</p>
+                <p className="text-[12px] text-slate-500 mt-0.5">{s}</p>
+              </div>
+            ))}
+          </div>
+          <p className="text-[11px] text-slate-400 mt-3">Availability and pricing vary. The dealership will confirm which products apply to this vehicle.</p>
+        </Card>
+        <LeadForm listing={listing} intent="protection" label="Protection Options" cta="Request protection info" />
+      </>
+    ),
+  },
 };
 
 // Comparable Vehicles — fetches the marketcheck-comps function on demand.
