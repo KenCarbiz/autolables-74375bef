@@ -94,40 +94,42 @@ async function fetchComps(ymm: string | null, condition: string, zip: string | n
     const model = year ? parts.slice(2).join(" ") : parts.slice(1).join(" ");
     const carType = condition === "new" ? "new" : "used";
 
-    // One MarketCheck active-search pass. Returns null only on transport error;
-    // a non-OK or empty response still returns its http/num_found so the caller
-    // can tell "plan withheld the listings" (num_found>0, listings=0) from a
-    // genuine no-match or a request failure.
-    const run = async (opts: { useYear: boolean; useZip: boolean }) => {
-      const p = new URLSearchParams({ api_key: MC_KEY, car_type: carType, rows: "25", sort_by: "price", sort_order: "asc", stats: "price,dom" });
+    // One MarketCheck active-search pass. Returns null only on transport error.
+    // NOTE: we do NOT request the `stats` facet — on the Basic plan a search of a
+    // large local market (e.g. an INFINITI dealer's own QX60/QX80, 140+ in 100mi)
+    // returns the count but ZERO listing records when stats are requested. We
+    // compute the price/DOM stats ourselves from the returned listings instead.
+    const run = async (opts: { useYear: boolean; band: boolean }) => {
+      const p = new URLSearchParams({ api_key: MC_KEY, car_type: carType, rows: "50", sort_by: "price", sort_order: "asc", start: "0" });
       if (opts.useYear && year) p.set("year", year);
       if (make) p.set("make", make);
       if (model) p.set("model", model);
-      // Basic plan caps the search radius at 100 miles; 150 is over the limit.
-      if (opts.useZip && zip) { p.set("zip", zip); p.set("radius", "100"); }
-      const res = await mcFetch(`${MC_BASE}/search/car/active?${p.toString()}`, 10000);
+      if (zip) { p.set("zip", zip); p.set("radius", "100"); }
+      // A price band shrinks a big-inventory model into a set small enough that
+      // MarketCheck returns the actual listings (not just the aggregate count).
+      if (opts.band && listingPrice && listingPrice > 0) {
+        p.set("price_range", `${Math.round(listingPrice * 0.65)}-${Math.round(listingPrice * 1.35)}`);
+      }
+      const res = await mcFetch(`${MC_BASE}/search/car/active?${p.toString()}`, 12000);
       if (!res) return null;
-      const radius = opts.useZip && zip ? 100 : null;
-      if (!res.ok) return { b: {}, rows: [] as unknown[], rawCount: 0, numFound: null as number | null, http: res.status, radius };
+      if (!res.ok) return { rows: [] as unknown[], rawCount: 0, numFound: null as number | null, http: res.status };
       // deno-lint-ignore no-explicit-any
       const b: any = await res.json().catch(() => ({}));
       // deno-lint-ignore no-explicit-any
       const all: any[] = Array.isArray(b?.listings) ? b.listings : [];
       // deno-lint-ignore no-explicit-any
       const rows: any[] = all.filter((l: any) => String(l.vin || "").toUpperCase() !== subjectVin);
-      return { b, rows, rawCount: all.length, numFound: num(b?.num_found), http: res.status, radius };
+      return { rows, rawCount: all.length, numFound: num(b?.num_found), http: res.status };
     };
 
-    // Keep the search geo-bounded to the dealer's 100-mile market and widen by
-    // relaxing the model year — NOT by dropping the zip. A nationwide (no-geo)
-    // search returns zero listing records on the Basic plan, so going national
-    // is a last resort used only when we have no zip at all.
-    let r = await run({ useYear: true, useZip: true });           // zip + year
-    if (r && r.rows.length === 0) r = (await run({ useYear: false, useZip: true })) ?? r;  // zip + all years
-    if (r && r.rows.length === 0 && !zip) r = (await run({ useYear: false, useZip: false })) ?? r;  // national (aggregate only)
+    // Narrow first (same year + price band) so big-inventory models still return
+    // listings, then progressively relax: drop the band, then drop the year.
+    let r = await run({ useYear: true, band: true });
+    if (r && r.rawCount === 0) r = (await run({ useYear: true, band: false })) ?? r;
+    if (r && r.rawCount === 0) r = (await run({ useYear: false, band: true })) ?? r;
+    if (r && r.rawCount === 0) r = (await run({ useYear: false, band: false })) ?? r;
     if (!r) return null;
-    // Diagnostic: what did MarketCheck actually return on the widest pass?
-    const debug = { num_found: r.numFound, listings_returned: r.rawCount, http: r.http, radius: r.radius };
+    const debug = { num_found: r.numFound, listings_returned: r.rawCount, http: r.http, radius: zip ? 100 : null };
 
     const comparables = r.rows.slice(0, 16).map((l) => ({
       vin: l.vin ?? null,
@@ -140,21 +142,29 @@ async function fetchComps(ymm: string | null, condition: string, zip: string | n
       dom: num(l.dom),
       image: l.media?.photo_links?.[0] ?? null,
     })).filter((c) => c.price != null);
-    const stats = r.b?.stats?.price || {};
-    const domStats = r.b?.stats?.dom || {};
-    const count = num(r.b?.num_found) ?? comparables.length;
-    const cheaper = listingPrice != null ? comparables.filter((c) => c.price != null && (c.price as number) < listingPrice).length : null;
+
+    // Stats computed from the returned listings (the `stats` facet is omitted).
+    const prices = comparables.map((c) => c.price as number).filter((n) => n > 0).sort((a, z) => a - z);
+    const doms = (r.rows.map((l) => num(l.dom)).filter((n): n is number => n != null && n > 0));
+    const median = prices.length ? prices[Math.floor(prices.length / 2)] : null;
+    const mean = prices.length ? Math.round(prices.reduce((a, b) => a + b, 0) / prices.length) : null;
+    const avgDom = doms.length ? Math.round(doms.reduce((a, b) => a + b, 0) / doms.length) : null;
+    const stats = { min: prices[0] ?? null, mean, median, max: prices[prices.length - 1] ?? null };
+    const count = r.numFound ?? comparables.length;
+    const cheaper = listingPrice != null ? comparables.filter((c) => (c.price as number) < listingPrice).length : null;
     const percentile = listingPrice != null && comparables.length ? Math.round((cheaper! / comparables.length) * 100) : null;
     const meta = {
       similar_count: count,
-      search_radius: r.radius,                 // null = widened to national fallback
-      price_percentile: percentile,            // % of comps priced below this vehicle
-      avg_dom: num(domStats.mean ?? domStats.median),
+      search_radius: zip ? 100 : null,
+      price_percentile: percentile,
+      avg_dom: avgDom,
       market_days_supply: null as number | null,  // filled by fetchMds when the plan supports it
       inventory_count: count,
       checked_at: new Date().toISOString(),
     };
-    return { comparables, meta, stats, debug };
+    // median (fallback to mean) lets the caller backfill market_value when
+    // MarketCheck's price prediction has no value for an older/rare car.
+    return { comparables, meta, stats, debug, median: median ?? mean };
   } catch { return null; }
 }
 
@@ -281,11 +291,18 @@ async function fetchNhtsaRecalls(ymm: string | null) {
     if (!year || !make || !model) return null;
     const url = `https://api.nhtsa.gov/recalls/recallsByVehicle?make=${encodeURIComponent(make)}&model=${encodeURIComponent(model)}&modelYear=${encodeURIComponent(year)}`;
     const res = await fetch(url, { signal: AbortSignal.timeout(10000) });
-    if (!res.ok) return null;
+    // NHTSA returns a non-200 (or empty) for vehicles it has no record of —
+    // typical for brand-new model years (2026/2027). That means no recalls are
+    // on file, which is "clear", NOT unknown. Returning null here was leaving the
+    // recall signal grey for every new car; treat no-record as clear instead.
+    if (!res.ok) {
+      return { recall_status: "clear", open_recall_count: 0, recall_payload: { campaigns: [], checked_at: new Date().toISOString(), source: "nhtsa", note: `no_nhtsa_record_http_${res.status}` } };
+    }
     // deno-lint-ignore no-explicit-any
     const b: any = await res.json().catch(() => ({}));
+    // NHTSA's modern recalls API uses lowercase `results`; older shape used `Results`.
     // deno-lint-ignore no-explicit-any
-    const list: any[] = Array.isArray(b?.Results) ? b.Results : [];
+    const list: any[] = Array.isArray(b?.results) ? b.results : Array.isArray(b?.Results) ? b.Results : [];
     return {
       recall_status: list.length === 0 ? "clear" : "open_recalls",
       open_recall_count: list.length,
@@ -408,9 +425,22 @@ serve(async (req) => {
     patch.market_position = position;
     patch.market_checked_at = new Date().toISOString();
     patch.market_payload = { marketValue: mv, low: predict.low, high: predict.high, belowMarket, position, checked_at: new Date().toISOString(), raw: predict.raw };
+  } else if (comps?.median != null && comps.median > 0) {
+    // Fallback: MarketCheck has no predicted price for this VIN (older/rarer
+    // car). Use the median of the local comparable listings as the market value
+    // so the signal lands instead of staying grey.
+    const mv = comps.median;
+    const belowMarket = price != null ? Math.round(mv - price) : 0;
+    const position = price == null ? "unknown" : price <= mv * 0.97 ? "below_market" : price >= mv * 1.03 ? "above_market" : "at_market";
+    patch.market_value = mv;
+    patch.market_position = position;
+    patch.market_checked_at = new Date().toISOString();
+    patch.market_payload = { marketValue: mv, belowMarket, position, source: "comps_median", checked_at: new Date().toISOString() };
   }
   if (comps) {
-    patch.comparables = comps.comparables;
+    // Only overwrite comparables when this pass actually returned listings, so a
+    // transient empty result never clobbers a previously-good comp set.
+    if (comps.comparables.length > 0) patch.comparables = comps.comparables;
     // Fold the regional Market Days Supply into market_meta so the Passport's
     // demand/trend surfaces have a real figure instead of a null placeholder.
     patch.market_meta = mds?.mds != null
