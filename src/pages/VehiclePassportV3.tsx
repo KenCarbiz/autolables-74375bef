@@ -15,6 +15,8 @@ import Logo from "@/components/brand/Logo";
 import { derivePassport, computePriceHistory, fmt$ } from "@/lib/passportV2Data";
 import PassportPanel, { type PassportPanelKey } from "@/components/passport/PassportPanel";
 import PassportCtaDock from "@/components/passport/PassportCtaDock";
+import PassportInfoModal, { type InfoModalKey } from "@/components/passport/PassportInfoModal";
+import { Info } from "lucide-react";
 
 // ──────────────────────────────────────────────────────────────
 // VehiclePassportV3 — /passport-v3/:vehicleSlug
@@ -146,6 +148,10 @@ const VehiclePassportV3 = () => {
   const panelTriggerRef = useRef<HTMLElement | null>(null);
   const openPanel = (key: PassportPanelKey, e?: React.MouseEvent) => { if (e) panelTriggerRef.current = e.currentTarget as HTMLElement; setActivePanel(key); };
   const closePanel = () => { setActivePanel(null); panelTriggerRef.current?.focus(); };
+  const [activeInfo, setActiveInfo] = useState<InfoModalKey | null>(null);
+  const infoTriggerRef = useRef<HTMLElement | null>(null);
+  const openInfo = (key: InfoModalKey, e: React.MouseEvent) => { e.stopPropagation(); infoTriggerRef.current = e.currentTarget as HTMLElement; setActiveInfo(key); };
+  const closeInfo = () => { setActiveInfo(null); infoTriggerRef.current?.focus(); };
 
   useEffect(() => {
     const onScroll = () => setShowSticky(window.scrollY > 360);
@@ -315,10 +321,13 @@ const VehiclePassportV3 = () => {
               {/* Verification card */}
               {d.verifyRows.length > 0 && (
                 <div className={`${CARD} p-5`}>
-                  <button onClick={() => go("verification")} className="flex items-center gap-2.5 text-left w-full">
-                    <span className="w-9 h-9 rounded-xl bg-emerald-50 flex items-center justify-center shrink-0"><ShieldCheck className="w-5 h-5 text-[#16A34A]" /></span>
-                    <div><p className="text-[15px] font-bold">AutoLabels Verified</p><p className="text-[12px] text-[#64748B]">Independently checked against trusted automotive data.</p></div>
-                  </button>
+                  <div className="flex items-start gap-2">
+                    <button onClick={() => go("verification")} className="flex items-center gap-2.5 text-left flex-1 min-w-0">
+                      <span className="w-9 h-9 rounded-xl bg-emerald-50 flex items-center justify-center shrink-0"><ShieldCheck className="w-5 h-5 text-[#16A34A]" /></span>
+                      <div><p className="text-[15px] font-bold">AutoLabels Verified</p><p className="text-[12px] text-[#64748B]">Independently checked against trusted automotive data.</p></div>
+                    </button>
+                    <button onClick={(e) => openInfo("verification-process", e)} aria-label="How verification works" className="w-7 h-7 rounded-full hover:bg-slate-100 flex items-center justify-center shrink-0"><Info className="w-4 h-4 text-[#94A3B8]" /></button>
+                  </div>
                   <div className="grid grid-cols-2 gap-x-6 gap-y-2.5 mt-4">
                     {[verifyL, verifyR].map((col, ci) => <div key={ci} className="space-y-2.5">{col.map((r) => <div key={r.label} className="flex items-center gap-2 text-[13px] font-medium text-[#0F172A]"><CheckCircle2 className="w-4 h-4 text-[#16A34A] shrink-0" />{r.label}</div>)}</div>)}
                   </div>
@@ -351,7 +360,7 @@ const VehiclePassportV3 = () => {
 
         {/* 4. MARKET INTELLIGENCE */}
         <section className={`${CARD} p-5`}>
-          <div className="flex items-center justify-between"><div><H2>Market Intelligence</H2><p className={`text-[13px] ${TEXT2} mt-0.5`}>Independent pricing, demand, and value analysis for this vehicle.</p></div><span className="text-[12px] text-[#94A3B8]">Powered by MarketCheck</span></div>
+          <div className="flex items-center justify-between"><div><H2>Market Intelligence</H2><p className={`text-[13px] ${TEXT2} mt-0.5`}>Independent pricing, demand, and value analysis for this vehicle.</p></div><span className="text-[12px] text-[#94A3B8] inline-flex items-center gap-1">Powered by MarketCheck<button onClick={(e) => openInfo("data-sources", e)} aria-label="Data sources explained" className="w-4 h-4 inline-flex items-center justify-center"><Info className="w-3.5 h-3.5 text-[#94A3B8]" /></button></span></div>
           <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-4 mt-5">
             {mi.map((c) => (
               <div key={c.section} onClick={(e) => openPanel(c.section as PassportPanelKey, e)} className="rounded-xl border border-[#E6E8EC] p-4 flex flex-col cursor-pointer hover:border-[#2563EB] transition-colors">
@@ -372,7 +381,7 @@ const VehiclePassportV3 = () => {
             <H3>Why This Is A Great Buy</H3>
             {d.confScore != null && (
               <div className="flex flex-col items-center mt-3 rounded-xl bg-emerald-50/60 border border-emerald-100 p-3">
-                <p className="text-[11px] font-semibold text-[#64748B]">AutoLabels Confidence Score</p>
+                <p className="text-[11px] font-semibold text-[#64748B] inline-flex items-center gap-1">AutoLabels Confidence Score<button onClick={(e) => openInfo("score-meaning", e)} aria-label="What does this score mean?" className="w-4 h-4 inline-flex items-center justify-center"><Info className="w-3.5 h-3.5 text-[#94A3B8]" /></button></p>
                 <Semi score={d.confScore} />
                 <p className="text-[13px] font-extrabold text-[#16A34A] -mt-1">{d.confLabel} Value</p>
               </div>
@@ -414,7 +423,7 @@ const VehiclePassportV3 = () => {
 
           {/* Factory Warranty */}
           <div className={`${CARD} p-5 flex flex-col`}>
-            <H3>Factory Warranty</H3>
+            <div className="flex items-center gap-1.5"><H3>Factory Warranty</H3><button onClick={(e) => openInfo("warranty-terms", e)} aria-label="Warranty terminology" className="w-6 h-6 rounded-full hover:bg-slate-100 flex items-center justify-center"><Info className="w-3.5 h-3.5 text-[#94A3B8]" /></button></div>
             {d.warrantyStr ? (() => {
               const w = d.warranty;
               const milesLeft = w.factory_miles != null && listing.mileage != null ? Math.max(0, w.factory_miles - listing.mileage) : null;
@@ -525,6 +534,8 @@ const VehiclePassportV3 = () => {
       </div>
 
       <PassportCtaDock go={go} dealerPhone={d.dealerPhone || undefined} reviewRating={d.reviewRating} advisor={adv} />
+
+      <PassportInfoModal info={activeInfo} onClose={closeInfo} go={go} openPanel={(k) => setActivePanel(k as PassportPanelKey)} />
 
       <PassportPanel
         panel={activePanel}
