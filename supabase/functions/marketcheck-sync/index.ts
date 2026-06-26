@@ -275,7 +275,7 @@ serve(async (req) => {
 
   const admin = createClient(supabaseUrl, serviceKey, { auth: { persistSession: false, autoRefreshToken: false } });
 
-  let body: { tenant_id?: string; force?: boolean; lookup?: boolean; zip?: string; state?: string } = {};
+  let body: { tenant_id?: string; force?: boolean; lookup?: boolean; zip?: string; state?: string; enrich?: boolean } = {};
   try { body = await req.json(); } catch { /* empty body OK */ }
 
   // ── Auth gate ───────────────────────────────────────────────
@@ -731,8 +731,15 @@ serve(async (req) => {
   // Each VIN's enrich fans out ~6-8 MarketCheck requests; running several VINs
   // concurrently pushed past MarketCheck's rate limit and comps/history came
   // back partial. Process one VIN at a time so each gets the full dataset.
+  //
+  // This inline pass is bounded by the edge wall-clock (hence ENRICH_CAP ≈ 10),
+  // so it only chips away a slice per run — that is the NIGHTLY cron path. A
+  // manual "Re-pull full inventory" passes enrich:false because the browser
+  // then orchestrates a complete, rate-limit-safe enrich loop over EVERY VIN
+  // (no wall-clock limit, with live progress) — see MarketcheckDataHealthCard.
+  const runInlineEnrich = body.enrich !== false;
   let enriched = 0;
-  for (const e of enrichQueue) {
+  for (const e of runInlineEnrich ? enrichQueue : []) {
     try {
       const r = await fetch(`${supabaseUrl}/functions/v1/vehicle-enrich`, {
         method: "POST",

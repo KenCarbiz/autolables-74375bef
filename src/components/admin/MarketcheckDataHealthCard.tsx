@@ -79,6 +79,7 @@ export default function MarketcheckDataHealthCard() {
   const [busyVin, setBusyVin] = useState<string | null>(null);
   const [bulk, setBulk] = useState(false);
   const [fullPull, setFullPull] = useState(false);
+  const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
 
   const load = useCallback(async () => {
     if (!tenantId) return;
@@ -96,19 +97,48 @@ export default function MarketcheckDataHealthCard() {
 
   useEffect(() => { load(); }, [load]);
 
+  // Enrich EVERY incomplete VIN, one at a time. The edge function's inline pass
+  // is bounded by its wall-clock (≈10 cars/run), so a full pull alone leaves the
+  // rest with only price+value. The browser has no such limit: it queries the
+  // fresh incomplete set and walks it sequentially (each vehicle-enrich fans out
+  // ~6-8 MarketCheck requests; sequential keeps us under the rate limit), so a
+  // single action brings the WHOLE inventory to fully-enriched. Returns the count
+  // enriched; reports live progress so the admin can watch it complete.
+  const enrichAllIncomplete = useCallback(async (): Promise<number> => {
+    if (!tenantId) return 0;
+    const { data } = await (supabase as any).from("vehicle_listings").select(SELECT)
+      .eq("tenant_id", tenantId).limit(2000);
+    const incomplete = ((data as Row[]) || []).filter((r) => !r.enriched_at || CORE.some((s) => !s.has(r)));
+    if (!incomplete.length) { setProgress(null); return 0; }
+    setProgress({ done: 0, total: incomplete.length });
+    let done = 0;
+    for (const t of incomplete) {
+      try { await supabase.functions.invoke("vehicle-enrich", { body: { tenant_id: tenantId, vin: t.vin } }); } catch { /* best-effort */ }
+      done++;
+      setProgress({ done, total: incomplete.length });
+    }
+    setProgress(null);
+    return done;
+  }, [tenantId]);
+
   // Re-pull the ENTIRE inventory from the dealer's website via marketcheck-sync
-  // (force), which re-ingests every VIN and re-queues enrichment. Distinct from
-  // the per-VIN "Re-pull" which only re-enriches one already-ingested car.
+  // (force), which re-ingests every VIN, THEN enrich every car from the browser.
+  // We pass enrich:false so the edge function skips its bounded inline pass — the
+  // client loop below covers all of them with live progress instead.
   const rePullInventory = async () => {
     if (!tenantId) return;
     setFullPull(true);
-    const { data, error } = await supabase.functions.invoke("marketcheck-sync", { body: { tenant_id: tenantId, force: true } });
-    setFullPull(false);
-    if (error) { toast.error("Full inventory pull failed — check the MarketCheck key / domain"); return; }
-    const r = (data || {}) as { listings_seen?: number; new_vehicles?: number; prices_recorded?: number; enriched?: number; error?: string };
-    if (r.error === "not_configured") { toast.error("MARKETCHECK_API_KEY_1 is not set on the server"); return; }
+    const { data, error } = await supabase.functions.invoke("marketcheck-sync", { body: { tenant_id: tenantId, force: true, enrich: false } });
+    if (error) { setFullPull(false); toast.error("Full inventory pull failed — check the MarketCheck key / domain"); return; }
+    const r = (data || {}) as { listings_seen?: number; new_vehicles?: number; prices_recorded?: number; error?: string };
+    if (r.error === "not_configured") { setFullPull(false); toast.error("MARKETCHECK_API_KEY_1 is not set on the server"); return; }
     const seen = r.listings_seen ?? 0;
-    toast[seen > 0 ? "success" : "error"](`Pulled ${seen} vehicles · ${r.new_vehicles ?? 0} new · ${r.prices_recorded ?? 0} price updates · ${r.enriched ?? 0} enriched`);
+    if (seen === 0) { setFullPull(false); toast.error("Pulled 0 vehicles — check the MarketCheck key / domain"); load(); return; }
+    toast.success(`Pulled ${seen} vehicles · ${r.new_vehicles ?? 0} new · ${r.prices_recorded ?? 0} price updates · enriching all…`);
+    await load();
+    const enriched = await enrichAllIncomplete();
+    setFullPull(false);
+    toast.success(enriched > 0 ? `Enriched ${enriched} vehicles — inventory is fully up to date` : "Every vehicle was already fully enriched");
     load();
   };
 
@@ -124,25 +154,11 @@ export default function MarketcheckDataHealthCard() {
   };
 
   const reEnrichStale = async () => {
-    if (!tenantId || !rows) return;
-    const incomplete = rows.filter((r) => !r.enriched_at || CORE.some((s) => !s.has(r)));
-    if (!incomplete.length) { toast.success("Every vehicle is fully enriched"); return; }
-    const PER_CLICK = 25;
-    const targets = incomplete.slice(0, PER_CLICK);
+    if (!tenantId) return;
     setBulk(true);
-    let done = 0;
-    // Process ONE VIN at a time. Each vehicle-enrich fans out ~6-8 MarketCheck
-    // requests; running several cars at once pushed past MarketCheck's rate
-    // limit, so comps/history came back partial on bulk runs while a single
-    // re-pull returned everything. Sequential matches that single-car behavior.
-    for (const t of targets) {
-      try { await supabase.functions.invoke("vehicle-enrich", { body: { tenant_id: tenantId, vin: t.vin } }); done++; } catch { /* best-effort */ }
-    }
+    const done = await enrichAllIncomplete();
     setBulk(false);
-    const remaining = incomplete.length - done;
-    toast.success(remaining > 0
-      ? `Enriched ${done} · ${remaining} still incomplete — click "Re-pull incomplete" again to continue`
-      : `Enriched ${done} — every vehicle is now complete`);
+    toast.success(done > 0 ? `Enriched ${done} — every vehicle is now complete` : "Every vehicle is fully enriched");
     load();
   };
 
@@ -169,11 +185,11 @@ export default function MarketcheckDataHealthCard() {
             className="h-9 px-3 rounded-md border border-border text-xs font-semibold inline-flex items-center gap-1.5 hover:bg-muted disabled:opacity-50">
             {loading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />} Refresh
           </button>
-          <button onClick={reEnrichStale} disabled={bulk || loading || !rows?.length}
+          <button onClick={reEnrichStale} disabled={bulk || fullPull || loading || !rows?.length}
             className="h-9 px-3 rounded-md border border-border text-xs font-semibold inline-flex items-center gap-1.5 hover:bg-muted disabled:opacity-50">
             {bulk ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />} Re-pull incomplete
           </button>
-          <button onClick={rePullInventory} disabled={fullPull || loading}
+          <button onClick={rePullInventory} disabled={fullPull || bulk || loading}
             className="h-9 px-3 rounded-md bg-primary text-primary-foreground text-xs font-semibold inline-flex items-center gap-1.5 disabled:opacity-50">
             {fullPull ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />} Re-pull full inventory
           </button>
@@ -181,6 +197,17 @@ export default function MarketcheckDataHealthCard() {
       </div>
 
       <SyncStatusLine sync={sync} running={fullPull} />
+      {progress && (
+        <div className="space-y-1.5">
+          <div className="flex items-center justify-between text-xs font-medium text-muted-foreground">
+            <span className="inline-flex items-center gap-1.5"><Loader2 className="w-3.5 h-3.5 animate-spin" /> Enriching every vehicle — comps, recalls, VIN history, Black Book</span>
+            <span className="tabular-nums">{progress.done} / {progress.total}</span>
+          </div>
+          <div className="h-1.5 rounded-full bg-muted overflow-hidden">
+            <div className="h-full bg-[#16A34A] transition-all" style={{ width: `${progress.total ? Math.round((progress.done / progress.total) * 100) : 0}%` }} />
+          </div>
+        </div>
+      )}
       <p className="text-sm text-muted-foreground -mt-1 max-w-2xl">
         Every VIN in inventory and which enrichment data points actually landed on the last pull. Use this to confirm
         the nightly sync is receiving everything, and to re-pull any vehicle that came back incomplete.
@@ -230,7 +257,7 @@ export default function MarketcheckDataHealthCard() {
                       </td>
                     ))}
                     <td className="py-2 pl-2 text-right">
-                      <button onClick={() => reEnrich(r.vin)} disabled={busyVin === r.vin}
+                      <button onClick={() => reEnrich(r.vin)} disabled={busyVin === r.vin || bulk || fullPull}
                         className="h-7 px-2.5 rounded-md border border-border text-[11px] font-semibold inline-flex items-center gap-1 hover:bg-muted disabled:opacity-50">
                         {busyVin === r.vin ? <Loader2 className="w-3 h-3 animate-spin" /> : <RefreshCw className="w-3 h-3" />} Re-pull
                       </button>
