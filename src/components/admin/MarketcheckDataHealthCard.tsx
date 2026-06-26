@@ -53,28 +53,52 @@ const SIGNALS = [
 const SELECT =
   "vin, ymm, price, market_value, market_meta, comparables, history_payload, recall_status, open_recall_count, blackbook, enriched_at, source_url, mc_attributes";
 
+interface SyncState {
+  last_run_at: string | null;
+  last_status: { ran_at?: string; seen?: number; new_vehicles?: number; prices_recorded?: number; error?: string; note?: string } | null;
+}
+
 export default function MarketcheckDataHealthCard() {
   const { tenant } = useTenant();
   const tenantId = tenant?.id || null;
   const [rows, setRows] = useState<Row[] | null>(null);
+  const [sync, setSync] = useState<SyncState | null>(null);
   const [loading, setLoading] = useState(true);
   const [busyVin, setBusyVin] = useState<string | null>(null);
   const [bulk, setBulk] = useState(false);
+  const [fullPull, setFullPull] = useState(false);
 
   const load = useCallback(async () => {
     if (!tenantId) return;
     setLoading(true);
-    const { data, error } = await (supabase as any)
-      .from("vehicle_listings").select(SELECT)
-      .eq("tenant_id", tenantId)
-      .order("enriched_at", { ascending: true, nullsFirst: true })
-      .limit(300);
-    if (error) toast.error(error.message);
-    setRows((data as Row[]) || []);
+    const [listRes, cfgRes] = await Promise.all([
+      (supabase as any).from("vehicle_listings").select(SELECT)
+        .eq("tenant_id", tenantId).order("enriched_at", { ascending: true, nullsFirst: true }).limit(300),
+      (supabase as any).from("marketcheck_sync_config").select("last_run_at, last_status").eq("tenant_id", tenantId).maybeSingle(),
+    ]);
+    if (listRes.error) toast.error(listRes.error.message);
+    setRows((listRes.data as Row[]) || []);
+    setSync((cfgRes.data as SyncState) || null);
     setLoading(false);
   }, [tenantId]);
 
   useEffect(() => { load(); }, [load]);
+
+  // Re-pull the ENTIRE inventory from the dealer's website via marketcheck-sync
+  // (force), which re-ingests every VIN and re-queues enrichment. Distinct from
+  // the per-VIN "Re-pull" which only re-enriches one already-ingested car.
+  const rePullInventory = async () => {
+    if (!tenantId) return;
+    setFullPull(true);
+    const { data, error } = await supabase.functions.invoke("marketcheck-sync", { body: { tenant_id: tenantId, force: true } });
+    setFullPull(false);
+    if (error) { toast.error("Full inventory pull failed — check the MarketCheck key / domain"); return; }
+    const r = (data || {}) as { listings_seen?: number; new_vehicles?: number; prices_recorded?: number; enriched?: number; error?: string };
+    if (r.error === "not_configured") { toast.error("MARKETCHECK_API_KEY_1 is not set on the server"); return; }
+    const seen = r.listings_seen ?? 0;
+    toast[seen > 0 ? "success" : "error"](`Pulled ${seen} vehicles · ${r.new_vehicles ?? 0} new · ${r.prices_recorded ?? 0} price updates · ${r.enriched ?? 0} enriched`);
+    load();
+  };
 
   const reEnrich = async (vin: string) => {
     if (!tenantId) return;
@@ -119,17 +143,23 @@ export default function MarketcheckDataHealthCard() {
           <Activity className="w-4 h-4 text-[#16A34A]" />
           <h3 className="font-display text-lg font-bold tracking-tight text-foreground">MarketCheck data health</h3>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           <button onClick={load} disabled={loading}
             className="h-9 px-3 rounded-md border border-border text-xs font-semibold inline-flex items-center gap-1.5 hover:bg-muted disabled:opacity-50">
             {loading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />} Refresh
           </button>
           <button onClick={reEnrichStale} disabled={bulk || loading || !rows?.length}
-            className="h-9 px-3 rounded-md bg-primary text-primary-foreground text-xs font-semibold inline-flex items-center gap-1.5 disabled:opacity-50">
+            className="h-9 px-3 rounded-md border border-border text-xs font-semibold inline-flex items-center gap-1.5 hover:bg-muted disabled:opacity-50">
             {bulk ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />} Re-pull incomplete
+          </button>
+          <button onClick={rePullInventory} disabled={fullPull || loading}
+            className="h-9 px-3 rounded-md bg-primary text-primary-foreground text-xs font-semibold inline-flex items-center gap-1.5 disabled:opacity-50">
+            {fullPull ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />} Re-pull full inventory
           </button>
         </div>
       </div>
+
+      <SyncStatusLine sync={sync} running={fullPull} />
       <p className="text-sm text-muted-foreground -mt-1 max-w-2xl">
         Every VIN in inventory and which enrichment data points actually landed on the last pull. Use this to confirm
         the nightly sync is receiving everything, and to re-pull any vehicle that came back incomplete.
@@ -191,6 +221,37 @@ export default function MarketcheckDataHealthCard() {
           </table>
         </div>
       )}
+    </div>
+  );
+}
+
+function SyncStatusLine({ sync, running }: { sync: SyncState | null; running: boolean }) {
+  if (running) {
+    return (
+      <div className="flex items-center gap-2 rounded-xl border border-border bg-muted/40 px-4 py-2.5 text-sm text-muted-foreground">
+        <Loader2 className="w-4 h-4 animate-spin" /> Pulling full inventory from the dealer website…
+      </div>
+    );
+  }
+  if (!sync?.last_run_at) {
+    return (
+      <div className="flex items-center gap-2 rounded-xl border border-border bg-muted/40 px-4 py-2.5 text-sm text-muted-foreground">
+        <MinusCircle className="w-4 h-4 text-slate-400" /> No inventory pull has run yet for this dealer.
+      </div>
+    );
+  }
+  const st = sync.last_status || {};
+  const failed = !!st.error;
+  const seen = st.seen ?? 0;
+  return (
+    <div className={`flex items-start gap-2 rounded-xl border px-4 py-2.5 text-sm ${failed ? "border-red-200 bg-red-50 text-red-700" : "border-emerald-200 bg-emerald-50 text-emerald-800"}`}>
+      {failed ? <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0" /> : <CheckCircle2 className="w-4 h-4 mt-0.5 shrink-0" />}
+      <div>
+        <span className="font-semibold">Last full pull {new Date(sync.last_run_at).toLocaleString()}</span>
+        {failed
+          ? <span> — failed{st.note ? `: ${st.note}` : st.error ? `: ${st.error}` : ""}</span>
+          : <span> — success · {seen} vehicles · {st.new_vehicles ?? 0} new · {st.prices_recorded ?? 0} price updates</span>}
+      </div>
     </div>
   );
 }

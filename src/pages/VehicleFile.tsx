@@ -11,7 +11,7 @@ import {
   FileUp, Upload, Printer, Sparkles, Plus, ArrowUpRight,
   AlertTriangle, ShieldCheck, Lock, Unlock, Send, MessageSquare,
   Link as LinkIcon, X, QrCode, Trash2, Save, ShieldAlert, UserRound, Users,
-  ChevronRight, CircleAlert, Activity,
+  ChevronRight, CircleAlert, Activity, RefreshCw,
 } from "lucide-react";
 import { formatPhone, composeName } from "@/components/addendum/CustomerInfoSection";
 import EmptyState from "@/components/ui/empty-state";
@@ -84,6 +84,8 @@ interface VehicleRow {
   market_value: number | null;
   market_position: string | null;
   market_payload: { listingPrice?: number | null; low?: number | null; high?: number | null; belowMarket?: number } | null;
+  enriched_at: string | null;
+  market_checked_at: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -145,6 +147,7 @@ const VehicleFile = () => {
   const [tab, setTab] = useState<TabId>(initialTab);
   const [imgIdx, setImgIdx] = useState(0);
   const [publishing, setPublishing] = useState(false);
+  const [repulling, setRepulling] = useState(false);
 
   // Keep ?tab= in sync so deep-links + refreshes land on the same tab.
   useEffect(() => {
@@ -265,6 +268,29 @@ const VehicleFile = () => {
     }
   };
 
+  // Re-pull this VIN's MarketCheck enrichment (value, comps, days-supply,
+  // recalls, VIN history, Black Book) on demand. On success the row's
+  // enriched_at updates, so the "Last synced" stamp reflects the new run.
+  const repullMarket = async () => {
+    if (!vehicle?.vin || !vehicle.tenant_id) {
+      toast.error("Vehicle needs a VIN and tenant before it can sync");
+      return;
+    }
+    setRepulling(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("vehicle-enrich", {
+        body: { tenant_id: vehicle.tenant_id, vin: vehicle.vin },
+      });
+      if (error) { toast.error("Re-pull failed — check the MarketCheck key"); return; }
+      const pulled = (data as { pulled?: Record<string, unknown> })?.pulled;
+      const got = pulled ? Object.entries(pulled).filter(([, v]) => v && v !== 0).map(([k]) => k.replace(/_/g, " ")) : [];
+      await load();
+      toast.success(got.length ? `Synced: ${got.join(", ")}` : "Sync complete — no new data available");
+    } finally {
+      setRepulling(false);
+    }
+  };
+
   const tabs: { id: TabId; label: string; icon: typeof Car; count?: number }[] = [
     { id: "overview",  label: "Overview",  icon: Car },
     { id: "documents", label: "Documents", icon: FileUp, count: vehicle.documents?.length || undefined },
@@ -376,6 +402,26 @@ const VehicleFile = () => {
                       <Clock className="w-4 h-4" />
                       Created {new Date(vehicle.created_at).toLocaleDateString()}
                     </span>
+                  </div>
+                  {/* MarketCheck sync state + on-demand re-pull for this VIN.
+                      enriched_at updates after a successful pull, so the stamp
+                      always reflects the most recent sync's date and time. */}
+                  <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 text-sm pt-1">
+                    <span className="inline-flex items-center gap-1.5 text-muted-foreground">
+                      <Activity className="w-4 h-4" />
+                      {vehicle.enriched_at
+                        ? <>Last synced <span className="font-semibold text-foreground">{new Date(vehicle.enriched_at).toLocaleString()}</span></>
+                        : <span className="text-amber-600 font-medium">Not yet synced from MarketCheck</span>}
+                    </span>
+                    <button
+                      onClick={repullMarket}
+                      disabled={repulling || !vehicle.vin}
+                      title="Re-pull market value, comparables, days-supply, recalls, VIN history and Black Book for this VIN"
+                      className="inline-flex items-center gap-1.5 h-7 px-2.5 rounded-lg border border-border bg-background hover:bg-muted text-[12px] font-semibold disabled:opacity-50 transition-colors"
+                    >
+                      <RefreshCw className={`w-3.5 h-3.5 ${repulling ? "animate-spin" : ""}`} />
+                      {repulling ? "Syncing…" : "Re-pull market data"}
+                    </button>
                   </div>
                 </div>
 
