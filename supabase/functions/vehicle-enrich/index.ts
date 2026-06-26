@@ -40,23 +40,22 @@ const json = (status: number, body: unknown) =>
 // deno-lint-ignore no-explicit-any
 const num = (v: any): number | null => { if (v == null) return null; const n = Number(String(v).replace(/[^0-9.\-]/g, "")); return Number.isFinite(n) ? n : null; };
 
-// Market Days Supply is plan-gated on MarketCheck — it returns nothing on the
-// Basic tier (the Data Health "Days supply" column stays empty for every car),
-// so firing it on every enrich just burns ~1/6 of the per-VIN call budget for
-// data that never lands. Off by default; set ENRICH_INCLUDE_MDS=true only on a
-// plan that actually serves /mds/car.
-const INCLUDE_MDS = (Deno.env.get("ENRICH_INCLUDE_MDS") || "false").toLowerCase() === "true";
+// Market Days Supply (/mds/car) — active inventory ÷ 45-day sales rate for the
+// car's ymm in the local market. It DOES serve on the Basic tier, so it's on by
+// default; set ENRICH_INCLUDE_MDS=false to skip it on a plan that doesn't.
+const INCLUDE_MDS = (Deno.env.get("ENRICH_INCLUDE_MDS") || "true").toLowerCase() === "true";
 
-// One 429-aware GET. MarketCheck throttles per second; on a 429 we wait briefly
-// and retry once so a transient rate-limit doesn't get mistaken for "no data"
-// and silently null out a signal — which would mark the car incomplete and
-// trigger a wasteful full re-pull, the opposite of what we want on a metered
-// (Basic) plan. Returns null on transport error or a persistent 429.
+// 429-aware GET with exponential backoff. MarketCheck throttles per second; a
+// throttled call that we treat as "no data" silently nulls a signal (comps,
+// days-supply) and marks the car incomplete. Retry a couple of times with
+// growing delay so a transient rate-limit doesn't cost us the data. Returns
+// null only on transport error or a persistent throttle.
 async function mcFetch(url: string, timeoutMs: number): Promise<Response | null> {
-  for (let attempt = 0; attempt < 2; attempt++) {
+  const backoff = [1200, 2500];
+  for (let attempt = 0; attempt <= backoff.length; attempt++) {
     try {
       const res = await fetch(url, { signal: AbortSignal.timeout(timeoutMs) });
-      if (res.status === 429 && attempt === 0) { await new Promise((r) => setTimeout(r, 1500)); continue; }
+      if (res.status === 429 && attempt < backoff.length) { await new Promise((r) => setTimeout(r, backoff[attempt])); continue; }
       return res;
     } catch { return null; }
   }
@@ -361,14 +360,23 @@ serve(async (req) => {
 
   const ymm = (row.ymm as string | null) || null;
 
-  const [predict, comps, mds, history, recalls, blackbook] = await Promise.all([
-    fetchPredict(vin, miles),
-    fetchComps(ymm, condition, zip, price, vin),
-    INCLUDE_MDS ? fetchMds(ymm, condition, zip) : Promise.resolve(null),
-    fetchHistory(vin),
-    fetchRecalls(vin, ymm),
-    fetchBlackBook(vin, miles, zip),
-  ]);
+  // Black Book is a separate provider with its own rate limit, so it runs
+  // alongside the MarketCheck chain rather than competing with it.
+  const blackbookP = fetchBlackBook(vin, miles, zip);
+
+  // MarketCheck calls run STRICTLY one-at-a-time. Firing them in parallel
+  // bursts past MarketCheck's per-second limit and the heaviest call (comps
+  // search) was the one getting throttled and dropped — the same model would
+  // land comps on one VIN and not the next. Serialized + the browser's
+  // one-VIN-at-a-time loop means a single MarketCheck request in flight at any
+  // moment, which can't trip the RPS limit. (fetchRecalls tries MarketCheck
+  // then falls back to free NHTSA.)
+  const predict = await fetchPredict(vin, miles);
+  const comps = await fetchComps(ymm, condition, zip, price, vin);
+  const mds = INCLUDE_MDS ? await fetchMds(ymm, condition, zip) : null;
+  const history = await fetchHistory(vin);
+  const recalls = await fetchRecalls(vin, ymm);
+  const blackbook = await blackbookP;
 
   const patch: Record<string, unknown> = { enriched_at: new Date().toISOString() };
 
