@@ -172,22 +172,19 @@ export function RangeBar({ low, avg, high, dealer }: { low: number; avg: number;
   const span = Math.max(1, high - low);
   const pct = (v: number) => Math.max(0, Math.min(100, ((v - low) / span) * 100));
   const dealerPct = pct(dealer), avgPct = pct(avg);
-  // Edge-aware flag: anchor the label's edge to the marker near the ends so it
-  // extends inward and never clips against the card edge.
-  const flag = dealerPct <= 20
-    ? { transform: "none", align: "text-left items-start" }
-    : dealerPct >= 80
-      ? { transform: "translateX(-100%)", align: "text-right items-end" }
-      : { transform: "translateX(-50%)", align: "text-center items-center" };
+  // Caption sits below the bar, anchored under the marker. Edge-aware so the
+  // label/value never clips against the card edge when near the ends.
+  const align = dealerPct <= 16 ? "items-start text-left" : dealerPct >= 84 ? "items-end text-right" : "items-center text-center";
+  const tx = dealerPct <= 16 ? "none" : dealerPct >= 84 ? "translateX(-100%)" : "translateX(-50%)";
   return (
-    <div className="pt-7 pb-6 relative">
-      <div className={`absolute top-0 whitespace-nowrap flex flex-col ${flag.align}`} style={{ left: `${dealerPct}%`, transform: flag.transform }}>
-        <span className="text-[11px] font-semibold text-[#16A34A]">Dealer Price</span>
-        <span className="block text-[13px] font-extrabold text-[#0F172A] leading-tight">{fmt$(dealer)}</span>
-      </div>
+    <div className="pt-3 pb-11 relative">
       <div className="relative h-2 rounded-full bg-gradient-to-r from-emerald-200 via-amber-100 to-rose-200">
         <span className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-[3px] h-4 rounded bg-[#0F172A]" style={{ left: `${avgPct}%` }} />
         <span className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-4 h-4 rounded-full bg-[#16A34A] ring-[3px] ring-white shadow" style={{ left: `${dealerPct}%` }} />
+      </div>
+      <div className={`absolute top-[22px] whitespace-nowrap flex flex-col ${align}`} style={{ left: `${dealerPct}%`, transform: tx }}>
+        <span className="text-[11px] font-semibold text-[#16A34A]">Dealer Price</span>
+        <span className="text-[13px] font-extrabold text-[#0F172A] leading-tight">{fmt$(dealer)}</span>
       </div>
     </div>
   );
