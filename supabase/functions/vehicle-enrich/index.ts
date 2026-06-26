@@ -103,10 +103,11 @@ async function fetchComps(ymm: string | null, condition: string, zip: string | n
       if (opts.useYear && year) p.set("year", year);
       if (make) p.set("make", make);
       if (model) p.set("model", model);
-      if (opts.useZip && zip) { p.set("zip", zip); p.set("radius", "150"); }
+      // Basic plan caps the search radius at 100 miles; 150 is over the limit.
+      if (opts.useZip && zip) { p.set("zip", zip); p.set("radius", "100"); }
       const res = await mcFetch(`${MC_BASE}/search/car/active?${p.toString()}`, 10000);
       if (!res) return null;
-      const radius = opts.useZip && zip ? 150 : null;
+      const radius = opts.useZip && zip ? 100 : null;
       if (!res.ok) return { b: {}, rows: [] as unknown[], rawCount: 0, numFound: null as number | null, http: res.status, radius };
       // deno-lint-ignore no-explicit-any
       const b: any = await res.json().catch(() => ({}));
@@ -117,12 +118,13 @@ async function fetchComps(ymm: string | null, condition: string, zip: string | n
       return { b, rows, rawCount: all.length, numFound: num(b?.num_found), http: res.status, radius };
     };
 
-    // Prefer local same-year comps; widen to national, then to all model years,
-    // so an oddball used trade-in (off-brand, rare config) still gets a price set
-    // instead of an empty Comparables column.
-    let r = await run({ useYear: true, useZip: true });
-    if (r && r.rows.length === 0) r = (await run({ useYear: true, useZip: false })) ?? r;
-    if (r && r.rows.length === 0) r = (await run({ useYear: false, useZip: false })) ?? r;
+    // Keep the search geo-bounded to the dealer's 100-mile market and widen by
+    // relaxing the model year — NOT by dropping the zip. A nationwide (no-geo)
+    // search returns zero listing records on the Basic plan, so going national
+    // is a last resort used only when we have no zip at all.
+    let r = await run({ useYear: true, useZip: true });           // zip + year
+    if (r && r.rows.length === 0) r = (await run({ useYear: false, useZip: true })) ?? r;  // zip + all years
+    if (r && r.rows.length === 0 && !zip) r = (await run({ useYear: false, useZip: false })) ?? r;  // national (aggregate only)
     if (!r) return null;
     // Diagnostic: what did MarketCheck actually return on the widest pass?
     const debug = { num_found: r.numFound, listings_returned: r.rawCount, http: r.http, radius: r.radius };
@@ -225,7 +227,7 @@ async function fetchMds(ymm: string | null, condition: string, zip: string | nul
     if (year) p.set("year", year);
     if (make) p.set("make", make);
     if (model) p.set("model", model);
-    if (zip) { p.set("zip", zip); p.set("radius", "150"); }
+    if (zip) { p.set("zip", zip); p.set("radius", "100"); }
     const res = await mcFetch(`${MC_BASE}/mds/car?${p.toString()}`, 10000);
     if (!res || !res.ok) return null;
     // deno-lint-ignore no-explicit-any
@@ -363,8 +365,18 @@ serve(async (req) => {
   const miles = num(row.mileage);
   const price = num(row.price);
   const condition = String(row.condition || "used");
+  // Resolve a ZIP for the geo-bounded comps/MDS search. dealer_snapshot.zip is
+  // empty in practice, so fall back to the dealer profile's saved zip. Without a
+  // zip the search runs nationwide, and on the Basic plan (100-mile radius cap)
+  // a no-geo search returns the aggregate count but ZERO listing records — which
+  // is exactly why Comparables came back empty for every car.
   // deno-lint-ignore no-explicit-any
-  const zip = body.zip || (row.dealer_snapshot as any)?.zip || null;
+  let zip: string | null = body.zip || (row.dealer_snapshot as any)?.zip || null;
+  if (!zip) {
+    const { data: prof } = await admin.from("dealer_profiles").select("settings").eq("tenant_id", tenantId).maybeSingle();
+    const pset = (prof?.settings || {}) as Record<string, string>;
+    zip = pset.dealer_zip || pset.zip || pset.doc_fee_zip || null;
+  }
 
   const ymm = (row.ymm as string | null) || null;
 
