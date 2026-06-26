@@ -172,9 +172,16 @@ export function RangeBar({ low, avg, high, dealer }: { low: number; avg: number;
   const span = Math.max(1, high - low);
   const pct = (v: number) => Math.max(0, Math.min(100, ((v - low) / span) * 100));
   const dealerPct = pct(dealer), avgPct = pct(avg);
+  // Edge-aware flag: anchor the label's edge to the marker near the ends so it
+  // extends inward and never clips against the card edge.
+  const flag = dealerPct <= 20
+    ? { transform: "none", align: "text-left items-start" }
+    : dealerPct >= 80
+      ? { transform: "translateX(-100%)", align: "text-right items-end" }
+      : { transform: "translateX(-50%)", align: "text-center items-center" };
   return (
     <div className="pt-7 pb-6 relative">
-      <div className="absolute top-0 -translate-x-1/2 text-center whitespace-nowrap" style={{ left: `${dealerPct}%` }}>
+      <div className={`absolute top-0 whitespace-nowrap flex flex-col ${flag.align}`} style={{ left: `${dealerPct}%`, transform: flag.transform }}>
         <span className="text-[11px] font-semibold text-[#16A34A]">Dealer Price</span>
         <span className="block text-[13px] font-extrabold text-[#0F172A] leading-tight">{fmt$(dealer)}</span>
       </div>
