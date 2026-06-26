@@ -1,14 +1,14 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   DollarSign, TrendingUp, TrendingDown, Gauge, Clock, Car, Package, ShieldCheck,
   Star, Award, FileText, MessageSquare, Eye, CheckCircle2,
-  Flame, Heart, Send, Bookmark, Users, Circle, ChevronDown,
+  Flame, Heart, Send, Bookmark, Users, Circle, ChevronDown, MapPin, BadgeCheck,
 } from "lucide-react";
-import type { PassportData } from "@/lib/passportV2Data";
+import type { PassportData, PricePoint } from "@/lib/passportV2Data";
 import { fmt$ } from "@/lib/passportV2Data";
 import type { VehicleListing } from "@/hooks/useVehicleListing";
 import {
-  PassportSlideOver, Hero, Section, Check, Empty, StatRow, RangeBar, TrendChart, Ring, CARD,
+  PassportSlideOver, Hero, Section, Check, Empty, StatRow, RangeBar, TrendChart, Ring, CARD, GREEN, BLUE,
 } from "./PassportSlideOver";
 
 // ──────────────────────────────────────────────────────────────
@@ -24,26 +24,34 @@ export type PassportPanelKey =
   | "comparable-vehicles" | "inventory-trend" | "factory-warranty"
   | "owner-reviews" | "highlights" | "overview" | "key-specs";
 
-interface Comp { ymm: string; trim: string; mileage: number | null; price: number | null; distance: string | null; image: string | null }
+interface Comp { ymm: string; trim: string; mileage: number | null; price: number | null; distance: string | null; distNum: number | null; image: string | null; dealer: string | null; dom: number | null }
 
 const deriveComps = (listing: VehicleListing, d: PassportData, isPreview: boolean): Comp[] => {
   const mc = (listing.mc_attributes || {}) as Record<string, unknown>;
   const raw = (listing as unknown as { comparables?: unknown }).comparables ?? (mc.comparables as unknown);
-  const real: Comp[] = (Array.isArray(raw) ? raw : []).map((c) => c as Record<string, unknown>).map((c) => ({
-    ymm: String(c.ymm ?? c.heading ?? [c.year, c.make, c.model].filter(Boolean).join(" ") ?? ""),
-    trim: String(c.trim ?? ""),
-    mileage: c.miles != null ? Number(c.miles) : c.mileage != null ? Number(c.mileage) : null,
-    price: c.price != null ? Number(c.price) : null,
-    distance: c.dist != null ? `${Math.round(Number(c.dist))} mi away` : c.distance != null ? String(c.distance) : null,
-    image: (c.image as string) ?? (c.photo_url as string) ?? null,
-  })).filter((c) => c.ymm);
+  const real: Comp[] = (Array.isArray(raw) ? raw : []).map((c) => c as Record<string, unknown>).map((c) => {
+    const distNum = c.dist != null ? Number(c.dist) : c.distance != null ? Number(c.distance) : null;
+    return {
+      ymm: String(c.ymm ?? c.heading ?? [c.year, c.make, c.model].filter(Boolean).join(" ") ?? ""),
+      trim: String(c.trim ?? ""),
+      mileage: c.miles != null ? Number(c.miles) : c.mileage != null ? Number(c.mileage) : null,
+      price: c.price != null ? Number(c.price) : null,
+      distance: distNum != null && !Number.isNaN(distNum) ? `${Math.round(distNum)} mi away` : null,
+      distNum: distNum != null && !Number.isNaN(distNum) ? distNum : null,
+      image: (c.image as string) ?? (c.photo_url as string) ?? null,
+      dealer: (c.dealer as string) ?? (c.seller_name as string) ?? (c.dealer_name as string) ?? null,
+      dom: c.dom != null ? Number(c.dom) : c.days_on_market != null ? Number(c.days_on_market) : null,
+    };
+  }).filter((c) => c.ymm);
   if (real.length) return real;
   const price = d.price;
   if (!isPreview || price == null) return [];
-  const offs = [2760, 4360, 4360, 4360];
-  const miles = [12, 18, 18, 22];
-  const dist = ["2.3 mi away", "4.1 mi away", "6.7 mi away", "6.7 mi away"];
-  return offs.map((o, i) => ({ ymm: listing.ymm || "Comparable", trim: listing.trim || "", mileage: miles[i], price: price + o, distance: dist[i], image: listing.hero_image_url || null }));
+  const offs = [2760, 4360, 3850, 5200, 1900, 4360, 6100, 3200];
+  const miles = [12, 18, 9, 24, 15, 18, 31, 11];
+  const distN = [2.3, 4.1, 6.7, 6.7, 9.2, 12.4, 15.1, 18.9];
+  const doms = [12, 31, 8, 45, 22, 51, 19, 37];
+  const dealers = ["Hartford INFINITI", "Premier Auto Group", "Valley Motors", "City Luxury Cars", "North Shore Auto", "Gateway Motors", "Summit Auto", "Lakeside INFINITI"];
+  return offs.map((o, i) => ({ ymm: listing.ymm || "Comparable", trim: listing.trim || "", mileage: miles[i], price: price + o, distance: `${distN[i]} mi away`, distNum: distN[i], image: listing.hero_image_url || null, dealer: dealers[i], dom: doms[i] }));
 };
 
 const CompStrip = ({ comps }: { comps: Comp[] }) => (
@@ -307,33 +315,68 @@ function buildPanel(key: PassportPanelKey, d: PassportData, listing: VehicleList
     }
 
     case "price-history": {
+      const priced = d.valueHistory.filter((h) => h.listing_price != null);
       const has = dealerSeries.length >= 2;
       const total = d.priceChangeTotal, recent = d.priceChange7d;
+      const lows = priced.map((h) => h.listing_price as number);
+      const lowest = lows.length ? Math.min(...lows) : null;
+      const highest = lows.length ? Math.max(...lows) : null;
+      const daysListed = d.dom ?? (priced.length ? Math.round((Date.now() - new Date(priced[0].captured_at).getTime()) / 86400000) : null);
+      const trendLabel = total == null || total === 0 ? "Price Stable" : total < 0 ? "Price Reduced" : "Recently Increased";
+      const events = priced.slice(1).map((h, i) => {
+        const prev = priced[i].listing_price as number, cur = h.listing_price as number;
+        return { date: new Date(h.captured_at).toLocaleDateString(), before: prev, after: cur, delta: cur - prev };
+      }).filter((e) => e.delta !== 0).reverse();
+      const pctDiff = avg != null && price != null ? Math.round(((price - avg) / avg) * 100) : null;
       return {
-        title: "Price History", subtitle: "How the asking price has moved",
-        primary: { label: "Check Availability", onClick: () => go("check-availability") },
+        title: "Price History", subtitle: "See how this vehicle's price has changed over time",
+        primary: { label: "Reserve This Vehicle", onClick: () => go("reserve") },
         body: <>
-          <Hero icon={Clock} tone={total != null && total < 0 ? "green" : "neutral"}
-            label={total != null && total !== 0 ? `${total < 0 ? "-" : "+"}${fmt$(Math.abs(total))} since listed` : "Price tracked"}
-            note={recent != null ? (recent < 0 ? `Down ${fmt$(Math.abs(recent))} in the last 7 days` : recent > 0 ? `Up ${fmt$(Math.abs(recent))} in the last 7 days` : "Stable over the last 7 days") : "Each price change is recorded here."} />
+          <Hero icon={Clock} tone={total != null && total < 0 ? "green" : "neutral"} label={trendLabel}
+            value={price != null ? fmt$(price) : undefined}
+            note={total != null && total !== 0 ? `${total < 0 ? "Down" : "Up"} ${fmt$(Math.abs(total))} since listed` : recent != null && recent !== 0 ? `${recent < 0 ? "Down" : "Up"} ${fmt$(Math.abs(recent))} in 7 days` : "Each price change is recorded here."} />
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <Stat label="Price Change" value={total != null ? `${total < 0 ? "-" : total > 0 ? "+" : ""}${fmt$(Math.abs(total))}` : "—"} tone={total != null && total < 0 ? "green" : "neutral"} />
+            <Stat label="Days Listed" value={daysListed != null ? String(daysListed) : "—"} />
+            <Stat label="Lowest Price" value={lowest != null ? fmt$(lowest) : "—"} />
+            <Stat label="Highest Price" value={highest != null ? fmt$(highest) : "—"} />
+          </div>
           {has ? (
             <>
-              <Section title="Price trend">
-                <div className={`${CARD} p-4`}>
-                  <div className="flex items-center gap-4 mb-2 text-[11px] font-semibold">
-                    {marketSeries.length >= 2 && <span className="inline-flex items-center gap-1.5 text-[#64748B]"><span className="w-4 border-t-2 border-dashed border-[#2563EB]" /> Market avg</span>}
-                    <span className="inline-flex items-center gap-1.5 text-[#16A34A]"><span className="w-4 border-t-2 border-[#16A34A]" /> Asking price</span>
-                  </div>
-                  <TrendChart market={marketSeries} dealer={dealerSeries} />
-                </div>
-              </Section>
-              <Section title="Recorded changes">
-                <div className={`${CARD} p-4`}>{d.valueHistory.filter((h) => h.listing_price != null).slice().reverse().map((h, i) => (
-                  <StatRow key={i} label={new Date(h.captured_at).toLocaleDateString()} value={<span className="inline-flex items-center gap-2">{fmt$(h.listing_price)}{h.below_market != null && h.below_market > 0 && <span className="text-[11px] font-semibold text-[#16A34A]">{fmt$(h.below_market)} below market</span>}</span>} />
-                ))}</div>
+              <Section title="Price timeline"><PriceTimeline history={priced} /></Section>
+              <Section title="Price change events">
+                {events.length ? (
+                  <div className="space-y-3">{events.map((e, i) => (
+                    <div key={i} className={`${CARD} p-3 flex items-center gap-3`}>
+                      <span className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${e.delta < 0 ? "bg-emerald-50" : "bg-orange-50"}`}>{e.delta < 0 ? <TrendingDown className="w-4 h-4 text-[#16A34A]" /> : <TrendingUp className="w-4 h-4 text-[#EA580C]" />}</span>
+                      <div className="min-w-0 flex-1"><p className="text-[13px] font-semibold leading-tight">{e.delta < 0 ? "Price reduced" : "Price increased"} {fmt$(Math.abs(e.delta))}</p><p className="text-[11px] text-[#94A3B8]">{e.date} · Dealer updated pricing</p></div>
+                      <p className="text-[12px] text-[#64748B] shrink-0 text-right">{fmt$(e.before)} <span className="text-[#94A3B8]">→</span> <span className="font-bold text-[#0F172A]">{fmt$(e.after)}</span></p>
+                    </div>
+                  ))}</div>
+                ) : <Empty>No price changes recorded yet — the asking price has held steady.</Empty>}
               </Section>
             </>
           ) : <Empty>Price history will appear here once the asking price has been tracked over time.</Empty>}
+          {pctDiff != null && (
+            <Section title="Market comparison">
+              <div className={`${CARD} p-4`}>
+                <div className="flex items-center justify-between"><span className="text-[12px] text-[#64748B]">This vehicle</span><span className="text-[14px] font-extrabold">{fmt$(price)}</span></div>
+                <div className="flex items-center justify-between mt-1.5"><span className="text-[12px] text-[#64748B]">Average market price</span><span className="text-[14px] font-semibold text-[#0F172A]">{fmt$(avg)}</span></div>
+                <div className={`mt-2 pt-2 border-t border-[#F1F5F9] text-[13px] font-semibold ${pctDiff <= 0 ? "text-[#16A34A]" : "text-[#EA580C]"}`}>{pctDiff <= 0 ? `${Math.abs(pctDiff)}% below market average` : `${pctDiff}% above market average`}</div>
+              </div>
+            </Section>
+          )}
+          <Section title="Price recommendation">
+            <div className="rounded-2xl border border-emerald-200 bg-emerald-50/70 p-4">
+              <p className="text-[14px] font-extrabold text-[#16A34A]">{lowest != null && price != null && price <= lowest && isGreat ? "Excellent time to purchase" : isGreat ? "Strong value right now" : "Worth a closer look"}</p>
+              <ul className="mt-2 space-y-1.5">
+                {lowest != null && price != null && price <= lowest && <Check>At its lowest recorded asking price</Check>}
+                {isGreat && <Check>Priced below the market average</Check>}
+                {total != null && total < 0 && <Check>Price has trended down since listing</Check>}
+                {(total == null || total === 0) && <Check>Price has been stable — likely to hold</Check>}
+              </ul>
+            </div>
+          </Section>
           <Disclaimer />
         </>,
       };
@@ -341,38 +384,78 @@ function buildPanel(key: PassportPanelKey, d: PassportData, listing: VehicleList
 
     case "comparable-vehicles": {
       const comps = deriveComps(listing, d, isPreview);
+      const radius = (mc.search_radius as number) ?? (isPreview ? 150 : null);
+      const current = { ymm: listing.ymm || "This vehicle", trim: listing.trim || "", mileage: listing.mileage, price, dealer: d.dealerName, dom: d.dom };
       return {
-        title: "Comparable Vehicles", subtitle: "Similar vehicles in your market area",
-        primary: { label: "Check Availability", onClick: () => go("check-availability") },
+        title: "Comparable Vehicles", subtitle: "See how this vehicle compares to similar listings in your market",
+        primary: { label: "Reserve This Vehicle", onClick: () => go("reserve") },
         body: <>
-          <Hero icon={Car} tone={comps.length ? "blue" : "neutral"} label={comps.length ? `${comps.length} comparable${comps.length === 1 ? "" : "s"} found` : "Comparables pending"}
-            note={comps.length ? "Matched on year, trim, mileage, and distance." : "Comparable listings appear once MarketCheck data is available."} />
-          {comps.length ? (
-            <Section title="Nearby listings">
-              <div className="space-y-3">{comps.map((c, i) => (
-                <div key={i} className={`${CARD} p-3 flex items-center gap-3`}>
-                  <div className="w-20 h-16 rounded-lg bg-[#eef0f3] overflow-hidden shrink-0 flex items-center justify-center">{c.image ? <img src={c.image} alt="" className="w-full h-full object-cover" /> : <Car className="w-6 h-6 text-[#94A3B8]" />}</div>
-                  <div className="min-w-0 flex-1"><p className="text-[13px] font-bold leading-tight line-clamp-1">{c.ymm}</p>{c.trim && <p className="text-[12px] text-[#64748B] line-clamp-1">{c.trim}</p>}<p className="text-[11px] text-[#94A3B8] mt-0.5">{[c.mileage != null ? `${c.mileage.toLocaleString()} mi` : null, c.distance].filter(Boolean).join(" · ")}</p></div>
-                  {c.price != null && <p className="text-[15px] font-extrabold shrink-0">{fmt$(c.price)}</p>}
-                </div>
-              ))}</div>
-            </Section>
-          ) : <Empty>Comparable vehicles will appear here once enough market data is available.</Empty>}
-          {price != null && comps.some((c) => c.price != null) && (
-            <div className={`${CARD} p-4 flex items-start gap-2`}><CheckCircle2 className="w-4 h-4 text-[#16A34A] shrink-0 mt-0.5" /><p className="text-[13px] text-[#0F172A]">This vehicle is priced at <span className="font-bold">{fmt$(price)}</span>{(() => { const ps = comps.map((c) => c.price).filter((p): p is number => p != null); const avgC = ps.length ? Math.round(ps.reduce((a, b) => a + b, 0) / ps.length) : null; return avgC != null && avgC > price ? <> — about <span className="font-bold text-[#16A34A]">{fmt$(avgC - price)}</span> under the comparable average.</> : "."; })()}</p></div>
-          )}
+          <Hero icon={Car} tone={comps.length ? "blue" : "neutral"} label={comps.length ? `${comps.length} similar vehicles found` : "Comparables pending"}
+            note={comps.length ? [radius != null ? `${radius}-mile radius` : null, "Updated today", avg != null ? `Avg ${fmt$(avg)}` : null].filter(Boolean).join(" · ") : "Comparable listings appear once MarketCheck data is available."} />
+          {comps.length ? <CompExplorer comps={comps} current={current} avg={avg} cleanTitle={d.cleanTitle} oneOwner={d.ownerCount === 1} certified={listing.condition === "cpo"} /> : <Empty>Comparable vehicles will appear here once enough market data is available.</Empty>}
           <Disclaimer />
         </>,
       };
     }
 
     case "inventory-trend": {
+      const supply = (mc.market_days_supply as number) ?? (mc.inventory_count as number) ?? (isPreview ? 42 : null);
+      const changePct = (mc.inventory_change_pct as number) ?? (isPreview ? -12 : null);
+      const avgDom = (mc.avg_dom as number) ?? (isPreview ? 38 : null);
+      const hasData = supply != null;
+      const trendLabel = changePct == null ? "Stable Inventory" : changePct < 0 ? `Inventory Down ${Math.abs(changePct)}%` : changePct > 0 ? `Inventory Up ${changePct}%` : "Stable Inventory";
       return {
-        title: "Inventory Trend", subtitle: "Market supply for this vehicle",
-        primary: { label: "Check Availability", onClick: () => go("check-availability") },
+        title: "Inventory Trends", subtitle: "Understand local inventory and market availability",
+        primary: { label: "Reserve This Vehicle", onClick: () => go("reserve") },
         body: <>
-          <Hero icon={Package} tone="neutral" label="Supply tracking" note="30-day market supply trends appear once enough data is available." />
-          <Empty>Inventory trend data will appear here once enough comparable listings have been tracked over time. Lower supply of similar vehicles generally means stronger pricing.</Empty>
+          <Hero icon={Package} tone={changePct != null && changePct < 0 ? "green" : "neutral"} label={trendLabel}
+            value={supply != null ? `${supply} available` : undefined}
+            note={hasData ? "Comparable vehicles in your local market." : "30-day market supply trends appear once enough data is available."} />
+          {hasData ? (
+            <>
+              <Section title="Inventory trend"><InventoryTrendChart isPreview={isPreview} /></Section>
+              <Section title="Local market summary">
+                <div className={`${CARD} p-4`}>
+                  <StatRow label="Vehicles available" value={supply != null ? `${supply}` : "—"} />
+                  <StatRow label="Average days on market" value={avgDom != null ? `${avgDom} days` : "—"} />
+                  <StatRow label="Average selling price" value={avg != null ? fmt$(avg) : isPreview ? fmt$(61300) : "—"} />
+                  <StatRow label="Supply level" value={supply != null ? (supply < 30 ? "Tight" : supply < 60 ? "Balanced" : "Ample") : "—"} />
+                  <StatRow label="Demand level" value={(d.viewCount ?? 0) > 20 || isPreview ? "High" : "Moderate"} />
+                  <StatRow label="Updated" value="Today" />
+                </div>
+              </Section>
+              <Section title="Inventory forecast">
+                <div className={`${CARD} p-4`}><ul className="space-y-2">
+                  {changePct != null && changePct < 0 && <Check>Inventory likely to keep decreasing over the next 30 days</Check>}
+                  {((d.viewCount ?? 0) > 20 || isPreview) && <Check>Demand expected to remain high</Check>}
+                  {isPreview && <Check>More comparable vehicles arriving next month</Check>}
+                  {!isPreview && changePct == null && <Check tone="orange">Forecast refines as more market data is collected</Check>}
+                </ul></div>
+              </Section>
+              <Section title="Buyer recommendation">
+                <div className="rounded-2xl border border-emerald-200 bg-emerald-50/70 p-4">
+                  <p className="text-[14px] font-extrabold text-[#16A34A]">{changePct != null && changePct < 0 ? "Inventory is tightening — good time to act" : "Solid time to purchase"}</p>
+                  <ul className="mt-2 space-y-1.5">
+                    {changePct != null && changePct < 0 && <Check>Fewer comparable vehicles available locally</Check>}
+                    {isGreat && <Check>This vehicle is priced below market</Check>}
+                    {supply != null && supply < 30 && <Check>Limited local availability for this configuration</Check>}
+                    {d.warrantyStr && <Check>Strong resale outlook with warranty remaining</Check>}
+                  </ul>
+                </div>
+              </Section>
+              <Section title="Nearby availability" sub="Comparable vehicles by distance (illustrative).">
+                <div className={`${CARD} p-4`}>
+                  {[{ b: "0–10 mi", n: isPreview ? 8 : 0 }, { b: "10–25 mi", n: isPreview ? 14 : 0 }, { b: "25–50 mi", n: isPreview ? 12 : 0 }, { b: "50+ mi", n: isPreview ? 8 : 0 }].map((r) => (
+                    <div key={r.b} className="flex items-center gap-3 py-1.5">
+                      <span className="text-[12px] text-[#64748B] w-16 shrink-0 inline-flex items-center gap-1"><MapPin className="w-3 h-3" />{r.b}</span>
+                      <div className="flex-1 h-2.5 rounded-full bg-slate-100 overflow-hidden"><div className="h-full rounded-full bg-[#2563EB]" style={{ width: `${Math.min(100, r.n * 6)}%` }} /></div>
+                      <span className="text-[12px] font-semibold w-7 text-right">{r.n || "—"}</span>
+                    </div>
+                  ))}
+                </div>
+              </Section>
+            </>
+          ) : <Empty>Inventory trend data will appear here once enough comparable listings have been tracked over time. Lower supply of similar vehicles generally means stronger pricing.</Empty>}
           <Disclaimer />
         </>,
       };
@@ -519,6 +602,163 @@ const Faq = ({ q, a }: { q: string; a: string }) => (
     <p className="text-[12px] text-[#64748B] mt-2 leading-relaxed">{a}</p>
   </details>
 );
+
+const Stat = ({ label, value, tone = "neutral" }: { label: string; value: string; tone?: "green" | "neutral" }) => (
+  <div className={`${CARD} p-3`}>
+    <p className="text-[11px] text-[#94A3B8] leading-tight">{label}</p>
+    <p className={`text-[16px] font-extrabold mt-0.5 leading-tight ${tone === "green" ? "text-[#16A34A]" : "text-[#0F172A]"}`}>{value}</p>
+  </div>
+);
+
+const Seg = ({ options, value, onChange }: { options: { label: string; value: string | number }[]; value: string | number; onChange: (v: string | number) => void }) => (
+  <div className="inline-flex rounded-lg border border-[#E6E8EC] bg-white p-0.5 text-[11px] font-semibold">
+    {options.map((o) => <button key={String(o.value)} onClick={() => onChange(o.value)} className={`px-2 py-1 rounded-md transition-colors ${value === o.value ? "bg-[#2563EB] text-white" : "text-[#64748B] hover:text-[#0F172A]"}`}>{o.label}</button>)}
+  </div>
+);
+
+// Multi-series line chart with point tooltips (round markers, no distortion).
+const PriceChart = ({ pts, height = 170 }: { pts: { label: string; dealer: number | null; market: number | null }[]; height?: number }) => {
+  const w = 560, pad = 12, h = height;
+  const vals = pts.flatMap((p) => [p.dealer, p.market]).filter((n): n is number => n != null);
+  if (vals.length < 2) return null;
+  const min = Math.min(...vals), max = Math.max(...vals), range = Math.max(1, max - min);
+  const x = (i: number) => pad + (i / Math.max(1, pts.length - 1)) * (w - pad * 2);
+  const y = (v: number) => pad + (1 - (v - min) / range) * (h - pad * 2);
+  const dline = pts.map((p, i) => (p.dealer != null ? `${x(i).toFixed(1)},${y(p.dealer).toFixed(1)}` : null)).filter(Boolean) as string[];
+  const mline = pts.map((p, i) => (p.market != null ? `${x(i).toFixed(1)},${y(p.market).toFixed(1)}` : null)).filter(Boolean) as string[];
+  return (
+    <svg viewBox={`0 0 ${w} ${h}`} className="w-full" style={{ height }} preserveAspectRatio="xMidYMid meet">
+      {[0.25, 0.5, 0.75].map((g) => <line key={g} x1={pad} x2={w - pad} y1={pad + g * (h - pad * 2)} y2={pad + g * (h - pad * 2)} stroke="#E6E8EC" strokeWidth="1" strokeDasharray="3 4" />)}
+      {mline.length >= 2 && <polyline points={mline.join(" ")} fill="none" stroke={BLUE} strokeWidth="2.5" strokeDasharray="5 4" strokeLinecap="round" strokeLinejoin="round" />}
+      {dline.length >= 2 && <polyline points={dline.join(" ")} fill="none" stroke={GREEN} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />}
+      {pts.map((p, i) => (p.dealer != null ? <circle key={i} cx={x(i)} cy={y(p.dealer)} r="3.5" fill="#fff" stroke={GREEN} strokeWidth="2"><title>{`${p.label}: ${fmt$(p.dealer)}`}</title></circle> : null))}
+    </svg>
+  );
+};
+
+function PriceTimeline({ history }: { history: PricePoint[] }) {
+  const [range, setRange] = useState<number>(90);
+  const pts = useMemo(() => {
+    const anchor = history.length ? new Date(history[history.length - 1].captured_at).getTime() : Date.now();
+    const cutoff = range === 0 ? -Infinity : anchor - range * 86400000;
+    const f = history.filter((h) => new Date(h.captured_at).getTime() >= cutoff);
+    const use = f.length >= 2 ? f : history;
+    return use.map((h) => ({ label: new Date(h.captured_at).toLocaleDateString(undefined, { month: "short", day: "numeric" }), dealer: h.listing_price, market: h.market_value }));
+  }, [history, range]);
+  return (
+    <div className={`${CARD} p-4`}>
+      <div className="flex items-center justify-between gap-3 mb-3 flex-wrap">
+        <div className="flex items-center gap-4 text-[11px] font-semibold">
+          <span className="inline-flex items-center gap-1.5 text-[#16A34A]"><span className="w-4 border-t-2 border-[#16A34A]" /> Dealer price</span>
+          <span className="inline-flex items-center gap-1.5 text-[#64748B]"><span className="w-4 border-t-2 border-dashed border-[#2563EB]" /> Market value</span>
+        </div>
+        <Seg value={range} onChange={(v) => setRange(v as number)} options={[{ label: "7D", value: 7 }, { label: "30D", value: 30 }, { label: "60D", value: 60 }, { label: "90D", value: 90 }, { label: "All", value: 0 }]} />
+      </div>
+      <PriceChart pts={pts} />
+    </div>
+  );
+}
+
+const Scatter = ({ comps, current }: { comps: Comp[]; current: { mileage: number | null; price: number | null } }) => {
+  const items = ([...comps.map((c) => ({ x: c.mileage, y: c.price, you: false })), { x: current.mileage, y: current.price, you: true }])
+    .filter((p) => p.x != null && p.y != null) as { x: number; y: number; you: boolean }[];
+  if (items.length < 2) return null;
+  const w = 560, h = 220, pad = 30;
+  const xs = items.map((i) => i.x), ys = items.map((i) => i.y);
+  const xmin = Math.min(...xs), xmax = Math.max(...xs), xr = Math.max(1, xmax - xmin);
+  const ymin = Math.min(...ys), ymax = Math.max(...ys), yr = Math.max(1, ymax - ymin);
+  const px = (v: number) => pad + ((v - xmin) / xr) * (w - pad * 2);
+  const py = (v: number) => pad + (1 - (v - ymin) / yr) * (h - pad * 2);
+  return (
+    <svg viewBox={`0 0 ${w} ${h}`} className="w-full" style={{ height: h }} preserveAspectRatio="xMidYMid meet">
+      {[0, 0.5, 1].map((g) => <line key={g} x1={pad} x2={w - pad} y1={pad + g * (h - pad * 2)} y2={pad + g * (h - pad * 2)} stroke="#E6E8EC" strokeWidth="1" />)}
+      {items.map((p, i) => <circle key={i} cx={px(p.x)} cy={py(p.y)} r={p.you ? 7 : 5} fill={p.you ? BLUE : "#CBD5E1"} stroke="#fff" strokeWidth="2"><title>{`${p.you ? "This vehicle" : "Comparable"}: ${p.x.toLocaleString()} mi · ${fmt$(p.y)}`}</title></circle>)}
+      <text x={w / 2} y={h - 6} textAnchor="middle" fill="#94A3B8" fontSize="11">Mileage</text>
+    </svg>
+  );
+};
+
+function CompExplorer({ comps, current, avg, cleanTitle, oneOwner, certified }: { comps: Comp[]; current: { ymm: string; trim: string; mileage: number | null; price: number | null; dealer: string; dom: number | null }; avg: number | null; cleanTitle: boolean; oneOwner: boolean; certified: boolean }) {
+  const [sort, setSort] = useState<"match" | "price-asc" | "price-desc" | "miles" | "new">("match");
+  const [certOnly, setCertOnly] = useState(false);
+  const sorted = useMemo(() => {
+    const by: Record<typeof sort, (a: Comp, b: Comp) => number> = {
+      match: (a, b) => (a.distNum ?? 1e9) - (b.distNum ?? 1e9),
+      "price-asc": (a, b) => (a.price ?? 1e12) - (b.price ?? 1e12),
+      "price-desc": (a, b) => (b.price ?? -1) - (a.price ?? -1),
+      miles: (a, b) => (a.mileage ?? 1e9) - (b.mileage ?? 1e9),
+      new: (a, b) => (a.dom ?? 1e9) - (b.dom ?? 1e9),
+    };
+    return [...comps].sort(by[sort]);
+  }, [comps, sort]);
+  const compPrices = comps.map((c) => c.price).filter((n): n is number => n != null);
+  const compMiles = comps.map((c) => c.mileage).filter((n): n is number => n != null);
+  const avgCompPrice = compPrices.length ? compPrices.reduce((a, b) => a + b, 0) / compPrices.length : null;
+  const avgCompMiles = compMiles.length ? compMiles.reduce((a, b) => a + b, 0) / compMiles.length : null;
+  const stand: string[] = [];
+  if (current.mileage != null && avgCompMiles != null && current.mileage < avgCompMiles) stand.push("Lower mileage than comparable listings");
+  if (current.price != null && avgCompPrice != null && current.price < avgCompPrice) stand.push("Priced below the comparable average");
+  if (certified) stand.push("Certified Pre-Owned");
+  if (oneOwner) stand.push("One owner");
+  if (cleanTitle) stand.push("Clean title & history");
+  return (
+    <>
+      <div className="flex items-center justify-between gap-2 flex-wrap">
+        <Seg value={sort} onChange={(v) => setSort(v as typeof sort)} options={[{ label: "Closest", value: "match" }, { label: "$ Low", value: "price-asc" }, { label: "$ High", value: "price-desc" }, { label: "Miles", value: "miles" }, { label: "Newest", value: "new" }]} />
+        <button onClick={() => setCertOnly((v) => !v)} className={`text-[11px] font-semibold px-2.5 py-1.5 rounded-lg border inline-flex items-center gap-1.5 transition-colors ${certOnly ? "border-[#2563EB] text-[#2563EB] bg-blue-50" : "border-[#E6E8EC] text-[#64748B] hover:text-[#0F172A]"}`}><BadgeCheck className="w-3.5 h-3.5" /> Certified</button>
+      </div>
+      <div className="rounded-2xl border-2 border-[#2563EB] bg-blue-50/40 p-3 flex items-center gap-3">
+        <div className="w-20 h-16 rounded-lg bg-[#dbe4f5] overflow-hidden shrink-0 flex items-center justify-center"><Car className="w-6 h-6 text-[#2563EB]" /></div>
+        <div className="min-w-0 flex-1"><div className="flex items-center gap-2"><p className="text-[13px] font-bold leading-tight line-clamp-1">{current.ymm}</p><span className="text-[9px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded bg-[#2563EB] text-white shrink-0">Your Vehicle</span></div>{current.trim && <p className="text-[12px] text-[#64748B] line-clamp-1">{current.trim}</p>}<p className="text-[11px] text-[#94A3B8] mt-0.5">{[current.mileage != null ? `${current.mileage.toLocaleString()} mi` : null, current.dom != null ? `${current.dom} days listed` : null].filter(Boolean).join(" · ")}</p></div>
+        {current.price != null && <p className="text-[15px] font-extrabold shrink-0">{fmt$(current.price)}</p>}
+      </div>
+      {certOnly ? (
+        <Empty>Certified status isn't available for these comparable listings yet.</Empty>
+      ) : (
+        <div className="space-y-3">{sorted.map((c, i) => {
+          const diff = current.price != null && c.price != null ? c.price - current.price : null;
+          return (
+            <div key={i} className={`${CARD} p-3 flex items-center gap-3`}>
+              <div className="w-20 h-16 rounded-lg bg-[#eef0f3] overflow-hidden shrink-0 flex items-center justify-center">{c.image ? <img src={c.image} alt="" className="w-full h-full object-cover" /> : <Car className="w-6 h-6 text-[#94A3B8]" />}</div>
+              <div className="min-w-0 flex-1"><p className="text-[13px] font-bold leading-tight line-clamp-1">{c.ymm}</p>{c.trim && <p className="text-[12px] text-[#64748B] line-clamp-1">{c.trim}</p>}<p className="text-[11px] text-[#94A3B8] mt-0.5">{[c.mileage != null ? `${c.mileage.toLocaleString()} mi` : null, c.dealer, c.distance, c.dom != null ? `${c.dom}d listed` : null].filter(Boolean).join(" · ")}</p></div>
+              <div className="shrink-0 text-right">{c.price != null && <p className="text-[15px] font-extrabold">{fmt$(c.price)}</p>}{diff != null && diff !== 0 && <p className={`text-[10px] font-semibold ${diff > 0 ? "text-[#16A34A]" : "text-[#EA580C]"}`}>{diff > 0 ? `+${fmt$(diff)}` : fmt$(diff)}</p>}</div>
+            </div>
+          );
+        })}</div>
+      )}
+      <Section title="Price vs mileage" sub="Your vehicle highlighted in blue.">
+        <div className={`${CARD} p-3`}><Scatter comps={comps} current={{ mileage: current.mileage, price: current.price }} /></div>
+      </Section>
+      {stand.length > 0 && (
+        <Section title="Why your vehicle stands out">
+          <div className={`${CARD} p-4`}><ul className="space-y-2">{stand.map((s) => <Check key={s}>{s}</Check>)}</ul></div>
+        </Section>
+      )}
+      {avg != null && current.price != null && (
+        <p className="text-[12px] text-[#64748B]">This vehicle is {current.price <= avg ? "below" : "above"} the {fmt$(avg)} comparable-set average.</p>
+      )}
+    </>
+  );
+}
+
+function InventoryTrendChart({ isPreview }: { isPreview: boolean }) {
+  const [range, setRange] = useState<number>(90);
+  const series = useMemo(() => {
+    if (!isPreview) return [] as number[];
+    const n = range >= 180 ? 12 : range >= 90 ? 9 : range >= 60 ? 6 : 4;
+    return Array.from({ length: n }, (_, i) => Math.round(56 - i * (12 / n) - (i % 2)));
+  }, [isPreview, range]);
+  return (
+    <div className={`${CARD} p-4`}>
+      <div className="flex items-center justify-between gap-3 mb-3 flex-wrap">
+        <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-[#16A34A]"><span className="w-4 border-t-2 border-[#16A34A]" /> Inventory count</span>
+        <Seg value={range} onChange={(v) => setRange(v as number)} options={[{ label: "30D", value: 30 }, { label: "60D", value: 60 }, { label: "90D", value: 90 }, { label: "180D", value: 180 }]} />
+      </div>
+      {series.length >= 2 ? <TrendChart dealer={series} height={140} /> : <Empty>Inventory time-series appears once enough market snapshots are collected.</Empty>}
+      {isPreview && <p className="text-[11px] text-[#94A3B8] mt-2">Sample trend shown in preview mode.</p>}
+    </div>
+  );
+}
 
 const Meter = ({ label, value, unit, pct }: { label: string; value: string; unit: string; pct: number }) => (
   <div>
