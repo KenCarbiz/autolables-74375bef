@@ -219,10 +219,6 @@ serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
   if (req.method !== "POST") return json(405, { error: "method not allowed" });
 
-  const auth = req.headers.get("authorization") || "";
-  const secret = req.headers.get("x-cron-secret") || "";
-  const ok = (SERVICE_KEY && auth === `Bearer ${SERVICE_KEY}`) || (CRON_SECRET && secret === CRON_SECRET);
-  if (!ok) return json(401, { error: "unauthorized" });
   if (!MC_KEY) return json(200, { ok: false, reason: "marketcheck_not_configured" });
 
   const body = await req.json().catch(() => ({})) as { tenant_id?: string; vin?: string; zip?: string };
@@ -230,7 +226,32 @@ serve(async (req) => {
   const vin = (body.vin || "").trim().toUpperCase();
   if (!tenantId || !/^[A-HJ-NPR-Z0-9]{17}$/.test(vin)) return json(400, { error: "tenant_id and valid vin required" });
 
-  const admin = createClient(SUPABASE_URL, SERVICE_KEY);
+  const admin = createClient(SUPABASE_URL, SERVICE_KEY, { auth: { persistSession: false, autoRefreshToken: false } });
+
+  // ── Auth gate ───────────────────────────────────────────────
+  // Accepted credentials, matching marketcheck-sync:
+  //   - service-role bearer (the internal sync → enrich call)
+  //   - x-cron-secret header (pg_cron)
+  //   - a real user JWT for a platform admin OR a member of this tenant
+  //     (the per-VIN "Re-pull market data" button calls this from the browser)
+  const authToken = (req.headers.get("authorization") || "").replace(/^Bearer\s+/i, "");
+  const secret = req.headers.get("x-cron-secret") || "";
+  const isServiceRole = !!SERVICE_KEY && authToken === SERVICE_KEY;
+  const hasCronSecret = !!CRON_SECRET && secret === CRON_SECRET;
+  if (!isServiceRole && !hasCronSecret) {
+    const { data: ures, error: uerr } = await admin.auth.getUser(authToken);
+    const userId = ures?.user?.id;
+    if (uerr || !userId) return json(401, { error: "authentication required" });
+    const { data: isAdmin } = await admin.from("user_roles")
+      .select("role").eq("user_id", userId).eq("role", "admin").maybeSingle();
+    if (!isAdmin) {
+      const { data: membership } = await admin.from("tenant_members")
+        .select("tenant_id").eq("user_id", userId).eq("tenant_id", tenantId)
+        .not("accepted_at", "is", null).maybeSingle();
+      if (!membership) return json(403, { error: "not a member of this tenant" });
+    }
+  }
+
   const { data: row } = await admin.from("vehicle_listings")
     .select("id, vin, ymm, condition, price, mileage, dealer_snapshot")
     .eq("tenant_id", tenantId).eq("vin", vin).maybeSingle();
