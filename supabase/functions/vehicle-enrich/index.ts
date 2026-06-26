@@ -100,6 +100,88 @@ async function fetchComps(vin: string, condition: string, zip: string | null, li
   } catch { return null; }
 }
 
+// ── MarketCheck: VIN listing history ───────────────────────────
+// GET /v2/history/car/{vin} → every past listing of this VIN (price, miles,
+// seller_type, inventory_type, dealer, source, vdp_url, first/last seen). We
+// derive an honest ownership/listing timeline, a real price+miles history, and
+// an estimated in-service date (first time the VIN was ever seen new). All
+// best-effort — absent data stays null and the Passport shows a pending state.
+async function fetchHistory(vin: string) {
+  try {
+    const res = await fetch(`${MC_BASE}/history/car/${encodeURIComponent(vin)}?api_key=${encodeURIComponent(MC_KEY)}`, { signal: AbortSignal.timeout(12000) });
+    if (!res.ok) return null;
+    // deno-lint-ignore no-explicit-any
+    const b: any = await res.json().catch(() => ({}));
+    // deno-lint-ignore no-explicit-any
+    const raw: any[] = Array.isArray(b?.listings) ? b.listings : Array.isArray(b) ? b : [];
+    if (!raw.length) return { available: false, entries: [], owners: null, inServiceDate: null, firstSeen: null };
+    // deno-lint-ignore no-explicit-any
+    const ts = (l: any) => Number(l.last_seen_at ?? l.first_seen_at ?? l.seen_at ?? 0) || (l.last_seen_at_date ? Date.parse(l.last_seen_at_date) / 1000 : 0);
+    const entries = raw.map((l) => ({
+      price: num(l.price),
+      miles: num(l.miles),
+      seller_type: l.seller_type ?? null,
+      inventory_type: l.inventory_type ?? null,
+      dealer: l.dealer?.name ?? l.seller_name ?? null,
+      source: l.source ?? null,
+      vdp_url: l.vdp_url ?? null,
+      first_seen: l.first_seen_at_date ?? (l.first_seen_at ? new Date(Number(l.first_seen_at) * 1000).toISOString() : null),
+      last_seen: l.last_seen_at_date ?? (l.last_seen_at ? new Date(Number(l.last_seen_at) * 1000).toISOString() : null),
+      _ts: ts(l),
+    })).sort((a, z) => a._ts - z._ts);
+    // Ownership estimate: count distinct dealer/seller spells across time (a
+    // new seller after a prior one implies a change of hands). Honest floor of 1.
+    let owners = 0;
+    let prevDealer: string | null = null;
+    for (const e of entries) {
+      const who = (e.dealer || e.seller_type || "").toString().trim().toLowerCase();
+      if (who && who !== prevDealer) { owners++; prevDealer = who; }
+    }
+    const firstSeen = entries.find((e) => e.first_seen)?.first_seen ?? null;
+    // In-service date ≈ first time this VIN appeared as a NEW car (warranty
+    // clock starts at first retail sale; first-new-listing is the closest
+    // defensible proxy available from listing data).
+    const firstNew = entries.find((e) => String(e.inventory_type || "").toLowerCase() === "new");
+    const inServiceDate = firstNew?.first_seen ?? firstSeen;
+    return {
+      available: true,
+      entries: entries.map(({ _ts, ...e }) => e),
+      owners: owners > 0 ? owners : 1,
+      inServiceDate,
+      firstSeen,
+      checked_at: new Date().toISOString(),
+      source: "marketcheck",
+    };
+  } catch { return null; }
+}
+
+// ── MarketCheck: Market Days Supply for this ymm in the tenant's market ──
+// GET /v2/mds/car scoped by ymm + zip + radius → how fast comparable cars sell
+// regionally (lower MDS = hotter demand). Shares Inventory-Search params.
+async function fetchMds(ymm: string | null, condition: string, zip: string | null) {
+  try {
+    if (!ymm) return null;
+    const parts = ymm.split(/\s+/);
+    const year = parts[0] && /^\d{4}$/.test(parts[0]) ? parts[0] : "";
+    const make = year ? parts[1] : parts[0];
+    const model = year ? parts.slice(2).join(" ") : parts.slice(1).join(" ");
+    const p = new URLSearchParams({ api_key: MC_KEY, car_type: condition === "new" ? "new" : "used" });
+    if (year) p.set("year", year);
+    if (make) p.set("make", make);
+    if (model) p.set("model", model);
+    if (zip) { p.set("zip", zip); p.set("radius", "150"); }
+    const res = await fetch(`${MC_BASE}/mds/car?${p.toString()}`, { signal: AbortSignal.timeout(10000) });
+    if (!res.ok) return null;
+    // deno-lint-ignore no-explicit-any
+    const b: any = await res.json().catch(() => ({}));
+    return {
+      mds: num(b.mds ?? b.market_days_supply ?? b.days_supply),
+      count: num(b.count ?? b.inventory_count ?? b.total),
+      checked_at: new Date().toISOString(),
+    };
+  } catch { return null; }
+}
+
 // ── MarketCheck: VIN recall lookup ─────────────────────────────
 async function fetchRecalls(vin: string) {
   try {
@@ -160,9 +242,13 @@ serve(async (req) => {
   // deno-lint-ignore no-explicit-any
   const zip = body.zip || (row.dealer_snapshot as any)?.zip || null;
 
-  const [predict, comps, recalls, blackbook] = await Promise.all([
+  const ymm = (row.ymm as string | null) || null;
+
+  const [predict, comps, mds, history, recalls, blackbook] = await Promise.all([
     fetchPredict(vin, miles),
     fetchComps(vin, condition, zip, price),
+    fetchMds(ymm, condition, zip),
+    fetchHistory(vin),
     fetchRecalls(vin),
     fetchBlackBook(vin, miles, zip),
   ]);
@@ -178,7 +264,20 @@ serve(async (req) => {
     patch.market_checked_at = new Date().toISOString();
     patch.market_payload = { marketValue: mv, low: predict.low, high: predict.high, belowMarket, position, checked_at: new Date().toISOString(), raw: predict.raw };
   }
-  if (comps) { patch.comparables = comps.comparables; patch.market_meta = comps.meta; }
+  if (comps) {
+    patch.comparables = comps.comparables;
+    // Fold the regional Market Days Supply into market_meta so the Passport's
+    // demand/trend surfaces have a real figure instead of a null placeholder.
+    patch.market_meta = mds?.mds != null
+      ? { ...comps.meta, market_days_supply: mds.mds, inventory_count: mds.count ?? comps.meta.inventory_count }
+      : comps.meta;
+  } else if (mds?.mds != null) {
+    patch.market_meta = { market_days_supply: mds.mds, inventory_count: mds.count, checked_at: mds.checked_at };
+  }
+  if (history) {
+    patch.history_payload = history;
+    if (history.inServiceDate) patch.in_service_date = history.inServiceDate;
+  }
   if (recalls) { patch.recall_status = recalls.recall_status; patch.open_recall_count = recalls.open_recall_count; patch.recall_payload = recalls.recall_payload; }
   if (blackbook) patch.blackbook = blackbook;
 
@@ -198,6 +297,16 @@ serve(async (req) => {
 
   return json(200, {
     ok: true, vin,
-    pulled: { predict: !!predict, comparables: comps?.comparables.length ?? 0, recalls: !!recalls, blackbook: !!blackbook },
+    pulled: {
+      predict: !!predict,
+      comparables: comps?.comparables.length ?? 0,
+      market_days_supply: mds?.mds ?? null,
+      history: history?.available ? (history.entries?.length ?? 0) : 0,
+      owners: history?.owners ?? null,
+      in_service_date: history?.inServiceDate ?? null,
+      recalls: !!recalls,
+      open_recalls: recalls?.open_recall_count ?? null,
+      blackbook: !!blackbook,
+    },
   });
 });

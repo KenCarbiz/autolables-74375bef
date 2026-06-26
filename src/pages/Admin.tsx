@@ -33,6 +33,7 @@ import { AddonElectionsPanel } from "@/components/admin/AddonElectionsPanel";
 import { PriceIntegrityPanel } from "@/components/admin/PriceIntegrityPanel";
 import { IncentivesSettingsPanel } from "@/components/admin/IncentivesSettingsPanel";
 import MarketcheckSyncCard from "@/components/admin/MarketcheckSyncCard";
+import MarketcheckDataHealthCard from "@/components/admin/MarketcheckDataHealthCard";
 import TeamPanel from "@/components/admin/TeamPanel";
 import { useEmailDistribution } from "@/hooks/useEmailDistribution";
 import { ProductIcon, PRODUCT_ICON_KEYS } from "@/components/addendum/productIcons";
@@ -2548,6 +2549,7 @@ const Admin = () => {
             {/* MarketCheck card self-hides for dealers without the grant; the
                 cross-VIN price reconciliation overview stays super-admin only. */}
             <MarketcheckSyncCard />
+            <MarketcheckDataHealthCard />
             {isAdmin && <PriceIntegrityPanel />}
             <div className="flex items-center justify-between flex-wrap gap-2">
               <div>

@@ -34,6 +34,14 @@ export interface PassportData {
   comparables: { vin?: string | null; ymm?: string | null; trim?: string | null; miles?: number | null; price?: number | null; dist?: number | null; dealer?: string | null; dom?: number | null; image?: string | null }[];
   blackbook: { tradeinClean: number | null; retailClean: number | null; wholesaleClean: number | null; available: boolean } | null;
   marketCheckedAt: string | null;
+  // VIN listing history (from MarketCheck History-by-VIN, pulled at ingest)
+  history: {
+    available: boolean;
+    entries: { price: number | null; miles: number | null; seller_type: string | null; inventory_type: string | null; dealer: string | null; first_seen: string | null; last_seen: string | null }[];
+    owners: number | null;
+    inServiceDate: string | null;
+    firstSeen: string | null;
+  } | null;
   // History
   ownerCount: number | null;
   accidentCount: number | null;
@@ -148,6 +156,16 @@ export const derivePassport = (listing: VehicleListing): PassportData => {
   } : null;
   const marketCheckedAt = (listing as unknown as { market_checked_at?: string }).market_checked_at || marketMeta.checkedAt || null;
 
+  const histRaw = (listing as unknown as { history_payload?: Record<string, unknown> }).history_payload || null;
+  type HistEntries = NonNullable<PassportData["history"]>["entries"];
+  const history: PassportData["history"] = histRaw && histRaw.available ? {
+    available: true,
+    entries: (Array.isArray(histRaw.entries) ? histRaw.entries : []) as HistEntries,
+    owners: n(histRaw.owners),
+    inServiceDate: (histRaw.inServiceDate as string) || null,
+    firstSeen: (histRaw.firstSeen as string) || null,
+  } : null;
+
   const price = listing.price ?? null;
   const msrp = (mc.msrp as number) ?? null;
   const marketAvg = listing.market_value ?? null;
@@ -163,7 +181,7 @@ export const derivePassport = (listing: VehicleListing): PassportData => {
     return isFinite(m) ? m : null;
   })();
 
-  const ownerCount = (mc.owner_count as number) ?? (mc.carfax_1_owner === true ? 1 : null);
+  const ownerCount = (mc.owner_count as number) ?? (mc.carfax_1_owner === true ? 1 : null) ?? (history?.owners ?? null);
   const accidentCount = (mc.accident_count as number) ?? (mc.carfax_clean_title === true ? 0 : null);
   const cleanTitle = mc.carfax_clean_title === true;
   const serviceCount = listing.service_records?.length ?? 0;
@@ -294,7 +312,7 @@ export const derivePassport = (listing: VehicleListing): PassportData => {
   return {
     price, msrp, priceLabel, estMonthly, saveVsMsrp,
     marketAvg, marketLow, marketHigh, belowMarket,
-    marketMeta, comparables, blackbook, marketCheckedAt,
+    marketMeta, comparables, blackbook, marketCheckedAt, history,
     viewCount: listing.view_count ?? null, dom: (mc.dom as number) ?? null,
     ownerCount, accidentCount, cleanTitle, serviceCount, recallClear, openRecalls, hasRecallCheck,
     warranty, warrantyStr,

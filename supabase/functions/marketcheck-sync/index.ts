@@ -388,7 +388,7 @@ serve(async (req) => {
   const diagnostics: Array<Record<string, unknown>> = [];
   // Vehicles to fully enrich (MarketCheck pricing/comps/recalls + Black Book)
   // after the inventory pull. Bounded per run to respect provider rate limits.
-  const enrichQueue: { tenant_id: string; vin: string }[] = [];
+  const enrichQueue: { tenant_id: string; vin: string; zip?: string }[] = [];
   const ENRICH_CAP = Number(Deno.env.get("ENRICH_PER_RUN") || "40");
 
   for (const cfg of due as SyncConfig[]) {
@@ -417,6 +417,9 @@ serve(async (req) => {
       const { data: prof } = await admin.from("dealer_profiles").select("settings").eq("tenant_id", cfg.tenant_id).maybeSingle();
       const pset = (prof?.settings || {}) as Record<string, string>;
       let dealerState = (pset.dealer_state || pset.doc_fee_state || "").trim().toUpperCase();
+      // Tenant ZIP anchors every enrichment pull's comps + Market Days Supply to
+      // this dealer's local market radius (not a national average).
+      const tenantZip = (pset.dealer_zip || "").trim();
 
       // Resolve the rooftop from its website domain via the NEW Dealerships
       // Search API, which returns the canonical mc_* ids the syndication feed
@@ -665,8 +668,9 @@ serve(async (req) => {
                     : `MarketCheck ${l.inventory_type || ""} · $${prev.toLocaleString()} → $${price.toLocaleString()}`,
                 });
                 if (!error) { tenantPrices++; pricesRecorded++; latestWebsite.set(vin, price); }
-                // New or price-changed VIN → queue a full enrichment pull.
-                if (enrichQueue.length < ENRICH_CAP) enrichQueue.push({ tenant_id: cfg.tenant_id, vin });
+                // New or price-changed VIN → queue a full enrichment pull,
+                // ZIP-anchored to the tenant's local market.
+                if (enrichQueue.length < ENRICH_CAP) enrichQueue.push({ tenant_id: cfg.tenant_id, vin, zip: tenantZip || undefined });
               }
             }
           }
