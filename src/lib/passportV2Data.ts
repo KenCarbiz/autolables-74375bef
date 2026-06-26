@@ -29,6 +29,11 @@ export interface PassportData {
   belowMarket: number | null;
   viewCount: number | null;
   dom: number | null;
+  // Enrichment (pulled at ingest by vehicle-enrich)
+  marketMeta: { percentile: number | null; radius: number | null; similarCount: number | null; avgDom: number | null; daysSupply: number | null; inventoryCount: number | null; checkedAt: string | null };
+  comparables: { vin?: string | null; ymm?: string | null; trim?: string | null; miles?: number | null; price?: number | null; dist?: number | null; dealer?: string | null; dom?: number | null; image?: string | null }[];
+  blackbook: { tradeinClean: number | null; retailClean: number | null; wholesaleClean: number | null; available: boolean } | null;
+  marketCheckedAt: string | null;
   // History
   ownerCount: number | null;
   accidentCount: number | null;
@@ -124,6 +129,24 @@ export const derivePassport = (listing: VehicleListing): PassportData => {
   const ks = listing.key_specs || {};
   const mc = (listing.mc_attributes || {}) as Record<string, unknown>;
   const mp = listing.market_payload || {};
+
+  const mm = ((listing as unknown as { market_meta?: Record<string, unknown> }).market_meta || {}) as Record<string, unknown>;
+  const n = (v: unknown): number | null => (v != null && Number.isFinite(Number(v)) ? Number(v) : null);
+  const marketMeta = {
+    percentile: n(mm.price_percentile), radius: n(mm.search_radius), similarCount: n(mm.similar_count),
+    avgDom: n(mm.avg_dom), daysSupply: n(mm.market_days_supply), inventoryCount: n(mm.inventory_count),
+    checkedAt: (mm.checked_at as string) || null,
+  };
+  const comparables = Array.isArray((listing as unknown as { comparables?: unknown }).comparables)
+    ? ((listing as unknown as { comparables: PassportData["comparables"] }).comparables) : [];
+  const bbRaw = (listing as unknown as { blackbook?: Record<string, unknown> }).blackbook || null;
+  const blackbook = bbRaw ? {
+    tradeinClean: n((bbRaw.tradein as Record<string, unknown>)?.clean),
+    retailClean: n((bbRaw.retail as Record<string, unknown>)?.clean),
+    wholesaleClean: n((bbRaw.wholesale as Record<string, unknown>)?.clean),
+    available: !!bbRaw.available,
+  } : null;
+  const marketCheckedAt = (listing as unknown as { market_checked_at?: string }).market_checked_at || marketMeta.checkedAt || null;
 
   const price = listing.price ?? null;
   const msrp = (mc.msrp as number) ?? null;
@@ -271,6 +294,7 @@ export const derivePassport = (listing: VehicleListing): PassportData => {
   return {
     price, msrp, priceLabel, estMonthly, saveVsMsrp,
     marketAvg, marketLow, marketHigh, belowMarket,
+    marketMeta, comparables, blackbook, marketCheckedAt,
     viewCount: listing.view_count ?? null, dom: (mc.dom as number) ?? null,
     ownerCount, accidentCount, cleanTitle, serviceCount, recallClear, openRecalls, hasRecallCheck,
     warranty, warrantyStr,

@@ -79,7 +79,9 @@ function buildPanel(key: PassportPanelKey, d: PassportData, listing: VehicleList
   const price = d.price, avg = d.marketAvg, low = d.marketLow, high = d.marketHigh, below = d.belowMarket;
   const isGreat = below != null && below > 0;
   const conf = d.confScore;
-  const mc = (listing.mc_attributes || {}) as Record<string, unknown>;
+  // Merge enrichment market_meta (percentile, radius, similar_count, avg_dom,
+  // inventory) into mc so the panels read real ingest data, not just mc_attributes.
+  const mc = { ...(listing.mc_attributes || {}), ...((listing as unknown as { market_meta?: Record<string, unknown> }).market_meta || {}) } as Record<string, unknown>;
   const marketSeries = d.valueHistory.filter((h) => h.market_value != null).map((h) => h.market_value as number);
   const dealerSeries = d.valueHistory.filter((h) => h.listing_price != null).map((h) => h.listing_price as number);
 
@@ -159,6 +161,16 @@ function buildPanel(key: PassportPanelKey, d: PassportData, listing: VehicleList
               <div className={`${CARD} p-4 flex items-center gap-5`}>
                 <div className="flex flex-col items-center shrink-0"><Ring pct={conf} /><p className="text-[12px] font-extrabold text-[#16A34A] mt-1">{conf >= 85 ? "High Confidence" : conf >= 70 ? "Good Confidence" : "Fair Confidence"}</p></div>
                 <div className="min-w-0"><p className="text-[12px] text-[#64748B] mb-2">Our price analysis is based on:</p><ul className="grid grid-cols-1 gap-1.5">{["MarketCheck data", "Dealer pricing data", "Regional demand", "Vehicle history", "Mileage & condition", "Equipment & features"].map((b) => <Check key={b}>{b}</Check>)}</ul></div>
+              </div>
+            </Section>
+          )}
+          {d.blackbook?.available && (d.blackbook.retailClean != null || d.blackbook.tradeinClean != null) && (
+            <Section title="Independent valuation" sub="Black Book — a third-party industry guide.">
+              <div className={`${CARD} p-4`}>
+                {d.blackbook.retailClean != null && <StatRow label="Retail value (clean)" value={fmt$(d.blackbook.retailClean)} />}
+                {d.blackbook.tradeinClean != null && <StatRow label="Trade-in value (clean)" value={fmt$(d.blackbook.tradeinClean)} />}
+                {d.blackbook.wholesaleClean != null && <StatRow label="Wholesale value (clean)" value={fmt$(d.blackbook.wholesaleClean)} />}
+                {price != null && d.blackbook.retailClean != null && <p className={`text-[12px] font-semibold mt-2 ${price <= d.blackbook.retailClean ? "text-[#16A34A]" : "text-[#64748B]"}`}>{price <= d.blackbook.retailClean ? `${fmt$(d.blackbook.retailClean - price)} under Black Book retail` : "Priced near Black Book retail"}</p>}
               </div>
             </Section>
           )}
