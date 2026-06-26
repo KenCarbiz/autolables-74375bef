@@ -511,7 +511,11 @@ const VehiclePassportV3 = () => {
           outside the content grid so it never reflows or covers page content.
           Only shown on very wide viewports where that margin actually exists
           (≈2000px+); hidden otherwise so it can't overlap the centered page. */}
-      <div className="hidden min-[2120px]:block fixed right-[76px] top-[100px] w-[330px] z-30">
+      {/* Anchored to the centered 1320px Passport container (not the viewport
+          edge): 660 half − 20 container padding + 32 gap = 50% + 672px, so the
+          gap to the content stays a constant ~32px at every desktop width.
+          Shown once the window is wide enough to fit it without overlap. */}
+      <div className="hidden min-[2040px]:block fixed top-[100px] w-[330px] z-30" style={{ left: "calc(50% + 672px)" }}>
         <div className="rounded-2xl p-6 text-white shadow-[0_20px_50px_rgba(37,99,235,0.30)]" style={{ background: "linear-gradient(160deg,#2563EB 0%,#1e50c8 100%)" }}>
           <h2 className="text-[22px] font-extrabold leading-tight text-center">Ready to take the next step?</h2>
           <p className="text-[13px] opacity-90 text-center mt-1">Choose the option that works best for you.</p>
