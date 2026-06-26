@@ -137,6 +137,14 @@ serve(async (req) => {
           advisor_title: (s.dealer_advisor_title as string) || "",
           advisor_photo: (s.dealer_advisor_photo as string) || "",
           advisor_response: (s.dealer_advisor_response as string) || "",
+          family_owned: (s.dealer_family_owned as string) || "",
+          service_location: (s.dealer_service_location as string) || "",
+          service_address: (s.dealer_service_address as string) || "",
+          delivery: (s.dealer_delivery as string) || "",
+          financing: (s.dealer_financing as string) || "",
+          amenities: (s.dealer_amenities as string) || "",
+          services: (s.dealer_services as string) || "",
+          hours: (s.dealer_hours as string) || "",
         };
         if (Object.values(trust).some((v) => v)) row.dealer_trust = trust;
       }

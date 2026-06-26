@@ -52,6 +52,16 @@ interface OnboardingData {
   newInventoryUrl: string;
   usedInventoryUrl: string;
 
+  // Customer experience (Passport "Why Buy From Us")
+  familyOwned: string;        // "yes" | ""
+  serviceLocation: string;    // "onsite" | "offsite" | "none" | ""
+  serviceAddress: string;
+  delivery: string;           // "none" | "local" | "regional" | "nationwide" | ""
+  financing: string;          // "yes" | ""
+  services: string;           // comma-separated
+  amenities: string;          // comma-separated
+  hours: string;
+
   // Step 3: Structure
   structure: StructureType;
 
@@ -77,6 +87,14 @@ const INITIAL: OnboardingData = {
   dmsProvider: "",
   newInventoryUrl: "",
   usedInventoryUrl: "",
+  familyOwned: "",
+  serviceLocation: "",
+  serviceAddress: "",
+  delivery: "",
+  financing: "",
+  services: "",
+  amenities: "",
+  hours: "",
   structure: "single",
   bdcType: "none",
   planTier: "essential",
@@ -279,6 +297,14 @@ const Onboarding = () => {
       dms_provider: data.dmsProvider,
       new_inventory_url: data.newInventoryUrl,
       used_inventory_url: data.usedInventoryUrl,
+      dealer_family_owned: data.familyOwned,
+      dealer_service_location: data.serviceLocation,
+      dealer_service_address: data.serviceAddress,
+      dealer_delivery: data.delivery,
+      dealer_financing: data.financing,
+      dealer_services: data.services,
+      dealer_amenities: data.amenities,
+      dealer_hours: data.hours,
     });
 
     // Create or update the default store
@@ -696,6 +722,41 @@ const Onboarding = () => {
                 <Field label="DMS Provider" value={data.dmsProvider} onChange={v => update("dmsProvider", v)} placeholder="CDK, Reynolds, Dealertrack, Tekion…" colSpan={2} />
                 <Field label="New inventory website" value={data.newInventoryUrl} onChange={v => update("newInventoryUrl", v)} placeholder="https://yourdealer.com/inventory/new" />
                 <Field label="Used inventory website" value={data.usedInventoryUrl} onChange={v => update("usedInventoryUrl", v)} placeholder="https://yourdealer.com/inventory/used" />
+              </div>
+            </Section>
+
+            <Section icon={Building2} title="Customer experience" subtitle="Powers the 'Why Buy From Us' section on your Vehicle Passport. Optional — only what you set is shown, so nothing is assumed about your store.">
+              <div className="grid grid-cols-2 gap-3">
+                <div className="col-span-1">
+                  <label className="block text-xs font-semibold text-foreground mb-1">Family owned</label>
+                  <select value={data.familyOwned} onChange={(e) => update("familyOwned", e.target.value)} className="w-full h-10 px-3 rounded-md border border-border bg-background text-sm outline-none focus:ring-2 focus:ring-ring">
+                    <option value="">Not specified</option><option value="yes">Yes</option>
+                  </select>
+                </div>
+                <div className="col-span-1">
+                  <label className="block text-xs font-semibold text-foreground mb-1">Service department</label>
+                  <select value={data.serviceLocation} onChange={(e) => update("serviceLocation", e.target.value)} className="w-full h-10 px-3 rounded-md border border-border bg-background text-sm outline-none focus:ring-2 focus:ring-ring">
+                    <option value="">Not specified</option><option value="onsite">On-site</option><option value="offsite">Off-site</option><option value="none">None</option>
+                  </select>
+                </div>
+                {data.serviceLocation === "offsite" && (
+                  <Field label="Off-site service address" value={data.serviceAddress} onChange={v => update("serviceAddress", v)} placeholder="123 Service Rd, City, ST" colSpan={2} />
+                )}
+                <div className="col-span-1">
+                  <label className="block text-xs font-semibold text-foreground mb-1">Vehicle delivery</label>
+                  <select value={data.delivery} onChange={(e) => update("delivery", e.target.value)} className="w-full h-10 px-3 rounded-md border border-border bg-background text-sm outline-none focus:ring-2 focus:ring-ring">
+                    <option value="">Not specified</option><option value="none">Not offered</option><option value="local">Local</option><option value="regional">Regional</option><option value="nationwide">Nationwide</option>
+                  </select>
+                </div>
+                <div className="col-span-1">
+                  <label className="block text-xs font-semibold text-foreground mb-1">Financing on-site</label>
+                  <select value={data.financing} onChange={(e) => update("financing", e.target.value)} className="w-full h-10 px-3 rounded-md border border-border bg-background text-sm outline-none focus:ring-2 focus:ring-ring">
+                    <option value="">Not specified</option><option value="yes">Yes</option>
+                  </select>
+                </div>
+                <Field label="Services offered (comma-separated)" value={data.services} onChange={v => update("services", v)} placeholder="OEM parts, Warranty repairs, State inspection, Express service" colSpan={2} />
+                <Field label="Amenities (comma-separated)" value={data.amenities} onChange={v => update("amenities", v)} placeholder="Customer lounge, Café, Kids area, EV charging" colSpan={2} />
+                <Field label="Hours" value={data.hours} onChange={v => update("hours", v)} placeholder="Mon–Sat 9–7, Sun closed" colSpan={2} />
               </div>
             </Section>
           </div>

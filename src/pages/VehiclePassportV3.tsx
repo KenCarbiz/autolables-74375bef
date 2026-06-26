@@ -112,7 +112,7 @@ export const MOCK_LISTING = {
   recall_status: "clear", open_recall_count: 0, view_count: 89, service_records: [{}, {}, {}],
   prep_status: { foreman_signed_at: "2025-04-12" },
   dealer_snapshot: { name: "Harte INFINITI", phone: "8605551234", address: "1 Auto Way", city: "Hartford", state: "CT", zip: "06103", review_rating: 4.8, review_count: 1248 },
-  dealer_trust: { years_in_business: "45", satisfaction: "98%", bbb_rating: "A+", google_rating: "4.9", google_count: "1248", certifications: "INFINITI Award of Excellence, 2024 Consumer Satisfaction", storefront_url: "https://images.unsplash.com/photo-1560179707-f14e90ef3623?w=400", review_sources: "Google | 4.9 | Excellent family SUV. Very smooth ride.\nEdmunds | 4.7 | Quiet, comfortable, and packed with technology.\nCars.com | 4.8 | Luxury feel without the luxury price.", advisor_name: "John Smith", advisor_title: "Senior Vehicle Specialist", advisor_photo: "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=200", advisor_response: "Usually replies within 5 minutes" },
+  dealer_trust: { years_in_business: "45", satisfaction: "98%", bbb_rating: "A+", google_rating: "4.9", google_count: "1248", certifications: "INFINITI Award of Excellence, 2024 Consumer Satisfaction", storefront_url: "https://images.unsplash.com/photo-1560179707-f14e90ef3623?w=400", review_sources: "Google | 4.9 | Excellent family SUV. Very smooth ride.\nEdmunds | 4.7 | Quiet, comfortable, and packed with technology.\nCars.com | 4.8 | Luxury feel without the luxury price.", advisor_name: "John Smith", advisor_title: "Senior Vehicle Specialist", advisor_photo: "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=200", advisor_response: "Usually replies within 5 minutes", family_owned: "yes", service_location: "offsite", service_address: "120 Service Drive, Hartford, CT 06120", delivery: "regional", financing: "yes", amenities: "Customer lounge, Café, Kids area, EV charging, Loaner vehicles", services: "OEM parts, Warranty repairs, Online scheduling, State inspection, Express service", hours: "Mon–Sat 9–7, Sun 11–4" },
   features: [{ title: "3rd Row", subtitle: "Seating" }, { title: "Panoramic", subtitle: "Moonroof" }, { title: "Heated", subtitle: "Seats" }, { title: "Premium", subtitle: "Audio" }],
   documents: [
     { type: "purchase_agreement", name: "Purchase Agreement", url: "https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf", uploaded_at: "2025-05-18" },
@@ -231,14 +231,19 @@ const VehiclePassportV3 = () => {
   if (ks.exterior_color) highlights.push({ icon: Wind, t: ks.exterior_color, s: "Exterior" });
   (listing.features || []).forEach((f) => { if (highlights.length < 8) highlights.push({ icon: Award, t: f.title, s: f.subtitle || "Feature" }); });
 
-  const dealerChips = [
-    { icon: Building2, t: "Family Owned", s: d.dealerTrust.yearsInBusiness ? `Since ${new Date().getFullYear() - Number(d.dealerTrust.yearsInBusiness)}` : "Trusted locally" },
-    { icon: Star, t: "Top Rated", s: d.dealerTrust.googleRating ? `${d.dealerTrust.googleRating} Google Rating` : "Verified buyers" },
-    { icon: Wrench, t: "Factory Certified", s: "Trained technicians" },
-    { icon: Settings, t: "Service Center", s: "On-site" },
-    { icon: Truck, t: "Delivery Available", s: "Nationwide" },
-    { icon: ShieldCheck, t: "Customer Commitment", s: "No-pressure" },
-  ];
+  // Dealer trust chips — only render what the dealer actually configured
+  // (onboarding / admin), so we never assert an unverified capability.
+  const dt = d.dealerTrust;
+  const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
+  const dealerChips: { icon: React.ElementType; t: string; s: string }[] = [];
+  if (dt.familyOwned) dealerChips.push({ icon: Building2, t: "Family Owned", s: dt.yearsInBusiness ? `Since ${new Date().getFullYear() - Number(dt.yearsInBusiness)}` : "Locally owned" });
+  else if (dt.yearsInBusiness) dealerChips.push({ icon: Building2, t: "Established", s: `Since ${new Date().getFullYear() - Number(dt.yearsInBusiness)}` });
+  if (dt.googleRating) dealerChips.push({ icon: Star, t: "Top Rated", s: `${dt.googleRating} Google Rating` });
+  if (dt.certifications.length) dealerChips.push({ icon: Wrench, t: "Factory Certified", s: dt.certifications[0] });
+  if (dt.serviceLocation === "onsite") dealerChips.push({ icon: Settings, t: "Service Center", s: "On-site" });
+  else if (dt.serviceLocation === "offsite") dealerChips.push({ icon: Settings, t: "Service Center", s: "Off-site" });
+  if (dt.delivery && dt.delivery !== "none") dealerChips.push({ icon: Truck, t: "Delivery Available", s: cap(dt.delivery) });
+  if (dt.financing) dealerChips.push({ icon: DollarSign, t: "Financing", s: "On-site" });
   const badges = [
     d.dealerTrust.yearsInBusiness ? { v: `${d.dealerTrust.yearsInBusiness}+`, l: "Years in Business" } : null,
     d.dealerTrust.googleRating ? { v: d.dealerTrust.googleRating, l: d.dealerTrust.googleCount ? `Google (${Number(d.dealerTrust.googleCount).toLocaleString()})` : "Google Rating", star: true } : null,
@@ -472,9 +477,11 @@ const VehiclePassportV3 = () => {
           {/* Why Buy From This Dealership (wider) */}
           <div className={`${CARD} p-5 flex flex-col`}>
             <H3>Why Buy From {d.dealerName}?</H3>
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-5 gap-y-4 mt-4">
-              {dealerChips.map((c, i) => <div key={i} className="flex items-start gap-2.5"><span className="w-9 h-9 rounded-xl bg-blue-50 flex items-center justify-center shrink-0"><c.icon className="w-[18px] h-[18px] text-[#2563EB]" /></span><div className="min-w-0"><p className="text-[12px] font-bold leading-tight">{c.t}</p><p className="text-[10px] text-[#64748B] mt-0.5 truncate">{c.s}</p></div></div>)}
-            </div>
+            {dealerChips.length > 0 ? (
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-5 gap-y-4 mt-4">
+                {dealerChips.map((c, i) => <div key={i} className="flex items-start gap-2.5"><span className="w-9 h-9 rounded-xl bg-blue-50 flex items-center justify-center shrink-0"><c.icon className="w-[18px] h-[18px] text-[#2563EB]" /></span><div className="min-w-0"><p className="text-[12px] font-bold leading-tight">{c.t}</p><p className="text-[10px] text-[#64748B] mt-0.5 truncate">{c.s}</p></div></div>)}
+              </div>
+            ) : <p className="text-[13px] text-[#64748B] mt-3">Learn what makes {d.dealerName} a trusted choice.</p>}
             {(badges.length > 0 || d.dealerTrust.certifications.length > 0 || d.dealerTrust.storefrontUrl) && (
               <div className="mt-5 pt-5 border-t border-[#E6E8EC] flex flex-wrap items-center gap-x-6 gap-y-4">
                 {d.dealerTrust.storefrontUrl && <img src={d.dealerTrust.storefrontUrl} alt={d.dealerName} className="w-28 h-20 rounded-xl object-cover border border-[#E6E8EC]" />}

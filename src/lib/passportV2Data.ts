@@ -80,6 +80,14 @@ export interface PassportData {
     advisorTitle: string;
     advisorPhoto: string;
     advisorResponse: string;
+    familyOwned: boolean;
+    serviceLocation: string;   // "onsite" | "offsite" | ""
+    serviceAddress: string;
+    delivery: string;          // "none" | "local" | "regional" | "nationwide" | ""
+    financing: boolean;
+    amenities: string[];
+    services: string[];
+    hours: string;
   };
 }
 
@@ -248,6 +256,14 @@ export const derivePassport = (listing: VehicleListing): PassportData => {
     advisorTitle: t.advisor_title || "",
     advisorPhoto: t.advisor_photo || "",
     advisorResponse: t.advisor_response || "",
+    familyOwned: t.family_owned === "yes",
+    serviceLocation: t.service_location || "",
+    serviceAddress: t.service_address || "",
+    delivery: t.delivery || "",
+    financing: t.financing === "yes",
+    amenities: (t.amenities || "").split(",").map((a) => a.trim()).filter(Boolean),
+    services: (t.services || "").split(",").map((a) => a.trim()).filter(Boolean),
+    hours: t.hours || "",
   };
 
   return {

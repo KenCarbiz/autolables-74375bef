@@ -11,7 +11,9 @@ type TrustKey =
   | "dealer_years_in_business" | "dealer_satisfaction" | "dealer_bbb_rating"
   | "dealer_google_rating" | "dealer_google_count" | "dealer_certifications"
   | "dealer_storefront_url" | "dealer_review_sources"
-  | "dealer_advisor_name" | "dealer_advisor_title" | "dealer_advisor_photo" | "dealer_advisor_response";
+  | "dealer_advisor_name" | "dealer_advisor_title" | "dealer_advisor_photo" | "dealer_advisor_response"
+  | "dealer_family_owned" | "dealer_service_location" | "dealer_service_address" | "dealer_delivery"
+  | "dealer_financing" | "dealer_amenities" | "dealer_services" | "dealer_hours";
 
 const FIELDS: { key: TrustKey; label: string; placeholder: string; hint?: string; wide?: boolean }[] = [
   { key: "dealer_years_in_business", label: "Years in business", placeholder: "45" },
@@ -45,6 +47,14 @@ const DealershipTrustPanel = () => {
     dealer_advisor_title: settings.dealer_advisor_title || "",
     dealer_advisor_photo: settings.dealer_advisor_photo || "",
     dealer_advisor_response: settings.dealer_advisor_response || "",
+    dealer_family_owned: settings.dealer_family_owned || "",
+    dealer_service_location: settings.dealer_service_location || "",
+    dealer_service_address: settings.dealer_service_address || "",
+    dealer_delivery: settings.dealer_delivery || "",
+    dealer_financing: settings.dealer_financing || "",
+    dealer_amenities: settings.dealer_amenities || "",
+    dealer_services: settings.dealer_services || "",
+    dealer_hours: settings.dealer_hours || "",
   }));
   const [saving, setSaving] = useState(false);
 
@@ -85,6 +95,55 @@ const DealershipTrustPanel = () => {
         <textarea value={cfg.dealer_review_sources} onChange={(e) => set("dealer_review_sources", e.target.value)} rows={5}
           placeholder={"Google | 4.9 | Excellent family SUV. Very smooth ride.\nEdmunds | 4.7 | Quiet, comfortable, and packed with tech.\nCars.com | 4.8 | Luxury feel without the luxury price."}
           className="mt-2 w-full px-3 py-2.5 rounded-lg border border-border bg-background text-sm outline-none focus:border-primary resize-none font-mono text-[12px]" />
+      </div>
+
+      <div className="rounded-2xl border border-border bg-card p-4">
+        <h3 className="text-[14px] font-bold text-foreground">Amenities & services</h3>
+        <p className="text-[12px] text-slate-500 mt-0.5 mb-3">Drives the "Why Buy From Us" section. Only what you set appears — nothing is assumed.</p>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div>
+            <label className="text-[13px] font-semibold text-foreground">Family owned</label>
+            <select value={cfg.dealer_family_owned} onChange={(e) => set("dealer_family_owned", e.target.value)} className="mt-1 w-full h-10 px-3 rounded-lg border border-border bg-background text-sm outline-none focus:border-primary">
+              <option value="">Not specified</option><option value="yes">Yes</option>
+            </select>
+          </div>
+          <div>
+            <label className="text-[13px] font-semibold text-foreground">Service department</label>
+            <select value={cfg.dealer_service_location} onChange={(e) => set("dealer_service_location", e.target.value)} className="mt-1 w-full h-10 px-3 rounded-lg border border-border bg-background text-sm outline-none focus:border-primary">
+              <option value="">Not specified</option><option value="onsite">On-site (same location as sales)</option><option value="offsite">Off-site (separate location)</option><option value="none">No service department</option>
+            </select>
+          </div>
+          <div className="sm:col-span-2">
+            <label className="text-[13px] font-semibold text-foreground">Off-site service address</label>
+            <input value={cfg.dealer_service_address} onChange={(e) => set("dealer_service_address", e.target.value)} placeholder="123 Service Rd, City, ST (only if off-site)" className="mt-1 w-full h-10 px-3 rounded-lg border border-border bg-background text-sm outline-none focus:border-primary" />
+          </div>
+          <div>
+            <label className="text-[13px] font-semibold text-foreground">Vehicle delivery</label>
+            <select value={cfg.dealer_delivery} onChange={(e) => set("dealer_delivery", e.target.value)} className="mt-1 w-full h-10 px-3 rounded-lg border border-border bg-background text-sm outline-none focus:border-primary">
+              <option value="">Not specified</option><option value="none">Not offered</option><option value="local">Local</option><option value="regional">Regional</option><option value="nationwide">Nationwide</option>
+            </select>
+          </div>
+          <div>
+            <label className="text-[13px] font-semibold text-foreground">Financing on-site</label>
+            <select value={cfg.dealer_financing} onChange={(e) => set("dealer_financing", e.target.value)} className="mt-1 w-full h-10 px-3 rounded-lg border border-border bg-background text-sm outline-none focus:border-primary">
+              <option value="">Not specified</option><option value="yes">Yes</option>
+            </select>
+          </div>
+          <div className="sm:col-span-2">
+            <label className="text-[13px] font-semibold text-foreground">Services offered</label>
+            <input value={cfg.dealer_services} onChange={(e) => set("dealer_services", e.target.value)} placeholder="OEM parts, Warranty repairs, Online scheduling, State inspection, Express service" className="mt-1 w-full h-10 px-3 rounded-lg border border-border bg-background text-sm outline-none focus:border-primary" />
+            <p className="text-[11px] text-slate-400 mt-1">Comma-separated. Only listed services appear on the Passport.</p>
+          </div>
+          <div className="sm:col-span-2">
+            <label className="text-[13px] font-semibold text-foreground">Amenities</label>
+            <input value={cfg.dealer_amenities} onChange={(e) => set("dealer_amenities", e.target.value)} placeholder="Customer lounge, Café, Kids area, EV charging, Loaner vehicles" className="mt-1 w-full h-10 px-3 rounded-lg border border-border bg-background text-sm outline-none focus:border-primary" />
+            <p className="text-[11px] text-slate-400 mt-1">Comma-separated.</p>
+          </div>
+          <div className="sm:col-span-2">
+            <label className="text-[13px] font-semibold text-foreground">Hours</label>
+            <input value={cfg.dealer_hours} onChange={(e) => set("dealer_hours", e.target.value)} placeholder="Mon–Sat 9–7, Sun closed" className="mt-1 w-full h-10 px-3 rounded-lg border border-border bg-background text-sm outline-none focus:border-primary" />
+          </div>
+        </div>
       </div>
 
       <div className="rounded-2xl border border-border bg-card p-4">

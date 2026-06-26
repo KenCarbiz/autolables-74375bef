@@ -214,6 +214,17 @@ export interface DealerSettings {
   dealer_advisor_title: string;       // e.g. "Senior Vehicle Specialist"
   dealer_advisor_photo: string;       // advisor headshot URL
   dealer_advisor_response: string;    // e.g. "Usually replies within 5 minutes"
+  // Passport dealership profile — amenities & services (captured at onboarding,
+  // editable in admin). Only what the dealer sets is shown on the Passport, so
+  // we never assert a capability a store doesn't actually offer.
+  dealer_family_owned: string;        // "yes" or ""
+  dealer_service_location: string;    // "onsite" | "offsite" | ""
+  dealer_service_address: string;     // off-site service department address (optional)
+  dealer_delivery: string;            // "none" | "local" | "regional" | "nationwide" | ""
+  dealer_financing: string;           // "yes" or ""
+  dealer_amenities: string;           // comma-separated (e.g. "Customer lounge, Café, EV charging")
+  dealer_services: string;            // comma-separated (e.g. "OEM parts, Warranty repairs, State inspection")
+  dealer_hours: string;               // free text (e.g. "Mon–Sat 9–7, Sun closed")
 }
 
 export const DEFAULT_SETTINGS: DealerSettings = {
@@ -303,6 +314,14 @@ export const DEFAULT_SETTINGS: DealerSettings = {
   dealer_advisor_title: "",
   dealer_advisor_photo: "",
   dealer_advisor_response: "",
+  dealer_family_owned: "",
+  dealer_service_location: "",
+  dealer_service_address: "",
+  dealer_delivery: "",
+  dealer_financing: "",
+  dealer_amenities: "",
+  dealer_services: "",
+  dealer_hours: "",
 };
 
 interface DealerSettingsContextType {

@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import {
   ChevronLeft, Upload, Printer, Bookmark, ShieldCheck, CheckCircle2, Star, Award, Building2,
-  Wrench, Truck, Users, Phone, MessageSquare, MapPin, Clock, Navigation, Settings, BadgeCheck, Sparkles, Car,
+  Wrench, Truck, Users, Phone, MessageSquare, MapPin, Clock, Navigation, Settings, BadgeCheck, Sparkles, Car, DollarSign,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Helmet } from "react-helmet-async";
@@ -85,12 +85,14 @@ const VehiclePassportDealer = () => {
     { label: `BBB ${t.bbbRating}`, on: !!t.bbbRating },
   ].filter((b) => b.on);
 
+  const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
   const choose = [
-    { icon: Building2, t: founded ? `Established ${founded}` : "Established Dealer", on: true },
+    { icon: Building2, t: t.familyOwned ? "Family Owned" : founded ? `Established ${founded}` : "Established Dealer", on: !!(t.familyOwned || founded) },
     { icon: Star, t: t.googleRating ? `${t.googleRating} Star Rated` : "Verified Reviews", on: !!t.googleRating },
     { icon: Award, t: "Factory Certified", on: t.certifications.length > 0 },
-    { icon: Wrench, t: "On-Site Service", on: true },
-    { icon: Truck, t: "Delivery Available", on: true },
+    { icon: Wrench, t: t.serviceLocation === "offsite" ? "Service Center (off-site)" : "On-Site Service", on: t.serviceLocation === "onsite" || t.serviceLocation === "offsite" },
+    { icon: Truck, t: `${cap(t.delivery)} Delivery`, on: !!t.delivery && t.delivery !== "none" },
+    { icon: DollarSign, t: "On-Site Financing", on: t.financing },
     { icon: ShieldCheck, t: "AutoLabels Verified", on: true },
   ].filter((c) => c.on);
 
@@ -203,15 +205,26 @@ const VehiclePassportDealer = () => {
               <div className={`${CARD} p-4 flex flex-col justify-center text-[13px] ${TEXT2}`}><p className="font-semibold text-[#0F172A] mb-1">{d.dealerName}</p>Showroom, service drive, and customer amenities. Additional facility photos coming soon.</div>
             </div>
           ) : <ComingSoon>Photos of the showroom, service drive, and customer lounge are coming soon.</ComingSoon>}
+          {t.amenities.length > 0 && (
+            <div className="flex flex-wrap gap-2 mt-3">{t.amenities.map((a) => <span key={a} className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-[#0F172A] bg-emerald-50 border border-emerald-200 rounded-full px-2.5 py-1"><CheckCircle2 className="w-3 h-3 text-[#16A34A]" />{a}</span>)}</div>
+          )}
         </Section>
 
         {/* 7. Service & support */}
         <Section n={7} title="Service & Support">
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-            {[{ i: Wrench, t: "On-Site Service Center" }, { i: Settings, t: "OEM Parts Department" }, { i: ShieldCheck, t: "Warranty Repairs" }, { i: Truck, t: "Pickup & Delivery" }, { i: Clock, t: "Online Scheduling" }, { i: Car, t: "State Inspection" }].map((s) => (
-              <div key={s.t} className={`${CARD} p-4 flex items-center gap-3`}><span className="w-9 h-9 rounded-xl bg-blue-50 flex items-center justify-center shrink-0"><s.i className="w-[18px] h-[18px] text-[#2563EB]" /></span><span className="text-[12px] font-semibold leading-tight">{s.t}</span></div>
-            ))}
-          </div>
+          {t.serviceLocation && t.serviceLocation !== "none" && (
+            <div className={`${CARD} p-4 mb-3 flex items-start gap-3`}>
+              <span className="w-9 h-9 rounded-xl bg-blue-50 flex items-center justify-center shrink-0"><Wrench className="w-[18px] h-[18px] text-[#2563EB]" /></span>
+              <div><p className="text-[13px] font-bold">{t.serviceLocation === "offsite" ? "Off-site service department" : "On-site service department"}</p>{t.serviceLocation === "offsite" && t.serviceAddress && <p className="text-[12px] text-[#64748B]">{t.serviceAddress}</p>}</div>
+            </div>
+          )}
+          {t.services.length > 0 ? (
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+              {t.services.map((s) => (
+                <div key={s} className={`${CARD} p-4 flex items-center gap-3`}><span className="w-9 h-9 rounded-xl bg-blue-50 flex items-center justify-center shrink-0"><Settings className="w-[18px] h-[18px] text-[#2563EB]" /></span><span className="text-[12px] font-semibold leading-tight">{s}</span></div>
+              ))}
+            </div>
+          ) : (t.serviceLocation && t.serviceLocation !== "none") ? null : <ComingSoon>Service details will appear here once the dealership adds them.</ComingSoon>}
           {t.certifications.length > 0 && <div className="flex flex-wrap gap-2 mt-3">{t.certifications.map((c) => <span key={c} className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-[#0F172A] bg-slate-100 rounded-full px-2.5 py-1"><Award className="w-3 h-3 text-[#2563EB]" />{c}</span>)}</div>}
           <p className="text-[12px] text-[#94A3B8] mt-3">Confirm specific service offerings and hours with the dealership.</p>
         </Section>
@@ -251,15 +264,20 @@ const VehiclePassportDealer = () => {
             <div className={`${CARD} p-4`}>
               {d.dealerAddress ? <p className="text-[13px] font-semibold inline-flex items-start gap-2"><MapPin className="w-4 h-4 text-[#2563EB] mt-0.5 shrink-0" /> {d.dealerAddress}</p> : <p className="text-[13px] text-[#94A3B8]">Address coming soon.</p>}
               {d.dealerPhone && <p className="text-[13px] mt-2 inline-flex items-center gap-2"><Phone className="w-4 h-4 text-[#2563EB]" /> <a href={`tel:${d.dealerPhone}`} className="font-semibold hover:text-[#2563EB]">{d.dealerPhone}</a></p>}
-              <p className="text-[13px] mt-2 inline-flex items-center gap-2 text-[#94A3B8]"><Clock className="w-4 h-4" /> Hours coming soon — call to confirm.</p>
+              <p className={`text-[13px] mt-2 inline-flex items-start gap-2 ${t.hours ? "text-[#0F172A]" : "text-[#94A3B8]"}`}><Clock className="w-4 h-4 mt-0.5 shrink-0" /> {t.hours || "Hours coming soon — call to confirm."}</p>
               <a href={mapsUrl} target="_blank" rel="noreferrer" className="mt-3 inline-flex items-center gap-1.5 text-[13px] font-semibold text-[#2563EB] hover:underline"><Navigation className="w-4 h-4" /> Get Directions</a>
             </div>
             <a href={mapsUrl} target="_blank" rel="noreferrer" className="rounded-2xl border border-[#E6E8EC] bg-slate-100 min-h-[160px] flex flex-col items-center justify-center text-[#64748B] hover:border-[#2563EB] transition-colors">
               <MapPin className="w-8 h-8 text-[#94A3B8]" /><span className="text-[12px] font-semibold mt-1">Open in Maps</span>
             </a>
           </div>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mt-3">{["Sales", "Service", "Parts", "Finance"].map((dep) => (
-            <div key={dep} className="rounded-xl border border-[#E6E8EC] px-3 py-2 text-center text-[12px] font-semibold text-[#0F172A]">{dep}</div>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mt-3">{[
+            "Sales",
+            (t.serviceLocation && t.serviceLocation !== "none") ? "Service" : null,
+            t.services.some((s) => /part/i.test(s)) ? "Parts" : null,
+            t.financing ? "Finance" : null,
+          ].filter(Boolean).map((dep) => (
+            <div key={dep as string} className="rounded-xl border border-[#E6E8EC] px-3 py-2 text-center text-[12px] font-semibold text-[#0F172A]">{dep}</div>
           ))}</div>
         </Section>
 
