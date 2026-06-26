@@ -660,10 +660,109 @@ function buildPanel(key: PassportPanelKey, d: PassportData, listing: VehicleList
       const avgDom = (mc.avg_dom as number) ?? (isPreview ? 38 : null);
       const hasData = supply != null;
       const trendLabel = changePct == null ? "Stable Inventory" : changePct < 0 ? `Inventory Down ${Math.abs(changePct)}%` : changePct > 0 ? `Inventory Up ${changePct}%` : "Stable Inventory";
+      const removed = changePct != null && supply != null && changePct < 0 ? Math.max(1, Math.round((supply * Math.abs(changePct)) / 100)) : isPreview ? 6 : null;
+      const SCARCITY = ["Abundant", "Moderate", "Limited", "Scarce"];
+      const scarcityIdx = supply == null ? -1 : supply < 30 ? 3 : supply < 50 ? 2 : supply < 90 ? 1 : 0;
+      const competition = (d.viewCount ?? 0) > 20 || isPreview ? "High" : "Moderate";
+      const localScore = (() => { let s = 50; if (changePct != null && changePct < 0) s += 15; if (supply != null) { if (supply < 30) s += 20; else if (supply < 60) s += 10; } if (competition === "High") s += 14; return Math.max(20, Math.min(96, s)); })();
+      const scoreLabel = localScore >= 80 ? "Highly Competitive" : localScore >= 60 ? "Moderately Competitive" : "Balanced";
+      const distBuckets = [{ b: "0–25 mi", n: isPreview ? 12 : 0 }, { b: "25–50 mi", n: isPreview ? 16 : 0 }, { b: "50–100 mi", n: isPreview ? 8 : 0 }, { b: "100+ mi", n: isPreview ? 6 : 0 }];
+      const maxDist = Math.max(1, ...distBuckets.map((x) => x.n));
+      const invInsights: { icon: React.ElementType; text: string }[] = [];
+      if (changePct != null && changePct < 0) invInsights.push({ icon: TrendingDown, text: "Inventory continues to decline — lower supply means more competition." });
+      if (isPreview) invInsights.push({ icon: TrendingUp, text: "New listings are entering the market slower than vehicles are selling." });
+      if ((d.viewCount ?? 0) > 20 || isPreview) invInsights.push({ icon: Flame, text: "Similar vehicles are selling faster than last month." });
       return {
         title: "Inventory Trends", subtitle: "Understand local inventory and market availability",
         primary: { label: "Reserve This Vehicle", onClick: () => go("reserve") },
         body: <>
+          {/* ── Mobile (<768px) — premium market-availability dashboard ── */}
+          <div className="md:hidden space-y-4">
+            {hasData ? (
+              <>
+                <div className="rounded-2xl p-5 text-white" style={{ background: "linear-gradient(160deg,#0f7a3d 0%,#16A34A 100%)" }}>
+                  <div className="flex items-center gap-3">
+                    <span className="w-12 h-12 rounded-2xl bg-white/15 flex items-center justify-center shrink-0"><Package className="w-6 h-6" /></span>
+                    <div><p className="text-[13px] font-bold uppercase tracking-wider opacity-95">{changePct != null && changePct < 0 ? "Inventory Tightening" : "Inventory Stable"}</p><p className="text-[24px] font-extrabold leading-tight">{supply} Available</p></div>
+                  </div>
+                  {changePct != null && changePct !== 0 && <p className="text-[13px] opacity-90 mt-3 leading-snug">Inventory has {changePct < 0 ? "declined" : "grown"} {Math.abs(changePct)}% over the past 30 days.</p>}
+                  <p className="text-[11px] opacity-80 mt-2">Updated using live market inventory.</p>
+                </div>
+
+                <Section title="Inventory trend">
+                  <InventoryTrendChart isPreview={isPreview} />
+                  <div className="grid grid-cols-2 gap-3 mt-3">
+                    <div className={`${CARD} p-4`}><TrendingDown className="w-5 h-5 text-[#16A34A]" /><p className="text-[20px] font-extrabold mt-1 leading-none text-[#16A34A]">{changePct != null ? `${changePct > 0 ? "+" : ""}${changePct}%` : "—"}</p><p className="text-[10px] text-[#94A3B8] mt-1">vs 30 days ago</p></div>
+                    <div className={`${CARD} p-4`}><Car className="w-5 h-5 text-[#2563EB]" /><p className="text-[20px] font-extrabold mt-1 leading-none">{removed != null ? removed : "—"}</p><p className="text-[10px] text-[#94A3B8] mt-1">Removed since last month</p></div>
+                  </div>
+                </Section>
+
+                <Section title="Market snapshot">
+                  <div className={`${CARD} divide-y divide-[#F1F5F9]`}>
+                    {[
+                      { i: Package, l: "Vehicles Available", v: `${supply}`, c: "text-[#0F172A]" },
+                      { i: TrendingDown, l: "30-Day Change", v: changePct != null ? `${changePct > 0 ? "+" : ""}${changePct}%` : "—", c: changePct != null && changePct < 0 ? "text-[#16A34A]" : "text-[#0F172A]" },
+                      { i: Clock, l: "Average Days on Market", v: avgDom != null ? `${avgDom} Days` : "—", c: "text-[#0F172A]" },
+                      { i: TrendingDown, l: "Market Trend", v: changePct != null && changePct < 0 ? "Declining" : "Stable", c: "text-[#16A34A]" },
+                      { i: Flame, l: "Competition Level", v: competition, c: competition === "High" ? "text-[#EA580C]" : "text-[#0F172A]" },
+                      { i: TrendingUp, l: "Buyer Demand", v: competition === "High" ? "Strong" : "Moderate", c: "text-[#16A34A]" },
+                    ].map((r) => (
+                      <div key={r.l} className="flex items-center justify-between px-4 py-3"><span className="text-[12px] text-[#64748B] inline-flex items-center gap-2"><r.i className="w-4 h-4 text-[#94A3B8]" />{r.l}</span><span className={`text-[15px] font-extrabold ${r.c}`}>{r.v}</span></div>
+                    ))}
+                  </div>
+                </Section>
+
+                {invInsights.length > 0 && (
+                  <Section title="Inventory insights">
+                    <div className="space-y-2.5">{invInsights.map((x, i) => (
+                      <div key={i} className={`${CARD} p-4 flex items-start gap-2.5`}><x.icon className="w-4 h-4 text-[#16A34A] shrink-0 mt-0.5" /><span className="text-[13px] text-[#0F172A]">{x.text}</span></div>
+                    ))}</div>
+                  </Section>
+                )}
+
+                <div className="rounded-2xl p-5 text-white" style={{ background: "linear-gradient(160deg,#0f7a3d 0%,#16A34A 100%)" }}>
+                  <p className="text-[12px] font-semibold uppercase tracking-wider opacity-85">Buyer Recommendation</p>
+                  <p className="text-[18px] font-extrabold mt-1 inline-flex items-center gap-2"><Star className="w-5 h-5" /> {changePct != null && changePct < 0 ? "Inventory Is Tightening" : "Solid Time To Purchase"}</p>
+                  <p className="text-[13px] opacity-90 mt-1">Now is a good time to act. Lower inventory typically means:</p>
+                  <ul className="mt-2 space-y-1.5">{["Fewer available choices", "Less negotiating leverage over time", "Potential for higher future pricing"].map((t) => <li key={t} className="flex items-start gap-2 text-[13px]"><CheckCircle2 className="w-4 h-4 shrink-0 mt-0.5" />{t}</li>)}</ul>
+                </div>
+
+                <Section title="Market availability">
+                  <div className={`${CARD} p-4`}>
+                    <div className="relative h-2 rounded-full bg-gradient-to-r from-emerald-300 via-amber-200 to-rose-300">
+                      {scarcityIdx >= 0 && <span className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-4 h-4 rounded-full bg-white ring-2 ring-[#0F172A] shadow" style={{ left: `${(scarcityIdx / 3) * 100}%` }} />}
+                    </div>
+                    <div className="flex justify-between text-[10px] font-semibold text-[#94A3B8] mt-1.5">{SCARCITY.map((s, i) => <span key={s} className={scarcityIdx === i ? "text-[#0F172A] font-bold" : ""}>{s}</span>)}</div>
+                  </div>
+                </Section>
+
+                <Section title="Availability by distance">
+                  <div className={`${CARD} p-4 space-y-3`}>{distBuckets.map((r) => (
+                    <div key={r.b} className="flex items-center gap-3">
+                      <span className="text-[12px] text-[#64748B] w-20 shrink-0 inline-flex items-center gap-1"><MapPin className="w-3 h-3" />{r.b}</span>
+                      <div className="flex-1 h-3 rounded-full bg-slate-100 overflow-hidden"><div className="h-full rounded-full bg-[#2563EB]" style={{ width: `${Math.max(6, (r.n / maxDist) * 100)}%` }} /></div>
+                      <span className="text-[14px] font-extrabold w-7 text-right">{r.n || "—"}</span>
+                    </div>
+                  ))}</div>
+                </Section>
+
+                <Section title="Local inventory score">
+                  <div className={`${CARD} p-4 flex items-center gap-5`}>
+                    <AnimatedRing pct={localScore} size={104} color={BLUE} />
+                    <div><p className="text-[15px] font-extrabold">{scoreLabel}</p><p className="text-[12px] text-[#64748B] mt-0.5">How competitive the local market is for this vehicle right now.</p></div>
+                  </div>
+                </Section>
+
+                <Section title="If you wait…">
+                  <div className={`${CARD} p-4`}><p className="text-[13px] text-[#64748B] leading-snug">{changePct != null && changePct < 0 ? "Inventory is currently declining. Waiting may reduce your available choices and increase competition from other buyers." : "Inventory is steady for now. Pricing and selection can still shift as the market moves."}</p></div>
+                </Section>
+              </>
+            ) : <Empty>Inventory trend data will appear here once enough comparable listings have been tracked over time.</Empty>}
+            <Disclaimer />
+          </div>
+
+          {/* ── Desktop / tablet (≥768px) — unchanged ── */}
+          <div className="hidden md:block space-y-5">
           <Hero icon={Package} tone={changePct != null && changePct < 0 ? "green" : "neutral"} label={trendLabel}
             value={supply != null ? `${supply} available` : undefined}
             note={hasData ? "Comparable vehicles in your local market." : "30-day market supply trends appear once enough data is available."} />
@@ -713,6 +812,7 @@ function buildPanel(key: PassportPanelKey, d: PassportData, listing: VehicleList
             </>
           ) : <Empty>Inventory trend data will appear here once enough comparable listings have been tracked over time. Lower supply of similar vehicles generally means stronger pricing.</Empty>}
           <Disclaimer />
+          </div>
         </>,
       };
     }
