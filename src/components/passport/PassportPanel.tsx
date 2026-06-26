@@ -184,10 +184,111 @@ function buildPanel(key: PassportPanelKey, d: PassportData, listing: VehicleList
       if (isPreview) { insights.push("Vehicles with this trim typically sell within 38 days"); insights.push("Comparable inventory is decreasing"); }
       const avgDom = (mc.avg_dom as number) ?? null;
       const supply = (mc.market_days_supply as number) ?? (mc.inventory_count as number) ?? null;
+      // Mobile-only derived content (same data, premium presentation).
+      const topPct = Math.max(5, 100 - score);
+      const demandWord = score >= 66 ? "High Demand" : score >= 45 ? "Moderate Demand" : "Low Demand";
+      const temp = score >= 80 ? { l: "Very Hot", c: "#DC2626" } : score >= 66 ? { l: "Hot", c: "#EA580C" } : score >= 45 ? { l: "Warm", c: "#D97706" } : { l: "Cold", c: "#2563EB" };
+      const supplyLevel = supply != null ? (supply < 30 ? "Low" : supply < 60 ? "Balanced" : "Ample") : isPreview ? "Low" : "—";
+      const kpis = [
+        { icon: Eye, label: "Active Shoppers", value: views != null ? views.toLocaleString() : isPreview ? "89" : "—" },
+        { icon: Car, label: "Similar Vehicles", value: supply != null ? `${supply}` : isPreview ? "14" : "—" },
+        { icon: Clock, label: "Avg Days to Sell", value: avgDom != null ? `${avgDom} Days` : isPreview ? "12 Days" : "—" },
+        { icon: TrendingUp, label: "Weekly Searches", value: isPreview ? "120" : "—" },
+        { icon: Heart, label: "Saved by Shoppers", value: isPreview ? "38" : "—" },
+        { icon: MapPin, label: "Local Availability", value: supplyLevel },
+      ];
+      const snapshot = [
+        { l: "Inventory Level", v: supplyLevel },
+        { l: "Average Days on Market", v: avgDom != null ? `${avgDom} Days` : dom != null ? `${dom} Days` : isPreview ? "12 Days" : "—" },
+        { l: "Search Activity", v: isPreview ? "Above Average" : has ? level : "—" },
+        { l: "Vehicles Within 50 Miles", v: supply != null ? `${supply}` : isPreview ? "14" : "—" },
+        { l: "Average Price", v: avg != null ? fmt$(avg) : isPreview ? fmt$(61300) : "—" },
+      ];
+      const invSeries = isPreview ? [20, 19, 18, 17, 16, 15, 14] : [];
+      const shopperTrend = isPreview ? "+18%" : null;
+      const goodTime = isGreat || score >= 66;
       return {
         title: "Market Demand Analysis", subtitle: "How popular this vehicle is in your market",
         primary: { label: "Reserve This Vehicle", onClick: () => go("reserve") },
         body: <>
+          {/* ── Mobile (<768px) — premium market-intelligence dashboard ── */}
+          <div className="md:hidden space-y-4">
+            <div className="rounded-2xl p-5 text-white" style={{ background: "linear-gradient(160deg,#0f7a3d 0%,#16A34A 100%)" }}>
+              <p className="inline-flex items-center gap-1.5 text-[13px] font-bold uppercase tracking-wider opacity-95"><Flame className="w-4 h-4" /> {has ? `${demandWord.replace("Demand", "Market Demand")}` : "Demand Tracking"}</p>
+              {has && <p className="text-[13px] opacity-90 mt-1 leading-snug">Estimated to be in the top ~{topPct}% of similar vehicles searched in your area.</p>}
+              <div className="flex flex-col items-center mt-4">
+                <AnimatedRing pct={score} color="#ffffff" label="Demand" />
+                <p className="text-[13px] font-bold opacity-90 mt-2">Demand Score</p>
+                <p className="text-[17px] font-extrabold">{demandWord}</p>
+              </div>
+              <div className="mt-4">
+                <div className="relative h-2 rounded-full bg-white/25"><span className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-4 h-4 rounded-full bg-white shadow" style={{ left: `${score}%` }} /></div>
+                <div className="flex justify-between text-[11px] font-bold opacity-80 mt-1.5"><span>LOW</span><span>HIGH</span></div>
+              </div>
+              <p className="text-[11px] opacity-80 mt-3 text-center">Updated using live market activity.</p>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              {kpis.map((k) => (
+                <div key={k.label} className={`${CARD} p-4`}>
+                  <k.icon className="w-5 h-5 text-[#2563EB]" />
+                  <p className="text-[20px] font-extrabold mt-1.5 leading-none">{k.value}</p>
+                  <p className="text-[11px] text-[#94A3B8] mt-1">{k.label}</p>
+                </div>
+              ))}
+            </div>
+
+            <Section title="Local market snapshot">
+              <div className={`${CARD} divide-y divide-[#F1F5F9]`}>
+                {snapshot.map((s) => (
+                  <div key={s.l} className="flex items-center justify-between px-4 py-3"><span className="text-[12px] text-[#64748B]">{s.l}</span><span className="text-[15px] font-extrabold">{s.v}</span></div>
+                ))}
+              </div>
+            </Section>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div className={`${CARD} p-4`}>
+                <p className="text-[12px] text-[#64748B]">Market Temperature</p>
+                <p className="text-[18px] font-extrabold mt-1 inline-flex items-center gap-1.5" style={{ color: temp.c }}><Flame className="w-4 h-4" /> {temp.l}</p>
+              </div>
+              <div className={`${CARD} p-4`}>
+                <p className="text-[12px] text-[#64748B]">Shopper Activity</p>
+                {shopperTrend ? <p className="text-[18px] font-extrabold text-[#16A34A] mt-1 inline-flex items-center gap-1"><TrendingUp className="w-4 h-4" /> {shopperTrend}</p> : <p className="text-[14px] font-bold text-[#94A3B8] mt-1">Tracking</p>}
+                <p className="text-[10px] text-[#94A3B8] mt-0.5">vs last week</p>
+              </div>
+            </div>
+
+            <Section title="Inventory trend" sub="Comparable vehicles, last 30 days.">
+              {invSeries.length >= 2 ? (
+                <div className={`${CARD} p-4`}><TrendChart dealer={invSeries} height={110} /><p className="text-[11px] text-[#94A3B8] mt-1">Sample trend shown in preview mode.</p></div>
+              ) : <Empty>Inventory trend appears once enough market snapshots are collected.</Empty>}
+            </Section>
+
+            {insights.length > 0 && (
+              <Section title="Market insights">
+                <div className="space-y-2.5">{insights.map((t) => (
+                  <div key={t} className={`${CARD} p-4 flex items-start gap-2.5`}><TrendingUp className="w-4 h-4 text-[#16A34A] shrink-0 mt-0.5" /><span className="text-[13px] text-[#0F172A]">{t}</span></div>
+                ))}</div>
+              </Section>
+            )}
+
+            <div className="rounded-2xl p-5 text-white" style={{ background: "linear-gradient(160deg,#0f7a3d 0%,#16A34A 100%)" }}>
+              <p className="text-[12px] font-semibold uppercase tracking-wider opacity-85">Our Recommendation</p>
+              <p className="text-[20px] font-extrabold mt-1 inline-flex items-center gap-2"><CheckCircle2 className="w-6 h-6" /> {goodTime ? "Good Time To Buy" : "Worth A Closer Look"}</p>
+              <p className="text-[13px] opacity-90 mt-1.5 leading-snug">{goodTime ? "Pricing is competitive while demand stays strong. Waiting may reduce your selection as inventory declines." : "Compare with similar vehicles and recent pricing before deciding."}</p>
+            </div>
+
+            <Section title="Should you buy now?">
+              <div className={`${CARD} p-4`}>
+                <p className={`text-[22px] font-extrabold ${goodTime ? "text-[#16A34A]" : "text-[#0F172A]"}`}>{goodTime ? "Yes." : "Maybe."}</p>
+                <p className="text-[13px] text-[#64748B] mt-1 leading-snug">{goodTime ? "Based on today's inventory levels and pricing, this vehicle is a strong value in the current market." : "The numbers are reasonable — weigh it against comparable listings nearby."}</p>
+              </div>
+            </Section>
+            <Disclaimer />
+          </div>
+
+          {/* ── Desktop / tablet (≥768px) — unchanged ── */}
+          <div className="hidden md:block space-y-5">
           <Hero icon={Flame} tone={has ? "green" : "neutral"} label={has ? level : "Demand tracking"}
             note={has ? [views != null ? `${views.toLocaleString()} views` : null, dom != null ? `${dom} days on market` : null].filter(Boolean).join(" · ") || "Demand Score" : "Demand signals appear once this listing has been live."} />
           {has && (
@@ -241,6 +342,7 @@ function buildPanel(key: PassportPanelKey, d: PassportData, listing: VehicleList
             </div>
           </Section>
           <Disclaimer />
+          </div>
         </>,
       };
     }
@@ -1019,6 +1121,22 @@ const Stat = ({ label, value, tone = "neutral" }: { label: string; value: string
     <p className={`text-[16px] font-extrabold mt-0.5 leading-tight ${tone === "green" ? "text-[#16A34A]" : "text-[#0F172A]"}`}>{value}</p>
   </div>
 );
+
+// Circular score ring that fills on mount (used by mobile panel heroes).
+const AnimatedRing = ({ pct, size = 132, color = GREEN, label }: { pct: number; size?: number; color?: string; label?: string }) => {
+  const [fill, setFill] = useState(false);
+  useEffect(() => { const r = requestAnimationFrame(() => setFill(true)); return () => cancelAnimationFrame(r); }, []);
+  const r = size / 2 - 9, c = 2 * Math.PI * r, off = c * (1 - Math.max(0, Math.min(100, pct)) / 100);
+  return (
+    <div className="relative shrink-0" style={{ width: size, height: size }}>
+      <svg viewBox={`0 0 ${size} ${size}`} className="w-full h-full -rotate-90">
+        <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="rgba(255,255,255,0.25)" strokeWidth="9" />
+        <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke={color} strokeWidth="9" strokeLinecap="round" strokeDasharray={c} strokeDashoffset={fill ? off : c} style={{ transition: "stroke-dashoffset 900ms ease-out" }} />
+      </svg>
+      <div className="absolute inset-0 flex flex-col items-center justify-center"><span className="text-[34px] font-extrabold leading-none">{pct}</span>{label && <span className="text-[11px] font-bold opacity-80 mt-0.5">{label}</span>}</div>
+    </div>
+  );
+};
 
 const Seg = ({ options, value, onChange }: { options: { label: string; value: string | number }[]; value: string | number; onChange: (v: string | number) => void }) => (
   <div className="inline-flex rounded-lg border border-[#E6E8EC] bg-white p-0.5 text-[11px] font-semibold">
