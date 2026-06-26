@@ -94,8 +94,10 @@ async function fetchComps(ymm: string | null, condition: string, zip: string | n
     const model = year ? parts.slice(2).join(" ") : parts.slice(1).join(" ");
     const carType = condition === "new" ? "new" : "used";
 
-    // One MarketCheck active-search pass. Returns null on transport error so the
-    // caller can distinguish "no listings" (retry wider) from "request failed".
+    // One MarketCheck active-search pass. Returns null only on transport error;
+    // a non-OK or empty response still returns its http/num_found so the caller
+    // can tell "plan withheld the listings" (num_found>0, listings=0) from a
+    // genuine no-match or a request failure.
     const run = async (opts: { useYear: boolean; useZip: boolean }) => {
       const p = new URLSearchParams({ api_key: MC_KEY, car_type: carType, rows: "25", sort_by: "price", sort_order: "asc", stats: "price,dom" });
       if (opts.useYear && year) p.set("year", year);
@@ -103,12 +105,16 @@ async function fetchComps(ymm: string | null, condition: string, zip: string | n
       if (model) p.set("model", model);
       if (opts.useZip && zip) { p.set("zip", zip); p.set("radius", "150"); }
       const res = await mcFetch(`${MC_BASE}/search/car/active?${p.toString()}`, 10000);
-      if (!res || !res.ok) return null;
+      if (!res) return null;
+      const radius = opts.useZip && zip ? 150 : null;
+      if (!res.ok) return { b: {}, rows: [] as unknown[], rawCount: 0, numFound: null as number | null, http: res.status, radius };
       // deno-lint-ignore no-explicit-any
       const b: any = await res.json().catch(() => ({}));
       // deno-lint-ignore no-explicit-any
-      const rows: any[] = (Array.isArray(b?.listings) ? b.listings : []).filter((l: any) => String(l.vin || "").toUpperCase() !== subjectVin);
-      return { b, rows, radius: opts.useZip && zip ? 150 : null };
+      const all: any[] = Array.isArray(b?.listings) ? b.listings : [];
+      // deno-lint-ignore no-explicit-any
+      const rows: any[] = all.filter((l: any) => String(l.vin || "").toUpperCase() !== subjectVin);
+      return { b, rows, rawCount: all.length, numFound: num(b?.num_found), http: res.status, radius };
     };
 
     // Prefer local same-year comps; widen to national, then to all model years,
@@ -118,6 +124,8 @@ async function fetchComps(ymm: string | null, condition: string, zip: string | n
     if (r && r.rows.length === 0) r = (await run({ useYear: true, useZip: false })) ?? r;
     if (r && r.rows.length === 0) r = (await run({ useYear: false, useZip: false })) ?? r;
     if (!r) return null;
+    // Diagnostic: what did MarketCheck actually return on the widest pass?
+    const debug = { num_found: r.numFound, listings_returned: r.rawCount, http: r.http, radius: r.radius };
 
     const comparables = r.rows.slice(0, 16).map((l) => ({
       vin: l.vin ?? null,
@@ -144,7 +152,7 @@ async function fetchComps(ymm: string | null, condition: string, zip: string | n
       inventory_count: count,
       checked_at: new Date().toISOString(),
     };
-    return { comparables, meta, stats };
+    return { comparables, meta, stats, debug };
   } catch { return null; }
 }
 
@@ -425,6 +433,12 @@ serve(async (req) => {
     pulled: {
       predict: !!predict,
       comparables: comps?.comparables.length ?? 0,
+      // Raw MarketCheck comps response, to diagnose empty Comparables: if
+      // num_found > 0 but listings_returned == 0, the plan is withholding the
+      // listing records (aggregate-only) — not a parameter problem.
+      comps_num_found: comps?.debug?.num_found ?? null,
+      comps_listings_returned: comps?.debug?.listings_returned ?? null,
+      comps_http: comps?.debug?.http ?? null,
       market_days_supply: mds?.mds ?? null,
       history: history?.available ? (history.entries?.length ?? 0) : 0,
       owners: history?.owners ?? null,

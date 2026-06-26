@@ -149,7 +149,16 @@ export default function MarketcheckDataHealthCard() {
     setBusyVin(null);
     if (error) { toast.error("Re-enrich failed — check the MarketCheck key"); return; }
     const p = (data as { pulled?: Record<string, unknown> })?.pulled;
-    toast.success(p ? `Pulled: ${Object.entries(p).filter(([, v]) => v).map(([k]) => k).join(", ") || "nothing new"}` : "Re-enriched");
+    // Surface the comps diagnostic prominently: num_found vs listings_returned
+    // tells us instantly whether the plan is withholding the listing records.
+    if (p) {
+      const nf = p.comps_num_found as number | null;
+      const lr = p.comps_listings_returned as number | null;
+      const got = p.comparables as number;
+      toast.success(`Comps: ${nf ?? 0} found in market, ${lr ?? 0} listings returned, ${got} usable (http ${p.comps_http ?? "?"})`, { duration: 9000 });
+    } else {
+      toast.success("Re-enriched");
+    }
     load();
   };
 
