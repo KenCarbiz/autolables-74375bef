@@ -60,6 +60,7 @@ const InstallerProof = lazy(() => import("./pages/InstallerProof"));
 const ServiceSignoff = lazy(() => import("./pages/ServiceSignoff"));
 const GetReady = lazy(() => import("./pages/GetReady"));
 const ServiceDesk = lazy(() => import("./pages/ServiceDesk"));
+const ReadyBoard = lazy(() => import("./pages/ReadyBoard"));
 const SigningLookup = lazy(() => import("./pages/SigningLookup"));
 const Onboarding = lazy(() => import("./pages/Onboarding"));
 const TradeUpSticker = lazy(() => import("./pages/TradeUpSticker"));
@@ -235,6 +236,7 @@ const App = () => (
                         <Route path="/add-inventory" element={<SaveCarInventory />} />
                         <Route path="/prep" element={<PrepSignOff />} />
                         <Route path="/service" element={<ServiceDesk />} />
+                        <Route path="/ready-board" element={<ReadyBoard />} />
                         <Route path="/service-inspection" element={<ServiceInspection />} />
                         <Route path="/service-inspection/:qrToken" element={<ServiceInspection />} />
                       </Route>

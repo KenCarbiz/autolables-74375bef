@@ -103,7 +103,7 @@ function GateSettingCard({ tenantId }: { tenantId: string }) {
     setSaving(false);
     if (error) { toast.error("Could not save setting"); return; }
     setOn(next);
-    toast.success(next ? "Used cars now require a signed K-208 to publish" : "K-208 publish requirement turned off");
+    toast.success(next ? "Used cars now require a signed K-208 before the deal can be finalized" : "K-208 finalize requirement turned off");
   };
 
   return (
@@ -111,8 +111,8 @@ function GateSettingCard({ tenantId }: { tenantId: string }) {
       <div className="flex items-start gap-3">
         <ShieldCheck className="w-5 h-5 text-primary mt-0.5" />
         <div>
-          <div className="font-bold text-foreground">Require K-208 before publishing used cars</div>
-          <div className="text-sm text-muted-foreground">When on, a used/CPO car can't go live on its Passport until the service department's safety inspection is signed. New cars are exempt; admins can always override.</div>
+          <div className="font-bold text-foreground">Require K-208 before finalizing a used-car deal</div>
+          <div className="text-sm text-muted-foreground">The Passport still auto-publishes so the car is shoppable right away. When on, a used/CPO deal can't be sent for disclosure signature until the service department's safety inspection is signed. New cars are exempt; admins can always override.</div>
         </div>
       </div>
       <button onClick={toggle} disabled={on === null || saving}
