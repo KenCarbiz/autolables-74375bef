@@ -15,6 +15,7 @@ import Logo from "@/components/brand/Logo";
 import { derivePassport, computePriceHistory, fmt$, listingEquipment } from "@/lib/passportV2Data";
 import { resolveStickyButtons, type StickyBottomButtons } from "@/lib/stickyButtons";
 import { listingGallery } from "@/lib/photos";
+import { packetVisible } from "@/lib/packetModules";
 import PassportPanel, { type PassportPanelKey } from "@/components/passport/PassportPanel";
 import PassportCtaDock from "@/components/passport/PassportCtaDock";
 import PassportInfoModal, { type InfoModalKey } from "@/components/passport/PassportInfoModal";
@@ -184,8 +185,12 @@ const VehiclePassportV3 = () => {
   const verifyL = d.verifyRows.slice(0, Math.ceil(d.verifyRows.length / 2));
   const verifyR = d.verifyRows.slice(Math.ceil(d.verifyRows.length / 2));
 
+  // Packet curation: a module renders unless the dealer switched it off
+  // (Vehicle File → Scan Info). Required disclosures are never curatable.
+  const pv = (id: string) => packetVisible(listing, id);
+
   const actions = [
-    { icon: FileText, label: "Documents", onClick: () => go("documents") },
+    ...(pv("documents") ? [{ icon: FileText, label: "Documents", onClick: () => go("documents") }] : []),
     { icon: MessageSquare, label: "Contact Dealer", onClick: () => go("contact") },
     { icon: RefreshCw, label: "Value My Trade", onClick: () => go("trade") },
     { icon: Upload, label: "Share Vehicle", onClick: handleShare },
@@ -327,7 +332,7 @@ const VehiclePassportV3 = () => {
             <div className="flex gap-2 mt-2">
               <button onClick={() => go("gallery")} className={`flex-1 h-10 rounded-xl border border-[#E6E8EC] bg-white text-[13px] font-semibold inline-flex items-center justify-center gap-1.5 hover:border-[#2563EB]`}><Eye className="w-4 h-4 text-[#2563EB]" /> All Photos ({photoCount})</button>
               <div className="flex-1 h-10 rounded-xl border border-dashed border-[#E6E8EC] bg-[#fafbfc] text-[12px] text-[#94A3B8] inline-flex items-center justify-center gap-1.5"><Rotate3d className="w-4 h-4" /> 360° View</div>
-              {listing.videos?.length ? <a href={listing.videos[0].url} target="_blank" rel="noreferrer" className="flex-1 h-10 rounded-xl border border-[#E6E8EC] bg-white text-[13px] font-semibold inline-flex items-center justify-center gap-1.5 hover:border-[#2563EB]"><Play className="w-4 h-4 text-[#2563EB]" /> Video</a> : <div className="flex-1 h-10 rounded-xl border border-dashed border-[#E6E8EC] bg-[#fafbfc] text-[12px] text-[#94A3B8] inline-flex items-center justify-center gap-1.5"><Play className="w-4 h-4" /> No Video</div>}
+              {pv("videos") && (listing.videos?.length ? <a href={listing.videos[0].url} target="_blank" rel="noreferrer" className="flex-1 h-10 rounded-xl border border-[#E6E8EC] bg-white text-[13px] font-semibold inline-flex items-center justify-center gap-1.5 hover:border-[#2563EB]"><Play className="w-4 h-4 text-[#2563EB]" /> Video</a> : <div className="flex-1 h-10 rounded-xl border border-dashed border-[#E6E8EC] bg-[#fafbfc] text-[12px] text-[#94A3B8] inline-flex items-center justify-center gap-1.5"><Play className="w-4 h-4" /> No Video</div>)}
             </div>
           </div>
 
@@ -358,7 +363,7 @@ const VehiclePassportV3 = () => {
                           : `+ ${fmt$(d.docFee)} doc fee · Sale ${fmt$(d.websiteSalePrice ?? price + d.docFee)}`}
                       </div>
                     ) : null}
-                    {d.estMonthly != null && <div className="text-[12px] text-[#64748B]">Est. {fmt$(d.estMonthly)}/mo</div>}
+                    {pv("payment") && d.estMonthly != null && <div className="text-[12px] text-[#64748B]">Est. {fmt$(d.estMonthly)}/mo</div>}
                     {d.msrp != null && <div className="text-[12px] text-[#64748B]">MSRP {fmt$(d.msrp)}</div>}
                     {d.saveVsMsrp != null && <div className="text-[13px] font-semibold text-[#16A34A]">You save {fmt$(d.saveVsMsrp)}</div>}
                   </div>
@@ -406,6 +411,7 @@ const VehiclePassportV3 = () => {
         </section>
 
         {/* 4. MARKET INTELLIGENCE */}
+        {pv("marketValue") && (
         <section className={`${CARD} p-5`}>
           <div className="flex items-center justify-between"><div><H2>Market Intelligence</H2><p className={`text-[13px] ${TEXT2} mt-0.5`}>Independent pricing, demand, and value analysis for this vehicle.</p></div><span className="text-[12px] text-[#94A3B8] inline-flex items-center gap-1">Powered by MarketCheck<button onClick={(e) => openInfo("data-sources", e)} aria-label="Data sources explained" className="w-4 h-4 inline-flex items-center justify-center"><Info className="w-3.5 h-3.5 text-[#94A3B8]" /></button></span></div>
           <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-4 mt-5">
@@ -420,10 +426,12 @@ const VehiclePassportV3 = () => {
           </div>
           <p className="text-[11px] text-[#94A3B8] mt-3">Market values are estimates from third-party data and may vary by region and time.</p>
         </section>
+        )}
 
         {/* 5. PRIMARY TRUST GRID */}
         <section className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-5 items-stretch">
           {/* Why This Is A Great Buy */}
+          {pv("insights") && (
           <div className={`${CARD} p-5 flex flex-col max-[767px]:p-6 max-[767px]:ring-1 max-[767px]:ring-blue-200 max-[767px]:shadow-[0_10px_30px_rgba(37,99,235,0.10)]`}>
             <H3>Why This Is A Great Buy</H3>
             {d.confScore != null && (
@@ -436,6 +444,7 @@ const VehiclePassportV3 = () => {
             <ul className="mt-3 space-y-2">{(d.whyBuy.length ? d.whyBuy.slice(0, 6) : ["Details confirmed at the dealership"]).map((b, i) => <li key={i} className="flex items-start gap-2 text-[13px]"><CheckCircle2 className="w-4 h-4 text-[#16A34A] shrink-0 mt-0.5" />{b}</li>)}</ul>
             <Link onClick={() => go("great-buy")} className="mt-auto pt-3 self-start">See full buying report</Link>
           </div>
+          )}
 
           {/* Vehicle History */}
           <div className={`${CARD} p-5 flex flex-col`}>
@@ -469,6 +478,7 @@ const VehiclePassportV3 = () => {
           </div>
 
           {/* Factory Warranty */}
+          {pv("warranty") && (
           <div className={`${CARD} p-5 flex flex-col`}>
             <div className="flex items-center gap-1.5"><H3>Factory Warranty</H3><button onClick={(e) => openInfo("warranty-terms", e)} aria-label="Warranty terminology" className="w-6 h-6 rounded-full hover:bg-slate-100 flex items-center justify-center"><Info className="w-3.5 h-3.5 text-[#94A3B8]" /></button></div>
             {d.warrantyStr ? (() => {
@@ -486,6 +496,7 @@ const VehiclePassportV3 = () => {
             })() : <p className="text-[13px] text-[#64748B] mt-3">Coverage details confirmed at the dealership.</p>}
             <Link onClick={() => openPanel("factory-warranty")} className="mt-auto pt-3 self-start">View warranty details</Link>
           </div>
+          )}
 
           {/* What Owners Say */}
           <div className={`${CARD} p-5 flex flex-col`}>
@@ -502,6 +513,7 @@ const VehiclePassportV3 = () => {
             now lives in the sticky right rail). */}
         <section className="grid grid-cols-1 lg:grid-cols-[1fr_1fr_1.6fr] gap-5 items-stretch">
           {/* Highlights */}
+          {pv("factoryOptions") && (
           <div className={`${CARD} p-5 flex flex-col`}>
             <H3>Vehicle Highlights</H3>
             {highlights.length ? (
@@ -509,13 +521,16 @@ const VehiclePassportV3 = () => {
             ) : <p className="text-[13px] text-[#64748B] mt-3">Equipment highlights appear here as the vehicle's data is decoded.</p>}
             <Link onClick={() => openPanel("highlights")} className="mt-auto pt-3 self-start">View all features &amp; specs</Link>
           </div>
+          )}
           {/* Overview */}
+          {pv("description") && (
           <div className={`${CARD} p-5 flex flex-col`}>
             <H3>Vehicle Overview</H3>
             <p className="text-[13px] leading-relaxed text-[#64748B] mt-3 line-clamp-6">{d.overview}</p>
             {(gallery[1] || gallery[0]) && <img src={gallery[1] || gallery[0]} alt="" className="w-full aspect-[16/9] object-cover rounded-xl mt-3" />}
             <Link onClick={() => openPanel("overview")} className="mt-auto pt-3 self-start">Read full overview</Link>
           </div>
+          )}
           {/* Why Buy From This Dealership (wider) */}
           <div className={`${CARD} p-5 flex flex-col`}>
             <H3>Why Buy From {d.dealerName}?</H3>
