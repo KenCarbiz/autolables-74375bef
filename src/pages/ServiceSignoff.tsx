@@ -4,7 +4,9 @@ import { supabase } from "@/integrations/supabase/client";
 import SignaturePad from "@/components/addendum/SignaturePad";
 import { K208_INSPECTION_CATEGORIES, K208_CERTIFICATION_TEXT } from "@/data/ctK208Form";
 import { buildConsentRecord, hashPayload, fetchClientIp } from "@/lib/esign";
-import { CheckCircle2, Loader2, ShieldCheck, Upload, X, AlertTriangle } from "lucide-react";
+import { CheckCircle2, Loader2, ShieldCheck, Upload, X, AlertTriangle, ShieldAlert } from "lucide-react";
+import { toast } from "sonner";
+import { OUTCOME_LABELS, type RecallOutcome } from "@/hooks/useRecallTask";
 
 // ──────────────────────────────────────────────────────────────
 // /inspect/:token — no-login Service department safety-inspection (CT K-208)
@@ -153,6 +155,8 @@ export default function ServiceSignoff() {
       </div>
 
       <div className="max-w-2xl mx-auto p-4 space-y-5">
+        <RecallOutcomeCard token={token} />
+
         <div className="flex items-center justify-between gap-3">
           <p className="text-sm text-muted-foreground">{answered} of {allItems.length} items marked</p>
           <button onClick={passAll} className="h-9 px-3 rounded-md bg-emerald-600 text-white text-xs font-semibold">Pass all</button>
@@ -249,6 +253,127 @@ export default function ServiceSignoff() {
             </p>
           )}
         </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Open Recall outcome (no-login, token-gated) ───────────────────────────
+// Shows above the K-208 form when the scanned vehicle has an open recall. The
+// service department records one of three outcomes with name/RO/notes and an
+// optional photo or document. Resolving clears the publish blocker.
+const RECALL_OUTCOMES: RecallOutcome[] = ["recall_completed", "no_fix_available", "does_not_apply"];
+
+function RecallOutcomeCard({ token }: { token: string }) {
+  const [task, setTask] = useState<{ task_id: string; vin?: string; open_recall_count?: number } | null>(null);
+  const [picked, setPicked] = useState<RecallOutcome | null>(null);
+  const [employee, setEmployee] = useState("");
+  const [ro, setRo] = useState("");
+  const [notes, setNotes] = useState("");
+  const [docs, setDocs] = useState<{ url: string; caption?: string }[]>([]);
+  const [uploading, setUploading] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [done, setDone] = useState<RecallOutcome | null>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    (async () => {
+      // deno-lint-ignore no-explicit-any
+      const { data } = await (supabase as any).rpc("get_recall_task_for_token", { _token: token });
+      const d = data as { ok?: boolean; has_open_recall?: boolean; task_id?: string; vin?: string; open_recall_count?: number };
+      if (d?.ok && d.has_open_recall && d.task_id) setTask({ task_id: d.task_id, vin: d.vin, open_recall_count: d.open_recall_count });
+    })();
+  }, [token]);
+
+  if (!task) return null;
+
+  const onFiles = async (files: FileList | null) => {
+    if (!files?.length) return;
+    setUploading(true);
+    for (const file of Array.from(files)) {
+      try {
+        const dataBase64: string = await new Promise((resolve, reject) => {
+          const r = new FileReader(); r.onload = () => resolve(String(r.result)); r.onerror = reject; r.readAsDataURL(file);
+        });
+        const { data, error } = await supabase.functions.invoke("signoff-upload", {
+          body: { token, filename: file.name, contentType: file.type, dataBase64 },
+        });
+        const url = (data as { url?: string })?.url;
+        if (!error && url) setDocs((p) => [...p, { url, caption: file.name }]);
+      } catch { /* skip */ }
+    }
+    setUploading(false);
+    if (fileRef.current) fileRef.current.value = "";
+  };
+
+  const submit = async () => {
+    if (!picked) return;
+    if (!employee.trim()) { toast.error("Service employee name is required"); return; }
+    setSubmitting(true);
+    // deno-lint-ignore no-explicit-any
+    const { data, error } = await (supabase as any).rpc("submit_recall_outcome_public", {
+      _token: token, _outcome: picked, _employee_name: employee.trim(),
+      _ro_number: ro.trim() || null, _notes: notes.trim() || null,
+      _documents: docs, _ip: null, _user_agent: typeof navigator !== "undefined" ? navigator.userAgent : null,
+    });
+    setSubmitting(false);
+    if (!error && (data as { ok?: boolean })?.ok) { setDone(picked); toast.success("Recall outcome recorded"); }
+    else toast.error((data as { reason?: string })?.reason || "Could not record outcome");
+  };
+
+  if (done) {
+    return (
+      <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4">
+        <div className="flex items-center gap-2 text-emerald-800"><CheckCircle2 className="w-5 h-5" /><span className="font-bold text-sm">Recall outcome recorded</span></div>
+        <p className="text-xs text-emerald-700 mt-1">{OUTCOME_LABELS[done]} · {employee.trim()}{ro.trim() ? ` · RO ${ro.trim()}` : ""}</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="rounded-2xl border border-red-200 bg-red-50 overflow-hidden">
+      <div className="px-4 py-3 bg-red-100/70 flex items-center gap-2">
+        <ShieldAlert className="w-5 h-5 text-red-600" />
+        <div>
+          <div className="font-bold text-sm text-red-800">Open Recall Found</div>
+          <div className="text-xs text-red-700">{task.open_recall_count || 1} active manufacturer recall{(task.open_recall_count || 1) === 1 ? "" : "s"} requires service review.</div>
+        </div>
+      </div>
+      <div className="p-4 space-y-2.5">
+        <p className="text-xs font-semibold text-foreground">Select the service outcome:</p>
+        <div className="grid gap-2">
+          {RECALL_OUTCOMES.map((o) => (
+            <button key={o} onClick={() => setPicked(o)}
+              className={`text-left text-sm font-semibold px-3 py-2.5 rounded-xl border transition-colors ${picked === o ? "border-blue-500 bg-blue-50 text-blue-700" : "border-border bg-card text-foreground hover:bg-muted"}`}>
+              {OUTCOME_LABELS[o]}
+            </button>
+          ))}
+        </div>
+        {picked && (
+          <div className="space-y-2 pt-1">
+            <input value={employee} onChange={(e) => setEmployee(e.target.value)} placeholder="Service employee name *" className="w-full px-3 py-2.5 border border-border rounded-xl text-sm" />
+            <input value={ro} onChange={(e) => setRo(e.target.value)} placeholder="RO number (if applicable)" className="w-full px-3 py-2.5 border border-border rounded-xl text-sm" />
+            <textarea value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Notes" rows={2} className="w-full px-3 py-2.5 border border-border rounded-xl text-sm resize-none" />
+            <div>
+              <input ref={fileRef} type="file" accept="image/*,application/pdf" multiple className="hidden" onChange={(e) => onFiles(e.target.files)} />
+              <button onClick={() => fileRef.current?.click()} disabled={uploading} className="w-full h-10 rounded-xl border border-dashed border-border text-sm font-semibold inline-flex items-center justify-center gap-2 text-muted-foreground hover:bg-muted disabled:opacity-50">
+                {uploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}{docs.length ? `${docs.length} file${docs.length === 1 ? "" : "s"} attached` : "Attach photo or document (optional)"}
+              </button>
+              {docs.length > 0 && (
+                <div className="flex flex-wrap gap-1.5 mt-1.5">
+                  {docs.map((d, i) => (
+                    <span key={i} className="inline-flex items-center gap-1 text-[11px] bg-muted px-2 py-1 rounded-md">{d.caption || "file"}
+                      <button onClick={() => setDocs((p) => p.filter((_, j) => j !== i))}><X className="w-3 h-3" /></button>
+                    </span>
+                  ))}
+                </div>
+              )}
+            </div>
+            <button onClick={submit} disabled={submitting} className="w-full h-11 rounded-xl bg-red-600 text-white text-sm font-bold disabled:opacity-50">
+              {submitting ? "Recording…" : `Record: ${OUTCOME_LABELS[picked]}`}
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );

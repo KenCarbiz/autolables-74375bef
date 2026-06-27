@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useNavigate, useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -2286,14 +2286,32 @@ const Item = ({ ok, label, when }: { ok: boolean; label: string; when: string | 
 // service detail. Resolving the task clears the publish blocker (a "No fix
 // available" outcome keeps the recall visible but is still a recorded review).
 const OUTCOME_ORDER: RecallOutcome[] = ["recall_completed", "no_fix_available", "does_not_apply"];
-const RecallReviewActions = ({ recall }: { recall: ReturnType<typeof useRecallTask> }) => {
+const RecallReviewActions = ({ recall, vehicle }: { recall: ReturnType<typeof useRecallTask>; vehicle: VehicleRow }) => {
   const { task, blocking, submitting, submitOutcome } = recall;
   const [picked, setPicked] = useState<RecallOutcome | null>(null);
   const [employee, setEmployee] = useState("");
   const [ro, setRo] = useState("");
   const [notes, setNotes] = useState("");
+  const [docs, setDocs] = useState<{ url: string; caption?: string }[]>([]);
+  const [uploading, setUploading] = useState(false);
+  const fileRef = useRef<HTMLInputElement>(null);
 
   if (!task) return null;
+
+  const onFiles = async (files: FileList | null) => {
+    if (!files?.length || !vehicle.tenant_id || !vehicle.vin) return;
+    setUploading(true);
+    for (const file of Array.from(files)) {
+      const path = `${vehicle.tenant_id}/${vehicle.vin}/recall/${Date.now()}-${file.name.replace(/[^a-zA-Z0-9._-]/g, "_")}`;
+      const { error } = await supabase.storage.from("service-docs").upload(path, file, { upsert: false });
+      if (!error) {
+        const { data } = supabase.storage.from("service-docs").getPublicUrl(path);
+        if (data?.publicUrl) setDocs((p) => [...p, { url: data.publicUrl, caption: file.name }]);
+      }
+    }
+    setUploading(false);
+    if (fileRef.current) fileRef.current.value = "";
+  };
 
   // Already reviewed — show the immutable record (audit trail preserved).
   if (task.status === "resolved" && task.outcome) {
@@ -2312,7 +2330,7 @@ const RecallReviewActions = ({ recall }: { recall: ReturnType<typeof useRecallTa
   const submit = async () => {
     if (!picked) return;
     if (!employee.trim()) { toast.error("Service employee name is required"); return; }
-    const r = await submitOutcome(picked, { employeeName: employee.trim(), roNumber: ro.trim() || undefined, notes: notes.trim() || undefined });
+    const r = await submitOutcome(picked, { employeeName: employee.trim(), roNumber: ro.trim() || undefined, notes: notes.trim() || undefined, documents: docs });
     if (r.ok) toast.success("Recall outcome recorded"); else toast.error(r.error || "Could not record outcome");
   };
 
@@ -2333,6 +2351,19 @@ const RecallReviewActions = ({ recall }: { recall: ReturnType<typeof useRecallTa
           <input value={employee} onChange={(e) => setEmployee(e.target.value)} placeholder="Service employee name *" className="w-full px-2 py-1.5 border border-border rounded text-[12px]" />
           <input value={ro} onChange={(e) => setRo(e.target.value)} placeholder="RO number (if applicable)" className="w-full px-2 py-1.5 border border-border rounded text-[12px]" />
           <textarea value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Notes" rows={2} className="w-full px-2 py-1.5 border border-border rounded text-[12px] resize-none" />
+          <input ref={fileRef} type="file" accept="image/*,application/pdf" multiple className="hidden" onChange={(e) => onFiles(e.target.files)} />
+          <button onClick={() => fileRef.current?.click()} disabled={uploading} className="w-full h-8 rounded-md border border-dashed border-border text-[12px] font-semibold text-muted-foreground hover:bg-muted disabled:opacity-50">
+            {uploading ? "Uploading…" : docs.length ? `${docs.length} file${docs.length === 1 ? "" : "s"} attached` : "Attach photo / document (optional)"}
+          </button>
+          {docs.length > 0 && (
+            <div className="flex flex-wrap gap-1">
+              {docs.map((d, i) => (
+                <span key={i} className="inline-flex items-center gap-1 text-[10px] bg-muted px-1.5 py-0.5 rounded">{d.caption || "file"}
+                  <button onClick={() => setDocs((p) => p.filter((_, j) => j !== i))}><X className="w-2.5 h-2.5" /></button>
+                </span>
+              ))}
+            </div>
+          )}
           <button onClick={submit} disabled={submitting} className="w-full h-8 rounded-md bg-blue-600 text-white text-[12px] font-semibold disabled:opacity-50">
             {submitting ? "Recording…" : `Record: ${OUTCOME_LABELS[picked]}`}
           </button>
@@ -2388,7 +2419,7 @@ const RecallCard = ({ vehicle, recall }: { vehicle: VehicleRow; recall: ReturnTy
             </li>
           ))}
         </ul>
-        <RecallReviewActions recall={recall} />
+        <RecallReviewActions recall={recall} vehicle={vehicle} />
       </Card>
     );
   }

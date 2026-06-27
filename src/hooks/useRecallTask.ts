@@ -26,12 +26,14 @@ export interface RecallTask {
   completed_at: string | null;
 }
 
+export interface RecallDoc { url: string; caption?: string }
+
 export interface RecallOutcomeInput {
   employeeName: string;
   roNumber?: string;
   notes?: string;
   serviceDate?: string;
-  documents?: string[];
+  documents?: RecallDoc[];
 }
 
 // "No fix available" leaves the recall visible but is still a recorded review,
