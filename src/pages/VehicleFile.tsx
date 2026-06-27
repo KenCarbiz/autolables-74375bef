@@ -1590,6 +1590,10 @@ const AddendumPanel = ({ vehicle }: { vehicle: VehicleRow }) => {
     if (vehicle.ymm) params.set("ymm", vehicle.ymm);
     if (vehicle.trim) params.set("trim", vehicle.trim);
     if (vehicle.mileage != null) params.set("mileage", String(vehicle.mileage));
+    // Carry the recall signal so the addendum's compliance receipt reflects the
+    // real NHTSA status instead of a generic "check ready" line.
+    if (vehicle.recall_status) params.set("recall", vehicle.recall_status);
+    if (vehicle.open_recall_count != null) params.set("open", String(vehicle.open_recall_count));
     const qs = params.toString();
     navigate(qs ? `/addendum?${qs}` : "/addendum");
   };

@@ -1080,7 +1080,15 @@ const Index = () => {
       { label: "Payload hashed (SHA-256) for tamper evidence" },
     ];
     if (vehicle.vin && vehicle.vin.length === 17) {
-      receipt.push({ label: "VIN recorded · NHTSA recall check ready" });
+      const rc = searchParams.get("recall");
+      const rn = Number(searchParams.get("open") || 0);
+      receipt.push({
+        label: rc === "open_recalls" && rn > 0
+          ? `${rn} open NHTSA recall${rn === 1 ? "" : "s"} — review before sale`
+          : rc === "clear"
+            ? "NHTSA recall check: no open recalls"
+            : "VIN recorded · NHTSA recall check ready",
+      });
     }
     if (settings.feature_buyers_guide) {
       receipt.push({ label: "FTC Buyers Guide template active", cite: "16 CFR 455" });
