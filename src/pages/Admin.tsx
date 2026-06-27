@@ -194,6 +194,29 @@ const Admin = () => {
   const { entries: auditEntries, exportCsv: exportAuditCsv } = useAudit();
   const { currentStore, updateTenant, tenant } = useTenant();
   const productIconKey = `product_icons:${tenant?.id || "none"}`;
+
+  // Auto-recalculate stored sale prices when the dealer changes their doc fee,
+  // so existing inventory updates immediately instead of waiting for the next
+  // sync/crawl. Debounced (the amount input fires per keystroke). Baselines the
+  // fee per tenant so it never fires on initial load or a store switch — only
+  // on a real change to the current tenant's doc fee.
+  const docFeeSig = `${!!settings.doc_fee_enabled}:${settings.doc_fee_amount}`;
+  const lastDocFee = useRef<{ tenant: string; sig: string } | null>(null);
+  useEffect(() => {
+    if (settingsLoading || !tenant?.id) return;
+    const prev = lastDocFee.current;
+    if (!prev || prev.tenant !== tenant.id) { lastDocFee.current = { tenant: tenant.id, sig: docFeeSig }; return; }
+    if (prev.sig === docFeeSig) return;
+    lastDocFee.current = { tenant: tenant.id, sig: docFeeSig };
+    const t = setTimeout(async () => {
+      const { data, error } = await supabase.rpc("recalc_tenant_doc_fee", { p_tenant_id: tenant.id });
+      if (!error && typeof data === "number" && data > 0) {
+        toast.success(`Updated ${data} vehicle${data === 1 ? "" : "s"} with the new doc fee.`);
+      }
+    }, 1200);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [docFeeSig, tenant?.id, settingsLoading]);
   const navigate = useNavigate();
   const { openScan } = useVinScan();
   const [searchParams, setSearchParams] = useSearchParams();
