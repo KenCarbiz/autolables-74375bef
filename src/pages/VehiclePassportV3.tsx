@@ -136,7 +136,10 @@ export const MOCK_LISTING = {
 
 // ── Lead modal is intentionally absent — every action routes to a full page ──
 const VehiclePassportV3 = () => {
-  const { vehicleSlug } = useParams<{ vehicleSlug: string }>();
+  // Canonical route is /v/:slug (param `slug`); legacy /passport-v3/:vehicleSlug
+  // still resolves here too, so accept either param name.
+  const params = useParams<{ vehicleSlug?: string; slug?: string }>();
+  const vehicleSlug = params.vehicleSlug ?? params.slug;
   const navigate = useNavigate();
   const { publicUrl } = useVehicleListing("");
   const [listing, setListing] = useState<VehicleListing | null>(null);
@@ -290,7 +293,7 @@ const VehiclePassportV3 = () => {
 
   return (
     <div className="min-h-screen bg-[#F6F7F9] text-[#0F172A]" style={{ fontFamily: "Inter, -apple-system, BlinkMacSystemFont, sans-serif" }}>
-      <Helmet><title>{`${listing.ymm}${listing.trim ? ` ${listing.trim}` : ""} — Passport`}</title>{isPreview && <meta name="robots" content="noindex" />}</Helmet>
+      <Helmet><title>{`${listing.ymm}${listing.trim ? ` ${listing.trim}` : ""} — ${d.dealerName}`}</title><meta name="description" content={`${listing.ymm}${price != null ? ` · ${fmt$(price)}` : ""} · ${d.dealerName}`} />{isPreview && <meta name="robots" content="noindex" />}</Helmet>
 
       {isPreview && (
         <div className="bg-amber-500 text-white text-center text-[12px] font-bold py-1.5 px-4">SAMPLE PREVIEW — design layout with placeholder data. Not a real listing.</div>

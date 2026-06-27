@@ -77,6 +77,14 @@ const VehicleVinRedirect = () => {
   const { vin } = useParams<{ vin: string }>();
   return <Navigate to={`/v/${(vin || "").toUpperCase()}`} replace />;
 };
+// The Passport V3 experience is now served at the canonical /v/:slug. Old
+// /passport-v2 and /passport-v3 root links redirect there so there is one
+// shopper page; the search string is preserved to keep the ?preview flag.
+const PassportRootRedirect = () => {
+  const { vehicleSlug } = useParams<{ vehicleSlug: string }>();
+  const { search } = useLocation();
+  return <Navigate to={`/v/${vehicleSlug || ""}${search}`} replace />;
+};
 const UsedCarSticker = lazy(() => import("./pages/UsedCarSticker"));
 const UsedVehicleDocuments = lazy(() => import("./pages/UsedVehicleDocuments"));
 const UsedVehicleDocumentsPrint = lazy(() => import("./pages/UsedVehicleDocumentsPrint"));
@@ -177,10 +185,11 @@ const App = () => (
                       <Route path="/onboarding" element={<Onboarding />} />
                       <Route path="/scan" element={<ScanPage />} />
                       <Route path="/vehicle/:vin" element={<VehicleVinRedirect />} />
-                      <Route path="/v/:slug" element={<PublicListing />} />
-                      <Route path="/passport-v2/:vehicleSlug" element={<VehiclePassportV2 />} />
+                      <Route path="/v/:slug" element={<VehiclePassportV3 />} />
+                      <Route path="/v-classic/:slug" element={<PublicListing />} />
+                      <Route path="/passport-v2/:vehicleSlug" element={<PassportRootRedirect />} />
                       <Route path="/passport-v2/:vehicleSlug/:section" element={<VehiclePassportV2Detail />} />
-                      <Route path="/passport-v3/:vehicleSlug" element={<VehiclePassportV3 />} />
+                      <Route path="/passport-v3/:vehicleSlug" element={<PassportRootRedirect />} />
                       <Route path="/passport-v3/:vehicleSlug/verification" element={<VehiclePassportVerification />} />
                       <Route path="/passport-v3/:vehicleSlug/documents" element={<VehiclePassportDocuments />} />
                       <Route path="/passport-v3/:vehicleSlug/great-buy" element={<VehiclePassportGreatBuy />} />
