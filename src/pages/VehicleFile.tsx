@@ -2386,6 +2386,20 @@ const MarketPricingCard = ({ vehicle }: { vehicle: VehicleRow }) => {
             <span className="text-muted-foreground">Market value</span>
             <span className="font-semibold tabular-nums text-foreground">${market.toLocaleString()}</span>
           </div>
+          {(() => {
+            const mm = ((vehicle as unknown as { market_meta?: Record<string, unknown> }).market_meta || {}) as Record<string, unknown>;
+            const comps = (vehicle as unknown as { comparables?: unknown[] }).comparables;
+            const compCount = Array.isArray(comps) ? comps.length : 0;
+            const daysSupply = mm.market_days_supply != null ? Math.round(Number(mm.market_days_supply)) : null;
+            const pct = mm.price_percentile != null ? Math.max(1, 100 - Math.round(Number(mm.price_percentile))) : null;
+            return (
+              <>
+                {compCount > 0 && <div className="flex items-center justify-between text-sm"><span className="text-muted-foreground">Comparables</span><span className="font-semibold tabular-nums text-foreground">{compCount} nearby</span></div>}
+                {daysSupply != null && <div className="flex items-center justify-between text-sm"><span className="text-muted-foreground">Days supply</span><span className="font-semibold tabular-nums text-foreground">{daysSupply} days</span></div>}
+                {pct != null && <div className="flex items-center justify-between text-sm"><span className="text-muted-foreground">Price rank</span><span className="font-semibold tabular-nums text-foreground">Top {pct}%</span></div>}
+              </>
+            );
+          })()}
         </div>
       ) : (
         <p className="text-sm text-muted-foreground">No market price yet. Run a check to compare this vehicle's price to the MarketCheck market value and position.</p>

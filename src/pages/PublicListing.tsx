@@ -306,8 +306,21 @@ const PublicListingBody = () => {
 
   // ── Derived data (all post-guard, no hooks) ─────────────────
   const dealer = (listing.dealer_snapshot || {}) as Record<string, unknown>;
-  const ks = listing.key_specs || {};
   const mc = (listing.mc_attributes || {}) as Record<string, unknown>;
+  // key_specs is empty on synced cars; merge mc_attributes (the pull writes
+  // specs there) so the classic page shows engine/drivetrain/MPG/colors too.
+  const ksRaw = (listing.key_specs || {}) as Record<string, unknown>;
+  const ks = {
+    ...ksRaw,
+    engine: (ksRaw.engine ?? mc.engine ?? undefined) as string | undefined,
+    drivetrain: (ksRaw.drivetrain ?? mc.drivetrain ?? undefined) as string | undefined,
+    transmission: (ksRaw.transmission ?? mc.transmission ?? undefined) as string | undefined,
+    fuel: (ksRaw.fuel ?? mc.fuel_type ?? undefined) as string | undefined,
+    mpg_city: (ksRaw.mpg_city ?? mc.city_mpg ?? undefined) as number | undefined,
+    mpg_hwy: (ksRaw.mpg_hwy ?? mc.highway_mpg ?? undefined) as number | undefined,
+    exterior_color: (ksRaw.exterior_color ?? mc.exterior_color ?? undefined) as string | undefined,
+    interior_color: (ksRaw.interior_color ?? mc.interior_color ?? undefined) as string | undefined,
+  };
   const mp = listing.market_payload || {};
   const viewUrl = publicUrl(listing.slug);
   const cond = conditionLabel(listing.condition);
