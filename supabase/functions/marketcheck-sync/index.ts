@@ -100,6 +100,40 @@ async function mcFetch(base: string, query: string): Promise<{ listings: MCListi
   }
 }
 
+const hex16 = () => {
+  const a = new Uint8Array(16);
+  crypto.getRandomValues(a);
+  return Array.from(a).map((b) => b.toString(16).padStart(2, "0")).join("");
+};
+
+// Auto-preload a brand-new vehicle the moment it's ingested: mint its permanent
+// Get-Ready hub token (so the windshield QR works immediately) and kick off a
+// best-effort OEM window-sticker fetch. All isolated — never throws back into
+// the sync loop. Runs only on genuinely new listings.
+// deno-lint-ignore no-explicit-any
+async function autoPreload(admin: any, supabaseUrl: string, serviceKey: string, tenantId: string, vin: string, ymm: string | null, listingId: string | null) {
+  try {
+    const { data: tok } = await admin.from("dept_signoff_tokens").select("id")
+      .eq("tenant_id", tenantId).eq("vin", vin).eq("department", "vehicle").eq("status", "pending").maybeSingle();
+    if (!tok) {
+      await admin.from("dept_signoff_tokens").insert({
+        tenant_id: tenantId, vehicle_listing_id: listingId, vin, ymm,
+        department: "vehicle", purpose: "get_ready", token: hex16(),
+        expires_at: new Date(Date.now() + 365 * 864e5).toISOString(),
+      });
+    }
+  } catch { /* token preload best-effort */ }
+  try {
+    // Fire-and-forget; no-op if no window-sticker API key is configured.
+    fetch(`${supabaseUrl}/functions/v1/oem-window-sticker`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${serviceKey}` },
+      body: JSON.stringify({ vin, tenant_id: tenantId }),
+      signal: AbortSignal.timeout(20000),
+    }).catch(() => { /* best-effort */ });
+  } catch { /* sticker preload best-effort */ }
+}
+
 // One page of a rooftop's inventory from the syndication feed. owned=true drops
 // the duplicate non-owned copies that have no price/stock, but it's only honored
 // for source/dealer_id/mc_website_id — so append it only for those params.
@@ -604,10 +638,14 @@ serve(async (req) => {
               const { error } = await admin.from("vehicle_listings").update(patch).eq("id", vl.id);
               if (!error) listingsUpserted++; else if (!firstWriteErr) firstWriteErr = error.message;
             } else {
-              const { error } = await admin.from("vehicle_listings").insert({
+              const ins = await admin.from("vehicle_listings").insert({
                 ...patch, store_id: cfg.tenant_id, slug: makeSlug(vin, ymm || undefined), status: "draft", sticker_snapshot: {},
-              });
-              if (!error) listingsUpserted++; else if (!firstWriteErr) firstWriteErr = error.message;
+              }).select("id").maybeSingle();
+              if (!ins.error) {
+                listingsUpserted++;
+                // New car → auto-preload its Get-Ready QR + OEM window sticker.
+                await autoPreload(admin, supabaseUrl, serviceKey, cfg.tenant_id, vin, ymm, ins.data?.id ?? null);
+              } else if (!firstWriteErr) firstWriteErr = ins.error.message;
             }
 
             // Best-effort enrichment (full gallery + structured feed attributes),
