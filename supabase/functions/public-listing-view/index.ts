@@ -151,6 +151,32 @@ serve(async (req) => {
       }
     } catch { /* config optional — passport falls back to its default bar */ }
 
+    // ── Dealer identity for the passport header/footer. dealer_snapshot is only
+    // written at publish time and is usually empty; fill name/logo/phone/website/
+    // address from the dealer's onboarding profile so the page shows the real
+    // dealership instead of "the dealership". Only real values — fields the
+    // dealer hasn't entered stay blank (no placeholders).
+    try {
+      const snap = (row.dealer_snapshot ?? {}) as Record<string, unknown>;
+      if (row.tenant_id && Object.keys(snap).length === 0) {
+        const { data: ob } = await admin
+          .from("onboarding_profiles")
+          .select("display_name, phone, website, logo_url, stores")
+          .eq("tenant_id", row.tenant_id).maybeSingle();
+        if (ob) {
+          const store = (Array.isArray(ob.stores) && ob.stores.length ? ob.stores[0] : {}) as Record<string, unknown>;
+          row.dealer_snapshot = {
+            name: ob.display_name || null,
+            phone: ob.phone || store.phone || null,
+            logo_url: ob.logo_url || null,
+            website: ob.website || null,
+            address: store.address || store.street || null,
+            city: store.city || null, state: store.state || null, zip: store.zip || store.postal_code || null,
+          };
+        }
+      }
+    } catch { /* dealer identity optional */ }
+
     // ── Attach real captured price/market history for this VIN (Passport V2
     // Price History). Read-only, service role; oldest→newest, capped.
     try {

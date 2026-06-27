@@ -645,7 +645,9 @@ serve(async (req) => {
             // First-pass photos from the feed; the crawler later upgrades the
             // hero to the dealer's own og:image. Only set hero when present so we
             // never null out a better image captured by a previous run.
-            const gallery: string[] = (l.media?.photo_links_cached?.length ? l.media.photo_links_cached : l.media?.photo_links) || [];
+            // Prefer the dealer's own website photos (photo_links); fall back to
+            // MarketCheck's cached copies only when the dealer set is missing.
+            const gallery: string[] = (l.media?.photo_links?.length ? l.media.photo_links : l.media?.photo_links_cached) || [];
             if (gallery[0]) patch.hero_image_url = gallery[0];
             if (vl) {
               const { error } = await admin.from("vehicle_listings").update(patch).eq("id", vl.id);

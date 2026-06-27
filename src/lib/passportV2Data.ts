@@ -258,6 +258,7 @@ export const derivePassport = (listing: VehicleListing): PassportData => {
   if (ks.drivetrain) highlights.push({ key: "drive", label: ks.drivetrain, sub: "Drivetrain" });
   if (ks.transmission) highlights.push({ key: "trans", label: ks.transmission, sub: "Transmission" });
   if (ks.mpg_city && ks.mpg_hwy) highlights.push({ key: "mpg", label: `${ks.mpg_city}/${ks.mpg_hwy} MPG`, sub: "Fuel economy" });
+  else if (ks.mpg_city) highlights.push({ key: "mpg", label: `${ks.mpg_city} MPG`, sub: "City" });
   else if (ks.fuel) highlights.push({ key: "fuel", label: ks.fuel, sub: "Fuel" });
   if (ks.exterior_color) highlights.push({ key: "ext", label: ks.exterior_color, sub: "Exterior" });
   listingEquipment(listing).forEach((label, i) => { if (highlights.length < 8) highlights.push({ key: `f${i}`, label, sub: "Feature" }); });
@@ -341,7 +342,7 @@ export const derivePassport = (listing: VehicleListing): PassportData => {
     price, msrp, priceLabel, estMonthly, saveVsMsrp,
     marketAvg, marketLow, marketHigh, belowMarket,
     marketMeta, comparables, blackbook, marketCheckedAt, history,
-    viewCount: listing.view_count ?? null, dom: (mc.dom as number) ?? null,
+    viewCount: listing.view_count ?? null, dom: (mc.dom as number) ?? marketMeta.avgDom ?? null,
     ownerCount, accidentCount, cleanTitle, serviceCount, recallClear, openRecalls, hasRecallCheck,
     warranty, warrantyStr,
     confScore, confLabel, verifiedBy, verifyRows,

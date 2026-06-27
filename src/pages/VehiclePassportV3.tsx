@@ -234,15 +234,15 @@ const VehiclePassportV3 = () => {
     { icon: DollarSign, title: "Market Price", strong: d.belowMarket && d.belowMarket > 0 ? "Great Price" : d.marketAvg != null ? "Market Price" : "Pending",
       sub: d.belowMarket && d.belowMarket > 0 ? `${fmt$(d.belowMarket)} below market average` : d.marketAvg != null ? `Market avg ${fmt$(d.marketAvg)}` : "Awaiting MarketCheck", chart: <Spark points={marketSeries} />, section: "market-price", cta: "View report" },
     { icon: TrendingUp, title: "Market Demand", strong: (d.viewCount != null || d.dom != null) ? ((d.viewCount ?? 0) > 20 ? "High Interest" : "Active") : "Pending",
-      sub: [d.viewCount != null ? `${d.viewCount.toLocaleString()} views` : null, d.dom != null ? `${d.dom} days on market` : null].filter(Boolean).join(" · ") || "Tracked once live", chart: <Bars values={[]} />, section: "market-demand", cta: "View report" },
+      sub: [d.viewCount != null ? `${d.viewCount.toLocaleString()} views` : null, d.dom != null ? `${d.dom} days on market` : null].filter(Boolean).join(" · ") || "Tracked once live", chart: null, section: "market-demand", cta: "View report" },
     { icon: GaugeIcon, title: "Price Confidence", strong: d.belowMarket && d.belowMarket > 0 ? "Excellent" : d.marketAvg != null ? "Fair" : "Pending",
       sub: d.marketAvg != null ? "based on live comparables" : "Awaiting MarketCheck", donut: d.confScore, section: "price-confidence", cta: "View report" },
     { icon: Clock, title: "Price History", strong: priceChange7d != null && priceChange7d !== 0 ? `${priceChange7d < 0 ? "-" : "+"}${fmt$(Math.abs(priceChange7d))}` : "7-Day Trend",
       sub: priceChange7d != null ? (priceChange7d < 0 ? "price decreased" : priceChange7d > 0 ? "price increased" : "stable") : "History builds over time", chart: <Spark points={priceSeries} color="#7C3AED" />, section: "price-history", cta: "View history" },
     { icon: Car, title: "Comparable Vehicles", strong: compCount ? `${compCount} Nearby` : "Comp set",
-      sub: compFrom != null ? `Similar vehicles from ${fmt$(compFrom)}` : "Similar vehicles via MarketCheck", comps: true, section: "comparable-vehicles", cta: "View comp set" },
+      sub: compFrom != null ? `Similar vehicles from ${fmt$(compFrom)}` : "Similar vehicles via MarketCheck", comps: false, section: "comparable-vehicles", cta: "View comp set" },
     { icon: Package, title: "Inventory Trend", strong: d.marketMeta.daysSupply != null ? `${Math.round(d.marketMeta.daysSupply)}-Day Supply` : "Market Supply",
-      sub: d.marketMeta.daysSupply != null ? (d.marketMeta.inventoryCount != null ? `${d.marketMeta.inventoryCount} similar listed` : "Regional days-supply") : "Market supply via MarketCheck", chart: <Spark points={[]} />, section: "inventory-trend", cta: "View trend" },
+      sub: d.marketMeta.daysSupply != null ? (d.marketMeta.inventoryCount != null ? `${d.marketMeta.inventoryCount} similar listed` : "Regional days-supply") : "Market supply via MarketCheck", chart: null, section: "inventory-trend", cta: "View trend" },
   ];
 
   const highlights: { icon: React.ElementType; t: string; s: string }[] = [];
@@ -263,6 +263,7 @@ const VehiclePassportV3 = () => {
   if (mc.horsepower) highlights.push({ icon: Zap, t: `${mc.horsepower} HP`, s: "Power" });
   if (ks.drivetrain) highlights.push({ icon: Car, t: abbrevDrive(ks.drivetrain), s: "Drivetrain" });
   if (ks.mpg_city && ks.mpg_hwy) highlights.push({ icon: Fuel, t: `${ks.mpg_city}/${ks.mpg_hwy}`, s: "MPG" });
+  else if (ks.mpg_city) highlights.push({ icon: Fuel, t: `${ks.mpg_city}`, s: "City MPG" });
   else if (ks.fuel) highlights.push({ icon: Fuel, t: ks.fuel, s: "Fuel" });
   if (ks.transmission) highlights.push({ icon: Settings, t: ks.transmission.replace(/\s*automatic/i, "").trim(), s: "Transmission" });
   if (ks.exterior_color) highlights.push({ icon: Wind, t: ks.exterior_color, s: "Exterior" });
