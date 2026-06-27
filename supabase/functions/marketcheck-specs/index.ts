@@ -59,7 +59,12 @@ function extractLists(raw: any): { options: string[]; features: string[] } {
     }
     if (typeof node === "object") {
       for (const [k, v] of Object.entries(node)) {
-        if (Array.isArray(v) || (v && typeof v === "object")) walk(v, k);
+        // Options/equipment sometimes arrive as a single delimited string
+        // (e.g. "Heated Seats, Sunroof, …") rather than an array — split those.
+        if (typeof v === "string" && v.trim() && (OPTION_KEYS.test(k) || FEATURE_KEYS.test(k))) {
+          const isOpt = OPTION_KEYS.test(k);
+          v.split(/[,;|]/).map((s) => s.trim()).filter(Boolean).forEach((s) => (isOpt ? options : features).add(s));
+        } else if (Array.isArray(v) || (v && typeof v === "object")) walk(v, k);
       }
     }
   };
@@ -176,5 +181,14 @@ Deno.serve(async (req) => {
     } catch { /* mc_attributes may not be migrated yet */ }
   }
 
-  return json(200, { ok: true, vin, endpoint, options, features, optionCount: options.length + features.length, build });
+  // Diagnostics: surface what the decoder actually returned so an empty result
+  // can be told apart from an extraction miss (payloadKeys/buildKeys show the
+  // shape; if these are rich but options/features are empty, the decode plan
+  // simply doesn't include per-vehicle equipment for this VIN).
+  return json(200, {
+    ok: true, vin, endpoint, options, features,
+    optionCount: options.length + features.length, build,
+    payloadKeys: payload && typeof payload === "object" ? Object.keys(payload) : [],
+    buildKeys: build && typeof build === "object" ? Object.keys(build) : [],
+  });
 });

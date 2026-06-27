@@ -118,7 +118,7 @@ const buildChecks = (v: VehicleRow): ReadyCheck[] => [
   { ok: true, label: "Vehicle created", when: v.created_at },
   { ok: !!v.ymm, label: "VIN decoded", when: v.ymm ? v.updated_at : null },
   { ok: v.status === "published", label: "Published to shopper portal", when: v.published_at, blocks: true },
-  { ok: !!(v.recall_status || v.recall_check), label: "Recall checked", when: null },
+  { ok: !!(v.recall_status || v.recall_check), label: "Recall checked", when: v.recall_checked_at },
   { ok: !!v.prep_status?.foreman_signed_at, label: "Prep & install signed off", when: v.prep_status?.foreman_signed_at || null },
   { ok: (v.documents?.length || 0) > 0, label: "Documents attached", when: null },
   { ok: (v.service_records?.length || 0) > 0, label: "Service history", when: null },
@@ -756,7 +756,7 @@ const OverviewPanel = ({ vehicle, onTab }: { vehicle: VehicleRow; onTab: (t: Tab
                     {c.ok ? <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" /> : <CircleAlert className="w-4 h-4 text-amber-500 shrink-0" />}
                     <span className={`truncate ${c.ok ? "text-foreground font-medium" : "text-muted-foreground"}`}>{c.label}</span>
                   </span>
-                  <span className="text-[10px] text-muted-foreground whitespace-nowrap">{c.when ? new Date(c.when).toLocaleDateString() : "pending"}</span>
+                  <span className="text-[10px] text-muted-foreground whitespace-nowrap">{c.when ? new Date(c.when).toLocaleDateString() : c.ok ? "done" : "pending"}</span>
                 </li>
               ))}
             </ul>
