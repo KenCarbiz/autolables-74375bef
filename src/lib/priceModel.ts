@@ -78,7 +78,13 @@ export function computeWebsiteSalePrice(
 
 export interface PriceBreakdownInput {
   advertisedBeforeDoc: number | null | undefined;
+  // The dealer's CONFIGURED doc fee — authoritative for the calculation (the
+  // dealer told us their fee in admin). website_sale_price uses this.
   docFee?: number | null;
+  // The doc/conveyance fee PARSED off the live page, when found. Used only as a
+  // CHECK that we are parsing the page correctly against the configured fee —
+  // never as the calculation basis. A disagreement flags a warning.
+  parsedDocFee?: number | null;
   // The dealer site's displayed final "Sale Price", when one was parsed off the
   // page. Used only to VALIDATE the calculation — never to overwrite advertised.
   displayedSalePrice?: number | null;
@@ -89,29 +95,49 @@ export interface PriceBreakdownInput {
 
 const TOLERANCE = 1; // dollars
 
-// Assemble the full, validated breakdown. Validation rule (spec #8/#9):
-// displayed_sale_price must equal advertised_price_before_doc + doc_fee; if a
-// displayed sale price exists and disagrees beyond $1, flag price_parse_status
-// "warning" so the audit view can surface "Price parse mismatch."
+// Assemble the full, validated breakdown.
+//   • website_sale_price = advertised_price_before_doc + doc_fee (configured).
+//   • Parse checks (spec #8/#9): the page's conveyance fee must match the
+//     dealer's configured doc fee, AND advertised + doc fee must equal the
+//     page's displayed sale price. Either disagreement flags price_parse_status
+//     "warning" so the audit view can surface "Price parse mismatch."
+// This is what an inventory reconcile uses to PROVE we parse a dealer's pricing
+// correctly against the doc fee they entered in admin.
 export function buildPriceBreakdown(input: PriceBreakdownInput): PriceBreakdown {
   const advertised = input.advertisedBeforeDoc ?? null;
   const docFee = input.docFee ?? null;
   const calc = computeWebsiteSalePrice(advertised, docFee ?? 0);
   const displayed = input.displayedSalePrice ?? null;
+  const parsedFee = input.parsedDocFee ?? null;
+
+  const issues: string[] = [];
+  const verified: string[] = [];
+
+  if (parsedFee != null && docFee != null) {
+    if (Math.abs(parsedFee - docFee) > TOLERANCE) {
+      issues.push(`page conveyance fee ${parsedFee} != configured doc fee ${docFee}`);
+    } else {
+      verified.push(`doc fee ${docFee} matches the page`);
+    }
+  }
+  if (displayed != null && calc != null) {
+    if (Math.abs(displayed - calc) > TOLERANCE) {
+      issues.push(`displayed sale price ${displayed} != advertised ${advertised} + doc fee ${docFee ?? 0} = ${calc}`);
+    } else {
+      verified.push(`sale price ${calc} matches the page`);
+    }
+  }
 
   let status: PriceParseStatus = "ok";
-  let notes = "";
-
+  let notes: string;
   if (advertised == null) {
     status = "pending";
     notes = "No advertised price parsed.";
-  } else if (displayed != null && calc != null && Math.abs(displayed - calc) > TOLERANCE) {
+  } else if (issues.length) {
     status = "warning";
-    notes =
-      `Price parse mismatch: displayed sale price ${displayed} != advertised ` +
-      `${advertised} + doc fee ${docFee ?? 0} = ${calc}. Review source page.`;
-  } else if (displayed != null && calc != null) {
-    notes = `Validated: ${advertised} + ${docFee ?? 0} doc fee = ${calc}.`;
+    notes = `Price parse mismatch: ${issues.join("; ")}. Review source page.`;
+  } else if (verified.length) {
+    notes = `Verified: ${verified.join("; ")}.`;
   } else {
     notes = "Sale price not displayed; computed from advertised price + doc fee.";
   }

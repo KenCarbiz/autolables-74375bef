@@ -98,6 +98,54 @@ describe("Harte INFINITI price breakdown (spec VINs)", () => {
   });
 });
 
+// ── Inventory reconcile: prove we parse a dealer's pricing against the doc fee
+// they configured in admin ────────────────────────────────────────────────
+describe("doc-fee parse check (first inventory reconcile)", () => {
+  it("verifies when the page conveyance fee matches the configured doc fee", () => {
+    const b = buildPriceBreakdown({
+      advertisedBeforeDoc: 58140,
+      docFee: 895,          // configured in admin
+      parsedDocFee: 895,    // found on the page
+      displayedSalePrice: 59035,
+    });
+    expect(b.price_parse_status).toBe("ok");
+    expect(b.price_parse_notes).toMatch(/doc fee 895 matches the page/i);
+  });
+
+  it("flags when the page conveyance fee differs from the configured doc fee", () => {
+    const b = buildPriceBreakdown({
+      advertisedBeforeDoc: 58140,
+      docFee: 895,          // dealer says $895
+      parsedDocFee: 699,    // page shows $699 — parsing or the setting is off
+    });
+    expect(b.price_parse_status).toBe("warning");
+    expect(b.price_parse_notes).toMatch(/conveyance fee 699 != configured doc fee 895/i);
+  });
+
+  it("uses the configured doc fee for the calculation regardless of a differing parse", () => {
+    const b = buildPriceBreakdown({ advertisedBeforeDoc: 58140, docFee: 895, parsedDocFee: 699 });
+    expect(b.doc_fee).toBe(895);
+    expect(b.website_sale_price).toBe(59035); // configured fee, not the parsed 699
+  });
+
+  it("stays 'ok' when no conveyance fee line is on the page (nothing to contradict)", () => {
+    const b = buildPriceBreakdown({ advertisedBeforeDoc: 65210, docFee: 895, parsedDocFee: null });
+    expect(b.price_parse_status).toBe("ok");
+    expect(b.website_sale_price).toBe(66105);
+  });
+
+  it("flags a second tenant whose configured fee does not reconcile with the page", () => {
+    // Tenant B configured $699 but the page (advertised + 699) doesn't match the
+    // displayed sale of 59035 → reconcile catches it before we trust the number.
+    const b = buildPriceBreakdown({
+      advertisedBeforeDoc: 58140,
+      docFee: 699,
+      displayedSalePrice: 59035,
+    });
+    expect(b.price_parse_status).toBe("warning");
+  });
+});
+
 describe("resolveDisplayPrice / resolveComparePrice", () => {
   const fields = { advertised_price_before_doc: 58140, doc_fee: 895, website_sale_price: 59035 };
 

@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useTenant } from "@/contexts/TenantContext";
+import { useDealerSettings } from "@/contexts/DealerSettingsContext";
 import { CheckCircle2, AlertTriangle, ExternalLink } from "lucide-react";
 
 // ──────────────────────────────────────────────────────────────────────
@@ -34,6 +35,8 @@ const fmtDate = (s: string | null) => (s ? new Date(s).toLocaleDateString(undefi
 
 export const PriceAuditPanel = () => {
   const { tenant } = useTenant();
+  const { settings } = useDealerSettings();
+  const configuredDocFee = settings.doc_fee_enabled ? (settings.doc_fee_amount || 0) : 0;
   const [rows, setRows] = useState<Row[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -70,6 +73,9 @@ export const PriceAuditPanel = () => {
           <h3 className="text-sm font-bold text-foreground">Price Audit</h3>
           <p className="text-xs text-muted-foreground mt-0.5">
             Advertised price + doc fee = website sale price, traced per VIN.
+            {configuredDocFee > 0
+              ? ` Reconciled against your $${configuredDocFee.toLocaleString()} doc fee.`
+              : " No doc fee configured — set one in Settings to reconcile."}
           </p>
         </div>
         {mismatchCount > 0 ? (

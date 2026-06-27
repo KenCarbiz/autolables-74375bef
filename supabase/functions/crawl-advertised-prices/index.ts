@@ -390,8 +390,12 @@ interface PriceBreakdown {
   price_parse_status: "ok" | "warning" | "pending";
   price_parse_notes: string;
 }
-const buildBreakdown = (extractedPrice: number | null, comp: PriceComponents, tenantDocFee: number): PriceBreakdown => {
-  const docFee = comp.docFee ?? tenantDocFee ?? 0;
+const buildBreakdown = (extractedPrice: number | null, comp: PriceComponents, configuredDocFee: number): PriceBreakdown => {
+  // The dealer's CONFIGURED doc fee (from admin) is authoritative for the
+  // amount; the page's conveyance fee line is a parse CHECK against it. When
+  // the dealer hasn't set a fee, fall back to whatever the page shows.
+  const parsedFee = comp.docFee;
+  const docFee = configuredDocFee > 0 ? configuredDocFee : (parsedFee ?? 0);
   let advertised = extractedPrice;
   // If the extractor picked the final sale price (== displayed sale), strip the
   // fee to recover the advertised-before-doc price.
@@ -402,12 +406,23 @@ const buildBreakdown = (extractedPrice: number | null, comp: PriceComponents, te
     return { advertised_price_before_doc: null, doc_fee: docFee, website_sale_price: null, retail_cash: comp.retailCash, dealer_discount: comp.dealerDiscount, price_parse_status: "pending", price_parse_notes: "No advertised price parsed." };
   }
   const websiteSale = advertised + docFee;
-  let status: PriceBreakdown["price_parse_status"] = "ok";
-  let notes = `Advertised ${advertised} + doc fee ${docFee} = sale ${websiteSale}.`;
-  if (comp.salePrice != null && Math.abs(comp.salePrice - websiteSale) > 1) {
-    status = "warning";
-    notes = `Price parse mismatch: displayed sale ${comp.salePrice} != advertised ${advertised} + doc fee ${docFee} = ${websiteSale}. Review source page.`;
+
+  // Two reconcile checks: (1) page conveyance fee matches the configured doc
+  // fee; (2) advertised + doc fee matches the page's displayed sale price.
+  const issues: string[] = [];
+  const verified: string[] = [];
+  if (parsedFee != null && configuredDocFee > 0) {
+    if (Math.abs(parsedFee - configuredDocFee) > 1) issues.push(`page conveyance fee ${parsedFee} != configured doc fee ${configuredDocFee}`);
+    else verified.push(`doc fee ${docFee} matches the page`);
   }
+  if (comp.salePrice != null) {
+    if (Math.abs(comp.salePrice - websiteSale) > 1) issues.push(`displayed sale ${comp.salePrice} != advertised ${advertised} + doc fee ${docFee} = ${websiteSale}`);
+    else verified.push(`sale price ${websiteSale} matches the page`);
+  }
+  const status: PriceBreakdown["price_parse_status"] = issues.length ? "warning" : "ok";
+  const notes = issues.length
+    ? `Price parse mismatch: ${issues.join("; ")}. Review source page.`
+    : (verified.length ? `Verified: ${verified.join("; ")}.` : `Advertised ${advertised} + doc fee ${docFee} = sale ${websiteSale}.`);
   return { advertised_price_before_doc: advertised, doc_fee: docFee, website_sale_price: websiteSale, retail_cash: comp.retailCash, dealer_discount: comp.dealerDiscount, price_parse_status: status, price_parse_notes: notes };
 };
 
