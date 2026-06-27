@@ -33,13 +33,16 @@ export const DEFAULT_USED_VEHICLE_DOCUMENT_DATA: UsedVehicleDocumentData = {
   dealerAddress: "150 Weston Road, Hartford, CT 06120",
   dealerPhone: "",
   buyerName: "",
-  year: "2024",
-  make: "INFINITI",
-  model: "QX60",
-  vin: "5N1DL1FS1RC334921",
-  stock: "I24082A",
-  mileage: "18,426",
-  salePrice: "42995",
+  // Blank vehicle identity by default — the form prefills from the real vehicle
+  // file. Never seed a sample vehicle here, or a failed prefill would generate a
+  // compliance doc for the wrong car.
+  year: "",
+  make: "",
+  model: "",
+  vin: "",
+  stock: "",
+  mileage: "",
+  salePrice: "",
   warrantyMode: "dealer_warranty",
   language: "en",
   warrantyDuration: "60 days",

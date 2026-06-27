@@ -66,13 +66,17 @@ const UsedVehicleDocuments = () => {
     (async () => {
       setPrefillLoading(true);
       try {
+        // vehicle_listings has NO stock/stock_number column — selecting them
+        // errored the whole query, so the form fell back to the sample default
+        // (a fake INFINITI). Select real columns; stock comes from mc_attributes.
         let query = (supabase as any)
           .from("vehicle_listings")
-          .select("id,tenant_id,vin,stock,stock_number,ymm,trim,mileage,price,dealer_snapshot")
+          .select("id,tenant_id,vin,ymm,trim,mileage,price,dealer_snapshot,mc_attributes")
           .limit(1);
         if (queryVehicleId) query = query.eq("id", queryVehicleId);
         else if (queryVin) query = query.eq("vin", queryVin.toUpperCase());
-        const { data: row } = await query.maybeSingle();
+        const { data: row, error } = await query.maybeSingle();
+        if (error) console.error("used-vehicle-docs prefill", error);
         if (!row || cancelled) return;
         const parsed = parseYmm(row.ymm);
         setVehicleId(row.id || queryVehicleId || null);
@@ -84,7 +88,7 @@ const UsedVehicleDocuments = () => {
           make: parsed.make || prev.make,
           model: [parsed.model, row.trim].filter(Boolean).join(" ") || prev.model,
           vin: row.vin || prev.vin,
-          stock: row.stock || row.stock_number || prev.stock,
+          stock: (row.mc_attributes?.stock_no as string) || queryStock || prev.stock,
           mileage: typeof row.mileage === "number" ? row.mileage.toLocaleString() : prev.mileage,
           salePrice: typeof row.price === "number" ? String(row.price) : prev.salePrice,
         }));
