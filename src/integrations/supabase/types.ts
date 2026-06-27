@@ -1577,6 +1577,188 @@ export type Database = {
         }
         Relationships: []
       }
+      dept_signoff_tokens: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          department: string
+          expires_at: string
+          id: string
+          purpose: string
+          status: string
+          stock_number: string | null
+          tenant_id: string
+          token: string
+          updated_at: string
+          used_at: string | null
+          vehicle_listing_id: string | null
+          vin: string
+          ymm: string | null
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          department: string
+          expires_at?: string
+          id?: string
+          purpose?: string
+          status?: string
+          stock_number?: string | null
+          tenant_id: string
+          token: string
+          updated_at?: string
+          used_at?: string | null
+          vehicle_listing_id?: string | null
+          vin: string
+          ymm?: string | null
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          department?: string
+          expires_at?: string
+          id?: string
+          purpose?: string
+          status?: string
+          stock_number?: string | null
+          tenant_id?: string
+          token?: string
+          updated_at?: string
+          used_at?: string | null
+          vehicle_listing_id?: string | null
+          vin?: string
+          ymm?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "dept_signoff_tokens_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenant_summary"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "dept_signoff_tokens_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "dept_signoff_tokens_vehicle_listing_id_fkey"
+            columns: ["vehicle_listing_id"]
+            isOneToOne: false
+            referencedRelation: "vehicle_listings"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      detail_signoffs: {
+        Row: {
+          content_hash: string | null
+          created_at: string
+          created_by: string | null
+          customer_ip: string | null
+          detail_types: Json
+          esign_consent: Json | null
+          id: string
+          installs: Json
+          is_third_party: boolean
+          notes: string | null
+          performer_name: string | null
+          photos: Json
+          provider_company: string | null
+          provider_contact: string | null
+          signature_data: string | null
+          signature_type: string | null
+          signed_at: string | null
+          status: string
+          submitted_via: string
+          tenant_id: string
+          updated_at: string
+          user_agent: string | null
+          vehicle_listing_id: string | null
+          vin: string
+          ymm: string | null
+        }
+        Insert: {
+          content_hash?: string | null
+          created_at?: string
+          created_by?: string | null
+          customer_ip?: string | null
+          detail_types?: Json
+          esign_consent?: Json | null
+          id?: string
+          installs?: Json
+          is_third_party?: boolean
+          notes?: string | null
+          performer_name?: string | null
+          photos?: Json
+          provider_company?: string | null
+          provider_contact?: string | null
+          signature_data?: string | null
+          signature_type?: string | null
+          signed_at?: string | null
+          status?: string
+          submitted_via?: string
+          tenant_id: string
+          updated_at?: string
+          user_agent?: string | null
+          vehicle_listing_id?: string | null
+          vin: string
+          ymm?: string | null
+        }
+        Update: {
+          content_hash?: string | null
+          created_at?: string
+          created_by?: string | null
+          customer_ip?: string | null
+          detail_types?: Json
+          esign_consent?: Json | null
+          id?: string
+          installs?: Json
+          is_third_party?: boolean
+          notes?: string | null
+          performer_name?: string | null
+          photos?: Json
+          provider_company?: string | null
+          provider_contact?: string | null
+          signature_data?: string | null
+          signature_type?: string | null
+          signed_at?: string | null
+          status?: string
+          submitted_via?: string
+          tenant_id?: string
+          updated_at?: string
+          user_agent?: string | null
+          vehicle_listing_id?: string | null
+          vin?: string
+          ymm?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "detail_signoffs_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenant_summary"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "detail_signoffs_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "detail_signoffs_vehicle_listing_id_fkey"
+            columns: ["vehicle_listing_id"]
+            isOneToOne: false
+            referencedRelation: "vehicle_listings"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       document_lifecycle_events: {
         Row: {
           actor_id: string | null
@@ -1797,6 +1979,30 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      get_ready_nudge_log: {
+        Row: {
+          id: string
+          recipient_count: number | null
+          sent_at: string
+          stuck_count: number | null
+          tenant_id: string
+        }
+        Insert: {
+          id?: string
+          recipient_count?: number | null
+          sent_at?: string
+          stuck_count?: number | null
+          tenant_id: string
+        }
+        Update: {
+          id?: string
+          recipient_count?: number | null
+          sent_at?: string
+          stuck_count?: number | null
+          tenant_id?: string
+        }
+        Relationships: []
       }
       get_ready_records: {
         Row: {
@@ -3111,6 +3317,115 @@ export type Database = {
           },
         ]
       }
+      safety_inspections: {
+        Row: {
+          checklist: Json
+          content_hash: string | null
+          created_at: string
+          created_by: string | null
+          customer_ip: string | null
+          documents: Json
+          esign_consent: Json | null
+          failure_notes: string | null
+          form_type: string
+          id: string
+          inspector_name: string | null
+          inspector_role: string | null
+          notes: string | null
+          result: string | null
+          signature_data: string | null
+          signature_type: string | null
+          signed_at: string | null
+          status: string
+          stock_number: string | null
+          submitted_via: string
+          tenant_id: string
+          updated_at: string
+          user_agent: string | null
+          vehicle_listing_id: string | null
+          vin: string
+          ymm: string | null
+        }
+        Insert: {
+          checklist?: Json
+          content_hash?: string | null
+          created_at?: string
+          created_by?: string | null
+          customer_ip?: string | null
+          documents?: Json
+          esign_consent?: Json | null
+          failure_notes?: string | null
+          form_type?: string
+          id?: string
+          inspector_name?: string | null
+          inspector_role?: string | null
+          notes?: string | null
+          result?: string | null
+          signature_data?: string | null
+          signature_type?: string | null
+          signed_at?: string | null
+          status?: string
+          stock_number?: string | null
+          submitted_via?: string
+          tenant_id: string
+          updated_at?: string
+          user_agent?: string | null
+          vehicle_listing_id?: string | null
+          vin: string
+          ymm?: string | null
+        }
+        Update: {
+          checklist?: Json
+          content_hash?: string | null
+          created_at?: string
+          created_by?: string | null
+          customer_ip?: string | null
+          documents?: Json
+          esign_consent?: Json | null
+          failure_notes?: string | null
+          form_type?: string
+          id?: string
+          inspector_name?: string | null
+          inspector_role?: string | null
+          notes?: string | null
+          result?: string | null
+          signature_data?: string | null
+          signature_type?: string | null
+          signed_at?: string | null
+          status?: string
+          stock_number?: string | null
+          submitted_via?: string
+          tenant_id?: string
+          updated_at?: string
+          user_agent?: string | null
+          vehicle_listing_id?: string | null
+          vin?: string
+          ymm?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "safety_inspections_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenant_summary"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "safety_inspections_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "safety_inspections_vehicle_listing_id_fkey"
+            columns: ["vehicle_listing_id"]
+            isOneToOne: false
+            referencedRelation: "vehicle_listings"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       signature_evidence: {
         Row: {
           consent_text: string | null
@@ -3962,6 +4277,73 @@ export type Database = {
           vehicle_id?: string
         }
         Relationships: []
+      }
+      vehicle_documents: {
+        Row: {
+          caption: string | null
+          created_at: string
+          customer_facing: boolean
+          doc_type: string
+          filename: string | null
+          id: string
+          tenant_id: string
+          uploaded_by: string | null
+          uploaded_via: string
+          url: string
+          vehicle_listing_id: string | null
+          vin: string
+        }
+        Insert: {
+          caption?: string | null
+          created_at?: string
+          customer_facing?: boolean
+          doc_type: string
+          filename?: string | null
+          id?: string
+          tenant_id: string
+          uploaded_by?: string | null
+          uploaded_via?: string
+          url: string
+          vehicle_listing_id?: string | null
+          vin: string
+        }
+        Update: {
+          caption?: string | null
+          created_at?: string
+          customer_facing?: boolean
+          doc_type?: string
+          filename?: string | null
+          id?: string
+          tenant_id?: string
+          uploaded_by?: string | null
+          uploaded_via?: string
+          url?: string
+          vehicle_listing_id?: string | null
+          vin?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "vehicle_documents_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenant_summary"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "vehicle_documents_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "vehicle_documents_vehicle_listing_id_fkey"
+            columns: ["vehicle_listing_id"]
+            isOneToOne: false
+            referencedRelation: "vehicle_listings"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       vehicle_files: {
         Row: {
@@ -4873,6 +5255,10 @@ export type Database = {
         Returns: string
       }
       claim_platform: { Args: never; Returns: Json }
+      create_draft_addendum: {
+        Args: { p_tenant_id: string; p_vin: string }
+        Returns: string
+      }
       current_tenant_id: { Args: never; Returns: string }
       find_abandoned_signings: {
         Args: {
@@ -4960,6 +5346,7 @@ export type Database = {
           isSetofReturn: true
         }
       }
+      get_dept_signoff_token: { Args: { _token: string }; Returns: Json }
       get_install_proofs_public: {
         Args: { _slug: string }
         Returns: {
@@ -4987,6 +5374,11 @@ export type Database = {
           version: number
         }[]
       }
+      get_ready_blocks_finalize: {
+        Args: { _tenant_id: string; _vin: string }
+        Returns: boolean
+      }
+      get_ready_nudge_payload: { Args: { p_tenant_id: string }; Returns: Json }
       get_reengage_schedule: {
         Args: never
         Returns: {
@@ -5146,6 +5538,7 @@ export type Database = {
           isSetofReturn: true
         }
       }
+      get_vehicle_ready: { Args: { _token: string }; Returns: Json }
       has_app_access: { Args: { _app_slug: string }; Returns: boolean }
       has_role: {
         Args: {
@@ -5158,6 +5551,19 @@ export type Database = {
       is_tenant_manager: {
         Args: { _tenant_id: string; _user_id: string }
         Returns: boolean
+      }
+      issue_dept_signoff_token: {
+        Args: {
+          p_department: string
+          p_purpose?: string
+          p_tenant_id: string
+          p_vin: string
+        }
+        Returns: string
+      }
+      issue_vehicle_ready_token: {
+        Args: { p_tenant_id: string; p_vin: string }
+        Returns: string
       }
       listings_with_stale_recalls: {
         Args: { p_limit?: number }
@@ -5208,6 +5614,13 @@ export type Database = {
           _vehicle_id: string
         }
         Returns: string
+      }
+      next_enrich_batch: {
+        Args: { p_limit: number; p_sweep_start: string }
+        Returns: {
+          tenant_id: string
+          vin: string
+        }[]
       }
       record_addendum_event: {
         Args: {
@@ -5342,6 +5755,42 @@ export type Database = {
           _user_agent: string
         }
         Returns: boolean
+      }
+      submit_detail_signoff: {
+        Args: {
+          _content_hash: string
+          _detail_types: Json
+          _esign_consent: Json
+          _installs: Json
+          _ip: string
+          _is_third_party: boolean
+          _notes: string
+          _performer_name: string
+          _photos: Json
+          _provider_company: string
+          _provider_contact: string
+          _signature_data: string
+          _token: string
+          _user_agent: string
+        }
+        Returns: Json
+      }
+      submit_safety_inspection: {
+        Args: {
+          _checklist: Json
+          _content_hash: string
+          _documents: Json
+          _esign_consent: Json
+          _failure_notes: string
+          _inspector_name: string
+          _ip: string
+          _notes: string
+          _result: string
+          _signature_data: string
+          _token: string
+          _user_agent: string
+        }
+        Returns: Json
       }
       tenant_price_verification_on: {
         Args: { _tenant_id: string }
