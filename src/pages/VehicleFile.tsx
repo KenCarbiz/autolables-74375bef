@@ -18,7 +18,7 @@ import EmptyState from "@/components/ui/empty-state";
 import { InstallProofList } from "@/components/admin/InstallProofList";
 import { useVehicleSpecs } from "@/hooks/useVehicleSpecs";
 import { useRecallTask, OUTCOME_LABELS, type RecallOutcome } from "@/hooks/useRecallTask";
-import { listingGallery } from "@/lib/photos";
+import { listingGallery, listingHero } from "@/lib/photos";
 import { PACKET_MODULES, packetVisible } from "@/lib/packetModules";
 import { QRCodeSVG } from "qrcode.react";
 import GeneratedDocumentsSection from "@/components/vehicle/GeneratedDocumentsSection";
@@ -901,8 +901,8 @@ const OverviewPanel = ({ vehicle, onTab, recall }: { vehicle: VehicleRow; onTab:
         <Card title="Shopper Portal Preview">
           <div className="flex items-stretch gap-3">
             <div className="flex-1 rounded-xl border border-border/70 bg-muted/40 h-32 overflow-hidden flex items-center justify-center text-muted-foreground">
-              {vehicle.hero_image_url || (vehicle.photos && vehicle.photos[0]) ? (
-                <img src={vehicle.hero_image_url || vehicle.photos![0]} alt={vehicle.ymm || "vehicle"} className="w-full h-full object-cover" />
+              {listingHero(vehicle) ? (
+                <img src={listingHero(vehicle)} alt={vehicle.ymm || "vehicle"} className="w-full h-full object-cover" />
               ) : (
                 <Car className="w-9 h-9" strokeWidth={1.25} />
               )}
