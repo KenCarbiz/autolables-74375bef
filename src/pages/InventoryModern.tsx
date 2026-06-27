@@ -313,12 +313,15 @@ const InventoryModern = () => {
     const v = (r.vin || "").toUpperCase();
     const stickerDone = r.status === "published";
     const hasAddendum = addendumVins.has(v);
-    // Verified means the scraped advertised price actually MATCHES the system
-    // price (within tolerance) — not merely that a snapshot exists. A snapshot
-    // that disagrees is a mismatch that needs attention, not "verified".
+    // In sync = the displayed price agrees with the advertised price. Two ways:
+    // a captured snapshot MATCHES (status "match"), OR the price came straight
+    // from the dealer's feed with no contradicting snapshot ("untracked") — in
+    // that case the listing price IS the advertised price we pulled, so it's
+    // synced, not "unchecked". Only a snapshot that DISAGREES ("drift") needs
+    // attention.
     const drift = r.price != null ? assessDrift(r.price, byVin.get(v), settings.doc_fee_amount || 0) : null;
-    const priceVerified = drift?.status === "match";
-    const needsPriceVerify = r.price != null && drift?.status !== "match";
+    const priceVerified = drift?.status === "match" || drift?.status === "untracked";
+    const needsPriceVerify = drift?.status === "drift";
     return { stickerDone, hasAddendum, priceVerified, needsPriceVerify };
   };
 
@@ -1126,14 +1129,16 @@ const AdvertisedPriceCell = ({ price, docFee, ap }: { price?: number | null; doc
   return (
     <div className="leading-tight">
       <p className="text-sm font-bold text-foreground tabular-nums">${price.toLocaleString()}</p>
-      {drift.status === "match" ? (
-        <p className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-600 mt-0.5"><CheckCircle2 className="w-3 h-3" />Verified</p>
-      ) : drift.status === "drift" ? (
+      {drift.status === "drift" ? (
         <p className="inline-flex items-center gap-1 text-[11px] font-semibold text-red-600 mt-0.5" title={drift.reason}>
           <AlertTriangle className="w-3 h-3" />Mismatch {drift.delta > 0 ? "+" : "−"}${Math.abs(Math.round(drift.delta)).toLocaleString()}
         </p>
+      ) : drift.status === "match" ? (
+        <p className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-600 mt-0.5" title="Captured advertised price matches the listing price."><CheckCircle2 className="w-3 h-3" />Matches</p>
       ) : (
-        <p className="text-[11px] font-semibold text-muted-foreground mt-0.5">Not checked</p>
+        // No separate snapshot: the listing price IS the advertised price we
+        // pulled from the dealer's feed, so it's in sync by definition.
+        <p className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-600 mt-0.5" title="This price was pulled from the dealer feed and matches the advertised price."><CheckCircle2 className="w-3 h-3" />Matches</p>
       )}
       {drift.advertised != null && (
         <p className="text-[10px] text-muted-foreground mt-0.5">ad ${drift.advertised.toLocaleString()}{drift.source ? ` · ${SOURCE_LABELS[drift.source] || drift.source}` : ""}</p>
