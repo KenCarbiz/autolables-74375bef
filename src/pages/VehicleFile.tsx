@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import { formatPhone, composeName } from "@/components/addendum/CustomerInfoSection";
 import EmptyState from "@/components/ui/empty-state";
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { InstallProofList } from "@/components/admin/InstallProofList";
 import { useVehicleSpecs } from "@/hooks/useVehicleSpecs";
 import { useRecallTask, OUTCOME_LABELS, type RecallOutcome } from "@/hooks/useRecallTask";
@@ -92,7 +93,7 @@ interface VehicleRow {
   updated_at: string;
 }
 
-interface RecallItem { title?: string; component?: string; reportDate?: string; remedy?: string; status?: string; nhtsaCampaignNumber?: string; }
+interface RecallItem { title?: string; summary?: string; description?: string; consequence?: string; component?: string; reportDate?: string; remedy?: string; status?: string; nhtsaCampaignNumber?: string; }
 
 // The recall detail list is written under two shapes: `recalls` (marketcheck-
 // recalls / NHTSA fallback) and `campaigns` (vehicle-enrich). Read either, and
@@ -102,9 +103,12 @@ const normalizeRecalls = (p: { recalls?: RecallItem[]; campaigns?: Record<string
   const c = p?.campaigns;
   if (Array.isArray(c)) return c.map((r) => ({
     title: String(r.title ?? r.summary ?? r.component ?? "Recall"),
+    summary: r.summary != null ? String(r.summary) : undefined,
+    consequence: r.consequence != null ? String(r.consequence) : undefined,
     component: r.component != null ? String(r.component) : undefined,
     reportDate: (r.reportDate ?? r.report_date) != null ? String(r.reportDate ?? r.report_date) : undefined,
     remedy: r.remedy != null ? String(r.remedy) : undefined,
+    nhtsaCampaignNumber: (r.nhtsaCampaignNumber ?? r.campaign ?? r.campaignId) != null ? String(r.nhtsaCampaignNumber ?? r.campaign ?? r.campaignId) : undefined,
   }));
   return [];
 };
@@ -2380,6 +2384,7 @@ const RecallCard = ({ vehicle, recall }: { vehicle: VehicleRow; recall: ReturnTy
   const [open, setOpen] = useState<number>(vehicle.open_recall_count ?? 0);
   const [recalls, setRecalls] = useState<RecallItem[]>(normalizeRecalls(vehicle.recall_payload));
   const [checking, setChecking] = useState(false);
+  const [detailsOpen, setDetailsOpen] = useState(false);
 
   const run = async () => {
     if (!vehicle.vin) { toast.error("No VIN to check"); return; }
@@ -2405,22 +2410,48 @@ const RecallCard = ({ vehicle, recall }: { vehicle: VehicleRow; recall: ReturnTy
 
   if (status === "open_recalls" && open > 0) {
     return (
-      <Card title="Recall Status" action={btn("Check again")}>
-        <div className="flex items-center gap-2.5">
-          <span className="w-9 h-9 rounded-xl bg-red-100 text-red-600 flex items-center justify-center shrink-0"><ShieldAlert className="w-5 h-5" /></span>
-          <div><p className="text-sm font-semibold text-red-700">Open recalls found</p><p className="text-[11px] text-muted-foreground">{open} open recall{open === 1 ? "" : "s"} may require attention before publishing.</p></div>
-        </div>
-        <ul className="mt-2 space-y-2">
-          {recalls.slice(0, 4).map((r, i) => (
-            <li key={i} className="rounded-lg border border-red-200 bg-red-50/50 p-2">
-              <p className="text-xs font-semibold text-foreground">{r.title || "Recall"}</p>
-              <p className="text-[11px] text-muted-foreground">{[r.component, r.reportDate].filter(Boolean).join(" · ")}</p>
-              {r.remedy ? <p className="text-[11px] text-muted-foreground mt-0.5">Remedy: {r.remedy}</p> : null}
-            </li>
-          ))}
-        </ul>
-        <RecallReviewActions recall={recall} vehicle={vehicle} />
-      </Card>
+      <>
+        {/* Compact status card — never dumps the full recall text inline. */}
+        <Card title="Recall Status" action={btn("Check again")}>
+          <div className="flex items-center gap-2.5">
+            <span className="w-9 h-9 rounded-xl bg-red-100 text-red-600 flex items-center justify-center shrink-0"><ShieldAlert className="w-5 h-5" /></span>
+            <div>
+              <p className="text-sm font-semibold text-red-700">Open Recall Found</p>
+              <p className="text-[11px] text-muted-foreground">{open} active manufacturer recall{open === 1 ? "" : "s"} require{open === 1 ? "s" : ""} service review.</p>
+            </div>
+          </div>
+          <button onClick={() => setDetailsOpen(true)} className="mt-2.5 text-[12px] font-semibold text-blue-600 inline-flex items-center gap-1 hover:underline">
+            View Recall Details <ChevronRight className="w-3.5 h-3.5" />
+          </button>
+        </Card>
+
+        {/* Right slide-out — full OEM/NHTSA detail + the service outcome actions. */}
+        <Sheet open={detailsOpen} onOpenChange={setDetailsOpen}>
+          <SheetContent className="w-full sm:max-w-md overflow-y-auto">
+            <SheetHeader>
+              <SheetTitle className="flex items-center gap-2 text-red-700"><ShieldAlert className="w-5 h-5" /> Recall Details</SheetTitle>
+            </SheetHeader>
+            <p className="text-[12px] text-muted-foreground mt-1">{open} active manufacturer recall{open === 1 ? "" : "s"} on this vehicle.</p>
+            <div className="mt-4 space-y-3">
+              {recalls.map((r, i) => (
+                <div key={i} className="rounded-xl border border-red-200 bg-red-50/40 p-3">
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="text-[11px] font-bold uppercase tracking-wide text-red-700">{r.component || "Safety Recall"}</p>
+                    {r.nhtsaCampaignNumber ? <span className="text-[10px] font-mono text-muted-foreground">{r.nhtsaCampaignNumber}</span> : null}
+                  </div>
+                  <p className="text-[12px] text-foreground mt-1 leading-relaxed">{r.summary || r.description || r.title}</p>
+                  {r.consequence ? <p className="text-[11px] text-muted-foreground mt-1.5"><span className="font-semibold">Risk:</span> {r.consequence}</p> : null}
+                  {r.remedy ? <p className="text-[11px] text-muted-foreground mt-1.5"><span className="font-semibold">Remedy:</span> {r.remedy}</p> : null}
+                  {r.reportDate ? <p className="text-[10px] text-muted-foreground mt-1.5">Reported {r.reportDate}</p> : null}
+                </div>
+              ))}
+            </div>
+            <div className="mt-4 border-t border-border pt-4">
+              <RecallReviewActions recall={recall} vehicle={vehicle} />
+            </div>
+          </SheetContent>
+        </Sheet>
+      </>
     );
   }
   if (status === "error") {
