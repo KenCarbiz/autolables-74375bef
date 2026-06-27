@@ -3317,6 +3317,80 @@ export type Database = {
           },
         ]
       }
+      recall_service_tasks: {
+        Row: {
+          completed_at: string | null
+          created_at: string
+          created_by: string | null
+          documents: Json
+          employee_name: string | null
+          id: string
+          notes: string | null
+          open_recall_count: number
+          outcome: string | null
+          recall_payload: Json | null
+          recall_signature: string | null
+          ro_number: string | null
+          service_date: string | null
+          status: string
+          tenant_id: string
+          updated_at: string
+          vehicle_listing_id: string
+          vin: string
+          ymm: string | null
+        }
+        Insert: {
+          completed_at?: string | null
+          created_at?: string
+          created_by?: string | null
+          documents?: Json
+          employee_name?: string | null
+          id?: string
+          notes?: string | null
+          open_recall_count?: number
+          outcome?: string | null
+          recall_payload?: Json | null
+          recall_signature?: string | null
+          ro_number?: string | null
+          service_date?: string | null
+          status?: string
+          tenant_id: string
+          updated_at?: string
+          vehicle_listing_id: string
+          vin: string
+          ymm?: string | null
+        }
+        Update: {
+          completed_at?: string | null
+          created_at?: string
+          created_by?: string | null
+          documents?: Json
+          employee_name?: string | null
+          id?: string
+          notes?: string | null
+          open_recall_count?: number
+          outcome?: string | null
+          recall_payload?: Json | null
+          recall_signature?: string | null
+          ro_number?: string | null
+          service_date?: string | null
+          status?: string
+          tenant_id?: string
+          updated_at?: string
+          vehicle_listing_id?: string
+          vin?: string
+          ymm?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "recall_service_tasks_vehicle_listing_id_fkey"
+            columns: ["vehicle_listing_id"]
+            isOneToOne: false
+            referencedRelation: "vehicle_listings"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       safety_inspections: {
         Row: {
           checklist: Json
@@ -4476,6 +4550,7 @@ export type Database = {
       }
       vehicle_listings: {
         Row: {
+          advertised_price_before_doc: number | null
           available_accessories: Json
           blackbook: Json | null
           certification: Json | null
@@ -4484,9 +4559,11 @@ export type Database = {
           condition: string | null
           created_at: string
           created_by: string | null
+          dealer_discount: number | null
           dealer_snapshot: Json
           default_locale: string
           description: string | null
+          doc_fee: number | null
           documents: Json
           enriched_at: string | null
           factory_sticker_url: string | null
@@ -4515,6 +4592,10 @@ export type Database = {
           photos: Json
           prep_status: Json | null
           price: number | null
+          price_last_verified_at: string | null
+          price_parse_notes: string | null
+          price_parse_status: string | null
+          price_source_url: string | null
           published_at: string | null
           recall_check: Json | null
           recall_checked_at: string | null
@@ -4523,6 +4604,7 @@ export type Database = {
           recall_override_notes: string | null
           recall_payload: Json | null
           recall_status: string | null
+          retail_cash: number | null
           scrape_last_synced_at: string | null
           scrape_source_url: string | null
           service_records: Json
@@ -4540,9 +4622,11 @@ export type Database = {
           view_count: number
           vin: string
           warranty_info: Json
+          website_sale_price: number | null
           ymm: string | null
         }
         Insert: {
+          advertised_price_before_doc?: number | null
           available_accessories?: Json
           blackbook?: Json | null
           certification?: Json | null
@@ -4551,9 +4635,11 @@ export type Database = {
           condition?: string | null
           created_at?: string
           created_by?: string | null
+          dealer_discount?: number | null
           dealer_snapshot?: Json
           default_locale?: string
           description?: string | null
+          doc_fee?: number | null
           documents?: Json
           enriched_at?: string | null
           factory_sticker_url?: string | null
@@ -4582,6 +4668,10 @@ export type Database = {
           photos?: Json
           prep_status?: Json | null
           price?: number | null
+          price_last_verified_at?: string | null
+          price_parse_notes?: string | null
+          price_parse_status?: string | null
+          price_source_url?: string | null
           published_at?: string | null
           recall_check?: Json | null
           recall_checked_at?: string | null
@@ -4590,6 +4680,7 @@ export type Database = {
           recall_override_notes?: string | null
           recall_payload?: Json | null
           recall_status?: string | null
+          retail_cash?: number | null
           scrape_last_synced_at?: string | null
           scrape_source_url?: string | null
           service_records?: Json
@@ -4607,9 +4698,11 @@ export type Database = {
           view_count?: number
           vin: string
           warranty_info?: Json
+          website_sale_price?: number | null
           ymm?: string | null
         }
         Update: {
+          advertised_price_before_doc?: number | null
           available_accessories?: Json
           blackbook?: Json | null
           certification?: Json | null
@@ -4618,9 +4711,11 @@ export type Database = {
           condition?: string | null
           created_at?: string
           created_by?: string | null
+          dealer_discount?: number | null
           dealer_snapshot?: Json
           default_locale?: string
           description?: string | null
+          doc_fee?: number | null
           documents?: Json
           enriched_at?: string | null
           factory_sticker_url?: string | null
@@ -4649,6 +4744,10 @@ export type Database = {
           photos?: Json
           prep_status?: Json | null
           price?: number | null
+          price_last_verified_at?: string | null
+          price_parse_notes?: string | null
+          price_parse_status?: string | null
+          price_source_url?: string | null
           published_at?: string | null
           recall_check?: Json | null
           recall_checked_at?: string | null
@@ -4657,6 +4756,7 @@ export type Database = {
           recall_override_notes?: string | null
           recall_payload?: Json | null
           recall_status?: string | null
+          retail_cash?: number | null
           scrape_last_synced_at?: string | null
           scrape_source_url?: string | null
           service_records?: Json
@@ -4674,6 +4774,7 @@ export type Database = {
           view_count?: number
           vin?: string
           warranty_info?: Json
+          website_sale_price?: number | null
           ymm?: string | null
         }
         Relationships: [
@@ -5379,6 +5480,7 @@ export type Database = {
         Returns: boolean
       }
       get_ready_nudge_payload: { Args: { p_tenant_id: string }; Returns: Json }
+      get_recall_task_for_token: { Args: { _token: string }; Returns: Json }
       get_reengage_schedule: {
         Args: never
         Returns: {
@@ -5465,6 +5567,7 @@ export type Database = {
       get_vehicle_listing_by_slug: {
         Args: { _slug: string }
         Returns: {
+          advertised_price_before_doc: number | null
           available_accessories: Json
           blackbook: Json | null
           certification: Json | null
@@ -5473,9 +5576,11 @@ export type Database = {
           condition: string | null
           created_at: string
           created_by: string | null
+          dealer_discount: number | null
           dealer_snapshot: Json
           default_locale: string
           description: string | null
+          doc_fee: number | null
           documents: Json
           enriched_at: string | null
           factory_sticker_url: string | null
@@ -5504,6 +5609,10 @@ export type Database = {
           photos: Json
           prep_status: Json | null
           price: number | null
+          price_last_verified_at: string | null
+          price_parse_notes: string | null
+          price_parse_status: string | null
+          price_source_url: string | null
           published_at: string | null
           recall_check: Json | null
           recall_checked_at: string | null
@@ -5512,6 +5621,7 @@ export type Database = {
           recall_override_notes: string | null
           recall_payload: Json | null
           recall_status: string | null
+          retail_cash: number | null
           scrape_last_synced_at: string | null
           scrape_source_url: string | null
           service_records: Json
@@ -5529,6 +5639,7 @@ export type Database = {
           view_count: number
           vin: string
           warranty_info: Json
+          website_sale_price: number | null
           ymm: string | null
         }[]
         SetofOptions: {
@@ -5622,6 +5733,8 @@ export type Database = {
           vin: string
         }[]
       }
+      recalc_tenant_doc_fee: { Args: { p_tenant_id: string }; Returns: number }
+      recall_payload_signature: { Args: { p: Json }; Returns: string }
       record_addendum_event: {
         Args: {
           _channel?: string
@@ -5774,6 +5887,31 @@ export type Database = {
           _user_agent: string
         }
         Returns: Json
+      }
+      submit_recall_outcome_public: {
+        Args: {
+          _documents?: Json
+          _employee_name: string
+          _ip?: string
+          _notes: string
+          _outcome: string
+          _ro_number: string
+          _token: string
+          _user_agent?: string
+        }
+        Returns: Json
+      }
+      submit_recall_service_outcome: {
+        Args: {
+          _documents?: Json
+          _employee_name: string
+          _notes: string
+          _outcome: string
+          _ro_number: string
+          _service_date: string
+          _task_id: string
+        }
+        Returns: string
       }
       submit_safety_inspection: {
         Args: {
