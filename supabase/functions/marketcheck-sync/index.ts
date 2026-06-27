@@ -124,6 +124,10 @@ async function autoPreload(admin: any, supabaseUrl: string, serviceKey: string, 
     }
   } catch { /* token preload best-effort */ }
   try {
+    // Draft addendum from the dealer's product rules (skips if none match).
+    await admin.rpc("create_draft_addendum", { p_tenant_id: tenantId, p_vin: vin });
+  } catch { /* addendum preload best-effort */ }
+  try {
     // Fire-and-forget; no-op if no window-sticker API key is configured.
     fetch(`${supabaseUrl}/functions/v1/oem-window-sticker`, {
       method: "POST",
