@@ -4,7 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useTenant } from "@/contexts/TenantContext";
 import { toast } from "sonner";
 import SignaturePad from "@/components/addendum/SignaturePad";
-import K208Checklist, { k208Answered, k208Result, k208Checklist, type K208Mark } from "@/components/service/K208Checklist";
+import K208Checklist, { K208_ITEMS, k208Answered, k208Result, k208Checklist, type K208Mark } from "@/components/service/K208Checklist";
 import { K208_CERTIFICATION_TEXT } from "@/data/ctK208Form";
 import { buildConsentRecord, hashPayload, fetchClientIp } from "@/lib/esign";
 import { uploadPhoto } from "@/lib/storage";
@@ -34,10 +34,12 @@ export default function ServiceDesk() {
   const loadVehicle = async () => {
     if (!tenantId) return;
     const vin = vinInput.trim().toUpperCase();
-    if (vin.length < 6) { toast.error("Enter a VIN"); return; }
+    if (vin.length < 11) { toast.error("Enter the full VIN"); return; }
     setLoadingVeh(true);
+    // Exact match only: a K-208 / QR is a compliance record, so a partial-VIN
+    // substring must never resolve to (and attach to) the wrong vehicle.
     const { data } = await (supabase as any).from("vehicle_listings")
-      .select("id, vin, ymm").eq("tenant_id", tenantId).ilike("vin", `%${vin}%`).limit(1).maybeSingle();
+      .select("id, vin, ymm").eq("tenant_id", tenantId).eq("vin", vin).limit(1).maybeSingle();
     setLoadingVeh(false);
     if (!data) { toast.error("No vehicle found for that VIN"); return; }
     setVeh(data as Veh);
@@ -177,14 +179,11 @@ function DesktopK208({ tenantId, veh }: { tenantId: string; veh: Veh }) {
 
   const answered = k208Answered(marks);
   const result = k208Result(marks);
-  const passAll = () => {
-    const next: Record<string, K208Mark> = {};
-    Object.keys(marks).forEach((k) => (next[k] = marks[k]));
-    import("@/components/service/K208Checklist").then(({ K208_ITEMS }) => {
-      K208_ITEMS.forEach((i) => { next[i.id] = marks[i.id] === "fail" || marks[i.id] === "na" ? marks[i.id] : "pass"; });
-      setMarks({ ...next });
-    });
-  };
+  const passAll = () => setMarks((cur) => {
+    const next: Record<string, K208Mark> = { ...cur };
+    K208_ITEMS.forEach((i) => { next[i.id] = cur[i.id] === "fail" || cur[i.id] === "na" ? cur[i.id] : "pass"; });
+    return next;
+  });
 
   const onFiles = async (files: FileList | null) => {
     if (!files?.length) return;

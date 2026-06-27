@@ -30,6 +30,24 @@ const json = (status: number, body: unknown) =>
 
 const safeName = (name: string) => (name || "file").replace(/[^a-zA-Z0-9._-]/g, "_").slice(-80);
 
+// Only images and PDFs may land in the public bucket. Without this allowlist an
+// attacker holding a (long-lived, shareable) token could upload text/html and
+// get a same-origin stored-XSS URL off the public bucket.
+const ALLOWED_TYPES = new Set([
+  "image/png", "image/jpeg", "image/jpg", "image/webp", "image/gif", "image/heic", "image/heif", "application/pdf",
+]);
+const EXT_TYPE: Record<string, string> = {
+  png: "image/png", jpg: "image/jpeg", jpeg: "image/jpeg", webp: "image/webp",
+  gif: "image/gif", heic: "image/heic", heif: "image/heif", pdf: "application/pdf",
+};
+const resolveType = (contentType?: string, filename?: string): string | null => {
+  const ct = (contentType || "").toLowerCase().split(";")[0].trim();
+  if (ALLOWED_TYPES.has(ct)) return ct;
+  const ext = (filename || "").toLowerCase().match(/\.([a-z0-9]+)$/)?.[1];
+  const fromExt = ext ? EXT_TYPE[ext] : undefined;
+  return fromExt && ALLOWED_TYPES.has(fromExt) ? fromExt : null;
+};
+
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
   if (req.method !== "POST") return json(405, { error: "method not allowed" });
@@ -39,6 +57,9 @@ serve(async (req) => {
   };
   const token = (body.token || "").trim();
   if (!token || !body.dataBase64) return json(400, { error: "token and dataBase64 required" });
+
+  const contentType = resolveType(body.contentType, body.filename);
+  if (!contentType) return json(415, { error: "unsupported file type (images and PDF only)" });
 
   const admin = createClient(SUPABASE_URL, SERVICE_KEY, { auth: { persistSession: false, autoRefreshToken: false } });
 
@@ -67,7 +88,7 @@ serve(async (req) => {
   const path = `${tok.tenant_id}/${tok.vin}/${stamp}-${rand}-${safeName(body.filename || "upload")}`;
 
   const { error: upErr } = await admin.storage.from(BUCKET).upload(path, bytes, {
-    contentType: body.contentType || "application/octet-stream", upsert: false,
+    contentType, upsert: false,
   });
   if (upErr) return json(500, { error: upErr.message || "upload failed" });
 

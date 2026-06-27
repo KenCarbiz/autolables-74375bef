@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import SignaturePad from "@/components/addendum/SignaturePad";
-import K208Checklist, { k208Answered, k208Result, k208Checklist, type K208Mark } from "@/components/service/K208Checklist";
+import K208Checklist, { K208_ITEMS, k208Answered, k208Result, k208Checklist, type K208Mark } from "@/components/service/K208Checklist";
 import { K208_CERTIFICATION_TEXT } from "@/data/ctK208Form";
 import { buildConsentRecord, hashPayload, fetchClientIp } from "@/lib/esign";
 import { CheckCircle2, Loader2, ShieldCheck, Sparkles, ChevronRight, Upload, X, AlertTriangle, ArrowLeft, Camera } from "lucide-react";
@@ -118,7 +118,7 @@ function ServiceStation({ token, ctx, onDone }: { token: string; ctx: Ctx; onDon
 
   if (ctx.service_done) return <DoneCard label="Safety inspection already completed for this vehicle." />;
   const answered = k208Answered(marks); const result = k208Result(marks);
-  const passAll = () => { const n: Record<string, K208Mark> = {}; import("@/components/service/K208Checklist").then(({ K208_ITEMS }) => { K208_ITEMS.forEach((i) => n[i.id] = marks[i.id] === "fail" || marks[i.id] === "na" ? marks[i.id] : "pass"); setMarks({ ...n }); }); };
+  const passAll = () => setMarks((cur) => { const n: Record<string, K208Mark> = {}; K208_ITEMS.forEach((i) => n[i.id] = cur[i.id] === "fail" || cur[i.id] === "na" ? cur[i.id] : "pass"); return n; });
   const onFiles = async (files: FileList | null) => { if (!files?.length) return; setUploading(true); for (const f of Array.from(files)) { const url = await uploadViaToken(token, f); if (url) setDocs((d) => [...d, { url, caption: f.name }]); } setUploading(false); };
   const canSubmit = !!name.trim() && !!sig.trim() && consent && answered > 0 && !busy;
 

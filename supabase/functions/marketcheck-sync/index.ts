@@ -106,12 +106,12 @@ const hex16 = () => {
   return Array.from(a).map((b) => b.toString(16).padStart(2, "0")).join("");
 };
 
-// Auto-preload a brand-new vehicle the moment it's ingested: mint its permanent
-// Get-Ready hub token (so the windshield QR works immediately) and kick off a
-// best-effort OEM window-sticker fetch. All isolated — never throws back into
-// the sync loop. Runs only on genuinely new listings.
+// Mint the permanent Get-Ready hub token if this vehicle doesn't already have a
+// live one. Cheap + idempotent, so it can run on every sync pass to back-fill
+// pre-existing inventory and cars first ingested by other paths — without the
+// addendum/sticker work that only makes sense once, at first ingest.
 // deno-lint-ignore no-explicit-any
-async function autoPreload(admin: any, supabaseUrl: string, serviceKey: string, tenantId: string, vin: string, ymm: string | null, listingId: string | null) {
+async function ensureReadyToken(admin: any, tenantId: string, vin: string, ymm: string | null, listingId: string | null) {
   try {
     const { data: tok } = await admin.from("dept_signoff_tokens").select("id")
       .eq("tenant_id", tenantId).eq("vin", vin).eq("department", "vehicle").eq("status", "pending").maybeSingle();
@@ -123,6 +123,15 @@ async function autoPreload(admin: any, supabaseUrl: string, serviceKey: string, 
       });
     }
   } catch { /* token preload best-effort */ }
+}
+
+// Auto-preload a brand-new vehicle the moment it's ingested: mint its permanent
+// Get-Ready hub token (so the windshield QR works immediately), draft the
+// addendum, and kick off a best-effort OEM window-sticker fetch. All isolated —
+// never throws back into the sync loop. Runs only on genuinely new listings.
+// deno-lint-ignore no-explicit-any
+async function autoPreload(admin: any, supabaseUrl: string, serviceKey: string, tenantId: string, vin: string, ymm: string | null, listingId: string | null) {
+  await ensureReadyToken(admin, tenantId, vin, ymm, listingId);
   try {
     // Draft addendum from the dealer's product rules (skips if none match).
     await admin.rpc("create_draft_addendum", { p_tenant_id: tenantId, p_vin: vin });
@@ -640,7 +649,13 @@ serve(async (req) => {
             if (gallery[0]) patch.hero_image_url = gallery[0];
             if (vl) {
               const { error } = await admin.from("vehicle_listings").update(patch).eq("id", vl.id);
-              if (!error) listingsUpserted++; else if (!firstWriteErr) firstWriteErr = error.message;
+              if (!error) {
+                listingsUpserted++;
+                // Back-fill the Get-Ready hub token for cars that predate this
+                // feature or were first ingested by another path (autocurb-sync,
+                // manual add) so they never fall out of the get-ready flow.
+                await ensureReadyToken(admin, cfg.tenant_id, vin, ymm, vl.id);
+              } else if (!firstWriteErr) firstWriteErr = error.message;
             } else {
               const ins = await admin.from("vehicle_listings").insert({
                 ...patch, store_id: cfg.tenant_id, slug: makeSlug(vin, ymm || undefined), status: "draft", sticker_snapshot: {},

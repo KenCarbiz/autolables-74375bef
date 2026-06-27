@@ -36,7 +36,7 @@ serve(async (req) => {
   const admin = createClient(SUPABASE_URL, SERVICE_KEY, { auth: { persistSession: false, autoRefreshToken: false } });
 
   // Opted-in tenants only.
-  const { data: profs } = await admin.from("dealer_profiles").select("tenant_id, settings");
+  const { data: profs } = await admin.from("dealer_profiles").select("tenant_id, settings").range(0, 49999);
   // deno-lint-ignore no-explicit-any
   const tenants = ((profs as any[]) || []).filter((p) => p?.settings?.require_safety_inspection === true).map((p) => p.tenant_id);
 
@@ -63,14 +63,22 @@ serve(async (req) => {
         <table style="border-collapse:collapse;width:100%;max-width:560px">${rows}</table>
         <p style="font-size:12px;color:#777">Scan the windshield QR or tap a link above to complete the inspection. This is a daily reminder until each one is signed.</p>`;
 
+      let delivered = 0;
       for (const to of recipients) {
-        await fetch(`${SUPABASE_URL}/functions/v1/send-email`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json", Authorization: `Bearer ${SERVICE_KEY}` },
-          body: JSON.stringify({ to, subject: `${stuck.length} vehicle${stuck.length === 1 ? "" : "s"} need a safety inspection`, html }),
-        }).catch(() => { /* best-effort per recipient */ });
+        try {
+          const res = await fetch(`${SUPABASE_URL}/functions/v1/send-email`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json", Authorization: `Bearer ${SERVICE_KEY}` },
+            body: JSON.stringify({ to, subject: `${stuck.length} vehicle${stuck.length === 1 ? "" : "s"} need a safety inspection`, html }),
+          });
+          if (res.ok) delivered++;
+        } catch { /* best-effort per recipient */ }
       }
-      await admin.from("get_ready_nudge_log").insert({ tenant_id: tenantId, stuck_count: stuck.length, recipient_count: recipients.length });
+      // Only burn the once-a-day throttle when at least one email actually went
+      // out — otherwise a transient send-email outage would silence the dealer
+      // for ~20h with zero emails delivered.
+      if (delivered === 0) { skipped++; continue; }
+      await admin.from("get_ready_nudge_log").insert({ tenant_id: tenantId, stuck_count: stuck.length, recipient_count: delivered });
       sent++;
     } catch { /* per-tenant best-effort */ }
   }

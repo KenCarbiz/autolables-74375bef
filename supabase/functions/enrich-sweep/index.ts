@@ -31,21 +31,32 @@ const json = (s: number, b: unknown) => new Response(JSON.stringify(b), { status
 async function runSweep(sweepStart: string, depth: number) {
   const admin = createClient(SUPABASE_URL, SERVICE_KEY, { auth: { persistSession: false, autoRefreshToken: false } });
   const deadline = Date.now() + BUDGET_MS;
+  let failures = 0;
   while (Date.now() < deadline) {
     const { data: batch } = await admin.rpc("next_enrich_batch", { p_sweep_start: sweepStart, p_limit: 5 });
     // deno-lint-ignore no-explicit-any
     const rows = (batch as any[]) || [];
-    if (rows.length === 0) return; // fully enriched — done
+    if (rows.length === 0) { if (failures) console.warn(`enrich-sweep: ${failures} enrich call(s) failed this sweep`); return; } // done
     for (const r of rows) {
       if (Date.now() >= deadline) break;
       try {
-        await fetch(`${SUPABASE_URL}/functions/v1/vehicle-enrich`, {
+        const res = await fetch(`${SUPABASE_URL}/functions/v1/vehicle-enrich`, {
           method: "POST",
           headers: { "Content-Type": "application/json", Authorization: `Bearer ${SERVICE_KEY}`, "x-cron-secret": CRON_SECRET },
           body: JSON.stringify({ tenant_id: r.tenant_id, vin: r.vin }),
           signal: AbortSignal.timeout(45000),
         });
-      } catch { /* a failed enrich leaves the car for the next pass */ }
+        if (!res.ok) failures++;
+      } catch { failures++; /* a failed enrich is retried next sweep, not this one */ }
+      // Liveness guard: stamp enriched_at no matter the outcome so this VIN drops
+      // out of next_enrich_batch FOR THIS SWEEP. vehicle-enrich already stamps on
+      // its normal path, but its early returns (no MarketCheck key, invalid VIN,
+      // missing row) and hard errors don't — without this, those VINs sort NULLS
+      // FIRST and get re-hammered for the whole budget, then re-chained 80×. A
+      // genuinely incomplete car is simply re-attempted on the next sweep
+      // (new sweep_start), never in a tight loop.
+      await admin.from("vehicle_listings").update({ enriched_at: new Date().toISOString() })
+        .eq("tenant_id", r.tenant_id).eq("vin", r.vin);
     }
   }
   // Budget hit — anything left? If so, chain another hop with the same cursor.
