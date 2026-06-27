@@ -227,6 +227,9 @@ const VehiclePassportV3 = () => {
     return map[key] || { icon: CheckCircle2, onClick: () => go("check-availability") };
   };
 
+  const compPrices = d.comparables.map((c) => (c as { price?: number }).price).filter((p): p is number => typeof p === "number" && p > 0);
+  const compFrom = compPrices.length ? Math.min(...compPrices) : null;
+  const compCount = d.comparables.length || d.marketMeta.similarCount || 0;
   const mi = [
     { icon: DollarSign, title: "Market Price", strong: d.belowMarket && d.belowMarket > 0 ? "Great Price" : d.marketAvg != null ? "Market Price" : "Pending",
       sub: d.belowMarket && d.belowMarket > 0 ? `${fmt$(d.belowMarket)} below market average` : d.marketAvg != null ? `Market avg ${fmt$(d.marketAvg)}` : "Awaiting MarketCheck", chart: <Spark points={marketSeries} />, section: "market-price", cta: "View report" },
@@ -236,12 +239,26 @@ const VehiclePassportV3 = () => {
       sub: d.marketAvg != null ? "based on live comparables" : "Awaiting MarketCheck", donut: d.confScore, section: "price-confidence", cta: "View report" },
     { icon: Clock, title: "Price History", strong: priceChange7d != null && priceChange7d !== 0 ? `${priceChange7d < 0 ? "-" : "+"}${fmt$(Math.abs(priceChange7d))}` : "7-Day Trend",
       sub: priceChange7d != null ? (priceChange7d < 0 ? "price decreased" : priceChange7d > 0 ? "price increased" : "stable") : "History builds over time", chart: <Spark points={priceSeries} color="#7C3AED" />, section: "price-history", cta: "View history" },
-    { icon: Car, title: "Comparable Vehicles", strong: "Comp set", sub: "Similar vehicles via MarketCheck", comps: true, section: "comparable-vehicles", cta: "View comp set" },
-    { icon: Package, title: "Inventory Trend", strong: "30-Day Trend", sub: "Market supply via MarketCheck", chart: <Spark points={[]} />, section: "inventory-trend", cta: "View trend" },
+    { icon: Car, title: "Comparable Vehicles", strong: compCount ? `${compCount} Nearby` : "Comp set",
+      sub: compFrom != null ? `Similar vehicles from ${fmt$(compFrom)}` : "Similar vehicles via MarketCheck", comps: true, section: "comparable-vehicles", cta: "View comp set" },
+    { icon: Package, title: "Inventory Trend", strong: d.marketMeta.daysSupply != null ? `${Math.round(d.marketMeta.daysSupply)}-Day Supply` : "Market Supply",
+      sub: d.marketMeta.daysSupply != null ? (d.marketMeta.inventoryCount != null ? `${d.marketMeta.inventoryCount} similar listed` : "Regional days-supply") : "Market supply via MarketCheck", chart: <Spark points={[]} />, section: "inventory-trend", cta: "View trend" },
   ];
 
   const highlights: { icon: React.ElementType; t: string; s: string }[] = [];
-  const ks = listing.key_specs || {}; const mc = (listing.mc_attributes || {}) as Record<string, unknown>;
+  // Specs are written into mc_attributes by the pull; key_specs is usually
+  // empty, so merge mc_attributes in (mapping its field names) before reading.
+  const mc = (listing.mc_attributes || {}) as Record<string, unknown>;
+  const ksRaw = (listing.key_specs || {}) as Record<string, unknown>;
+  const ks = {
+    engine: (ksRaw.engine ?? mc.engine ?? undefined) as string | undefined,
+    drivetrain: (ksRaw.drivetrain ?? mc.drivetrain ?? undefined) as string | undefined,
+    transmission: (ksRaw.transmission ?? mc.transmission ?? undefined) as string | undefined,
+    fuel: (ksRaw.fuel ?? mc.fuel_type ?? undefined) as string | undefined,
+    mpg_city: (ksRaw.mpg_city ?? mc.city_mpg ?? undefined) as number | undefined,
+    mpg_hwy: (ksRaw.mpg_hwy ?? mc.highway_mpg ?? undefined) as number | undefined,
+    exterior_color: (ksRaw.exterior_color ?? mc.exterior_color ?? undefined) as string | undefined,
+  };
   if (ks.engine) highlights.push({ icon: Cog, t: ks.engine, s: "Engine" });
   if (mc.horsepower) highlights.push({ icon: Zap, t: `${mc.horsepower} HP`, s: "Power" });
   if (ks.drivetrain) highlights.push({ icon: Car, t: abbrevDrive(ks.drivetrain), s: "Drivetrain" });

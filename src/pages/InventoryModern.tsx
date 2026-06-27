@@ -621,6 +621,7 @@ const InventoryModern = () => {
                         </td>
                         <td className="px-3 py-3">
                           <AdvertisedPriceCell price={r.price} docFee={settings.doc_fee_amount} ap={byVin.get((r.vin || "").toUpperCase())} />
+                          <div className="mt-1"><MarketCell position={r.market_position} price={r.price} value={r.market_value} /></div>
                         </td>
                         <td className="px-3 py-3" onClick={(e) => e.stopPropagation()}>
                           <PortalChip status={r.status} />

@@ -692,6 +692,9 @@ serve(async (req) => {
                 cylinders: b.cylinders ?? null, vehicle_type: b.vehicle_type || null,
                 city_mpg: b.city_mpg ?? null, highway_mpg: b.highway_mpg ?? null,
                 engine_size: b.engine_size ?? null,
+                // Alias to the keys the passport's specs/highlights actually read.
+                seating: (b as Record<string, unknown>).std_seating ?? (b as Record<string, unknown>).seating ?? null,
+                horsepower: (b as Record<string, unknown>).horsepower ?? (b as Record<string, unknown>).engine_power ?? null,
                 // Market & history signals (days-on-market, price movement,
                 // listing age, CARFAX badge flags, seller type).
                 dom: l.dom ?? null, dom_active: l.dom_active ?? null, dom_180: l.dom_180 ?? null,

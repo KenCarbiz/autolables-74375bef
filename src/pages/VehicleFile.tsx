@@ -118,7 +118,7 @@ const buildChecks = (v: VehicleRow): ReadyCheck[] => [
   { ok: true, label: "Vehicle created", when: v.created_at },
   { ok: !!v.ymm, label: "VIN decoded", when: v.ymm ? v.updated_at : null },
   { ok: v.status === "published", label: "Published to shopper portal", when: v.published_at, blocks: true },
-  { ok: !!v.recall_check, label: "Recall checked", when: null },
+  { ok: !!(v.recall_status || v.recall_check), label: "Recall checked", when: null },
   { ok: !!v.prep_status?.foreman_signed_at, label: "Prep & install signed off", when: v.prep_status?.foreman_signed_at || null },
   { ok: (v.documents?.length || 0) > 0, label: "Documents attached", when: null },
   { ok: (v.service_records?.length || 0) > 0, label: "Service history", when: null },
@@ -859,6 +859,7 @@ const OverviewPanel = ({ vehicle, onTab }: { vehicle: VehicleRow; onTab: (t: Tab
         {/* Recall + Packet Completeness, stacked */}
         <div className="space-y-4">
           <RecallCard vehicle={vehicle} />
+          <MarketPricingCard vehicle={vehicle} />
           <Card title="Packet Completeness">
             <div className="flex items-end justify-between gap-2">
               <span className="font-display text-3xl font-black tabular-nums text-foreground leading-none">{packetPct}%</span>

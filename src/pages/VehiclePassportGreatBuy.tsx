@@ -82,7 +82,7 @@ const VehiclePassportGreatBuy = () => {
   const mc = (listing.mc_attributes || {}) as Record<string, unknown>;
   const score = d.confScore;
   const purchaseLabel = score == null ? "Pending Verification" : score >= 90 ? "Excellent Purchase" : score >= 80 ? "Strong Purchase" : score >= 70 ? "Good Purchase" : "Fair Purchase";
-  const percentile = (mc.price_percentile as number) ?? null;
+  const percentile = d.marketMeta.percentile;
   const topPct = percentile != null ? `Top ${Math.max(1, 100 - percentile)}% of comparable vehicles` : isPreview ? "Top 4% of comparable vehicles" : null;
   const premium = /luxe|autograph|limited|platinum|premium|touring|signature|reserve|titanium|sensory|denali/i.test(listing.trim || "");
   const lowMiles = listing.mileage != null && listing.mileage < 30000;
@@ -158,14 +158,17 @@ const VehiclePassportGreatBuy = () => {
   const annualTotal = Object.values(annual).reduce((a, b) => a + b, 0);
   const fiveYear = annualTotal * 5;
 
-  // Similar vehicles (sample only behind the preview banner).
-  const similar = isPreview && d.price != null
-    ? [
-        { mi: 24000, price: d.price + 5200, score: 91 },
-        { mi: 18000, price: d.price + 4360, score: 93 },
-        { mi: 31000, price: d.price + 6100, score: 88 },
-      ]
-    : [];
+  // Similar vehicles — real MarketCheck comparables (sample only behind preview).
+  const similar: { mi: number; price: number; score: number | null; ymm: string | null; image: string | null }[] =
+    !isPreview && d.comparables.length
+      ? d.comparables.slice(0, 3).map((c) => ({ mi: c.miles ?? 0, price: c.price ?? 0, score: null, ymm: c.ymm ?? listing.ymm, image: c.image ?? listing.hero_image_url ?? null }))
+      : isPreview && d.price != null
+        ? [
+            { mi: 24000, price: d.price + 5200, score: 91, ymm: listing.ymm, image: listing.hero_image_url ?? null },
+            { mi: 18000, price: d.price + 4360, score: 93, ymm: listing.ymm, image: listing.hero_image_url ?? null },
+            { mi: 31000, price: d.price + 6100, score: 88, ymm: listing.ymm, image: listing.hero_image_url ?? null },
+          ]
+        : [];
 
   const matrix: { k: string; s: number | null }[] = [
     { k: "Price", s: priceVal }, { k: "History", s: histVal }, { k: "Warranty", s: warVal }, { k: "Ownership", s: ownVal },
@@ -174,7 +177,7 @@ const VehiclePassportGreatBuy = () => {
   ];
 
   const buyNow: string[] = [];
-  if (isPreview || (mc.inventory_change_pct as number) < 0) buyNow.push("Comparable inventory is decreasing in your market.");
+  if (isPreview || (d.marketMeta.daysSupply != null && d.marketMeta.daysSupply < 60)) buyNow.push("Comparable inventory is moving quickly in your market.");
   if (d.belowMarket && d.belowMarket > 0) buyNow.push("Pricing is below the market average right now.");
   if ((d.viewCount ?? 0) > 20) buyNow.push("Shopper interest in this vehicle remains strong.");
   if (d.warrantyStr) buyNow.push("Factory warranty is still active.");
@@ -293,11 +296,11 @@ const VehiclePassportGreatBuy = () => {
           {similar.length ? (
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">{similar.map((s, i) => (
               <div key={i} className={`${CARD} p-3`}>
-                <div className="h-24 rounded-lg bg-[#eef0f3] flex items-center justify-center mb-2">{listing.hero_image_url ? <img src={listing.hero_image_url} alt="" className="w-full h-full object-cover rounded-lg" /> : <Car className="w-7 h-7 text-[#94A3B8]" />}</div>
-                <p className="text-[13px] font-bold leading-tight line-clamp-1">{listing.ymm}</p>
+                <div className="h-24 rounded-lg bg-[#eef0f3] flex items-center justify-center mb-2">{s.image ? <img src={s.image} alt="" className="w-full h-full object-cover rounded-lg" /> : <Car className="w-7 h-7 text-[#94A3B8]" />}</div>
+                <p className="text-[13px] font-bold leading-tight line-clamp-1">{s.ymm}</p>
                 <p className="text-[11px] text-[#94A3B8]">{s.mi.toLocaleString()} mi</p>
-                <div className="flex items-center justify-between mt-1"><span className="text-[14px] font-extrabold">{fmt$(s.price)}</span><span className="text-[11px] font-bold text-[#16A34A]">Score {s.score}</span></div>
-                {score != null && <p className="text-[11px] text-[#64748B] mt-1.5">This vehicle scores {score - s.score > 0 ? `${score - s.score} points higher` : "competitively"} on price and history.</p>}
+                <div className="flex items-center justify-between mt-1"><span className="text-[14px] font-extrabold">{fmt$(s.price)}</span>{s.score != null && <span className="text-[11px] font-bold text-[#16A34A]">Score {s.score}</span>}</div>
+                {score != null && s.score != null && <p className="text-[11px] text-[#64748B] mt-1.5">This vehicle scores {score - s.score > 0 ? `${score - s.score} points higher` : "competitively"} on price and history.</p>}
                 <button onClick={() => go("comparable-vehicles")} className="mt-2 text-[12px] font-semibold text-[#2563EB] hover:underline">View comparison</button>
               </div>
             ))}</div>
