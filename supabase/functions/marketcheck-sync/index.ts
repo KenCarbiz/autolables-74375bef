@@ -792,6 +792,21 @@ serve(async (req) => {
     } catch { /* best-effort — a failed enrich leaves the listing's prior data intact */ }
   }
 
+  // Once-daily full enrichment sweep. The inline pass above only covers new /
+  // re-priced cars (kept for immediacy); this self-chaining sweep backfills the
+  // entire inventory one VIN at a time on the shared MarketCheck key. Fire in a
+  // single configurable UTC hour; the sweep's cursor makes repeat triggers safe.
+  try {
+    const sweepHour = Number(Deno.env.get("ENRICH_SWEEP_HOUR_UTC") || "8");
+    if (new Date().getUTCHours() === sweepHour) {
+      fetch(`${supabaseUrl}/functions/v1/enrich-sweep`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${serviceKey}`, "x-cron-secret": cronSecret },
+        body: "{}", signal: AbortSignal.timeout(15000),
+      }).catch(() => { /* best-effort */ });
+    }
+  } catch { /* best-effort */ }
+
   // Once-daily Get-Ready nudge digest. This runs hourly, so fire only in a single
   // UTC hour; the nudge function self-throttles per tenant. Reuses our valid
   // service-role context instead of a separate cron with its own auth.
