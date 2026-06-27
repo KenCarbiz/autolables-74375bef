@@ -204,14 +204,11 @@ async function fetchHistory(vin: string) {
       last_seen: l.last_seen_at_date ?? (l.last_seen_at ? new Date(Number(l.last_seen_at) * 1000).toISOString() : null),
       _ts: ts(l),
     })).sort((a, z) => a._ts - z._ts);
-    // Ownership estimate: count distinct dealer/seller spells across time (a
-    // new seller after a prior one implies a change of hands). Honest floor of 1.
-    let owners = 0;
-    let prevDealer: string | null = null;
-    for (const e of entries) {
-      const who = (e.dealer || e.seller_type || "").toString().trim().toLowerCase();
-      if (who && who !== prevDealer) { owners++; prevDealer = who; }
-    }
+    // Do NOT derive an owner count from listing history. Distinct dealer/seller
+    // spells count how many DEALERS relisted the VIN, not personal ownership
+    // changes — a wholesale/auction chain inflates this to 12-50 "owners". A
+    // true owner count only comes from a title history (CARFAX/AutoCheck), which
+    // this feed is not. Leave it null so the Passport reads honestly.
     const firstSeen = entries.find((e) => e.first_seen)?.first_seen ?? null;
     // In-service date ≈ first time this VIN appeared as a NEW car (warranty
     // clock starts at first retail sale; first-new-listing is the closest
@@ -221,7 +218,7 @@ async function fetchHistory(vin: string) {
     return {
       available: true,
       entries: entries.map(({ _ts, ...e }) => e),
-      owners: owners > 0 ? owners : 1,
+      owners: null,
       inServiceDate,
       firstSeen,
       checked_at: new Date().toISOString(),

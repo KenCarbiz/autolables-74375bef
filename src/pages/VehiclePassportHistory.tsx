@@ -207,7 +207,9 @@ const VehiclePassportHistory = () => {
         <div className="px-5 mt-7 space-y-2.5">
           <h2 className="text-[18px] font-bold mb-1">History Details</h2>
           <MAcc open={mOpen === "ownership"} onToggle={() => setMOpen(mOpen === "ownership" ? null : "ownership")} icon={Users} title="Ownership Summary" desc="Personal ownership history" status={d.ownerCount != null ? "verified" : "pending"}>
-            {d.ownerCount != null ? (
+            {d.ownerCount === 0 ? (
+              <p className="text-[13px] text-[#64748B]">New vehicle — no prior owners.</p>
+            ) : d.ownerCount != null ? (
               <div className="space-y-2">
                 {Array.from({ length: Math.min(4, Math.max(1, d.ownerCount)) }).map((_, i, arr) => (
                   <div key={i} className="rounded-xl border border-[#E6E8EC] p-3"><div className="flex items-center justify-between"><p className="text-[13px] font-bold">Owner #{i + 1}</p>{i === arr.length - 1 && <span className="text-[10px] font-bold text-[#16A34A] bg-emerald-50 rounded-full px-2 py-0.5">Current Owner</span>}</div><p className="text-[12px] text-[#64748B]">Personal owner{mState ? ` · ${mState}` : ""}</p></div>

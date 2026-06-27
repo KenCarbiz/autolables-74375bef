@@ -209,7 +209,12 @@ export const derivePassport = (listing: VehicleListing): PassportData => {
     return isFinite(m) ? m : null;
   })();
 
-  const ownerCount = (mc.owner_count as number) ?? (mc.carfax_1_owner === true ? 1 : null) ?? (history?.owners ?? null);
+  // A brand-new car has had no prior owners. For everything else, only trust a
+  // real owner signal (MarketCheck owner_count or a CARFAX one-owner flag) —
+  // never the listing-history "owners" estimate, which counts distinct dealer
+  // listing spells (a car relisted by 12 dealers is NOT a 12-owner car).
+  const isNew = String((listing as { condition?: string }).condition || "").toLowerCase() === "new";
+  const ownerCount = isNew ? 0 : ((mc.owner_count as number) ?? (mc.carfax_1_owner === true ? 1 : null));
   const accidentCount = (mc.accident_count as number) ?? (mc.carfax_clean_title === true ? 0 : null);
   const cleanTitle = mc.carfax_clean_title === true;
   const serviceCount = listing.service_records?.length ?? 0;
