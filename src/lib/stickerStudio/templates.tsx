@@ -53,6 +53,7 @@ export interface StickerData {
   mileage?: string;
   msrp?: string;
   price?: string;
+  specs?: string; // pre-joined key specs, e.g. "3.5L V6 · AWD · 9-Speed Auto · 20/25 MPG"
   installed: StickerLineItem[];
   upgrades: StickerLineItem[];
   benefits: StickerLineItem[];
@@ -193,6 +194,7 @@ function WindowSheet({ config, data, branding, options }: TemplateRenderProps) {
           {data.stock && <span>Stock # <span className="font-semibold" style={{ color: pal.ink }}>{data.stock}</span></span>}
           {data.vin && <span>VIN <span className="font-mono" style={{ color: pal.ink }}>{data.vin}</span></span>}
           {data.mileage && <span>Mileage <span className="font-semibold" style={{ color: pal.ink }}>{Number(data.mileage).toLocaleString()}</span></span>}
+          {data.specs && <span style={{ color: pal.ink }}>{data.specs}</span>}
         </div>
       </div>
 
@@ -278,6 +280,7 @@ function AddendumStrip({ config, data, branding, options }: TemplateRenderProps)
         <p className="text-[8px] font-bold uppercase tracking-[0.2em]" style={{ color: accent }}>Supplemental Addendum</p>
         <p className={`font-black leading-tight ${luxury ? "font-serif text-base" : "text-sm"}`} style={{ color: pal.ink }}>{data.vehicleTitle || "Vehicle"}</p>
         <p className="text-[8px]" style={{ color: pal.subInk }}>{[data.stock && `Stock ${data.stock}`, data.vin && `VIN ${data.vin}`].filter(Boolean).join(" · ")}</p>
+        {data.specs && <p className="text-[8px]" style={{ color: pal.subInk }}>{data.specs}</p>}
       </div>
 
       <div className="mt-2 space-y-2.5">
@@ -365,7 +368,7 @@ function PassportPremiumSheet({ config, data, branding, options }: TemplateRende
       <div className="mt-4">
         <p className="font-black leading-[1.05] tracking-tight text-[34px]" style={{ ...clamp2, color: pal.ink }}>{data.vehicleTitle || "Vehicle"}</p>
         <div className="mt-2 flex flex-wrap gap-1.5">
-          {[data.stock && `STOCK ${data.stock}`, data.vin && `VIN ${data.vin}`, data.mileage && `${Number(data.mileage).toLocaleString()} MI`].filter(Boolean).map((c, i) => (
+          {[data.stock && `STOCK ${data.stock}`, data.vin && `VIN ${data.vin}`, data.mileage && `${Number(data.mileage).toLocaleString()} MI`, data.specs].filter(Boolean).map((c, i) => (
             <span key={i} className="text-[10px] font-semibold tracking-wide rounded-md px-2 py-1" style={{ backgroundColor: pal.dark ? "#1b2230" : "#f1f5f9", color: pal.subInk }}>{c}</span>
           ))}
         </div>
@@ -463,6 +466,7 @@ function BigPriceSheet({ config, data, branding, options }: TemplateRenderProps)
           {data.stock && <span>STOCK <span className="font-bold" style={{ color: pal.ink }}>{data.stock}</span></span>}
           {data.vin && <span>VIN <span className="font-mono" style={{ color: pal.ink }}>{data.vin}</span></span>}
           {data.mileage && <span><span className="font-bold" style={{ color: pal.ink }}>{Number(data.mileage).toLocaleString()}</span> mi</span>}
+          {data.specs && <span style={{ color: pal.ink }}>{data.specs}</span>}
           {branding.phone && <span className="font-bold" style={{ color: accent }}>{branding.phone}</span>}
         </div>
         {branding.disclaimer && <p className="mt-1 text-[8px] leading-snug" style={{ color: pal.faintInk }}>{branding.disclaimer}</p>}
@@ -540,6 +544,7 @@ function ExecutiveNoirSheet({ config, data, branding, options }: TemplateRenderP
           {data.stock && <p>Stock <span style={{ color: sub }}>{data.stock}</span></p>}
           {data.vin && <p>VIN <span className="font-mono" style={{ color: sub }}>{data.vin}</span></p>}
           {data.mileage && <p>Mileage <span style={{ color: sub }}>{Number(data.mileage).toLocaleString()}</span></p>}
+          {data.specs && <p style={{ color: sub }}>{data.specs}</p>}
         </div>
         <QrBox url={data.qrUrl} size={92} caption="Vehicle Passport" captionColor={faint} />
       </div>

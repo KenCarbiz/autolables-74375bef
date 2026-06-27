@@ -88,6 +88,9 @@ const StickerStudioGenerator = () => {
       mileage: v.mileage || prev.mileage,
       msrp: v.msrp || prev.msrp,
       price: v.price || prev.price,
+      specs: [v.engine, v.drivetrain, v.transmission,
+        (v.mpgCity && v.mpgHwy) ? `${v.mpgCity}/${v.mpgHwy} MPG` : v.mpgCity ? `${v.mpgCity} MPG` : v.fuelType,
+      ].filter(Boolean).join(" · ") || prev.specs,
       qrUrl: v.slug ? `${origin}/v/${v.slug}` : v.vin ? `${origin}/v/${v.vin}` : prev.qrUrl,
       installed: (v.options.length || v.features.length)
         ? [...v.options, ...v.features].slice(0, 12).map((n) => ({ name: n }))
