@@ -1,5 +1,6 @@
 import { Fragment, useEffect, useMemo, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
+import { listingGallery } from "@/lib/photos";
 import {
   ChevronLeft, ChevronRight, Share2, Printer, Bookmark,
   FileText, MessageSquare, RefreshCw, ExternalLink, Upload,
@@ -237,13 +238,7 @@ const PublicListingBody = () => {
   }, [slug]);
 
   // All hooks must run before any early return (Rules of Hooks).
-  const gallery = useMemo(() => {
-    if (!listing) return [];
-    const fromPhotos = (listing.photos || []).map((p) => p.url).filter(Boolean);
-    if (fromPhotos.length > 0) return fromPhotos;
-    if (listing.hero_image_url) return [listing.hero_image_url];
-    return [];
-  }, [listing]);
+  const gallery = useMemo(() => (listing ? listingGallery(listing) : []), [listing]);
 
   const highlights = useMemo(() => {
     if (!listing) return [];

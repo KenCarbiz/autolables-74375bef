@@ -14,6 +14,7 @@ import { formatPhone } from "@/components/addendum/CustomerInfoSection";
 import Logo from "@/components/brand/Logo";
 import { derivePassport, computePriceHistory, fmt$, listingEquipment } from "@/lib/passportV2Data";
 import { resolveStickyButtons, type StickyBottomButtons } from "@/lib/stickyButtons";
+import { listingGallery } from "@/lib/photos";
 import PassportPanel, { type PassportPanelKey } from "@/components/passport/PassportPanel";
 import PassportCtaDock from "@/components/passport/PassportCtaDock";
 import PassportInfoModal, { type InfoModalKey } from "@/components/passport/PassportInfoModal";
@@ -164,11 +165,7 @@ const VehiclePassportV3 = () => {
   const { listing, loading, notFound } = usePublicListing(vehicleSlug, { preview: isPreview, previewData: MOCK_LISTING as unknown as VehicleListing });
 
   const d = useMemo(() => (listing ? derivePassport(listing) : null), [listing]);
-  const gallery = useMemo(() => {
-    if (!listing) return [] as string[];
-    const fromPhotos = (listing.photos || []).map((p) => p.url).filter(Boolean);
-    return fromPhotos.length ? fromPhotos : listing.hero_image_url ? [listing.hero_image_url] : [];
-  }, [listing]);
+  const gallery = useMemo(() => (listing ? listingGallery(listing) : ([] as string[])), [listing]);
 
   if (loading) return <div className="min-h-screen flex items-center justify-center bg-[#F6F7F9]"><div className="w-8 h-8 border-2 border-[#2563EB] border-t-transparent rounded-full animate-spin" /></div>;
   if (notFound || !listing || !d) return (

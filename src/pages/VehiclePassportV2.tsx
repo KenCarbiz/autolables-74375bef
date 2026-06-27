@@ -15,6 +15,7 @@ import Logo from "@/components/brand/Logo";
 import { formatPhone } from "@/components/addendum/CustomerInfoSection";
 import { resolveStickyButtons } from "@/lib/stickyButtons";
 import { computePriceHistory } from "@/lib/passportV2Data";
+import { photoUrls } from "@/lib/photos";
 
 // ──────────────────────────────────────────────────────────────
 // VehiclePassportV2 — /passport-v2/:vehicleSlug
@@ -191,7 +192,7 @@ const VehiclePassportV2 = () => {
 
   const gallery = useMemo(() => {
     if (!listing) return [];
-    const fromPhotos = (listing.photos || []).map((p) => p.url).filter(Boolean);
+    const fromPhotos = photoUrls(listing.photos);
     if (fromPhotos.length) return fromPhotos;
     if (listing.hero_image_url) return [listing.hero_image_url];
     return [];

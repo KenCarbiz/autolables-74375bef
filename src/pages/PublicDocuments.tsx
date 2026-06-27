@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
+import { listingHero } from "@/lib/photos";
 import {
   ArrowLeft, Upload, Bookmark, Printer,
   FileText, FileCheck, ShieldCheck, Shield, BadgeCheck, Award,
@@ -715,8 +716,8 @@ const PublicDocuments = () => {
       <div className="border-b border-slate-200 bg-white">
         <div className="max-w-6xl mx-auto px-4 py-4 flex items-center justify-between gap-4">
           <div className="flex items-center gap-3 min-w-0">
-            {(listing.hero_image_url || listing.photos?.[0]?.url) && (
-              <img src={listing.hero_image_url || listing.photos[0].url} alt={ymm}
+            {listingHero(listing) && (
+              <img src={listingHero(listing)} alt={ymm}
                 className="w-24 h-16 rounded-xl object-cover border border-slate-100 shrink-0 hidden sm:block" />
             )}
             <div className="min-w-0">

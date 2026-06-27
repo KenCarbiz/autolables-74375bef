@@ -13,6 +13,7 @@ import { usePublicListing } from "@/hooks/usePublicListing";
 import { formatPhone } from "@/components/addendum/CustomerInfoSection";
 import Logo from "@/components/brand/Logo";
 import { derivePassport, fmt$, type PassportData } from "@/lib/passportV2Data";
+import { listingGallery, listingHero } from "@/lib/photos";
 
 // ──────────────────────────────────────────────────────────────
 // VehiclePassportV2Detail — /passport-v2/:vehicleSlug/:section
@@ -456,7 +457,7 @@ const SECTIONS: Record<string, { title: string; render: SectionRender }> = {
   "overview": {
     title: "Vehicle Overview",
     render: ({ d, listing }) => {
-      const img = listing.hero_image_url || listing.photos?.[0]?.url || "";
+      const img = listingHero(listing);
       return (
         <>
           <SectionHeading icon={Car} title="Vehicle Overview" subtitle={`${listing.ymm}${listing.trim ? ` ${listing.trim}` : ""}`} />
@@ -588,8 +589,7 @@ const SECTIONS: Record<string, { title: string; render: SectionRender }> = {
   "gallery": {
     title: "Photo Gallery",
     render: ({ listing }) => {
-      const photos = (listing.photos || []).map((p) => p.url).filter(Boolean);
-      const all = photos.length ? photos : listing.hero_image_url ? [listing.hero_image_url] : [];
+      const all = listingGallery(listing);
       return (
         <>
           <SectionHeading icon={Car} title="Photo Gallery" subtitle={all.length ? `${all.length} photo${all.length === 1 ? "" : "s"} of this vehicle.` : "Photos of this vehicle."} />
@@ -734,7 +734,7 @@ const VehiclePassportV2Detail = () => {
     </div>
   );
 
-  const heroSrc = listing.hero_image_url || listing.photos?.[0]?.url || "";
+  const heroSrc = listingHero(listing);
 
   return (
     <div className="min-h-screen bg-[#f4f5f7] text-[#1a1d21]" style={{ fontFamily: "Inter, -apple-system, BlinkMacSystemFont, sans-serif" }}>

@@ -12,6 +12,7 @@ import { type VehicleListing } from "@/hooks/useVehicleListing";
 import { formatPhone } from "@/components/addendum/CustomerInfoSection";
 import Logo from "@/components/brand/Logo";
 import { derivePassport } from "@/lib/passportV2Data";
+import { listingHero } from "@/lib/photos";
 import { MOCK_LISTING } from "./VehiclePassportV3";
 import { usePublicListing } from "@/hooks/usePublicListing";
 import PassportCtaDock from "@/components/passport/PassportCtaDock";
@@ -107,7 +108,7 @@ const VehiclePassportDocuments = () => {
 
   const slug = listing.slug || vehicleSlug;
   const pp = (s: string) => `/v/${slug}${s ? `/${s}` : ""}${isPreview ? "?preview=1" : ""}`;
-  const hero = listing.hero_image_url || listing.photos?.[0]?.url || "";
+  const hero = listingHero(listing);
   const total = allDocs.length;
   const adv = d.dealerTrust;
   const share = async (url: string) => { try { if (navigator.share) { await navigator.share({ url }); return; } } catch { return; } await navigator.clipboard.writeText(url); toast.success("Link copied"); };

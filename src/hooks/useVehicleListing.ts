@@ -140,7 +140,9 @@ export interface VehicleListing {
   available_accessories?: { name?: string; price?: string; note?: string }[] | null;
 
   // Premium shopper-page fields (migration 20260418070000_vdp_scrape...)
-  photos: ListingPhoto[];
+  // Stored as bare URL strings (feed path) OR {url} objects (DMS/VDP ingest);
+  // always read via src/lib/photos.ts helpers, never `.map(p => p.url)`.
+  photos: (string | ListingPhoto)[];
   description: string | null;
   features: ListingFeature[];
   key_specs: ListingKeySpecs;

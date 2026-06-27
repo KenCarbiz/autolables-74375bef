@@ -11,6 +11,7 @@ import { Helmet } from "react-helmet-async";
 import { type VehicleListing } from "@/hooks/useVehicleListing";
 import Logo from "@/components/brand/Logo";
 import { derivePassport, fmt$, type PassportData } from "@/lib/passportV2Data";
+import { listingHero } from "@/lib/photos";
 import { MOCK_LISTING } from "./VehiclePassportV3";
 import { usePublicListing } from "@/hooks/usePublicListing";
 import PassportCtaDock from "@/components/passport/PassportCtaDock";
@@ -152,7 +153,7 @@ const VehiclePassportVerification = () => {
     { on: d.serviceCount > 0, label: "Service records" },
   ];
   const liveSources = sourcesUsed.filter((s) => s.on);
-  const hero = listing.hero_image_url || listing.photos?.[0]?.url || "";
+  const hero = listingHero(listing);
   const reportTime = (() => { const t = (listing as unknown as { market_checked_at?: string }).market_checked_at || listing.updated_at; return t ? new Date(t) : new Date(); })();
   const share = async () => { try { if (navigator.share) { await navigator.share({ title: "AutoLabels Verified Report", url: window.location.href }); return; } } catch { return; } await navigator.clipboard.writeText(window.location.href); toast.success("Report link copied"); };
   const toGlance = [
