@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import {
   ChevronLeft, ChevronDown, Search, LayoutGrid, List, Eye, Download, Printer,
@@ -8,12 +8,12 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { Helmet } from "react-helmet-async";
-import { supabase } from "@/integrations/supabase/client";
 import { type VehicleListing } from "@/hooks/useVehicleListing";
 import { formatPhone } from "@/components/addendum/CustomerInfoSection";
 import Logo from "@/components/brand/Logo";
 import { derivePassport } from "@/lib/passportV2Data";
 import { MOCK_LISTING } from "./VehiclePassportV3";
+import { usePublicListing } from "@/hooks/usePublicListing";
 import PassportCtaDock from "@/components/passport/PassportCtaDock";
 
 // ──────────────────────────────────────────────────────────────
@@ -68,9 +68,6 @@ const VehiclePassportDocuments = () => {
   const params = useParams<{ vehicleSlug?: string; slug?: string }>();
   const vehicleSlug = params.vehicleSlug ?? params.slug;
   const navigate = useNavigate();
-  const [listing, setListing] = useState<VehicleListing | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [notFound, setNotFound] = useState(false);
   const [cat, setCat] = useState("all");
   const [q, setQ] = useState("");
   const [sort, setSort] = useState("newest");
@@ -79,21 +76,7 @@ const VehiclePassportDocuments = () => {
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
 
   const isPreview = typeof window !== "undefined" && new URLSearchParams(window.location.search).has("preview");
-
-  useEffect(() => {
-    if (!vehicleSlug) return;
-    if (isPreview) { setListing(MOCK_LISTING as unknown as VehicleListing); setLoading(false); return; }
-    let mounted = true;
-    (async () => {
-      setLoading(true);
-      const { data, error } = await supabase.functions.invoke("public-listing-view", { body: { slug: vehicleSlug } });
-      if (!mounted) return;
-      const row = (data as { listing?: VehicleListing } | null)?.listing ?? null;
-      if (error || !row) { setNotFound(true); setLoading(false); return; }
-      setListing(row); setLoading(false);
-    })();
-    return () => { mounted = false; };
-  }, [vehicleSlug, isPreview]);
+  const { listing, loading, notFound } = usePublicListing(vehicleSlug, { preview: isPreview, previewData: MOCK_LISTING as unknown as VehicleListing });
 
   const d = useMemo(() => (listing ? derivePassport(listing) : null), [listing]);
   const allDocs = useMemo(() => ((listing?.documents as Doc[] | undefined) || []).filter((x) => x.name && x.url), [listing]);

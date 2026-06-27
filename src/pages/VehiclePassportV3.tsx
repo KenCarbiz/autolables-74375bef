@@ -8,8 +8,8 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { Helmet } from "react-helmet-async";
-import { supabase } from "@/integrations/supabase/client";
 import { useVehicleListing, type VehicleListing } from "@/hooks/useVehicleListing";
+import { usePublicListing } from "@/hooks/usePublicListing";
 import { formatPhone } from "@/components/addendum/CustomerInfoSection";
 import Logo from "@/components/brand/Logo";
 import { derivePassport, computePriceHistory, fmt$ } from "@/lib/passportV2Data";
@@ -142,9 +142,6 @@ const VehiclePassportV3 = () => {
   const vehicleSlug = params.vehicleSlug ?? params.slug;
   const navigate = useNavigate();
   const { publicUrl } = useVehicleListing("");
-  const [listing, setListing] = useState<VehicleListing | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [notFound, setNotFound] = useState(false);
   const [idx, setIdx] = useState(0);
   const [zip, setZip] = useState("");
   const [showSticky, setShowSticky] = useState(false);
@@ -164,21 +161,7 @@ const VehiclePassportV3 = () => {
   }, []);
 
   const isPreview = typeof window !== "undefined" && new URLSearchParams(window.location.search).has("preview");
-
-  useEffect(() => {
-    if (!vehicleSlug) return;
-    if (isPreview) { setListing(MOCK_LISTING as unknown as VehicleListing); setLoading(false); return; }
-    let mounted = true;
-    (async () => {
-      setLoading(true);
-      const { data, error } = await supabase.functions.invoke("public-listing-view", { body: { slug: vehicleSlug } });
-      if (!mounted) return;
-      const row = (data as { listing?: VehicleListing } | null)?.listing ?? null;
-      if (error || !row) { setNotFound(true); setLoading(false); return; }
-      setListing(row); setLoading(false);
-    })();
-    return () => { mounted = false; };
-  }, [vehicleSlug]);
+  const { listing, loading, notFound } = usePublicListing(vehicleSlug, { preview: isPreview, previewData: MOCK_LISTING as unknown as VehicleListing });
 
   const d = useMemo(() => (listing ? derivePassport(listing) : null), [listing]);
   const gallery = useMemo(() => {

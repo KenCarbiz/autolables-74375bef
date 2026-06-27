@@ -8,11 +8,11 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { Helmet } from "react-helmet-async";
-import { supabase } from "@/integrations/supabase/client";
 import { type VehicleListing } from "@/hooks/useVehicleListing";
 import Logo from "@/components/brand/Logo";
 import { derivePassport, fmt$, type PassportData } from "@/lib/passportV2Data";
 import { MOCK_LISTING } from "./VehiclePassportV3";
+import { usePublicListing } from "@/hooks/usePublicListing";
 import PassportCtaDock from "@/components/passport/PassportCtaDock";
 
 // ──────────────────────────────────────────────────────────────
@@ -116,9 +116,6 @@ const VehiclePassportVerification = () => {
   const params = useParams<{ vehicleSlug?: string; slug?: string }>();
   const vehicleSlug = params.vehicleSlug ?? params.slug;
   const navigate = useNavigate();
-  const [listing, setListing] = useState<VehicleListing | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [notFound, setNotFound] = useState(false);
   const [active, setActive] = useState("overview");
   const [open, setOpen] = useState<Record<string, boolean>>({});
   const [modal, setModal] = useState<null | "process" | "sources" | "promise">(null);
@@ -128,21 +125,7 @@ const VehiclePassportVerification = () => {
   useEffect(() => { const r = requestAnimationFrame(() => setRingFill(true)); return () => cancelAnimationFrame(r); }, []);
 
   const isPreview = typeof window !== "undefined" && new URLSearchParams(window.location.search).has("preview");
-
-  useEffect(() => {
-    if (!vehicleSlug) return;
-    if (isPreview) { setListing(MOCK_LISTING as unknown as VehicleListing); setLoading(false); return; }
-    let mounted = true;
-    (async () => {
-      setLoading(true);
-      const { data, error } = await supabase.functions.invoke("public-listing-view", { body: { slug: vehicleSlug } });
-      if (!mounted) return;
-      const row = (data as { listing?: VehicleListing } | null)?.listing ?? null;
-      if (error || !row) { setNotFound(true); setLoading(false); return; }
-      setListing(row); setLoading(false);
-    })();
-    return () => { mounted = false; };
-  }, [vehicleSlug]);
+  const { listing, loading, notFound } = usePublicListing(vehicleSlug, { preview: isPreview, previewData: MOCK_LISTING as unknown as VehicleListing });
 
   const d = useMemo(() => (listing ? derivePassport(listing) : null), [listing]);
   const rows = useMemo(() => (d && listing ? buildRows(d, listing) : []), [d, listing]);

@@ -9,6 +9,7 @@ import { toast } from "sonner";
 import { Helmet } from "react-helmet-async";
 import { supabase } from "@/integrations/supabase/client";
 import { type VehicleListing } from "@/hooks/useVehicleListing";
+import { usePublicListing } from "@/hooks/usePublicListing";
 import { formatPhone } from "@/components/addendum/CustomerInfoSection";
 import Logo from "@/components/brand/Logo";
 import { derivePassport, fmt$, type PassportData } from "@/lib/passportV2Data";
@@ -712,23 +713,7 @@ const VehiclePassportV2Detail = () => {
   const base = location.pathname.startsWith("/v/") ? "v"
     : location.pathname.startsWith("/passport-v3") ? "passport-v3" : "passport-v2";
   const navigate = useNavigate();
-  const [listing, setListing] = useState<VehicleListing | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [notFound, setNotFound] = useState(false);
-
-  useEffect(() => {
-    if (!vehicleSlug) return;
-    let mounted = true;
-    (async () => {
-      setLoading(true);
-      const { data, error } = await supabase.functions.invoke("public-listing-view", { body: { slug: vehicleSlug } });
-      if (!mounted) return;
-      const row = (data as { listing?: VehicleListing } | null)?.listing ?? null;
-      if (error || !row) { setNotFound(true); setLoading(false); return; }
-      setListing(row); setLoading(false);
-    })();
-    return () => { mounted = false; };
-  }, [vehicleSlug]);
+  const { listing, loading, notFound } = usePublicListing(vehicleSlug);
 
   const d = useMemo(() => (listing ? derivePassport(listing) : null), [listing]);
   const def = section ? SECTIONS[section] : undefined;
