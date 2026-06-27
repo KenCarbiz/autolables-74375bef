@@ -792,6 +792,19 @@ serve(async (req) => {
     } catch { /* best-effort — a failed enrich leaves the listing's prior data intact */ }
   }
 
+  // Once-daily Get-Ready nudge digest. This runs hourly, so fire only in a single
+  // UTC hour; the nudge function self-throttles per tenant. Reuses our valid
+  // service-role context instead of a separate cron with its own auth.
+  try {
+    if (new Date().getUTCHours() === 14) {
+      fetch(`${supabaseUrl}/functions/v1/get-ready-nudges`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${serviceKey}`, "x-cron-secret": cronSecret },
+        body: "{}", signal: AbortSignal.timeout(20000),
+      }).catch(() => { /* best-effort */ });
+    }
+  } catch { /* best-effort */ }
+
   return json(200, {
     ok: true, tenants_due: due.length, tenants_synced: tenantsSynced,
     listings_seen: seen, new_vehicles: newVehicles,
