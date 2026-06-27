@@ -22,6 +22,7 @@ export default function ReadyBoard() {
   const [service, setService] = useState<Set<string>>(new Set());
   const [detail, setDetail] = useState<Set<string>>(new Set());
   const [prep, setPrep] = useState<Set<string>>(new Set());
+  const [recallReview, setRecallReview] = useState<Set<string>>(new Set());
   const [requireK208, setRequireK208] = useState(false);
   const [loading, setLoading] = useState(true);
   const [qrVin, setQrVin] = useState<string | null>(null);
@@ -30,17 +31,19 @@ export default function ReadyBoard() {
   const load = useCallback(async () => {
     if (!tenantId) return;
     setLoading(true);
-    const [list, si, ds, ps, prof] = await Promise.all([
+    const [list, si, ds, ps, rr, prof] = await Promise.all([
       (supabase as any).from("vehicle_listings").select("id, vin, ymm, condition, status, recall_check").eq("tenant_id", tenantId).limit(500),
       (supabase as any).from("safety_inspections").select("vin").eq("tenant_id", tenantId).eq("status", "signed"),
       (supabase as any).from("detail_signoffs").select("vin").eq("tenant_id", tenantId).eq("status", "signed"),
       (supabase as any).from("prep_sign_offs").select("vin").eq("tenant_id", tenantId).eq("listing_unlocked", true),
+      (supabase as any).from("recall_service_tasks").select("vin").eq("tenant_id", tenantId).eq("status", "open_review"),
       (supabase as any).from("dealer_profiles").select("settings").eq("tenant_id", tenantId).maybeSingle(),
     ]);
     setRows((list.data as Row[]) || []);
     setService(new Set(((si.data as { vin: string }[]) || []).map((r) => r.vin)));
     setDetail(new Set(((ds.data as { vin: string }[]) || []).map((r) => r.vin)));
     setPrep(new Set(((ps.data as { vin: string }[]) || []).map((r) => r.vin)));
+    setRecallReview(new Set(((rr.data as { vin: string }[]) || []).map((r) => r.vin)));
     setRequireK208(!!(prof.data?.settings as { require_safety_inspection?: boolean } | null)?.require_safety_inspection);
     setLoading(false);
   }, [tenantId]);
@@ -55,8 +58,9 @@ export default function ReadyBoard() {
   const isReady = useCallback((r: Row) => {
     if (!prep.has(r.vin)) return false;
     if (requireK208 && isUsed(r.condition) && !service.has(r.vin)) return false;
+    if (recallReview.has(r.vin)) return false;   // open recall awaiting service outcome
     return recallState(r) === "ok";
-  }, [prep, service, requireK208]);
+  }, [prep, service, requireK208, recallReview]);
 
   const stats = useMemo(() => {
     if (!rows) return null;
@@ -65,9 +69,9 @@ export default function ReadyBoard() {
       ready: rows.filter(isReady).length,
       needService: rows.filter((r) => isUsed(r.condition) && !service.has(r.vin)).length,
       needPrep: rows.filter((r) => !prep.has(r.vin)).length,
-      recallBlocked: rows.filter((r) => recallState(r) !== "ok").length,
+      recallBlocked: rows.filter((r) => recallState(r) !== "ok" || recallReview.has(r.vin)).length,
     };
-  }, [rows, service, prep, isReady]);
+  }, [rows, service, prep, isReady, recallReview]);
 
   const showQr = async (vin: string) => {
     if (!tenantId) return;
@@ -133,7 +137,8 @@ export default function ReadyBoard() {
                     <td className="py-2 px-2 text-center"><Cell on={detail.has(r.vin)} /></td>
                     <td className="py-2 px-2 text-center"><Cell on={prep.has(r.vin)} /></td>
                     <td className="py-2 px-2 text-center">
-                      {rc === "ok" ? <CheckCircle2 className="w-4 h-4 text-[#16A34A] inline" />
+                      {recallReview.has(r.vin) ? <span title="Open recall — service review required" className="inline-flex items-center gap-1 text-red-600 font-semibold text-[11px]"><AlertTriangle className="w-3.5 h-3.5" /> Review</span>
+                        : rc === "ok" ? <CheckCircle2 className="w-4 h-4 text-[#16A34A] inline" />
                         : rc === "dnd" ? <span title="Do-not-drive recall"><AlertTriangle className="w-4 h-4 text-red-600 inline" /></span>
                         : <span title="Recall check stale/missing"><AlertTriangle className="w-4 h-4 text-amber-500 inline" /></span>}
                     </td>

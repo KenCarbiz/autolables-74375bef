@@ -7,7 +7,7 @@ import { getStateCompliance, FEDERAL_DISCLOSURES, FTC_BUYERS_GUIDE_SYSTEMS } fro
 import { supabase } from "@/integrations/supabase/client";
 import Logo from "@/components/brand/Logo";
 import { toast } from "sonner";
-import { ShieldCheck, FileText, Scale, Building2, AlertTriangle, CheckCircle2, BookOpen, Gavel, Users, Globe, Search, Download, FileSignature, Wrench, Car, ScrollText, FileArchive } from "lucide-react";
+import { ShieldCheck, ShieldAlert, FileText, Scale, Building2, AlertTriangle, CheckCircle2, BookOpen, Gavel, Users, Globe, Search, Download, FileSignature, Wrench, Car, ScrollText, FileArchive } from "lucide-react";
 import { buildAuditPacket } from "@/lib/auditPacket";
 import { downloadPacketHtml } from "@/lib/auditPacketRenderer";
 import PriceIntegrityPanel from "@/components/admin/PriceIntegrityPanel";
@@ -29,6 +29,7 @@ interface CompliancePacket {
   addendums: unknown[];
   prep_sign_offs: unknown[];
   deal_signing_tokens: unknown[];
+  recall_service_tasks: unknown[];
   audit_events: unknown[];
   signed_document_archive: unknown[];
   summary: {
@@ -39,6 +40,8 @@ interface CompliancePacket {
     signed_prep_count: number;
     deal_token_count: number;
     signed_deal_count: number;
+    recall_task_count: number;
+    open_recall_review_count: number;
     audit_event_count: number;
     archived_document_count: number;
   };
@@ -57,7 +60,7 @@ const useCompliancePacket = () => {
     setPacket(null);
     const clean = vin.toUpperCase().trim();
     try {
-      const [listings, addendums, prep, deals, audits, archive] = await Promise.all([
+      const [listings, addendums, prep, deals, recallTasks, audits, archive] = await Promise.all([
         (supabase as any)
           .from("vehicle_listings")
           .select("*")
@@ -83,6 +86,12 @@ const useCompliancePacket = () => {
           .order("created_at", { ascending: false })
           .limit(20),
         (supabase as any)
+          .from("recall_service_tasks")
+          .select("*")
+          .eq("vin", clean)
+          .order("created_at", { ascending: false })
+          .limit(20),
+        (supabase as any)
           .from("audit_log")
           .select("*")
           .or(`details->>vin.eq.${clean}`)
@@ -99,6 +108,7 @@ const useCompliancePacket = () => {
       const lA = rows(addendums) as Array<{ status?: string }>;
       const lP = rows(prep) as Array<{ status?: string }>;
       const lD = rows(deals) as Array<{ status?: string }>;
+      const lR = rows(recallTasks) as Array<{ status?: string }>;
       const next: CompliancePacket = {
         query: { vin: clean, at: new Date().toISOString() },
         tenant: { id: tenantId, name: tenantName },
@@ -106,6 +116,7 @@ const useCompliancePacket = () => {
         addendums: lA,
         prep_sign_offs: lP,
         deal_signing_tokens: lD,
+        recall_service_tasks: lR,
         audit_events: rows(audits),
         signed_document_archive: rows(archive),
         summary: {
@@ -116,6 +127,8 @@ const useCompliancePacket = () => {
           signed_prep_count: lP.filter((x) => x.status === "signed").length,
           deal_token_count: lD.length,
           signed_deal_count: lD.filter((x) => x.status === "signed").length,
+          recall_task_count: lR.length,
+          open_recall_review_count: lR.filter((x) => x.status === "open_review").length,
           audit_event_count: rows(audits).length,
           archived_document_count: rows(archive).length,
         },
@@ -218,6 +231,7 @@ const CompliancePacketPanel = ({
       { key: "signed_prep_count",       label: "Signed prep sign-offs", icon: Wrench,       hint: "foreman signed" },
       { key: "signed_deal_count",       label: "Signed deals",         icon: FileText,      hint: "deal jackets completed" },
       { key: "archived_document_count", label: "Archived documents",   icon: ScrollText,    hint: "PDF/JSON in cold storage" },
+      { key: "open_recall_review_count", label: "Open recall reviews",  icon: ShieldAlert,   hint: "awaiting service outcome" },
       { key: "audit_event_count",       label: "Audit events",         icon: ShieldCheck,   hint: "immutable event log" },
     ] as const,
     []
