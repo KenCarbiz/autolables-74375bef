@@ -65,7 +65,8 @@ const DocThumb = ({ url }: { url: string }) => {
 };
 
 const VehiclePassportDocuments = () => {
-  const { vehicleSlug } = useParams<{ vehicleSlug: string }>();
+  const params = useParams<{ vehicleSlug?: string; slug?: string }>();
+  const vehicleSlug = params.vehicleSlug ?? params.slug;
   const navigate = useNavigate();
   const [listing, setListing] = useState<VehicleListing | null>(null);
   const [loading, setLoading] = useState(true);
@@ -122,7 +123,7 @@ const VehiclePassportDocuments = () => {
   );
 
   const slug = listing.slug || vehicleSlug;
-  const pp = (s: string) => `/passport-v3/${slug}${s ? `/${s}` : ""}${isPreview ? "?preview=1" : ""}`;
+  const pp = (s: string) => `/v/${slug}${s ? `/${s}` : ""}${isPreview ? "?preview=1" : ""}`;
   const hero = listing.hero_image_url || listing.photos?.[0]?.url || "";
   const total = allDocs.length;
   const adv = d.dealerTrust;

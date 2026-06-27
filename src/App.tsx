@@ -85,6 +85,11 @@ const PassportRootRedirect = () => {
   const { search } = useLocation();
   return <Navigate to={`/v/${vehicleSlug || ""}${search}`} replace />;
 };
+const PassportSectionRedirect = () => {
+  const { vehicleSlug, section } = useParams<{ vehicleSlug: string; section: string }>();
+  const { search } = useLocation();
+  return <Navigate to={`/v/${vehicleSlug || ""}/${section || ""}${search}`} replace />;
+};
 const UsedCarSticker = lazy(() => import("./pages/UsedCarSticker"));
 const UsedVehicleDocuments = lazy(() => import("./pages/UsedVehicleDocuments"));
 const UsedVehicleDocumentsPrint = lazy(() => import("./pages/UsedVehicleDocumentsPrint"));
@@ -107,7 +112,6 @@ const DescriptionStudio = lazy(() => import("./pages/DescriptionStudio"));
 const SaveCarInventory = lazy(() => import("./pages/SaveCarInventory"));
 const DealSigning = lazy(() => import("./pages/DealSigning"));
 const PublicListing = lazy(() => import("./pages/PublicListing"));
-const VehiclePassportV2 = lazy(() => import("./pages/VehiclePassportV2"));
 const VehiclePassportV2Detail = lazy(() => import("./pages/VehiclePassportV2Detail"));
 const VehiclePassportV3 = lazy(() => import("./pages/VehiclePassportV3"));
 const VehiclePassportVerification = lazy(() => import("./pages/VehiclePassportVerification"));
@@ -185,18 +189,22 @@ const App = () => (
                       <Route path="/onboarding" element={<Onboarding />} />
                       <Route path="/scan" element={<ScanPage />} />
                       <Route path="/vehicle/:vin" element={<VehicleVinRedirect />} />
+                      {/* Canonical V3 Passport experience, all under /v/:slug */}
                       <Route path="/v/:slug" element={<VehiclePassportV3 />} />
+                      <Route path="/v/:slug/verification" element={<VehiclePassportVerification />} />
+                      <Route path="/v/:slug/documents" element={<VehiclePassportDocuments />} />
+                      <Route path="/v/:slug/great-buy" element={<VehiclePassportGreatBuy />} />
+                      <Route path="/v/:slug/vehicle-history" element={<VehiclePassportHistory />} />
+                      <Route path="/v/:slug/dealer" element={<VehiclePassportDealer />} />
+                      <Route path="/v/:slug/:section" element={<VehiclePassportV2Detail />} />
+                      {/* Classic page kept for rollback/comparison */}
                       <Route path="/v-classic/:slug" element={<PublicListing />} />
+                      <Route path="/v-classic/:slug/documents" element={<PublicDocuments />} />
+                      {/* Legacy passport URLs fold into the canonical /v/ tree */}
                       <Route path="/passport-v2/:vehicleSlug" element={<PassportRootRedirect />} />
-                      <Route path="/passport-v2/:vehicleSlug/:section" element={<VehiclePassportV2Detail />} />
+                      <Route path="/passport-v2/:vehicleSlug/:section" element={<PassportSectionRedirect />} />
                       <Route path="/passport-v3/:vehicleSlug" element={<PassportRootRedirect />} />
-                      <Route path="/passport-v3/:vehicleSlug/verification" element={<VehiclePassportVerification />} />
-                      <Route path="/passport-v3/:vehicleSlug/documents" element={<VehiclePassportDocuments />} />
-                      <Route path="/passport-v3/:vehicleSlug/great-buy" element={<VehiclePassportGreatBuy />} />
-                      <Route path="/passport-v3/:vehicleSlug/vehicle-history" element={<VehiclePassportHistory />} />
-                      <Route path="/passport-v3/:vehicleSlug/dealer" element={<VehiclePassportDealer />} />
-                      <Route path="/passport-v3/:vehicleSlug/:section" element={<VehiclePassportV2Detail />} />
-                      <Route path="/v/:slug/documents" element={<PublicDocuments />} />
+                      <Route path="/passport-v3/:vehicleSlug/:section" element={<PassportSectionRedirect />} />
                       <Route path="/deal/:token" element={<DealSigning />} />
                       <Route path="/about" element={<About />} />
                       <Route path="/trust" element={<Trust />} />

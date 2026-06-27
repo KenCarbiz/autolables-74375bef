@@ -61,7 +61,8 @@ const MAcc = ({ open, onToggle, icon: Icon, title, desc, status, children }: { o
 };
 
 const VehiclePassportHistory = () => {
-  const { vehicleSlug } = useParams<{ vehicleSlug: string }>();
+  const params = useParams<{ vehicleSlug?: string; slug?: string }>();
+  const vehicleSlug = params.vehicleSlug ?? params.slug;
   const navigate = useNavigate();
   const [listing, setListing] = useState<VehicleListing | null>(null);
   const [loading, setLoading] = useState(true);
@@ -96,8 +97,8 @@ const VehiclePassportHistory = () => {
   );
 
   const slug = listing.slug || vehicleSlug;
-  const go = (section: string) => navigate(`/passport-v3/${slug}/${section}${isPreview ? "?preview=1" : ""}`);
-  const back = () => navigate(`/passport-v3/${slug}${isPreview ? "?preview=1" : ""}`);
+  const go = (section: string) => navigate(`/v/${slug}/${section}${isPreview ? "?preview=1" : ""}`);
+  const back = () => navigate(`/v/${slug}${isPreview ? "?preview=1" : ""}`);
 
   const score = d.confScore;
   const histLabel = score == null ? "Pending" : score >= 90 ? "Excellent History" : score >= 80 ? "Very Good History" : score >= 70 ? "Good History" : "Fair History";

@@ -34,7 +34,8 @@ const Stars = ({ n, size = 16 }: { n: number; size?: number }) => (
 const ComingSoon = ({ children }: { children: React.ReactNode }) => <div className={`${CARD} p-4 text-[13px] ${TEXT2}`}>{children}</div>;
 
 const VehiclePassportDealer = () => {
-  const { vehicleSlug } = useParams<{ vehicleSlug: string }>();
+  const params = useParams<{ vehicleSlug?: string; slug?: string }>();
+  const vehicleSlug = params.vehicleSlug ?? params.slug;
   const navigate = useNavigate();
   const [listing, setListing] = useState<VehicleListing | null>(null);
   const [loading, setLoading] = useState(true);
@@ -66,8 +67,8 @@ const VehiclePassportDealer = () => {
   );
 
   const slug = listing.slug || vehicleSlug;
-  const go = (section: string) => navigate(`/passport-v3/${slug}/${section}${isPreview ? "?preview=1" : ""}`);
-  const back = () => navigate(`/passport-v3/${slug}${isPreview ? "?preview=1" : ""}`);
+  const go = (section: string) => navigate(`/v/${slug}/${section}${isPreview ? "?preview=1" : ""}`);
+  const back = () => navigate(`/v/${slug}${isPreview ? "?preview=1" : ""}`);
 
   const t = d.dealerTrust;
   const dealer = d.dealer;

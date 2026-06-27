@@ -62,7 +62,8 @@ const ratingLabel = (s: number | null) => s == null ? "Pending" : s >= 90 ? "Exc
 const ratingColor = (s: number | null) => s == null ? "#94A3B8" : s >= 90 ? "#16A34A" : s >= 80 ? "#22C55E" : s >= 70 ? "#F59E0B" : "#EF4444";
 
 const VehiclePassportGreatBuy = () => {
-  const { vehicleSlug } = useParams<{ vehicleSlug: string }>();
+  const params = useParams<{ vehicleSlug?: string; slug?: string }>();
+  const vehicleSlug = params.vehicleSlug ?? params.slug;
   const navigate = useNavigate();
   const [listing, setListing] = useState<VehicleListing | null>(null);
   const [loading, setLoading] = useState(true);
@@ -93,8 +94,8 @@ const VehiclePassportGreatBuy = () => {
   );
 
   const slug = listing.slug || vehicleSlug;
-  const go = (section: string) => navigate(`/passport-v3/${slug}/${section}${isPreview ? "?preview=1" : ""}`);
-  const back = () => navigate(`/passport-v3/${slug}${isPreview ? "?preview=1" : ""}`);
+  const go = (section: string) => navigate(`/v/${slug}/${section}${isPreview ? "?preview=1" : ""}`);
+  const back = () => navigate(`/v/${slug}${isPreview ? "?preview=1" : ""}`);
 
   const mc = (listing.mc_attributes || {}) as Record<string, unknown>;
   const score = d.confScore;

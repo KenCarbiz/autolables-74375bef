@@ -705,9 +705,12 @@ const ShareSection = ({ listing, dealerName }: { listing: VehicleListing; dealer
 };
 
 const VehiclePassportV2Detail = () => {
-  const { vehicleSlug, section } = useParams<{ vehicleSlug: string; section: string }>();
+  const params = useParams<{ vehicleSlug?: string; slug?: string; section: string }>();
+  const vehicleSlug = params.vehicleSlug ?? params.slug;
+  const section = params.section;
   const location = useLocation();
-  const base = location.pathname.startsWith("/passport-v3") ? "passport-v3" : "passport-v2";
+  const base = location.pathname.startsWith("/v/") ? "v"
+    : location.pathname.startsWith("/passport-v3") ? "passport-v3" : "passport-v2";
   const navigate = useNavigate();
   const [listing, setListing] = useState<VehicleListing | null>(null);
   const [loading, setLoading] = useState(true);

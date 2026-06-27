@@ -423,7 +423,7 @@ const PublicListingBody = () => {
   ].filter(Boolean) as { icon: typeof Shield; title: string; sub: string }[];
 
   const quickActions = [
-    { icon: FileText,     label: "Documents",     onClick: () => navigate(`/v/${listing.slug}/documents`) },
+    { icon: FileText,     label: "Documents",     onClick: () => navigate(`/v-classic/${listing.slug}/documents`) },
     { icon: MessageSquare,label: "Contact Dealer",onClick: () => setInquiryOpen(true) },
     { icon: RefreshCw,    label: "Value My Trade",onClick: () => setInquiryOpen(true) },
     { icon: Upload,       label: "Share Vehicle", onClick: handleShare },

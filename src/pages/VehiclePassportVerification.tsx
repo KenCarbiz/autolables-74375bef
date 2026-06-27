@@ -113,7 +113,8 @@ const buildRows = (d: PassportData, listing: VehicleListing): Row[] => {
 };
 
 const VehiclePassportVerification = () => {
-  const { vehicleSlug } = useParams<{ vehicleSlug: string }>();
+  const params = useParams<{ vehicleSlug?: string; slug?: string }>();
+  const vehicleSlug = params.vehicleSlug ?? params.slug;
   const navigate = useNavigate();
   const [listing, setListing] = useState<VehicleListing | null>(null);
   const [loading, setLoading] = useState(true);
@@ -157,8 +158,8 @@ const VehiclePassportVerification = () => {
   );
 
   const score = d.confScore ?? 90;
-  const back = () => navigate(`/passport-v3/${listing.slug || vehicleSlug}${isPreview ? "?preview=1" : ""}`);
-  const go = (section: string) => navigate(`/passport-v3/${listing.slug || vehicleSlug}/${section}${isPreview ? "?preview=1" : ""}`);
+  const back = () => navigate(`/v/${listing.slug || vehicleSlug}${isPreview ? "?preview=1" : ""}`);
+  const go = (section: string) => navigate(`/v/${listing.slug || vehicleSlug}/${section}${isPreview ? "?preview=1" : ""}`);
   const sourcesUsed = [
     { on: !!listing.ymm, label: "OEM / VIN decode" },
     { on: d.accidentCount != null || d.ownerCount != null || d.cleanTitle, label: "Vehicle history" },
@@ -308,7 +309,7 @@ const VehiclePassportVerification = () => {
           <div className="mt-5 rounded-xl border border-[#E6E8EC] bg-[#fafbfc] p-4">
             <p className="text-[13px] font-bold">Questions about this report?</p>
             <p className="text-[12px] text-[#64748B] mt-1">Our specialists are here to help you understand any part of this report.</p>
-            <button onClick={() => navigate(`/passport-v3/${listing.slug || vehicleSlug}/contact`)} className="mt-3 w-full h-9 rounded-lg border border-[#E6E8EC] bg-white text-[12px] font-bold inline-flex items-center justify-center gap-1.5 hover:border-[#2563EB]"><MessageSquare className="w-3.5 h-3.5 text-[#2563EB]" /> Contact a Specialist</button>
+            <button onClick={() => navigate(`/v/${listing.slug || vehicleSlug}/contact`)} className="mt-3 w-full h-9 rounded-lg border border-[#E6E8EC] bg-white text-[12px] font-bold inline-flex items-center justify-center gap-1.5 hover:border-[#2563EB]"><MessageSquare className="w-3.5 h-3.5 text-[#2563EB]" /> Contact a Specialist</button>
           </div>
         </aside>
 
