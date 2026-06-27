@@ -31,6 +31,7 @@ import { InventoryFeedHealth } from "@/components/admin/InventoryFeedHealth";
 import { OpenSigningsList } from "@/components/admin/OpenSigningsList";
 import { AddonElectionsPanel } from "@/components/admin/AddonElectionsPanel";
 import { PriceIntegrityPanel } from "@/components/admin/PriceIntegrityPanel";
+import { PriceAuditPanel } from "@/components/admin/PriceAuditPanel";
 import { IncentivesSettingsPanel } from "@/components/admin/IncentivesSettingsPanel";
 import MarketcheckSyncCard from "@/components/admin/MarketcheckSyncCard";
 import MarketcheckDataHealthCard from "@/components/admin/MarketcheckDataHealthCard";
@@ -1299,6 +1300,20 @@ const Admin = () => {
                   </div>
                 </div>
               )}
+              <div className="mt-3">
+                <label className="text-xs font-semibold text-muted-foreground">Customer price display</label>
+                <select
+                  value={settings.price_display_mode || "advertised_before_doc"}
+                  onChange={(e) => updateSettings({ price_display_mode: e.target.value as DealerSettings["price_display_mode"] })}
+                  className="w-full px-3 py-2 border border-border-custom rounded text-sm"
+                >
+                  <option value="advertised_before_doc">Advertised price (before doc fee) — disclose fee separately</option>
+                  <option value="website_sale_price">Website sale price (doc fee included)</option>
+                </select>
+                <p className="text-[11px] text-muted-foreground mt-1">
+                  Controls the price shown on the customer Passport. The advertised price is always compared to market before the doc fee.
+                </p>
+              </div>
             </div>
 
             {/* Integrations status */}
@@ -2550,6 +2565,7 @@ const Admin = () => {
                 cross-VIN price reconciliation overview stays super-admin only. */}
             <MarketcheckSyncCard />
             <MarketcheckDataHealthCard />
+            <PriceAuditPanel />
             {isAdmin && <PriceIntegrityPanel />}
             <div className="flex items-center justify-between flex-wrap gap-2">
               <div>

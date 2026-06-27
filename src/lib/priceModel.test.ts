@@ -1,0 +1,133 @@
+import { describe, it, expect } from "vitest";
+import {
+  normalizeCurrency,
+  computeWebsiteSalePrice,
+  buildPriceBreakdown,
+  resolveDisplayPrice,
+  resolveComparePrice,
+  getPriceDisplayMode,
+  DEFAULT_PRICE_DISPLAY_MODE,
+} from "./priceModel";
+
+describe("normalizeCurrency", () => {
+  it("strips $, commas, whitespace, and +/- signs", () => {
+    expect(normalizeCurrency("$58,140")).toBe(58140);
+    expect(normalizeCurrency("$65,210")).toBe(65210);
+    expect(normalizeCurrency("$895")).toBe(895);
+    expect(normalizeCurrency("+ $895")).toBe(895);
+    expect(normalizeCurrency("-$1,500")).toBe(1500); // Retail Cash carried as magnitude
+    expect(normalizeCurrency("  $59,035 USD ")).toBe(59035);
+  });
+  it("returns null for non-numeric / empty input", () => {
+    expect(normalizeCurrency("")).toBeNull();
+    expect(normalizeCurrency("Call for price")).toBeNull();
+    expect(normalizeCurrency(null)).toBeNull();
+    expect(normalizeCurrency(undefined)).toBeNull();
+  });
+  it("passes through finite numbers", () => {
+    expect(normalizeCurrency(58140)).toBe(58140);
+    expect(normalizeCurrency(NaN)).toBeNull();
+  });
+});
+
+describe("computeWebsiteSalePrice", () => {
+  it("adds the doc fee exactly once", () => {
+    expect(computeWebsiteSalePrice(58140, 895)).toBe(59035);
+    expect(computeWebsiteSalePrice(65210, 895)).toBe(66105);
+  });
+  it("treats a missing doc fee as zero, never inventing a price", () => {
+    expect(computeWebsiteSalePrice(58140, null)).toBe(58140);
+    expect(computeWebsiteSalePrice(null, 895)).toBeNull();
+  });
+});
+
+// ── Spec validation tests ─────────────────────────────────────────────
+describe("Harte INFINITI price breakdown (spec VINs)", () => {
+  it("VIN 5N1AL1F83VC332076 → 58140 + 895 = 59035", () => {
+    const b = buildPriceBreakdown({
+      advertisedBeforeDoc: 58140,
+      docFee: 895,
+      displayedSalePrice: 59035,
+    });
+    expect(b.advertised_price_before_doc).toBe(58140);
+    expect(b.doc_fee).toBe(895);
+    expect(b.website_sale_price).toBe(59035);
+    expect(b.price_parse_status).toBe("ok");
+  });
+
+  it("VIN 5N1AC0JX8VC602735 → 65210 + 895 = 66105", () => {
+    const b = buildPriceBreakdown({
+      advertisedBeforeDoc: 65210,
+      docFee: 895,
+      displayedSalePrice: 66105,
+    });
+    expect(b.advertised_price_before_doc).toBe(65210);
+    expect(b.doc_fee).toBe(895);
+    expect(b.website_sale_price).toBe(66105);
+    expect(b.price_parse_status).toBe("ok");
+  });
+
+  it("does not overwrite advertised with sale price and does not double-add the fee", () => {
+    const b = buildPriceBreakdown({ advertisedBeforeDoc: 58140, docFee: 895, displayedSalePrice: 59035 });
+    // advertised stays advertised; sale is exactly advertised + fee (not +2×fee)
+    expect(b.advertised_price_before_doc).toBe(58140);
+    expect(b.website_sale_price).toBe(58140 + 895);
+    expect(b.website_sale_price).not.toBe(58140 + 895 * 2);
+  });
+
+  it("flags a mismatch when the displayed sale price disagrees with the calculation", () => {
+    const b = buildPriceBreakdown({
+      advertisedBeforeDoc: 58140,
+      docFee: 895,
+      displayedSalePrice: 59000, // wrong on the page
+    });
+    expect(b.price_parse_status).toBe("warning");
+    expect(b.price_parse_notes).toMatch(/mismatch/i);
+  });
+
+  it("is 'ok' when no displayed sale price was parsed (computed from advertised + fee)", () => {
+    const b = buildPriceBreakdown({ advertisedBeforeDoc: 65210, docFee: 895 });
+    expect(b.price_parse_status).toBe("ok");
+    expect(b.website_sale_price).toBe(66105);
+  });
+
+  it("is 'pending' when no advertised price was parsed", () => {
+    const b = buildPriceBreakdown({ advertisedBeforeDoc: null, docFee: 895 });
+    expect(b.price_parse_status).toBe("pending");
+    expect(b.website_sale_price).toBeNull();
+  });
+});
+
+describe("resolveDisplayPrice / resolveComparePrice", () => {
+  const fields = { advertised_price_before_doc: 58140, doc_fee: 895, website_sale_price: 59035 };
+
+  it("defaults to advertised price before doc", () => {
+    expect(DEFAULT_PRICE_DISPLAY_MODE).toBe("advertised_before_doc");
+    expect(resolveDisplayPrice(fields)).toBe(58140);
+  });
+
+  it("shows the website sale price when configured", () => {
+    expect(resolveDisplayPrice(fields, "website_sale_price")).toBe(59035);
+  });
+
+  it("compares on advertised-before-doc by default (vehicle price vs vehicle price)", () => {
+    expect(resolveComparePrice(fields)).toBe(58140);
+    expect(resolveComparePrice(fields, "website_sale_price")).toBe(59035);
+  });
+
+  it("falls back to the legacy price column when breakdown fields are absent", () => {
+    expect(resolveDisplayPrice({ price: 42000 })).toBe(42000);
+    expect(resolveDisplayPrice({ price: 42000 }, "website_sale_price")).toBe(42000);
+  });
+});
+
+describe("getPriceDisplayMode", () => {
+  it("defaults to advertised_before_doc and Harte keeps the default", () => {
+    expect(getPriceDisplayMode(null)).toBe("advertised_before_doc");
+    expect(getPriceDisplayMode({})).toBe("advertised_before_doc");
+    expect(getPriceDisplayMode({ price_display_mode: "bogus" })).toBe("advertised_before_doc");
+  });
+  it("honors a valid configured mode", () => {
+    expect(getPriceDisplayMode({ price_display_mode: "website_sale_price" })).toBe("website_sale_price");
+  });
+});

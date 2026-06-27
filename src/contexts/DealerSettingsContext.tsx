@@ -182,6 +182,10 @@ export interface DealerSettings {
   doc_fee_enabled: boolean;
   doc_fee_amount: number;
   doc_fee_state: string;  // 2-letter state code
+  // Customer-facing price on the Passport: show the advertised price (before
+  // the doc fee) and disclose the fee separately, or show the final website
+  // sale price (fee included). Default: advertised_before_doc.
+  price_display_mode: "advertised_before_doc" | "website_sale_price";
   // Compliance
   cars_act_mode: boolean;
   retention_years: number;
@@ -296,6 +300,7 @@ export const DEFAULT_SETTINGS: DealerSettings = {
   doc_fee_enabled: true,
   doc_fee_amount: 0,
   doc_fee_state: "",
+  price_display_mode: "advertised_before_doc",
   cars_act_mode: false,
   retention_years: 7,
   required_languages: ["en"],

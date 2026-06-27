@@ -49,14 +49,13 @@ export const AdvertisedPriceBand = ({ vin, stickerPrice, storeId = "", docFee = 
   const ap = vin ? byVin.get(vin.toUpperCase()) : undefined;
   const drift = assessDrift(sticker, ap, docFee);
   // MarketCheck pulls the dealer's ACTUAL advertised price into the listing
-  // price, so when there's no manually-captured snapshot we recognize the
-  // listing price itself as the advertised price — it already includes the
-  // dealer's doc/conveyance fee.
+  // price. That price is BEFORE the doc/conveyance fee — the website sale price
+  // is advertised + the doc fee (added once), matching the dealer's VDP.
   const feedAdvertised = !ap && sticker > 0;
-  const sellingBeforeFee = docFee > 0 ? sticker - docFee : null;
+  const websiteSale = docFee > 0 ? sticker + docFee : null;
   const docNote = feedAdvertised
     ? (docFee > 0
-        ? `Advertised ${fmtMoney(sticker)} · incl. ${fmtMoney(docFee)} doc fee · selling ${fmtMoney(sellingBeforeFee!)}`
+        ? `Advertised ${fmtMoney(sticker)} · + ${fmtMoney(docFee)} doc fee · sale ${fmtMoney(websiteSale!)}`
         : `Advertised ${fmtMoney(sticker)}`)
     : "";
 
@@ -134,7 +133,7 @@ export const AdvertisedPriceBand = ({ vin, stickerPrice, storeId = "", docFee = 
               {feedAdvertised ? (
                 <>
                   Advertised {fmtMoney(sticker)}
-                  {docFee > 0 && <>{" · "}incl. {fmtMoney(docFee)} doc fee{" · "}selling {fmtMoney(sellingBeforeFee!)}</>}
+                  {docFee > 0 && <>{" · "}+ {fmtMoney(docFee)} doc fee{" · "}sale {fmtMoney(websiteSale!)}</>}
                 </>
               ) : (
                 <>Sticker {fmtMoney(sticker)}</>

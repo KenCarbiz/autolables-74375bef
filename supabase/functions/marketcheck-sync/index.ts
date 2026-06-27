@@ -469,6 +469,12 @@ serve(async (req) => {
       const { data: prof } = await admin.from("dealer_profiles").select("settings").eq("tenant_id", cfg.tenant_id).maybeSingle();
       const pset = (prof?.settings || {}) as Record<string, string>;
       let dealerState = (pset.dealer_state || pset.doc_fee_state || "").trim().toUpperCase();
+      // Doc/conveyance fee for this tenant (e.g. $895 at Harte INFINITI). The
+      // feed `price` is the advertised price BEFORE doc; the website sale price
+      // is advertised + this fee. Added exactly once, never subtracted.
+      const tenantDocFee = String(pset.doc_fee_enabled) === "true"
+        ? (Number(pset.doc_fee_amount) || 0)
+        : 0;
       // Tenant ZIP anchors every enrichment pull's comps + Market Days Supply to
       // this dealer's local market radius (not a national average).
       const tenantZip = (pset.dealer_zip || "").trim();
@@ -642,6 +648,18 @@ serve(async (req) => {
               // own page (Your Price / <Dealer> Deal).
               source_url: l.vdp_url || null,
             };
+            // Price/doc-fee breakdown: the feed price is advertised-before-doc;
+            // website sale price = advertised + the tenant doc fee (added once).
+            // The nightly advertised-price crawl refines these from the live VDP.
+            if (price != null) {
+              patch.advertised_price_before_doc = price;
+              patch.doc_fee = tenantDocFee;
+              patch.website_sale_price = price + tenantDocFee;
+              patch.price_source_url = l.vdp_url || null;
+              patch.price_parse_status = "ok";
+              patch.price_parse_notes = "From MarketCheck feed; sale price = advertised + tenant doc fee.";
+              patch.price_last_verified_at = new Date().toISOString();
+            }
             // First-pass photos from the feed; the crawler later upgrades the
             // hero to the dealer's own og:image. Only set hero when present so we
             // never null out a better image captured by a previous run.

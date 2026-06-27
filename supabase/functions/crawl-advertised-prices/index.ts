@@ -340,6 +340,77 @@ const extractAdvertised = (
   return { price: null, source: "none", gated: false, reason: "no_price_extracted", msrp, candidates };
 };
 
+// ── Price components: doc/conveyance fee, displayed sale price, retail cash,
+// dealer discount ──────────────────────────────────────────────────────────
+// Parsed SEPARATELY from the advertised price so we can store each field and
+// validate the calculation (advertised + doc fee === displayed sale price).
+// Fees/cash live in a different magnitude band than a car price, so they use
+// their own sanity windows (a $895 fee would fail the $1k car-price floor).
+const saneFee = (n: number | null): n is number => n != null && n >= 1 && n <= 10000;
+const saneCash = (n: number | null): n is number => n != null && n >= 1 && n <= 60000;
+
+// First dollar amount appearing within 0..60 chars AFTER a label match.
+const valueForLabel = (text: string, labelSrc: string): number | null => {
+  const re = new RegExp(`(?:${labelSrc})[^$]{0,60}\\$\\s?(\\d{1,3}(?:,\\d{3})+|\\d{1,6})(?:\\.\\d{2})?`, "i");
+  const m = text.match(re);
+  return m ? norm(m[1]) : null;
+};
+
+interface PriceComponents {
+  docFee: number | null;
+  salePrice: number | null;   // the dealer site's displayed final "Sale Price"
+  retailCash: number | null;
+  dealerDiscount: number | null;
+}
+const extractPriceComponents = (html: string): PriceComponents => {
+  const text = html.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").toLowerCase();
+  const docRaw = valueForLabel(text, "conveyance fee|documentation fee|doc(?:ument)? fee|dealer doc(?:ument)?(?:ation)? fee|processing fee");
+  const saleRaw = valueForLabel(text, "sale price|total price|price after savings|net price|final price");
+  const cashRaw = valueForLabel(text, "retail cash|customer cash|consumer cash|bonus cash|cash allowance");
+  const discRaw = valueForLabel(text, "dealer discount|total savings|you save|savings|discount");
+  return {
+    docFee: saneFee(docRaw) ? docRaw : null,
+    salePrice: sane(saleRaw) ? saleRaw : null,
+    retailCash: saneCash(cashRaw) ? cashRaw : null,
+    dealerDiscount: saneCash(discRaw) ? discRaw : null,
+  };
+};
+
+// Reconcile parsed components into the canonical breakdown. The advertised
+// price is BEFORE the doc fee: if the extractor grabbed the displayed sale
+// price (which already includes the fee), back the fee out so we never
+// double-count it. website_sale_price = advertised_before_doc + doc_fee, added
+// exactly once. Returns the fields written to vehicle_listings + a parse status.
+interface PriceBreakdown {
+  advertised_price_before_doc: number | null;
+  doc_fee: number;
+  website_sale_price: number | null;
+  retail_cash: number | null;
+  dealer_discount: number | null;
+  price_parse_status: "ok" | "warning" | "pending";
+  price_parse_notes: string;
+}
+const buildBreakdown = (extractedPrice: number | null, comp: PriceComponents, tenantDocFee: number): PriceBreakdown => {
+  const docFee = comp.docFee ?? tenantDocFee ?? 0;
+  let advertised = extractedPrice;
+  // If the extractor picked the final sale price (== displayed sale), strip the
+  // fee to recover the advertised-before-doc price.
+  if (advertised != null && comp.salePrice != null && docFee > 0 && Math.abs(advertised - comp.salePrice) <= 1) {
+    advertised = advertised - docFee;
+  }
+  if (advertised == null) {
+    return { advertised_price_before_doc: null, doc_fee: docFee, website_sale_price: null, retail_cash: comp.retailCash, dealer_discount: comp.dealerDiscount, price_parse_status: "pending", price_parse_notes: "No advertised price parsed." };
+  }
+  const websiteSale = advertised + docFee;
+  let status: PriceBreakdown["price_parse_status"] = "ok";
+  let notes = `Advertised ${advertised} + doc fee ${docFee} = sale ${websiteSale}.`;
+  if (comp.salePrice != null && Math.abs(comp.salePrice - websiteSale) > 1) {
+    status = "warning";
+    notes = `Price parse mismatch: displayed sale ${comp.salePrice} != advertised ${advertised} + doc fee ${docFee} = ${websiteSale}. Review source page.`;
+  }
+  return { advertised_price_before_doc: advertised, doc_fee: docFee, website_sale_price: websiteSale, retail_cash: comp.retailCash, dealer_discount: comp.dealerDiscount, price_parse_status: status, price_parse_notes: notes };
+};
+
 // Browser-like UA shared by the seeded crawl and discovery fetches.
 const UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36";
 const FETCH_HEADERS = { "User-Agent": UA, "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8", "Accept-Language": "en-US,en;q=0.9" };
@@ -529,13 +600,14 @@ serve(async (req) => {
   // dealer_profiles.settings.vdp_price_labels (comma-separated, priority
   // order) and .vdp_strip_finance_params (default true) configure the
   // extractor. Cached in a Map so the per-row loop doesn't refetch.
-  const settingsCache = new Map<string, { labels: string[]; stripFinance: boolean }>();
+  const settingsCache = new Map<string, { labels: string[]; stripFinance: boolean; docFee: number }>();
   const getTenantScrapeSettings = async (tenantId: string) => {
     const cached = settingsCache.get(tenantId);
     if (cached) return cached;
     const { data } = await admin.from("dealer_profiles").select("settings").eq("tenant_id", tenantId).maybeSingle();
     // deno-lint-ignore no-explicit-any
     const s: any = data?.settings || {};
+    const docFee = String(s.doc_fee_enabled) === "true" ? (Number(s.doc_fee_amount) || 0) : 0;
     const custom = String(s.vdp_price_labels || "").split(",").map((x: string) => x.trim()).filter(Boolean);
     // Dealer's configured labels win priority; generic selling-price labels run
     // after so common sites still resolve. Dedupe case-insensitively.
@@ -547,7 +619,7 @@ serve(async (req) => {
       return true;
     });
     const stripFinance = s.vdp_strip_finance_params !== false;
-    const out = { labels, stripFinance };
+    const out = { labels, stripFinance, docFee };
     settingsCache.set(tenantId, out);
     return out;
   };
@@ -820,6 +892,30 @@ serve(async (req) => {
         }).then(() => undefined, () => undefined);
         continue;
       }
+      // Parse the doc/conveyance fee, displayed sale price, retail cash and
+      // dealer discount off the rendered page, reconcile to the canonical
+      // breakdown (advertised BEFORE doc; sale = advertised + doc fee), and
+      // store each field on vehicle_listings. Isolated so a not-yet-migrated
+      // column can never fail the price write. price_parse_status = 'warning'
+      // when the displayed sale price disagrees with advertised + doc fee.
+      try {
+        const comp = extractPriceComponents(html);
+        const bd = buildBreakdown(newPrice, comp, cfg.docFee);
+        if (bd.advertised_price_before_doc != null) {
+          await admin.from("vehicle_listings").update({
+            advertised_price_before_doc: bd.advertised_price_before_doc,
+            doc_fee: bd.doc_fee,
+            website_sale_price: bd.website_sale_price,
+            retail_cash: bd.retail_cash,
+            dealer_discount: bd.dealer_discount,
+            price_source_url: fetchUrl,
+            price_parse_status: bd.price_parse_status,
+            price_parse_notes: bd.price_parse_notes,
+            price_last_verified_at: new Date().toISOString(),
+          }).eq("tenant_id", row.tenant_id).eq("vin", row.vin);
+        }
+      } catch { /* price breakdown columns may not be migrated yet */ }
+
       // Skip a no-op write only when nothing changed AND we have no fresh
       // evidence screenshot to record (a render always logs its screenshot).
       if (Math.abs(newPrice - row.advertised_price) < 1 && !screenshot) {

@@ -1,4 +1,5 @@
 import type { VehicleListing } from "@/hooks/useVehicleListing";
+import { resolveDisplayPrice, getPriceDisplayMode, type PriceDisplayMode } from "@/lib/priceModel";
 
 // ──────────────────────────────────────────────────────────────
 // Passport V2 shared derivations
@@ -36,6 +37,13 @@ export interface PassportData {
   priceLabel: string;
   estMonthly: number | null;
   saveVsMsrp: number | null;
+  // Doc-fee model. `price` already reflects priceMode; docFee/websiteSalePrice
+  // let the surface disclose the fee. priceIncludesDoc = the displayed price is
+  // the website sale price (fee already inside) vs advertised-before-doc.
+  docFee: number | null;
+  websiteSalePrice: number | null;
+  priceMode: PriceDisplayMode;
+  priceIncludesDoc: boolean;
   // Market
   marketAvg: number | null;
   marketLow: number | null;
@@ -194,7 +202,23 @@ export const derivePassport = (listing: VehicleListing): PassportData => {
     firstSeen: (histRaw.firstSeen as string) || null,
   } : null;
 
-  const price = listing.price ?? null;
+  // Price / doc-fee model. The customer-facing price follows the tenant's
+  // price_display_mode (default advertised_before_doc — Harte INFINITI's
+  // default, which keeps the historic behavior of showing listing.price). The
+  // doc fee is disclosed separately by the surface; market math compares on the
+  // same value the dealer displays.
+  const lp = listing as unknown as {
+    advertised_price_before_doc?: number | null; doc_fee?: number | null; website_sale_price?: number | null; price_display_mode?: unknown;
+  };
+  const priceMode: PriceDisplayMode = getPriceDisplayMode({ price_display_mode: lp.price_display_mode });
+  const advBeforeDoc = lp.advertised_price_before_doc ?? listing.price ?? null;
+  const docFee = lp.doc_fee ?? null;
+  const websiteSalePrice = lp.website_sale_price ?? (advBeforeDoc != null ? advBeforeDoc + (docFee ?? 0) : null);
+  const price = resolveDisplayPrice(
+    { advertised_price_before_doc: advBeforeDoc, doc_fee: docFee, website_sale_price: websiteSalePrice, price: listing.price },
+    priceMode,
+  );
+  const priceIncludesDoc = priceMode === "website_sale_price";
   const msrp = (mc.msrp as number) ?? null;
   const marketAvg = listing.market_value ?? null;
   const marketHigh = (mp.high as number) ?? null;
@@ -345,6 +369,7 @@ export const derivePassport = (listing: VehicleListing): PassportData => {
 
   return {
     price, msrp, priceLabel, estMonthly, saveVsMsrp,
+    docFee, websiteSalePrice, priceMode, priceIncludesDoc,
     marketAvg, marketLow, marketHigh, belowMarket,
     marketMeta, comparables, blackbook, marketCheckedAt, history,
     viewCount: listing.view_count ?? null, dom: (mc.dom as number) ?? marketMeta.avgDom ?? null,

@@ -1138,7 +1138,12 @@ const AdvertisedPriceCell = ({ price, docFee, ap }: { price?: number | null; doc
       {drift.advertised != null && (
         <p className="text-[10px] text-muted-foreground mt-0.5">ad ${drift.advertised.toLocaleString()}{drift.source ? ` · ${SOURCE_LABELS[drift.source] || drift.source}` : ""}</p>
       )}
-      {docFee ? <p className="text-[10px] text-muted-foreground mt-0.5">includes ${Number(docFee).toLocaleString()} doc fee</p> : null}
+      {docFee ? (
+        <p
+          className="text-[10px] text-muted-foreground mt-0.5"
+          title={`Website Sale Price: $${(price + Number(docFee)).toLocaleString()}`}
+        >+ ${Number(docFee).toLocaleString()} doc fee</p>
+      ) : null}
     </div>
   );
 };

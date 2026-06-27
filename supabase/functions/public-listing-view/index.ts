@@ -123,6 +123,9 @@ serve(async (req) => {
           .from("dealer_profiles").select("settings").eq("tenant_id", row.tenant_id).maybeSingle();
         const s = (prof?.settings ?? {}) as Record<string, unknown>;
         if (s.sticky_bottom_buttons) row.sticky_bottom_buttons = s.sticky_bottom_buttons;
+        // Customer-facing price display mode (advertised_before_doc default vs
+        // website_sale_price). Lets the passport show the dealer's chosen price.
+        if (s.price_display_mode) row.price_display_mode = s.price_display_mode;
         // Dealer-entered passport trust content (badges + multi-source reviews).
         const trust = {
           years_in_business: (s.dealer_years_in_business as string) || "",

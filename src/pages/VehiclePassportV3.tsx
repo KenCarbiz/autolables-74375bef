@@ -354,6 +354,13 @@ const VehiclePassportV3 = () => {
                   <div className="text-right shrink-0">
                     <div className="text-[13px] font-semibold text-[#64748B]">{d.priceLabel}</div>
                     <div className="text-[28px] font-extrabold leading-9">{fmt$(price)}</div>
+                    {d.docFee ? (
+                      <div className="text-[12px] text-[#64748B]">
+                        {d.priceIncludesDoc
+                          ? `Incl. ${fmt$(d.docFee)} doc fee`
+                          : `+ ${fmt$(d.docFee)} doc fee · Sale ${fmt$(d.websiteSalePrice ?? price + d.docFee)}`}
+                      </div>
+                    ) : null}
                     {d.estMonthly != null && <div className="text-[12px] text-[#64748B]">Est. {fmt$(d.estMonthly)}/mo</div>}
                     {d.msrp != null && <div className="text-[12px] text-[#64748B]">MSRP {fmt$(d.msrp)}</div>}
                     {d.saveVsMsrp != null && <div className="text-[13px] font-semibold text-[#16A34A]">You save {fmt$(d.saveVsMsrp)}</div>}
