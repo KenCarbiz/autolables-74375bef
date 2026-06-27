@@ -56,6 +56,7 @@ export default function ServiceDesk() {
       <p className="text-sm text-muted-foreground -mt-3">Generate a Get-Ready QR for a car, complete the CT K-208 here, or upload the title / MCO.</p>
 
       <GateSettingCard tenantId={tenantId} />
+      <RoleAuthorityCard tenantId={tenantId} />
 
       <div className="rounded-2xl border border-border bg-card p-4 flex items-end gap-3">
         <div className="flex-1">
@@ -121,6 +122,70 @@ function GateSettingCard({ tenantId }: { tenantId: string }) {
         className={`shrink-0 h-7 w-12 rounded-full transition-colors relative ${on ? "bg-emerald-600" : "bg-muted"}`} aria-pressed={!!on}>
         <span className={`absolute top-0.5 h-6 w-6 rounded-full bg-white shadow transition-all ${on ? "left-[22px]" : "left-0.5"}`} />
       </button>
+    </div>
+  );
+}
+
+// ── Who may authoritatively sign the K-208 (gate authority) ─────────────────
+const AUTHORITY_ROLES = [
+  { key: "owner", label: "Owner" },
+  { key: "admin", label: "Admin" },
+  { key: "manager", label: "Manager" },
+  { key: "service", label: "Service" },
+] as const;
+
+function RoleAuthorityCard({ tenantId }: { tenantId: string }) {
+  const [roles, setRoles] = useState<string[] | null>(null);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    (async () => {
+      const { data } = await (supabase as any).from("dealer_profiles").select("settings").eq("tenant_id", tenantId).maybeSingle();
+      const r = (data?.settings as { k208_authority_roles?: string[] } | null)?.k208_authority_roles;
+      setRoles(Array.isArray(r) ? r : []);
+    })();
+  }, [tenantId]);
+
+  const toggle = async (key: string) => {
+    if (roles === null) return;
+    const next = roles.includes(key) ? roles.filter((r) => r !== key) : [...roles, key];
+    setSaving(true);
+    const { data } = await (supabase as any).from("dealer_profiles").select("settings").eq("tenant_id", tenantId).maybeSingle();
+    const settings = { ...((data?.settings as Record<string, unknown>) || {}), k208_authority_roles: next };
+    const { error } = await (supabase as any).from("dealer_profiles").update({ settings }).eq("tenant_id", tenantId);
+    setSaving(false);
+    if (error) { toast.error("Could not save authority setting"); return; }
+    setRoles(next);
+    toast.success("Sign-off authority updated");
+  };
+
+  const restricted = (roles?.length ?? 0) > 0;
+
+  return (
+    <div className="rounded-2xl border border-border bg-card p-4 space-y-3">
+      <div className="flex items-start gap-3">
+        <ShieldCheck className="w-5 h-5 text-primary mt-0.5" />
+        <div>
+          <div className="font-bold text-foreground">Who can sign off the K-208</div>
+          <div className="text-sm text-muted-foreground">
+            Pick which roles count as an authorized inspector for the finalize gate. When one or more is selected, only a logged-in member with that role satisfies the requirement — an anonymous windshield-QR sign-off no longer counts on its own (it still records the work). Leave all unselected to accept any signed K-208.
+          </div>
+        </div>
+      </div>
+      <div className="flex flex-wrap gap-2 pl-8">
+        {AUTHORITY_ROLES.map((r) => {
+          const on = !!roles?.includes(r.key);
+          return (
+            <button key={r.key} onClick={() => toggle(r.key)} disabled={roles === null || saving}
+              className={`h-9 px-4 rounded-full text-sm font-semibold border transition-colors disabled:opacity-50 ${on ? "bg-primary text-primary-foreground border-primary" : "bg-background text-foreground border-border hover:bg-muted"}`}>
+              {on ? "✓ " : ""}{r.label}
+            </button>
+          );
+        })}
+      </div>
+      <div className="pl-8 text-xs text-muted-foreground">
+        {restricted ? "Restricted: a logged-in authorized signer is required." : "Open: any signed K-208 (including anonymous QR) satisfies the gate."}
+      </div>
     </div>
   );
 }
