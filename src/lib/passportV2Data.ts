@@ -9,6 +9,20 @@ import type { VehicleListing } from "@/hooks/useVehicleListing";
 // the backing data is absent so callers can show honest empty states.
 // ──────────────────────────────────────────────────────────────
 
+// Equipment strings for a listing: the curated `features` column PLUS the
+// MarketCheck `mc_attributes.options`/`.features` (which the feed and the VIN
+// decoder populate, and which arrive as arrays OR delimited strings). Without
+// this, equipment captured by the API pull never reaches the shopper page,
+// which only read the top-level `features` column. De-duplicated and trimmed.
+export const listingEquipment = (listing: VehicleListing): string[] => {
+  const toList = (v: unknown): string[] => Array.isArray(v)
+    ? v.map((x) => typeof x === "string" ? x : String((x as Record<string, unknown>)?.name ?? (x as Record<string, unknown>)?.label ?? (x as Record<string, unknown>)?.description ?? "")).map((s) => s.trim()).filter(Boolean)
+    : typeof v === "string" ? v.split(/[,;|]/).map((s) => s.trim()).filter(Boolean) : [];
+  const mc = (listing.mc_attributes || {}) as Record<string, unknown>;
+  const fromFeatures = (listing.features || []).map((f) => [f.title, f.subtitle].filter(Boolean).join(" ").trim()).filter(Boolean);
+  return Array.from(new Set([...fromFeatures, ...toList(mc.options), ...toList(mc.features)]));
+};
+
 export const fmt$ = (n: number | null | undefined) =>
   n == null ? "" : `$${Math.round(n).toLocaleString()}`;
 
@@ -232,7 +246,7 @@ export const derivePassport = (listing: VehicleListing): PassportData => {
   if (ks.mpg_city && ks.mpg_hwy) highlights.push({ key: "mpg", label: `${ks.mpg_city}/${ks.mpg_hwy} MPG`, sub: "Fuel economy" });
   else if (ks.fuel) highlights.push({ key: "fuel", label: ks.fuel, sub: "Fuel" });
   if (ks.exterior_color) highlights.push({ key: "ext", label: ks.exterior_color, sub: "Exterior" });
-  (listing.features || []).forEach((f, i) => { if (highlights.length < 8) highlights.push({ key: `f${i}`, label: f.title, sub: f.subtitle || "Feature" }); });
+  listingEquipment(listing).forEach((label, i) => { if (highlights.length < 8) highlights.push({ key: `f${i}`, label, sub: "Feature" }); });
 
   const overview = listing.description ||
     `The ${listing.ymm}${listing.trim ? " " + listing.trim : ""} pairs a ${ks.engine || "capable"} powertrain with ${ks.drivetrain || "a refined drivetrain"} and a well-equipped cabin.`;

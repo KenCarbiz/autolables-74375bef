@@ -80,7 +80,7 @@ interface VehicleRow {
   recall_status: string | null;
   recall_checked_at: string | null;
   open_recall_count: number | null;
-  recall_payload: { recalls?: RecallItem[] } | null;
+  recall_payload: { recalls?: RecallItem[]; campaigns?: Record<string, unknown>[] } | null;
   market_value: number | null;
   market_position: string | null;
   market_payload: { listingPrice?: number | null; low?: number | null; high?: number | null; belowMarket?: number } | null;
@@ -91,6 +91,21 @@ interface VehicleRow {
 }
 
 interface RecallItem { title?: string; component?: string; reportDate?: string; remedy?: string; status?: string; nhtsaCampaignNumber?: string; }
+
+// The recall detail list is written under two shapes: `recalls` (marketcheck-
+// recalls / NHTSA fallback) and `campaigns` (vehicle-enrich). Read either, and
+// map the campaign field names so the card never shows a blank list.
+const normalizeRecalls = (p: { recalls?: RecallItem[]; campaigns?: Record<string, unknown>[] } | null): RecallItem[] => {
+  if (Array.isArray(p?.recalls) && p!.recalls!.length) return p!.recalls!;
+  const c = p?.campaigns;
+  if (Array.isArray(c)) return c.map((r) => ({
+    title: String(r.title ?? r.summary ?? r.component ?? "Recall"),
+    component: r.component != null ? String(r.component) : undefined,
+    reportDate: (r.reportDate ?? r.report_date) != null ? String(r.reportDate ?? r.report_date) : undefined,
+    remedy: r.remedy != null ? String(r.remedy) : undefined,
+  }));
+  return [];
+};
 
 const VALID_TABS: TabId[] = ["overview", "documents", "scan", "customer", "addendum", "prep", "labels", "sign", "evidence"];
 
@@ -693,9 +708,11 @@ const OverviewPanel = ({ vehicle, onTab }: { vehicle: VehicleRow; onTab: (t: Tab
 
   // Market & history insights from the MarketCheck feed (one-owner, clean
   // title, days-on-market, price movement, seller type).
-  const mcStrArr = (v: unknown): string[] => Array.isArray(v)
-    ? v.map((x) => typeof x === "string" ? x : (x && typeof x === "object" ? String((x as Record<string, unknown>).name ?? (x as Record<string, unknown>).label ?? (x as Record<string, unknown>).description ?? "") : String(x ?? ""))).filter(Boolean)
-    : [];
+  const mcStrArr = (v: unknown): string[] => {
+    if (Array.isArray(v)) return v.map((x) => typeof x === "string" ? x : (x && typeof x === "object" ? String((x as Record<string, unknown>).name ?? (x as Record<string, unknown>).label ?? (x as Record<string, unknown>).description ?? "") : String(x ?? ""))).map((s) => s.trim()).filter(Boolean);
+    if (typeof v === "string") return v.split(/[,;|]/).map((s) => s.trim()).filter(Boolean);
+    return [];
+  };
   const optionsList = Array.from(new Set([...mcStrArr(mc.options), ...mcStrArr(mc.features), ...pulledOptions]));
   const handlePullSpecs = async () => {
     const r = await fetchSpecs({ vin: vehicle.vin, tenantId: vehicle.tenant_id, vehicleId: vehicle.id });
@@ -2240,7 +2257,7 @@ const RecallCard = ({ vehicle }: { vehicle: VehicleRow }) => {
   const [status, setStatus] = useState<string | null>(vehicle.recall_status);
   const [checkedAt, setCheckedAt] = useState<string | null>(vehicle.recall_checked_at);
   const [open, setOpen] = useState<number>(vehicle.open_recall_count ?? 0);
-  const [recalls, setRecalls] = useState<RecallItem[]>(vehicle.recall_payload?.recalls || []);
+  const [recalls, setRecalls] = useState<RecallItem[]>(normalizeRecalls(vehicle.recall_payload));
   const [checking, setChecking] = useState(false);
 
   const run = async () => {

@@ -31,7 +31,7 @@ interface Normalized {
   recallStatus: "clear" | "open_recalls" | "unknown" | "error";
   openRecallCount: number; closedRecallCount: number;
   serviceCampaignCount: number; emissionIssueCount: number;
-  recalls: NormalRecall[]; rawProvider: "marketcheck_autorecalls";
+  recalls: NormalRecall[]; rawProvider: string;
 }
 
 // deno-lint-ignore no-explicit-any
@@ -68,6 +68,50 @@ function normalize(vin: string, raw: any): Normalized {
     openRecallCount: open, closedRecallCount: closed, serviceCampaignCount, emissionIssueCount,
     recalls, rawProvider: "marketcheck_autorecalls",
   };
+}
+
+function buildNormalized(vin: string, recalls: NormalRecall[], provider: string): Normalized {
+  const open = recalls.filter((r) => r.status === "open").length;
+  const closed = recalls.filter((r) => r.status === "closed").length;
+  return {
+    vin, checkedAt: new Date().toISOString(),
+    recallStatus: recalls.length === 0 ? "clear" : open > 0 ? "open_recalls" : "clear",
+    openRecallCount: open, closedRecallCount: closed, serviceCampaignCount: 0, emissionIssueCount: 0,
+    recalls, rawProvider: provider,
+  };
+}
+
+// NHTSA recallsByVehicle (free, model-level) — the authoritative fallback when
+// MarketCheck AutoRecalls returns nothing (it's a separately-licensed product
+// that's empty for most cars). A 200 is authoritative (open OR a real "clear");
+// a transient non-200 returns null so we never downgrade a known recall on it.
+// deno-lint-ignore no-explicit-any
+async function fetchNhtsa(ymm: string | null): Promise<{ recalls: NormalRecall[] } | null> {
+  try {
+    if (!ymm) return null;
+    const parts = ymm.split(/\s+/);
+    const year = parts[0] && /^\d{4}$/.test(parts[0]) ? parts[0] : "";
+    const make = year ? parts[1] : parts[0];
+    const model = year ? parts.slice(2).join(" ") : parts.slice(1).join(" ");
+    if (!year || !make || !model) return null;
+    const url = `https://api.nhtsa.gov/recalls/recallsByVehicle?make=${encodeURIComponent(make)}&model=${encodeURIComponent(model)}&modelYear=${encodeURIComponent(year)}`;
+    const res = await fetch(url, { signal: AbortSignal.timeout(10000) });
+    if (res.status === 404) return { recalls: [] };          // no record on file (typical new model year) = clear
+    if (!res.ok) return null;                                  // 429/500/etc — transient, do not downgrade
+    // deno-lint-ignore no-explicit-any
+    const b: any = await res.json().catch(() => ({}));
+    // deno-lint-ignore no-explicit-any
+    const list: any[] = Array.isArray(b?.results) ? b.results : Array.isArray(b?.Results) ? b.Results : [];
+    const recalls: NormalRecall[] = list.map((r) => ({
+      campaignId: str(r.NHTSACampaignNumber ?? r.CampaignNumber),
+      recallType: "safety", status: "open",
+      title: str(r.Component ?? r.Summary ?? "Recall") || "Recall",
+      description: str(r.Summary), consequence: str(r.Consequence), remedy: str(r.Remedy),
+      manufacturer: str(r.Manufacturer ?? make), reportDate: str(r.ReportReceivedDate),
+      nhtsaCampaignNumber: str(r.NHTSACampaignNumber ?? r.CampaignNumber), component: str(r.Component),
+    }));
+    return { recalls };
+  } catch { return null; }
 }
 
 // Candidate MarketCheck recall endpoints (the path/host has moved across API
@@ -176,8 +220,40 @@ Deno.serve(async (req) => {
   if (!vin) return json(400, { recallStatus: "error", error: "vin required" });
   if (!validVin(vin)) return json(400, { recallStatus: "error", error: "invalid_vin", note: "VIN must be 17 chars with no I, O, or Q" });
 
-  const r = await fetchRecalls(vin);
-  if (!r.ok) return json(200, { vin, recallStatus: "error", error: r.reason, tried: r.tried });
-  await persist(admin, tenantId, vin, r.data);
-  return json(200, { ...r.data, endpoint: r.endpoint, ...(body.diagnostic ? { _raw: r.raw } : {}) });
+  // Current state, so a failed re-check never downgrades a known-open recall.
+  let q0 = admin.from("vehicle_listings").select("ymm, recall_status, open_recall_count").eq("vin", vin);
+  if (tenantId) q0 = q0.eq("tenant_id", tenantId);
+  const { data: row0 } = await q0.maybeSingle();
+  const ymm: string | null = (row0 as { ymm?: string } | null)?.ymm ?? null;
+  const hadOpen = (row0 as { recall_status?: string } | null)?.recall_status === "open_recalls"
+    && ((row0 as { open_recall_count?: number } | null)?.open_recall_count ?? 0) > 0;
+
+  const mc = await fetchRecalls(vin);
+  let final: Normalized | null = null;
+  let authoritativeClear = false;
+
+  if (mc.ok && mc.data.recalls.length > 0) {
+    final = mc.data;                                        // MarketCheck found recalls — authoritative
+  } else {
+    // MarketCheck empty/unlicensed/errored → confirm with NHTSA (free, model-level).
+    const nh = await fetchNhtsa(ymm);
+    if (nh) {
+      final = buildNormalized(vin, nh.recalls, "nhtsa");   // open recalls OR an authoritative clear
+      authoritativeClear = nh.recalls.length === 0;
+    } else if (mc.ok) {
+      final = mc.data;                                      // MC returned a valid empty; NHTSA unavailable
+    }
+  }
+
+  // Neither source answered → never wipe a known recall.
+  if (!final) {
+    return json(200, { vin, recallStatus: hadOpen ? "open_recalls" : "error", error: mc.ok ? undefined : mc.reason, preserved: hadOpen, note: "no_authoritative_source" });
+  }
+  // A non-authoritative "clear" must not overwrite an existing open recall.
+  if (final.recallStatus === "clear" && hadOpen && !authoritativeClear) {
+    return json(200, { vin, recallStatus: "open_recalls", preserved: true, note: "kept_existing_open" });
+  }
+
+  await persist(admin, tenantId, vin, final);
+  return json(200, { ...final, ...(mc.ok ? { endpoint: mc.endpoint } : {}), ...(body.diagnostic && mc.ok ? { _raw: mc.raw } : {}) });
 });

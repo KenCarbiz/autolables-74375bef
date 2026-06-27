@@ -12,7 +12,7 @@ import { useVehicleListing, type VehicleListing } from "@/hooks/useVehicleListin
 import { usePublicListing } from "@/hooks/usePublicListing";
 import { formatPhone } from "@/components/addendum/CustomerInfoSection";
 import Logo from "@/components/brand/Logo";
-import { derivePassport, computePriceHistory, fmt$ } from "@/lib/passportV2Data";
+import { derivePassport, computePriceHistory, fmt$, listingEquipment } from "@/lib/passportV2Data";
 import { resolveStickyButtons, type StickyBottomButtons } from "@/lib/stickyButtons";
 import PassportPanel, { type PassportPanelKey } from "@/components/passport/PassportPanel";
 import PassportCtaDock from "@/components/passport/PassportCtaDock";
@@ -249,7 +249,7 @@ const VehiclePassportV3 = () => {
   else if (ks.fuel) highlights.push({ icon: Fuel, t: ks.fuel, s: "Fuel" });
   if (ks.transmission) highlights.push({ icon: Settings, t: ks.transmission.replace(/\s*automatic/i, "").trim(), s: "Transmission" });
   if (ks.exterior_color) highlights.push({ icon: Wind, t: ks.exterior_color, s: "Exterior" });
-  (listing.features || []).forEach((f) => { if (highlights.length < 8) highlights.push({ icon: Award, t: f.title, s: f.subtitle || "Feature" }); });
+  listingEquipment(listing).forEach((label) => { if (highlights.length < 8) highlights.push({ icon: Award, t: label, s: "Feature" }); });
 
   // Dealer trust chips — only render what the dealer actually configured
   // (onboarding / admin), so we never assert an unverified capability.

@@ -5,7 +5,7 @@ import {
   Flame, Heart, Send, Bookmark, Users, Circle, ChevronDown, MapPin, BadgeCheck, Info, AlertTriangle, History, ArrowRight, Sparkles,
 } from "lucide-react";
 import type { PassportData, PricePoint } from "@/lib/passportV2Data";
-import { fmt$ } from "@/lib/passportV2Data";
+import { fmt$, listingEquipment } from "@/lib/passportV2Data";
 import type { VehicleListing } from "@/hooks/useVehicleListing";
 import {
   PassportSlideOver, Hero, Section, Check, Empty, StatRow, RangeBar, TrendChart, Ring, CARD, GREEN, BLUE,
@@ -2004,7 +2004,7 @@ const TimelineGroup = ({ events }: { events: TEvent[] }) => (
 const featureGroups = (listing: VehicleListing) => {
   const ks = listing.key_specs || {};
   const mc = (listing.mc_attributes || {}) as Record<string, unknown>;
-  const featLabels = (listing.features || []).map((f) => [f.title, f.subtitle].filter(Boolean).join(" ").trim()).filter(Boolean);
+  const featLabels = listingEquipment(listing);
   const groups: Record<string, string[]> = {};
   const push = (cat: string, label: string) => { if (!label) return; (groups[cat] ||= []); if (!groups[cat].includes(label)) groups[cat].push(label); };
   featLabels.forEach((l) => push(categorizeFeature(l), l));

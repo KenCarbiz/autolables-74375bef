@@ -675,6 +675,12 @@ serve(async (req) => {
               // the feed carries (mpg, engine size, seating, dimensions, …) is
               // retained for any surface that needs it later, then layer the
               // normalized aliases the app reads on top.
+              // Preserve options/features previously decoded by "Pull factory
+              // options" (marketcheck-specs) — the syndication feed usually omits
+              // them, so writing null on every sync was wiping that decoded data.
+              const { data: priorRow } = await admin.from("vehicle_listings")
+                .select("mc_attributes").eq("tenant_id", cfg.tenant_id).eq("vin", vin).maybeSingle();
+              const priorMc = (priorRow?.mc_attributes || {}) as Record<string, unknown>;
               const mcAttrs = {
                 ...(b as Record<string, unknown>),
                 msrp: toPrice(l.msrp), exterior_color: l.exterior_color || null,
@@ -697,8 +703,8 @@ serve(async (req) => {
                 seller_type: l.seller_type || null, in_transit: l.in_transit ?? null,
                 vdp_url: l.vdp_url || null,
                 // OEM equipment / options & packages when present in the feed.
-                features: (l.extra?.features ?? l.features) ?? null,
-                options: (l.extra?.options ?? l.options) ?? null,
+                features: ((l.extra?.features ?? l.features) ?? priorMc.features) ?? null,
+                options: ((l.extra?.options ?? l.options) ?? priorMc.options) ?? null,
               };
               const enrich: Record<string, unknown> = { mc_attributes: mcAttrs };
               if (gallery.length) { enrich.photos = gallery; enrich.photo_count = gallery.length; }
