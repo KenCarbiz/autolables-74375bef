@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { QRCodeSVG } from "qrcode.react";
 import { supabase } from "@/integrations/supabase/client";
 import { useTenant } from "@/contexts/TenantContext";
@@ -51,7 +51,9 @@ export default function ServiceDesk() {
         <ShieldCheck className="w-5 h-5 text-primary" />
         <h1 className="font-display text-2xl font-bold tracking-tight text-foreground">Service desk</h1>
       </div>
-      <p className="text-sm text-muted-foreground -mt-3">Generate a safety-inspection QR for a tech, complete the CT K-208 here, or upload the title / MCO.</p>
+      <p className="text-sm text-muted-foreground -mt-3">Generate a Get-Ready QR for a car, complete the CT K-208 here, or upload the title / MCO.</p>
+
+      <GateSettingCard tenantId={tenantId} />
 
       <div className="rounded-2xl border border-border bg-card p-4 flex items-end gap-3">
         <div className="flex-1">
@@ -76,6 +78,47 @@ export default function ServiceDesk() {
           <TitleMcoUpload tenantId={tenantId} veh={veh} />
         </>
       )}
+    </div>
+  );
+}
+
+// ── Publish-gate setting: require a signed K-208 before used cars publish ───
+function GateSettingCard({ tenantId }: { tenantId: string }) {
+  const [on, setOn] = useState<boolean | null>(null);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    (async () => {
+      const { data } = await (supabase as any).from("dealer_profiles").select("settings").eq("tenant_id", tenantId).maybeSingle();
+      setOn(!!(data?.settings as { require_safety_inspection?: boolean } | null)?.require_safety_inspection);
+    })();
+  }, [tenantId]);
+
+  const toggle = async () => {
+    const next = !on;
+    setSaving(true);
+    const { data } = await (supabase as any).from("dealer_profiles").select("settings").eq("tenant_id", tenantId).maybeSingle();
+    const settings = { ...((data?.settings as Record<string, unknown>) || {}), require_safety_inspection: next };
+    const { error } = await (supabase as any).from("dealer_profiles").update({ settings }).eq("tenant_id", tenantId);
+    setSaving(false);
+    if (error) { toast.error("Could not save setting"); return; }
+    setOn(next);
+    toast.success(next ? "Used cars now require a signed K-208 to publish" : "K-208 publish requirement turned off");
+  };
+
+  return (
+    <div className="rounded-2xl border border-border bg-card p-4 flex items-start justify-between gap-4">
+      <div className="flex items-start gap-3">
+        <ShieldCheck className="w-5 h-5 text-primary mt-0.5" />
+        <div>
+          <div className="font-bold text-foreground">Require K-208 before publishing used cars</div>
+          <div className="text-sm text-muted-foreground">When on, a used/CPO car can't go live on its Passport until the service department's safety inspection is signed. New cars are exempt; admins can always override.</div>
+        </div>
+      </div>
+      <button onClick={toggle} disabled={on === null || saving}
+        className={`shrink-0 h-7 w-12 rounded-full transition-colors relative ${on ? "bg-emerald-600" : "bg-muted"}`} aria-pressed={!!on}>
+        <span className={`absolute top-0.5 h-6 w-6 rounded-full bg-white shadow transition-all ${on ? "left-[22px]" : "left-0.5"}`} />
+      </button>
     </div>
   );
 }
