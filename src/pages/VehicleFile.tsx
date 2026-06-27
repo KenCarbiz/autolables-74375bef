@@ -17,6 +17,8 @@ import { formatPhone, composeName } from "@/components/addendum/CustomerInfoSect
 import EmptyState from "@/components/ui/empty-state";
 import { InstallProofList } from "@/components/admin/InstallProofList";
 import { useVehicleSpecs } from "@/hooks/useVehicleSpecs";
+import { useRecallTask, OUTCOME_LABELS, type RecallOutcome } from "@/hooks/useRecallTask";
+import { listingGallery } from "@/lib/photos";
 import { PACKET_MODULES, packetVisible } from "@/lib/packetModules";
 import { QRCodeSVG } from "qrcode.react";
 import GeneratedDocumentsSection from "@/components/vehicle/GeneratedDocumentsSection";
@@ -114,20 +116,35 @@ interface ReadyCheck { ok: boolean; label: string; when: string | null; blocks?:
 // Single readiness model used by both the header banner and the Overview
 // readiness card, so the two never disagree. `blocks` marks a check that
 // gates publishing to the shopper portal.
-const buildChecks = (v: VehicleRow): ReadyCheck[] => [
-  { ok: true, label: "Vehicle created", when: v.created_at },
-  { ok: !!v.ymm, label: "VIN decoded", when: v.ymm ? v.updated_at : null },
-  { ok: v.status === "published", label: "Published to shopper portal", when: v.published_at, blocks: true },
-  { ok: !!(v.recall_status || v.recall_check), label: "Recall checked", when: v.recall_checked_at },
-  { ok: !!v.prep_status?.foreman_signed_at, label: "Prep & install signed off", when: v.prep_status?.foreman_signed_at || null },
-  { ok: (v.documents?.length || 0) > 0, label: "Documents attached", when: null },
-  { ok: (v.service_records?.length || 0) > 0, label: "Service history", when: null },
-  { ok: !!v.warranty_info && Object.keys(v.warranty_info).length > 0, label: "Remaining warranty", when: null },
-  { ok: (v.available_accessories?.length || 0) > 0, label: "Available accessories", when: null },
-];
+interface RecallReviewState { task: { completed_at: string | null } | null; blocking: boolean }
 
-const readinessSummary = (v: VehicleRow) => {
-  const checks = buildChecks(v);
+const buildChecks = (v: VehicleRow, recall?: RecallReviewState): ReadyCheck[] => {
+  const checks: ReadyCheck[] = [
+    { ok: true, label: "Vehicle created", when: v.created_at },
+    { ok: !!v.ymm, label: "VIN decoded", when: v.ymm ? v.updated_at : null },
+    { ok: v.status === "published", label: "Published to shopper portal", when: v.published_at, blocks: true },
+    { ok: !!(v.recall_status || v.recall_check), label: "Recall checked", when: v.recall_checked_at },
+    { ok: !!v.prep_status?.foreman_signed_at, label: "Prep & install signed off", when: v.prep_status?.foreman_signed_at || null },
+    { ok: (v.documents?.length || 0) > 0, label: "Documents attached", when: null },
+    { ok: (v.service_records?.length || 0) > 0, label: "Service history", when: null },
+    { ok: !!v.warranty_info && Object.keys(v.warranty_info).length > 0, label: "Remaining warranty", when: null },
+    { ok: (v.available_accessories?.length || 0) > 0, label: "Available accessories", when: null },
+  ];
+  // An open recall raises a required Service task that blocks publish until the
+  // service department records an outcome. Inserted right after "Recall checked".
+  if (recall?.task) {
+    checks.splice(4, 0, {
+      ok: !recall.blocking,
+      label: "Open Recall Review Required",
+      when: recall.task.completed_at,
+      blocks: recall.blocking,
+    });
+  }
+  return checks;
+};
+
+const readinessSummary = (v: VehicleRow, recall?: RecallReviewState) => {
+  const checks = buildChecks(v, recall);
   const done = checks.filter((c) => c.ok).length;
   const pct = Math.round((done / checks.length) * 100);
   return { checks, done, pct, remaining: checks.filter((c) => !c.ok) };
@@ -139,6 +156,7 @@ const shortCheck = (label: string): string => (({
   "VIN decoded": "VIN",
   "Published to shopper portal": "Publish",
   "Recall checked": "Recall",
+  "Open Recall Review Required": "Recall Review",
   "Prep & install signed off": "Prep & Install",
   "Documents attached": "Documents",
   "Service history": "Service",
@@ -163,6 +181,8 @@ const VehicleFile = () => {
   const [imgIdx, setImgIdx] = useState(0);
   const [publishing, setPublishing] = useState(false);
   const [repulling, setRepulling] = useState(false);
+  // Open-recall service task (auto-raised by a DB trigger on every recall pull).
+  const recall = useRecallTask(vehicle?.vin, vehicle?.tenant_id);
 
   // Keep ?tab= in sync so deep-links + refreshes land on the same tab.
   useEffect(() => {
@@ -259,6 +279,11 @@ const VehicleFile = () => {
 
   const publish = async () => {
     if (!vehicle) return;
+    // Open recall must be reviewed by service before publish.
+    if (recall.blocking) {
+      toast.error("Open Recall Review Required — service must record an outcome before publishing.");
+      return;
+    }
     setPublishing(true);
     try {
       const { error } = await (supabase as any)
@@ -318,10 +343,10 @@ const VehicleFile = () => {
     { id: "evidence",  label: "Evidence",  icon: Activity },
   ];
 
-  const ready = readinessSummary(vehicle);
+  const ready = readinessSummary(vehicle, recall);
   const heroMc = (vehicle.mc_attributes || {}) as Record<string, unknown>;
   const stockNo = (heroMc.stock_no as string) || ((vehicle.sticker_snapshot?.decoded as Record<string, unknown> | undefined)?.stock as string) || null;
-  const gallery: string[] = (vehicle.photos && vehicle.photos.length ? vehicle.photos : (vehicle.hero_image_url ? [vehicle.hero_image_url] : []));
+  const gallery: string[] = listingGallery(vehicle);
   const safeImg = gallery.length ? Math.min(imgIdx, gallery.length - 1) : 0;
 
   return (
@@ -560,7 +585,7 @@ const VehicleFile = () => {
 
       {/* Panels */}
       <div className="pt-2">
-        {tab === "overview"  && <OverviewPanel vehicle={vehicle} onTab={setTab} />}
+        {tab === "overview"  && <OverviewPanel vehicle={vehicle} onTab={setTab} recall={recall} />}
         {tab === "documents" && <DocumentsPanel vehicle={vehicle} onReload={load} />}
         {tab === "scan"      && <ScanInfoPanel vehicle={vehicle} onReload={load} />}
         {tab === "customer"  && <CustomerPanel vehicle={vehicle} />}
@@ -646,7 +671,7 @@ const PRETTY_ACTION: Record<string, string> = {
 const prettyAction = (a: string) =>
   PRETTY_ACTION[a] || a.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
 
-const OverviewPanel = ({ vehicle, onTab }: { vehicle: VehicleRow; onTab: (t: TabId) => void }) => {
+const OverviewPanel = ({ vehicle, onTab, recall }: { vehicle: VehicleRow; onTab: (t: TabId) => void; recall: ReturnType<typeof useRecallTask> }) => {
   const [events, setEvents] = useState<AuditEvent[]>([]);
   const [loadingEvents, setLoadingEvents] = useState(true);
   const { fetchSpecs, loading: pullingSpecs } = useVehicleSpecs();
@@ -678,7 +703,7 @@ const OverviewPanel = ({ vehicle, onTab }: { vehicle: VehicleRow; onTab: (t: Tab
     return () => { cancelled = true; };
   }, [vehicle.id, vehicle.vin, vehicle.slug]);
 
-  const { checks, pct, remaining } = readinessSummary(vehicle);
+  const { checks, pct, remaining } = readinessSummary(vehicle, recall);
   const notReady = pct < 100;
   const ringTone = pct === 100 ? "#10B981" : pct >= 60 ? "#2563EB" : "#F59E0B";
   const decoded = (vehicle.sticker_snapshot?.decoded as Record<string, unknown> | undefined) || undefined;
@@ -858,7 +883,7 @@ const OverviewPanel = ({ vehicle, onTab }: { vehicle: VehicleRow; onTab: (t: Tab
 
         {/* Recall + Packet Completeness, stacked */}
         <div className="space-y-4">
-          <RecallCard vehicle={vehicle} />
+          <RecallCard vehicle={vehicle} recall={recall} />
           <MarketPricingCard vehicle={vehicle} />
           <Card title="Packet Completeness">
             <div className="flex items-end justify-between gap-2">
@@ -2257,8 +2282,68 @@ const Item = ({ ok, label, when }: { ok: boolean; label: string; when: string | 
   </li>
 );
 
+// Service Get Ready: record the recall outcome (one of three) with the required
+// service detail. Resolving the task clears the publish blocker (a "No fix
+// available" outcome keeps the recall visible but is still a recorded review).
+const OUTCOME_ORDER: RecallOutcome[] = ["recall_completed", "no_fix_available", "does_not_apply"];
+const RecallReviewActions = ({ recall }: { recall: ReturnType<typeof useRecallTask> }) => {
+  const { task, blocking, submitting, submitOutcome } = recall;
+  const [picked, setPicked] = useState<RecallOutcome | null>(null);
+  const [employee, setEmployee] = useState("");
+  const [ro, setRo] = useState("");
+  const [notes, setNotes] = useState("");
+
+  if (!task) return null;
+
+  // Already reviewed — show the immutable record (audit trail preserved).
+  if (task.status === "resolved" && task.outcome) {
+    return (
+      <div className="mt-3 rounded-lg border border-emerald-200 bg-emerald-50/60 p-2.5">
+        <p className="text-[11px] font-bold text-emerald-800">Recall reviewed · {OUTCOME_LABELS[task.outcome]}</p>
+        <p className="text-[11px] text-muted-foreground mt-0.5">
+          {[task.employee_name, task.ro_number ? `RO ${task.ro_number}` : null, task.completed_at ? new Date(task.completed_at).toLocaleDateString() : null].filter(Boolean).join(" · ")}
+        </p>
+        {task.notes ? <p className="text-[11px] text-muted-foreground mt-0.5">{task.notes}</p> : null}
+        {task.outcome === "no_fix_available" && <p className="text-[11px] text-amber-700 mt-1">OEM remedy not yet available — recall stays visible; dealer publish policy applies.</p>}
+      </div>
+    );
+  }
+
+  const submit = async () => {
+    if (!picked) return;
+    if (!employee.trim()) { toast.error("Service employee name is required"); return; }
+    const r = await submitOutcome(picked, { employeeName: employee.trim(), roNumber: ro.trim() || undefined, notes: notes.trim() || undefined });
+    if (r.ok) toast.success("Recall outcome recorded"); else toast.error(r.error || "Could not record outcome");
+  };
+
+  return (
+    <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50/60 p-2.5">
+      <p className="text-[11px] font-bold text-amber-800">Open Recall Review Required {blocking ? "· blocks publish" : ""}</p>
+      <p className="text-[11px] text-muted-foreground mt-0.5 mb-2">Service must record an outcome before this vehicle can publish.</p>
+      <div className="flex flex-wrap gap-1.5">
+        {OUTCOME_ORDER.map((o) => (
+          <button key={o} onClick={() => setPicked(o)}
+            className={`text-[11px] font-semibold px-2 py-1 rounded-md border transition-colors ${picked === o ? "border-blue-500 bg-blue-50 text-blue-700" : "border-border bg-card text-foreground hover:bg-muted"}`}>
+            {OUTCOME_LABELS[o]}
+          </button>
+        ))}
+      </div>
+      {picked && (
+        <div className="mt-2 space-y-1.5">
+          <input value={employee} onChange={(e) => setEmployee(e.target.value)} placeholder="Service employee name *" className="w-full px-2 py-1.5 border border-border rounded text-[12px]" />
+          <input value={ro} onChange={(e) => setRo(e.target.value)} placeholder="RO number (if applicable)" className="w-full px-2 py-1.5 border border-border rounded text-[12px]" />
+          <textarea value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Notes" rows={2} className="w-full px-2 py-1.5 border border-border rounded text-[12px] resize-none" />
+          <button onClick={submit} disabled={submitting} className="w-full h-8 rounded-md bg-blue-600 text-white text-[12px] font-semibold disabled:opacity-50">
+            {submitting ? "Recording…" : `Record: ${OUTCOME_LABELS[picked]}`}
+          </button>
+        </div>
+      )}
+    </div>
+  );
+};
+
 // MarketCheck AutoRecalls — live 4-state card (clear / open / unknown / error).
-const RecallCard = ({ vehicle }: { vehicle: VehicleRow }) => {
+const RecallCard = ({ vehicle, recall }: { vehicle: VehicleRow; recall: ReturnType<typeof useRecallTask> }) => {
   const [status, setStatus] = useState<string | null>(vehicle.recall_status);
   const [checkedAt, setCheckedAt] = useState<string | null>(vehicle.recall_checked_at);
   const [open, setOpen] = useState<number>(vehicle.open_recall_count ?? 0);
@@ -2303,6 +2388,7 @@ const RecallCard = ({ vehicle }: { vehicle: VehicleRow }) => {
             </li>
           ))}
         </ul>
+        <RecallReviewActions recall={recall} />
       </Card>
     );
   }
