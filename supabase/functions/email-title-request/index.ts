@@ -55,6 +55,17 @@ Deno.serve(async (req) => {
   if (recipients.length === 0 && ob?.email) recipients = splitEmails(ob.email as string);
   if (recipients.length === 0) return json(400, { error: "no recipient — set a title clerk email in Settings" });
 
+  // Round-robin: when enabled, email a single clerk and rotate to the next on
+  // each re-send for this vehicle, instead of emailing everyone at once. The
+  // rotation index is the count of prior title sends for this VIN, so each
+  // reminder lands on a different person until the title is filed.
+  if (!body.to && recipients.length > 1 && String(settings.title_round_robin) === "true") {
+    const { count } = await admin.from("audit_log")
+      .select("id", { count: "exact", head: true })
+      .eq("store_id", tenantId).eq("action", "title_request_emailed").eq("entity_id", vin);
+    recipients = [recipients[(count || 0) % recipients.length]];
+  }
+
   // Mint or reuse a long-lived title-upload token.
   let token: string | undefined;
   const { data: existing } = await admin.from("dept_signoff_tokens")

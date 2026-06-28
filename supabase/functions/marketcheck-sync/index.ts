@@ -156,6 +156,19 @@ async function autoPreload(admin: any, supabaseUrl: string, serviceKey: string, 
       }).catch(() => { /* best-effort */ });
     } catch { /* title email best-effort */ }
   }
+  // Fire-once recon orchestration: seed the intake estimate and (in auto mode)
+  // route over-threshold lines to the used-car manager. Idempotent server-side,
+  // so a re-sync never double-dispatches; fully isolated from the sync loop.
+  if (listingId) {
+    try {
+      fetch(`${supabaseUrl}/functions/v1/ingest-orchestrate`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${serviceKey}` },
+        body: JSON.stringify({ tenant_id: tenantId, vin, listing_id: listingId, ymm }),
+        signal: AbortSignal.timeout(20000),
+      }).catch(() => { /* best-effort */ });
+    } catch { /* orchestration best-effort */ }
+  }
 }
 
 // One page of a rooftop's inventory from the syndication feed. owned=true drops
