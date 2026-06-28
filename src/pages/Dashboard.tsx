@@ -20,6 +20,22 @@ import {
   ChevronRight,
 } from "lucide-react";
 
+// Shape of an addendum row as the dashboard reads it. The query returns
+// loosely-typed rows (PostgREST), so this names just the fields used here;
+// JSON-blob columns stay `any` to preserve the existing untyped handling.
+interface DashAddendum {
+  id: string;
+  status: string;
+  created_at: string;
+  customer_name?: string | null;
+  vehicle_ymm?: string | null;
+  total_with_optional?: number | null;
+  signing_token?: string | null;
+  rate?: any;
+  optional_selections?: any;
+  products_snapshot?: any;
+}
+
 const Dashboard = () => {
   const { user } = useAuth();
   const { currentStore, tenant } = useTenant();
@@ -53,7 +69,7 @@ const Dashboard = () => {
     enabled: !!user,
   });
 
-  const all = addendums || [];
+  const all: DashAddendum[] = addendums || [];
   const signed = all.filter(a => a.status === "signed");
   const drafts = all.filter(a => a.status === "draft");
 

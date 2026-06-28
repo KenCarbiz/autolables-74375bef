@@ -779,7 +779,7 @@ const Index = () => {
       const canvas = await html2canvas(card, {
         scale: 2,
         useCORS: true,
-        ignoreElements: (el) => el.classList?.contains("no-print"),
+        ignoreElements: (el: Element) => el.classList?.contains("no-print"),
         // Render input/select/textarea text as plain text so html2canvas
         // doesn't clip it at the bottom of the PDF.
         onclone: replaceInputsForCanvas,

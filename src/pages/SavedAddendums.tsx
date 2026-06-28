@@ -72,7 +72,7 @@ const SavedAddendums = ({ stage = "saved" }: { stage?: DealStage }) => {
     return a.status !== "signed";
   };
 
-  const filtered = addendums?.filter(inStage).filter((a) => {
+  const filtered = addendums?.filter(inStage).filter((a: any) => {
     const q = search.toLowerCase();
     if (!q) return true;
     return (
@@ -143,7 +143,7 @@ const SavedAddendums = ({ stage = "saved" }: { stage?: DealStage }) => {
             {/* Mobile: stacked cards so status, total, and every action stay on
                 screen instead of being scrolled off a wide table. */}
             <div className="md:hidden space-y-3">
-              {filtered.map((a) => (
+              {filtered.map((a: any) => (
                 <div key={a.id} className="bg-card rounded-xl border border-border shadow-sm p-4">
                   <button onClick={() => navigate(`/addendum?id=${a.id}`)} className="w-full text-left">
                     <div className="flex items-start justify-between gap-3">
@@ -196,7 +196,7 @@ const SavedAddendums = ({ stage = "saved" }: { stage?: DealStage }) => {
                     </tr>
                   </thead>
                   <tbody>
-                    {filtered.map((a) => (
+                    {filtered.map((a: any) => (
                       <tr key={a.id} className="border-b last:border-0 hover:bg-muted/30">
                         <td className="px-4 py-3 whitespace-nowrap">{format(new Date(a.created_at), "MMM d, yyyy")}</td>
                         <td className="px-4 py-3">{a.vehicle_ymm || "—"}</td>
