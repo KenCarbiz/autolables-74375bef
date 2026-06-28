@@ -11,7 +11,10 @@ import { supabase } from "@/integrations/supabase/client";
 // key. No-ops when disabled (preview/mock) or with no slug.
 // ──────────────────────────────────────────────────────────────────────
 
-function sessionId(): string {
+// Shared per-visit shopper session id (sessionStorage). Reused by the passport
+// data loader so a "your packet was viewed" notification can be deduped to one
+// per shopper session, and by engagement tracking so dwell rolls up per visit.
+export function passportSessionId(): string {
   try {
     const k = "al_passport_sid";
     let s = sessionStorage.getItem(k);
@@ -21,7 +24,7 @@ function sessionId(): string {
 }
 
 export function usePassportEngagement(slug: string | undefined, activePanel: string | null, enabled = true) {
-  const sid = useMemo(() => sessionId(), []);
+  const sid = useMemo(() => passportSessionId(), []);
   const acc = useRef<Record<string, number>>({});
   const panelRef = useRef<string | null>(activePanel);
   useEffect(() => { panelRef.current = activePanel; }, [activePanel]);

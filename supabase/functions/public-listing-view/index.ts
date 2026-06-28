@@ -56,8 +56,9 @@ serve(async (req) => {
     const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
     if (!supabaseUrl || !serviceKey) return json(500, { error: "supabase not configured" });
 
-    const { slug } = await req.json().catch(() => ({}));
+    const { slug, session } = await req.json().catch(() => ({}));
     if (!slug || typeof slug !== "string") return json(400, { error: "slug required" });
+    const sessionId = typeof session === "string" ? session.slice(0, 80) : "";
 
     const ip = clientIp(req);
     const ua = req.headers.get("user-agent") || "";
@@ -123,6 +124,8 @@ serve(async (req) => {
           .from("dealer_profiles").select("settings").eq("tenant_id", row.tenant_id).maybeSingle();
         const s = (prof?.settings ?? {}) as Record<string, unknown>;
         if (s.sticky_bottom_buttons) row.sticky_bottom_buttons = s.sticky_bottom_buttons;
+        // Price-drop watch opt-in is on unless the dealer turned it off.
+        row.price_drop_watch = s.price_drop_watch_enabled !== false;
         // Customer-facing price display mode (advertised_before_doc default vs
         // website_sale_price). Lets the passport show the dealer's chosen price.
         if (s.price_display_mode) row.price_display_mode = s.price_display_mode;
@@ -264,6 +267,59 @@ serve(async (req) => {
         details: { slug: lookupSlug, requested: slug },
       }),
     ]);
+
+    // ── #2 "Your packet was viewed" notification ────────────────────────────
+    // When the dealer has opted in, email the configured recipient that a
+    // shopper opened this vehicle's packet. Deduped to once per shopper session
+    // (or, with no session, once per VIN / 6h) so the salesperson gets a real
+    // heads-up without being buried by repeat opens, refreshes, or scrapers.
+    try {
+      if (row.tenant_id) {
+        const { data: prof } = await admin
+          .from("dealer_profiles").select("settings").eq("tenant_id", row.tenant_id).maybeSingle();
+        const s = (prof?.settings ?? {}) as Record<string, unknown>;
+        const enabled = s.view_notify_enabled === true || String(s.view_notify_enabled) === "true";
+        const recipients = String(s.view_notify_email || "")
+          .split(/[\n,;]+/).map((e) => e.trim().toLowerCase()).filter((e) => e.includes("@"));
+        if (enabled && recipients.length && row.vin) {
+          const vinU = String(row.vin).toUpperCase();
+          const sinceIso = new Date(Date.now() - 6 * 60 * 60_000).toISOString();
+          let dq = admin.from("audit_log").select("id", { head: true, count: "exact" })
+            .eq("action", "packet_view_notified").eq("entity_id", row.id).gte("created_at", sinceIso);
+          if (sessionId) dq = admin.from("audit_log").select("id", { head: true, count: "exact" })
+            .eq("action", "packet_view_notified").eq("entity_id", row.id)
+            .contains("details", { session: sessionId });
+          const { count: already } = await dq;
+          if (!already) {
+            const title = [row.year, row.make, row.model, row.trim].filter(Boolean).join(" ").trim() || "your vehicle";
+            const priceNum = typeof row.price === "number" ? row.price : Number(row.price);
+            const priceStr = Number.isFinite(priceNum) && priceNum > 0
+              ? `$${Math.round(priceNum).toLocaleString("en-US")}` : "";
+            const origin = (req.headers.get("origin") || "").replace(/\/$/, "");
+            const packetUrl = `${origin || "https://autolabels.io"}/v/${encodeURIComponent(row.slug || vinU)}`;
+            const stockStr = (row.mc_attributes && (row.mc_attributes as Record<string, unknown>).stock_no) || row.stock_number || "";
+            const html = `
+              <div style="font-family:Inter,Arial,sans-serif;max-width:520px;margin:0 auto;color:#0F172A">
+                <p style="font-size:15px;margin:0 0 4px">A shopper just opened the digital packet for:</p>
+                <h2 style="font-size:20px;margin:8px 0 2px">${title}</h2>
+                ${priceStr ? `<p style="font-size:15px;color:#2563EB;font-weight:700;margin:0 0 2px">${priceStr}</p>` : ""}
+                <p style="font-size:13px;color:#475569;margin:0 0 16px">VIN ${vinU}${stockStr ? ` &middot; Stock ${stockStr}` : ""}</p>
+                <a href="${packetUrl}" style="display:inline-block;background:#2563EB;color:#fff;text-decoration:none;padding:11px 18px;border-radius:12px;font-weight:600;font-size:14px">View the packet</a>
+                <p style="font-size:12px;color:#94A3B8;margin:18px 0 0">You're receiving this because packet-view alerts are on for this dealership. Turn them off in AutoLabels &rarr; Admin.</p>
+              </div>`;
+            await fetch(`${supabaseUrl}/functions/v1/send-email`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json", "Authorization": `Bearer ${serviceKey}` },
+              body: JSON.stringify({ to: recipients, subject: `Packet viewed: ${title}`, html }),
+            }).catch(() => {});
+            await admin.from("audit_log").insert({
+              action: "packet_view_notified", entity_type: "vehicle_listing", entity_id: row.id,
+              store_id: row.store_id || null, details: { vin: vinU, session: sessionId || null, recipients: recipients.length },
+            });
+          }
+        }
+      }
+    } catch { /* notification is best-effort; never block the shopper view */ }
 
     return json(200, { listing: row });
   } catch (err) {

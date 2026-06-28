@@ -14,6 +14,7 @@ import { formatPhone } from "@/components/addendum/CustomerInfoSection";
 import Logo from "@/components/brand/Logo";
 import { derivePassport, computePriceHistory, fmt$, listingEquipment } from "@/lib/passportV2Data";
 import { resolveStickyButtons, type StickyBottomButtons } from "@/lib/stickyButtons";
+import PriceDropWatch from "@/components/listing/PriceDropWatch";
 import { listingGallery } from "@/lib/photos";
 import { usePassportEngagement } from "@/lib/passportEngagement";
 import { packetVisible } from "@/lib/packetModules";
@@ -416,6 +417,7 @@ const VehiclePassportV3 = () => {
               <div className="grid grid-cols-2 gap-3">
                 {actions.map((a) => <button key={a.label} onClick={a.onClick} className={`${CARD} p-3 flex flex-col items-center justify-center gap-1.5 hover:border-[#2563EB] transition-colors h-[84px]`}><a.icon className="w-5 h-5 text-[#2563EB]" /><span className="text-[12px] font-semibold text-center leading-tight">{a.label}</span></button>)}
               </div>
+              {price != null && <PriceDropWatch slug={listing.slug || vehicleSlug || listing.vin} enabled={(listing as unknown as { price_drop_watch?: boolean }).price_drop_watch !== false} />}
             </div>
           </div>
         </section>

@@ -193,6 +193,14 @@ export interface DealerSettings {
   title_reminders_enabled: boolean;
   title_reminder_days: number;
   title_email_on_intake: boolean;
+  // Packet engagement loop. "Packet viewed" alert emails the salesperson/BDC
+  // when a shopper opens a vehicle packet (deduped per shopper session). The
+  // price-drop watch lets shoppers ask to be notified, and re-engages them by
+  // email when the advertised price falls.
+  view_notify_enabled: boolean;
+  view_notify_email: string;          // comma/newline-separated recipients
+  price_drop_watch_enabled: boolean;  // show the "notify me on price drop" opt-in
+  price_drop_emails_enabled: boolean; // actually send the re-engagement emails
   // Compliance
   cars_act_mode: boolean;
   retention_years: number;
@@ -312,6 +320,10 @@ export const DEFAULT_SETTINGS: DealerSettings = {
   title_reminders_enabled: true,
   title_reminder_days: 3,
   title_email_on_intake: true,
+  view_notify_enabled: false,
+  view_notify_email: "",
+  price_drop_watch_enabled: true,
+  price_drop_emails_enabled: true,
   cars_act_mode: false,
   retention_years: 7,
   required_languages: ["en"],

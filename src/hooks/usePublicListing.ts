@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { passportSessionId } from "@/lib/passportEngagement";
 import type { VehicleListing } from "@/hooks/useVehicleListing";
 
 // Shared, cached fetch for the public Vehicle Passport (`public-listing-view`).
@@ -31,7 +32,8 @@ export function usePublicListing(
     gcTime: 30 * 60 * 1000,
     retry: 1,
     queryFn: async () => {
-      const { data, error } = await supabase.functions.invoke("public-listing-view", { body: { slug: key } });
+      const session = (() => { try { return passportSessionId(); } catch { return undefined; } })();
+      const { data, error } = await supabase.functions.invoke("public-listing-view", { body: { slug: key, session } });
       if (error) throw error;
       const row = (data as { listing?: VehicleListing } | null)?.listing ?? null;
       if (!row) throw new Error("not_found");

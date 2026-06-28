@@ -1378,6 +1378,40 @@ const Admin = () => {
               </div>
             </div>
 
+            {/* Shopper engagement loop */}
+            <div className="bg-card rounded-lg p-4 shadow-premium mb-3">
+              <h4 className="text-sm font-bold text-foreground mb-1">Shopper Engagement</h4>
+              <p className="text-xs text-muted-foreground mb-3">Get alerted when a shopper opens a vehicle packet, and automatically re-engage shoppers by email when a price drops.</p>
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-semibold text-foreground">Email me when a packet is viewed</span>
+                  <Switch checked={!!settings.view_notify_enabled} onCheckedChange={(v) => updateSettings({ view_notify_enabled: v })} className="data-[state=checked]:bg-teal" />
+                </div>
+                {settings.view_notify_enabled && (
+                  <div>
+                    <label className="text-xs font-semibold text-muted-foreground">Alert recipient(s)</label>
+                    <textarea
+                      value={settings.view_notify_email || ""}
+                      onChange={(e) => updateSettings({ view_notify_email: e.target.value })}
+                      rows={2}
+                      placeholder="sales@dealership.com, bdc@dealership.com"
+                      className="w-full px-3 py-2 border border-border-custom rounded text-sm resize-none"
+                    />
+                    <p className="text-[11px] text-muted-foreground mt-1">One alert per shopper visit (deduped per session) so you're not buried by refreshes or scrapers.</p>
+                  </div>
+                )}
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-semibold text-foreground">Let shoppers watch for price drops</span>
+                  <Switch checked={settings.price_drop_watch_enabled !== false} onCheckedChange={(v) => updateSettings({ price_drop_watch_enabled: v })} className="data-[state=checked]:bg-teal" />
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-semibold text-foreground">Send price-drop re-engagement emails</span>
+                  <Switch checked={settings.price_drop_emails_enabled !== false} onCheckedChange={(v) => updateSettings({ price_drop_emails_enabled: v })} className="data-[state=checked]:bg-teal" />
+                </div>
+                <p className="text-[11px] text-muted-foreground">When the advertised price falls, watchers get one email per drop with the new price and a link back to the packet.</p>
+              </div>
+            </div>
+
             {/* Integrations status */}
             <div className="bg-card rounded-lg p-4 shadow-premium mb-3">
               <h4 className="text-sm font-bold text-foreground mb-2">Integration Status</h4>
