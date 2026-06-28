@@ -3466,6 +3466,178 @@ export type Database = {
           },
         ]
       }
+      recon_estimate_lines: {
+        Row: {
+          approval_status: string
+          approved_amount: number | null
+          category: string | null
+          created_at: string
+          decided_at: string | null
+          decided_by: string | null
+          decided_role: string | null
+          decision_channel: string | null
+          decline_reason: string | null
+          description: string
+          estimate_id: string
+          id: string
+          labor_cost: number
+          line_total: number
+          parts_cost: number
+          photos: Json
+          severity: string | null
+          sublet_cost: number
+          tenant_id: string
+          vendor: string | null
+        }
+        Insert: {
+          approval_status?: string
+          approved_amount?: number | null
+          category?: string | null
+          created_at?: string
+          decided_at?: string | null
+          decided_by?: string | null
+          decided_role?: string | null
+          decision_channel?: string | null
+          decline_reason?: string | null
+          description: string
+          estimate_id: string
+          id?: string
+          labor_cost?: number
+          line_total?: number
+          parts_cost?: number
+          photos?: Json
+          severity?: string | null
+          sublet_cost?: number
+          tenant_id: string
+          vendor?: string | null
+        }
+        Update: {
+          approval_status?: string
+          approved_amount?: number | null
+          category?: string | null
+          created_at?: string
+          decided_at?: string | null
+          decided_by?: string | null
+          decided_role?: string | null
+          decision_channel?: string | null
+          decline_reason?: string | null
+          description?: string
+          estimate_id?: string
+          id?: string
+          labor_cost?: number
+          line_total?: number
+          parts_cost?: number
+          photos?: Json
+          severity?: string | null
+          sublet_cost?: number
+          tenant_id?: string
+          vendor?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "recon_estimate_lines_estimate_id_fkey"
+            columns: ["estimate_id"]
+            isOneToOne: false
+            referencedRelation: "recon_estimates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      recon_estimate_messages: {
+        Row: {
+          author_id: string | null
+          author_name: string | null
+          author_role: string | null
+          body: string
+          created_at: string
+          estimate_id: string
+          id: string
+          tenant_id: string
+        }
+        Insert: {
+          author_id?: string | null
+          author_name?: string | null
+          author_role?: string | null
+          body: string
+          created_at?: string
+          estimate_id: string
+          id?: string
+          tenant_id: string
+        }
+        Update: {
+          author_id?: string | null
+          author_name?: string | null
+          author_role?: string | null
+          body?: string
+          created_at?: string
+          estimate_id?: string
+          id?: string
+          tenant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "recon_estimate_messages_estimate_id_fkey"
+            columns: ["estimate_id"]
+            isOneToOne: false
+            referencedRelation: "recon_estimates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      recon_estimates: {
+        Row: {
+          approval_token: string
+          approved_total: number
+          created_at: string
+          id: string
+          notes: string | null
+          status: string
+          store_id: string | null
+          submitted_by: string | null
+          submitted_role: string | null
+          subtotal: number
+          tenant_id: string
+          updated_at: string
+          vehicle_listing_id: string | null
+          vin: string
+          ymm: string | null
+        }
+        Insert: {
+          approval_token: string
+          approved_total?: number
+          created_at?: string
+          id?: string
+          notes?: string | null
+          status?: string
+          store_id?: string | null
+          submitted_by?: string | null
+          submitted_role?: string | null
+          subtotal?: number
+          tenant_id: string
+          updated_at?: string
+          vehicle_listing_id?: string | null
+          vin: string
+          ymm?: string | null
+        }
+        Update: {
+          approval_token?: string
+          approved_total?: number
+          created_at?: string
+          id?: string
+          notes?: string | null
+          status?: string
+          store_id?: string | null
+          submitted_by?: string | null
+          submitted_role?: string | null
+          subtotal?: number
+          tenant_id?: string
+          updated_at?: string
+          vehicle_listing_id?: string | null
+          vin?: string
+          ymm?: string | null
+        }
+        Relationships: []
+      }
       safety_inspections: {
         Row: {
           checklist: Json
@@ -5445,6 +5617,26 @@ export type Database = {
         Returns: string
       }
       current_tenant_id: { Args: never; Returns: string }
+      decide_recon_estimate: {
+        Args: {
+          _action: string
+          _approval_token: string
+          _by?: string
+          _channel?: string
+        }
+        Returns: Json
+      }
+      decide_recon_line: {
+        Args: {
+          _action: string
+          _approval_token: string
+          _by?: string
+          _channel?: string
+          _line_id: string
+          _reason?: string
+        }
+        Returns: Json
+      }
       find_abandoned_signings: {
         Args: {
           _limit?: number
@@ -5565,6 +5757,7 @@ export type Database = {
       }
       get_ready_nudge_payload: { Args: { p_tenant_id: string }; Returns: Json }
       get_recall_task_for_token: { Args: { _token: string }; Returns: Json }
+      get_recon_estimate: { Args: { _approval_token: string }; Returns: Json }
       get_reengage_schedule: {
         Args: never
         Returns: {
@@ -5823,6 +6016,35 @@ export type Database = {
       }
       recalc_tenant_doc_fee: { Args: { p_tenant_id: string }; Returns: number }
       recall_payload_signature: { Args: { p: Json }; Returns: string }
+      recon_caller_role: { Args: { _tenant: string }; Returns: string }
+      recon_decide_member: {
+        Args: {
+          _action: string
+          _by?: string
+          _estimate_id: string
+          _line_id: string
+          _reason?: string
+        }
+        Returns: Json
+      }
+      recon_post_message: {
+        Args: { _body: string; _by?: string; _estimate_id: string }
+        Returns: Json
+      }
+      recon_recompute_estimate: {
+        Args: { _estimate_id: string }
+        Returns: undefined
+      }
+      recon_submit_member: {
+        Args: {
+          _by: string
+          _lines: Json
+          _notes: string
+          _vin: string
+          _ymm: string
+        }
+        Returns: Json
+      }
       record_addendum_event: {
         Args: {
           _channel?: string
@@ -6005,6 +6227,17 @@ export type Database = {
           _task_id: string
         }
         Returns: string
+      }
+      submit_recon_estimate: {
+        Args: {
+          _auto_approve_under?: number
+          _lines: Json
+          _notes: string
+          _submitted_by: string
+          _submitted_role: string
+          _token: string
+        }
+        Returns: Json
       }
       submit_safety_inspection: {
         Args: {
