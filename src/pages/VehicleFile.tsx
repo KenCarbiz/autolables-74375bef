@@ -721,7 +721,12 @@ const OverviewPanel = ({ vehicle, onTab, recall }: { vehicle: VehicleRow; onTab:
     { label: "Upload Documents", icon: Upload, tone: "bg-slate-100 text-slate-600", onClick: () => onTab("documents") },
     { label: "Customer Sign-off", icon: Signature, tone: "bg-fuchsia-50 text-fuchsia-600", onClick: () => onTab("sign") },
     { label: "Publish Vehicle", icon: Globe, tone: "bg-emerald-50 text-emerald-600", onClick: () => onTab("labels") },
-    { label: "Open Shopper Portal", icon: ExternalLink, tone: "bg-blue-50 text-blue-600", onClick: () => window.open(publicUrl, "_blank", "noopener") },
+    // Only open the public passport when it actually exists — an unpublished
+    // vehicle's /v/{vin} renders "Vehicle unavailable", so route drafts to the
+    // publish flow instead of a blank page.
+    vehicle.status === "published"
+      ? { label: "Open Shopper Portal", icon: ExternalLink, tone: "bg-blue-50 text-blue-600", onClick: () => window.open(publicUrl, "_blank", "noopener") }
+      : { label: "Publish to Go Live", icon: Globe, tone: "bg-blue-50 text-blue-600", onClick: () => onTab("labels") },
   ];
 
   const mc = (vehicle.mc_attributes || {}) as Record<string, unknown>;
