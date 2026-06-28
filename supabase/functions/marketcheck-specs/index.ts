@@ -8,17 +8,11 @@
 //
 // Body: { vin, tenant_id?, vehicle_id? }
 // ──────────────────────────────────────────────────────────────────────
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { json, preflight } from "../_shared/http.ts";
+import { adminClient } from "../_shared/supabase.ts";
 
 const MC_KEY = Deno.env.get("MARKETCHECK_API_KEY_1") || Deno.env.get("MARKETCHECK_API_KEY") || "";
 const MC_BASE = "https://api.marketcheck.com/v2";
-
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-};
-const json = (status: number, body: unknown) =>
-  new Response(JSON.stringify(body), { status, headers: { ...corsHeaders, "Content-Type": "application/json" } });
 
 const validVin = (vin: string) => /^[A-HJ-NPR-Z0-9]{17}$/i.test(vin);
 const redact = (u: string) => u.replace(/api_key=[^&]+/, "api_key=***");
@@ -86,12 +80,10 @@ const specEndpoints = (vin: string): string[] => {
 };
 
 Deno.serve(async (req) => {
-  if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
+  const pf = preflight(req); if (pf) return pf;
   if (!MC_KEY) return json(200, { ok: false, error: "not_configured", note: "Set MARKETCHECK_API_KEY_1" });
 
-  const supabaseUrl = Deno.env.get("SUPABASE_URL") || "";
-  const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
-  const admin = createClient(supabaseUrl, serviceKey, { auth: { persistSession: false, autoRefreshToken: false } });
+  const admin = adminClient();
 
   const body = await req.json().catch(() => ({}));
   const vin = String(body.vin || "").toUpperCase().trim();
@@ -146,7 +138,7 @@ Deno.serve(async (req) => {
   // isolated so a missing column never fails the decode response.
   if (vehicleId || tenantId) {
     try {
-      const admin = createClient(Deno.env.get("SUPABASE_URL") || "", Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "");
+      const admin = adminClient();
       let sel = admin.from("vehicle_listings").select("id, mc_attributes").eq("vin", vin);
       if (tenantId) sel = sel.eq("tenant_id", tenantId);
       const { data: rows } = await sel.limit(1);
