@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { useReconEstimates, type ReconEstimate, type ReconLine, type ReconMessage, type NewLine } from "@/hooks/useReconEstimates";
+import { useDealerSettings, type ReconCannedService } from "@/contexts/DealerSettingsContext";
 import {
   Wrench, CheckCircle2, XCircle, Clock, Plus, Trash2, Printer, MessageSquare, Send, Loader2, Car, ShieldAlert, DollarSign,
 } from "lucide-react";
@@ -37,6 +38,8 @@ const printWorkOrder = (est: ReconEstimate, lines: ReconLine[]) => {
 
 export default function ReconBoard() {
   const { estimates, isManager, loading, reload, loadDetail, submit, decide, postMessage } = useReconEstimates();
+  const { settings } = useDealerSettings();
+  const canned = settings.recon_canned_services || [];
   const [selId, setSelId] = useState<string | null>(null);
   const [detail, setDetail] = useState<{ lines: ReconLine[]; messages: ReconMessage[] } | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
@@ -185,7 +188,7 @@ export default function ReconBoard() {
         </div>
       </div>
 
-      {showNew && <NewEstimateModal onClose={() => setShowNew(false)} onSubmit={async (input) => { const ok = await submit(input); if (ok) { setShowNew(false); toast.success("Recon estimate submitted"); } else toast.error("Couldn't submit — check the VIN belongs to your inventory."); return ok; }} />}
+      {showNew && <NewEstimateModal canned={canned} onClose={() => setShowNew(false)} onSubmit={async (input) => { const ok = await submit(input); if (ok) { setShowNew(false); toast.success("Recon estimate submitted"); } else toast.error("Couldn't submit — check the VIN belongs to your inventory."); return ok; }} />}
     </div>
   );
 }
@@ -215,7 +218,7 @@ function Stat({ icon, label, value }: { icon: React.ReactNode; label: string; va
   return <div className="rounded-xl bg-muted/50 p-3 text-center"><div className="text-muted-foreground inline-flex justify-center w-full mb-1">{icon}</div><div className="text-[15px] font-bold text-foreground">{value}</div><div className="text-[11px] text-muted-foreground">{label}</div></div>;
 }
 
-function NewEstimateModal({ onClose, onSubmit }: { onClose: () => void; onSubmit: (input: { vin: string; ymm?: string; notes?: string; lines: NewLine[] }) => Promise<boolean> }) {
+function NewEstimateModal({ canned, onClose, onSubmit }: { canned: ReconCannedService[]; onClose: () => void; onSubmit: (input: { vin: string; ymm?: string; notes?: string; lines: NewLine[] }) => Promise<boolean> }) {
   const [vin, setVin] = useState("");
   const [ymm, setYmm] = useState("");
   const [notes, setNotes] = useState("");
@@ -223,11 +226,29 @@ function NewEstimateModal({ onClose, onSubmit }: { onClose: () => void; onSubmit
   const [busy, setBusy] = useState(false);
   const valid = vin.trim().length >= 11 && lines.some((l) => l.description.trim());
   const set = (i: number, patch: Partial<NewLine>) => setLines((s) => s.map((l, x) => x === i ? { ...l, ...patch } : l));
+  const addCanned = (c: ReconCannedService) => setLines((s) => {
+    const next = [...s.filter((l) => l.description.trim()), { description: c.label, category: c.category, severity: c.severity, labor_cost: c.labor_cost, parts_cost: c.parts_cost }];
+    return next.length ? next : s;
+  });
+  // Sort the preprinted choices most-used first (self-aware common services).
+  const cannedSorted = [...canned].sort((a, b) => (b.uses || 0) - (a.uses || 0));
 
   return (
     <div className="fixed inset-0 z-50 bg-black/40 flex items-end sm:items-center justify-center p-0 sm:p-4" onClick={onClose}>
       <div className="bg-card w-full sm:max-w-lg sm:rounded-2xl rounded-t-2xl max-h-[92vh] overflow-y-auto p-5" onClick={(e) => e.stopPropagation()}>
         <h2 className="text-lg font-bold text-foreground mb-3">New recon estimate</h2>
+        {cannedSorted.length > 0 && (
+          <div className="mb-3">
+            <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mb-1.5">Quick add</p>
+            <div className="flex flex-wrap gap-1.5">
+              {cannedSorted.map((c, i) => (
+                <button key={i} onClick={() => addCanned(c)} className="h-8 px-2.5 rounded-full border border-border text-xs font-medium hover:border-primary hover:bg-primary/5">
+                  + {c.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
         <div className="grid grid-cols-2 gap-2 mb-2">
           <input value={vin} onChange={(e) => setVin(e.target.value.toUpperCase())} placeholder="VIN" className="h-10 rounded-lg border border-border bg-background px-3 text-sm" />
           <input value={ymm} onChange={(e) => setYmm(e.target.value)} placeholder="Year Make Model" className="h-10 rounded-lg border border-border bg-background px-3 text-sm" />

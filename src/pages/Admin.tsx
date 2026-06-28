@@ -1360,6 +1360,13 @@ const Admin = () => {
                   <Switch checked={!!settings.title_email_on_intake} onCheckedChange={(v) => updateSettings({ title_email_on_intake: v })} className="data-[state=checked]:bg-teal" />
                 </div>
                 <div className="flex items-center justify-between">
+                  <div className="pr-3">
+                    <span className="text-sm font-semibold text-foreground">Round-robin the request</span>
+                    <p className="text-[11px] text-muted-foreground">Send to one clerk at a time and rotate to the next on each reminder, instead of emailing everyone at once.</p>
+                  </div>
+                  <Switch checked={!!settings.title_round_robin} onCheckedChange={(v) => updateSettings({ title_round_robin: v })} className="data-[state=checked]:bg-teal" />
+                </div>
+                <div className="flex items-center justify-between">
                   <span className="text-sm font-semibold text-foreground">Resend reminders until received</span>
                   <Switch checked={!!settings.title_reminders_enabled} onCheckedChange={(v) => updateSettings({ title_reminders_enabled: v })} className="data-[state=checked]:bg-teal" />
                 </div>
@@ -1437,6 +1444,47 @@ const Admin = () => {
                     className="w-full px-3 py-2 border border-border-custom rounded text-sm resize-none"
                   />
                   <p className="text-[11px] text-muted-foreground mt-1">Gets the approve/decline link when an estimate needs a decision. Leave blank to send to the dealership's main contact email.</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Nightly-ingest automation */}
+            <div className="bg-card rounded-lg p-4 shadow-premium mb-3">
+              <h4 className="text-sm font-bold text-foreground mb-1">Ingest Automation</h4>
+              <p className="text-xs text-muted-foreground mb-3">When a new vehicle is ingested overnight, choose what fires automatically vs. what waits for a person to send it.</p>
+              <div className="space-y-3">
+                <div>
+                  <span className="text-sm font-semibold text-foreground">Recon estimate</span>
+                  <div className="flex gap-2 mt-1.5">
+                    {(["manual", "auto"] as const).map((m) => (
+                      <button key={m} onClick={() => updateSettings({ ingest_recon_dispatch: m })}
+                        className={`flex-1 h-9 rounded-lg text-xs font-semibold border ${settings.ingest_recon_dispatch === m ? "border-primary bg-primary/10 text-primary" : "border-border-custom text-foreground"}`}>
+                        {m === "manual" ? "Manager sends it" : "Auto-send on ingest"}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <div>
+                  <span className="text-sm font-semibold text-foreground">Detail get-ready</span>
+                  <div className="flex gap-2 mt-1.5">
+                    {(["manual", "auto"] as const).map((m) => (
+                      <button key={m} onClick={() => updateSettings({ ingest_detail_dispatch: m })}
+                        className={`flex-1 h-9 rounded-lg text-xs font-semibold border ${settings.ingest_detail_dispatch === m ? "border-primary bg-primary/10 text-primary" : "border-border-custom text-foreground"}`}>
+                        {m === "manual" ? "Send manually" : "Auto-send on ingest"}
+                      </button>
+                    ))}
+                  </div>
+                  <textarea
+                    value={settings.detail_default_instructions || ""}
+                    onChange={(e) => updateSettings({ detail_default_instructions: e.target.value })}
+                    rows={2}
+                    placeholder="Standing instructions sent to the detail shop (optional)"
+                    className="w-full mt-2 px-3 py-2 border border-border-custom rounded text-sm resize-none"
+                  />
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-semibold text-foreground">Auto-notify third-party installers on preinstall</span>
+                  <Switch checked={settings.thirdparty_auto_notify !== false} onCheckedChange={(v) => updateSettings({ thirdparty_auto_notify: v })} className="data-[state=checked]:bg-teal" />
                 </div>
               </div>
             </div>

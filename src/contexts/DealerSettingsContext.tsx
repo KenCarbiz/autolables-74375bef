@@ -17,6 +17,18 @@ export interface GetReadyService {
   cost: string;
 }
 
+// A preprinted recon line the service team can one-tap into an estimate, so
+// common work isn't re-typed every time. `uses` lets the system surface the
+// most-used ones first (self-aware common services).
+export interface ReconCannedService {
+  label: string;
+  category: string;   // mechanical | safety | tires | glass | cosmetic | interior | detail | keys | sublet
+  severity: string;   // required | recommended
+  labor_cost: number;
+  parts_cost: number;
+  uses?: number;
+}
+
 // ── Window-sticker PRINT templates ──────────────────────────────
 // Each dealer stores how they physically print a given document onto
 // label stock. Two modes:
@@ -206,6 +218,17 @@ export interface DealerSettings {
   // the used-car manager (recon_approval_email recipients) to approve/decline.
   recon_auto_approve_amount: number;
   recon_approval_email: string;       // comma/newline-separated UCM recipients
+  // ── Nightly-ingest automation spine ──────────────────────────────────────
+  // For each downstream flow the dealer chooses "manual" (a person sends/OKs)
+  // or "auto" (fires automatically on ingest). The orchestrator reads these.
+  ingest_recon_dispatch: "manual" | "auto";   // recon estimate → UCM queue
+  ingest_detail_dispatch: "manual" | "auto";  // get-ready → detail shop
+  detail_default_instructions: string;        // instructions sent with detail get-ready
+  thirdparty_auto_notify: boolean;             // auto-notify the installer on a preinstall
+  title_round_robin: boolean;                  // rotate title requests person-to-person vs all at once
+  // Preprinted recon choices service can pick to document faster. Self-aware:
+  // frequently-added items can be promoted into this list.
+  recon_canned_services: ReconCannedService[];
   // Compliance
   cars_act_mode: boolean;
   retention_years: number;
@@ -331,6 +354,19 @@ export const DEFAULT_SETTINGS: DealerSettings = {
   price_drop_emails_enabled: true,
   recon_auto_approve_amount: 500,
   recon_approval_email: "",
+  ingest_recon_dispatch: "manual",
+  ingest_detail_dispatch: "manual",
+  detail_default_instructions: "",
+  thirdparty_auto_notify: true,
+  title_round_robin: false,
+  recon_canned_services: [
+    { label: "Full safety inspection", category: "safety", severity: "required", labor_cost: 0, parts_cost: 0 },
+    { label: "Front brake pads & rotors", category: "mechanical", severity: "required", labor_cost: 180, parts_cost: 220 },
+    { label: "Mount & balance 4 tires", category: "tires", severity: "recommended", labor_cost: 100, parts_cost: 0 },
+    { label: "Oil & filter change", category: "mechanical", severity: "recommended", labor_cost: 40, parts_cost: 45 },
+    { label: "Full detail", category: "detail", severity: "recommended", labor_cost: 0, parts_cost: 0 },
+    { label: "Windshield chip repair", category: "glass", severity: "recommended", labor_cost: 0, parts_cost: 0 },
+  ],
   cars_act_mode: false,
   retention_years: 7,
   required_languages: ["en"],
