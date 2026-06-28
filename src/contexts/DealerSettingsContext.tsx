@@ -222,6 +222,8 @@ export interface DealerSettings {
   // For each downstream flow the dealer chooses "manual" (a person sends/OKs)
   // or "auto" (fires automatically on ingest). The orchestrator reads these.
   ingest_auto_publish: boolean;                // publish the passport on intake (no prep gate)
+  require_safety_inspection: boolean;          // finalize gate: signed K-208 required before signing
+  k208_authority_roles: string[];              // roles whose signed K-208 satisfies the gate ([]=any)
   require_install_verification: boolean;       // finalize gate: all preinstalls verified before signing
   ingest_recon_dispatch: "manual" | "auto";   // recon estimate → UCM queue
   ingest_detail_dispatch: "manual" | "auto";  // get-ready → detail shop
@@ -358,6 +360,8 @@ export const DEFAULT_SETTINGS: DealerSettings = {
   recon_auto_approve_amount: 500,
   recon_approval_email: "",
   ingest_auto_publish: true,
+  require_safety_inspection: false,
+  k208_authority_roles: [],
   require_install_verification: false,
   ingest_recon_dispatch: "manual",
   ingest_detail_dispatch: "manual",

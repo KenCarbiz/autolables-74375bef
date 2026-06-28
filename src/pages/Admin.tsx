@@ -1463,6 +1463,34 @@ const Admin = () => {
                 </div>
                 <div className="flex items-center justify-between">
                   <div className="pr-3">
+                    <span className="text-sm font-semibold text-foreground">Require K-208 before finalizing</span>
+                    <p className="text-xs text-muted-foreground">Block the customer disclosure from being signed until the CT K-208 safety inspection is done (used/CPO only; new cars exempt).</p>
+                  </div>
+                  <Switch checked={settings.require_safety_inspection === true} onCheckedChange={(v) => updateSettings({ require_safety_inspection: v })} className="data-[state=checked]:bg-teal" />
+                </div>
+                {settings.require_safety_inspection === true && (
+                  <div className="pl-1 border-l-2 border-border-custom ml-1">
+                    <div className="pl-3">
+                      <span className="text-xs font-semibold text-foreground">Who may sign the K-208</span>
+                      <p className="text-xs text-muted-foreground mb-1.5">Leave all off to accept any signed K-208. Select roles to require the satisfying inspection be signed by a logged-in member with that role (a tech's anonymous QR sign-off won't count).</p>
+                      <div className="flex flex-wrap gap-1.5">
+                        {(["owner", "admin", "manager", "service"] as const).map((role) => {
+                          const on = (settings.k208_authority_roles || []).includes(role);
+                          return (
+                            <button key={role} onClick={() => {
+                              const cur = settings.k208_authority_roles || [];
+                              updateSettings({ k208_authority_roles: on ? cur.filter((r) => r !== role) : [...cur, role] });
+                            }} className={`h-8 px-3 rounded-full text-xs font-semibold border capitalize ${on ? "border-primary bg-primary/10 text-primary" : "border-border-custom text-foreground"}`}>
+                              {role}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  </div>
+                )}
+                <div className="flex items-center justify-between">
+                  <div className="pr-3">
                     <span className="text-sm font-semibold text-foreground">Require install verification before finalizing</span>
                     <p className="text-xs text-muted-foreground">Block the customer disclosure from being signed until every pre-installed product has a verified install (photo + signature).</p>
                   </div>
