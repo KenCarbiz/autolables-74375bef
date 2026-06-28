@@ -12,6 +12,7 @@ import type { Json } from "@/integrations/supabase/types";
 import { useAudit } from "@/contexts/AuditContext";
 import { useTenant } from "@/contexts/TenantContext";
 import { supabase } from "@/integrations/supabase/client";
+import InstallerContactsCard from "@/components/admin/InstallerContactsCard";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useVinScan } from "@/contexts/VinScanContext";
 import { toast } from "sonner";
@@ -1492,6 +1493,7 @@ const Admin = () => {
                   <span className="text-sm font-semibold text-foreground">Auto-notify third-party installers on preinstall</span>
                   <Switch checked={settings.thirdparty_auto_notify !== false} onCheckedChange={(v) => updateSettings({ thirdparty_auto_notify: v })} className="data-[state=checked]:bg-teal" />
                 </div>
+                <InstallerContactsCard />
               </div>
             </div>
 

@@ -43,6 +43,16 @@ async function orchestrateOne(admin: any, tenantId: string, vin: string, listing
     }).catch(() => { /* best-effort */ });
   }
 
+  // Auto-notify the dealer's third-party installers on intake (default on).
+  if (String(settings.thirdparty_auto_notify) !== "false") {
+    await fetch(`${SUPABASE_URL}/functions/v1/notify-installer`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${SERVICE_KEY}` },
+      body: JSON.stringify({ tenant_id: tenantId, vin }),
+      signal: AbortSignal.timeout(20000),
+    }).catch(() => { /* best-effort */ });
+  }
+
   const { data: seed } = await admin.rpc("seed_recon_estimate_for_ingest", {
     _tenant_id: tenantId, _vin: vin, _ymm: ymm, _vehicle_listing_id: listingId, _mode: mode,
   });
