@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useEffect, useRef, useState, ReactNode } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, ReactNode } from "react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -500,8 +500,13 @@ export const DealerSettingsProvider = ({ children }: { children: ReactNode }) =>
     [settings, tenantId, user]
   );
 
+  const value = useMemo(
+    () => ({ settings, loading, updateSettings, reload: load }),
+    [settings, loading, updateSettings, load],
+  );
+
   return (
-    <DealerSettingsContext.Provider value={{ settings, loading, updateSettings, reload: load }}>
+    <DealerSettingsContext.Provider value={value}>
       {children}
     </DealerSettingsContext.Provider>
   );

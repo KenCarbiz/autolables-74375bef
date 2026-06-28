@@ -1,4 +1,4 @@
-CREATE TABLE public.marketcheck_vehicle_cache (
+CREATE TABLE IF NOT EXISTS public.marketcheck_vehicle_cache (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   tenant_id UUID NOT NULL REFERENCES public.tenants(id) ON DELETE CASCADE,
   vin TEXT NOT NULL,

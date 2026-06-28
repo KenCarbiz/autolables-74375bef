@@ -1,4 +1,4 @@
-CREATE TABLE public.tenant_incentive_settings (
+CREATE TABLE IF NOT EXISTS public.tenant_incentive_settings (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   tenant_id UUID NOT NULL UNIQUE REFERENCES public.tenants(id) ON DELETE CASCADE,
   incentives_enabled BOOLEAN NOT NULL DEFAULT FALSE,

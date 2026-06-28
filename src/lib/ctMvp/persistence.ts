@@ -110,12 +110,12 @@ export async function persistCtMvpEvidenceBundle(params: {
   certification?: CtMvpCertificationResult;
   source?: string;
 }) {
-  const lifecycleRows = [];
+  const lifecycleRows: Awaited<ReturnType<typeof recordDocumentLifecycleEvent>>[] = [];
   for (const event of params.lifecycleEvents || []) {
     lifecycleRows.push(await recordDocumentLifecycleEvent(params.context, event));
   }
 
-  const signatureRows = [];
+  const signatureRows: Awaited<ReturnType<typeof recordSignatureEvidence>>[] = [];
   for (const evidence of params.signatureEvidence || []) {
     signatureRows.push(await recordSignatureEvidence(params.context, evidence));
   }

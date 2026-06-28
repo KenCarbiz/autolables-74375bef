@@ -73,7 +73,7 @@ export const useDealToken = () => {
       token: string;
       signedPayload: Record<string, unknown>;
       contentHash: string;
-      customerIp: string;
+      customerIp: string | null;
       userAgent: string;
       esignConsent: Record<string, unknown>;
     }): Promise<boolean> => {

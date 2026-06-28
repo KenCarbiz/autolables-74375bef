@@ -268,7 +268,7 @@ const DealSigning = () => {
           cobuyer_name: showCobuyer ? cobuyerName.trim() : "",
           cobuyer_phone: showCobuyer ? cobuyerPhone.trim() : "",
           cobuyer_email: "",
-          signings: [...(all[idx].signings || []), signingRecord],
+          signings: [...(all[idx].signings || []), signingRecord as NonNullable<VehicleFile["signings"]>[number]],
           updated_at: now,
         };
 

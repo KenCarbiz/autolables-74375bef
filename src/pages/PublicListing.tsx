@@ -165,7 +165,7 @@ const InquiryModal = ({
             <CheckCircle2 className="w-14 h-14 text-emerald-500 mx-auto mb-3" />
             <h3 className="text-lg font-bold text-slate-900 mb-1">Message Sent!</h3>
             <p className="text-sm text-slate-500 mb-5">The dealer will follow up with you shortly.</p>
-            {dealer.phone && (
+            {Boolean(dealer.phone) && (
               <a href={`tel:${dealer.phone}`} className="inline-flex items-center gap-2 text-blue-600 font-semibold text-sm">
                 <Phone className="w-4 h-4" /> {formatPhone(dealer.phone as string)}
               </a>

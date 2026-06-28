@@ -1,6 +1,6 @@
 
 DROP TABLE IF EXISTS public.autolabels_usage_events CASCADE;
-CREATE TABLE public.autolabels_usage_events (
+CREATE TABLE IF NOT EXISTS public.autolabels_usage_events (
   id          uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   tenant_id   uuid NOT NULL REFERENCES public.tenants(id) ON DELETE CASCADE,
   feature_key text NOT NULL,
@@ -25,7 +25,7 @@ CREATE POLICY "tenant insert usage" ON public.autolabels_usage_events
   WITH CHECK (tenant_id IN (SELECT tenant_id FROM public.tenant_members WHERE user_id = (SELECT auth.uid())));
 
 DROP TABLE IF EXISTS public.stale_document_flags CASCADE;
-CREATE TABLE public.stale_document_flags (
+CREATE TABLE IF NOT EXISTS public.stale_document_flags (
   id                    uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   tenant_id             uuid NOT NULL REFERENCES public.tenants(id) ON DELETE CASCADE,
   vehicle_id            uuid NOT NULL,

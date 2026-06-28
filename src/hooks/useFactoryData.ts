@@ -91,7 +91,7 @@ export const useFactoryData = () => {
       const cylinders = getValue("Engine Number of Cylinders");
       const hp = getValue("Engine Power (kW)");
       if (displacement || cylinders) {
-        const parts = [];
+        const parts: string[] = [];
         if (displacement) parts.push(`${displacement}L`);
         if (cylinders) parts.push(`${cylinders}-cylinder`);
         if (engineConfig) parts.push(engineConfig);

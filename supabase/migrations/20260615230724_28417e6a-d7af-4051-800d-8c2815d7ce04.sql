@@ -1,4 +1,4 @@
-CREATE TABLE public.product_sale_mode_changes (
+CREATE TABLE IF NOT EXISTS public.product_sale_mode_changes (
   id            uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   tenant_id     uuid NOT NULL,
   addendum_id   uuid,

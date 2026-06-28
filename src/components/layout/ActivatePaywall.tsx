@@ -202,7 +202,7 @@ const ActivatePaywall = ({ app, tenant, entitlement }: Props) => {
                   ))}
                 </ul>
                 <button
-                  onClick={() => handleActivate(plan.tier, isBundled)}
+                  onClick={() => handleActivate(plan.tier, !!isBundled)}
                   disabled={!!activating}
                   className={`mt-5 h-10 rounded-md text-sm font-semibold transition-all flex items-center justify-center gap-1.5 ${
                     isBundled

@@ -36,7 +36,7 @@ export function usePassportEngagement(slug: string | undefined, activePanel: str
     let mostVisible: string | null = null;
     const recompute = () => {
       let best: { module: string; ratio: number } | null = null;
-      ratios.forEach((v) => { if (!best || v.ratio > best.ratio) best = v; });
+      for (const v of ratios.values()) { if (!best || v.ratio > best.ratio) best = v; }
       mostVisible = best && best.ratio > 0.15 ? best.module : null;
     };
     const io = new IntersectionObserver((entries) => {

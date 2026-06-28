@@ -2,7 +2,7 @@
 CREATE TYPE public.app_role AS ENUM ('admin', 'user');
 
 -- Create user_roles table
-CREATE TABLE public.user_roles (
+CREATE TABLE IF NOT EXISTS public.user_roles (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL,
   role app_role NOT NULL,
@@ -31,7 +31,7 @@ CREATE POLICY "Admins can view all roles" ON public.user_roles
   FOR SELECT USING (public.has_role(auth.uid(), 'admin'));
 
 -- Products table (admin-configurable)
-CREATE TABLE public.products (
+CREATE TABLE IF NOT EXISTS public.products (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   name TEXT NOT NULL,
   subtitle TEXT,
@@ -59,7 +59,7 @@ CREATE POLICY "Admins can delete products" ON public.products
   FOR DELETE USING (public.has_role(auth.uid(), 'admin'));
 
 -- Addendums table (saved completed forms)
-CREATE TABLE public.addendums (
+CREATE TABLE IF NOT EXISTS public.addendums (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   created_by UUID REFERENCES auth.users(id),
   vehicle_ymm TEXT,
@@ -124,7 +124,7 @@ AS $$
 $$;
 
 -- Profiles table for user display info
-CREATE TABLE public.profiles (
+CREATE TABLE IF NOT EXISTS public.profiles (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL UNIQUE,
   display_name TEXT,

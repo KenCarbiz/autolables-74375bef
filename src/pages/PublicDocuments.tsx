@@ -727,7 +727,7 @@ const PublicDocuments = () => {
               <p className="text-xs text-slate-500 truncate flex flex-wrap gap-x-2">
                 {listing.mileage != null && <span>{listing.mileage.toLocaleString()} mi</span>}
                 {ks.exterior_color && <span>· {ks.exterior_color}</span>}
-                {(listing as unknown as Record<string, unknown>).stock_number && <span>· Stock # {String((listing as unknown as Record<string, unknown>).stock_number)}</span>}
+                {Boolean((listing as unknown as Record<string, unknown>).stock_number) && <span>· Stock # {String((listing as unknown as Record<string, unknown>).stock_number)}</span>}
                 {listing.vin && <span>· VIN {listing.vin}</span>}
               </p>
             </div>

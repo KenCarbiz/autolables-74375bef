@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useEffect, useRef, useState, ReactNode } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, ReactNode } from "react";
 import type { AuditLogEntry } from "@/types/tenant";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -162,10 +162,13 @@ export const AuditProvider = ({ children }: { children: ReactNode }) => {
     [entries]
   );
 
+  const value = useMemo(
+    () => ({ log, entries, getByEntity, getByStore, exportCsv, reload: load, loading }),
+    [log, entries, getByEntity, getByStore, exportCsv, load, loading],
+  );
+
   return (
-    <AuditContext.Provider
-      value={{ log, entries, getByEntity, getByStore, exportCsv, reload: load, loading }}
-    >
+    <AuditContext.Provider value={value}>
       {children}
     </AuditContext.Provider>
   );

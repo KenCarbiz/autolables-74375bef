@@ -54,8 +54,9 @@ const stubPacket = (over: Partial<AuditPacket> = {}): AuditPacket => ({
     has_recall_snapshot: true,
     open_recall_count: 0,
     do_not_drive: false,
+    latest_advertised_source: null,
     ...over.summary,
-  },
+  } as AuditPacket["summary"],
 });
 
 describe("renderPacketHtml — compliance contract", () => {
