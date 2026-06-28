@@ -47,10 +47,10 @@ export default function K208Checklist({ marks, onMark, onPassAll, failureNotes, 
             {cat.items.map((item) => (
               <div key={item.id} className="flex items-center justify-between gap-3 px-4 py-2.5">
                 <span className="text-sm text-foreground flex-1">{item.label}</span>
-                <div className="flex gap-1 shrink-0">
+                <div className="flex gap-1.5 shrink-0">
                   {(["pass", "fail", "na"] as const).map((m) => (
                     <button key={m} onClick={() => onMark(item.id, m)}
-                      className={`h-8 w-12 rounded-md text-[11px] font-semibold border transition-colors ${
+                      className={`h-11 w-14 rounded-md text-[12px] font-semibold border transition-colors ${
                         marks[item.id] === m
                           ? m === "pass" ? "bg-emerald-600 text-white border-emerald-600"
                             : m === "fail" ? "bg-red-600 text-white border-red-600"

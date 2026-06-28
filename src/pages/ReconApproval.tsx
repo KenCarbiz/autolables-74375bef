@@ -159,7 +159,12 @@ export default function ReconApproval() {
                 {isPending && (
                   declineFor === l.id ? (
                     <div className="mt-3 space-y-2">
-                      <input autoFocus value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Reason for declining (required)" className="w-full h-10 rounded-lg border border-red-300 bg-background px-3 text-sm" />
+                      <div className="flex flex-wrap gap-1.5">
+                        {["Price too high", "Not needed for sale", "Defer to next service", "Customer can address"].map((rc) => (
+                          <button key={rc} onClick={() => setReason(rc)} className="h-8 px-2.5 rounded-full border border-border text-xs font-medium hover:border-red-300 hover:bg-red-50">{rc}</button>
+                        ))}
+                      </div>
+                      <input autoFocus value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Reason for declining (required)" className="w-full h-11 rounded-lg border border-red-300 bg-background px-3 text-sm" />
                       <div className="flex gap-2">
                         <button disabled={!reason.trim() || busy === l.id} onClick={() => decideLine(l.id, "decline", reason.trim())} className="flex-1 h-10 rounded-lg bg-red-600 text-white text-sm font-semibold disabled:opacity-50">Confirm decline</button>
                         <button onClick={() => { setDeclineFor(null); setReason(""); }} className="h-10 px-4 rounded-lg border border-border text-sm font-semibold">Cancel</button>
