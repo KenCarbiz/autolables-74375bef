@@ -19,6 +19,7 @@ export interface ReconEstimate {
   id: string; vin: string; ymm: string | null; status: string; submitted_by: string | null;
   submitted_role: string | null; notes: string | null; subtotal: number; approved_total: number;
   approval_token: string; created_at: string;
+  origin?: string | null; sent_to_service_at?: string | null;
 }
 export interface ReconMessage {
   id: string; estimate_id: string; author_id: string | null; author_name: string | null;
@@ -93,5 +94,12 @@ export function useReconEstimates() {
     return !!data?.ok;
   }, [byName]);
 
-  return { estimates, role, isManager, byName, loading, reload: load, loadDetail, submit, decide, postMessage };
+  // UCM OKs + releases a staged (manual-mode, ingest-seeded) estimate to service.
+  const sendToService = useCallback(async (estimateId: string): Promise<boolean> => {
+    const { data } = await sb().rpc("recon_send_to_service", { _estimate_id: estimateId, _by: byName });
+    if (data?.ok) await load();
+    return !!data?.ok;
+  }, [byName, load]);
+
+  return { estimates, role, isManager, byName, loading, reload: load, loadDetail, submit, decide, postMessage, sendToService };
 }

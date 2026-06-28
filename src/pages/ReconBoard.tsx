@@ -37,7 +37,7 @@ const printWorkOrder = (est: ReconEstimate, lines: ReconLine[]) => {
 };
 
 export default function ReconBoard() {
-  const { estimates, isManager, loading, reload, loadDetail, submit, decide, postMessage } = useReconEstimates();
+  const { estimates, isManager, loading, reload, loadDetail, submit, decide, postMessage, sendToService } = useReconEstimates();
   const { settings } = useDealerSettings();
   const canned = settings.recon_canned_services || [];
   const [selId, setSelId] = useState<string | null>(null);
@@ -70,6 +70,16 @@ export default function ReconBoard() {
     if (!sel || !msg.trim()) return;
     const ok = await postMessage(sel.id, msg.trim());
     if (ok) { setMsg(""); await refreshDetail(sel.id); } else toast.error("Couldn't post.");
+  };
+  // UCM OKs a staged intake estimate: approve everything still pending, then
+  // release it to service in one tap.
+  const onOkAndSend = async () => {
+    if (!sel) return;
+    setBusy("send");
+    if (detail?.lines.some((l) => l.approval_status === "pending")) await decide(sel.id, null, "approve");
+    const ok = await sendToService(sel.id);
+    setBusy(null);
+    if (ok) { await refreshDetail(sel.id); toast.success("Sent to service"); } else toast.error("Couldn't send to service.");
   };
 
   return (
@@ -108,11 +118,18 @@ export default function ReconBoard() {
               <div className="rounded-2xl border border-border bg-card p-4 sm:p-5">
                 <div className="flex items-start justify-between gap-3">
                   <div>
-                    <h2 className="text-lg font-bold text-foreground">{sel.ymm || "Vehicle"}</h2>
+                    <div className="flex items-center gap-2 flex-wrap mb-0.5">
+                      <h2 className="text-lg font-bold text-foreground">{sel.ymm || "Vehicle"}</h2>
+                      {sel.origin === "ingest" && <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-blue-100 text-blue-700">From intake</span>}
+                      {sel.sent_to_service_at && <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-emerald-100 text-emerald-700">Sent to service</span>}
+                    </div>
                     <p className="text-xs text-muted-foreground">VIN {sel.vin}{sel.submitted_by ? ` · submitted by ${sel.submitted_by}` : ""}</p>
                   </div>
                   <button onClick={() => printWorkOrder(sel, detail.lines)} className="h-9 px-3 rounded-lg border border-border text-xs font-semibold inline-flex items-center gap-1.5 hover:bg-muted"><Printer className="w-3.5 h-3.5" /> Print work order</button>
                 </div>
+                {isManager && sel.origin === "ingest" && !sel.sent_to_service_at && (
+                  <button disabled={busy === "send"} onClick={onOkAndSend} className="mt-4 w-full h-11 rounded-xl bg-primary text-primary-foreground font-semibold inline-flex items-center justify-center gap-2 disabled:opacity-50">{busy === "send" ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />} OK &amp; send to service</button>
+                )}
                 <div className="grid grid-cols-3 gap-3 mt-4">
                   <Stat icon={<DollarSign className="w-4 h-4" />} label="Estimate" value={money(sel.subtotal)} />
                   <Stat icon={<CheckCircle2 className="w-4 h-4" />} label="Approved" value={money(sel.approved_total)} />
@@ -160,7 +177,7 @@ export default function ReconBoard() {
                     </div>
                   );
                 })}
-                {isManager && groups.needs.some((e) => e.id === sel.id) && (
+                {isManager && groups.needs.some((e) => e.id === sel.id) && !(sel.origin === "ingest" && !sel.sent_to_service_at) && (
                   <button disabled={busy === "all"} onClick={() => onDecide(null, "approve")} className="w-full h-11 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-semibold inline-flex items-center justify-center gap-2 disabled:opacity-50">{busy === "all" ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />} Approve all remaining</button>
                 )}
               </div>
