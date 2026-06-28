@@ -1,0 +1,184 @@
+import { useEffect, useMemo, useState } from "react";
+import { useParams } from "react-router-dom";
+import { Printer, Loader2, ShieldCheck } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+import { useTenant } from "@/contexts/TenantContext";
+import { useDealerSettings } from "@/contexts/DealerSettingsContext";
+import { K208_INSPECTION_CATEGORIES, K208_INSPECTION_RESULTS, K208_CERTIFICATION_TEXT } from "@/data/ctK208Form";
+
+// /k208/:vin — the completed official CT DMV K-208, populated with the tenant's
+// dealer info + DMV license number and the vehicle's data, ready to print as the
+// buyer's copy and for the vehicle / evidence file. Loads the latest signed
+// inspection for the VIN (tenant-scoped via RLS).
+
+interface Inspection {
+  id: string; vin: string; ymm: string | null; stock_number: string | null;
+  checklist: { id?: string; label?: string; result?: string; explanation?: string }[];
+  result: string | null; inspector_name: string | null; signature_data: string | null;
+  signed_at: string | null; result_initial: string | null;
+  buyer_name: string | null; buyer_signature_data: string | null; buyer_signed_at: string | null;
+}
+interface Listing { ymm: string | null; mileage: number | null; body_style: string | null; condition: string | null; }
+
+// deno-lint-ignore no-explicit-any
+const sb = () => supabase as any;
+const fmtDate = (s: string | null) => (s ? new Date(s).toLocaleDateString("en-US") : "");
+const OFFICIAL_ITEMS = K208_INSPECTION_CATEGORIES[0].items;
+
+export default function K208Document() {
+  const { vin = "" } = useParams();
+  const { tenant } = useTenant();
+  const { settings } = useDealerSettings();
+  const tenantId = tenant?.id && tenant.id !== "house" ? tenant.id : null;
+  const [insp, setInsp] = useState<Inspection | null>(null);
+  const [listing, setListing] = useState<Listing | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!tenantId || !vin) { setLoading(false); return; }
+    (async () => {
+      const v = vin.toUpperCase();
+      const [{ data: ins }, { data: lst }] = await Promise.all([
+        sb().from("safety_inspections").select("*").eq("tenant_id", tenantId).eq("vin", v).eq("status", "signed").order("signed_at", { ascending: false }).limit(1).maybeSingle(),
+        sb().from("vehicle_listings").select("ymm, mileage, body_style, condition").eq("tenant_id", tenantId).eq("vin", v).maybeSingle(),
+      ]);
+      setInsp((ins as Inspection) || null);
+      setListing((lst as Listing) || null);
+      setLoading(false);
+    })();
+  }, [tenantId, vin]);
+
+  // Map the stored checklist to the official item order, by id then label.
+  const rows = useMemo(() => {
+    const byId = new Map((insp?.checklist || []).map((c) => [c.id, c]));
+    const byLabel = new Map((insp?.checklist || []).map((c) => [(c.label || "").toLowerCase(), c]));
+    return OFFICIAL_ITEMS.map((it) => {
+      const rec = byId.get(it.id) || byLabel.get(it.label.toLowerCase());
+      return { label: it.label, result: rec?.result || "", explanation: rec?.explanation || "" };
+    });
+  }, [insp]);
+
+  const ymmParts = (insp?.ymm || listing?.ymm || "").split(" ");
+  const year = ymmParts[0] || "";
+  const makeModel = ymmParts.slice(1).join(" ");
+
+  if (loading) return <div className="min-h-screen grid place-items-center"><Loader2 className="w-6 h-6 animate-spin text-muted-foreground" /></div>;
+  if (!insp) return (
+    <div className="min-h-screen grid place-items-center p-6 text-center">
+      <div>
+        <ShieldCheck className="w-10 h-10 text-slate-300 mx-auto mb-3" />
+        <p className="text-sm text-muted-foreground">No completed K-208 on file for {vin.toUpperCase()} yet.</p>
+      </div>
+    </div>
+  );
+
+  return (
+    <div className="bg-muted/30 min-h-screen py-6 print:bg-white print:py-0">
+      <style>{`@media print { .no-print { display: none !important; } @page { size: letter; margin: 0.5in; } }`}</style>
+      <div className="no-print max-w-[850px] mx-auto mb-4 flex justify-end">
+        <button onClick={() => window.print()} className="h-10 px-4 rounded-lg bg-primary text-primary-foreground text-sm font-semibold inline-flex items-center gap-2"><Printer className="w-4 h-4" /> Print K-208</button>
+      </div>
+
+      <div className="max-w-[850px] mx-auto bg-white text-[#0F172A] p-8 shadow-premium print:shadow-none text-[12px] leading-snug">
+        {/* Header */}
+        <div className="text-center border-b-2 border-black pb-2">
+          <div className="font-bold text-[13px]">STATE OF CONNECTICUT &middot; DEPARTMENT OF MOTOR VEHICLES</div>
+          <div className="text-[11px]">Commercial Vehicle Safety Division</div>
+          <div className="font-bold text-[14px] mt-1">CT LICENSED DEALER VEHICLE INSPECTION FORM &mdash; K-208</div>
+          <div className="text-[9px] text-slate-500">NEW 10-2012 &middot; Required by CGS 14-62(g)</div>
+        </div>
+
+        {/* Vehicle + Dealer */}
+        <div className="grid grid-cols-2 gap-4 mt-3">
+          <div>
+            <SectionTitle>Vehicle Information</SectionTitle>
+            <Field label="Year" value={year} />
+            <Field label="Make / Model" value={makeModel} />
+            <Field label="Body Style" value={listing?.body_style || ""} />
+            <Field label="VIN" value={insp.vin} />
+            <Field label="Mileage" value={listing?.mileage != null ? listing.mileage.toLocaleString() : ""} />
+            <Field label="Stock #" value={insp.stock_number || ""} />
+          </div>
+          <div>
+            <SectionTitle>Dealer License Information</SectionTitle>
+            <Field label="Dealer" value={settings.dealer_name || ""} />
+            <Field label="Phone" value={settings.dealer_phone || ""} />
+            <Field label="Address" value={settings.dealer_address || ""} />
+            <Field label="Town / State / Zip" value={[settings.dealer_city, settings.dealer_state, settings.dealer_zip].filter(Boolean).join(", ")} />
+            <Field label="Principal Dealer License #" value={settings.dealer_license_number || ""} bold />
+          </div>
+        </div>
+
+        {/* Inspection grid */}
+        <table className="w-full border-collapse mt-3 border border-black">
+          <thead>
+            <tr className="bg-slate-100">
+              <th className="border border-black text-left px-2 py-1 w-[28%]">Inspection Item</th>
+              <th className="border border-black px-2 py-1 w-[8%]">Pass</th>
+              <th className="border border-black px-2 py-1 w-[8%]">Fail</th>
+              <th className="border border-black text-left px-2 py-1">Explanation of Defects or Repairs Needed</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((r) => (
+              <tr key={r.label}>
+                <td className="border border-black px-2 py-1 font-medium">{r.label}</td>
+                <td className="border border-black text-center py-1">{r.result === "pass" ? "X" : ""}</td>
+                <td className="border border-black text-center py-1">{r.result === "fail" ? "X" : ""}</td>
+                <td className="border border-black px-2 py-1">{r.explanation}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+
+        {/* Inspection results A/B/C */}
+        <div className="mt-3">
+          <SectionTitle>Inspection Results &mdash; Dealer Must Initial A, B or C</SectionTitle>
+          {K208_INSPECTION_RESULTS.map((res) => (
+            <div key={res.code} className="flex gap-2 items-start py-0.5">
+              <span className="font-bold border border-black w-6 h-6 inline-grid place-items-center shrink-0">{insp.result_initial === res.code ? res.code : ""}</span>
+              <span className="text-[11px]"><b>{res.code}.</b> {res.label}</span>
+            </div>
+          ))}
+          <div className="text-[10px] text-slate-600 mt-1">Vehicle shall be emissions compliant per 14-164c(n).</div>
+        </div>
+
+        {/* Certification */}
+        <div className="mt-3 border-t border-black pt-2">
+          <div className="font-bold text-[11px]">Certification &mdash; Must Be Signed By Licensee</div>
+          <p className="text-[10px] mt-1">{K208_CERTIFICATION_TEXT}</p>
+          <div className="grid grid-cols-2 gap-6 mt-3">
+            <SignatureLine label="Licensee Signature & Printed Name" sig={insp.signature_data} name={insp.inspector_name} date={fmtDate(insp.signed_at)} dateLabel="Date of Completion" />
+            <SignatureLine label="Buyer Signature & Printed Name" sig={insp.buyer_signature_data} name={insp.buyer_name} date={fmtDate(insp.buyer_signed_at)} dateLabel="Date of Signature" />
+          </div>
+        </div>
+
+        <div className="text-center text-[10px] font-bold mt-4 border border-black py-1">A COPY OF THIS DOCUMENT MUST BE PROVIDED TO THE BUYER</div>
+      </div>
+    </div>
+  );
+}
+
+function SectionTitle({ children }: { children: React.ReactNode }) {
+  return <div className="font-bold text-[11px] uppercase tracking-wide border-b border-black mb-1">{children}</div>;
+}
+function Field({ label, value, bold }: { label: string; value: string; bold?: boolean }) {
+  return (
+    <div className="flex gap-2 py-0.5">
+      <span className="text-slate-600 w-[40%] shrink-0">{label}:</span>
+      <span className={`flex-1 border-b border-dotted border-slate-400 min-h-[14px] ${bold ? "font-bold" : ""}`}>{value || " "}</span>
+    </div>
+  );
+}
+function SignatureLine({ label, sig, name, date, dateLabel }: { label: string; sig: string | null; name: string | null; date: string; dateLabel: string }) {
+  return (
+    <div>
+      <div className="h-12 border-b border-black flex items-end">
+        {sig && sig.startsWith("data:image") ? <img src={sig} alt="" className="max-h-12" /> : <span className="text-[14px] italic pb-0.5">{sig || name || ""}</span>}
+      </div>
+      <div className="text-[9px] text-slate-600 mt-0.5">{label}</div>
+      {name && <div className="text-[11px] font-medium">{name}</div>}
+      <div className="text-[10px] mt-1">{dateLabel}: <b>{date || "      "}</b></div>
+    </div>
+  );
+}

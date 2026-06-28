@@ -193,6 +193,7 @@ export default function ReadyBoard() {
                     </td>
                     <td className="py-2 pl-2">
                       <div className="flex items-center justify-end gap-1">
+                        {service.has(r.vin) && <button onClick={() => navigate(`/k208/${r.vin}`)} title="Print K-208" className="h-7 px-2 rounded-md border border-border text-[11px] font-semibold inline-flex items-center gap-1 hover:bg-muted"><ShieldCheck className="w-3.5 h-3.5" /></button>}
                         <button onClick={() => printSticker(r)} title="Print window sticker" className="h-7 px-2 rounded-md border border-border text-[11px] font-semibold inline-flex items-center gap-1 hover:bg-muted"><Printer className="w-3.5 h-3.5" /></button>
                         <button onClick={() => sendGetReady(r)} disabled={sending === r.vin} title="Send get-ready to detail" className="h-7 px-2 rounded-md border border-border text-[11px] font-semibold inline-flex items-center gap-1 hover:bg-muted disabled:opacity-50">{sending === r.vin ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}</button>
                         <button onClick={() => showQr(r.vin)} title="Get-Ready QR" className="h-7 px-2 rounded-md border border-border text-[11px] font-semibold inline-flex items-center gap-1 hover:bg-muted"><QrCode className="w-3.5 h-3.5" /></button>

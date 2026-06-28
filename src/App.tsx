@@ -63,6 +63,7 @@ const GetReady = lazy(() => import("./pages/GetReady"));
 const ReconApproval = lazy(() => import("./pages/ReconApproval"));
 const ServiceDesk = lazy(() => import("./pages/ServiceDesk"));
 const ReadyBoard = lazy(() => import("./pages/ReadyBoard"));
+const K208Document = lazy(() => import("./pages/K208Document"));
 const SigningLookup = lazy(() => import("./pages/SigningLookup"));
 const Onboarding = lazy(() => import("./pages/Onboarding"));
 const TradeUpSticker = lazy(() => import("./pages/TradeUpSticker"));
@@ -260,6 +261,7 @@ const App = () => (
                         <Route path="/recon" element={<ReconBoard />} />
                         <Route path="/service" element={<ServiceDesk />} />
                         <Route path="/ready-board" element={<ReadyBoard />} />
+                        <Route path="/k208/:vin" element={<K208Document />} />
                         <Route path="/service-inspection" element={<ServiceInspection />} />
                         <Route path="/service-inspection/:qrToken" element={<ServiceInspection />} />
                       </Route>
