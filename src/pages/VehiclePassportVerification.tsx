@@ -15,6 +15,7 @@ import { listingHero } from "@/lib/photos";
 import { MOCK_LISTING } from "./VehiclePassportV3";
 import { usePublicListing } from "@/hooks/usePublicListing";
 import PassportCtaDock from "@/components/passport/PassportCtaDock";
+import { CARD } from "@/lib/passportTokens";
 
 // ──────────────────────────────────────────────────────────────
 // VehiclePassportVerification — /passport-v3/:vehicleSlug/verification
@@ -26,7 +27,6 @@ import PassportCtaDock from "@/components/passport/PassportCtaDock";
 // — unsupported claims are never shown as verified.
 // ──────────────────────────────────────────────────────────────
 
-const CARD = "rounded-2xl border border-[#E6E8EC] bg-white shadow-[0_1px_2px_rgba(0,0,0,0.04),0_8px_24px_rgba(0,0,0,0.05)]";
 
 type Status = "verified" | "attention" | "issue" | "pending";
 const STATUS_UI: Record<Status, { label: string; cls: string; icon: React.ElementType }> = {

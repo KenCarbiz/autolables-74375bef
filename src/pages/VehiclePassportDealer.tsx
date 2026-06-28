@@ -13,6 +13,7 @@ import { MOCK_LISTING } from "./VehiclePassportV3";
 import { usePublicListing } from "@/hooks/usePublicListing";
 import { InfoModal, Para, Callout } from "@/components/passport/InfoModal";
 import PassportCtaDock from "@/components/passport/PassportCtaDock";
+import { CARD } from "@/lib/passportTokens";
 
 // ──────────────────────────────────────────────────────────────
 // VehiclePassportDealer — /passport-v3/:vehicleSlug/dealer
@@ -24,7 +25,6 @@ import PassportCtaDock from "@/components/passport/PassportCtaDock";
 // No floating CTA (the page stands alone).
 // ──────────────────────────────────────────────────────────────
 
-const CARD = "rounded-2xl border border-[#E6E8EC] bg-white shadow-[0_1px_2px_rgba(0,0,0,0.04),0_8px_24px_rgba(0,0,0,0.05)]";
 const TEXT2 = "text-[#64748B]";
 
 const H2 = ({ children }: { children: React.ReactNode }) => <h2 className="text-[20px] font-bold leading-7 tracking-tight text-[#0F172A]">{children}</h2>;

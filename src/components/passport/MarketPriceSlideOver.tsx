@@ -3,6 +3,7 @@ import { X, Info, ShieldCheck, CheckCircle2, MessageSquare, Car, TrendingDown, T
 import type { PassportData } from "@/lib/passportV2Data";
 import { fmt$ } from "@/lib/passportV2Data";
 import type { VehicleListing } from "@/hooks/useVehicleListing";
+import { BLUE, GREEN } from "@/lib/passportTokens";
 
 // ──────────────────────────────────────────────────────────────
 // MarketPriceSlideOver — Passport V3 "Market Pricing Analysis" panel
@@ -18,8 +19,6 @@ import type { VehicleListing } from "@/hooks/useVehicleListing";
 // page's SAMPLE PREVIEW banner (isPreview), never for real shoppers.
 // ──────────────────────────────────────────────────────────────
 
-const GREEN = "#16A34A";
-const BLUE = "#2563EB";
 const CARD_BORDER = "border border-[#E6E8EC]";
 
 // ── Reusable slide-over shell ─────────────────────────────────

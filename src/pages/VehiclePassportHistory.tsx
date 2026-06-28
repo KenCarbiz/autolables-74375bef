@@ -12,6 +12,7 @@ import { derivePassport } from "@/lib/passportV2Data";
 import { MOCK_LISTING } from "./VehiclePassportV3";
 import { usePublicListing } from "@/hooks/usePublicListing";
 import PassportCtaDock from "@/components/passport/PassportCtaDock";
+import { GREEN, CARD } from "@/lib/passportTokens";
 
 // ──────────────────────────────────────────────────────────────
 // VehiclePassportHistory — /passport-v3/:vehicleSlug/vehicle-history
@@ -22,9 +23,7 @@ import PassportCtaDock from "@/components/passport/PassportCtaDock";
 // fabricate history. No floating CTA (the page stands alone).
 // ──────────────────────────────────────────────────────────────
 
-const CARD = "rounded-2xl border border-[#E6E8EC] bg-white shadow-[0_1px_2px_rgba(0,0,0,0.04),0_8px_24px_rgba(0,0,0,0.05)]";
 const TEXT2 = "text-[#64748B]";
-const GREEN = "#16A34A";
 
 const H2 = ({ children }: { children: React.ReactNode }) => <h2 className="text-[20px] font-bold leading-7 tracking-tight text-[#0F172A]">{children}</h2>;
 

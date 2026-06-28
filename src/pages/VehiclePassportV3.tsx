@@ -22,6 +22,7 @@ import PassportPanel, { type PassportPanelKey } from "@/components/passport/Pass
 import PassportCtaDock from "@/components/passport/PassportCtaDock";
 import PassportInfoModal, { type InfoModalKey } from "@/components/passport/PassportInfoModal";
 import { Info } from "lucide-react";
+import { BLUE, GREEN, CARD } from "@/lib/passportTokens";
 
 // ──────────────────────────────────────────────────────────────
 // VehiclePassportV3 — /passport-v3/:vehicleSlug
@@ -34,9 +35,6 @@ import { Info } from "lucide-react";
 // presentation layer is new. Every link opens a full destination page.
 // ──────────────────────────────────────────────────────────────
 
-const BLUE = "#2563EB";
-const GREEN = "#16A34A";
-const CARD = "rounded-2xl border border-[#E6E8EC] bg-white shadow-[0_1px_2px_rgba(0,0,0,0.04),0_8px_24px_rgba(0,0,0,0.05)]";
 const TEXT2 = "text-[#64748B]";
 
 const abbrevDrive = (s: string) => s.replace(/all[- ]?wheel drive/i, "AWD").replace(/front[- ]?wheel drive/i, "FWD").replace(/rear[- ]?wheel drive/i, "RWD").replace(/(four|4)[- ]?wheel drive/i, "4WD");

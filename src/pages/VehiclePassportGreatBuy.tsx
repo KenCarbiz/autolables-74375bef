@@ -12,6 +12,7 @@ import { derivePassport, fmt$ } from "@/lib/passportV2Data";
 import { MOCK_LISTING } from "./VehiclePassportV3";
 import { usePublicListing } from "@/hooks/usePublicListing";
 import PassportCtaDock from "@/components/passport/PassportCtaDock";
+import { BLUE, GREEN, CARD } from "@/lib/passportTokens";
 
 // ──────────────────────────────────────────────────────────────
 // VehiclePassportGreatBuy — /passport-v3/:vehicleSlug/great-buy
@@ -23,9 +24,6 @@ import PassportCtaDock from "@/components/passport/PassportCtaDock";
 // No floating CTA on this page (it stands on its own).
 // ──────────────────────────────────────────────────────────────
 
-const BLUE = "#2563EB";
-const GREEN = "#16A34A";
-const CARD = "rounded-2xl border border-[#E6E8EC] bg-white shadow-[0_1px_2px_rgba(0,0,0,0.04),0_8px_24px_rgba(0,0,0,0.05)]";
 const TEXT2 = "text-[#64748B]";
 
 const H2 = ({ children }: { children: React.ReactNode }) => <h2 className="text-[20px] font-bold leading-7 tracking-tight text-[#0F172A]">{children}</h2>;
