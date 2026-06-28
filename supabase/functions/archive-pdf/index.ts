@@ -93,6 +93,7 @@ serve(async (req) => {
       "buyers_guide",
       "prep_signoff",
       "disclosure",
+      "k208",
     ];
     if (!validTypes.includes(doc_type)) {
       return json(400, { error: `invalid doc_type; must be one of ${validTypes.join(", ")}` });

@@ -1,9 +1,11 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
-import { Printer, Loader2, ShieldCheck } from "lucide-react";
+import { toast } from "sonner";
+import { Printer, Loader2, ShieldCheck, Archive } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useTenant } from "@/contexts/TenantContext";
 import { useDealerSettings } from "@/contexts/DealerSettingsContext";
+import { persistArchivedPdf } from "@/lib/pdfArchive";
 import { K208_INSPECTION_CATEGORIES, K208_INSPECTION_RESULTS, K208_CERTIFICATION_TEXT } from "@/data/ctK208Form";
 
 // /k208/:vin — the completed official CT DMV K-208, populated with the tenant's
@@ -33,6 +35,28 @@ export default function K208Document() {
   const [insp, setInsp] = useState<Inspection | null>(null);
   const [listing, setListing] = useState<Listing | null>(null);
   const [loading, setLoading] = useState(true);
+  const [filing, setFiling] = useState(false);
+  const formRef = useRef<HTMLDivElement>(null);
+
+  // Render the displayed form to a PDF and store it immutably in the evidence
+  // file (signed_document_archive via archive-pdf).
+  const saveToEvidence = async () => {
+    if (!insp || !formRef.current) return;
+    setFiling(true);
+    try {
+      const [{ default: html2canvas }, { jsPDF }] = await Promise.all([import("html2canvas-pro"), import("jspdf")]);
+      const canvas = await html2canvas(formRef.current, { scale: 2, backgroundColor: "#ffffff" });
+      const img = canvas.toDataURL("image/jpeg", 0.92);
+      const pdf = new jsPDF({ unit: "pt", format: "letter" });
+      const pw = pdf.internal.pageSize.getWidth();
+      const ph = (canvas.height / canvas.width) * pw;
+      pdf.addImage(img, "JPEG", 0, 0, pw, Math.min(ph, pdf.internal.pageSize.getHeight()));
+      const res = await persistArchivedPdf(pdf, { docType: "k208", entityId: insp.id, vin: insp.vin });
+      if (res.ok) toast.success("Signed K-208 saved to the evidence file");
+      else toast.error("Couldn't save to evidence — try again.");
+    } catch { toast.error("Couldn't render the K-208 for filing."); }
+    setFiling(false);
+  };
 
   useEffect(() => {
     if (!tenantId || !vin) { setLoading(false); return; }
@@ -75,11 +99,12 @@ export default function K208Document() {
   return (
     <div className="bg-muted/30 min-h-screen py-6 print:bg-white print:py-0">
       <style>{`@media print { .no-print { display: none !important; } @page { size: letter; margin: 0.5in; } }`}</style>
-      <div className="no-print max-w-[850px] mx-auto mb-4 flex justify-end">
-        <button onClick={() => window.print()} className="h-10 px-4 rounded-lg bg-primary text-primary-foreground text-sm font-semibold inline-flex items-center gap-2"><Printer className="w-4 h-4" /> Print K-208</button>
+      <div className="no-print max-w-[850px] mx-auto mb-4 flex justify-end gap-2">
+        <button onClick={saveToEvidence} disabled={filing} className="h-10 px-4 rounded-lg border border-border text-sm font-semibold inline-flex items-center gap-2 hover:bg-muted disabled:opacity-50">{filing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Archive className="w-4 h-4" />} Save to evidence file</button>
+        <button onClick={() => window.print()} className="h-10 px-4 rounded-lg bg-primary text-primary-foreground text-sm font-semibold inline-flex items-center gap-2"><Printer className="w-4 h-4" /> Print customer copy</button>
       </div>
 
-      <div className="max-w-[850px] mx-auto bg-white text-[#0F172A] p-8 shadow-premium print:shadow-none text-[12px] leading-snug">
+      <div ref={formRef} className="max-w-[850px] mx-auto bg-white text-[#0F172A] p-8 shadow-premium print:shadow-none text-[12px] leading-snug">
         {/* Header */}
         <div className="text-center border-b-2 border-black pb-2">
           <div className="font-bold text-[13px]">STATE OF CONNECTICUT &middot; DEPARTMENT OF MOTOR VEHICLES</div>

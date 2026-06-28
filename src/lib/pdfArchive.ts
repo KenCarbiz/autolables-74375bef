@@ -124,7 +124,8 @@ export type ArchivalDocType =
   | "sticker"
   | "buyers_guide"
   | "prep_signoff"
-  | "disclosure";
+  | "disclosure"
+  | "k208";
 
 /**
  * Ship a stamped PDF to the archive-pdf edge function so it lands
