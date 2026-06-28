@@ -532,10 +532,19 @@ const MobileSigning = () => {
 
     setSubmitting(false);
     if (error) {
-      // A price-not-verified rejection is intentional — never fall through to a
-      // direct update that would bypass the gate. Surface it to the customer.
-      if (/price not verified|check_violation/i.test(error.message || "")) {
+      // Compliance rejections are intentional — never fall through to a direct
+      // update that would bypass the gate. Surface the specific reason.
+      const m = error.message || "";
+      if (/safety_inspection_required/i.test(m)) {
+        toast.error("This vehicle isn't ready to finalize yet — its safety inspection and any pre-installed product verifications must be completed first.");
+        return;
+      }
+      if (/price not verified/i.test(m)) {
         toast.error("This addendum is awaiting price verification by the dealership. Please ask them to confirm the advertised price before signing.");
+        return;
+      }
+      if (/check_violation/i.test(m)) {
+        toast.error("This vehicle can't be finalized yet — a dealership compliance step is still pending.");
         return;
       }
       // Fall back to the legacy direct-update path if the RPC isn't

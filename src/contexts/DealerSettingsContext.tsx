@@ -221,6 +221,8 @@ export interface DealerSettings {
   // ── Nightly-ingest automation spine ──────────────────────────────────────
   // For each downstream flow the dealer chooses "manual" (a person sends/OKs)
   // or "auto" (fires automatically on ingest). The orchestrator reads these.
+  ingest_auto_publish: boolean;                // publish the passport on intake (no prep gate)
+  require_install_verification: boolean;       // finalize gate: all preinstalls verified before signing
   ingest_recon_dispatch: "manual" | "auto";   // recon estimate → UCM queue
   ingest_detail_dispatch: "manual" | "auto";  // get-ready → detail shop
   detail_email: string;                        // detail-dept recipient(s) for get-ready dispatch
@@ -355,6 +357,8 @@ export const DEFAULT_SETTINGS: DealerSettings = {
   price_drop_emails_enabled: true,
   recon_auto_approve_amount: 500,
   recon_approval_email: "",
+  ingest_auto_publish: true,
+  require_install_verification: false,
   ingest_recon_dispatch: "manual",
   ingest_detail_dispatch: "manual",
   detail_email: "",

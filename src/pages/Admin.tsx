@@ -1454,6 +1454,20 @@ const Admin = () => {
               <h4 className="text-sm font-bold text-foreground mb-1">Ingest Automation</h4>
               <p className="text-xs text-muted-foreground mb-3">When a new vehicle is ingested overnight, choose what fires automatically vs. what waits for a person to send it.</p>
               <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="pr-3">
+                    <span className="text-sm font-semibold text-foreground">Auto-publish customer passport on intake</span>
+                    <p className="text-xs text-muted-foreground">No prep gate at intake — the passport goes live immediately. Recon, K-208, and installs happen afterward.</p>
+                  </div>
+                  <Switch checked={settings.ingest_auto_publish !== false} onCheckedChange={(v) => updateSettings({ ingest_auto_publish: v })} className="data-[state=checked]:bg-teal" />
+                </div>
+                <div className="flex items-center justify-between">
+                  <div className="pr-3">
+                    <span className="text-sm font-semibold text-foreground">Require install verification before finalizing</span>
+                    <p className="text-xs text-muted-foreground">Block the customer disclosure from being signed until every pre-installed product has a verified install (photo + signature).</p>
+                  </div>
+                  <Switch checked={settings.require_install_verification === true} onCheckedChange={(v) => updateSettings({ require_install_verification: v })} className="data-[state=checked]:bg-teal" />
+                </div>
                 <div>
                   <span className="text-sm font-semibold text-foreground">Recon estimate</span>
                   <div className="flex gap-2 mt-1.5">

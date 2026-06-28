@@ -32,6 +32,17 @@ async function orchestrateOne(admin: any, tenantId: string, vin: string, listing
   const settings = (prof?.settings || {}) as Record<string, unknown>;
   const mode = String(settings.ingest_recon_dispatch || "manual") === "auto" ? "auto" : "manual";
 
+  // Auto-publish the customer passport on intake (default on). No prep/K-208
+  // gate at intake — only a known do-not-drive recall blocks the publish
+  // trigger, in which case this stays draft (best-effort; never throws here).
+  if (String(settings.ingest_auto_publish) !== "false") {
+    try {
+      await admin.from("vehicle_listings")
+        .update({ status: "published", published_at: new Date().toISOString() })
+        .eq("id", listingId).neq("status", "published");
+    } catch { /* do-not-drive gate or other block → leave as draft */ }
+  }
+
   // Auto-dispatch the detail get-ready to the detail department on intake when
   // the dealer chose auto detail dispatch. Best-effort; never blocks the seed.
   if (String(settings.ingest_detail_dispatch || "manual") === "auto") {
