@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect, useCallback, ReactNode } from "react";
+import { createContext, useContext, useState, useEffect, useCallback, useMemo, ReactNode } from "react";
 import type { Tenant, Store } from "@/types/tenant";
 import { useTenantIntegration, IntegrationMode } from "@/hooks/useTenantIntegration";
 import { useAuth } from "@/contexts/AuthContext";
@@ -201,8 +201,14 @@ export const TenantProvider = ({ children }: { children: ReactNode }) => {
     }
   }, [integration.externalTenant]);
 
-  const persistStores = async (next: Store[]) => {
-    if (!tenantRowId || integration.mode === "embedded") return;
+  // Deps below intentionally key on the specific stable members of `integration`
+  // (mode primitive, sendToParent/completeOnboarding are useCallback'd in the
+  // hook) rather than the whole object, which the hook re-creates each render.
+  const integrationMode = integration.mode;
+  const sendToParent = integration.sendToParent;
+
+  const persistStores = useCallback(async (next: Store[]) => {
+    if (!tenantRowId || integrationMode === "embedded") return;
     const stripped = next.map((s) => ({
       id: s.id, name: s.name, slug: s.slug,
       address: s.address, city: s.city, state: s.state, zip: s.zip,
@@ -213,15 +219,15 @@ export const TenantProvider = ({ children }: { children: ReactNode }) => {
       .from("onboarding_profiles")
       .update({ stores: stripped })
       .eq("tenant_id", tenantRowId);
-  };
+  }, [tenantRowId, integrationMode]);
 
-  const setCurrentStore = (store: Store) => {
+  const setCurrentStore = useCallback((store: Store) => {
     setCurrentStoreState(store);
     localStorage.setItem(CURRENT_STORE_KEY, store.id);
-    integration.sendToParent("store_change", { storeId: store.id });
-  };
+    sendToParent("store_change", { storeId: store.id });
+  }, [sendToParent]);
 
-  const addStore = (data: Omit<Store, "id" | "created_at">) => {
+  const addStore = useCallback((data: Omit<Store, "id" | "created_at">) => {
     const newStore: Store = {
       ...data,
       id: crypto.randomUUID(),
@@ -230,16 +236,16 @@ export const TenantProvider = ({ children }: { children: ReactNode }) => {
     const next = [...stores, newStore];
     setStores(next);
     void persistStores(next);
-  };
+  }, [stores, persistStores]);
 
-  const updateStore = (id: string, updates: Partial<Store>) => {
+  const updateStore = useCallback((id: string, updates: Partial<Store>) => {
     const next = stores.map((s) => (s.id === id ? { ...s, ...updates } : s));
     setStores(next);
     if (currentStore?.id === id) setCurrentStoreState({ ...currentStore, ...updates });
     void persistStores(next);
-  };
+  }, [stores, currentStore, persistStores]);
 
-  const deleteStore = (id: string) => {
+  const deleteStore = useCallback((id: string) => {
     const next = stores.filter((s) => s.id !== id);
     setStores(next);
     if (currentStore?.id === id) {
@@ -248,13 +254,13 @@ export const TenantProvider = ({ children }: { children: ReactNode }) => {
       if (fallback) localStorage.setItem(CURRENT_STORE_KEY, fallback.id);
     }
     void persistStores(next);
-  };
+  }, [stores, currentStore, persistStores]);
 
-  const updateTenant = async (updates: Partial<Tenant>) => {
+  const updateTenant = useCallback(async (updates: Partial<Tenant>) => {
     if (!tenant) return;
     const next = { ...tenant, ...updates };
     setTenant(next);
-    if (!tenantRowId || integration.mode === "embedded") return;
+    if (!tenantRowId || integrationMode === "embedded") return;
     await (supabase as any)
       .from("tenants")
       .update({ name: next.name })
@@ -268,33 +274,33 @@ export const TenantProvider = ({ children }: { children: ReactNode }) => {
         secondary_color: next.secondary_color,
       })
       .eq("tenant_id", tenantRowId);
-  };
+  }, [tenant, tenantRowId, integrationMode]);
 
-  return (
-    <TenantContext.Provider
-      value={{
-        tenant,
-        stores,
-        currentStore,
-        setCurrentStore,
-        addStore,
-        updateStore,
-        deleteStore,
-        updateTenant,
-        loading,
-        mode: integration.mode,
-        isEmbedded: integration.mode === "embedded",
-        isStandalone: integration.mode === "standalone",
-        isOnboardingComplete: integration.isOnboardingComplete,
-        completeOnboarding: integration.completeOnboarding,
-        parentOrigin: integration.parentOrigin,
-        externalUser: integration.externalTenant?.user || null,
-        reload: load,
-      }}
-    >
-      {children}
-    </TenantContext.Provider>
-  );
+  const value = useMemo<TenantContextType>(() => ({
+    tenant,
+    stores,
+    currentStore,
+    setCurrentStore,
+    addStore,
+    updateStore,
+    deleteStore,
+    updateTenant,
+    loading,
+    mode: integrationMode,
+    isEmbedded: integrationMode === "embedded",
+    isStandalone: integrationMode === "standalone",
+    isOnboardingComplete: integration.isOnboardingComplete,
+    completeOnboarding: integration.completeOnboarding,
+    parentOrigin: integration.parentOrigin,
+    externalUser: integration.externalTenant?.user || null,
+    reload: load,
+  }), [
+    tenant, stores, currentStore, setCurrentStore, addStore, updateStore, deleteStore,
+    updateTenant, loading, integrationMode, integration.isOnboardingComplete,
+    integration.completeOnboarding, integration.parentOrigin, integration.externalTenant, load,
+  ]);
+
+  return <TenantContext.Provider value={value}>{children}</TenantContext.Provider>;
 };
 
 export const useTenant = () => {
