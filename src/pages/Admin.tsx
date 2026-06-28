@@ -1474,6 +1474,12 @@ const Admin = () => {
                       </button>
                     ))}
                   </div>
+                  <input
+                    value={settings.detail_email || ""}
+                    onChange={(e) => updateSettings({ detail_email: e.target.value })}
+                    placeholder="Detail shop email(s) — comma separated (up to 3)"
+                    className="w-full mt-2 px-3 py-2 border border-border-custom rounded text-sm"
+                  />
                   <textarea
                     value={settings.detail_default_instructions || ""}
                     onChange={(e) => updateSettings({ detail_default_instructions: e.target.value })}

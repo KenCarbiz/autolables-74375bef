@@ -223,6 +223,7 @@ export interface DealerSettings {
   // or "auto" (fires automatically on ingest). The orchestrator reads these.
   ingest_recon_dispatch: "manual" | "auto";   // recon estimate → UCM queue
   ingest_detail_dispatch: "manual" | "auto";  // get-ready → detail shop
+  detail_email: string;                        // detail-dept recipient(s) for get-ready dispatch
   detail_default_instructions: string;        // instructions sent with detail get-ready
   thirdparty_auto_notify: boolean;             // auto-notify the installer on a preinstall
   title_round_robin: boolean;                  // rotate title requests person-to-person vs all at once
@@ -356,6 +357,7 @@ export const DEFAULT_SETTINGS: DealerSettings = {
   recon_approval_email: "",
   ingest_recon_dispatch: "manual",
   ingest_detail_dispatch: "manual",
+  detail_email: "",
   detail_default_instructions: "",
   thirdparty_auto_notify: true,
   title_round_robin: false,

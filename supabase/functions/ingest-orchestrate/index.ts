@@ -32,6 +32,17 @@ async function orchestrateOne(admin: any, tenantId: string, vin: string, listing
   const settings = (prof?.settings || {}) as Record<string, unknown>;
   const mode = String(settings.ingest_recon_dispatch || "manual") === "auto" ? "auto" : "manual";
 
+  // Auto-dispatch the detail get-ready to the detail department on intake when
+  // the dealer chose auto detail dispatch. Best-effort; never blocks the seed.
+  if (String(settings.ingest_detail_dispatch || "manual") === "auto") {
+    await fetch(`${SUPABASE_URL}/functions/v1/notify-getready`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${SERVICE_KEY}` },
+      body: JSON.stringify({ tenant_id: tenantId, vin }),
+      signal: AbortSignal.timeout(20000),
+    }).catch(() => { /* best-effort */ });
+  }
+
   const { data: seed } = await admin.rpc("seed_recon_estimate_for_ingest", {
     _tenant_id: tenantId, _vin: vin, _ymm: ymm, _vehicle_listing_id: listingId, _mode: mode,
   });

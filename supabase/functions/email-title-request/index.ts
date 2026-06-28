@@ -64,6 +64,10 @@ Deno.serve(async (req) => {
       .select("id", { count: "exact", head: true })
       .eq("store_id", tenantId).eq("action", "title_request_emailed").eq("entity_id", vin);
     recipients = [recipients[(count || 0) % recipients.length]];
+  } else if (!body.to) {
+    // Up to 3 office recipients per the spec (adjustable cap; defaults to 3).
+    const cap = Math.max(1, Math.min(10, Number(settings.title_recipient_cap) || 3));
+    recipients = recipients.slice(0, cap);
   }
 
   // Mint or reuse a long-lived title-upload token.
