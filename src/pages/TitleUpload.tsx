@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
+import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { CheckCircle2, Loader2, FileText, Upload, ShieldCheck, Camera } from "lucide-react";
 
@@ -55,7 +56,8 @@ export default function TitleUpload() {
         _token: token, _doc_type: `${kind}_${side}`, _path: path, _filename: file.name,
       });
       if ((data as { ok?: boolean })?.ok) setDone((d) => ({ ...d, [side]: true }));
-    } catch { /* leave slot unfilled; office can retry */ }
+      else throw new Error("attach failed");
+    } catch { toast.error(`Couldn't save the ${side} — please retake and try again.`); }
     setBusy(null);
   };
 

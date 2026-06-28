@@ -1,7 +1,10 @@
 import { useCallback, useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
+import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { CheckCircle2, XCircle, Loader2, AlertTriangle, Car, DollarSign, ShieldAlert, Wrench } from "lucide-react";
+
+const NAME_KEY = "autolabels.signer.ucm";
 
 // /approve/:token — the used-car manager's no-login approve/decline surface for a
 // recon estimate submitted by service. Resolves via get_recon_estimate; decisions
@@ -42,7 +45,7 @@ export default function ReconApproval() {
   const [lines, setLines] = useState<Line[]>([]);
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
-  const [approver, setApprover] = useState("");
+  const [approver, setApprover] = useState(() => { try { return localStorage.getItem(NAME_KEY) || ""; } catch { return ""; } });
   const [busy, setBusy] = useState<string | null>(null);
   const [declineFor, setDeclineFor] = useState<string | null>(null);
   const [reason, setReason] = useState("");
@@ -64,7 +67,8 @@ export default function ReconApproval() {
       _approval_token: token, _line_id: lineId, _action: action, _reason: declineReason || null, _by: approver.trim() || null, _channel: "link",
     });
     setBusy(null); setDeclineFor(null); setReason("");
-    if (data?.ok) await load();
+    if (data?.ok) { try { if (approver.trim()) localStorage.setItem(NAME_KEY, approver.trim()); } catch { /* ignore */ } await load(); }
+    else toast.error(data?.reason === "reason_required" ? "Add a reason to decline." : "Couldn't record that — try again.");
   };
 
   const decideAll = async (action: "approve" | "decline") => {
@@ -74,7 +78,8 @@ export default function ReconApproval() {
       _approval_token: token, _action: action, _by: approver.trim() || null, _channel: "link",
     });
     setBusy(null);
-    if (data?.ok) await load();
+    if (data?.ok) { try { if (approver.trim()) localStorage.setItem(NAME_KEY, approver.trim()); } catch { /* ignore */ } await load(); }
+    else toast.error("Couldn't record that — try again.");
   };
 
   if (loading) return <div className="min-h-screen grid place-items-center bg-background"><Loader2 className="w-6 h-6 animate-spin text-muted-foreground" /></div>;

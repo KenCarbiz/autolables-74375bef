@@ -1,11 +1,17 @@
 import { useCallback, useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
+import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import SignaturePad from "@/components/addendum/SignaturePad";
 import K208Checklist, { K208_ITEMS, k208Answered, k208Result, k208Checklist, type K208Mark } from "@/components/service/K208Checklist";
 import { K208_CERTIFICATION_TEXT } from "@/data/ctK208Form";
 import { buildConsentRecord, hashPayload, fetchClientIp } from "@/lib/esign";
 import { CheckCircle2, Loader2, ShieldCheck, Sparkles, ChevronRight, Upload, X, AlertTriangle, ArrowLeft, Camera } from "lucide-react";
+
+// Remember the signer's name per device + station so a tech/detailer signing
+// 20 cars a day doesn't retype it every time.
+const rememberedName = (key: string) => { try { return localStorage.getItem(`autolabels.signer.${key}`) || ""; } catch { return ""; } };
+const saveName = (key: string, v: string) => { try { if (v.trim()) localStorage.setItem(`autolabels.signer.${key}`, v.trim()); } catch { /* ignore */ } };
 
 // /ready/:token — the per-vehicle Get-Ready hub. One permanent QR; anyone scans
 // it (no login), picks their station, completes it, signs. Each station locks
@@ -153,7 +159,7 @@ function ServiceStation({ token, ctx, onDone }: { token: string; ctx: Ctx; onDon
   const [notes, setNotes] = useState("");
   const [docs, setDocs] = useState<{ url: string; caption?: string }[]>([]);
   const [uploading, setUploading] = useState(false);
-  const [name, setName] = useState("");
+  const [name, setName] = useState(() => rememberedName("service"));
   const [sig, setSig] = useState(""); const [sigType, setSigType] = useState<"draw" | "type">("draw");
   const [consent, setConsent] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -162,7 +168,11 @@ function ServiceStation({ token, ctx, onDone }: { token: string; ctx: Ctx; onDon
   const answered = k208Answered(marks); const result = k208Result(marks);
   const passAll = () => setMarks((cur) => { const n: Record<string, K208Mark> = {}; K208_ITEMS.forEach((i) => n[i.id] = cur[i.id] === "fail" || cur[i.id] === "na" ? cur[i.id] : "pass"); return n; });
   const onFiles = async (files: FileList | null) => { if (!files?.length) return; setUploading(true); for (const f of Array.from(files)) { const url = await uploadViaToken(token, f); if (url) setDocs((d) => [...d, { url, caption: f.name }]); } setUploading(false); };
-  const canSubmit = !!name.trim() && !!sig.trim() && consent && answered > 0 && !busy;
+  // Every checklist item must be marked (pass/fail/N/A) before the inspection
+  // can be certified — a partial K-208 must never submit as a PASS. "Pass all"
+  // marks the remainder in one tap.
+  const allAnswered = answered >= K208_ITEMS.length;
+  const canSubmit = !!name.trim() && !!sig.trim() && consent && allAnswered && !busy;
 
   const submit = async () => {
     if (!canSubmit) return; setBusy(true);
@@ -175,7 +185,8 @@ function ServiceStation({ token, ctx, onDone }: { token: string; ctx: Ctx; onDon
       _esign_consent: buildConsentRecord(), _ip: ip, _user_agent: typeof navigator !== "undefined" ? navigator.userAgent : null,
     });
     setBusy(false);
-    if (!error && (data as { ok?: boolean })?.ok) onDone();
+    if (!error && (data as { ok?: boolean })?.ok) { saveName("service", name); onDone(); }
+    else toast.error(error?.message ? "Couldn't submit — please try again." : (data as { reason?: string })?.reason === "expired" ? "This link is no longer active — ask for a new QR." : "Couldn't submit — please try again.");
   };
 
   return (
@@ -185,6 +196,14 @@ function ServiceStation({ token, ctx, onDone }: { token: string; ctx: Ctx; onDon
       <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Inspector full name" className="w-full h-11 rounded-lg border border-border bg-background px-3 text-sm" />
       <SignaturePad label="Inspector signature" subtitle="Sign to certify this inspection." value={sig} type={sigType} onChange={(d, t) => { setSig(d); setSigType(t); }} />
       <ConsentRow text={K208_CERTIFICATION_TEXT} checked={consent} onChange={setConsent} />
+      {!canSubmit && !busy && (
+        <p className="text-[12px] text-amber-600 text-center">
+          {!allAnswered ? `${K208_ITEMS.length - answered} item${K208_ITEMS.length - answered === 1 ? "" : "s"} still need a mark — use "Pass all" then adjust any exceptions.`
+            : !name.trim() ? "Enter your name to certify."
+            : !sig.trim() ? "Add your signature to certify."
+            : !consent ? "Check the certification box to submit." : ""}
+        </p>
+      )}
       <SubmitBar label={`Submit K-208 (${result.toUpperCase()})`} disabled={!canSubmit} busy={busy} onClick={submit} />
     </div>
   );
@@ -198,7 +217,7 @@ function DetailStation({ token, ctx, onDone }: { token: string; ctx: Ctx; onDone
   const [installs, setInstalls] = useState<Record<string, { on: boolean; photo?: string; uploading?: boolean }>>({});
   const [extras, setExtras] = useState<{ id: string; label: string; photo?: string; uploading?: boolean }[]>([]);
   const [company, setCompany] = useState(""); const [contact, setContact] = useState("");
-  const [name, setName] = useState(""); const [sig, setSig] = useState(""); const [sigType, setSigType] = useState<"draw" | "type">("draw");
+  const [name, setName] = useState(() => rememberedName("detail")); const [sig, setSig] = useState(""); const [sigType, setSigType] = useState<"draw" | "type">("draw");
   const [notes, setNotes] = useState(""); const [consent, setConsent] = useState(false); const [busy, setBusy] = useState(false);
 
   const thirdParty = role === "outside";
@@ -240,7 +259,8 @@ function DetailStation({ token, ctx, onDone }: { token: string; ctx: Ctx; onDone
       _user_agent: typeof navigator !== "undefined" ? navigator.userAgent : null, _performer_role: role,
     });
     setBusy(false);
-    if (!error && (data as { ok?: boolean })?.ok) onDone();
+    if (!error && (data as { ok?: boolean })?.ok) { saveName("detail", name); onDone(); }
+    else toast.error((data as { reason?: string })?.reason === "expired" ? "This link is no longer active — ask for a new QR." : "Couldn't submit — please try again.");
   };
 
   return (
