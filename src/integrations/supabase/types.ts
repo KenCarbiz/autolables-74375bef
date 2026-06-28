@@ -1666,6 +1666,7 @@ export type Database = {
           is_third_party: boolean
           notes: string | null
           performer_name: string | null
+          performer_role: string | null
           photos: Json
           provider_company: string | null
           provider_contact: string | null
@@ -1693,6 +1694,7 @@ export type Database = {
           is_third_party?: boolean
           notes?: string | null
           performer_name?: string | null
+          performer_role?: string | null
           photos?: Json
           provider_company?: string | null
           provider_contact?: string | null
@@ -1720,6 +1722,7 @@ export type Database = {
           is_third_party?: boolean
           notes?: string | null
           performer_name?: string | null
+          performer_role?: string | null
           photos?: Json
           provider_company?: string | null
           provider_contact?: string | null
@@ -5968,6 +5971,7 @@ export type Database = {
           _is_third_party: boolean
           _notes: string
           _performer_name: string
+          _performer_role?: string
           _photos: Json
           _provider_company: string
           _provider_contact: string
