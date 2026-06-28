@@ -11,6 +11,11 @@ export default defineConfig({
     include: ["src/**/*.{test,spec}.{ts,tsx}"],
   },
   resolve: {
-    alias: { "@": path.resolve(__dirname, "./src") },
+    alias: {
+      // Stub Supabase in unit tests so pure modules behind a transitive client
+      // import can load without the real (network-bound) package.
+      "@supabase/supabase-js": path.resolve(__dirname, "./src/test/mocks/supabaseClient.ts"),
+      "@": path.resolve(__dirname, "./src"),
+    },
   },
 });
