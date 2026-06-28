@@ -319,7 +319,7 @@ const VehiclePassportV3 = () => {
             <button onClick={handleShare} className={`text-sm font-medium inline-flex items-center gap-1.5 ${TEXT2} hover:text-[#0F172A]`}><Upload className="w-4 h-4" /> <span className="hidden sm:inline">Share</span></button>
             <button onClick={() => toast.success("Saved to this device")} className={`hidden sm:inline-flex text-sm font-medium items-center gap-1.5 ${TEXT2} hover:text-[#0F172A]`}><Bookmark className="w-4 h-4" /> Save</button>
             <button onClick={() => window.print()} className={`hidden sm:inline-flex text-sm font-medium items-center gap-1.5 ${TEXT2} hover:text-[#0F172A]`}><Printer className="w-4 h-4" /> Print</button>
-            <button onClick={() => go("check-availability")} className="h-11 px-3.5 sm:px-5 rounded-xl bg-[#2563EB] hover:bg-[#1d4fd7] text-white text-sm font-semibold inline-flex items-center gap-2"><CheckCircle2 className="w-4 h-4" /> <span className="hidden sm:inline">Check Availability</span><span className="sm:hidden">Check</span></button>
+            <button onClick={() => go("todays-price")} className="h-11 px-3.5 sm:px-5 rounded-xl bg-[#2563EB] hover:bg-[#1d4fd7] text-white text-sm font-semibold inline-flex items-center gap-2"><DollarSign className="w-4 h-4" /> <span className="hidden sm:inline">See My Price</span><span className="sm:hidden">Price</span></button>
           </div>
         </div>
       </header>
@@ -426,17 +426,22 @@ const VehiclePassportV3 = () => {
         {pv("recon") && d.recon && (() => {
           const r = d.recon;
           const stepCount = r.workItems.length + (r.inspection ? 1 : 0) + r.thirdParty.length;
+          // Only make the grand "everything we did" claim when there's real
+          // substance behind it; a lone inspection gets honest, lighter copy.
+          const substantial = r.workItems.length >= 3 || r.photos.length > 0 || r.thirdParty.length > 0;
           return (
             <section data-module="recon" className={`${CARD} p-0 overflow-hidden`}>
               <div className="bg-[#0F172A] px-6 py-6 sm:px-8 sm:py-7">
                 <div className="flex flex-wrap items-center justify-between gap-5">
                   <div className="min-w-0">
                     <p className="text-[12px] font-semibold uppercase tracking-wider text-emerald-400 inline-flex items-center gap-1.5"><BadgeCheck className="w-4 h-4" /> Dealer-Certified Reconditioning</p>
-                    <h2 className="text-[22px] sm:text-[26px] font-bold text-white leading-tight mt-1.5">Everything we did to get this vehicle ready for you</h2>
-                    <p className="text-[13px] text-slate-300 mt-1.5 max-w-xl">Before this {listing.ymm || "vehicle"} was listed, our team completed and documented {stepCount} reconditioning, safety, and detailing step{stepCount === 1 ? "" : "s"} — so you can buy with total confidence.</p>
+                    <h2 className="text-[22px] sm:text-[26px] font-bold text-white leading-tight mt-1.5">{substantial ? "Everything we did to get this vehicle ready for you" : "Inspected and prepped for you"}</h2>
+                    <p className="text-[13px] text-slate-300 mt-1.5 max-w-xl">{substantial
+                      ? <>Before this {listing.ymm || "vehicle"} was listed, our team completed and documented {stepCount} reconditioning, safety, and detailing step{stepCount === 1 ? "" : "s"} — so you can buy with total confidence.</>
+                      : <>Our team inspected and prepared this {listing.ymm || "vehicle"} before listing it, with every step documented — so you can buy with confidence.</>}</p>
                   </div>
                   <div className="flex items-center gap-6 shrink-0">
-                    <div className="text-center"><p className="text-[34px] font-extrabold text-emerald-400 leading-none">{stepCount}</p><p className="text-[11px] text-slate-400 mt-1 leading-tight">Steps<br />completed</p></div>
+                    {substantial && <div className="text-center"><p className="text-[34px] font-extrabold text-emerald-400 leading-none">{stepCount}</p><p className="text-[11px] text-slate-400 mt-1 leading-tight">Steps<br />completed</p></div>}
                     {r.inspection && <div className="text-center"><ShieldCheck className="w-8 h-8 text-emerald-400 mx-auto" /><p className="text-[11px] text-slate-300 mt-1 leading-tight font-semibold">{r.inspection.passed ? "Passed" : "Done"}<br />inspection</p></div>}
                   </div>
                 </div>
@@ -520,15 +525,22 @@ const VehiclePassportV3 = () => {
           {/* Vehicle History */}
           <div className={`${CARD} p-5 flex flex-col`}>
             <H3>Vehicle History Summary</H3>
-            <ul className="mt-3 space-y-3">
-              {[
-                { icon: Users, t: d.ownerCount === 1 ? "One Owner" : d.ownerCount ? `${d.ownerCount} Owners` : "Ownership", s: d.ownerCount === 1 ? "Personal Use" : "Not reported", ok: d.ownerCount === 1 },
-                { icon: ShieldCheck, t: "No Accidents", s: d.accidentCount === 0 ? "No Issues Reported" : "Not reported", ok: d.accidentCount === 0 },
-                { icon: FileText, t: "Clean Title", s: d.cleanTitle ? "No Brands" : "Not reported", ok: d.cleanTitle },
-                { icon: Wrench, t: "Service History", s: d.serviceCount > 0 ? `${d.serviceCount} Records` : "No records", ok: d.serviceCount > 0 },
-                { icon: BadgeCheck, t: "No Open Recalls", s: d.recallClear ? "0 Open Recalls" : "Not checked", ok: d.recallClear },
-              ].map((r) => <li key={r.t} className="flex items-center gap-2.5"><span className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 ${r.ok ? "bg-emerald-50" : "bg-slate-100"}`}><r.icon className={`w-4 h-4 ${r.ok ? "text-[#16A34A]" : "text-[#94A3B8]"}`} /></span><div className="min-w-0"><p className="text-[13px] font-semibold leading-tight">{r.t}</p><p className="text-[11px] text-[#64748B]">{r.s}</p></div></li>)}
-            </ul>
+            {(() => {
+              // Show only known, positive signals — empty "Not reported" rows
+              // next to certified claims read as "lots unknown" and erode trust.
+              const rows = [
+                d.ownerCount === 1 ? { icon: Users, t: "One Owner", s: "Personal Use" } : d.ownerCount ? { icon: Users, t: `${d.ownerCount} Owners`, s: "Ownership history on file" } : null,
+                d.accidentCount === 0 ? { icon: ShieldCheck, t: "No Accidents", s: "No Issues Reported" } : null,
+                d.cleanTitle ? { icon: FileText, t: "Clean Title", s: "No Brands" } : null,
+                d.serviceCount > 0 ? { icon: Wrench, t: "Service History", s: `${d.serviceCount} Records` } : null,
+                d.recallClear ? { icon: BadgeCheck, t: "No Open Recalls", s: "0 Open Recalls" } : null,
+              ].filter(Boolean) as { icon: typeof Users; t: string; s: string }[];
+              return rows.length ? (
+                <ul className="mt-3 space-y-3">
+                  {rows.map((r) => <li key={r.t} className="flex items-center gap-2.5"><span className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0 bg-emerald-50"><r.icon className="w-4 h-4 text-[#16A34A]" /></span><div className="min-w-0"><p className="text-[13px] font-semibold leading-tight">{r.t}</p><p className="text-[11px] text-[#64748B]">{r.s}</p></div></li>)}
+                </ul>
+              ) : <p className="text-[13px] text-[#64748B] mt-3">The full vehicle history report is available from the dealership.</p>;
+            })()}
             <Link onClick={() => go("vehicle-history")} className="mt-auto pt-3 self-start">View full history report</Link>
           </div>
 

@@ -217,7 +217,10 @@ serve(async (req) => {
           // Every signed detail/install sign-off — many parties (detail, parts,
           // service, outside vendors) can each sign off their own work.
           admin.from("detail_signoffs").select("detail_types, installs, photos, is_third_party, provider_company, signed_at").eq("vin", vinU).eq("tenant_id", row.tenant_id).eq("status", "signed").order("signed_at", { ascending: false }).limit(50),
-          admin.from("install_proofs").select("product_name, installer_company, photo_path, installed_at").eq("vehicle_vin", vinU).order("installed_at", { ascending: false }).limit(20),
+          // Tenant-scoped (same-VIN cars at other dealers must not leak) and
+          // is_verified only — an install isn't "proven" to the shopper without
+          // both a photo and the installer's signature.
+          admin.from("install_proofs").select("product_name, installer_company, photo_path, installed_at").eq("vehicle_vin", vinU).eq("tenant_id", row.tenant_id).eq("is_verified", true).order("installed_at", { ascending: false }).limit(20),
         ]);
         const inspRow = (insp.data || [])[0] as { form_type?: string; result?: string; signed_at?: string } | undefined;
         const prepRow = (prep.data || [])[0] as { install_photos?: unknown[]; accessories_installed?: unknown[]; signed_at?: string; inspection_passed?: boolean } | undefined;
