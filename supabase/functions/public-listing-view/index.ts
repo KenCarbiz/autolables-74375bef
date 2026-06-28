@@ -214,25 +214,34 @@ serve(async (req) => {
         const [insp, prep, detail, installs] = await Promise.all([
           admin.from("safety_inspections").select("form_type, result, signed_at").eq("vin", vinU).eq("tenant_id", row.tenant_id).eq("status", "signed").order("signed_at", { ascending: false }).limit(1),
           admin.from("prep_sign_offs").select("install_photos, accessories_installed, signed_at, inspection_passed").eq("vehicle_vin", vinU).eq("tenant_id", row.tenant_id).eq("listing_unlocked", true).order("signed_at", { ascending: false }).limit(1),
-          admin.from("detail_signoffs").select("detail_types, photos, signed_at").eq("vin", vinU).eq("tenant_id", row.tenant_id).eq("status", "signed").order("signed_at", { ascending: false }).limit(1),
+          // Every signed detail/install sign-off — many parties (detail, parts,
+          // service, outside vendors) can each sign off their own work.
+          admin.from("detail_signoffs").select("detail_types, installs, photos, is_third_party, provider_company, signed_at").eq("vin", vinU).eq("tenant_id", row.tenant_id).eq("status", "signed").order("signed_at", { ascending: false }).limit(50),
           admin.from("install_proofs").select("product_name, installer_company, photo_path, installed_at").eq("vehicle_vin", vinU).order("installed_at", { ascending: false }).limit(20),
         ]);
         const inspRow = (insp.data || [])[0] as { form_type?: string; result?: string; signed_at?: string } | undefined;
         const prepRow = (prep.data || [])[0] as { install_photos?: unknown[]; accessories_installed?: unknown[]; signed_at?: string; inspection_passed?: boolean } | undefined;
-        const detailRow = (detail.data || [])[0] as { detail_types?: unknown[]; photos?: unknown[]; signed_at?: string } | undefined;
+        const detailRows = (detail.data || []) as { detail_types?: unknown[]; installs?: unknown[]; photos?: unknown[]; is_third_party?: boolean; provider_company?: string; signed_at?: string }[];
         const installRows = (installs.data || []) as { product_name?: string; installer_company?: string; photo_path?: string; installed_at?: string }[];
 
+        const labelOf = (v: unknown): string | null =>
+          typeof v === "string" ? v : (v && typeof v === "object" ? ((v as { label?: string; name?: string }).label || (v as { name?: string }).name || null) : null);
+
         const items: string[] = [];
-        (Array.isArray(detailRow?.detail_types) ? detailRow!.detail_types : []).forEach((t) => typeof t === "string" && items.push(t));
+        const detailThirdParty: { product: string; company: string }[] = [];
+        for (const dr of detailRows) {
+          (Array.isArray(dr.detail_types) ? dr.detail_types : []).forEach((t) => { const l = labelOf(t); if (l) items.push(l); });
+          (Array.isArray(dr.installs) ? dr.installs : []).forEach((i) => { const l = labelOf(i); if (l) { items.push(l); if (dr.is_third_party && dr.provider_company) detailThirdParty.push({ product: l, company: dr.provider_company }); } });
+        }
         (Array.isArray(prepRow?.accessories_installed) ? prepRow!.accessories_installed : []).forEach((a) => {
-          const name = typeof a === "string" ? a : (a && typeof a === "object" ? (a as { name?: string }).name : null);
+          const name = labelOf(a);
           if (name) items.push(name);
         });
         installRows.forEach((i) => { if (i.product_name) items.push(i.product_name); });
 
         const photos = [
           ...(Array.isArray(prepRow?.install_photos) ? prepRow!.install_photos : []),
-          ...(Array.isArray(detailRow?.photos) ? detailRow!.photos : []),
+          ...detailRows.flatMap((dr) => Array.isArray(dr.photos) ? dr.photos : []),
           ...installRows.map((i) => i.photo_path),
         ].map(pubUrl).filter((u): u is string => !!u).slice(0, 12);
 
@@ -244,10 +253,13 @@ serve(async (req) => {
 
         const recon = {
           inspection: inspRow ? { type: inspectionType, passed: (inspRow.result || "").toLowerCase() !== "fail", date: inspRow.signed_at || null } : null,
-          detailed: !!detailRow,
-          detailDate: detailRow?.signed_at || null,
+          detailed: detailRows.length > 0,
+          detailDate: detailRows[0]?.signed_at || null,
           workItems: Array.from(new Set(items)).slice(0, 24),
-          thirdParty: installRows.filter((i) => i.installer_company).map((i) => ({ product: i.product_name || "Accessory", company: i.installer_company })),
+          thirdParty: [
+            ...detailThirdParty,
+            ...installRows.filter((i) => i.installer_company).map((i) => ({ product: i.product_name || "Accessory", company: i.installer_company as string })),
+          ],
           photos,
         };
         if (recon.inspection || recon.detailed || recon.workItems.length || recon.photos.length) row.recon = recon;

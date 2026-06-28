@@ -40,7 +40,7 @@ export const DeliverySignoffs = ({ vin, tenantId, condition }: Props) => {
     const [insp, prep, detail, installs, recall] = await Promise.all([
       sb.from("safety_inspections").select("status, form_type, result, signed_at, documents").eq("vin", v).eq("tenant_id", tenantId),
       sb.from("prep_sign_offs").select("listing_unlocked, foreman_name, install_photos, signed_at, status").eq("vehicle_vin", v).eq("tenant_id", tenantId),
-      sb.from("detail_signoffs").select("status, detail_types, is_third_party, provider_company, photos, signed_at").eq("vin", v).eq("tenant_id", tenantId),
+      sb.from("detail_signoffs").select("status, detail_types, installs, is_third_party, provider_company, performer_role, performer_name, photos, signed_at").eq("vin", v).eq("tenant_id", tenantId),
       sb.from("install_proofs").select("product_name, installer_company, photo_path, is_verified").eq("vehicle_vin", v),
       sb.from("recall_service_tasks").select("status").eq("vin", v).eq("tenant_id", tenantId),
     ]);
@@ -49,8 +49,13 @@ export const DeliverySignoffs = ({ vin, tenantId, condition }: Props) => {
     const inspSigned = inspRows.find((r) => r.status === "signed");
     const prepRows = (prep.data || []) as { listing_unlocked: boolean; foreman_name: string | null; install_photos: unknown[] | null }[];
     const prepDone = prepRows.find((r) => r.listing_unlocked);
-    const detailRows = (detail.data || []) as { status: string; is_third_party: boolean; provider_company: string | null; photos: unknown[] | null }[];
-    const detailSigned = detailRows.find((r) => r.status === "signed");
+    const detailRows = (detail.data || []) as { status: string; is_third_party: boolean; provider_company: string | null; performer_role: string | null; photos: unknown[] | null }[];
+    const detailSignedRows = detailRows.filter((r) => r.status === "signed");
+    const detailSigned = detailSignedRows[0];
+    const ROLE_LABEL: Record<string, string> = { detail: "Detail", service: "Service", parts: "Parts", recon: "Recon", outside: "Outside vendor" };
+    const detailParties = Array.from(new Set(detailSignedRows.map((r) =>
+      (r.is_third_party && r.provider_company) ? r.provider_company : (ROLE_LABEL[r.performer_role || ""] || "Detail"))));
+    const detailPhotoCount = detailSignedRows.reduce((n, r) => n + (r.photos || []).length, 0);
     const installRows = (installs.data || []) as { product_name: string; installer_company: string | null; photo_path: string | null }[];
     const recallRows = (recall.data || []) as { status: string }[];
     const openRecall = recallRows.some((r) => r.status === "open_review");
@@ -94,11 +99,13 @@ export const DeliverySignoffs = ({ vin, tenantId, condition }: Props) => {
       },
       {
         key: "detail",
-        title: isNew ? "Detail — ready for new-car inventory" : "Detail — full detail for used-car inventory",
-        sub: detailSigned ? `Detailed${detailSigned.is_third_party ? ` · ${detailSigned.provider_company || "third-party"}` : ""}${(detailSigned.photos || []).length ? ` · ${(detailSigned.photos || []).length} photo${(detailSigned.photos || []).length === 1 ? "" : "s"}` : ""}` : "Detail not signed off",
+        title: isNew ? "Detail & install — ready for new-car inventory" : "Detail & install — used-car inventory",
+        sub: detailSignedRows.length
+          ? `${detailSignedRows.length} sign-off${detailSignedRows.length === 1 ? "" : "s"} · ${detailParties.join(", ")}${detailPhotoCount ? ` · ${detailPhotoCount} photo${detailPhotoCount === 1 ? "" : "s"}` : ""}`
+          : "No detail / install sign-off yet",
         icon: Sparkles,
-        done: !!detailSigned,
-        photos: (detailSigned?.photos || []).length || undefined,
+        done: detailSignedRows.length > 0,
+        photos: detailPhotoCount || undefined,
       },
     ]);
   }, [vin, tenantId, isNew]);

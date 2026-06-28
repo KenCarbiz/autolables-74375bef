@@ -12,12 +12,30 @@ import { CheckCircle2, Loader2, ShieldCheck, Sparkles, ChevronRight, Upload, X, 
 // once a signed record exists. Stations: Service (CT K-208) and Detail (cleaning
 // + pre-install protection w/ mandatory photos + optional third-party provider).
 
+interface SignoffRow {
+  id: string; role: string; performer_name?: string | null; company?: string | null;
+  is_third_party?: boolean; detail_types?: { label?: string }[]; installs?: { label?: string }[];
+  photos?: number; signed_at?: string | null;
+}
 interface Ctx {
   ok: boolean; reason?: string; tenant_id?: string; vehicle_listing_id?: string;
   vin?: string; ymm?: string; service_done?: boolean; detail_done?: boolean;
+  signoffs?: SignoffRow[];
   preinstall_products?: { id: string; name: string; pre_install: boolean }[];
 }
 type View = "hub" | "service" | "detail";
+
+// Self-declared installer identity — the "login" without the friction. The
+// signature + photo + IP + timestamp are the real proof of who did the work.
+const ROLES = [
+  { key: "detail", label: "Detail dept" },
+  { key: "service", label: "Service dept" },
+  { key: "parts", label: "Parts dept" },
+  { key: "recon", label: "Reconditioning" },
+  { key: "outside", label: "Outside vendor" },
+];
+const ROLE_LABEL = (k: string) => ROLES.find((r) => r.key === k)?.label || "Installer";
+
 const DETAIL_TYPES = [
   { key: "full_detail", label: "Full detail" },
   { key: "exterior_wash", label: "Exterior wash" },
@@ -79,9 +97,33 @@ export default function GetReady() {
       <div className="max-w-2xl mx-auto p-4">
         {view === "hub" && (
           <div className="space-y-3">
-            <p className="text-sm text-muted-foreground">Tap your station. Each one locks once it's signed.</p>
+            <p className="text-sm text-muted-foreground">Tap your station and sign off your own work. Multiple departments and outside vendors can each add a sign-off for this vehicle.</p>
             <StationCard icon={<ShieldCheck className="w-5 h-5" />} title="Safety inspection (K-208)" sub="Service department" done={!!ctx.service_done} onClick={() => setView("service")} />
-            <StationCard icon={<Sparkles className="w-5 h-5" />} title="Detail & protection install" sub="Detail / installer / outside vendor" done={!!ctx.detail_done} onClick={() => setView("detail")} />
+            <StationCard icon={<Sparkles className="w-5 h-5" />} title="Detail / accessory install" sub="Detail · service · parts · outside vendor" done={false} onClick={() => setView("detail")} addAction />
+
+            {(ctx.signoffs?.length ?? 0) > 0 && (
+              <div className="rounded-2xl border border-border bg-card p-4">
+                <div className="text-xs font-bold uppercase tracking-wider text-foreground mb-2">Sign-offs on this vehicle</div>
+                <div className="divide-y divide-border/60">
+                  {ctx.signoffs!.map((s) => {
+                    const items = [
+                      ...((s.detail_types || []).map((d) => d.label).filter(Boolean) as string[]),
+                      ...((s.installs || []).map((i) => i.label).filter(Boolean) as string[]),
+                    ];
+                    const who = s.is_third_party && s.company ? s.company : ROLE_LABEL(s.role);
+                    return (
+                      <div key={s.id} className="flex items-start gap-3 py-2.5">
+                        <CheckCircle2 className="w-4 h-4 text-emerald-600 mt-0.5 shrink-0" />
+                        <div className="min-w-0 flex-1">
+                          <p className="text-[13px] font-semibold text-foreground">{who}{s.performer_name ? ` · ${s.performer_name}` : ""}</p>
+                          <p className="text-[11px] text-muted-foreground">{items.length ? items.join(", ") : "Work recorded"}{s.photos ? ` · ${s.photos} photo${s.photos === 1 ? "" : "s"}` : ""}</p>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
           </div>
         )}
         {view === "service" && <ServiceStation token={token} ctx={ctx} onDone={() => { refresh(); setView("hub"); }} />}
@@ -91,13 +133,13 @@ export default function GetReady() {
   );
 }
 
-function StationCard({ icon, title, sub, done, onClick }: { icon: React.ReactNode; title: string; sub: string; done: boolean; onClick: () => void }) {
+function StationCard({ icon, title, sub, done, onClick, addAction }: { icon: React.ReactNode; title: string; sub: string; done: boolean; onClick: () => void; addAction?: boolean }) {
   return (
     <button onClick={onClick} className={`w-full flex items-center gap-3 rounded-2xl border p-4 text-left transition-colors ${done ? "border-emerald-200 bg-emerald-50" : "border-border bg-card hover:bg-muted/40"}`}>
       <div className={`grid place-items-center w-10 h-10 rounded-xl ${done ? "bg-emerald-600 text-white" : "bg-muted text-foreground"}`}>{done ? <CheckCircle2 className="w-5 h-5" /> : icon}</div>
       <div className="flex-1">
         <div className="font-bold text-foreground">{title}</div>
-        <div className="text-xs text-muted-foreground">{done ? "Completed & signed" : sub}</div>
+        <div className="text-xs text-muted-foreground">{done ? "Completed & signed" : addAction ? `${sub} · tap to add a sign-off` : sub}</div>
       </div>
       {!done && <ChevronRight className="w-5 h-5 text-muted-foreground" />}
     </button>
@@ -148,17 +190,18 @@ function ServiceStation({ token, ctx, onDone }: { token: string; ctx: Ctx; onDon
   );
 }
 
-// ── Detail station (cleaning + pre-install + third-party) ───────────────────
+// ── Detail / install station (role pick + cleaning + installs + accessories) ─
 function DetailStation({ token, ctx, onDone }: { token: string; ctx: Ctx; onDone: () => void }) {
   const products = ctx.preinstall_products || [];
+  const [role, setRole] = useState("");
   const [types, setTypes] = useState<Record<string, boolean>>({});
   const [installs, setInstalls] = useState<Record<string, { on: boolean; photo?: string; uploading?: boolean }>>({});
-  const [thirdParty, setThirdParty] = useState(false);
+  const [extras, setExtras] = useState<{ id: string; label: string; photo?: string; uploading?: boolean }[]>([]);
   const [company, setCompany] = useState(""); const [contact, setContact] = useState("");
   const [name, setName] = useState(""); const [sig, setSig] = useState(""); const [sigType, setSigType] = useState<"draw" | "type">("draw");
   const [notes, setNotes] = useState(""); const [consent, setConsent] = useState(false); const [busy, setBusy] = useState(false);
 
-  if (ctx.detail_done) return <DoneCard label="Detail & install already completed for this vehicle." />;
+  const thirdParty = role === "outside";
 
   const installPhoto = async (id: string, file: File | null) => {
     if (!file) return;
@@ -166,24 +209,35 @@ function DetailStation({ token, ctx, onDone }: { token: string; ctx: Ctx; onDone
     const url = await uploadViaToken(token, file);
     setInstalls((s) => ({ ...s, [id]: { on: true, photo: url || undefined, uploading: false } }));
   };
+  const extraPhoto = async (id: string, file: File | null) => {
+    if (!file) return;
+    setExtras((s) => s.map((e) => e.id === id ? { ...e, uploading: true } : e));
+    const url = await uploadViaToken(token, file);
+    setExtras((s) => s.map((e) => e.id === id ? { ...e, photo: url || undefined, uploading: false } : e));
+  };
+  const addExtra = () => setExtras((s) => [...s, { id: `x${s.length}-${Math.random().toString(36).slice(2, 7)}`, label: "" }]);
   const selectedInstalls = products.filter((p) => installs[p.id]?.on);
+  const validExtras = extras.filter((e) => e.label.trim());
   const missingPhoto = selectedInstalls.some((p) => p.pre_install && !installs[p.id]?.photo);
-  const anySelected = Object.values(types).some(Boolean) || selectedInstalls.length > 0;
-  const canSubmit = !!name.trim() && !!sig.trim() && consent && anySelected && !missingPhoto && (!thirdParty || !!company.trim()) && !busy;
+  const anySelected = Object.values(types).some(Boolean) || selectedInstalls.length > 0 || validExtras.length > 0;
+  const canSubmit = !!role && !!name.trim() && !!sig.trim() && consent && anySelected && !missingPhoto && (!thirdParty || !!company.trim()) && !busy;
 
   const submit = async () => {
     if (!canSubmit) return; setBusy(true);
     const detail_types = DETAIL_TYPES.filter((t) => types[t.key]).map((t) => ({ key: t.key, label: t.label }));
-    const installPayload = selectedInstalls.map((p) => ({ product_id: p.id, label: p.name, pre_install: p.pre_install, photo_url: installs[p.id]?.photo || null }));
+    const installPayload = [
+      ...selectedInstalls.map((p) => ({ product_id: p.id, label: p.name, pre_install: p.pre_install, photo_url: installs[p.id]?.photo || null })),
+      ...validExtras.map((e) => ({ product_id: null, label: e.label.trim(), pre_install: false, photo_url: e.photo || null })),
+    ];
     const photos = installPayload.map((i) => i.photo_url).filter(Boolean);
-    const content_hash = await hashPayload({ vin: ctx.vin, detail_types, installs: installPayload, name, thirdParty, company });
+    const content_hash = await hashPayload({ vin: ctx.vin, role, detail_types, installs: installPayload, name, thirdParty, company });
     const ip = await fetchClientIp();
     const { data, error } = await (supabase as any).rpc("submit_detail_signoff", {
       _token: token, _detail_types: detail_types, _installs: installPayload, _is_third_party: thirdParty,
       _provider_company: thirdParty ? company.trim() : null, _provider_contact: thirdParty ? contact.trim() : null,
       _performer_name: name.trim(), _signature_data: sig, _photos: photos, _notes: notes || null,
       _content_hash: content_hash, _esign_consent: buildConsentRecord(), _ip: ip,
-      _user_agent: typeof navigator !== "undefined" ? navigator.userAgent : null,
+      _user_agent: typeof navigator !== "undefined" ? navigator.userAgent : null, _performer_role: role,
     });
     setBusy(false);
     if (!error && (data as { ok?: boolean })?.ok) onDone();
@@ -191,6 +245,29 @@ function DetailStation({ token, ctx, onDone }: { token: string; ctx: Ctx; onDone
 
   return (
     <div className="space-y-4">
+      <div className="rounded-2xl border border-border bg-card p-4 space-y-2">
+        <div className="text-xs font-bold uppercase tracking-wider text-foreground">Who's signing off?</div>
+        <p className="text-xs text-muted-foreground">Pick your department or vendor. Each party records and signs only their own work.</p>
+        <div className="flex flex-wrap gap-2">
+          {ROLES.map((rl) => (
+            <button key={rl.key} onClick={() => setRole(rl.key)}
+              className={`h-10 rounded-lg border text-sm font-semibold px-3 ${role === rl.key ? "border-primary bg-primary/10 text-primary" : "border-border bg-background text-foreground"}`}>
+              {rl.label}
+            </button>
+          ))}
+        </div>
+        {thirdParty && (
+          <div className="grid gap-2 pt-1">
+            <input value={company} onChange={(e) => setCompany(e.target.value)} placeholder="Company name" className="h-10 rounded-lg border border-border bg-background px-3 text-sm" />
+            <input value={contact} onChange={(e) => setContact(e.target.value)} placeholder="Contact number / email" className="h-10 rounded-lg border border-border bg-background px-3 text-sm" />
+          </div>
+        )}
+      </div>
+
+      {!role ? (
+        <p className="text-center text-xs text-muted-foreground py-4">Select who's signing off to continue.</p>
+      ) : (
+      <>
       <div className="rounded-2xl border border-border bg-card p-4 space-y-2">
         <div className="text-xs font-bold uppercase tracking-wider text-foreground">Detail performed</div>
         <div className="grid grid-cols-2 gap-2">
@@ -237,16 +314,27 @@ function DetailStation({ token, ctx, onDone }: { token: string; ctx: Ctx; onDone
       )}
 
       <div className="rounded-2xl border border-border bg-card p-4 space-y-3">
-        <label className="flex items-center gap-2 text-sm font-medium text-foreground">
-          <input type="checkbox" checked={thirdParty} onChange={(e) => setThirdParty(e.target.checked)} />
-          I'm an outside (third-party) provider
-        </label>
-        {thirdParty && (
-          <div className="grid gap-2">
-            <input value={company} onChange={(e) => setCompany(e.target.value)} placeholder="Company name" className="h-10 rounded-lg border border-border bg-background px-3 text-sm" />
-            <input value={contact} onChange={(e) => setContact(e.target.value)} placeholder="Contact number / email" className="h-10 rounded-lg border border-border bg-background px-3 text-sm" />
+        <div className="text-xs font-bold uppercase tracking-wider text-foreground">Other accessories / equipment installed</div>
+        <p className="text-xs text-muted-foreground">Anything not listed above — wind deflector, all-weather mats, trailer hitch, tint. Add a photo of the finished work.</p>
+        {extras.map((e) => (
+          <div key={e.id} className="rounded-xl border border-border p-3 space-y-2">
+            <div className="flex items-center gap-2">
+              <input value={e.label} onChange={(ev) => setExtras((s) => s.map((x) => x.id === e.id ? { ...x, label: ev.target.value } : x))} placeholder="Accessory / item installed" className="flex-1 h-9 rounded-lg border border-border bg-background px-3 text-sm" />
+              <button onClick={() => setExtras((s) => s.filter((x) => x.id !== e.id))} className="w-8 h-8 grid place-items-center rounded-md border border-border text-muted-foreground"><X className="w-4 h-4" /></button>
+            </div>
+            {e.photo ? (
+              <a href={e.photo} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-xs text-emerald-600 font-semibold"><CheckCircle2 className="w-3.5 h-3.5" /> Photo attached</a>
+            ) : (
+              <>
+                <input type="file" accept="image/*" capture="environment" id={`ex-${e.id}`} className="hidden" onChange={(ev) => extraPhoto(e.id, ev.target.files?.[0] ?? null)} />
+                <label htmlFor={`ex-${e.id}`} className="h-8 px-3 rounded-md border border-border text-[11px] font-semibold inline-flex items-center gap-1.5 cursor-pointer w-fit">
+                  {e.uploading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Camera className="w-3.5 h-3.5" />} Take / add photo
+                </label>
+              </>
+            )}
           </div>
-        )}
+        ))}
+        <button onClick={addExtra} className="h-9 px-3 rounded-md border border-dashed border-border text-xs font-semibold inline-flex items-center gap-1.5 hover:bg-muted w-fit"><Upload className="w-3.5 h-3.5" /> Add accessory</button>
       </div>
 
       <div className="rounded-2xl border border-border bg-card p-4 space-y-3">
@@ -258,6 +346,8 @@ function DetailStation({ token, ctx, onDone }: { token: string; ctx: Ctx; onDone
 
       {missingPhoto && <p className="text-center text-xs text-amber-600 font-semibold">Add a photo for each pre-install item before submitting.</p>}
       <SubmitBar label="Submit & sign" disabled={!canSubmit} busy={busy} onClick={submit} />
+      </>
+      )}
     </div>
   );
 }
