@@ -23,6 +23,9 @@ const corsHeaders = {
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") || "";
 const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
 const BUCKET = "service-docs";
+// Title/MCO scans are PII — they go to the PRIVATE vehicle-docs bucket and the
+// caller gets the storage path (dealer signs it on read), never a public URL.
+const BUCKET_PRIVATE = "vehicle-docs";
 const MAX_BYTES = 10 * 1024 * 1024;
 
 const json = (status: number, body: unknown) =>
@@ -53,7 +56,7 @@ serve(async (req) => {
   if (req.method !== "POST") return json(405, { error: "method not allowed" });
 
   const body = await req.json().catch(() => ({})) as {
-    token?: string; filename?: string; contentType?: string; dataBase64?: string;
+    token?: string; filename?: string; contentType?: string; dataBase64?: string; private?: boolean;
   };
   const token = (body.token || "").trim();
   if (!token || !body.dataBase64) return json(400, { error: "token and dataBase64 required" });
@@ -83,15 +86,25 @@ serve(async (req) => {
   }
   if (bytes.byteLength > MAX_BYTES) return json(413, { error: "file too large (max 10MB)" });
 
+  const isPrivate = body.private === true;
+  const bucket = isPrivate ? BUCKET_PRIVATE : BUCKET;
   const stamp = Date.now();
   const rand = Math.random().toString(36).slice(2, 8);
   const path = `${tok.tenant_id}/${tok.vin}/${stamp}-${rand}-${safeName(body.filename || "upload")}`;
 
-  const { error: upErr } = await admin.storage.from(BUCKET).upload(path, bytes, {
+  // Ensure the private bucket exists (idempotent) so title uploads never 404.
+  if (isPrivate) {
+    try { await admin.storage.createBucket(BUCKET_PRIVATE, { public: false }); } catch { /* exists */ }
+  }
+
+  const { error: upErr } = await admin.storage.from(bucket).upload(path, bytes, {
     contentType, upsert: false,
   });
   if (upErr) return json(500, { error: upErr.message || "upload failed" });
 
-  const { data: pub } = admin.storage.from(BUCKET).getPublicUrl(path);
+  // Private files return only the path (PII — no public URL). Public bucket
+  // (service-docs) keeps returning the public URL for the existing callers.
+  if (isPrivate) return json(200, { ok: true, path, private: true });
+  const { data: pub } = admin.storage.from(bucket).getPublicUrl(path);
   return json(200, { ok: true, url: pub?.publicUrl || "", path });
 });

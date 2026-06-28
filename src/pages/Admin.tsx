@@ -1339,6 +1339,45 @@ const Admin = () => {
               </div>
             </div>
 
+            {/* Title / MCO capture */}
+            <div className="bg-card rounded-lg p-4 shadow-premium mb-3">
+              <h4 className="text-sm font-bold text-foreground mb-1">Title / MCO Upload</h4>
+              <p className="text-xs text-muted-foreground mb-3">The office gets a per-vehicle link + QR to upload the title (used) or MCO (new), front and back, into the private vehicle file.</p>
+              <div className="space-y-3">
+                <div>
+                  <label className="text-xs font-semibold text-muted-foreground">Office clerk email(s)</label>
+                  <textarea
+                    value={settings.title_clerk_email || ""}
+                    onChange={(e) => updateSettings({ title_clerk_email: e.target.value })}
+                    rows={2}
+                    placeholder="titles@dealership.com, backup-clerk@dealership.com"
+                    className="w-full px-3 py-2 border border-border-custom rounded text-sm resize-none"
+                  />
+                  <p className="text-[11px] text-muted-foreground mt-1">Separate multiple addresses with commas — add a backup so it still goes out when someone's out of office.</p>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-semibold text-foreground">Email the office automatically on intake</span>
+                  <Switch checked={!!settings.title_email_on_intake} onCheckedChange={(v) => updateSettings({ title_email_on_intake: v })} className="data-[state=checked]:bg-teal" />
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-semibold text-foreground">Resend reminders until received</span>
+                  <Switch checked={!!settings.title_reminders_enabled} onCheckedChange={(v) => updateSettings({ title_reminders_enabled: v })} className="data-[state=checked]:bg-teal" />
+                </div>
+                {settings.title_reminders_enabled && (
+                  <div>
+                    <label className="text-xs font-semibold text-muted-foreground">Remind every (days)</label>
+                    <input
+                      type="number" min={1} step={1}
+                      value={settings.title_reminder_days ?? 3}
+                      onChange={(e) => updateSettings({ title_reminder_days: Math.max(1, parseInt(e.target.value) || 3) })}
+                      className="w-full px-3 py-2 border border-border-custom rounded text-sm"
+                    />
+                    <p className="text-[11px] text-muted-foreground mt-1">Re-emails the office every N days while no title/MCO is on file for an in-stock vehicle.</p>
+                  </div>
+                )}
+              </div>
+            </div>
+
             {/* Integrations status */}
             <div className="bg-card rounded-lg p-4 shadow-premium mb-3">
               <h4 className="text-sm font-bold text-foreground mb-2">Integration Status</h4>

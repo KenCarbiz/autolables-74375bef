@@ -25,6 +25,7 @@ import { QRCodeSVG } from "qrcode.react";
 import GeneratedDocumentsSection from "@/components/vehicle/GeneratedDocumentsSection";
 import UsedCarDocPack from "@/components/vehicle/UsedCarDocPack";
 import DeliverySignoffs from "@/components/vehicle/DeliverySignoffs";
+import TitleMcoPanel from "@/components/vehicle/TitleMcoPanel";
 import VehicleEvidenceTimeline from "@/components/vehicle/VehicleEvidenceTimeline";
 
 // ──────────────────────────────────────────────────────────────
@@ -1100,6 +1101,7 @@ const DocumentsPanel = ({ vehicle, onReload }: { vehicle: VehicleRow; onReload: 
         description="Files available to shoppers and dealership staff — upload PDFs, links, brochures, reports, and warranty paperwork."
       />
       <UsedCarDocPack vehicleId={vehicle.id} vin={vehicle.vin} condition={vehicle.condition} />
+      <TitleMcoPanel vin={vehicle.vin} tenantId={vehicle.tenant_id} condition={vehicle.condition} />
       <div className="rounded-2xl border border-border bg-card shadow-[0_1px_3px_rgba(0,0,0,0.05)] p-5">
         <GeneratedDocumentsSection vehicleId={vehicle.id} />
       </div>

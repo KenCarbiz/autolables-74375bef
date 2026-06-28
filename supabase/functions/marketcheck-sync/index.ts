@@ -130,7 +130,7 @@ async function ensureReadyToken(admin: any, tenantId: string, vin: string, ymm: 
 // addendum, and kick off a best-effort OEM window-sticker fetch. All isolated —
 // never throws back into the sync loop. Runs only on genuinely new listings.
 // deno-lint-ignore no-explicit-any
-async function autoPreload(admin: any, supabaseUrl: string, serviceKey: string, tenantId: string, vin: string, ymm: string | null, listingId: string | null) {
+async function autoPreload(admin: any, supabaseUrl: string, serviceKey: string, tenantId: string, vin: string, ymm: string | null, listingId: string | null, emailTitle = false) {
   await ensureReadyToken(admin, tenantId, vin, ymm, listingId);
   try {
     // Draft addendum from the dealer's product rules (skips if none match).
@@ -145,6 +145,17 @@ async function autoPreload(admin: any, supabaseUrl: string, serviceKey: string, 
       signal: AbortSignal.timeout(20000),
     }).catch(() => { /* best-effort */ });
   } catch { /* sticker preload best-effort */ }
+  // Email the office the per-vehicle title/MCO upload link on intake (opt-in).
+  if (emailTitle) {
+    try {
+      fetch(`${supabaseUrl}/functions/v1/email-title-request`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${serviceKey}` },
+        body: JSON.stringify({ tenant_id: tenantId, vin }),
+        signal: AbortSignal.timeout(20000),
+      }).catch(() => { /* best-effort */ });
+    } catch { /* title email best-effort */ }
+  }
 }
 
 // One page of a rooftop's inventory from the syndication feed. owned=true drops
@@ -683,7 +694,7 @@ serve(async (req) => {
               if (!ins.error) {
                 listingsUpserted++;
                 // New car → auto-preload its Get-Ready QR + OEM window sticker.
-                await autoPreload(admin, supabaseUrl, serviceKey, cfg.tenant_id, vin, ymm, ins.data?.id ?? null);
+                await autoPreload(admin, supabaseUrl, serviceKey, cfg.tenant_id, vin, ymm, ins.data?.id ?? null, String(pset.title_email_on_intake) !== "false");
               } else if (!firstWriteErr) firstWriteErr = ins.error.message;
             }
 
