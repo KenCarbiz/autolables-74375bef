@@ -15,6 +15,7 @@ import Logo from "@/components/brand/Logo";
 import { derivePassport, computePriceHistory, fmt$, listingEquipment } from "@/lib/passportV2Data";
 import { resolveStickyButtons, type StickyBottomButtons } from "@/lib/stickyButtons";
 import { listingGallery } from "@/lib/photos";
+import { usePassportEngagement } from "@/lib/passportEngagement";
 import { packetVisible } from "@/lib/packetModules";
 import PassportPanel, { type PassportPanelKey } from "@/components/passport/PassportPanel";
 import PassportCtaDock from "@/components/passport/PassportCtaDock";
@@ -174,6 +175,8 @@ const VehiclePassportV3 = () => {
 
   const d = useMemo(() => (listing ? derivePassport(listing) : null), [listing]);
   const gallery = useMemo(() => (listing ? listingGallery(listing) : ([] as string[])), [listing]);
+  // Shopper Focus Breakdown — time per module + open panel (skipped in preview).
+  usePassportEngagement(listing?.slug || vehicleSlug, activePanel, !isPreview);
 
   if (loading) return <div className="min-h-screen flex items-center justify-center bg-[#F6F7F9]"><div className="w-8 h-8 border-2 border-[#2563EB] border-t-transparent rounded-full animate-spin" /></div>;
   if (notFound || !listing || !d) return (
@@ -324,7 +327,7 @@ const VehiclePassportV3 = () => {
 
       <main className="mx-auto max-w-[1320px] px-4 sm:px-5 py-5 sm:py-6 pb-[calc(92px+env(safe-area-inset-bottom))] lg:pb-6 space-y-6 max-[767px]:space-y-8 lg:space-y-7">
         {/* 1–2. TOP ZONE */}
-        <section className="grid grid-cols-1 lg:grid-cols-[minmax(0,380px)_1fr] gap-5">
+        <section data-module="vehicle-details" className="grid grid-cols-1 lg:grid-cols-[minmax(0,380px)_1fr] gap-5">
           {/* Gallery */}
           <div>
             <div className="relative overflow-hidden rounded-2xl bg-[#1f2227] aspect-[4/3] max-[767px]:aspect-[5/4]">
@@ -419,7 +422,7 @@ const VehiclePassportV3 = () => {
 
         {/* 4. MARKET INTELLIGENCE */}
         {pv("marketValue") && (
-        <section className={`${CARD} p-5`}>
+        <section data-module="market" className={`${CARD} p-5`}>
           <div className="flex items-center justify-between"><div><H2>Market Intelligence</H2><p className={`text-[13px] ${TEXT2} mt-0.5`}>Independent pricing, demand, and value analysis for this vehicle.</p></div><span className="text-[12px] text-[#94A3B8] inline-flex items-center gap-1">Powered by MarketCheck<button onClick={(e) => openInfo("data-sources", e)} aria-label="Data sources explained" className="w-4 h-4 inline-flex items-center justify-center"><Info className="w-3.5 h-3.5 text-[#94A3B8]" /></button></span></div>
           <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-4 mt-5">
             {mi.map((c) => (
@@ -486,7 +489,7 @@ const VehiclePassportV3 = () => {
 
           {/* Factory Warranty */}
           {pv("warranty") && (
-          <div className={`${CARD} p-5 flex flex-col`}>
+          <div data-module="warranty" className={`${CARD} p-5 flex flex-col`}>
             <div className="flex items-center gap-1.5"><H3>Factory Warranty</H3><button onClick={(e) => openInfo("warranty-terms", e)} aria-label="Warranty terminology" className="w-6 h-6 rounded-full hover:bg-slate-100 flex items-center justify-center"><Info className="w-3.5 h-3.5 text-[#94A3B8]" /></button></div>
             {d.warrantyStr ? (() => {
               const w = d.warranty;
@@ -521,7 +524,7 @@ const VehiclePassportV3 = () => {
         <section className="grid grid-cols-1 lg:grid-cols-[1fr_1fr_1.6fr] gap-5 items-stretch">
           {/* Highlights */}
           {pv("factoryOptions") && (
-          <div className={`${CARD} p-5 flex flex-col`}>
+          <div data-module="highlights" className={`${CARD} p-5 flex flex-col`}>
             <H3>Vehicle Highlights</H3>
             {highlights.length ? (
               <div className="grid grid-cols-4 gap-y-4 gap-x-2 mt-4">{highlights.slice(0, 8).map((h, i) => <div key={i} className="flex flex-col items-center text-center gap-1.5"><span className="w-10 h-10 rounded-xl bg-blue-50 flex items-center justify-center shrink-0"><h.icon className="w-5 h-5 text-[#2563EB]" /></span><div className="w-full min-w-0"><div className="text-[11px] font-bold leading-tight line-clamp-2 break-words">{h.t}</div><div className="text-[10px] text-[#94A3B8] truncate">{h.s}</div></div></div>)}</div>
@@ -534,7 +537,7 @@ const VehiclePassportV3 = () => {
           )}
           {/* Overview */}
           {pv("description") && (
-          <div className={`${CARD} p-5 flex flex-col`}>
+          <div data-module="overview" className={`${CARD} p-5 flex flex-col`}>
             <H3>Vehicle Overview</H3>
             <p className="text-[13px] leading-relaxed text-[#64748B] mt-3 line-clamp-6">{d.overview}</p>
             {(gallery[1] || gallery[0]) && <img src={gallery[1] || gallery[0]} alt="" className="w-full aspect-[16/9] object-cover rounded-xl mt-3" />}
@@ -543,7 +546,7 @@ const VehiclePassportV3 = () => {
           )}
           {/* Reconditioning & Inspection */}
           {pv("recon") && (
-          <div className={`${CARD} p-5 flex flex-col`}>
+          <div data-module="recon" className={`${CARD} p-5 flex flex-col`}>
             <div className="flex items-center gap-1.5"><H3>Reconditioning &amp; Inspection</H3></div>
             {d.recon ? (
               <div className="mt-3 space-y-3">
@@ -570,7 +573,7 @@ const VehiclePassportV3 = () => {
           </div>
           )}
           {/* Why Buy From This Dealership (wider) */}
-          <div className={`${CARD} p-5 flex flex-col`}>
+          <div data-module="dealer" className={`${CARD} p-5 flex flex-col`}>
             <H3>Why Buy From {d.dealerName}?</H3>
             {dealerChips.length > 0 ? (
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-5 gap-y-4 mt-4">

@@ -26,6 +26,7 @@ import GeneratedDocumentsSection from "@/components/vehicle/GeneratedDocumentsSe
 import UsedCarDocPack from "@/components/vehicle/UsedCarDocPack";
 import DeliverySignoffs from "@/components/vehicle/DeliverySignoffs";
 import TitleMcoPanel from "@/components/vehicle/TitleMcoPanel";
+import ShopperFocus from "@/components/vehicle/ShopperFocus";
 import VehicleEvidenceTimeline from "@/components/vehicle/VehicleEvidenceTimeline";
 
 // ──────────────────────────────────────────────────────────────
@@ -897,6 +898,7 @@ const OverviewPanel = ({ vehicle, onTab, recall }: { vehicle: VehicleRow; onTab:
         <div className="space-y-4">
           <RecallCard vehicle={vehicle} recall={recall} />
           <MarketPricingCard vehicle={vehicle} />
+          <ShopperFocus vin={vehicle.vin} tenantId={vehicle.tenant_id} />
           <Card title="Packet Completeness">
             <div className="flex items-end justify-between gap-2">
               <span className="font-display text-3xl font-black tabular-nums text-foreground leading-none">{packetPct}%</span>
