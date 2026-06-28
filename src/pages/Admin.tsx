@@ -1412,6 +1412,35 @@ const Admin = () => {
               </div>
             </div>
 
+            {/* Recon approval gate */}
+            <div className="bg-card rounded-lg p-4 shadow-premium mb-3">
+              <h4 className="text-sm font-bold text-foreground mb-1">Recon Approval</h4>
+              <p className="text-xs text-muted-foreground mb-3">When service submits a recon estimate, line items at or under this amount clear automatically so work isn't stalled. Anything higher routes to the used-car manager to approve or decline.</p>
+              <div className="space-y-3">
+                <div>
+                  <label className="text-xs font-semibold text-muted-foreground">Auto-approve line items up to ($)</label>
+                  <input
+                    type="number" min={0} step={50}
+                    value={settings.recon_auto_approve_amount ?? 500}
+                    onChange={(e) => updateSettings({ recon_auto_approve_amount: Math.max(0, parseInt(e.target.value) || 0) })}
+                    className="w-full px-3 py-2 border border-border-custom rounded text-sm"
+                  />
+                  <p className="text-[11px] text-muted-foreground mt-1">Set to 0 to route every estimate to the manager. Industry-typical is $500&ndash;$800.</p>
+                </div>
+                <div>
+                  <label className="text-xs font-semibold text-muted-foreground">Used-car manager email(s) for approvals</label>
+                  <textarea
+                    value={settings.recon_approval_email || ""}
+                    onChange={(e) => updateSettings({ recon_approval_email: e.target.value })}
+                    rows={2}
+                    placeholder="ucm@dealership.com, gm@dealership.com"
+                    className="w-full px-3 py-2 border border-border-custom rounded text-sm resize-none"
+                  />
+                  <p className="text-[11px] text-muted-foreground mt-1">Gets the approve/decline link when an estimate needs a decision. Leave blank to send to the dealership's main contact email.</p>
+                </div>
+              </div>
+            </div>
+
             {/* Integrations status */}
             <div className="bg-card rounded-lg p-4 shadow-premium mb-3">
               <h4 className="text-sm font-bold text-foreground mb-2">Integration Status</h4>

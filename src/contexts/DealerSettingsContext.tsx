@@ -201,6 +201,11 @@ export interface DealerSettings {
   view_notify_email: string;          // comma/newline-separated recipients
   price_drop_watch_enabled: boolean;  // show the "notify me on price drop" opt-in
   price_drop_emails_enabled: boolean; // actually send the re-engagement emails
+  // Recon approval gate. Service submits a recon estimate; lines whose total is
+  // at/under recon_auto_approve_amount clear automatically, the rest route to
+  // the used-car manager (recon_approval_email recipients) to approve/decline.
+  recon_auto_approve_amount: number;
+  recon_approval_email: string;       // comma/newline-separated UCM recipients
   // Compliance
   cars_act_mode: boolean;
   retention_years: number;
@@ -324,6 +329,8 @@ export const DEFAULT_SETTINGS: DealerSettings = {
   view_notify_email: "",
   price_drop_watch_enabled: true,
   price_drop_emails_enabled: true,
+  recon_auto_approve_amount: 500,
+  recon_approval_email: "",
   cars_act_mode: false,
   retention_years: 7,
   required_languages: ["en"],

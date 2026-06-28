@@ -177,6 +177,7 @@ const AppShell = ({ children }: AppShellProps) => {
         { label: "Compliance Guide", path: "/compliance", icon: BookOpen },
         { label: "CT MVP Smoke Test", path: "/admin/smoke-test", icon: ShieldCheck, requireManager: true },
         { label: "Certification History", path: "/admin/certification-history", icon: CheckCircle2, requireManager: true },
+        { label: "Recon Approvals", path: "/recon", icon: Wrench },
         { label: "Prep & Install", path: "/prep", icon: Wrench },
         { label: "Vehicle Files", path: "/admin?tab=files", icon: FolderOpen },
         { label: "Audit Log", path: "/admin?tab=audit", icon: ShieldCheck },

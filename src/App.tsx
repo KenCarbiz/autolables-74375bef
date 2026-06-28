@@ -60,6 +60,7 @@ const InstallerProof = lazy(() => import("./pages/InstallerProof"));
 const ServiceSignoff = lazy(() => import("./pages/ServiceSignoff"));
 const TitleUpload = lazy(() => import("./pages/TitleUpload"));
 const GetReady = lazy(() => import("./pages/GetReady"));
+const ReconApproval = lazy(() => import("./pages/ReconApproval"));
 const ServiceDesk = lazy(() => import("./pages/ServiceDesk"));
 const ReadyBoard = lazy(() => import("./pages/ReadyBoard"));
 const SigningLookup = lazy(() => import("./pages/SigningLookup"));
@@ -122,6 +123,7 @@ const VehiclePassportHistory = lazy(() => import("./pages/VehiclePassportHistory
 const VehiclePassportDealer = lazy(() => import("./pages/VehiclePassportDealer"));
 const PublicDocuments = lazy(() => import("./pages/PublicDocuments"));
 const PrepSignOff = lazy(() => import("./pages/PrepSignOff"));
+const ReconBoard = lazy(() => import("./pages/ReconBoard"));
 const ServiceInspection = lazy(() => import("./pages/ServiceInspection"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 
@@ -187,6 +189,7 @@ const App = () => (
                       <Route path="/inspect/:token" element={<ServiceSignoff />} />
                       <Route path="/title/:token" element={<TitleUpload />} />
                       <Route path="/ready/:token" element={<GetReady />} />
+                      <Route path="/approve/:token" element={<ReconApproval />} />
                       <Route path="/lookup" element={<SigningLookup />} />
                       <Route path="/onboarding" element={<Onboarding />} />
                       <Route path="/scan" element={<ScanPage />} />
@@ -254,6 +257,7 @@ const App = () => (
                         <Route path="/description-writer" element={<DescriptionStudio />} />
                         <Route path="/add-inventory" element={<SaveCarInventory />} />
                         <Route path="/prep" element={<PrepSignOff />} />
+                        <Route path="/recon" element={<ReconBoard />} />
                         <Route path="/service" element={<ServiceDesk />} />
                         <Route path="/ready-board" element={<ReadyBoard />} />
                         <Route path="/service-inspection" element={<ServiceInspection />} />
