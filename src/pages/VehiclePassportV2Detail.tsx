@@ -21,12 +21,13 @@ import { listingGallery, listingHero } from "@/lib/photos";
 // Full dedicated detail pages for every meaningful Passport V2 link
 // (verification report, market modules, history, warranty, reviews,
 // lead capture, etc.). One component, section registry, shared chrome
-// in the V2 design system. All content is real-data-gated — honest
-// unavailable states, never fabricated certainty.
+// on the V3 design tokens (#2563EB / #F6F7F9 / #E6E8EC / #0F172A) so the
+// catch-all sections match the main passport. All content is real-data-
+// gated — honest unavailable states, never fabricated certainty.
 // ──────────────────────────────────────────────────────────────
 
 const Card = ({ children, className = "" }: { children: React.ReactNode; className?: string }) => (
-  <div className={`rounded-2xl border border-[#e8ebef] bg-white shadow-[0_1px_3px_rgba(16,24,40,0.05)] ${className}`}>{children}</div>
+  <div className={`rounded-2xl border border-[#E6E8EC] bg-white shadow-[0_1px_2px_rgba(0,0,0,0.04),0_8px_24px_rgba(0,0,0,0.05)] ${className}`}>{children}</div>
 );
 
 const Stars = ({ n, size = 16 }: { n: number; size?: number }) => (
@@ -91,7 +92,7 @@ const LeadForm = ({
         <input value={phone} onChange={(e) => setPhone(formatPhone(e.target.value))} placeholder="Phone" type="tel" className="w-full border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
         <textarea value={message} onChange={(e) => setMessage(e.target.value)} placeholder="Anything you'd like the dealer to know? (optional)" rows={3} className="w-full border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none" />
       </div>
-      <button onClick={submit} disabled={sending} className="w-full h-12 mt-4 bg-[#1a6dff] hover:bg-[#155fe0] disabled:opacity-60 text-white font-bold rounded-xl flex items-center justify-center gap-2 transition-colors">
+      <button onClick={submit} disabled={sending} className="w-full h-12 mt-4 bg-[#2563EB] hover:bg-[#1d4fd7] disabled:opacity-60 text-white font-bold rounded-xl flex items-center justify-center gap-2 transition-colors">
         {sending ? <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" /> : <><Send className="w-4 h-4" /> {cta}</>}
       </button>
       <p className="text-[11px] text-slate-400 text-center mt-3">By submitting, you agree to be contacted by the dealership about this vehicle.</p>
@@ -122,7 +123,7 @@ const Sparkline = ({ points }: { points: number[] }) => {
 
 const SectionHeading = ({ icon: Icon, title, subtitle }: { icon: React.ElementType; title: string; subtitle?: string }) => (
   <div className="flex items-start gap-3 mb-4">
-    <span className="w-11 h-11 rounded-2xl bg-blue-50 flex items-center justify-center shrink-0"><Icon className="w-6 h-6 text-[#1a6dff]" /></span>
+    <span className="w-11 h-11 rounded-2xl bg-blue-50 flex items-center justify-center shrink-0"><Icon className="w-6 h-6 text-[#2563EB]" /></span>
     <div>
       <h1 className="text-[22px] font-extrabold tracking-tight leading-tight">{title}</h1>
       {subtitle && <p className="text-[13px] text-slate-500 mt-0.5">{subtitle}</p>}
@@ -411,7 +412,7 @@ const SECTIONS: Record<string, { title: string; render: SectionRender }> = {
         ) : d.reviewRating != null ? (
           <Card className="p-5">
             <div className="flex items-center gap-3"><span className="text-4xl font-extrabold">{d.reviewRating.toFixed(1)}</span><div><Stars n={d.reviewRating} size={18} />{d.reviewCount != null && <p className="text-[13px] text-slate-500 mt-0.5">{d.reviewCount.toLocaleString()} reviews</p>}</div></div>
-            {d.reviewUrl && <a href={d.reviewUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 mt-4 text-[14px] font-semibold text-[#1a6dff] hover:underline">Read all reviews <ChevronLeft className="w-4 h-4 rotate-180" /></a>}
+            {d.reviewUrl && <a href={d.reviewUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 mt-4 text-[14px] font-semibold text-[#2563EB] hover:underline">Read all reviews <ChevronLeft className="w-4 h-4 rotate-180" /></a>}
             <p className="text-[11px] text-slate-400 mt-3 leading-snug">Reviews reflect dealership or model ratings and may not reflect the ownership experience of this specific vehicle.</p>
           </Card>
         ) : <Unavailable what="Owner reviews" hint="Verified dealership reviews appear here when the dealer connects a review source." />}
@@ -428,7 +429,7 @@ const SECTIONS: Record<string, { title: string; render: SectionRender }> = {
             <p className="text-[12px] font-bold uppercase tracking-wider text-slate-400 mb-3">Highlights</p>
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
               {d.highlights.map((h) => (
-                <div key={h.key} className="flex items-start gap-2.5"><span className="w-9 h-9 rounded-xl bg-blue-50 flex items-center justify-center shrink-0"><Zap className="w-4 h-4 text-[#1a6dff]" /></span><div className="min-w-0"><p className="text-[13px] font-bold leading-tight truncate">{h.label}</p><p className="text-[11px] text-slate-400">{h.sub}</p></div></div>
+                <div key={h.key} className="flex items-start gap-2.5"><span className="w-9 h-9 rounded-xl bg-blue-50 flex items-center justify-center shrink-0"><Zap className="w-4 h-4 text-[#2563EB]" /></span><div className="min-w-0"><p className="text-[13px] font-bold leading-tight truncate">{h.label}</p><p className="text-[11px] text-slate-400">{h.sub}</p></div></div>
               ))}
             </div>
           </Card>
@@ -484,28 +485,28 @@ const SECTIONS: Record<string, { title: string; render: SectionRender }> = {
         <>
           <SectionHeading icon={Building2} title={d.dealerName} subtitle="Why shoppers buy here." />
           <Card className="p-5">
-            {(d.dealerTrust.storefrontUrl) && <img src={d.dealerTrust.storefrontUrl} alt={d.dealerName} className="w-full h-44 rounded-xl object-cover border border-[#e8ebef] mb-5" />}
+            {(d.dealerTrust.storefrontUrl) && <img src={d.dealerTrust.storefrontUrl} alt={d.dealerName} className="w-full h-44 rounded-xl object-cover border border-[#E6E8EC] mb-5" />}
             {(d.dealerTrust.yearsInBusiness || d.dealerTrust.googleRating || d.dealerTrust.satisfaction || d.dealerTrust.bbbRating) && (
               <div className="flex flex-wrap items-center gap-x-8 gap-y-4 mb-5 pb-5 border-b border-[#eef1f4]">
-                {d.dealerTrust.yearsInBusiness && <div className="text-center"><p className="text-[24px] font-extrabold text-[#1a6dff] leading-none">{d.dealerTrust.yearsInBusiness}+</p><p className="text-[11px] text-slate-500 mt-1">Years in Business</p></div>}
-                {d.dealerTrust.googleRating && <div className="text-center"><p className="text-[24px] font-extrabold text-[#1a6dff] leading-none inline-flex items-center gap-1">{d.dealerTrust.googleRating}<Star className="w-4 h-4 text-amber-400" fill="#fbbf24" /></p><p className="text-[11px] text-slate-500 mt-1">Google{d.dealerTrust.googleCount ? ` (${Number(d.dealerTrust.googleCount).toLocaleString()})` : ""}</p></div>}
-                {d.dealerTrust.satisfaction && <div className="text-center"><p className="text-[24px] font-extrabold text-[#1a6dff] leading-none">{d.dealerTrust.satisfaction}</p><p className="text-[11px] text-slate-500 mt-1">Customer Satisfaction</p></div>}
-                {d.dealerTrust.bbbRating && <div className="text-center"><p className="text-[24px] font-extrabold text-[#1a6dff] leading-none">{d.dealerTrust.bbbRating}</p><p className="text-[11px] text-slate-500 mt-1">BBB Rating</p></div>}
+                {d.dealerTrust.yearsInBusiness && <div className="text-center"><p className="text-[24px] font-extrabold text-[#2563EB] leading-none">{d.dealerTrust.yearsInBusiness}+</p><p className="text-[11px] text-slate-500 mt-1">Years in Business</p></div>}
+                {d.dealerTrust.googleRating && <div className="text-center"><p className="text-[24px] font-extrabold text-[#2563EB] leading-none inline-flex items-center gap-1">{d.dealerTrust.googleRating}<Star className="w-4 h-4 text-amber-400" fill="#fbbf24" /></p><p className="text-[11px] text-slate-500 mt-1">Google{d.dealerTrust.googleCount ? ` (${Number(d.dealerTrust.googleCount).toLocaleString()})` : ""}</p></div>}
+                {d.dealerTrust.satisfaction && <div className="text-center"><p className="text-[24px] font-extrabold text-[#2563EB] leading-none">{d.dealerTrust.satisfaction}</p><p className="text-[11px] text-slate-500 mt-1">Customer Satisfaction</p></div>}
+                {d.dealerTrust.bbbRating && <div className="text-center"><p className="text-[24px] font-extrabold text-[#2563EB] leading-none">{d.dealerTrust.bbbRating}</p><p className="text-[11px] text-slate-500 mt-1">BBB Rating</p></div>}
               </div>
             )}
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-5">
               {chips.map((c, i) => (
-                <div key={i} className="flex items-start gap-3"><span className="w-11 h-11 rounded-xl bg-blue-50 flex items-center justify-center shrink-0"><c.icon className="w-5 h-5 text-[#1a6dff]" /></span><div><p className="text-[14px] font-bold leading-tight">{c.t}</p><p className="text-[12px] text-slate-500 mt-0.5">{c.s}</p></div></div>
+                <div key={i} className="flex items-start gap-3"><span className="w-11 h-11 rounded-xl bg-blue-50 flex items-center justify-center shrink-0"><c.icon className="w-5 h-5 text-[#2563EB]" /></span><div><p className="text-[14px] font-bold leading-tight">{c.t}</p><p className="text-[12px] text-slate-500 mt-0.5">{c.s}</p></div></div>
               ))}
             </div>
             {d.dealerTrust.certifications.length > 0 && (
               <div className="flex flex-wrap gap-2 mt-5">
-                {d.dealerTrust.certifications.map((c, i) => <span key={i} className="inline-flex items-center gap-1.5 text-[12px] font-semibold text-slate-700 bg-slate-100 rounded-full px-3 py-1.5"><Award className="w-3.5 h-3.5 text-[#1a6dff]" />{c}</span>)}
+                {d.dealerTrust.certifications.map((c, i) => <span key={i} className="inline-flex items-center gap-1.5 text-[12px] font-semibold text-slate-700 bg-slate-100 rounded-full px-3 py-1.5"><Award className="w-3.5 h-3.5 text-[#2563EB]" />{c}</span>)}
               </div>
             )}
             {(d.dealerPhone || d.dealerAddress) && (
               <div className="mt-5 pt-4 border-t border-slate-100 text-[14px] space-y-1.5">
-                {d.dealerPhone && <a href={`tel:${d.dealerPhone}`} className="flex items-center gap-2 font-semibold text-[#1a6dff]"><Phone className="w-4 h-4" />{formatPhone(d.dealerPhone)}</a>}
+                {d.dealerPhone && <a href={`tel:${d.dealerPhone}`} className="flex items-center gap-2 font-semibold text-[#2563EB]"><Phone className="w-4 h-4" />{formatPhone(d.dealerPhone)}</a>}
                 {d.dealerAddress && <a href={`https://maps.google.com/?q=${encodeURIComponent(d.dealerAddress)}`} target="_blank" rel="noreferrer" className="flex items-center gap-2 text-slate-600"><Truck className="w-4 h-4" />{d.dealerAddress}</a>}
               </div>
             )}
@@ -575,7 +576,7 @@ const SECTIONS: Record<string, { title: string; render: SectionRender }> = {
         {d.dealerPhone && (
           <Card className="p-5 mb-4 text-center">
             <p className="text-[13px] text-slate-600 mb-3">Open your messages app to text the dealership directly.</p>
-            <a href={`sms:${d.dealerPhone.replace(/[^\d+]/g, "")}`} className="inline-flex items-center justify-center gap-2 h-12 px-6 rounded-xl bg-[#1a6dff] text-white font-bold"><Send className="w-4 h-4" /> Text {formatPhone(d.dealerPhone)}</a>
+            <a href={`sms:${d.dealerPhone.replace(/[^\d+]/g, "")}`} className="inline-flex items-center justify-center gap-2 h-12 px-6 rounded-xl bg-[#2563EB] text-white font-bold"><Send className="w-4 h-4" /> Text {formatPhone(d.dealerPhone)}</a>
           </Card>
         )}
         <LeadForm listing={listing} intent="text" label="Text Dealer" cta="Request a text" />
@@ -596,7 +597,7 @@ const SECTIONS: Record<string, { title: string; render: SectionRender }> = {
           {all.length ? (
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
               {all.map((src, i) => (
-                <a key={i} href={src} target="_blank" rel="noreferrer" className="block rounded-xl overflow-hidden border border-[#e8ebef] bg-slate-100 aspect-[4/3] hover:opacity-95 transition-opacity">
+                <a key={i} href={src} target="_blank" rel="noreferrer" className="block rounded-xl overflow-hidden border border-[#E6E8EC] bg-slate-100 aspect-[4/3] hover:opacity-95 transition-opacity">
                   <img src={src} alt={`${listing.ymm || "Vehicle"} photo ${i + 1}`} loading="lazy" className="w-full h-full object-cover" />
                 </a>
               ))}
@@ -622,7 +623,7 @@ const SECTIONS: Record<string, { title: string; render: SectionRender }> = {
               ["Appearance Protection", "Interior and exterior surface protection."],
               ["Certified Warranty Upgrade", "Manufacturer-backed coverage where eligible."],
             ].map(([t, s]) => (
-              <div key={t} className="rounded-xl border border-[#e8ebef] p-3">
+              <div key={t} className="rounded-xl border border-[#E6E8EC] p-3">
                 <p className="text-[13px] font-bold text-slate-800">{t}</p>
                 <p className="text-[12px] text-slate-500 mt-0.5">{s}</p>
               </div>
@@ -697,8 +698,8 @@ const ShareSection = ({ listing, dealerName }: { listing: VehicleListing; dealer
     <>
       <SectionHeading icon={Upload} title="Share This Vehicle" subtitle={`Send this ${listing.ymm} to a friend or co-buyer.`} />
       <Card className="p-5">
-        <div className="flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-3"><span className="text-[13px] text-slate-600 truncate flex-1">{url}</span><button onClick={() => { navigator.clipboard?.writeText(url); toast.success("Link copied"); }} className="text-[13px] font-bold text-[#1a6dff] shrink-0">Copy</button></div>
-        <button onClick={share} className="w-full h-12 mt-3 rounded-xl bg-[#1a6dff] text-white font-bold inline-flex items-center justify-center gap-2"><Upload className="w-4 h-4" /> Share</button>
+        <div className="flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-3"><span className="text-[13px] text-slate-600 truncate flex-1">{url}</span><button onClick={() => { navigator.clipboard?.writeText(url); toast.success("Link copied"); }} className="text-[13px] font-bold text-[#2563EB] shrink-0">Copy</button></div>
+        <button onClick={share} className="w-full h-12 mt-3 rounded-xl bg-[#2563EB] text-white font-bold inline-flex items-center justify-center gap-2"><Upload className="w-4 h-4" /> Share</button>
         <p className="text-[12px] text-slate-400 mt-3 text-center">Shared from {dealerName}'s AutoLabels passport.</p>
       </Card>
     </>
@@ -720,32 +721,32 @@ const VehiclePassportV2Detail = () => {
 
   const back = () => navigate(`/${base}/${vehicleSlug}`);
 
-  if (loading) return <div className="min-h-screen flex items-center justify-center bg-[#f4f5f7]"><div className="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" /></div>;
+  if (loading) return <div className="min-h-screen flex items-center justify-center bg-[#F6F7F9]"><div className="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" /></div>;
 
   if (notFound || !listing || !d) return (
-    <div className="min-h-screen flex items-center justify-center px-6 bg-[#f4f5f7]">
+    <div className="min-h-screen flex items-center justify-center px-6 bg-[#F6F7F9]">
       <div className="text-center"><Package className="w-12 h-12 text-slate-300 mx-auto mb-4" /><h1 className="text-xl font-bold">Vehicle unavailable</h1><p className="text-sm text-slate-500 mt-2">This listing may have been sold or unpublished.</p></div>
     </div>
   );
 
   if (!def) return (
-    <div className="min-h-screen flex items-center justify-center px-6 bg-[#f4f5f7]">
-      <div className="text-center"><Package className="w-12 h-12 text-slate-300 mx-auto mb-4" /><h1 className="text-xl font-bold">Page not found</h1><button onClick={back} className="mt-4 text-[#1a6dff] font-semibold">Back to Passport</button></div>
+    <div className="min-h-screen flex items-center justify-center px-6 bg-[#F6F7F9]">
+      <div className="text-center"><Package className="w-12 h-12 text-slate-300 mx-auto mb-4" /><h1 className="text-xl font-bold">Page not found</h1><button onClick={back} className="mt-4 text-[#2563EB] font-semibold">Back to Passport</button></div>
     </div>
   );
 
   const heroSrc = listingHero(listing);
 
   return (
-    <div className="min-h-screen bg-[#f4f5f7] text-[#1a1d21]" style={{ fontFamily: "Inter, -apple-system, BlinkMacSystemFont, sans-serif" }}>
+    <div className="min-h-screen bg-[#F6F7F9] text-[#0F172A]" style={{ fontFamily: "Inter, -apple-system, BlinkMacSystemFont, sans-serif" }}>
       <Helmet><title>{`${def.title} — ${listing.ymm} · Passport`}</title><meta name="robots" content="noindex" /></Helmet>
 
       {/* Sticky top header — back + vehicle context */}
-      <header className="sticky top-0 z-40 bg-white/95 backdrop-blur border-b border-[#e8ebef]">
+      <header className="sticky top-0 z-40 bg-white/95 backdrop-blur border-b border-[#E6E8EC]">
         <div className="mx-auto max-w-[760px] h-14 px-3 flex items-center gap-3">
           <button onClick={back} aria-label="Back to passport" className="w-9 h-9 rounded-full hover:bg-slate-100 flex items-center justify-center shrink-0"><ChevronLeft className="w-5 h-5" /></button>
           {heroSrc && <img src={heroSrc} alt="" className="w-9 h-9 rounded-lg object-cover shrink-0" />}
-          <div className="min-w-0 flex-1"><p className="text-[14px] font-bold leading-tight truncate">{listing.ymm}{listing.trim ? ` ${listing.trim}` : ""}</p>{d.price != null && <p className="text-[12px] font-bold text-[#1a6dff] leading-tight">{fmt$(d.price)}</p>}</div>
+          <div className="min-w-0 flex-1"><p className="text-[14px] font-bold leading-tight truncate">{listing.ymm}{listing.trim ? ` ${listing.trim}` : ""}</p>{d.price != null && <p className="text-[12px] font-bold text-[#2563EB] leading-tight">{fmt$(d.price)}</p>}</div>
         </div>
       </header>
 
@@ -756,10 +757,10 @@ const VehiclePassportV2Detail = () => {
         <Card className="p-5">
           <p className="text-[13px] font-semibold text-slate-700 mb-3">Ready to move forward?</p>
           <div className="grid grid-cols-2 gap-2.5">
-            <button onClick={() => navigate(`/${base}/${vehicleSlug}/reserve`)} className="h-11 rounded-xl bg-[#1a6dff] text-white text-[13px] font-bold inline-flex items-center justify-center gap-1.5"><BadgeCheck className="w-4 h-4" /> Reserve</button>
-            <button onClick={() => navigate(`/${base}/${vehicleSlug}/trade`)} className="h-11 rounded-xl border-2 border-[#1a6dff] text-[#1a6dff] text-[13px] font-bold inline-flex items-center justify-center gap-1.5"><GaugeIcon className="w-4 h-4" /> Trade value</button>
+            <button onClick={() => navigate(`/${base}/${vehicleSlug}/reserve`)} className="h-11 rounded-xl bg-[#2563EB] text-white text-[13px] font-bold inline-flex items-center justify-center gap-1.5"><BadgeCheck className="w-4 h-4" /> Reserve</button>
+            <button onClick={() => navigate(`/${base}/${vehicleSlug}/trade`)} className="h-11 rounded-xl border-2 border-[#2563EB] text-[#2563EB] text-[13px] font-bold inline-flex items-center justify-center gap-1.5"><GaugeIcon className="w-4 h-4" /> Trade value</button>
           </div>
-          <button onClick={back} className="w-full mt-2.5 h-11 rounded-xl border border-[#e8ebef] text-[13px] font-semibold inline-flex items-center justify-center gap-1.5 hover:border-[#1a6dff]"><ChevronLeft className="w-4 h-4" /> Back to Vehicle Passport</button>
+          <button onClick={back} className="w-full mt-2.5 h-11 rounded-xl border border-[#E6E8EC] text-[13px] font-semibold inline-flex items-center justify-center gap-1.5 hover:border-[#2563EB]"><ChevronLeft className="w-4 h-4" /> Back to Vehicle Passport</button>
         </Card>
 
         <footer className="pt-2 pb-4">
@@ -768,7 +769,7 @@ const VehiclePassportV2Detail = () => {
       </div>
 
       {/* Sticky bottom action bar — Call / Text / Test Drive / Today's Price */}
-      <div className="fixed bottom-0 inset-x-0 z-40 bg-white/95 backdrop-blur border-t border-[#e8ebef] px-3 pt-2 pb-[calc(8px+env(safe-area-inset-bottom))]">
+      <div className="fixed bottom-0 inset-x-0 z-40 bg-white/95 backdrop-blur border-t border-[#E6E8EC] px-3 pt-2 pb-[calc(8px+env(safe-area-inset-bottom))]">
         <div className="mx-auto max-w-[760px] grid grid-cols-4 gap-2">
           {[
             { key: "call", icon: Phone, label: "Call", onClick: () => { if (d.dealerPhone) window.location.href = `tel:${d.dealerPhone}`; else navigate(`/${base}/${vehicleSlug}/contact`); } },
@@ -776,8 +777,8 @@ const VehiclePassportV2Detail = () => {
             { key: "td", icon: Clock, label: "Test Drive", onClick: () => navigate(`/${base}/${vehicleSlug}/test-drive`) },
             { key: "price", icon: DollarSign, label: "Today's Price", primary: true, onClick: () => navigate(`/${base}/${vehicleSlug}/todays-price`) },
           ].map((b) => (
-            <button key={b.key} onClick={b.onClick} className={`h-11 rounded-xl text-[10px] leading-[1.05] font-bold inline-flex flex-col items-center justify-center gap-0.5 text-center px-0.5 ${b.primary ? "bg-[#1a6dff] text-white" : "border border-[#d8dce0] bg-white text-[#1a1d21]"}`}>
-              <b.icon className={`w-4 h-4 ${b.primary ? "" : "text-[#1a6dff]"}`} /> {b.label}
+            <button key={b.key} onClick={b.onClick} className={`h-11 rounded-xl text-[10px] leading-[1.05] font-bold inline-flex flex-col items-center justify-center gap-0.5 text-center px-0.5 ${b.primary ? "bg-[#2563EB] text-white" : "border border-[#d8dce0] bg-white text-[#0F172A]"}`}>
+              <b.icon className={`w-4 h-4 ${b.primary ? "" : "text-[#2563EB]"}`} /> {b.label}
             </button>
           ))}
         </div>
