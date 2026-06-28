@@ -526,7 +526,10 @@ const VehiclePassportV3 = () => {
             {highlights.length ? (
               <div className="grid grid-cols-4 gap-y-4 gap-x-2 mt-4">{highlights.slice(0, 8).map((h, i) => <div key={i} className="flex flex-col items-center text-center gap-1.5"><span className="w-10 h-10 rounded-xl bg-blue-50 flex items-center justify-center shrink-0"><h.icon className="w-5 h-5 text-[#2563EB]" /></span><div className="w-full min-w-0"><div className="text-[11px] font-bold leading-tight line-clamp-2 break-words">{h.t}</div><div className="text-[10px] text-[#94A3B8] truncate">{h.s}</div></div></div>)}</div>
             ) : <p className="text-[13px] text-[#64748B] mt-3">Equipment highlights appear here as the vehicle's data is decoded.</p>}
-            <Link onClick={() => openPanel("highlights")} className="mt-auto pt-3 self-start">View all features &amp; specs</Link>
+            <div className="mt-auto pt-3 flex items-center gap-4">
+              <Link onClick={() => openPanel("highlights")} className="self-start">All features</Link>
+              <Link onClick={() => openPanel("key-specs")} className="self-start">Full specs</Link>
+            </div>
           </div>
           )}
           {/* Overview */}
