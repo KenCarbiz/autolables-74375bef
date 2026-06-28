@@ -13,6 +13,30 @@ import { CheckCircle2, Loader2, ShieldCheck, Sparkles, ChevronRight, Upload, X, 
 const rememberedName = (key: string) => { try { return localStorage.getItem(`autolabels.signer.${key}`) || ""; } catch { return ""; } };
 const saveName = (key: string, v: string) => { try { if (v.trim()) localStorage.setItem(`autolabels.signer.${key}`, v.trim()); } catch { /* ignore */ } };
 
+// Preloaded completion notes — tap to drop in instead of thumb-typing.
+const COMPLETION_NOTES = [
+  "Completed per checklist",
+  "No issues found",
+  "Road tested OK",
+  "Customer-requested items done",
+  "Recommend follow-up at next service",
+];
+function NoteChips({ onPick }: { onPick: (text: string) => void }) {
+  return (
+    <div className="flex flex-wrap gap-1.5 mb-2">
+      {COMPLETION_NOTES.map((n) => (
+        <button key={n} type="button" onClick={() => onPick(n)} className="h-8 px-2.5 rounded-full border border-border text-xs font-medium text-foreground hover:border-primary hover:bg-primary/5">+ {n}</button>
+      ))}
+    </div>
+  );
+}
+// Append a preset to existing free-text, comma-separated, no duplicates.
+const appendNote = (cur: string, add: string) => {
+  const parts = cur.split(/,\s*/).map((p) => p.trim()).filter(Boolean);
+  if (parts.includes(add)) return cur;
+  return parts.length ? `${parts.join(", ")}, ${add}` : add;
+};
+
 // /ready/:token — the per-vehicle Get-Ready hub. One permanent QR; anyone scans
 // it (no login), picks their station, completes it, signs. Each station locks
 // once a signed record exists. Stations: Service (CT K-208) and Detail (cleaning
@@ -192,6 +216,7 @@ function ServiceStation({ token, ctx, onDone }: { token: string; ctx: Ctx; onDon
   return (
     <div className="space-y-4">
       <K208Checklist marks={marks} onMark={(id, m) => setMarks((s) => ({ ...s, [id]: m }))} onPassAll={passAll} failureNotes={failureNotes} onFailureNotes={setFailureNotes} notes={notes} onNotes={setNotes} />
+      <div><p className="text-xs font-semibold text-foreground mb-1.5">Quick notes</p><NoteChips onPick={(t) => setNotes((c) => appendNote(c, t))} /></div>
       <UploadRow label="Repair order / inspection sheet / photos" uploading={uploading} onFiles={onFiles} docs={docs} onRemove={(i) => setDocs((a) => a.filter((_, x) => x !== i))} />
       <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Inspector full name" className="w-full h-11 rounded-lg border border-border bg-background px-3 text-sm" />
       <SignaturePad label="Inspector signature" subtitle="Sign to certify this inspection." value={sig} type={sigType} onChange={(d, t) => { setSig(d); setSigType(t); }} />
@@ -358,7 +383,8 @@ function DetailStation({ token, ctx, onDone }: { token: string; ctx: Ctx; onDone
       </div>
 
       <div className="rounded-2xl border border-border bg-card p-4 space-y-3">
-        <textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={2} placeholder="Notes (optional)" className="w-full rounded-lg border border-border bg-background p-3 text-sm" />
+        <NoteChips onPick={(t) => setNotes((c) => appendNote(c, t))} />
+        <textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={2} placeholder="Notes (optional) — tap a chip above or type" className="w-full rounded-lg border border-border bg-background p-3 text-sm" />
         <input value={name} onChange={(e) => setName(e.target.value)} placeholder={thirdParty ? "Your name" : "Your full name"} className="w-full h-11 rounded-lg border border-border bg-background px-3 text-sm" />
         <SignaturePad label="Signature" subtitle="Sign to confirm the work above was completed." value={sig} type={sigType} onChange={(d, t) => { setSig(d); setSigType(t); }} />
         <ConsentRow text="I confirm the work recorded above was performed on this vehicle and the information is accurate." checked={consent} onChange={setConsent} />
