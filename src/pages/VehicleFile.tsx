@@ -24,6 +24,7 @@ import { PACKET_MODULES, packetVisible } from "@/lib/packetModules";
 import { QRCodeSVG } from "qrcode.react";
 import GeneratedDocumentsSection from "@/components/vehicle/GeneratedDocumentsSection";
 import UsedCarDocPack from "@/components/vehicle/UsedCarDocPack";
+import DeliverySignoffs from "@/components/vehicle/DeliverySignoffs";
 import VehicleEvidenceTimeline from "@/components/vehicle/VehicleEvidenceTimeline";
 
 // ──────────────────────────────────────────────────────────────
@@ -1812,6 +1813,8 @@ const PrepPanel = ({ vehicle }: { vehicle: VehicleRow }) => {
           New Sign-Off
         </button>
       </div>
+
+      <DeliverySignoffs vin={vehicle.vin} tenantId={vehicle.tenant_id} condition={vehicle.condition} />
 
       {/* Listing-unlock banner */}
       <div
