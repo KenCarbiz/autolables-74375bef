@@ -14,6 +14,7 @@ export interface PacketModule {
 
 export const PACKET_MODULES: PacketModule[] = [
   { id: "insights", label: "Why this is a great buy", desc: "Below-market, one-owner, clean title, MPG badges" },
+  { id: "recon", label: "Reconditioning & inspection", desc: "Inspection result, reconditioning work performed, and prep photos" },
   { id: "oemSticker", label: "OEM window sticker", desc: "Original factory Monroney label" },
   { id: "programs", label: "Dealer programs", desc: "Your value propositions — warranties, free maintenance, etc." },
   { id: "marketValue", label: "Market value report", desc: "This price vs. the local market range" },

@@ -194,6 +194,63 @@ serve(async (req) => {
       }
     } catch { /* history optional — Passport shows a pending state */ }
 
+    // ── Customer-safe reconditioning & inspection summary (iPacket parity).
+    // The service/prep/detail/install sign-offs are tenant-scoped; expose only
+    // shopper-appropriate facts (what was done, dates, photos) — never names,
+    // notes, signatures, or IPs. service-docs is a public bucket, so the photo
+    // URLs load for anonymous shoppers.
+    try {
+      if (row.vin && row.tenant_id) {
+        const vinU = String(row.vin).toUpperCase();
+        const pubUrl = (p: unknown): string | null => {
+          const s = typeof p === "string" ? p : (p && typeof p === "object" ? (p as { url?: string }).url : null);
+          if (!s) return null;
+          if (/^https?:\/\//i.test(s)) return s;
+          return `${supabaseUrl}/storage/v1/object/public/service-docs/${String(s).replace(/^\/+/, "")}`;
+        };
+        const [insp, prep, detail, installs] = await Promise.all([
+          admin.from("safety_inspections").select("form_type, result, signed_at").eq("vin", vinU).eq("tenant_id", row.tenant_id).eq("status", "signed").order("signed_at", { ascending: false }).limit(1),
+          admin.from("prep_sign_offs").select("install_photos, accessories_installed, signed_at, inspection_passed").eq("vehicle_vin", vinU).eq("tenant_id", row.tenant_id).eq("listing_unlocked", true).order("signed_at", { ascending: false }).limit(1),
+          admin.from("detail_signoffs").select("detail_types, photos, signed_at").eq("vin", vinU).eq("tenant_id", row.tenant_id).eq("status", "signed").order("signed_at", { ascending: false }).limit(1),
+          admin.from("install_proofs").select("product_name, installer_company, photo_path, installed_at").eq("vehicle_vin", vinU).order("installed_at", { ascending: false }).limit(20),
+        ]);
+        const inspRow = (insp.data || [])[0] as { form_type?: string; result?: string; signed_at?: string } | undefined;
+        const prepRow = (prep.data || [])[0] as { install_photos?: unknown[]; accessories_installed?: unknown[]; signed_at?: string; inspection_passed?: boolean } | undefined;
+        const detailRow = (detail.data || [])[0] as { detail_types?: unknown[]; photos?: unknown[]; signed_at?: string } | undefined;
+        const installRows = (installs.data || []) as { product_name?: string; installer_company?: string; photo_path?: string; installed_at?: string }[];
+
+        const items: string[] = [];
+        (Array.isArray(detailRow?.detail_types) ? detailRow!.detail_types : []).forEach((t) => typeof t === "string" && items.push(t));
+        (Array.isArray(prepRow?.accessories_installed) ? prepRow!.accessories_installed : []).forEach((a) => {
+          const name = typeof a === "string" ? a : (a && typeof a === "object" ? (a as { name?: string }).name : null);
+          if (name) items.push(name);
+        });
+        installRows.forEach((i) => { if (i.product_name) items.push(i.product_name); });
+
+        const photos = [
+          ...(Array.isArray(prepRow?.install_photos) ? prepRow!.install_photos : []),
+          ...(Array.isArray(detailRow?.photos) ? detailRow!.photos : []),
+          ...installRows.map((i) => i.photo_path),
+        ].map(pubUrl).filter((u): u is string => !!u).slice(0, 12);
+
+        const inspectionType = inspRow
+          ? (/k.?208/i.test(inspRow.form_type || "") ? "Connecticut K-208 safety inspection"
+             : /pdi|pre.?delivery/i.test(inspRow.form_type || "") ? "Pre-delivery inspection"
+             : "Multi-point inspection")
+          : null;
+
+        const recon = {
+          inspection: inspRow ? { type: inspectionType, passed: (inspRow.result || "").toLowerCase() !== "fail", date: inspRow.signed_at || null } : null,
+          detailed: !!detailRow,
+          detailDate: detailRow?.signed_at || null,
+          workItems: Array.from(new Set(items)).slice(0, 24),
+          thirdParty: installRows.filter((i) => i.installer_company).map((i) => ({ product: i.product_name || "Accessory", company: i.installer_company })),
+          photos,
+        };
+        if (recon.inspection || recon.detailed || recon.workItems.length || recon.photos.length) row.recon = recon;
+      }
+    } catch { /* recon optional — module shows a pending state */ }
+
     // ── Bump view count + record audit event
     await Promise.all([
       admin.rpc("increment_listing_view", { _slug: lookupSlug }),

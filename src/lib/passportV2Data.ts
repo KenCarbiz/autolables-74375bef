@@ -44,6 +44,17 @@ export interface PassportData {
   websiteSalePrice: number | null;
   priceMode: PriceDisplayMode;
   priceIncludesDoc: boolean;
+  // Customer-safe reconditioning & inspection summary (injected by
+  // public-listing-view from the dealer's prep/detail/install/inspection
+  // sign-offs). Null until the dealership records reconditioning work.
+  recon: {
+    inspection: { type: string | null; passed: boolean; date: string | null } | null;
+    detailed: boolean;
+    detailDate: string | null;
+    workItems: string[];
+    thirdParty: { product: string; company: string }[];
+    photos: string[];
+  } | null;
   // Market
   marketAvg: number | null;
   marketLow: number | null;
@@ -370,6 +381,7 @@ export const derivePassport = (listing: VehicleListing): PassportData => {
   return {
     price, msrp, priceLabel, estMonthly, saveVsMsrp,
     docFee, websiteSalePrice, priceMode, priceIncludesDoc,
+    recon: (listing as unknown as { recon?: PassportData["recon"] }).recon ?? null,
     marketAvg, marketLow, marketHigh, belowMarket,
     marketMeta, comparables, blackbook, marketCheckedAt, history,
     viewCount: listing.view_count ?? null, dom: (mc.dom as number) ?? marketMeta.avgDom ?? null,

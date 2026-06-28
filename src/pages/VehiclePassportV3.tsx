@@ -112,6 +112,13 @@ export const MOCK_LISTING = {
   mc_attributes: { msrp: 61640, horsepower: 295, owner_count: 1, accident_count: 0, carfax_clean_title: true, dom: 45, seating: 7 },
   market_payload: { high: 64200, low: 56800, belowMarket: 3160 },
   warranty_info: { factory_months: 48, factory_miles: 60000, in_service_date: "2024-10-01" },
+  recon: {
+    inspection: { type: "Multi-point inspection", passed: true, date: "2025-04-12" },
+    detailed: true, detailDate: "2025-04-13",
+    workItems: ["Oil & filter service", "Four new tires", "Brake inspection", "Full interior & exterior detail", "Cabin air filter"],
+    thirdParty: [{ product: "Ceramic coating", company: "ProShield" }],
+    photos: [],
+  },
   recall_status: "clear", open_recall_count: 0, view_count: 89, service_records: [{}, {}, {}],
   prep_status: { foreman_signed_at: "2025-04-12" },
   dealer_snapshot: { name: "Harte INFINITI", phone: "8605551234", address: "1 Auto Way", city: "Hartford", state: "CT", zip: "06103", review_rating: 4.8, review_count: 1248 },
@@ -529,6 +536,34 @@ const VehiclePassportV3 = () => {
             <p className="text-[13px] leading-relaxed text-[#64748B] mt-3 line-clamp-6">{d.overview}</p>
             {(gallery[1] || gallery[0]) && <img src={gallery[1] || gallery[0]} alt="" className="w-full aspect-[16/9] object-cover rounded-xl mt-3" />}
             <Link onClick={() => openPanel("overview")} className="mt-auto pt-3 self-start">Read full overview</Link>
+          </div>
+          )}
+          {/* Reconditioning & Inspection */}
+          {pv("recon") && (
+          <div className={`${CARD} p-5 flex flex-col`}>
+            <div className="flex items-center gap-1.5"><H3>Reconditioning &amp; Inspection</H3></div>
+            {d.recon ? (
+              <div className="mt-3 space-y-3">
+                {d.recon.inspection && (
+                  <div className="flex items-center gap-2">
+                    <span className="w-8 h-8 rounded-lg bg-emerald-50 flex items-center justify-center shrink-0"><ShieldCheck className="w-4 h-4 text-[#16A34A]" /></span>
+                    <div className="min-w-0"><p className="text-[13px] font-bold leading-tight">{d.recon.inspection.passed ? "Passed" : "Completed"} — {d.recon.inspection.type}</p>{d.recon.inspection.date && <p className="text-[11px] text-[#94A3B8]">{new Date(d.recon.inspection.date).toLocaleDateString()}</p>}</div>
+                  </div>
+                )}
+                {d.recon.detailed && <p className="text-[13px] font-semibold text-[#16A34A] inline-flex items-center gap-1.5"><Wrench className="w-4 h-4" /> Professionally reconditioned &amp; detailed{d.recon.detailDate ? ` · ${new Date(d.recon.detailDate).toLocaleDateString()}` : ""}</p>}
+                {d.recon.workItems.length > 0 && (
+                  <ul className="space-y-1.5">{d.recon.workItems.slice(0, 8).map((w, i) => <li key={i} className="flex items-start gap-2 text-[13px]"><CheckCircle2 className="w-4 h-4 text-[#16A34A] shrink-0 mt-0.5" />{w}</li>)}</ul>
+                )}
+                {d.recon.thirdParty.length > 0 && (
+                  <div className="flex flex-wrap gap-1.5">{d.recon.thirdParty.map((t, i) => <span key={i} className="inline-flex items-center gap-1 text-[11px] font-semibold text-[#334155] bg-slate-100 rounded-full px-2.5 py-1"><Award className="w-3 h-3 text-[#2563EB]" />{t.product} · {t.company}</span>)}</div>
+                )}
+                {d.recon.photos.length > 0 && (
+                  <div className="grid grid-cols-4 gap-2">{d.recon.photos.slice(0, 8).map((p, i) => <a key={i} href={p} target="_blank" rel="noreferrer" className="block rounded-lg overflow-hidden aspect-square bg-slate-100 hover:opacity-90 transition-opacity"><img src={p} alt="" loading="lazy" className="w-full h-full object-cover" /></a>)}</div>
+                )}
+              </div>
+            ) : (
+              <p className="text-[13px] text-[#64748B] mt-3">Reconditioning and inspection records appear here once the dealership completes them.</p>
+            )}
           </div>
           )}
           {/* Why Buy From This Dealership (wider) */}
