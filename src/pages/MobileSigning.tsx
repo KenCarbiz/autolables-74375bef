@@ -511,6 +511,18 @@ const MobileSigning = () => {
       optional_selections: optionalSelections,
     };
 
+    // The customer signs their CT K-208 first: their name + signature are
+    // stamped onto the completed inspection and it's dated/locked. The
+    // service-signed K-208 is what gates the addendum; this records the buyer's
+    // acknowledgment as part of the same assignment, before the addendum signs.
+    try {
+      await (supabase as any).rpc("k208_record_buyer_signature", {
+        _signing_token: token!,
+        _buyer_name: customerName || null,
+        _buyer_signature_data: customerSig.data || null,
+      });
+    } catch { /* best-effort — the service-signed K-208 still gates finalization */ }
+
     const { error } = await (supabase as any).rpc("record_customer_signing", {
       _signing_token: token!,
       _signer_type: "customer",
