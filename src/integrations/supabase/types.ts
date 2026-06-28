@@ -2721,6 +2721,42 @@ export type Database = {
         }
         Relationships: []
       }
+      passport_engagement: {
+        Row: {
+          first_at: string
+          id: string
+          last_at: string
+          module: string
+          seconds: number
+          session_id: string
+          slug: string | null
+          tenant_id: string
+          vin: string
+        }
+        Insert: {
+          first_at?: string
+          id?: string
+          last_at?: string
+          module: string
+          seconds?: number
+          session_id: string
+          slug?: string | null
+          tenant_id: string
+          vin: string
+        }
+        Update: {
+          first_at?: string
+          id?: string
+          last_at?: string
+          module?: string
+          seconds?: number
+          session_id?: string
+          slug?: string | null
+          tenant_id?: string
+          vin?: string
+        }
+        Relationships: []
+      }
       passport_sms_verifications: {
         Row: {
           attempts: number
@@ -2960,6 +2996,42 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      price_watchers: {
+        Row: {
+          created_at: string
+          email: string
+          id: string
+          last_notified_at: string | null
+          last_price: number | null
+          name: string | null
+          slug: string | null
+          tenant_id: string
+          vin: string
+        }
+        Insert: {
+          created_at?: string
+          email: string
+          id?: string
+          last_notified_at?: string | null
+          last_price?: number | null
+          name?: string | null
+          slug?: string | null
+          tenant_id: string
+          vin: string
+        }
+        Update: {
+          created_at?: string
+          email?: string
+          id?: string
+          last_notified_at?: string | null
+          last_price?: number | null
+          name?: string | null
+          slug?: string | null
+          tenant_id?: string
+          vin?: string
+        }
+        Relationships: []
       }
       product_rules: {
         Row: {
@@ -5325,6 +5397,15 @@ export type Database = {
         Args: { _patch: Json; _tenant_id: string }
         Returns: undefined
       }
+      attach_title_document: {
+        Args: {
+          _doc_type: string
+          _filename?: string
+          _path: string
+          _token: string
+        }
+        Returns: Json
+      }
       autocurb_cancel_subscription: {
         Args: { p_stripe_subscription_id: string }
         Returns: number
@@ -5672,6 +5753,10 @@ export type Database = {
         }
         Returns: string
       }
+      issue_title_upload_token: {
+        Args: { _tenant_id: string; _vin: string }
+        Returns: string
+      }
       issue_vehicle_ready_token: {
         Args: { p_tenant_id: string; p_vin: string }
         Returns: string
@@ -5804,6 +5889,10 @@ export type Database = {
             }
             Returns: string
           }
+      record_passport_engagement: {
+        Args: { _modules: Json; _session: string; _slug: string }
+        Returns: Json
+      }
       record_signing_reengagement: {
         Args: { _addendum_id: string; _channel?: string; _details?: Json }
         Returns: undefined
@@ -5951,6 +6040,10 @@ export type Database = {
           total: number
           verified: number
         }[]
+      }
+      watch_price: {
+        Args: { _email: string; _name?: string; _slug: string }
+        Returns: Json
       }
     }
     Enums: {
