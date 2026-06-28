@@ -4,7 +4,7 @@ import {
   ChevronLeft, ChevronRight, Upload, Bookmark, Printer, FileText, MessageSquare,
   RefreshCw, ShieldCheck, CheckCircle2, Star, Phone, Car, Cog, Fuel, Settings, Wind,
   Award, Wrench, DollarSign, Clock, Building2, Users, Truck, Lock, Zap, ArrowRight,
-  Package, Eye, Play, Rotate3d, TrendingUp, BadgeCheck, Gauge as GaugeIcon, Send, MapPin,
+  Package, Eye, Play, TrendingUp, BadgeCheck, Gauge as GaugeIcon, Send, MapPin,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Helmet } from "react-helmet-async";
@@ -340,8 +340,7 @@ const VehiclePassportV3 = () => {
             {photoCount > 1 && <div className="flex gap-2 mt-2">{gallery.slice(0, 6).map((s, i) => <button key={i} onClick={() => setIdx(i)} className="w-[60px] h-11 rounded-lg overflow-hidden bg-[#e9ecef]" style={{ outline: i === idx ? `2px solid ${BLUE}` : "2px solid transparent", outlineOffset: -2 }}><img src={s} alt="" className="w-full h-full object-cover" /></button>)}{photoCount > 6 && <button onClick={() => go("gallery")} className="w-[60px] h-11 rounded-lg bg-black/70 text-white text-[11px] font-bold">+{photoCount - 6}</button>}</div>}
             <div className="flex gap-2 mt-2">
               <button onClick={() => go("gallery")} className={`flex-1 h-10 rounded-xl border border-[#E6E8EC] bg-white text-[13px] font-semibold inline-flex items-center justify-center gap-1.5 hover:border-[#2563EB]`}><Eye className="w-4 h-4 text-[#2563EB]" /> All Photos ({photoCount})</button>
-              <div className="flex-1 h-10 rounded-xl border border-dashed border-[#E6E8EC] bg-[#fafbfc] text-[12px] text-[#94A3B8] inline-flex items-center justify-center gap-1.5"><Rotate3d className="w-4 h-4" /> 360° View</div>
-              {pv("videos") && (listing.videos?.length ? <a href={listing.videos[0].url} target="_blank" rel="noreferrer" className="flex-1 h-10 rounded-xl border border-[#E6E8EC] bg-white text-[13px] font-semibold inline-flex items-center justify-center gap-1.5 hover:border-[#2563EB]"><Play className="w-4 h-4 text-[#2563EB]" /> Video</a> : <div className="flex-1 h-10 rounded-xl border border-dashed border-[#E6E8EC] bg-[#fafbfc] text-[12px] text-[#94A3B8] inline-flex items-center justify-center gap-1.5"><Play className="w-4 h-4" /> No Video</div>)}
+              {pv("videos") && listing.videos?.length ? <a href={listing.videos[0].url} target="_blank" rel="noreferrer" className="flex-1 h-10 rounded-xl border border-[#E6E8EC] bg-white text-[13px] font-semibold inline-flex items-center justify-center gap-1.5 hover:border-[#2563EB]"><Play className="w-4 h-4 text-[#2563EB]" /> Walkaround Video</a> : null}
             </div>
           </div>
 

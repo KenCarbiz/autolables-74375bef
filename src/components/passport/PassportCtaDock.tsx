@@ -24,7 +24,7 @@ const MiniStars = ({ n }: { n: number }) => (
 );
 
 export default function PassportCtaDock({ go, dealerPhone, reviewRating, advisor }: PassportCtaDockProps) {
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(true);
   const adv = advisor || {};
   return (
     <div className="hidden lg:block fixed bottom-6 right-6 z-40" style={{ fontFamily: "Inter, -apple-system, BlinkMacSystemFont, sans-serif" }}>
