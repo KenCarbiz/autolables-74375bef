@@ -179,7 +179,7 @@ function StationCard({ icon, title, sub, done, onClick, addAction }: { icon: Rea
 // ── Service station (CT K-208) ─────────────────────────────────────────────
 function ServiceStation({ token, ctx, onDone }: { token: string; ctx: Ctx; onDone: () => void }) {
   const [marks, setMarks] = useState<Record<string, K208Mark>>({});
-  const [failureNotes, setFailureNotes] = useState("");
+  const [itemNotes, setItemNotes] = useState<Record<string, string>>({});
   const [notes, setNotes] = useState("");
   const [docs, setDocs] = useState<{ url: string; caption?: string }[]>([]);
   const [uploading, setUploading] = useState(false);
@@ -190,17 +190,21 @@ function ServiceStation({ token, ctx, onDone }: { token: string; ctx: Ctx; onDon
 
   if (ctx.service_done) return <DoneCard label="Safety inspection already completed for this vehicle." />;
   const answered = k208Answered(marks); const result = k208Result(marks);
-  const passAll = () => setMarks((cur) => { const n: Record<string, K208Mark> = {}; K208_ITEMS.forEach((i) => n[i.id] = cur[i.id] === "fail" || cur[i.id] === "na" ? cur[i.id] : "pass"); return n; });
+  // "Pass all" marks every line PASS (checks off each spot). If a car doesn't
+  // all-pass, the writer marks the failing lines individually instead.
+  const passAll = () => { setMarks(Object.fromEntries(K208_ITEMS.map((i) => [i.id, "pass" as K208Mark]))); setItemNotes({}); };
   const onFiles = async (files: FileList | null) => { if (!files?.length) return; setUploading(true); for (const f of Array.from(files)) { const url = await uploadViaToken(token, f); if (url) setDocs((d) => [...d, { url, caption: f.name }]); } setUploading(false); };
-  // Every checklist item must be marked (pass/fail/N/A) before the inspection
-  // can be certified — a partial K-208 must never submit as a PASS. "Pass all"
-  // marks the remainder in one tap.
+  // Every line must be marked (pass/fail), and every FAIL must carry an
+  // explanation of defects/repairs — a partial K-208 must never certify as PASS.
   const allAnswered = answered >= K208_ITEMS.length;
-  const canSubmit = !!name.trim() && !!sig.trim() && consent && allAnswered && !busy;
+  const failsExplained = K208_ITEMS.every((i) => marks[i.id] !== "fail" || (itemNotes[i.id] || "").trim() !== "");
+  const canSubmit = !!name.trim() && !!sig.trim() && consent && allAnswered && failsExplained && !busy;
 
   const submit = async () => {
     if (!canSubmit) return; setBusy(true);
-    const checklist = k208Checklist(marks);
+    const checklist = k208Checklist(marks, itemNotes);
+    // Roll the per-item explanations up into the failure_notes column too.
+    const failureNotes = checklist.filter((c) => c.result === "fail").map((c) => `${c.label}: ${c.explanation || "(no explanation)"}`).join("; ");
     const content_hash = await hashPayload({ vin: ctx.vin, checklist, result, name });
     const ip = await fetchClientIp();
     const { data, error } = await (supabase as any).rpc("submit_safety_inspection", {
@@ -215,7 +219,7 @@ function ServiceStation({ token, ctx, onDone }: { token: string; ctx: Ctx; onDon
 
   return (
     <div className="space-y-4">
-      <K208Checklist marks={marks} onMark={(id, m) => setMarks((s) => ({ ...s, [id]: m }))} onPassAll={passAll} failureNotes={failureNotes} onFailureNotes={setFailureNotes} notes={notes} onNotes={setNotes} />
+      <K208Checklist marks={marks} onMark={(id, m) => setMarks((s) => ({ ...s, [id]: m }))} onPassAll={passAll} failureNotes="" onFailureNotes={() => {}} notes={notes} onNotes={setNotes} itemNotes={itemNotes} onItemNote={(id, v) => setItemNotes((s) => ({ ...s, [id]: v }))} />
       <div><p className="text-xs font-semibold text-foreground mb-1.5">Quick notes</p><NoteChips onPick={(t) => setNotes((c) => appendNote(c, t))} /></div>
       <UploadRow label="Repair order / inspection sheet / photos" uploading={uploading} onFiles={onFiles} docs={docs} onRemove={(i) => setDocs((a) => a.filter((_, x) => x !== i))} />
       <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Inspector full name" className="w-full h-11 rounded-lg border border-border bg-background px-3 text-sm" />
@@ -224,6 +228,7 @@ function ServiceStation({ token, ctx, onDone }: { token: string; ctx: Ctx; onDon
       {!canSubmit && !busy && (
         <p className="text-[12px] text-amber-600 text-center">
           {!allAnswered ? `${K208_ITEMS.length - answered} item${K208_ITEMS.length - answered === 1 ? "" : "s"} still need a mark — use "Pass all" then adjust any exceptions.`
+            : !failsExplained ? "Add an explanation of defects/repairs for each failed item."
             : !name.trim() ? "Enter your name to certify."
             : !sig.trim() ? "Add your signature to certify."
             : !consent ? "Check the certification box to submit." : ""}

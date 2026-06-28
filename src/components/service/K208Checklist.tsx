@@ -16,8 +16,8 @@ export const k208Answered = (marks: Record<string, K208Mark>) =>
 export const k208Result = (marks: Record<string, K208Mark>): "pass" | "fail" =>
   Object.values(marks).some((m) => m === "fail") ? "fail" : "pass";
 
-export const k208Checklist = (marks: Record<string, K208Mark>) =>
-  K208_ITEMS.map((i) => ({ id: i.id, label: i.label, category: i.category, result: marks[i.id] || "na" }));
+export const k208Checklist = (marks: Record<string, K208Mark>, itemNotes: Record<string, string> = {}) =>
+  K208_ITEMS.map((i) => ({ id: i.id, label: i.label, category: i.category, result: marks[i.id] || "na", explanation: (itemNotes[i.id] || "").trim() }));
 
 interface Props {
   marks: Record<string, K208Mark>;
@@ -27,9 +27,13 @@ interface Props {
   onFailureNotes: (v: string) => void;
   notes: string;
   onNotes: (v: string) => void;
+  // Per-item "Explanation of Defects or Repairs Needed" (the official K-208
+  // column). When provided, a fail reveals an inline explanation field per item.
+  itemNotes?: Record<string, string>;
+  onItemNote?: (id: string, v: string) => void;
 }
 
-export default function K208Checklist({ marks, onMark, onPassAll, failureNotes, onFailureNotes, notes, onNotes }: Props) {
+export default function K208Checklist({ marks, onMark, onPassAll, failureNotes, onFailureNotes, notes, onNotes, itemNotes = {}, onItemNote }: Props) {
   const answered = useMemo(() => k208Answered(marks), [marks]);
   const anyFail = Object.values(marks).some((m) => m === "fail");
 
@@ -44,32 +48,41 @@ export default function K208Checklist({ marks, onMark, onPassAll, failureNotes, 
         <div key={cat.category} className="rounded-2xl border border-border bg-card overflow-hidden">
           <div className="px-4 py-2.5 bg-muted/50 text-xs font-bold uppercase tracking-wider text-foreground">{cat.category}</div>
           <div className="divide-y divide-border/60">
-            {cat.items.map((item) => (
-              <div key={item.id} className="flex items-center justify-between gap-3 px-4 py-2.5">
-                <span className="text-sm text-foreground flex-1">{item.label}</span>
-                <div className="flex gap-1.5 shrink-0">
-                  {(["pass", "fail", "na"] as const).map((m) => (
-                    <button key={m} onClick={() => onMark(item.id, m)}
-                      className={`h-11 w-14 rounded-md text-[12px] font-semibold border transition-colors ${
-                        marks[item.id] === m
-                          ? m === "pass" ? "bg-emerald-600 text-white border-emerald-600"
-                            : m === "fail" ? "bg-red-600 text-white border-red-600"
-                            : "bg-slate-500 text-white border-slate-500"
-                          : "bg-background text-muted-foreground border-border hover:bg-muted"
-                      }`}>
-                      {m === "pass" ? "Pass" : m === "fail" ? "Fail" : "N/A"}
-                    </button>
-                  ))}
+            {cat.items.map((item) => {
+              const failed = marks[item.id] === "fail";
+              return (
+                <div key={item.id} className="px-4 py-2.5">
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="text-sm font-medium text-foreground flex-1">{item.label}</span>
+                    <div className="flex gap-1.5 shrink-0">
+                      {(["pass", "fail"] as const).map((m) => (
+                        <button key={m} onClick={() => onMark(item.id, m)}
+                          className={`h-11 w-16 rounded-md text-[12px] font-semibold border transition-colors ${
+                            marks[item.id] === m
+                              ? m === "pass" ? "bg-emerald-600 text-white border-emerald-600"
+                                : "bg-red-600 text-white border-red-600"
+                              : "bg-background text-muted-foreground border-border hover:bg-muted"
+                          }`}>
+                          {m === "pass" ? "Pass" : "Fail"}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  {failed && onItemNote && (
+                    <input autoFocus value={itemNotes[item.id] || ""} onChange={(e) => onItemNote(item.id, e.target.value)}
+                      placeholder="Explanation of defects or repairs needed (required)"
+                      className="mt-2 w-full rounded-lg border border-red-300 bg-red-50/40 px-3 h-10 text-sm" />
+                  )}
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       ))}
 
-      {anyFail && (
+      {anyFail && !onItemNote && (
         <div className="rounded-2xl border border-red-200 bg-red-50 p-4 space-y-2">
-          <label className="text-xs font-bold text-red-800 uppercase tracking-wider">What failed & what was done</label>
+          <label className="text-xs font-bold text-red-800 uppercase tracking-wider">Explanation of defects or repairs needed</label>
           <textarea value={failureNotes} onChange={(e) => onFailureNotes(e.target.value)} rows={3}
             className="w-full rounded-lg border border-red-200 bg-white p-3 text-sm" placeholder="Describe failures and corrective action taken before sale…" />
         </div>
