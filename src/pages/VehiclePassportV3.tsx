@@ -420,6 +420,68 @@ const VehiclePassportV3 = () => {
           </div>
         </section>
 
+        {/* 3.5 RECONDITIONING PROOF — value-building, above the fold.
+            Customers see everything the dealership did to prep the vehicle;
+            one dominant CTA moves them to request a price. Only declined work
+            is ever hidden — every fact here is cost-free and PII-free. */}
+        {pv("recon") && d.recon && (() => {
+          const r = d.recon;
+          const stepCount = r.workItems.length + (r.inspection ? 1 : 0) + r.thirdParty.length;
+          return (
+            <section data-module="recon" className={`${CARD} p-0 overflow-hidden`}>
+              <div className="bg-[#0F172A] px-6 py-6 sm:px-8 sm:py-7">
+                <div className="flex flex-wrap items-center justify-between gap-5">
+                  <div className="min-w-0">
+                    <p className="text-[12px] font-semibold uppercase tracking-wider text-emerald-400 inline-flex items-center gap-1.5"><BadgeCheck className="w-4 h-4" /> Dealer-Certified Reconditioning</p>
+                    <h2 className="text-[22px] sm:text-[26px] font-bold text-white leading-tight mt-1.5">Everything we did to get this vehicle ready for you</h2>
+                    <p className="text-[13px] text-slate-300 mt-1.5 max-w-xl">Before this {listing.ymm || "vehicle"} was listed, our team completed and documented {stepCount} reconditioning, safety, and detailing step{stepCount === 1 ? "" : "s"} — so you can buy with total confidence.</p>
+                  </div>
+                  <div className="flex items-center gap-6 shrink-0">
+                    <div className="text-center"><p className="text-[34px] font-extrabold text-emerald-400 leading-none">{stepCount}</p><p className="text-[11px] text-slate-400 mt-1 leading-tight">Steps<br />completed</p></div>
+                    {r.inspection && <div className="text-center"><ShieldCheck className="w-8 h-8 text-emerald-400 mx-auto" /><p className="text-[11px] text-slate-300 mt-1 leading-tight font-semibold">{r.inspection.passed ? "Passed" : "Done"}<br />inspection</p></div>}
+                  </div>
+                </div>
+              </div>
+              <div className="p-6 sm:p-8 grid grid-cols-1 lg:grid-cols-[1.4fr_1fr] gap-7">
+                <div>
+                  {r.inspection && (
+                    <div className="flex items-center gap-3 rounded-xl border border-emerald-200 bg-emerald-50/70 p-3.5 mb-4">
+                      <span className="w-10 h-10 rounded-xl bg-emerald-100 flex items-center justify-center shrink-0"><ShieldCheck className="w-5 h-5 text-[#16A34A]" /></span>
+                      <div className="min-w-0"><p className="text-[14px] font-bold text-[#0F172A]">{r.inspection.passed ? "Passed" : "Completed"} — {r.inspection.type}</p>{r.inspection.date && <p className="text-[12px] text-[#64748B]">Documented {new Date(r.inspection.date).toLocaleDateString()}</p>}</div>
+                    </div>
+                  )}
+                  {r.detailed && <p className="text-[14px] font-semibold text-[#16A34A] inline-flex items-center gap-1.5 mb-3"><Wrench className="w-4 h-4" /> Professionally reconditioned &amp; detailed{r.detailDate ? ` · ${new Date(r.detailDate).toLocaleDateString()}` : ""}</p>}
+                  {r.workItems.length > 0 && (
+                    <>
+                      <p className="text-[13px] font-semibold text-[#0F172A] mb-2.5">Completed work</p>
+                      <ul className="grid grid-cols-1 sm:grid-cols-2 gap-x-5 gap-y-2">{r.workItems.slice(0, 16).map((w, i) => <li key={i} className="flex items-start gap-2 text-[13px]"><CheckCircle2 className="w-4 h-4 text-[#16A34A] shrink-0 mt-0.5" />{w}</li>)}</ul>
+                      {r.workItems.length > 16 && <p className="text-[12px] text-[#94A3B8] mt-2">+{r.workItems.length - 16} more completed</p>}
+                    </>
+                  )}
+                  {r.thirdParty.length > 0 && (
+                    <div className="mt-5">
+                      <p className="text-[13px] font-semibold text-[#0F172A] mb-2.5">Premium add-ons installed</p>
+                      <div className="flex flex-wrap gap-1.5">{r.thirdParty.map((t, i) => <span key={i} className="inline-flex items-center gap-1 text-[12px] font-semibold text-[#334155] bg-blue-50 border border-blue-100 rounded-full px-3 py-1.5"><Award className="w-3.5 h-3.5 text-[#2563EB]" />{t.product} · {t.company}</span>)}</div>
+                    </div>
+                  )}
+                </div>
+                <div className="flex flex-col">
+                  {r.photos.length > 0 && (
+                    <div className="grid grid-cols-3 gap-2">{r.photos.slice(0, 9).map((p, i) => <a key={i} href={p} target="_blank" rel="noreferrer" className="block rounded-lg overflow-hidden aspect-square bg-slate-100 hover:opacity-90 transition-opacity"><img src={p} alt="" loading="lazy" className="w-full h-full object-cover" /></a>)}</div>
+                  )}
+                  <div className="mt-auto pt-5">
+                    <div className="rounded-2xl border border-[#E6E8EC] bg-[#F8FAFC] p-5">
+                      <p className="text-[15px] font-bold text-[#0F172A]">This work is already done — and included.</p>
+                      <p className="text-[13px] text-[#64748B] mt-1">See your personalized out-the-door price on a vehicle that's been fully prepped and ready to drive home.</p>
+                      <button onClick={() => go("todays-price")} className="mt-3.5 w-full h-12 rounded-xl bg-[#2563EB] hover:bg-[#1d4fd7] text-white text-[15px] font-bold inline-flex items-center justify-center gap-2"><DollarSign className="w-5 h-5" /> Get my out-the-door price</button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </section>
+          );
+        })()}
+
         {/* 4. MARKET INTELLIGENCE */}
         {pv("marketValue") && (
         <section data-module="market" className={`${CARD} p-5`}>
@@ -542,34 +604,6 @@ const VehiclePassportV3 = () => {
             <p className="text-[13px] leading-relaxed text-[#64748B] mt-3 line-clamp-6">{d.overview}</p>
             {(gallery[1] || gallery[0]) && <img src={gallery[1] || gallery[0]} alt="" className="w-full aspect-[16/9] object-cover rounded-xl mt-3" />}
             <Link onClick={() => openPanel("overview")} className="mt-auto pt-3 self-start">Read full overview</Link>
-          </div>
-          )}
-          {/* Reconditioning & Inspection */}
-          {pv("recon") && (
-          <div data-module="recon" className={`${CARD} p-5 flex flex-col`}>
-            <div className="flex items-center gap-1.5"><H3>Reconditioning &amp; Inspection</H3></div>
-            {d.recon ? (
-              <div className="mt-3 space-y-3">
-                {d.recon.inspection && (
-                  <div className="flex items-center gap-2">
-                    <span className="w-8 h-8 rounded-lg bg-emerald-50 flex items-center justify-center shrink-0"><ShieldCheck className="w-4 h-4 text-[#16A34A]" /></span>
-                    <div className="min-w-0"><p className="text-[13px] font-bold leading-tight">{d.recon.inspection.passed ? "Passed" : "Completed"} — {d.recon.inspection.type}</p>{d.recon.inspection.date && <p className="text-[11px] text-[#94A3B8]">{new Date(d.recon.inspection.date).toLocaleDateString()}</p>}</div>
-                  </div>
-                )}
-                {d.recon.detailed && <p className="text-[13px] font-semibold text-[#16A34A] inline-flex items-center gap-1.5"><Wrench className="w-4 h-4" /> Professionally reconditioned &amp; detailed{d.recon.detailDate ? ` · ${new Date(d.recon.detailDate).toLocaleDateString()}` : ""}</p>}
-                {d.recon.workItems.length > 0 && (
-                  <ul className="space-y-1.5">{d.recon.workItems.slice(0, 8).map((w, i) => <li key={i} className="flex items-start gap-2 text-[13px]"><CheckCircle2 className="w-4 h-4 text-[#16A34A] shrink-0 mt-0.5" />{w}</li>)}</ul>
-                )}
-                {d.recon.thirdParty.length > 0 && (
-                  <div className="flex flex-wrap gap-1.5">{d.recon.thirdParty.map((t, i) => <span key={i} className="inline-flex items-center gap-1 text-[11px] font-semibold text-[#334155] bg-slate-100 rounded-full px-2.5 py-1"><Award className="w-3 h-3 text-[#2563EB]" />{t.product} · {t.company}</span>)}</div>
-                )}
-                {d.recon.photos.length > 0 && (
-                  <div className="grid grid-cols-4 gap-2">{d.recon.photos.slice(0, 8).map((p, i) => <a key={i} href={p} target="_blank" rel="noreferrer" className="block rounded-lg overflow-hidden aspect-square bg-slate-100 hover:opacity-90 transition-opacity"><img src={p} alt="" loading="lazy" className="w-full h-full object-cover" /></a>)}</div>
-                )}
-              </div>
-            ) : (
-              <p className="text-[13px] text-[#64748B] mt-3">Reconditioning and inspection records appear here once the dealership completes them.</p>
-            )}
           </div>
           )}
           {/* Why Buy From This Dealership (wider) */}
