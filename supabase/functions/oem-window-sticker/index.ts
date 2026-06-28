@@ -10,17 +10,11 @@
 //
 // Body: { vin, tenant_id?, vehicle_id? }
 // ──────────────────────────────────────────────────────────────────────
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { json, preflight } from "../_shared/http.ts";
+import { SERVICE_KEY, adminClient } from "../_shared/supabase.ts";
 
 const VINAUDIT_KEY = Deno.env.get("VINAUDIT_WINDOW_STICKER_KEY") || "";
 const MONRONEY_KEY = Deno.env.get("MONRONEY_LABELS_KEY") || "";
-
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-};
-const json = (status: number, body: unknown) =>
-  new Response(JSON.stringify(body), { status, headers: { ...corsHeaders, "Content-Type": "application/json" } });
 
 const validVin = (vin: string) => /^[A-HJ-NPR-Z0-9]{17}$/i.test(vin);
 const extFor = (ct: string) => (ct.includes("pdf") ? "pdf" : ct.includes("png") ? "png" : ct.includes("jpeg") || ct.includes("jpg") ? "jpg" : "bin");
@@ -59,14 +53,12 @@ async function fromMonroney(vin: string): Promise<Fetched | { error: string }> {
 }
 
 Deno.serve(async (req) => {
-  if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
+  const pf = preflight(req); if (pf) return pf;
   if (!VINAUDIT_KEY && !MONRONEY_KEY) {
     return json(200, { ok: false, error: "not_configured", note: "Set VINAUDIT_WINDOW_STICKER_KEY or MONRONEY_LABELS_KEY" });
   }
 
-  const supabaseUrl = Deno.env.get("SUPABASE_URL") || "";
-  const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
-  const admin = createClient(supabaseUrl, serviceKey, { auth: { persistSession: false, autoRefreshToken: false } });
+  const admin = adminClient();
 
   const body = await req.json().catch(() => ({}));
   const vin = String(body.vin || "").toUpperCase().trim();
@@ -78,7 +70,7 @@ Deno.serve(async (req) => {
   // Service-role (cron/admin) bypasses; otherwise require a signed-in
   // tenant member (or platform admin) for the requested tenant_id.
   const auth = (req.headers.get("Authorization") || "").replace(/^Bearer\s+/i, "");
-  if (auth !== serviceKey) {
+  if (auth !== SERVICE_KEY) {
     const { data: ures, error: uerr } = await admin.auth.getUser(auth);
     const userId = ures?.user?.id;
     if (uerr || !userId) return json(401, { ok: false, error: "authentication required" });

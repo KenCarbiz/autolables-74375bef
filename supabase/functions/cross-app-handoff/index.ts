@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
+import { json, preflight } from "../_shared/http.ts";
+import { SUPABASE_URL, SERVICE_KEY, adminClient } from "../_shared/supabase.ts";
 
 // ──────────────────────────────────────────────────────────────
 // cross-app-handoff
@@ -26,30 +27,16 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 // handoff_tokens table regardless of RLS.
 // ──────────────────────────────────────────────────────────────
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-  "Access-Control-Allow-Methods": "POST, OPTIONS",
-};
-
-const json = (status: number, body: unknown) =>
-  new Response(JSON.stringify(body), {
-    status,
-    headers: { ...corsHeaders, "Content-Type": "application/json" },
-  });
-
 serve(async (req) => {
-  if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
+  const pf = preflight(req); if (pf) return pf;
 
   try {
     const { token, targetApp } = await req.json().catch(() => ({}));
     if (!token || !targetApp) return json(400, { error: "token and targetApp required" });
 
-    const supabaseUrl = Deno.env.get("SUPABASE_URL");
-    const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
-    if (!supabaseUrl || !serviceKey) return json(500, { error: "supabase not configured" });
+    if (!SUPABASE_URL || !SERVICE_KEY) return json(500, { error: "supabase not configured" });
 
-    const admin = createClient(supabaseUrl, serviceKey);
+    const admin = adminClient();
 
     // 1. Try the native handoff_tokens path first.
     const { data: row, error: tokErr } = await admin

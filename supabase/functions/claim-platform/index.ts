@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
+import { json, preflight } from "../_shared/http.ts";
+import { SUPABASE_URL, SERVICE_KEY, adminClient } from "../_shared/supabase.ts";
 
 // ──────────────────────────────────────────────────────────────
 // claim-platform
@@ -23,32 +24,18 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 // house-tenant membership.
 // ──────────────────────────────────────────────────────────────
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-  "Access-Control-Allow-Methods": "POST, OPTIONS",
-};
-
-const json = (status: number, body: unknown) =>
-  new Response(JSON.stringify(body), {
-    status,
-    headers: { ...corsHeaders, "Content-Type": "application/json" },
-  });
-
 serve(async (req) => {
-  if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
+  const pf = preflight(req); if (pf) return pf;
   if (req.method !== "POST") return json(405, { error: "method not allowed" });
 
   try {
-    const supabaseUrl = Deno.env.get("SUPABASE_URL");
-    const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
-    if (!supabaseUrl || !serviceKey) return json(500, { error: "supabase not configured" });
+    if (!SUPABASE_URL || !SERVICE_KEY) return json(500, { error: "supabase not configured" });
 
     const authHeader = req.headers.get("Authorization") || "";
     const jwt = authHeader.replace(/^Bearer\s+/i, "");
     if (!jwt) return json(401, { error: "missing bearer token" });
 
-    const admin = createClient(supabaseUrl, serviceKey);
+    const admin = adminClient();
     const { data: userRes, error: userErr } = await admin.auth.getUser(jwt);
     if (userErr || !userRes?.user) return json(401, { error: "invalid token" });
     const user = userRes.user;

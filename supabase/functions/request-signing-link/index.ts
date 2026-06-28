@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
+import { json, preflight } from "../_shared/http.ts";
+import { SUPABASE_URL, SERVICE_KEY, adminClient } from "../_shared/supabase.ts";
 
 // ──────────────────────────────────────────────────────────────
 // request-signing-link
@@ -24,18 +25,6 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 // attempt and by normal edge-function rate limits.
 // ──────────────────────────────────────────────────────────────
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-  "Access-Control-Allow-Methods": "POST, OPTIONS",
-};
-
-const json = (status: number, body: unknown) =>
-  new Response(JSON.stringify(body), {
-    status,
-    headers: { ...corsHeaders, "Content-Type": "application/json" },
-  });
-
 interface DispatchEnvelope {
   email?: string;
   signing_url?: string;
@@ -44,15 +33,11 @@ interface DispatchEnvelope {
 }
 
 serve(async (req) => {
-  if (req.method === "OPTIONS") {
-    return new Response(null, { headers: corsHeaders });
-  }
+  const pf = preflight(req); if (pf) return pf;
   if (req.method !== "POST") {
     return json(405, { ok: true });
   }
 
-  const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
-  const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
   if (!SUPABASE_URL || !SERVICE_KEY) {
     // Always same shape out even when misconfigured, so a scraper
     // can't distinguish a config issue from a miss.
@@ -79,7 +64,7 @@ serve(async (req) => {
   const origin = req.headers.get("origin") || "https://autolabels.io";
 
   try {
-    const admin = createClient(SUPABASE_URL, SERVICE_KEY);
+    const admin = adminClient();
     const { data } = await admin.rpc("request_signing_link_resend", {
       _vin: vin,
       _contact: contact,
