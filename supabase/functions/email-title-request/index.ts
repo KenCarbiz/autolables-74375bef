@@ -1,5 +1,6 @@
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { qrcode } from "https://deno.land/x/qrcode@v2.0.0/mod.ts";
+import { json, preflight } from "../_shared/http.ts";
+import { SUPABASE_URL, SERVICE_KEY, adminClient } from "../_shared/supabase.ts";
 
 // ──────────────────────────────────────────────────────────────────────
 // email-title-request — emails the office a per-vehicle Title/MCO upload link
@@ -11,16 +12,7 @@ import { qrcode } from "https://deno.land/x/qrcode@v2.0.0/mod.ts";
 // Auth: service-role (called by the vehicle file via the app, or by intake).
 // ──────────────────────────────────────────────────────────────────────
 
-const cors = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-  "Access-Control-Allow-Methods": "POST, OPTIONS",
-};
-const json = (s: number, b: unknown) => new Response(JSON.stringify(b), { status: s, headers: { ...cors, "Content-Type": "application/json" } });
-
 const APP_BASE = Deno.env.get("APP_BASE_URL") || "https://autolabels.io";
-const SUPABASE_URL = Deno.env.get("SUPABASE_URL") || "";
-const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
 
 const hex16 = () => {
   const b = new Uint8Array(16); crypto.getRandomValues(b);
@@ -33,7 +25,8 @@ const b64ToBytes = (b64: string) => {
 };
 
 Deno.serve(async (req) => {
-  if (req.method === "OPTIONS") return new Response(null, { headers: cors });
+  const pf = preflight(req);
+  if (pf) return pf;
   if (req.method !== "POST") return json(405, { error: "method not allowed" });
 
   const body = await req.json().catch(() => ({})) as { tenant_id?: string; vin?: string; to?: string };
@@ -41,7 +34,7 @@ Deno.serve(async (req) => {
   const vin = (body.vin || "").toUpperCase().trim();
   if (!tenantId || !vin) return json(400, { error: "tenant_id and vin required" });
 
-  const admin = createClient(SUPABASE_URL, SERVICE_KEY, { auth: { persistSession: false, autoRefreshToken: false } });
+  const admin = adminClient();
 
   // Vehicle context for the email.
   const { data: listing } = await admin.from("vehicle_listings").select("id, ymm, condition").eq("tenant_id", tenantId).eq("vin", vin).maybeSingle();

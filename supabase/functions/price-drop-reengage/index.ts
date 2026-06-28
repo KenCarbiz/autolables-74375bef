@@ -1,4 +1,5 @@
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { json, preflight } from "../_shared/http.ts";
+import { SUPABASE_URL, SERVICE_KEY, adminClient, isServiceOrCron } from "../_shared/supabase.ts";
 
 // ──────────────────────────────────────────────────────────────────────
 // price-drop-reengage — re-engages shoppers who asked to be notified when a
@@ -9,24 +10,17 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 // Service-role / cron-secret only. Honors the dealer's price_drop_emails_enabled.
 // ──────────────────────────────────────────────────────────────────────
 
-const cors = { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type" };
-const json = (s: number, b: unknown) => new Response(JSON.stringify(b), { status: s, headers: { ...cors, "Content-Type": "application/json" } });
-
-const SUPABASE_URL = Deno.env.get("SUPABASE_URL") || "";
-const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
 const MIN_DROP = 100;        // ignore sub-$100 noise / rounding
 const PER_RUN_CAP = 500;     // safety cap on emails per sweep
 
 const money = (n: number) => `$${Math.round(n).toLocaleString("en-US")}`;
 
 Deno.serve(async (req) => {
-  if (req.method === "OPTIONS") return new Response(null, { headers: cors });
-  const auth = (req.headers.get("Authorization") || "").replace(/^Bearer\s+/i, "");
-  const cronSecret = Deno.env.get("MARKETCHECK_CRON_SECRET") || "";
-  const hasCron = !!cronSecret && (req.headers.get("x-cron-secret") || "") === cronSecret;
-  if (auth !== SERVICE_KEY && !hasCron) return json(401, { error: "unauthorized" });
+  const pf = preflight(req);
+  if (pf) return pf;
+  if (!isServiceOrCron(req)) return json(401, { error: "unauthorized" });
 
-  const admin = createClient(SUPABASE_URL, SERVICE_KEY, { auth: { persistSession: false, autoRefreshToken: false } });
+  const admin = adminClient();
 
   // Per-tenant kill switch.
   const { data: profiles } = await admin.from("dealer_profiles").select("tenant_id, settings");

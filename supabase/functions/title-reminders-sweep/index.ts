@@ -1,29 +1,23 @@
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { json, preflight } from "../_shared/http.ts";
+import { SUPABASE_URL, SERVICE_KEY, adminClient, isServiceOrCron } from "../_shared/supabase.ts";
 
 // ──────────────────────────────────────────────────────────────────────
 // title-reminders-sweep — for each tenant with reminders enabled, re-email the
 // office an upload link for any in-stock vehicle that still has no complete
 // Title (used) / MCO (new) on file, paced by the tenant's reminder cadence.
-// Runs daily via cron. Service-role only.
+// Runs daily via cron. Service-role / cron-secret only.
 // ──────────────────────────────────────────────────────────────────────
 
-const cors = { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type" };
-const json = (s: number, b: unknown) => new Response(JSON.stringify(b), { status: s, headers: { ...cors, "Content-Type": "application/json" } });
-
-const SUPABASE_URL = Deno.env.get("SUPABASE_URL") || "";
-const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
 const PER_TENANT_CAP = 60;
 
 Deno.serve(async (req) => {
-  if (req.method === "OPTIONS") return new Response(null, { headers: cors });
+  const pf = preflight(req);
+  if (pf) return pf;
   // Service-role or the cron secret only — this fans out emails, so it must not
   // be publicly triggerable.
-  const auth = (req.headers.get("Authorization") || "").replace(/^Bearer\s+/i, "");
-  const cronSecret = Deno.env.get("MARKETCHECK_CRON_SECRET") || "";
-  const hasCron = !!cronSecret && (req.headers.get("x-cron-secret") || "") === cronSecret;
-  if (auth !== SERVICE_KEY && !hasCron) return json(401, { error: "unauthorized" });
+  if (!isServiceOrCron(req)) return json(401, { error: "unauthorized" });
 
-  const admin = createClient(SUPABASE_URL, SERVICE_KEY, { auth: { persistSession: false, autoRefreshToken: false } });
+  const admin = adminClient();
 
   const { data: profiles } = await admin.from("dealer_profiles").select("tenant_id, settings");
   let emailed = 0, scanned = 0;
