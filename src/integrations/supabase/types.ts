@@ -2855,6 +2855,69 @@ export type Database = {
           },
         ]
       }
+      pdi_signoffs: {
+        Row: {
+          checklist: Json
+          content_hash: string | null
+          created_at: string
+          customer_ip: string | null
+          esign_consent: Json | null
+          id: string
+          notes: string | null
+          performer_name: string | null
+          performer_role: string | null
+          result: string | null
+          signature_data: string | null
+          signed_at: string
+          status: string
+          tenant_id: string
+          user_agent: string | null
+          vehicle_listing_id: string | null
+          vin: string
+          ymm: string | null
+        }
+        Insert: {
+          checklist?: Json
+          content_hash?: string | null
+          created_at?: string
+          customer_ip?: string | null
+          esign_consent?: Json | null
+          id?: string
+          notes?: string | null
+          performer_name?: string | null
+          performer_role?: string | null
+          result?: string | null
+          signature_data?: string | null
+          signed_at?: string
+          status?: string
+          tenant_id: string
+          user_agent?: string | null
+          vehicle_listing_id?: string | null
+          vin: string
+          ymm?: string | null
+        }
+        Update: {
+          checklist?: Json
+          content_hash?: string | null
+          created_at?: string
+          customer_ip?: string | null
+          esign_consent?: Json | null
+          id?: string
+          notes?: string | null
+          performer_name?: string | null
+          performer_role?: string | null
+          result?: string | null
+          signature_data?: string | null
+          signed_at?: string
+          status?: string
+          tenant_id?: string
+          user_agent?: string | null
+          vehicle_listing_id?: string | null
+          vin?: string
+          ymm?: string | null
+        }
+        Relationships: []
+      }
       platform_bundles: {
         Row: {
           created_at: string
@@ -5805,6 +5868,7 @@ export type Database = {
         Args: { _store_id: string; _vin: string; _ymm?: string }
         Returns: string
       }
+      get_pdi_for_token: { Args: { _token: string }; Returns: Json }
       get_published_documents_public: {
         Args: { p_slug: string }
         Returns: {
@@ -6297,6 +6361,22 @@ export type Database = {
           _photos: Json
           _provider_company: string
           _provider_contact: string
+          _signature_data: string
+          _token: string
+          _user_agent: string
+        }
+        Returns: Json
+      }
+      submit_pdi_signoff: {
+        Args: {
+          _checklist: Json
+          _content_hash: string
+          _esign_consent: Json
+          _ip: string
+          _notes: string
+          _performer_name: string
+          _performer_role: string
+          _result: string
           _signature_data: string
           _token: string
           _user_agent: string
