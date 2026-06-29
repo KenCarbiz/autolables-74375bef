@@ -252,8 +252,8 @@ const VehiclePassportV3 = () => {
       sub: priceChange7d != null ? (priceChange7d < 0 ? "price decreased" : priceChange7d > 0 ? "price increased" : "stable") : "History builds over time", chart: <Spark points={priceSeries} color="#7C3AED" />, section: "price-history", cta: "View history" },
     { icon: Car, title: "Comparable Vehicles", strong: compCount ? `${compCount} Nearby` : "Comp set",
       sub: compFrom != null ? `Similar vehicles from ${fmt$(compFrom)}` : "Similar vehicles via MarketCheck", comps: false, section: "comparable-vehicles", cta: "View comp set" },
-    { icon: Package, title: "Inventory Trend", strong: d.marketMeta.daysSupply != null ? `${Math.round(d.marketMeta.daysSupply)}-Day Supply` : "Market Supply",
-      sub: d.marketMeta.daysSupply != null ? (d.marketMeta.inventoryCount != null ? `${d.marketMeta.inventoryCount} similar listed` : "Regional days-supply") : "Market supply via MarketCheck", chart: null, section: "inventory-trend", cta: "View trend" },
+    { icon: Car, title: "Inventory Availability", strong: compCount > 0 ? `${compCount} Similar Available` : ((d.viewCount ?? 0) > 20 ? "High Interest" : "Popular Model"),
+      sub: compCount > 0 ? (compCount <= 8 ? "Limited local availability" : "Comparable vehicles nearby") : "Strong shopper demand", chart: null, section: "comparable-vehicles", cta: "View availability" },
   ];
 
   const highlights: { icon: React.ElementType; t: string; s: string }[] = [];
@@ -563,8 +563,7 @@ const VehiclePassportV3 = () => {
           {/* Factory Warranty */}
           {pv("warranty") && (
           <div data-module="warranty" className={`${CARD} p-5 flex flex-col`}>
-            <div className="flex items-center gap-1.5"><H3>Factory Warranty</H3><button onClick={(e) => openInfo("warranty-terms", e)} aria-label="Warranty terminology" className="w-6 h-6 rounded-full hover:bg-slate-100 flex items-center justify-center"><Info className="w-3.5 h-3.5 text-[#94A3B8]" /></button></div>
-            {d.warrantyStr ? (() => {
+            {(() => {
               const w = d.warranty;
               const calc = (months?: number, miles?: number) => {
                 let timePct: number | null = null, monthsLeft: number | null = null;
@@ -579,22 +578,39 @@ const VehiclePassportV3 = () => {
               };
               const b2b = calc(w.factory_months, w.factory_miles);
               const ptw = (w.powertrain_months != null || w.powertrain_miles != null) ? calc(w.powertrain_months, w.powertrain_miles) : null;
-              return <div className="mt-2 space-y-3">
-                {(b2b.pct != null || b2b.left) && (
+              const active = !!d.warrantyStr && (b2b.pct ?? 100) > 0;
+              type CpoView = { name?: string; basic_months?: number; basic_miles?: number; powertrain_months?: number; powertrain_miles?: number };
+              const cpo = listing.condition === "cpo" ? (listing as unknown as { cpo_programs?: CpoView[] }).cpo_programs?.[0] : null;
+              const cpoTerm = cpo ? [(cpo.powertrain_months ?? cpo.basic_months) ? `${Math.round(((cpo.powertrain_months ?? cpo.basic_months) as number) / 12)} yr` : null, ((cpo.powertrain_miles ?? cpo.basic_miles) === -1) ? "Unlimited mi" : (cpo.powertrain_miles ?? cpo.basic_miles) ? `${(((cpo.powertrain_miles ?? cpo.basic_miles) as number) / 1000).toFixed(0)}K mi` : null].filter(Boolean).join(" / ") : "";
+              const Bar = ({ label, tone, pct, left, badge }: { label: string; tone: "blue" | "green" | "gold"; pct: number | null; left?: string | null; badge?: string }) => {
+                const c = tone === "blue" ? { ic: "text-[#2563EB]", bar: "bg-[#2563EB]" } : tone === "green" ? { ic: "text-[#16A34A]", bar: "bg-[#16A34A]" } : { ic: "text-amber-600", bar: "bg-amber-500" };
+                return (
                   <div>
-                    <div className="flex justify-between text-[12px]"><span className="text-[#64748B]">Bumper-to-Bumper</span>{b2b.left && <span className="font-bold text-[#0F172A]">{b2b.left} left</span>}</div>
-                    <div className="mt-1.5 h-2.5 rounded-full bg-slate-100 overflow-hidden"><div className="h-full rounded-full bg-[#2563EB]" style={{ width: `${b2b.pct ?? 3}%` }} /></div>
+                    <div className="flex items-center gap-1.5"><ShieldCheck className={`w-3.5 h-3.5 ${c.ic}`} /><span className="text-[12px] font-semibold text-[#0F172A]">{label}</span>{badge && <span className="ml-1 text-[9px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded bg-amber-100 text-amber-700">{badge}</span>}</div>
+                    <div className="flex items-center gap-2 mt-1.5">
+                      {pct != null && <span className={`text-[15px] font-extrabold tabular-nums w-9 ${c.ic}`}>{pct}%</span>}
+                      <div className="flex-1 h-2.5 rounded-full bg-slate-100 overflow-hidden"><div className={`h-full rounded-full ${c.bar}`} style={{ width: `${pct ?? 100}%` }} /></div>
+                    </div>
+                    {left && <p className="text-[11px] text-[#64748B] mt-1">{left}{tone === "gold" ? "" : " left"}</p>}
                   </div>
-                )}
-                {ptw && (ptw.pct != null || ptw.left) && (
-                  <div>
-                    <div className="flex justify-between text-[12px]"><span className="text-[#64748B]">Powertrain</span>{ptw.left && <span className="font-bold text-[#0F172A]">{ptw.left} left</span>}</div>
-                    <div className="mt-1.5 h-2.5 rounded-full bg-slate-100 overflow-hidden"><div className="h-full rounded-full bg-[#16A34A]" style={{ width: `${ptw.pct ?? 3}%` }} /></div>
+                );
+              };
+              return <>
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-1.5"><H3>Factory Warranty</H3><button onClick={(e) => openInfo("warranty-terms", e)} aria-label="Warranty terminology" className="w-6 h-6 rounded-full hover:bg-slate-100 flex items-center justify-center"><Info className="w-3.5 h-3.5 text-[#94A3B8]" /></button></div>
+                  {active && <span className="text-[9px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700">Active</span>}
+                </div>
+                <p className="text-[11px] text-[#94A3B8] mt-0.5">Coverage Remaining</p>
+                {d.warrantyStr ? (
+                  <div className="mt-3 space-y-3">
+                    {(b2b.pct != null || b2b.left) && <Bar label="Bumper-to-Bumper" tone="blue" pct={b2b.pct} left={b2b.left} />}
+                    {ptw && (ptw.pct != null || ptw.left) && <Bar label="Powertrain" tone="green" pct={ptw.pct} left={ptw.left} />}
+                    {cpo && <Bar label="Certified Pre-Owned" tone="gold" pct={100} left={cpoTerm || "Certified coverage"} badge="Certified" />}
                   </div>
-                )}
-              </div>;
-            })() : <p className="text-[13px] text-[#64748B] mt-3">Coverage details confirmed at the dealership.</p>}
-            <Link onClick={() => openPanel("factory-warranty")} className="mt-auto pt-3 self-start">View full warranty details</Link>
+                ) : <p className="text-[13px] text-[#64748B] mt-3">Coverage details confirmed at the dealership.</p>}
+              </>;
+            })()}
+            <Link onClick={() => openPanel("factory-warranty")} className="mt-auto pt-3 self-start">View complete warranty</Link>
           </div>
           )}
 
