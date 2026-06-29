@@ -74,7 +74,7 @@ export default function K208Document() {
       const v = vin.toUpperCase();
       const [{ data: ins }, { data: lst }] = await Promise.all([
         sb().from("safety_inspections").select("*").eq("tenant_id", tenantId).eq("vin", v).eq("status", "signed").order("signed_at", { ascending: false }).limit(1).maybeSingle(),
-        sb().from("vehicle_listings").select("ymm, mileage, body_style, condition").eq("tenant_id", tenantId).eq("vin", v).maybeSingle(),
+        sb().from("vehicle_listings").select("ymm, mileage, condition").eq("tenant_id", tenantId).eq("vin", v).maybeSingle(),
       ]);
       setInsp((ins as Inspection) || null);
       setListing((lst as Listing) || null);
