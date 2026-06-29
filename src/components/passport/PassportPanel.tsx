@@ -859,147 +859,135 @@ function buildPanel(key: PassportPanelKey, d: PassportData, listing: VehicleList
         { q: "Is roadside assistance included?", a: "Many manufacturers bundle roadside assistance with the basic warranty term. Confirm the specifics for this vehicle with the dealer." },
         { q: "Can I purchase additional coverage?", a: "Yes — extended service contracts and protection plans can be added at purchase. A specialist can walk you through the options and pricing." },
       ];
+      const hasPt = w.powertrain_months != null || w.powertrain_miles != null;
+      const hasBasic = w.factory_months != null || w.factory_miles != null;
+      const pctOf = (...vals: (number | null)[]) => { const v = vals.filter((x): x is number => x != null); return v.length ? Math.round(Math.min(...v)) : null; };
+      const b2bPct = pctOf(basic.pct, milesPct);
+      const ptPct = pctOf(pt.pct, ptMilesPct);
+      const yrsRemain = (m: number | null) => m == null ? null : m >= 12 ? `${Math.round(m / 12)} ${Math.round(m / 12) === 1 ? "year" : "years"} remaining` : `${m} months remaining`;
+      const milesRemainLbl = (n: number | null) => n == null ? null : `${n.toLocaleString()} miles remaining`;
+      const expiresLine = (date: string | null, miles?: number | null) => [date ? `Expires ${date}` : null, miles ? `${miles.toLocaleString()} miles` : null].filter(Boolean).join(" or ") || null;
+      const startDate = w.in_service_date ? new Date(w.in_service_date).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" }) : null;
+      const endDate = pt.date ?? basic.date ?? null;
+      const endMiles = w.powertrain_miles ?? w.factory_miles ?? null;
+      const tlPoints = ([
+        startDate ? { date: startDate, label: listing.condition === "new" ? "Manufactured" : "In service", color: "bg-slate-300" } : null,
+        { date: "Today", label: "Current", color: "bg-emerald-500" },
+        basic.date ? { date: basic.date, label: "B-to-B Ends", color: "bg-[#2563EB]" } : null,
+        pt.date ? { date: pt.date, label: "Powertrain Ends", color: "bg-[#16A34A]" } : null,
+      ] as (TLPoint | null)[]).filter((p): p is TLPoint => p != null);
+      const todayIdx = tlPoints.findIndex((p) => p.date === "Today");
+      const isCpo = listing.condition === "cpo";
+      const cpo = (listing as unknown as { cpo_programs?: Array<Record<string, unknown>> }).cpo_programs?.[0] || null;
+      const cov = oemCoverageRows(d.oemWarranty || {});
+      const benefitRows = cov.filter((r) => r.key === "corrosion" || r.key === "roadside" || r.key === "ev_battery" || r.key === "maintenance");
+      const includedRows = cov.filter((r) => r.key === "basic" || r.key === "powertrain");
+      const cpoTerm = (mo: unknown, mi: unknown) => [Number(mo) ? `${Math.round(Number(mo) / 12)} yr` : null, Number(mi) ? `${(Number(mi) / 1000).toFixed(0)}K mi` : null].filter(Boolean).join(" / ");
+      const hasData = !!(d.warrantyStr || d.oemWarranty);
       return {
-        title: "Factory Warranty", subtitle: "See what protection is still included with this vehicle",
-        primary: { label: "Protect This Vehicle", onClick: () => go("protect") },
-        secondary: { label: "View full warranty details", onClick: () => go("factory-warranty") },
+        title: "Factory Warranty",
+        subtitle: "See what's covered and for how long.",
+        primary: { label: "Contact Dealer", onClick: () => go("contact") },
+        secondary: { label: "Learn More", onClick: () => go("protect") },
         footerQuestion: "Questions about warranty?", specialistLabel: "Talk to a Warranty Specialist",
-        body: <>
-          {/* Full OEM coverage breakdown — the dealer's verified factory terms
-              for this brand. Shows on both mobile and desktop when present. */}
-          {d.oemWarranty && <FactoryCoverageGrid w={d.oemWarranty} ymm={listing.ymm} />}
-
-          {/* ── Mobile (<768px) — focused warranty card ── */}
-          <div className="md:hidden space-y-4">
-            {d.warrantyStr ? (
-              <>
-                <div className="rounded-2xl border border-emerald-200 bg-emerald-50/70 p-5 text-center">
-                  <span className="w-14 h-14 rounded-2xl bg-emerald-100 flex items-center justify-center mx-auto"><ShieldCheck className="w-7 h-7 text-[#16A34A]" /></span>
-                  <p className="text-[13px] font-bold text-[#64748B] mt-3">Factory Warranty</p>
-                  <p className="text-[28px] font-extrabold text-[#16A34A] leading-none mt-1 tracking-wide">{active ? "ACTIVE" : "EXPIRED"}</p>
-                  <p className="text-[13px] text-[#64748B] mt-2">{active ? "This vehicle is still protected by the manufacturer." : "Factory coverage has ended for this vehicle."}</p>
-                  {basic.date && <div className="mt-3"><p className="text-[11px] text-[#94A3B8]">Coverage Ends</p><p className="text-[15px] font-bold">{basic.date}</p></div>}
-                </div>
-
-                {(basic.pct != null || milesPct != null) && (
-                  <WarrantyBar title="Bumper-to-Bumper" big={basic.left != null ? `${basic.left} Months Remaining` : milesLeft != null ? `${milesLeft.toLocaleString()} Miles Remaining` : "Active"} pctLabel={`${Math.round(basic.pct ?? milesPct ?? 0)}% Remaining`} pct={basic.pct ?? milesPct ?? 0} expires={basic.date ?? (w.factory_miles ? `${w.factory_miles.toLocaleString()} mi` : null)} />
-                )}
-                {(ptMilesPct != null || pt.pct != null) && (
-                  <WarrantyBar title="Powertrain" big={ptMilesLeft != null ? `${ptMilesLeft.toLocaleString()} Miles Remaining` : pt.left != null ? `${pt.left} Months Remaining` : "Active"} pctLabel={`${Math.round(ptMilesPct ?? pt.pct ?? 0)}% Remaining`} pct={ptMilesPct ?? pt.pct ?? 0} expires={w.powertrain_miles ? `${w.powertrain_miles.toLocaleString()} Miles` : pt.date} />
-                )}
-
-                {listing.condition === "cpo" && (
-                  <div className={`${CARD} p-5 !border-blue-200 bg-blue-50/40`}>
-                    <p className="text-[13px] font-bold text-[#2563EB] inline-flex items-center gap-1.5"><BadgeCheck className="w-4 h-4" /> Certified Pre-Owned · Powertrain</p>
-                    <p className="text-[12px] text-[#64748B] mt-2">This vehicle includes additional Certified Pre-Owned powertrain coverage.</p>
-                    <p className="text-[11px] text-[#94A3B8] mt-2">This warranty begins after the original factory powertrain warranty expires. Confirm exact CPO terms with the dealer.</p>
-                  </div>
-                )}
-
-                <Section title="What's covered">
-                  <div className="space-y-3">
-                    <div className={`${CARD} p-4 flex items-start gap-3`}><span className="w-2.5 h-2.5 rounded-full bg-[#16A34A] mt-1.5 shrink-0" /><div><p className="text-[14px] font-bold">Bumper-to-Bumper</p><p className="text-[12px] text-[#64748B]">Most vehicle systems and components.</p></div></div>
-                    <div className={`${CARD} p-4 flex items-start gap-3`}><span className="w-2.5 h-2.5 rounded-full bg-[#16A34A] mt-1.5 shrink-0" /><div><p className="text-[14px] font-bold">Powertrain</p><p className="text-[12px] text-[#64748B]">Engine, transmission, and drivetrain.</p></div></div>
-                    <button onClick={() => go("factory-warranty")} className="w-full h-11 rounded-xl border border-[#E6E8EC] bg-white text-[13px] font-bold text-[#2563EB] inline-flex items-center justify-center gap-1.5 hover:border-[#2563EB]">View Full Coverage <ArrowRight className="w-4 h-4" /></button>
-                  </div>
-                </Section>
-
-                <div className={`${CARD} p-5`}>
-                  <p className="text-[15px] font-bold">Need More Protection?</p>
-                  <p className="text-[13px] text-[#64748B] mt-1">Extend your protection before factory coverage expires.</p>
-                  <button onClick={() => go("protect")} className="mt-3 w-full h-11 rounded-xl bg-[#2563EB] hover:bg-[#1d4fd7] text-white text-[13px] font-bold inline-flex items-center justify-center gap-1.5 transition-colors">See Protection Options <ArrowRight className="w-4 h-4" /></button>
-                </div>
-
-                <Section title="FAQ"><div className="space-y-2">{faqs.map((f) => <Faq key={f.q} q={f.q} a={f.a} />)}</div></Section>
-              </>
-            ) : <Empty>Warranty coverage details are confirmed at the dealership for this vehicle.</Empty>}
-            <Disclaimer />
-          </div>
-
-          {/* ── Desktop / tablet (≥768px) — unchanged ── */}
-          <div className="hidden md:block space-y-5">
-          {d.warrantyStr ? (
-            <>
-              <div className="rounded-2xl border border-emerald-200 bg-emerald-50/70 p-5">
-                <div className="flex items-center gap-3">
-                  <span className="w-12 h-12 rounded-2xl bg-emerald-100 flex items-center justify-center shrink-0"><ShieldCheck className="w-6 h-6 text-[#16A34A]" /></span>
-                  <div><p className="text-[16px] font-extrabold text-[#16A34A] leading-tight">{active ? "Factory Warranty Active" : "Factory Warranty"}</p><p className="text-[13px] text-[#0F172A] font-semibold">{d.warrantyStr} remaining</p></div>
-                </div>
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-4">
-                  <Stat label="Remaining" value={basic.left != null ? `${basic.left} mo` : d.warrantyStr || "—"} tone="green" />
-                  <Stat label="Mileage Left" value={milesLeft != null ? `${milesLeft.toLocaleString()}` : "—"} />
-                  <Stat label="Expires" value={basic.date ?? "—"} />
-                  <Stat label="Coverage" value={coverageType} />
+        body: hasData ? (
+          <div className="space-y-5">
+            {/* Hero status */}
+            <div className="rounded-2xl border border-emerald-200 bg-emerald-50/70 p-4 flex items-start justify-between gap-4">
+              <div className="flex items-start gap-3 min-w-0">
+                <span className="w-11 h-11 rounded-xl bg-emerald-100 flex items-center justify-center shrink-0"><ShieldCheck className="w-5 h-5 text-[#16A34A]" /></span>
+                <div className="min-w-0">
+                  <p className="text-[12px] font-bold text-[#64748B]">Factory Warranty</p>
+                  <p className={`text-[22px] font-extrabold leading-none mt-0.5 tracking-wide ${active ? "text-[#16A34A]" : "text-[#64748B]"}`}>{active ? "ACTIVE" : "EXPIRED"}</p>
+                  <p className="text-[12px] text-[#64748B] mt-1">{active ? "Your vehicle is still protected." : "Factory coverage has ended for this vehicle."}</p>
                 </div>
               </div>
-              <Section title="Coverage remaining">
-                <div className="space-y-3">
-                  <div className={`${CARD} p-4`}>
-                    <p className="text-[13px] font-bold mb-3">Basic (Bumper-to-Bumper)</p>
-                    <div className="space-y-3">
-                      {basic.pct != null && <Meter label="Time Remaining" value={`${basic.left}`} unit={`of ${w.factory_months} mo`} pct={basic.pct} />}
-                      {milesPct != null && <Meter label="Mileage Remaining" value={milesLeft!.toLocaleString()} unit={`of ${(w.factory_miles! / 1000).toFixed(0)}K mi`} pct={milesPct} />}
-                      {basic.date && <p className="text-[11px] text-[#64748B]">Expires {basic.date}</p>}
-                    </div>
-                  </div>
-                  {(w.powertrain_months != null || w.powertrain_miles != null) && (
-                    <div className={`${CARD} p-4`}>
-                      <p className="text-[13px] font-bold mb-3">Powertrain</p>
-                      <div className="space-y-3">
-                        {pt.pct != null && <Meter label="Time Remaining" value={`${pt.left}`} unit={`of ${w.powertrain_months} mo`} pct={pt.pct} />}
-                        {ptMilesPct != null && <Meter label="Mileage Remaining" value={ptMilesLeft!.toLocaleString()} unit={`of ${(w.powertrain_miles! / 1000).toFixed(0)}K mi`} pct={ptMilesPct} />}
-                        {pt.date && <p className="text-[11px] text-[#64748B]">Expires {pt.date}</p>}
-                      </div>
-                    </div>
-                  )}
+              {(endDate || endMiles) && (
+                <div className="text-right shrink-0">
+                  <p className="text-[10px] font-bold uppercase tracking-wide text-[#94A3B8]">Warranty End</p>
+                  {endDate && <p className="text-[13px] font-extrabold text-[#0F172A] leading-tight mt-0.5">{endDate}</p>}
+                  {endMiles && <p className="text-[11px] text-[#64748B]">or {endMiles.toLocaleString()} miles</p>}
                 </div>
-              </Section>
-              <Section title="Other coverages">
-                <div className={`${CARD} p-4`}>
-                  <StatRow label="Corrosion / Perforation" value="Varies by manufacturer" />
-                  <StatRow label="Roadside Assistance" value="Confirm with dealer" />
-                  {(isHybrid || isEV) && <StatRow label={isEV ? "EV Battery" : "Hybrid Battery"} value="Extended coverage — confirm terms" />}
-                </div>
-                <p className="text-[11px] text-[#94A3B8] mt-2">Exact terms vary by manufacturer and model year. Confirm specifics with the dealer.</p>
-              </Section>
-              <Section title="Coverage details">
-                <div className={`${CARD} p-4`}>
-                  <StatRow label="Transferable" value="Yes — transfers with the vehicle" />
-                  <StatRow label="Deductible" value="Typically $0 on covered factory repairs" />
-                  <StatRow label="Roadside Included" value="Confirm with dealer" />
-                  <StatRow label="Rental / Loaner" value="Confirm with dealer" />
-                </div>
-              </Section>
-              {protections.length > 0 && (
-                <Section title="Recommended protection options">
-                  <div className="space-y-3">{protections.map((p) => (
-                    <div key={p.t} className={`${CARD} p-4`}>
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="min-w-0"><p className="text-[13px] font-bold">{p.t}</p><p className="text-[12px] text-[#64748B] mt-0.5">{p.s}</p><p className="text-[11px] text-[#94A3B8] mt-1">{p.len}</p></div>
-                        <button onClick={() => go("protect")} className="text-[12px] font-semibold text-[#2563EB] hover:underline shrink-0">Learn More</button>
-                      </div>
-                    </div>
-                  ))}</div>
-                </Section>
               )}
-              <Section title="Warranty timeline">
-                <ol className="space-y-4 relative border-l-2 border-slate-100 ml-1.5 pl-4">
-                  {([
-                    w.in_service_date ? { d: new Date(w.in_service_date).toLocaleDateString(), t: "Placed in service", s: "Factory warranty begins", c: "bg-emerald-500" } : null,
-                    { d: "Today", t: "Current coverage", s: d.warrantyStr ? `${d.warrantyStr} remaining` : "Active", c: "bg-[#2563EB]" },
-                    basic.date ? { d: basic.date, t: "Basic warranty expires", s: "Bumper-to-bumper ends", c: "bg-slate-400" } : null,
-                    pt.date ? { d: pt.date, t: "Powertrain expires", s: "Powertrain coverage ends", c: "bg-slate-400" } : null,
-                  ].filter(Boolean) as { d: string; t: string; s: string; c: string }[]).map((e, i) => (
-                    <li key={i} className="relative"><span className={`absolute -left-[22px] top-1 w-3 h-3 rounded-full ${e.c} ring-2 ring-white`} /><p className="text-[12px] font-bold">{e.d} · {e.t}</p><p className="text-[11px] text-[#64748B]">{e.s}</p></li>
-                  ))}
-                </ol>
-              </Section>
-              <Section title="FAQ"><div className="space-y-2">{faqs.map((f) => <Faq key={f.q} q={f.q} a={f.a} />)}</div></Section>
-            </>
-          ) : <Empty>Warranty coverage details are confirmed at the dealership for this vehicle.</Empty>}
-          <Disclaimer />
+            </div>
+
+            {/* Coverage at a glance */}
+            <div>
+              <p className="text-[15px] font-bold text-[#0F172A] mb-2">Coverage at a Glance</p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {hasBasic && (
+                  <CoverageCard title="Bumper-to-Bumper" subtitle="Basic Vehicle Coverage" icon={ShieldCheck} tone="blue" pct={b2bPct}
+                    timeLeft={yrsRemain(basic.left)} milesLeft={milesRemainLbl(milesLeft)} expires={expiresLine(basic.date, w.factory_miles)} />
+                )}
+                {hasPt && (
+                  <CoverageCard title="Powertrain" subtitle="Engine, Transmission & Drivetrain" icon={Gauge} tone="green" pct={ptPct}
+                    timeLeft={yrsRemain(pt.left)} milesLeft={milesRemainLbl(ptMilesLeft)} expires={expiresLine(pt.date, w.powertrain_miles)} />
+                )}
+              </div>
+            </div>
+
+            {/* Coverage timeline */}
+            {tlPoints.length >= 2 && (
+              <div>
+                <p className="text-[15px] font-bold text-[#0F172A]">Coverage Timeline</p>
+                <p className="text-[12px] text-[#64748B] mb-3">See your coverage from day one to expiration.</p>
+                <WarrantyTimeline points={tlPoints} todayIndex={todayIdx} />
+              </div>
+            )}
+
+            {/* Interactive vehicle coverage visual */}
+            <div>
+              <p className="text-[15px] font-bold text-[#0F172A]">What's Covered</p>
+              <p className="text-[12px] text-[#64748B] mb-2">Tap a coverage type to see highlighted areas and included systems.</p>
+              <WarrantyCarVisual hasPowertrain={hasPt} onAll={() => go("contact")} />
+            </div>
+
+            {/* Accordions */}
+            <div className="space-y-2">
+              <WAcc icon={CheckCircle2} title="What's Included" sub="See systems and components covered">
+                {includedRows.length > 0
+                  ? includedRows.map((r) => <p key={r.key}><span className="font-semibold text-[#0F172A]">{r.label}</span> — {r.sub} ({r.term}).</p>)
+                  : <><p><span className="font-semibold text-[#0F172A]">Bumper-to-Bumper</span> — most vehicle systems and components.</p><p><span className="font-semibold text-[#0F172A]">Powertrain</span> — engine, transmission, and drivetrain.</p></>}
+              </WAcc>
+              <WAcc icon={AlertTriangle} title="What's NOT Covered" sub="See general exclusions and limitations">
+                <p>Routine maintenance and wear items (brake pads, wiper blades, tires, fluids).</p>
+                <p>Damage from accidents, misuse, modification, or lack of maintenance.</p>
+                <p>Cosmetic wear, glass, and items covered by separate manufacturer warranties.</p>
+              </WAcc>
+              <WAcc icon={LifeBuoy} title="Additional Factory Benefits" sub="Roadside, corrosion, emissions & more">
+                {benefitRows.length > 0
+                  ? benefitRows.map((r) => <p key={r.key}><span className="font-semibold text-[#0F172A]">{r.label}</span> — {r.term}.</p>)
+                  : <p>Roadside assistance, corrosion / rust-through, and emissions coverage may apply — confirm terms with the dealer.</p>}
+                {(isHybrid || isEV) && benefitRows.every((r) => r.key !== "ev_battery") && <p><span className="font-semibold text-[#0F172A]">{isEV ? "EV Battery" : "Hybrid Battery"}</span> — extended high-voltage coverage; confirm terms.</p>}
+                <p className="text-[11px] text-[#94A3B8]">Federal emissions components carry their own coverage. Exact terms vary by model year.</p>
+              </WAcc>
+              {isCpo && (
+                <WAcc icon={BadgeCheck} title="Certified Pre-Owned Coverage" sub={cpo ? String(cpo.name || "Manufacturer-backed coverage") : "Additional coverage that applies"}>
+                  {cpo ? (
+                    <>
+                      <p><span className="font-semibold text-[#0F172A]">{String(cpo.name)}</span> — {cpo.kind === "oem" ? "Manufacturer Certified" : "Dealer Certified"}.</p>
+                      {cpoTerm(cpo.basic_months, cpo.basic_miles) && <p>Limited warranty: <span className="font-semibold text-[#0F172A]">{cpoTerm(cpo.basic_months, cpo.basic_miles)}</span></p>}
+                      {cpoTerm(cpo.powertrain_months, cpo.powertrain_miles) && <p>Powertrain: <span className="font-semibold text-[#0F172A]">{cpoTerm(cpo.powertrain_months, cpo.powertrain_miles)}</span></p>}
+                      {cpo.inspection_points ? <p>{String(cpo.inspection_points)} inspection{cpo.transferable ? " · transferable" : ""}</p> : null}
+                      {cpo.benefits ? <p>{String(cpo.benefits)}</p> : null}
+                      {cpo.disclosure ? <p className="text-[11px] text-[#94A3B8]">{String(cpo.disclosure)}</p> : null}
+                    </>
+                  ) : (
+                    <p>This vehicle includes additional Certified Pre-Owned coverage. Confirm exact CPO terms with the dealer.</p>
+                  )}
+                </WAcc>
+              )}
+              <WAcc icon={FileText} title="Warranty Details & FAQ" sub="Deductible, transferability, claims & more">
+                <p><span className="font-semibold text-[#0F172A]">Deductible:</span> typically $0 on covered factory repairs.</p>
+                <p><span className="font-semibold text-[#0F172A]">Transferable:</span> {d.oemWarranty?.owner === "subsequent" ? "remaining coverage transfers with the vehicle (some terms reduce for a second owner)." : "yes — remaining coverage transfers with the vehicle."}</p>
+                <p><span className="font-semibold text-[#0F172A]">Claims:</span> honored at any authorized manufacturer dealer nationwide.</p>
+                <div className="pt-1 space-y-2">{faqs.map((f) => <Faq key={f.q} q={f.q} a={f.a} />)}</div>
+              </WAcc>
+            </div>
+
+            <Disclaimer />
           </div>
-        </>,
+        ) : <Empty>Warranty coverage details are confirmed at the dealership for this vehicle.</Empty>,
       };
     }
 
@@ -1530,42 +1518,105 @@ const Faq = ({ q, a }: { q: string; a: string }) => (
 const COVERAGE_ICON: Record<CoverageKey, React.ElementType> = {
   basic: ShieldCheck, powertrain: Gauge, corrosion: Car, roadside: LifeBuoy, ev_battery: Zap, maintenance: Wrench,
 };
-const FactoryCoverageGrid = ({ w, ymm }: { w: OemWarrantyView; ymm?: string | null }) => {
-  const rows = oemCoverageRows(w);
-  if (rows.length === 0) return null;
-  const brand = w.brand || (ymm || "").split(/\s+/).slice(1, 2).join("") || "Manufacturer";
-  const subsequent = w.owner === "subsequent";
+// ── Factory-warranty slide-out primitives ───────────────────────────────────
+
+// Big coverage card (Bumper-to-Bumper = blue, Powertrain = green): % remaining,
+// progress bar, time + miles remaining, expiration.
+const CoverageCard = ({ title, subtitle, icon: Icon, pct, tone, timeLeft, milesLeft, expires }: {
+  title: string; subtitle: string; icon: React.ElementType; pct: number | null;
+  tone: "blue" | "green"; timeLeft?: string | null; milesLeft?: string | null; expires?: string | null;
+}) => {
+  const a = tone === "blue"
+    ? { text: "text-[#2563EB]", bar: "bg-[#2563EB]", chip: "bg-blue-50 text-[#2563EB]", ring: "border-blue-100" }
+    : { text: "text-[#16A34A]", bar: "bg-[#16A34A]", chip: "bg-emerald-50 text-[#16A34A]", ring: "border-emerald-100" };
   return (
-    <div className="rounded-2xl border border-emerald-200 bg-gradient-to-b from-emerald-50/80 to-white p-5">
+    <div className={`rounded-2xl border ${a.ring} bg-white p-4 shadow-sm`}>
       <div className="flex items-center gap-2.5">
-        <span className="w-10 h-10 rounded-xl bg-emerald-100 flex items-center justify-center shrink-0"><BadgeCheck className="w-5 h-5 text-[#16A34A]" /></span>
-        <div>
-          <p className="text-[15px] font-extrabold text-[#0F172A] leading-tight">{brand} Factory Warranty</p>
-          <p className="text-[12px] text-[#64748B]">{subsequent ? "Coverage as it transfers to a subsequent owner" : "Full manufacturer coverage included with this vehicle"}</p>
-        </div>
+        <span className={`w-9 h-9 rounded-lg ${a.chip} flex items-center justify-center shrink-0`}><Icon className="w-4 h-4" /></span>
+        <div className="min-w-0"><p className="text-[13px] font-bold text-[#0F172A] leading-tight">{title}</p><p className="text-[11px] text-[#64748B] leading-tight">{subtitle}</p></div>
       </div>
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 mt-4">
-        {rows.map((r) => {
-          const Icon = COVERAGE_ICON[r.key];
-          return (
-            <div key={r.key} className={`${CARD} p-3.5 flex items-start gap-3`}>
-              <span className="w-9 h-9 rounded-lg bg-emerald-50 flex items-center justify-center shrink-0"><Icon className="w-4 h-4 text-[#16A34A]" /></span>
-              <div className="min-w-0">
-                <p className="text-[13px] font-bold text-[#0F172A] leading-tight">{r.label}</p>
-                <p className="text-[15px] font-extrabold text-[#16A34A] leading-tight mt-0.5">{r.term}</p>
-                <p className="text-[11px] text-[#94A3B8] leading-snug mt-0.5">{r.sub}</p>
-              </div>
-            </div>
-          );
-        })}
-      </div>
-      {w.notes && (
-        <p className="text-[11px] text-[#64748B] mt-3 leading-snug">{w.notes}</p>
+      {pct != null && (
+        <>
+          <p className={`text-[34px] font-extrabold ${a.text} leading-none mt-3`}>{pct}<span className="text-[18px] font-bold">%</span></p>
+          <div className="h-2 rounded-full bg-slate-100 overflow-hidden mt-2"><div className={`h-full rounded-full ${a.bar}`} style={{ width: `${Math.max(3, Math.min(100, pct))}%` }} /></div>
+        </>
       )}
-      <p className="text-[10px] text-[#94A3B8] mt-3 leading-snug">Coverage terms are the manufacturer's published new-vehicle warranty for this brand, verified by the dealership. Confirm exact terms for this VIN with the dealer.</p>
+      <div className="mt-3 space-y-1.5">
+        {timeLeft && <p className="text-[12px] font-semibold text-[#0F172A] flex items-center gap-1.5"><Clock className="w-3.5 h-3.5 text-[#94A3B8]" />{timeLeft}</p>}
+        {milesLeft && <p className="text-[12px] font-semibold text-[#0F172A] flex items-center gap-1.5"><Gauge className="w-3.5 h-3.5 text-[#94A3B8]" />{milesLeft}</p>}
+      </div>
+      {expires && <p className="text-[11px] text-[#64748B] mt-2.5 pt-2.5 border-t border-slate-100">{expires}</p>}
     </div>
   );
 };
+
+interface TLPoint { date: string; label: string; color: string }
+const WarrantyTimeline = ({ points, todayIndex }: { points: TLPoint[]; todayIndex: number }) => {
+  const n = points.length;
+  if (n < 2) return null;
+  const fillPct = todayIndex > 0 ? (todayIndex / (n - 1)) * 100 : 0;
+  return (
+    <div className="relative pt-1">
+      <div className="absolute left-0 right-0 top-[8px] mx-[12%] h-0.5 bg-slate-200" />
+      <div className="absolute left-0 top-[8px] ml-[12%] h-0.5 bg-emerald-400" style={{ width: `${fillPct * 0.76}%` }} />
+      <div className="grid relative" style={{ gridTemplateColumns: `repeat(${n}, minmax(0,1fr))` }}>
+        {points.map((p, i) => (
+          <div key={i} className="flex flex-col items-center text-center px-1">
+            <span className={`w-3.5 h-3.5 rounded-full ring-2 ring-white ${p.color}`} />
+            <p className="text-[10px] font-bold text-[#0F172A] mt-1.5 leading-tight">{p.date}</p>
+            <p className="text-[9px] text-[#94A3B8] leading-tight">{p.label}</p>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+};
+
+// Side-view vehicle that highlights the body (basic) or the drivetrain
+// (powertrain) when the matching toggle is selected.
+const WarrantyCarVisual = ({ hasPowertrain, onAll }: { hasPowertrain: boolean; onAll: () => void }) => {
+  const [mode, setMode] = useState<"basic" | "powertrain">("basic");
+  const body = mode === "basic" ? "#3B82F6" : "#CBD5E1";
+  const stroke = mode === "basic" ? "#2563EB" : "#94A3B8";
+  const dt = mode === "powertrain" ? "#16A34A" : "#E2E8F0";
+  const hub = mode === "powertrain" ? "#16A34A" : "#94A3B8";
+  return (
+    <div className={`${CARD} p-4`}>
+      <div className="flex gap-2">
+        <button onClick={() => setMode("basic")} className={`inline-flex items-center gap-1.5 h-8 px-3 rounded-lg text-[12px] font-semibold border transition-colors ${mode === "basic" ? "border-[#2563EB] bg-blue-50 text-[#2563EB]" : "border-[#E6E8EC] text-[#64748B]"}`}><ShieldCheck className="w-3.5 h-3.5" /> Bumper-to-Bumper</button>
+        {hasPowertrain && <button onClick={() => setMode("powertrain")} className={`inline-flex items-center gap-1.5 h-8 px-3 rounded-lg text-[12px] font-semibold border transition-colors ${mode === "powertrain" ? "border-[#16A34A] bg-emerald-50 text-[#16A34A]" : "border-[#E6E8EC] text-[#64748B]"}`}><Gauge className="w-3.5 h-3.5" /> Powertrain</button>}
+      </div>
+      <svg viewBox="0 0 320 124" className="w-full h-auto mt-3">
+        <path d="M16 84 C16 64 40 60 56 58 L86 40 C96 34 110 32 128 32 L196 32 C220 32 236 40 252 56 L292 70 C302 74 304 80 304 88 L304 90 C304 94 300 96 296 96 L24 96 C19 96 16 93 16 88 Z" fill={body} opacity="0.85" stroke={stroke} strokeWidth="2" />
+        <path d="M96 46 L120 46 L120 60 L82 60 Z" fill="#ffffff" opacity="0.7" />
+        <path d="M128 46 L196 46 L210 60 L128 60 Z" fill="#ffffff" opacity="0.7" />
+        <rect x="74" y="88" width="172" height="7" rx="3.5" fill={dt} />
+        <rect x="250" y="74" width="34" height="20" rx="4" fill={mode === "powertrain" ? "#16A34A" : "#E2E8F0"} />
+        <circle cx="96" cy="96" r="18" fill="#1E293B" /><circle cx="96" cy="96" r="8" fill={hub} />
+        <circle cx="238" cy="96" r="18" fill="#1E293B" /><circle cx="238" cy="96" r="8" fill={hub} />
+      </svg>
+      <div className="flex items-center justify-between gap-3 mt-1">
+        <div className="flex items-center gap-3 text-[10px] text-[#64748B]">
+          <span className="inline-flex items-center gap-1"><span className={`w-2 h-2 rounded-full ${mode === "basic" ? "bg-[#2563EB]" : "bg-[#16A34A]"}`} /> Covered</span>
+          <span className="inline-flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-slate-300" /> Not Covered</span>
+        </div>
+        <button onClick={onAll} className="text-[11px] font-semibold text-[#2563EB] inline-flex items-center gap-1 hover:underline">View all covered components <ArrowRight className="w-3 h-3" /></button>
+      </div>
+    </div>
+  );
+};
+
+// Compact accordion row (collapsed by default).
+const WAcc = ({ icon: Icon, title, sub, children }: { icon: React.ElementType; title: string; sub?: string; children: React.ReactNode }) => (
+  <details className="rounded-xl border border-[#E6E8EC] bg-white group">
+    <summary className="cursor-pointer list-none flex items-center gap-3 p-3.5">
+      <span className="w-8 h-8 rounded-lg bg-slate-50 flex items-center justify-center shrink-0"><Icon className="w-4 h-4 text-[#64748B]" /></span>
+      <div className="min-w-0 flex-1"><p className="text-[13px] font-bold text-[#0F172A] leading-tight">{title}</p>{sub && <p className="text-[11px] text-[#94A3B8] leading-tight">{sub}</p>}</div>
+      <ChevronDown className="w-4 h-4 text-[#94A3B8] group-open:rotate-180 transition-transform shrink-0" />
+    </summary>
+    <div className="px-3.5 pb-3.5 pt-1 text-[12px] text-[#64748B] space-y-2 leading-relaxed">{children}</div>
+  </details>
+);
 
 const Stat = ({ label, value, tone = "neutral" }: { label: string; value: string; tone?: "green" | "neutral" }) => (
   <div className={`${CARD} p-3`}>
