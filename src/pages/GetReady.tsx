@@ -6,7 +6,7 @@ import SignaturePad from "@/components/addendum/SignaturePad";
 import K208Checklist, { K208_ITEMS, k208Answered, k208Result, k208Checklist, type K208Mark } from "@/components/service/K208Checklist";
 import { K208_CERTIFICATION_TEXT } from "@/data/ctK208Form";
 import { buildConsentRecord, hashPayload, fetchClientIp } from "@/lib/esign";
-import { CheckCircle2, Loader2, ShieldCheck, Sparkles, ChevronRight, Upload, X, AlertTriangle, ArrowLeft, Camera } from "lucide-react";
+import { CheckCircle2, Loader2, ShieldCheck, Sparkles, ChevronRight, Upload, X, AlertTriangle, ArrowLeft, Camera, Wrench } from "lucide-react";
 
 // Remember the signer's name per device + station so a tech/detailer signing
 // 20 cars a day doesn't retype it every time.
@@ -53,7 +53,9 @@ interface Ctx {
   signoffs?: SignoffRow[];
   preinstall_products?: { id: string; name: string; pre_install: boolean }[];
 }
-type View = "hub" | "service" | "detail";
+type View = "hub" | "service" | "detail" | "recon";
+
+interface ReconLine { id: string; category: string | null; description: string; severity: string; completed_at: string | null; completed_by: string | null; }
 
 // Self-declared installer identity — the "login" without the friction. The
 // signature + photo + IP + timestamp are the real proof of who did the work.
@@ -90,14 +92,21 @@ const uploadViaToken = async (token: string, file: File): Promise<string | null>
 export default function GetReady() {
   const { token = "" } = useParams();
   const [ctx, setCtx] = useState<Ctx | null>(null);
+  const [reconLines, setReconLines] = useState<ReconLine[]>([]);
   const [loading, setLoading] = useState(true);
   const [view, setView] = useState<View>("hub");
+
+  const loadRecon = useCallback(async () => {
+    const { data } = await (supabase as any).rpc("get_recon_for_token", { _token: token });
+    if (data?.ok) setReconLines((data.lines as ReconLine[]) || []);
+  }, [token]);
 
   const refresh = useCallback(async () => {
     const { data } = await (supabase as any).rpc("get_vehicle_ready", { _token: token });
     setCtx((data as Ctx) || { ok: false, reason: "not_found" });
+    loadRecon();
     setLoading(false);
-  }, [token]);
+  }, [token, loadRecon]);
   useEffect(() => { refresh(); }, [refresh]);
 
   if (loading) return <div className="min-h-screen grid place-items-center bg-background"><Loader2 className="w-6 h-6 animate-spin text-muted-foreground" /></div>;
@@ -119,17 +128,21 @@ export default function GetReady() {
       <div className="sticky top-0 z-10 bg-primary text-primary-foreground px-4 py-3 shadow-sm flex items-center gap-2">
         {view !== "hub" && <button onClick={() => setView("hub")} className="-ml-1 mr-1"><ArrowLeft className="w-5 h-5" /></button>}
         <div>
-          <div className="font-display font-bold leading-tight">{view === "service" ? "Safety Inspection · K-208" : view === "detail" ? "Detail & Install" : "Get the car ready"}</div>
+          <div className="font-display font-bold leading-tight">{view === "service" ? "Safety Inspection · K-208" : view === "detail" ? "Detail & Install" : view === "recon" ? "Reconditioning Work" : "Get the car ready"}</div>
           <div className="text-xs opacity-90">{ctx.ymm || "Vehicle"} · {ctx.vin}</div>
         </div>
       </div>
 
       <div className="max-w-2xl mx-auto p-4">
-        {view === "hub" && (
+        {view === "hub" && (() => {
+          const reconDone = reconLines.length > 0 && reconLines.every((l) => l.completed_at);
+          const reconDoneCount = reconLines.filter((l) => l.completed_at).length;
+          return (
           <div className="space-y-3">
-            <p className="text-sm text-muted-foreground">Tap your station and sign off your own work. Multiple departments and outside vendors can each add a sign-off for this vehicle.</p>
-            <StationCard icon={<ShieldCheck className="w-5 h-5" />} title="Safety inspection (K-208)" sub="Service department" done={!!ctx.service_done} onClick={() => setView("service")} />
-            <StationCard icon={<Sparkles className="w-5 h-5" />} title="Detail / accessory install" sub="Detail · service · parts · outside vendor" done={false} onClick={() => setView("detail")} addAction />
+            <p className="text-sm text-muted-foreground">What are you here to do? Tap a step below. Each one locks once it's signed.</p>
+            <StationCard step={1} icon={<ShieldCheck className="w-5 h-5" />} title="Sign off the safety inspection (K-208)" sub={ctx.service_done ? "Completed" : "Mark each item Pass or Fail, then sign"} done={!!ctx.service_done} onClick={() => setView("service")} />
+            <StationCard step={2} icon={<Wrench className="w-5 h-5" />} title="Confirm reconditioning is done" sub={reconLines.length === 0 ? "No recon work assigned yet" : reconDone ? "All work confirmed" : `Check off each job — ${reconDoneCount} of ${reconLines.length} done`} done={reconDone} onClick={() => setView("recon")} disabled={reconLines.length === 0} />
+            <StationCard step={3} icon={<Sparkles className="w-5 h-5" />} title="Confirm detail & installed work" sub="Detail · service · parts · outside vendor" done={false} onClick={() => setView("detail")} addAction />
 
             {(ctx.signoffs?.length ?? 0) > 0 && (
               <div className="rounded-2xl border border-border bg-card p-4">
@@ -155,24 +168,73 @@ export default function GetReady() {
               </div>
             )}
           </div>
-        )}
+          );
+        })()}
         {view === "service" && <ServiceStation token={token} ctx={ctx} onDone={() => { refresh(); setView("hub"); }} />}
         {view === "detail" && <DetailStation token={token} ctx={ctx} onDone={() => { refresh(); setView("hub"); }} />}
+        {view === "recon" && <ReconStation token={token} lines={reconLines} onDone={() => { loadRecon(); setView("hub"); }} />}
       </div>
     </div>
   );
 }
 
-function StationCard({ icon, title, sub, done, onClick, addAction }: { icon: React.ReactNode; title: string; sub: string; done: boolean; onClick: () => void; addAction?: boolean }) {
+function StationCard({ icon, title, sub, done, onClick, addAction, step, disabled }: { icon: React.ReactNode; title: string; sub: string; done: boolean; onClick: () => void; addAction?: boolean; step?: number; disabled?: boolean }) {
   return (
-    <button onClick={onClick} className={`w-full flex items-center gap-3 rounded-2xl border p-4 text-left transition-colors ${done ? "border-emerald-200 bg-emerald-50" : "border-border bg-card hover:bg-muted/40"}`}>
-      <div className={`grid place-items-center w-10 h-10 rounded-xl ${done ? "bg-emerald-600 text-white" : "bg-muted text-foreground"}`}>{done ? <CheckCircle2 className="w-5 h-5" /> : icon}</div>
-      <div className="flex-1">
-        <div className="font-bold text-foreground">{title}</div>
-        <div className="text-xs text-muted-foreground">{done ? "Completed & signed" : addAction ? `${sub} · tap to add a sign-off` : sub}</div>
+    <button onClick={onClick} disabled={disabled} className={`w-full flex items-center gap-3 rounded-2xl border p-4 text-left transition-colors ${disabled ? "border-border bg-muted/30 opacity-60 cursor-default" : done ? "border-emerald-200 bg-emerald-50" : "border-border bg-card hover:bg-muted/40"}`}>
+      {step != null && <div className="grid place-items-center w-7 h-7 rounded-full bg-primary/10 text-primary text-sm font-bold shrink-0">{step}</div>}
+      <div className={`grid place-items-center w-11 h-11 rounded-xl shrink-0 ${done ? "bg-emerald-600 text-white" : "bg-muted text-foreground"}`}>{done ? <CheckCircle2 className="w-5 h-5" /> : icon}</div>
+      <div className="flex-1 min-w-0">
+        <div className="font-bold text-foreground leading-tight">{title}</div>
+        <div className="text-xs text-muted-foreground mt-0.5">{addAction && !done ? `${sub} · tap to add a sign-off` : sub}</div>
       </div>
-      {!done && <ChevronRight className="w-5 h-5 text-muted-foreground" />}
+      {!done && !disabled && <ChevronRight className="w-5 h-5 text-muted-foreground shrink-0" />}
     </button>
+  );
+}
+
+// ── Reconditioning station — service checks off each approved job as done ────
+function ReconStation({ token, lines, onDone }: { token: string; lines: ReconLine[]; onDone: () => void }) {
+  const [checked, setChecked] = useState<Record<string, boolean>>(() => Object.fromEntries(lines.filter((l) => l.completed_at).map((l) => [l.id, true])));
+  const [name, setName] = useState(() => rememberedName("service"));
+  const [notes, setNotes] = useState("");
+  const [busy, setBusy] = useState(false);
+  const toConfirm = lines.filter((l) => checked[l.id] && !l.completed_at).map((l) => l.id);
+  const canSubmit = !!name.trim() && toConfirm.length > 0 && !busy;
+
+  const submit = async () => {
+    if (!canSubmit) return; setBusy(true);
+    const { data, error } = await (supabase as any).rpc("recon_confirm_lines_done", {
+      _token: token, _line_ids: toConfirm, _by: name.trim(), _notes: notes || null,
+    });
+    setBusy(false);
+    if (!error && (data as { ok?: boolean })?.ok) { saveName("service", name); toast.success(`${(data as { completed?: number }).completed ?? toConfirm.length} job(s) confirmed`); onDone(); }
+    else toast.error("Couldn't save — please try again.");
+  };
+
+  return (
+    <div className="space-y-4">
+      <p className="text-sm text-muted-foreground">Check off each reconditioning job you completed on this vehicle, then sign.</p>
+      <div className="rounded-2xl border border-border bg-card divide-y divide-border/60">
+        {lines.map((l) => {
+          const on = !!checked[l.id]; const already = !!l.completed_at;
+          return (
+            <button key={l.id} onClick={() => !already && setChecked((s) => ({ ...s, [l.id]: !s[l.id] }))} disabled={already}
+              className="w-full flex items-center gap-3 p-3.5 text-left disabled:opacity-100">
+              <span className={`grid place-items-center w-7 h-7 rounded-lg shrink-0 border ${on ? "bg-emerald-600 border-emerald-600 text-white" : "border-border bg-background text-transparent"}`}><CheckCircle2 className="w-4 h-4" /></span>
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-semibold text-foreground">{l.description}</p>
+                <p className="text-[11px] text-muted-foreground">{l.category || "Recon"}{already ? ` · done by ${l.completed_by || "service"}` : ""}</p>
+              </div>
+            </button>
+          );
+        })}
+      </div>
+      <div><p className="text-xs font-semibold text-foreground mb-1.5">Notes (optional)</p><NoteChips onPick={(t) => setNotes((c) => appendNote(c, t))} />
+        <textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={2} placeholder="Anything to note about the work…" className="w-full rounded-lg border border-border bg-background p-3 text-sm" /></div>
+      <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Your name" className="w-full h-11 rounded-lg border border-border bg-background px-3 text-sm" />
+      {!canSubmit && !busy && <p className="text-[12px] text-amber-600 text-center">{toConfirm.length === 0 ? "Check off the jobs you completed." : "Enter your name to confirm."}</p>}
+      <SubmitBar label={`Confirm ${toConfirm.length || ""} job${toConfirm.length === 1 ? "" : "s"} done`} disabled={!canSubmit} busy={busy} onClick={submit} />
+    </div>
   );
 }
 
