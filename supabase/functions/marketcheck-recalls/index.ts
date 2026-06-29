@@ -2,9 +2,12 @@
 // marketcheck-recalls — server-side VIN recall lookup via MarketCheck's
 // AutoRecalls API. The API key never leaves the server. Single-VIN mode
 // checks one car; batch mode sweeps a tenant's inventory (skipping cars
-// checked in the last 24h unless force=true), rate-limited.
+// checked in the last 24h unless force=true), rate-limited. Sweep mode
+// (service-role only) re-checks every published listing whose recall_check
+// is missing or >30 days old, across all tenants — the nightly self-heal
+// behind the Recall backfill screen.
 //
-// Body: { vin?, tenant_id?, batch?, force? }
+// Body: { vin?, tenant_id?, batch?, force?, sweep? }
 // ──────────────────────────────────────────────────────────────────────
 import { json, preflight } from "../_shared/http.ts";
 import { adminClient, SERVICE_KEY } from "../_shared/supabase.ts";
@@ -148,6 +151,22 @@ async function fetchRecalls(vin: string): Promise<FetchOk | FetchErr> {
   return { ok: false, reason: sawRateLimit ? "rate_limited" : "no_endpoint_matched", tried };
 }
 
+// Resolve a VIN's recall state from MarketCheck (authoritative when it returns
+// recalls) falling back to NHTSA (free, model-level). Shared by single-VIN and
+// the nightly sweep so the two can never drift. `final` is null only when
+// neither source answered — callers must not downgrade a known recall on that.
+async function resolveRecall(
+  vin: string,
+  ymm: string | null,
+): Promise<{ final: Normalized | null; authoritativeClear: boolean; mcOk: boolean; mcReason?: string }> {
+  const mc = await fetchRecalls(vin);
+  if (mc.ok && mc.data.recalls.length > 0) return { final: mc.data, authoritativeClear: false, mcOk: true };
+  const nh = await fetchNhtsa(ymm);
+  if (nh) return { final: buildNormalized(vin, nh.recalls, "nhtsa"), authoritativeClear: nh.recalls.length === 0, mcOk: mc.ok };
+  if (mc.ok) return { final: mc.data, authoritativeClear: false, mcOk: true };
+  return { final: null, authoritativeClear: false, mcOk: false, mcReason: (mc as FetchErr).reason };
+}
+
 const DND_RE = /do not drive|stop sale|park outside|fire risk/i;
 
 // deno-lint-ignore no-explicit-any
@@ -200,6 +219,36 @@ Deno.serve(async (req) => {
   }
 
 
+  // ── All-tenants self-heal sweep (cron) ───────────────────────────────
+  // Re-checks every published listing whose recall_check is missing or
+  // >30 days old, reusing the same definition of "stale" as the admin
+  // worklist (listings_with_stale_recalls). Service-role only.
+  if (body.sweep) {
+    if (auth !== SERVICE_KEY) return json(403, { error: "sweep is service-role only" });
+    const limit = Math.min(Math.max(Number(body.limit) || 500, 1), 1000);
+    const { data: stale, error: staleErr } = await admin.rpc("listings_with_stale_recalls", { p_limit: limit });
+    if (staleErr) return json(200, { sweep: true, error: staleErr.message, checked: 0 });
+    const rows = (stale || []) as Array<{ tenant_id: string | null; vin: string; ymm: string | null }>;
+    let checked = 0, openFound = 0, errors = 0, skipped = 0;
+    for (const row of rows) {
+      const vin = (row.vin || "").toUpperCase();
+      if (!validVin(vin)) { skipped++; continue; }
+      const { final, authoritativeClear } = await resolveRecall(vin, row.ymm);
+      // Persist only an authoritative result (recalls found, or NHTSA's
+      // authoritative empty). A bare non-authoritative "clear" is skipped so a
+      // transient MC-empty + NHTSA-down can never wipe a real recall.
+      if (final && (authoritativeClear || final.recalls.length > 0)) {
+        await persist(admin, row.tenant_id, vin, final);
+        checked++;
+        if (final.openRecallCount > 0) openFound++;
+      } else {
+        errors++;
+      }
+      await new Promise((res) => setTimeout(res, 250)); // rate-limit courtesy
+    }
+    return json(200, { sweep: true, candidates: rows.length, checked, openFound, errors, skipped });
+  }
+
   // ── Batch sweep ──────────────────────────────────────────────────────
   if (body.batch) {
     if (!tenantId) return json(400, { error: "tenant_id required for batch" });
@@ -233,26 +282,11 @@ Deno.serve(async (req) => {
   const hadOpen = (row0 as { recall_status?: string } | null)?.recall_status === "open_recalls"
     && ((row0 as { open_recall_count?: number } | null)?.open_recall_count ?? 0) > 0;
 
-  const mc = await fetchRecalls(vin);
-  let final: Normalized | null = null;
-  let authoritativeClear = false;
-
-  if (mc.ok && mc.data.recalls.length > 0) {
-    final = mc.data;                                        // MarketCheck found recalls — authoritative
-  } else {
-    // MarketCheck empty/unlicensed/errored → confirm with NHTSA (free, model-level).
-    const nh = await fetchNhtsa(ymm);
-    if (nh) {
-      final = buildNormalized(vin, nh.recalls, "nhtsa");   // open recalls OR an authoritative clear
-      authoritativeClear = nh.recalls.length === 0;
-    } else if (mc.ok) {
-      final = mc.data;                                      // MC returned a valid empty; NHTSA unavailable
-    }
-  }
+  const { final, authoritativeClear, mcOk, mcReason } = await resolveRecall(vin, ymm);
 
   // Neither source answered → never wipe a known recall.
   if (!final) {
-    return json(200, { vin, recallStatus: hadOpen ? "open_recalls" : "error", error: mc.ok ? undefined : mc.reason, preserved: hadOpen, note: "no_authoritative_source" });
+    return json(200, { vin, recallStatus: hadOpen ? "open_recalls" : "error", error: mcOk ? undefined : mcReason, preserved: hadOpen, note: "no_authoritative_source" });
   }
   // A non-authoritative "clear" must not overwrite an existing open recall.
   if (final.recallStatus === "clear" && hadOpen && !authoritativeClear) {
@@ -260,5 +294,5 @@ Deno.serve(async (req) => {
   }
 
   await persist(admin, tenantId, vin, final);
-  return json(200, { ...final, ...(mc.ok ? { endpoint: mc.endpoint } : {}), ...(body.diagnostic && mc.ok ? { _raw: mc.raw } : {}) });
+  return json(200, { ...final, provider: final.rawProvider });
 });
