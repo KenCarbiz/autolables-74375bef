@@ -3,7 +3,7 @@ import {
   DollarSign, TrendingUp, TrendingDown, Gauge, Clock, Car, Package, ShieldCheck,
   Star, Award, FileText, MessageSquare, Eye, CheckCircle2,
   Flame, Heart, Send, Bookmark, Users, Circle, ChevronDown, MapPin, BadgeCheck, Info, AlertTriangle, History, ArrowRight, Sparkles,
-  Wrench, Zap, LifeBuoy,
+  Wrench, Zap, LifeBuoy, Calendar, CalendarDays,
 } from "lucide-react";
 import type { PassportData, PricePoint, OemWarrantyView } from "@/lib/passportV2Data";
 import { fmt$, listingEquipment } from "@/lib/passportV2Data";
@@ -864,9 +864,9 @@ function buildPanel(key: PassportPanelKey, d: PassportData, listing: VehicleList
       const pctOf = (...vals: (number | null)[]) => { const v = vals.filter((x): x is number => x != null); return v.length ? Math.round(Math.min(...v)) : null; };
       const b2bPct = pctOf(basic.pct, milesPct);
       const ptPct = pctOf(pt.pct, ptMilesPct);
-      const yrsRemain = (m: number | null) => m == null ? null : m >= 12 ? `${Math.round(m / 12)} ${Math.round(m / 12) === 1 ? "year" : "years"} remaining` : `${m} months remaining`;
-      const milesRemainLbl = (n: number | null) => n == null ? null : `${n.toLocaleString()} miles remaining`;
-      const expiresLine = (date: string | null, miles?: number | null) => [date ? `Expires ${date}` : null, miles ? `${miles.toLocaleString()} miles` : null].filter(Boolean).join(" or ") || null;
+      const yrsRemain = (m: number | null) => m == null ? null : m >= 12 ? `${Math.round(m / 12)} ${Math.round(m / 12) === 1 ? "Year" : "Years"} Remaining` : `${m} Months Remaining`;
+      const milesRemainLbl = (n: number | null) => n == null ? null : `${n.toLocaleString()} Miles Remaining`;
+      const milesCapLbl = (n?: number | null) => n ? `${n.toLocaleString()} miles` : null;
       const startDate = w.in_service_date ? new Date(w.in_service_date).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" }) : null;
       const endDate = pt.date ?? basic.date ?? null;
       const endMiles = w.powertrain_miles ?? w.factory_miles ?? null;
@@ -899,7 +899,7 @@ function buildPanel(key: PassportPanelKey, d: PassportData, listing: VehicleList
                 <div className="min-w-0">
                   <p className="text-[12px] font-bold text-[#64748B]">Factory Warranty</p>
                   <p className={`text-[22px] font-extrabold leading-none mt-0.5 tracking-wide ${active ? "text-[#16A34A]" : "text-[#64748B]"}`}>{active ? "ACTIVE" : "EXPIRED"}</p>
-                  <p className="text-[12px] text-[#64748B] mt-1">{active ? "Your vehicle is still protected." : "Factory coverage has ended for this vehicle."}</p>
+                  <p className="text-[12px] text-[#64748B] mt-1 leading-tight">{active ? "Your factory warranty is in effect. You're covered." : "Factory coverage has ended for this vehicle."}</p>
                 </div>
               </div>
               {(endDate || endMiles) && (
@@ -916,12 +916,12 @@ function buildPanel(key: PassportPanelKey, d: PassportData, listing: VehicleList
               <p className="text-[15px] font-bold text-[#0F172A] mb-2">Coverage at a Glance</p>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 {hasBasic && (
-                  <CoverageCard title="Bumper-to-Bumper" subtitle="Basic Vehicle Coverage" icon={ShieldCheck} tone="blue" pct={b2bPct}
-                    timeLeft={yrsRemain(basic.left)} milesLeft={milesRemainLbl(milesLeft)} expires={expiresLine(basic.date, w.factory_miles)} />
+                  <CoverageCard title="Bumper-to-Bumper" subtitle="Basic Vehicle Coverage" tone="blue" pct={b2bPct}
+                    years={yrsRemain(basic.left)} miles={milesRemainLbl(milesLeft)} expiresDate={basic.date} expiresMiles={milesCapLbl(w.factory_miles)} />
                 )}
                 {hasPt && (
-                  <CoverageCard title="Powertrain" subtitle="Engine, Transmission & Drivetrain" icon={Gauge} tone="green" pct={ptPct}
-                    timeLeft={yrsRemain(pt.left)} milesLeft={milesRemainLbl(ptMilesLeft)} expires={expiresLine(pt.date, w.powertrain_miles)} />
+                  <CoverageCard title="Powertrain" subtitle="Engine, Transmission & Drivetrain" tone="green" pct={ptPct}
+                    years={yrsRemain(pt.left)} miles={milesRemainLbl(ptMilesLeft)} expiresDate={pt.date} expiresMiles={milesCapLbl(w.powertrain_miles)} />
                 )}
               </div>
             </div>
@@ -961,22 +961,22 @@ function buildPanel(key: PassportPanelKey, d: PassportData, listing: VehicleList
                 {(isHybrid || isEV) && benefitRows.every((r) => r.key !== "ev_battery") && <p><span className="font-semibold text-[#0F172A]">{isEV ? "EV Battery" : "Hybrid Battery"}</span> — extended high-voltage coverage; confirm terms.</p>}
                 <p className="text-[11px] text-[#94A3B8]">Federal emissions components carry their own coverage. Exact terms vary by model year.</p>
               </WAcc>
-              {isCpo && (
-                <WAcc icon={BadgeCheck} title="Certified Pre-Owned Coverage" sub={cpo ? String(cpo.name || "Manufacturer-backed coverage") : "Additional coverage that applies"}>
-                  {cpo ? (
-                    <>
-                      <p><span className="font-semibold text-[#0F172A]">{String(cpo.name)}</span> — {cpo.kind === "oem" ? "Manufacturer Certified" : "Dealer Certified"}.</p>
-                      {cpoTerm(cpo.basic_months, cpo.basic_miles) && <p>Limited warranty: <span className="font-semibold text-[#0F172A]">{cpoTerm(cpo.basic_months, cpo.basic_miles)}</span></p>}
-                      {cpoTerm(cpo.powertrain_months, cpo.powertrain_miles) && <p>Powertrain: <span className="font-semibold text-[#0F172A]">{cpoTerm(cpo.powertrain_months, cpo.powertrain_miles)}</span></p>}
-                      {cpo.inspection_points ? <p>{String(cpo.inspection_points)} inspection{cpo.transferable ? " · transferable" : ""}</p> : null}
-                      {cpo.benefits ? <p>{String(cpo.benefits)}</p> : null}
-                      {cpo.disclosure ? <p className="text-[11px] text-[#94A3B8]">{String(cpo.disclosure)}</p> : null}
-                    </>
-                  ) : (
-                    <p>This vehicle includes additional Certified Pre-Owned coverage. Confirm exact CPO terms with the dealer.</p>
-                  )}
-                </WAcc>
-              )}
+              <WAcc icon={BadgeCheck} title="Certified Pre-Owned Coverage" sub="Additional coverage that applies (if any)">
+                {isCpo && cpo ? (
+                  <>
+                    <p><span className="font-semibold text-[#0F172A]">{String(cpo.name)}</span> — {cpo.kind === "oem" ? "Manufacturer Certified" : "Dealer Certified"}.</p>
+                    {cpoTerm(cpo.basic_months, cpo.basic_miles) && <p>Limited warranty: <span className="font-semibold text-[#0F172A]">{cpoTerm(cpo.basic_months, cpo.basic_miles)}</span></p>}
+                    {cpoTerm(cpo.powertrain_months, cpo.powertrain_miles) && <p>Powertrain: <span className="font-semibold text-[#0F172A]">{cpoTerm(cpo.powertrain_months, cpo.powertrain_miles)}</span></p>}
+                    {cpo.inspection_points ? <p>{String(cpo.inspection_points)} inspection{cpo.transferable ? " · transferable" : ""}</p> : null}
+                    {cpo.benefits ? <p>{String(cpo.benefits)}</p> : null}
+                    {cpo.disclosure ? <p className="text-[11px] text-[#94A3B8]">{String(cpo.disclosure)}</p> : null}
+                  </>
+                ) : isCpo ? (
+                  <p>This vehicle includes additional Certified Pre-Owned coverage. Confirm exact CPO terms with the dealer.</p>
+                ) : (
+                  <p>This vehicle is sold new, so factory coverage applies. Certified Pre-Owned coverage applies to qualifying used vehicles.</p>
+                )}
+              </WAcc>
               <WAcc icon={FileText} title="Warranty Details & FAQ" sub="Deductible, transferability, claims & more">
                 <p><span className="font-semibold text-[#0F172A]">Deductible:</span> typically $0 on covered factory repairs.</p>
                 <p><span className="font-semibold text-[#0F172A]">Transferable:</span> {d.oemWarranty?.owner === "subsequent" ? "remaining coverage transfers with the vehicle (some terms reduce for a second owner)." : "yes — remaining coverage transfers with the vehicle."}</p>
@@ -1521,59 +1521,81 @@ const COVERAGE_ICON: Record<CoverageKey, React.ElementType> = {
 // ── Factory-warranty slide-out primitives ───────────────────────────────────
 
 // Big coverage card (Bumper-to-Bumper = blue, Powertrain = green): % remaining,
-// progress bar, time + miles remaining, expiration.
-const CoverageCard = ({ title, subtitle, icon: Icon, pct, tone, timeLeft, milesLeft, expires }: {
-  title: string; subtitle: string; icon: React.ElementType; pct: number | null;
-  tone: "blue" | "green"; timeLeft?: string | null; milesLeft?: string | null; expires?: string | null;
+// progress bar, time + miles remaining, two-line expiration.
+const CoverageCard = ({ title, subtitle, pct, tone, years, miles, expiresDate, expiresMiles }: {
+  title: string; subtitle: string; pct: number | null; tone: "blue" | "green";
+  years?: string | null; miles?: string | null; expiresDate?: string | null; expiresMiles?: string | null;
 }) => {
   const a = tone === "blue"
-    ? { text: "text-[#2563EB]", bar: "bg-[#2563EB]", chip: "bg-blue-50 text-[#2563EB]", ring: "border-blue-100" }
-    : { text: "text-[#16A34A]", bar: "bg-[#16A34A]", chip: "bg-emerald-50 text-[#16A34A]", ring: "border-emerald-100" };
+    ? { text: "text-[#2563EB]", bar: "bg-[#2563EB]", chip: "bg-blue-50 text-[#2563EB]" }
+    : { text: "text-[#16A34A]", bar: "bg-[#16A34A]", chip: "bg-emerald-50 text-[#16A34A]" };
   return (
-    <div className={`rounded-2xl border ${a.ring} bg-white p-4 shadow-sm`}>
+    <div className="rounded-2xl border border-slate-100 bg-white p-4 shadow-sm">
       <div className="flex items-center gap-2.5">
-        <span className={`w-9 h-9 rounded-lg ${a.chip} flex items-center justify-center shrink-0`}><Icon className="w-4 h-4" /></span>
-        <div className="min-w-0"><p className="text-[13px] font-bold text-[#0F172A] leading-tight">{title}</p><p className="text-[11px] text-[#64748B] leading-tight">{subtitle}</p></div>
+        <span className={`w-9 h-9 rounded-xl ${a.chip} flex items-center justify-center shrink-0`}><ShieldCheck className="w-[18px] h-[18px]" /></span>
+        <div className="min-w-0"><p className="text-[14px] font-bold text-[#0F172A] leading-tight">{title}</p><p className="text-[11px] text-[#64748B] leading-tight">{subtitle}</p></div>
       </div>
       {pct != null && (
         <>
-          <p className={`text-[34px] font-extrabold ${a.text} leading-none mt-3`}>{pct}<span className="text-[18px] font-bold">%</span></p>
-          <div className="h-2 rounded-full bg-slate-100 overflow-hidden mt-2"><div className={`h-full rounded-full ${a.bar}`} style={{ width: `${Math.max(3, Math.min(100, pct))}%` }} /></div>
+          <p className={`font-extrabold ${a.text} leading-none mt-3`}><span className="text-[40px]">{pct}</span><span className="text-[20px]">%</span></p>
+          <div className="h-2 rounded-full bg-slate-100 overflow-hidden mt-2.5"><div className={`h-full rounded-full ${a.bar}`} style={{ width: `${Math.max(3, Math.min(100, pct))}%` }} /></div>
         </>
       )}
-      <div className="mt-3 space-y-1.5">
-        {timeLeft && <p className="text-[12px] font-semibold text-[#0F172A] flex items-center gap-1.5"><Clock className="w-3.5 h-3.5 text-[#94A3B8]" />{timeLeft}</p>}
-        {milesLeft && <p className="text-[12px] font-semibold text-[#0F172A] flex items-center gap-1.5"><Gauge className="w-3.5 h-3.5 text-[#94A3B8]" />{milesLeft}</p>}
+      <div className="mt-3 space-y-2">
+        {years && <p className="text-[12px] font-semibold text-[#0F172A] flex items-center gap-2"><Calendar className="w-4 h-4 text-[#94A3B8] shrink-0" />{years}</p>}
+        {miles && <p className="text-[12px] font-semibold text-[#0F172A] flex items-center gap-2"><CalendarDays className="w-4 h-4 text-[#94A3B8] shrink-0" />{miles}</p>}
       </div>
-      {expires && <p className="text-[11px] text-[#64748B] mt-2.5 pt-2.5 border-t border-slate-100">{expires}</p>}
+      {(expiresDate || expiresMiles) && (
+        <div className="mt-3 pt-3 border-t border-slate-100">
+          {expiresDate && <p className="text-[12px] text-[#64748B] leading-tight">Expires {expiresDate}</p>}
+          {expiresMiles && <p className="text-[12px] text-[#64748B] leading-tight">or {expiresMiles}</p>}
+        </div>
+      )}
     </div>
   );
 };
 
 interface TLPoint { date: string; label: string; color: string }
+// Slider-style timeline: labels above, a gray track below with a green fill to
+// today and a dot at each milestone.
 const WarrantyTimeline = ({ points, todayIndex }: { points: TLPoint[]; todayIndex: number }) => {
   const n = points.length;
   if (n < 2) return null;
   const fillPct = todayIndex > 0 ? (todayIndex / (n - 1)) * 100 : 0;
   return (
-    <div className="relative pt-1">
-      <div className="absolute left-0 right-0 top-[8px] mx-[12%] h-0.5 bg-slate-200" />
-      <div className="absolute left-0 top-[8px] ml-[12%] h-0.5 bg-emerald-400" style={{ width: `${fillPct * 0.76}%` }} />
-      <div className="grid relative" style={{ gridTemplateColumns: `repeat(${n}, minmax(0,1fr))` }}>
+    <div>
+      <div className="grid mb-2.5" style={{ gridTemplateColumns: `repeat(${n}, minmax(0,1fr))` }}>
         {points.map((p, i) => (
-          <div key={i} className="flex flex-col items-center text-center px-1">
-            <span className={`w-3.5 h-3.5 rounded-full ring-2 ring-white ${p.color}`} />
-            <p className="text-[10px] font-bold text-[#0F172A] mt-1.5 leading-tight">{p.date}</p>
-            <p className="text-[9px] text-[#94A3B8] leading-tight">{p.label}</p>
+          <div key={i} className={i === 0 ? "text-left" : i === n - 1 ? "text-right" : "text-center"}>
+            <p className="text-[11px] font-bold text-[#0F172A] leading-tight">{p.date}</p>
+            <p className="text-[10px] text-[#94A3B8] leading-tight">{p.label}</p>
           </div>
         ))}
+      </div>
+      <div className="relative h-3.5 mx-1">
+        <div className="absolute top-1/2 -translate-y-1/2 left-0 right-0 h-1 rounded-full bg-slate-200" />
+        <div className="absolute top-1/2 -translate-y-1/2 left-0 h-1 rounded-full bg-emerald-400" style={{ width: `${fillPct}%` }} />
+        {points.map((p, i) => {
+          const pos = (i / (n - 1)) * 100;
+          return <span key={i} className={`absolute top-1/2 -translate-y-1/2 w-3.5 h-3.5 rounded-full ring-2 ring-white shadow-sm ${p.color}`} style={{ left: `calc(${pos}% - 7px)` }} />;
+        })}
       </div>
     </div>
   );
 };
 
 // Side-view vehicle that highlights the body (basic) or the drivetrain
-// (powertrain) when the matching toggle is selected.
+// (powertrain) when the matching toggle is selected. Toggles + legend on the
+// left, the vehicle on the right.
+const CoverageToggle = ({ active, tone, icon: Icon, title, sub, onClick }: { active: boolean; tone: "blue" | "green"; icon: React.ElementType; title: string; sub: string; onClick: () => void }) => {
+  const on = tone === "blue" ? "border-[#2563EB] bg-blue-50 text-[#2563EB]" : "border-[#16A34A] bg-emerald-50 text-[#16A34A]";
+  return (
+    <button onClick={onClick} className={`w-full flex items-center gap-2.5 h-12 px-3 rounded-xl border text-left transition-colors ${active ? on : "border-[#E6E8EC] bg-white text-[#64748B] hover:border-slate-300"}`}>
+      <Icon className="w-4 h-4 shrink-0" />
+      <div className="min-w-0"><p className="text-[12px] font-bold leading-tight">{title}</p><p className="text-[10px] opacity-80 leading-tight">{sub}</p></div>
+    </button>
+  );
+};
 const WarrantyCarVisual = ({ hasPowertrain, onAll }: { hasPowertrain: boolean; onAll: () => void }) => {
   const [mode, setMode] = useState<"basic" | "powertrain">("basic");
   const body = mode === "basic" ? "#3B82F6" : "#CBD5E1";
@@ -1582,20 +1604,28 @@ const WarrantyCarVisual = ({ hasPowertrain, onAll }: { hasPowertrain: boolean; o
   const hub = mode === "powertrain" ? "#16A34A" : "#94A3B8";
   return (
     <div className={`${CARD} p-4`}>
-      <div className="flex gap-2">
-        <button onClick={() => setMode("basic")} className={`inline-flex items-center gap-1.5 h-8 px-3 rounded-lg text-[12px] font-semibold border transition-colors ${mode === "basic" ? "border-[#2563EB] bg-blue-50 text-[#2563EB]" : "border-[#E6E8EC] text-[#64748B]"}`}><ShieldCheck className="w-3.5 h-3.5" /> Bumper-to-Bumper</button>
-        {hasPowertrain && <button onClick={() => setMode("powertrain")} className={`inline-flex items-center gap-1.5 h-8 px-3 rounded-lg text-[12px] font-semibold border transition-colors ${mode === "powertrain" ? "border-[#16A34A] bg-emerald-50 text-[#16A34A]" : "border-[#E6E8EC] text-[#64748B]"}`}><Gauge className="w-3.5 h-3.5" /> Powertrain</button>}
+      <div className="grid grid-cols-1 sm:grid-cols-[150px_1fr] gap-3 items-center">
+        <div className="space-y-2">
+          <CoverageToggle active={mode === "basic"} tone="blue" icon={ShieldCheck} title="Bumper-to-Bumper" sub="Basic Coverage" onClick={() => setMode("basic")} />
+          {hasPowertrain && <CoverageToggle active={mode === "powertrain"} tone="green" icon={Gauge} title="Powertrain" sub="Drivetrain Coverage" onClick={() => setMode("powertrain")} />}
+        </div>
+        <div className="flex items-center justify-center">
+          <svg viewBox="0 0 320 138" className="w-full h-auto max-w-[260px]">
+            {/* SUV side silhouette — taller greenhouse + roof rails */}
+            <path d="M10 96 C10 80 22 76 34 74 L52 72 L78 44 C86 36 98 34 116 34 L206 34 C226 34 240 40 256 56 L296 76 C308 81 312 86 312 96 L312 100 C312 104 308 106 304 106 L18 106 C13 106 10 103 10 98 Z" fill={body} opacity="0.9" stroke={stroke} strokeWidth="2" />
+            <rect x="84" y="30" width="130" height="5" rx="2.5" fill={stroke} opacity="0.6" />
+            <path d="M92 48 L120 48 L120 66 L74 66 Z" fill="#ffffff" opacity="0.75" />
+            <path d="M128 48 L206 48 L222 66 L128 66 Z" fill="#ffffff" opacity="0.75" />
+            {/* drivetrain bar + engine (green when powertrain) */}
+            <rect x="78" y="98" width="180" height="8" rx="4" fill={dt} />
+            <rect x="258" y="80" width="38" height="22" rx="5" fill={mode === "powertrain" ? "#16A34A" : "#E2E8F0"} />
+            {/* wheels */}
+            <circle cx="100" cy="106" r="20" fill="#1E293B" /><circle cx="100" cy="106" r="9" fill={hub} />
+            <circle cx="246" cy="106" r="20" fill="#1E293B" /><circle cx="246" cy="106" r="9" fill={hub} />
+          </svg>
+        </div>
       </div>
-      <svg viewBox="0 0 320 124" className="w-full h-auto mt-3">
-        <path d="M16 84 C16 64 40 60 56 58 L86 40 C96 34 110 32 128 32 L196 32 C220 32 236 40 252 56 L292 70 C302 74 304 80 304 88 L304 90 C304 94 300 96 296 96 L24 96 C19 96 16 93 16 88 Z" fill={body} opacity="0.85" stroke={stroke} strokeWidth="2" />
-        <path d="M96 46 L120 46 L120 60 L82 60 Z" fill="#ffffff" opacity="0.7" />
-        <path d="M128 46 L196 46 L210 60 L128 60 Z" fill="#ffffff" opacity="0.7" />
-        <rect x="74" y="88" width="172" height="7" rx="3.5" fill={dt} />
-        <rect x="250" y="74" width="34" height="20" rx="4" fill={mode === "powertrain" ? "#16A34A" : "#E2E8F0"} />
-        <circle cx="96" cy="96" r="18" fill="#1E293B" /><circle cx="96" cy="96" r="8" fill={hub} />
-        <circle cx="238" cy="96" r="18" fill="#1E293B" /><circle cx="238" cy="96" r="8" fill={hub} />
-      </svg>
-      <div className="flex items-center justify-between gap-3 mt-1">
+      <div className="flex items-center justify-between gap-3 mt-2 pt-2 border-t border-slate-100">
         <div className="flex items-center gap-3 text-[10px] text-[#64748B]">
           <span className="inline-flex items-center gap-1"><span className={`w-2 h-2 rounded-full ${mode === "basic" ? "bg-[#2563EB]" : "bg-[#16A34A]"}`} /> Covered</span>
           <span className="inline-flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-slate-300" /> Not Covered</span>
