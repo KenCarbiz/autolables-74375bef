@@ -46,39 +46,40 @@ const RecallRefreshTool = () => {
 
   useEffect(() => { load(); }, [load]);
 
-  const refreshOne = async (row: StaleRow): Promise<boolean> => {
-    if (!row.ymm) return false;
-    // Parse "2023 Honda Civic LX" into {year, make, model}
-    const parts = row.ymm.trim().split(/\s+/);
-    const year = parts[0];
-    const make = parts[1];
-    const model = parts.slice(2).join(" ");
-    if (!year || !make || !model) return false;
+  const refreshOne = async (row: StaleRow): Promise<{ ok: boolean; reason?: string }> => {
+    try {
+      if (!row.ymm) return { ok: false, reason: "no year/make/model on the listing" };
+      // Parse "2023 Honda Civic LX" into {year, make, model}
+      const parts = row.ymm.trim().split(/\s+/);
+      const year = parts[0];
+      const make = parts[1];
+      const model = parts.slice(2).join(" ");
+      if (!year || !make || !model) return { ok: false, reason: `can't parse "${row.ymm}"` };
 
-    const { data, error } = await supabase.functions.invoke("nhtsa-recall", {
-      body: { vin: row.vin, make, model, year },
-    });
-    if (error || !data) return false;
+      const { data, error } = await supabase.functions.invoke("nhtsa-recall", {
+        body: { vin: row.vin, make, model, year },
+      });
+      if (error) return { ok: false, reason: `nhtsa-recall: ${error.message || "invoke failed"}` };
+      if (!data || (data as { error?: string }).error) return { ok: false, reason: `nhtsa-recall: ${(data as { error?: string })?.error || "no data"}` };
 
-    const resp = data as {
-      recalls?: unknown[];
-      hasOpenRecall?: boolean;
-      hasStopSale?: boolean;
-    };
+      const resp = data as { recalls?: unknown[]; hasOpenRecall?: boolean; hasStopSale?: boolean };
+      const recallCheck = {
+        checked_at: new Date().toISOString(),
+        has_open: !!resp.hasOpenRecall,
+        do_not_drive: !!resp.hasStopSale,
+        campaigns: resp.recalls || [],
+      };
 
-    const recallCheck = {
-      checked_at: new Date().toISOString(),
-      has_open: !!resp.hasOpenRecall,
-      do_not_drive: !!resp.hasStopSale,
-      campaigns: resp.recalls || [],
-    };
+      const { error: updateError } = await (supabase as any)
+        .from("vehicle_listings")
+        .update({ recall_check: recallCheck })
+        .eq("id", row.id);
 
-    const { error: updateError } = await (supabase as any)
-      .from("vehicle_listings")
-      .update({ recall_check: recallCheck })
-      .eq("id", row.id);
-
-    return !updateError;
+      if (updateError) return { ok: false, reason: `write: ${updateError.message || "update blocked"}` };
+      return { ok: true };
+    } catch (e) {
+      return { ok: false, reason: (e as Error)?.message || "unexpected error" };
+    }
   };
 
   const refreshAll = async () => {
@@ -87,14 +88,25 @@ const RecallRefreshTool = () => {
     setProgress({ done: 0, total: rows.length, failures: 0 });
     let done = 0;
     let failures = 0;
-    for (const row of rows) {
-      const ok = await refreshOne(row);
-      done += 1;
-      if (!ok) failures += 1;
-      setProgress({ done, total: rows.length, failures });
+    let firstError = "";
+    try {
+      for (const row of rows) {
+        const res = await refreshOne(row);
+        done += 1;
+        if (!res.ok) {
+          failures += 1;
+          if (!firstError && res.reason) firstError = res.reason;
+          // eslint-disable-next-line no-console
+          console.warn("recall refresh failed", row.vin, res.reason);
+        }
+        setProgress({ done, total: rows.length, failures });
+      }
+    } finally {
+      setRefreshing(false);
     }
-    setRefreshing(false);
-    toast.success(`Refreshed ${done - failures}/${rows.length}${failures ? ` (${failures} failed)` : ""}`);
+    if (failures === 0) toast.success(`Refreshed ${done} listing${done === 1 ? "" : "s"}`);
+    else if (failures < rows.length) toast.warning(`Refreshed ${done - failures}/${rows.length} — ${failures} failed. First error: ${firstError}`);
+    else toast.error(`All ${rows.length} failed. First error: ${firstError || "unknown"}`);
     await load();
   };
 
