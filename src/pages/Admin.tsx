@@ -1476,14 +1476,20 @@ const Admin = () => {
                       <span className="text-xs font-semibold text-foreground">Who may sign the K-208</span>
                       <p className="text-xs text-muted-foreground mb-1.5">Leave all off to accept any signed K-208. Select roles to require the satisfying inspection be signed by a logged-in member with that role (a tech's anonymous QR sign-off won't count).</p>
                       <div className="flex flex-wrap gap-1.5">
-                        {(["owner", "admin", "manager", "service"] as const).map((role) => {
-                          const on = (settings.k208_authority_roles || []).includes(role);
+                        {([
+                          { key: "owner", label: "Owner" },
+                          { key: "admin", label: "Admin" },
+                          { key: "general_manager", label: "General Manager" },
+                          { key: "service_manager", label: "Service Manager" },
+                          { key: "service_advisor", label: "Service Writer" },
+                        ] as const).map(({ key, label }) => {
+                          const on = (settings.k208_authority_roles || []).includes(key);
                           return (
-                            <button key={role} onClick={() => {
+                            <button key={key} onClick={() => {
                               const cur = settings.k208_authority_roles || [];
-                              updateSettings({ k208_authority_roles: on ? cur.filter((r) => r !== role) : [...cur, role] });
-                            }} className={`h-8 px-3 rounded-full text-xs font-semibold border capitalize ${on ? "border-primary bg-primary/10 text-primary" : "border-border-custom text-foreground"}`}>
-                              {role}
+                              updateSettings({ k208_authority_roles: on ? cur.filter((r) => r !== key) : [...cur, key] });
+                            }} className={`h-8 px-3 rounded-full text-xs font-semibold border ${on ? "border-primary bg-primary/10 text-primary" : "border-border-custom text-foreground"}`}>
+                              {label}
                             </button>
                           );
                         })}

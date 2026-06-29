@@ -127,11 +127,15 @@ function GateSettingCard({ tenantId }: { tenantId: string }) {
 }
 
 // ── Who may authoritatively sign the K-208 (gate authority) ─────────────────
+// Keys MUST match real tenant_members.role values — the finalize gate compares
+// the signed K-208 inspector's role against these. "Service Writer" is the
+// service_advisor role; "Service Manager" is service_manager.
 const AUTHORITY_ROLES = [
   { key: "owner", label: "Owner" },
   { key: "admin", label: "Admin" },
-  { key: "manager", label: "Manager" },
-  { key: "service", label: "Service" },
+  { key: "general_manager", label: "General Manager" },
+  { key: "service_manager", label: "Service Manager" },
+  { key: "service_advisor", label: "Service Writer" },
 ] as const;
 
 function RoleAuthorityCard({ tenantId }: { tenantId: string }) {
