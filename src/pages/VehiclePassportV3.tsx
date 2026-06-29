@@ -5,6 +5,7 @@ import {
   RefreshCw, ShieldCheck, CheckCircle2, Star, Phone, Car, Cog, Fuel, Settings, Wind,
   Award, Wrench, DollarSign, Clock, Building2, Users, Truck, Lock, Zap, ArrowRight,
   Package, Eye, Play, TrendingUp, BadgeCheck, Gauge as GaugeIcon, Send, MapPin,
+  Sun, Navigation, Smartphone, Camera, Volume2, Palette, Snowflake,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Helmet } from "react-helmet-async";
@@ -252,8 +253,6 @@ const VehiclePassportV3 = () => {
       sub: priceChange7d != null ? (priceChange7d < 0 ? "price decreased" : priceChange7d > 0 ? "price increased" : "stable") : "History builds over time", chart: <Spark points={priceSeries} color="#7C3AED" />, section: "price-history", cta: "View history" },
     { icon: Car, title: "Comparable Vehicles", strong: compCount ? `${compCount} Nearby` : "Comp set",
       sub: compFrom != null ? `Similar vehicles from ${fmt$(compFrom)}` : "Similar vehicles via MarketCheck", comps: false, section: "comparable-vehicles", cta: "View comp set" },
-    { icon: Car, title: "Inventory Availability", strong: compCount > 0 ? `${compCount} Similar Available` : ((d.viewCount ?? 0) > 20 ? "High Interest" : "Popular Model"),
-      sub: compCount > 0 ? (compCount <= 8 ? "Limited local availability" : "Comparable vehicles nearby") : "Strong shopper demand", chart: null, section: "comparable-vehicles", cta: "View availability" },
   ];
 
   const highlights: { icon: React.ElementType; t: string; s: string }[] = [];
@@ -277,8 +276,36 @@ const VehiclePassportV3 = () => {
   else if (ks.mpg_city) highlights.push({ icon: Fuel, t: `${ks.mpg_city}`, s: "City MPG" });
   else if (ks.fuel) highlights.push({ icon: Fuel, t: ks.fuel, s: "Fuel" });
   if (ks.transmission) highlights.push({ icon: Settings, t: ks.transmission.replace(/\s*automatic/i, "").trim(), s: "Transmission" });
-  if (ks.exterior_color) highlights.push({ icon: Wind, t: ks.exterior_color, s: "Exterior" });
-  listingEquipment(listing).forEach((label) => { if (highlights.length < 8) highlights.push({ icon: Award, t: label, s: "Feature" }); });
+  if (ks.exterior_color) highlights.push({ icon: Wind, t: ks.exterior_color, s: "Exterior Color" });
+  const interiorColor = (ksRaw.interior_color ?? mc.interior_color) as string | undefined;
+  if (interiorColor) highlights.push({ icon: Palette, t: interiorColor, s: "Interior Color" });
+  const seats = (mc.seating_capacity ?? mc.std_seating ?? ksRaw.seating) as number | string | undefined;
+  if (seats) highlights.push({ icon: Users, t: `${seats}-Passenger`, s: "Seating" });
+  // Amenity detection from the decoded equipment/options blob — only chips
+  // whose feature is actually present are shown (no invented equipment).
+  const featBlob = [
+    ...listingEquipment(listing),
+    ...(Array.isArray(mc.features) ? (mc.features as unknown[]).map(String) : []),
+    ...(Array.isArray(mc.options) ? (mc.options as unknown[]).map(String) : []),
+  ].join(" | ").toLowerCase();
+  const amenityDefs: { re: RegExp; icon: React.ElementType; t: string; s: string }[] = [
+    { re: /panoramic|moonroof|sunroof|pano roof/, icon: Sun, t: "Panoramic Roof", s: "Sunroof" },
+    { re: /navigation|nav system|gps/, icon: Navigation, t: "Navigation", s: "Built-in" },
+    { re: /carplay|android auto/, icon: Smartphone, t: "CarPlay / Android", s: "Smartphone" },
+    { re: /adaptive cruise|propilot|pro-pilot|driver assist|lane keep/, icon: GaugeIcon, t: "Driver Assist", s: "Adaptive Cruise" },
+    { re: /blind spot|blind-spot/, icon: Eye, t: "Blind Spot", s: "Monitor" },
+    { re: /wireless charg/, icon: Zap, t: "Wireless Charging", s: "Built-in" },
+    { re: /360|surround view|around view/, icon: Camera, t: "360° Camera", s: "Surround View" },
+    { re: /bose|premium audio|harman|mark levinson|sound system|burmester/, icon: Volume2, t: "Premium Audio", s: "Premium Sound" },
+    { re: /tri-zone|dual-zone|multi-zone|climate control/, icon: Snowflake, t: "Multi-Zone Climate", s: "Comfort" },
+    { re: /wi-?fi|hotspot/, icon: Smartphone, t: "Wi-Fi Hotspot", s: "Built-in" },
+  ];
+  amenityDefs.forEach((f) => {
+    if (highlights.length < 10 && f.re.test(featBlob) && !highlights.some((h) => h.s === f.s || h.t === f.t)) {
+      highlights.push({ icon: f.icon, t: f.t, s: f.s });
+    }
+  });
+  listingEquipment(listing).forEach((label) => { if (highlights.length < 10) highlights.push({ icon: Award, t: label, s: "Feature" }); });
 
   // Dealer trust chips — only render what the dealer actually configured
   // (onboarding / admin), so we never assert an unverified capability.
@@ -490,7 +517,7 @@ const VehiclePassportV3 = () => {
         {pv("marketValue") && (
         <section data-module="market" className={`${CARD} p-5`}>
           <div className="flex items-center justify-between"><div><H2>Market Intelligence</H2><p className={`text-[13px] ${TEXT2} mt-0.5`}>Independent pricing, demand, and value analysis for this vehicle.</p></div><span className="text-[12px] text-[#94A3B8] inline-flex items-center gap-1">Powered by MarketCheck<button onClick={(e) => openInfo("data-sources", e)} aria-label="Data sources explained" className="w-4 h-4 inline-flex items-center justify-center"><Info className="w-3.5 h-3.5 text-[#94A3B8]" /></button></span></div>
-          <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-4 mt-5">
+          <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-4 mt-5">
             {mi.map((c) => (
               <div key={c.section} onClick={(e) => openPanel(c.section as PassportPanelKey, e)} className="rounded-xl border border-[#E6E8EC] p-4 flex flex-col cursor-pointer hover:border-[#2563EB] transition-colors">
                 <div className="flex items-center gap-1.5 mb-2"><c.icon className="w-4 h-4 text-[#2563EB]" /><span className="text-[12px] font-semibold text-[#64748B]">{c.title}</span></div>
@@ -505,7 +532,7 @@ const VehiclePassportV3 = () => {
         )}
 
         {/* 5. PRIMARY TRUST GRID */}
-        <section className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-5 items-stretch">
+        <section className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-6 items-stretch">
           {/* Why This Is A Great Buy */}
           {pv("insights") && (
           <div className={`${CARD} p-5 flex flex-col max-[767px]:p-6 max-[767px]:ring-1 max-[767px]:ring-blue-200 max-[767px]:shadow-[0_10px_30px_rgba(37,99,235,0.10)]`}>
@@ -517,7 +544,7 @@ const VehiclePassportV3 = () => {
                 <p className="text-[13px] font-extrabold text-[#16A34A] -mt-1">{d.confLabel} Value</p>
               </div>
             )}
-            <ul className="mt-3 space-y-2">{(d.whyBuy.length ? d.whyBuy.slice(0, 6) : ["Details confirmed at the dealership"]).map((b, i) => <li key={i} className="flex items-start gap-2 text-[13px]"><CheckCircle2 className="w-4 h-4 text-[#16A34A] shrink-0 mt-0.5" />{b}</li>)}</ul>
+            <ul className="mt-3 space-y-2">{(d.whyBuy.length ? d.whyBuy.slice(0, 5) : ["Details confirmed at the dealership"]).map((b, i) => <li key={i} className="flex items-start gap-2 text-[13px]"><CheckCircle2 className="w-4 h-4 text-[#16A34A] shrink-0 mt-0.5" />{b}</li>)}</ul>
             <Link onClick={() => go("great-buy")} className="mt-auto pt-3 self-start">See full buying report</Link>
           </div>
           )}
@@ -617,7 +644,7 @@ const VehiclePassportV3 = () => {
           {/* What Owners Say */}
           <div className={`${CARD} p-5 flex flex-col`}>
             <H3>What Owners Say</H3>
-            {d.reviewRating != null && <div className="flex items-center gap-2 mt-2"><span className="text-[24px] font-bold text-[#2563EB]">{d.reviewRating.toFixed(1)}</span><Stars n={d.reviewRating} />{d.reviewCount != null && <span className="text-[12px] text-[#64748B]">({d.reviewCount.toLocaleString()})</span>}</div>}
+            {d.reviewRating != null && <div className="flex items-center gap-2.5 mt-2"><span className="text-[32px] font-extrabold text-[#0F172A] leading-none">{d.reviewRating.toFixed(1)}</span><div><Stars n={d.reviewRating} />{d.reviewCount != null && <p className="text-[11px] text-[#64748B] mt-0.5">{d.reviewCount.toLocaleString()} Reviews</p>}</div></div>}
             {d.dealerTrust.reviewSources.length > 0 ? (
               <div className="mt-3 space-y-3">{d.dealerTrust.reviewSources.slice(0, 3).map((r, i) => <div key={i}><div className="flex items-center gap-2"><span className="text-[12px] font-bold">{r.name}</span>{r.rating != null && <Stars n={r.rating} size={12} />}</div>{r.quote && <p className="text-[12px] text-[#64748B] leading-snug">"{r.quote}"</p>}</div>)}</div>
             ) : <p className="text-[13px] text-[#64748B] mt-3">Verified dealership reviews appear here when the dealer connects a review source.</p>}
@@ -627,13 +654,13 @@ const VehiclePassportV3 = () => {
 
         {/* 7. INFORMATION GRID — three equal-height cards (the conversion CTA
             now lives in the sticky right rail). */}
-        <section className="grid grid-cols-1 lg:grid-cols-[1fr_1fr_1.6fr] gap-5 items-stretch">
+        <section className="grid grid-cols-1 lg:grid-cols-[1fr_1fr_1.6fr] gap-6 items-stretch">
           {/* Highlights */}
           {pv("factoryOptions") && (
           <div data-module="highlights" className={`${CARD} p-5 flex flex-col`}>
             <H3>Vehicle Highlights</H3>
             {highlights.length ? (
-              <div className="grid grid-cols-4 gap-y-4 gap-x-2 mt-4">{highlights.slice(0, 8).map((h, i) => <div key={i} className="flex flex-col items-center text-center gap-1.5"><span className="w-10 h-10 rounded-xl bg-blue-50 flex items-center justify-center shrink-0"><h.icon className="w-5 h-5 text-[#2563EB]" /></span><div className="w-full min-w-0"><div className="text-[11px] font-bold leading-tight line-clamp-2 break-words">{h.t}</div><div className="text-[10px] text-[#94A3B8] truncate">{h.s}</div></div></div>)}</div>
+              <div className="grid grid-cols-4 sm:grid-cols-5 gap-y-4 gap-x-2 mt-4">{highlights.slice(0, 10).map((h, i) => <div key={i} className="flex flex-col items-center text-center gap-1.5"><span className="w-11 h-11 rounded-full bg-slate-100 flex items-center justify-center shrink-0"><h.icon className="w-5 h-5 text-[#64748B]" strokeWidth={1.75} /></span><div className="w-full min-w-0"><div className="text-[11px] font-bold leading-tight line-clamp-2 break-words">{h.t}</div><div className="text-[10px] text-[#94A3B8] truncate">{h.s}</div></div></div>)}</div>
             ) : <p className="text-[13px] text-[#64748B] mt-3">Equipment highlights appear here as the vehicle's data is decoded.</p>}
             <div className="mt-auto pt-3 flex items-center gap-4">
               <Link onClick={() => openPanel("highlights")} className="self-start">All features</Link>
@@ -655,7 +682,7 @@ const VehiclePassportV3 = () => {
             <H3>Why Buy From {d.dealerName}?</H3>
             {dealerChips.length > 0 ? (
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-5 gap-y-4 mt-4">
-                {dealerChips.map((c, i) => <div key={i} className="flex items-start gap-2.5"><span className="w-9 h-9 rounded-xl bg-blue-50 flex items-center justify-center shrink-0"><c.icon className="w-[18px] h-[18px] text-[#2563EB]" /></span><div className="min-w-0"><p className="text-[12px] font-bold leading-tight">{c.t}</p><p className="text-[10px] text-[#64748B] mt-0.5 truncate">{c.s}</p></div></div>)}
+                {dealerChips.map((c, i) => <div key={i} className="flex items-start gap-2"><CheckCircle2 className="w-4 h-4 text-[#16A34A] shrink-0 mt-0.5" /><div className="min-w-0"><p className="text-[13px] font-semibold leading-tight text-[#0F172A]">{c.t}</p><p className="text-[11px] text-[#64748B] mt-0.5">{c.s}</p></div></div>)}
               </div>
             ) : <p className="text-[13px] text-[#64748B] mt-3">Learn what makes {d.dealerName} a trusted choice.</p>}
             {(badges.length > 0 || d.dealerTrust.certifications.length > 0 || d.dealerTrust.storefrontUrl) && (
