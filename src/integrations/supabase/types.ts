@@ -2233,6 +2233,39 @@ export type Database = {
         }
         Relationships: []
       }
+      installer_contacts: {
+        Row: {
+          active: boolean
+          company: string
+          created_at: string
+          email: string | null
+          id: string
+          phone: string | null
+          product: string | null
+          tenant_id: string
+        }
+        Insert: {
+          active?: boolean
+          company: string
+          created_at?: string
+          email?: string | null
+          id?: string
+          phone?: string | null
+          product?: string | null
+          tenant_id: string
+        }
+        Update: {
+          active?: boolean
+          company?: string
+          created_at?: string
+          email?: string | null
+          id?: string
+          phone?: string | null
+          product?: string | null
+          tenant_id?: string
+        }
+        Relationships: []
+      }
       leads: {
         Row: {
           captured_at: string
@@ -3471,6 +3504,9 @@ export type Database = {
           approval_status: string
           approved_amount: number | null
           category: string | null
+          completed_at: string | null
+          completed_by: string | null
+          completion_notes: string | null
           created_at: string
           decided_at: string | null
           decided_by: string | null
@@ -3493,6 +3529,9 @@ export type Database = {
           approval_status?: string
           approved_amount?: number | null
           category?: string | null
+          completed_at?: string | null
+          completed_by?: string | null
+          completion_notes?: string | null
           created_at?: string
           decided_at?: string | null
           decided_by?: string | null
@@ -3515,6 +3554,9 @@ export type Database = {
           approval_status?: string
           approved_amount?: number | null
           category?: string | null
+          completed_at?: string | null
+          completed_by?: string | null
+          completion_notes?: string | null
           created_at?: string
           decided_at?: string | null
           decided_by?: string | null
@@ -3591,6 +3633,8 @@ export type Database = {
           created_at: string
           id: string
           notes: string | null
+          origin: string
+          sent_to_service_at: string | null
           status: string
           store_id: string | null
           submitted_by: string | null
@@ -3608,6 +3652,8 @@ export type Database = {
           created_at?: string
           id?: string
           notes?: string | null
+          origin?: string
+          sent_to_service_at?: string | null
           status?: string
           store_id?: string | null
           submitted_by?: string | null
@@ -3625,6 +3671,8 @@ export type Database = {
           created_at?: string
           id?: string
           notes?: string | null
+          origin?: string
+          sent_to_service_at?: string | null
           status?: string
           store_id?: string | null
           submitted_by?: string | null
@@ -3640,6 +3688,9 @@ export type Database = {
       }
       safety_inspections: {
         Row: {
+          buyer_name: string | null
+          buyer_signature_data: string | null
+          buyer_signed_at: string | null
           checklist: Json
           content_hash: string | null
           created_at: string
@@ -3654,6 +3705,7 @@ export type Database = {
           inspector_role: string | null
           notes: string | null
           result: string | null
+          result_initial: string | null
           signature_data: string | null
           signature_type: string | null
           signed_at: string | null
@@ -3668,6 +3720,9 @@ export type Database = {
           ymm: string | null
         }
         Insert: {
+          buyer_name?: string | null
+          buyer_signature_data?: string | null
+          buyer_signed_at?: string | null
           checklist?: Json
           content_hash?: string | null
           created_at?: string
@@ -3682,6 +3737,7 @@ export type Database = {
           inspector_role?: string | null
           notes?: string | null
           result?: string | null
+          result_initial?: string | null
           signature_data?: string | null
           signature_type?: string | null
           signed_at?: string | null
@@ -3696,6 +3752,9 @@ export type Database = {
           ymm?: string | null
         }
         Update: {
+          buyer_name?: string | null
+          buyer_signature_data?: string | null
+          buyer_signed_at?: string | null
           checklist?: Json
           content_hash?: string | null
           created_at?: string
@@ -3710,6 +3769,7 @@ export type Database = {
           inspector_role?: string | null
           notes?: string | null
           result?: string | null
+          result_initial?: string | null
           signature_data?: string | null
           signature_type?: string | null
           signed_at?: string | null
@@ -4833,6 +4893,7 @@ export type Database = {
           oem_sticker_checked_at: string | null
           oem_sticker_url: string | null
           open_recall_count: number | null
+          orchestrated_at: string | null
           packet_modules: Json
           payment_estimate: Json | null
           photo_count: number | null
@@ -4909,6 +4970,7 @@ export type Database = {
           oem_sticker_checked_at?: string | null
           oem_sticker_url?: string | null
           open_recall_count?: number | null
+          orchestrated_at?: string | null
           packet_modules?: Json
           payment_estimate?: Json | null
           photo_count?: number | null
@@ -4985,6 +5047,7 @@ export type Database = {
           oem_sticker_checked_at?: string | null
           oem_sticker_url?: string | null
           open_recall_count?: number | null
+          orchestrated_at?: string | null
           packet_modules?: Json
           payment_estimate?: Json | null
           photo_count?: number | null
@@ -5611,6 +5674,10 @@ export type Database = {
         }
         Returns: string
       }
+      claim_listing_orchestration: {
+        Args: { _listing_id: string }
+        Returns: boolean
+      }
       claim_platform: { Args: never; Returns: Json }
       create_draft_addendum: {
         Args: { p_tenant_id: string; p_vin: string }
@@ -5758,6 +5825,7 @@ export type Database = {
       get_ready_nudge_payload: { Args: { p_tenant_id: string }; Returns: Json }
       get_recall_task_for_token: { Args: { _token: string }; Returns: Json }
       get_recon_estimate: { Args: { _approval_token: string }; Returns: Json }
+      get_recon_for_token: { Args: { _token: string }; Returns: Json }
       get_reengage_schedule: {
         Args: never
         Returns: {
@@ -5880,6 +5948,7 @@ export type Database = {
           oem_sticker_checked_at: string | null
           oem_sticker_url: string | null
           open_recall_count: number | null
+          orchestrated_at: string | null
           packet_modules: Json
           payment_estimate: Json | null
           photo_count: number | null
@@ -5936,6 +6005,10 @@ export type Database = {
         Returns: boolean
       }
       increment_listing_view: { Args: { _slug: string }; Returns: undefined }
+      installs_block_finalize: {
+        Args: { _tenant_id: string; _vin: string }
+        Returns: boolean
+      }
       is_tenant_manager: {
         Args: { _tenant_id: string; _user_id: string }
         Returns: boolean
@@ -5956,6 +6029,15 @@ export type Database = {
       issue_vehicle_ready_token: {
         Args: { p_tenant_id: string; p_vin: string }
         Returns: string
+      }
+      k208_record_buyer_signature: {
+        Args: {
+          _buyer_name: string
+          _buyer_signature_data: string
+          _result_initial?: string
+          _signing_token: string
+        }
+        Returns: Json
       }
       listings_with_stale_recalls: {
         Args: { p_limit?: number }
@@ -6017,6 +6099,10 @@ export type Database = {
       recalc_tenant_doc_fee: { Args: { p_tenant_id: string }; Returns: number }
       recall_payload_signature: { Args: { p: Json }; Returns: string }
       recon_caller_role: { Args: { _tenant: string }; Returns: string }
+      recon_confirm_lines_done: {
+        Args: { _by: string; _line_ids: Json; _notes?: string; _token: string }
+        Returns: Json
+      }
       recon_decide_member: {
         Args: {
           _action: string
@@ -6034,6 +6120,10 @@ export type Database = {
       recon_recompute_estimate: {
         Args: { _estimate_id: string }
         Returns: undefined
+      }
+      recon_send_to_service: {
+        Args: { _by?: string; _estimate_id: string }
+        Returns: Json
       }
       recon_submit_member: {
         Args: {
@@ -6167,6 +6257,16 @@ export type Database = {
           _supabase_url?: string
         }
         Returns: number
+      }
+      seed_recon_estimate_for_ingest: {
+        Args: {
+          _mode?: string
+          _tenant_id: string
+          _vehicle_listing_id: string
+          _vin: string
+          _ymm: string
+        }
+        Returns: Json
       }
       set_marketcheck_allowed: {
         Args: { _allowed: boolean; _tenant_id: string }
