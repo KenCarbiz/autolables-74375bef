@@ -109,7 +109,7 @@ const CustomerReview = () => {
   }, [token]);
 
   const loadAddendum = async () => {
-    const { data, error } = await supabase.rpc("get_addendum_by_token", { _token: token });
+    const { data, error } = await supabase.rpc("get_addendum_by_token", { _token: token ?? "" });
     if (error || !data || data.length === 0) {
       setError("Invalid or expired review link.");
       setLoading(false);
