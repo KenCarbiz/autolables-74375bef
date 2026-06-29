@@ -531,8 +531,10 @@ const VehiclePassportV3 = () => {
         </section>
         )}
 
-        {/* 5. PRIMARY TRUST GRID */}
-        <section className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-6 items-stretch">
+        {/* 5. CHAPTER 2 — BUY WITH CONFIDENCE */}
+        <section>
+          <div className="mb-4"><H2>Buy With Confidence</H2><p className={`text-[13px] ${TEXT2} mt-0.5`}>The signals that back this vehicle — value, history, coverage, and reputation.</p></div>
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-6 items-stretch">
           {/* Why This Is A Great Buy */}
           {pv("insights") && (
           <div className={`${CARD} p-5 flex flex-col max-[767px]:p-6 max-[767px]:ring-1 max-[767px]:ring-blue-200 max-[767px]:shadow-[0_10px_30px_rgba(37,99,235,0.10)]`}>
@@ -671,11 +673,13 @@ const VehiclePassportV3 = () => {
             ) : <p className="text-[13px] text-[#64748B] mt-3">Verified dealership reviews appear here when the dealer connects a review source.</p>}
             <Link onClick={() => openPanel("owner-reviews")} className="mt-auto pt-3 self-start">Read all reviews</Link>
           </div>
+          </div>
         </section>
 
-        {/* 7. INFORMATION GRID — three equal-height cards (the conversion CTA
-            now lives in the sticky right rail). */}
-        <section className="grid grid-cols-1 lg:grid-cols-[1fr_1fr_1.6fr] gap-6 items-stretch">
+        {/* 7. CHAPTER 3 — ABOUT THIS VEHICLE */}
+        <section>
+          <div className="mb-4"><H2>About This Vehicle</H2><p className={`text-[13px] ${TEXT2} mt-0.5`}>Highlights and a quick look at how it's equipped.</p></div>
+          <div className="grid grid-cols-1 lg:grid-cols-[1fr_1.4fr] gap-6 items-stretch">
           {/* Highlights */}
           {pv("factoryOptions") && (
           <div data-module="highlights" className={`${CARD} p-5 flex flex-col`}>
@@ -698,11 +702,15 @@ const VehiclePassportV3 = () => {
             <Link onClick={() => openPanel("overview")} className="mt-auto pt-3 self-start">Read full overview</Link>
           </div>
           )}
-          {/* Why Buy From This Dealership (wider) */}
-          <div data-module="dealer" className={`${CARD} p-5 flex flex-col`}>
-            <H3>Why Buy From {d.dealerName}?</H3>
+          </div>
+        </section>
+
+        {/* 8. CHAPTER 4 — WHY BUY HERE */}
+        <section>
+          <div className="mb-4"><H2>Why Buy From {d.dealerName}</H2><p className={`text-[13px] ${TEXT2} mt-0.5`}>What makes buying here different.</p></div>
+          <div data-module="dealer" className={`${CARD} p-6 flex flex-col`}>
             {dealerChips.length > 0 ? (
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-5 gap-y-4 mt-4">
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-x-5 gap-y-4 mt-1">
                 {dealerChips.map((c, i) => <div key={i} className="flex items-start gap-2"><CheckCircle2 className="w-4 h-4 text-[#16A34A] shrink-0 mt-0.5" /><div className="min-w-0"><p className="text-[13px] font-semibold leading-tight text-[#0F172A]">{c.t}</p><p className="text-[11px] text-[#64748B] mt-0.5">{c.s}</p></div></div>)}
               </div>
             ) : <p className="text-[13px] text-[#64748B] mt-3">Learn what makes {d.dealerName} a trusted choice.</p>}
