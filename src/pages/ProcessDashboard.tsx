@@ -5,9 +5,11 @@ import { useVinScan } from "@/contexts/VinScanContext";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useTenant } from "@/contexts/TenantContext";
+import { useEntitlements } from "@/hooks/useEntitlements";
 import { useVehicleFiles } from "@/hooks/useVehicleFiles";
 import { useGetReady } from "@/hooks/useGetReady";
 import { useAdvertisedPrices, assessDrift } from "@/hooks/useAdvertisedPrices";
+import { hasDealerCapability, type DealerCapability } from "@/lib/permissions/dealerRoleCapabilities";
 import SetupChecklistWidget from "@/components/dashboard/SetupChecklistWidget";
 import {
   ScanLine, Wrench, Tag, Send, CheckCircle2,
@@ -32,11 +34,26 @@ import {
 // their own row below; they fire when there's something to do.
 // ──────────────────────────────────────────────────────────────
 
+interface PriorityItem {
+  key: string;
+  cap: DealerCapability;
+  icon: typeof ScanLine;
+  label: string;
+  count: number;
+  unit: string;
+  done: string;
+  href: string;
+  tone: "sky" | "amber" | "indigo" | "violet" | "emerald" | "rose";
+}
+
 const ProcessDashboard = () => {
   const navigate = useNavigate();
   const { openScan } = useVinScan();
-  const { user } = useAuth();
+  const { user, isAdmin } = useAuth();
   const { tenant, currentStore } = useTenant();
+  const { member } = useEntitlements();
+  const role = member?.role;
+  const can = (c: DealerCapability) => hasDealerCapability(role, c, isAdmin);
   const storeId = currentStore?.id || "";
 
   // ── Reuse existing hooks where they exist (already cached via
@@ -187,6 +204,23 @@ const ProcessDashboard = () => {
     ? { tone: "ok" as const, headline: "Your dealership is compliant", sub: inFlight > 0 ? `${inFlight} ${inFlight === 1 ? "vehicle" : "vehicles"} moving through the pipeline` : "No vehicles in the pipeline right now" }
     : { tone: "warn" as const, headline: `${attentionCount} item${attentionCount === 1 ? "" : "s"} need${attentionCount === 1 ? "s" : ""} your attention`, sub: `${inFlight} ${inFlight === 1 ? "vehicle" : "vehicles"} in flight · review the action center below` };
 
+  // ── Role worklist. Each candidate is tied to a capability; only the
+  //    ones the signed-in role holds appear, and items with work to do
+  //    (count > 0) sort to the front so the role opens onto "what's mine
+  //    today" instead of the full owner pipeline. Reads the counts already
+  //    computed above — no extra queries.
+  const showCompliance = can("can_view_compliance");
+  const priorities: PriorityItem[] = ([
+    { key: "capture", cap: "can_edit_inventory", icon: ScanLine, label: "Lot capture", count: vinQueueCount, unit: vinQueueCount === 1 ? "VIN to triage" : "VINs to triage", done: "lot fully scanned", href: "/queue", tone: "sky" },
+    { key: "getready", cap: "can_view_get_ready", icon: Wrench, label: "Get-ready", count: getReadyInFlight, unit: getReadyInFlight === 1 ? "vehicle in recon" : "vehicles in recon", done: "all recon complete", href: "/ready-board", tone: "amber" },
+    { key: "publish", cap: "can_create_documents", icon: Tag, label: "Ready to publish", count: listings.draft, unit: listings.draft === 1 ? "draft sticker" : "draft stickers", done: "every sticker is live", href: "/inventory", tone: "indigo" },
+    { key: "sign", cap: "can_view_deals", icon: Send, label: "Out for signature", count: signings.open, unit: signings.open === 1 ? "signing link open" : "signing links open", done: "no signatures pending", href: "/signatures", tone: "violet" },
+    { key: "returns", cap: "can_view_compliance", icon: RotateCcw, label: "SB 766 returns", count: signings.returnsOpen, unit: signings.returnsOpen === 1 ? "return to process" : "returns to process", done: "no open returns", href: "/admin?tab=home", tone: "amber" },
+    { key: "photos", cap: "can_view_compliance", icon: Camera, label: "Install proof", count: missingInstallPhotos, unit: missingInstallPhotos === 1 ? "vehicle missing photos" : "vehicles missing photos", done: "all installs photographed", href: "/admin?tab=getready", tone: "rose" },
+  ] as PriorityItem[]).filter((p) => isAdmin || can(p.cap));
+  const openPriorities = priorities.filter((p) => p.count > 0);
+  const sortedPriorities = [...priorities].sort((a, b) => (b.count > 0 ? 1 : 0) - (a.count > 0 ? 1 : 0));
+
   return (
     <div className="p-4 lg:p-6 max-w-[1600px] mx-auto space-y-5">
       {/* Hero — outcome-centric greeting; the dealer's status line. */}
@@ -230,6 +264,29 @@ const ProcessDashboard = () => {
 
         <SetupChecklistWidget />
       </section>
+
+      {/* Role worklist — the role's own "today's work", capability-scoped. */}
+      {priorities.length > 0 && (
+        <section>
+          <div className="flex items-center justify-between mb-2">
+            <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground">
+              Your work today{openPriorities.length > 0 ? ` · ${openPriorities.length} need${openPriorities.length === 1 ? "s" : ""} action` : ""}
+            </p>
+          </div>
+          {openPriorities.length === 0 ? (
+            <div className="rounded-2xl border border-emerald-200 bg-emerald-50/60 px-5 py-4 flex items-center gap-2.5">
+              <CheckCircle2 className="w-5 h-5 text-emerald-600" strokeWidth={2} />
+              <p className="text-sm font-semibold text-emerald-900">You're all caught up — nothing in your queue right now.</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+              {sortedPriorities.map((p) => (
+                <PriorityCard key={p.key} item={p} />
+              ))}
+            </div>
+          )}
+        </section>
+      )}
 
       <div className="flex flex-col xl:flex-row gap-5">
         {/* Main column — KPI strip + pipeline + signings worklist */}
@@ -429,7 +486,9 @@ const ProcessDashboard = () => {
           <ShopperInterest />
         </div>
 
-        {/* Right rail — compliance defense, always in view. */}
+        {/* Right rail — compliance defense. Hidden for roles without
+            compliance visibility so they aren't drowned in citations. */}
+        {showCompliance && (
         <aside className="xl:w-[320px] shrink-0 space-y-4">
           <div className="rounded-2xl border border-border bg-card shadow-sm p-4">
             <h3 className="text-xs font-bold uppercase tracking-[0.14em] text-muted-foreground mb-3">Compliance defense</h3>
@@ -496,6 +555,7 @@ const ProcessDashboard = () => {
             </div>
           </div>
         </aside>
+        )}
       </div>
     </div>
   );
@@ -553,6 +613,47 @@ const ShopperInterest = () => {
         ))}
       </div>
     </section>
+  );
+};
+
+// ──────────────────────────────────────────────────────────────
+// PriorityCard — one row of the role worklist. Active (count > 0)
+// cards carry their tone; cleared cards read calm-emerald so the
+// role can see at a glance that lane is done.
+// ──────────────────────────────────────────────────────────────
+
+const PriorityCard = ({ item }: { item: PriorityItem }) => {
+  const { icon: Icon, label, count, unit, done, href, tone } = item;
+  const active = count > 0;
+  const chip = !active ? "bg-emerald-100 text-emerald-700" :
+    tone === "sky"    ? "bg-sky-100 text-sky-700"       :
+    tone === "amber"  ? "bg-amber-100 text-amber-700"   :
+    tone === "indigo" ? "bg-indigo-100 text-indigo-700" :
+    tone === "violet" ? "bg-violet-100 text-violet-700" :
+    tone === "rose"   ? "bg-rose-100 text-rose-700"     :
+                        "bg-emerald-100 text-emerald-700";
+  return (
+    <Link
+      to={href}
+      className={`group rounded-xl border bg-card p-4 flex items-center gap-3.5 hover:shadow-md transition-all ${active ? "border-border hover:border-foreground/20" : "border-emerald-200/70"}`}
+    >
+      <span className={`w-10 h-10 rounded-lg ${chip} inline-flex items-center justify-center shrink-0`}>
+        {active ? <Icon className="w-5 h-5" strokeWidth={2} /> : <CheckCircle2 className="w-5 h-5" strokeWidth={2} />}
+      </span>
+      <div className="min-w-0 flex-1">
+        <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">{label}</p>
+        {active ? (
+          <p className="text-sm font-semibold text-foreground mt-0.5">
+            <span className="font-display text-lg tabular-nums mr-1">{count}</span>{unit}
+          </p>
+        ) : (
+          <p className="text-sm text-emerald-800/80 mt-0.5">{done}</p>
+        )}
+      </div>
+      {active && (
+        <ArrowRight className="w-4 h-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
+      )}
+    </Link>
   );
 };
 
