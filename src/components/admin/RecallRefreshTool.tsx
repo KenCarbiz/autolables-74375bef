@@ -48,34 +48,16 @@ const RecallRefreshTool = () => {
 
   const refreshOne = async (row: StaleRow): Promise<{ ok: boolean; reason?: string }> => {
     try {
-      if (!row.ymm) return { ok: false, reason: "no year/make/model on the listing" };
-      // Parse "2023 Honda Civic LX" into {year, make, model}
-      const parts = row.ymm.trim().split(/\s+/);
-      const year = parts[0];
-      const make = parts[1];
-      const model = parts.slice(2).join(" ");
-      if (!year || !make || !model) return { ok: false, reason: `can't parse "${row.ymm}"` };
-
-      const { data, error } = await supabase.functions.invoke("nhtsa-recall", {
-        body: { vin: row.vin, make, model, year },
+      if (!row.tenant_id) return { ok: false, reason: "no tenant on listing" };
+      // VIN-based MarketCheck AutoRecalls (with NHTSA fallback), server-side.
+      // The function writes recall_check itself, so no client write here.
+      const { data, error } = await supabase.functions.invoke("marketcheck-recalls", {
+        body: { vin: row.vin, tenant_id: row.tenant_id, force: true },
       });
-      if (error) return { ok: false, reason: `nhtsa-recall: ${error.message || "invoke failed"}` };
-      if (!data || (data as { error?: string }).error) return { ok: false, reason: `nhtsa-recall: ${(data as { error?: string })?.error || "no data"}` };
-
-      const resp = data as { recalls?: unknown[]; hasOpenRecall?: boolean; hasStopSale?: boolean };
-      const recallCheck = {
-        checked_at: new Date().toISOString(),
-        has_open: !!resp.hasOpenRecall,
-        do_not_drive: !!resp.hasStopSale,
-        campaigns: resp.recalls || [],
-      };
-
-      const { error: updateError } = await (supabase as any)
-        .from("vehicle_listings")
-        .update({ recall_check: recallCheck })
-        .eq("id", row.id);
-
-      if (updateError) return { ok: false, reason: `write: ${updateError.message || "update blocked"}` };
+      if (error) return { ok: false, reason: `marketcheck-recalls: ${error.message || "invoke failed"}` };
+      const resp = data as { recallStatus?: string; error?: string } | null;
+      if (!resp) return { ok: false, reason: "no data" };
+      if (resp.recallStatus === "error") return { ok: false, reason: resp.error || "recall lookup error" };
       return { ok: true };
     } catch (e) {
       return { ok: false, reason: (e as Error)?.message || "unexpected error" };
@@ -114,9 +96,9 @@ const RecallRefreshTool = () => {
     <div className="space-y-4">
       <div className="flex items-start justify-between gap-3 flex-wrap">
         <div>
-          <h2 className="text-base font-semibold text-foreground">NHTSA recall backfill</h2>
+          <h2 className="text-base font-semibold text-foreground">Recall backfill</h2>
           <p className="text-xs text-muted-foreground mt-0.5">
-            Published listings with a missing or &gt;30-day-old recall check. The publish-gate blocks new publishes without a fresh check; this tool handles the backlog.
+            Published listings with a missing or &gt;30-day-old recall check. Re-checks each VIN via MarketCheck AutoRecalls (NHTSA fallback) and clears the backlog.
           </p>
         </div>
         <button

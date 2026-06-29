@@ -7,7 +7,7 @@
 // Body: { vin?, tenant_id?, batch?, force? }
 // ──────────────────────────────────────────────────────────────────────
 import { json, preflight } from "../_shared/http.ts";
-import { adminClient } from "../_shared/supabase.ts";
+import { adminClient, SERVICE_KEY } from "../_shared/supabase.ts";
 
 const MC_KEY = Deno.env.get("MARKETCHECK_API_KEY_1") || Deno.env.get("MARKETCHECK_API_KEY") || "";
 const MC_BASE = "https://api.marketcheck.com/v2";
@@ -148,14 +148,27 @@ async function fetchRecalls(vin: string): Promise<FetchOk | FetchErr> {
   return { ok: false, reason: sawRateLimit ? "rate_limited" : "no_endpoint_matched", tried };
 }
 
+const DND_RE = /do not drive|stop sale|park outside|fire risk/i;
+
 // deno-lint-ignore no-explicit-any
 const persist = async (admin: any, tenantId: string | null, vin: string, n: Normalized) => {
+  // Also write the recall_check jsonb — that is what the stale-recall worklist
+  // (listings_with_stale_recalls) and the publish gate (do_not_drive) read.
+  // Without this, MarketCheck recall checks never clear the backlog or feed the
+  // gate (the recall_status columns are a separate, parallel store).
+  const recall_check = {
+    checked_at: n.checkedAt,
+    has_open: n.openRecallCount > 0,
+    do_not_drive: n.recalls.some((r) => DND_RE.test(`${r.title} ${r.description} ${r.consequence}`)),
+    campaigns: n.recalls,
+  };
   let q = admin.from("vehicle_listings").update({
     recall_status: n.recallStatus,
     recall_checked_at: n.checkedAt,
     open_recall_count: n.openRecallCount,
     closed_recall_count: n.closedRecallCount,
     recall_payload: n,
+    recall_check,
   }).eq("vin", vin);
   if (tenantId) q = q.eq("tenant_id", tenantId);
   try { await q; } catch { /* recall_* columns may not be migrated yet */ }
@@ -172,7 +185,7 @@ Deno.serve(async (req) => {
   // ── Auth gate: service-role (cron) bypasses; otherwise require a
   // signed-in tenant member or platform admin for the requested tenant.
   const auth = (req.headers.get("Authorization") || "").replace(/^Bearer\s+/i, "");
-  if (auth !== serviceKey) {
+  if (auth !== SERVICE_KEY) {
     const { data: ures, error: uerr } = await admin.auth.getUser(auth);
     const userId = ures?.user?.id;
     if (uerr || !userId) return json(401, { error: "authentication required" });

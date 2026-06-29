@@ -3,7 +3,9 @@ import { serve } from "https://deno.land/std@0.208.0/http/server.ts";
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
-  "Access-Control-Allow-Headers": "content-type",
+  // Must include the headers supabase-js attaches to functions.invoke, or the
+  // browser preflight fails with "Failed to send a request to the Edge Function".
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
 interface RecallBody {
