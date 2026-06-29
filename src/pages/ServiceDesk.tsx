@@ -231,11 +231,11 @@ function ServiceQrCard({ tenantId, vin }: { tenantId: string; vin: string }) {
 // ── Complete the K-208 on desktop ──────────────────────────────────────────
 function DesktopK208({ tenantId, veh }: { tenantId: string; veh: Veh }) {
   const [marks, setMarks] = useState<Record<string, K208Mark>>({});
-  const [failureNotes, setFailureNotes] = useState("");
+  const [itemNotes, setItemNotes] = useState<Record<string, string>>({});
   const [notes, setNotes] = useState("");
   const [docs, setDocs] = useState<DocRef[]>([]);
   const [uploading, setUploading] = useState(false);
-  const [inspectorName, setInspectorName] = useState("");
+  const [inspectorName, setInspectorName] = useState(() => { try { return localStorage.getItem("autolabels.signer.service") || ""; } catch { return ""; } });
   const [signature, setSignature] = useState("");
   const [sigType, setSigType] = useState<"draw" | "type">("draw");
   const [consent, setConsent] = useState(false);
@@ -244,11 +244,10 @@ function DesktopK208({ tenantId, veh }: { tenantId: string; veh: Veh }) {
 
   const answered = k208Answered(marks);
   const result = k208Result(marks);
-  const passAll = () => setMarks((cur) => {
-    const next: Record<string, K208Mark> = { ...cur };
-    K208_ITEMS.forEach((i) => { next[i.id] = cur[i.id] === "fail" || cur[i.id] === "na" ? cur[i.id] : "pass"; });
-    return next;
-  });
+  const allAnswered = answered >= K208_ITEMS.length;
+  const failsExplained = K208_ITEMS.every((i) => marks[i.id] !== "fail" || (itemNotes[i.id] || "").trim() !== "");
+  // "Pass all" marks every line PASS; exceptions are then marked individually.
+  const passAll = () => { setMarks(Object.fromEntries(K208_ITEMS.map((i) => [i.id, "pass" as K208Mark]))); setItemNotes({}); };
 
   const onFiles = async (files: FileList | null) => {
     if (!files?.length) return;
@@ -262,12 +261,13 @@ function DesktopK208({ tenantId, veh }: { tenantId: string; veh: Veh }) {
     setUploading(false);
   };
 
-  const canSubmit = !!inspectorName.trim() && !!signature.trim() && consent && answered > 0 && !saving;
+  const canSubmit = !!inspectorName.trim() && !!signature.trim() && consent && allAnswered && failsExplained && !saving;
 
   const submit = async () => {
     if (!canSubmit) return;
     setSaving(true);
-    const checklist = k208Checklist(marks);
+    const checklist = k208Checklist(marks, itemNotes);
+    const failureNotes = checklist.filter((c) => c.result === "fail").map((c) => `${c.label}: ${c.explanation || "(no explanation)"}`).join("; ");
     const payload = { vin: veh.vin, ymm: veh.ymm, checklist, result, failureNotes, notes, docs, inspectorName };
     const content_hash = await hashPayload(payload);
     const ip = await fetchClientIp();
@@ -282,6 +282,7 @@ function DesktopK208({ tenantId, veh }: { tenantId: string; veh: Veh }) {
     });
     setSaving(false);
     if (error) { toast.error(error.message || "Could not save inspection"); return; }
+    try { localStorage.setItem("autolabels.signer.service", inspectorName.trim()); } catch { /* ignore */ }
     setDone(true);
     toast.success("K-208 saved and signed");
   };
@@ -299,7 +300,8 @@ function DesktopK208({ tenantId, veh }: { tenantId: string; veh: Veh }) {
     <div className="rounded-2xl border border-border bg-card p-5 space-y-4">
       <div className="flex items-center gap-2"><ShieldCheck className="w-4 h-4 text-primary" /><h2 className="font-bold text-foreground">Complete CT K-208 here</h2></div>
       <K208Checklist marks={marks} onMark={(id, m) => setMarks((s) => ({ ...s, [id]: m }))} onPassAll={passAll}
-        failureNotes={failureNotes} onFailureNotes={setFailureNotes} notes={notes} onNotes={setNotes} />
+        failureNotes="" onFailureNotes={() => {}} notes={notes} onNotes={setNotes}
+        itemNotes={itemNotes} onItemNote={(id, v) => setItemNotes((s) => ({ ...s, [id]: v }))} />
 
       <div className="space-y-2">
         <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Documents (inspection sheet, defect photos)</label>

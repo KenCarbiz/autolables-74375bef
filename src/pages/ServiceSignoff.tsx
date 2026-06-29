@@ -25,11 +25,11 @@ export default function ServiceSignoff() {
   const [ctx, setCtx] = useState<TokenCtx | null>(null);
   const [loading, setLoading] = useState(true);
   const [marks, setMarks] = useState<Record<string, Mark>>({});
-  const [failureNotes, setFailureNotes] = useState("");
+  const [itemNotes, setItemNotes] = useState<Record<string, string>>({});
   const [notes, setNotes] = useState("");
   const [docs, setDocs] = useState<DocRef[]>([]);
   const [uploading, setUploading] = useState(false);
-  const [inspectorName, setInspectorName] = useState("");
+  const [inspectorName, setInspectorName] = useState(() => { try { return localStorage.getItem("autolabels.signer.service") || ""; } catch { return ""; } });
   const [signature, setSignature] = useState("");
   const [signatureType, setSignatureType] = useState<"draw" | "type">("type");
   const [consent, setConsent] = useState(false);
@@ -48,13 +48,13 @@ export default function ServiceSignoff() {
   const allItems = useMemo(() => K208_INSPECTION_CATEGORIES.flatMap((c) => c.items.map((i) => ({ ...i, category: c.category }))), []);
   const anyFail = Object.values(marks).some((m) => m === "fail");
   const answered = allItems.filter((i) => marks[i.id] && marks[i.id] !== "").length;
+  const allAnswered = answered >= allItems.length;
+  const failsExplained = allItems.every((i) => marks[i.id] !== "fail" || (itemNotes[i.id] || "").trim() !== "");
   const result: "pass" | "fail" = anyFail ? "fail" : "pass";
 
-  const passAll = () => {
-    const next: Record<string, Mark> = {};
-    allItems.forEach((i) => { next[i.id] = marks[i.id] === "fail" || marks[i.id] === "na" ? marks[i.id] : "pass"; });
-    setMarks(next);
-  };
+  // "Pass all" marks every line PASS; a car that doesn't all-pass is marked
+  // line by line, and each fail needs an explanation.
+  const passAll = () => { setMarks(Object.fromEntries(allItems.map((i) => [i.id, "pass" as Mark]))); setItemNotes({}); };
 
   const onFiles = async (files: FileList | null) => {
     if (!files || !files.length) return;
@@ -78,12 +78,13 @@ export default function ServiceSignoff() {
     if (fileRef.current) fileRef.current.value = "";
   };
 
-  const canSubmit = !!inspectorName.trim() && !!signature.trim() && consent && answered > 0 && !submitting;
+  const canSubmit = !!inspectorName.trim() && !!signature.trim() && consent && allAnswered && failsExplained && !submitting;
 
   const submit = async () => {
     if (!canSubmit || !ctx) return;
     setSubmitting(true);
-    const checklist = allItems.map((i) => ({ id: i.id, label: i.label, category: i.category, result: marks[i.id] || "na" }));
+    const checklist = allItems.map((i) => ({ id: i.id, label: i.label, category: i.category, result: marks[i.id] || "na", explanation: (itemNotes[i.id] || "").trim() }));
+    const failureNotes = checklist.filter((c) => c.result === "fail").map((c) => `${c.label}: ${c.explanation || "(no explanation)"}`).join("; ");
     const payload = { vin: ctx.vin, ymm: ctx.ymm, checklist, result, failureNotes, notes, docs, inspectorName, signedAt: new Date().toISOString() };
     const content_hash = await hashPayload(payload);
     const ip = await fetchClientIp();
@@ -102,7 +103,7 @@ export default function ServiceSignoff() {
       _user_agent: typeof navigator !== "undefined" ? navigator.userAgent : null,
     });
     setSubmitting(false);
-    if (!error && (data as { ok?: boolean })?.ok) setDone(true);
+    if (!error && (data as { ok?: boolean })?.ok) { try { localStorage.setItem("autolabels.signer.service", inspectorName.trim()); } catch { /* ignore */ } setDone(true); }
     else {
       const reason = (data as { reason?: string })?.reason;
       // Token consumed between load and submit, or another failure.
@@ -166,36 +167,37 @@ export default function ServiceSignoff() {
           <div key={cat.category} className="rounded-2xl border border-border bg-card overflow-hidden">
             <div className="px-4 py-2.5 bg-muted/50 text-xs font-bold uppercase tracking-wider text-foreground">{cat.category}</div>
             <div className="divide-y divide-border/60">
-              {cat.items.map((item) => (
-                <div key={item.id} className="flex items-center justify-between gap-3 px-4 py-2.5">
-                  <span className="text-sm text-foreground flex-1">{item.label}</span>
-                  <div className="flex gap-1 shrink-0">
-                    {(["pass", "fail", "na"] as const).map((m) => (
-                      <button key={m} onClick={() => setMarks((s) => ({ ...s, [item.id]: m }))}
-                        className={`h-8 w-12 rounded-md text-[11px] font-semibold border transition-colors ${
-                          marks[item.id] === m
-                            ? m === "pass" ? "bg-emerald-600 text-white border-emerald-600"
-                              : m === "fail" ? "bg-red-600 text-white border-red-600"
-                              : "bg-slate-500 text-white border-slate-500"
-                            : "bg-background text-muted-foreground border-border hover:bg-muted"
-                        }`}>
-                        {m === "pass" ? "Pass" : m === "fail" ? "Fail" : "N/A"}
-                      </button>
-                    ))}
+              {cat.items.map((item) => {
+                const failed = marks[item.id] === "fail";
+                return (
+                <div key={item.id} className="px-4 py-2.5">
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="text-sm font-medium text-foreground flex-1">{item.label}</span>
+                    <div className="flex gap-1.5 shrink-0">
+                      {(["pass", "fail"] as const).map((m) => (
+                        <button key={m} onClick={() => setMarks((s) => ({ ...s, [item.id]: m }))}
+                          className={`h-11 w-16 rounded-md text-[12px] font-semibold border transition-colors ${
+                            marks[item.id] === m
+                              ? m === "pass" ? "bg-emerald-600 text-white border-emerald-600"
+                                : "bg-red-600 text-white border-red-600"
+                              : "bg-background text-muted-foreground border-border hover:bg-muted"
+                          }`}>
+                          {m === "pass" ? "Pass" : "Fail"}
+                        </button>
+                      ))}
+                    </div>
                   </div>
+                  {failed && (
+                    <input autoFocus value={itemNotes[item.id] || ""} onChange={(e) => setItemNotes((s) => ({ ...s, [item.id]: e.target.value }))}
+                      placeholder="Explanation of defects or repairs needed (required)"
+                      className="mt-2 w-full rounded-lg border border-red-300 bg-red-50/40 px-3 h-10 text-sm" />
+                  )}
                 </div>
-              ))}
+                );
+              })}
             </div>
           </div>
         ))}
-
-        {anyFail && (
-          <div className="rounded-2xl border border-red-200 bg-red-50 p-4 space-y-2">
-            <label className="text-xs font-bold text-red-800 uppercase tracking-wider">What failed & what was done</label>
-            <textarea value={failureNotes} onChange={(e) => setFailureNotes(e.target.value)} rows={3}
-              className="w-full rounded-lg border border-red-200 bg-white p-3 text-sm" placeholder="Describe failures and corrective action taken before sale…" />
-          </div>
-        )}
 
         <div className="rounded-2xl border border-border bg-card p-4 space-y-3">
           <label className="text-xs font-bold text-foreground uppercase tracking-wider">Documents & photos (optional)</label>
@@ -249,7 +251,7 @@ export default function ServiceSignoff() {
           </button>
           {!canSubmit && !submitting && (
             <p className="text-center text-[11px] text-muted-foreground mt-1.5">
-              {answered === 0 ? "Mark the checklist, " : ""}{!inspectorName.trim() ? "enter your name, " : ""}{!signature.trim() ? "sign, " : ""}{!consent ? "and accept the certification" : ""} to submit.
+              {!allAnswered ? "Mark every item (use Pass all), " : !failsExplained ? "explain each failed item, " : ""}{!inspectorName.trim() ? "enter your name, " : ""}{!signature.trim() ? "sign, " : ""}{!consent ? "and accept the certification" : ""} to submit.
             </p>
           )}
         </div>
