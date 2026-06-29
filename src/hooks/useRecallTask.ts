@@ -76,8 +76,8 @@ export function useRecallTask(vin: string | null | undefined, tenantId: string |
         _outcome: outcome,
         _employee_name: input.employeeName,
         _service_date: input.serviceDate ?? new Date().toISOString(),
-        _ro_number: input.roNumber ?? null,
-        _notes: input.notes ?? null,
+        _ro_number: (input.roNumber ?? null) as unknown as string,
+        _notes: (input.notes ?? null) as unknown as string,
         _documents: (input.documents ?? []) as unknown as never,
       });
       if (error) return { ok: false, error: error.message };
