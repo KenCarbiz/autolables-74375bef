@@ -1,5 +1,9 @@
 import type { VehicleListing } from "@/hooks/useVehicleListing";
 import { resolveDisplayPrice, getPriceDisplayMode, type PriceDisplayMode } from "@/lib/priceModel";
+import type { OemFactoryWarranty } from "@/lib/oemWarranty";
+
+// The OEM coverage breakdown public-listing-view attaches to a new/CPO listing.
+export type OemWarrantyView = Partial<OemFactoryWarranty> & { owner?: "original" | "subsequent" };
 
 // ──────────────────────────────────────────────────────────────
 // Passport V2 shared derivations
@@ -86,6 +90,10 @@ export interface PassportData {
   // Warranty
   warranty: NonNullable<VehicleListing["warranty_info"]>;
   warrantyStr: string | null;
+  // Full OEM coverage breakdown for new/CPO cars (from the dealer's verified
+  // Factory & CPO terms, attached by public-listing-view). Drives the
+  // factory-warranty slide-out's full presentation.
+  oemWarranty: OemWarrantyView | null;
   // Confidence
   confScore: number | null;
   confLabel: string;
@@ -387,6 +395,7 @@ export const derivePassport = (listing: VehicleListing): PassportData => {
     viewCount: listing.view_count ?? null, dom: (mc.dom as number) ?? marketMeta.avgDom ?? null,
     ownerCount, accidentCount, cleanTitle, serviceCount, recallClear, openRecalls, hasRecallCheck,
     warranty, warrantyStr,
+    oemWarranty: ((listing as unknown as { oem_warranty?: OemWarrantyView }).oem_warranty) || null,
     confScore, confLabel, verifiedBy, verifyRows,
     highlights, specRows, keySpecs, overview, whyBuy,
     reviewRating: (dealer.review_rating as number) ?? null,

@@ -152,6 +152,34 @@ export const warrantyHeadline = (w: OemFactoryWarranty): string => {
   return basic || "Factory warranty";
 };
 
+// "4 yr / 60K mi", "4 yr / Unlimited", "3 yr", or "Included" — used for the
+// passport's full-coverage presentation. Whole-year terms read as "yr",
+// odd month counts as "mo".
+export const formatCoverageTerm = (months?: number, miles?: number): string => {
+  const time = months ? (months % 12 === 0 ? `${months / 12} yr` : `${months} mo`) : null;
+  const mi = milesLabel(miles);
+  return [time, mi].filter(Boolean).join(" / ") || "Included";
+};
+
+export type CoverageKey = "basic" | "powertrain" | "corrosion" | "roadside" | "ev_battery" | "maintenance";
+export interface OemCoverageRow { key: CoverageKey; label: string; sub: string; term: string }
+
+// Display-ready coverage rows for whichever terms a brand actually has. Accepts
+// the full OemFactoryWarranty or the trimmed object the passport receives.
+export const oemCoverageRows = (w: Partial<OemFactoryWarranty>): OemCoverageRow[] => {
+  const rows: OemCoverageRow[] = [];
+  const add = (key: CoverageKey, label: string, sub: string, mo?: number, mi?: number) => {
+    if (mo || mi) rows.push({ key, label, sub, term: formatCoverageTerm(mo, mi) });
+  };
+  add("basic", "Bumper-to-Bumper", "Most vehicle components", w.basic_months, w.basic_miles);
+  add("powertrain", "Powertrain", "Engine, transmission, drivetrain", w.powertrain_months, w.powertrain_miles);
+  add("corrosion", "Corrosion / Rust-Through", "Body-panel perforation", w.corrosion_months, w.corrosion_miles);
+  add("roadside", "Roadside Assistance", "Towing, lockout, jump-start", w.roadside_months, w.roadside_miles);
+  add("ev_battery", "Hybrid / EV Battery", "High-voltage battery & components", w.ev_battery_months, w.ev_battery_miles);
+  add("maintenance", "Complimentary Maintenance", "Factory scheduled service", w.maintenance_months, w.maintenance_miles);
+  return rows;
+};
+
 function hashStr(s: string): number {
   let h = 0;
   for (let i = 0; i < s.length; i++) h = (Math.imul(31, h) + s.charCodeAt(i)) | 0;

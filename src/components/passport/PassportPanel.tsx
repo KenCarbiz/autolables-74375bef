@@ -3,9 +3,11 @@ import {
   DollarSign, TrendingUp, TrendingDown, Gauge, Clock, Car, Package, ShieldCheck,
   Star, Award, FileText, MessageSquare, Eye, CheckCircle2,
   Flame, Heart, Send, Bookmark, Users, Circle, ChevronDown, MapPin, BadgeCheck, Info, AlertTriangle, History, ArrowRight, Sparkles,
+  Wrench, Zap, LifeBuoy,
 } from "lucide-react";
-import type { PassportData, PricePoint } from "@/lib/passportV2Data";
+import type { PassportData, PricePoint, OemWarrantyView } from "@/lib/passportV2Data";
 import { fmt$, listingEquipment } from "@/lib/passportV2Data";
+import { oemCoverageRows, type CoverageKey } from "@/lib/oemWarranty";
 import type { VehicleListing } from "@/hooks/useVehicleListing";
 import {
   PassportSlideOver, Hero, Section, Check, Empty, StatRow, RangeBar, TrendChart, Ring, CARD, GREEN, BLUE,
@@ -863,6 +865,10 @@ function buildPanel(key: PassportPanelKey, d: PassportData, listing: VehicleList
         secondary: { label: "View full warranty details", onClick: () => go("factory-warranty") },
         footerQuestion: "Questions about warranty?", specialistLabel: "Talk to a Warranty Specialist",
         body: <>
+          {/* Full OEM coverage breakdown — the dealer's verified factory terms
+              for this brand. Shows on both mobile and desktop when present. */}
+          {d.oemWarranty && <FactoryCoverageGrid w={d.oemWarranty} ymm={listing.ymm} />}
+
           {/* ── Mobile (<768px) — focused warranty card ── */}
           <div className="md:hidden space-y-4">
             {d.warrantyStr ? (
@@ -1517,6 +1523,49 @@ const Faq = ({ q, a }: { q: string; a: string }) => (
     <p className="text-[12px] text-[#64748B] mt-2 leading-relaxed">{a}</p>
   </details>
 );
+
+// Full factory-coverage presentation for a new/CPO car — one card per coverage
+// type the dealer verified for this brand (bumper-to-bumper, powertrain,
+// corrosion, roadside, hybrid/EV battery, complimentary maintenance).
+const COVERAGE_ICON: Record<CoverageKey, React.ElementType> = {
+  basic: ShieldCheck, powertrain: Gauge, corrosion: Car, roadside: LifeBuoy, ev_battery: Zap, maintenance: Wrench,
+};
+const FactoryCoverageGrid = ({ w, ymm }: { w: OemWarrantyView; ymm?: string | null }) => {
+  const rows = oemCoverageRows(w);
+  if (rows.length === 0) return null;
+  const brand = w.brand || (ymm || "").split(/\s+/).slice(1, 2).join("") || "Manufacturer";
+  const subsequent = w.owner === "subsequent";
+  return (
+    <div className="rounded-2xl border border-emerald-200 bg-gradient-to-b from-emerald-50/80 to-white p-5">
+      <div className="flex items-center gap-2.5">
+        <span className="w-10 h-10 rounded-xl bg-emerald-100 flex items-center justify-center shrink-0"><BadgeCheck className="w-5 h-5 text-[#16A34A]" /></span>
+        <div>
+          <p className="text-[15px] font-extrabold text-[#0F172A] leading-tight">{brand} Factory Warranty</p>
+          <p className="text-[12px] text-[#64748B]">{subsequent ? "Coverage as it transfers to a subsequent owner" : "Full manufacturer coverage included with this vehicle"}</p>
+        </div>
+      </div>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 mt-4">
+        {rows.map((r) => {
+          const Icon = COVERAGE_ICON[r.key];
+          return (
+            <div key={r.key} className={`${CARD} p-3.5 flex items-start gap-3`}>
+              <span className="w-9 h-9 rounded-lg bg-emerald-50 flex items-center justify-center shrink-0"><Icon className="w-4 h-4 text-[#16A34A]" /></span>
+              <div className="min-w-0">
+                <p className="text-[13px] font-bold text-[#0F172A] leading-tight">{r.label}</p>
+                <p className="text-[15px] font-extrabold text-[#16A34A] leading-tight mt-0.5">{r.term}</p>
+                <p className="text-[11px] text-[#94A3B8] leading-snug mt-0.5">{r.sub}</p>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+      {w.notes && (
+        <p className="text-[11px] text-[#64748B] mt-3 leading-snug">{w.notes}</p>
+      )}
+      <p className="text-[10px] text-[#94A3B8] mt-3 leading-snug">Coverage terms are the manufacturer's published new-vehicle warranty for this brand, verified by the dealership. Confirm exact terms for this VIN with the dealer.</p>
+    </div>
+  );
+};
 
 const Stat = ({ label, value, tone = "neutral" }: { label: string; value: string; tone?: "green" | "neutral" }) => (
   <div className={`${CARD} p-3`}>

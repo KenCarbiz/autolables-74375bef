@@ -191,6 +191,29 @@ serve(async (req) => {
               powertrain_miles: finiteMiles(ptMiles),
               in_service_date: String(start).slice(0, 10),
             };
+            // Full coverage breakdown for the passport's factory-warranty
+            // slide-out (bumper-to-bumper, powertrain, corrosion, roadside,
+            // hybrid/EV battery, maintenance). Owner-resolved powertrain/basic;
+            // other lines pass through. Miles use the -1 unlimited sentinel.
+            const numOrU = (n: unknown) => { const v = Number(n); return v === -1 ? -1 : v > 0 ? v : undefined; };
+            row.oem_warranty = {
+              brand: w.brand,
+              verified: true,
+              owner: subsequent ? "subsequent" : "original",
+              basic_months: Number(bMonths) || undefined,
+              basic_miles: numOrU(bMiles),
+              powertrain_months: Number(ptMonths) || undefined,
+              powertrain_miles: numOrU(ptMiles),
+              corrosion_months: Number(w.corrosion_months) || undefined,
+              corrosion_miles: numOrU(w.corrosion_miles),
+              roadside_months: Number(w.roadside_months) || undefined,
+              roadside_miles: numOrU(w.roadside_miles),
+              ev_battery_months: Number(w.ev_battery_months) || undefined,
+              ev_battery_miles: numOrU(w.ev_battery_miles),
+              maintenance_months: Number(w.maintenance_months) || undefined,
+              maintenance_miles: numOrU(w.maintenance_miles),
+              notes: w.notes || undefined,
+            };
           }
         }
 
