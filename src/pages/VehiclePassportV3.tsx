@@ -571,12 +571,31 @@ const VehiclePassportV3 = () => {
               let monthsLeft: number | null = null, monthsPct: number | null = null, expiry: string | null = null;
               if (w.in_service_date && w.factory_months) { const end = new Date(w.in_service_date); end.setMonth(end.getMonth() + w.factory_months); expiry = end.toLocaleDateString(); const ms = end.getTime() - Date.now(); monthsLeft = ms > 0 ? Math.round(ms / (1000 * 60 * 60 * 24 * 30.4)) : 0; monthsPct = Math.max(3, Math.min(100, (monthsLeft / w.factory_months) * 100)); }
               return <>
-                <div className="flex items-center gap-2 mt-2"><span className="w-8 h-8 rounded-lg bg-emerald-50 flex items-center justify-center"><ShieldCheck className="w-4 h-4 text-[#16A34A]" /></span><p className="text-[12px] text-[#64748B]">{d.warrantyStr} remaining</p></div>
+                <div className="flex items-center gap-2 mt-2"><span className="w-8 h-8 rounded-lg bg-emerald-50 flex items-center justify-center"><ShieldCheck className="w-4 h-4 text-[#16A34A]" /></span><p className="text-[12px] text-[#64748B]">{d.warrantyStr} {listing.condition === "new" ? "factory coverage" : "remaining"}</p></div>
                 {monthsPct != null && <div className="mt-3"><div className="flex justify-between text-[12px]"><span className="text-[#64748B]">Time Remaining</span><span className="font-bold">{monthsLeft} <span className="text-[#94A3B8] font-medium">of {w.factory_months} mo</span></span></div><div className="mt-1.5 h-3.5 rounded-full bg-slate-100 overflow-hidden"><div className="h-full rounded-full bg-emerald-500" style={{ width: `${monthsPct}%` }} /></div></div>}
                 {milesPct != null && <div className="mt-3"><div className="flex justify-between text-[12px]"><span className="text-[#64748B]">Mileage Remaining</span><span className="font-bold">{milesLeft!.toLocaleString()} <span className="text-[#94A3B8] font-medium">of {(w.factory_miles! / 1000).toFixed(0)}K mi</span></span></div><div className="mt-1.5 h-3.5 rounded-full bg-slate-100 overflow-hidden"><div className="h-full rounded-full bg-emerald-500" style={{ width: `${milesPct}%` }} /></div></div>}
                 {expiry && <p className="text-[11px] text-[#64748B] mt-3">Expires {expiry}</p>}
               </>;
             })() : <p className="text-[13px] text-[#64748B] mt-3">Coverage details confirmed at the dealership.</p>}
+            {(() => {
+              type CpoProgramView = { name: string; basic_months?: number; basic_miles?: number; powertrain_months?: number; powertrain_miles?: number; inspection_points?: string; transferable?: boolean; benefits?: string };
+              const cpo = (listing as unknown as { cpo_programs?: CpoProgramView[] }).cpo_programs?.[0];
+              if (!cpo) return null;
+              const yrmi = (mo?: number, mi?: number) => [mo ? `${Math.round(mo / 12)} yr` : null, mi ? `${(mi / 1000).toFixed(0)}K mi` : null].filter(Boolean).join(" / ");
+              const b2b = yrmi(cpo.basic_months, cpo.basic_miles);
+              const pt = yrmi(cpo.powertrain_months, cpo.powertrain_miles);
+              return (
+                <div className="mt-3 rounded-xl border border-blue-200 bg-blue-50/50 p-3">
+                  <p className="text-[12px] font-bold text-[#2563EB] inline-flex items-center gap-1.5"><BadgeCheck className="w-4 h-4" /> {cpo.name}</p>
+                  <div className="mt-1.5 space-y-0.5 text-[11px] text-[#64748B]">
+                    {b2b && <p>Limited warranty: <span className="font-semibold text-[#0F172A]">{b2b}</span></p>}
+                    {pt && <p>Powertrain: <span className="font-semibold text-[#0F172A]">{pt}</span></p>}
+                    {cpo.inspection_points && <p>{cpo.inspection_points} inspection{cpo.transferable ? " · transferable" : ""}</p>}
+                    {cpo.benefits && <p>{cpo.benefits}</p>}
+                  </div>
+                </div>
+              );
+            })()}
             <Link onClick={() => openPanel("factory-warranty")} className="mt-auto pt-3 self-start">View warranty details</Link>
           </div>
           )}

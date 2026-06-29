@@ -5,6 +5,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useTenant } from "@/contexts/TenantContext";
 import { mapAutocurbProfile } from "@/lib/autocurbProfile";
 import type { DealerProgram } from "@/lib/dealerPrograms";
+import type { OemFactoryWarranty, CpoProgram } from "@/lib/oemWarranty";
 import type { DocumentRules } from "@/lib/documentRules";
 import { DEFAULT_STICKY_BUTTONS, type StickyBottomButtons } from "@/lib/stickyButtons";
 
@@ -137,6 +138,13 @@ export interface DealerSettings {
   // lifetime powertrain, free maintenance, …) with FTC-style value/offer/
   // benefit/disclosure, optional finance requirement, and placement toggles.
   dealer_programs: DealerProgram[];
+  // OEM factory-warranty terms per franchised brand, dealer-verified. New cars'
+  // passport pulls the matching brand's terms (no in-service date needed — the
+  // full term carries forward from sale). Only verified entries feed the
+  // passport. CPO programs (OEM-certified + dealer-certified) carry their own
+  // coverage/eligibility and surface on CPO listings.
+  oem_factory_warranties: OemFactoryWarranty[];
+  cpo_programs: CpoProgram[];
   // Dealer-configurable condition terms (comma-separated). The dealer can use
   // their own labels (e.g. "OEM CPO", "Dealer CPO"); each maps to a canonical
   // new/used/cpo value under the hood for storage + compliance gating.
@@ -307,6 +315,8 @@ export const DEFAULT_SETTINGS: DealerSettings = {
   why_buy_here: "",
   warranty_programs: "",
   dealer_programs: [],
+  oem_factory_warranties: [],
+  cpo_programs: [],
   vehicle_conditions: "New, Demo, Used, CPO",
   get_ready_services: [
     { name: "Reconditioning / mechanical", responsible_name: "Service Dept.", responsible_email: "", cost: "" },

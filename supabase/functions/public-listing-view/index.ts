@@ -154,6 +154,49 @@ serve(async (req) => {
           mobile_cta_variant: (s.mobile_slideout_cta_variant as string) || "",
         };
         if (Object.values(trust).some((v) => v)) row.dealer_trust = trust;
+
+        // ── Factory warranty for new / CPO cars. The dealer verifies OEM
+        // warranty terms per brand in admin; here we match the listing's make
+        // and, when the listing itself carries no warranty_info, synthesize it
+        // so the passport shows the factory coverage. New cars have no prior
+        // in-service date — the full term carries forward from the listing
+        // date, so we stamp published_at/created_at/today as the start. Only
+        // VERIFIED terms are used.
+        const ymm = String((row.ymm as string) || "").toUpperCase();
+        const cond = String((row.condition as string) || "").toLowerCase();
+        const hasWarranty = row.warranty_info && Object.keys(row.warranty_info as object).length > 0;
+        if (ymm && (cond === "new" || cond === "cpo") && !hasWarranty) {
+          // deno-lint-ignore no-explicit-any
+          const warranties: any[] = Array.isArray(s.oem_factory_warranties) ? s.oem_factory_warranties as any[] : [];
+          const w = warranties.find((x) => {
+            const b = String(x?.brand || "").trim().toUpperCase();
+            return b.length > 1 && x?.verified === true && ymm.includes(b);
+          });
+          if (w) {
+            const start = (row.published_at as string) || (row.created_at as string) || new Date().toISOString();
+            row.warranty_info = {
+              factory_months: Number(w.basic_months) || undefined,
+              factory_miles: Number(w.basic_miles) || undefined,
+              powertrain_months: Number(w.powertrain_months) || undefined,
+              powertrain_miles: Number(w.powertrain_miles) || undefined,
+              in_service_date: String(start).slice(0, 10),
+            };
+          }
+        }
+
+        // ── CPO program details for CPO listings (matched OEM-by-brand, plus
+        // any dealer-certified program). Surfaced on the passport CPO block.
+        if (cond === "cpo") {
+          // deno-lint-ignore no-explicit-any
+          const programs: any[] = Array.isArray(s.cpo_programs) ? s.cpo_programs as any[] : [];
+          const matched = programs.filter((p) => {
+            if (!p?.enabled || p?.show_on_passport === false) return false;
+            if (p?.kind === "dealer") return true;
+            const b = String(p?.brand || "").trim().toUpperCase();
+            return b.length > 1 && ymm.includes(b);
+          });
+          if (matched.length) row.cpo_programs = matched;
+        }
       }
     } catch { /* config optional — passport falls back to its default bar */ }
 
