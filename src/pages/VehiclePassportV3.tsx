@@ -592,24 +592,41 @@ const VehiclePassportV3 = () => {
           <div data-module="warranty" className={`${CARD} p-5 flex flex-col`}>
             {(() => {
               const w = d.warranty;
+              const isNew = listing.condition === "new";
               const calc = (months?: number, miles?: number) => {
-                let timePct: number | null = null, monthsLeft: number | null = null;
-                if (w.in_service_date && months) { const end = new Date(w.in_service_date); end.setMonth(end.getMonth() + months); const ms = end.getTime() - Date.now(); monthsLeft = ms > 0 ? Math.round(ms / (1000 * 60 * 60 * 24 * 30.4)) : 0; timePct = Math.max(3, Math.min(100, (monthsLeft / months) * 100)); }
-                const milesLeft = miles != null && listing.mileage != null ? Math.max(0, miles - listing.mileage) : null;
-                const milesPct = miles && listing.mileage != null ? Math.max(3, 100 - Math.min(100, (listing.mileage / miles) * 100)) : null;
+                let timePct: number | null = null, monthsLeft: number | null = null, endDate: Date | null = null;
+                if (w.in_service_date && months) { const end = new Date(w.in_service_date); end.setMonth(end.getMonth() + months); endDate = end; const ms = end.getTime() - Date.now(); monthsLeft = ms > 0 ? Math.round(ms / (1000 * 60 * 60 * 24 * 30.4)) : 0; timePct = Math.max(3, Math.min(100, (monthsLeft / months) * 100)); }
+                const milesLeft = miles != null && miles > 0 && listing.mileage != null ? Math.max(0, miles - listing.mileage) : null;
+                const milesPct = miles && miles > 0 && listing.mileage != null ? Math.max(3, 100 - Math.min(100, (listing.mileage / miles) * 100)) : null;
                 const vals = [timePct, milesPct].filter((x): x is number => x != null);
-                const pct = vals.length ? Math.round(Math.min(...vals)) : null;
+                const remainPct = vals.length ? Math.round(Math.min(...vals)) : null;
                 const yrs = monthsLeft == null ? null : monthsLeft >= 12 ? `${Math.round(monthsLeft / 12)} yr` : `${monthsLeft} mo`;
                 const milesLbl = milesLeft == null ? null : `${(milesLeft / 1000).toFixed(0)}K mi`;
-                return { pct, left: [yrs, milesLbl].filter(Boolean).join(" / ") };
+                const fYrs = months ? `${Math.round(months / 12)} yr` : null;
+                const fMiles = miles === -1 ? "Unlimited" : miles ? `${(miles / 1000).toFixed(0)}K mi` : null;
+                const fullTerm = [fYrs, fMiles].filter(Boolean).join(" / ");
+                // New cars: full term ahead (100%). Used cars: remaining.
+                const pct = isNew ? 100 : remainPct;
+                const label = isNew ? (fullTerm || null) : ([yrs, milesLbl].filter(Boolean).join(" / ") ? `${[yrs, milesLbl].filter(Boolean).join(" / ")} left` : null);
+                return { pct, label, endMonthYear: endDate ? endDate.toLocaleDateString(undefined, { month: "long", year: "numeric" }) : null, remainPct };
               };
               const b2b = calc(w.factory_months, w.factory_miles);
               const ptw = (w.powertrain_months != null || w.powertrain_miles != null) ? calc(w.powertrain_months, w.powertrain_miles) : null;
-              const active = !!d.warrantyStr && (b2b.pct ?? 100) > 0;
+              const active = !!d.warrantyStr;
               type CpoView = { name?: string; basic_months?: number; basic_miles?: number; powertrain_months?: number; powertrain_miles?: number };
               const cpo = listing.condition === "cpo" ? (listing as unknown as { cpo_programs?: CpoView[] }).cpo_programs?.[0] : null;
               const cpoTerm = cpo ? [(cpo.powertrain_months ?? cpo.basic_months) ? `${Math.round(((cpo.powertrain_months ?? cpo.basic_months) as number) / 12)} yr` : null, ((cpo.powertrain_miles ?? cpo.basic_miles) === -1) ? "Unlimited mi" : (cpo.powertrain_miles ?? cpo.basic_miles) ? `${(((cpo.powertrain_miles ?? cpo.basic_miles) as number) / 1000).toFixed(0)}K mi` : null].filter(Boolean).join(" / ") : "";
-              const Bar = ({ label, tone, pct, left, badge }: { label: string; tone: "blue" | "green" | "gold"; pct: number | null; left?: string | null; badge?: string }) => {
+              // OEM-data-driven confidence one-liner — turns raw terms into a selling point.
+              const confidence = isNew
+                ? "Factory coverage begins when you take delivery."
+                : cpo
+                  ? "Certified Pre-Owned extends your factory powertrain coverage."
+                  : ptw?.endMonthYear
+                    ? `Powertrain coverage extends through ${ptw.endMonthYear}.`
+                    : (b2b.remainPct ?? 0) >= 80
+                      ? "Nearly all of the factory warranty remains."
+                      : "This vehicle is still covered by the factory warranty.";
+              const Bar = ({ label, tone, pct, sub, badge }: { label: string; tone: "blue" | "green" | "gold"; pct: number | null; sub?: string | null; badge?: string }) => {
                 const c = tone === "blue" ? { ic: "text-[#2563EB]", bar: "bg-[#2563EB]" } : tone === "green" ? { ic: "text-[#16A34A]", bar: "bg-[#16A34A]" } : { ic: "text-amber-600", bar: "bg-amber-500" };
                 return (
                   <div>
@@ -618,21 +635,25 @@ const VehiclePassportV3 = () => {
                       {pct != null && <span className={`text-[15px] font-extrabold tabular-nums w-9 ${c.ic}`}>{pct}%</span>}
                       <div className="flex-1 h-2.5 rounded-full bg-slate-100 overflow-hidden"><div className={`h-full rounded-full ${c.bar}`} style={{ width: `${pct ?? 100}%` }} /></div>
                     </div>
-                    {left && <p className="text-[11px] text-[#64748B] mt-1">{left}{tone === "gold" ? "" : " left"}</p>}
+                    {sub && <p className="text-[11px] text-[#64748B] mt-1">{sub}</p>}
                   </div>
                 );
               };
               return <>
                 <div className="flex items-center justify-between gap-2">
                   <div className="flex items-center gap-1.5"><H3>Factory Warranty</H3><button onClick={(e) => openInfo("warranty-terms", e)} aria-label="Warranty terminology" className="w-6 h-6 rounded-full hover:bg-slate-100 flex items-center justify-center"><Info className="w-3.5 h-3.5 text-[#94A3B8]" /></button></div>
-                  {active && <span className="text-[9px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700">Active</span>}
+                  {active && <span className="text-[9px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700">{isNew ? "Full Coverage" : "Active"}</span>}
                 </div>
-                <p className="text-[11px] text-[#94A3B8] mt-0.5">Coverage Remaining</p>
+                <p className="text-[11px] text-[#94A3B8] mt-0.5">{isNew ? "Starts When You Purchase" : "Coverage Remaining"}</p>
                 {d.warrantyStr ? (
                   <div className="mt-3 space-y-3">
-                    {(b2b.pct != null || b2b.left) && <Bar label="Bumper-to-Bumper" tone="blue" pct={b2b.pct} left={b2b.left} />}
-                    {ptw && (ptw.pct != null || ptw.left) && <Bar label="Powertrain" tone="green" pct={ptw.pct} left={ptw.left} />}
-                    {cpo && <Bar label="Certified Pre-Owned" tone="gold" pct={100} left={cpoTerm || "Certified coverage"} badge="Certified" />}
+                    {b2b.pct != null && <Bar label="Bumper-to-Bumper" tone="blue" pct={b2b.pct} sub={b2b.label} />}
+                    {ptw && ptw.pct != null && <Bar label="Powertrain" tone="green" pct={ptw.pct} sub={ptw.label} />}
+                    {cpo && <Bar label="Certified Pre-Owned" tone="gold" pct={100} sub={cpoTerm || "Certified coverage"} badge="Certified" />}
+                    <div className="flex items-start gap-1.5 rounded-lg bg-emerald-50 px-2.5 py-2">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 mt-[5px] shrink-0" />
+                      <p className="text-[11px] font-medium text-emerald-800 leading-snug">{confidence}</p>
+                    </div>
                   </div>
                 ) : <p className="text-[13px] text-[#64748B] mt-3">Coverage details confirmed at the dealership.</p>}
               </>;

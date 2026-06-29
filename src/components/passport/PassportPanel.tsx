@@ -924,6 +924,17 @@ function buildPanel(key: PassportPanelKey, d: PassportData, listing: VehicleList
                     years={yrsRemain(pt.left)} miles={milesRemainLbl(ptMilesLeft)} expiresDate={pt.date} expiresMiles={milesCapLbl(w.powertrain_miles)} />
                 )}
               </div>
+              {/* OEM-data-driven confidence line — the selling point. */}
+              <div className="mt-3 flex items-start gap-2 rounded-xl bg-emerald-50 px-3 py-2.5">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 mt-[6px] shrink-0" />
+                <p className="text-[12px] font-medium text-emerald-800 leading-snug">{
+                  listing.condition === "new" ? "Factory coverage begins when you take delivery."
+                    : listing.condition === "cpo" ? "Certified Pre-Owned extends your factory powertrain coverage."
+                    : pt.date ? `Powertrain coverage extends through ${pt.date}.`
+                    : (b2bPct ?? 0) >= 80 ? "Nearly all of the factory warranty remains."
+                    : "This vehicle is still covered by the factory warranty."
+                }</p>
+              </div>
             </div>
 
             {/* Coverage timeline */}
