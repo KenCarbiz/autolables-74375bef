@@ -6073,6 +6073,10 @@ export type Database = {
         Args: { _tenant_id: string; _vin: string }
         Returns: boolean
       }
+      invite_tenant_member: {
+        Args: { p_email: string; p_role: string; p_tenant_id: string }
+        Returns: string
+      }
       is_tenant_manager: {
         Args: { _tenant_id: string; _user_id: string }
         Returns: boolean
@@ -6160,6 +6164,7 @@ export type Database = {
           vin: string
         }[]
       }
+      rbac_is_tenant_admin: { Args: { p_tenant_id: string }; Returns: boolean }
       recalc_tenant_doc_fee: { Args: { p_tenant_id: string }; Returns: number }
       recall_payload_signature: { Args: { p: Json }; Returns: string }
       recon_caller_role: { Args: { _tenant: string }; Returns: string }
@@ -6334,6 +6339,10 @@ export type Database = {
       }
       set_marketcheck_allowed: {
         Args: { _allowed: boolean; _tenant_id: string }
+        Returns: undefined
+      }
+      set_tenant_member_role: {
+        Args: { p_member_id: string; p_role: string }
         Returns: undefined
       }
       sign_deal_token: {
