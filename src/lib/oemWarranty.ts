@@ -21,6 +21,15 @@ export interface OemFactoryWarranty {
   ev_battery_miles?: number;
   maintenance_months?: number;   // complimentary scheduled maintenance
   maintenance_miles?: number;
+  // Subsequent-owner (post-transfer) terms. Several makes — notably Hyundai,
+  // Kia, Genesis, Mitsubishi — drop the long original-owner powertrain coverage
+  // when the car changes hands (e.g. 10 yr / 100k original → 5 yr / 60k second
+  // owner). Used and CPO buyers are subsequent owners, so their passport shows
+  // these when present. Leave blank when the term is fully transferable.
+  powertrain_transfer_months?: number;
+  powertrain_transfer_miles?: number;
+  basic_transfer_months?: number;
+  basic_transfer_miles?: number;
   notes?: string;
   verified: boolean;             // dealer confirmed these match the OEM's published terms
   verified_at?: string;          // ISO timestamp of the confirmation
@@ -104,15 +113,23 @@ export const resolveFactoryWarranty = (
 // Build the listing.warranty_info shape the passport already renders. For a new
 // car there is no prior in-service date, so the caller passes the sale/listing
 // date — a brand-new car carries the full term forward from that point.
-export const factoryWarrantyToInfo = (w: OemFactoryWarranty, inServiceDate?: string) => ({
-  factory_months: w.basic_months || undefined,
-  // Unlimited (or unset) → omit the mile cap; the term is then time-only, which
-  // is exactly how an unlimited-mileage warranty reads.
-  factory_miles: finiteMiles(w.basic_miles),
-  powertrain_months: w.powertrain_months || undefined,
-  powertrain_miles: finiteMiles(w.powertrain_miles),
-  in_service_date: inServiceDate,
-});
+export const factoryWarrantyToInfo = (w: OemFactoryWarranty, inServiceDate?: string, subsequentOwner = false) => {
+  // A subsequent (used/CPO) owner gets the transferred term where the make
+  // reduces it; otherwise the standard term carries over unchanged.
+  const basicMonths = subsequentOwner && w.basic_transfer_months ? w.basic_transfer_months : w.basic_months;
+  const basicMiles = subsequentOwner && w.basic_transfer_miles ? w.basic_transfer_miles : w.basic_miles;
+  const ptMonths = subsequentOwner && w.powertrain_transfer_months ? w.powertrain_transfer_months : w.powertrain_months;
+  const ptMiles = subsequentOwner && w.powertrain_transfer_miles ? w.powertrain_transfer_miles : w.powertrain_miles;
+  return {
+    factory_months: basicMonths || undefined,
+    // Unlimited (or unset) → omit the mile cap; the term is then time-only,
+    // which is exactly how an unlimited-mileage warranty reads.
+    factory_miles: finiteMiles(basicMiles),
+    powertrain_months: ptMonths || undefined,
+    powertrain_miles: finiteMiles(ptMiles),
+    in_service_date: inServiceDate,
+  };
+};
 
 // CPO programs applicable to a vehicle of the given make — OEM programs whose
 // brand matches, plus every enabled dealer program (brand-agnostic).

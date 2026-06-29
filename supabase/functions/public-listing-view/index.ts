@@ -177,11 +177,18 @@ serve(async (req) => {
             // Unlimited (sentinel -1) or unset miles → omit the cap so the
             // passport renders a time-only term and never does negative-mile math.
             const finiteMiles = (n: unknown) => { const v = Number(n); return v > 0 ? v : undefined; };
+            // A CPO buyer is a subsequent owner, so use the transferred terms
+            // where the make reduces them (e.g. Hyundai/Kia 10/100 → 5/60).
+            const subsequent = cond === "cpo";
+            const bMonths = subsequent && w.basic_transfer_months ? w.basic_transfer_months : w.basic_months;
+            const bMiles = subsequent && w.basic_transfer_miles ? w.basic_transfer_miles : w.basic_miles;
+            const ptMonths = subsequent && w.powertrain_transfer_months ? w.powertrain_transfer_months : w.powertrain_months;
+            const ptMiles = subsequent && w.powertrain_transfer_miles ? w.powertrain_transfer_miles : w.powertrain_miles;
             row.warranty_info = {
-              factory_months: Number(w.basic_months) || undefined,
-              factory_miles: finiteMiles(w.basic_miles),
-              powertrain_months: Number(w.powertrain_months) || undefined,
-              powertrain_miles: finiteMiles(w.powertrain_miles),
+              factory_months: Number(bMonths) || undefined,
+              factory_miles: finiteMiles(bMiles),
+              powertrain_months: Number(ptMonths) || undefined,
+              powertrain_miles: finiteMiles(ptMiles),
               in_service_date: String(start).slice(0, 10),
             };
           }

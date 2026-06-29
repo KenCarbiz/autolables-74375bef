@@ -6,7 +6,8 @@ import {
   emptyOemWarranty, emptyCpoProgram, warrantyHeadline,
   UNLIMITED_MILES, isUnlimitedMiles,
 } from "@/lib/oemWarranty";
-import { Plus, Trash2, ShieldCheck, BadgeCheck, Save, CheckCircle2, Infinity as InfinityIcon, X } from "lucide-react";
+import { lookupOemReference } from "@/data/oemWarrantyReference";
+import { Plus, Trash2, ShieldCheck, BadgeCheck, Save, CheckCircle2, Infinity as InfinityIcon, X, Wand2 } from "lucide-react";
 import { toast } from "sonner";
 
 // Month/mile number pair. Defined at module scope (NOT inside the panel) so its
@@ -69,7 +70,18 @@ export default function OemWarrantyPanel() {
 
   const setW = (i: number, patch: Partial<OemFactoryWarranty>) =>
     setWarranties((prev) => prev.map((w, j) => (j === i ? { ...w, ...patch } : w)));
-  const addW = (brand = "") => setWarranties((prev) => [...prev, emptyOemWarranty(brand)]);
+  // Adding a franchised brand seeds the standard manufacturer terms from our
+  // reference (when known) so the dealer reviews instead of retypes — Verified
+  // stays OFF until they confirm.
+  const addW = (brand = "") => {
+    const ref = brand ? lookupOemReference(brand) : null;
+    setWarranties((prev) => [...prev, ref ? { ...emptyOemWarranty(brand), ...ref, brand, verified: false } : emptyOemWarranty(brand)]);
+  };
+  // Re-pull the reference into an existing row (keeps the brand, drops verified).
+  const fillFromReference = (i: number, brand: string) => {
+    const ref = lookupOemReference(brand);
+    if (ref) setW(i, { ...ref, verified: false, verified_at: undefined });
+  };
   const removeW = (i: number) => setWarranties((prev) => prev.filter((_, j) => j !== i));
   const verifyW = (i: number, on: boolean) =>
     setW(i, on
@@ -136,14 +148,24 @@ export default function OemWarrantyPanel() {
             <div className="flex items-center justify-between gap-3">
               <input value={w.brand} onChange={(e) => setW(i, { brand: e.target.value })} placeholder="Brand (e.g. INFINITI)" className="flex-1 min-w-0 h-9 px-2.5 rounded-lg border border-border bg-background text-sm font-semibold text-foreground outline-none focus:border-primary" />
               <span className="text-[11px] text-muted-foreground hidden sm:inline">{warrantyHeadline(w)}</span>
-              <button onClick={() => removeW(i)} className="h-8 w-8 inline-flex items-center justify-center rounded-lg border border-border text-rose-600 hover:bg-rose-50" aria-label="Remove brand">
+              {lookupOemReference(w.brand) && (
+                <button onClick={() => fillFromReference(i, w.brand)} title="Fill standard manufacturer terms from the reference (you still verify)" className="inline-flex items-center gap-1 h-8 px-2.5 rounded-lg border border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100 text-xs font-semibold shrink-0">
+                  <Wand2 className="w-3.5 h-3.5" /> Auto-fill
+                </button>
+              )}
+              <button onClick={() => removeW(i)} className="h-8 w-8 inline-flex items-center justify-center rounded-lg border border-border text-rose-600 hover:bg-rose-50 shrink-0" aria-label="Remove brand">
                 <Trash2 className="w-4 h-4" />
               </button>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div><label className={label}>Bumper-to-bumper (mo / mi)</label><Pair mo={w.basic_months} mi={w.basic_miles} onMo={(n) => setW(i, { basic_months: n })} onMi={(n) => setW(i, { basic_miles: n })} /></div>
-              <div><label className={label}>Powertrain (mo / mi)</label><Pair mo={w.powertrain_months} mi={w.powertrain_miles} onMo={(n) => setW(i, { powertrain_months: n })} onMi={(n) => setW(i, { powertrain_miles: n })} /></div>
+              <div><label className={label}>Powertrain — original owner (mo / mi)</label><Pair mo={w.powertrain_months} mi={w.powertrain_miles} onMo={(n) => setW(i, { powertrain_months: n })} onMi={(n) => setW(i, { powertrain_miles: n })} /></div>
+              <div>
+                <label className={label}>Powertrain — second owner (mo / mi)</label>
+                <Pair mo={w.powertrain_transfer_months} mi={w.powertrain_transfer_miles} onMo={(n) => setW(i, { powertrain_transfer_months: n })} onMi={(n) => setW(i, { powertrain_transfer_miles: n })} />
+                <p className="text-[10px] text-muted-foreground mt-0.5">Leave blank if fully transferable. Used &amp; CPO cars show this.</p>
+              </div>
               <div><label className={label}>Corrosion / rust-through (mo / mi)</label><Pair mo={w.corrosion_months} mi={w.corrosion_miles} onMo={(n) => setW(i, { corrosion_months: n })} onMi={(n) => setW(i, { corrosion_miles: n })} /></div>
               <div><label className={label}>Roadside assistance (mo / mi)</label><Pair mo={w.roadside_months} mi={w.roadside_miles} onMo={(n) => setW(i, { roadside_months: n })} onMi={(n) => setW(i, { roadside_miles: n })} /></div>
               <div><label className={label}>Hybrid / EV battery (mo / mi)</label><Pair mo={w.ev_battery_months} mi={w.ev_battery_miles} onMo={(n) => setW(i, { ev_battery_months: n })} onMi={(n) => setW(i, { ev_battery_miles: n })} /></div>
