@@ -5,8 +5,9 @@ import { supabase } from "@/integrations/supabase/client";
 import SignaturePad from "@/components/addendum/SignaturePad";
 import K208Checklist, { K208_ITEMS, k208Answered, k208Result, k208Checklist, type K208Mark } from "@/components/service/K208Checklist";
 import { K208_CERTIFICATION_TEXT } from "@/data/ctK208Form";
+import { PDI_ITEMS, PDI_CERTIFICATION_TEXT } from "@/data/pdiForm";
 import { buildConsentRecord, hashPayload, fetchClientIp } from "@/lib/esign";
-import { CheckCircle2, Loader2, ShieldCheck, Sparkles, ChevronRight, Upload, X, AlertTriangle, ArrowLeft, Camera, Wrench } from "lucide-react";
+import { CheckCircle2, Loader2, ShieldCheck, Sparkles, ChevronRight, Upload, X, AlertTriangle, ArrowLeft, Camera, Wrench, ClipboardCheck } from "lucide-react";
 
 // Remember the signer's name per device + station so a tech/detailer signing
 // 20 cars a day doesn't retype it every time.
@@ -53,7 +54,7 @@ interface Ctx {
   signoffs?: SignoffRow[];
   preinstall_products?: { id: string; name: string; pre_install: boolean }[];
 }
-type View = "hub" | "service" | "detail" | "recon";
+type View = "hub" | "service" | "detail" | "recon" | "pdi";
 
 interface ReconLine { id: string; category: string | null; description: string; severity: string; completed_at: string | null; completed_by: string | null; }
 
@@ -93,6 +94,7 @@ export default function GetReady() {
   const { token = "" } = useParams();
   const [ctx, setCtx] = useState<Ctx | null>(null);
   const [reconLines, setReconLines] = useState<ReconLine[]>([]);
+  const [pdiDone, setPdiDone] = useState(false);
   const [loading, setLoading] = useState(true);
   const [view, setView] = useState<View>("hub");
 
@@ -101,12 +103,18 @@ export default function GetReady() {
     if (data?.ok) setReconLines((data.lines as ReconLine[]) || []);
   }, [token]);
 
+  const loadPdi = useCallback(async () => {
+    const { data } = await (supabase as any).rpc("get_pdi_for_token", { _token: token });
+    if (data?.ok) setPdiDone(!!data.done);
+  }, [token]);
+
   const refresh = useCallback(async () => {
     const { data } = await (supabase as any).rpc("get_vehicle_ready", { _token: token });
     setCtx((data as Ctx) || { ok: false, reason: "not_found" });
     loadRecon();
+    loadPdi();
     setLoading(false);
-  }, [token, loadRecon]);
+  }, [token, loadRecon, loadPdi]);
   useEffect(() => { refresh(); }, [refresh]);
 
   if (loading) return <div className="min-h-screen grid place-items-center bg-background"><Loader2 className="w-6 h-6 animate-spin text-muted-foreground" /></div>;
@@ -128,7 +136,7 @@ export default function GetReady() {
       <div className="sticky top-0 z-10 bg-primary text-primary-foreground px-4 py-3 shadow-sm flex items-center gap-2">
         {view !== "hub" && <button onClick={() => setView("hub")} className="-ml-1 mr-1"><ArrowLeft className="w-5 h-5" /></button>}
         <div>
-          <div className="font-display font-bold leading-tight">{view === "service" ? "Safety Inspection · K-208" : view === "detail" ? "Detail & Install" : view === "recon" ? "Reconditioning Work" : "Get the car ready"}</div>
+          <div className="font-display font-bold leading-tight">{view === "service" ? "Safety Inspection · K-208" : view === "detail" ? "Detail & Install" : view === "recon" ? "Reconditioning Work" : view === "pdi" ? "Pre-Delivery Inspection" : "Get the car ready"}</div>
           <div className="text-xs opacity-90">{ctx.ymm || "Vehicle"} · {ctx.vin}</div>
         </div>
       </div>
@@ -143,6 +151,7 @@ export default function GetReady() {
             <StationCard step={1} icon={<ShieldCheck className="w-5 h-5" />} title="Sign off the safety inspection (K-208)" sub={ctx.service_done ? "Completed" : "Mark each item Pass or Fail, then sign"} done={!!ctx.service_done} onClick={() => setView("service")} />
             <StationCard step={2} icon={<Wrench className="w-5 h-5" />} title="Confirm reconditioning is done" sub={reconLines.length === 0 ? "No recon work assigned yet" : reconDone ? "All work confirmed" : `Check off each job — ${reconDoneCount} of ${reconLines.length} done`} done={reconDone} onClick={() => setView("recon")} disabled={reconLines.length === 0} />
             <StationCard step={3} icon={<Sparkles className="w-5 h-5" />} title="Confirm detail & installed work" sub="Detail · service · parts · outside vendor" done={false} onClick={() => setView("detail")} addAction />
+            <StationCard step={4} icon={<ClipboardCheck className="w-5 h-5" />} title="Pre-delivery inspection (PDI)" sub={pdiDone ? "Completed" : "Final check before delivery — tech or service writer"} done={pdiDone} onClick={() => setView("pdi")} />
 
             {(ctx.signoffs?.length ?? 0) > 0 && (
               <div className="rounded-2xl border border-border bg-card p-4">
@@ -173,6 +182,7 @@ export default function GetReady() {
         {view === "service" && <ServiceStation token={token} ctx={ctx} onDone={() => { refresh(); setView("hub"); }} />}
         {view === "detail" && <DetailStation token={token} ctx={ctx} onDone={() => { refresh(); setView("hub"); }} />}
         {view === "recon" && <ReconStation token={token} lines={reconLines} onDone={() => { loadRecon(); setView("hub"); }} />}
+        {view === "pdi" && <PdiStation token={token} ctx={ctx} onDone={() => { loadPdi(); setView("hub"); }} />}
       </div>
     </div>
   );
@@ -234,6 +244,89 @@ function ReconStation({ token, lines, onDone }: { token: string; lines: ReconLin
       <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Your name" className="w-full h-11 rounded-lg border border-border bg-background px-3 text-sm" />
       {!canSubmit && !busy && <p className="text-[12px] text-amber-600 text-center">{toConfirm.length === 0 ? "Check off the jobs you completed." : "Enter your name to confirm."}</p>}
       <SubmitBar label={`Confirm ${toConfirm.length || ""} job${toConfirm.length === 1 ? "" : "s"} done`} disabled={!canSubmit} busy={busy} onClick={submit} />
+    </div>
+  );
+}
+
+// ── PDI station — pre-delivery inspection (technician or service writer) ─────
+function PdiStation({ token, ctx, onDone }: { token: string; ctx: Ctx; onDone: () => void }) {
+  const [role, setRole] = useState<"technician" | "service_writer">("technician");
+  const [marks, setMarks] = useState<Record<string, "pass" | "fail">>({});
+  const [itemNotes, setItemNotes] = useState<Record<string, string>>({});
+  const [notes, setNotes] = useState("");
+  const [name, setName] = useState(() => rememberedName("pdi"));
+  const [sig, setSig] = useState(""); const [sigType, setSigType] = useState<"draw" | "type">("draw");
+  const [consent, setConsent] = useState(false);
+  const [busy, setBusy] = useState(false);
+
+  const answered = PDI_ITEMS.filter((i) => marks[i.id]).length;
+  const allAnswered = answered >= PDI_ITEMS.length;
+  const anyFail = PDI_ITEMS.some((i) => marks[i.id] === "fail");
+  const failsExplained = PDI_ITEMS.every((i) => marks[i.id] !== "fail" || (itemNotes[i.id] || "").trim() !== "");
+  const passAll = () => { setMarks(Object.fromEntries(PDI_ITEMS.map((i) => [i.id, "pass" as const]))); setItemNotes({}); };
+  const canSubmit = !!name.trim() && !!sig.trim() && consent && allAnswered && failsExplained && !busy;
+
+  const submit = async () => {
+    if (!canSubmit) return; setBusy(true);
+    const checklist = PDI_ITEMS.map((i) => ({ id: i.id, label: i.label, result: marks[i.id] || "pass", explanation: (itemNotes[i.id] || "").trim() }));
+    const result = anyFail ? "fail" : "pass";
+    const content_hash = await hashPayload({ vin: ctx.vin, checklist, result, name, role });
+    const ip = await fetchClientIp();
+    const { data, error } = await (supabase as any).rpc("submit_pdi_signoff", {
+      _token: token, _checklist: checklist, _result: result, _notes: notes || null,
+      _performer_name: name.trim(), _performer_role: role, _signature_data: sig, _content_hash: content_hash,
+      _esign_consent: buildConsentRecord(), _ip: ip, _user_agent: typeof navigator !== "undefined" ? navigator.userAgent : null,
+    });
+    setBusy(false);
+    if (!error && (data as { ok?: boolean })?.ok) { saveName("pdi", name); onDone(); }
+    else toast.error((data as { reason?: string })?.reason === "expired" ? "This link is no longer active — ask for a new QR." : "Couldn't submit — please try again.");
+  };
+
+  return (
+    <div className="space-y-4">
+      <div className="rounded-2xl border border-border bg-card p-4 space-y-2">
+        <div className="text-xs font-bold uppercase tracking-wider text-foreground">Who's completing the PDI?</div>
+        <div className="flex gap-2">
+          {([["technician", "Technician"], ["service_writer", "Service writer"]] as const).map(([k, label]) => (
+            <button key={k} onClick={() => setRole(k)} className={`flex-1 h-10 rounded-lg text-sm font-semibold border ${role === k ? "border-primary bg-primary/10 text-primary" : "border-border text-foreground"}`}>{label}</button>
+          ))}
+        </div>
+      </div>
+      <div className="flex items-center justify-between gap-3">
+        <p className="text-sm text-muted-foreground">{answered} of {PDI_ITEMS.length} items marked</p>
+        <button onClick={passAll} className="h-9 px-3 rounded-md bg-emerald-600 text-white text-xs font-semibold">Pass all</button>
+      </div>
+      <div className="rounded-2xl border border-border bg-card divide-y divide-border/60">
+        {PDI_ITEMS.map((item) => {
+          const failed = marks[item.id] === "fail";
+          return (
+            <div key={item.id} className="px-4 py-2.5">
+              <div className="flex items-center justify-between gap-3">
+                <span className="text-sm font-medium text-foreground flex-1">{item.label}</span>
+                <div className="flex gap-1.5 shrink-0">
+                  {(["pass", "fail"] as const).map((m) => (
+                    <button key={m} onClick={() => setMarks((s) => ({ ...s, [item.id]: m }))}
+                      className={`h-11 w-16 rounded-md text-[12px] font-semibold border transition-colors ${marks[item.id] === m ? (m === "pass" ? "bg-emerald-600 text-white border-emerald-600" : "bg-red-600 text-white border-red-600") : "bg-background text-muted-foreground border-border hover:bg-muted"}`}>
+                      {m === "pass" ? "Pass" : "Fail"}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              {failed && (
+                <input autoFocus value={itemNotes[item.id] || ""} onChange={(e) => setItemNotes((s) => ({ ...s, [item.id]: e.target.value }))}
+                  placeholder="What's the issue? (required)" className="mt-2 w-full rounded-lg border border-red-300 bg-red-50/40 px-3 h-10 text-sm" />
+              )}
+            </div>
+          );
+        })}
+      </div>
+      <div><p className="text-xs font-semibold text-foreground mb-1.5">Notes (optional)</p><NoteChips onPick={(t) => setNotes((c) => appendNote(c, t))} />
+        <textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={2} placeholder="Anything to note…" className="w-full rounded-lg border border-border bg-background p-3 text-sm" /></div>
+      <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Your full name" className="w-full h-11 rounded-lg border border-border bg-background px-3 text-sm" />
+      <SignaturePad label="Signature" subtitle="Sign to certify the PDI." value={sig} type={sigType} onChange={(d, t) => { setSig(d); setSigType(t); }} />
+      <ConsentRow text={PDI_CERTIFICATION_TEXT} checked={consent} onChange={setConsent} />
+      {!canSubmit && !busy && <p className="text-[12px] text-amber-600 text-center">{!allAnswered ? `${PDI_ITEMS.length - answered} item(s) still need a mark — use "Pass all" then adjust.` : !failsExplained ? "Explain each failed item." : !name.trim() ? "Enter your name." : !sig.trim() ? "Add your signature." : !consent ? "Check the certification box." : ""}</p>}
+      <SubmitBar label="Submit PDI" disabled={!canSubmit} busy={busy} onClick={submit} />
     </div>
   );
 }
