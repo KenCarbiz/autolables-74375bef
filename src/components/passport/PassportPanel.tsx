@@ -837,13 +837,21 @@ function buildPanel(key: PassportPanelKey, d: PassportData, listing: VehicleList
     case "factory-warranty": {
       const w = d.warranty;
       const ks = listing.key_specs || {};
-      const milesLeft = w.factory_miles != null && listing.mileage != null ? Math.max(0, w.factory_miles - listing.mileage) : null;
-      const milesPct = w.factory_miles && listing.mileage != null ? Math.max(3, 100 - Math.min(100, (listing.mileage / w.factory_miles) * 100)) : null;
+      const isNew = listing.condition === "new";
+      // New-car mileage credit: the factory allowance is measured from delivery,
+      // so add back the few odometer miles already on the car (capped at 100). A
+      // 60,000-mi warranty on a 17-mi new car expires at 60,017 / shows 60,000 left.
+      const odoCredit = isNew && listing.mileage != null ? Math.min(listing.mileage, 100) : 0;
+      const expMilesOf = (limit?: number | null) => (limit && limit > 0 ? limit + odoCredit : null);
+      const milesRemainOf = (limit?: number | null) => (limit && limit > 0 && listing.mileage != null ? Math.max((limit + odoCredit) - listing.mileage, 0) : null);
+      const milesPctOf = (limit?: number | null) => { const exp = expMilesOf(limit); const rem = milesRemainOf(limit); return exp != null && rem != null ? Math.max(3, Math.min(100, (rem / exp) * 100)) : null; };
+      const milesLeft = milesRemainOf(w.factory_miles);
+      const milesPct = milesPctOf(w.factory_miles);
       const expFrom = (months?: number) => { if (!w.in_service_date || !months) return { date: null as string | null, left: null as number | null, pct: null as number | null }; const end = new Date(w.in_service_date); end.setMonth(end.getMonth() + months); const ms = end.getTime() - Date.now(); const left = ms > 0 ? Math.round(ms / (1000 * 60 * 60 * 24 * 30.4)) : 0; return { date: end.toLocaleDateString(), left, pct: Math.max(3, Math.min(100, (left / months) * 100)) }; };
       const basic = expFrom(w.factory_months);
       const pt = expFrom(w.powertrain_months);
-      const ptMilesLeft = w.powertrain_miles != null && listing.mileage != null ? Math.max(0, w.powertrain_miles - listing.mileage) : null;
-      const ptMilesPct = w.powertrain_miles && listing.mileage != null ? Math.max(3, 100 - Math.min(100, (listing.mileage / w.powertrain_miles) * 100)) : null;
+      const ptMilesLeft = milesRemainOf(w.powertrain_miles);
+      const ptMilesPct = milesPctOf(w.powertrain_miles);
       const fuel = String(ks.fuel || "").toLowerCase();
       const isHybrid = /hybrid/.test(fuel), isEV = /electric|ev\b/.test(fuel);
       const coverageType = w.powertrain_months ? "Powertrain Coverage" : "Basic Coverage";
@@ -917,11 +925,11 @@ function buildPanel(key: PassportPanelKey, d: PassportData, listing: VehicleList
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 {hasBasic && (
                   <CoverageCard title="Bumper-to-Bumper" subtitle="Basic Vehicle Coverage" tone="blue" pct={b2bPct}
-                    years={yrsRemain(basic.left)} miles={milesRemainLbl(milesLeft)} expiresDate={basic.date} expiresMiles={milesCapLbl(w.factory_miles)} />
+                    years={yrsRemain(basic.left)} miles={milesRemainLbl(milesLeft)} expiresDate={basic.date} expiresMiles={milesCapLbl(expMilesOf(w.factory_miles))} />
                 )}
                 {hasPt && (
                   <CoverageCard title="Powertrain" subtitle="Engine, Transmission & Drivetrain" tone="green" pct={ptPct}
-                    years={yrsRemain(pt.left)} miles={milesRemainLbl(ptMilesLeft)} expiresDate={pt.date} expiresMiles={milesCapLbl(w.powertrain_miles)} />
+                    years={yrsRemain(pt.left)} miles={milesRemainLbl(ptMilesLeft)} expiresDate={pt.date} expiresMiles={milesCapLbl(expMilesOf(w.powertrain_miles))} />
                 )}
               </div>
               {/* OEM-data-driven confidence line — the selling point. */}
@@ -972,22 +980,23 @@ function buildPanel(key: PassportPanelKey, d: PassportData, listing: VehicleList
                 {(isHybrid || isEV) && benefitRows.every((r) => r.key !== "ev_battery") && <p><span className="font-semibold text-[#0F172A]">{isEV ? "EV Battery" : "Hybrid Battery"}</span> — extended high-voltage coverage; confirm terms.</p>}
                 <p className="text-[11px] text-[#94A3B8]">Federal emissions components carry their own coverage. Exact terms vary by model year.</p>
               </WAcc>
-              <WAcc icon={BadgeCheck} title="Certified Pre-Owned Coverage" sub="Additional coverage that applies (if any)">
-                {isCpo && cpo ? (
-                  <>
-                    <p><span className="font-semibold text-[#0F172A]">{String(cpo.name)}</span> — {cpo.kind === "oem" ? "Manufacturer Certified" : "Dealer Certified"}.</p>
-                    {cpoTerm(cpo.basic_months, cpo.basic_miles) && <p>Limited warranty: <span className="font-semibold text-[#0F172A]">{cpoTerm(cpo.basic_months, cpo.basic_miles)}</span></p>}
-                    {cpoTerm(cpo.powertrain_months, cpo.powertrain_miles) && <p>Powertrain: <span className="font-semibold text-[#0F172A]">{cpoTerm(cpo.powertrain_months, cpo.powertrain_miles)}</span></p>}
-                    {cpo.inspection_points ? <p>{String(cpo.inspection_points)} inspection{cpo.transferable ? " · transferable" : ""}</p> : null}
-                    {cpo.benefits ? <p>{String(cpo.benefits)}</p> : null}
-                    {cpo.disclosure ? <p className="text-[11px] text-[#94A3B8]">{String(cpo.disclosure)}</p> : null}
-                  </>
-                ) : isCpo ? (
-                  <p>This vehicle includes additional Certified Pre-Owned coverage. Confirm exact CPO terms with the dealer.</p>
-                ) : (
-                  <p>This vehicle is sold new, so factory coverage applies. Certified Pre-Owned coverage applies to qualifying used vehicles.</p>
-                )}
-              </WAcc>
+              {/* CPO coverage is a used/CPO concern — hidden entirely for new cars. */}
+              {!isNew && (
+                <WAcc icon={BadgeCheck} title="Certified Pre-Owned Coverage" sub="Additional coverage that applies (if any)">
+                  {isCpo && cpo ? (
+                    <>
+                      <p><span className="font-semibold text-[#0F172A]">{String(cpo.name)}</span> — {cpo.kind === "oem" ? "Manufacturer Certified" : "Dealer Certified"}.</p>
+                      {cpoTerm(cpo.basic_months, cpo.basic_miles) && <p>Limited warranty: <span className="font-semibold text-[#0F172A]">{cpoTerm(cpo.basic_months, cpo.basic_miles)}</span></p>}
+                      {cpoTerm(cpo.powertrain_months, cpo.powertrain_miles) && <p>Powertrain: <span className="font-semibold text-[#0F172A]">{cpoTerm(cpo.powertrain_months, cpo.powertrain_miles)}</span></p>}
+                      {cpo.inspection_points ? <p>{String(cpo.inspection_points)} inspection{cpo.transferable ? " · transferable" : ""}</p> : null}
+                      {cpo.benefits ? <p>{String(cpo.benefits)}</p> : null}
+                      {cpo.disclosure ? <p className="text-[11px] text-[#94A3B8]">{String(cpo.disclosure)}</p> : null}
+                    </>
+                  ) : (
+                    <p>This vehicle includes additional Certified Pre-Owned coverage. Confirm exact CPO terms with the dealer.</p>
+                  )}
+                </WAcc>
+              )}
               <WAcc icon={FileText} title="Warranty Details & FAQ" sub="Deductible, transferability, claims & more">
                 <p><span className="font-semibold text-[#0F172A]">Deductible:</span> typically $0 on covered factory repairs.</p>
                 <p><span className="font-semibold text-[#0F172A]">Transferable:</span> {d.oemWarranty?.owner === "subsequent" ? "remaining coverage transfers with the vehicle (some terms reduce for a second owner)." : "yes — remaining coverage transfers with the vehicle."}</p>
@@ -1617,7 +1626,7 @@ const WarrantyCarVisual = ({ hasPowertrain, onAll }: { hasPowertrain: boolean; o
     <div className={`${CARD} p-4`}>
       <div className="grid grid-cols-1 sm:grid-cols-[150px_1fr] gap-3 items-center">
         <div className="space-y-2">
-          <CoverageToggle active={mode === "basic"} tone="blue" icon={ShieldCheck} title="Bumper-to-Bumper" sub="Basic Coverage" onClick={() => setMode("basic")} />
+          <CoverageToggle active={mode === "basic"} tone="blue" icon={Car} title="Bumper-to-Bumper" sub="Basic Coverage" onClick={() => setMode("basic")} />
           {hasPowertrain && <CoverageToggle active={mode === "powertrain"} tone="green" icon={Gauge} title="Powertrain" sub="Drivetrain Coverage" onClick={() => setMode("powertrain")} />}
         </div>
         <div className="flex items-center justify-center">
