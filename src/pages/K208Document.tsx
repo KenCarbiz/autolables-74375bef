@@ -38,6 +38,16 @@ export default function K208Document() {
   const [filing, setFiling] = useState(false);
   const formRef = useRef<HTMLDivElement>(null);
 
+  // The dealer initials the A/B/C warranty result. Members may update the
+  // inspection directly under RLS, so no extra RPC is needed.
+  const setResult = async (code: "A" | "B" | "C") => {
+    if (!insp || !tenantId) return;
+    const prev = insp.result_initial;
+    setInsp({ ...insp, result_initial: code });
+    const { error } = await sb().from("safety_inspections").update({ result_initial: code }).eq("id", insp.id);
+    if (error) { setInsp((s) => (s ? { ...s, result_initial: prev } : s)); toast.error("Couldn't save the result."); }
+  };
+
   // Render the displayed form to a PDF and store it immutably in the evidence
   // file (signed_document_archive via archive-pdf).
   const saveToEvidence = async () => {
@@ -161,10 +171,14 @@ export default function K208Document() {
           <SectionTitle>Inspection Results &mdash; Dealer Must Initial A, B or C</SectionTitle>
           {K208_INSPECTION_RESULTS.map((res) => (
             <div key={res.code} className="flex gap-2 items-start py-0.5">
-              <span className="font-bold border border-black w-6 h-6 inline-grid place-items-center shrink-0">{insp.result_initial === res.code ? res.code : ""}</span>
+              <button onClick={() => setResult(res.code as "A" | "B" | "C")} title={`Initial ${res.code}`}
+                className={`font-bold border border-black w-6 h-6 inline-grid place-items-center shrink-0 ${insp.result_initial === res.code ? "bg-slate-900 text-white print:bg-white print:text-black" : "hover:bg-slate-100 print:hover:bg-white"}`}>
+                {insp.result_initial === res.code ? res.code : ""}
+              </button>
               <span className="text-[11px]"><b>{res.code}.</b> {res.label}</span>
             </div>
           ))}
+          <p className="no-print text-[10px] text-slate-500 mt-1">Tap A, B, or C to record the dealer's warranty determination.</p>
           <div className="text-[10px] text-slate-600 mt-1">Vehicle shall be emissions compliant per 14-164c(n).</div>
         </div>
 
