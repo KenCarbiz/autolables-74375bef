@@ -17,7 +17,7 @@ import { isServiceOrCron } from "../_shared/supabase.ts";
 //     -d '{"vin":"<optional VIN>","zip":"06010","dealer_id":"<optional>"}'
 // ──────────────────────────────────────────────────────────────────────
 
-const KEY = Deno.env.get("MARKETCHECK_API_KEY") || Deno.env.get("MARKETCHECK_API_KEY_") || "";
+const KEY = Deno.env.get("MARKETCHECK_API_KEY_1") || Deno.env.get("MARKETCHECK_API_KEY") || "";
 const BASE = "https://api.marketcheck.com/v2";
 
 // deno-lint-ignore no-explicit-any
