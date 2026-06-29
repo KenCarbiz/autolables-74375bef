@@ -8,6 +8,18 @@ import {
 import { Plus, Trash2, ShieldCheck, BadgeCheck, Save, CheckCircle2 } from "lucide-react";
 import { toast } from "sonner";
 
+// Month/mile number pair. Defined at module scope (NOT inside the panel) so its
+// component identity is stable across re-renders — a nested definition would be
+// a new function every keystroke, remounting the input and dropping focus after
+// one character.
+const PAIR_INPUT = "w-full h-9 px-2.5 rounded-lg border border-border bg-background text-sm text-foreground outline-none focus:border-primary tabular-nums";
+const Pair = ({ mo, mi, onMo, onMi }: { mo?: number; mi?: number; onMo: (n: number) => void; onMi: (n: number) => void }) => (
+  <div className="grid grid-cols-2 gap-2">
+    <input type="number" min={0} value={mo ?? ""} onChange={(e) => onMo(Number(e.target.value) || 0)} placeholder="months" className={PAIR_INPUT} />
+    <input type="number" min={0} value={mi ?? ""} onChange={(e) => onMi(Number(e.target.value) || 0)} placeholder="miles" className={PAIR_INPUT} />
+  </div>
+);
+
 // Factory & CPO warranty config. The dealer verifies each franchised brand's
 // OEM factory-warranty terms (only verified terms feed the passport) and lists
 // their CPO programs. New cars surface the matching brand's factory warranty on
@@ -52,13 +64,6 @@ export default function OemWarrantyPanel() {
   const num = `${input} tabular-nums`;
   const label = "text-[10px] font-bold uppercase tracking-wider text-muted-foreground";
   const area = "w-full px-2.5 py-2 rounded-lg border border-border bg-background text-sm text-foreground outline-none focus:border-primary resize-y";
-
-  const Pair = ({ mo, mi, onMo, onMi }: { mo?: number; mi?: number; onMo: (n: number) => void; onMi: (n: number) => void }) => (
-    <div className="grid grid-cols-2 gap-2">
-      <input type="number" min={0} value={mo ?? ""} onChange={(e) => onMo(Number(e.target.value) || 0)} placeholder="months" className={num} />
-      <input type="number" min={0} value={mi ?? ""} onChange={(e) => onMi(Number(e.target.value) || 0)} placeholder="miles" className={num} />
-    </div>
-  );
 
   return (
     <div className="space-y-6 max-w-3xl">
