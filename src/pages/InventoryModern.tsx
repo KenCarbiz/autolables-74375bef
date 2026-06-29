@@ -582,55 +582,52 @@ const InventoryModern = () => {
             <>
               {/* Table view (tablet/desktop only when list mode) */}
               <div className={`${viewMode === "list" ? "hidden md:block" : "hidden"} rounded-2xl border border-border bg-card shadow-sm overflow-x-auto`}>
-                <table className="w-full text-sm min-w-[820px]">
+                <table className="w-full text-sm min-w-[760px]">
                   <thead className="bg-muted/40 text-[11px] uppercase tracking-wide text-muted-foreground">
                     <tr>
-                      <th className="text-left font-semibold px-4 py-3">Vehicle</th>
-                      <th className="text-left font-semibold px-3 py-3">Stock / VIN</th>
-                      <th className="text-left font-semibold px-3 py-3">Status</th>
-                      <th className="text-left font-semibold px-3 py-3">Readiness</th>
-                      <th className="text-left font-semibold px-3 py-3">Compliance</th>
-                      <th className="text-left font-semibold px-3 py-3">Advertised Price</th>
-                      <th className="text-left font-semibold px-3 py-3">Publishing</th>
-                      <th className="text-left font-semibold px-3 py-3">Updated</th>
-                      <th className="text-right font-semibold px-3 py-3">Actions</th>
+                      <th className="text-left font-semibold px-4 py-2.5">Vehicle</th>
+                      <th className="text-left font-semibold px-3 py-2.5">Status</th>
+                      <th className="text-left font-semibold px-3 py-2.5">Readiness</th>
+                      <th className="text-left font-semibold px-3 py-2.5">Compliance</th>
+                      <th className="text-left font-semibold px-3 py-2.5">Advertised Price</th>
+                      <th className="text-left font-semibold px-3 py-2.5">Publishing</th>
+                      <th className="text-left font-semibold px-3 py-2.5">Updated</th>
+                      <th className="text-right font-semibold px-3 py-2.5">Actions</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-border">
                     {pageRows.map((r) => (
                       <tr key={r.id} className="group hover:bg-muted/30 cursor-pointer transition-colors" onClick={() => navigate(`/vehicle-file/${r.id}`)}>
-                        <td className="px-4 py-2.5">
+                        <td className="px-4 py-2 align-middle">
                           <div className="flex items-center gap-3">
                             <Thumb r={r} />
-                            <div className="min-w-0">
+                            <div className="min-w-0 leading-tight">
                               <div className="flex items-center gap-1.5">
                                 <span className="font-semibold text-foreground truncate">{r.ymm || "(needs decode)"}</span>
                                 {r.condition && <CondBadge condition={r.condition} />}
                               </div>
-                              {r.trim && <p className="text-xs text-muted-foreground truncate">{r.trim}</p>}
+                              {r.trim && <p className="text-xs text-muted-foreground truncate mt-px">{r.trim}</p>}
+                              <p className="text-[11px] text-muted-foreground/90 font-mono truncate mt-0.5">
+                                Stock {r.stock_number ? `#${r.stock_number}` : "—"} • VIN …{(r.vin || "").slice(-6)}
+                              </p>
                             </div>
                           </div>
                         </td>
-                        <td className="px-3 py-2.5">
-                          <p className="font-mono text-xs text-foreground">{r.stock_number || "—"}</p>
-                          <p className="font-mono text-[11px] text-muted-foreground">…{(r.vin || "").slice(-6)}</p>
-                        </td>
-                        <td className="px-3 py-3"><SimpleStatusPill status={r.status} /></td>
-                        <td className="px-3 py-3">
+                        <td className="px-3 py-2 align-middle"><SimpleStatusPill status={r.status} /></td>
+                        <td className="px-3 py-2 align-middle">
                           <ReadinessCell r={r} signal={signalFor(r)} pct={rowReadiness(r)} />
                         </td>
-                        <td className="px-3 py-3">
+                        <td className="px-3 py-2 align-middle">
                           <ComplianceCell ymm={r.ymm} recallStatus={r.recall_status} openRecallCount={r.open_recall_count} />
                         </td>
-                        <td className="px-3 py-3">
-                          <AdvertisedPriceCell price={r.price} docFee={settings.doc_fee_amount} ap={byVin.get((r.vin || "").toUpperCase())} />
-                          <div className="mt-1"><MarketCell position={r.market_position} price={r.price} value={r.market_value} /></div>
+                        <td className="px-3 py-2 align-middle">
+                          <PriceCell price={r.price} docFee={settings.doc_fee_amount} ap={byVin.get((r.vin || "").toUpperCase())} position={r.market_position} value={r.market_value} />
                         </td>
-                        <td className="px-3 py-3" onClick={(e) => e.stopPropagation()}>
+                        <td className="px-3 py-2 align-middle" onClick={(e) => e.stopPropagation()}>
                           <PortalChip status={r.status} />
                         </td>
-                        <td className="px-3 py-3">{r.updated_at ? <UpdatedCell iso={r.updated_at} /> : <span className="text-xs text-muted-foreground">—</span>}</td>
-                        <td className="px-3 py-2.5 text-right" onClick={(e) => e.stopPropagation()}>
+                        <td className="px-3 py-2 align-middle">{r.updated_at ? <UpdatedCell iso={r.updated_at} /> : <span className="text-xs text-muted-foreground">—</span>}</td>
+                        <td className="px-3 py-2 text-right align-middle" onClick={(e) => e.stopPropagation()}>
                           <div className="flex justify-end items-center gap-1">
                             <div className="hidden md:flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
                               <HoverBtn title="Open vehicle" onClick={() => navigate(`/vehicle-file/${r.id}`)}><ExternalLink className="w-3.5 h-3.5" /></HoverBtn>
@@ -753,11 +750,11 @@ const UpdatedCell = ({ iso }: { iso: string }) => {
   const yest = new Date(today); yest.setDate(today.getDate() - 1);
   const isYest = d.toDateString() === yest.toDateString();
   const time = d.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
-  const top = sameDay ? "Today" : isYest ? "Yesterday" : d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+  const label = sameDay ? "Today" : isYest ? "Yesterday" : d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
   return (
     <div className="leading-tight whitespace-nowrap">
-      <p className="text-xs font-semibold text-foreground">{top}</p>
-      <p className="text-[11px] text-muted-foreground tabular-nums">{time}</p>
+      <p className="text-xs font-semibold text-foreground tabular-nums">{time}</p>
+      <p className="text-[11px] text-muted-foreground">{label}</p>
     </div>
   );
 };
@@ -782,7 +779,7 @@ const CondBadge = ({ condition }: { condition: "new" | "used" | "cpo" }) => {
   return <span className={`text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded ${cls}`}>{condition}</span>;
 };
 
-const MiniRing = ({ pct, size = 52 }: { pct: number; size?: number }) => {
+const MiniRing = ({ pct, size = 40 }: { pct: number; size?: number }) => {
   const tone = pct >= 100 ? "#10B981" : pct >= 60 ? "#2563EB" : pct >= 40 ? "#F59E0B" : "#EF4444";
   const r = 16; const c = 2 * Math.PI * r;
   return (
@@ -810,12 +807,13 @@ const ReadinessCell = ({ r, signal, pct }: { r: VehicleRow; signal: RowSignal; p
   const label = pct >= 100 ? "Ready" : pct >= 80 ? "Almost Ready" : missing <= 1 ? "Missing Items" : "Several Missing";
   const labelTone = pct >= 100 ? "text-emerald-700" : pct >= 80 ? "text-blue-700" : missing <= 1 ? "text-amber-700" : "text-red-600";
   const title = `${pct}% readiness\n` + checks.map((c) => `${c.ok ? "✓" : "✗"} ${c.label}`).join("\n");
+  const shortLabel = pct >= 100 ? "Ready" : label;
   return (
-    <div className="flex items-center gap-2.5 cursor-help" title={title}>
+    <div className="flex items-center gap-2 cursor-help" title={title}>
       <MiniRing pct={pct} />
       <div className="min-w-0 leading-tight">
-        <p className={`text-xs font-semibold tracking-tight ${labelTone}`}>{label}</p>
-        {pct < 100 && <p className="text-[11px] font-semibold text-blue-600 mt-0.5">View reasons</p>}
+        <p className={`text-xs font-semibold tracking-tight ${labelTone}`}>{shortLabel}</p>
+        {missing > 0 && <p className="text-[11px] font-semibold text-blue-600 mt-0.5">{missing} {missing === 1 ? "Task" : "Tasks"}</p>}
       </div>
     </div>
   );
@@ -1041,27 +1039,6 @@ const VinDecodeCell = ({ ymm }: { ymm?: string | null }) =>
     ? <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-emerald-600"><CheckCircle2 className="w-3.5 h-3.5" />Decoded</span>
     : <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-red-600"><AlertTriangle className="w-3.5 h-3.5" />Decode Failed</span>;
 
-// Market position — deal label over the dollar delta vs. MarketCheck value.
-const MarketCell = ({ position, price, value }: { position?: string | null; price?: number | null; value?: number | null }) => {
-  const delta = price != null && value != null ? Number(value) - price : null;
-  const dealLabel = position === "above_market"
-    ? "Over Market"
-    : position && MARKET_CHIP[position]
-      ? MARKET_CHIP[position].label
-      : delta == null ? null : delta >= 0 ? "Good Deal" : "Over Market";
-  const below = delta == null ? null : delta >= 0;
-  const labelCls = dealLabel === "Over Market" ? "text-red-600" : dealLabel === "Fair Price" ? "text-amber-600" : "text-emerald-600";
-  if (!dealLabel && delta == null) return <span className="text-xs text-muted-foreground">—</span>;
-  return (
-    <div className="leading-tight">
-      {dealLabel && <p className={`text-xs font-semibold ${labelCls}`}>{dealLabel}</p>}
-      {delta != null && (
-        <p className="text-[11px] text-muted-foreground tabular-nums">${Math.abs(delta).toLocaleString()} {below ? "below" : "above"} market</p>
-      )}
-    </div>
-  );
-};
-
 const RecallChip = ({ status, open }: { status?: string | null; open?: number | null }) => {
   const n = open || 0;
   // Only show warning colors when a real issue exists; gray for pending/unknown.
@@ -1103,52 +1080,72 @@ const SimpleStatusPill = ({ status }: { status: VehicleRow["status"] }) => {
   );
 };
 
-// Compliance cell — VIN decode + recall status stacked.
+// Compliance cell — two status badges (VIN decode + recall), icon + label.
+const ComplianceBadge = ({ tone, icon: Icon, label }: { tone: "green" | "amber" | "red" | "muted"; icon: typeof CheckCircle2; label: string }) => {
+  const cls = tone === "green" ? "bg-emerald-50 text-emerald-700"
+    : tone === "amber" ? "bg-amber-50 text-amber-700"
+    : tone === "red" ? "bg-red-50 text-red-700"
+    : "bg-muted text-muted-foreground";
+  return (
+    <span className={`inline-flex items-center gap-1 text-[11px] font-semibold px-1.5 py-0.5 rounded-md ${cls}`}>
+      <Icon className="w-3 h-3" />{label}
+    </span>
+  );
+};
 const ComplianceCell = ({ ymm, recallStatus, openRecallCount }: { ymm?: string | null; recallStatus?: string | null; openRecallCount?: number | null }) => {
   const n = openRecallCount || 0;
   const recall = recallStatus === "open_recalls" && n > 0
-    ? { cls: "text-amber-600", icon: AlertTriangle, label: `${n} Open Recall${n === 1 ? "" : "s"}` }
+    ? { tone: "amber" as const, icon: AlertTriangle, label: `${n} Open Recall${n === 1 ? "" : "s"}` }
     : recallStatus === "clear"
-      ? { cls: "text-emerald-600", icon: ShieldCheck, label: "No Open Recalls" }
-      : { cls: "text-muted-foreground", icon: ShieldCheck, label: "Recall Pending" };
-  const RecallIcon = recall.icon;
+      ? { tone: "green" as const, icon: ShieldCheck, label: "No Open Recalls" }
+      : { tone: "muted" as const, icon: ShieldCheck, label: "Recall Pending" };
   return (
-    <div className="leading-tight space-y-0.5">
+    <div className="flex flex-col items-start gap-1">
       {ymm
-        ? <p className="inline-flex items-center gap-1 text-xs font-semibold text-emerald-600"><CheckCircle2 className="w-3.5 h-3.5" />VIN Decoded</p>
-        : <p className="inline-flex items-center gap-1 text-xs font-semibold text-red-600"><AlertTriangle className="w-3.5 h-3.5" />VIN Decode Failed</p>}
-      <p className={`inline-flex items-center gap-1 text-xs font-semibold ${recall.cls}`}><RecallIcon className="w-3.5 h-3.5" />{recall.label}</p>
+        ? <ComplianceBadge tone="green" icon={CheckCircle2} label="VIN Decoded" />
+        : <ComplianceBadge tone="red" icon={AlertTriangle} label="VIN Decode Failed" />}
+      <ComplianceBadge tone={recall.tone} icon={recall.icon} label={recall.label} />
     </div>
   );
 };
 
-// Advertised price cell — $XX,XXX, ✓ Advertised, incl. $XXX doc.
-const AdvertisedPriceCell = ({ price, docFee, ap }: { price?: number | null; docFee?: number | null; ap?: AdvertisedPrice }) => {
+// Price cell — $XX,XXX over a single colored market line. The advertised-price
+// match/mismatch, doc fee, website price, and market delta all move into the
+// hover tooltip so the column reads as two lines while keeping every detail.
+const PriceCell = ({ price, docFee, ap, position, value }: { price?: number | null; docFee?: number | null; ap?: AdvertisedPrice; position?: string | null; value?: number | null }) => {
   if (price == null) return <span className="text-xs text-muted-foreground">—</span>;
   const drift = assessDrift(price, ap, docFee || 0);
+  const delta = value != null ? Number(value) - price : null; // > 0 → price below market value (good)
+  const above = delta != null && delta < 0;
+  const dealLabel = position === "above_market"
+    ? "Above Market"
+    : position && MARKET_CHIP[position]
+      ? MARKET_CHIP[position].label
+      : delta == null ? null : above ? "Above Market" : "Good Price";
+  const marketTone = dealLabel === "Above Market" ? "text-red-600" : dealLabel === "Fair Price" ? "text-amber-600" : "text-emerald-600";
+  const dotTone = dealLabel === "Above Market" ? "bg-red-500" : dealLabel === "Fair Price" ? "bg-amber-500" : "bg-emerald-500";
+  const marketText = above && delta != null ? `$${Math.abs(delta).toLocaleString()} Above Market` : dealLabel;
+
+  const tip = [
+    drift.status === "drift"
+      ? `Advertised mismatch ${drift.delta > 0 ? "+" : "−"}$${Math.abs(Math.round(drift.delta)).toLocaleString()}${drift.reason ? ` · ${drift.reason}` : ""}`
+      : "Advertised price matches the listing price",
+    drift.advertised != null ? `Advertised $${drift.advertised.toLocaleString()}${drift.source ? ` · ${SOURCE_LABELS[drift.source] || drift.source}` : ""}` : null,
+    docFee ? `+ $${Number(docFee).toLocaleString()} doc fee · Website $${(price + Number(docFee)).toLocaleString()}` : null,
+    delta != null ? `$${Math.abs(delta).toLocaleString()} ${above ? "above" : "below"} market value` : null,
+  ].filter(Boolean).join("\n");
+
   return (
-    <div className="leading-tight">
-      <p className="text-sm font-bold text-foreground tabular-nums">${price.toLocaleString()}</p>
-      {drift.status === "drift" ? (
-        <p className="inline-flex items-center gap-1 text-[11px] font-semibold text-red-600 mt-0.5" title={drift.reason}>
-          <AlertTriangle className="w-3 h-3" />Mismatch {drift.delta > 0 ? "+" : "−"}${Math.abs(Math.round(drift.delta)).toLocaleString()}
+    <div className="leading-tight" title={tip}>
+      <p className="inline-flex items-center gap-1 text-sm font-bold text-foreground tabular-nums">
+        ${price.toLocaleString()}
+        {drift.status === "drift" && <AlertTriangle className="w-3 h-3 text-red-600" />}
+      </p>
+      {marketText && (
+        <p className={`inline-flex items-center gap-1 text-xs font-semibold mt-0.5 ${marketTone}`}>
+          <span className={`w-2 h-2 rounded-full ${dotTone}`} />{marketText}
         </p>
-      ) : drift.status === "match" ? (
-        <p className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-600 mt-0.5" title="Captured advertised price matches the listing price."><CheckCircle2 className="w-3 h-3" />Matches</p>
-      ) : (
-        // No separate snapshot: the listing price IS the advertised price we
-        // pulled from the dealer's feed, so it's in sync by definition.
-        <p className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-600 mt-0.5" title="This price was pulled from the dealer feed and matches the advertised price."><CheckCircle2 className="w-3 h-3" />Matches</p>
       )}
-      {drift.advertised != null && (
-        <p className="text-[10px] text-muted-foreground mt-0.5">ad ${drift.advertised.toLocaleString()}{drift.source ? ` · ${SOURCE_LABELS[drift.source] || drift.source}` : ""}</p>
-      )}
-      {docFee ? (
-        <p
-          className="text-[10px] text-muted-foreground mt-0.5"
-          title={`Website Sale Price: $${(price + Number(docFee)).toLocaleString()}`}
-        >+ ${Number(docFee).toLocaleString()} doc fee</p>
-      ) : null}
     </div>
   );
 };
