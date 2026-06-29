@@ -50,6 +50,18 @@ export interface CpoProgram {
   show_on_passport: boolean;
 }
 
+// Sentinel for an unlimited-mileage term (many luxury basic warranties, and
+// most roadside/corrosion coverage). Stored in the miles field so the shape
+// stays a plain number; helpers below translate it for display, and downstream
+// (passport) an unlimited cap is rendered as a time-only term (no mile bar).
+export const UNLIMITED_MILES = -1;
+export const isUnlimitedMiles = (n?: number): boolean => n === UNLIMITED_MILES;
+// A positive mileage value, or undefined for unset/unlimited (so callers that
+// do remaining-mile math never see the sentinel or zero).
+export const finiteMiles = (n?: number): number | undefined => (n && n > 0 ? n : undefined);
+export const milesLabel = (n?: number): string | null =>
+  n === UNLIMITED_MILES ? "Unlimited" : n && n > 0 ? `${(n / 1000).toFixed(0)}K mi` : null;
+
 export const emptyOemWarranty = (brand = ""): OemFactoryWarranty => ({
   brand,
   basic_months: 36,
@@ -94,9 +106,11 @@ export const resolveFactoryWarranty = (
 // date — a brand-new car carries the full term forward from that point.
 export const factoryWarrantyToInfo = (w: OemFactoryWarranty, inServiceDate?: string) => ({
   factory_months: w.basic_months || undefined,
-  factory_miles: w.basic_miles || undefined,
+  // Unlimited (or unset) → omit the mile cap; the term is then time-only, which
+  // is exactly how an unlimited-mileage warranty reads.
+  factory_miles: finiteMiles(w.basic_miles),
   powertrain_months: w.powertrain_months || undefined,
-  powertrain_miles: w.powertrain_miles || undefined,
+  powertrain_miles: finiteMiles(w.powertrain_miles),
   in_service_date: inServiceDate,
 });
 
@@ -117,8 +131,7 @@ export const matchCpoPrograms = (
 
 export const warrantyHeadline = (w: OemFactoryWarranty): string => {
   const yr = (mo?: number) => (mo ? `${Math.round(mo / 12)} yr` : null);
-  const mi = (m?: number) => (m ? `${(m / 1000).toFixed(0)}K mi` : null);
-  const basic = [yr(w.basic_months), mi(w.basic_miles)].filter(Boolean).join(" / ");
+  const basic = [yr(w.basic_months), milesLabel(w.basic_miles)].filter(Boolean).join(" / ");
   return basic || "Factory warranty";
 };
 

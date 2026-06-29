@@ -4,6 +4,8 @@ import {
   matchCpoPrograms,
   factoryWarrantyToInfo,
   warrantyHeadline,
+  milesLabel,
+  UNLIMITED_MILES,
   type OemFactoryWarranty,
   type CpoProgram,
 } from "./oemWarranty";
@@ -75,5 +77,26 @@ describe("matchCpoPrograms", () => {
 describe("warrantyHeadline", () => {
   it("renders years and thousands of miles", () => {
     expect(warrantyHeadline(infiniti)).toBe("4 yr / 60K mi");
+  });
+
+  it("renders Unlimited for an unlimited-mileage term", () => {
+    expect(warrantyHeadline({ ...infiniti, basic_miles: UNLIMITED_MILES })).toBe("4 yr / Unlimited");
+  });
+});
+
+describe("milesLabel", () => {
+  it("formats positive miles, Unlimited, and nothing for unset", () => {
+    expect(milesLabel(60000)).toBe("60K mi");
+    expect(milesLabel(UNLIMITED_MILES)).toBe("Unlimited");
+    expect(milesLabel(0)).toBeNull();
+    expect(milesLabel(undefined)).toBeNull();
+  });
+});
+
+describe("factoryWarrantyToInfo unlimited", () => {
+  it("omits the mile cap when unlimited so the passport never does negative math", () => {
+    const info = factoryWarrantyToInfo({ ...infiniti, basic_miles: UNLIMITED_MILES });
+    expect(info.factory_miles).toBeUndefined();
+    expect(info.factory_months).toBe(48);
   });
 });

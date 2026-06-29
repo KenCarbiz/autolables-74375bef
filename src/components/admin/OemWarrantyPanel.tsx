@@ -4,8 +4,9 @@ import { useAuth } from "@/contexts/AuthContext";
 import {
   type OemFactoryWarranty, type CpoProgram,
   emptyOemWarranty, emptyCpoProgram, warrantyHeadline,
+  UNLIMITED_MILES, isUnlimitedMiles,
 } from "@/lib/oemWarranty";
-import { Plus, Trash2, ShieldCheck, BadgeCheck, Save, CheckCircle2 } from "lucide-react";
+import { Plus, Trash2, ShieldCheck, BadgeCheck, Save, CheckCircle2, Infinity as InfinityIcon, X } from "lucide-react";
 import { toast } from "sonner";
 
 // Month/mile number pair. Defined at module scope (NOT inside the panel) so its
@@ -13,12 +14,39 @@ import { toast } from "sonner";
 // a new function every keystroke, remounting the input and dropping focus after
 // one character.
 const PAIR_INPUT = "w-full h-9 px-2.5 rounded-lg border border-border bg-background text-sm text-foreground outline-none focus:border-primary tabular-nums";
-const Pair = ({ mo, mi, onMo, onMi }: { mo?: number; mi?: number; onMo: (n: number) => void; onMi: (n: number) => void }) => (
-  <div className="grid grid-cols-2 gap-2">
-    <input type="number" min={0} value={mo ?? ""} onChange={(e) => onMo(Number(e.target.value) || 0)} placeholder="months" className={PAIR_INPUT} />
-    <input type="number" min={0} value={mi ?? ""} onChange={(e) => onMi(Number(e.target.value) || 0)} placeholder="miles" className={PAIR_INPUT} />
-  </div>
-);
+const Pair = ({ mo, mi, onMo, onMi }: { mo?: number; mi?: number; onMo: (n: number) => void; onMi: (n: number) => void }) => {
+  const unlimited = isUnlimitedMiles(mi);
+  return (
+    <div className="grid grid-cols-2 gap-2">
+      <input type="number" min={0} value={mo ?? ""} onChange={(e) => onMo(Number(e.target.value) || 0)} placeholder="months" className={PAIR_INPUT} />
+      <div className="relative">
+        {unlimited ? (
+          <button
+            type="button"
+            onClick={() => onMi(0)}
+            title="Unlimited miles — click to set a mileage cap"
+            className="w-full h-9 px-2.5 rounded-lg border border-emerald-300 bg-emerald-50 text-sm font-semibold text-emerald-700 inline-flex items-center justify-between"
+          >
+            <span className="inline-flex items-center gap-1"><InfinityIcon className="w-4 h-4" /> Unlimited</span>
+            <X className="w-3.5 h-3.5 text-emerald-600/70" />
+          </button>
+        ) : (
+          <>
+            <input type="number" min={0} value={mi ?? ""} onChange={(e) => onMi(Number(e.target.value) || 0)} placeholder="miles" className={`${PAIR_INPUT} pr-8`} />
+            <button
+              type="button"
+              onClick={() => onMi(UNLIMITED_MILES)}
+              title="Mark as unlimited miles"
+              className="absolute right-1 top-1/2 -translate-y-1/2 h-7 w-7 rounded-md text-muted-foreground hover:text-emerald-600 hover:bg-emerald-50 inline-flex items-center justify-center"
+            >
+              <InfinityIcon className="w-4 h-4" />
+            </button>
+          </>
+        )}
+      </div>
+    </div>
+  );
+};
 
 // Factory & CPO warranty config. The dealer verifies each franchised brand's
 // OEM factory-warranty terms (only verified terms feed the passport) and lists

@@ -174,11 +174,14 @@ serve(async (req) => {
           });
           if (w) {
             const start = (row.published_at as string) || (row.created_at as string) || new Date().toISOString();
+            // Unlimited (sentinel -1) or unset miles → omit the cap so the
+            // passport renders a time-only term and never does negative-mile math.
+            const finiteMiles = (n: unknown) => { const v = Number(n); return v > 0 ? v : undefined; };
             row.warranty_info = {
               factory_months: Number(w.basic_months) || undefined,
-              factory_miles: Number(w.basic_miles) || undefined,
+              factory_miles: finiteMiles(w.basic_miles),
               powertrain_months: Number(w.powertrain_months) || undefined,
-              powertrain_miles: Number(w.powertrain_miles) || undefined,
+              powertrain_miles: finiteMiles(w.powertrain_miles),
               in_service_date: String(start).slice(0, 10),
             };
           }
