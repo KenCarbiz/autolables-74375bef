@@ -92,11 +92,16 @@ async function fetchPredict(vin: string, miles: number | null) {
 // NOT the subject VIN — searching active listings by `vin` returns only that
 // one car, which is why this used to come back empty. Search by ymm, then drop
 // the subject VIN from the results.
-async function fetchComps(ymm: string | null, condition: string, zip: string | null, listingPrice: number | null, subjectVin: string) {
+async function fetchComps(ymm: string | null, condition: string, zip: string | null, listingPrice: number | null, subjectVin: string, subjectTrim: string | null, dealerName: string | null) {
   try {
     if (!ymm) return null;
     const parts = ymm.split(/\s+/);
     const year = parts[0] && /^\d{4}$/.test(parts[0]) ? parts[0] : "";
+    // Normalized dealer name for same-rooftop exclusion (so we never show the
+    // customer the dealer's OWN cars as comparables).
+    const normDealer = (s: unknown) => String(s || "").toLowerCase().replace(/[^a-z0-9]+/g, "");
+    const ownName = normDealer(dealerName);
+    const trim = String(subjectTrim || "").trim();
     const make = year ? parts[1] : parts[0];
     const model = year ? parts.slice(2).join(" ") : parts.slice(1).join(" ");
     const carType = condition === "new" ? "new" : "used";
@@ -106,11 +111,15 @@ async function fetchComps(ymm: string | null, condition: string, zip: string | n
     // large local market (e.g. an INFINITI dealer's own QX60/QX80, 140+ in 100mi)
     // returns the count but ZERO listing records when stats are requested. We
     // compute the price/DOM stats ourselves from the returned listings instead.
-    const run = async (opts: { useYear: boolean; band: boolean }) => {
+    const run = async (opts: { useYear: boolean; band: boolean; useTrim: boolean }) => {
       const p = new URLSearchParams({ api_key: MC_KEY, car_type: carType, rows: "50", sort_by: "price", sort_order: "asc", start: "0" });
       if (opts.useYear && year) p.set("year", year);
       if (make) p.set("make", make);
       if (model) p.set("model", model);
+      // Trim-match so comps are the SAME equipment level (e.g. QX60 LUXE vs
+      // LUXE), not the whole model line — a mismatched comp set reads as "off"
+      // and sends shoppers elsewhere. Tried first, relaxed only if it's empty.
+      if (opts.useTrim && trim) p.set("trim", trim);
       if (zip) { p.set("zip", zip); p.set("radius", "100"); }
       // A price band shrinks a big-inventory model into a set small enough that
       // MarketCheck returns the actual listings (not just the aggregate count).
@@ -125,16 +134,26 @@ async function fetchComps(ymm: string | null, condition: string, zip: string | n
       // deno-lint-ignore no-explicit-any
       const all: any[] = Array.isArray(b?.listings) ? b.listings : [];
       // deno-lint-ignore no-explicit-any
-      const rows: any[] = all.filter((l: any) => String(l.vin || "").toUpperCase() !== subjectVin);
+      const rows: any[] = all.filter((l: any) => {
+        if (String(l.vin || "").toUpperCase() === subjectVin) return false;
+        // Drop the dealer's own rooftop (name match) and any same-location lot
+        // (dist 0) so a shopper never sees this dealer's own cars as comps.
+        const cn = normDealer((l.dealer as any)?.name ?? l.seller_name);
+        if (ownName && cn && (cn.includes(ownName) || ownName.includes(cn))) return false;
+        if (Number(l.dist) === 0) return false;
+        return true;
+      });
       return { rows, rawCount: all.length, numFound: num(b?.num_found), http: res.status };
     };
 
-    // Narrow first (same year + price band) so big-inventory models still return
-    // listings, then progressively relax: drop the band, then drop the year.
-    let r = await run({ useYear: true, band: true });
-    if (r && r.rawCount === 0) r = (await run({ useYear: true, band: false })) ?? r;
-    if (r && r.rawCount === 0) r = (await run({ useYear: false, band: true })) ?? r;
-    if (r && r.rawCount === 0) r = (await run({ useYear: false, band: false })) ?? r;
+    // Tightest first — same trim + year + price band, so comps are like-for-like
+    // — then progressively relax (drop trim, then band, then year) only when the
+    // tighter pass yields no usable comps.
+    let r = await run({ useYear: true, band: true, useTrim: true });
+    if (r && r.rows.length === 0) r = (await run({ useYear: true, band: true, useTrim: false })) ?? r;
+    if (r && r.rows.length === 0) r = (await run({ useYear: true, band: false, useTrim: false })) ?? r;
+    if (r && r.rows.length === 0) r = (await run({ useYear: false, band: true, useTrim: false })) ?? r;
+    if (r && r.rows.length === 0) r = (await run({ useYear: false, band: false, useTrim: false })) ?? r;
     if (!r) return null;
     const debug = { num_found: r.numFound, listings_returned: r.rawCount, http: r.http, radius: zip ? 100 : null };
 
@@ -394,7 +413,7 @@ serve(async (req) => {
   }
 
   const { data: row } = await admin.from("vehicle_listings")
-    .select("id, vin, ymm, condition, price, mileage, dealer_snapshot")
+    .select("id, vin, ymm, trim, condition, price, mileage, dealer_snapshot")
     .eq("tenant_id", tenantId).eq("vin", vin).maybeSingle();
   if (!row) return json(404, { error: "listing_not_found" });
 
@@ -415,6 +434,12 @@ serve(async (req) => {
   }
 
   const ymm = (row.ymm as string | null) || null;
+  const subjectTrim = (row.trim as string | null) || null;
+  // The dealer's own rooftop name, so we never show the customer the dealer's
+  // OWN inventory as "competition" in the comp set.
+  // deno-lint-ignore no-explicit-any
+  const dealerName = ((row.dealer_snapshot as any)?.name as string | null)
+    || ((row.dealer_snapshot as any)?.display_name as string | null) || null;
 
   // Black Book is a separate provider with its own rate limit, so it runs
   // alongside the MarketCheck chain rather than competing with it.
@@ -428,7 +453,7 @@ serve(async (req) => {
   // moment, which can't trip the RPS limit. (fetchRecalls tries MarketCheck
   // then falls back to free NHTSA.) Skipped entirely on a Black-Book-only run.
   const predict = wantMC ? await fetchPredict(vin, miles) : null;
-  const comps = wantMC ? await fetchComps(ymm, condition, zip, price, vin) : null;
+  const comps = wantMC ? await fetchComps(ymm, condition, zip, price, vin, subjectTrim, dealerName) : null;
   const mds = wantMC && INCLUDE_MDS ? await fetchMds(ymm, condition, zip) : null;
   const history = wantMC ? await fetchHistory(vin) : null;
   const recalls = wantMC ? await fetchRecalls(vin, ymm) : null;

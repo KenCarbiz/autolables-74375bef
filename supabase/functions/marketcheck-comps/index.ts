@@ -51,21 +51,48 @@ Deno.serve(async (req) => {
     const [year, make, ...model] = ymm.split(/\s+/);
     const dealer = (row.dealer_snapshot || {}) as Record<string, unknown>;
     const zip = String(dealer.zip || row.vehicle_zip || "").trim();
+    const trim = String(row.trim || "").trim();
+    const normDealer = (s: unknown) => String(s || "").toLowerCase().replace(/[^a-z0-9]+/g, "");
+    const ownName = normDealer(dealer.name ?? dealer.display_name);
+    const subjectVin = String(row.vin || "").toUpperCase();
 
-    const params = new URLSearchParams({ api_key: MC_KEY, car_type: row.condition === "new" ? "new" : "used", rows: "12", sort_by: "price", sort_order: "asc", stats: "price" });
-    if (year && /^\d{4}$/.test(year)) params.set("year", year);
-    if (make) params.set("make", make);
-    if (model.length) params.set("model", model.join(" "));
-    if (zip) { params.set("zip", zip); params.set("radius", "150"); }
+    // Same equipment level wherever possible (trim-matched), and never the
+    // dealer's own rooftop — a mismatched comp set reads as "off" and sends
+    // shoppers elsewhere. Try trim-matched first; relax to model-level only if
+    // that yields nothing usable.
+    const buildParams = (useTrim: boolean) => {
+      const p = new URLSearchParams({ api_key: MC_KEY, car_type: row.condition === "new" ? "new" : "used", rows: "20", sort_by: "price", sort_order: "asc", stats: "price" });
+      if (year && /^\d{4}$/.test(year)) p.set("year", year);
+      if (make) p.set("make", make);
+      if (model.length) p.set("model", model.join(" "));
+      if (useTrim && trim) p.set("trim", trim);
+      if (zip) { p.set("zip", zip); p.set("radius", "150"); }
+      return p;
+    };
+    const usable = (b: { listings?: unknown }) => (Array.isArray(b?.listings) ? b.listings : [])
+      .filter((l: Record<string, unknown>) => {
+        if (String(l.vin || "").toUpperCase() === subjectVin) return false;
+        const cn = normDealer((l.dealer as Record<string, unknown>)?.name ?? l.seller_name);
+        if (ownName && cn && (cn.includes(ownName) || ownName.includes(cn))) return false;
+        if (Number(l.dist) === 0) return false;
+        return true;
+      });
 
-    const res = await fetch(`${MC_BASE}/search/car/active?${params.toString()}`, { signal: AbortSignal.timeout(10000) });
-    if (!res.ok) return json(200, { available: false, reason: `provider_${res.status}` });
-    // deno-lint-ignore no-explicit-any
-    const b: any = await res.json().catch(() => ({}));
+    const fetchPass = async (useTrim: boolean) => {
+      const res = await fetch(`${MC_BASE}/search/car/active?${buildParams(useTrim).toString()}`, { signal: AbortSignal.timeout(10000) });
+      if (!res.ok) return { ok: false as const, status: res.status, b: {} as Record<string, unknown> };
+      // deno-lint-ignore no-explicit-any
+      const b: any = await res.json().catch(() => ({}));
+      return { ok: true as const, status: res.status, b };
+    };
 
-    const raw = Array.isArray(b?.listings) ? b.listings : [];
-    const comparables = raw
-      .filter((l: Record<string, unknown>) => String(l.vin || "").toUpperCase() !== String(row.vin || "").toUpperCase())
+    let pass = await fetchPass(true);
+    if (!pass.ok) return json(200, { available: false, reason: `provider_${pass.status}` });
+    let filtered = usable(pass.b);
+    if (filtered.length === 0 && trim) { pass = await fetchPass(false); filtered = pass.ok ? usable(pass.b) : filtered; }
+    const b = pass.b;
+
+    const comparables = filtered
       .slice(0, 8)
       .map((l: Record<string, unknown>) => ({
         vin: l.vin ?? null,
