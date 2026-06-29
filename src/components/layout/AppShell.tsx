@@ -469,12 +469,21 @@ const AppShell = ({ children }: AppShellProps) => {
     else navigate(url);
   };
 
-  const bottomNavItems = [
-    { label: "Home", path: "/dashboard", icon: Grid2X2 },
-    { label: "Vehicles", path: "/inventory", icon: Car },
+  // Role-aware mobile bottom nav: Scan stays the raised center; the four side
+  // slots are filled from the role's capabilities (a service writer gets Get
+  // Ready instead of Deals/Create, etc.).
+  const bottomCandidates: { label: string; path: string; icon: typeof Grid2X2; cap: DealerCapability }[] = [
+    { label: "Home", path: "/dashboard", icon: Grid2X2, cap: "can_view_dashboard" },
+    { label: "Inventory", path: "/inventory", icon: Car, cap: "can_view_inventory" },
+    { label: "Get Ready", path: "/ready-board", icon: Wrench, cap: "can_view_get_ready" },
+    { label: "Deals", path: "/saved", icon: Folder, cap: "can_view_deals" },
+    { label: "Create", path: "/create", icon: FilePlus2, cap: "can_create_documents" },
+  ];
+  const sideItems = bottomCandidates.filter((c) => can(c.cap)).slice(0, 4);
+  const bottomNavItems: { label: string; path: string; icon: typeof Grid2X2; raised?: boolean }[] = [
+    ...sideItems.slice(0, 2),
     { label: "Scan", path: "scan", icon: ScanLine, raised: true },
-    { label: "Deals", path: "/saved", icon: Folder },
-    { label: "Create", path: "/add-inventory", icon: FilePlus2 },
+    ...sideItems.slice(2, 4),
   ];
 
   return (
