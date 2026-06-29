@@ -204,10 +204,21 @@ export const safeDefaultCapabilities: DealerCapability[] = [
   "can_view_work_queue",
 ];
 
+// Legacy DB role values (pre-job-roles) map onto a job role so existing
+// members keep a sensible access level until they're reassigned.
+const LEGACY_ROLE_ALIAS: Record<string, string> = {
+  staff: "salesperson",
+  sales: "salesperson",
+  viewer: "readonly",
+  // "manager", "finance", "compliance", "biller", etc. already exist in the map.
+};
+
 export const getDealerCapabilities = (role: DealerRole, isPlatformAdmin = false): DealerCapability[] => {
   if (isPlatformAdmin) return [...allDealerCapabilities, "can_view_platform_admin"];
   const normalized = `${role || ""}`.trim().toLowerCase();
-  return dealerRoleCapabilityMap[normalized] || safeDefaultCapabilities;
+  return dealerRoleCapabilityMap[normalized]
+    || dealerRoleCapabilityMap[LEGACY_ROLE_ALIAS[normalized]]
+    || safeDefaultCapabilities;
 };
 
 export const hasDealerCapability = (role: DealerRole, capability: DealerCapability, isPlatformAdmin = false) =>
