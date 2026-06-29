@@ -10,6 +10,7 @@ import { DealerSettingsProvider } from "@/contexts/DealerSettingsContext";
 import { TenantProvider } from "@/contexts/TenantContext";
 import { AuditProvider } from "@/contexts/AuditContext";
 import AppShell from "@/components/layout/AppShell";
+import RouteCapabilityGuard from "@/components/layout/RouteCapabilityGuard";
 import ThemeInjector from "@/components/layout/ThemeInjector";
 import ErrorBoundary from "@/components/layout/ErrorBoundary";
 import EntitlementGate from "@/components/layout/EntitlementGate";
@@ -19,7 +20,9 @@ const GatedLayout = () => (
   <EntitlementGate app="autolabels">
     <AppShell>
       <Suspense fallback={<BodyLoader />}>
-        <Outlet />
+        <RouteCapabilityGuard>
+          <Outlet />
+        </RouteCapabilityGuard>
       </Suspense>
     </AppShell>
   </EntitlementGate>
@@ -64,6 +67,7 @@ const ReconApproval = lazy(() => import("./pages/ReconApproval"));
 const ServiceDesk = lazy(() => import("./pages/ServiceDesk"));
 const ReadyBoard = lazy(() => import("./pages/ReadyBoard"));
 const K208Document = lazy(() => import("./pages/K208Document"));
+const CreateHub = lazy(() => import("./pages/CreateHub"));
 const SigningLookup = lazy(() => import("./pages/SigningLookup"));
 const Onboarding = lazy(() => import("./pages/Onboarding"));
 const TradeUpSticker = lazy(() => import("./pages/TradeUpSticker"));
@@ -225,6 +229,7 @@ const App = () => (
 
                       <Route element={<GatedLayout />}>
                         <Route path="/addendum" element={<Index />} />
+                        <Route path="/create" element={<CreateHub />} />
                         <Route path="/dashboard" element={<ProcessDashboard />} />
                         <Route path="/dashboard/qr-analytics" element={<QrAnalytics />} />
                         <Route path="/dashboard/reports" element={<Reports />} />

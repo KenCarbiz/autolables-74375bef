@@ -3,6 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useTenant } from "@/contexts/TenantContext";
 import { toast } from "sonner";
 import { Users, UserPlus, Loader2, Trash2 } from "lucide-react";
+import { ASSIGNABLE_ROLE_GROUPS, roleDisplayName } from "@/lib/permissions/dealerRoleCapabilities";
 
 // Dealer-scoped team management. Uses the tenant RBAC RPCs (owner/admin-gated,
 // last-owner-protected) from 20260617000000_team_rbac.sql — no platform admin
@@ -17,15 +18,16 @@ interface Member {
   invited_email: string | null;
 }
 
-const ROLES = [
-  { value: "admin", label: "Admin" },
-  { value: "manager", label: "Manager" },
-  { value: "finance", label: "F&I / Finance" },
-  { value: "sales", label: "Salesperson" },
-  { value: "staff", label: "Staff" },
-  { value: "viewer", label: "Viewer" },
-];
-const roleLabel = (r: string) => ROLES.find((x) => x.value === r)?.label || (r === "owner" ? "Owner" : r);
+// Job roles (grouped) come from the capability source of truth so the picker
+// and the access model can never drift apart.
+const RoleOptions = () => (
+  <>{ASSIGNABLE_ROLE_GROUPS.map((g) => (
+    <optgroup key={g.group} label={g.group}>
+      {g.roles.map((r) => <option key={r.value} value={r.value}>{r.label}</option>)}
+    </optgroup>
+  ))}</>
+);
+const roleLabel = (r: string) => roleDisplayName(r);
 
 export default function TeamPanel() {
   const { tenant } = useTenant();
@@ -33,7 +35,7 @@ export default function TeamPanel() {
   const [members, setMembers] = useState<Member[]>([]);
   const [loading, setLoading] = useState(true);
   const [email, setEmail] = useState("");
-  const [role, setRole] = useState("sales");
+  const [role, setRole] = useState("salesperson");
   const [inviting, setInviting] = useState(false);
 
   const load = useCallback(async () => {
@@ -96,7 +98,7 @@ export default function TeamPanel() {
             className="flex-1 h-10 rounded-md border border-border bg-background px-3 text-sm"
           />
           <select value={role} onChange={(e) => setRole(e.target.value)} className="h-10 rounded-md border border-border bg-background px-2 text-sm font-semibold">
-            {ROLES.map((r) => <option key={r.value} value={r.value}>{r.label}</option>)}
+            <RoleOptions />
           </select>
           <button onClick={invite} disabled={inviting} className="h-10 px-4 rounded-md bg-primary text-primary-foreground text-sm font-semibold inline-flex items-center gap-2 disabled:opacity-50">
             {inviting ? <Loader2 className="w-4 h-4 animate-spin" /> : <UserPlus className="w-4 h-4" />}
@@ -127,7 +129,10 @@ export default function TeamPanel() {
                     onChange={(e) => changeRole(m, e.target.value)}
                     className="h-8 rounded-md border border-border bg-background px-2 text-xs font-semibold"
                   >
-                    {ROLES.map((r) => <option key={r.value} value={r.value}>{r.label}</option>)}
+                    {!ASSIGNABLE_ROLE_GROUPS.some((g) => g.roles.some((r) => r.value === m.role)) && (
+                      <option value={m.role}>{roleLabel(m.role)} (current)</option>
+                    )}
+                    <RoleOptions />
                   </select>
                 )}
                 {m.role !== "owner" && (

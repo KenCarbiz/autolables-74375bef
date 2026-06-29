@@ -1,6 +1,7 @@
 import { ReactNode, useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { useViewTransitionNavigate } from "@/lib/navigation";
+import { hasDealerCapability, type DealerCapability } from "@/lib/permissions/dealerRoleCapabilities";
 import {
   Award,
   BarChart3,
@@ -82,6 +83,7 @@ interface NavItem {
   featureKey?: string;
   requireManager?: boolean;
   requireAdmin?: boolean;
+  capability?: DealerCapability;
 }
 
 interface NavSection {
@@ -115,7 +117,10 @@ const AppShell = ({ children }: AppShellProps) => {
   const [marketCheckCount, setMarketCheckCount] = useState<number | null>(null);
 
   const role = member?.role;
-  const isManager = isAdmin || !role || role === "owner" || role === "admin" || role === "manager";
+  // Capability-driven. Note: a roleless member is NO LONGER treated as a
+  // manager (the old `!role` default-true was a latent over-grant).
+  const isManager = isAdmin || hasDealerCapability(role, "can_manage_settings");
+  const can = useCallback((c: DealerCapability) => hasDealerCapability(role, c, isAdmin), [role, isAdmin]);
 
   const openScan = useCallback(() => {
     if (prefersLiveScanner()) navigate("/scan");
@@ -139,79 +144,65 @@ const AppShell = ({ children }: AppShellProps) => {
   const [openSections, setOpenSections] = useState<Record<string, boolean>>({
     main: true,
     create: true,
+    getready: true,
     compliance: true,
     settings: true,
     platform: true,
   });
 
+  // Consolidated, capability-gated nav. The ~19 `?tab=` rows now live behind the
+  // single "Settings" door (the Admin page is already tabbed); the 9 document
+  // creators behind one "Create" hub; recon/prep/service/ready under "Get Ready".
   const sections: Record<string, NavSection> = {
     main: {
       title: "",
       defaultOpen: true,
       items: [
-        { label: "Home", path: "/dashboard", icon: LayoutDashboard },
-        { label: "Setup", path: "/setup", icon: Rocket, requireManager: true },
-        { label: "Vehicles", path: "/inventory", icon: Car },
-        { label: "Deals", path: "/saved", icon: FolderOpen },
+        { label: "Home", path: "/dashboard", icon: LayoutDashboard, capability: "can_view_dashboard" },
+        { label: "Inventory", path: "/inventory", icon: Car, capability: "can_view_inventory" },
+        { label: "Deals", path: "/saved", icon: FolderOpen, capability: "can_view_deals" },
       ],
     },
     create: {
       title: "CREATE",
       defaultOpen: true,
       items: [
-        { label: "New Addendum", path: "/addendum", icon: FileText },
-        { label: "New Car Sticker", path: "/new-car-sticker", icon: FileText },
-        { label: "Used Car Sticker", path: "/used-car-sticker", icon: Car },
-        { label: "Sticker Studio", path: "/sticker-studio", icon: Sparkles },
-        { label: "CPO Info Sheet", path: "/cpo-sheet", icon: Award },
-        { label: "Trade-Up Sticker", path: "/trade-up", icon: TrendingUp },
-        { label: "Buyers Guide", path: "/buyers-guide", icon: ScrollText, featureKey: "feature_buyers_guide" },
-        { label: "Used Vehicle Docs", path: "/used-vehicle-documents", icon: ScrollText, requireManager: true },
-        { label: "Description Writer", path: "/description-writer", icon: Sparkles },
+        { label: "Create", path: "/create", icon: Sparkles, capability: "can_create_documents" },
+      ],
+    },
+    getready: {
+      title: "GET READY",
+      defaultOpen: true,
+      items: [
+        { label: "Recon Approvals", path: "/recon", icon: Wrench, capability: "can_view_get_ready" },
+        { label: "Prep & Install", path: "/prep", icon: Wrench, capability: "can_view_get_ready" },
+        { label: "Service Desk", path: "/service", icon: Wrench, capability: "can_view_get_ready" },
+        { label: "Ready Board", path: "/ready-board", icon: CheckCircle2, capability: "can_view_get_ready" },
       ],
     },
     compliance: {
       title: "COMPLIANCE",
       defaultOpen: false,
       items: [
-        { label: "Compliance Guide", path: "/compliance", icon: BookOpen },
-        { label: "CT MVP Smoke Test", path: "/admin/smoke-test", icon: ShieldCheck, requireManager: true },
-        { label: "Certification History", path: "/admin/certification-history", icon: CheckCircle2, requireManager: true },
-        { label: "Recon Approvals", path: "/recon", icon: Wrench },
-        { label: "Prep & Install", path: "/prep", icon: Wrench },
-        { label: "Vehicle Files", path: "/admin?tab=files", icon: FolderOpen },
-        { label: "Audit Log", path: "/admin?tab=audit", icon: ShieldCheck },
+        { label: "Compliance Center", path: "/compliance", icon: BookOpen, capability: "can_view_compliance" },
+        { label: "Document Review", path: "/dashboard/document-review", icon: FileWarning, capability: "can_view_compliance" },
+        { label: "Audit Log", path: "/admin?tab=audit", icon: ShieldCheck, capability: "can_view_compliance" },
       ],
     },
     settings: {
       title: "SETTINGS",
       defaultOpen: false,
       items: [
-        { label: "Admin Home", path: "/admin?tab=home", icon: LayoutDashboard, requireManager: true },
-        { label: "Products", path: "/admin?tab=products", icon: Package, requireManager: true },
-        { label: "Product Rules", path: "/admin?tab=rules", icon: Wrench, featureKey: "feature_product_rules", requireManager: true },
-        { label: "Branding & Setup", path: "/admin?tab=branding", icon: Palette, requireManager: true },
-        { label: "Programs", path: "/admin?tab=programs", icon: Award, requireManager: true },
-        { label: "Team", path: "/admin?tab=team", icon: Users, requireManager: true },
-        { label: "Reports", path: "/admin?tab=analytics", icon: BarChart3, featureKey: "feature_analytics", requireManager: true },
-        { label: "QR Analytics", path: "/dashboard/qr-analytics", icon: QrCode, requireManager: true },
-        { label: "AutoLabels Reports", path: "/dashboard/reports", icon: BarChart3, requireManager: true },
-        { label: "Document Review", path: "/dashboard/document-review", icon: FileWarning, requireManager: true },
-        { label: "Leads", path: "/admin?tab=leads", icon: Users, featureKey: "feature_lead_capture", requireManager: true },
-        { label: "Feature Toggles", path: "/admin?tab=settings", icon: ToggleLeft, requireManager: true },
+        { label: "Settings", path: "/admin", icon: Settings, capability: "can_manage_settings" },
+        { label: "Setup", path: "/setup", icon: Rocket, capability: "can_manage_settings" },
+        { label: "Reports", path: "/dashboard/reports", icon: BarChart3, capability: "can_view_reports" },
       ],
     },
     platform: {
       title: "PLATFORM",
       defaultOpen: false,
       items: [
-        { label: "Tenants", path: "/platform-admin?tab=tenants", icon: Store, requireAdmin: true },
-        { label: "Members", path: "/platform-admin?tab=members", icon: Users, requireAdmin: true },
-        { label: "Entitlements", path: "/platform-admin?tab=entitlements", icon: Award, requireAdmin: true },
-        { label: "Platform Audit", path: "/platform-admin?tab=audit", icon: ShieldCheck, requireAdmin: true },
-        { label: "Recall Refresh", path: "/platform-admin?tab=recalls", icon: RefreshCw, requireAdmin: true },
-        { label: "Billing Handshake", path: "/platform-admin?tab=billing", icon: CreditCard, requireAdmin: true },
-        { label: "Sticker Templates", path: "/platform-admin?tab=templates", icon: LayoutTemplate, requireAdmin: true },
+        { label: "Platform Admin", path: "/platform-admin", icon: Store, requireAdmin: true },
       ],
     },
   };
@@ -219,6 +210,7 @@ const AppShell = ({ children }: AppShellProps) => {
   const filterItems = (items: NavItem[]) =>
     items.filter((item) =>
       (!item.featureKey || (settings as unknown as Record<string, unknown>)[item.featureKey]) &&
+      (isAdmin || !item.capability || can(item.capability)) &&
       (!item.requireManager || isManager) &&
       (!item.requireAdmin || isAdmin)
     );
