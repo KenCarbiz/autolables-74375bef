@@ -60,7 +60,7 @@ Deno.serve(async (req) => {
   const zip = body.zip || "06010";
 
   // 1) One active listing — the richest object (build/dealer/media/price/dom/...).
-  const searchQ = new URLSearchParams({ api_key: KEY, rows: "1", start: "0", zip, radius: "500", car_type: "used" });
+  const searchQ = new URLSearchParams({ api_key: KEY, rows: "1", start: "0", zip, radius: "100", car_type: "used" });
   if (body.dealer_id) searchQ.set("dealer_id", body.dealer_id);
   const search = await hit(`${BASE}/search/car/active?${searchQ}`);
 
