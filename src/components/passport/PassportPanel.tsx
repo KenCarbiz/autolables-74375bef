@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   DollarSign, TrendingUp, TrendingDown, Gauge, Clock, Car, Package, ShieldCheck,
   Star, Award, FileText, MessageSquare, Eye, CheckCircle2,
@@ -1616,33 +1616,36 @@ const CoverageToggle = ({ active, tone, icon: Icon, title, sub, onClick }: { act
     </button>
   );
 };
+// Customer-uploaded vehicle renders. The transition frame (neutral blue) is
+// crossfaded between the two so switching coverage reads as a morph.
+const WARR_IMG = {
+  basic: "/BUMPER%20TO%20BUMPER%20WARR.png",
+  powertrain: "/POWERTRAIN%20WARR.png",
+  transition: "/PT%20TO%20BB%20WARR%20TRANSITION.png",
+};
 const WarrantyCarVisual = ({ hasPowertrain, onAll }: { hasPowertrain: boolean; onAll: () => void }) => {
   const [mode, setMode] = useState<"basic" | "powertrain">("basic");
-  const body = mode === "basic" ? "#3B82F6" : "#CBD5E1";
-  const stroke = mode === "basic" ? "#2563EB" : "#94A3B8";
-  const dt = mode === "powertrain" ? "#16A34A" : "#E2E8F0";
-  const hub = mode === "powertrain" ? "#16A34A" : "#94A3B8";
+  const [morphing, setMorphing] = useState(false);
+  const timers = useRef<number[]>([]);
+  useEffect(() => () => { timers.current.forEach(clearTimeout); }, []);
+  const switchTo = (next: "basic" | "powertrain") => {
+    if (next === mode) return;
+    setMorphing(true); // fade the neutral transition frame in over the current image
+    timers.current.push(window.setTimeout(() => { setMode(next); }, 300)); // swap target underneath
+    timers.current.push(window.setTimeout(() => { setMorphing(false); }, 330)); // fade transition back out to reveal target
+  };
+  const layer = "absolute inset-0 w-full h-full object-contain transition-opacity duration-300 ease-out";
   return (
     <div className={`${CARD} p-4`}>
       <div className="grid grid-cols-1 sm:grid-cols-[150px_1fr] gap-3 items-center">
         <div className="space-y-2">
-          <CoverageToggle active={mode === "basic"} tone="blue" icon={Car} title="Bumper-to-Bumper" sub="Basic Coverage" onClick={() => setMode("basic")} />
-          {hasPowertrain && <CoverageToggle active={mode === "powertrain"} tone="green" icon={Gauge} title="Powertrain" sub="Drivetrain Coverage" onClick={() => setMode("powertrain")} />}
+          <CoverageToggle active={mode === "basic"} tone="blue" icon={Car} title="Bumper-to-Bumper" sub="Basic Coverage" onClick={() => switchTo("basic")} />
+          {hasPowertrain && <CoverageToggle active={mode === "powertrain"} tone="green" icon={Gauge} title="Powertrain" sub="Drivetrain Coverage" onClick={() => switchTo("powertrain")} />}
         </div>
-        <div className="flex items-center justify-center">
-          <svg viewBox="0 0 320 138" className="w-full h-auto max-w-[260px]">
-            {/* SUV side silhouette — taller greenhouse + roof rails */}
-            <path d="M10 96 C10 80 22 76 34 74 L52 72 L78 44 C86 36 98 34 116 34 L206 34 C226 34 240 40 256 56 L296 76 C308 81 312 86 312 96 L312 100 C312 104 308 106 304 106 L18 106 C13 106 10 103 10 98 Z" fill={body} opacity="0.9" stroke={stroke} strokeWidth="2" />
-            <rect x="84" y="30" width="130" height="5" rx="2.5" fill={stroke} opacity="0.6" />
-            <path d="M92 48 L120 48 L120 66 L74 66 Z" fill="#ffffff" opacity="0.75" />
-            <path d="M128 48 L206 48 L222 66 L128 66 Z" fill="#ffffff" opacity="0.75" />
-            {/* drivetrain bar + engine (green when powertrain) */}
-            <rect x="78" y="98" width="180" height="8" rx="4" fill={dt} />
-            <rect x="258" y="80" width="38" height="22" rx="5" fill={mode === "powertrain" ? "#16A34A" : "#E2E8F0"} />
-            {/* wheels */}
-            <circle cx="100" cy="106" r="20" fill="#1E293B" /><circle cx="100" cy="106" r="9" fill={hub} />
-            <circle cx="246" cy="106" r="20" fill="#1E293B" /><circle cx="246" cy="106" r="9" fill={hub} />
-          </svg>
+        <div className="relative w-full max-w-[340px] mx-auto" style={{ aspectRatio: "1448 / 1086" }}>
+          <img src={WARR_IMG.basic} alt="Bumper-to-bumper coverage" loading="lazy" className={`${layer} ${mode === "basic" && !morphing ? "opacity-100" : "opacity-0"}`} />
+          <img src={WARR_IMG.powertrain} alt="Powertrain coverage" loading="lazy" className={`${layer} ${mode === "powertrain" && !morphing ? "opacity-100" : "opacity-0"}`} />
+          <img src={WARR_IMG.transition} alt="" aria-hidden="true" loading="lazy" className={`${layer} ${morphing ? "opacity-100" : "opacity-0"}`} />
         </div>
       </div>
       <div className="flex items-center justify-between gap-3 mt-2 pt-2 border-t border-slate-100">
