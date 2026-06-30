@@ -19,9 +19,11 @@ const redact = (u: string) => u.replace(/api_key=[^&]+/, "api_key=***");
 
 // Flatten a feed value (string | {name|label|description|...}) to a clean name.
 // deno-lint-ignore no-explicit-any
+// NeoVIN shapes: InstalledOption/AvailableOption use `name`; Feature/
+// HighValueFeature use `description`; InstalledEquipment uses `item`.
 const flat = (x: any): string =>
   typeof x === "string" ? x.trim()
-  : x && typeof x === "object" ? String(x.name ?? x.label ?? x.description ?? x.value ?? x.code ?? "").trim()
+  : x && typeof x === "object" ? String(x.name ?? x.label ?? x.item ?? x.description ?? x.value ?? x.code ?? "").trim()
   : "";
 
 // Pull every array that looks like an option/equipment/feature list out of a
@@ -73,12 +75,11 @@ const specEndpoints = (vin: string): string[] => {
   const v = encodeURIComponent(vin);
   return [
     // NeoVIN carries the full installed options / equipment / features list —
-    // the basic decoder returns core specs but no per-vehicle equipment. Try
-    // NeoVIN first; if the plan doesn't include it the call 4xx's and we fall
-    // through to the basic decoder.
-    `${MC_BASE}/decode/car/neovin/${v}/specs?api_key=${k}`,
-    `${MC_BASE}/decode/car/neovin/${v}/options-packages?api_key=${k}`,
-    `${MC_BASE}/decode/car/${v}/specs?api_key=${k}&include=options,features,equipment`,
+    // the basic decoder returns core specs but no per-vehicle equipment.
+    // include_generic falls back to generic specs when a VIN can't be fully
+    // decoded. Try NeoVIN first; if the plan doesn't include it the call 4xx's
+    // and we fall through to the basic decoder.
+    `${MC_BASE}/decode/car/neovin/${v}/specs?api_key=${k}&include_generic=true`,
     `${MC_BASE}/decode/car/${v}/specs?api_key=${k}`,
     `${MC_BASE}/decode/car/${v}?api_key=${k}`,
   ];
@@ -160,12 +161,14 @@ Deno.serve(async (req) => {
         setIf("engine", build.engine);
         setIf("engine_size", build.engine_size);
         setIf("cylinders", build.cylinders);
-        setIf("transmission", build.transmission);
+        setIf("transmission", build.transmission_description ?? build.transmission);
         setIf("drivetrain", build.drivetrain);
         setIf("fuel_type", build.fuel_type);
         setIf("body_type", build.body_type);
         setIf("doors", build.doors);
-        setIf("std_seating", build.std_seating);
+        // NeoVIN exposes seating_capacity at the top level (basic decoder uses std_seating).
+        setIf("std_seating", build.std_seating ?? build.seating_capacity);
+        setIf("seating_capacity", build.seating_capacity);
         const merged = {
           ...prev,
           ...fill,
