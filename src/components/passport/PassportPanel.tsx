@@ -878,12 +878,23 @@ function buildPanel(key: PassportPanelKey, d: PassportData, listing: VehicleList
       const startDate = w.in_service_date ? new Date(w.in_service_date).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" }) : null;
       const endDate = pt.date ?? basic.date ?? null;
       const endMiles = w.powertrain_miles ?? w.factory_miles ?? null;
-      const tlPoints = ([
-        startDate ? { date: startDate, label: listing.condition === "new" ? "Manufactured" : "In service", color: "bg-slate-300" } : null,
-        { date: "Today", label: "Current", color: "bg-emerald-500" },
-        basic.date ? { date: basic.date, label: "B-to-B Ends", color: "bg-[#2563EB]" } : null,
-        pt.date ? { date: pt.date, label: "Powertrain Ends", color: "bg-[#16A34A]" } : null,
-      ] as (TLPoint | null)[]).filter((p): p is TLPoint => p != null);
+      // New cars: coverage starts at delivery (today), so the timeline opens on
+      // "Today · Warranty Start" — no separate manufactured/current points.
+      // New cars: coverage starts at delivery (today), so the timeline opens on
+      // "Today · Warranty Start" — no separate manufactured/current points.
+      const tlRaw = (listing.condition === "new"
+        ? [
+            { date: "Today", label: "Warranty Start", color: "bg-emerald-500" },
+            basic.date ? { date: basic.date, label: "B-to-B Ends", color: "bg-[#2563EB]" } : null,
+            pt.date ? { date: pt.date, label: "Powertrain Ends", color: "bg-[#16A34A]" } : null,
+          ]
+        : [
+            startDate ? { date: startDate, label: "In service", color: "bg-slate-300" } : null,
+            { date: "Today", label: "Current", color: "bg-emerald-500" },
+            basic.date ? { date: basic.date, label: "B-to-B Ends", color: "bg-[#2563EB]" } : null,
+            pt.date ? { date: pt.date, label: "Powertrain Ends", color: "bg-[#16A34A]" } : null,
+          ]) as (TLPoint | null)[];
+      const tlPoints = tlRaw.filter((p): p is TLPoint => p != null);
       const todayIdx = tlPoints.findIndex((p) => p.date === "Today");
       const isCpo = listing.condition === "cpo";
       const cpo = (listing as unknown as { cpo_programs?: Array<Record<string, unknown>> }).cpo_programs?.[0] || null;

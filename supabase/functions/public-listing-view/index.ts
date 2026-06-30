@@ -173,7 +173,12 @@ serve(async (req) => {
             return b.length > 1 && x?.verified === true && ymm.includes(b);
           });
           if (w) {
-            const start = (row.published_at as string) || (row.created_at as string) || new Date().toISOString();
+            // A new, unregistered car's factory clock hasn't started — coverage
+            // begins at delivery — so its warranty start always rolls forward to
+            // today. Used/CPO keep their real in-service (publish) date.
+            const start = cond === "new"
+              ? new Date().toISOString()
+              : ((row.published_at as string) || (row.created_at as string) || new Date().toISOString());
             // Unlimited (sentinel -1) or unset miles → omit the cap so the
             // passport renders a time-only term and never does negative-mile math.
             const finiteMiles = (n: unknown) => { const v = Number(n); return v > 0 ? v : undefined; };
