@@ -70,10 +70,13 @@ async function mcFetch(url: string, timeoutMs: number): Promise<Response | null>
 }
 
 // ── MarketCheck: predicted market value + range ────────────────
-async function fetchPredict(vin: string, miles: number | null) {
+async function fetchPredict(vin: string, miles: number | null, carType: string, zip: string | null) {
   try {
-    const p = new URLSearchParams({ api_key: MC_KEY, vin });
+    // predict/car/price requires car_type and a location (zip, or city+state) —
+    // with only vin+miles MarketCheck returns 400. Supply both.
+    const p = new URLSearchParams({ api_key: MC_KEY, vin, car_type: carType === "new" ? "new" : "used" });
     if (miles != null) p.set("miles", String(miles));
+    if (zip) p.set("zip", zip);
     const res = await mcFetch(`${MC_BASE}/predict/car/price?${p.toString()}`, 10000);
     if (!res || !res.ok) return null;
     // deno-lint-ignore no-explicit-any
@@ -452,7 +455,7 @@ serve(async (req) => {
   // one-VIN-at-a-time loop means a single MarketCheck request in flight at any
   // moment, which can't trip the RPS limit. (fetchRecalls tries MarketCheck
   // then falls back to free NHTSA.) Skipped entirely on a Black-Book-only run.
-  const predict = wantMC ? await fetchPredict(vin, miles) : null;
+  const predict = wantMC ? await fetchPredict(vin, miles, condition, zip) : null;
   const comps = wantMC ? await fetchComps(ymm, condition, zip, price, vin, subjectTrim, dealerName) : null;
   const mds = wantMC && INCLUDE_MDS ? await fetchMds(ymm, condition, zip) : null;
   const history = wantMC ? await fetchHistory(vin) : null;

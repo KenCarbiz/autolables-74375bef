@@ -72,9 +72,14 @@ const specEndpoints = (vin: string): string[] => {
   const k = encodeURIComponent(MC_KEY);
   const v = encodeURIComponent(vin);
   return [
+    // NeoVIN carries the full installed options / equipment / features list —
+    // the basic decoder returns core specs but no per-vehicle equipment. Try
+    // NeoVIN first; if the plan doesn't include it the call 4xx's and we fall
+    // through to the basic decoder.
+    `${MC_BASE}/decode/car/neovin/${v}/specs?api_key=${k}`,
+    `${MC_BASE}/decode/car/neovin/${v}/options-packages?api_key=${k}`,
     `${MC_BASE}/decode/car/${v}/specs?api_key=${k}&include=options,features,equipment`,
     `${MC_BASE}/decode/car/${v}/specs?api_key=${k}`,
-    `${MC_BASE}/decode/car/${v}?api_key=${k}&include=options,features,equipment`,
     `${MC_BASE}/decode/car/${v}?api_key=${k}`,
   ];
 };
