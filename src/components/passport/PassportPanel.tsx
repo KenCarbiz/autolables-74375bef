@@ -1619,9 +1619,9 @@ const CoverageToggle = ({ active, tone, icon: Icon, title, sub, onClick }: { act
 // Customer-uploaded vehicle renders. The transition frame (neutral blue) is
 // crossfaded between the two so switching coverage reads as a morph.
 const WARR_IMG = {
-  basic: "/warranty-bumper-to-bumper.png",
-  powertrain: "/warranty-powertrain.png",
-  transition: "/warranty-transition.png",
+  basic: "/cropped_more_translucent_suv.png",
+  powertrain: "/cropped_powertrain_suv.png",
+  transition: "/cropped_translucent_suv.png",
 };
 const WarrantyCarVisual = ({ hasPowertrain, onAll }: { hasPowertrain: boolean; onAll: () => void }) => {
   const [mode, setMode] = useState<"basic" | "powertrain">("basic");
@@ -1642,7 +1642,7 @@ const WarrantyCarVisual = ({ hasPowertrain, onAll }: { hasPowertrain: boolean; o
           <CoverageToggle active={mode === "basic"} tone="blue" icon={Car} title="Bumper-to-Bumper" sub="Basic Coverage" onClick={() => switchTo("basic")} />
           {hasPowertrain && <CoverageToggle active={mode === "powertrain"} tone="green" icon={Gauge} title="Powertrain" sub="Drivetrain Coverage" onClick={() => switchTo("powertrain")} />}
         </div>
-        <div className="relative w-full max-w-[340px] mx-auto" style={{ aspectRatio: "1448 / 1086" }}>
+        <div className="relative w-full max-w-[360px] mx-auto" style={{ aspectRatio: "1448 / 630" }}>
           <img src={WARR_IMG.basic} alt="Bumper-to-bumper coverage" loading="lazy" className={`${layer} ${mode === "basic" && !morphing ? "opacity-100" : "opacity-0"}`} />
           <img src={WARR_IMG.powertrain} alt="Powertrain coverage" loading="lazy" className={`${layer} ${mode === "powertrain" && !morphing ? "opacity-100" : "opacity-0"}`} />
           <img src={WARR_IMG.transition} alt="" aria-hidden="true" loading="lazy" className={`${layer} ${morphing ? "opacity-100" : "opacity-0"}`} />
