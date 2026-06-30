@@ -1619,9 +1619,9 @@ const CoverageToggle = ({ active, tone, icon: Icon, title, sub, onClick }: { act
 // Customer-uploaded vehicle renders. The transition frame (neutral blue) is
 // crossfaded between the two so switching coverage reads as a morph.
 const WARR_IMG = {
-  basic: "/BUMPER%20TO%20BUMPER%20WARR.png",
-  powertrain: "/POWERTRAIN%20WARR.png",
-  transition: "/PT%20TO%20BB%20WARR%20TRANSITION.png",
+  basic: "/warranty-bumper-to-bumper.png",
+  powertrain: "/warranty-powertrain.png",
+  transition: "/warranty-transition.png",
 };
 const WarrantyCarVisual = ({ hasPowertrain, onAll }: { hasPowertrain: boolean; onAll: () => void }) => {
   const [mode, setMode] = useState<"basic" | "powertrain">("basic");
