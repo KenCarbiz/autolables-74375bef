@@ -16,7 +16,7 @@ export const ORANGE = "#EA580C";
 export const CARD = "rounded-2xl bg-white border border-[#E6E8EC]";
 
 export function PassportSlideOver({
-  open, onClose, title, subtitle, footer, children,
+  open, onClose, title, subtitle, footer, children, wide = false,
 }: {
   open: boolean;
   onClose: () => void;
@@ -24,6 +24,9 @@ export function PassportSlideOver({
   subtitle?: string;
   footer?: React.ReactNode;
   children: React.ReactNode;
+  // `wide` swaps the right-side drawer for a large centered modal (used by the
+  // Factory Warranty panel's two-column layout). All other panels stay drawers.
+  wide?: boolean;
 }) {
   const [render, setRender] = useState(open);
   const [enter, setEnter] = useState(false);
@@ -68,6 +71,34 @@ export function PassportSlideOver({
 
   if (!render) return null;
 
+  const inner = (
+    <>
+      <div className="shrink-0 bg-white border-b border-[#E6E8EC] px-5 sm:px-6 py-4 flex items-start justify-between gap-4">
+        <div className="min-w-0">
+          <h2 className="text-[19px] font-bold tracking-tight text-[#0F172A] leading-tight">{title}</h2>
+          {subtitle && (
+            <p className="text-[13px] text-[#64748B] mt-0.5 inline-flex items-center gap-1.5">
+              {subtitle}<Info className="w-3.5 h-3.5 text-[#94A3B8]" />
+            </p>
+          )}
+        </div>
+        <button
+          onClick={onClose}
+          aria-label={wide ? "Close warranty details" : "Close panel"}
+          className="shrink-0 w-9 h-9 rounded-full hover:bg-slate-100 flex items-center justify-center text-[#64748B] hover:text-[#0F172A] transition-colors"
+        >
+          <X className="w-5 h-5" />
+        </button>
+      </div>
+
+      <div className="flex-1 overflow-y-auto px-5 sm:px-6 py-5 space-y-5">{children}</div>
+
+      {footer && (
+        <div className="shrink-0 bg-white border-t border-[#E6E8EC] px-5 sm:px-6 py-4 pb-[calc(16px+env(safe-area-inset-bottom))]">{footer}</div>
+      )}
+    </>
+  );
+
   return (
     <div className="fixed inset-0 z-[60]" style={{ fontFamily: "Inter, -apple-system, BlinkMacSystemFont, sans-serif" }}>
       <div
@@ -75,38 +106,31 @@ export function PassportSlideOver({
         className={`absolute inset-0 bg-slate-900/40 transition-opacity duration-200 ${enter ? "opacity-100" : "opacity-0"}`}
         aria-hidden="true"
       />
-      <div
-        ref={panelRef}
-        role="dialog"
-        aria-modal="true"
-        aria-label={title}
-        tabIndex={-1}
-        className={`absolute right-0 top-0 h-full w-full sm:w-[90vw] md:w-[600px] xl:w-[660px] 2xl:w-[680px] bg-[#F6F7F9] shadow-[0_0_60px_rgba(0,0,0,0.25)] outline-none flex flex-col transition-transform duration-200 ease-out will-change-transform ${enter ? "translate-x-0" : "translate-x-full"}`}
-      >
-        <div className="shrink-0 bg-white border-b border-[#E6E8EC] px-5 sm:px-6 py-4 flex items-start justify-between gap-4">
-          <div className="min-w-0">
-            <h2 className="text-[19px] font-bold tracking-tight text-[#0F172A] leading-tight">{title}</h2>
-            {subtitle && (
-              <p className="text-[13px] text-[#64748B] mt-0.5 inline-flex items-center gap-1.5">
-                {subtitle}<Info className="w-3.5 h-3.5 text-[#94A3B8]" />
-              </p>
-            )}
-          </div>
-          <button
-            onClick={onClose}
-            aria-label="Close panel"
-            className="shrink-0 w-9 h-9 rounded-full hover:bg-slate-100 flex items-center justify-center text-[#64748B] hover:text-[#0F172A] transition-colors"
+      {wide ? (
+        <div className="absolute inset-0 flex items-stretch sm:items-center justify-center sm:p-6 pointer-events-none">
+          <div
+            ref={panelRef}
+            role="dialog"
+            aria-modal="true"
+            aria-label={title}
+            tabIndex={-1}
+            className={`pointer-events-auto relative w-full h-full sm:h-auto sm:max-h-[92vh] sm:w-[94vw] sm:max-w-[1200px] bg-[#F6F7F9] shadow-[0_24px_80px_rgba(0,0,0,0.30)] outline-none flex flex-col overflow-hidden sm:rounded-3xl transition-all duration-200 ease-out will-change-transform ${enter ? "opacity-100 translate-y-0 sm:scale-100" : "opacity-0 translate-y-2 sm:scale-95"}`}
           >
-            <X className="w-5 h-5" />
-          </button>
+            {inner}
+          </div>
         </div>
-
-        <div className="flex-1 overflow-y-auto px-5 sm:px-6 py-5 space-y-5">{children}</div>
-
-        {footer && (
-          <div className="shrink-0 bg-white border-t border-[#E6E8EC] px-5 sm:px-6 py-4 pb-[calc(16px+env(safe-area-inset-bottom))]">{footer}</div>
-        )}
-      </div>
+      ) : (
+        <div
+          ref={panelRef}
+          role="dialog"
+          aria-modal="true"
+          aria-label={title}
+          tabIndex={-1}
+          className={`absolute right-0 top-0 h-full w-full sm:w-[90vw] md:w-[600px] xl:w-[660px] 2xl:w-[680px] bg-[#F6F7F9] shadow-[0_0_60px_rgba(0,0,0,0.25)] outline-none flex flex-col transition-transform duration-200 ease-out will-change-transform ${enter ? "translate-x-0" : "translate-x-full"}`}
+        >
+          {inner}
+        </div>
+      )}
     </div>
   );
 }

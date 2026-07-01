@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import {
   DollarSign, TrendingUp, TrendingDown, Gauge, Clock, Car, Package, ShieldCheck,
   Star, Award, FileText, MessageSquare, Eye, CheckCircle2,
-  Flame, Heart, Send, Bookmark, Users, Circle, ChevronDown, MapPin, BadgeCheck, Info, AlertTriangle, History, ArrowRight, Sparkles,
+  Flame, Heart, Send, Bookmark, Users, Circle, ChevronDown, ChevronRight, MapPin, BadgeCheck, Info, AlertTriangle, History, ArrowRight, Sparkles,
   Wrench, Zap, LifeBuoy, Calendar, CalendarDays,
 } from "lucide-react";
 import type { PassportData, PricePoint, OemWarrantyView } from "@/lib/passportV2Data";
@@ -75,7 +75,7 @@ const CompStrip = ({ comps }: { comps: Comp[] }) => (
   </div>
 );
 
-interface PanelDef { title: string; subtitle: string; body: React.ReactNode; primary?: { label: string; onClick: () => void }; secondary?: { label: string; onClick: () => void }; footerQuestion?: string; specialistLabel?: string }
+interface PanelDef { title: string; subtitle: string; body: React.ReactNode; primary?: { label: string; onClick: () => void }; secondary?: { label: string; onClick: () => void }; footerQuestion?: string; specialistLabel?: string; wide?: boolean }
 
 function buildPanel(key: PassportPanelKey, d: PassportData, listing: VehicleListing, isPreview: boolean, go: (s: string) => void, openPanel: (k: PassportPanelKey) => void): PanelDef {
   const price = d.price, avg = d.marketAvg, low = d.marketLow, high = d.marketHigh, below = d.belowMarket;
@@ -903,58 +903,86 @@ function buildPanel(key: PassportPanelKey, d: PassportData, listing: VehicleList
       const includedRows = cov.filter((r) => r.key === "basic" || r.key === "powertrain");
       const cpoTerm = (mo: unknown, mi: unknown) => [Number(mo) ? `${Math.round(Number(mo) / 12)} yr` : null, Number(mi) ? `${(Number(mi) / 1000).toFixed(0)}K mi` : null].filter(Boolean).join(" / ");
       const hasData = !!(d.warrantyStr || d.oemWarranty);
+      // ── Goal-layout derived values ──────────────────────────────────────
+      // A new car's factory warranty is active by definition (starts at
+      // delivery); used/CPO rely on the calculated remaining coverage.
+      const statusActive = isNew ? true : active;
+      const statusStart = isNew ? "At Delivery Date" : (startDate ?? "See dealer");
+      const statusStartSub = isNew ? null : (startDate ? "(In-Service Date)" : null);
+      const yTerm = (mo?: number | null) => (mo ? `${Math.round(mo / 12)} ${Math.round(mo / 12) === 1 ? "Year" : "Years"}` : null);
+      const mTerm = (mi?: number | null) => (mi ? `${mi.toLocaleString()} Miles` : null);
+      const brand = (listing.ymm || "").replace(/^\d{4}\s+/, "").split(/\s+/)[0] || null;
+      const benefitCards: BenefitRow[] = benefitRows.map((r) => ({
+        icon: COVERAGE_ICON[r.key] ?? LifeBuoy,
+        title: r.label,
+        term: r.term,
+        sub: r.sub ?? null,
+        tone: r.key === "ev_battery" || r.key === "maintenance" ? "green" : "blue",
+      }));
+      if ((isHybrid || isEV) && !benefitRows.some((r) => r.key === "ev_battery")) {
+        benefitCards.push({ icon: Zap, title: isEV ? "EV Battery" : "Hybrid Battery", term: "Extended high-voltage coverage", sub: "Confirm terms with dealer", tone: "green" });
+      }
+      const openMoreDetails = () => {
+        const el = document.getElementById("warr-more-details") as HTMLDetailsElement | null;
+        if (el) { el.open = true; el.scrollIntoView({ behavior: "smooth", block: "nearest" }); }
+      };
       return {
         title: "Factory Warranty",
         subtitle: "See what's covered and for how long.",
+        wide: true,
         primary: { label: "Contact Dealer", onClick: () => go("contact") },
         secondary: { label: "Learn More", onClick: () => go("protect") },
         footerQuestion: "Questions about warranty?", specialistLabel: "Talk to a Warranty Specialist",
         body: hasData ? (
           <div className="space-y-5">
-            {/* Hero status */}
-            <div className="rounded-2xl border border-emerald-200 bg-emerald-50/70 p-4 flex items-start justify-between gap-4">
-              <div className="flex items-start gap-3 min-w-0">
-                <span className="w-11 h-11 rounded-xl bg-emerald-100 flex items-center justify-center shrink-0"><ShieldCheck className="w-5 h-5 text-[#16A34A]" /></span>
-                <div className="min-w-0">
-                  <p className="text-[12px] font-bold text-[#64748B]">Factory Warranty</p>
-                  <p className={`text-[22px] font-extrabold leading-none mt-0.5 tracking-wide ${active ? "text-[#16A34A]" : "text-[#64748B]"}`}>{active ? "ACTIVE" : "EXPIRED"}</p>
-                  <p className="text-[12px] text-[#64748B] mt-1 leading-tight">{active ? "Your factory warranty is in effect. You're covered." : "Factory coverage has ended for this vehicle."}</p>
+            <div className="grid grid-cols-1 lg:grid-cols-[2fr_1fr] gap-5 items-start">
+              {/* Left column — status + coverage at a glance */}
+              <div className="space-y-5">
+                <WarrantyStatusCard
+                  active={statusActive}
+                  startLabel={statusStart}
+                  startSub={statusStartSub}
+                  endDate={isNew ? null : endDate}
+                  endMiles={isNew ? null : endMiles}
+                />
+                <div className="rounded-2xl border border-[#E6E8EC] bg-white p-4 sm:p-5">
+                  <p className="text-[15px] font-bold text-[#0F172A] mb-3">Coverage at a Glance</p>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    {isNew ? (
+                      <>
+                        {hasBasic && <NewCoverageCard title="Bumper-to-Bumper" subtitle="Basic Vehicle Coverage" tone="blue" years={yTerm(w.factory_months)} miles={mTerm(w.factory_miles)} />}
+                        {hasPt && <NewCoverageCard title="Powertrain" subtitle="Engine, Transmission & Drivetrain" tone="green" years={yTerm(w.powertrain_months)} miles={mTerm(w.powertrain_miles)} />}
+                      </>
+                    ) : (
+                      <>
+                        {hasBasic && <CoverageCard title="Bumper-to-Bumper" subtitle="Basic Vehicle Coverage" tone="blue" pct={b2bPct} years={yrsRemain(basic.left)} miles={milesRemainLbl(milesLeft)} expiresDate={basic.date} expiresMiles={milesCapLbl(expMilesOf(w.factory_miles))} />}
+                        {hasPt && <CoverageCard title="Powertrain" subtitle="Engine, Transmission & Drivetrain" tone="green" pct={ptPct} years={yrsRemain(pt.left)} miles={milesRemainLbl(ptMilesLeft)} expiresDate={pt.date} expiresMiles={milesCapLbl(expMilesOf(w.powertrain_miles))} />}
+                      </>
+                    )}
+                  </div>
+                  {isNew && (
+                    <div className="mt-3 flex items-start gap-2 rounded-xl bg-emerald-50 px-3 py-2.5">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 mt-[6px] shrink-0" />
+                      <p className="text-[12px] font-medium text-emerald-800 leading-snug">Factory coverage begins when you take delivery of your vehicle.</p>
+                    </div>
+                  )}
                 </div>
               </div>
-              {(endDate || endMiles) && (
-                <div className="text-right shrink-0">
-                  <p className="text-[10px] font-bold uppercase tracking-wide text-[#94A3B8]">Warranty End</p>
-                  {endDate && <p className="text-[13px] font-extrabold text-[#0F172A] leading-tight mt-0.5">{endDate}</p>}
-                  {endMiles && <p className="text-[11px] text-[#64748B]">or {endMiles.toLocaleString()} miles</p>}
-                </div>
-              )}
+              {/* Right column — additional factory benefits */}
+              <AdditionalFactoryBenefitsCard rows={benefitCards} onDetails={openMoreDetails} />
             </div>
 
-            {/* Coverage at a glance */}
-            <div>
-              <p className="text-[15px] font-bold text-[#0F172A] mb-2">Coverage at a Glance</p>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                {hasBasic && (
-                  <CoverageCard title="Bumper-to-Bumper" subtitle="Basic Vehicle Coverage" tone="blue" pct={b2bPct}
-                    years={yrsRemain(basic.left)} miles={milesRemainLbl(milesLeft)} expiresDate={basic.date} expiresMiles={milesCapLbl(expMilesOf(w.factory_miles))} />
-                )}
-                {hasPt && (
-                  <CoverageCard title="Powertrain" subtitle="Engine, Transmission & Drivetrain" tone="green" pct={ptPct}
-                    years={yrsRemain(pt.left)} miles={milesRemainLbl(ptMilesLeft)} expiresDate={pt.date} expiresMiles={milesCapLbl(expMilesOf(w.powertrain_miles))} />
-                )}
-              </div>
-              {/* OEM-data-driven confidence line — the selling point. */}
-              <div className="mt-3 flex items-start gap-2 rounded-xl bg-emerald-50 px-3 py-2.5">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 mt-[6px] shrink-0" />
-                <p className="text-[12px] font-medium text-emerald-800 leading-snug">{
-                  listing.condition === "new" ? "Factory coverage begins when you take delivery."
-                    : listing.condition === "cpo" ? "Certified Pre-Owned extends your factory powertrain coverage."
-                    : pt.date ? `Powertrain coverage extends through ${pt.date}.`
-                    : (b2bPct ?? 0) >= 80 ? "Nearly all of the factory warranty remains."
-                    : "This vehicle is still covered by the factory warranty."
-                }</p>
-              </div>
-            </div>
+            {/* Used / pre-owned only — Certified Pre-Owned eligibility */}
+            {!isNew && <CpoBanner brand={brand} onLearn={() => go("protect")} />}
+
+            {/* Secondary details — collapsed by default so the first view matches the goal layout */}
+            <details id="warr-more-details" className="rounded-2xl border border-[#E6E8EC] bg-white group">
+              <summary className="cursor-pointer list-none flex items-center gap-3 p-4">
+                <span className="w-9 h-9 rounded-xl bg-slate-50 flex items-center justify-center shrink-0"><FileText className="w-4 h-4 text-[#64748B]" /></span>
+                <div className="min-w-0 flex-1"><p className="text-[14px] font-bold text-[#0F172A] leading-tight">More warranty details</p><p className="text-[11px] text-[#94A3B8] leading-tight">Coverage timeline, what's covered, exclusions &amp; FAQ</p></div>
+                <ChevronDown className="w-4 h-4 text-[#94A3B8] group-open:rotate-180 transition-transform shrink-0" />
+              </summary>
+              <div className="px-4 pb-4 pt-1 space-y-5">
 
             {/* Coverage timeline */}
             {tlPoints.length >= 2 && (
@@ -987,13 +1015,6 @@ function buildPanel(key: PassportPanelKey, d: PassportData, listing: VehicleList
                 <p>Damage from accidents, misuse, modification, or lack of maintenance.</p>
                 <p>Cosmetic wear, glass, and items covered by separate manufacturer warranties.</p>
               </WAcc>
-              <WAcc icon={LifeBuoy} title="Additional Factory Benefits" sub="Roadside, corrosion, emissions & more">
-                {benefitRows.length > 0
-                  ? benefitRows.map((r) => <p key={r.key}><span className="font-semibold text-[#0F172A]">{r.label}</span> — {r.term}.</p>)
-                  : <p>Roadside assistance, corrosion / rust-through, and emissions coverage may apply — confirm terms with the dealer.</p>}
-                {(isHybrid || isEV) && benefitRows.every((r) => r.key !== "ev_battery") && <p><span className="font-semibold text-[#0F172A]">{isEV ? "EV Battery" : "Hybrid Battery"}</span> — extended high-voltage coverage; confirm terms.</p>}
-                <p className="text-[11px] text-[#94A3B8]">Federal emissions components carry their own coverage. Exact terms vary by model year.</p>
-              </WAcc>
               {/* CPO coverage is a used/CPO concern — hidden entirely for new cars. */}
               {!isNew && (
                 <WAcc icon={BadgeCheck} title="Certified Pre-Owned Coverage" sub="Additional coverage that applies (if any)">
@@ -1018,6 +1039,8 @@ function buildPanel(key: PassportPanelKey, d: PassportData, listing: VehicleList
                 <div className="pt-1 space-y-2">{faqs.map((f) => <Faq key={f.q} q={f.q} a={f.a} />)}</div>
               </WAcc>
             </div>
+              </div>
+            </details>
 
             <Disclaimer />
           </div>
@@ -1588,6 +1611,105 @@ const CoverageCard = ({ title, subtitle, pct, tone, years, miles, expiresDate, e
     </div>
   );
 };
+
+// ── Goal-layout warranty primitives (wide modal) ─────────────────────────────
+// Top status card. New cars show only the delivery-based start; used/CPO show
+// the in-service start and the calculated end (date + mileage).
+const WarrantyStatusCard = ({ active, startLabel, startSub, endDate, endMiles }: {
+  active: boolean; startLabel: string; startSub?: string | null; endDate?: string | null; endMiles?: number | null;
+}) => (
+  <div className="rounded-2xl border border-emerald-200 bg-emerald-50/60 p-5">
+    <div className="flex flex-col sm:flex-row sm:items-center gap-5">
+      <div className="flex items-start gap-3.5 min-w-0 flex-1">
+        <span className="w-14 h-14 rounded-2xl bg-emerald-100 flex items-center justify-center shrink-0"><ShieldCheck className="w-7 h-7 text-[#16A34A]" /></span>
+        <div className="min-w-0">
+          <p className="text-[13px] font-bold text-[#0F172A]">Factory Warranty</p>
+          <p className={`text-[26px] font-extrabold leading-none tracking-wide mt-0.5 ${active ? "text-[#16A34A]" : "text-[#64748B]"}`}>{active ? "ACTIVE" : "EXPIRED"}</p>
+          <p className="text-[12px] text-[#64748B] mt-1.5 leading-snug">{active ? "Your factory warranty is in effect. You're covered." : "Factory coverage has ended for this vehicle."}</p>
+        </div>
+      </div>
+      <div className="flex items-stretch gap-6 sm:border-l sm:border-emerald-200/70 sm:pl-6">
+        <div>
+          <p className="text-[11px] font-semibold text-[#64748B]">Warranty Start</p>
+          <p className="text-[15px] font-extrabold text-[#0F172A] mt-1 leading-tight">{startLabel}</p>
+          {startSub && <p className="text-[11px] text-[#94A3B8] leading-tight">{startSub}</p>}
+        </div>
+        {(endDate || endMiles) && (
+          <div>
+            <p className="text-[11px] font-semibold text-[#64748B]">Warranty End</p>
+            {endDate && <p className="text-[15px] font-extrabold text-[#0F172A] mt-1 leading-tight">{endDate}</p>}
+            {endMiles && <p className="text-[11px] text-[#94A3B8] leading-tight">or {endMiles.toLocaleString()} miles</p>}
+          </div>
+        )}
+      </div>
+    </div>
+  </div>
+);
+
+// New-car coverage card: term + mileage only — no percentages, progress, or
+// remaining figures (coverage hasn't started counting down until delivery).
+const NewCoverageCard = ({ title, subtitle, tone, years, miles }: {
+  title: string; subtitle: string; tone: "blue" | "green"; years?: string | null; miles?: string | null;
+}) => {
+  const a = tone === "blue" ? { chip: "bg-blue-50 text-[#2563EB]", text: "text-[#2563EB]" } : { chip: "bg-emerald-50 text-[#16A34A]", text: "text-[#16A34A]" };
+  return (
+    <div className="rounded-2xl border border-slate-100 bg-white p-4 shadow-sm">
+      <div className="flex items-center gap-2.5">
+        <span className={`w-9 h-9 rounded-xl ${a.chip} flex items-center justify-center shrink-0`}><ShieldCheck className="w-[18px] h-[18px]" /></span>
+        <div className="min-w-0"><p className="text-[14px] font-bold text-[#0F172A] leading-tight">{title}</p><p className="text-[11px] text-[#64748B] leading-tight">{subtitle}</p></div>
+      </div>
+      <div className="mt-4 space-y-2.5">
+        {years && <p className="flex items-center gap-2.5"><Calendar className="w-4 h-4 text-[#94A3B8] shrink-0" /><span className="text-[15px]"><span className={`font-extrabold ${a.text}`}>{years.replace(/\s.*/, "")}</span> <span className="text-[#64748B] font-medium">{years.replace(/^\S+\s/, "")}</span></span></p>}
+        {miles && <p className="flex items-center gap-2.5"><Gauge className="w-4 h-4 text-[#94A3B8] shrink-0" /><span className="text-[15px]"><span className={`font-extrabold ${a.text}`}>{miles.replace(/\s.*/, "")}</span> <span className="text-[#64748B] font-medium">{miles.replace(/^\S+\s/, "")}</span></span></p>}
+      </div>
+    </div>
+  );
+};
+
+// Right-column list of additional factory benefits. Each row is a button that
+// opens the collapsed "More warranty details" section (keyboard accessible).
+interface BenefitRow { icon: React.ElementType; title: string; term: string; sub?: string | null; tone?: "blue" | "green" }
+const AdditionalFactoryBenefitsCard = ({ rows, onDetails }: { rows: BenefitRow[]; onDetails: () => void }) => (
+  <div className="rounded-2xl border border-[#E6E8EC] bg-white p-4 sm:p-5">
+    <p className="text-[15px] font-bold text-[#0F172A] mb-1">Additional Factory Benefits</p>
+    {rows.length > 0 ? (
+      <div className="divide-y divide-slate-100">
+        {rows.map((r) => {
+          const Icon = r.icon;
+          const c = r.tone === "green" ? "bg-emerald-50 text-[#16A34A]" : "bg-blue-50 text-[#2563EB]";
+          return (
+            <button key={r.title} onClick={onDetails} className="w-full flex items-center gap-3 py-3 text-left group">
+              <span className={`w-10 h-10 rounded-full ${c} flex items-center justify-center shrink-0`}><Icon className="w-[18px] h-[18px]" /></span>
+              <div className="min-w-0 flex-1">
+                <p className="text-[13px] font-bold text-[#0F172A] leading-tight">{r.title}</p>
+                <p className="text-[12px] text-[#64748B] leading-tight">{r.term}</p>
+                {r.sub && <p className="text-[11px] text-[#94A3B8] leading-tight mt-0.5">{r.sub}</p>}
+              </div>
+              <ChevronRight className="w-4 h-4 text-[#CBD5E1] group-hover:text-[#94A3B8] shrink-0" />
+            </button>
+          );
+        })}
+      </div>
+    ) : (
+      <p className="text-[12px] text-[#64748B] mt-2">Roadside, corrosion, and emissions coverage may apply — ask the dealer to confirm the terms for this vehicle.</p>
+    )}
+  </div>
+);
+
+// Used / pre-owned CPO eligibility banner (lavender). Never shown for new cars.
+const CpoBanner = ({ brand, onLearn }: { brand?: string | null; onLearn: () => void }) => (
+  <div className="rounded-2xl border border-violet-200 bg-violet-50/60 p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center gap-4">
+    <span className="w-12 h-12 rounded-2xl bg-violet-100 flex items-center justify-center shrink-0"><BadgeCheck className="w-6 h-6 text-violet-600" /></span>
+    <div className="min-w-0 flex-1">
+      <div className="flex items-center gap-2 flex-wrap">
+        <p className="text-[15px] font-bold text-[#0F172A]">Certified Pre-Owned</p>
+        {brand && <span className="text-[10px] font-bold uppercase tracking-wide text-violet-700 bg-violet-100 rounded-full px-2 py-0.5">{brand} CPO</span>}
+      </div>
+      <p className="text-[12px] text-[#64748B] mt-0.5">This vehicle may qualify for {brand ? `${brand} ` : ""}Certified Pre-Owned benefits.</p>
+    </div>
+    <button onClick={onLearn} className="shrink-0 h-10 px-4 rounded-xl border border-violet-300 bg-white text-[13px] font-semibold text-violet-700 inline-flex items-center gap-1.5 hover:bg-violet-100 transition-colors">Learn More <ChevronRight className="w-4 h-4" /></button>
+  </div>
+);
 
 interface TLPoint { date: string; label: string; color: string }
 // Slider-style timeline: labels above, a gray track below with a green fill to
@@ -2351,7 +2473,7 @@ export default function PassportPanel({ panel, onClose, openPanel, d, listing, i
   ) : undefined;
 
   return (
-    <PassportSlideOver open={panel !== null} onClose={onClose} title={def.title} subtitle={def.subtitle} footer={footer}>
+    <PassportSlideOver open={panel !== null} onClose={onClose} title={def.title} subtitle={def.subtitle} footer={footer} wide={def.wide}>
       {def.body}
     </PassportSlideOver>
   );
