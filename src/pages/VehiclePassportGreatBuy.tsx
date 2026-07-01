@@ -96,9 +96,13 @@ const VehiclePassportGreatBuy = () => {
   ].filter(Boolean) as string[];
 
   // Buying-score breakdown — each 0–100 from real signals, null when unknown.
+  // A new vehicle has no accident/title history and no prior owners by
+  // definition, so those factors are full-credit rather than "pending" — there
+  // is no report to wait on.
+  const isNew = listing.condition === "new";
   const priceVal = d.belowMarket && d.belowMarket > 0 ? 94 : d.marketAvg != null && d.price != null ? (d.price <= d.marketAvg ? 78 : 62) : d.saveVsMsrp ? 85 : null;
-  const histVal = d.cleanTitle && d.accidentCount === 0 ? 96 : d.accidentCount === 0 ? 84 : (typeof mc.carfax_clean_title === "boolean" || d.accidentCount != null) ? 70 : null;
-  const ownVal = d.ownerCount === 1 ? 93 : d.ownerCount != null ? 72 : null;
+  const histVal = isNew ? 97 : d.cleanTitle && d.accidentCount === 0 ? 96 : d.accidentCount === 0 ? 84 : (typeof mc.carfax_clean_title === "boolean" || d.accidentCount != null) ? 70 : null;
+  const ownVal = isNew ? 96 : d.ownerCount === 1 ? 93 : d.ownerCount != null ? 72 : null;
   const warVal = d.warrantyStr ? (() => { const w = d.warranty; if (w.in_service_date && w.factory_months) { const end = new Date(w.in_service_date); end.setMonth(end.getMonth() + w.factory_months); const left = Math.max(0, end.getTime() - Date.now()) / (1000 * 60 * 60 * 24 * 30.4); return Math.round(Math.max(55, Math.min(98, 55 + (left / w.factory_months) * 43))); } return 80; })() : null;
   // Equipment count spans the top-level features column AND the decoded
   // mc_attributes.options/.features (where the VIN decode lands) — not just the
@@ -110,8 +114,8 @@ const VehiclePassportGreatBuy = () => {
   const condVal = (d.serviceCount > 0 || listing.prep_status?.foreman_signed_at) ? 90 : (listing.condition === "new" ? 92 : 74);
   const breakdown: { label: string; score: number | null; note: string }[] = [
     { label: "Price Value", score: priceVal, note: d.belowMarket && d.belowMarket > 0 ? `${fmt$(d.belowMarket)} below market average` : d.marketAvg != null ? "Near the market average" : "Awaiting market data" },
-    { label: "Vehicle History", score: histVal, note: d.cleanTitle && d.accidentCount === 0 ? "Clean title, no accidents reported" : "History reviewed where data exists" },
-    { label: "Ownership", score: ownVal, note: d.ownerCount === 1 ? "Single previous owner" : d.ownerCount != null ? `${d.ownerCount} previous owners` : "Ownership pending" },
+    { label: "Vehicle History", score: histVal, note: isNew ? "New vehicle — no accident or title history" : d.cleanTitle && d.accidentCount === 0 ? "Clean title, no accidents reported" : "History reviewed where data exists" },
+    { label: "Ownership", score: ownVal, note: isNew ? "New — you are the first owner" : d.ownerCount === 1 ? "Single previous owner" : d.ownerCount != null ? `${d.ownerCount} previous owners` : "Ownership pending" },
     { label: "Warranty", score: warVal, note: d.warrantyStr ? `${d.warrantyStr} of factory coverage remains` : "Confirm coverage with dealer" },
     { label: "Equipment", score: equipVal, note: equipCount > 0 ? `${equipCount} equipment highlights decoded` : "Equipment pending" },
     { label: "Market Demand", score: demandVal, note: d.viewCount != null ? `${d.viewCount.toLocaleString()} shopper views` : "Demand tracked once live" },
