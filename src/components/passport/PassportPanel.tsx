@@ -1618,6 +1618,25 @@ const WarrantyTimeline = ({ points, todayIndex }: { points: TLPoint[]; todayInde
 // Side-view vehicle that highlights the body (basic) or the drivetrain
 // (powertrain) when the matching toggle is selected. Toggles + legend on the
 // left, the vehicle on the right.
+// Custom top-down drivetrain icon (four wheels + front/rear differentials +
+// driveshaft) for Powertrain coverage — cleaner than a generic gauge/gear.
+// 24px grid, 2px stroke, rounded caps/joins, inherits currentColor.
+const DrivetrainIcon = ({ className, strokeWidth = 2, ...rest }: React.SVGProps<SVGSVGElement>) => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={strokeWidth as number} strokeLinecap="round" strokeLinejoin="round" className={className} {...rest}>
+    <rect x="2.5" y="3.5" width="3" height="5" rx="1.5" />
+    <rect x="18.5" y="3.5" width="3" height="5" rx="1.5" />
+    <rect x="2.5" y="15.5" width="3" height="5" rx="1.5" />
+    <rect x="18.5" y="15.5" width="3" height="5" rx="1.5" />
+    <path d="M5.5 6H10" />
+    <path d="M14 6h4.5" />
+    <path d="M5.5 18H10" />
+    <path d="M14 18h4.5" />
+    <circle cx="12" cy="6" r="2" />
+    <circle cx="12" cy="18" r="2" />
+    <path d="M12 8v8" />
+  </svg>
+);
+
 // Segmented-control card: 60px tall, 16px radius, left icon, bold title over a
 // gray subtitle. Selected → blue/green border + tint + accent icon/title.
 const CoverageToggle = ({ active, tone, icon: Icon, title, sub, onClick }: { active: boolean; tone: "blue" | "green"; icon: React.ElementType; title: string; sub: string; onClick: () => void }) => {
@@ -1665,7 +1684,7 @@ const WarrantyCarVisual = ({ hasPowertrain, onAll }: { hasPowertrain: boolean; o
         {/* Left ~35% — segmented selector + live covered-systems list */}
         <div className="space-y-2.5">
           <CoverageToggle active={mode === "basic"} tone="blue" icon={ShieldCheck} title="Bumper-to-Bumper" sub="Basic Vehicle Coverage" onClick={() => switchTo("basic")} />
-          {hasPowertrain && <CoverageToggle active={mode === "powertrain"} tone="green" icon={Gauge} title="Powertrain" sub="Engine, Transmission & Drivetrain" onClick={() => switchTo("powertrain")} />}
+          {hasPowertrain && <CoverageToggle active={mode === "powertrain"} tone="green" icon={DrivetrainIcon} title="Powertrain" sub="Engine, Transmission & Drivetrain" onClick={() => switchTo("powertrain")} />}
           <ul className="pt-1.5 space-y-1.5">
             {COVERED_SYSTEMS[mode].map((s) => (
               <li key={s} className="flex items-center gap-1.5 text-[12px] text-[#0F172A]"><CheckCircle2 className="w-3.5 h-3.5 text-[#2ECC71] shrink-0" />{s}</li>
