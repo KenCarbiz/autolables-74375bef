@@ -8,6 +8,8 @@ import {
 import type { PassportData, PricePoint, OemWarrantyView } from "@/lib/passportV2Data";
 import { fmt$, listingEquipment } from "@/lib/passportV2Data";
 import { oemCoverageRows, type CoverageKey } from "@/lib/oemWarranty";
+import { lookupOemReference } from "@/data/oemWarrantyReference";
+import { resolveEffectiveWarranty } from "@/lib/warranty/passportWarranty";
 import type { VehicleListing } from "@/hooks/useVehicleListing";
 import {
   PassportSlideOver, Hero, Section, Check, Empty, StatRow, RangeBar, TrendChart, Ring, CARD, GREEN, BLUE,
@@ -835,7 +837,17 @@ function buildPanel(key: PassportPanelKey, d: PassportData, listing: VehicleList
     }
 
     case "factory-warranty": {
-      const w = d.warranty;
+      const cpoProgs = (listing as unknown as { cpo_programs?: Array<Record<string, unknown>> }).cpo_programs || null;
+      // Vehicle-aware coverage: dealer-verified terms win; the verified OEM
+      // library fills the rest. Factory CPO at a matching franchise overlays the
+      // CPO program; cross-brand/used cars get the factory balance with any
+      // second-owner powertrain reduction applied.
+      const eff = resolveEffectiveWarranty({
+        condition: listing.condition, ymm: listing.ymm,
+        warrantyInfo: d.warranty, hasDealerOem: !!d.oemWarranty, cpoPrograms: cpoProgs,
+      });
+      const w = eff.info;
+      const isFactoryCpo = eff.mode === "cpo_factory";
       const ks = listing.key_specs || {};
       const isNew = listing.condition === "new";
       // New-car mileage credit: the factory allowance is measured from delivery,
@@ -897,12 +909,15 @@ function buildPanel(key: PassportPanelKey, d: PassportData, listing: VehicleList
       const tlPoints = tlRaw.filter((p): p is TLPoint => p != null);
       const todayIdx = tlPoints.findIndex((p) => p.date === "Today");
       const isCpo = listing.condition === "cpo";
-      const cpo = (listing as unknown as { cpo_programs?: Array<Record<string, unknown>> }).cpo_programs?.[0] || null;
-      const cov = oemCoverageRows(d.oemWarranty || {});
+      const cpo = cpoProgs?.[0] || null;
+      // Benefits/coverage rows: dealer-verified terms first, then the verified
+      // OEM library for the vehicle's make (cross-brand used cars get their own
+      // manufacturer's benefits, not the tenant's).
+      const cov = oemCoverageRows(d.oemWarranty || lookupOemReference(listing.ymm) || {});
       const benefitRows = cov.filter((r) => r.key === "corrosion" || r.key === "roadside" || r.key === "ev_battery" || r.key === "maintenance");
       const includedRows = cov.filter((r) => r.key === "basic" || r.key === "powertrain");
       const cpoTerm = (mo: unknown, mi: unknown) => [Number(mo) ? `${Math.round(Number(mo) / 12)} yr` : null, Number(mi) ? `${(Number(mi) / 1000).toFixed(0)}K mi` : null].filter(Boolean).join(" / ");
-      const hasData = !!(d.warrantyStr || d.oemWarranty);
+      const hasData = !!(d.warrantyStr || d.oemWarranty || eff.usedLibrary || isFactoryCpo);
       // ── Goal-layout derived values ──────────────────────────────────────
       // A new car's factory warranty is active by definition (starts at
       // delivery); used/CPO rely on the calculated remaining coverage.
@@ -955,8 +970,13 @@ function buildPanel(key: PassportPanelKey, d: PassportData, listing: VehicleList
                       </>
                     ) : (
                       <>
-                        {hasBasic && <CoverageCard title="Bumper-to-Bumper" subtitle="Basic Vehicle Coverage" tone="blue" pct={b2bPct} years={yrsRemain(basic.left)} miles={milesRemainLbl(milesLeft)} expiresDate={basic.date} expiresMiles={milesCapLbl(expMilesOf(w.factory_miles))} />}
+                        {hasBasic && <CoverageCard title="Bumper-to-Bumper" subtitle={isFactoryCpo && eff.cpoProgramName ? "CPO Vehicle Coverage" : "Basic Vehicle Coverage"} tone="blue" pct={b2bPct} years={yrsRemain(basic.left)} miles={milesRemainLbl(milesLeft)} expiresDate={basic.date} expiresMiles={milesCapLbl(expMilesOf(w.factory_miles))} />}
                         {hasPt && <CoverageCard title="Powertrain" subtitle="Engine, Transmission & Drivetrain" tone="green" pct={ptPct} years={yrsRemain(pt.left)} miles={milesRemainLbl(ptMilesLeft)} expiresDate={pt.date} expiresMiles={milesCapLbl(expMilesOf(w.powertrain_miles))} />}
+                        {eff.cpoWrap && (
+                          <NewCoverageCard title={eff.cpoWrap.programName} subtitle="Additional CPO coverage from purchase" tone="green"
+                            years={eff.cpoWrap.months ? `${Math.round(eff.cpoWrap.months / 12) || 1} ${eff.cpoWrap.months >= 24 ? "Years" : "Year"}` : null}
+                            miles={eff.cpoWrap.unlimitedMiles ? "Unlimited Miles" : eff.cpoWrap.miles ? `${eff.cpoWrap.miles.toLocaleString()} Miles` : null} />
+                        )}
                       </>
                     )}
                   </div>
@@ -966,14 +986,30 @@ function buildPanel(key: PassportPanelKey, d: PassportData, listing: VehicleList
                       <p className="text-[12px] font-medium text-emerald-800 leading-snug">Factory coverage begins when you take delivery of your vehicle.</p>
                     </div>
                   )}
+                  {isFactoryCpo && (
+                    <div className="mt-3 flex items-start gap-2 rounded-xl bg-emerald-50 px-3 py-2.5">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 mt-[6px] shrink-0" />
+                      <p className="text-[12px] font-medium text-emerald-800 leading-snug">{brand ? `${brand} ` : ""}Certified Pre-Owned extends this vehicle's factory coverage{eff.cpoInspectionPoints ? ` and includes a ${eff.cpoInspectionPoints} inspection` : ""}.</p>
+                    </div>
+                  )}
+                  {eff.secondOwnerReduced && !isFactoryCpo && (
+                    <div className="mt-3 flex items-start gap-2 rounded-xl bg-slate-50 px-3 py-2.5">
+                      <span className="w-1.5 h-1.5 rounded-full bg-slate-400 mt-[6px] shrink-0" />
+                      <p className="text-[12px] font-medium text-[#64748B] leading-snug">Powertrain shown at second-owner terms — {brand || "this manufacturer"} reduces powertrain coverage when the vehicle transfers from the original owner.</p>
+                    </div>
+                  )}
                 </div>
               </div>
               {/* Right column — additional factory benefits */}
               <AdditionalFactoryBenefitsCard rows={benefitCards} onDetails={openMoreDetails} />
             </div>
 
-            {/* Used / pre-owned only — Certified Pre-Owned eligibility */}
-            {!isNew && <CpoBanner brand={brand} onLearn={() => go("protect")} />}
+            {/* Certified Pre-Owned: certified copy for factory-CPO cars, "may
+                qualify" only at a matching franchise. Cross-brand used cars get
+                no CPO banner — the tenant can't factory-certify another make. */}
+            {!isNew && (isFactoryCpo || eff.franchiseMatch) && (
+              <CpoBanner brand={brand} certified={isFactoryCpo} programName={eff.cpoProgramName} onLearn={() => go("protect")} />
+            )}
 
             {/* Secondary details — collapsed by default so the first view matches the goal layout */}
             <details id="warr-more-details" className="rounded-2xl border border-[#E6E8EC] bg-white group">
@@ -1696,8 +1732,9 @@ const AdditionalFactoryBenefitsCard = ({ rows, onDetails }: { rows: BenefitRow[]
   </div>
 );
 
-// Used / pre-owned CPO eligibility banner (lavender). Never shown for new cars.
-const CpoBanner = ({ brand, onLearn }: { brand?: string | null; onLearn: () => void }) => (
+// Used / pre-owned CPO banner (lavender). Never shown for new cars. Certified
+// cars state the fact; eligible-but-uncertified cars say "may qualify".
+const CpoBanner = ({ brand, certified = false, programName, onLearn }: { brand?: string | null; certified?: boolean; programName?: string | null; onLearn: () => void }) => (
   <div className="rounded-2xl border border-violet-200 bg-violet-50/60 p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center gap-4">
     <span className="w-12 h-12 rounded-2xl bg-violet-100 flex items-center justify-center shrink-0"><BadgeCheck className="w-6 h-6 text-violet-600" /></span>
     <div className="min-w-0 flex-1">
@@ -1705,7 +1742,11 @@ const CpoBanner = ({ brand, onLearn }: { brand?: string | null; onLearn: () => v
         <p className="text-[15px] font-bold text-[#0F172A]">Certified Pre-Owned</p>
         {brand && <span className="text-[10px] font-bold uppercase tracking-wide text-violet-700 bg-violet-100 rounded-full px-2 py-0.5">{brand} CPO</span>}
       </div>
-      <p className="text-[12px] text-[#64748B] mt-0.5">This vehicle may qualify for {brand ? `${brand} ` : ""}Certified Pre-Owned benefits.</p>
+      <p className="text-[12px] text-[#64748B] mt-0.5">
+        {certified
+          ? `This vehicle is ${brand ? `${brand} ` : ""}Certified Pre-Owned${programName ? ` under ${programName}` : ""}.`
+          : `This vehicle may qualify for ${brand ? `${brand} ` : ""}Certified Pre-Owned benefits.`}
+      </p>
     </div>
     <button onClick={onLearn} className="shrink-0 h-10 px-4 rounded-xl border border-violet-300 bg-white text-[13px] font-semibold text-violet-700 inline-flex items-center gap-1.5 hover:bg-violet-100 transition-colors">Learn More <ChevronRight className="w-4 h-4" /></button>
   </div>
