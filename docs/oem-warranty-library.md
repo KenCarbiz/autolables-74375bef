@@ -100,19 +100,71 @@ modal shows **term figures only**:
 4. Add the make to `LOADED_MAKES` in `src/data/oemWarrantyPrograms.ts` (or seed
    it directly). The coverage tracker will pick it up automatically.
 
-### Currently loaded (Phase 1)
+### Currently loaded
 
-INFINITI (incl. a 2026 QX60 model-specific program), NISSAN, VOLKSWAGEN,
-HYUNDAI — all `needs_review`, derived from the app's curated reference terms.
+**New-car:** the full curated gamut — every make in `oemWarrantyReference.ts`
+(~33 brands) now has a make-level new-car program, plus a model-specific INFINITI
+2026 QX60 program. All `needs_review`.
 
-Use `buildWarrantyCoverageReport()` to see, at any time, which makes are loaded,
-which curated makes are still **pending** a program, and which loaded makes still
-need source verification. Suggested rollout order after Phase 1:
+**CPO:** every make in `oemCpoReference.ts` (~30 brands) has a Certified Pre-Owned
+program (program name, comprehensive/powertrain terms, coverage-from rule,
+eligibility window, inspection points, transferability). All `needs_review`.
 
-- Phase 2: Toyota / Lexus, Honda / Acura, Ford / Lincoln, GM
-- Phase 3: Kia, Subaru, Mazda, CDJR
-- Phase 4: German luxury + EV-specific rules
-- Phase 5: admin approval dashboard + source-refresh reminders
+Use `buildWarrantyCoverageReport()` to see, at any time, which makes are loaded
+for new-car and CPO, which are still **pending**, and which still need source
+verification (`needsVerification`, `cpoMissing`).
+
+## CPO (Certified Pre-Owned) programs
+
+CPO terms live in `src/data/oemCpoReference.ts`, keyed by brand, parallel to the
+new-car reference. `matchOemCpoProgram(vehicle, asOfYear)` resolves a vehicle to
+its brand's CPO program and computes **eligibility** against the program's age /
+mileage ceilings:
+
+- `eligible: true` — within the window; `false` — outside it; `null` — can't tell
+  (missing year or mileage) → `needsDealerConfirmation`.
+- Non-certified used vehicles are treated as "may qualify" (needs confirmation);
+  a listing flagged CPO with a known-eligible vehicle is covered.
+- Coverage-from matters: powertrain usually runs from the **original in-service
+  date**, while the added comprehensive/limited coverage runs from the **CPO
+  purchase date** — so it's shown as a term, not a countdown, until purchase.
+
+CPO figures reflect commonly-published standard US programs and are **all
+unverified** — CPO terms change often (coverage lengths, eligibility, inspection
+counts). Verify each against the manufacturer's current CPO page before showing
+it as fact.
+
+## Keeping the library current (updates & changeover)
+
+OEMs revise warranty and CPO terms, most often at **model-year changeover**.
+`src/lib/warranty/review.ts` provides the re-check workflow:
+
+- `WARRANTY_LIBRARY_META` records `lastReviewedAt` and a `reviewIntervalMonths`
+  cadence. Update `lastReviewedAt` after each verification pass.
+- `buildWarrantyReviewQueue({ asOf })` returns everything to re-check, tagged with
+  a reason:
+  - `unverified` — program not yet source-verified;
+  - `model_year_rollover` — the program's model-year range ends before the current
+    year, so a newer model year may carry changed terms — re-check;
+  - `missing_cpo` — a make has a new-car program but no CPO reference;
+  - `review_interval_due` — the periodic full re-review is due.
+- `reviewQueueSummary({ asOf })` gives counts by reason for an admin/CLI view.
+
+**Update procedure:** run the review queue, confirm each flagged program against
+the OEM's current warranty/CPO page, correct the figures in
+`oemWarrantyReference.ts` / `oemCpoReference.ts` (or model-specific programs),
+attach a real source + `source_last_verified_at`, set `confidence_status` to
+`verified`, and bump `WARRANTY_LIBRARY_META.lastReviewedAt`.
+
+### Rollout / verification order
+
+- Phase 1 (done): seed all makes new-car + CPO as `needs_review`.
+- Phase 2: verify high-volume makes first — Toyota/Lexus, Honda/Acura, Ford/Lincoln,
+  GM, Hyundai/Kia/Genesis, Nissan/INFINITI.
+- Phase 3: verify remaining mainstream — Subaru, Mazda, VW, CDJR.
+- Phase 4: verify luxury/German + EV-specific rules (Tesla battery, hybrid/EV).
+- Phase 5: admin approval dashboard + automated source-refresh reminders; wire the
+  modal to `buildWarrantyDisplayModel` and the runtime to the DB tables.
 
 ## Source verification requirements
 

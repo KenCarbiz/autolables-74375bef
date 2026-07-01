@@ -3,6 +3,8 @@ import { getWarrantyDisplayMode, matchOemWarrantyProgram } from "./match";
 import { calculateUsedWarrantyRemaining } from "./calculate";
 import { buildWarrantyDisplayModel } from "./displayModel";
 import { buildWarrantyCoverageReport } from "./coverageReport";
+import { matchOemCpoProgram } from "./cpo";
+import { buildWarrantyReviewQueue, reviewQueueSummary } from "./review";
 import type { WarrantyVehicleInput } from "./types";
 
 const QX60 = (over: Partial<WarrantyVehicleInput> = {}): WarrantyVehicleInput => ({
@@ -120,15 +122,51 @@ describe("Hyundai second-owner powertrain reduction", () => {
 
 describe("coverage tracker", () => {
   const report = buildWarrantyCoverageReport();
-  it("lists the four loaded makes and flags them needs_review", () => {
-    const makes = report.loaded.map((m) => m.make).sort();
-    expect(makes).toEqual(["HYUNDAI", "INFINITI", "NISSAN", "VOLKSWAGEN"]);
-    expect(report.needsVerification.sort()).toEqual(["HYUNDAI", "INFINITI", "NISSAN", "VOLKSWAGEN"]);
-    expect(report.totals.verifiedMakes).toBe(0);
+  it("loads the full new-car gamut with nothing pending", () => {
+    expect(report.loaded.length).toBeGreaterThanOrEqual(30);
+    expect(report.loaded.map((m) => m.make)).toContain("TOYOTA");
+    expect(report.loaded.map((m) => m.make)).toContain("INFINITI");
+    // Every curated make is now loaded → no new-car makes left pending.
+    expect(report.pending).toEqual([]);
   });
-  it("reports remaining curated makes as pending", () => {
-    expect(report.pending).not.toContain("INFINITI");
-    expect(report.pending.length).toBeGreaterThan(0);
-    expect(report.pending).toContain("TOYOTA");
+  it("flags every make needs_review until source-verified", () => {
+    expect(report.totals.verifiedMakes).toBe(0);
+    expect(report.needsVerification.length).toBe(report.loaded.length);
+  });
+  it("reports CPO coverage alongside new-car", () => {
+    expect(report.cpoLoaded).toContain("TOYOTA");
+    expect(report.cpoLoaded).toContain("INFINITI");
+    expect(report.totals.cpoMakes).toBeGreaterThanOrEqual(30);
+  });
+});
+
+describe("CPO matching", () => {
+  it("resolves a certified vehicle to its brand CPO program", () => {
+    const m = matchOemCpoProgram({ make: "TOYOTA", model: "Camry", year: 2023, condition: "cpo", mileage: 30000 }, 2026);
+    expect(m.entry?.programName).toMatch(/Toyota Certified/i);
+    expect(m.isCertified).toBe(true);
+    expect(m.eligible).toBe(true);
+    expect(m.confidenceStatus).toBe("needs_review");
+  });
+  it("marks a vehicle outside the age/mileage window ineligible", () => {
+    const m = matchOemCpoProgram({ make: "TOYOTA", year: 2010, condition: "cpo", mileage: 160000 }, 2026);
+    expect(m.eligible).toBe(false);
+  });
+  it("needs confirmation for a brand with no CPO program", () => {
+    const m = matchOemCpoProgram({ make: "Koenigsegg", year: 2022, condition: "used" }, 2026);
+    expect(m.entry).toBeNull();
+    expect(m.needsDealerConfirmation).toBe(true);
+  });
+});
+
+describe("review queue", () => {
+  it("flags unverified programs and a model-year rollover", () => {
+    const items = buildWarrantyReviewQueue({ asOf: new Date("2028-10-01") });
+    expect(items.some((i) => i.reason === "unverified")).toBe(true);
+    // 2015-2027 make-level ranges are before MY2028 → rollover flagged.
+    expect(items.some((i) => i.reason === "model_year_rollover")).toBe(true);
+    const summary = reviewQueueSummary({ asOf: new Date("2028-10-01") });
+    expect(summary.total).toBeGreaterThan(0);
+    expect(summary.cpoMakes).toBeGreaterThanOrEqual(30);
   });
 });

@@ -172,9 +172,10 @@ const INFINITI_QX60_2026: OemWarrantyProgram = {
   sources: [unverifiedSource("INFINITI")],
 };
 
-// Makes with a loaded program this phase. Add to this list (and the makes will
-// flow into the coverage tracker) as new OEMs are reviewed and seeded.
-export const LOADED_MAKES = ["INFINITI", "NISSAN", "VOLKSWAGEN", "HYUNDAI"] as const;
+// Every make with a curated reference now gets a make-level new-car program —
+// the full OEM new-vehicle gamut. The coverage tracker reports which of these
+// still need source verification (all of them, until reviewed).
+export const LOADED_MAKES: string[] = Object.keys(OEM_WARRANTY_REFERENCE).sort();
 
 export const OEM_WARRANTY_PROGRAMS: OemWarrantyProgram[] = [
   // Model-specific first (more specific programs win the match ladder).

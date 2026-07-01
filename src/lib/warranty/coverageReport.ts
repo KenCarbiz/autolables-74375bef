@@ -6,6 +6,7 @@
 
 import { OEM_WARRANTY_PROGRAMS } from "@/data/oemWarrantyPrograms";
 import { OEM_WARRANTY_REFERENCE } from "@/data/oemWarrantyReference";
+import { OEM_CPO_REFERENCE } from "@/data/oemCpoReference";
 import type { ConfidenceStatus, OemWarrantyProgram } from "@/lib/warranty/types";
 
 export interface MakeCoverageStatus {
@@ -13,14 +14,17 @@ export interface MakeCoverageStatus {
   loaded: boolean;
   programCount: number;
   hasModelSpecific: boolean;
+  hasCpo: boolean;                    // a CPO reference exists for this make
   confidence: ConfidenceStatus | "mixed" | null;
 }
 
 export interface WarrantyCoverageReport {
-  loaded: MakeCoverageStatus[];       // makes with at least one program
+  loaded: MakeCoverageStatus[];       // makes with at least one new-car program
   pending: string[];                  // curated-reference makes with no program yet
   needsVerification: string[];        // loaded makes not yet fully "verified"
-  totals: { loadedMakes: number; programs: number; verifiedMakes: number; pendingMakes: number };
+  cpoLoaded: string[];                // makes with a CPO reference
+  cpoMissing: string[];               // loaded new-car makes with no CPO reference
+  totals: { loadedMakes: number; programs: number; verifiedMakes: number; pendingMakes: number; cpoMakes: number };
 }
 
 const norm = (s: string) => s.trim().toUpperCase();
@@ -45,6 +49,7 @@ export function buildWarrantyCoverageReport(
         loaded: true,
         programCount: list.length,
         hasModelSpecific: list.some((p) => p.model != null),
+        hasCpo: !!OEM_CPO_REFERENCE[make],
         confidence,
       };
     })
@@ -57,16 +62,21 @@ export function buildWarrantyCoverageReport(
     .sort();
 
   const needsVerification = loaded.filter((m) => m.confidence !== "verified").map((m) => m.make);
+  const cpoLoaded = Object.keys(OEM_CPO_REFERENCE).map(norm).sort();
+  const cpoMissing = loaded.filter((m) => !m.hasCpo).map((m) => m.make).sort();
 
   return {
     loaded,
     pending,
     needsVerification,
+    cpoLoaded,
+    cpoMissing,
     totals: {
       loadedMakes: loaded.length,
       programs: programs.length,
       verifiedMakes: loaded.filter((m) => m.confidence === "verified").length,
       pendingMakes: pending.length,
+      cpoMakes: cpoLoaded.length,
     },
   };
 }
