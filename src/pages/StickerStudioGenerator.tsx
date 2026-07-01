@@ -4,6 +4,7 @@ import { useDealerSettings } from "@/contexts/DealerSettingsContext";
 import { useTenant } from "@/contexts/TenantContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { useDealerDocumentRules } from "@/lib/documentRules";
+import { cleanEquipmentList } from "@/lib/passportV2Data";
 import { useUsageLimits } from "@/lib/entitlements/useUsageLimits";
 import { useAssetReadiness } from "@/lib/stickerStudio/useAssetReadiness";
 import { transitionDocument } from "@/lib/stickerStudio/documentWorkflow";
@@ -93,7 +94,7 @@ const StickerStudioGenerator = () => {
       ].filter(Boolean).join(" · ") || prev.specs,
       qrUrl: v.slug ? `${origin}/v/${v.slug}` : v.vin ? `${origin}/v/${v.vin}` : prev.qrUrl,
       installed: (v.options.length || v.features.length)
-        ? [...v.options, ...v.features].slice(0, 12).map((n) => ({ name: n }))
+        ? cleanEquipmentList([...v.options, ...v.features]).slice(0, 12).map((n) => ({ name: n }))
         : prev.installed,
     }));
   });

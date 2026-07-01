@@ -19,13 +19,68 @@ export type OemWarrantyView = Partial<OemFactoryWarranty> & { owner?: "original"
 // decoder populate, and which arrive as arrays OR delimited strings). Without
 // this, equipment captured by the API pull never reaches the shopper page,
 // which only read the top-level `features` column. De-duplicated and trimmed.
+// NeoVIN returns a very large, noisy equipment set (633+ rows for one car):
+// US/UK spelling duplicates, raw option codes, available paint colors,
+// crash-test ratings, and taxonomy/metadata labels. cleanEquipmentList strips
+// that down to real, customer-facing features and de-dupes across spellings.
+const UK_US: [RegExp, string][] = [
+  [/\blitres?\b/gi, "Liters"], [/\bcentre\b/gi, "Center"], [/\bgrey\b/gi, "Gray"],
+  [/\bcolour\b/gi, "Color"], [/\baluminium\b/gi, "Aluminum"], [/\btyres?\b/gi, "Tire"],
+  [/\bmetre\b/gi, "Meter"], [/\bkerb\b/gi, "Curb"],
+];
+const normSpelling = (s: string) => UK_US.reduce((a, [re, t]) => a.replace(re, t), s);
+const CODE_RE = /^[A-Z]{1,3}\d{1,4}$/;                                                   // B10, E10, B93
+const META_RE = /\b(msrp|warranty|currency|invoice|jato|segment|dimensions?|emission|plant of assembly|country|weights?|charges?|model generation|model year|ramp angle|secondary|delivery charge)\b/i;
+const RATING_RE = /\b(iihs|nhtsa)\b|-(good|acceptable|marginal|poor|tsp|updated|[1-5])$|overlap|rollover|frontal crash|side impact-/i;
+const PAINT_RE = /\b(metallic|pearl)\b|^paint[- ]/i;                                     // paint-color variants
+const GENERIC = new Set([
+  "engine", "fuel", "fuel tanks", "fuel consumption", "transmission", "electrical system",
+  "performance", "tires", "tire", "suspension", "ventilation system", "air conditioning",
+  "doors", "door", "powertrain", "wheels", "wheel", "spare wheel", "brakes", "disc brakes",
+  "abs", "seating", "console", "paint", "speakers", "vehicle type", "computer",
+  "floor covering", "floor mats", "power", "power locks", "power steering", "power windows",
+  "head restraints", "blind", "stability control", "garage door opener", "bumpers",
+  "glass roof", "telematics", "remote services", "drive", "compressor", "charges",
+  "start/stop", "privacy glass", "rear axle", "driver modes", "vanity mirror", "apps control",
+  "trip computer", "crash test results", "body style", "over air updates", "windshield wipers",
+  "rear window", "rear side windows", "cup holders", "cupholders", "seat upholstery",
+  "instrument cluster", "cargo capacity", "underbody protection", "emergency call",
+  "ground view", "differential lock", "torque vectoring", "active grille shutter",
+  "hill holder", "memorized adjustment", "anti-theft protection", "isofix preparation",
+  "voice activating system", "laminated side windows", "electronic hand brake",
+  "door sill protector", "accident data recorder", "electronic traction control",
+  "multiple user profiles", "emission control level", "load restraint", "model generation id",
+  "secondary ventilation controls", "compass", "suspension", "weights", "performance",
+]);
+const isEquipNoise = (raw: string): boolean => {
+  const s = raw.trim();
+  if (s.length < 2) return true;
+  if (CODE_RE.test(s)) return true;
+  if (META_RE.test(s) || RATING_RE.test(s) || PAINT_RE.test(s)) return true;
+  if (GENERIC.has(s.toLowerCase())) return true;
+  return false;
+};
+export const cleanEquipmentList = (items: string[]): string[] => {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const raw of items) {
+    if (isEquipNoise(raw)) continue;
+    const norm = normSpelling(raw);
+    const key = norm.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+    if (!key || seen.has(key)) continue;
+    seen.add(key);
+    out.push(norm);
+  }
+  return out;
+};
+
 export const listingEquipment = (listing: VehicleListing): string[] => {
   const toList = (v: unknown): string[] => Array.isArray(v)
     ? v.map((x) => typeof x === "string" ? x : String((x as Record<string, unknown>)?.name ?? (x as Record<string, unknown>)?.label ?? (x as Record<string, unknown>)?.description ?? "")).map((s) => s.trim()).filter(Boolean)
     : typeof v === "string" ? v.split(/[,;|]/).map((s) => s.trim()).filter(Boolean) : [];
   const mc = (listing.mc_attributes || {}) as Record<string, unknown>;
   const fromFeatures = (listing.features || []).map((f) => [f.title, f.subtitle].filter(Boolean).join(" ").trim()).filter(Boolean);
-  return Array.from(new Set([...fromFeatures, ...toList(mc.options), ...toList(mc.features)]));
+  return cleanEquipmentList([...fromFeatures, ...toList(mc.options), ...toList(mc.features)]);
 };
 
 export const fmt$ = (n: number | null | undefined) =>

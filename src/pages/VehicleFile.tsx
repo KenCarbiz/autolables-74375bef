@@ -20,6 +20,7 @@ import { InstallProofList } from "@/components/admin/InstallProofList";
 import { useVehicleSpecs } from "@/hooks/useVehicleSpecs";
 import { useRecallTask, OUTCOME_LABELS, type RecallOutcome } from "@/hooks/useRecallTask";
 import { listingGallery, listingHero } from "@/lib/photos";
+import { cleanEquipmentList } from "@/lib/passportV2Data";
 import { PACKET_MODULES, packetVisible } from "@/lib/packetModules";
 import { QRCodeSVG } from "qrcode.react";
 import GeneratedDocumentsSection from "@/components/vehicle/GeneratedDocumentsSection";
@@ -751,7 +752,7 @@ const OverviewPanel = ({ vehicle, onTab, recall }: { vehicle: VehicleRow; onTab:
     if (typeof v === "string") return v.split(/[,;|]/).map((s) => s.trim()).filter(Boolean);
     return [];
   };
-  const optionsList = Array.from(new Set([...mcStrArr(mc.options), ...mcStrArr(mc.features), ...pulledOptions]));
+  const optionsList = cleanEquipmentList([...mcStrArr(mc.options), ...mcStrArr(mc.features), ...pulledOptions]);
   const handlePullSpecs = async () => {
     const r = await fetchSpecs({ vin: vehicle.vin, tenantId: vehicle.tenant_id, vehicleId: vehicle.id });
     if (r) setPulledOptions([...r.options, ...r.features]);

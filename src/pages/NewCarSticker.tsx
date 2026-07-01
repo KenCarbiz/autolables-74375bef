@@ -9,6 +9,7 @@ import { useProducts } from "@/hooks/useProducts";
 import { useVehicleListing } from "@/hooks/useVehicleListing";
 import { useRecallLookup } from "@/hooks/useRecallLookup";
 import { saveStickerToVehicle, markDocumentPublished } from "@/lib/stickerStudio/api";
+import { cleanEquipmentList } from "@/lib/passportV2Data";
 import { useOemSticker } from "@/hooks/useOemSticker";
 import RecallBanner from "@/components/addendum/RecallBanner";
 import { useVehiclePrefill, VehicleContextHeader } from "@/lib/vehiclePrefill";
@@ -75,7 +76,7 @@ const NewCarSticker = () => {
     }));
     setEquipment((prev) => {
       if (prev.filter(Boolean).length > 0) return prev;
-      const opts = [...v.options, ...v.features];
+      const opts = cleanEquipmentList([...v.options, ...v.features]);
       return opts.length > 0 ? opts : [v.bodyStyle, v.drivetrain, v.fuelType, v.engine].filter(Boolean);
     });
   });
@@ -85,8 +86,8 @@ const NewCarSticker = () => {
   const handlePullSpecs = async () => {
     const r = await fetchSpecs({ vin: vehicle.vin, tenantId: tenant?.id, vehicleId: prefill.vehicle?.id });
     if (r) {
-      const opts = [...r.options, ...r.features];
-      if (opts.length) setEquipment((prev) => Array.from(new Set([...prev.filter(Boolean), ...opts])));
+      const opts = cleanEquipmentList([...r.options, ...r.features]);
+      if (opts.length) setEquipment((prev) => cleanEquipmentList([...prev.filter(Boolean), ...opts]));
       const b = r.build || {};
       const str = (val: unknown) => (val == null || val === "" ? "" : String(val));
       setVehicle((prev) => ({

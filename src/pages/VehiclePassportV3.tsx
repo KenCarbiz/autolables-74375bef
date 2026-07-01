@@ -283,11 +283,10 @@ const VehiclePassportV3 = () => {
   if (seats) highlights.push({ icon: Users, t: `${seats}-Passenger`, s: "Seating" });
   // Amenity detection from the decoded equipment/options blob — only chips
   // whose feature is actually present are shown (no invented equipment).
-  const featBlob = [
-    ...listingEquipment(listing),
-    ...(Array.isArray(mc.features) ? (mc.features as unknown[]).map(String) : []),
-    ...(Array.isArray(mc.options) ? (mc.options as unknown[]).map(String) : []),
-  ].join(" | ").toLowerCase();
+  // listingEquipment already merges the cleaned options + features, so use it
+  // directly — re-appending the raw mc blobs would just add back the decoder
+  // noise (codes, paint, ratings) we strip.
+  const featBlob = listingEquipment(listing).join(" | ").toLowerCase();
   const amenityDefs: { re: RegExp; icon: React.ElementType; t: string; s: string }[] = [
     { re: /panoramic|moonroof|sunroof|pano roof/, icon: Sun, t: "Panoramic Roof", s: "Sunroof" },
     { re: /navigation|nav system|gps/, icon: Navigation, t: "Navigation", s: "Built-in" },
