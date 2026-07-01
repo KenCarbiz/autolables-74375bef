@@ -8,7 +8,7 @@ import { toast } from "sonner";
 import { Helmet } from "react-helmet-async";
 import { type VehicleListing } from "@/hooks/useVehicleListing";
 import Logo from "@/components/brand/Logo";
-import { derivePassport, fmt$ } from "@/lib/passportV2Data";
+import { derivePassport, fmt$, listingEquipment } from "@/lib/passportV2Data";
 import { MOCK_LISTING } from "./VehiclePassportV3";
 import { usePublicListing } from "@/hooks/usePublicListing";
 import PassportCtaDock from "@/components/passport/PassportCtaDock";
@@ -100,7 +100,11 @@ const VehiclePassportGreatBuy = () => {
   const histVal = d.cleanTitle && d.accidentCount === 0 ? 96 : d.accidentCount === 0 ? 84 : (typeof mc.carfax_clean_title === "boolean" || d.accidentCount != null) ? 70 : null;
   const ownVal = d.ownerCount === 1 ? 93 : d.ownerCount != null ? 72 : null;
   const warVal = d.warrantyStr ? (() => { const w = d.warranty; if (w.in_service_date && w.factory_months) { const end = new Date(w.in_service_date); end.setMonth(end.getMonth() + w.factory_months); const left = Math.max(0, end.getTime() - Date.now()) / (1000 * 60 * 60 * 24 * 30.4); return Math.round(Math.max(55, Math.min(98, 55 + (left / w.factory_months) * 43))); } return 80; })() : null;
-  const equipVal = (listing.features?.length ?? 0) > 0 ? Math.min(96, 60 + (listing.features!.length + (premium ? 3 : 0)) * 6) : null;
+  // Equipment count spans the top-level features column AND the decoded
+  // mc_attributes.options/.features (where the VIN decode lands) — not just the
+  // features column, which the NeoVIN pull never writes to.
+  const equipCount = listingEquipment(listing).length;
+  const equipVal = equipCount > 0 ? Math.min(96, 60 + (equipCount + (premium ? 3 : 0)) * 6) : null;
   const demandVal = (d.viewCount != null || d.dom != null) ? ((d.viewCount ?? 0) > 20 ? 88 : 74) : null;
   const dealerVal = d.dealerTrust.googleRating ? Math.round(Math.min(98, (Number(d.dealerTrust.googleRating) / 5) * 100)) : d.verifyRows.length > 0 ? 82 : null;
   const condVal = (d.serviceCount > 0 || listing.prep_status?.foreman_signed_at) ? 90 : (listing.condition === "new" ? 92 : 74);
@@ -109,7 +113,7 @@ const VehiclePassportGreatBuy = () => {
     { label: "Vehicle History", score: histVal, note: d.cleanTitle && d.accidentCount === 0 ? "Clean title, no accidents reported" : "History reviewed where data exists" },
     { label: "Ownership", score: ownVal, note: d.ownerCount === 1 ? "Single previous owner" : d.ownerCount != null ? `${d.ownerCount} previous owners` : "Ownership pending" },
     { label: "Warranty", score: warVal, note: d.warrantyStr ? `${d.warrantyStr} of factory coverage remains` : "Confirm coverage with dealer" },
-    { label: "Equipment", score: equipVal, note: (listing.features?.length ?? 0) > 0 ? `${listing.features!.length} equipment highlights decoded` : "Equipment pending" },
+    { label: "Equipment", score: equipVal, note: equipCount > 0 ? `${equipCount} equipment highlights decoded` : "Equipment pending" },
     { label: "Market Demand", score: demandVal, note: d.viewCount != null ? `${d.viewCount.toLocaleString()} shopper views` : "Demand tracked once live" },
     { label: "Dealer Confidence", score: dealerVal, note: d.dealerTrust.googleRating ? `${d.dealerTrust.googleRating} dealer rating` : "Verified dealer" },
     { label: "Condition", score: condVal, note: d.serviceCount > 0 ? `${d.serviceCount} service records on file` : listing.condition === "new" ? "New vehicle" : "Inspected" },
