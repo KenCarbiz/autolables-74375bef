@@ -969,12 +969,15 @@ function buildPanel(key: PassportPanelKey, d: PassportData, listing: VehicleList
             <div>
               <p className="text-[15px] font-bold text-[#0F172A]">What's Covered</p>
               <p className="text-[12px] text-[#64748B] mb-2">Tap a coverage type to highlight the covered systems on the vehicle below.</p>
-              <WarrantyCarVisual hasPowertrain={hasPt} onAll={() => go("contact")} />
+              <WarrantyCarVisual hasPowertrain={hasPt} onAll={() => {
+                const el = document.getElementById("warr-whats-included") as HTMLDetailsElement | null;
+                if (el) { el.open = true; el.scrollIntoView({ behavior: "smooth", block: "nearest" }); }
+              }} />
             </div>
 
             {/* Accordions */}
             <div className="space-y-2">
-              <WAcc icon={CheckCircle2} title="What's Included" sub="See systems and components covered">
+              <WAcc id="warr-whats-included" icon={CheckCircle2} title="What's Included" sub="See systems and components covered">
                 {includedRows.length > 0
                   ? includedRows.map((r) => <p key={r.key}><span className="font-semibold text-[#0F172A]">{r.label}</span> — {r.sub} ({r.term}).</p>)
                   : <><p><span className="font-semibold text-[#0F172A]">Bumper-to-Bumper</span> — most vehicle systems and components.</p><p><span className="font-semibold text-[#0F172A]">Powertrain</span> — engine, transmission, and drivetrain.</p></>}
@@ -1618,38 +1621,57 @@ const WarrantyTimeline = ({ points, todayIndex }: { points: TLPoint[]; todayInde
 // Side-view vehicle that highlights the body (basic) or the drivetrain
 // (powertrain) when the matching toggle is selected. Toggles + legend on the
 // left, the vehicle on the right.
-// Custom top-down drivetrain icon (four wheels + front/rear differentials +
-// driveshaft) for Powertrain coverage — cleaner than a generic gauge/gear.
-// 24px grid, 2px stroke, rounded caps/joins, inherits currentColor.
-const DrivetrainIcon = ({ className, strokeWidth = 2, ...rest }: React.SVGProps<SVGSVGElement>) => (
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={strokeWidth as number} strokeLinecap="round" strokeLinejoin="round" className={className} {...rest}>
-    <rect x="2.5" y="3.5" width="3" height="5" rx="1.5" />
-    <rect x="18.5" y="3.5" width="3" height="5" rx="1.5" />
-    <rect x="2.5" y="15.5" width="3" height="5" rx="1.5" />
-    <rect x="18.5" y="15.5" width="3" height="5" rx="1.5" />
-    <path d="M5.5 6H10" />
-    <path d="M14 6h4.5" />
-    <path d="M5.5 18H10" />
-    <path d="M14 18h4.5" />
-    <circle cx="12" cy="6" r="2" />
-    <circle cx="12" cy="18" r="2" />
-    <path d="M12 8v8" />
-  </svg>
-);
+// Uploaded coverage icons — five interaction states per coverage type
+// (bumper-to-bumper "btb", powertrain "pt"). Files live in /public and were
+// renamed to hyphenated names so the browser can serve them without %20
+// URL-encoding surprises.
+const COVERAGE_ICON_IMG: Record<"btb" | "pt", Record<"default" | "hover" | "active" | "selected" | "disabled", string>> = {
+  btb: {
+    default: "/btb-default.png",
+    hover: "/btb-hover.png",
+    active: "/btb-active.png",
+    selected: "/btb-selected.png",
+    disabled: "/btb-disabled.png",
+  },
+  pt: {
+    default: "/pt-default.png",
+    hover: "/pt-hover.png",
+    active: "/pt-active.png",
+    selected: "/pt-selected.png",
+    disabled: "/pt-disabled.png",
+  },
+};
 
-// Segmented-control card: 60px tall, 16px radius, left icon, bold title over a
-// gray subtitle. Selected → blue/green border + tint + accent icon/title.
-const CoverageToggle = ({ active, tone, icon: Icon, title, sub, onClick }: { active: boolean; tone: "blue" | "green"; icon: React.ElementType; title: string; sub: string; onClick: () => void }) => {
+// Segmented-control card: 64px tall, 14px radius, uploaded state icon on the
+// left, bold title over a gray subtitle. Selected → blue/green border + tint +
+// accent title. Hover/pressed/disabled swap the icon PNG accordingly.
+const CoverageToggle = ({ selected, tone, iconKey, title, sub, disabled = false, onClick }: { selected: boolean; tone: "blue" | "green"; iconKey: "btb" | "pt"; title: string; sub: string; disabled?: boolean; onClick: () => void }) => {
+  const [hover, setHover] = useState(false);
+  const [pressed, setPressed] = useState(false);
   const accent = tone === "blue" ? "#0D6EFD" : "#16A34A";
-  const box = active
-    ? (tone === "blue" ? "border-[#0D6EFD] bg-[#F3F8FF]" : "border-[#2ECC71] bg-[#F0FBF4]")
-    : "border-[#E5E7EB] bg-white hover:border-slate-300";
+  const iconState = disabled ? "disabled" : pressed ? "active" : selected ? "selected" : hover ? "hover" : "default";
+  const box = disabled
+    ? "border-[#E5E7EB] bg-[#F8FAFC] cursor-not-allowed"
+    : selected
+      ? (tone === "blue" ? "border-[#0D6EFD] bg-[#F3F8FF]" : "border-[#2ECC71] bg-[#F0FBF4]")
+      : "border-[#E5E7EB] bg-white hover:bg-slate-50 cursor-pointer";
   return (
-    <button onClick={onClick} className={`w-full flex items-center gap-3 min-h-[60px] px-4 py-2.5 rounded-2xl border-2 text-left transition-colors ${box}`}>
-      <Icon className="w-6 h-6 shrink-0" strokeWidth={2} style={{ color: active ? accent : "#6B7280" }} />
+    <button
+      type="button"
+      disabled={disabled}
+      aria-pressed={selected}
+      aria-label={`${title} coverage, ${selected ? "selected" : "not selected"}`}
+      onClick={disabled ? undefined : onClick}
+      onMouseEnter={() => setHover(true)}
+      onMouseLeave={() => { setHover(false); setPressed(false); }}
+      onMouseDown={() => setPressed(true)}
+      onMouseUp={() => setPressed(false)}
+      className={`w-full flex items-center gap-3 min-h-[64px] px-4 py-2.5 rounded-[14px] border-2 text-left transition-all duration-150 ${box} ${pressed && !disabled ? "scale-[0.98]" : ""}`}
+    >
+      <img src={COVERAGE_ICON_IMG[iconKey][iconState]} alt="" aria-hidden="true" className="w-8 h-8 shrink-0 object-contain" />
       <div className="min-w-0">
-        <p className="text-[14px] font-bold leading-tight" style={{ color: active ? accent : "#0F172A" }}>{title}</p>
-        <p className="text-[11px] leading-tight text-[#6B7280] mt-0.5">{sub}</p>
+        <p className="text-[14px] font-bold leading-tight" style={{ color: disabled ? "#94A3B8" : selected ? accent : "#0F172A" }}>{title}</p>
+        <p className="text-[11px] leading-tight mt-0.5" style={{ color: disabled ? "#CBD5E1" : "#6B7280" }}>{sub}</p>
       </div>
     </button>
   );
@@ -1664,7 +1686,7 @@ const WARR_IMG = {
 // The systems each coverage type protects — updates live under the selector.
 const COVERED_SYSTEMS: Record<"basic" | "powertrain", string[]> = {
   basic: ["Electronics", "Climate Control", "Audio", "Navigation", "Suspension", "Interior Components"],
-  powertrain: ["Engine", "Transmission", "Transfer Case", "AWD System", "Drive Axles"],
+  powertrain: ["Engine", "Transmission", "Transfer Case", "AWD System", "Drive Axles", "Differential"],
 };
 const WarrantyCarVisual = ({ hasPowertrain, onAll }: { hasPowertrain: boolean; onAll: () => void }) => {
   const [mode, setMode] = useState<"basic" | "powertrain">("basic");
@@ -1678,16 +1700,19 @@ const WarrantyCarVisual = ({ hasPowertrain, onAll }: { hasPowertrain: boolean; o
     timers.current.push(window.setTimeout(() => { setMorphing(false); }, 330)); // fade transition back out to reveal target
   };
   const layer = "absolute inset-0 w-full h-full object-contain transition-opacity duration-300 ease-out";
+  // Legend "Covered" dot + list checks track the active coverage: blue for
+  // bumper-to-bumper, green for powertrain.
+  const accent = mode === "basic" ? "#0D6EFD" : "#16A34A";
   return (
     <div className={`${CARD} p-4`}>
       <div className="grid grid-cols-1 sm:grid-cols-[minmax(0,35fr)_minmax(0,65fr)] gap-4 items-start">
         {/* Left ~35% — segmented selector + live covered-systems list */}
         <div className="space-y-2.5">
-          <CoverageToggle active={mode === "basic"} tone="blue" icon={ShieldCheck} title="Bumper-to-Bumper" sub="Basic Vehicle Coverage" onClick={() => switchTo("basic")} />
-          {hasPowertrain && <CoverageToggle active={mode === "powertrain"} tone="green" icon={DrivetrainIcon} title="Powertrain" sub="Engine, Transmission & Drivetrain" onClick={() => switchTo("powertrain")} />}
+          <CoverageToggle selected={mode === "basic"} tone="blue" iconKey="btb" title="Bumper-to-Bumper" sub="Basic Vehicle Coverage" onClick={() => switchTo("basic")} />
+          {hasPowertrain && <CoverageToggle selected={mode === "powertrain"} tone="green" iconKey="pt" title="Powertrain" sub="Engine, Transmission & Drivetrain" onClick={() => switchTo("powertrain")} />}
           <ul className="pt-1.5 space-y-1.5">
             {COVERED_SYSTEMS[mode].map((s) => (
-              <li key={s} className="flex items-center gap-1.5 text-[12px] text-[#0F172A]"><CheckCircle2 className="w-3.5 h-3.5 text-[#2ECC71] shrink-0" />{s}</li>
+              <li key={s} className="flex items-center gap-1.5 text-[12px] text-[#0F172A]"><CheckCircle2 className="w-3.5 h-3.5 shrink-0" style={{ color: accent }} />{s}</li>
             ))}
           </ul>
         </div>
@@ -1699,7 +1724,7 @@ const WarrantyCarVisual = ({ hasPowertrain, onAll }: { hasPowertrain: boolean; o
             <img src={WARR_IMG.transition} alt="" aria-hidden="true" loading="lazy" className={`${layer} ${morphing ? "opacity-100" : "opacity-0"}`} />
           </div>
           <div className="flex items-center justify-center gap-4 mt-1.5 text-[11px] text-[#6B7280]">
-            <span className="inline-flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-[#2ECC71]" /> Covered</span>
+            <span className="inline-flex items-center gap-1.5"><span className="w-2 h-2 rounded-full" style={{ backgroundColor: accent }} /> Covered</span>
             <span className="inline-flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-slate-300" /> Not Covered</span>
           </div>
         </div>
@@ -1712,8 +1737,8 @@ const WarrantyCarVisual = ({ hasPowertrain, onAll }: { hasPowertrain: boolean; o
 };
 
 // Compact accordion row (collapsed by default).
-const WAcc = ({ icon: Icon, title, sub, children }: { icon: React.ElementType; title: string; sub?: string; children: React.ReactNode }) => (
-  <details className="rounded-xl border border-[#E6E8EC] bg-white group">
+const WAcc = ({ id, icon: Icon, title, sub, children }: { id?: string; icon: React.ElementType; title: string; sub?: string; children: React.ReactNode }) => (
+  <details id={id} className="rounded-xl border border-[#E6E8EC] bg-white group">
     <summary className="cursor-pointer list-none flex items-center gap-3 p-3.5">
       <span className="w-8 h-8 rounded-lg bg-slate-50 flex items-center justify-center shrink-0"><Icon className="w-4 h-4 text-[#64748B]" /></span>
       <div className="min-w-0 flex-1"><p className="text-[13px] font-bold text-[#0F172A] leading-tight">{title}</p>{sub && <p className="text-[11px] text-[#94A3B8] leading-tight">{sub}</p>}</div>
