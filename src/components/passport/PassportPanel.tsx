@@ -1666,7 +1666,7 @@ const CoverageToggle = ({ selected, tone, iconKey, title, sub, disabled = false,
       onMouseLeave={() => { setHover(false); setPressed(false); }}
       onMouseDown={() => setPressed(true)}
       onMouseUp={() => setPressed(false)}
-      className={`w-full flex items-center gap-3 min-h-[64px] px-4 py-2.5 rounded-[14px] border-2 text-left transition-all duration-150 ${box} ${pressed && !disabled ? "scale-[0.98]" : ""}`}
+      className={`w-full flex items-center gap-3 h-[72px] px-4 py-2.5 rounded-[14px] border-2 text-left transition-all duration-150 ${box} ${pressed && !disabled ? "scale-[0.98]" : ""}`}
     >
       <img src={COVERAGE_ICON_IMG[iconKey][iconState]} alt="" aria-hidden="true" className="w-8 h-8 shrink-0 object-contain" />
       <div className="min-w-0">
