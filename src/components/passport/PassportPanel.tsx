@@ -1648,13 +1648,17 @@ const COVERAGE_ICON_IMG: Record<"btb" | "pt", Record<"default" | "hover" | "acti
 const CoverageToggle = ({ selected, tone, iconKey, title, sub, disabled = false, onClick }: { selected: boolean; tone: "blue" | "green"; iconKey: "btb" | "pt"; title: string; sub: string; disabled?: boolean; onClick: () => void }) => {
   const [hover, setHover] = useState(false);
   const [pressed, setPressed] = useState(false);
-  const accent = tone === "blue" ? "#0D6EFD" : "#16A34A";
+  const accent = tone === "blue" ? "#2563EB" : "#16A34A";
   const iconState = disabled ? "disabled" : pressed ? "active" : selected ? "selected" : hover ? "hover" : "default";
+  // 1px default border, 2px selected — box-sizing keeps the outer size fixed so
+  // selecting never shifts layout. Hover tints match the coverage color.
   const box = disabled
-    ? "border-[#E5E7EB] bg-[#F8FAFC] cursor-not-allowed"
+    ? "border border-[#E5E7EB] bg-[#F8FAFC] cursor-not-allowed"
     : selected
-      ? (tone === "blue" ? "border-[#0D6EFD] bg-[#F3F8FF]" : "border-[#2ECC71] bg-[#F0FBF4]")
-      : "border-[#E5E7EB] bg-white hover:bg-slate-50 cursor-pointer";
+      ? (tone === "blue" ? "border-2 border-[#2563EB] bg-[#EFF6FF]" : "border-2 border-[#16A34A] bg-[#F0FDF4]")
+      : (tone === "blue"
+          ? "border border-[#E5E7EB] bg-white hover:bg-[#EFF6FF] hover:border-slate-300 cursor-pointer"
+          : "border border-[#E5E7EB] bg-white hover:bg-[#F0FDF4] hover:border-slate-300 cursor-pointer");
   return (
     <button
       type="button"
@@ -1666,12 +1670,12 @@ const CoverageToggle = ({ selected, tone, iconKey, title, sub, disabled = false,
       onMouseLeave={() => { setHover(false); setPressed(false); }}
       onMouseDown={() => setPressed(true)}
       onMouseUp={() => setPressed(false)}
-      className={`w-full flex items-center gap-3 h-[72px] px-4 py-2.5 rounded-[14px] border-2 text-left transition-all duration-150 ${box} ${pressed && !disabled ? "scale-[0.98]" : ""}`}
+      className={`w-full flex items-center gap-3 h-[72px] px-3.5 py-3 rounded-2xl text-left transition-all duration-[120ms] ${box} ${pressed && !disabled ? "scale-[0.98]" : ""}`}
     >
-      <img src={COVERAGE_ICON_IMG[iconKey][iconState]} alt="" aria-hidden="true" className="w-8 h-8 shrink-0 object-contain" />
+      <img src={COVERAGE_ICON_IMG[iconKey][iconState]} alt="" aria-hidden="true" className="w-[30px] h-[30px] shrink-0 object-contain" />
       <div className="min-w-0">
-        <p className="text-[14px] font-bold leading-tight" style={{ color: disabled ? "#94A3B8" : selected ? accent : "#0F172A" }}>{title}</p>
-        <p className="text-[11px] leading-tight mt-0.5" style={{ color: disabled ? "#CBD5E1" : "#6B7280" }}>{sub}</p>
+        <p className="text-[14px] font-bold leading-[1.15] whitespace-nowrap" style={{ color: disabled ? "#94A3B8" : selected ? accent : "#111827" }}>{title}</p>
+        <p className="text-[11.5px] leading-[1.25] mt-0.5" style={{ color: disabled ? "#CBD5E1" : "#64748B" }}>{sub}</p>
       </div>
     </button>
   );
@@ -1702,7 +1706,7 @@ const WarrantyCarVisual = ({ hasPowertrain, onAll }: { hasPowertrain: boolean; o
   const layer = "absolute inset-0 w-full h-full object-contain transition-opacity duration-300 ease-out";
   // Legend "Covered" dot + list checks track the active coverage: blue for
   // bumper-to-bumper, green for powertrain.
-  const accent = mode === "basic" ? "#0D6EFD" : "#16A34A";
+  const accent = mode === "basic" ? "#2563EB" : "#16A34A";
   return (
     <div className={`${CARD} p-4`}>
       <div className="grid grid-cols-1 sm:grid-cols-[minmax(0,35fr)_minmax(0,65fr)] gap-4 items-start">
@@ -1730,7 +1734,7 @@ const WarrantyCarVisual = ({ hasPowertrain, onAll }: { hasPowertrain: boolean; o
         </div>
       </div>
       <div className="flex justify-end mt-2 pt-2 border-t border-slate-100">
-        <button onClick={onAll} className="text-[11px] font-semibold text-[#0D6EFD] inline-flex items-center gap-1 hover:underline">View all covered components <ArrowRight className="w-3 h-3" /></button>
+        <button onClick={onAll} className="text-[11px] font-semibold text-[#2563EB] inline-flex items-center gap-1 hover:underline">View all covered components <ArrowRight className="w-3 h-3" /></button>
       </div>
     </div>
   );
