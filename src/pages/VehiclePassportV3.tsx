@@ -188,6 +188,10 @@ const VehiclePassportV3 = () => {
   const handleShare = async () => { try { if (navigator.share) { await navigator.share({ title: listing.ymm || "Vehicle", url: viewUrl }); return; } } catch { return; } go("share"); };
   const hero = gallery[idx] || gallery[0] || "";
   const photoCount = gallery.length;
+  // The secondary image (Vehicle Overview) must never duplicate the hero — pick
+  // the first gallery photo that differs from whatever the hero is showing; if
+  // there is no distinct second photo, render none rather than repeat.
+  const secondaryImage = gallery.find((g) => g && g !== hero) || "";
   const { priceChange7d } = computePriceHistory(listing);
   const priceSeries = d.valueHistory.filter((h) => h.listing_price != null).map((h) => h.listing_price as number);
   const marketSeries = d.valueHistory.filter((h) => h.market_value != null).map((h) => h.market_value as number);
@@ -697,7 +701,7 @@ const VehiclePassportV3 = () => {
           <div data-module="overview" className={`${CARD} p-5 flex flex-col`}>
             <H3>Vehicle Overview</H3>
             <p className="text-[13px] leading-relaxed text-[#64748B] mt-3 line-clamp-6">{d.overview}</p>
-            {(gallery[1] || gallery[0]) && <img src={gallery[1] || gallery[0]} alt="" className="w-full aspect-[16/9] object-cover rounded-xl mt-3" />}
+            {secondaryImage && <img src={secondaryImage} alt="" className="w-full aspect-[16/9] object-cover rounded-xl mt-3" />}
             <Link onClick={() => openPanel("overview")} className="mt-auto pt-3 self-start">Read full overview</Link>
           </div>
           )}
