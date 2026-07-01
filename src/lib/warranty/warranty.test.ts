@@ -5,6 +5,8 @@ import { buildWarrantyDisplayModel } from "./displayModel";
 import { buildWarrantyCoverageReport } from "./coverageReport";
 import { matchOemCpoProgram } from "./cpo";
 import { buildWarrantyReviewQueue, reviewQueueSummary } from "./review";
+import { OEM_WARRANTY_REFERENCE } from "@/data/oemWarrantyReference";
+import { OEM_CPO_REFERENCE } from "@/data/oemCpoReference";
 import type { WarrantyVehicleInput } from "./types";
 
 const QX60 = (over: Partial<WarrantyVehicleInput> = {}): WarrantyVehicleInput => ({
@@ -59,7 +61,7 @@ describe("buildWarrantyDisplayModel — NEW vehicle", () => {
     const btb = m.coverageAtGlance.find((c) => c.coverageType === "bumper_to_bumper");
     const pt = m.coverageAtGlance.find((c) => c.coverageType === "powertrain");
     expect(btb?.termYears).toBe("4 Years");
-    expect(btb?.termMiles).toBe("50,000 Miles");
+    expect(btb?.termMiles).toBe("60,000 Miles"); // verified 2026-07-01: QX60 basic is 4yr/60k, not 50k
     expect(pt?.termYears).toBe("6 Years");
     expect(pt?.termMiles).toBe("70,000 Miles");
     expect(btb?.pctRemaining ?? null).toBeNull();
@@ -129,14 +131,19 @@ describe("coverage tracker", () => {
     // Every curated make is now loaded → no new-car makes left pending.
     expect(report.pending).toEqual([]);
   });
-  it("flags every make needs_review until source-verified", () => {
-    expect(report.totals.verifiedMakes).toBe(0);
-    expect(report.needsVerification.length).toBe(report.loaded.length);
+  it("marks new-car makes verified after the 2026-07-01 cross-check", () => {
+    // Every curated make has a verified new-car source now.
+    expect(report.totals.verifiedMakes).toBe(report.loaded.length);
+    expect(report.needsVerification).toEqual([]);
   });
-  it("reports CPO coverage alongside new-car", () => {
+  it("reports CPO coverage + verification status alongside new-car", () => {
     expect(report.cpoLoaded).toContain("TOYOTA");
     expect(report.cpoLoaded).toContain("INFINITI");
     expect(report.totals.cpoMakes).toBeGreaterThanOrEqual(30);
+    // Most CPO verified; Land Rover + Tesla remain needs_review.
+    expect(report.totals.cpoVerified).toBeGreaterThanOrEqual(28);
+    expect(report.cpoNeedsVerification).toContain("LAND ROVER");
+    expect(report.cpoNeedsVerification).toContain("TESLA");
   });
 });
 
@@ -156,6 +163,36 @@ describe("CPO matching", () => {
     const m = matchOemCpoProgram({ make: "Koenigsegg", year: 2022, condition: "used" }, 2026);
     expect(m.entry).toBeNull();
     expect(m.needsDealerConfirmation).toBe(true);
+  });
+});
+
+describe("verified corrections (2026-07-01 agent cross-check)", () => {
+  it("Buick new-car dropped to Chevy/GMC terms", () => {
+    expect(OEM_WARRANTY_REFERENCE.BUICK.basic_months).toBe(36);
+    expect(OEM_WARRANTY_REFERENCE.BUICK.powertrain_months).toBe(60);
+  });
+  it("Tesla gained 12yr/unlimited corrosion", () => {
+    expect(OEM_WARRANTY_REFERENCE.TESLA.corrosion_months).toBe(144);
+  });
+  it("Audi CPO comprehensive is 1yr/20k (not unlimited)", () => {
+    expect(OEM_CPO_REFERENCE.AUDI.comprehensiveMiles).toBe(20000);
+  });
+  it("Porsche CPO eligibility expanded to 13yr/124k", () => {
+    expect(OEM_CPO_REFERENCE.PORSCHE.maxAgeYears).toBe(13);
+    expect(OEM_CPO_REFERENCE.PORSCHE.maxMileage).toBe(124000);
+  });
+  it("Cadillac runs its own CPO (not shared GM)", () => {
+    expect(OEM_CPO_REFERENCE.CADILLAC.programName).toMatch(/Cadillac Certified/);
+    expect(OEM_CPO_REFERENCE.CADILLAC.maxMileage).toBe(70000);
+  });
+  it("Subaru/Nissan/Hyundai/Mitsubishi CPO carry no fabricated comprehensive wrap", () => {
+    expect(OEM_CPO_REFERENCE.SUBARU.comprehensiveMonths).toBeUndefined();
+    expect(OEM_CPO_REFERENCE.NISSAN.comprehensiveMonths).toBeUndefined();
+    expect(OEM_CPO_REFERENCE.HYUNDAI.comprehensiveMonths).toBeUndefined();
+  });
+  it("Land Rover + Tesla CPO stay needs_review", () => {
+    expect(OEM_CPO_REFERENCE["LAND ROVER"].confidenceStatus).toBe("needs_review");
+    expect(OEM_CPO_REFERENCE.TESLA.confidenceStatus).toBe("needs_review");
   });
 });
 

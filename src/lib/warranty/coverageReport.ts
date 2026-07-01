@@ -24,7 +24,8 @@ export interface WarrantyCoverageReport {
   needsVerification: string[];        // loaded makes not yet fully "verified"
   cpoLoaded: string[];                // makes with a CPO reference
   cpoMissing: string[];               // loaded new-car makes with no CPO reference
-  totals: { loadedMakes: number; programs: number; verifiedMakes: number; pendingMakes: number; cpoMakes: number };
+  cpoNeedsVerification: string[];     // CPO references not yet "verified"
+  totals: { loadedMakes: number; programs: number; verifiedMakes: number; pendingMakes: number; cpoMakes: number; cpoVerified: number };
 }
 
 const norm = (s: string) => s.trim().toUpperCase();
@@ -64,6 +65,10 @@ export function buildWarrantyCoverageReport(
   const needsVerification = loaded.filter((m) => m.confidence !== "verified").map((m) => m.make);
   const cpoLoaded = Object.keys(OEM_CPO_REFERENCE).map(norm).sort();
   const cpoMissing = loaded.filter((m) => !m.hasCpo).map((m) => m.make).sort();
+  const cpoNeedsVerification = Object.entries(OEM_CPO_REFERENCE)
+    .filter(([, v]) => v.confidenceStatus !== "verified")
+    .map(([k]) => norm(k))
+    .sort();
 
   return {
     loaded,
@@ -71,12 +76,14 @@ export function buildWarrantyCoverageReport(
     needsVerification,
     cpoLoaded,
     cpoMissing,
+    cpoNeedsVerification,
     totals: {
       loadedMakes: loaded.length,
       programs: programs.length,
       verifiedMakes: loaded.filter((m) => m.confidence === "verified").length,
       pendingMakes: pending.length,
       cpoMakes: cpoLoaded.length,
+      cpoVerified: cpoLoaded.length - cpoNeedsVerification.length,
     },
   };
 }

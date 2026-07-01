@@ -67,9 +67,12 @@ export function buildWarrantyReviewQueue(opts: ReviewQueueOptions = {}): Warrant
     }
   }
 
-  // CPO reference: everything is unverified today.
+  // CPO reference: flag only the entries not yet verified.
   for (const make of Object.keys(OEM_CPO_REFERENCE)) {
-    items.push({ kind: "cpo", make, reason: "unverified", detail: `${OEM_CPO_REFERENCE[make].programName} has not been source-verified.` });
+    const cpo = OEM_CPO_REFERENCE[make];
+    if (cpo.confidenceStatus !== "verified") {
+      items.push({ kind: "cpo", make, reason: "unverified", detail: `${cpo.programName} is not source-verified${cpo.notes ? ` — ${cpo.notes}` : "."}` });
+    }
   }
 
   // Periodic full re-review.

@@ -103,16 +103,47 @@ modal shows **term figures only**:
 ### Currently loaded
 
 **New-car:** the full curated gamut — every make in `oemWarrantyReference.ts`
-(~33 brands) now has a make-level new-car program, plus a model-specific INFINITI
-2026 QX60 program. All `needs_review`.
+(~33 brands) has a make-level new-car program, plus a model-specific INFINITI
+2026 QX60 program. **Cross-checked 2026-07-01** against manufacturer warranty
+pages → all `verified` with a source.
 
 **CPO:** every make in `oemCpoReference.ts` (~30 brands) has a Certified Pre-Owned
 program (program name, comprehensive/powertrain terms, coverage-from rule,
-eligibility window, inspection points, transferability). All `needs_review`.
+eligibility window, inspection points, transferability). Cross-checked
+2026-07-01 → `verified` with a source, **except LAND ROVER** (conflicting
+official term) and **TESLA** (no published CPO eligibility cap), which remain
+`needs_review`.
 
 Use `buildWarrantyCoverageReport()` to see, at any time, which makes are loaded
-for new-car and CPO, which are still **pending**, and which still need source
-verification (`needsVerification`, `cpoMissing`).
+for new-car and CPO, verification counts (`verifiedMakes`, `cpoVerified`), and
+what still needs review (`cpoNeedsVerification`, `cpoMissing`).
+
+### Verification log — 2026-07-01
+
+Five agents cross-checked the seed against manufacturer + reputable secondary
+sources. New-car data was almost entirely clean; corrections were concentrated
+in CPO. Applied corrections:
+
+- **Buick new-car** → 3yr/36k basic, 5yr/60k powertrain (was on Cadillac terms).
+- **Tesla new-car** → added 12yr/unlimited corrosion; battery mileage noted per model.
+- **INFINITI 2026 QX60** basic → 4yr/**60k** (the early mockup's 50k was wrong).
+- **Lexus CPO** eligibility → 80k mi. **Hyundai/Kia CPO** eligibility → 6yr/80k.
+- **Cadillac CPO** → its own program (not shared GM); comprehensive 1yr/unlimited
+  from B2B expiry; eligibility 6yr/70k.
+- **Audi CPO** comprehensive → 1yr/20k (not unlimited).
+- **Porsche CPO** eligibility → 13 model years / 124k mi.
+- **BMW / MINI / Jaguar / Land Rover / Mitsubishi CPO** age cap → 5 years.
+- **Genesis CPO** → 6yr/75k comprehensive from in-service, 191-point.
+- **INFINITI CPO** → 6yr/75k comprehensive, 6yr/60k eligibility.
+- **Acura CPO** → renamed to current "Acura Precision Certified".
+- **Subaru / Nissan / Hyundai / Mitsubishi CPO** → removed the unconfirmed
+  12/12k "comprehensive" (those programs pass powertrain + remaining basic, not a
+  fresh bumper-to-bumper wrap; only Kia's 1yr/12k Platinum is a real wrap).
+
+Caveat: several OEM CPO pages (Kia/INFINITI/Genesis/Hyundai) 403 automated
+fetches, so those were corroborated via official PDFs / ConsumerAffairs / KBB — a
+human spot-check against the OEM PDF is still advisable. Land Rover CPO and Tesla
+CPO eligibility remain open (`needs_review`).
 
 ## CPO (Certified Pre-Owned) programs
 
