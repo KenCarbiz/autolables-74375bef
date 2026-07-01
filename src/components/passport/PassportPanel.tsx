@@ -968,7 +968,7 @@ function buildPanel(key: PassportPanelKey, d: PassportData, listing: VehicleList
             {/* Interactive vehicle coverage visual */}
             <div>
               <p className="text-[15px] font-bold text-[#0F172A]">What's Covered</p>
-              <p className="text-[12px] text-[#64748B] mb-2">Tap a coverage type to see highlighted areas and included systems.</p>
+              <p className="text-[12px] text-[#64748B] mb-2">Tap a coverage type to highlight the covered systems on the vehicle below.</p>
               <WarrantyCarVisual hasPowertrain={hasPt} onAll={() => go("contact")} />
             </div>
 
@@ -1618,12 +1618,20 @@ const WarrantyTimeline = ({ points, todayIndex }: { points: TLPoint[]; todayInde
 // Side-view vehicle that highlights the body (basic) or the drivetrain
 // (powertrain) when the matching toggle is selected. Toggles + legend on the
 // left, the vehicle on the right.
+// Segmented-control card: 60px tall, 16px radius, left icon, bold title over a
+// gray subtitle. Selected → blue/green border + tint + accent icon/title.
 const CoverageToggle = ({ active, tone, icon: Icon, title, sub, onClick }: { active: boolean; tone: "blue" | "green"; icon: React.ElementType; title: string; sub: string; onClick: () => void }) => {
-  const on = tone === "blue" ? "border-[#2563EB] bg-blue-50 text-[#2563EB]" : "border-[#16A34A] bg-emerald-50 text-[#16A34A]";
+  const accent = tone === "blue" ? "#0D6EFD" : "#16A34A";
+  const box = active
+    ? (tone === "blue" ? "border-[#0D6EFD] bg-[#F3F8FF]" : "border-[#2ECC71] bg-[#F0FBF4]")
+    : "border-[#E5E7EB] bg-white hover:border-slate-300";
   return (
-    <button onClick={onClick} className={`w-full flex items-center gap-2.5 h-12 px-3 rounded-xl border text-left transition-colors ${active ? on : "border-[#E6E8EC] bg-white text-[#64748B] hover:border-slate-300"}`}>
-      <Icon className="w-4 h-4 shrink-0" />
-      <div className="min-w-0"><p className="text-[12px] font-bold leading-tight">{title}</p><p className="text-[10px] opacity-80 leading-tight">{sub}</p></div>
+    <button onClick={onClick} className={`w-full flex items-center gap-3 min-h-[60px] px-4 py-2.5 rounded-2xl border-2 text-left transition-colors ${box}`}>
+      <Icon className="w-6 h-6 shrink-0" strokeWidth={2} style={{ color: active ? accent : "#6B7280" }} />
+      <div className="min-w-0">
+        <p className="text-[14px] font-bold leading-tight" style={{ color: active ? accent : "#0F172A" }}>{title}</p>
+        <p className="text-[11px] leading-tight text-[#6B7280] mt-0.5">{sub}</p>
+      </div>
     </button>
   );
 };
@@ -1633,6 +1641,11 @@ const WARR_IMG = {
   basic: "/cropped_more_translucent_suv.png",
   powertrain: "/cropped_powertrain_suv.png",
   transition: "/cropped_translucent_suv.png",
+};
+// The systems each coverage type protects — updates live under the selector.
+const COVERED_SYSTEMS: Record<"basic" | "powertrain", string[]> = {
+  basic: ["Electronics", "Climate Control", "Audio", "Navigation", "Suspension", "Interior Components"],
+  powertrain: ["Engine", "Transmission", "Transfer Case", "AWD System", "Drive Axles"],
 };
 const WarrantyCarVisual = ({ hasPowertrain, onAll }: { hasPowertrain: boolean; onAll: () => void }) => {
   const [mode, setMode] = useState<"basic" | "powertrain">("basic");
@@ -1648,23 +1661,32 @@ const WarrantyCarVisual = ({ hasPowertrain, onAll }: { hasPowertrain: boolean; o
   const layer = "absolute inset-0 w-full h-full object-contain transition-opacity duration-300 ease-out";
   return (
     <div className={`${CARD} p-4`}>
-      <div className="grid grid-cols-1 sm:grid-cols-[150px_1fr] gap-3 items-center">
-        <div className="space-y-2">
-          <CoverageToggle active={mode === "basic"} tone="blue" icon={Car} title="Bumper-to-Bumper" sub="Basic Coverage" onClick={() => switchTo("basic")} />
-          {hasPowertrain && <CoverageToggle active={mode === "powertrain"} tone="green" icon={Gauge} title="Powertrain" sub="Drivetrain Coverage" onClick={() => switchTo("powertrain")} />}
+      <div className="grid grid-cols-1 sm:grid-cols-[minmax(0,35fr)_minmax(0,65fr)] gap-4 items-start">
+        {/* Left ~35% — segmented selector + live covered-systems list */}
+        <div className="space-y-2.5">
+          <CoverageToggle active={mode === "basic"} tone="blue" icon={ShieldCheck} title="Bumper-to-Bumper" sub="Basic Vehicle Coverage" onClick={() => switchTo("basic")} />
+          {hasPowertrain && <CoverageToggle active={mode === "powertrain"} tone="green" icon={Gauge} title="Powertrain" sub="Engine, Transmission & Drivetrain" onClick={() => switchTo("powertrain")} />}
+          <ul className="pt-1.5 space-y-1.5">
+            {COVERED_SYSTEMS[mode].map((s) => (
+              <li key={s} className="flex items-center gap-1.5 text-[12px] text-[#0F172A]"><CheckCircle2 className="w-3.5 h-3.5 text-[#2ECC71] shrink-0" />{s}</li>
+            ))}
+          </ul>
         </div>
-        <div className="relative w-full max-w-[360px] mx-auto" style={{ aspectRatio: "1448 / 630" }}>
-          <img src={WARR_IMG.basic} alt="Bumper-to-bumper coverage" loading="lazy" className={`${layer} ${mode === "basic" && !morphing ? "opacity-100" : "opacity-0"}`} />
-          <img src={WARR_IMG.powertrain} alt="Powertrain coverage" loading="lazy" className={`${layer} ${mode === "powertrain" && !morphing ? "opacity-100" : "opacity-0"}`} />
-          <img src={WARR_IMG.transition} alt="" aria-hidden="true" loading="lazy" className={`${layer} ${morphing ? "opacity-100" : "opacity-0"}`} />
+        {/* Right ~65% — large vehicle illustration + legend beneath */}
+        <div>
+          <div className="relative w-full" style={{ aspectRatio: "1448 / 630" }}>
+            <img src={WARR_IMG.basic} alt="Bumper-to-bumper coverage" loading="lazy" className={`${layer} ${mode === "basic" && !morphing ? "opacity-100" : "opacity-0"}`} />
+            <img src={WARR_IMG.powertrain} alt="Powertrain coverage" loading="lazy" className={`${layer} ${mode === "powertrain" && !morphing ? "opacity-100" : "opacity-0"}`} />
+            <img src={WARR_IMG.transition} alt="" aria-hidden="true" loading="lazy" className={`${layer} ${morphing ? "opacity-100" : "opacity-0"}`} />
+          </div>
+          <div className="flex items-center justify-center gap-4 mt-1.5 text-[11px] text-[#6B7280]">
+            <span className="inline-flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-[#2ECC71]" /> Covered</span>
+            <span className="inline-flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-slate-300" /> Not Covered</span>
+          </div>
         </div>
       </div>
-      <div className="flex items-center justify-between gap-3 mt-2 pt-2 border-t border-slate-100">
-        <div className="flex items-center gap-3 text-[10px] text-[#64748B]">
-          <span className="inline-flex items-center gap-1"><span className={`w-2 h-2 rounded-full ${mode === "basic" ? "bg-[#2563EB]" : "bg-[#16A34A]"}`} /> Covered</span>
-          <span className="inline-flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-slate-300" /> Not Covered</span>
-        </div>
-        <button onClick={onAll} className="text-[11px] font-semibold text-[#2563EB] inline-flex items-center gap-1 hover:underline">View all covered components <ArrowRight className="w-3 h-3" /></button>
+      <div className="flex justify-end mt-2 pt-2 border-t border-slate-100">
+        <button onClick={onAll} className="text-[11px] font-semibold text-[#0D6EFD] inline-flex items-center gap-1 hover:underline">View all covered components <ArrowRight className="w-3 h-3" /></button>
       </div>
     </div>
   );
