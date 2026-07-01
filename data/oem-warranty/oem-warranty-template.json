@@ -1,0 +1,35 @@
+{
+  "$comment": "OEM warranty import template. One row per COVERAGE (a program is the set of rows sharing oem_make + model + model_year range + country + powertrain). Every row must carry a real source before confidence_status can be set to 'verified'. Do NOT fabricate terms — leave source fields blank and confidence_status 'needs_review' until confirmed against the model-year warranty booklet.",
+  "rows": [
+    {
+      "oem_make": "INFINITI",
+      "brand": "INFINITI",
+      "country": "US",
+      "model_year_start": 2026,
+      "model_year_end": 2026,
+      "model": "QX60",
+      "trim": "",
+      "powertrain_type": "gas",
+      "fuel_type": "gasoline",
+      "vehicle_type": "suv",
+      "coverage_type": "bumper_to_bumper",
+      "display_name": "Bumper-to-Bumper",
+      "subtitle": "Basic Vehicle Coverage",
+      "description": "Covers most vehicle systems and components.",
+      "term_years": 4,
+      "term_months": 48,
+      "mileage_limit": 50000,
+      "unlimited_miles": false,
+      "starts_at": "in_service_date",
+      "applies_to_new": true,
+      "applies_to_used": true,
+      "applies_to_cpo": true,
+      "confidence_status": "needs_review",
+      "source_title": "Dealer/OEM warranty source required",
+      "source_url": "",
+      "source_effective_date": "",
+      "source_last_verified_at": "",
+      "notes": "Example row. Verify against the INFINITI 2026 warranty booklet before production."
+    }
+  ]
+}
