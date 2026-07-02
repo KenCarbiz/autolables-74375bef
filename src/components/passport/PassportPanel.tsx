@@ -457,6 +457,11 @@ function buildPanel(key: PassportPanelKey, d: PassportData, listing: VehicleList
         return { date: new Date(h.captured_at).toLocaleDateString(), before: prev, after: cur, delta: cur - prev };
       }).filter((e) => e.delta !== 0).reverse();
       const pctDiff = avg != null && price != null ? Math.round(((price - avg) / avg) * 100) : null;
+      // A few percent off the market AVERAGE is normal spread, not a verdict —
+      // ±3% reads as "priced at market" (neutral). Only color beyond the band,
+      // and when above it, say why with provable option value.
+      const priceBand = pctDiff == null ? null : pctDiff <= -3 ? "below" : pctDiff >= 3 ? "above" : "at";
+      const phOptValue = readBuildSheet(listing)?.estValue ?? null;
       const originalPrice = priced.length ? (priced[0].listing_price as number) : null;
       const reductions = events.filter((e) => e.delta < 0).length;
       const savings = total != null && total < 0 ? -total : (d.belowMarket && d.belowMarket > 0 ? d.belowMarket : null);
@@ -517,9 +522,14 @@ function buildPanel(key: PassportPanelKey, d: PassportData, listing: VehicleList
                   <div className="flex items-center justify-between px-4 py-3"><span className="text-[12px] text-[#64748B]">Market Average</span><span className="text-[15px] font-extrabold">{fmt$(avg)}</span></div>
                   <div className="flex items-center justify-between px-4 py-3"><span className="text-[12px] text-[#64748B]">Current Vehicle</span><span className="text-[15px] font-extrabold">{fmt$(price)}</span></div>
                 </div>
-                <div className={`mt-2 rounded-2xl border p-4 flex items-center justify-between ${pctDiff <= 0 ? "border-emerald-200 bg-emerald-50/70" : "border-orange-200 bg-orange-50/70"}`}>
-                  <span className="text-[13px] font-bold text-[#0F172A]">Difference</span>
-                  <span className={`text-[14px] font-extrabold ${pctDiff <= 0 ? "text-[#16A34A]" : "text-[#EA580C]"}`}>{marketDiff != null ? `${marketDiff < 0 ? "-" : "+"}${fmt$(Math.abs(marketDiff))}` : ""} · {Math.abs(pctDiff)}% {pctDiff <= 0 ? "Below" : "Above"} Market</span>
+                <div className={`mt-2 rounded-2xl border p-4 ${priceBand === "below" ? "border-emerald-200 bg-emerald-50/70" : priceBand === "at" ? "border-[#E6E8EC] bg-slate-50" : "border-[#E6E8EC] bg-white"}`}>
+                  <div className="flex items-center justify-between">
+                    <span className="text-[13px] font-bold text-[#0F172A]">{priceBand === "below" ? "Below Market" : priceBand === "at" ? "Priced At Market" : "Position"}</span>
+                    <span className={`text-[14px] font-extrabold ${priceBand === "below" ? "text-[#16A34A]" : "text-[#0F172A]"}`}>
+                      {priceBand === "at" ? `Within ${Math.abs(pctDiff)}% of average` : `${marketDiff != null ? `${marketDiff < 0 ? "-" : "+"}${fmt$(Math.abs(marketDiff))} · ` : ""}${Math.abs(pctDiff)}% ${pctDiff <= 0 ? "below" : "above"} average`}
+                    </span>
+                  </div>
+                  {priceBand === "above" && phOptValue ? <p className="text-[12px] text-[#64748B] mt-1.5">This build carries {fmt$(phOptValue)} in factory options — the market average includes lower-equipped vehicles.</p> : null}
                 </div>
               </Section>
             )}
@@ -589,7 +599,10 @@ function buildPanel(key: PassportPanelKey, d: PassportData, listing: VehicleList
               <div className={`${CARD} p-4`}>
                 <div className="flex items-center justify-between"><span className="text-[12px] text-[#64748B]">This vehicle</span><span className="text-[14px] font-extrabold">{fmt$(price)}</span></div>
                 <div className="flex items-center justify-between mt-1.5"><span className="text-[12px] text-[#64748B]">Average market price</span><span className="text-[14px] font-semibold text-[#0F172A]">{fmt$(avg)}</span></div>
-                <div className={`mt-2 pt-2 border-t border-[#F1F5F9] text-[13px] font-semibold ${pctDiff <= 0 ? "text-[#16A34A]" : "text-[#EA580C]"}`}>{pctDiff <= 0 ? `${Math.abs(pctDiff)}% below market average` : `${pctDiff}% above market average`}</div>
+                <div className={`mt-2 pt-2 border-t border-[#F1F5F9] text-[13px] font-semibold ${priceBand === "below" ? "text-[#16A34A]" : "text-[#0F172A]"}`}>
+                  {priceBand === "below" ? `${Math.abs(pctDiff)}% below market average` : priceBand === "at" ? `Priced at market — within ${Math.abs(pctDiff)}% of average` : `${pctDiff}% above market average`}
+                </div>
+                {priceBand === "above" && phOptValue ? <p className="text-[12px] text-[#64748B] mt-1.5">This build carries {fmt$(phOptValue)} in factory options — the average includes lower-equipped vehicles.</p> : null}
               </div>
             </Section>
           )}
