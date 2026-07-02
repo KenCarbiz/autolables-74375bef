@@ -169,6 +169,20 @@ const extractHistoryReportLink = (html: string, targetVin: string): string | nul
   return CFX_LINK_RE.exec(html)?.[0] ?? null;
 };
 
+// One-owner badge on the dealer's own VDP. Provider context (CARFAX/
+// AutoCheck within range, or badge image alt/title) is REQUIRED so loose
+// marketing copy can't set the flag; absence of the badge means nothing —
+// this signal is positive-only and never marks a car multi-owner.
+const ONE_OWNER_RE = new RegExp(
+  [
+    String.raw`\b(?:carfax|autocheck)\b[\s\S]{0,160}?\b(?:1|one)[\s-]?owner\b`,
+    String.raw`\b(?:1|one)[\s-]?owner\b[\s\S]{0,160}?\b(?:carfax|autocheck)\b`,
+    String.raw`(?:alt|title)=["'][^"']{0,80}(?:1|one)[\s-]?owner`,
+  ].join("|"),
+  "i",
+);
+const detectOneOwnerBadge = (html: string): boolean => ONE_OWNER_RE.test(html);
+
 // Generic selling-price labels appended after each dealer's configured labels.
 // These are advertised-price brands (never MSRP/retail), so running them in the
 // custom-label tier is safe and lets common sites resolve without per-dealer
@@ -911,6 +925,21 @@ serve(async (req) => {
           if (link) {
             await admin.from("vehicle_listings").update({ history_report_url: link })
               .eq("tenant_id", row.tenant_id).eq("vin", row.vin).is("history_report_url", null);
+          }
+
+          // One-owner badge on the dealer's VDP → the carfax_1_owner flag the
+          // passport already trusts (owner chip, Why Buy, buying score). Only
+          // fills the gap — never overwrites a real MarketCheck owner_count or
+          // an existing flag, and only ever asserts the positive.
+          if (detectOneOwnerBadge(html)) {
+            const { data: cur } = await admin.from("vehicle_listings")
+              .select("mc_attributes").eq("tenant_id", row.tenant_id).eq("vin", row.vin).maybeSingle();
+            const mc = (cur?.mc_attributes ?? {}) as Record<string, unknown>;
+            if (mc.owner_count == null && mc.carfax_1_owner !== true) {
+              await admin.from("vehicle_listings")
+                .update({ mc_attributes: { ...mc, carfax_1_owner: true, one_owner_source: "dealer_vdp" } })
+                .eq("tenant_id", row.tenant_id).eq("vin", row.vin);
+            }
           }
         }
       } catch { /* history_report_url column may not be migrated yet */ }
