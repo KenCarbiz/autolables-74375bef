@@ -31,7 +31,7 @@ import {
   TireWheel, Windshield, DentDing, TireSwap, BuyersGuide, Hitch, Crossbars, FloorMats,
   WheelLocks, SplashGuards, CargoTray, TonneauCover, BedLiner, RemoteStartFob,
   ChargingCable, ChargingPort, ChargingStation, HybridLeafBolt, PlugInHybrid, Airbag,
-  GaugeAlert,
+  GaugeAlert, HeatedSeats, MudFlaps, RunningBoards, FactoryWarrantyShield, WiperService,
 } from "./icons200";
 
 // One definition per icon: the render component AND the manifest row live
@@ -168,7 +168,7 @@ export const ADDENDUM_ICON_DEFS: AddendumIconDef[] = [
   d("V032", "Off-Road", "vehicle", Mountain, "lucide", "green", ["offroad", "terrain", "4x4"]),
   d("V033", "Eco Mode", "vehicle", Leaf, "lucide", "green", ["eco", "efficiency", "hybrid"]),
   d("V034", "Steering Wheel", "vehicle", SteeringWheel, "custom", "blue", ["steering", "wheel", "heated wheel"], custom),
-  d("V035", "Heated Seats", "vehicle", PlaceholderGlyph, "custom", "orange", ["heated seats", "comfort"], custom),
+  d("V035", "Heated Seats", "vehicle", HeatedSeats, "custom", "blue", ["heated seats", "comfort"], custom),
 
   // ── A — Accessories / aftermarket ────────────────────────────
   d("A001", "Window Tint", "accessories", WindowTint, "custom", "green", ["tint", "window", "appearance"], custom),
@@ -184,9 +184,9 @@ export const ADDENDUM_ICON_DEFS: AddendumIconDef[] = [
   d("A011", "Trailer Hitch", "accessories", Link2, "lucide", "green", ["hitch", "towing", "trailer"]),
   d("A012", "Bike Rack", "accessories", Bike, "lucide", "green", ["bike", "rack", "carrier"]),
   d("A013", "Roof Tent Ready", "accessories", Tent, "lucide", "green", ["overland", "tent", "camping"]),
-  d("A014", "Mud Flaps", "accessories", PlaceholderGlyph, "custom", "green", ["mud flaps", "splash guards"], custom),
+  d("A014", "Mud Flaps", "accessories", MudFlaps, "custom", "green", ["mud flaps", "splash guards"], custom),
   d("A015", "Bed Liner", "accessories", BedLiner, "custom", "green", ["bed liner", "truck bed"], custom),
-  d("A016", "Running Boards", "accessories", PlaceholderGlyph, "custom", "green", ["running boards", "steps"], custom),
+  d("A016", "Running Boards", "accessories", RunningBoards, "custom", "green", ["running boards", "steps"], custom),
   d("A017", "Tonneau Cover", "accessories", TonneauCover, "custom", "green", ["tonneau", "bed cover"], custom),
   d("A018", "Wheel Locks", "accessories", Lock, "lucide", "green", ["wheel locks", "security"]),
   d("A019", "Remote Start", "accessories", Radio, "lucide", "green", ["remote start", "convenience"]),
@@ -209,7 +209,7 @@ export const ADDENDUM_ICON_DEFS: AddendumIconDef[] = [
   d("C002", "Coverage Verified", "coverage", ShieldCheck, "lucide", "green", ["warranty", "verified", "active"]),
   d("C003", "Extended Coverage", "coverage", ShieldPlus, "lucide", "purple", ["extended", "warranty", "vsc"]),
   d("C004", "Coverage Alert", "coverage", ShieldAlert, "lucide", "orange", ["expiring", "coverage", "attention"]),
-  d("C005", "Factory Warranty", "coverage", PlaceholderGlyph, "custom", "blue", ["factory", "warranty", "oem"], custom),
+  d("C005", "Factory Warranty", "coverage", FactoryWarrantyShield, "custom", "green", ["factory", "warranty", "oem"], custom),
   d("C006", "Roadside Assistance", "coverage", LifeBuoy, "lucide", "blue", ["roadside", "assistance", "towing"]),
   d("C007", "Assistance Hotline", "coverage", PhoneCall, "lucide", "blue", ["hotline", "support", "24/7"]),
   d("C008", "Coverage Term", "coverage", CalendarClock, "lucide", "blue", ["term", "months", "expiration"]),
@@ -236,7 +236,7 @@ export const ADDENDUM_ICON_DEFS: AddendumIconDef[] = [
   d("M011", "Coolant Service", "maintenance", Thermometer, "lucide", "orange", ["coolant", "flush", "radiator"]),
   d("M012", "Detail Service", "maintenance", Sparkles, "lucide", "purple", ["detail", "clean", "recondition"]),
   d("M013", "Car Wash", "maintenance", SprayCan, "lucide", "blue", ["wash", "exterior", "clean"]),
-  d("M014", "Wiper Service", "maintenance", PlaceholderGlyph, "custom", "blue", ["wipers", "blades", "visibility"], custom),
+  d("M014", "Wiper Service", "maintenance", WiperService, "custom", "blue", ["wipers", "blades", "visibility"], custom),
   d("M015", "Service Timer", "maintenance", Timer, "lucide", "blue", ["due", "interval", "reminder"]),
   d("M016", "Reconditioning", "maintenance", History, "lucide", "green", ["recon", "get ready", "restored"]),
   d("M017", "Oil Can", "maintenance", OilCan, "custom", "blue", ["oil can", "oil service", "lubrication"], custom),
@@ -258,7 +258,7 @@ export const ADDENDUM_ICON_DEFS: AddendumIconDef[] = [
   d("D012", "Window Sticker", "documents", WindowSticker, "custom", "blue", ["window sticker", "monroney", "label"], custom),
   d("D013", "Addendum", "documents", AddendumSheet, "custom", "blue", ["addendum", "supplemental", "sticker"], custom),
   d("D014", "Buyers Guide", "documents", BuyersGuide, "custom", "navy", ["buyers guide", "ftc", "as-is"], custom),
-  d("D015", "FTC Compliant", "documents", PlaceholderGlyph, "custom", "green", ["ftc", "compliant", "regulation"], custom),
+  d("D015", "FTC Compliant", "documents", ShieldCheck, "lucide", "green", ["ftc", "compliant", "regulation"], { description: "Alias of PR201 FTC Compliant — same artwork, documents-range ID.", use: "Use PR201 for new work; D015 exists for documents-range callers" }),
   d("D016", "Title Record", "documents", FileWarning, "lucide", "navy", ["title", "brand", "record"], placeholder),
   d("D017", "Barcode", "documents", Barcode, "lucide", "navy", ["barcode", "vin", "scan"]),
 

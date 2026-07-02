@@ -304,6 +304,58 @@ export const Airbag = (p: CustomIconProps) => (
   </Svg>
 );
 
+// V035 — seat profile with rising heat waves.
+export const HeatedSeats = (p: CustomIconProps) => (
+  <Svg {...p}>
+    <path d="M7 4c-1 0-1.6.8-1.4 1.8l1.6 9.2" />
+    <path d="M7.2 15h8.3a2.5 2.5 0 0 1 2.5 2.5V19H6.5a2 2 0 0 1-2-1.7L4.3 16" />
+    <path d="M12 6.5c-.8 1.1-.8 1.9 0 3-.8 1.1-.8 1.9 0 3" />
+    <path d="M16 6.5c-.8 1.1-.8 1.9 0 3-.8 1.1-.8 1.9 0 3" />
+  </Svg>
+);
+
+// A014 — tire with mud flap hanging behind it.
+export const MudFlaps = (p: CustomIconProps) => (
+  <Svg {...p}>
+    <circle cx="10" cy="11" r="7" />
+    <circle cx="10" cy="11" r="2.5" />
+    <path d="M17 8h2.5v10a2 2 0 0 1-2 2H15v-3" />
+    <path d="M15 20l-1.5 1.5" />
+  </Svg>
+);
+
+// A016 — running board step under the door line.
+export const RunningBoards = (p: CustomIconProps) => (
+  <Svg {...p}>
+    <path d="M4 5h16" />
+    <path d="M6 5v7" />
+    <path d="M18 5v7" />
+    <path d="M4 14h14a2 2 0 0 1 2 2v1a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-3z" />
+    <path d="M7 16.5h9" />
+  </Svg>
+);
+
+// C005 — shield with a factory silhouette inside.
+export const FactoryWarrantyShield = (p: CustomIconProps) => (
+  <Svg {...p}>
+    <path d="M12 2.5l7.5 3v5.5c0 4.8-3.2 9-7.5 10.5-4.3-1.5-7.5-5.7-7.5-10.5V5.5l7.5-3z" />
+    <path d="M8 14.5V10l3 2v-2l3 2v-2.5" />
+    <path d="M14 9.5V7.5h1.5v7" />
+    <path d="M8 14.5h7.5" />
+  </Svg>
+);
+
+// M014 — windshield with wiper blade and sweep arcs.
+export const WiperService = (p: CustomIconProps) => (
+  <Svg {...p}>
+    <path d="M3.5 17L5 8a2 2 0 0 1 2-1.6h10A2 2 0 0 1 19 8l1.5 9" />
+    <path d="M3.5 17h17" />
+    <path d="M12.5 16.5L8 10.5" />
+    <path d="M12.5 16.5l1.5-1" />
+    <path d="M9.5 9c2.5-.8 5-.8 7.5.2" strokeDasharray="2 2" />
+  </Svg>
+);
+
 // WA203 — odometer gauge with alert mark.
 export const GaugeAlert = (p: CustomIconProps) => (
   <Svg {...p}>
