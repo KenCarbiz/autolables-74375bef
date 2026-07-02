@@ -32,6 +32,7 @@ import CustomerInfoSection, { CustomerInfo, emptyCustomerInfo, composeName } fro
 import { ScrapedVehicle } from "@/hooks/useVehicleUrlScrape";
 import { useAudit } from "@/contexts/AuditContext";
 import { useTenant } from "@/contexts/TenantContext";
+import { confirmPrintReady } from "@/lib/printReadiness";
 import { useVehicleFiles } from "@/hooks/useVehicleFiles";
 import { QRCodeSVG } from "qrcode.react";
 import { ArrowLeft, Save, Send, Printer, Download, ChevronDown, Check, Pencil } from "lucide-react";
@@ -742,6 +743,9 @@ const Index = () => {
   }, [viewId, searchParams]);
 
   const handlePrint = () => {
+    if (!confirmPrintReady(settings, currentStore?.name, (blockers) => {
+      blockers.forEach((b) => toast.error(b.message));
+    })) return;
     window.print();
     if (user) log({ store_id: currentStore?.id || "", user_id: user.id, action: "addendum_printed", entity_type: "addendum", entity_id: vehicle.vin, details: { ymm: vehicle.ymm, vin: vehicle.vin, stock: vehicle.stock, customer_name: composeName(customerInfo.buyer_first_name, customerInfo.buyer_middle_initial, customerInfo.buyer_last_name, customerInfo.buyer_suffix) } });
   };
@@ -1335,7 +1339,9 @@ const Index = () => {
   );
 
   // Signing URL for barcode on the printed addendum
-  const addendumSigningUrl = signingUrl || (vehicle.vin ? `${window.location.origin}/sign/pending-${vehicle.vin}` : "");
+  // Only a minted token yields a printable signing QR — the old
+  // /sign/pending-<VIN> placeholder baked a dead URL into early prints.
+  const addendumSigningUrl = signingUrl || "";
 
   return (
     <div className="bg-muted/30 py-6 px-4 lg:px-8 min-h-[calc(100vh-3.5rem)]">

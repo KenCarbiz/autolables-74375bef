@@ -1,6 +1,7 @@
 import { useState, useRef } from "react";
 import { useDealerSettings } from "@/contexts/DealerSettingsContext";
 import { useTenant } from "@/contexts/TenantContext";
+import { confirmPrintReady } from "@/lib/printReadiness";
 import { useVinDecode } from "@/hooks/useVinDecode";
 import { useFactoryData } from "@/hooks/useFactoryData";
 import { useAuth } from "@/contexts/AuthContext";
@@ -154,6 +155,9 @@ const NewCarSticker = () => {
   };
 
   const handlePrint = () => {
+    if (!confirmPrintReady(settings, currentStore?.name, (blockers) => {
+      blockers.forEach((b) => toast.error(b.message));
+    })) return;
     window.print();
     if (user) log({ store_id: currentStore?.id || "", user_id: user.id, action: "addendum_printed", entity_type: "new_car_sticker", entity_id: vehicle.vin, details: { ymm: `${vehicle.year} ${vehicle.make} ${vehicle.model}` } });
   };

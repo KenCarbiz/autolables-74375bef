@@ -40,7 +40,7 @@ const STRINGS = {
   es: {
     heading: "Divulgaciones Requeridas y Derechos del Consumidor",
     carsBanner: (languages: string) =>
-      `LEY CARS DE CALIFORNIA (SB 766) — Este anexo cumple con los requisitos de divulgación de California con vigencia a partir del 1 de octubre de 2026. Los encabezados están en negrita de 12 puntos y el texto del cuerpo en negrita de 10 puntos, según lo requerido.${languages ? " Disponible en: " + languages + "." : ""}`,
+      `DIVULGACIÓN DE CALIFORNIA (SB 766) — Este anexo cumple con los requisitos de divulgación de California con vigencia a partir del 1 de octubre de 2026. Los encabezados están en negrita de 12 puntos y el texto del cuerpo en negrita de 10 puntos, según lo requerido.${languages ? " Disponible en: " + languages + "." : ""}`,
     ackLabel: "RECONOCIMIENTO DEL ANEXO Y ETIQUETA DE VENTANA:",
     ackBody:
       "Al firmar este anexo, el consumidor reconoce y acepta que: (1) este anexo refleja con precisión y corresponde a la etiqueta de la ventana adherida a este vehículo; (2) al consumidor se le ha dado tiempo y oportunidad adecuados para revisar tanto la etiqueta de la ventana del vehículo como este anexo en su totalidad; (3) los productos, precios y términos enumerados en este anexo coinciden con los mostrados en la etiqueta de la ventana del vehículo; y (4) las iniciales y la firma del consumidor a continuación constituyen la aceptación de los productos y precios divulgados en ambos documentos. Cualquier discrepancia entre la etiqueta de la ventana y este anexo debe informarse a la gerencia del concesionario antes de firmar.",
@@ -63,7 +63,10 @@ const Disclosures = ({ inkSaving, language = "en" }: DisclosuresProps) => {
   const { currentStore } = useTenant();
 
   const t = STRINGS[language];
-  const dealerState = currentStore?.state || settings.doc_fee_state || "";
+  // Match TotalBar/PurchaseSummary resolution — dealer_state must be in the
+  // chain or a tenant with only dealer_state set prints a mixed-state
+  // document (state fee wording beside federal-only disclosures).
+  const dealerState = currentStore?.state || settings.doc_fee_state || settings.dealer_state || "";
   const compliance = getStateCompliance(dealerState);
   const stateDisclosures = getAddendumDisclosures(dealerState);
 

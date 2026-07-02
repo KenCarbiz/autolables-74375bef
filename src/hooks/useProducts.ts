@@ -73,11 +73,23 @@ export const useProducts = () => {
     refetchOnMount: "always",
     refetchOnWindowFocus: true,
     queryFn: async () => {
-      const { data, error } = await supabase
+      // Tenant-scoped: this tenant's catalog plus legacy pre-scoping rows
+      // (tenant_id null). RLS enforces the same shape server-side; the
+      // explicit filter keeps multi-tenant admins from mixing catalogs.
+      let q = supabase
         .from("products")
         .select("*")
         .eq("is_active", true)
         .order("sort_order");
+      if (tenant?.id && tenant.id !== "house") {
+        q = q.or(`tenant_id.eq.${tenant.id},tenant_id.is.null`);
+      }
+      let { data, error } = await q;
+      // Pre-migration schema (no tenant_id column): fall back to the
+      // unfiltered query so the addendum keeps working until it's applied.
+      if (error && /tenant_id/i.test(error.message || "")) {
+        ({ data, error } = await supabase.from("products").select("*").eq("is_active", true).order("sort_order"));
+      }
       if (error) throw error;
       // `upgrade` is jsonb in the DB (Json); cast through unknown so the
       // typed ProductUpgrade shape lands on the client.

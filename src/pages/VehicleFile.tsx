@@ -1652,13 +1652,22 @@ const AddendumPanel = ({ vehicle }: { vehicle: VehicleRow }) => {
             <span className="font-mono ml-1">{vehicle.vin}</span>.
           </p>
         </div>
-        <button
-          onClick={startAddendum}
-          className="h-10 px-4 rounded-md bg-primary text-primary-foreground text-sm font-semibold inline-flex items-center gap-1.5"
-        >
-          <Plus className="w-4 h-4" />
-          New Addendum
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => navigate(`/addendum-label/${vehicle.id}`)}
+            className="h-10 px-4 rounded-md border border-border text-sm font-semibold inline-flex items-center gap-1.5 hover:border-primary"
+          >
+            <Printer className="w-4 h-4" />
+            Addendum Label
+          </button>
+          <button
+            onClick={startAddendum}
+            className="h-10 px-4 rounded-md bg-primary text-primary-foreground text-sm font-semibold inline-flex items-center gap-1.5"
+          >
+            <Plus className="w-4 h-4" />
+            New Addendum
+          </button>
+        </div>
       </div>
 
       {loading ? (
