@@ -68,6 +68,66 @@ function extractLists(raw: any): { options: string[]; features: string[] } {
   return { options: [...options], features: [...features] };
 }
 
+// ── Structured build sheet ───────────────────────────────────────────────────
+// NeoVIN returns five distinct layers (packages / installed options / high-value
+// features / standard features / granular installed_equipment). The flat
+// options+features arrays keep back-compat; this preserves the tiers so the
+// passport can show packages as packages instead of a 633-row info dump.
+// installed_equipment (engineering rows) is deliberately NOT captured — it is
+// noise for shoppers.
+// deno-lint-ignore no-explicit-any
+function structuredSheet(payload: any): Record<string, unknown> | null {
+  const src = payload || {};
+  const num = (v: unknown) => { const n = Number(v); return Number.isFinite(n) && n > 0 ? n : undefined; };
+
+  const packages: { name: string; msrp?: number; contents: string[] }[] = [];
+  const pkgSrc = Array.isArray(src.options_packages) ? src.options_packages : [];
+  for (const p of pkgSrc) {
+    const name = flat(p);
+    if (!name) continue;
+    const contents = ([] as unknown[])
+      .concat(p?.options ?? p?.contents ?? p?.items ?? p?.features ?? [])
+      .map(flat).filter(Boolean);
+    packages.push({ name, msrp: num(p?.msrp ?? p?.price), contents });
+  }
+
+  const options: { name: string; msrp?: number }[] = [];
+  const optSrc = Array.isArray(src.installed_options_details) ? src.installed_options_details : [];
+  for (const o of optSrc) {
+    const name = flat(o);
+    if (!name) continue;
+    // Some feeds list packages inside installed options — route them by type or
+    // by the presence of sub-contents.
+    const subs = ([] as unknown[]).concat(o?.options ?? o?.contents ?? []).map(flat).filter(Boolean);
+    if (/package/i.test(String(o?.type ?? o?.category ?? "")) || subs.length) {
+      if (!packages.some((p) => p.name === name)) packages.push({ name, msrp: num(o?.msrp ?? o?.price), contents: subs });
+    } else {
+      options.push({ name, msrp: num(o?.msrp ?? o?.price) });
+    }
+  }
+
+  // Category map {category: [{description}|string]} → {category: [names]}.
+  const catMap = (obj: unknown): Record<string, string[]> => {
+    const out: Record<string, string[]> = {};
+    if (obj && typeof obj === "object" && !Array.isArray(obj)) {
+      for (const [cat, arr] of Object.entries(obj as Record<string, unknown>)) {
+        const names = (Array.isArray(arr) ? arr : [arr]).map(flat).filter(Boolean);
+        if (names.length) out[cat] = names;
+      }
+    }
+    return out;
+  };
+  const key_features = catMap(src.high_value_features);
+  const standard = catMap(src.features);
+
+  // include_generic=true falls back to typical-for-trim specs when the VIN
+  // can't be fully decoded — the passport must label those, never assert them.
+  const generic = Boolean(src.is_generic ?? src.generic ?? /generic/i.test(String(src.decode_mode ?? src.decode ?? "")));
+
+  if (!packages.length && !options.length && !Object.keys(key_features).length && !Object.keys(standard).length) return null;
+  return { packages, options, key_features, standard, generic, decoded_at: new Date().toISOString(), source: "neovin" };
+}
+
 // Candidate MarketCheck VIN-decode endpoints — the specs/options path differs
 // across API generations, so we try each until one answers.
 const specEndpoints = (vin: string): string[] => {
@@ -137,6 +197,7 @@ Deno.serve(async (req) => {
   if (!payload) return json(200, { ok: false, error: "no_endpoint_matched", tried });
 
   const { options, features } = extractLists(payload);
+  const sheet = structuredSheet(payload);
   // deno-lint-ignore no-explicit-any
   const build = (payload.build || payload) as any;
 
@@ -174,6 +235,7 @@ Deno.serve(async (req) => {
           ...fill,
           options: options.length ? options : prev.options ?? null,
           features: features.length ? features : prev.features ?? null,
+          build_sheet: sheet ?? prev.build_sheet ?? null,
           specs_decoded_at: new Date().toISOString(),
         };
         await admin.from("vehicle_listings").update({ mc_attributes: merged }).eq("id", row.id);
@@ -187,6 +249,12 @@ Deno.serve(async (req) => {
   // simply doesn't include per-vehicle equipment for this VIN).
   return json(200, {
     ok: true, vin, endpoint, options, features,
+    buildSheet: sheet ? {
+      packages: (sheet.packages as unknown[]).length,
+      options: (sheet.options as unknown[]).length,
+      keyFeatureCategories: Object.keys(sheet.key_features as Record<string, unknown>).length,
+      generic: sheet.generic,
+    } : null,
     optionCount: options.length + features.length, build,
     payloadKeys: payload && typeof payload === "object" ? Object.keys(payload) : [],
     buildKeys: build && typeof build === "object" ? Object.keys(build) : [],

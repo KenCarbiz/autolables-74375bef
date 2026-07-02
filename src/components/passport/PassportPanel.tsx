@@ -10,6 +10,7 @@ import { fmt$, listingEquipment } from "@/lib/passportV2Data";
 import { oemCoverageRows, type CoverageKey } from "@/lib/oemWarranty";
 import { lookupOemReference } from "@/data/oemWarrantyReference";
 import { resolveEffectiveWarranty } from "@/lib/warranty/passportWarranty";
+import { readBuildSheet } from "@/lib/buildSheet";
 import type { VehicleListing } from "@/hooks/useVehicleListing";
 import {
   PassportSlideOver, Hero, Section, Check, Empty, StatRow, RangeBar, TrendChart, Ring, CARD, GREEN, BLUE,
@@ -1448,33 +1449,108 @@ function buildPanel(key: PassportPanelKey, d: PassportData, listing: VehicleList
 
     case "equipment": {
       const { ordered, featLabels, accessories } = featureGroups(listing);
-      const hasContent = featLabels.length > 0 || accessories.length > 0 || ordered.length > 0;
+      // Structured NeoVIN build sheet (packages / options / key features /
+      // standard) — the tiered display. Older decodes without it fall back to
+      // the flat categorized list.
+      const sheet = readBuildSheet(listing);
+      const equipCount = sheet ? sheet.keyFeatureCount + sheet.standardCount : featLabels.length;
+      const hasContent = !!sheet || featLabels.length > 0 || accessories.length > 0 || ordered.length > 0;
       return {
         title: "Equipment & Installed Options", subtitle: "Everything included on this vehicle from the factory and dealership",
         primary: { label: "Reserve This Vehicle", onClick: () => go("reserve") },
         footerQuestion: "Questions about the equipment?", specialistLabel: "Talk to a Product Specialist",
         body: <>
-          <div className="md:hidden"><MHero tone="blue" icon={Package} eyebrow="Equipment & Options" title={`${featLabels.length} on this vehicle`} note={accessories.length ? `${accessories.length} dealer add-on${accessories.length === 1 ? "" : "s"} available` : "Factory and dealer equipment"} /></div>
+          <div className="md:hidden"><MHero tone="blue" icon={Package} eyebrow="Equipment & Options" title={`${equipCount} on this vehicle`} note={sheet?.packages.length ? `${sheet.packages.length} factory package${sheet.packages.length === 1 ? "" : "s"} installed` : accessories.length ? `${accessories.length} dealer add-on${accessories.length === 1 ? "" : "s"} available` : "Factory and dealer equipment"} /></div>
           {hasContent ? (
             <>
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                <Stat label="Factory Equipment" value={`${featLabels.length}`} />
-                <Stat label="Packages" value="Pending" />
+                <Stat label="Factory Equipment" value={`${equipCount}`} />
+                <Stat label="Packages" value={sheet ? `${sheet.packages.length}` : "—"} />
                 <Stat label="Dealer Add-ons" value={`${accessories.length}`} />
-                <Stat label="Est. Value" value="Not Available" />
+                <Stat label="Option Value" value={sheet?.estValue ? fmt$(sheet.estValue) : "—"} tone={sheet?.estValue ? "green" : "neutral"} />
               </div>
-              {ordered.length > 0 && (
-                <Section title="Equipment categories">
-                  <div className="space-y-2">{ordered.map(([name, items], i) => <Group key={name} title={name} items={items} defaultOpen={i === 0} />)}</div>
-                </Section>
+              {/* Generic decode = typical-for-trim, not VIN-verified — label it. */}
+              {sheet?.generic && (
+                <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2.5 flex items-start gap-2">
+                  <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                  <p className="text-[12px] text-amber-800 leading-snug">Equipment shown is typical for this trim. Confirm this vehicle's exact build with the dealer.</p>
+                </div>
               )}
-              <Section title="Installed packages">
-                <Empty>Factory package breakdown is pending OEM build-sheet data for this vehicle.</Empty>
-              </Section>
-              {featLabels.length > 0 && (
-                <Section title="Factory options">
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">{featLabels.slice(0, 12).map((f) => <IconCard key={f} icon={Award} title={f} />)}</div>
-                </Section>
+              {sheet ? (
+                <>
+                  {/* Tier 2 — the differentiator: what THIS car has beyond the trim */}
+                  <Section title="Installed packages" sub={listing.trim ? `Factory packages this vehicle was built with — beyond the standard ${listing.trim} trim.` : "Factory packages this vehicle was built with."}>
+                    {sheet.packages.length > 0 ? (
+                      <div className="space-y-2">
+                        {sheet.packages.map((p) => (
+                          <details key={p.name} className={`${CARD} overflow-hidden group`}>
+                            <summary className="cursor-pointer list-none flex items-center justify-between gap-3 px-4 py-3">
+                              <span className="inline-flex items-center gap-2.5 min-w-0">
+                                <span className="w-8 h-8 rounded-lg bg-blue-50 flex items-center justify-center shrink-0"><Package className="w-4 h-4 text-[#2563EB]" /></span>
+                                <span className="text-[13px] font-bold text-[#0F172A] leading-tight">{p.name}</span>
+                              </span>
+                              <span className="inline-flex items-center gap-2 shrink-0">
+                                {p.msrp && <span className="text-[12px] font-bold text-[#16A34A]">{fmt$(p.msrp)}</span>}
+                                {p.contents.length > 0 && <ChevronDown className="w-4 h-4 text-[#94A3B8] group-open:rotate-180 transition-transform" />}
+                              </span>
+                            </summary>
+                            {p.contents.length > 0 && (
+                              <div className="px-4 pb-3 grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1.5">
+                                {p.contents.map((c) => <div key={c} className="flex items-start gap-2 text-[12px] text-[#334155]"><CheckCircle2 className="w-3.5 h-3.5 text-[#16A34A] shrink-0 mt-0.5" />{c}</div>)}
+                              </div>
+                            )}
+                          </details>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-[12px] text-[#64748B]">No optional packages — this vehicle is equipped as a standard {listing.trim ? `${listing.trim} ` : ""}build.</p>
+                    )}
+                  </Section>
+                  {sheet.options.length > 0 && (
+                    <Section title="Factory options" sub="Standalone options installed on this vehicle.">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                        {sheet.options.map((o) => (
+                          <div key={o.name} className={`${CARD} px-3.5 py-2.5 flex items-center justify-between gap-2`}>
+                            <span className="text-[12px] font-semibold text-[#0F172A] leading-tight">{o.name}</span>
+                            {o.msrp && <span className="text-[11px] font-bold text-[#16A34A] shrink-0">{fmt$(o.msrp)}</span>}
+                          </div>
+                        ))}
+                      </div>
+                    </Section>
+                  )}
+                  {/* Tier 3 — key features by shopper-priority category */}
+                  {sheet.keyFeatures.length > 0 && (
+                    <Section title="Key features" sub="The equipment shoppers ask about, organized by category.">
+                      <div className="space-y-2">{sheet.keyFeatures.map(([name, items], i) => <Group key={name} title={name} items={items} defaultOpen={i === 0} />)}</div>
+                    </Section>
+                  )}
+                  {/* Tier 4 — full reference list, collapsed by default */}
+                  {sheet.standardCount > 0 && (
+                    <details className={`${CARD} overflow-hidden group`}>
+                      <summary className="cursor-pointer list-none flex items-center justify-between gap-3 px-4 py-3.5">
+                        <span className="min-w-0">
+                          <span className="block text-[13px] font-bold text-[#0F172A] leading-tight">Complete factory equipment ({sheet.standardCount})</span>
+                          <span className="block text-[11px] text-[#94A3B8] leading-tight mt-0.5">Every standard feature on this build, for reference</span>
+                        </span>
+                        <ChevronDown className="w-4 h-4 text-[#94A3B8] group-open:rotate-180 transition-transform shrink-0" />
+                      </summary>
+                      <div className="px-3 pb-3 space-y-2">{sheet.standard.map(([name, items]) => <Group key={name} title={name} items={items} />)}</div>
+                    </details>
+                  )}
+                </>
+              ) : (
+                <>
+                  {ordered.length > 0 && (
+                    <Section title="Equipment categories">
+                      <div className="space-y-2">{ordered.map(([name, items], i) => <Group key={name} title={name} items={items} defaultOpen={i === 0} />)}</div>
+                    </Section>
+                  )}
+                  {featLabels.length > 0 && (
+                    <Section title="Factory options">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">{featLabels.slice(0, 12).map((f) => <IconCard key={f} icon={Award} title={f} />)}</div>
+                    </Section>
+                  )}
+                </>
               )}
               {accessories.length > 0 && (
                 <Section title="Dealer accessories available" sub="Add-ons offered by the dealer — not factory-installed.">
@@ -1483,12 +1559,12 @@ function buildPanel(key: PassportPanelKey, d: PassportData, listing: VehicleList
               )}
               <Section title="Build summary">
                 <div className={`${CARD} p-4`}>
-                  <StatRow label="Factory equipment" value={`${featLabels.length} items`} />
-                  <StatRow label="Factory options" value="Pending OEM build sheet" />
+                  <StatRow label="Factory equipment" value={`${equipCount} items`} />
+                  <StatRow label="Factory packages" value={sheet ? (sheet.packages.length ? `${sheet.packages.length} installed` : "None — standard build") : "Awaiting VIN decode"} />
+                  <StatRow label="Factory options" value={sheet ? (sheet.options.length ? `${sheet.options.length} installed` : "None reported") : "Awaiting VIN decode"} />
                   <StatRow label="Dealer installed" value={accessories.length ? `${accessories.length} available` : "None reported"} />
-                  <StatRow label="Aftermarket" value="None reported" />
                 </div>
-                <p className="text-[11px] text-[#94A3B8] mt-2">A full factory build sheet with itemized option values requires OEM data and is not yet available for this vehicle.</p>
+                {!sheet && <p className="text-[11px] text-[#94A3B8] mt-2">The itemized package and option breakdown appears once this VIN's build sheet is decoded.</p>}
               </Section>
             </>
           ) : <Empty>Equipment details appear here as the vehicle's build data is decoded.</Empty>}
