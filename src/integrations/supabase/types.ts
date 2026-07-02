@@ -4941,6 +4941,7 @@ export type Database = {
           feed_source: string | null
           hero_image_url: string | null
           history_payload: Json | null
+          history_report_url: string | null
           id: string
           in_service_date: string | null
           install_token: string
@@ -5018,6 +5019,7 @@ export type Database = {
           feed_source?: string | null
           hero_image_url?: string | null
           history_payload?: Json | null
+          history_report_url?: string | null
           id?: string
           in_service_date?: string | null
           install_token?: string
@@ -5095,6 +5097,7 @@ export type Database = {
           feed_source?: string | null
           hero_image_url?: string | null
           history_payload?: Json | null
+          history_report_url?: string | null
           id?: string
           in_service_date?: string | null
           install_token?: string
@@ -5997,6 +6000,7 @@ export type Database = {
           feed_source: string | null
           hero_image_url: string | null
           history_payload: Json | null
+          history_report_url: string | null
           id: string
           in_service_date: string | null
           install_token: string
