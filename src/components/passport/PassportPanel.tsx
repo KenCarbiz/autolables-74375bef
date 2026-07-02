@@ -14,6 +14,7 @@ import { lookupOemReference } from "@/data/oemWarrantyReference";
 import { resolveEffectiveWarranty } from "@/lib/warranty/passportWarranty";
 import { readBuildSheet, PACKAGE_KIND_ORDER } from "@/lib/buildSheet";
 import { readDealerAlternatives, type DealerAlternative } from "@/lib/dealerAlternatives";
+import { rememberPassportOrigin } from "@/lib/passportOrigin";
 import { recordPanelView } from "@/lib/shopperIntent";
 import { useNhtsaSafety, type NhtsaSafetyResult } from "@/hooks/useNhtsaSafety";
 import type { VehicleListing } from "@/hooks/useVehicleListing";
@@ -64,7 +65,10 @@ function buildPanel(key: PassportPanelKey, d: PassportData, listing: VehicleList
       const percentile = (mc.price_percentile as number) ?? null;
       const why: string[] = [];
       if (isGreat) why.push("Priced below local market");
-      if (percentile != null) why.push(`Lower than ${percentile}% of similar vehicles`); else if (isPreview) why.push("Lower than 91% of similar vehicles");
+      // price_percentile = % of comps priced below this car, so "priced lower
+      // than N%" is the complement — and only belongs in a praise list when
+      // the car actually sits in the cheaper half.
+      if (percentile != null && percentile <= 50) why.push(`Priced lower than ${100 - percentile}% of similar vehicles`); else if (isPreview && percentile == null) why.push("Priced lower than 91% of similar vehicles");
       if (listing.mileage != null && listing.mileage < 30000) why.push(`Low mileage (${listing.mileage.toLocaleString()} mi)`);
       if (d.ownerCount === 1) why.push("One owner");
       if (d.cleanTitle && d.accidentCount === 0) why.push("Clean history");
@@ -104,7 +108,7 @@ function buildPanel(key: PassportPanelKey, d: PassportData, listing: VehicleList
             <Section title={`Similar Vehicles In Stock (${priceAlts.length})`} sub={`Other options at ${d.dealerName || "this dealership"}.`}
               action={<button onClick={() => openPanel("comparable-vehicles")} className="text-[12px] font-semibold text-[#2563EB] hover:underline shrink-0">View all</button>}>
               <div className="flex gap-3 overflow-x-auto -mx-1 px-1 pb-1 snap-x">
-                {priceAlts.slice(0, 4).map((a) => <div key={a.slug} className="min-w-[240px] snap-start"><AlternativeCard alt={a} compact /></div>)}
+                {priceAlts.slice(0, 4).map((a) => <div key={a.slug} className="min-w-[240px] snap-start"><AlternativeCard alt={a} from={{ slug: listing.slug, ymm: listing.ymm }} compact /></div>)}
               </div>
             </Section>
           )}
@@ -649,7 +653,7 @@ function buildPanel(key: PassportPanelKey, d: PassportData, listing: VehicleList
               <Hero icon={Car} tone="blue" label={`${alts.length} in stock at ${d.dealerName || "this dealership"}`}
                 note={sameModelCount ? `${sameModelCount} same-model alternative${sameModelCount === 1 ? "" : "s"} at different package levels` : "Closest matches from this dealership's inventory"} />
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                {alts.map((a) => <AlternativeCard key={a.slug} alt={a} />)}
+                {alts.map((a) => <AlternativeCard key={a.slug} alt={a} from={{ slug: listing.slug, ymm: listing.ymm }} />)}
               </div>
               <p className="text-[11px] text-[#94A3B8]">All vehicles shown are in stock at {d.dealerName || "this dealership"}.</p>
             </>
@@ -2558,8 +2562,12 @@ const ALT_TONE: Record<DealerAlternative["tone"], string> = {
   violet: "bg-violet-50 text-violet-700",
   neutral: "bg-slate-100 text-[#64748B]",
 };
-const AlternativeCard = ({ alt, compact = false }: { alt: DealerAlternative; compact?: boolean }) => (
-  <a href={`/v/${alt.slug}`} className={`block ${CARD} overflow-hidden hover:border-[#2563EB] transition-colors`}>
+const AlternativeCard = ({ alt, from, compact = false }: { alt: DealerAlternative; from?: { slug: string | null; ymm: string | null }; compact?: boolean }) => (
+  <a
+    href={`/v/${alt.slug}`}
+    onClick={() => { if (from?.slug) rememberPassportOrigin(from.slug, from.ymm); }}
+    className={`block ${CARD} overflow-hidden hover:border-[#2563EB] transition-colors`}
+  >
     <div className={`${compact ? "h-[110px]" : "h-[140px]"} bg-[#eef0f3] flex items-center justify-center relative`}>
       {alt.image ? <img src={alt.image} alt={alt.ymm || ""} loading="lazy" className="w-full h-full object-cover" /> : <Car className="w-8 h-8 text-[#94A3B8]" />}
       <span className={`absolute top-2 left-2 text-[10px] font-bold rounded-full px-2 py-0.5 ${ALT_TONE[alt.tone]}`}>{alt.tag}</span>

@@ -5,7 +5,7 @@ import {
   RefreshCw, ShieldCheck, CheckCircle2, Star, Phone, Car, Cog, Fuel, Settings, Wind, AlertTriangle,
   Award, Wrench, DollarSign, Clock, Building2, Users, Truck, Lock, Zap, ArrowRight,
   Package, Eye, Play, TrendingUp, BadgeCheck, Gauge as GaugeIcon, Send, MapPin,
-  Sun, Navigation, Smartphone, Camera, Volume2, Palette, Snowflake, ExternalLink,
+  Sun, Navigation, Smartphone, Camera, Volume2, Palette, Snowflake, ExternalLink, X,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Helmet } from "react-helmet-async";
@@ -20,6 +20,7 @@ import { listingGallery } from "@/lib/photos";
 import { usePassportEngagement } from "@/lib/passportEngagement";
 import { isVehicleSaved, toggleSavedVehicle } from "@/lib/savedVehicles";
 import { readBuildSheet } from "@/lib/buildSheet";
+import { readPassportOrigin, clearPassportOrigin, type PassportOrigin } from "@/lib/passportOrigin";
 import { trackPassportOpened, trackWindowStickerScanned, trackCustomerCtaClicked } from "@/lib/engagement/customerEngagement";
 import { packetVisible } from "@/lib/packetModules";
 import PassportPanel, { type PassportPanelKey } from "@/components/passport/PassportPanel";
@@ -217,6 +218,17 @@ const VehiclePassportV3 = () => {
   // Shopper Focus Breakdown — time per module + open panel (skipped in preview).
   usePassportEngagement(listing?.slug || vehicleSlug, activePanel, !isPreview);
 
+  // "Back to the vehicle you were viewing" — set when the shopper clicked a
+  // dealer-alternative card on another passport. Cleared once they return.
+  const [originBack, setOriginBack] = useState<PassportOrigin | null>(null);
+  useEffect(() => {
+    if (!listing?.slug) return;
+    const o = readPassportOrigin();
+    if (!o) { setOriginBack(null); return; }
+    if (o.slug === listing.slug) { clearPassportOrigin(); setOriginBack(null); return; }
+    setOriginBack(o);
+  }, [listing?.slug]);
+
   if (loading) return <div className="min-h-screen flex items-center justify-center bg-[#F6F7F9]"><div className="w-8 h-8 border-2 border-[#2563EB] border-t-transparent rounded-full animate-spin" /></div>;
   if (notFound || !listing || !d) return (
     <div className="min-h-screen flex items-center justify-center px-6 bg-[#F6F7F9]"><div className="text-center"><Package className="w-12 h-12 text-slate-300 mx-auto mb-4" /><h1 className="text-xl font-bold">Vehicle unavailable</h1><p className="text-sm text-slate-500 mt-2">This listing may have been sold or unpublished.</p></div></div>
@@ -413,6 +425,20 @@ const VehiclePassportV3 = () => {
           </div>
         </div>
       </header>
+
+      {/* Return path after browsing a sibling listing — sticky so the shopper
+          can always get back to the vehicle they started on. */}
+      {originBack && (
+        <div className="sticky top-0 z-30 bg-[#0D1B2A] text-white">
+          <div className="mx-auto max-w-[1320px] px-4 sm:px-5 h-11 flex items-center justify-between gap-3">
+            <a href={`/v/${originBack.slug}${isPreview ? "?preview=1" : ""}`} onClick={() => clearPassportOrigin()} className="inline-flex items-center gap-2 text-[13px] font-semibold min-w-0 hover:underline">
+              <ChevronLeft className="w-4 h-4 shrink-0" />
+              <span className="truncate">Back to the {originBack.ymm || "vehicle"} you were viewing</span>
+            </a>
+            <button onClick={() => { clearPassportOrigin(); setOriginBack(null); }} className="text-white/70 hover:text-white shrink-0" aria-label="Dismiss"><X className="w-4 h-4" /></button>
+          </div>
+        </div>
+      )}
 
       <main className="mx-auto max-w-[1320px] px-4 sm:px-5 py-5 sm:py-6 pb-[calc(92px+env(safe-area-inset-bottom))] lg:pb-6 space-y-6 max-[767px]:space-y-8 lg:space-y-7">
         {/* 1–2. TOP ZONE */}
