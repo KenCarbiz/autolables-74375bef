@@ -15,8 +15,12 @@ const QrRedirect = () => {
     (async () => {
       const dest = await logScan(token);
       if (done) return;
-      if (dest) window.location.replace(dest);
-      else setFailed(true);
+      if (dest) {
+        // Stamp the scan source so the passport can attribute the session (and
+        // any lead) to the window sticker instead of "website".
+        const withSrc = dest.includes("src=") ? dest : `${dest}${dest.includes("?") ? "&" : "?"}src=qr`;
+        window.location.replace(withSrc);
+      } else setFailed(true);
     })();
     // Safety: if the RPC hangs, don't strand the shopper.
     const t = window.setTimeout(() => { if (!done) setFailed(true); }, 4000);

@@ -42,15 +42,15 @@ interface Row {
 }
 
 // Circular score gauge (real confidence score).
-const ScoreRing = ({ score }: { score: number }) => {
-  const r = 54, c = 2 * Math.PI * r, off = c * (1 - score / 100);
+const ScoreRing = ({ score }: { score: number | null }) => {
+  const r = 54, c = 2 * Math.PI * r, off = c * (1 - (score ?? 0) / 100);
   return (
     <div className="relative w-[140px] h-[140px] shrink-0">
       <svg viewBox="0 0 128 128" className="w-full h-full -rotate-90">
         <circle cx="64" cy="64" r={r} fill="none" stroke="#E6E8EC" strokeWidth="10" />
         <circle cx="64" cy="64" r={r} fill="none" stroke="#16A34A" strokeWidth="10" strokeLinecap="round" strokeDasharray={c} strokeDashoffset={off} />
       </svg>
-      <div className="absolute inset-0 flex flex-col items-center justify-center"><span className="text-[34px] font-extrabold text-[#0F172A] leading-none">{score}</span><span className="text-[12px] font-bold text-[#94A3B8]">/100</span></div>
+      <div className="absolute inset-0 flex flex-col items-center justify-center"><span className="text-[34px] font-extrabold text-[#0F172A] leading-none">{score ?? "—"}</span><span className="text-[12px] font-bold text-[#94A3B8]">{score != null ? "/100" : "Pending"}</span></div>
     </div>
   );
 };
@@ -85,7 +85,7 @@ const buildRows = (d: PassportData, listing: VehicleListing): Row[] => {
   return [
     { key: "vin", icon: Hash, title: "VIN Verification", desc: "VIN decoding, format validation, and database checks",
       status: listing.vin && listing.ymm ? "verified" : "pending", source: "OEM / VIN decode",
-      lines: [`VIN format ${/^[A-HJ-NPR-Z0-9]{17}$/i.test(listing.vin || "") ? "valid" : "unconfirmed"}`, listing.ymm ? `Decoded: ${listing.ymm}${listing.trim ? ` ${listing.trim}` : ""}` : "Decode pending", "No VIN mismatch detected"] },
+      lines: [`VIN format ${/^[A-HJ-NPR-Z0-9]{17}$/i.test(listing.vin || "") ? "valid" : "unconfirmed"}`, listing.ymm ? `Decoded: ${listing.ymm}${listing.trim ? ` ${listing.trim}` : ""}` : "Decode pending"] },
     { key: "history", icon: FileText, title: "Vehicle History", desc: "Accident, damage, and ownership history",
       status: hasHistory ? "verified" : "pending", source: "Vehicle history records",
       lines: [d.ownerCount != null ? `${d.ownerCount === 1 ? "One owner" : `${d.ownerCount} owners`} on record` : "Ownership: not available", d.accidentCount != null ? (d.accidentCount === 0 ? "No accidents reported" : `${d.accidentCount} accident(s) reported`) : "Accident history: not available", "Service record availability checked"] },
@@ -97,7 +97,7 @@ const buildRows = (d: PassportData, listing: VehicleListing): Row[] => {
       lines: [d.cleanTitle ? "Clean title — no brands on record" : "Title brand: dealer confirmation needed", "Salvage / flood / lemon / rebuilt indicators checked"], note: d.cleanTitle ? undefined : "Confirm title status with the dealer before purchase." },
     { key: "odometer", icon: GaugeIcon, title: "Odometer Verification", desc: "Mileage consistency and rollback detection",
       status: listing.mileage != null ? "verified" : "pending", source: "Vehicle history / DMS",
-      lines: [listing.mileage != null ? `Reported mileage: ${listing.mileage.toLocaleString()} mi` : "Mileage: not available", "Rollback detection: no anomalies flagged"] },
+      lines: [listing.mileage != null ? `Reported mileage: ${listing.mileage.toLocaleString()} mi` : "Mileage: not available", "Confirm mileage history with the dealer's history report"] },
     { key: "market", icon: DollarSign, title: "Market Data Verification", desc: "Pricing, comparables, and market positioning",
       status: d.marketAvg != null ? "verified" : "pending", source: "MarketCheck",
       lines: [d.marketAvg != null ? `Market average ${fmt$(d.marketAvg)}` : "Market pricing pending", d.belowMarket && d.belowMarket > 0 ? `${fmt$(d.belowMarket)} below market` : "Market position checked", "Comparable listings reviewed"] },
@@ -141,7 +141,9 @@ const VehiclePassportVerification = () => {
     <div className="min-h-screen flex items-center justify-center px-6 bg-[#F6F7F9]"><div className="text-center"><ShieldCheck className="w-12 h-12 text-slate-300 mx-auto mb-4" /><h1 className="text-xl font-bold">Report unavailable</h1><p className="text-sm text-slate-500 mt-2">This vehicle's verification report could not be found.</p></div></div>
   );
 
-  const score = d.confScore ?? 90;
+  // Never invent a score: when there aren't enough verified signals to compute
+  // one, the report says Pending instead of fabricating a 90.
+  const score = d.confScore;
   const back = () => navigate(`/v/${listing.slug || vehicleSlug}${isPreview ? "?preview=1" : ""}`);
   const go = (section: string) => navigate(`/v/${listing.slug || vehicleSlug}/${section}${isPreview ? "?preview=1" : ""}`);
   const sourcesUsed = [
@@ -163,8 +165,10 @@ const VehiclePassportVerification = () => {
     { icon: Database, cls: "text-[#2563EB]", label: "Data sources", value: `${liveSources.length}` },
     { icon: Clock, cls: "text-[#64748B]", label: "Last updated", value: "Today" },
   ];
-  const tier = score >= 90 ? "Excellent" : score >= 75 ? "Very Good" : score >= 60 ? "Good" : "Fair";
+  const tier = score == null ? "Pending" : score >= 90 ? "Excellent" : score >= 75 ? "Very Good" : score >= 60 ? "Good" : "Fair";
   const isToday = reportTime.toDateString() === new Date().toDateString();
+  // Real report date everywhere — never a hardcoded "today".
+  const reportDateLbl = isToday ? "today" : reportTime.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
   const mStatus = (s: Status) =>
     s === "verified" ? { label: "Verified", cls: "text-[#16A34A]" }
     : s === "attention" ? { label: "Needs Review", cls: "text-[#D97706]" }
@@ -185,9 +189,9 @@ const VehiclePassportVerification = () => {
             <div className="relative w-[200px] h-[200px] mx-auto mt-5">
               <svg viewBox="0 0 160 160" className="w-full h-full -rotate-90">
                 <circle cx="80" cy="80" r="70" fill="none" stroke="#E6E8EC" strokeWidth="12" />
-                <circle cx="80" cy="80" r="70" fill="none" stroke="#16A34A" strokeWidth="12" strokeLinecap="round" strokeDasharray={2 * Math.PI * 70} strokeDashoffset={ringFill ? (2 * Math.PI * 70) * (1 - score / 100) : 2 * Math.PI * 70} style={{ transition: "stroke-dashoffset 1s ease-out" }} />
+                <circle cx="80" cy="80" r="70" fill="none" stroke="#16A34A" strokeWidth="12" strokeLinecap="round" strokeDasharray={2 * Math.PI * 70} strokeDashoffset={ringFill ? (2 * Math.PI * 70) * (1 - (score ?? 0) / 100) : 2 * Math.PI * 70} style={{ transition: "stroke-dashoffset 1s ease-out" }} />
               </svg>
-              <div className="absolute inset-0 flex flex-col items-center justify-center"><span className="text-[56px] font-extrabold leading-none text-[#0F172A]">{score}</span><span className="text-[13px] font-bold text-[#94A3B8] mt-1">Trust Score</span></div>
+              <div className="absolute inset-0 flex flex-col items-center justify-center"><span className="text-[56px] font-extrabold leading-none text-[#0F172A]">{score ?? "—"}</span><span className="text-[13px] font-bold text-[#94A3B8] mt-1">{score != null ? "Trust Score" : "Score Pending"}</span></div>
             </div>
             <span className="inline-flex items-center gap-1.5 mt-4 px-4 py-1.5 rounded-full bg-emerald-50 text-[#16A34A] text-[14px] font-bold"><CheckCircle2 className="w-[18px] h-[18px]" /> {tier}</span>
           </div>
@@ -227,7 +231,7 @@ const VehiclePassportVerification = () => {
                     <div className="px-4 pb-4">
                       <ul className="space-y-2">{r.lines.map((l, i) => <li key={i} className="flex items-start gap-2 text-[13px] text-[#475569]"><CheckCircle2 className="w-4 h-4 text-[#16A34A] shrink-0 mt-0.5" />{l}</li>)}</ul>
                       {r.note && <div className="mt-3 rounded-xl bg-amber-50 border border-amber-100 p-3 text-[12px] text-[#92400E] flex items-start gap-2"><AlertTriangle className="w-4 h-4 shrink-0 mt-0.5 text-[#D97706]" />{r.note}</div>}
-                      <p className="text-[11px] text-[#94A3B8] mt-2.5">Source: {r.source} · Updated today</p>
+                      <p className="text-[11px] text-[#94A3B8] mt-2.5">Source: {r.source} · Updated {reportDateLbl}</p>
                     </div>
                   )}
                 </div>
@@ -244,7 +248,7 @@ const VehiclePassportVerification = () => {
               "OEM VIN validation",
               "Recall database checked",
               "Market pricing verified",
-              "Updated today",
+              `Updated ${reportDateLbl}`,
             ].map((t) => <li key={t} className="flex items-start gap-2.5 text-[14px] text-[#0F172A]"><CheckCircle2 className="w-[18px] h-[18px] text-[#16A34A] shrink-0 mt-0.5" />{t}</li>)}</ul>
           </div>
         </div>
@@ -325,7 +329,7 @@ const VehiclePassportVerification = () => {
                 <div className="flex flex-col lg:flex-row lg:items-center gap-6">
                   <ScoreRing score={score} />
                   <div className="flex-1 min-w-0">
-                    <h2 className="text-[20px] font-bold">{score >= 90 ? "Excellent. This vehicle is verified." : score >= 75 ? "Verified with a few items to review." : "Verification in progress."}</h2>
+                    <h2 className="text-[20px] font-bold">{score != null && score >= 90 ? "Excellent. This vehicle is verified." : score != null && score >= 75 ? "Verified with a few items to review." : "Verification in progress."}</h2>
                     <p className="text-[14px] text-[#64748B] mt-1">Our comprehensive verification process confirms this vehicle's information is accurate and trustworthy.</p>
                     <div className="flex flex-wrap gap-x-8 gap-y-2 mt-4">
                       {[{ icon: CheckCircle2, cls: "text-[#16A34A]", v: counts.verified, l: "Verified" }, { icon: AlertTriangle, cls: "text-[#F59E0B]", v: counts.attention, l: "Attention" }, { icon: MinusCircle, cls: "text-[#94A3B8]", v: counts.issue, l: "Issues Found" }].map((m, i) => (
@@ -346,7 +350,7 @@ const VehiclePassportVerification = () => {
               {/* Verification details */}
               <div className={`${CARD} p-6`}>
                 <div className="flex items-start justify-between gap-4">
-                  <div><h2 className="text-[18px] font-bold">Verification Details</h2><p className="text-[13px] text-[#64748B] mt-0.5">Detailed results from our 150+ point verification process.</p></div>
+                  <div><h2 className="text-[18px] font-bold">Verification Details</h2><p className="text-[13px] text-[#64748B] mt-0.5">Detailed results from our multi-source verification process.</p></div>
                   <button onClick={() => setModal("process")} className="text-[13px] font-semibold text-[#2563EB] hover:underline shrink-0 hidden sm:inline">Learn about our verification process →</button>
                 </div>
                 <div className="mt-4 divide-y divide-[#EEF1F4]">
@@ -363,7 +367,7 @@ const VehiclePassportVerification = () => {
                         {open[r.key] && (
                           <div className="pb-4 pl-12 pr-2">
                             <ul className="space-y-1.5">{r.lines.map((l, i) => <li key={i} className="flex items-start gap-2 text-[13px] text-[#475569]"><CheckCircle2 className="w-3.5 h-3.5 text-[#16A34A] shrink-0 mt-0.5" />{l}</li>)}</ul>
-                            <div className="flex flex-wrap gap-x-6 gap-y-1 mt-2.5 text-[11px] text-[#94A3B8]"><span>Source: {r.source}</span><span>Last checked: Today</span><span>Confidence: {r.status === "verified" ? "High" : r.status === "attention" ? "Review" : "Pending"}</span></div>
+                            <div className="flex flex-wrap gap-x-6 gap-y-1 mt-2.5 text-[11px] text-[#94A3B8]"><span>Source: {r.source}</span><span>Last checked: {reportDateLbl}</span><span>Confidence: {r.status === "verified" ? "High" : r.status === "attention" ? "Review" : "Pending"}</span></div>
                             {r.note && <p className="text-[12px] text-[#F59E0B] mt-2 inline-flex items-center gap-1.5"><AlertTriangle className="w-3.5 h-3.5" /> {r.note}</p>}
                           </div>
                         )}
@@ -376,7 +380,7 @@ const VehiclePassportVerification = () => {
               {/* Promise banner */}
               <div id="v-summary" className="rounded-2xl border border-emerald-200 bg-emerald-50/60 p-6 flex flex-col sm:flex-row sm:items-center gap-4">
                 <span className="w-11 h-11 rounded-xl bg-emerald-100 flex items-center justify-center shrink-0"><ShieldCheck className="w-6 h-6 text-[#16A34A]" /></span>
-                <div className="flex-1"><p className="text-[16px] font-bold text-[#0F172A]">Every vehicle. Every time. Every detail.</p><p className="text-[13px] text-[#64748B] mt-0.5">AutoLabels verifies every vehicle using industry-leading data sources and our proprietary 150+ point inspection process.</p></div>
+                <div className="flex-1"><p className="text-[16px] font-bold text-[#0F172A]">Every vehicle. Every time. Every detail.</p><p className="text-[13px] text-[#64748B] mt-0.5">AutoLabels checks every vehicle against independent data sources — VIN decode, NHTSA recalls, market pricing, title and history records.</p></div>
                 <button onClick={() => setModal("promise")} className="h-10 px-4 rounded-xl bg-[#16A34A] hover:bg-[#15803d] text-white text-[13px] font-bold shrink-0">Our Verification Promise</button>
               </div>
             </div>

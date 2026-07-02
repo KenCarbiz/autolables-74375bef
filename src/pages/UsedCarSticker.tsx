@@ -151,9 +151,9 @@ const UsedCarSticker = () => {
   // it resolves to the live page; before publish it shows the not-yet-available
   // state (drafts are intentionally not exposed to shoppers).
   const signingUrl = publishedSlug
-    ? publicUrl(publishedSlug)
+    ? `${publicUrl(publishedSlug)}?src=qr`
     : vehicle.vin
-      ? `${window.location.origin}/v/${vehicle.vin.toUpperCase()}`
+      ? `${window.location.origin}/v/${vehicle.vin.toUpperCase()}?src=qr`
       : "";
 
   // Per-dealer used-car print template. In pre-printed mode the dealer's

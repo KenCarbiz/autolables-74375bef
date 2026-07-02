@@ -18,6 +18,7 @@ import { resolveStickyButtons, type StickyBottomButtons } from "@/lib/stickyButt
 import PriceDropWatch from "@/components/listing/PriceDropWatch";
 import { listingGallery } from "@/lib/photos";
 import { usePassportEngagement } from "@/lib/passportEngagement";
+import { isVehicleSaved, toggleSavedVehicle } from "@/lib/savedVehicles";
 import { packetVisible } from "@/lib/packetModules";
 import PassportPanel, { type PassportPanelKey } from "@/components/passport/PassportPanel";
 import PassportCtaDock from "@/components/passport/PassportCtaDock";
@@ -171,7 +172,16 @@ const VehiclePassportV3 = () => {
   }, []);
 
   const isPreview = typeof window !== "undefined" && new URLSearchParams(window.location.search).has("preview");
+  // QR attribution: window-sticker QRs land with ?src=qr. Persist for the whole
+  // session so leads are stamped qr_scan even after in-app navigation.
+  useEffect(() => {
+    try {
+      const src = new URLSearchParams(window.location.search).get("src");
+      if (src) sessionStorage.setItem("al_visit_src", src);
+    } catch { /* storage unavailable */ }
+  }, []);
   const { listing, loading, notFound } = usePublicListing(vehicleSlug, { preview: isPreview, previewData: MOCK_LISTING as unknown as VehicleListing });
+  const [savedState, setSavedState] = useState<boolean | null>(null);
 
   const d = useMemo(() => (listing ? derivePassport(listing) : null), [listing]);
   const gallery = useMemo(() => (listing ? listingGallery(listing) : ([] as string[])), [listing]);
@@ -185,6 +195,13 @@ const VehiclePassportV3 = () => {
 
   const go = (section: string) => navigate(`/v/${listing.slug || vehicleSlug}/${section}${isPreview ? "?preview=1" : ""}`);
   const viewUrl = publicUrl(listing.slug);
+  // Real save: persists an on-device shortlist (no more no-op toast).
+  const isSaved = savedState ?? isVehicleSaved(listing.slug);
+  const handleSave = () => {
+    const nowSaved = toggleSavedVehicle({ slug: listing.slug, ymm: listing.ymm, trim: listing.trim, price: listing.price, image: hero || listing.hero_image_url || null });
+    setSavedState(nowSaved);
+    toast.success(nowSaved ? "Saved to your list on this device" : "Removed from your saved list");
+  };
   const handleShare = async () => { try { if (navigator.share) { await navigator.share({ title: listing.ymm || "Vehicle", url: viewUrl }); return; } } catch { return; } go("share"); };
   const hero = gallery[idx] || gallery[0] || "";
   const photoCount = gallery.length;
@@ -216,7 +233,13 @@ const VehiclePassportV3 = () => {
   const sticky = resolveStickyButtons((listing as unknown as { sticky_bottom_buttons?: StickyBottomButtons }).sticky_bottom_buttons);
   const stickyAction = (key: string): { icon: React.ElementType; onClick: () => void } => {
     const call = () => { if (d.dealerPhone) window.location.href = `tel:${d.dealerPhone}`; else go("contact"); };
-    const text = () => { if (d.dealerPhone) window.location.href = `sms:${d.dealerPhone.replace(/[^\d+]/g, "")}`; else go("text"); };
+    // Prefilled body: the shopper skips composing and the BDC knows the vehicle.
+    const text = () => {
+      if (d.dealerPhone) {
+        const body = encodeURIComponent(`Hi, I'm interested in the ${listing.ymm || "vehicle"}${listing.vin ? ` (VIN ...${listing.vin.slice(-8)})` : ""} — is it available?`);
+        window.location.href = `sms:${d.dealerPhone.replace(/[^\d+]/g, "")}?&body=${body}`;
+      } else go("text");
+    };
     const directions = () => window.open(`https://maps.google.com/?q=${encodeURIComponent(d.dealerAddress || d.dealerName)}`, "_blank", "noopener");
     const map: Record<string, { icon: React.ElementType; onClick: () => void }> = {
       call: { icon: Phone, onClick: call },
@@ -234,7 +257,7 @@ const VehiclePassportV3 = () => {
       payment_options: { icon: DollarSign, onClick: () => go("todays-price") },
       calculate_payment: { icon: DollarSign, onClick: () => go("todays-price") },
       send_to_phone: { icon: Send, onClick: handleShare },
-      save_vehicle: { icon: Bookmark, onClick: () => toast.success("Saved to this device") },
+      save_vehicle: { icon: Bookmark, onClick: handleSave },
       share_vehicle: { icon: Upload, onClick: handleShare },
       directions: { icon: MapPin, onClick: directions },
       chat: { icon: MessageSquare, onClick: () => go("contact") },
@@ -347,7 +370,7 @@ const VehiclePassportV3 = () => {
           {listing.dealer_snapshot?.logo_url ? <img src={listing.dealer_snapshot.logo_url as string} alt="" className="h-7" /> : <Logo variant="full" size={22} />}
           <div className="flex items-center gap-3 sm:gap-5">
             <button onClick={handleShare} className={`text-sm font-medium inline-flex items-center gap-1.5 ${TEXT2} hover:text-[#0F172A]`}><Upload className="w-4 h-4" /> <span className="hidden sm:inline">Share</span></button>
-            <button onClick={() => toast.success("Saved to this device")} className={`hidden sm:inline-flex text-sm font-medium items-center gap-1.5 ${TEXT2} hover:text-[#0F172A]`}><Bookmark className="w-4 h-4" /> Save</button>
+            <button onClick={handleSave} className={`hidden sm:inline-flex text-sm font-medium items-center gap-1.5 ${isSaved ? "text-[#2563EB]" : TEXT2} hover:text-[#0F172A]`}><Bookmark className="w-4 h-4" fill={isSaved ? "currentColor" : "none"} /> {isSaved ? "Saved" : "Save"}</button>
             <button onClick={() => window.print()} className={`hidden sm:inline-flex text-sm font-medium items-center gap-1.5 ${TEXT2} hover:text-[#0F172A]`}><Printer className="w-4 h-4" /> Print</button>
             <button onClick={() => go("todays-price")} className="h-11 px-3.5 sm:px-5 rounded-xl bg-[#2563EB] hover:bg-[#1d4fd7] text-white text-sm font-semibold inline-flex items-center gap-2"><DollarSign className="w-4 h-4" /> <span className="hidden sm:inline">See My Price</span><span className="sm:hidden">Price</span></button>
           </div>
@@ -381,7 +404,7 @@ const VehiclePassportV3 = () => {
                 <div className="min-w-0">
                   <div className="flex items-center gap-2 mb-1.5">
                     <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-lg bg-blue-100 text-blue-700">{listing.condition || "vehicle"}</span>
-                    <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-lg ${listing.status === "published" ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"}`}>{listing.status}</span>
+                    {listing.status !== "published" && <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-lg bg-amber-100 text-amber-700">Preview — not yet published</span>}
                   </div>
                   <h1 className="text-[32px] font-bold leading-10 tracking-tight">{listing.ymm}</h1>
                   {listing.trim && <div className="text-[18px] font-semibold text-[#64748B]">{listing.trim}</div>}
@@ -438,7 +461,7 @@ const VehiclePassportV3 = () => {
                 <p className="text-[13px] font-semibold mb-2">Get your best offer in minutes</p>
                 <div className="flex gap-2">
                   <input value={zip} onChange={(e) => setZip(e.target.value.replace(/\D/g, "").slice(0, 5))} placeholder="Enter your ZIP code" inputMode="numeric" className="flex-1 min-w-0 h-11 px-3 rounded-xl border border-[#E6E8EC] text-sm outline-none focus:border-[#2563EB]" />
-                  <button onClick={() => /^\d{5}$/.test(zip) ? go(`offers?zip=${zip}`) : toast.error("Enter a valid ZIP")} className="h-11 px-4 rounded-xl bg-[#2563EB] hover:bg-[#1d4fd7] text-white text-sm font-semibold shrink-0">View Offers</button>
+                  <button onClick={() => { if (!/^\d{5}$/.test(zip)) { toast.error("Enter a valid ZIP"); return; } try { sessionStorage.setItem("al_zip", zip); } catch { /* ignore */ } go("todays-price"); }} className="h-11 px-4 rounded-xl bg-[#2563EB] hover:bg-[#1d4fd7] text-white text-sm font-semibold shrink-0">View Offers</button>
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-3">
@@ -734,8 +757,8 @@ const VehiclePassportV3 = () => {
             <Logo variant="full" size={20} />
             <div className="flex gap-6 text-[12px] text-[#64748B]">
               <span className="inline-flex items-center gap-1.5"><Lock className="w-3.5 h-3.5 text-[#16A34A]" /> Secure &amp; Private</span>
-              <span className="inline-flex items-center gap-1.5"><DollarSign className="w-3.5 h-3.5 text-[#16A34A]" /> 100% Free</span>
-              <span className="inline-flex items-center gap-1.5"><Zap className="w-3.5 h-3.5 text-[#16A34A]" /> Instant Access</span>
+              <span className="inline-flex items-center gap-1.5"><ShieldCheck className="w-3.5 h-3.5 text-[#16A34A]" /> VIN-Verified Data</span>
+              <span className="inline-flex items-center gap-1.5"><FileText className="w-3.5 h-3.5 text-[#16A34A]" /> Dealer-Provided Documents</span>
             </div>
             <div className="hidden lg:flex items-center gap-2 text-[12px]">
               {sticky.enabled && sticky.items.map((it) => {

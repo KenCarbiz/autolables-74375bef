@@ -118,9 +118,9 @@ const NewCarSticker = () => {
   const totalSuggestedRetail = baseMsrp + destCharge + installedTotal + docFee;
 
   const signingUrl = publishedSlug
-    ? publicUrl(publishedSlug)
+    ? `${publicUrl(publishedSlug)}?src=qr`
     : vehicle.vin
-      ? `${window.location.origin}/v/${vehicle.vin.toUpperCase()}`
+      ? `${window.location.origin}/v/${vehicle.vin.toUpperCase()}?src=qr`
       : "";
 
   // Proper tracking code: AC-{STORE}-{VIN6}-NA-{TIMESTAMP}

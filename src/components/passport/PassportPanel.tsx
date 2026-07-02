@@ -210,7 +210,7 @@ function buildPanel(key: PassportPanelKey, d: PassportData, listing: VehicleList
             </div>
 
             <div className="grid grid-cols-2 gap-3">
-              {kpis.map((k) => (
+              {kpis.filter((k) => k.value !== "\u2014").map((k) => (
                 <div key={k.label} className={`${CARD} p-4`}>
                   <k.icon className="w-5 h-5 text-[#2563EB]" />
                   <p className="text-[20px] font-extrabold mt-1.5 leading-none">{k.value}</p>
@@ -221,7 +221,7 @@ function buildPanel(key: PassportPanelKey, d: PassportData, listing: VehicleList
 
             <Section title="Local market snapshot">
               <div className={`${CARD} divide-y divide-[#F1F5F9]`}>
-                {snapshot.map((s) => (
+                {snapshot.filter((s) => s.v !== "\u2014").map((s) => (
                   <div key={s.l} className="flex items-center justify-between px-4 py-3"><span className="text-[12px] text-[#64748B]">{s.l}</span><span className="text-[15px] font-extrabold">{s.v}</span></div>
                 ))}
               </div>
@@ -2051,8 +2051,14 @@ const ctaFor = (panelKey: string, s: CtaSignals): CtaDef => {
   switch (panelKey) {
     case "market-price": return { badge: s.greatPrice ? "Great Price Available Today" : "Vehicle Available Today", btn: s.greatPrice ? "Lock In This Price" : "Reserve This Vehicle", sub: s.greatPrice ? "This price is below market and ready to lock in." : "Secure this vehicle while it's still available.", action: "reserve", tone: s.greatPrice ? "green" : "blue" };
     case "market-demand": return { badge: s.highDemand ? "High Demand In Your Market" : "Vehicle Available Today", btn: s.highDemand ? "Claim This Vehicle" : "Reserve This Vehicle", sub: s.highDemand ? "High-demand vehicles go fast." : "Secure this vehicle while it's still available.", action: "reserve", tone: "green" };
-    case "comparable-vehicles": return { badge: "Don't Miss Out", btn: "Reserve This Vehicle", sub: "Similar vehicles in your area are selling fast.", action: "reserve", tone: "blue" };
-    case "inventory-trend": return { badge: "Inventory Is Tightening", btn: "Reserve Before Inventory Drops", sub: "Fewer similar vehicles are available in your area.", action: "reserve", tone: "orange" };
+    // Urgency copy only when the data supports it — a fabricated scarcity badge
+    // above an honest empty state poisons the page's verification premise.
+    case "comparable-vehicles": return s.highDemand
+      ? { badge: "In Demand", btn: "Reserve This Vehicle", sub: "This vehicle is drawing strong shopper interest.", action: "reserve", tone: "blue" }
+      : { badge: "Vehicle Available Today", btn: "Reserve This Vehicle", sub: "Secure this vehicle while it's still available.", action: "reserve", tone: "blue" };
+    case "inventory-trend": return s.highDemand
+      ? { badge: "Strong Local Interest", btn: "Reserve This Vehicle", sub: "Shopper activity on this vehicle is above average.", action: "reserve", tone: "orange" }
+      : { badge: "Vehicle Available Today", btn: "Reserve This Vehicle", sub: "Secure this vehicle while it's still available.", action: "reserve", tone: "blue" };
     case "price-confidence": return { badge: s.highConf ? "Verified Best Value" : "Independently Verified", btn: s.highConf ? "Reserve With Confidence" : "Reserve This Vehicle", sub: "This price has been independently verified.", action: "reserve", tone: "green" };
     case "factory-warranty": return { badge: s.hasWarranty ? "Warranty Coverage Available" : "Vehicle Available Today", btn: s.hasWarranty ? "Protect This Vehicle" : "Reserve This Vehicle", sub: s.hasWarranty ? "Secure remaining factory protection." : "Secure this vehicle while it's still available.", action: s.hasWarranty ? "protect" : "reserve", tone: "green" };
     case "owner-reviews": return { badge: s.highlyRated ? "Highly Rated By Owners" : "Trusted Dealer Reviews", btn: "Reserve This Vehicle", sub: "Owners love this vehicle.", action: "reserve", tone: "green" };
@@ -2064,8 +2070,10 @@ const TrustRow = ({ items }: { items: { icon: React.ElementType; t: string }[] }
     <div key={x.t} className="flex flex-col items-center gap-0.5 text-center flex-1"><x.icon className="w-3.5 h-3.5 text-[#94A3B8]" /><span className="text-[9px] text-[#94A3B8] leading-tight">{x.t}</span></div>
   ))}</div>
 );
-const TRUST_DEFAULT = [{ icon: ShieldCheck, t: "Refundable Deposit" }, { icon: CheckCircle2, t: "Instant Confirmation" }, { icon: BadgeCheck, t: "No Obligation Anytime" }];
-const TRUST_PROGRESSIVE = [{ icon: ShieldCheck, t: "Refundable Deposit" }, { icon: BadgeCheck, t: "Dealer Holds Vehicle" }, { icon: CheckCircle2, t: "Secure Checkout" }];
+// Honest promise set: reserving sends a request the dealer confirms — nothing
+// is charged or instantly locked, so the chips must not claim it is.
+const TRUST_DEFAULT = [{ icon: ShieldCheck, t: "No Payment Now" }, { icon: CheckCircle2, t: "Dealer Confirms Fast" }, { icon: BadgeCheck, t: "No Obligation" }];
+const TRUST_PROGRESSIVE = [{ icon: ShieldCheck, t: "No Payment Now" }, { icon: BadgeCheck, t: "Dealer Will Confirm" }, { icon: CheckCircle2, t: "No Obligation" }];
 
 function MobileCtaFooter({ variant, panelKey, go, signals }: { variant: string; panelKey: string; go: (s: string) => void; signals: CtaSignals }) {
   const cta = ctaFor(panelKey, signals);

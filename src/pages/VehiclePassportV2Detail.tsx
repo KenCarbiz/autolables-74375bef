@@ -48,10 +48,12 @@ const Unavailable = ({ what, hint }: { what: string; hint?: string }) => (
 );
 
 // ── Lead-capture form (shared by contact / trade / reserve / etc.) ──
+// extraNotes lets intent pages append structured context (test-drive time,
+// trade vehicle, ZIP) without new fields here.
 const LeadForm = ({
-  listing, intent, label, cta, onDone,
+  listing, intent, label, cta, onDone, extraNotes, dealerPhone,
 }: {
-  listing: VehicleListing; intent: string; label: string; cta: string; onDone?: () => void;
+  listing: VehicleListing; intent: string; label: string; cta: string; onDone?: () => void; extraNotes?: () => string; dealerPhone?: string | null;
 }) => {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -59,17 +61,32 @@ const LeadForm = ({
   const [message, setMessage] = useState("");
   const [sending, setSending] = useState(false);
   const [sent, setSent] = useState(false);
+  const navigate = useNavigate();
 
   const submit = async () => {
     if (!name.trim() || (!email.trim() && !phone.trim())) { toast.error("Name and a phone or email are required"); return; }
     setSending(true);
     try {
+      // Attribution: QR scans persist ?src=qr for the session; the leads table
+      // has a qr_scan source. On-lot leads must not be mislabeled "website".
+      let src = "website";
+      let zip = "";
+      try {
+        if (sessionStorage.getItem("al_visit_src") === "qr") src = "qr_scan";
+        zip = sessionStorage.getItem("al_zip") || "";
+      } catch { /* storage unavailable */ }
+      const extras = [extraNotes?.() || "", zip ? `ZIP ${zip}` : ""].filter(Boolean).join(" · ");
       await (supabase as unknown as { from: (t: string) => { insert: (r: unknown) => Promise<unknown> } }).from("leads").insert({
         store_id: listing.store_id, name: name.trim(), email: email.trim() || "", phone: phone.trim() || "",
         vehicle_interest: `${listing.ymm || "Vehicle"} (${label})`,
-        vehicle_vin: listing.vin, source: "website", status: "new",
-        notes: `[intent=${intent}] Passport V2 — ${label}${message.trim() ? `: ${message.trim()}` : ""}`,
+        vehicle_vin: listing.vin, source: src, status: "new",
+        notes: `[intent=${intent}] Passport V2 — ${label}${extras ? ` · ${extras}` : ""}${message.trim() ? `: ${message.trim()}` : ""}`,
       });
+      // Fire-and-forget dealer alert — a submitted lead should page someone
+      // faster than a page view does.
+      supabase.functions.invoke("lead-alert", {
+        body: { slug: listing.slug, vin: listing.vin, intent, name: name.trim(), phone: phone.trim() || null, email: email.trim() || null, source: src },
+      }).catch(() => { /* alert failure never blocks the shopper */ });
       setSent(true);
       onDone?.();
     } catch { toast.error("Couldn't send — please call the dealer directly"); }
@@ -81,6 +98,11 @@ const LeadForm = ({
       <CheckCircle2 className="w-14 h-14 text-emerald-500 mx-auto mb-3" />
       <h3 className="text-lg font-bold text-slate-900 mb-1">Request sent</h3>
       <p className="text-sm text-slate-500">A specialist from the dealership will follow up shortly.</p>
+      {/* The moment after a yes is the cheapest moment to get a second yes. */}
+      <div className="flex flex-col sm:flex-row gap-2 justify-center mt-5">
+        {dealerPhone && <a href={`tel:${dealerPhone.replace(/[^\d+]/g, "")}`} className="h-11 px-5 rounded-xl bg-[#2563EB] text-white text-sm font-bold inline-flex items-center justify-center gap-2"><Phone className="w-4 h-4" /> Call now instead</a>}
+        {intent !== "test_drive" && <button onClick={() => navigate(`/v/${listing.slug}/test-drive`)} className="h-11 px-5 rounded-xl border border-slate-200 text-sm font-bold text-slate-700 inline-flex items-center justify-center gap-2"><Car className="w-4 h-4" /> Schedule a test drive</button>}
+      </div>
     </Card>
   );
 
@@ -97,6 +119,33 @@ const LeadForm = ({
       </button>
       <p className="text-[11px] text-slate-400 text-center mt-3">By submitting, you agree to be contacted by the dealership about this vehicle.</p>
     </Card>
+  );
+};
+
+// Test-drive request with a concrete time commitment — a date + window is a
+// micro-contract that raises show rates versus "we'll call you."
+const TestDriveForm = ({ listing, dealerPhone }: { listing: VehicleListing; dealerPhone?: string | null }) => {
+  const [date, setDate] = useState("");
+  const [window_, setWindow] = useState("");
+  const WINDOWS = ["Morning", "Afternoon", "Evening"];
+  return (
+    <>
+      <Card className="p-5 mb-4">
+        <p className="text-[13px] font-bold text-slate-900 mb-2.5">When works for you?</p>
+        <input type="date" value={date} min={new Date().toISOString().slice(0, 10)} onChange={(e) => setDate(e.target.value)}
+          className="w-full border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+        <div className="flex gap-2 mt-3">
+          {WINDOWS.map((w) => (
+            <button key={w} onClick={() => setWindow(window_ === w ? "" : w)}
+              className={`flex-1 h-10 rounded-xl text-[13px] font-semibold border transition-colors ${window_ === w ? "border-[#2563EB] bg-blue-50 text-[#2563EB]" : "border-slate-200 text-slate-600 hover:border-slate-300"}`}>
+              {w}
+            </button>
+          ))}
+        </div>
+      </Card>
+      <LeadForm listing={listing} intent="test_drive" label="Test Drive" cta="Request test drive" dealerPhone={dealerPhone}
+        extraNotes={() => [date ? `Requested ${date}` : "", window_].filter(Boolean).join(" ")} />
+    </>
   );
 };
 
@@ -517,7 +566,7 @@ const SECTIONS: Record<string, { title: string; render: SectionRender }> = {
   },
   "offers": {
     title: "Available Offers",
-    render: ({ d }) => (
+    render: ({ d, listing }) => (
       <>
         <SectionHeading icon={Award} title="Available Offers" subtitle="Current incentives and programs." />
         {d.offers.length > 0 ? (
@@ -526,7 +575,14 @@ const SECTIONS: Record<string, { title: string; render: SectionRender }> = {
               <Card key={i} className="p-4"><p className="text-[15px] font-bold">{o.title}</p><p className="text-[13px] text-slate-600 mt-0.5">{o.body}</p>{o.exp && <p className="text-[12px] text-slate-400 mt-0.5">{o.exp}</p>}</Card>
             ))}
           </div>
-        ) : <Unavailable what="Offers" hint="The dealership can publish current incentives and programs to this vehicle. Contact them for today's best offer." />}
+        ) : (
+          <>
+            {/* No published offers ≠ dead end: the shopper who typed a ZIP gets
+                a form, not an apology. */}
+            <p className="text-[14px] text-slate-600 mb-4">The dealership will send you today's best offer on this vehicle directly.</p>
+            <LeadForm listing={listing} intent="offers" label="Best Offer Request" cta="Get today's best offer" dealerPhone={d.dealerPhone} />
+          </>
+        )}
       </>
     ),
   },
@@ -566,7 +622,7 @@ const SECTIONS: Record<string, { title: string; render: SectionRender }> = {
   },
   "test-drive": {
     title: "Schedule a Test Drive",
-    render: ({ listing }) => (<><SectionHeading icon={Calendar} title="Schedule a Test Drive" subtitle="Pick a time that works and we'll confirm." /><LeadForm listing={listing} intent="test_drive" label="Test Drive" cta="Request test drive" /></>),
+    render: ({ listing, d }) => (<><SectionHeading icon={Calendar} title="Schedule a Test Drive" subtitle="Pick a time that works and we'll confirm." /><TestDriveForm listing={listing} dealerPhone={d.dealerPhone} /></>),
   },
   "text": {
     title: "Text the Dealer",
@@ -576,7 +632,7 @@ const SECTIONS: Record<string, { title: string; render: SectionRender }> = {
         {d.dealerPhone && (
           <Card className="p-5 mb-4 text-center">
             <p className="text-[13px] text-slate-600 mb-3">Open your messages app to text the dealership directly.</p>
-            <a href={`sms:${d.dealerPhone.replace(/[^\d+]/g, "")}`} className="inline-flex items-center justify-center gap-2 h-12 px-6 rounded-xl bg-[#2563EB] text-white font-bold"><Send className="w-4 h-4" /> Text {formatPhone(d.dealerPhone)}</a>
+            <a href={`sms:${d.dealerPhone.replace(/[^\d+]/g, "")}?&body=${encodeURIComponent(`Hi, I'm interested in the ${listing.ymm || "vehicle"}${listing.vin ? ` (VIN ...${listing.vin.slice(-8)})` : ""} — is it available?`)}`} className="inline-flex items-center justify-center gap-2 h-12 px-6 rounded-xl bg-[#2563EB] text-white font-bold"><Send className="w-4 h-4" /> Text {formatPhone(d.dealerPhone)}</a>
           </Card>
         )}
         <LeadForm listing={listing} intent="text" label="Text Dealer" cta="Request a text" />

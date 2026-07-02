@@ -223,7 +223,7 @@ const VehiclePassportGreatBuy = () => {
       <main className="mx-auto max-w-[1100px] px-4 sm:px-5 py-6 space-y-5">
         <div>
           <h1 className="text-[28px] sm:text-[34px] font-bold tracking-tight leading-tight">Why This Is A Great Buy</h1>
-          <p className={`text-[14px] ${TEXT2} mt-1 max-w-[760px]`}>Our analysis weighs 150+ verification points and thousands of comparable vehicles to determine why the {listing.ymm}{listing.trim ? ` ${listing.trim}` : ""} stands out.</p>
+          <p className={`text-[14px] ${TEXT2} mt-1 max-w-[760px]`}>Our analysis weighs the verification checks and comparable listings on this report to show why the {listing.ymm}{listing.trim ? ` ${listing.trim}` : ""} stands out.</p>
         </div>
 
         {/* 1. Buying score hero */}

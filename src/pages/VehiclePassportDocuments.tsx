@@ -81,6 +81,11 @@ const VehiclePassportDocuments = () => {
 
   const d = useMemo(() => (listing ? derivePassport(listing) : null), [listing]);
   const allDocs = useMemo(() => ((listing?.documents as Doc[] | undefined) || []).filter((x) => x.name && x.url), [listing]);
+  // Real most-recent upload date — never a hardcoded timestamp.
+  const lastUpdated = useMemo(() => {
+    const ts = allDocs.map((x) => x.uploaded_at).filter((t): t is string => !!t).sort().pop();
+    return ts ? new Date(ts).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : null;
+  }, [allDocs]);
   const counts = useMemo(() => {
     const m: Record<string, number> = {};
     allDocs.forEach((x) => { const k = categoryOf(x); m[k] = (m[k] || 0) + 1; });
@@ -124,7 +129,7 @@ const VehiclePassportDocuments = () => {
       {doc.description && <p className="text-[11px] text-[#64748B] mt-0.5 leading-snug">{doc.description}</p>}
       {doc.uploaded_at && <p className="text-[11px] text-[#94A3B8] mt-1">{fmtDate(doc.uploaded_at)}</p>}
       <div className="flex items-center gap-2 mt-2">
-        <span className="inline-flex items-center gap-1 text-[10px] font-bold text-[#16A34A] bg-emerald-50 rounded px-1.5 py-0.5"><CheckCircle2 className="w-3 h-3" /> Dealer Verified</span>
+        <span className="inline-flex items-center gap-1 text-[10px] font-bold text-[#16A34A] bg-emerald-50 rounded px-1.5 py-0.5"><CheckCircle2 className="w-3 h-3" /> Dealer Provided</span>
         <span className="inline-flex items-center gap-1 text-[10px] font-bold text-[#EF4444] bg-red-50 rounded px-1.5 py-0.5">{fileType(doc.url)}</span>
       </div>
       <div className="flex items-center gap-1 mt-2.5 pt-2.5 border-t border-[#EEF1F4]">
@@ -187,11 +192,11 @@ const VehiclePassportDocuments = () => {
             <div>
               <h1 className="text-[26px] font-bold tracking-tight">Vehicle Documents</h1>
               <p className="text-[14px] text-[#64748B] mt-0.5">Everything provided by the dealership for this vehicle.</p>
-              <p className="text-[12px] text-[#94A3B8] mt-2 inline-flex items-center gap-1.5"><Clock className="w-3.5 h-3.5" /> Last updated: Today · 10:42 AM</p>
+              {lastUpdated && <p className="text-[12px] text-[#94A3B8] mt-2 inline-flex items-center gap-1.5"><Clock className="w-3.5 h-3.5" /> Last updated: {lastUpdated}</p>}
             </div>
             <div className="flex items-center gap-3">
               <span className="inline-flex items-center gap-1.5 text-[13px] font-semibold text-[#0F172A]"><span className="w-6 h-6 rounded-full bg-emerald-50 flex items-center justify-center"><CheckCircle2 className="w-3.5 h-3.5 text-[#16A34A]" /></span>{total} Documents Available</span>
-              <span className="inline-flex items-center gap-1.5 text-[13px] font-semibold text-[#16A34A] bg-emerald-50 rounded-full px-3 py-1.5"><ShieldCheck className="w-4 h-4" /> Dealer Verified</span>
+              <span className="inline-flex items-center gap-1.5 text-[13px] font-semibold text-[#16A34A] bg-emerald-50 rounded-full px-3 py-1.5"><ShieldCheck className="w-4 h-4" /> Dealer Provided</span>
             </div>
           </div>
 
