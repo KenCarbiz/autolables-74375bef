@@ -49,6 +49,7 @@ const Terms = lazy(() => import("./pages/Terms"));
 const Login = lazy(() => import("./pages/Login"));
 const Admin = lazy(() => import("./pages/Admin"));
 const AdminSmokeTest = lazy(() => import("./pages/AdminSmokeTest"));
+const AddendumIconLibrary = lazy(() => import("./pages/AddendumIconLibrary"));
 const AdminCertificationHistory = lazy(() => import("./pages/AdminCertificationHistory"));
 const PlatformAdmin = lazy(() => import("./pages/PlatformAdmin"));
 const Inventory = lazy(() => import("./pages/Inventory"));
@@ -242,6 +243,7 @@ const App = () => (
                         <Route path="/vehicle-file/:id" element={<VehicleFile />} />
                         <Route path="/admin" element={<Admin />} />
                         <Route path="/admin/smoke-test" element={<AdminSmokeTest />} />
+                        <Route path="/admin/design-system/addendum-icons" element={<AddendumIconLibrary />} />
                         <Route path="/admin/certification-history" element={<AdminCertificationHistory />} />
                         <Route path="/saved" element={<SavedAddendums />} />
                         <Route path="/signed" element={<SavedAddendums stage="signed" />} />
