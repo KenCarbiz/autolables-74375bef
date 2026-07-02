@@ -58,7 +58,7 @@ const AddendumHeader = ({ inkSaving }: AddendumHeaderProps) => {
             Dealer Addendum
           </p>
           <p className="text-[8px] tracking-[0.18em] uppercase mt-1 opacity-80">
-            Form AL-100 · Supplement to Monroney Label
+            Supplement to Monroney Label
           </p>
         </div>
       </div>

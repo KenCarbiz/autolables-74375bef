@@ -36,6 +36,8 @@ import {
   type ComplianceFinding,
 } from "./stateCompliance";
 
+import { getDocFeeForState } from "@/data/docFees";
+
 export interface RedTeamDraft extends ComplianceDraft {
   customerName?: string;
   buyersGuideAttached?: boolean;
@@ -245,6 +247,21 @@ export const runComplianceRedTeam = (draft: RedTeamDraft): ComplianceFinding[] =
   }
 
   // ─── Doc fee sanity ──────────────────────────────────────────
+  // Over-cap is a hard FAIL, not a note: printing a $499 fee in an $85-cap
+  // state is a statutory violation, not a style choice.
+  if (typeof draft.docFeeAmount === "number" && draft.docFeeAmount > 0 && draft.state) {
+    const cfg = getDocFeeForState(draft.state);
+    if (cfg?.maxFee != null && draft.docFeeAmount > cfg.maxFee) {
+      findings.push({
+        id: "doc-fee-over-cap",
+        severity: "fail",
+        rule: "Doc fee exceeds state cap",
+        message: `The ${cfg.terminology.toLowerCase()} ($${draft.docFeeAmount.toLocaleString()}) exceeds the ${draft.state} statutory cap of $${cfg.maxFee.toLocaleString()}.`,
+        citation: cfg.notes || `${draft.state} doc fee cap.`,
+        suggestion: `Reduce the fee to $${cfg.maxFee.toLocaleString()} or below before printing or signing.`,
+      });
+    }
+  }
   if (typeof draft.docFeeAmount === "number" && draft.docFeeAmount <= 0) {
     findings.push({
       id: "doc-fee-zero",

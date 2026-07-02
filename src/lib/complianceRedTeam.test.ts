@@ -243,6 +243,25 @@ describe("pre-installed products require a verified install proof", () => {
   });
 });
 
+describe("doc fee over state cap", () => {
+  it("hard-FAILS a fee above the state's statutory cap", () => {
+    const findings = runComplianceRedTeam({ ...baseDraft, state: "CA", docFeeAmount: 499 });
+    const f = findings.find((x) => x.id === "doc-fee-over-cap");
+    expect(f?.severity).toBe("fail");
+    expect(f?.message).toMatch(/\$85/);
+  });
+
+  it("is silent at exactly the cap", () => {
+    const findings = runComplianceRedTeam({ ...baseDraft, state: "CA", docFeeAmount: 85 });
+    expect(findings.find((x) => x.id === "doc-fee-over-cap")).toBeUndefined();
+  });
+
+  it("is silent in a no-cap state", () => {
+    const findings = runComplianceRedTeam({ ...baseDraft, state: "CT", docFeeAmount: 999 });
+    expect(findings.find((x) => x.id === "doc-fee-over-cap")).toBeUndefined();
+  });
+});
+
 describe("summarizeRedTeam blocker flag", () => {
   it("sets blocker=true when any fail is present", () => {
     const findings = runComplianceRedTeam({

@@ -189,6 +189,7 @@ const UsedCarSticker = () => {
   };
 
   const handlePrint = () => {
+    if (stopSale) { toast.error("Do-not-drive recall open. The sticker cannot be printed until the recall is remedied."); return; }
     if (!confirmPrintReady(settings, currentStore?.name, (blockers) => {
       blockers.forEach((b) => toast.error(b.message));
     })) return;
@@ -297,6 +298,15 @@ const UsedCarSticker = () => {
         templateId: "used-car-sticker",
         docType: "window",
         qrUrl: url,
+        // Frozen print-state so stale detection can flag this sticker when
+        // the live record's price/mileage/identity later drift from it.
+        snapshot: {
+          data: {
+            vin: vehicle.vin, stock: vehicle.stock,
+            vehicleTitle: `${vehicle.year} ${vehicle.make} ${vehicle.model}`.trim(),
+            price: String(totalPrice), mileage: vehicle.mileage,
+          },
+        },
       });
       if (saveResult.ok && saveResult.documentId) {
         await markDocumentPublished(saveResult.documentId, url);

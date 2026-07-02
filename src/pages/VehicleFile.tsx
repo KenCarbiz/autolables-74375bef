@@ -1628,6 +1628,7 @@ const AddendumPanel = ({ vehicle }: { vehicle: VehicleRow }) => {
   // re-keys VIN / year-make-model / mileage that we already have on file.
   const startAddendum = () => {
     const params = new URLSearchParams();
+    params.set("vehicleId", vehicle.id);
     if (vehicle.vin) params.set("vin", vehicle.vin);
     if (vehicle.ymm) params.set("ymm", vehicle.ymm);
     if (vehicle.trim) params.set("trim", vehicle.trim);

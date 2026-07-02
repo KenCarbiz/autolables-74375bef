@@ -719,11 +719,12 @@ const Index = () => {
   const prefilledRef = useRef(false);
   useEffect(() => {
     if (viewId || prefilledRef.current) return;
+    const vehicleId = searchParams.get("vehicleId") || "";
     const vin = searchParams.get("vin") || "";
     const ymmParam = searchParams.get("ymm") || "";
     const trim = searchParams.get("trim") || "";
     const mileage = searchParams.get("mileage") || "";
-    if (!vin && !ymmParam && !mileage) return;
+    if (!vin && !ymmParam && !mileage && !vehicleId) return;
     prefilledRef.current = true;
     const ymmFull = [ymmParam, trim].filter(Boolean).join(" ").trim();
     setVehicle((v) => ({ ...v, vin: vin || v.vin, ymm: ymmFull || v.ymm }));
@@ -740,6 +741,45 @@ const Index = () => {
       }));
     }
     if (mileage) setVehicleDetails((d) => ({ ...d, mileage }));
+
+    // Inventory-record wiring: the addendum is self-aware when opened from a
+    // vehicle file. Loads the vehicle_listings row (by id, else VIN) and seeds
+    // stock, advertised price, condition, and body class — condition drives
+    // the state compliance gates and body class drives product tier pricing.
+    // Manual entry still wins: only empty fields are filled.
+    if (vehicleId || vin) {
+      (async () => {
+        try {
+          let q = supabase
+            .from("vehicle_listings")
+            .select("id, vin, ymm, trim, stock_number, mileage, price, condition, mc_attributes")
+            .limit(1);
+          q = vehicleId ? q.eq("id", vehicleId) : q.eq("vin", vin.toUpperCase());
+          const { data } = await q;
+          const row = (data as Array<Record<string, unknown>> | null)?.[0];
+          if (!row) return;
+          const mc = (row.mc_attributes || {}) as Record<string, unknown>;
+          const stock = String(row.stock_number || mc.stock_no || "");
+          setVehicle((v) => ({
+            ...v,
+            vin: v.vin || String(row.vin || ""),
+            ymm: v.ymm || [row.ymm, row.trim].filter(Boolean).join(" "),
+            stock: v.stock || stock,
+          }));
+          setVehicleDetails((d) => ({
+            ...d,
+            mileage: d.mileage || (row.mileage != null ? String(row.mileage) : ""),
+            price: d.price || (row.price != null ? String(row.price) : ""),
+            condition: d.condition || String(row.condition || ""),
+          }));
+          setVehicleContext((c) => ({
+            ...c,
+            bodyStyle: c.bodyStyle || String(mc.body_type || mc.body || ""),
+            trim: c.trim || String(row.trim || ""),
+          }));
+        } catch { /* record fetch is best-effort; manual entry continues */ }
+      })();
+    }
   }, [viewId, searchParams]);
 
   const handlePrint = () => {
@@ -833,7 +873,7 @@ const Index = () => {
         pdf.line(0.3, 10.62, pdfWidth - 0.3, 10.62);
         pdf.setFontSize(6.5);
         pdf.setTextColor(110, 110, 110);
-        const label = `FORM AL-100${footerStore ? ` · ${footerStore}` : ""}${vehicle.vin ? ` · VIN ${vehicle.vin}` : ""} · PAGE ${p} OF ${pageTotal}`;
+        const label = `DEALER ADDENDUM${footerStore ? ` · ${footerStore}` : ""}${vehicle.vin ? ` · VIN ${vehicle.vin}` : ""} · PAGE ${p} OF ${pageTotal}`;
         pdf.text(label, pdfWidth / 2, 10.74, { align: "center" });
       }
 

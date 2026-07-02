@@ -3,6 +3,7 @@ import { useDealerSettings } from "@/contexts/DealerSettingsContext";
 import { useTenant } from "@/contexts/TenantContext";
 import { useVinDecode } from "@/hooks/useVinDecode";
 import { useVehiclePrefill, VehicleContextHeader } from "@/lib/vehiclePrefill";
+import { confirmPrintReady } from "@/lib/printReadiness";
 import { toast } from "sonner";
 import { QRCodeSVG } from "qrcode.react";
 import { Printer, Download, ShieldCheck, CheckCircle2, Award } from "lucide-react";
@@ -19,21 +20,41 @@ const CpoSheet = () => {
     vin: "", year: "", make: "", model: "", trim: "", stock: "", mileage: "",
     color: "", engine: "", transmission: "", drivetrain: "",
   });
+  // CPO claims start EMPTY and fill from the dealer's configured programs —
+  // a certification sheet must never print sample warranty terms or
+  // inspection counts the dealer didn't verify.
   const [cpoProgram, setCpoProgram] = useState("");
-  const [cpoWarranty, setCpoWarranty] = useState("Powertrain: 7 years / 100,000 miles from original in-service date");
-  const [inspectionPoints, setInspectionPoints] = useState("150+");
+  const [cpoWarranty, setCpoWarranty] = useState("");
+  const [inspectionPoints, setInspectionPoints] = useState("");
   const [reconditioning, setReconditioning] = useState("");
-  const [benefits, setBenefits] = useState<string[]>([
-    "Multi-point inspection completed",
-    "Manufacturer-backed warranty",
-    "Vehicle history report included",
-    "Roadside assistance",
-    "Exchange/return privilege",
-  ]);
+  const [benefits, setBenefits] = useState<string[]>([]);
   const [carfaxUrl, setCarfaxUrl] = useState("");
 
+  // Seed program claims from the tenant's configured CPO programs (Admin →
+  // Factory Warranty). Brand-matched OEM program wins, then a dealer-kind
+  // program; only empty fields are filled so manual edits stick.
+  const seedFromPrograms = (make: string) => {
+    const programs = (settings.cpo_programs || []).filter((p) => p.enabled);
+    const mk = make.trim().toUpperCase();
+    const match = programs.find((p) => p.kind === "oem" && (p.brand || "").trim().toUpperCase() === mk)
+      || programs.find((p) => p.kind === "dealer");
+    if (!match) return;
+    setCpoProgram((prev) => prev || match.name);
+    const term = (mo?: number, mi?: number) => {
+      if (!mo) return "";
+      const yrs = mo % 12 === 0 ? `${mo / 12} years` : `${mo} months`;
+      const from = match.coverage_from === "purchase" ? "from CPO purchase date" : "from original in-service date";
+      return mi && mi > 0 ? `${yrs} / ${mi.toLocaleString()} miles ${from}` : `${yrs} ${from}`;
+    };
+    const pt = term(match.powertrain_months, match.powertrain_miles);
+    const basic = term(match.basic_months, match.basic_miles);
+    setCpoWarranty((prev) => prev || [pt && `Powertrain: ${pt}`, basic && `Comprehensive: ${basic}`].filter(Boolean).join(" · "));
+    const pts = (match as unknown as { inspection_points?: string | number }).inspection_points;
+    if (pts) setInspectionPoints((prev) => prev || String(pts));
+  };
+
   // Prefill from a vehicle file (?vehicleId=…). Seeds the form once and
-  // defaults the CPO program from the make so the dealer never re-keys it.
+  // resolves the CPO program from the dealer's configured programs.
   const prefill = useVehiclePrefill((v) => {
     setVehicle((prev) => ({
       ...prev,
@@ -49,7 +70,7 @@ const CpoSheet = () => {
       transmission: v.transmission || prev.transmission,
       drivetrain: v.drivetrain || prev.drivetrain,
     }));
-    if (v.make) setCpoProgram((prev) => prev || `${v.make} Certified Pre-Owned`);
+    if (v.make) seedFromPrograms(v.make);
   });
 
   const dealerName = currentStore?.name || settings.dealer_name || "Your Dealership";
@@ -60,12 +81,15 @@ const CpoSheet = () => {
     const result = await decode(vehicle.vin);
     if (result) {
       setVehicle(prev => ({ ...prev, year: result.year, make: result.make, model: result.model, trim: result.trim, engine: result.engineDescription, drivetrain: result.driveType }));
-      setCpoProgram(`${result.make} Certified Pre-Owned`);
+      seedFromPrograms(result.make);
       toast.success(`${result.year} ${result.make} ${result.model}`);
     }
   };
 
-  const handlePrint = () => window.print();
+  const handlePrint = () => {
+    if (!confirmPrintReady(settings, currentStore?.name, (blockers) => blockers.forEach((b) => toast.error(b.message)))) return;
+    window.print();
+  };
   const handlePdf = async () => {
     if (!cardRef.current) return;
     setGenerating(true);

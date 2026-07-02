@@ -25,6 +25,13 @@ export interface DocumentSnapshot {
   options: StickerRenderOptions;
 }
 
+// The sticker/addendum pages freeze only the identity fields stale detection
+// compares (detectStale reads data.{vin,stock,price,msrp,mileage,vehicleTitle});
+// Sticker Studio saves the full render state. Both shapes satisfy this input.
+export interface SnapshotInput extends Partial<Omit<DocumentSnapshot, "data">> {
+  data: Partial<StickerData>;
+}
+
 export interface SaveStickerArgs {
   tenantId?: string | null;
   vehicleId?: string | null;
@@ -35,7 +42,7 @@ export interface SaveStickerArgs {
   qrUrl?: string;
   pngDataUrl?: string;
   pdfDataUrl?: string;
-  snapshot?: DocumentSnapshot;
+  snapshot?: SnapshotInput;
 }
 
 export interface ApiResult {
