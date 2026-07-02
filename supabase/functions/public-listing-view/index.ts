@@ -350,6 +350,71 @@ serve(async (req) => {
       }
     } catch { /* recon optional — module shows a pending state */ }
 
+    // ── Same-rooftop alternatives ─────────────────────────────────────────
+    // The passport never merchandises other dealers' cars, so every "similar
+    // vehicles" module shows the tenant's OWN published stock, tiered:
+    //   1. same model — ANY condition (a new car's pre-owned twin, and vice
+    //      versa, is the strongest cross-shop we can offer);
+    //   2. same make;
+    //   3. competitive set — same body type or price band from the rest of the
+    //      lot, when nothing closer exists.
+    // Package data from each sibling's build_sheet lets the client position
+    // alternatives as higher/lower-equipped.
+    try {
+      if (row.tenant_id) {
+        const { data: sibs } = await admin
+          .from("vehicle_listings")
+          .select("slug, ymm, trim, price, mileage, condition, hero_image_url, mc_attributes, key_specs")
+          .eq("tenant_id", row.tenant_id)
+          .eq("status", "published")
+          .neq("id", row.id)
+          .limit(80);
+        if (sibs?.length) {
+          const words = (ymm: unknown) => String(ymm || "").toLowerCase().replace(/^\s*(19|20)\d{2}\s+/, "").split(/\s+/).filter(Boolean);
+          const cur = words(row.ymm);
+          const overlap = (a: string[], b: string[]) => a.filter((w) => b.includes(w)).length;
+          // deno-lint-ignore no-explicit-any
+          const bodyOf = (s: any) => String(s?.mc_attributes?.body_type ?? s?.key_specs?.body_style ?? s?.key_specs?.body ?? "").toLowerCase().trim();
+          // deno-lint-ignore no-explicit-any
+          const summarize = (mc: any) => {
+            const sh = mc && typeof mc === "object" ? mc.build_sheet : null;
+            if (!sh || typeof sh !== "object") return { package_count: null, option_value: null, top_packages: [] as string[] };
+            const pkgs = Array.isArray(sh.packages) ? sh.packages : [];
+            const opts = Array.isArray(sh.options) ? sh.options : [];
+            const msrps = [...pkgs, ...opts].map((p: { msrp?: unknown }) => Number(p?.msrp)).filter((n: number) => Number.isFinite(n) && n > 0);
+            return {
+              package_count: pkgs.length,
+              option_value: msrps.length ? msrps.reduce((a: number, b: number) => a + b, 0) : null,
+              top_packages: pkgs.slice(0, 3).map((p: { name?: unknown }) => String(p?.name || "")).filter(Boolean),
+            };
+          };
+          const price = Number(row.price) || null;
+          const curBody = bodyOf(row);
+          const scored = (sibs as Record<string, unknown>[]).map((s) => {
+            const ov = overlap(cur, words(s.ymm));
+            const sPrice = Number(s.price) || null;
+            const priceGap = price != null && sPrice != null ? Math.abs(sPrice - price) : Number.MAX_SAFE_INTEGER;
+            const inBand = price != null && sPrice != null && priceGap <= price * 0.25;
+            const sameBody = !!curBody && bodyOf(s) === curBody;
+            const tier = ov >= 2 ? 1 : ov >= 1 ? 2 : (sameBody || inBand) ? 3 : 0;
+            return { s, tier, priceGap };
+          }).filter((x) => x.tier > 0);
+          // Prefer closer tiers; only reach into the competitive set when the
+          // closer tiers are thin.
+          const ranked = scored
+            .sort((a, b) => a.tier - b.tier || a.priceGap - b.priceGap)
+            .slice(0, 6)
+            .map(({ s, tier }) => ({
+              slug: s.slug, ymm: s.ymm, trim: s.trim, price: s.price, mileage: s.mileage,
+              condition: s.condition, image: s.hero_image_url || null,
+              same_model: tier === 1, tier,
+              ...summarize(s.mc_attributes),
+            }));
+          if (ranked.length) row.dealer_similar = ranked;
+        }
+      }
+    } catch { /* alternatives optional — module hides when absent */ }
+
     // ── Bump view count + record audit event
     await Promise.all([
       admin.rpc("increment_listing_view", { _slug: lookupSlug }),

@@ -9,6 +9,7 @@ import { Helmet } from "react-helmet-async";
 import { type VehicleListing } from "@/hooks/useVehicleListing";
 import Logo from "@/components/brand/Logo";
 import { derivePassport, fmt$, listingEquipment } from "@/lib/passportV2Data";
+import { readDealerAlternatives } from "@/lib/dealerAlternatives";
 import { MOCK_LISTING } from "./VehiclePassportV3";
 import { usePublicListing } from "@/hooks/usePublicListing";
 import PassportCtaDock from "@/components/passport/PassportCtaDock";
@@ -164,10 +165,12 @@ const VehiclePassportGreatBuy = () => {
   const annualTotal = Object.values(annual).reduce((a, b) => a + b, 0);
   const fiveYear = annualTotal * 5;
 
-  // Similar vehicles — real MarketCheck comparables (sample only behind preview).
+  // Similar vehicles — the dealer's OWN stock only (never other dealers'
+  // listings). Sample only behind preview.
+  const dealerAlts = readDealerAlternatives(listing);
   const similar: { mi: number; price: number; score: number | null; ymm: string | null; image: string | null }[] =
-    !isPreview && d.comparables.length
-      ? d.comparables.slice(0, 3).map((c) => ({ mi: c.miles ?? 0, price: c.price ?? 0, score: null, ymm: c.ymm ?? listing.ymm, image: c.image ?? listing.hero_image_url ?? null }))
+    !isPreview && dealerAlts.length
+      ? dealerAlts.slice(0, 3).map((a) => ({ mi: a.mileage ?? 0, price: a.price ?? 0, score: null, ymm: a.ymm ?? listing.ymm, image: a.image ?? listing.hero_image_url ?? null }))
       : isPreview && d.price != null
         ? [
             { mi: 24000, price: d.price + 5200, score: 91, ymm: listing.ymm, image: listing.hero_image_url ?? null },

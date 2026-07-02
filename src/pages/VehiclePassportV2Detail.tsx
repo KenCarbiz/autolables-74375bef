@@ -664,24 +664,15 @@ const CompsSection = ({ slug }: { slug: string }) => {
         <Unavailable what="Comparable listings" hint="A live comparable set (year, trim, mileage, and price) is sourced from MarketCheck and appears here when available for this vehicle and market." />
       ) : (
         <>
-          <Card className="p-5 mb-4">
+          {/* Aggregate market stats only — the passport never lists other
+              dealers' individual vehicles (names, distances) to a customer. */}
+          <Card className="p-5">
             <div className="flex flex-wrap items-baseline gap-x-6 gap-y-2">
               <div><p className="text-[11px] text-slate-500">Comparable vehicles</p><p className="text-[22px] font-extrabold">{data.count.toLocaleString()}</p></div>
               {data.startingAt != null && <div><p className="text-[11px] text-slate-500">Starting at</p><p className="text-[22px] font-extrabold text-emerald-600">{fmt$(data.startingAt)}</p></div>}
               {data.median != null && <div><p className="text-[11px] text-slate-500">Median price</p><p className="text-[22px] font-extrabold">{fmt$(data.median)}</p></div>}
             </div>
-          </Card>
-          <Card className="p-5">
-            <p className="text-[12px] font-bold uppercase tracking-wider text-slate-400 mb-2">Nearby comparables</p>
-            <div className="space-y-3">
-              {data.comparables.map((c, i) => (
-                <div key={i} className="flex items-center justify-between gap-4 border-b border-slate-100 pb-3 last:border-0 last:pb-0">
-                  <div className="min-w-0"><p className="text-[14px] font-semibold truncate">{c.heading}{c.trim ? ` ${c.trim}` : ""}</p><p className="text-[12px] text-slate-500">{[c.miles != null ? `${c.miles.toLocaleString()} mi` : null, c.dealer, c.distance != null ? `${Math.round(c.distance)} mi away` : null].filter(Boolean).join(" · ")}</p></div>
-                  {c.price != null && <span className="text-[15px] font-extrabold shrink-0">{fmt$(c.price)}</span>}
-                </div>
-              ))}
-            </div>
-            <p className="text-[11px] text-slate-400 mt-3">Comparable listings provided by MarketCheck.</p>
+            <p className="text-[11px] text-slate-400 mt-3">Market statistics provided by MarketCheck.</p>
           </Card>
         </>
       )}

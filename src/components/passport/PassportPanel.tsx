@@ -11,6 +11,8 @@ import { oemCoverageRows, type CoverageKey } from "@/lib/oemWarranty";
 import { lookupOemReference } from "@/data/oemWarrantyReference";
 import { resolveEffectiveWarranty } from "@/lib/warranty/passportWarranty";
 import { readBuildSheet, PACKAGE_KIND_ORDER } from "@/lib/buildSheet";
+import { readDealerAlternatives, type DealerAlternative } from "@/lib/dealerAlternatives";
+import { recordPanelView } from "@/lib/shopperIntent";
 import type { VehicleListing } from "@/hooks/useVehicleListing";
 import {
   PassportSlideOver, Hero, Section, Check, Empty, StatRow, RangeBar, TrendChart, Ring, CARD, GREEN, BLUE,
@@ -28,55 +30,6 @@ export type PassportPanelKey =
   | "market-price" | "market-demand" | "price-confidence" | "price-history"
   | "comparable-vehicles" | "inventory-trend" | "factory-warranty"
   | "owner-reviews" | "highlights" | "overview" | "key-specs" | "equipment" | "ownership-timeline";
-
-interface Comp { ymm: string; trim: string; mileage: number | null; price: number | null; distance: string | null; distNum: number | null; image: string | null; dealer: string | null; dom: number | null }
-
-const deriveComps = (listing: VehicleListing, d: PassportData, isPreview: boolean): Comp[] => {
-  const mc = (listing.mc_attributes || {}) as Record<string, unknown>;
-  const raw = (listing as unknown as { comparables?: unknown }).comparables ?? (mc.comparables as unknown);
-  const real: Comp[] = (Array.isArray(raw) ? raw : []).map((c) => c as Record<string, unknown>).map((c) => {
-    const distNum = c.dist != null ? Number(c.dist) : c.distance != null ? Number(c.distance) : null;
-    return {
-      ymm: String(c.ymm ?? c.heading ?? [c.year, c.make, c.model].filter(Boolean).join(" ") ?? ""),
-      trim: String(c.trim ?? ""),
-      mileage: c.miles != null ? Number(c.miles) : c.mileage != null ? Number(c.mileage) : null,
-      price: c.price != null ? Number(c.price) : null,
-      distance: distNum != null && !Number.isNaN(distNum) ? `${Math.round(distNum)} mi away` : null,
-      distNum: distNum != null && !Number.isNaN(distNum) ? distNum : null,
-      image: (c.image as string) ?? (c.photo_url as string) ?? null,
-      dealer: (c.dealer as string) ?? (c.seller_name as string) ?? (c.dealer_name as string) ?? null,
-      dom: c.dom != null ? Number(c.dom) : c.days_on_market != null ? Number(c.days_on_market) : null,
-    };
-  }).filter((c) => c.ymm);
-  if (real.length) return real;
-  const price = d.price;
-  if (!isPreview || price == null) return [];
-  const offs = [2760, 4360, 3850, 5200, 1900, 4360, 6100, 3200];
-  const miles = [12, 18, 9, 24, 15, 18, 31, 11];
-  const distN = [2.3, 4.1, 6.7, 6.7, 9.2, 12.4, 15.1, 18.9];
-  const doms = [12, 31, 8, 45, 22, 51, 19, 37];
-  const dealers = ["Hartford INFINITI", "Premier Auto Group", "Valley Motors", "City Luxury Cars", "North Shore Auto", "Gateway Motors", "Summit Auto", "Lakeside INFINITI"];
-  return offs.map((o, i) => ({ ymm: listing.ymm || "Comparable", trim: listing.trim || "", mileage: miles[i], price: price + o, distance: `${distN[i]} mi away`, distNum: distN[i], image: listing.hero_image_url || null, dealer: dealers[i], dom: doms[i] }));
-};
-
-const CompStrip = ({ comps }: { comps: Comp[] }) => (
-  <div className="flex gap-3 overflow-x-auto -mx-1 px-1 pb-1 snap-x">
-    {comps.map((c, i) => (
-      <div key={i} className={`shrink-0 w-[150px] ${CARD} overflow-hidden snap-start`}>
-        <div className="h-[84px] bg-[#eef0f3] flex items-center justify-center">
-          {c.image ? <img src={c.image} alt="" className="w-full h-full object-cover" /> : <Car className="w-7 h-7 text-[#94A3B8]" />}
-        </div>
-        <div className="p-2.5">
-          <p className="text-[12px] font-bold leading-tight line-clamp-1">{c.ymm}</p>
-          {c.trim && <p className="text-[11px] text-[#64748B] line-clamp-1">{c.trim}</p>}
-          {c.mileage != null && <p className="text-[11px] text-[#64748B] mt-0.5">{c.mileage.toLocaleString()} mi</p>}
-          {c.price != null && <p className="text-[13px] font-extrabold text-[#0F172A] mt-1">{fmt$(c.price)}</p>}
-          {c.distance && <p className="text-[10px] text-[#94A3B8] mt-0.5">{c.distance}</p>}
-        </div>
-      </div>
-    ))}
-  </div>
-);
 
 interface PanelDef { title: string; subtitle: string; body: React.ReactNode; primary?: { label: string; onClick: () => void }; secondary?: { label: string; onClick: () => void }; footerQuestion?: string; specialistLabel?: string; wide?: boolean }
 
@@ -113,7 +66,7 @@ function buildPanel(key: PassportPanelKey, d: PassportData, listing: VehicleList
       if (d.ownerCount === 1) why.push("One owner");
       if (d.cleanTitle && d.accidentCount === 0) why.push("Clean history");
       if ((listing.features?.length ?? 0) >= 3) why.push("Strong equipment package");
-      const comps = deriveComps(listing, d, isPreview);
+      const priceAlts = readDealerAlternatives(listing);
       const dealerDelta = d.priceChangeTotal;
       const marketDelta = marketSeries.length >= 2 ? marketSeries[marketSeries.length - 1] - marketSeries[0] : null;
       return {
@@ -142,10 +95,16 @@ function buildPanel(key: PassportPanelKey, d: PassportData, listing: VehicleList
               {why.length > 0 && <div className={`${CARD} p-4`}><p className="text-[13px] font-bold mb-2.5">{isGreat ? "Why it's a Great Price" : "Pricing factors"}</p><ul className="space-y-2">{why.map((t) => <Check key={t}>{t}</Check>)}</ul></div>}
             </div>
           )}
-          <Section title={`Comparable Vehicles${comps.length ? ` (${compCount ?? comps.length})` : ""}`} sub="Based on similar vehicles in your market area."
-            action={comps.length ? <button onClick={() => openPanel("comparable-vehicles")} className="text-[12px] font-semibold text-[#2563EB] hover:underline shrink-0">View all</button> : undefined}>
-            {comps.length ? <CompStrip comps={comps} /> : <Empty>Comparable vehicles will appear here once enough market data is available.</Empty>}
-          </Section>
+          {/* The pricing math uses market comparables in aggregate (range/avg
+              above); the browsable cards are the dealer's OWN stock only. */}
+          {priceAlts.length > 0 && (
+            <Section title={`Similar Vehicles In Stock (${priceAlts.length})`} sub={`Other options at ${d.dealerName || "this dealership"}.`}
+              action={<button onClick={() => openPanel("comparable-vehicles")} className="text-[12px] font-semibold text-[#2563EB] hover:underline shrink-0">View all</button>}>
+              <div className="flex gap-3 overflow-x-auto -mx-1 px-1 pb-1 snap-x">
+                {priceAlts.slice(0, 4).map((a) => <div key={a.slug} className="min-w-[240px] snap-start"><AlternativeCard alt={a} compact /></div>)}
+              </div>
+            </Section>
+          )}
           <Section title="Pricing Trend (30 Days)">
             {(marketSeries.length >= 2 || dealerSeries.length >= 2) ? (
               <div className={`${CARD} p-4`}>
@@ -209,9 +168,11 @@ function buildPanel(key: PassportPanelKey, d: PassportData, listing: VehicleList
       const demandWord = score >= 66 ? "High Demand" : score >= 45 ? "Moderate Demand" : "Low Demand";
       const temp = score >= 80 ? { l: "Very Hot", c: "#DC2626" } : score >= 66 ? { l: "Hot", c: "#EA580C" } : score >= 45 ? { l: "Warm", c: "#D97706" } : { l: "Cold", c: "#2563EB" };
       const supplyLevel = supply != null ? (supply < 30 ? "Low" : supply < 60 ? "Balanced" : "Ample") : isPreview ? "Low" : "—";
+      // Never show the raw days-supply / market inventory count to a customer —
+      // it can be in the thousands and reads terribly. Qualitative level only.
       const kpis = [
         { icon: Eye, label: "Active Shoppers", value: views != null ? views.toLocaleString() : isPreview ? "89" : "—" },
-        { icon: Car, label: "Similar Vehicles", value: supply != null ? `${supply}` : isPreview ? "14" : "—" },
+        { icon: Car, label: "Similar Vehicles", value: supplyLevel },
         { icon: Clock, label: "Avg Days to Sell", value: avgDom != null ? `${avgDom} Days` : isPreview ? "12 Days" : "—" },
         { icon: TrendingUp, label: "Weekly Searches", value: isPreview ? "120" : "—" },
         { icon: Heart, label: "Saved by Shoppers", value: isPreview ? "38" : "—" },
@@ -221,7 +182,7 @@ function buildPanel(key: PassportPanelKey, d: PassportData, listing: VehicleList
         { l: "Inventory Level", v: supplyLevel },
         { l: "Average Days on Market", v: avgDom != null ? `${avgDom} Days` : dom != null ? `${dom} Days` : isPreview ? "12 Days" : "—" },
         { l: "Search Activity", v: isPreview ? "Above Average" : has ? level : "—" },
-        { l: "Vehicles Within 50 Miles", v: supply != null ? `${supply}` : isPreview ? "14" : "—" },
+        { l: "Local Availability", v: supplyLevel },
         { l: "Average Price", v: avg != null ? fmt$(avg) : isPreview ? fmt$(61300) : "—" },
       ];
       const invSeries = isPreview ? [20, 19, 18, 17, 16, 15, 14] : [];
@@ -650,26 +611,31 @@ function buildPanel(key: PassportPanelKey, d: PassportData, listing: VehicleList
     }
 
     case "comparable-vehicles": {
-      const comps = deriveComps(listing, d, isPreview);
-      const radius = (mc.search_radius as number) ?? (isPreview ? 150 : null);
-      const current = { ymm: listing.ymm || "This vehicle", trim: listing.trim || "", mileage: listing.mileage, price, dealer: d.dealerName, dom: d.dom };
+      // Own-rooftop alternatives only — the passport never merchandises other
+      // dealers' cars. Tiered same-model → same-make → competitive set, with
+      // package-aware positioning and the shopper's session intent deciding
+      // what leads.
+      const alts = readDealerAlternatives(listing);
+      const sameModelCount = alts.filter((a) => a.sameModel).length;
       return {
-        title: "Comparable Vehicles", subtitle: "See how this vehicle compares to similar listings in your market",
+        title: "Similar Vehicles In Stock",
+        subtitle: `More options at ${d.dealerName || "this dealership"} — compare builds and package levels`,
         primary: { label: "Reserve This Vehicle", onClick: () => go("reserve") },
+        footerQuestion: "Want to compare these in person?", specialistLabel: "Talk to a Vehicle Specialist",
         body: <>
-          {/* ── Mobile (<768px) — premium comparison experience ── */}
-          <div className="md:hidden space-y-4">
-            {comps.length ? <MobileCompExplorer comps={comps} current={current} avg={avg} radius={radius} flags={{ certified: listing.condition === "cpo", oneOwner: d.ownerCount === 1, cleanTitle: d.cleanTitle, noAccidents: d.accidentCount === 0, warranty: !!d.warrantyStr, isPreview }} /> : <Empty>Comparable vehicles will appear here once enough market data is available.</Empty>}
-            <Disclaimer />
-          </div>
-
-          {/* ── Desktop / tablet (≥768px) — unchanged ── */}
-          <div className="hidden md:block space-y-5">
-            <Hero icon={Car} tone={comps.length ? "blue" : "neutral"} label={comps.length ? `${comps.length} similar vehicles found` : "Comparables pending"}
-              note={comps.length ? [radius != null ? `${radius}-mile radius` : null, "Updated today", avg != null ? `Avg ${fmt$(avg)}` : null].filter(Boolean).join(" · ") : "Comparable listings appear once MarketCheck data is available."} />
-            {comps.length ? <CompExplorer comps={comps} current={current} avg={avg} cleanTitle={d.cleanTitle} oneOwner={d.ownerCount === 1} certified={listing.condition === "cpo"} /> : <Empty>Comparable vehicles will appear here once enough market data is available.</Empty>}
-            <Disclaimer />
-          </div>
+          {alts.length ? (
+            <>
+              <Hero icon={Car} tone="blue" label={`${alts.length} in stock at ${d.dealerName || "this dealership"}`}
+                note={sameModelCount ? `${sameModelCount} same-model alternative${sameModelCount === 1 ? "" : "s"} at different package levels` : "Closest matches from this dealership's inventory"} />
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {alts.map((a) => <AlternativeCard key={a.slug} alt={a} />)}
+              </div>
+              <p className="text-[11px] text-[#94A3B8]">All vehicles shown are in stock at {d.dealerName || "this dealership"}.</p>
+            </>
+          ) : (
+            <Empty>This is the only vehicle like it in stock right now — ask the dealer about incoming inventory.</Empty>
+          )}
+          <Disclaimer />
         </>,
       };
     }
@@ -680,9 +646,12 @@ function buildPanel(key: PassportPanelKey, d: PassportData, listing: VehicleList
       const avgDom = (mc.avg_dom as number) ?? (isPreview ? 38 : null);
       const hasData = supply != null;
       const trendLabel = changePct == null ? "Stable Inventory" : changePct < 0 ? `Inventory Down ${Math.abs(changePct)}%` : changePct > 0 ? `Inventory Up ${changePct}%` : "Stable Inventory";
-      const removed = changePct != null && supply != null && changePct < 0 ? Math.max(1, Math.round((supply * Math.abs(changePct)) / 100)) : isPreview ? 6 : null;
       const SCARCITY = ["Abundant", "Moderate", "Limited", "Scarce"];
       const scarcityIdx = supply == null ? -1 : supply < 30 ? 3 : supply < 50 ? 2 : supply < 90 ? 1 : 0;
+      // Never show the raw market-days-supply / inventory count to a customer
+      // (it can be in the thousands) — qualitative levels only, on every
+      // breakpoint. The raw number stays internal to the math above.
+      const supplyWord = supply == null ? null : supply < 30 ? "Tight" : supply < 60 ? "Balanced" : "Ample";
       const competition = (d.viewCount ?? 0) > 20 || isPreview ? "High" : "Moderate";
       const localScore = (() => { let s = 50; if (changePct != null && changePct < 0) s += 15; if (supply != null) { if (supply < 30) s += 20; else if (supply < 60) s += 10; } if (competition === "High") s += 14; return Math.max(20, Math.min(96, s)); })();
       const scoreLabel = localScore >= 80 ? "Highly Competitive" : localScore >= 60 ? "Moderately Competitive" : "Balanced";
@@ -703,7 +672,7 @@ function buildPanel(key: PassportPanelKey, d: PassportData, listing: VehicleList
                 <div className="rounded-2xl p-5 text-white" style={{ background: "linear-gradient(160deg,#0f7a3d 0%,#16A34A 100%)" }}>
                   <div className="flex items-center gap-3">
                     <span className="w-12 h-12 rounded-2xl bg-white/15 flex items-center justify-center shrink-0"><Package className="w-6 h-6" /></span>
-                    <div><p className="text-[13px] font-bold uppercase tracking-wider opacity-95">{changePct != null && changePct < 0 ? "Inventory Tightening" : "Inventory Stable"}</p><p className="text-[24px] font-extrabold leading-tight">{supply} Available</p></div>
+                    <div><p className="text-[13px] font-bold uppercase tracking-wider opacity-95">{changePct != null && changePct < 0 ? "Inventory Tightening" : "Inventory Stable"}</p><p className="text-[24px] font-extrabold leading-tight">{supplyWord} Supply</p></div>
                   </div>
                   {changePct != null && changePct !== 0 && <p className="text-[13px] opacity-90 mt-3 leading-snug">Inventory has {changePct < 0 ? "declined" : "grown"} {Math.abs(changePct)}% over the past 30 days.</p>}
                   <p className="text-[11px] opacity-80 mt-2">Updated using live market inventory.</p>
@@ -713,14 +682,14 @@ function buildPanel(key: PassportPanelKey, d: PassportData, listing: VehicleList
                   <InventoryTrendChart isPreview={isPreview} />
                   <div className="grid grid-cols-2 gap-3 mt-3">
                     <div className={`${CARD} p-4`}><TrendingDown className="w-5 h-5 text-[#16A34A]" /><p className="text-[20px] font-extrabold mt-1 leading-none text-[#16A34A]">{changePct != null ? `${changePct > 0 ? "+" : ""}${changePct}%` : "—"}</p><p className="text-[10px] text-[#94A3B8] mt-1">vs 30 days ago</p></div>
-                    <div className={`${CARD} p-4`}><Car className="w-5 h-5 text-[#2563EB]" /><p className="text-[20px] font-extrabold mt-1 leading-none">{removed != null ? removed : "—"}</p><p className="text-[10px] text-[#94A3B8] mt-1">Removed since last month</p></div>
+                    <div className={`${CARD} p-4`}><Clock className="w-5 h-5 text-[#2563EB]" /><p className="text-[20px] font-extrabold mt-1 leading-none">{avgDom != null ? `${avgDom}d` : "—"}</p><p className="text-[10px] text-[#94A3B8] mt-1">Avg days on market</p></div>
                   </div>
                 </Section>
 
                 <Section title="Market snapshot">
                   <div className={`${CARD} divide-y divide-[#F1F5F9]`}>
                     {[
-                      { i: Package, l: "Vehicles Available", v: `${supply}`, c: "text-[#0F172A]" },
+                      { i: Package, l: "Supply Level", v: supplyWord ?? "—", c: "text-[#0F172A]" },
                       { i: TrendingDown, l: "30-Day Change", v: changePct != null ? `${changePct > 0 ? "+" : ""}${changePct}%` : "—", c: changePct != null && changePct < 0 ? "text-[#16A34A]" : "text-[#0F172A]" },
                       { i: Clock, l: "Average Days on Market", v: avgDom != null ? `${avgDom} Days` : "—", c: "text-[#0F172A]" },
                       { i: TrendingDown, l: "Market Trend", v: changePct != null && changePct < 0 ? "Declining" : "Stable", c: "text-[#16A34A]" },
@@ -784,17 +753,16 @@ function buildPanel(key: PassportPanelKey, d: PassportData, listing: VehicleList
           {/* ── Desktop / tablet (≥768px) — unchanged ── */}
           <div className="hidden md:block space-y-5">
           <Hero icon={Package} tone={changePct != null && changePct < 0 ? "green" : "neutral"} label={trendLabel}
-            value={supply != null ? `${supply} available` : undefined}
-            note={hasData ? "Comparable vehicles in your local market." : "30-day market supply trends appear once enough data is available."} />
+            value={supplyWord ? `${supplyWord} supply` : undefined}
+            note={hasData ? "Comparable availability in your local market." : "30-day market supply trends appear once enough data is available."} />
           {hasData ? (
             <>
               <Section title="Inventory trend"><InventoryTrendChart isPreview={isPreview} /></Section>
               <Section title="Local market summary">
                 <div className={`${CARD} p-4`}>
-                  <StatRow label="Vehicles available" value={supply != null ? `${supply}` : "—"} />
                   <StatRow label="Average days on market" value={avgDom != null ? `${avgDom} days` : "—"} />
                   <StatRow label="Average selling price" value={avg != null ? fmt$(avg) : isPreview ? fmt$(61300) : "—"} />
-                  <StatRow label="Supply level" value={supply != null ? (supply < 30 ? "Tight" : supply < 60 ? "Balanced" : "Ample") : "—"} />
+                  <StatRow label="Supply level" value={supplyWord ?? "—"} />
                   <StatRow label="Demand level" value={(d.viewCount ?? 0) > 20 || isPreview ? "High" : "Moderate"} />
                   <StatRow label="Updated" value="Today" />
                 </div>
@@ -2191,225 +2159,6 @@ function PriceTimeline({ history }: { history: PricePoint[] }) {
   );
 }
 
-const Scatter = ({ comps, current }: { comps: Comp[]; current: { mileage: number | null; price: number | null } }) => {
-  const items = ([...comps.map((c) => ({ x: c.mileage, y: c.price, you: false })), { x: current.mileage, y: current.price, you: true }])
-    .filter((p) => p.x != null && p.y != null) as { x: number; y: number; you: boolean }[];
-  if (items.length < 2) return null;
-  const w = 560, h = 220, pad = 30;
-  const xs = items.map((i) => i.x), ys = items.map((i) => i.y);
-  const xmin = Math.min(...xs), xmax = Math.max(...xs), xr = Math.max(1, xmax - xmin);
-  const ymin = Math.min(...ys), ymax = Math.max(...ys), yr = Math.max(1, ymax - ymin);
-  const px = (v: number) => pad + ((v - xmin) / xr) * (w - pad * 2);
-  const py = (v: number) => pad + (1 - (v - ymin) / yr) * (h - pad * 2);
-  return (
-    <svg viewBox={`0 0 ${w} ${h}`} className="w-full" style={{ height: h }} preserveAspectRatio="xMidYMid meet">
-      {[0, 0.5, 1].map((g) => <line key={g} x1={pad} x2={w - pad} y1={pad + g * (h - pad * 2)} y2={pad + g * (h - pad * 2)} stroke="#E6E8EC" strokeWidth="1" />)}
-      {items.map((p, i) => <circle key={i} cx={px(p.x)} cy={py(p.y)} r={p.you ? 7 : 5} fill={p.you ? BLUE : "#CBD5E1"} stroke="#fff" strokeWidth="2"><title>{`${p.you ? "This vehicle" : "Comparable"}: ${p.x.toLocaleString()} mi · ${fmt$(p.y)}`}</title></circle>)}
-      <text x={w / 2} y={h - 6} textAnchor="middle" fill="#94A3B8" fontSize="11">Mileage</text>
-    </svg>
-  );
-};
-
-function CompExplorer({ comps, current, avg, cleanTitle, oneOwner, certified }: { comps: Comp[]; current: { ymm: string; trim: string; mileage: number | null; price: number | null; dealer: string; dom: number | null }; avg: number | null; cleanTitle: boolean; oneOwner: boolean; certified: boolean }) {
-  const [sort, setSort] = useState<"match" | "price-asc" | "price-desc" | "miles" | "new">("match");
-  const [certOnly, setCertOnly] = useState(false);
-  const sorted = useMemo(() => {
-    const by: Record<typeof sort, (a: Comp, b: Comp) => number> = {
-      match: (a, b) => (a.distNum ?? 1e9) - (b.distNum ?? 1e9),
-      "price-asc": (a, b) => (a.price ?? 1e12) - (b.price ?? 1e12),
-      "price-desc": (a, b) => (b.price ?? -1) - (a.price ?? -1),
-      miles: (a, b) => (a.mileage ?? 1e9) - (b.mileage ?? 1e9),
-      new: (a, b) => (a.dom ?? 1e9) - (b.dom ?? 1e9),
-    };
-    return [...comps].sort(by[sort]);
-  }, [comps, sort]);
-  const compPrices = comps.map((c) => c.price).filter((n): n is number => n != null);
-  const compMiles = comps.map((c) => c.mileage).filter((n): n is number => n != null);
-  const avgCompPrice = compPrices.length ? compPrices.reduce((a, b) => a + b, 0) / compPrices.length : null;
-  const avgCompMiles = compMiles.length ? compMiles.reduce((a, b) => a + b, 0) / compMiles.length : null;
-  const stand: string[] = [];
-  if (current.mileage != null && avgCompMiles != null && current.mileage < avgCompMiles) stand.push("Lower mileage than comparable listings");
-  if (current.price != null && avgCompPrice != null && current.price < avgCompPrice) stand.push("Priced below the comparable average");
-  if (certified) stand.push("Certified Pre-Owned");
-  if (oneOwner) stand.push("One owner");
-  if (cleanTitle) stand.push("Clean title & history");
-  return (
-    <>
-      <div className="flex items-center justify-between gap-2 flex-wrap">
-        <Seg value={sort} onChange={(v) => setSort(v as typeof sort)} options={[{ label: "Closest", value: "match" }, { label: "$ Low", value: "price-asc" }, { label: "$ High", value: "price-desc" }, { label: "Miles", value: "miles" }, { label: "Newest", value: "new" }]} />
-        <button onClick={() => setCertOnly((v) => !v)} className={`text-[11px] font-semibold px-2.5 py-1.5 rounded-lg border inline-flex items-center gap-1.5 transition-colors ${certOnly ? "border-[#2563EB] text-[#2563EB] bg-blue-50" : "border-[#E6E8EC] text-[#64748B] hover:text-[#0F172A]"}`}><BadgeCheck className="w-3.5 h-3.5" /> Certified</button>
-      </div>
-      <div className="rounded-2xl border-2 border-[#2563EB] bg-blue-50/40 p-3 flex items-center gap-3">
-        <div className="w-20 h-16 rounded-lg bg-[#dbe4f5] overflow-hidden shrink-0 flex items-center justify-center"><Car className="w-6 h-6 text-[#2563EB]" /></div>
-        <div className="min-w-0 flex-1"><div className="flex items-center gap-2"><p className="text-[13px] font-bold leading-tight line-clamp-1">{current.ymm}</p><span className="text-[9px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded bg-[#2563EB] text-white shrink-0">Your Vehicle</span></div>{current.trim && <p className="text-[12px] text-[#64748B] line-clamp-1">{current.trim}</p>}<p className="text-[11px] text-[#94A3B8] mt-0.5">{[current.mileage != null ? `${current.mileage.toLocaleString()} mi` : null, current.dom != null ? `${current.dom} days listed` : null].filter(Boolean).join(" · ")}</p></div>
-        {current.price != null && <p className="text-[15px] font-extrabold shrink-0">{fmt$(current.price)}</p>}
-      </div>
-      {certOnly ? (
-        <Empty>Certified status isn't available for these comparable listings yet.</Empty>
-      ) : (
-        <div className="space-y-3">{sorted.map((c, i) => {
-          const diff = current.price != null && c.price != null ? c.price - current.price : null;
-          return (
-            <div key={i} className={`${CARD} p-3 flex items-center gap-3`}>
-              <div className="w-20 h-16 rounded-lg bg-[#eef0f3] overflow-hidden shrink-0 flex items-center justify-center">{c.image ? <img src={c.image} alt="" className="w-full h-full object-cover" /> : <Car className="w-6 h-6 text-[#94A3B8]" />}</div>
-              <div className="min-w-0 flex-1"><p className="text-[13px] font-bold leading-tight line-clamp-1">{c.ymm}</p>{c.trim && <p className="text-[12px] text-[#64748B] line-clamp-1">{c.trim}</p>}<p className="text-[11px] text-[#94A3B8] mt-0.5">{[c.mileage != null ? `${c.mileage.toLocaleString()} mi` : null, c.dealer, c.distance, c.dom != null ? `${c.dom}d listed` : null].filter(Boolean).join(" · ")}</p></div>
-              <div className="shrink-0 text-right">{c.price != null && <p className="text-[15px] font-extrabold">{fmt$(c.price)}</p>}{diff != null && diff !== 0 && <p className={`text-[10px] font-semibold ${diff > 0 ? "text-[#16A34A]" : "text-[#EA580C]"}`}>{diff > 0 ? `+${fmt$(diff)}` : fmt$(diff)}</p>}</div>
-            </div>
-          );
-        })}</div>
-      )}
-      <Section title="Price vs mileage" sub="Your vehicle highlighted in blue.">
-        <div className={`${CARD} p-3`}><Scatter comps={comps} current={{ mileage: current.mileage, price: current.price }} /></div>
-      </Section>
-      {stand.length > 0 && (
-        <Section title="Why your vehicle stands out">
-          <div className={`${CARD} p-4`}><ul className="space-y-2">{stand.map((s) => <Check key={s}>{s}</Check>)}</ul></div>
-        </Section>
-      )}
-      {avg != null && current.price != null && (
-        <p className="text-[12px] text-[#64748B]">This vehicle is {current.price <= avg ? "below" : "above"} the {fmt$(avg)} comparable-set average.</p>
-      )}
-    </>
-  );
-}
-
-// Mobile-only premium comparison experience (same data as CompExplorer).
-interface CompFlags { certified: boolean; oneOwner: boolean; cleanTitle: boolean; noAccidents: boolean; warranty: boolean; isPreview: boolean }
-function MobileCompExplorer({ comps, current, avg, radius, flags }: { comps: Comp[]; current: { ymm: string; trim: string; mileage: number | null; price: number | null; dealer: string; dom: number | null }; avg: number | null; radius: number | null; flags: CompFlags }) {
-  const [sort, setSort] = useState<"match" | "price" | "miles" | "value" | "new">("match");
-  const sorted = useMemo(() => {
-    const by: Record<typeof sort, (a: Comp, b: Comp) => number> = {
-      match: (a, b) => (a.distNum ?? 1e9) - (b.distNum ?? 1e9),
-      price: (a, b) => (a.price ?? 1e12) - (b.price ?? 1e12),
-      miles: (a, b) => (a.mileage ?? 1e9) - (b.mileage ?? 1e9),
-      value: (a, b) => ((a.price ?? 1e12) + (a.mileage ?? 0) * 0.2) - ((b.price ?? 1e12) + (b.mileage ?? 0) * 0.2),
-      new: (a, b) => (a.dom ?? 1e9) - (b.dom ?? 1e9),
-    };
-    return [...comps].sort(by[sort]);
-  }, [comps, sort]);
-  const prices = comps.map((c) => c.price).filter((n): n is number => n != null);
-  const miles = comps.map((c) => c.mileage).filter((n): n is number => n != null);
-  const minPrice = prices.length ? Math.min(...prices) : null;
-  const minMiles = miles.length ? Math.min(...miles) : null;
-  const allPrices = [current.price, ...prices].filter((n): n is number => n != null);
-  const lo = allPrices.length ? Math.min(...allPrices) : null, hi = allPrices.length ? Math.max(...allPrices) : null;
-  const avgComp = prices.length ? Math.round(prices.reduce((a, b) => a + b, 0) / prices.length) : null;
-  const avgMiles = miles.length ? Math.round(miles.reduce((a, b) => a + b, 0) / miles.length) : null;
-  const yourPos = lo != null && hi != null && current.price != null ? Math.max(0, Math.min(100, ((current.price - lo) / Math.max(1, hi - lo)) * 100)) : null;
-  const cheaperCount = comps.filter((c) => c.price != null && current.price != null && current.price <= c.price).length;
-  const topPct = comps.length ? Math.max(5, Math.round(((comps.length - cheaperCount) / comps.length) * 100)) : null;
-  const SORTS: { k: typeof sort; l: string }[] = [{ k: "match", l: "Closest Match" }, { k: "price", l: "Lowest Price" }, { k: "miles", l: "Lowest Mileage" }, { k: "value", l: "Best Value" }, { k: "new", l: "Newest" }];
-  const wins: string[] = [];
-  if (current.mileage != null && avgMiles != null && current.mileage < avgMiles) wins.push("Lower mileage than most comparable vehicles");
-  if (current.price != null && avgComp != null && current.price < avgComp) wins.push("Below the comparable average price");
-  if (flags.certified) wins.push("Certified Pre-Owned");
-  if (flags.oneOwner) wins.push("One owner");
-  if (flags.cleanTitle && flags.noAccidents) wins.push("Clean title and history");
-  if (flags.warranty) wins.push("Factory warranty remaining");
-  const insights = [flags.oneOwner ? "One Owner" : null, flags.cleanTitle ? "Clean History" : null, flags.noAccidents ? "No Accidents" : null, flags.certified ? "Dealer Certified" : null, flags.warranty ? "Factory Warranty" : null].filter(Boolean) as string[];
-  const youCheaper = current.price != null && avgComp != null && current.price <= avgComp;
-
-  const Badge = ({ children, tone = "blue" }: { children: React.ReactNode; tone?: "blue" | "green" | "amber" }) => (
-    <span className={`text-[9px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full ${tone === "green" ? "bg-emerald-100 text-[#16A34A]" : tone === "amber" ? "bg-amber-100 text-[#B45309]" : "bg-blue-100 text-[#2563EB]"}`}>{children}</span>
-  );
-
-  return (
-    <div className="space-y-4">
-      {/* Hero */}
-      <div className="rounded-2xl p-5 text-white" style={{ background: "linear-gradient(160deg,#2563EB 0%,#1e50c8 100%)" }}>
-        <div className="flex items-center gap-3">
-          <span className="w-12 h-12 rounded-2xl bg-white/15 flex items-center justify-center shrink-0"><Car className="w-6 h-6" /></span>
-          <div><p className="text-[24px] font-extrabold leading-tight">{comps.length} Similar Vehicles</p><p className="text-[12px] opacity-90">{[radius != null ? `${radius}-mile radius` : null, "Updated today", avg != null ? `Avg ${fmt$(avg)}` : null].filter(Boolean).join(" · ")}</p></div>
-        </div>
-        <p className="text-[12px] opacity-90 mt-3">Matched on year, make, model, trim, mileage range, and equipment.</p>
-      </div>
-
-      {/* Filter chips */}
-      <div className="flex gap-2 overflow-x-auto -mx-1 px-1 pb-1">
-        {SORTS.map((s) => (
-          <button key={s.k} onClick={() => setSort(s.k)} className={`shrink-0 h-9 px-3.5 rounded-full text-[12px] font-bold transition-colors ${sort === s.k ? "bg-[#2563EB] text-white" : "bg-white border border-[#E6E8EC] text-[#64748B]"}`}>{s.l}</button>
-        ))}
-      </div>
-
-      {/* Your vehicle pinned */}
-      <div className="rounded-2xl border-2 border-[#2563EB] bg-blue-50/40 shadow-[0_8px_30px_rgba(37,99,235,0.12)] p-3 flex items-center gap-3">
-        <div className="w-20 h-16 rounded-xl bg-[#dbe4f5] overflow-hidden shrink-0 flex items-center justify-center"><Car className="w-7 h-7 text-[#2563EB]" /></div>
-        <div className="min-w-0 flex-1">
-          <Badge>Your Vehicle</Badge>
-          <p className="text-[14px] font-bold leading-tight line-clamp-1 mt-1">{current.ymm}</p>
-          {current.trim && <p className="text-[12px] text-[#64748B] line-clamp-1">{current.trim}</p>}
-          <p className="text-[11px] text-[#94A3B8]">{[current.mileage != null ? `${current.mileage.toLocaleString()} mi` : null, current.dom != null ? `${current.dom} days listed` : null].filter(Boolean).join(" · ")}</p>
-        </div>
-        {current.price != null && <p className="text-[16px] font-extrabold shrink-0">{fmt$(current.price)}</p>}
-      </div>
-
-      {/* Comparison cards */}
-      <div className="space-y-3">{sorted.map((c, i) => {
-        const diff = current.price != null && c.price != null ? c.price - current.price : null;
-        const badge = c.price === minPrice && minPrice != null ? { l: "Lowest Price", t: "green" as const } : c.mileage === minMiles && minMiles != null ? { l: "Lowest Mileage", t: "blue" as const } : null;
-        return (
-          <div key={i} className={`${CARD} p-3 flex items-center gap-3`}>
-            <span className="w-6 h-6 rounded-full bg-slate-100 text-[#64748B] text-[12px] font-bold flex items-center justify-center shrink-0">{i + 1}</span>
-            <div className="w-18 h-16 w-[72px] rounded-xl bg-[#eef0f3] overflow-hidden shrink-0 flex items-center justify-center">{c.image ? <img src={c.image} alt="" className="w-full h-full object-cover" /> : <Car className="w-6 h-6 text-[#94A3B8]" />}</div>
-            <div className="min-w-0 flex-1">
-              {badge && <Badge tone={badge.t}>{badge.l}</Badge>}
-              <p className="text-[13px] font-bold leading-tight line-clamp-1 mt-0.5">{c.ymm}</p>
-              <p className="text-[11px] text-[#94A3B8] line-clamp-1">{[c.mileage != null ? `${c.mileage.toLocaleString()} mi` : null, c.dealer, c.distance].filter(Boolean).join(" · ")}</p>
-            </div>
-            <div className="shrink-0 text-right">
-              {c.price != null && <p className="text-[15px] font-extrabold">{fmt$(c.price)}</p>}
-              {diff != null && diff !== 0 && <p className={`text-[11px] font-bold inline-flex items-center gap-0.5 ${diff < 0 ? "text-[#16A34A]" : "text-[#EF4444]"}`}>{diff < 0 ? <TrendingDown className="w-3 h-3" /> : <TrendingUp className="w-3 h-3" />}{fmt$(Math.abs(diff))} {diff < 0 ? "Less" : "More"}</p>}
-            </div>
-          </div>
-        );
-      })}</div>
-
-      {/* Price range slider */}
-      {lo != null && hi != null && yourPos != null && (
-        <Section title="Market price range">
-          <div className={`${CARD} p-4`}>
-            <div className="grid grid-cols-3 text-center mb-1 text-[11px] text-[#64748B]"><span>Lowest {fmt$(lo)}</span><span>Average {fmt$(avgComp ?? avg)}</span><span>Highest {fmt$(hi)}</span></div>
-            <div className="relative pt-6 h-2">
-              <div className="absolute top-6 left-0 right-0 h-2 rounded-full bg-gradient-to-r from-emerald-200 via-amber-100 to-rose-200" />
-              <div className="absolute -translate-x-1/2 text-center" style={{ left: `${yourPos}%`, top: 0 }}><span className="text-[10px] font-bold text-[#2563EB]">YOUR PRICE</span></div>
-              <span className="absolute top-6 -translate-y-0 -translate-x-1/2 w-4 h-4 rounded-full bg-[#2563EB] ring-[3px] ring-white shadow" style={{ left: `${yourPos}%` }} />
-            </div>
-          </div>
-        </Section>
-      )}
-
-      {/* Market position */}
-      {youCheaper && topPct != null && (
-        <div className={`${CARD} p-4 flex items-center gap-3`}>
-          <span className="w-11 h-11 rounded-2xl bg-emerald-50 flex items-center justify-center shrink-0"><Award className="w-6 h-6 text-[#16A34A]" /></span>
-          <div><p className="text-[12px] text-[#64748B]">Market Position</p><p className="text-[16px] font-extrabold text-[#16A34A]">Top {topPct}% · Excellent Value</p></div>
-        </div>
-      )}
-
-      {/* Why this vehicle wins */}
-      {wins.length > 0 && (
-        <Section title="Why this vehicle stands out">
-          <div className={`${CARD} p-4`}><ul className="space-y-2">{wins.map((w) => <Check key={w}>{w}</Check>)}</ul></div>
-        </Section>
-      )}
-
-      {/* Optional insights */}
-      {insights.length > 0 && (
-        <div className="flex flex-wrap gap-2">{insights.map((t) => <span key={t} className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-[#0F172A] bg-emerald-50 border border-emerald-200 rounded-full px-2.5 py-1"><CheckCircle2 className="w-3 h-3 text-[#16A34A]" />{t}</span>)}</div>
-      )}
-
-      {/* Market snapshot */}
-      <Section title="Market summary">
-        <div className={`${CARD} divide-y divide-[#F1F5F9]`}>
-          <div className="flex items-center justify-between px-4 py-3"><span className="text-[12px] text-[#64748B]">Vehicles Compared</span><span className="text-[15px] font-extrabold">{comps.length}</span></div>
-          <div className="flex items-center justify-between px-4 py-3"><span className="text-[12px] text-[#64748B]">Average Price</span><span className="text-[15px] font-extrabold">{avgComp != null ? fmt$(avgComp) : avg != null ? fmt$(avg) : "—"}</span></div>
-          <div className="flex items-center justify-between px-4 py-3"><span className="text-[12px] text-[#64748B]">Average Mileage</span><span className="text-[15px] font-extrabold">{avgMiles != null ? `${avgMiles.toLocaleString()} mi` : "—"}</span></div>
-          <div className="flex items-center justify-between px-4 py-3"><span className="text-[12px] text-[#64748B]">Inventory Trend</span><span className="text-[15px] font-extrabold text-[#16A34A]">{flags.isPreview ? "Declining" : "Tracking"}</span></div>
-        </div>
-      </Section>
-    </div>
-  );
-}
 
 function InventoryTrendChart({ isPreview }: { isPreview: boolean }) {
   const [range, setRange] = useState<number>(90);
@@ -2530,6 +2279,37 @@ const Accordion = ({ title, defaultOpen, children }: { title: string; defaultOpe
   </details>
 );
 
+// Same-rooftop alternative card — the ONLY vehicles the passport merchandises
+// are the tenant's own stock. Tag line carries the package/price positioning
+// ("More equipment · +$2,450 in factory options"); links to the sibling's
+// passport with a full navigation so panel/scroll state resets.
+const ALT_TONE: Record<DealerAlternative["tone"], string> = {
+  blue: "bg-blue-50 text-[#2563EB]",
+  green: "bg-emerald-50 text-[#16A34A]",
+  violet: "bg-violet-50 text-violet-700",
+  neutral: "bg-slate-100 text-[#64748B]",
+};
+const AlternativeCard = ({ alt, compact = false }: { alt: DealerAlternative; compact?: boolean }) => (
+  <a href={`/v/${alt.slug}`} className={`block ${CARD} overflow-hidden hover:border-[#2563EB] transition-colors`}>
+    <div className={`${compact ? "h-[110px]" : "h-[140px]"} bg-[#eef0f3] flex items-center justify-center relative`}>
+      {alt.image ? <img src={alt.image} alt={alt.ymm || ""} loading="lazy" className="w-full h-full object-cover" /> : <Car className="w-8 h-8 text-[#94A3B8]" />}
+      <span className={`absolute top-2 left-2 text-[10px] font-bold rounded-full px-2 py-0.5 ${ALT_TONE[alt.tone]}`}>{alt.tag}</span>
+      {alt.condition && <span className="absolute top-2 right-2 text-[10px] font-bold uppercase tracking-wide rounded-full px-2 py-0.5 bg-black/60 text-white">{alt.condition === "cpo" ? "CPO" : alt.condition}</span>}
+    </div>
+    <div className="p-3">
+      <p className="text-[13px] font-bold text-[#0F172A] leading-tight line-clamp-1">{alt.ymm || "Vehicle"}</p>
+      {alt.trim && <p className="text-[11px] text-[#64748B] line-clamp-1">{alt.trim}{alt.packageCount ? ` · ${alt.packageCount} package${alt.packageCount === 1 ? "" : "s"}` : ""}</p>}
+      <div className="flex items-baseline justify-between gap-2 mt-1.5">
+        {alt.price != null ? <p className="text-[15px] font-extrabold text-[#0F172A]">{fmt$(alt.price)}</p> : <span />}
+        {alt.mileage != null && <p className="text-[11px] text-[#64748B]">{alt.mileage.toLocaleString()} mi</p>}
+      </div>
+      {alt.tagDetail && <p className="text-[11px] font-semibold text-[#16A34A] mt-0.5">{alt.tagDetail}</p>}
+      {!compact && alt.topPackages.length > 0 && <p className="text-[11px] text-[#94A3B8] mt-1 line-clamp-1">{alt.topPackages.join(" · ")}</p>}
+      <span className="mt-2 inline-flex items-center gap-1 text-[11px] font-semibold text-[#2563EB]">View this vehicle <ArrowRight className="w-3 h-3" /></span>
+    </div>
+  </a>
+);
+
 const IconCard = ({ icon: Icon, title, sub }: { icon: React.ElementType; title: string; sub?: string }) => (
   <div className={`${CARD} p-4 flex items-start gap-3`}>
     <span className="w-9 h-9 rounded-xl bg-blue-50 flex items-center justify-center shrink-0"><Icon className="w-[18px] h-[18px] text-[#2563EB]" /></span>
@@ -2589,6 +2369,9 @@ export default function PassportPanel({ panel, onClose, openPanel, d, listing, i
   // doesn't blank out as the drawer slides away.
   const [shown, setShown] = useState<PassportPanelKey | null>(panel);
   useEffect(() => { if (panel) setShown(panel); }, [panel]);
+  // Session heat-map signal: what this shopper keeps opening tunes which
+  // same-rooftop alternatives lead (price vs equipment vs coverage).
+  useEffect(() => { if (panel) recordPanelView(panel); }, [panel]);
   const key = panel ?? shown;
   if (!key) return null;
 
