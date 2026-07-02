@@ -4,6 +4,7 @@ import { useTenant } from "@/contexts/TenantContext";
 import { useVinDecode } from "@/hooks/useVinDecode";
 import { useVehiclePrefill, VehicleContextHeader } from "@/lib/vehiclePrefill";
 import { confirmPrintReady } from "@/lib/printReadiness";
+import { saveStickerToVehicle } from "@/lib/stickerStudio/api";
 import { toast } from "sonner";
 import { QRCodeSVG } from "qrcode.react";
 import { Printer, Download, ShieldCheck, CheckCircle2, Award } from "lucide-react";
@@ -29,6 +30,7 @@ const CpoSheet = () => {
   const [reconditioning, setReconditioning] = useState("");
   const [benefits, setBenefits] = useState<string[]>([]);
   const [carfaxUrl, setCarfaxUrl] = useState("");
+  const [vehicleFileId, setVehicleFileId] = useState<string | null>(null);
 
   // Seed program claims from the tenant's configured CPO programs (Admin →
   // Factory Warranty). Brand-matched OEM program wins, then a dealer-kind
@@ -56,6 +58,7 @@ const CpoSheet = () => {
   // Prefill from a vehicle file (?vehicleId=…). Seeds the form once and
   // resolves the CPO program from the dealer's configured programs.
   const prefill = useVehiclePrefill((v) => {
+    setVehicleFileId(v.id || null);
     setVehicle((prev) => ({
       ...prev,
       vin: v.vin || prev.vin,
@@ -86,9 +89,32 @@ const CpoSheet = () => {
     }
   };
 
+  // Persist the sheet into the vehicle file's generated_documents so stale
+  // detection covers it and it appears alongside the other documents.
+  const saveToVehicleFile = async () => {
+    if (!vehicleFileId || !vehicle.vin) return;
+    try {
+      await saveStickerToVehicle({
+        vehicleId: vehicleFileId,
+        tenantId: tenant?.id || null,
+        vin: vehicle.vin,
+        templateId: "cpo-sheet",
+        docType: "cpo_sheet",
+        snapshot: {
+          data: {
+            vin: vehicle.vin, stock: vehicle.stock,
+            vehicleTitle: `${vehicle.year} ${vehicle.make} ${vehicle.model}`.trim(),
+            mileage: vehicle.mileage,
+          },
+        },
+      });
+    } catch { /* best-effort — the print itself is not blocked */ }
+  };
+
   const handlePrint = () => {
     if (!confirmPrintReady(settings, currentStore?.name, (blockers) => blockers.forEach((b) => toast.error(b.message)))) return;
     window.print();
+    void saveToVehicleFile();
   };
   const handlePdf = async () => {
     if (!cardRef.current) return;
@@ -102,6 +128,7 @@ const CpoSheet = () => {
       const pdf = new jsPDF({ unit: "in", format: [w, h], orientation: "portrait" });
       pdf.addImage(imgData, "JPEG", 0, 0, w, h);
       pdf.save(`CPO-Sheet-${vehicle.vin || "draft"}.pdf`);
+      void saveToVehicleFile();
     } catch { toast.error("PDF failed"); } finally { setGenerating(false); }
   };
 

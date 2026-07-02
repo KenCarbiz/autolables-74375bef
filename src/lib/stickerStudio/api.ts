@@ -37,7 +37,7 @@ export interface SaveStickerArgs {
   vehicleId?: string | null;
   vin: string;
   templateId: string;
-  docType: "window" | "addendum";
+  docType: "window" | "addendum" | "cpo_sheet";
   labelMode?: "white" | "black";
   qrUrl?: string;
   pngDataUrl?: string;
@@ -159,7 +159,7 @@ export async function saveStickerToVehicle(args: SaveStickerArgs): Promise<ApiRe
           templateId: args.templateId,
           documentId: doc.id,
         });
-        await recordUsageEvent({ tenantId: args.tenantId, featureKey: args.docType === "window" ? "window_stickers" : "addendum_stickers", metric: "stickers_generated", entityType: args.docType, entityId: doc.id });
+        await recordUsageEvent({ tenantId: args.tenantId, featureKey: args.docType === "window" ? "window_stickers" : args.docType === "cpo_sheet" ? "cpo_sheets" : "addendum_stickers", metric: "stickers_generated", entityType: args.docType, entityId: doc.id });
         return { ok: true, documentId: doc.id, version: doc.version };
       }
     }
@@ -170,7 +170,7 @@ export async function saveStickerToVehicle(args: SaveStickerArgs): Promise<ApiRe
     const { data: row } = await client.from("vehicle_listings").select("documents").eq("id", args.vehicleId).maybeSingle();
     const documents = Array.isArray(row?.documents) ? row.documents : [];
     const entry = {
-      name: `${args.docType === "window" ? "Window Sticker" : "Addendum"} · ${args.templateId}`,
+      name: `${args.docType === "window" ? "Window Sticker" : args.docType === "cpo_sheet" ? "CPO Sheet" : "Addendum"} · ${args.templateId}`,
       type: "sticker",
       url: args.pdfDataUrl || args.pngDataUrl || "",
       created_at: new Date().toISOString(),

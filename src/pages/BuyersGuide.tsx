@@ -200,13 +200,22 @@ const WARRANTY_SYSTEMS = ["system_engine", "system_transmission", "system_steeri
 
 const BuyersGuide = () => {
   const navigate = useNavigate();
-  const { settings } = useDealerSettings();
+  const { settings, loading: settingsLoading } = useDealerSettings();
   const { log } = useAudit();
   const { currentStore } = useTenant();
   const { user } = useAuth();
   const cardRef = useRef<HTMLDivElement>(null);
 
   const [guideType, setGuideType] = useState<GuideType>("as-is");
+  // Admin's "FTC used-car warranty" default seeds the guide type once the
+  // dealer's settings arrive (the provider renders before they load).
+  const guideTypeSeeded = useRef(false);
+  useEffect(() => {
+    if (settingsLoading || guideTypeSeeded.current) return;
+    guideTypeSeeded.current = true;
+    if (settings.default_ftc_warranty === "implied") setGuideType("implied");
+    else if (settings.default_ftc_warranty === "dealer") setGuideType("warranty");
+  }, [settingsLoading, settings.default_ftc_warranty]);
   const [lang, setLang] = useState<Language>("en");
   const [vehicle, setVehicle] = useState<VehicleInfo>({
     year: "", make: "", model: "", vin: "", stock: "", mileage: "", price: "",

@@ -28,7 +28,7 @@ const toneClass: Record<string, string> = {
   rose: "bg-rose-50 text-rose-700",
 };
 
-const TYPE_LABEL: Record<string, string> = { window: "Window Sticker", addendum: "Addendum", passport: "Vehicle Passport" };
+const TYPE_LABEL: Record<string, string> = { window: "Window Sticker", addendum: "Addendum", passport: "Vehicle Passport", cpo_sheet: "CPO Sheet" };
 const fmtDate = (d?: string | null) => (d ? new Date(d).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" }) : "—");
 
 const ACTION_META: Record<DocumentAction, { label: string; icon: typeof Check }> = {

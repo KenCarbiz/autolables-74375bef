@@ -32,7 +32,7 @@ const SaveCarInventory = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { currentStore } = useTenant();
-  const { settings } = useDealerSettings();
+  const { settings, loading: settingsLoading } = useDealerSettings();
   const { log } = useAudit();
   const { decode, decoding, error: vinError } = useVinDecode();
   const { fetchFactoryData, loading: factoryLoading } = useFactoryData();
@@ -58,8 +58,16 @@ const SaveCarInventory = () => {
   const [factoryData, setFactoryData] = useState<NhtsaMsrpData | null>(null);
   const [showEquipment, setShowEquipment] = useState(false);
 
-  // FTC Buyers Guide
+  // FTC Buyers Guide — Admin's "FTC used-car warranty" default seeds the
+  // designation once the dealer's settings arrive.
   const [buyersGuideType, setBuyersGuideType] = useState<"as-is" | "implied" | "warranty">("as-is");
+  const guideTypeSeeded = useRef(false);
+  useEffect(() => {
+    if (settingsLoading || guideTypeSeeded.current) return;
+    guideTypeSeeded.current = true;
+    if (settings.default_ftc_warranty === "implied") setBuyersGuideType("implied");
+    else if (settings.default_ftc_warranty === "dealer") setBuyersGuideType("warranty");
+  }, [settingsLoading, settings.default_ftc_warranty]);
   const [warrantyDuration, setWarrantyDuration] = useState("30 days or 1,000 miles");
   const [warrantyPercent, setWarrantyPercent] = useState("50");
 
