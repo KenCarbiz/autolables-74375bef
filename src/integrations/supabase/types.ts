@@ -2269,15 +2269,22 @@ export type Database = {
       leads: {
         Row: {
           captured_at: string
+          created_at: string
           email: string
+          escalated_at: string | null
+          escalation_level: number
+          first_response_at: string | null
           id: string
           name: string
           notes: string
           phone: string
+          routed_agent_id: string | null
+          routing: Json | null
           signing_url: string
           source: string
           status: string
           store_id: string | null
+          sub_source: string | null
           tenant_id: string | null
           updated_at: string
           vehicle_interest: string
@@ -2285,15 +2292,22 @@ export type Database = {
         }
         Insert: {
           captured_at?: string
+          created_at?: string
           email?: string
+          escalated_at?: string | null
+          escalation_level?: number
+          first_response_at?: string | null
           id?: string
           name?: string
           notes?: string
           phone?: string
+          routed_agent_id?: string | null
+          routing?: Json | null
           signing_url?: string
           source?: string
           status?: string
           store_id?: string | null
+          sub_source?: string | null
           tenant_id?: string | null
           updated_at?: string
           vehicle_interest?: string
@@ -2301,15 +2315,22 @@ export type Database = {
         }
         Update: {
           captured_at?: string
+          created_at?: string
           email?: string
+          escalated_at?: string | null
+          escalation_level?: number
+          first_response_at?: string | null
           id?: string
           name?: string
           notes?: string
           phone?: string
+          routed_agent_id?: string | null
+          routing?: Json | null
           signing_url?: string
           source?: string
           status?: string
           store_id?: string | null
+          sub_source?: string | null
           tenant_id?: string | null
           updated_at?: string
           vehicle_interest?: string
@@ -3267,6 +3288,7 @@ export type Database = {
           price_tiers: Json | null
           sort_order: number
           subtitle: string | null
+          tenant_id: string | null
           updated_at: string
           upgrade: Json | null
           warranty: string | null
@@ -3290,6 +3312,7 @@ export type Database = {
           price_tiers?: Json | null
           sort_order?: number
           subtitle?: string | null
+          tenant_id?: string | null
           updated_at?: string
           upgrade?: Json | null
           warranty?: string | null
@@ -3313,6 +3336,7 @@ export type Database = {
           price_tiers?: Json | null
           sort_order?: number
           subtitle?: string | null
+          tenant_id?: string | null
           updated_at?: string
           upgrade?: Json | null
           warranty?: string | null
@@ -4921,6 +4945,7 @@ export type Database = {
       vehicle_listings: {
         Row: {
           advertised_price_before_doc: number | null
+          assigned_agent_id: string | null
           available_accessories: Json
           blackbook: Json | null
           certification: Json | null
@@ -4999,6 +5024,7 @@ export type Database = {
         }
         Insert: {
           advertised_price_before_doc?: number | null
+          assigned_agent_id?: string | null
           available_accessories?: Json
           blackbook?: Json | null
           certification?: Json | null
@@ -5077,6 +5103,7 @@ export type Database = {
         }
         Update: {
           advertised_price_before_doc?: number | null
+          assigned_agent_id?: string | null
           available_accessories?: Json
           blackbook?: Json | null
           certification?: Json | null
@@ -5980,6 +6007,7 @@ export type Database = {
         Args: { _slug: string }
         Returns: {
           advertised_price_before_doc: number | null
+          assigned_agent_id: string | null
           available_accessories: Json
           blackbook: Json | null
           certification: Json | null
