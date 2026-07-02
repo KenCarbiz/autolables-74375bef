@@ -293,7 +293,7 @@ const VehiclePassportDealer = () => {
         <Callout>For the specific criteria and the period this recognition covers, ask the dealership directly.</Callout>
       </InfoModal>
 
-      <PassportCtaDock go={go} dealerPhone={d.dealerPhone || undefined} reviewRating={d.reviewRating} advisor={d.dealerTrust} />
+      <PassportCtaDock go={go} dealerPhone={d.dealerPhone || undefined} reviewRating={d.reviewRating} advisor={d.dealerTrust} routing={d.contactRouting} vehicle={{ storeId: listing.store_id, vehicleId: listing.id, vin: listing.vin }} />
     </div>
   );
 };

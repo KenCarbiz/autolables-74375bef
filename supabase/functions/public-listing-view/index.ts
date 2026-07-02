@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
+import { resolveCustomerPassportRouting, type PassportAgent } from "../_shared/passport-routing.ts";
 
 // ──────────────────────────────────────────────────────────────
 // public-listing-view
@@ -154,6 +155,30 @@ serve(async (req) => {
           mobile_cta_variant: (s.mobile_slideout_cta_variant as string) || "",
         };
         if (Object.values(trust).some((v) => v)) row.dealer_trust = trust;
+
+        // ── Contact routing: resolve WHO this shopper reaches (agent / BDC /
+        // store) server-side and attach only the result. The roster, priority
+        // ladder, and rotation memory never reach the anonymous client.
+        try {
+          const agents = (Array.isArray(s.passport_agents) ? s.passport_agents : []) as PassportAgent[];
+          const assignments = (s.vehicle_agent_assignments ?? {}) as Record<string, string>;
+          const assignedAgentId =
+            (row.assigned_agent_id as string) || assignments[String(row.vin || "").toUpperCase()] || assignments[String(row.vin || "")] || null;
+          const routing = resolveCustomerPassportRouting(
+            { ...(s.passport_contact_routing ?? {}), dealershipDefaultContact: {
+              salesPhone: ((s.passport_contact_routing as Record<string, Record<string, string>> | undefined)?.dealershipDefaultContact?.salesPhone) || (s.dealer_phone as string) || "",
+              salesEmail: ((s.passport_contact_routing as Record<string, Record<string, string>> | undefined)?.dealershipDefaultContact?.salesEmail) || (s.view_notify_email as string) || "",
+            } },
+            {
+              agents,
+              assignedAgentId,
+              rotationState: (s.passport_rotation_state ?? {}) as Record<string, string>,
+              now: new Date(),
+            },
+          );
+          // Strip internal email before it ships to an anonymous page.
+          row.contact_routing = { ...routing, email: undefined };
+        } catch { /* routing must never break the listing payload */ }
 
         // ── Factory warranty for new / CPO cars. The dealer verifies OEM
         // warranty terms per brand in admin; here we match the listing's make

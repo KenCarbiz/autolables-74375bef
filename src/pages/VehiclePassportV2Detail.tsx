@@ -78,17 +78,43 @@ const LeadForm = ({
         zip = sessionStorage.getItem("al_zip") || "";
       } catch { /* storage unavailable */ }
       const extras = [extraNotes?.() || "", zip ? `ZIP ${zip}` : ""].filter(Boolean).join(" · ");
-      await (supabase as unknown as { from: (t: string) => { insert: (r: unknown) => Promise<unknown> } }).from("leads").insert({
+      // Contact routing context resolved server-side by public-listing-view.
+      // Rides on the lead so the store knows who the shopper was shown, and
+      // lead-alert re-resolves (CRM ownership can only be checked at lead time).
+      const routing = (listing as unknown as { contact_routing?: Record<string, unknown> }).contact_routing || null;
+      const subSource = intent === "reserve" ? "reserve_vehicle" : intent === "trade" ? "trade_appraisal" : "contact";
+      const basePayload = {
         store_id: listing.store_id, name: name.trim(), email: email.trim() || "", phone: phone.trim() || "",
         vehicle_interest: `${listing.ymm || "Vehicle"} (${label})`,
         vehicle_vin: listing.vin, source: src, status: "new",
         notes: `[intent=${intent}] Passport V2 — ${label}${extras ? ` · ${extras}` : ""}${message.trim() ? `: ${message.trim()}` : ""}`,
-      });
-      trackLeadSubmitted({ storeId: listing.store_id, vehicleId: listing.id, vin: listing.vin, source: src === "qr_scan" ? "window_sticker_qr" : "passport", metadata: { intent } });
+      };
+      const routedPayload = {
+        ...basePayload,
+        sub_source: subSource,
+        routing: routing ? {
+          source: "customer_passport",
+          routingTargetType: routing.routingTargetType ?? null,
+          routingTargetId: routing.routingTargetId ?? null,
+          routingReason: routing.routingReason ?? null,
+          displayMode: routing.displayMode ?? null,
+          afterHours: routing.afterHours ?? false,
+        } : null,
+      };
+      // Anonymous shoppers can INSERT leads but not SELECT them back, so no
+      // .select() here — lead-alert locates the fresh row with the service
+      // role. The routing columns land with a migration; until it's applied
+      // the routed insert fails — a lead must never be lost to that, so
+      // retry with the bare payload.
+      type LeadsTable = { from: (t: string) => { insert: (r: unknown) => Promise<{ error: unknown }> } };
+      let insErr = (await (supabase as unknown as LeadsTable).from("leads").insert(routedPayload)).error;
+      if (insErr) insErr = (await (supabase as unknown as LeadsTable).from("leads").insert(basePayload)).error;
+      if (insErr) throw insErr;
+      trackLeadSubmitted({ storeId: listing.store_id, vehicleId: listing.id, vin: listing.vin, source: src === "qr_scan" ? "window_sticker_qr" : "passport", metadata: { intent, routing_target_type: (routing?.routingTargetType as string) ?? null } });
       // Fire-and-forget dealer alert — a submitted lead should page someone
       // faster than a page view does.
       supabase.functions.invoke("lead-alert", {
-        body: { slug: listing.slug, vin: listing.vin, intent, name: name.trim(), phone: phone.trim() || null, email: email.trim() || null, source: src },
+        body: { slug: listing.slug, vin: listing.vin, intent, name: name.trim(), phone: phone.trim() || null, email: email.trim() || null, source: src, sub_source: subSource },
       }).catch(() => { /* alert failure never blocks the shopper */ });
       setSent(true);
       onDone?.();

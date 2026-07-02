@@ -427,7 +427,7 @@ const VehiclePassportVerification = () => {
       {modal === "sources" && <Modal title="Data sources" onClose={() => setModal(null)} body="This report draws on the data sources that have information available for this vehicle — vehicle history records, OEM/VIN decode, NHTSA recall data, MarketCheck market data, and dealer-provided service and media. Only sources that contributed data for this specific vehicle are shown. Availability varies by vehicle and region." />}
       {modal === "promise" && <Modal title="Our Verification Promise" onClose={() => setModal(null)} body="AutoLabels is committed to transparency. We verify every vehicle using trusted third-party data sources and a structured inspection process, and we clearly distinguish verified data from items that still need dealer confirmation. We never present unconfirmed information as verified." />}
 
-      <PassportCtaDock go={go} dealerPhone={d.dealerPhone || undefined} reviewRating={d.reviewRating} advisor={d.dealerTrust} />
+      <PassportCtaDock go={go} dealerPhone={d.dealerPhone || undefined} reviewRating={d.reviewRating} advisor={d.dealerTrust} routing={d.contactRouting} vehicle={{ storeId: listing.store_id, vehicleId: listing.id, vin: listing.vin }} />
     </div>
   );
 };

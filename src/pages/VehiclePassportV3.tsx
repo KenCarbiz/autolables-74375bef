@@ -871,7 +871,7 @@ const VehiclePassportV3 = () => {
         </div>
       )}
 
-      <PassportCtaDock go={go} dealerPhone={d.dealerPhone || undefined} reviewRating={d.reviewRating} advisor={adv} />
+      <PassportCtaDock go={go} dealerPhone={d.dealerPhone || undefined} reviewRating={d.reviewRating} advisor={adv} routing={d.contactRouting} vehicle={{ storeId: listing.store_id, vehicleId: listing.id, vin: listing.vin }} />
 
       <PassportInfoModal info={activeInfo} onClose={closeInfo} go={go} openPanel={(k) => setActivePanel(k as PassportPanelKey)} />
 

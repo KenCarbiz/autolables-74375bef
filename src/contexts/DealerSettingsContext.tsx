@@ -8,6 +8,7 @@ import type { DealerProgram } from "@/lib/dealerPrograms";
 import type { OemFactoryWarranty, CpoProgram } from "@/lib/oemWarranty";
 import type { DocumentRules } from "@/lib/documentRules";
 import { DEFAULT_STICKY_BUTTONS, type StickyBottomButtons } from "@/lib/stickyButtons";
+import { DEFAULT_CONTACT_ROUTING, type CustomerPassportContactSettings, type PassportAgent } from "@/lib/passportRouting";
 
 // A configurable internal recon/service the dealer routes to a responsible
 // party. Non-customer charge — tracked as the store's own cost.
@@ -287,6 +288,16 @@ export interface DealerSettings {
   dealer_hours: string;               // free text (e.g. "Mon–Sat 9–7, Sun closed")
   // Mobile Passport slide-out footer CTA style (default: dealer_availability).
   mobile_slideout_cta_variant: string; // "context_aware" | "two_button" | "dealer_availability" | "progressive"
+  // Customer Passport contact routing: which person/team the shopper's
+  // Reserve / Trade / Contact actions reach. The shopper never sees the
+  // routing logic — public-listing-view resolves it server-side and attaches
+  // only the result. Agents live here (per-rooftop roster with availability);
+  // rotation memory is written by lead-alert into passport_rotation_state.
+  passport_contact_routing: CustomerPassportContactSettings;
+  passport_agents: PassportAgent[];
+  passport_rotation_state: Record<string, string>;
+  // Per-vehicle agent assignment (VIN → agent id) for Assigned Agent mode.
+  vehicle_agent_assignments: Record<string, string>;
 }
 
 export const DEFAULT_SETTINGS: DealerSettings = {
@@ -416,6 +427,10 @@ export const DEFAULT_SETTINGS: DealerSettings = {
   dealer_services: "",
   dealer_hours: "",
   mobile_slideout_cta_variant: "dealer_availability",
+  passport_contact_routing: DEFAULT_CONTACT_ROUTING,
+  passport_agents: [],
+  passport_rotation_state: {},
+  vehicle_agent_assignments: {},
 };
 
 interface DealerSettingsContextType {
