@@ -52,10 +52,12 @@ const categoryOf = (d: Doc) => {
 const fileType = (url: string) => /\.(png|jpe?g|webp|gif)(\?|$)/i.test(url) ? "Image" : /\.docx?(\?|$)/i.test(url) ? "DOC" : "PDF";
 const fmtDate = (s?: string) => s ? new Date(s).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "";
 
-const PASSPORT_NAV = [
+// Highlights/specs live in the passport slide-out panels (the richest
+// renderers), reached via ?panel= deep links rather than the stale V2 pages.
+const PASSPORT_NAV: { label: string; to?: string; panel?: string; active?: boolean }[] = [
   { label: "Overview", to: "" }, { label: "Market Intelligence", to: "market-price" }, { label: "Why This Is A Great Buy", to: "great-buy" },
   { label: "Vehicle History", to: "vehicle-history" }, { label: "Ownership Timeline", to: "ownership-timeline" }, { label: "Factory Warranty", to: "factory-warranty" },
-  { label: "What Owners Say", to: "owner-reviews" }, { label: "Vehicle Highlights", to: "features" }, { label: "Specifications", to: "specifications" },
+  { label: "What Owners Say", to: "owner-reviews" }, { label: "Vehicle Highlights", panel: "highlights" }, { label: "Specifications", panel: "key-specs" },
   { label: "Why Buy From This Dealership?", to: "dealer" }, { label: "Documents", to: "documents", active: true },
 ];
 
@@ -224,7 +226,7 @@ const VehiclePassportDocuments = () => {
           </div>
           <nav className="mt-4 space-y-0.5 flex-1">
             {PASSPORT_NAV.map((n) => (
-              <button key={n.label} onClick={() => navigate(pp(n.to))} className={`w-full text-left px-3 py-2 rounded-lg text-[13px] font-medium transition-colors ${n.active ? "bg-blue-50 text-[#2563EB]" : "text-[#64748B] hover:bg-slate-50"}`}>{n.label}</button>
+              <button key={n.label} onClick={() => navigate(n.panel ? `/v/${slug}?panel=${n.panel}${isPreview ? "&preview=1" : ""}` : pp(n.to || ""))} className={`w-full text-left px-3 py-2 rounded-lg text-[13px] font-medium transition-colors ${n.active ? "bg-blue-50 text-[#2563EB]" : "text-[#64748B] hover:bg-slate-50"}`}>{n.label}</button>
             ))}
           </nav>
           <div className="mt-4 rounded-xl border border-[#E6E8EC] bg-[#fafbfc] p-4">

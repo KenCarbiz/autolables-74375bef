@@ -23,7 +23,7 @@ import { readBuildSheet } from "@/lib/buildSheet";
 import { readPassportOrigin, clearPassportOrigin, type PassportOrigin } from "@/lib/passportOrigin";
 import { trackPassportOpened, trackWindowStickerScanned, trackCustomerCtaClicked } from "@/lib/engagement/customerEngagement";
 import { packetVisible } from "@/lib/packetModules";
-import PassportPanel, { type PassportPanelKey } from "@/components/passport/PassportPanel";
+import PassportPanel, { isPassportPanelKey, type PassportPanelKey } from "@/components/passport/PassportPanel";
 import PassportCtaDock from "@/components/passport/PassportCtaDock";
 import PassportInfoModal, { type InfoModalKey } from "@/components/passport/PassportInfoModal";
 import { Info } from "lucide-react";
@@ -174,22 +174,45 @@ const VehiclePassportV3 = () => {
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
 
+  // Deep link: /v/:slug?panel=<key> opens that slide-out on load, so panel
+  // content (specs, highlights, warranty) is shareable and the Documents
+  // sidebar has a real target. The param is stripped from the base history
+  // entry so the back gesture lands on a clean URL with the panel closed.
+  useEffect(() => {
+    const p = new URLSearchParams(window.location.search).get("panel");
+    if (!isPassportPanelKey(p)) return;
+    const url = new URL(window.location.href);
+    url.searchParams.delete("panel");
+    window.history.replaceState(window.history.state, "", url);
+    setActivePanel(p);
+  }, []);
+
   // Panel <-> browser history: on mobile the drawer covers the page, so the OS
   // back gesture must close the panel — not exit the passport (a lost session
   // on the lot; QR shoppers rarely re-scan). One history entry per panel
-  // session; switching panels reuses it, closing by X consumes it.
+  // session; switching panels reuses it, closing by X consumes it. The entry
+  // carries ?panel=<key> so the open panel is copyable from the address bar.
   const panelOpen = activePanel != null;
   useEffect(() => {
-    if (!panelOpen) return;
+    if (activePanel == null) return;
     let popped = false;
-    window.history.pushState({ alPanel: true }, "");
+    const url = new URL(window.location.href);
+    url.searchParams.set("panel", activePanel);
+    window.history.pushState({ alPanel: true }, "", url);
     const onPop = () => { popped = true; setActivePanel(null); };
     window.addEventListener("popstate", onPop);
     return () => {
       window.removeEventListener("popstate", onPop);
       if (!popped && window.history.state?.alPanel) window.history.back();
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [panelOpen]);
+  useEffect(() => {
+    if (activePanel == null || !window.history.state?.alPanel) return;
+    const url = new URL(window.location.href);
+    url.searchParams.set("panel", activePanel);
+    window.history.replaceState({ alPanel: true }, "", url);
+  }, [activePanel]);
 
   const isPreview = typeof window !== "undefined" && new URLSearchParams(window.location.search).has("preview");
   // QR attribution: window-sticker QRs land with ?src=qr. Persist for the whole
@@ -821,8 +844,8 @@ const VehiclePassportV3 = () => {
               <div className="grid grid-cols-4 sm:grid-cols-5 gap-y-4 gap-x-2 mt-4">{highlights.slice(0, 10).map((h, i) => <div key={i} className="flex flex-col items-center text-center gap-1.5"><span className="w-11 h-11 rounded-full bg-slate-100 flex items-center justify-center shrink-0"><h.icon className="w-5 h-5 text-[#64748B]" strokeWidth={1.75} /></span><div className="w-full min-w-0"><div className="text-[11px] font-bold leading-tight line-clamp-2 break-words">{h.t}</div><div className="text-[10px] text-[#94A3B8] truncate">{h.s}</div></div></div>)}</div>
             ) : <p className="text-[13px] text-[#64748B] mt-3">Equipment highlights appear here as the vehicle's data is decoded.</p>}
             <div className="mt-auto pt-3 flex items-center gap-4">
-              <Link onClick={() => openPanel("highlights")} className="self-start">All features</Link>
-              <Link onClick={() => openPanel("key-specs")} className="self-start">Full specs</Link>
+              <Link onClick={() => openPanel("highlights")} className="self-start">All features &amp; equipment</Link>
+              <Link onClick={() => openPanel("key-specs")} className="self-start">Full specifications</Link>
             </div>
           </div>
           )}

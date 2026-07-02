@@ -836,12 +836,21 @@ const VehiclePassportV2Detail = () => {
   const navigate = useNavigate();
   const { listing, loading, notFound } = usePublicListing(vehicleSlug);
 
+  // Old shared links to the V2-era features/specifications pages redirect to
+  // the passport's richer slide-out panels (deep-linked via ?panel=).
+  const PANEL_SHIMS: Record<string, string> = { features: "highlights", specifications: "key-specs" };
+  const shimPanel = section ? PANEL_SHIMS[section] : undefined;
+  useEffect(() => {
+    if (shimPanel && vehicleSlug) navigate(`/v/${vehicleSlug}?panel=${shimPanel}`, { replace: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [shimPanel, vehicleSlug]);
+
   const d = useMemo(() => (listing ? derivePassport(listing) : null), [listing]);
-  const def = section ? SECTIONS[section] : undefined;
+  const def = section && !shimPanel ? SECTIONS[section] : undefined;
 
   const back = () => navigate(`/${base}/${vehicleSlug}`);
 
-  if (loading) return <div className="min-h-screen flex items-center justify-center bg-[#F6F7F9]"><div className="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" /></div>;
+  if (loading || shimPanel) return <div className="min-h-screen flex items-center justify-center bg-[#F6F7F9]"><div className="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" /></div>;
 
   if (notFound || !listing || !d) return (
     <div className="min-h-screen flex items-center justify-center px-6 bg-[#F6F7F9]">
