@@ -33,6 +33,16 @@ const CODE_RE = /^[A-Z]{1,3}\d{1,4}$/;                                          
 const META_RE = /\b(msrp|warranty|currency|invoice|jato|segment|dimensions?|emission|plant of assembly|country|weights?|charges?|model generation|model year|ramp angle|secondary|delivery charge)\b/i;
 const RATING_RE = /\b(iihs|nhtsa)\b|-(good|acceptable|marginal|poor|tsp|updated|[1-5])$|overlap|rollover|frontal crash|side impact-/i;
 const PAINT_RE = /\b(metallic|pearl)\b|^paint[- ]/i;                                     // paint-color variants
+// Engineering/spec rows that arrive as feature-name strings: parenthesized
+// measurements ("Front Wheel Diameter (21 in)"), chassis dimensions, and
+// sub-attribute rows ("Activates Brake Lights", "Seat belt warning").
+const SPEC_MEASURE_RE = /\(\s*\d+(\.\d+)?\s?(in|mm|cm|cu\.?\s?ft|lbs?|kg|gal|l)\b\.?\s*\)\s*$/i;
+const SPEC_DIM_RE = /\b(wheelbase|wheel (diameter|width)|(front|rear) wheel (diameter|width)|track (front|rear)|(front|rear) track|overhang|bore|stroke|axle ratio|compression ratio|approach angle|departure angle)\b/i;
+const ACTIVATES_RE = /^activates\b/i;
+const WARNING_RE = /\bwarnings?$/i;
+// Shopper-meaningful warning systems stay ("Blind Spot Warning"); bare
+// engineering rows ("Seat belt warning") go.
+const WARNING_KEEP_RE = /\b(blind ?spot|lane departure|forward collision|cross ?traffic|driver attention|tire pressure|low tire|pedestrian)\b/i;
 const GENERIC = new Set([
   "engine", "fuel", "fuel tanks", "fuel consumption", "transmission", "electrical system",
   "performance", "tires", "tire", "suspension", "ventilation system", "air conditioning",
@@ -57,30 +67,104 @@ const isEquipNoise = (raw: string): boolean => {
   if (s.length < 2) return true;
   if (CODE_RE.test(s)) return true;
   if (META_RE.test(s) || RATING_RE.test(s) || PAINT_RE.test(s)) return true;
+  if (SPEC_MEASURE_RE.test(s) || SPEC_DIM_RE.test(s) || ACTIVATES_RE.test(s)) return true;
+  if (WARNING_RE.test(s) && !WARNING_KEEP_RE.test(s)) return true;
   if (GENERIC.has(s.toLowerCase())) return true;
   return false;
 };
+
+// Concept families: the decoder emits every variant of one feature as its own
+// row ("Front Sunroof", "Glass Sunroof", "One-Touch Opening Sunroof-Front").
+// When two or more rows land in a family, they collapse to one canonical row.
+const FAMILY_RULES: { re: RegExp; canon: (members: string[]) => string }[] = [
+  { re: /\b(sun ?roofs?|moon ?roofs?)\b/i, canon: (m) => m.some((s) => /panoramic/i.test(s)) ? "Panoramic sunroof" : m.some((s) => /power|electric|one.?touch/i.test(s)) ? "Power sunroof" : "Sunroof" },
+  { re: /\bhead ?(light|lamp)s?\b/i, canon: (m) => `${m.some((s) => /\bled\b/i.test(s)) ? "LED headlights" : "Headlights"}${m.some((s) => /high ?beam|auto/i.test(s)) ? " (auto high-beam)" : ""}` },
+  { re: /\b(heated|ventilated|cooled|climate.?controlled)\b[^.]*\bseats?\b/i, canon: (m) => {
+      const heated = m.some((s) => /heated/i.test(s));
+      const vented = m.some((s) => /ventilated|cooled|climate/i.test(s));
+      return heated && vented ? "Heated & ventilated seats" : heated ? "Heated seats" : "Ventilated seats";
+    } },
+  { re: /\b(keyless|proximity key|push.?button start|remote (engine )?start)\b/i, canon: (m) => m.some((s) => /remote (engine )?start/i.test(s)) ? "Keyless entry & remote start" : "Keyless entry & push-button start" },
+  { re: /\b(park(ing)? (sensor|assist|aid)s?|surround.?view|360.?(degree)? camera|birds?.?eye)\b/i, canon: (m) => m.some((s) => /surround|360|birds?.?eye/i.test(s)) ? "Surround-view camera & parking sensors" : "Parking sensors" },
+  { re: /\bwireless (charging|charger|phone charg)/i, canon: () => "Wireless phone charging" },
+];
+
+const equipKey = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+const equipTokens = (key: string) => key.split(" ").filter(Boolean).map((t) => t.replace(/s$/, ""));
+
 export const cleanEquipmentList = (items: string[]): string[] => {
   const seen = new Set<string>();
-  const out: string[] = [];
+  const kept: string[] = [];
   for (const raw of items) {
     if (isEquipNoise(raw)) continue;
     const norm = normSpelling(raw);
-    const key = norm.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+    const key = equipKey(norm);
     if (!key || seen.has(key)) continue;
     seen.add(key);
-    out.push(norm);
+    kept.push(norm);
   }
-  return out;
+
+  // Family merge: collapse each ≥2-member family to one canonical row, at the
+  // position of its first member. Single-member families keep their own text.
+  const familyOf = (s: string) => FAMILY_RULES.findIndex((f) => f.re.test(s));
+  const members = new Map<number, string[]>();
+  for (const item of kept) {
+    const f = familyOf(item);
+    if (f >= 0) members.set(f, [...(members.get(f) || []), item]);
+  }
+  const merged: string[] = [];
+  const emittedFamily = new Set<number>();
+  for (const item of kept) {
+    const f = familyOf(item);
+    if (f < 0) { merged.push(item); continue; }
+    const fam = members.get(f)!;
+    if (fam.length < 2) { merged.push(item); continue; }
+    if (!emittedFamily.has(f)) { emittedFamily.add(f); merged.push(FAMILY_RULES[f].canon(fam)); }
+  }
+
+  // Containment dedupe: drop generic losers whose word set is a strict subset
+  // of a more specific sibling ("Headlights" ⊂ "LED Headlights", "Heated
+  // Seats" ⊂ "Heated Driver Seat"). An inverted token index keeps this linear
+  // in practice on decoder-sized lists.
+  const tokenSets = merged.map((s) => new Set(equipTokens(equipKey(s))));
+  const byToken = new Map<string, number[]>();
+  tokenSets.forEach((ts, i) => ts.forEach((t) => byToken.set(t, [...(byToken.get(t) || []), i])));
+  const drop = new Set<number>();
+  tokenSets.forEach((ts, i) => {
+    if (ts.size === 0) return;
+    const candidates = new Set<number>();
+    ts.forEach((t) => (byToken.get(t) || []).forEach((j) => { if (j !== i) candidates.add(j); }));
+    for (const j of candidates) {
+      if (drop.has(j)) continue;
+      const other = tokenSets[j];
+      if (other.size > ts.size && [...ts].every((t) => other.has(t))) { drop.add(i); break; }
+    }
+  });
+  return merged.filter((_, i) => !drop.has(i));
 };
+
+// Upholstery color OPTIONS the decoder lists for the trim ("Vermilion Red
+// Semi-Aniline Leather", "Graphite Leather") — only the color actually in the
+// car belongs on its equipment list, so mismatched color variants are dropped
+// against the listing's selected interior color.
+const UPHOLSTERY_RE = /\b(leather(ette)?|cloth|upholstery|semi.?aniline|nappa|suede|ultrasuede|vinyl)\b/i;
+const COLOR_WORDS = ["black", "white", "red", "blue", "gray", "grey", "brown", "tan", "beige", "ivory", "cream", "charcoal", "graphite", "ebony", "vermilion", "saddle", "camel", "stone", "slate", "espresso", "cocoa", "chestnut", "sand", "linen", "oyster", "parchment", "mocha", "burgundy", "wine", "navy", "titanium", "ash", "walnut", "cognac", "caramel", "terracotta"];
 
 export const listingEquipment = (listing: VehicleListing): string[] => {
   const toList = (v: unknown): string[] => Array.isArray(v)
     ? v.map((x) => typeof x === "string" ? x : String((x as Record<string, unknown>)?.name ?? (x as Record<string, unknown>)?.label ?? (x as Record<string, unknown>)?.description ?? "")).map((s) => s.trim()).filter(Boolean)
     : typeof v === "string" ? v.split(/[,;|]/).map((s) => s.trim()).filter(Boolean) : [];
   const mc = (listing.mc_attributes || {}) as Record<string, unknown>;
+  const ksRaw = (listing.key_specs || {}) as Record<string, unknown>;
+  const intColor = String(ksRaw.interior_color ?? mc.interior_color ?? "").toLowerCase();
   const fromFeatures = (listing.features || []).map((f) => [f.title, f.subtitle].filter(Boolean).join(" ").trim()).filter(Boolean);
-  return cleanEquipmentList([...fromFeatures, ...toList(mc.options), ...toList(mc.features)]);
+  const all = [...fromFeatures, ...toList(mc.options), ...toList(mc.features)].filter((item) => {
+    if (!intColor || !UPHOLSTERY_RE.test(item)) return true;
+    const lc = item.toLowerCase();
+    const named = COLOR_WORDS.filter((c) => new RegExp(`\\b${c}\\b`).test(lc));
+    return named.length === 0 || named.some((c) => intColor.includes(c));
+  });
+  return cleanEquipmentList(all);
 };
 
 export const fmt$ = (n: number | null | undefined) =>

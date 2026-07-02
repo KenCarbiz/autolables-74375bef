@@ -1300,9 +1300,10 @@ function buildPanel(key: PassportPanelKey, d: PassportData, listing: VehicleList
       const perfBits = [engine && `powered by ${engine}`, hp && `producing ${hp}`, trans && `paired with ${trans}`, drivetrain && `driving the ${drivetrain}`].filter(Boolean);
       if (perfBits.length) story.push({ t: "Performance", c: <p>This vehicle is {perfBits.join(", ")}.{mpg ? ` EPA-estimated ${mpg}.` : ""}</p> });
       if (premium && groups.Comfort?.length) story.push({ t: "Luxury", c: <p>The {listing.trim} trim is appointed with {groups.Comfort.slice(0, 5).join(", ")}.</p> });
-      if (groups.Technology?.length) story.push({ t: "Technology", c: <p>Connectivity and infotainment include {groups.Technology.join(", ")}.</p> });
-      if (groups.Comfort?.length) story.push({ t: "Comfort", c: <p>Cabin comfort features include {groups.Comfort.join(", ")}.</p> });
-      if (groups.Safety?.length) story.push({ t: "Safety", c: <p>Driver assistance and safety equipment include {groups.Safety.join(", ")}.</p> });
+      const storyList = (items: string[]) => `${items.slice(0, 6).join(", ")}${items.length > 6 ? ", and more" : ""}`;
+      if (groups.Technology?.length) story.push({ t: "Technology", c: <p>Connectivity and infotainment include {storyList(groups.Technology)}.</p> });
+      if (groups.Comfort?.length) story.push({ t: "Comfort", c: <p>Cabin comfort features include {storyList(groups.Comfort)}.</p> });
+      if (groups.Safety?.length) story.push({ t: "Safety", c: <p>Driver assistance and safety equipment include {storyList(groups.Safety)}.</p> });
       if (awd) story.push({ t: "Driving Experience", c: <p>{drivetrain} delivers confident handling and all-weather capability.</p> });
       const ownBits = [d.warrantyStr && `${d.warrantyStr} of factory warranty remains`, d.recallClear && "no open recalls are reported", d.serviceCount > 0 && `${d.serviceCount} service records are on file`].filter(Boolean) as string[];
       if (ownBits.length) story.push({ t: "Ownership", c: <p>For peace of mind, {ownBits.join(", ")}.</p> });
@@ -1311,8 +1312,15 @@ function buildPanel(key: PassportPanelKey, d: PassportData, listing: VehicleList
       if (Number(ks.mpg_hwy) >= 28) recs.push({ t: "Daily Commuters", w: `Up to ${ks.mpg_hwy} MPG highway eases the daily drive.` });
       if (premium) { recs.push({ t: "Luxury Buyers", w: `${listing.trim} trim brings premium materials and features.` }); recs.push({ t: "Business Professionals", w: "A refined, professional presence." }); }
       if (awd) recs.push({ t: "Weekend Adventures", w: `${drivetrain} adds all-weather confidence.` });
-      const exterior = groups.Exterior || [];
-      const interior = Array.from(new Set([...(groups.Interior || []), ...(groups.Comfort || [])]));
+      // "What this vehicle comes with" — top-6 canonical rows per card, sourced
+      // from the tiered build sheet when the structured decode exists (already
+      // denoised and shopper-ordered), else the cleaned flat groups. The full
+      // reference list lives on the Equipment panel; the overview only orients.
+      const ovSheet = readBuildSheet(listing);
+      const sheetPick = (cats: string[]) => (ovSheet?.keyFeatures || []).filter(([c]) => cats.includes(c)).flatMap(([, items]) => items);
+      const extCap = (ovSheet ? sheetPick(["Exterior & Lighting", "Performance & Capability"]) : groups.Exterior || []).slice(0, 6);
+      const intComf = (ovSheet ? sheetPick(["Seating & Interior", "Comfort & Convenience"]) : Array.from(new Set([...(groups.Interior || []), ...(groups.Comfort || [])]))).slice(0, 6);
+      const allEquipCount = ovSheet ? ovSheet.keyFeatureCount + ovSheet.standardCount : Object.values(groups).reduce((a, g) => a + g.length, 0);
       const loveReasons: string[] = [];
       if (groups.Safety?.length) loveReasons.push("Advanced safety technology");
       if (groups.Comfort?.length) loveReasons.push("Premium ride comfort");
@@ -1383,6 +1391,16 @@ function buildPanel(key: PassportPanelKey, d: PassportData, listing: VehicleList
               ))}</div>
             )}
 
+            {ovSheet && ovSheet.packages.length > 0 && (
+              <button onClick={() => openPanel("equipment")} className="w-full rounded-2xl border border-blue-200 bg-blue-50/60 p-4 flex items-center justify-between gap-3 text-left active:bg-blue-50">
+                <div>
+                  <p className="text-[13px] font-bold text-[#0F172A]">Built with {ovSheet.packages.length} factory package{ovSheet.packages.length === 1 ? "" : "s"}{ovSheet.estValue ? ` — ${fmt$(ovSheet.estValue)} in options` : ""}</p>
+                  <p className="text-[12px] text-[#64748B] mt-0.5">View the build sheet</p>
+                </div>
+                <Package className="w-5 h-5 text-[#2563EB] shrink-0" />
+              </button>
+            )}
+
             {carousel.length > 0 && (
               <div>
                 <h2 className="text-[18px] font-bold mb-3">Why You'll Love This Vehicle</h2>
@@ -1421,11 +1439,32 @@ function buildPanel(key: PassportPanelKey, d: PassportData, listing: VehicleList
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">{recs.map((r) => <div key={r.t} className={`${CARD} p-4`}><p className="text-[13px] font-bold">{r.t}</p><p className="text-[12px] text-[#64748B] mt-0.5">{r.w}</p></div>)}</div>
             </Section>
           )}
-          {exterior.length > 0 && (
-            <Section title="Exterior highlights"><div className="grid grid-cols-1 sm:grid-cols-2 gap-3">{exterior.map((e) => <IconCard key={e} icon={catIcon.Exterior} title={e} />)}</div></Section>
+          {(extCap.length > 0 || intComf.length > 0) && (
+            <Section title="What this vehicle comes with">
+              <p className="text-[12px] text-[#94A3B8] -mt-1 mb-3">The equipment shoppers ask about — see the full build sheet for everything.</p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {[{ t: "Exterior & capability", icon: catIcon.Exterior, items: extCap }, { t: "Interior & comfort", icon: catIcon.Interior, items: intComf }].filter((c) => c.items.length > 0).map((c) => (
+                  <div key={c.t} className={`${CARD} p-4`}>
+                    <div className="flex items-center gap-2 mb-2"><c.icon className="w-4 h-4 text-[#2563EB]" /><p className="text-[13px] font-bold">{c.t}</p></div>
+                    <ul className="space-y-1.5">{c.items.map((e) => (
+                      <li key={e} className="flex items-start gap-2 text-[13px] text-[#334155]"><CheckCircle2 className="w-3.5 h-3.5 text-[#16A34A] shrink-0 mt-0.5" />{e}</li>
+                    ))}</ul>
+                  </div>
+                ))}
+              </div>
+              {allEquipCount > extCap.length + intComf.length && (
+                <button onClick={() => openPanel("equipment")} className="mt-3 text-[13px] font-semibold text-[#2563EB] hover:underline">See all {allEquipCount} features</button>
+              )}
+            </Section>
           )}
-          {interior.length > 0 && (
-            <Section title="Interior experience"><div className="grid grid-cols-1 sm:grid-cols-2 gap-3">{interior.map((e) => <IconCard key={e} icon={catIcon.Interior} title={e} />)}</div></Section>
+          {ovSheet && ovSheet.packages.length > 0 && (
+            <button onClick={() => openPanel("equipment")} className="w-full rounded-2xl border border-blue-200 bg-blue-50/60 p-4 flex items-center justify-between gap-3 text-left hover:bg-blue-50 transition-colors">
+              <div>
+                <p className="text-[13px] font-bold text-[#0F172A]">Built with {ovSheet.packages.length} factory package{ovSheet.packages.length === 1 ? "" : "s"}{ovSheet.estValue ? ` — ${fmt$(ovSheet.estValue)} in options` : ""}</p>
+                <p className="text-[12px] text-[#64748B] mt-0.5">View the build sheet</p>
+              </div>
+              <Package className="w-5 h-5 text-[#2563EB] shrink-0" />
+            </button>
           )}
           {loveReasons.length > 0 && (
             <Section title="Why shoppers love this vehicle">
