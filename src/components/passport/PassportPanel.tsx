@@ -1003,10 +1003,43 @@ function buildPanel(key: PassportPanelKey, d: PassportData, listing: VehicleList
               <p className="text-[15px] font-bold text-[#0F172A]">What's Covered</p>
               <p className="text-[12px] text-[#64748B] mb-2">Tap a coverage type to highlight the covered systems on the vehicle below.</p>
               <WarrantyCarVisual hasPowertrain={hasPt} onAll={() => {
-                const el = document.getElementById("warr-whats-included") as HTMLDetailsElement | null;
-                if (el) { el.open = true; el.scrollIntoView({ behavior: "smooth", block: "nearest" }); }
+                const el = document.getElementById("warr-all-components") as HTMLDetailsElement | null;
+                if (el) { el.open = true; el.scrollIntoView({ behavior: "smooth", block: "start" }); }
               }} />
             </div>
+
+            {/* Full covered-components breakdown — every coverage this vehicle
+                carries (from the resolved OEM terms), with its component list. */}
+            <details id="warr-all-components" className={`${CARD} overflow-hidden group`}>
+              <summary className="cursor-pointer list-none flex items-center gap-3 p-4">
+                <span className="w-9 h-9 rounded-xl bg-blue-50 flex items-center justify-center shrink-0"><ShieldCheck className="w-4 h-4 text-[#2563EB]" /></span>
+                <div className="min-w-0 flex-1">
+                  <p className="text-[14px] font-bold text-[#0F172A] leading-tight">All covered components</p>
+                  <p className="text-[11px] text-[#94A3B8] leading-tight">Every coverage on this vehicle with what it protects</p>
+                </div>
+                <ChevronDown className="w-4 h-4 text-[#94A3B8] group-open:rotate-180 transition-transform shrink-0" />
+              </summary>
+              <div className="px-4 pb-4 space-y-4">
+                {cov.map((r) => {
+                  const comps = COVERAGE_COMPONENTS[r.key] ?? [];
+                  const accent = r.key === "basic" ? "text-[#2563EB]" : r.key === "powertrain" ? "text-[#16A34A]" : "text-[#0F172A]";
+                  return (
+                    <div key={r.key}>
+                      <div className="flex items-baseline justify-between gap-3 mb-1.5">
+                        <p className={`text-[13px] font-bold ${accent}`}>{r.label}</p>
+                        <p className="text-[12px] font-semibold text-[#64748B] shrink-0">{r.term}</p>
+                      </div>
+                      {comps.length > 0 ? (
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1.5">
+                          {comps.map((c) => <div key={c} className="flex items-start gap-2 text-[12px] text-[#334155]"><CheckCircle2 className="w-3.5 h-3.5 text-[#16A34A] shrink-0 mt-0.5" />{c}</div>)}
+                        </div>
+                      ) : <p className="text-[12px] text-[#64748B]">{r.sub}</p>}
+                    </div>
+                  );
+                })}
+                <p className="text-[11px] text-[#94A3B8] pt-1 border-t border-slate-100">Typical coverage groupings for this manufacturer's terms. The OEM warranty booklet governs exact components and exclusions — confirm specifics with the dealer.</p>
+              </div>
+            </details>
 
             {/* Additional factory benefits */}
             <AdditionalFactoryBenefitsCard rows={benefitCards} onDetails={openMoreDetails} />
@@ -1919,6 +1952,29 @@ const WARR_IMG = {
   powertrain: "/cropped_powertrain_suv.png",
   transition: "/cropped_translucent_suv.png",
 };
+// Full component breakdown per coverage type — powers "View all covered
+// components". Typical manufacturer groupings; the OEM warranty booklet
+// governs, and the disclaimer under the list says so.
+const COVERAGE_COMPONENTS: Record<string, string[]> = {
+  basic: [
+    "Air conditioning & climate control", "Audio & infotainment systems", "Navigation & displays",
+    "Electrical system & electronics", "Sensors, cameras & driver assistance", "Power windows, locks & seats",
+    "Steering components", "Suspension components", "Brake system (excl. pads & rotors wear)",
+    "Fuel system", "Cooling & heating system", "Interior trim, seats & switchgear",
+    "Exterior components & lighting", "Onboard computers & modules",
+  ],
+  powertrain: [
+    "Engine block, heads & internals", "Timing components", "Oil pump & lubrication",
+    "Transmission & transaxle", "Torque converter", "Transfer case",
+    "Drive shafts & CV joints", "Axles & bearings", "Differential",
+    "AWD / 4WD components", "Major seals & gaskets",
+  ],
+  corrosion: ["Body sheet-metal panels (rust-through / perforation from the inside out)"],
+  roadside: ["24/7 towing to the nearest dealer", "Battery jump-start", "Flat-tire change", "Lockout assistance", "Emergency fuel delivery"],
+  ev_battery: ["High-voltage battery pack", "Drive motor(s)", "Inverter & power electronics", "On-board charger"],
+  maintenance: ["Factory-scheduled maintenance visits", "Oil & filter changes", "Tire rotations", "Multi-point inspections"],
+};
+
 // The systems each coverage type protects — updates live under the selector.
 const COVERED_SYSTEMS: Record<"basic" | "powertrain", string[]> = {
   basic: ["Electronics", "Climate Control", "Audio", "Navigation", "Suspension", "Interior Components"],
