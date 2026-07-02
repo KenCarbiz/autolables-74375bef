@@ -9,6 +9,7 @@ import type { OemFactoryWarranty, CpoProgram } from "@/lib/oemWarranty";
 import type { DocumentRules } from "@/lib/documentRules";
 import { DEFAULT_STICKY_BUTTONS, type StickyBottomButtons } from "@/lib/stickyButtons";
 import { DEFAULT_CONTACT_ROUTING, type CustomerPassportContactSettings, type PassportAgent } from "@/lib/passportRouting";
+import type { IihsAward } from "@/lib/iihsAwards";
 
 // A configurable internal recon/service the dealer routes to a responsible
 // party. Non-customer charge — tracked as the store's own cost.
@@ -298,6 +299,11 @@ export interface DealerSettings {
   passport_rotation_state: Record<string, string>;
   // Per-vehicle agent assignment (VIN → agent id) for Assigned Agent mode.
   vehicle_agent_assignments: Record<string, string>;
+  // IIHS Top Safety Pick display. OFF until IIHS grants the dealership
+  // written permission (their ratings are copyrighted; text-only statements,
+  // dealer-verified per model against iihs.org/ratings/top-safety-picks).
+  iihs_awards_enabled: boolean;
+  iihs_awards: IihsAward[];
 }
 
 export const DEFAULT_SETTINGS: DealerSettings = {
@@ -431,6 +437,8 @@ export const DEFAULT_SETTINGS: DealerSettings = {
   passport_agents: [],
   passport_rotation_state: {},
   vehicle_agent_assignments: {},
+  iihs_awards_enabled: false,
+  iihs_awards: [],
 };
 
 interface DealerSettingsContextType {

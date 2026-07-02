@@ -203,6 +203,9 @@ export interface PassportData {
   // Server-resolved contact routing (public-listing-view). Null on preview /
   // legacy payloads; the CTA dock then falls back to the advisor fields.
   contactRouting: import("@/lib/passportRouting").PassportRoutingResult | null;
+  // IIHS award, attached by public-listing-view only when the dealer has
+  // IIHS's written permission AND verified this model's award.
+  iihsAward: import("@/lib/iihsAwards").MatchedIihsAward | null;
 }
 
 export interface PricePoint { captured_at: string; market_value: number | null; listing_price: number | null; below_market: number | null; position: string | null }
@@ -479,5 +482,6 @@ export const derivePassport = (listing: VehicleListing): PassportData => {
     valueHistory, priceChange7d, priceChangeTotal,
     dealerTrust,
     contactRouting: ((listing as unknown as { contact_routing?: PassportData["contactRouting"] }).contact_routing) ?? null,
+    iihsAward: ((listing as unknown as { iihs_award?: PassportData["iihsAward"] }).iihs_award) ?? null,
   };
 };

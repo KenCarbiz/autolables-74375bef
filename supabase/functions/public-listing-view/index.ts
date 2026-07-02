@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 import { resolveCustomerPassportRouting, type PassportAgent } from "../_shared/passport-routing.ts";
+import { matchIihsAward, type IihsAward } from "../_shared/iihs-awards.ts";
 
 // ──────────────────────────────────────────────────────────────
 // public-listing-view
@@ -155,6 +156,16 @@ serve(async (req) => {
           mobile_cta_variant: (s.mobile_slideout_cta_variant as string) || "",
         };
         if (Object.values(trust).some((v) => v)) row.dealer_trust = trust;
+
+        // ── IIHS Top Safety Pick — permission-gated (the dealer flips the
+        // enable flag only after IIHS grants written permission) and
+        // dealer-verified per model. Text-only statement, never a logo.
+        try {
+          if (s.iihs_awards_enabled === true || String(s.iihs_awards_enabled) === "true") {
+            const award = matchIihsAward((s.iihs_awards ?? null) as IihsAward[] | null, (row.ymm as string) || "");
+            if (award) row.iihs_award = award;
+          }
+        } catch { /* award must never break the payload */ }
 
         // ── Contact routing: resolve WHO this shopper reaches (agent / BDC /
         // store) server-side and attach only the result. The roster, priority

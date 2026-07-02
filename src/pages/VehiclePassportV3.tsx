@@ -643,6 +643,7 @@ const VehiclePassportV3 = () => {
               // history report, and an accident this page hid destroys the whole
               // evidence-manual premise. Unknown signals still render nothing.
               const rows = [
+                d.iihsAward ? { icon: BadgeCheck, t: d.iihsAward.label, s: "Insurance Institute for Highway Safety", warn: false } : null,
                 d.ownerCount === 1 ? { icon: Users, t: "One Owner", s: "Personal Use", warn: false } : d.ownerCount ? { icon: Users, t: `${d.ownerCount} Owners`, s: "Ownership history on file", warn: false } : null,
                 d.accidentCount === 0 ? { icon: ShieldCheck, t: "No Accidents", s: "No Issues Reported", warn: false }
                   : d.accidentCount != null ? { icon: AlertTriangle, t: `${d.accidentCount} Reported Accident${d.accidentCount === 1 ? "" : "s"}`, s: "See the full history report and reconditioning work", warn: true } : null,

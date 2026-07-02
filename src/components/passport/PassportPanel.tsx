@@ -1151,6 +1151,17 @@ function buildPanel(key: PassportPanelKey, d: PassportData, listing: VehicleList
               </div>
             </Section>
           )}
+          {d.iihsAward && (
+            <Section title="IIHS safety award" sub="Insurance Institute for Highway Safety.">
+              <div className={`${CARD} p-4 flex items-center gap-3`}>
+                <span className="w-10 h-10 rounded-xl bg-emerald-50 flex items-center justify-center shrink-0"><Award className="w-5 h-5 text-[#16A34A]" /></span>
+                <div className="min-w-0">
+                  <p className="text-[15px] font-extrabold text-[#0F172A]">{d.iihsAward.label}</p>
+                  <p className="text-[12px] text-[#64748B]">{d.iihsAward.note || "Awarded for crashworthiness and crash-avoidance performance in IIHS testing. Applies to this model; confirm configuration with the dealer."}</p>
+                </div>
+              </div>
+            </Section>
+          )}
           {nhtsa?.complaints && (
             <Section title="Owner-reported issues" sub="Complaints filed with NHTSA by owners nationwide for this model year.">
               <div className={`${CARD} p-4`}>

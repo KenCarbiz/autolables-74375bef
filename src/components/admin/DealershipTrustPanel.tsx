@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { useDealerSettings, type DealerSettings } from "@/contexts/DealerSettingsContext";
 import { toast } from "sonner";
-import { Save } from "lucide-react";
+import { Save, Plus, Trash2 } from "lucide-react";
+import type { IihsAward } from "@/lib/iihsAwards";
 
 // Dealer admin: the trust content shown on the Vehicle Passport's
 // "Why Buy From This Dealership" badges and "What Owners Say" reviews.
@@ -59,11 +60,18 @@ const DealershipTrustPanel = () => {
     mobile_slideout_cta_variant: settings.mobile_slideout_cta_variant || "dealer_availability",
   }));
   const [saving, setSaving] = useState(false);
+  const [iihsEnabled, setIihsEnabled] = useState<boolean>(settings.iihs_awards_enabled || false);
+  const [iihsAwards, setIihsAwards] = useState<IihsAward[]>(settings.iihs_awards || []);
 
   const set = (k: TrustKey, v: string) => setCfg((c) => ({ ...c, [k]: v }));
+  const patchAward = (i: number, p: Partial<IihsAward>) => setIihsAwards((a) => a.map((x, j) => (j === i ? { ...x, ...p } : x)));
   const save = async () => {
     setSaving(true);
-    const ok = await updateSettings(cfg as Partial<DealerSettings>);
+    const ok = await updateSettings({
+      ...cfg,
+      iihs_awards_enabled: iihsEnabled,
+      iihs_awards: iihsAwards.filter((a) => a.year.trim() && a.make.trim() && a.model.trim()),
+    } as Partial<DealerSettings>);
     setSaving(false);
     if (ok !== false) toast.success("Dealership trust content saved");
   };
@@ -155,6 +163,34 @@ const DealershipTrustPanel = () => {
             </select>
             <p className="text-[11px] text-slate-400 mt-1">How the bottom action area appears inside mobile Passport slide-outs.</p>
           </div>
+        </div>
+      </div>
+
+      <div className="rounded-2xl border border-border bg-card p-4">
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <h3 className="text-[14px] font-bold text-foreground">IIHS Top Safety Pick awards</h3>
+            <p className="text-[12px] text-slate-500 mt-0.5">IIHS ratings are copyrighted — display requires IIHS's written permission. Keep this OFF until permission is granted, then verify each model against iihs.org/ratings/top-safety-picks before adding it. Text statements only; no IIHS logos.</p>
+          </div>
+          <label className="flex items-center gap-2 shrink-0 cursor-pointer select-none">
+            <input type="checkbox" checked={iihsEnabled} onChange={(e) => setIihsEnabled(e.target.checked)} className="w-4 h-4 accent-blue-600" />
+            <span className="text-[13px] font-semibold">{iihsEnabled ? "Enabled" : "Off"}</span>
+          </label>
+        </div>
+        <div className="mt-3 space-y-2">
+          {iihsAwards.map((a, i) => (
+            <div key={i} className="grid grid-cols-2 sm:grid-cols-[80px_1fr_1fr_150px_auto] gap-2 items-center">
+              <input value={a.year} onChange={(e) => patchAward(i, { year: e.target.value })} placeholder="2026" className="h-10 px-3 rounded-lg border border-border bg-background text-sm outline-none focus:border-primary" />
+              <input value={a.make} onChange={(e) => patchAward(i, { make: e.target.value })} placeholder="INFINITI" className="h-10 px-3 rounded-lg border border-border bg-background text-sm outline-none focus:border-primary" />
+              <input value={a.model} onChange={(e) => patchAward(i, { model: e.target.value })} placeholder="QX60" className="h-10 px-3 rounded-lg border border-border bg-background text-sm outline-none focus:border-primary" />
+              <select value={a.award} onChange={(e) => patchAward(i, { award: e.target.value as IihsAward["award"] })} className="h-10 px-3 rounded-lg border border-border bg-background text-sm outline-none focus:border-primary">
+                <option value="tsp">Top Safety Pick</option>
+                <option value="tsp_plus">Top Safety Pick+</option>
+              </select>
+              <button onClick={() => setIihsAwards((arr) => arr.filter((_, j) => j !== i))} aria-label="Remove award" className="w-10 h-10 rounded-lg border border-border text-slate-400 hover:text-red-500 hover:border-red-300 inline-flex items-center justify-center"><Trash2 className="w-4 h-4" /></button>
+            </div>
+          ))}
+          <button onClick={() => setIihsAwards((a) => [...a, { year: "", make: "", model: "", award: "tsp_plus" }])} className="inline-flex items-center gap-1 h-9 px-3 rounded-lg border border-border text-[13px] font-semibold hover:border-blue-500"><Plus className="w-4 h-4" /> Add award</button>
         </div>
       </div>
 
