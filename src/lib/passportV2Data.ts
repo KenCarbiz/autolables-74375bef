@@ -152,6 +152,7 @@ export interface PassportData {
   // Confidence
   confScore: number | null;
   confLabel: string;
+  confDeductions: { label: string; points: number }[];
   verifiedBy: string[];
   verifyRows: VerifyRow[];
   // Content
@@ -327,15 +328,26 @@ export const derivePassport = (listing: VehicleListing): PassportData => {
     return [yrs ? `${yrs} yr` : null, mi].filter(Boolean).join(" / ") || null;
   })();
 
-  const confSignals: { ok: boolean; w: number }[] = [];
-  if (typeof mc.carfax_clean_title === "boolean") confSignals.push({ ok: cleanTitle, w: 22 });
-  if (accidentCount != null) confSignals.push({ ok: accidentCount === 0, w: 22 });
-  if (ownerCount != null) confSignals.push({ ok: ownerCount === 1, w: 16 });
-  if (listing.recall_status) confSignals.push({ ok: recallClear, w: 16 });
-  if (serviceCount > 0) confSignals.push({ ok: true, w: 12 });
-  if (warrantyStr) confSignals.push({ ok: true, w: 12 });
-  const confScore = confSignals.length >= 2
-    ? Math.min(99, Math.round(60 + (confSignals.reduce((s, x) => s + (x.ok ? x.w : 0), 0) / confSignals.reduce((s, x) => s + x.w, 0)) * 39))
+  // Falsifiable confidence score: start high and subtract LABELED deductions
+  // for negative or unknown signals. The old formula had a 60-point floor and
+  // only counted positives — every car scored 80-something, which reads as
+  // marketing. A score that can visibly go down (and shows why) is evidence.
+  const knownSignals =
+    (typeof mc.carfax_clean_title === "boolean" ? 1 : 0) + (accidentCount != null ? 1 : 0) +
+    (ownerCount != null ? 1 : 0) + (listing.recall_status ? 1 : 0) +
+    (serviceCount > 0 ? 1 : 0) + (warrantyStr ? 1 : 0);
+  const isNewCar = listing.condition === "new";
+  const confDeductions: { label: string; points: number }[] = [];
+  const ded = (cond: boolean, label: string, points: number) => { if (cond) confDeductions.push({ label, points }); };
+  ded(typeof mc.carfax_clean_title === "boolean" && !cleanTitle, "Title not confirmed clean", 14);
+  ded(accidentCount != null && accidentCount > 0, `${accidentCount} reported accident${accidentCount === 1 ? "" : "s"}`, Math.min(18, (accidentCount ?? 0) * 9));
+  ded(!isNewCar && ownerCount != null && ownerCount > 1, `${ownerCount} previous owners`, 6);
+  ded(!!listing.recall_status && !recallClear, "Open recall — needs remedy", 12);
+  ded(!isNewCar && serviceCount === 0 && knownSignals >= 2, "No service records on file", 4);
+  ded(!warrantyStr && knownSignals >= 2, "No factory warranty remaining", 5);
+  ded(!isNewCar && typeof mc.carfax_clean_title !== "boolean" && accidentCount == null, "History report not yet attached", 7);
+  const confScore = knownSignals >= 2
+    ? Math.max(35, 97 - confDeductions.reduce((s, x) => s + x.points, 0))
     : null;
   const confLabel = confScore == null ? "" : confScore >= 90 ? "Excellent" : confScore >= 80 ? "Very Good" : confScore >= 70 ? "Good" : "Fair";
 
@@ -451,7 +463,7 @@ export const derivePassport = (listing: VehicleListing): PassportData => {
     ownerCount, accidentCount, cleanTitle, serviceCount, recallClear, openRecalls, hasRecallCheck,
     warranty, warrantyStr,
     oemWarranty: ((listing as unknown as { oem_warranty?: OemWarrantyView }).oem_warranty) || null,
-    confScore, confLabel, verifiedBy, verifyRows,
+    confScore, confLabel, confDeductions, verifiedBy, verifyRows,
     highlights, specRows, keySpecs, overview, whyBuy,
     reviewRating: (dealer.review_rating as number) ?? null,
     reviewCount: (dealer.review_count as number) ?? null,

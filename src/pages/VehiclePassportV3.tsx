@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import {
   ChevronLeft, ChevronRight, Upload, Bookmark, Printer, FileText, MessageSquare,
-  RefreshCw, ShieldCheck, CheckCircle2, Star, Phone, Car, Cog, Fuel, Settings, Wind,
+  RefreshCw, ShieldCheck, CheckCircle2, Star, Phone, Car, Cog, Fuel, Settings, Wind, AlertTriangle,
   Award, Wrench, DollarSign, Clock, Building2, Users, Truck, Lock, Zap, ArrowRight,
   Package, Eye, Play, TrendingUp, BadgeCheck, Gauge as GaugeIcon, Send, MapPin,
   Sun, Navigation, Smartphone, Camera, Volume2, Palette, Snowflake,
@@ -19,6 +19,8 @@ import PriceDropWatch from "@/components/listing/PriceDropWatch";
 import { listingGallery } from "@/lib/photos";
 import { usePassportEngagement } from "@/lib/passportEngagement";
 import { isVehicleSaved, toggleSavedVehicle } from "@/lib/savedVehicles";
+import { readBuildSheet } from "@/lib/buildSheet";
+import { trackPassportOpened, trackWindowStickerScanned, trackCustomerCtaClicked } from "@/lib/engagement/customerEngagement";
 import { packetVisible } from "@/lib/packetModules";
 import PassportPanel, { type PassportPanelKey } from "@/components/passport/PassportPanel";
 import PassportCtaDock from "@/components/passport/PassportCtaDock";
@@ -171,6 +173,23 @@ const VehiclePassportV3 = () => {
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
 
+  // Panel <-> browser history: on mobile the drawer covers the page, so the OS
+  // back gesture must close the panel — not exit the passport (a lost session
+  // on the lot; QR shoppers rarely re-scan). One history entry per panel
+  // session; switching panels reuses it, closing by X consumes it.
+  const panelOpen = activePanel != null;
+  useEffect(() => {
+    if (!panelOpen) return;
+    let popped = false;
+    window.history.pushState({ alPanel: true }, "");
+    const onPop = () => { popped = true; setActivePanel(null); };
+    window.addEventListener("popstate", onPop);
+    return () => {
+      window.removeEventListener("popstate", onPop);
+      if (!popped && window.history.state?.alPanel) window.history.back();
+    };
+  }, [panelOpen]);
+
   const isPreview = typeof window !== "undefined" && new URLSearchParams(window.location.search).has("preview");
   // QR attribution: window-sticker QRs land with ?src=qr. Persist for the whole
   // session so leads are stamped qr_scan even after in-app navigation.
@@ -185,6 +204,16 @@ const VehiclePassportV3 = () => {
 
   const d = useMemo(() => (listing ? derivePassport(listing) : null), [listing]);
   const gallery = useMemo(() => (listing ? listingGallery(listing) : ([] as string[])), [listing]);
+  // Engagement events (schema + dealer dashboard already exist; these are the
+  // missing call sites). Fire once per listing load, never in preview.
+  useEffect(() => {
+    if (!listing || isPreview) return;
+    let viaQr = false;
+    try { viaQr = sessionStorage.getItem("al_visit_src") === "qr"; } catch { /* ignore */ }
+    const base = { storeId: listing.store_id, vehicleId: listing.id, vin: listing.vin };
+    (viaQr ? trackWindowStickerScanned(base) : trackPassportOpened(base));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [listing?.id, isPreview]);
   // Shopper Focus Breakdown — time per module + open panel (skipped in preview).
   usePassportEngagement(listing?.slug || vehicleSlug, activePanel, !isPreview);
 
@@ -195,6 +224,9 @@ const VehiclePassportV3 = () => {
 
   const go = (section: string) => navigate(`/v/${listing.slug || vehicleSlug}/${section}${isPreview ? "?preview=1" : ""}`);
   const viewUrl = publicUrl(listing.slug);
+  // Decoded build sheet: the dollar story (packages + option value) for the
+  // hero price block and highlights strip.
+  const buildSheet = readBuildSheet(listing);
   // Real save: persists an on-device shortlist (no more no-op toast).
   const isSaved = savedState ?? isVehicleSaved(listing.slug);
   const handleSave = () => {
@@ -232,9 +264,11 @@ const VehiclePassportV3 = () => {
   // Price when unconfigured. Drives both the desktop footer row and mobile bar.
   const sticky = resolveStickyButtons((listing as unknown as { sticky_bottom_buttons?: StickyBottomButtons }).sticky_bottom_buttons);
   const stickyAction = (key: string): { icon: React.ElementType; onClick: () => void } => {
-    const call = () => { if (d.dealerPhone) window.location.href = `tel:${d.dealerPhone}`; else go("contact"); };
+    const tapTrack = (cta: string) => { if (!isPreview) trackCustomerCtaClicked({ storeId: listing.store_id, vehicleId: listing.id, vin: listing.vin, source: "passport", surface: "vehicle_passport", metadata: { cta } }); };
+    const call = () => { tapTrack("call"); if (d.dealerPhone) window.location.href = `tel:${d.dealerPhone}`; else go("contact"); };
     // Prefilled body: the shopper skips composing and the BDC knows the vehicle.
     const text = () => {
+      tapTrack("text");
       if (d.dealerPhone) {
         const body = encodeURIComponent(`Hi, I'm interested in the ${listing.ymm || "vehicle"}${listing.vin ? ` (VIN ...${listing.vin.slice(-8)})` : ""} — is it available?`);
         window.location.href = `sms:${d.dealerPhone.replace(/[^\d+]/g, "")}?&body=${body}`;
@@ -424,6 +458,9 @@ const VehiclePassportV3 = () => {
                           : `+ ${fmt$(d.docFee)} doc fee · Sale ${fmt$(d.websiteSalePrice ?? price + d.docFee)}`}
                       </div>
                     ) : null}
+                    {buildSheet?.estValue ? (
+                      <div className="text-[12px] font-semibold text-[#16A34A]">Incl. {fmt$(buildSheet.estValue)} in factory options</div>
+                    ) : null}
                     {pv("payment") && d.estMonthly != null && <div className="text-[12px] text-[#64748B]">Est. {fmt$(d.estMonthly)}/mo</div>}
                     {d.msrp != null && <div className="text-[12px] text-[#64748B]">MSRP {fmt$(d.msrp)}</div>}
                     {d.saveVsMsrp != null && <div className="text-[13px] font-semibold text-[#16A34A]">You save {fmt$(d.saveVsMsrp)}</div>}
@@ -437,13 +474,24 @@ const VehiclePassportV3 = () => {
                   <div className="flex items-start gap-2">
                     <button onClick={() => go("verification")} className="flex items-center gap-2.5 text-left flex-1 min-w-0">
                       <span className="w-9 h-9 rounded-xl bg-emerald-50 flex items-center justify-center shrink-0"><ShieldCheck className="w-5 h-5 text-[#16A34A]" /></span>
-                      <div><p className="text-[15px] font-bold">AutoLabels Verified</p><p className="text-[12px] text-[#64748B]">Independently checked against trusted automotive data.</p></div>
+                      <div><p className="text-[15px] font-bold">AutoLabels Verified</p><p className="text-[12px] text-[#64748B]">Checked against trusted automotive data sources.</p></div>
                     </button>
                     <button onClick={(e) => openInfo("verification-process", e)} aria-label="How verification works" className="w-7 h-7 rounded-full hover:bg-slate-100 flex items-center justify-center shrink-0"><Info className="w-4 h-4 text-[#94A3B8]" /></button>
                   </div>
                   <div className="grid grid-cols-2 gap-x-6 gap-y-2.5 mt-4">
                     {[verifyL, verifyR].map((col, ci) => <div key={ci} className="space-y-2.5">{col.map((r) => <div key={r.label} className="flex items-center gap-2 text-[13px] font-medium text-[#0F172A]"><CheckCircle2 className="w-4 h-4 text-[#16A34A] shrink-0" />{r.label}</div>)}</div>)}
                   </div>
+                  {pv("documents") && ((listing.documents as { name?: string }[] | undefined)?.length ?? 0) > 0 && (
+                    <div className="mt-4 pt-3 border-t border-slate-100">
+                      <p className="text-[11px] font-semibold text-[#94A3B8] mb-2">Source documents on file</p>
+                      <div className="flex flex-wrap gap-2">
+                        {(listing.documents as { name?: string }[]).filter((x) => x?.name).slice(0, 4).map((doc, i) => (
+                          <button key={i} onClick={() => go("documents")} className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-[#0F172A] bg-slate-50 hover:bg-blue-50 hover:text-[#2563EB] border border-slate-200 rounded-full px-2.5 py-1 transition-colors"><FileText className="w-3 h-3" />{doc.name}</button>
+                        ))}
+                        {((listing.documents as unknown[]).length > 4) && <button onClick={() => go("documents")} className="text-[11px] font-semibold text-[#2563EB] px-1.5 py-1">+{(listing.documents as unknown[]).length - 4} more</button>}
+                      </div>
+                    </div>
+                  )}
                   <Link onClick={() => go("verification")} className="mt-4">View full verification report</Link>
                 </div>
               )}
@@ -542,7 +590,7 @@ const VehiclePassportV3 = () => {
         {/* 4. MARKET INTELLIGENCE */}
         {pv("marketValue") && (
         <section data-module="market" className={`${CARD} p-5`}>
-          <div className="flex items-center justify-between"><div><H2>Market Intelligence</H2><p className={`text-[13px] ${TEXT2} mt-0.5`}>Independent pricing, demand, and value analysis for this vehicle.</p></div><span className="text-[12px] text-[#94A3B8] inline-flex items-center gap-1">Powered by MarketCheck<button onClick={(e) => openInfo("data-sources", e)} aria-label="Data sources explained" className="w-4 h-4 inline-flex items-center justify-center"><Info className="w-3.5 h-3.5 text-[#94A3B8]" /></button></span></div>
+          <div className="flex items-center justify-between"><div><H2>{d.belowMarket && d.belowMarket > 0 ? `Priced ${fmt$(d.belowMarket)} Under the Local Market` : "Market Intelligence"}</H2><p className={`text-[13px] ${TEXT2} mt-0.5`}>Independent pricing, demand, and value analysis for this vehicle.</p></div><span className="text-[12px] text-[#94A3B8] inline-flex items-center gap-1">Powered by MarketCheck<button onClick={(e) => openInfo("data-sources", e)} aria-label="Data sources explained" className="w-4 h-4 inline-flex items-center justify-center"><Info className="w-3.5 h-3.5 text-[#94A3B8]" /></button></span></div>
           <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-4 mt-5">
             {mi.map((c) => (
               <div key={c.section} onClick={(e) => openPanel(c.section as PassportPanelKey, e)} className="rounded-xl border border-[#E6E8EC] p-4 flex flex-col cursor-pointer hover:border-[#2563EB] transition-colors">
@@ -573,6 +621,15 @@ const VehiclePassportV3 = () => {
               </div>
             )}
             <ul className="mt-3 space-y-2">{(d.whyBuy.length ? d.whyBuy.slice(0, 5) : ["Details confirmed at the dealership"]).map((b, i) => <li key={i} className="flex items-start gap-2 text-[13px]"><CheckCircle2 className="w-4 h-4 text-[#16A34A] shrink-0 mt-0.5" />{b}</li>)}</ul>
+            {/* Showing what LOWERED the score is what makes it believable. */}
+            {d.confDeductions.length > 0 && (
+              <div className="mt-3 pt-3 border-t border-slate-100">
+                <p className="text-[11px] font-semibold text-[#94A3B8] mb-1.5">What lowered the score</p>
+                <ul className="space-y-1">{d.confDeductions.slice(0, 4).map((x) => (
+                  <li key={x.label} className="flex items-center justify-between gap-2 text-[12px] text-[#64748B]"><span>{x.label}</span><span className="font-bold text-[#EA580C] shrink-0">−{x.points}</span></li>
+                ))}</ul>
+              </div>
+            )}
             <Link onClick={() => go("great-buy")} className="mt-auto pt-3 self-start">See full buying report</Link>
           </div>
           )}
@@ -581,18 +638,22 @@ const VehiclePassportV3 = () => {
           <div className={`${CARD} p-5 flex flex-col`}>
             <H3>Vehicle History Summary</H3>
             {(() => {
-              // Show only known, positive signals — empty "Not reported" rows
-              // next to certified claims read as "lots unknown" and erode trust.
+              // Known positives render green; known NEGATIVES are disclosed in
+              // amber instead of silently omitted — a shopper will run their own
+              // history report, and an accident this page hid destroys the whole
+              // evidence-manual premise. Unknown signals still render nothing.
               const rows = [
-                d.ownerCount === 1 ? { icon: Users, t: "One Owner", s: "Personal Use" } : d.ownerCount ? { icon: Users, t: `${d.ownerCount} Owners`, s: "Ownership history on file" } : null,
-                d.accidentCount === 0 ? { icon: ShieldCheck, t: "No Accidents", s: "No Issues Reported" } : null,
-                d.cleanTitle ? { icon: FileText, t: "Clean Title", s: "No Brands" } : null,
-                d.serviceCount > 0 ? { icon: Wrench, t: "Service History", s: `${d.serviceCount} Records` } : null,
-                d.recallClear ? { icon: BadgeCheck, t: "No Open Recalls", s: "0 Open Recalls" } : null,
-              ].filter(Boolean) as { icon: typeof Users; t: string; s: string }[];
+                d.ownerCount === 1 ? { icon: Users, t: "One Owner", s: "Personal Use", warn: false } : d.ownerCount ? { icon: Users, t: `${d.ownerCount} Owners`, s: "Ownership history on file", warn: false } : null,
+                d.accidentCount === 0 ? { icon: ShieldCheck, t: "No Accidents", s: "No Issues Reported", warn: false }
+                  : d.accidentCount != null ? { icon: AlertTriangle, t: `${d.accidentCount} Reported Accident${d.accidentCount === 1 ? "" : "s"}`, s: "See the full history report and reconditioning work", warn: true } : null,
+                d.cleanTitle ? { icon: FileText, t: "Clean Title", s: "No Brands", warn: false } : null,
+                d.serviceCount > 0 ? { icon: Wrench, t: "Service History", s: `${d.serviceCount} Records`, warn: false } : null,
+                d.recallClear ? { icon: BadgeCheck, t: "No Open Recalls", s: "0 Open Recalls", warn: false }
+                  : d.openRecalls != null && d.openRecalls > 0 ? { icon: AlertTriangle, t: `${d.openRecalls} Open Recall${d.openRecalls === 1 ? "" : "s"}`, s: "Ask the dealer about the remedy before purchase", warn: true } : null,
+              ].filter(Boolean) as { icon: typeof Users; t: string; s: string; warn: boolean }[];
               return rows.length ? (
                 <ul className="mt-3 space-y-3">
-                  {rows.map((r) => <li key={r.t} className="flex items-center gap-2.5"><span className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0 bg-emerald-50"><r.icon className="w-4 h-4 text-[#16A34A]" /></span><div className="min-w-0"><p className="text-[13px] font-semibold leading-tight">{r.t}</p><p className="text-[11px] text-[#64748B]">{r.s}</p></div></li>)}
+                  {rows.map((r) => <li key={r.t} className="flex items-center gap-2.5"><span className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 ${r.warn ? "bg-amber-50" : "bg-emerald-50"}`}><r.icon className={`w-4 h-4 ${r.warn ? "text-[#D97706]" : "text-[#16A34A]"}`} /></span><div className="min-w-0"><p className="text-[13px] font-semibold leading-tight">{r.t}</p><p className="text-[11px] text-[#64748B]">{r.s}</p></div></li>)}
                 </ul>
               ) : <p className="text-[13px] text-[#64748B] mt-3">The full vehicle history report is available from the dealership.</p>;
             })()}
@@ -710,6 +771,14 @@ const VehiclePassportV3 = () => {
           {pv("factoryOptions") && (
           <div data-module="highlights" className={`${CARD} p-5 flex flex-col`}>
             <H3>Vehicle Highlights</H3>
+            {buildSheet && buildSheet.packages.length > 0 && (
+              <p className="text-[12px] text-[#64748B] mt-1.5">
+                <span className="font-semibold text-[#0F172A]">Built with:</span>{" "}
+                {buildSheet.packages.slice(0, 3).map((p) => p.msrp ? `${p.name} (${fmt$(p.msrp)})` : p.name).join(" · ")}
+                {buildSheet.packages.length > 3 ? ` +${buildSheet.packages.length - 3} more` : ""}
+                {buildSheet.estValue ? ` — ${fmt$(buildSheet.estValue)} in options beyond a standard ${listing.trim || "build"}` : ""}
+              </p>
+            )}
             {highlights.length ? (
               <div className="grid grid-cols-4 sm:grid-cols-5 gap-y-4 gap-x-2 mt-4">{highlights.slice(0, 10).map((h, i) => <div key={i} className="flex flex-col items-center text-center gap-1.5"><span className="w-11 h-11 rounded-full bg-slate-100 flex items-center justify-center shrink-0"><h.icon className="w-5 h-5 text-[#64748B]" strokeWidth={1.75} /></span><div className="w-full min-w-0"><div className="text-[11px] font-bold leading-tight line-clamp-2 break-words">{h.t}</div><div className="text-[10px] text-[#94A3B8] truncate">{h.s}</div></div></div>)}</div>
             ) : <p className="text-[13px] text-[#64748B] mt-3">Equipment highlights appear here as the vehicle's data is decoded.</p>}

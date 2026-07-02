@@ -1453,7 +1453,8 @@ function buildPanel(key: PassportPanelKey, d: PassportData, listing: VehicleList
         </details>
       );
       return {
-        title: "Equipment & Installed Options", subtitle: "Everything included on this vehicle from the factory and dealership",
+        title: sheet?.estValue ? `${fmt$(sheet.estValue)} in Factory Options on This Build` : "Equipment & Installed Options",
+        subtitle: sheet?.estValue ? "Everything this vehicle was built with, from the factory and dealership" : "Everything included on this vehicle from the factory and dealership",
         primary: { label: "Reserve This Vehicle", onClick: () => go("reserve") },
         footerQuestion: "Questions about the equipment?", specialistLabel: "Talk to a Product Specialist",
         body: <>

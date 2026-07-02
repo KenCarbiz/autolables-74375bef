@@ -11,6 +11,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { type VehicleListing } from "@/hooks/useVehicleListing";
 import { usePublicListing } from "@/hooks/usePublicListing";
 import { formatPhone } from "@/components/addendum/CustomerInfoSection";
+import { trackLeadSubmitted } from "@/lib/engagement/customerEngagement";
 import Logo from "@/components/brand/Logo";
 import { derivePassport, fmt$, type PassportData } from "@/lib/passportV2Data";
 import { listingGallery, listingHero } from "@/lib/photos";
@@ -82,6 +83,7 @@ const LeadForm = ({
         vehicle_vin: listing.vin, source: src, status: "new",
         notes: `[intent=${intent}] Passport V2 — ${label}${extras ? ` · ${extras}` : ""}${message.trim() ? `: ${message.trim()}` : ""}`,
       });
+      trackLeadSubmitted({ storeId: listing.store_id, vehicleId: listing.id, vin: listing.vin, source: src === "qr_scan" ? "window_sticker_qr" : "passport", metadata: { intent } });
       // Fire-and-forget dealer alert — a submitted lead should page someone
       // faster than a page view does.
       supabase.functions.invoke("lead-alert", {

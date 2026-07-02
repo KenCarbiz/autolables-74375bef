@@ -10,6 +10,7 @@ import { type VehicleListing } from "@/hooks/useVehicleListing";
 import Logo from "@/components/brand/Logo";
 import { derivePassport, fmt$, listingEquipment } from "@/lib/passportV2Data";
 import { readDealerAlternatives } from "@/lib/dealerAlternatives";
+import { readBuildSheet } from "@/lib/buildSheet";
 import { MOCK_LISTING } from "./VehiclePassportV3";
 import { usePublicListing } from "@/hooks/usePublicListing";
 import PassportCtaDock from "@/components/passport/PassportCtaDock";
@@ -109,6 +110,7 @@ const VehiclePassportGreatBuy = () => {
   // mc_attributes.options/.features (where the VIN decode lands) — not just the
   // features column, which the NeoVIN pull never writes to.
   const equipCount = listingEquipment(listing).length;
+  const gbSheet = readBuildSheet(listing);
   const equipVal = equipCount > 0 ? Math.min(96, 60 + (equipCount + (premium ? 3 : 0)) * 6) : null;
   const demandVal = (d.viewCount != null || d.dom != null) ? ((d.viewCount ?? 0) > 20 ? 88 : 74) : null;
   const dealerVal = d.dealerTrust.googleRating ? Math.round(Math.min(98, (Number(d.dealerTrust.googleRating) / 5) * 100)) : d.verifyRows.length > 0 ? 82 : null;
@@ -118,7 +120,7 @@ const VehiclePassportGreatBuy = () => {
     { label: "Vehicle History", score: histVal, note: isNew ? "New vehicle — no accident or title history" : d.cleanTitle && d.accidentCount === 0 ? "Clean title, no accidents reported" : "History reviewed where data exists" },
     { label: "Ownership", score: ownVal, note: isNew ? "New — you are the first owner" : d.ownerCount === 1 ? "Single previous owner" : d.ownerCount != null ? `${d.ownerCount} previous owners` : "Ownership pending" },
     { label: "Warranty", score: warVal, note: d.warrantyStr ? `${d.warrantyStr} of factory coverage remains` : "Confirm coverage with dealer" },
-    { label: "Equipment", score: equipVal, note: equipCount > 0 ? `${equipCount} equipment highlights decoded` : "Equipment pending" },
+    { label: "Equipment", score: equipVal, note: gbSheet?.packages.length ? `${gbSheet.packages.length} factory package${gbSheet.packages.length === 1 ? "" : "s"}${gbSheet.estValue ? ` · ${fmt$(gbSheet.estValue)} in options` : ""}` : equipCount > 0 ? `${equipCount} equipment highlights decoded` : "Equipment pending" },
     { label: "Market Demand", score: demandVal, note: d.viewCount != null ? `${d.viewCount.toLocaleString()} shopper views` : "Demand tracked once live" },
     { label: "Dealer Confidence", score: dealerVal, note: d.dealerTrust.googleRating ? `${d.dealerTrust.googleRating} dealer rating` : "Verified dealer" },
     { label: "Condition", score: condVal, note: d.serviceCount > 0 ? `${d.serviceCount} service records on file` : listing.condition === "new" ? "New vehicle" : "Inspected" },
@@ -248,11 +250,11 @@ const VehiclePassportGreatBuy = () => {
           <p className="text-[14px] leading-relaxed text-[#334155]">
             This {listing.ymm}{listing.trim ? ` ${listing.trim}` : ""} ranks among the stronger vehicles currently available in your market. It combines{" "}
             {[d.belowMarket && d.belowMarket > 0 ? "below-market pricing" : null, lowMiles ? "low mileage" : null, d.cleanTitle && d.accidentCount === 0 ? "a clean ownership history" : null, d.warrantyStr ? "remaining factory warranty" : null, d.reviewRating != null && d.reviewRating >= 4.5 ? "strong owner satisfaction" : null].filter(Boolean).join(", ") || "verified vehicle data"}{" "}
-            into a well-rounded purchase.
+            {d.belowMarket && d.belowMarket > 0 && d.price != null ? `— at ${fmt$(d.price)}, that's ${fmt$(d.belowMarket)} under comparable listings.` : "into a well-rounded purchase."}
           </p>
           <div className="mt-4 rounded-2xl border border-emerald-200 bg-emerald-50/70 p-4 flex items-center gap-3">
             <Sparkles className="w-5 h-5 text-[#16A34A] shrink-0" />
-            <div><p className="text-[11px] font-semibold uppercase tracking-wider text-[#64748B]">AI Recommendation</p><p className="text-[16px] font-extrabold text-[#16A34A] leading-tight">{recLabel}</p></div>
+            <div><p className="text-[11px] font-semibold uppercase tracking-wider text-[#64748B]">AutoLabels Recommendation</p><p className="text-[16px] font-extrabold text-[#16A34A] leading-tight">{recLabel}</p></div>
           </div>
         </Section>
 
