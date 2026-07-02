@@ -471,7 +471,12 @@ function buildPanel(key: PassportPanelKey, d: PassportData, listing: VehicleList
       const trendPct = total != null && originalPrice ? Math.round((total / originalPrice) * 1000) / 10 : null;
       const marketDiff = price != null && avg != null ? price - avg : null;
       const phPercentile = (mc.price_percentile as number) ?? null;
-      const posLabel = phPercentile != null ? `Top ${Math.max(1, 100 - phPercentile)}% best priced` : isPreview ? "Top 15% best priced similar vehicles" : "Priced below the market average";
+      // price_percentile = % of comps priced BELOW this car — a LOW percentile
+      // means well priced, so "Top N%" uses the percentile directly. Above the
+      // median we state position neutrally instead of inventing praise.
+      const posLabel = phPercentile != null
+        ? (phPercentile <= 50 ? `Top ${Math.max(1, phPercentile)}% best priced` : "Priced within the local market range")
+        : isPreview ? "Top 15% best priced similar vehicles" : "Priced below the market average";
       const goodTime = isGreat || (total != null && total < 0);
       return {
         title: "Price History", subtitle: "See how this vehicle's price has changed over time",

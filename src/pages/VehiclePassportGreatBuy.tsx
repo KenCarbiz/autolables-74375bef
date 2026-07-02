@@ -58,8 +58,11 @@ const Bar = ({ label, score, note }: { label: string; score: number | null; note
   </div>
 );
 
-const ratingLabel = (s: number | null) => s == null ? "Pending" : s >= 90 ? "Excellent" : s >= 80 ? "Very Good" : s >= 70 ? "Good" : "Fair";
-const ratingColor = (s: number | null) => s == null ? "#94A3B8" : s >= 90 ? "#16A34A" : s >= 80 ? "#22C55E" : s >= 70 ? "#F59E0B" : "#EF4444";
+// Red is reserved for true negatives (accidents, open recalls, branded
+// titles) — none of which this matrix carries. An at-market price is a
+// neutral fact, so sub-80 scores render in slate, never warning colors.
+const ratingLabel = (s: number | null) => s == null ? "Pending" : s >= 90 ? "Excellent" : s >= 80 ? "Very Good" : s >= 70 ? "Good" : "At Market";
+const ratingColor = (s: number | null) => s == null ? "#94A3B8" : s >= 90 ? "#16A34A" : s >= 80 ? "#22C55E" : s >= 70 ? "#475569" : "#64748B";
 
 const VehiclePassportGreatBuy = () => {
   const params = useParams<{ vehicleSlug?: string; slug?: string }>();
@@ -82,8 +85,11 @@ const VehiclePassportGreatBuy = () => {
   const mc = (listing.mc_attributes || {}) as Record<string, unknown>;
   const score = d.confScore;
   const purchaseLabel = score == null ? "Pending Verification" : score >= 90 ? "Excellent Purchase" : score >= 80 ? "Strong Purchase" : score >= 70 ? "Good Purchase" : "Fair Purchase";
+  // price_percentile = % of comps priced BELOW this car, so a low percentile
+  // means well priced. Surface it only when favorable; never praise the
+  // priciest car in the set.
   const percentile = d.marketMeta.percentile;
-  const topPct = percentile != null ? `Top ${Math.max(1, 100 - percentile)}% of comparable vehicles` : isPreview ? "Top 4% of comparable vehicles" : null;
+  const topPct = percentile != null && percentile <= 25 ? `Top ${Math.max(1, percentile)}% best priced among comparable vehicles` : isPreview ? "Top 4% best priced among comparable vehicles" : null;
   const premium = /luxe|autograph|limited|platinum|premium|touring|signature|reserve|titanium|sensory|denali/i.test(listing.trim || "");
   const lowMiles = listing.mileage != null && listing.mileage < 30000;
   const seats = Number(mc.seating) || null;
@@ -102,7 +108,32 @@ const VehiclePassportGreatBuy = () => {
   // definition, so those factors are full-credit rather than "pending" — there
   // is no report to wait on.
   const isNew = listing.condition === "new";
-  const priceVal = d.belowMarket && d.belowMarket > 0 ? 94 : d.marketAvg != null && d.price != null ? (d.price <= d.marketAvg ? 78 : 62) : d.saveVsMsrp ? 85 : null;
+  // Same-trim comp subset: when at least two same-trim comps carry prices,
+  // their average is the honest anchor — the mixed-trim average punishes a
+  // flagship build for costing more than base cars.
+  const trimLc = (listing.trim || "").trim().toLowerCase();
+  const sameTrimComps = trimLc ? d.comparables.filter((c) => (c.trim || "").trim().toLowerCase() === trimLc && c.price != null && c.price > 0) : [];
+  const trimAvg = sameTrimComps.length >= 2 ? Math.round(sameTrimComps.reduce((a, c) => a + (c.price as number), 0) / sameTrimComps.length) : null;
+  const priceAnchor = trimAvg ?? d.marketAvg;
+  const pctVsAnchor = priceAnchor != null && d.price != null ? Math.round(((d.price - priceAnchor) / priceAnchor) * 100) : null;
+  // New cars anchor to their own sticker — trim-exact by construction. Used
+  // cars use the ±3% "at market" band (a few percent off the average is
+  // normal spread, not a verdict), preferring the same-trim average.
+  const msrpDelta = isNew && d.msrp != null && d.price != null ? d.msrp - d.price : null;
+  const gbSheet = readBuildSheet(listing);
+  const priceVal =
+    msrpDelta != null ? (msrpDelta > 0 ? Math.min(94, 86 + Math.round(msrpDelta / 1000)) : msrpDelta === 0 ? 85 : 72)
+    : d.belowMarket && d.belowMarket > 0 ? 94
+    : pctVsAnchor != null ? (pctVsAnchor <= -3 ? 90 : pctVsAnchor < 3 ? 80 : 72)
+    : d.saveVsMsrp ? 85 : null;
+  const priceNote =
+    msrpDelta != null && msrpDelta > 0 ? `${fmt$(msrpDelta)} below MSRP — sticker for this exact build is ${fmt$(d.msrp!)}`
+    : msrpDelta != null && msrpDelta === 0 ? "Priced at MSRP for this exact build"
+    : msrpDelta != null ? `Priced ${fmt$(-msrpDelta)} above the ${fmt$(d.msrp!)} sticker for this build`
+    : d.belowMarket && d.belowMarket > 0 ? `${fmt$(d.belowMarket)} below market average`
+    : pctVsAnchor != null && pctVsAnchor < 3 ? `Within 3% of the ${trimAvg != null ? `${listing.trim} trim` : "market"} average${gbSheet?.estValue ? ` — includes ${fmt$(gbSheet.estValue)} in factory options` : ""}`
+    : pctVsAnchor != null ? `Above the market average${gbSheet?.estValue ? ` — carries ${fmt$(gbSheet.estValue)} in factory packages the average comparable may not include` : " for the model line"}`
+    : d.marketAvg != null ? "Near the market average" : "Awaiting market data";
   const histVal = isNew ? 97 : d.cleanTitle && d.accidentCount === 0 ? 96 : d.accidentCount === 0 ? 84 : (typeof mc.carfax_clean_title === "boolean" || d.accidentCount != null) ? 70 : null;
   const ownVal = isNew ? 96 : d.ownerCount === 1 ? 93 : d.ownerCount != null ? 72 : null;
   const warVal = d.warrantyStr ? (() => { const w = d.warranty; if (w.in_service_date && w.factory_months) { const end = new Date(w.in_service_date); end.setMonth(end.getMonth() + w.factory_months); const left = Math.max(0, end.getTime() - Date.now()) / (1000 * 60 * 60 * 24 * 30.4); return Math.round(Math.max(55, Math.min(98, 55 + (left / w.factory_months) * 43))); } return 80; })() : null;
@@ -110,13 +141,12 @@ const VehiclePassportGreatBuy = () => {
   // mc_attributes.options/.features (where the VIN decode lands) — not just the
   // features column, which the NeoVIN pull never writes to.
   const equipCount = listingEquipment(listing).length;
-  const gbSheet = readBuildSheet(listing);
   const equipVal = equipCount > 0 ? Math.min(96, 60 + (equipCount + (premium ? 3 : 0)) * 6) : null;
   const demandVal = (d.viewCount != null || d.dom != null) ? ((d.viewCount ?? 0) > 20 ? 88 : 74) : null;
   const dealerVal = d.dealerTrust.googleRating ? Math.round(Math.min(98, (Number(d.dealerTrust.googleRating) / 5) * 100)) : d.verifyRows.length > 0 ? 82 : null;
   const condVal = (d.serviceCount > 0 || listing.prep_status?.foreman_signed_at) ? 90 : (listing.condition === "new" ? 92 : 74);
   const breakdown: { label: string; score: number | null; note: string }[] = [
-    { label: "Price Value", score: priceVal, note: d.belowMarket && d.belowMarket > 0 ? `${fmt$(d.belowMarket)} below market average` : d.marketAvg != null ? "Near the market average" : "Awaiting market data" },
+    { label: "Price Value", score: priceVal, note: priceNote },
     { label: "Vehicle History", score: histVal, note: isNew ? "New vehicle — no accident or title history" : d.cleanTitle && d.accidentCount === 0 ? "Clean title, no accidents reported" : "History reviewed where data exists" },
     { label: "Ownership", score: ownVal, note: isNew ? "New — you are the first owner" : d.ownerCount === 1 ? "Single previous owner" : d.ownerCount != null ? `${d.ownerCount} previous owners` : "Ownership pending" },
     { label: "Warranty", score: warVal, note: d.warrantyStr ? `${d.warrantyStr} of factory coverage remains` : "Confirm coverage with dealer" },
@@ -151,14 +181,17 @@ const VehiclePassportGreatBuy = () => {
   know.push("Replacement tires for larger wheels can cost above average.");
   if (!d.warrantyStr) know.push("Confirm remaining warranty coverage with the dealer.");
 
-  // Market position comparison (real where available).
+  // Market position comparison — rows render only when the market cell holds
+  // a real figure (a table of "Pending" reads as an unfinished report).
+  const compMiles = d.comparables.map((c) => c.miles).filter((m): m is number => m != null && m > 0);
+  const avgCompMiles = compMiles.length >= 2 ? Math.round(compMiles.reduce((a, b) => a + b, 0) / compMiles.length) : null;
   const posRows: { k: string; v: string; m: string }[] = [
-    { k: "Price", v: d.price != null ? fmt$(d.price) : "—", m: d.marketAvg != null ? `Avg ${fmt$(d.marketAvg)}` : "Pending" },
-    { k: "Mileage", v: listing.mileage != null ? `${listing.mileage.toLocaleString()} mi` : "—", m: isPreview ? "Avg 24,000 mi" : "Pending" },
-    { k: "Owner Count", v: d.ownerCount != null ? `${d.ownerCount}` : "—", m: isPreview ? "Avg 1.6" : "Pending" },
-    { k: "Warranty", v: d.warrantyStr ? `${d.warrantyStr} left` : "—", m: "Varies" },
-    { k: "Market Days", v: d.dom != null ? `${d.dom} days` : "—", m: isPreview ? "Avg 38 days" : "Pending" },
-  ];
+    { k: "Price", v: d.price != null ? fmt$(d.price) : "—", m: trimAvg != null ? `Avg ${fmt$(trimAvg)} (${listing.trim} trim)` : d.marketAvg != null ? `Avg ${fmt$(d.marketAvg)}${d.marketMeta.trimMatched === false && listing.trim ? " (all trims)" : ""}` : isPreview ? "Avg $71,400" : "" },
+    { k: "Mileage", v: listing.mileage != null ? `${listing.mileage.toLocaleString()} mi` : "—", m: avgCompMiles != null ? `Avg ${avgCompMiles.toLocaleString()} mi` : isPreview ? "Avg 24,000 mi" : "" },
+    { k: "Owner Count", v: d.ownerCount != null ? `${d.ownerCount}` : "—", m: isPreview ? "Avg 1.6" : "" },
+    { k: "Warranty", v: d.warrantyStr ? `${d.warrantyStr} left` : "—", m: d.warrantyStr ? "Varies" : "" },
+    { k: "Market Days", v: d.dom != null ? `${d.dom} days` : "—", m: d.marketMeta.avgDom != null ? `Avg ${d.marketMeta.avgDom} days` : isPreview ? "Avg 38 days" : "" },
+  ].filter((r) => r.m && r.v !== "—");
 
   // Ownership cost estimate — transparent model, clearly labelled (not a vehicle-specific fact).
   const base = d.price ?? d.marketAvg ?? 45000;
@@ -168,31 +201,55 @@ const VehiclePassportGreatBuy = () => {
   const fiveYear = annualTotal * 5;
 
   // Similar vehicles — the dealer's OWN stock only (never other dealers'
-  // listings). Sample only behind preview.
+  // listings). Sample only behind preview. Trim + the salesperson positioning
+  // chip travel with each card: a cheaper sibling labeled "Lower package
+  // level" supports this vehicle's price instead of undercutting it.
+  type SimilarCard = { mi: number; price: number; score: number | null; ymm: string | null; image: string | null; trim: string | null; condition: string | null; tag: string | null; tagDetail: string | null; tone: "blue" | "green" | "violet" | "neutral" };
   const dealerAlts = readDealerAlternatives(listing);
-  const similar: { mi: number; price: number; score: number | null; ymm: string | null; image: string | null }[] =
+  const similar: SimilarCard[] =
     !isPreview && dealerAlts.length
-      ? dealerAlts.slice(0, 3).map((a) => ({ mi: a.mileage ?? 0, price: a.price ?? 0, score: null, ymm: a.ymm ?? listing.ymm, image: a.image ?? listing.hero_image_url ?? null }))
+      ? dealerAlts.slice(0, 3).map((a) => ({ mi: a.mileage ?? 0, price: a.price ?? 0, score: null, ymm: a.ymm ?? listing.ymm, image: a.image ?? listing.hero_image_url ?? null, trim: a.trim, condition: a.condition, tag: a.tag === "Also in stock" ? null : a.tag, tagDetail: a.tagDetail, tone: a.tone }))
       : isPreview && d.price != null
         ? [
-            { mi: 24000, price: d.price + 5200, score: 91, ymm: listing.ymm, image: listing.hero_image_url ?? null },
-            { mi: 18000, price: d.price + 4360, score: 93, ymm: listing.ymm, image: listing.hero_image_url ?? null },
-            { mi: 31000, price: d.price + 6100, score: 88, ymm: listing.ymm, image: listing.hero_image_url ?? null },
+            { mi: 24000, price: d.price + 5200, score: 91, ymm: listing.ymm, image: listing.hero_image_url ?? null, trim: "LUXE", condition: "used", tag: "Lower package level", tagDetail: null, tone: "neutral" as const },
+            { mi: 18000, price: d.price + 4360, score: 93, ymm: listing.ymm, image: listing.hero_image_url ?? null, trim: "LUXE", condition: "used", tag: "Similar build", tagDetail: null, tone: "neutral" as const },
+            { mi: 31000, price: d.price + 6100, score: 88, ymm: listing.ymm, image: listing.hero_image_url ?? null, trim: "SENSORY", condition: "used", tag: "More equipment", tagDetail: "+$2,450 in factory options", tone: "blue" as const },
           ]
         : [];
+  const toneChip: Record<SimilarCard["tone"], string> = {
+    blue: "bg-blue-50 text-blue-700 border-blue-200",
+    green: "bg-emerald-50 text-emerald-700 border-emerald-200",
+    violet: "bg-violet-50 text-violet-700 border-violet-200",
+    neutral: "bg-slate-100 text-slate-600 border-slate-200",
+  };
 
+  // Market Position measures supply and scarcity — a genuinely distinct
+  // signal from Price (which used to be double-counted here, doubling the
+  // damage of any sub-par price chip).
+  const supplyVal =
+    d.marketMeta.daysSupply != null ? (d.marketMeta.daysSupply < 30 ? 92 : d.marketMeta.daysSupply < 60 ? 84 : 74)
+    : d.comparables.length >= 5 && trimLc ? (sameTrimComps.length <= 1 ? 88 : 80)
+    : null;
   const matrix: { k: string; s: number | null }[] = [
     { k: "Price", s: priceVal }, { k: "History", s: histVal }, { k: "Warranty", s: warVal }, { k: "Ownership", s: ownVal },
-    { k: "Equipment", s: equipVal }, { k: "Market Position", s: priceVal }, { k: "Dealer Confidence", s: dealerVal },
+    { k: "Equipment", s: equipVal }, { k: "Market Position", s: supplyVal }, { k: "Dealer Confidence", s: dealerVal },
     { k: "Maintenance", s: condVal }, { k: "Resale Potential", s: demandVal }, { k: "Overall", s: score },
   ];
 
+  // Real, verifiable urgency signals only — no fabricated scarcity.
   const buyNow: string[] = [];
-  if (isPreview || (d.marketMeta.daysSupply != null && d.marketMeta.daysSupply < 60)) buyNow.push("Comparable inventory is moving quickly in your market.");
+  if (d.marketMeta.daysSupply != null && d.marketMeta.daysSupply < 60) buyNow.push(`Local supply covers about ${Math.round(d.marketMeta.daysSupply)} days of demand — comparable inventory is moving quickly.`);
+  else if (isPreview) buyNow.push("Comparable inventory is moving quickly in your market.");
+  if (d.saveVsMsrp) buyNow.push(`Priced ${fmt$(d.saveVsMsrp)} below MSRP.`);
   if (d.belowMarket && d.belowMarket > 0) buyNow.push("Pricing is below the market average right now.");
+  if (listing.trim && d.comparables.length >= 5 && sameTrimComps.length <= 2) buyNow.push(sameTrimComps.length === 0
+    ? `None of the ${d.comparables.length} comparable listings nearby matches this ${listing.trim} build.`
+    : `Only ${sameTrimComps.length} of ${d.comparables.length} comparable listings nearby ${sameTrimComps.length === 1 ? "is" : "are"} a ${listing.trim}.`);
+  if (gbSheet?.estValue) buyNow.push(`Built with ${fmt$(gbSheet.estValue)} in factory packages.`);
   if ((d.viewCount ?? 0) > 20) buyNow.push("Shopper interest in this vehicle remains strong.");
   if (d.warrantyStr) buyNow.push("Factory warranty is still active.");
   if (d.ownerCount === 1) buyNow.push("One-owner vehicles like this are becoming harder to find.");
+  if (d.dom != null && d.dom <= 14) buyNow.push(`Recently arrived — ${d.dom} day${d.dom === 1 ? "" : "s"} on the lot.`);
 
   const recommend = score == null ? "Pending" : score >= 80 ? "YES" : score >= 70 ? "WORTH A LOOK" : "REVIEW CAREFULLY";
   const recLabel = score == null ? "More data needed" : score >= 90 ? "Highly Recommended" : score >= 80 ? "Recommended" : score >= 70 ? "Consider" : "Review";
@@ -277,11 +334,18 @@ const VehiclePassportGreatBuy = () => {
         <Section n={6} title="Market Position" sub="How this vehicle compares to similar listings.">
           {d.marketLow != null && d.marketHigh != null && d.marketAvg != null && d.price != null && (
             <div className="mb-5">
+              {/* Neutral band — the low/high figures are pricing-model bounds,
+                  not a good-to-bad spectrum, so no green-to-red gradient: a
+                  correctly priced top trim always sits right of center. */}
               <div className="grid grid-cols-3 text-center mb-1 text-[11px] text-[#64748B]"><span>Low {fmt$(d.marketLow)}</span><span>Avg {fmt$(d.marketAvg)}</span><span>High {fmt$(d.marketHigh)}</span></div>
-              <div className="relative h-2 rounded-full bg-gradient-to-r from-emerald-200 via-amber-100 to-rose-200">
+              <div className="relative h-2 rounded-full bg-slate-200">
                 <span className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-4 h-4 rounded-full bg-[#16A34A] ring-[3px] ring-white shadow" style={{ left: `${Math.max(0, Math.min(100, ((d.price - d.marketLow) / Math.max(1, d.marketHigh - d.marketLow)) * 100))}%` }} />
               </div>
               <p className="text-center text-[12px] font-semibold text-[#16A34A] mt-2">This vehicle: {fmt$(d.price)}</p>
+              {premium && listing.trim && pctVsAnchor != null && pctVsAnchor >= -3 && (
+                <p className="text-center text-[11px] text-[#64748B] mt-1">Priced at market for its trim — {listing.trim} is a top trim level, and the range includes lower-equipped builds.</p>
+              )}
+              <p className="text-center text-[10px] text-[#94A3B8] mt-1">Range reflects estimated pricing for comparable listings in this market.</p>
             </div>
           )}
           <div className={`${CARD} p-0 overflow-hidden`}>
@@ -308,10 +372,14 @@ const VehiclePassportGreatBuy = () => {
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">{similar.map((s, i) => (
               <div key={i} className={`${CARD} p-3`}>
                 <div className="h-24 rounded-lg bg-[#eef0f3] flex items-center justify-center mb-2">{s.image ? <img src={s.image} alt="" className="w-full h-full object-cover rounded-lg" /> : <Car className="w-7 h-7 text-[#94A3B8]" />}</div>
-                <p className="text-[13px] font-bold leading-tight line-clamp-1">{s.ymm}</p>
-                <p className="text-[11px] text-[#94A3B8]">{s.mi.toLocaleString()} mi</p>
-                <div className="flex items-center justify-between mt-1"><span className="text-[14px] font-extrabold">{fmt$(s.price)}</span>{s.score != null && <span className="text-[11px] font-bold text-[#16A34A]">Score {s.score}</span>}</div>
-                {score != null && s.score != null && <p className="text-[11px] text-[#64748B] mt-1.5">This vehicle scores {score - s.score > 0 ? `${score - s.score} points higher` : "competitively"} on price and history.</p>}
+                <p className="text-[13px] font-bold leading-tight line-clamp-1">{s.ymm}{s.trim ? ` ${s.trim}` : ""}</p>
+                <p className="text-[11px] text-[#94A3B8]">{[s.mi > 0 ? `${s.mi.toLocaleString()} mi` : null, s.condition ? s.condition.toUpperCase() === "CPO" ? "Certified" : s.condition.charAt(0).toUpperCase() + s.condition.slice(1) : null].filter(Boolean).join(" · ")}</p>
+                {s.tag && (
+                  <span className={`inline-flex items-center text-[10px] font-bold rounded-full border px-2 py-0.5 mt-1.5 ${toneChip[s.tone]}`}>
+                    {s.tag}{s.tagDetail ? ` — ${s.tagDetail}` : ""}
+                  </span>
+                )}
+                <div className="flex items-center justify-between mt-1.5"><span className="text-[14px] font-extrabold">{fmt$(s.price)}</span>{s.score != null && <span className="text-[11px] font-bold text-[#16A34A]">Score {s.score}</span>}</div>
                 <button onClick={() => go("comparable-vehicles")} className="mt-2 text-[12px] font-semibold text-[#2563EB] hover:underline">View comparison</button>
               </div>
             ))}</div>

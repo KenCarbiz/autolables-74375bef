@@ -122,7 +122,7 @@ export interface PassportData {
   viewCount: number | null;
   dom: number | null;
   // Enrichment (pulled at ingest by vehicle-enrich)
-  marketMeta: { percentile: number | null; radius: number | null; similarCount: number | null; avgDom: number | null; daysSupply: number | null; inventoryCount: number | null; checkedAt: string | null };
+  marketMeta: { percentile: number | null; radius: number | null; similarCount: number | null; avgDom: number | null; daysSupply: number | null; inventoryCount: number | null; checkedAt: string | null; trimMatched: boolean | null };
   comparables: { vin?: string | null; ymm?: string | null; trim?: string | null; miles?: number | null; price?: number | null; dist?: number | null; dealer?: string | null; dom?: number | null; image?: string | null }[];
   blackbook: { tradeinClean: number | null; retailClean: number | null; wholesaleClean: number | null; available: boolean } | null;
   marketCheckedAt: string | null;
@@ -268,6 +268,7 @@ export const derivePassport = (listing: VehicleListing): PassportData => {
     percentile: n(mm.price_percentile), radius: n(mm.search_radius), similarCount: n(mm.similar_count),
     avgDom: n(mm.avg_dom), daysSupply: n(mm.market_days_supply), inventoryCount: n(mm.inventory_count),
     checkedAt: (mm.checked_at as string) || null,
+    trimMatched: typeof mm.trim_matched === "boolean" ? mm.trim_matched : null,
   };
   const comparables = Array.isArray((listing as unknown as { comparables?: unknown }).comparables)
     ? ((listing as unknown as { comparables: PassportData["comparables"] }).comparables) : [];

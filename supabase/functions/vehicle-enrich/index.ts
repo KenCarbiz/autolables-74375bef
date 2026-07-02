@@ -151,12 +151,14 @@ async function fetchComps(ymm: string | null, condition: string, zip: string | n
 
     // Tightest first — same trim + year + price band, so comps are like-for-like
     // — then progressively relax (drop trim, then band, then year) only when the
-    // tighter pass yields no usable comps.
+    // tighter pass yields no usable comps. The winning tier is persisted so the
+    // client can caveat a trim-blind comp set instead of presenting it as exact.
+    let tier = trim ? "trim_year_band" : "year_band";
     let r = await run({ useYear: true, band: true, useTrim: true });
-    if (r && r.rows.length === 0) r = (await run({ useYear: true, band: true, useTrim: false })) ?? r;
-    if (r && r.rows.length === 0) r = (await run({ useYear: true, band: false, useTrim: false })) ?? r;
-    if (r && r.rows.length === 0) r = (await run({ useYear: false, band: true, useTrim: false })) ?? r;
-    if (r && r.rows.length === 0) r = (await run({ useYear: false, band: false, useTrim: false })) ?? r;
+    if (r && r.rows.length === 0) { r = (await run({ useYear: true, band: true, useTrim: false })) ?? r; tier = "year_band"; }
+    if (r && r.rows.length === 0) { r = (await run({ useYear: true, band: false, useTrim: false })) ?? r; tier = "year"; }
+    if (r && r.rows.length === 0) { r = (await run({ useYear: false, band: true, useTrim: false })) ?? r; tier = "band"; }
+    if (r && r.rows.length === 0) { r = (await run({ useYear: false, band: false, useTrim: false })) ?? r; tier = "model"; }
     if (!r) return null;
     const debug = { num_found: r.numFound, listings_returned: r.rawCount, http: r.http, radius: zip ? 100 : null };
 
@@ -186,6 +188,8 @@ async function fetchComps(ymm: string | null, condition: string, zip: string | n
       similar_count: count,
       search_radius: zip ? 100 : null,
       price_percentile: percentile,
+      relaxation_tier: tier,
+      trim_matched: tier === "trim_year_band",
       avg_dom: avgDom,
       market_days_supply: null as number | null,  // filled by fetchMds when the plan supports it
       inventory_count: count,
