@@ -65,7 +65,7 @@ const Waitlist = () => {
     <div className="min-h-screen bg-white text-slate-900 antialiased">
       <Seo
         title="Join the AutoLabels Wait List"
-        description="AutoLabels opens July 1st. Join the wait list to get early access to the window-sticker, addendum, and 50-state compliance platform."
+        description="The AutoLabels wait list is open now. Join to get early access to the window-sticker, addendum, and 50-state compliance platform."
         path="/waitlist"
       />
       {/* Nav */}
@@ -86,8 +86,8 @@ const Waitlist = () => {
             </div>
             <h1 className="font-display text-3xl font-black tracking-tight">You're on the list.</h1>
             <p className="mt-3 text-slate-600 max-w-md mx-auto">
-              Thanks{f.full_name ? `, ${f.full_name.split(" ")[0]}` : ""} — we'll reach out before AutoLabels opens
-              <span className="font-semibold text-slate-900"> July 1st</span> with your early-access details.
+              Thanks{f.full_name ? `, ${f.full_name.split(" ")[0]}` : ""} — we'll reach out
+              <span className="font-semibold text-slate-900"> shortly</span> with your early-access details.
             </p>
             <button onClick={() => navigate("/")} className="mt-6 inline-flex h-11 items-center gap-2 rounded-full bg-[#0B2041] px-6 text-sm font-semibold text-white hover:bg-[#13315e]">
               Back to home <ArrowRight className="h-4 w-4" />
@@ -101,7 +101,7 @@ const Waitlist = () => {
                   <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
                   <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-emerald-500" />
                 </span>
-                Opening July 1st
+                Wait list open now
               </div>
               <h1 className="font-display text-[34px] sm:text-5xl font-black tracking-tighter leading-[1.05]">
                 Join the AutoLabels <span className="text-blue-600">wait list.</span>

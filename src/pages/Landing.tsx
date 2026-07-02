@@ -29,7 +29,7 @@ import {
 
 // ──────────────────────────────────────────────────────────────
 // Landing — Wave 35. Pre-launch / waitlist positioning.
-// Every CTA is "Join Wait List Opening July 1st"
+// Every CTA is "Join Wait List Now"
 // (secondary). One card system across the whole page.
 // Legal discipline: "FTC-aligned" (CARS Rule was vacated 1/2025),
 // "documents" consent (never "guarantees compliance"),
@@ -129,7 +129,7 @@ const Nav = ({
               onClick={onWaitlist}
               className="inline-flex h-9 items-center gap-1.5 rounded-full bg-[#0B2041] px-4 text-sm font-medium text-white hover:bg-[#13315e]"
             >
-              Join Wait List Opening July 1st <ArrowRight className="h-3.5 w-3.5" />
+              Join Wait List Now <ArrowRight className="h-3.5 w-3.5" />
             </button>
           </>
         )}
@@ -175,7 +175,7 @@ const Hero = ({ onWaitlist }: { onWaitlist: () => void; onDemo: () => void }) =>
             onClick={onWaitlist}
             className="inline-flex h-12 items-center gap-2 rounded-full bg-[#0B2041] px-6 text-sm font-semibold text-white hover:bg-[#13315e]"
           >
-            Join Wait List Opening July 1st
+            Join Wait List Now
             <ArrowRight className="h-4 w-4" />
           </button>
           <a
@@ -1044,7 +1044,7 @@ const TakeThePowerBack = ({ onWaitlist }: { onWaitlist: () => void }) => (
           onClick={onWaitlist}
           className="inline-flex h-12 items-center gap-2 rounded-full bg-[#0B2041] px-6 text-sm font-semibold text-white hover:bg-[#13315e]"
         >
-          Join Wait List Opening July 1st
+          Join Wait List Now
           <ArrowRight className="h-4 w-4" />
         </button>
       </div>
@@ -1253,7 +1253,7 @@ const PricingTeaser = ({
                   onClick={onWaitlist}
                   className="inline-flex h-10 w-full items-center justify-center gap-1.5 rounded-full bg-[#0B2041] px-4 text-sm font-semibold text-white hover:bg-[#13315e]"
                 >
-                  Join Wait List Opening July 1st
+                  Join Wait List Now
                   <ArrowRight className="h-3.5 w-3.5" />
                 </button>
               ) : (
@@ -1261,7 +1261,7 @@ const PricingTeaser = ({
                   onClick={onWaitlist}
                   className="inline-flex h-10 w-full items-center justify-center gap-1.5 rounded-full border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 hover:bg-slate-50"
                 >
-                  Join Wait List Opening July 1st
+                  Join Wait List Now
                 </button>
               )}
             </div>
@@ -1274,7 +1274,7 @@ const PricingTeaser = ({
           onClick={onWaitlist}
           className="inline-flex h-11 items-center gap-2 rounded-full bg-[#0B2041] px-6 text-sm font-semibold text-white hover:bg-[#13315e]"
         >
-          Join Wait List Opening July 1st
+          Join Wait List Now
           <ArrowRight className="h-4 w-4" />
         </button>
       </div>
@@ -1361,7 +1361,7 @@ const FinalCTA = ({ onWaitlist, onDemo }: { onWaitlist: () => void; onDemo: () =
             onClick={onWaitlist}
             className="inline-flex h-12 items-center gap-2 rounded-full bg-white px-6 text-sm font-semibold text-slate-950 hover:bg-white/90"
           >
-            Join Wait List Opening July 1st
+            Join Wait List Now
             <ArrowRight className="h-4 w-4" />
           </button>
         </div>
@@ -1391,7 +1391,7 @@ const Footer = ({ onNav, onWaitlist }: { onNav: (to: string) => void; onWaitlist
           onClick={onWaitlist}
           className="inline-flex h-8 items-center gap-1.5 rounded-full bg-[#0B2041] px-3 text-xs font-medium text-white hover:bg-[#13315e]"
         >
-          Join Wait List Opening July 1st
+          Join Wait List Now
         </button>
       </div>
       <p className="text-xs text-slate-500">
