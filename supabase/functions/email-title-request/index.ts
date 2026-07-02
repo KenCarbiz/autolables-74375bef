@@ -36,6 +36,23 @@ Deno.serve(async (req) => {
 
   const admin = adminClient();
 
+  // Auth gate: service/cron callers (marketcheck-sync, title-reminders-sweep)
+  // pass the service key or cron secret. Browser callers must be a signed-in
+  // member of the target tenant — otherwise anyone could mint a 365-day
+  // title-upload token and harvest the clerk email for any tenant/VIN.
+  if (!isServiceOrCron(req)) {
+    const authHeader = req.headers.get("Authorization") || "";
+    const jwt = authHeader.replace(/^Bearer\s+/i, "");
+    if (!jwt) return json(401, { error: "unauthorized" });
+    const { data: claims, error: claimsErr } = await admin.auth.getClaims(jwt);
+    const uid = claims?.claims?.sub;
+    if (claimsErr || !uid) return json(401, { error: "unauthorized" });
+    const { data: member } = await admin.from("tenant_members")
+      .select("user_id").eq("tenant_id", tenantId).eq("user_id", uid).maybeSingle();
+    if (!member) return json(403, { error: "forbidden" });
+  }
+
+
   // Vehicle context for the email.
   const { data: listing } = await admin.from("vehicle_listings").select("id, ymm, condition").eq("tenant_id", tenantId).eq("vin", vin).maybeSingle();
   const { data: vf } = await admin.from("vehicle_files").select("stock_number").eq("tenant_id", tenantId).eq("vin", vin).maybeSingle();
