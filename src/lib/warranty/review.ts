@@ -12,7 +12,7 @@ import type { OemWarrantyProgram } from "@/lib/warranty/types";
 // When the library was last given a full human review, and how often it should
 // be re-reviewed. Update lastReviewedAt whenever a verification pass is done.
 export const WARRANTY_LIBRARY_META = {
-  lastReviewedAt: "2026-07-01",
+  lastReviewedAt: "2026-07-02",
   reviewIntervalMonths: 12,
   notes:
     "New-car terms derive from the curated oemWarrantyReference; CPO terms from oemCpoReference. " +

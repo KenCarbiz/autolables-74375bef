@@ -6,6 +6,7 @@ import { buildWarrantyCoverageReport } from "./coverageReport";
 import { matchOemCpoProgram } from "./cpo";
 import { buildWarrantyReviewQueue, reviewQueueSummary } from "./review";
 import { OEM_WARRANTY_REFERENCE } from "@/data/oemWarrantyReference";
+import { OEM_WARRANTY_PROGRAMS } from "@/data/oemWarrantyPrograms";
 import { OEM_CPO_REFERENCE } from "@/data/oemCpoReference";
 import type { WarrantyVehicleInput } from "./types";
 
@@ -140,10 +141,9 @@ describe("coverage tracker", () => {
     expect(report.cpoLoaded).toContain("TOYOTA");
     expect(report.cpoLoaded).toContain("INFINITI");
     expect(report.totals.cpoMakes).toBeGreaterThanOrEqual(30);
-    // Most CPO verified; Land Rover + Tesla remain needs_review.
-    expect(report.totals.cpoVerified).toBeGreaterThanOrEqual(28);
-    expect(report.cpoNeedsVerification).toContain("LAND ROVER");
-    expect(report.cpoNeedsVerification).toContain("TESLA");
+    // Every curated CPO entry is source-verified after the 2026-07-02 pass.
+    expect(report.totals.cpoVerified).toBe(report.totals.cpoMakes);
+    expect(report.cpoNeedsVerification).toEqual([]);
   });
 });
 
@@ -190,20 +190,34 @@ describe("verified corrections (2026-07-01 agent cross-check)", () => {
     expect(OEM_CPO_REFERENCE.NISSAN.comprehensiveMonths).toBeUndefined();
     expect(OEM_CPO_REFERENCE.HYUNDAI.comprehensiveMonths).toBeUndefined();
   });
-  it("Land Rover + Tesla CPO stay needs_review", () => {
-    expect(OEM_CPO_REFERENCE["LAND ROVER"].confidenceStatus).toBe("needs_review");
-    expect(OEM_CPO_REFERENCE.TESLA.confidenceStatus).toBe("needs_review");
+  it("Land Rover CPO reflects the current program (1yr/unlimited from factory expiry)", () => {
+    expect(OEM_CPO_REFERENCE["LAND ROVER"].confidenceStatus).toBe("verified");
+    expect(OEM_CPO_REFERENCE["LAND ROVER"].comprehensiveMonths).toBe(12);
+    expect(OEM_CPO_REFERENCE["LAND ROVER"].comprehensiveFrom).toBe("purchase");
+  });
+  it("Tesla used-vehicle warranty is verified (1yr/10k after basic)", () => {
+    expect(OEM_CPO_REFERENCE.TESLA.confidenceStatus).toBe("verified");
+    expect(OEM_CPO_REFERENCE.TESLA.comprehensiveMiles).toBe(10000);
   });
 });
 
 describe("review queue", () => {
-  it("flags unverified programs and a model-year rollover", () => {
+  it("has no unverified items after the 2026-07-02 pass; still flags rollover", () => {
     const items = buildWarrantyReviewQueue({ asOf: new Date("2028-10-01") });
-    expect(items.some((i) => i.reason === "unverified")).toBe(true);
+    expect(items.some((i) => i.reason === "unverified")).toBe(false);
     // 2015-2027 make-level ranges are before MY2028 → rollover flagged.
     expect(items.some((i) => i.reason === "model_year_rollover")).toBe(true);
     const summary = reviewQueueSummary({ asOf: new Date("2028-10-01") });
     expect(summary.total).toBeGreaterThan(0);
     expect(summary.cpoMakes).toBeGreaterThanOrEqual(30);
+  });
+  it("still flags an unverified program when one exists", () => {
+    const synthetic = {
+      ...OEM_WARRANTY_PROGRAMS[0],
+      id: "test-unverified",
+      confidenceStatus: "needs_review" as const,
+    };
+    const items = buildWarrantyReviewQueue({ asOf: new Date("2026-08-01"), programs: [synthetic] });
+    expect(items.some((i) => i.reason === "unverified" && i.programId === "test-unverified")).toBe(true);
   });
 });
