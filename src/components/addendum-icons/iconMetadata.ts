@@ -15,7 +15,8 @@ import {
   AlertOctagon, BellRing, Waves, FileWarning, RefreshCw, DollarSign, Percent, Tag, Gift,
   Handshake, Users, Volume2, Radio, Timer, CalendarDays, History, Grid3x3, Layers2,
   BadgeDollarSign, PiggyBank, Landmark, CircleDollarSign, Barcode, ArrowRight, ArrowLeft,
-  ChevronsRight, Leaf,
+  ChevronsRight, Leaf, MinusCircle, PlusCircle, Crosshair, FileClock, FileBadge, IdCard,
+  Megaphone, FileX, User, Video, Bookmark,
 } from "lucide-react";
 import type { AddendumIconCategory, AddendumIconMeta, AddendumIconSource, AddendumIconStatus } from "./iconTypes";
 import type { AddendumIconColor } from "./colorTokens";
@@ -25,6 +26,13 @@ import {
   PassportProtection, PassportBenefits, WindowTint, PaintProtectionFilm, WindowSticker,
   AddendumSheet, OilCan, OilChange, FuelNozzle, SteeringWheel, PlaceholderGlyph,
 } from "./customIcons";
+import {
+  PriceLocked, PriceUpdated, DealerInstalled, BumperToBumper, Powertrain, CorrosionShield,
+  TireWheel, Windshield, DentDing, TireSwap, BuyersGuide, Hitch, Crossbars, FloorMats,
+  WheelLocks, SplashGuards, CargoTray, TonneauCover, BedLiner, RemoteStartFob,
+  ChargingCable, ChargingPort, ChargingStation, HybridLeafBolt, PlugInHybrid, Airbag,
+  GaugeAlert,
+} from "./icons200";
 
 // One definition per icon: the render component AND the manifest row live
 // together so the registry and metadata can never drift apart. Artwork for
@@ -54,6 +62,9 @@ const USE_BY_CATEGORY: Record<AddendumIconCategory, string> = {
   documents: "Document lists, compliance labels, and packet rows",
   ui: "Buttons, links, and communication actions",
   warnings: "Recall, disclosure, and caution rows",
+  pricing_compliance: "Pricing transparency, disclosures, and addendum validation",
+  vehicle_status: "Inventory state badges on stickers and admin surfaces",
+  ev: "EV and hybrid equipment, charging, and range call-outs",
 };
 
 const d = (
@@ -169,14 +180,14 @@ export const ADDENDUM_ICON_DEFS: AddendumIconDef[] = [
   d("A007", "Cargo Package", "accessories", Package, "lucide", "green", ["cargo", "organizer", "trunk"]),
   d("A008", "Cargo Cover", "accessories", Box, "lucide", "green", ["cargo", "cover", "privacy"]),
   d("A009", "Luggage Carrier", "accessories", Luggage, "lucide", "green", ["luggage", "carrier", "travel"]),
-  d("A010", "Roof Rack", "accessories", PlaceholderGlyph, "custom", "green", ["roof rack", "crossbars"], custom),
+  d("A010", "Roof Rack", "accessories", Crossbars, "custom", "green", ["roof rack", "crossbars"], custom),
   d("A011", "Trailer Hitch", "accessories", Link2, "lucide", "green", ["hitch", "towing", "trailer"]),
   d("A012", "Bike Rack", "accessories", Bike, "lucide", "green", ["bike", "rack", "carrier"]),
   d("A013", "Roof Tent Ready", "accessories", Tent, "lucide", "green", ["overland", "tent", "camping"]),
   d("A014", "Mud Flaps", "accessories", PlaceholderGlyph, "custom", "green", ["mud flaps", "splash guards"], custom),
-  d("A015", "Bed Liner", "accessories", PlaceholderGlyph, "custom", "green", ["bed liner", "truck bed"], custom),
+  d("A015", "Bed Liner", "accessories", BedLiner, "custom", "green", ["bed liner", "truck bed"], custom),
   d("A016", "Running Boards", "accessories", PlaceholderGlyph, "custom", "green", ["running boards", "steps"], custom),
-  d("A017", "Tonneau Cover", "accessories", PlaceholderGlyph, "custom", "green", ["tonneau", "bed cover"], custom),
+  d("A017", "Tonneau Cover", "accessories", TonneauCover, "custom", "green", ["tonneau", "bed cover"], custom),
   d("A018", "Wheel Locks", "accessories", Lock, "lucide", "green", ["wheel locks", "security"]),
   d("A019", "Remote Start", "accessories", Radio, "lucide", "green", ["remote start", "convenience"]),
   d("A020", "Alarm System", "accessories", BellRing, "lucide", "green", ["alarm", "security", "anti-theft"]),
@@ -246,7 +257,7 @@ export const ADDENDUM_ICON_DEFS: AddendumIconDef[] = [
   d("D011", "Receipt", "documents", Receipt, "lucide", "navy", ["receipt", "invoice", "purchase"]),
   d("D012", "Window Sticker", "documents", WindowSticker, "custom", "blue", ["window sticker", "monroney", "label"], custom),
   d("D013", "Addendum", "documents", AddendumSheet, "custom", "blue", ["addendum", "supplemental", "sticker"], custom),
-  d("D014", "Buyers Guide", "documents", PlaceholderGlyph, "custom", "navy", ["buyers guide", "ftc", "as-is"], custom),
+  d("D014", "Buyers Guide", "documents", BuyersGuide, "custom", "navy", ["buyers guide", "ftc", "as-is"], custom),
   d("D015", "FTC Compliant", "documents", PlaceholderGlyph, "custom", "green", ["ftc", "compliant", "regulation"], custom),
   d("D016", "Title Record", "documents", FileWarning, "lucide", "navy", ["title", "brand", "record"], placeholder),
   d("D017", "Barcode", "documents", Barcode, "lucide", "navy", ["barcode", "vin", "scan"]),
@@ -292,9 +303,110 @@ export const ADDENDUM_ICON_DEFS: AddendumIconDef[] = [
   d("W005", "Flood History", "warnings", Waves, "lucide", "orange", ["flood", "water", "damage"]),
   d("W006", "Branded Title", "warnings", FileWarning, "lucide", "orange", ["salvage", "branded", "title"]),
   d("W007", "Odometer Alert", "warnings", Gauge, "lucide", "orange", ["odometer", "rollback", "discrepancy"]),
-  d("W008", "Airbag Recall", "warnings", PlaceholderGlyph, "custom", "orange", ["airbag", "takata", "recall"], custom),
+  d("W008", "Airbag Recall", "warnings", Airbag, "custom", "orange", ["airbag", "takata", "recall"], custom),
   d("W009", "Inspection Required", "warnings", ClipboardCheck, "lucide", "orange", ["inspection", "required", "state"]),
   d("W010", "Time Sensitive", "warnings", Timer, "lucide", "orange", ["deadline", "expiring", "urgent"]),
+
+  // ══ 200-series — "Missing Addendum Icons" reference sheet ══════
+
+  // ── PR — Pricing / Compliance ────────────────────────────────
+  d("PR201", "FTC Compliant", "pricing_compliance", ShieldCheck, "lucide", "blue", ["ftc", "compliance", "pricing", "disclosure", "legal"], { use: "Compliance footer, pricing transparency, addendum validation" }),
+  d("PR202", "Price Locked", "pricing_compliance", PriceLocked, "custom", "blue", ["price", "locked", "guaranteed"], custom),
+  d("PR203", "Price Updated", "pricing_compliance", PriceUpdated, "custom", "blue", ["price", "updated", "refreshed"], custom),
+  d("PR204", "Disclosure", "pricing_compliance", ScrollText, "lucide", "blue", ["disclosure", "terms", "legal"]),
+  d("PR205", "Included in Price", "pricing_compliance", CheckCircle2, "lucide", "green", ["included", "in price", "no charge"]),
+  d("PR206", "Not Included", "pricing_compliance", MinusCircle, "lucide", "blue", ["not included", "excluded", "extra"]),
+  d("PR207", "Dealer Installed", "pricing_compliance", DealerInstalled, "custom", "blue", ["dealer installed", "equipment", "addendum"], custom),
+  d("PR208", "Optional Item", "pricing_compliance", Star, "lucide", "purple", ["optional", "upgrade", "available"]),
+
+  // ── ST — Vehicle Status ──────────────────────────────────────
+  d("ST201", "New", "vehicle_status", Sparkles, "lucide", "blue", ["new", "brand new", "factory"]),
+  d("ST202", "Used", "vehicle_status", Car, "lucide", "blue", ["used", "pre-owned"]),
+  d("ST203", "CPO", "vehicle_status", BadgeCheck, "lucide", "green", ["cpo", "certified", "pre-owned"]),
+  d("ST204", "Demo", "vehicle_status", Tag, "lucide", "blue", ["demo", "demonstrator", "loaner"]),
+  d("ST205", "Loaner", "vehicle_status", User, "lucide", "blue", ["loaner", "courtesy", "service"]),
+  d("ST206", "In Transit", "vehicle_status", Truck, "lucide", "blue", ["in transit", "arriving", "incoming"]),
+  d("ST207", "Sold", "vehicle_status", Handshake, "lucide", "orange", ["sold", "delivered", "closed"]),
+  d("ST208", "Reserved", "vehicle_status", Bookmark, "lucide", "purple", ["reserved", "hold", "deposit"]),
+  d("ST209", "Available", "vehicle_status", CheckCircle2, "lucide", "green", ["available", "in stock", "ready"]),
+
+  // ── WC — Warranty / Coverage ─────────────────────────────────
+  d("WC201", "Bumper-to-Bumper", "coverage", BumperToBumper, "custom", "green", ["bumper to bumper", "basic", "comprehensive"], custom),
+  d("WC202", "Powertrain", "coverage", Powertrain, "custom", "green", ["powertrain", "engine", "transmission"], custom),
+  d("WC203", "Corrosion", "coverage", CorrosionShield, "custom", "green", ["corrosion", "rust", "perforation"], custom),
+  d("WC204", "Emissions", "coverage", Leaf, "lucide", "green", ["emissions", "epa", "federal"]),
+  d("WC205", "Roadside", "coverage", LifeBuoy, "lucide", "green", ["roadside", "towing", "assistance"]),
+  d("WC206", "Maintenance Plan", "coverage", CalendarCheck, "lucide", "green", ["maintenance", "plan", "prepaid"]),
+  d("WC207", "Tire & Wheel", "coverage", TireWheel, "custom", "green", ["tire", "wheel", "road hazard"], custom),
+  d("WC208", "Key Replacement", "coverage", Key, "lucide", "green", ["key", "replacement", "fob"]),
+  d("WC209", "Windshield", "coverage", Windshield, "custom", "green", ["windshield", "glass", "chip"], custom),
+  d("WC210", "Dent / Ding", "coverage", DentDing, "custom", "green", ["dent", "ding", "paintless repair"], custom),
+
+  // ── SR — Service / Recon ─────────────────────────────────────
+  d("SR201", "Safety Inspection", "maintenance", ClipboardCheck, "lucide", "blue", ["safety", "inspection", "state"]),
+  d("SR202", "Oil Service", "maintenance", OilCan, "custom", "blue", ["oil", "service", "change"], custom),
+  d("SR203", "Brake Service", "maintenance", Disc, "lucide", "blue", ["brakes", "pads", "rotors"]),
+  d("SR204", "Tire Replacement", "maintenance", TireSwap, "custom", "blue", ["tires", "replacement", "new tires"], custom),
+  d("SR205", "Alignment", "maintenance", Crosshair, "lucide", "blue", ["alignment", "steering", "suspension"]),
+  d("SR206", "Battery Test", "maintenance", BatteryCharging, "lucide", "blue", ["battery", "test", "charge"]),
+  d("SR207", "Detail Complete", "maintenance", Sparkles, "lucide", "green", ["detail", "clean", "complete"]),
+  d("SR208", "Recall Checked", "maintenance", BadgeCheck, "lucide", "green", ["recall", "checked", "verified"]),
+  d("SR209", "Recall Open", "maintenance", BellRing, "lucide", "orange", ["recall", "open", "outstanding"]),
+  d("SR210", "No Recall", "maintenance", ShieldCheck, "lucide", "green", ["no recall", "clear", "nhtsa"]),
+
+  // ── DC — Documents ───────────────────────────────────────────
+  d("DC201", "Buyer's Guide", "documents", BuyersGuide, "custom", "blue", ["buyers guide", "ftc", "as-is", "warranty"], custom),
+  d("DC202", "Vehicle History", "documents", FileClock, "lucide", "blue", ["history", "carfax", "autocheck", "report"]),
+  d("DC203", "Title", "documents", FileBadge, "lucide", "blue", ["title", "certificate", "ownership"]),
+  d("DC204", "Registration", "documents", IdCard, "lucide", "blue", ["registration", "dmv", "plates"]),
+  d("DC205", "Payoff", "documents", Banknote, "lucide", "blue", ["payoff", "lien", "balance"]),
+  d("DC206", "Insurance", "documents", Shield, "lucide", "blue", ["insurance", "proof", "coverage"]),
+  d("DC207", "Window Sticker", "documents", WindowSticker, "custom", "blue", ["window sticker", "monroney", "label"], custom),
+  d("DC208", "Purchase Order", "documents", Receipt, "lucide", "blue", ["purchase order", "buyers order", "deal"]),
+
+  // ── CA — Customer Actions ────────────────────────────────────
+  d("CA201", "Scan QR", "ui", QrCode, "lucide", "purple", ["scan", "qr", "code"]),
+  d("CA202", "Upload Photos", "ui", Camera, "lucide", "purple", ["upload", "photos", "trade"]),
+  d("CA203", "Sign Document", "ui", FileSignature, "lucide", "purple", ["sign", "esign", "signature"]),
+  d("CA204", "Schedule Visit", "ui", CalendarDays, "lucide", "purple", ["schedule", "visit", "appointment"]),
+  d("CA205", "Call", "ui", Phone, "lucide", "purple", ["call", "phone", "sales"]),
+  d("CA206", "Text", "ui", MessageSquare, "lucide", "purple", ["text", "sms", "message"]),
+  d("CA207", "Email", "ui", Mail, "lucide", "purple", ["email", "contact", "message"]),
+  d("CA208", "Get Directions", "ui", MapPin, "lucide", "purple", ["directions", "map", "dealership"]),
+
+  // ── AX — Accessories ─────────────────────────────────────────
+  d("AX201", "Hitch", "accessories", Hitch, "custom", "purple", ["hitch", "towing", "ball mount"], custom),
+  d("AX202", "Crossbars", "accessories", Crossbars, "custom", "purple", ["crossbars", "roof rack", "rails"], custom),
+  d("AX203", "Floor Mats", "accessories", FloorMats, "custom", "purple", ["floor mats", "all weather", "carpet"], custom),
+  d("AX204", "Tint", "accessories", WindowTint, "custom", "purple", ["tint", "window", "film"], custom),
+  d("AX205", "PPF", "accessories", PaintProtectionFilm, "custom", "purple", ["ppf", "paint protection", "film"], custom),
+  d("AX206", "Ceramic Coating", "accessories", Droplets, "lucide", "purple", ["ceramic", "coating", "hydrophobic"]),
+  d("AX207", "Wheel Locks", "accessories", WheelLocks, "custom", "purple", ["wheel locks", "lug", "security"], custom),
+  d("AX208", "Splash Guards", "accessories", SplashGuards, "custom", "purple", ["splash guards", "mud flaps"], custom),
+  d("AX209", "Cargo Tray", "accessories", CargoTray, "custom", "purple", ["cargo tray", "trunk", "liner"], custom),
+  d("AX210", "Tonneau Cover", "accessories", TonneauCover, "custom", "purple", ["tonneau", "bed cover", "truck"], custom),
+  d("AX211", "Bed Liner", "accessories", BedLiner, "custom", "purple", ["bed liner", "spray in", "truck bed"], custom),
+  d("AX212", "Remote Start", "accessories", RemoteStartFob, "custom", "purple", ["remote start", "fob", "convenience"], custom),
+  d("AX213", "Dash Cam", "accessories", Video, "lucide", "purple", ["dash cam", "camera", "recording"]),
+  d("AX214", "Accessory / Add-On", "accessories", PlusCircle, "lucide", "purple", ["accessory", "add-on", "extra"]),
+
+  // ── EV — EV / Hybrid ─────────────────────────────────────────
+  d("EV201", "EV Battery", "ev", BatteryCharging, "lucide", "green", ["ev", "battery", "high voltage"]),
+  d("EV202", "Charging Cable", "ev", ChargingCable, "custom", "green", ["charging", "cable", "cord"], custom),
+  d("EV203", "Charging Port", "ev", ChargingPort, "custom", "green", ["charging", "port", "connector"], custom),
+  d("EV204", "Charging Station", "ev", ChargingStation, "custom", "green", ["charging", "station", "level 2"], custom),
+  d("EV205", "Hybrid", "ev", HybridLeafBolt, "custom", "green", ["hybrid", "electric", "gas"], custom),
+  d("EV206", "Plug-In Hybrid", "ev", PlugInHybrid, "custom", "green", ["phev", "plug-in", "hybrid"], custom),
+  d("EV207", "EV Range", "ev", Gauge, "lucide", "blue", ["range", "miles", "battery"]),
+
+  // ── WA — Warnings ────────────────────────────────────────────
+  d("WA201", "Recall", "warnings", AlertTriangle, "lucide", "orange", ["recall", "warning", "safety"]),
+  d("WA202", "Airbag", "warnings", Airbag, "custom", "orange", ["airbag", "takata", "srs"], custom),
+  d("WA203", "Mileage Discrepancy", "warnings", GaugeAlert, "custom", "orange", ["mileage", "odometer", "discrepancy"], custom),
+  d("WA204", "Title Issue", "warnings", FileWarning, "lucide", "orange", ["title", "brand", "issue"]),
+  d("WA205", "Open Campaign", "warnings", Megaphone, "lucide", "orange", ["campaign", "service", "open"]),
+  d("WA206", "Document Missing", "warnings", FileX, "lucide", "orange", ["document", "missing", "pending"]),
+  d("WA207", "Pending Verification", "warnings", Hourglass, "lucide", "orange", ["pending", "verification", "review"]),
 ];
 
 export const ADDENDUM_ICON_METADATA: AddendumIconMeta[] = ADDENDUM_ICON_DEFS.map((def) => {

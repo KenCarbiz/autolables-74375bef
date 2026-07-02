@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { ADDENDUM_ICON_DEFS, ADDENDUM_ICON_METADATA } from "./iconMetadata";
 import { getAddendumIconDef, getAddendumIconComponent, searchAddendumIcons } from "./iconRegistry";
-import { CATEGORY_PREFIX } from "./iconTypes";
+import { CATEGORY_PREFIX, CATEGORY_PREFIX_200 } from "./iconTypes";
 import { ADDENDUM_ICON_COLORS } from "./colorTokens";
 
 const RANGE_MAX: Record<string, number> = { S: 25, P: 25, V: 50, A: 75, C: 50, M: 50, D: 50, U: 50, W: 25 };
@@ -18,12 +18,28 @@ describe("addendum icon manifest", () => {
 
   it("every id matches its category prefix and stays inside the reserved range", () => {
     for (const def of ADDENDUM_ICON_DEFS) {
-      const m = /^([A-Z])(\d{3})$/.exec(def.iconId);
+      const m = /^([A-Z]{1,2})(\d{3})$/.exec(def.iconId);
       expect(m, def.iconId).toBeTruthy();
       const [, prefix, num] = m!;
-      expect(prefix, def.iconId).toBe(CATEGORY_PREFIX[def.category]);
-      expect(Number(num), def.iconId).toBeGreaterThanOrEqual(1);
-      expect(Number(num), def.iconId).toBeLessThanOrEqual(RANGE_MAX[prefix]);
+      if (prefix.length === 2) {
+        // 200-series: two-letter prefix, numbered 201+ so it can never
+        // collide with the core single-letter ranges.
+        expect(CATEGORY_PREFIX_200[prefix], def.iconId).toBe(def.category);
+        expect(Number(num), def.iconId).toBeGreaterThanOrEqual(201);
+        expect(Number(num), def.iconId).toBeLessThanOrEqual(299);
+      } else {
+        expect(prefix, def.iconId).toBe(CATEGORY_PREFIX[def.category]);
+        expect(Number(num), def.iconId).toBeGreaterThanOrEqual(1);
+        expect(Number(num), def.iconId).toBeLessThanOrEqual(RANGE_MAX[prefix]);
+      }
+    }
+  });
+
+  it("includes the full 200-series from the reference sheet", () => {
+    const counts: Record<string, number> = { PR: 8, ST: 9, WC: 10, SR: 10, DC: 8, CA: 8, AX: 14, EV: 7, WA: 7 };
+    for (const [prefix, expected] of Object.entries(counts)) {
+      const got = ADDENDUM_ICON_DEFS.filter((x) => new RegExp(`^${prefix}2\\d{2}$`).test(x.iconId)).length;
+      expect(got, prefix).toBe(expected);
     }
   });
 

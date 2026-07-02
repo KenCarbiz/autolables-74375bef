@@ -30,13 +30,16 @@ const AddendumIconLibrary = () => {
   const [query, setQuery] = useState("");
   const [category, setCategory] = useState<AddendumIconCategory | "all">("all");
   const [status, setStatus] = useState<AddendumIconStatus | "all">("all");
+  const [series, setSeries] = useState<"all" | "core" | "200">("all");
 
+  const seriesOf = (id: string) => (/^[A-Z]{2}\d{3}$/.test(id) ? "200" : "core");
   const icons = useMemo(() => {
     let list = searchAddendumIcons(query);
     if (category !== "all") list = list.filter((i) => i.category === category);
     if (status !== "all") list = list.filter((i) => i.status === status);
+    if (series !== "all") list = list.filter((i) => seriesOf(i.iconId) === series);
     return list;
-  }, [query, category, status]);
+  }, [query, category, status, series]);
 
   const counts = useMemo(() => ({
     total: ADDENDUM_ICON_DEFS.length,
@@ -94,6 +97,11 @@ const AddendumIconLibrary = () => {
             <option value="ready">Ready</option>
             <option value="placeholder">Placeholder</option>
             <option value="custom_required">Custom required</option>
+          </select>
+          <select value={series} onChange={(e) => setSeries(e.target.value as typeof series)} className="h-11 px-3 rounded-xl border border-[#E6E8EC] bg-white text-sm outline-none focus:border-[#2563EB]">
+            <option value="all">All series</option>
+            <option value="core">Core set</option>
+            <option value="200">Missing Addendum Icons / 200-Series</option>
           </select>
         </div>
 

@@ -139,6 +139,10 @@ const extractHeroImage = (html: string, baseUrl: string): string | null => {
 // opaque (no vin param) so they're accepted as-is; they were served on this
 // exact VDP.
 const CARFAX_REPORT_RE = /https?:\/\/(?:www\.)?carfax\.com\/VehicleHistory\/p\/Report\.cfx\?[^"'<>\s\\)]+/gi;
+// Modern tokenized dealer links (e.g. carfax.com/vehiclehistory/ar20/<token>,
+// as served on Harte INFINITI VDPs) — opaque per-VIN tokens with no query
+// params, so like cfx.link they're trusted as served on that exact VDP.
+const CARFAX_TOKEN_RE = /https?:\/\/(?:www\.)?carfax\.com\/vehiclehistory\/[A-Za-z0-9]{2,10}\/[A-Za-z0-9_-]{20,}/gi;
 const CFX_LINK_RE = /https?:\/\/(?:www\.)?cfx\.link\/[A-Za-z0-9_-]{4,}/gi;
 const AUTOCHECK_RE = /https?:\/\/(?:www\.)?autocheck\.com\/[^"'<>\s\\)]*vin=[A-Za-z0-9]{11,17}[^"'<>\s\\)]*/gi;
 
@@ -158,6 +162,9 @@ const extractHistoryReportLink = (html: string, targetVin: string): string | nul
   while ((m = CARFAX_REPORT_RE.exec(html))) if (vinParamMatches(m[0])) return decode(m[0]);
   AUTOCHECK_RE.lastIndex = 0;
   while ((m = AUTOCHECK_RE.exec(html))) if (vinParamMatches(m[0])) return decode(m[0]);
+  CARFAX_TOKEN_RE.lastIndex = 0;
+  const token = CARFAX_TOKEN_RE.exec(html)?.[0];
+  if (token) return token;
   CFX_LINK_RE.lastIndex = 0;
   return CFX_LINK_RE.exec(html)?.[0] ?? null;
 };

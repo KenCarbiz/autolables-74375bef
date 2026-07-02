@@ -10,6 +10,11 @@ import type { AddendumIconColor } from "./colorTokens";
 //   D001-D050  documents / compliance
 //   U001-U050  UI / actions / communication
 //   W001-W025  warnings / alerts / recall
+// The 200-series (numbered reference sheet) uses TWO-letter prefixes starting
+// at 201 so it can never collide with the core single-letter ranges:
+//   PR201+ pricing/compliance · ST201+ vehicle status · WC201+ coverage
+//   SR201+ service/recon · DC201+ documents · CA201+ customer actions
+//   AX201+ accessories · EV201+ EV/hybrid · WA201+ warnings
 export type AddendumIconCategory =
   | "status"
   | "passport"
@@ -19,11 +24,22 @@ export type AddendumIconCategory =
   | "maintenance"
   | "documents"
   | "ui"
-  | "warnings";
+  | "warnings"
+  | "pricing_compliance"
+  | "vehicle_status"
+  | "ev";
 
 export const CATEGORY_PREFIX: Record<AddendumIconCategory, string> = {
   status: "S", passport: "P", vehicle: "V", accessories: "A",
   coverage: "C", maintenance: "M", documents: "D", ui: "U", warnings: "W",
+  pricing_compliance: "PR", vehicle_status: "ST", ev: "EV",
+};
+
+// 200-series prefix → category (categories the sheet shares with the core
+// set keep their core category; only the sheet-new concepts get new ones).
+export const CATEGORY_PREFIX_200: Record<string, AddendumIconCategory> = {
+  PR: "pricing_compliance", ST: "vehicle_status", WC: "coverage", SR: "maintenance",
+  DC: "documents", CA: "ui", AX: "accessories", EV: "ev", WA: "warnings",
 };
 
 export const CATEGORY_LABEL: Record<AddendumIconCategory, string> = {
@@ -36,6 +52,9 @@ export const CATEGORY_LABEL: Record<AddendumIconCategory, string> = {
   documents: "Documents & Compliance",
   ui: "UI & Communication",
   warnings: "Warnings & Recalls",
+  pricing_compliance: "Pricing & Compliance",
+  vehicle_status: "Vehicle Status",
+  ev: "EV & Hybrid",
 };
 
 export type AddendumIconStatus = "ready" | "placeholder" | "custom_required";
