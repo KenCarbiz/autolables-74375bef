@@ -9,8 +9,41 @@
 import { cleanEquipmentList } from "@/lib/passportV2Data";
 import type { VehicleListing } from "@/hooks/useVehicleListing";
 
-export interface BuildSheetPackage { name: string; msrp?: number; contents: string[] }
+export type PackageKind =
+  | "Equipment Group"
+  | "Towing & Hauling"
+  | "Off-Road"
+  | "Safety & Technology"
+  | "Comfort & Convenience"
+  | "Appearance & Wheels"
+  | "Protection & Utility"
+  | "Other Packages";
+
+export interface BuildSheetPackage { name: string; msrp?: number; contents: string[]; kind: PackageKind }
 export interface BuildSheetOption { name: string; msrp?: number }
+
+// Domestic trucks carry a dozen-plus packages, so classification is what keeps
+// the section readable: the build-defining equipment group leads, then the
+// capability packages shoppers cross-shop on (towing, off-road), then the rest.
+const PACKAGE_KINDS: [RegExp, PackageKind][] = [
+  // Ford 301A/302A/502A, GM Preferred Equipment Group, Ram Level 1/2 groups.
+  [/equipment group|preferred equipment|\b[1-9]0[0-9]a\b|\blevel [1-4]\b(?=.*(group|package))|package level/i, "Equipment Group"],
+  [/tow|trailer|haul|gooseneck|fifth.?wheel|payload|camper/i, "Towing & Hauling"],
+  [/off.?road|fx4|z71|zr2|at4|trail|tremor|sasquatch|rebel|rocky ridge|skid plate|4x4 pkg/i, "Off-Road"],
+  [/safety|technology|tech pkg|tech package|driver assist|co.?pilot|super cruise|active safety|camera/i, "Safety & Technology"],
+  [/comfort|convenience|cold weather|climate|heated|ventilated|luxury|premium interior/i, "Comfort & Convenience"],
+  [/appearance|chrome|black(out| out| appearance)|monochrome|sport appearance|wheel|graphics|stripe|midnight|redline/i, "Appearance & Wheels"],
+  [/protection|bed ?liner|bedliner|bed utility|floor liner|mud flap|cargo|security|interior protection/i, "Protection & Utility"],
+];
+export const PACKAGE_KIND_ORDER: PackageKind[] = [
+  "Equipment Group", "Towing & Hauling", "Off-Road", "Safety & Technology",
+  "Comfort & Convenience", "Appearance & Wheels", "Protection & Utility", "Other Packages",
+];
+
+export const classifyPackage = (name: string): PackageKind => {
+  for (const [re, kind] of PACKAGE_KINDS) if (re.test(name)) return kind;
+  return "Other Packages";
+};
 
 export interface ShopperBuildSheet {
   packages: BuildSheetPackage[];
@@ -74,12 +107,22 @@ export function readBuildSheet(listing: VehicleListing): ShopperBuildSheet | nul
   if (!raw || typeof raw !== "object") return null;
 
   const packages: BuildSheetPackage[] = (Array.isArray(raw.packages) ? raw.packages : [])
-    .map((p: Record<string, unknown>) => ({
-      name: String(p?.name ?? "").trim(),
-      msrp: num(p?.msrp),
-      contents: cleanEquipmentList((Array.isArray(p?.contents) ? p.contents : []).map((c) => String(c ?? "").trim()).filter(Boolean)),
-    }))
-    .filter((p) => p.name);
+    .map((p: Record<string, unknown>) => {
+      const name = String(p?.name ?? "").trim();
+      return {
+        name,
+        msrp: num(p?.msrp),
+        contents: cleanEquipmentList((Array.isArray(p?.contents) ? p.contents : []).map((c) => String(c ?? "").trim()).filter(Boolean)),
+        kind: classifyPackage(name),
+      };
+    })
+    .filter((p) => p.name)
+    // Build-defining groups first, then capability packages, biggest MSRP first
+    // within each kind — the $3,500 equipment group leads, the wheel locks trail.
+    .sort((a, b) =>
+      PACKAGE_KIND_ORDER.indexOf(a.kind) - PACKAGE_KIND_ORDER.indexOf(b.kind)
+      || (b.msrp ?? 0) - (a.msrp ?? 0)
+      || a.name.localeCompare(b.name));
 
   const options: BuildSheetOption[] = cleanEquipmentList(
     (Array.isArray(raw.options) ? raw.options : []).map((o: Record<string, unknown>) => String(o?.name ?? "").trim()),

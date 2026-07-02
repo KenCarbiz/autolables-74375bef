@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { readBuildSheet } from "./buildSheet";
+import { readBuildSheet, classifyPackage } from "./buildSheet";
 import type { VehicleListing } from "@/hooks/useVehicleListing";
 
 const listingWith = (build_sheet: unknown): VehicleListing =>
@@ -71,5 +71,44 @@ describe("readBuildSheet", () => {
   it("flags generic (typical-for-trim) decodes", () => {
     const g = readBuildSheet(listingWith({ ...SHEET, generic: true }))!;
     expect(g.generic).toBe(true);
+  });
+});
+
+describe("truck package organization", () => {
+  it("classifies typical American-truck package names", () => {
+    expect(classifyPackage("Equipment Group 302A High")).toBe("Equipment Group");
+    expect(classifyPackage("Preferred Equipment Group 1LT")).toBe("Equipment Group");
+    expect(classifyPackage("Trailer Tow Package")).toBe("Towing & Hauling");
+    expect(classifyPackage("Max Trailer Tow Package")).toBe("Towing & Hauling");
+    expect(classifyPackage("FX4 Off-Road Package")).toBe("Off-Road");
+    expect(classifyPackage("Z71 Off Road and Protection Package")).toBe("Off-Road");
+    expect(classifyPackage("Ford Co-Pilot360 Assist 2.0")).toBe("Safety & Technology");
+    expect(classifyPackage("Cold Weather Package")).toBe("Comfort & Convenience");
+    expect(classifyPackage("Chrome Appearance Package")).toBe("Appearance & Wheels");
+    expect(classifyPackage("Bed Utility Package")).toBe("Protection & Utility");
+    expect(classifyPackage("Mystery Bundle")).toBe("Other Packages");
+  });
+
+  it("orders packages: equipment group first, then by kind, biggest MSRP first within kind", () => {
+    const truck = readBuildSheet(listingWith({
+      packages: [
+        { name: "Chrome Appearance Package", msrp: 995, contents: [] },
+        { name: "Trailer Tow Package", msrp: 1195, contents: [] },
+        { name: "Max Trailer Tow Package", msrp: 2295, contents: [] },
+        { name: "Equipment Group 302A High", msrp: 3500, contents: [] },
+        { name: "FX4 Off-Road Package", msrp: 1005, contents: [] },
+        { name: "Bed Utility Package", msrp: 350, contents: [] },
+      ],
+      options: [], key_features: {}, standard: {}, generic: false,
+    }))!;
+    expect(truck.packages.map((p) => p.name)).toEqual([
+      "Equipment Group 302A High",
+      "Max Trailer Tow Package",   // towing, higher MSRP first
+      "Trailer Tow Package",
+      "FX4 Off-Road Package",
+      "Chrome Appearance Package",
+      "Bed Utility Package",
+    ]);
+    expect(truck.estValue).toBe(995 + 1195 + 2295 + 3500 + 1005 + 350);
   });
 });

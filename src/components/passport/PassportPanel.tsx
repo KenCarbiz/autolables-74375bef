@@ -10,7 +10,7 @@ import { fmt$, listingEquipment } from "@/lib/passportV2Data";
 import { oemCoverageRows, type CoverageKey } from "@/lib/oemWarranty";
 import { lookupOemReference } from "@/data/oemWarrantyReference";
 import { resolveEffectiveWarranty } from "@/lib/warranty/passportWarranty";
-import { readBuildSheet } from "@/lib/buildSheet";
+import { readBuildSheet, PACKAGE_KIND_ORDER } from "@/lib/buildSheet";
 import type { VehicleListing } from "@/hooks/useVehicleListing";
 import {
   PassportSlideOver, Hero, Section, Check, Empty, StatRow, RangeBar, TrendChart, Ring, CARD, GREEN, BLUE,
@@ -1455,6 +1455,35 @@ function buildPanel(key: PassportPanelKey, d: PassportData, listing: VehicleList
       const sheet = readBuildSheet(listing);
       const equipCount = sheet ? sheet.keyFeatureCount + sheet.standardCount : featLabels.length;
       const hasContent = !!sheet || featLabels.length > 0 || accessories.length > 0 || ordered.length > 0;
+      // Domestic trucks can carry a dozen-plus packages — group them under type
+      // headers once the list gets long, so the section stays scannable.
+      const pkgGroups = sheet
+        ? PACKAGE_KIND_ORDER.map((k) => [k, sheet.packages.filter((p) => p.kind === k)] as const).filter(([, l]) => l.length > 0)
+        : [];
+      const groupedPkgView = (sheet?.packages.length ?? 0) >= 5 && pkgGroups.length > 1;
+      const pkgTotal = sheet ? sheet.packages.reduce((a, p) => a + (p.msrp ?? 0), 0) : 0;
+      const renderPkg = (p: { name: string; msrp?: number; contents: string[]; kind: string }) => (
+        <details key={p.name} className={`${CARD} overflow-hidden group`}>
+          <summary className="cursor-pointer list-none flex items-center justify-between gap-3 px-4 py-3">
+            <span className="inline-flex items-center gap-2.5 min-w-0">
+              <span className="w-8 h-8 rounded-lg bg-blue-50 flex items-center justify-center shrink-0"><Package className="w-4 h-4 text-[#2563EB]" /></span>
+              <span className="min-w-0">
+                <span className="block text-[13px] font-bold text-[#0F172A] leading-tight">{p.name}</span>
+                {p.kind === "Equipment Group" && <span className="inline-block mt-0.5 text-[9px] font-bold uppercase tracking-wide text-[#2563EB] bg-blue-50 rounded-full px-1.5 py-0.5">Equipment Group</span>}
+              </span>
+            </span>
+            <span className="inline-flex items-center gap-2 shrink-0">
+              {p.msrp ? <span className="text-[12px] font-bold text-[#16A34A]">{fmt$(p.msrp)}</span> : null}
+              {p.contents.length > 0 && <ChevronDown className="w-4 h-4 text-[#94A3B8] group-open:rotate-180 transition-transform" />}
+            </span>
+          </summary>
+          {p.contents.length > 0 && (
+            <div className="px-4 pb-3 grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1.5">
+              {p.contents.map((c) => <div key={c} className="flex items-start gap-2 text-[12px] text-[#334155]"><CheckCircle2 className="w-3.5 h-3.5 text-[#16A34A] shrink-0 mt-0.5" />{c}</div>)}
+            </div>
+          )}
+        </details>
+      );
       return {
         title: "Equipment & Installed Options", subtitle: "Everything included on this vehicle from the factory and dealership",
         primary: { label: "Reserve This Vehicle", onClick: () => go("reserve") },
@@ -1479,29 +1508,23 @@ function buildPanel(key: PassportPanelKey, d: PassportData, listing: VehicleList
               {sheet ? (
                 <>
                   {/* Tier 2 — the differentiator: what THIS car has beyond the trim */}
-                  <Section title="Installed packages" sub={listing.trim ? `Factory packages this vehicle was built with — beyond the standard ${listing.trim} trim.` : "Factory packages this vehicle was built with."}>
+                  <Section title="Installed packages"
+                    sub={sheet.packages.length > 0
+                      ? `${sheet.packages.length} factory package${sheet.packages.length === 1 ? "" : "s"} on this build${pkgTotal ? ` · ${fmt$(pkgTotal)} in factory options` : ""}${listing.trim ? ` — beyond the standard ${listing.trim} trim` : ""}.`
+                      : listing.trim ? `Factory packages this vehicle was built with — beyond the standard ${listing.trim} trim.` : "Factory packages this vehicle was built with."}>
                     {sheet.packages.length > 0 ? (
-                      <div className="space-y-2">
-                        {sheet.packages.map((p) => (
-                          <details key={p.name} className={`${CARD} overflow-hidden group`}>
-                            <summary className="cursor-pointer list-none flex items-center justify-between gap-3 px-4 py-3">
-                              <span className="inline-flex items-center gap-2.5 min-w-0">
-                                <span className="w-8 h-8 rounded-lg bg-blue-50 flex items-center justify-center shrink-0"><Package className="w-4 h-4 text-[#2563EB]" /></span>
-                                <span className="text-[13px] font-bold text-[#0F172A] leading-tight">{p.name}</span>
-                              </span>
-                              <span className="inline-flex items-center gap-2 shrink-0">
-                                {p.msrp && <span className="text-[12px] font-bold text-[#16A34A]">{fmt$(p.msrp)}</span>}
-                                {p.contents.length > 0 && <ChevronDown className="w-4 h-4 text-[#94A3B8] group-open:rotate-180 transition-transform" />}
-                              </span>
-                            </summary>
-                            {p.contents.length > 0 && (
-                              <div className="px-4 pb-3 grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1.5">
-                                {p.contents.map((c) => <div key={c} className="flex items-start gap-2 text-[12px] text-[#334155]"><CheckCircle2 className="w-3.5 h-3.5 text-[#16A34A] shrink-0 mt-0.5" />{c}</div>)}
-                              </div>
-                            )}
-                          </details>
-                        ))}
-                      </div>
+                      groupedPkgView ? (
+                        <div className="space-y-3">
+                          {pkgGroups.map(([kind, pkgs]) => (
+                            <div key={kind}>
+                              <p className="text-[11px] font-bold uppercase tracking-wide text-[#94A3B8] mb-1.5">{kind} <span className="font-semibold">· {pkgs.length}</span></p>
+                              <div className="space-y-2">{pkgs.map(renderPkg)}</div>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="space-y-2">{sheet.packages.map(renderPkg)}</div>
+                      )
                     ) : (
                       <p className="text-[12px] text-[#64748B]">No optional packages — this vehicle is equipped as a standard {listing.trim ? `${listing.trim} ` : ""}build.</p>
                     )}
