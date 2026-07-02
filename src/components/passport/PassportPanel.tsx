@@ -907,20 +907,18 @@ function buildPanel(key: PassportPanelKey, d: PassportData, listing: VehicleList
         benefitCards.push({ icon: Zap, title: isEV ? "EV Battery" : "Hybrid Battery", term: "Extended high-voltage coverage", sub: "Confirm terms with dealer", tone: "green" });
       }
       const openMoreDetails = () => {
-        const el = document.getElementById("warr-more-details") as HTMLDetailsElement | null;
+        const el = document.getElementById("warr-whats-included") as HTMLDetailsElement | null;
         if (el) { el.open = true; el.scrollIntoView({ behavior: "smooth", block: "nearest" }); }
       };
       return {
         title: "Factory Warranty",
         subtitle: "See what's covered and for how long.",
-        wide: true,
         primary: { label: "Contact Dealer", onClick: () => go("contact") },
         secondary: { label: "Learn More", onClick: () => go("protect") },
         footerQuestion: "Questions about warranty?", specialistLabel: "Talk to a Warranty Specialist",
         body: hasData ? (
           <div className="space-y-5">
-            <div className="grid grid-cols-1 lg:grid-cols-[2fr_1fr] gap-5 items-start">
-              {/* Left column — status + coverage at a glance */}
+            <div className="space-y-5">
               <div className="space-y-5">
                 <WarrantyStatusCard
                   active={statusActive}
@@ -969,8 +967,6 @@ function buildPanel(key: PassportPanelKey, d: PassportData, listing: VehicleList
                   )}
                 </div>
               </div>
-              {/* Right column — additional factory benefits */}
-              <AdditionalFactoryBenefitsCard rows={benefitCards} onDetails={openMoreDetails} />
             </div>
 
             {/* Certified Pre-Owned: certified copy for factory-CPO cars, "may
@@ -979,15 +975,6 @@ function buildPanel(key: PassportPanelKey, d: PassportData, listing: VehicleList
             {!isNew && (isFactoryCpo || eff.franchiseMatch) && (
               <CpoBanner brand={brand} certified={isFactoryCpo} programName={eff.cpoProgramName} onLearn={() => go("protect")} />
             )}
-
-            {/* Secondary details — collapsed by default so the first view matches the goal layout */}
-            <details id="warr-more-details" className="rounded-2xl border border-[#E6E8EC] bg-white group">
-              <summary className="cursor-pointer list-none flex items-center gap-3 p-4">
-                <span className="w-9 h-9 rounded-xl bg-slate-50 flex items-center justify-center shrink-0"><FileText className="w-4 h-4 text-[#64748B]" /></span>
-                <div className="min-w-0 flex-1"><p className="text-[14px] font-bold text-[#0F172A] leading-tight">More warranty details</p><p className="text-[11px] text-[#94A3B8] leading-tight">Coverage timeline, what's covered, exclusions &amp; FAQ</p></div>
-                <ChevronDown className="w-4 h-4 text-[#94A3B8] group-open:rotate-180 transition-transform shrink-0" />
-              </summary>
-              <div className="px-4 pb-4 pt-1 space-y-5">
 
             {/* Coverage timeline */}
             {tlPoints.length >= 2 && (
@@ -1007,6 +994,9 @@ function buildPanel(key: PassportPanelKey, d: PassportData, listing: VehicleList
                 if (el) { el.open = true; el.scrollIntoView({ behavior: "smooth", block: "nearest" }); }
               }} />
             </div>
+
+            {/* Additional factory benefits */}
+            <AdditionalFactoryBenefitsCard rows={benefitCards} onDetails={openMoreDetails} />
 
             {/* Accordions */}
             <div className="space-y-2">
@@ -1044,8 +1034,6 @@ function buildPanel(key: PassportPanelKey, d: PassportData, listing: VehicleList
                 <div className="pt-1 space-y-2">{faqs.map((f) => <Faq key={f.q} q={f.q} a={f.a} />)}</div>
               </WAcc>
             </div>
-              </div>
-            </details>
 
             <Disclaimer />
           </div>
