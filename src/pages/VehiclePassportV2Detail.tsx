@@ -12,6 +12,7 @@ import { type VehicleListing } from "@/hooks/useVehicleListing";
 import { usePublicListing } from "@/hooks/usePublicListing";
 import { formatPhone } from "@/components/addendum/CustomerInfoSection";
 import { trackLeadSubmitted } from "@/lib/engagement/customerEngagement";
+import { estimateAffordability, DEFAULT_APR_PERCENT } from "@/lib/affordability";
 import Logo from "@/components/brand/Logo";
 import { derivePassport, fmt$, type PassportData } from "@/lib/passportV2Data";
 import { listingGallery, listingHero } from "@/lib/photos";
@@ -121,6 +122,47 @@ const LeadForm = ({
       </button>
       <p className="text-[11px] text-slate-400 text-center mt-3">By submitting, you agree to be contacted by the dealership about this vehicle.</p>
     </Card>
+  );
+};
+
+// Interactive payment estimator — payment shoppers are the largest used-car
+// segment, and a monthly number they CHOSE converts far better than a static
+// assumption line. The picked terms ride into the lead so the desk opens with
+// a pre-qualified conversation.
+const PaymentEstimator = ({ price, listing, dealerPhone }: { price: number; listing: VehicleListing; dealerPhone?: string | null }) => {
+  const [down, setDown] = useState(() => Math.round((price * 0.1) / 500) * 500);
+  const [term, setTerm] = useState(72);
+  const [apr, setApr] = useState(DEFAULT_APR_PERCENT);
+  const row = estimateAffordability({ price, downPayment: down, aprPercent: apr }, [term])[0];
+  const TERMS = [48, 60, 72, 84];
+  return (
+    <>
+      <Card className="p-5 mb-4">
+        <div className="flex items-baseline justify-between gap-3 flex-wrap">
+          <p className="text-[14px] font-bold text-slate-900">Build your payment</p>
+          <p className="text-[26px] font-extrabold tracking-tight text-[#2563EB]">{fmt$(Math.round(row.monthly_payment))}<span className="text-[14px] font-semibold text-slate-500">/mo</span></p>
+        </div>
+        <div className="mt-4 space-y-4">
+          <div>
+            <div className="flex justify-between text-[12px] text-slate-500 mb-1"><span>Down payment</span><span className="font-bold text-slate-900">{fmt$(down)}</span></div>
+            <input type="range" min={0} max={Math.round((price * 0.4) / 500) * 500} step={500} value={down} onChange={(e) => setDown(Number(e.target.value))} className="w-full accent-[#2563EB]" />
+          </div>
+          <div>
+            <p className="text-[12px] text-slate-500 mb-1.5">Term</p>
+            <div className="flex gap-2">{TERMS.map((t) => (
+              <button key={t} onClick={() => setTerm(t)} className={`flex-1 h-10 rounded-xl text-[13px] font-semibold border transition-colors ${term === t ? "border-[#2563EB] bg-blue-50 text-[#2563EB]" : "border-slate-200 text-slate-600 hover:border-slate-300"}`}>{t} mo</button>
+            ))}</div>
+          </div>
+          <div>
+            <div className="flex justify-between text-[12px] text-slate-500 mb-1"><span>Est. APR</span><span className="font-bold text-slate-900">{apr.toFixed(2)}%</span></div>
+            <input type="range" min={3} max={12} step={0.25} value={apr} onChange={(e) => setApr(Number(e.target.value))} className="w-full accent-[#2563EB]" />
+          </div>
+        </div>
+        <p className="text-[11px] text-slate-400 mt-3">Estimate only, with approved credit (WAC). Excludes tax, title, and registration. Your rate and terms are set by the lender.</p>
+      </Card>
+      <LeadForm listing={listing} intent="todays_price" label="Today's Price" cta="Get my best price on these terms" dealerPhone={dealerPhone}
+        extraNotes={() => `Payment goal ${fmt$(Math.round(row.monthly_payment))}/mo · ${term} mo · ${apr.toFixed(2)}% APR · ${fmt$(down)} down`} />
+    </>
   );
 };
 
@@ -593,15 +635,18 @@ const SECTIONS: Record<string, { title: string; render: SectionRender }> = {
     render: ({ d, listing }) => (
       <>
         <SectionHeading icon={DollarSign} title="Get Today's Price" subtitle="Request the dealership's best out-the-door price." />
-        {d.price != null && (
-          <Card className="p-5 mb-4 text-center">
-            <p className="text-[13px] font-semibold text-slate-500">{d.priceLabel}</p>
-            <p className="text-[36px] font-extrabold tracking-tight leading-none mt-1">{fmt$(d.price)}</p>
-            {d.estMonthly != null && <p className="text-[13px] text-slate-500 mt-1">Est. {fmt$(d.estMonthly)}/mo · 72 mo, 7.49% APR, 10% down (WAC)</p>}
-            {d.saveVsMsrp != null && <p className="text-[14px] font-semibold text-emerald-600 mt-1">You save {fmt$(d.saveVsMsrp)} vs MSRP</p>}
-          </Card>
+        {d.price != null ? (
+          <>
+            <Card className="p-5 mb-4 text-center">
+              <p className="text-[13px] font-semibold text-slate-500">{d.priceLabel}</p>
+              <p className="text-[36px] font-extrabold tracking-tight leading-none mt-1">{fmt$(d.price)}</p>
+              {d.saveVsMsrp != null && <p className="text-[14px] font-semibold text-emerald-600 mt-1">You save {fmt$(d.saveVsMsrp)} vs MSRP</p>}
+            </Card>
+            <PaymentEstimator price={d.price} listing={listing} dealerPhone={d.dealerPhone} />
+          </>
+        ) : (
+          <LeadForm listing={listing} intent="todays_price" label="Today's Price" cta="Get my best price" dealerPhone={d.dealerPhone} />
         )}
-        <LeadForm listing={listing} intent="todays_price" label="Today's Price" cta="Get my best price" />
       </>
     ),
   },

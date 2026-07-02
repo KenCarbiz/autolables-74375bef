@@ -15,6 +15,8 @@ import { derivePassport } from "@/lib/passportV2Data";
 import { listingHero } from "@/lib/photos";
 import { MOCK_LISTING } from "./VehiclePassportV3";
 import { usePublicListing } from "@/hooks/usePublicListing";
+import { supabase } from "@/integrations/supabase/client";
+import { requestPassportDocumentDelivery } from "@/lib/passport/passportDocumentDelivery";
 import PassportCtaDock from "@/components/passport/PassportCtaDock";
 import { CARD } from "@/lib/passportTokens";
 
@@ -65,6 +67,56 @@ const DocThumb = ({ url }: { url: string }) => {
   );
 };
 
+// "Email me this packet" — the deepest-funnel shoppers on the passport are
+// document seekers, and until now they converted at 0%. Uses the existing
+// delivery pipeline (request -> outbox -> send function) and flushes the outbox
+// immediately so the packet arrives while the shopper is still on the lot.
+const EmailPacketCard = ({ listing, docs, onClose }: { listing: VehicleListing; docs: Doc[]; onClose: () => void }) => {
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [sending, setSending] = useState(false);
+  const [sent, setSent] = useState(false);
+  const submit = async () => {
+    if (!name.trim() || !/.+@.+\..+/.test(email.trim())) { toast.error("Name and a valid email are required"); return; }
+    setSending(true);
+    try {
+      const l = listing as unknown as { tenant_id?: string | null; id?: string; store_id?: string | null };
+      await requestPassportDocumentDelivery({
+        tenantId: l.tenant_id, storeId: l.store_id, vehicleId: l.id, vin: listing.vin,
+        vehicleOfInterest: { ymm: listing.ymm, trim: listing.trim, price: listing.price, slug: listing.slug },
+        customerName: name.trim(), customerEmail: email.trim(),
+        requestedDocuments: docs.slice(0, 20).map((x) => ({ documentType: x.type || "document", documentTitle: x.name })),
+      });
+      supabase.functions.invoke("send-passport-document-deliveries", { body: { limit: 5 } }).catch(() => { /* cron will flush */ });
+      setSent(true);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "";
+      toast.error(/not enabled/i.test(msg) ? "Document delivery isn't enabled — ask the dealership to send the packet." : "Couldn't send — please contact the dealership.");
+    } finally { setSending(false); }
+  };
+  if (sent) return (
+    <div className={`${CARD} p-5 mb-5 flex items-center gap-3`}>
+      <CheckCircle2 className="w-8 h-8 text-[#16A34A] shrink-0" />
+      <div className="min-w-0 flex-1"><p className="text-[14px] font-bold text-[#0F172A]">Packet on its way</p><p className="text-[12px] text-[#64748B]">Check {email} — the dealership team was notified too.</p></div>
+      <button onClick={onClose} className="text-[12px] font-semibold text-[#64748B] shrink-0">Close</button>
+    </div>
+  );
+  return (
+    <div className={`${CARD} p-5 mb-5`}>
+      <div className="flex items-start justify-between gap-3">
+        <div><p className="text-[14px] font-bold text-[#0F172A]">Email me this packet</p><p className="text-[12px] text-[#64748B] mt-0.5">All {docs.length} documents for the {listing.ymm}, straight to your inbox.</p></div>
+        <button onClick={onClose} className="text-[#94A3B8] hover:text-[#0F172A] shrink-0"><X className="w-4 h-4" /></button>
+      </div>
+      <div className="grid grid-cols-1 sm:grid-cols-[1fr_1fr_auto] gap-2.5 mt-3">
+        <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Your name" className="border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+        <input value={email} onChange={(e) => setEmail(e.target.value)} type="email" placeholder="Email address" className="border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+        <button onClick={submit} disabled={sending} className="h-[42px] px-5 rounded-xl bg-[#2563EB] hover:bg-[#1d4fd7] disabled:opacity-60 text-white text-sm font-bold">{sending ? "Sending..." : "Send packet"}</button>
+      </div>
+      <p className="text-[11px] text-[#94A3B8] mt-2">By submitting, you agree the dealership may contact you about this vehicle.</p>
+    </div>
+  );
+};
+
 const VehiclePassportDocuments = () => {
   const params = useParams<{ vehicleSlug?: string; slug?: string }>();
   const vehicleSlug = params.vehicleSlug ?? params.slug;
@@ -74,6 +126,7 @@ const VehiclePassportDocuments = () => {
   const [sort, setSort] = useState("newest");
   const [view, setView] = useState<"grid" | "list">("grid");
   const [preview, setPreview] = useState<Doc | null>(null);
+  const [emailOpen, setEmailOpen] = useState(false);
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
 
   const isPreview = typeof window !== "undefined" && new URLSearchParams(window.location.search).has("preview");
@@ -194,11 +247,16 @@ const VehiclePassportDocuments = () => {
               <p className="text-[14px] text-[#64748B] mt-0.5">Everything provided by the dealership for this vehicle.</p>
               {lastUpdated && <p className="text-[12px] text-[#94A3B8] mt-2 inline-flex items-center gap-1.5"><Clock className="w-3.5 h-3.5" /> Last updated: {lastUpdated}</p>}
             </div>
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-3 flex-wrap">
               <span className="inline-flex items-center gap-1.5 text-[13px] font-semibold text-[#0F172A]"><span className="w-6 h-6 rounded-full bg-emerald-50 flex items-center justify-center"><CheckCircle2 className="w-3.5 h-3.5 text-[#16A34A]" /></span>{total} Documents Available</span>
               <span className="inline-flex items-center gap-1.5 text-[13px] font-semibold text-[#16A34A] bg-emerald-50 rounded-full px-3 py-1.5"><ShieldCheck className="w-4 h-4" /> Dealer Provided</span>
+              {total > 0 && !isPreview && (
+                <button onClick={() => setEmailOpen((v) => !v)} className="inline-flex items-center gap-1.5 h-10 px-4 rounded-xl bg-[#2563EB] hover:bg-[#1d4fd7] text-white text-[13px] font-bold transition-colors"><Upload className="w-4 h-4" /> Email me this packet</button>
+              )}
             </div>
           </div>
+
+          {emailOpen && <div className="mt-5"><EmailPacketCard listing={listing} docs={allDocs} onClose={() => setEmailOpen(false)} /></div>}
 
           {/* Hero card */}
           <div className={`${CARD} p-6 mt-5 flex flex-col lg:flex-row lg:items-center gap-6`}>
