@@ -1,6 +1,6 @@
 import { qrcode } from "https://deno.land/x/qrcode@v2.0.0/mod.ts";
 import { json, preflight } from "../_shared/http.ts";
-import { SUPABASE_URL, SERVICE_KEY, adminClient } from "../_shared/supabase.ts";
+import { SUPABASE_URL, SERVICE_KEY, adminClient, isServiceOrCron } from "../_shared/supabase.ts";
 
 // ──────────────────────────────────────────────────────────────────────
 // email-title-request — emails the office a per-vehicle Title/MCO upload link
