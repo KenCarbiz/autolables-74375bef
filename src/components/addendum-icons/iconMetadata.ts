@@ -14,6 +14,8 @@ import {
   ExternalLink, Plus, Minus, X, Menu, Phone, Mail, MessageSquare, Send, Globe, Settings,
   AlertOctagon, BellRing, Waves, FileWarning, RefreshCw, DollarSign, Percent, Tag, Gift,
   Handshake, Users, Volume2, Radio, Timer, CalendarDays, History, Grid3x3, Layers2,
+  BadgeDollarSign, PiggyBank, Landmark, CircleDollarSign, Barcode, ArrowRight, ArrowLeft,
+  ChevronsRight, Leaf,
 } from "lucide-react";
 import type { AddendumIconCategory, AddendumIconMeta, AddendumIconSource, AddendumIconStatus } from "./iconTypes";
 import type { AddendumIconColor } from "./colorTokens";
@@ -21,7 +23,7 @@ import {
   PassportBook, PassportShield, PassportBadge, PassportStamp, DigitalPassport,
   VehiclePassportShield, PassportQr, PassportVerified, PassportDocuments, PassportHistory,
   PassportProtection, PassportBenefits, WindowTint, PaintProtectionFilm, WindowSticker,
-  AddendumSheet, PlaceholderGlyph,
+  AddendumSheet, OilCan, OilChange, FuelNozzle, SteeringWheel, PlaceholderGlyph,
 } from "./customIcons";
 
 // One definition per icon: the render component AND the manifest row live
@@ -153,6 +155,9 @@ export const ADDENDUM_ICON_DEFS: AddendumIconDef[] = [
   d("V030", "LED Lighting", "vehicle", Lightbulb, "lucide", "orange", ["led", "headlights", "lighting"]),
   d("V031", "Driver Assist", "vehicle", Eye, "lucide", "blue", ["adas", "monitoring", "blind spot"]),
   d("V032", "Off-Road", "vehicle", Mountain, "lucide", "green", ["offroad", "terrain", "4x4"]),
+  d("V033", "Eco Mode", "vehicle", Leaf, "lucide", "green", ["eco", "efficiency", "hybrid"]),
+  d("V034", "Steering Wheel", "vehicle", SteeringWheel, "custom", "blue", ["steering", "wheel", "heated wheel"], custom),
+  d("V035", "Heated Seats", "vehicle", PlaceholderGlyph, "custom", "orange", ["heated seats", "comfort"], custom),
 
   // ── A — Accessories / aftermarket ────────────────────────────
   d("A001", "Window Tint", "accessories", WindowTint, "custom", "green", ["tint", "window", "appearance"], custom),
@@ -223,6 +228,9 @@ export const ADDENDUM_ICON_DEFS: AddendumIconDef[] = [
   d("M014", "Wiper Service", "maintenance", PlaceholderGlyph, "custom", "blue", ["wipers", "blades", "visibility"], custom),
   d("M015", "Service Timer", "maintenance", Timer, "lucide", "blue", ["due", "interval", "reminder"]),
   d("M016", "Reconditioning", "maintenance", History, "lucide", "green", ["recon", "get ready", "restored"]),
+  d("M017", "Oil Can", "maintenance", OilCan, "custom", "blue", ["oil can", "oil service", "lubrication"], custom),
+  d("M018", "Oil Change Interval", "maintenance", OilChange, "custom", "blue", ["oil change", "interval", "maintenance"], custom),
+  d("M019", "Fuel Nozzle", "maintenance", FuelNozzle, "custom", "blue", ["fuel nozzle", "fuel type", "refill"], custom),
 
   // ── D — Documents / compliance ───────────────────────────────
   d("D001", "Document", "documents", FileText, "lucide", "navy", ["document", "file", "page"]),
@@ -241,6 +249,7 @@ export const ADDENDUM_ICON_DEFS: AddendumIconDef[] = [
   d("D014", "Buyers Guide", "documents", PlaceholderGlyph, "custom", "navy", ["buyers guide", "ftc", "as-is"], custom),
   d("D015", "FTC Compliant", "documents", PlaceholderGlyph, "custom", "green", ["ftc", "compliant", "regulation"], custom),
   d("D016", "Title Record", "documents", FileWarning, "lucide", "navy", ["title", "brand", "record"], placeholder),
+  d("D017", "Barcode", "documents", Barcode, "lucide", "navy", ["barcode", "vin", "scan"]),
 
   // ── U — UI / actions / communication ─────────────────────────
   d("U001", "Search", "ui", Search, "lucide", "gray", ["search", "find", "lookup"]),
@@ -267,6 +276,13 @@ export const ADDENDUM_ICON_DEFS: AddendumIconDef[] = [
   d("U022", "Announcement", "ui", Volume2, "lucide", "orange", ["announce", "promo", "offer"]),
   d("U023", "Calendar", "ui", CalendarDays, "lucide", "blue", ["calendar", "date", "appointment"]),
   d("U024", "Layers", "ui", Layers2, "lucide", "gray", ["layers", "stack", "templates"]),
+  d("U025", "Savings Tag", "ui", BadgeDollarSign, "lucide", "green", ["savings", "fuel savings", "value tag"]),
+  d("U026", "Savings", "ui", PiggyBank, "lucide", "green", ["savings", "budget", "piggy bank"]),
+  d("U027", "Financing", "ui", Landmark, "lucide", "blue", ["financing", "bank", "lender"]),
+  d("U028", "Price Circle", "ui", CircleDollarSign, "lucide", "green", ["price", "cost", "dollar"]),
+  d("U029", "Arrow Right", "ui", ArrowRight, "lucide", "blue", ["arrow", "next", "forward"]),
+  d("U030", "Arrow Left", "ui", ArrowLeft, "lucide", "blue", ["arrow", "back", "previous"]),
+  d("U031", "Chevrons Right", "ui", ChevronsRight, "lucide", "blue", ["chevrons", "more", "continue"]),
 
   // ── W — Warnings / alerts / recall ───────────────────────────
   d("W001", "Open Recall", "warnings", AlertOctagon, "lucide", "orange", ["recall", "open", "nhtsa"]),

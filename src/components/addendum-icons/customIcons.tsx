@@ -180,6 +180,46 @@ export const AddendumSheet = (p: CustomIconProps) => (
   </Svg>
 );
 
+// M0xx — oil can: body, spout, drip.
+export const OilCan = (p: CustomIconProps) => (
+  <Svg {...p}>
+    <path d="M5 11h9v8a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1v-8z" />
+    <path d="M8 11V8h3" />
+    <path d="M14 12l5-3v3l-5 2" />
+    <path d="M20 16.5c0 .8-.7 1.5-1.5 1.5s-1.5-.7-1.5-1.5c0-1 1.5-2.5 1.5-2.5s1.5 1.5 1.5 2.5z" />
+  </Svg>
+);
+
+// M0xx — oil change: interval arrow circling a drop.
+export const OilChange = (p: CustomIconProps) => (
+  <Svg {...p}>
+    <path d="M20 12a8 8 0 1 1-3-6.2" />
+    <path d="M17 3v3h3" />
+    <path d="M12 8.5s2.5 2.6 2.5 4.3A2.5 2.5 0 0 1 12 15a2.5 2.5 0 0 1-2.5-2.2c0-1.7 2.5-4.3 2.5-4.3z" />
+  </Svg>
+);
+
+// M0xx — fuel nozzle: handle, spout, drip.
+export const FuelNozzle = (p: CustomIconProps) => (
+  <Svg {...p}>
+    <path d="M4 9l5-5 4 4-5 5-4-4z" />
+    <path d="M11 12l5 5v3h3v-4l-6-6" />
+    <path d="M6 4L4 2" />
+    <path d="M17 8.5c0 .8-.7 1.5-1.5 1.5S14 9.3 14 8.5C14 7.5 15.5 6 15.5 6S17 7.5 17 8.5z" />
+  </Svg>
+);
+
+// V0xx — steering wheel: rim, hub, three spokes.
+export const SteeringWheel = (p: CustomIconProps) => (
+  <Svg {...p}>
+    <circle cx="12" cy="12" r="9" />
+    <circle cx="12" cy="12" r="2.5" />
+    <path d="M3.5 10.5L9.5 12" />
+    <path d="M20.5 10.5L14.5 12" />
+    <path d="M12 14.5V21" />
+  </Svg>
+);
+
 // Generic stand-in for custom_required entries awaiting final artwork:
 // dashed tile with a plus, unmistakably "not final".
 export const PlaceholderGlyph = (p: CustomIconProps) => (
