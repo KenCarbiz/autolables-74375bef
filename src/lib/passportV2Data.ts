@@ -206,7 +206,14 @@ export interface PassportData {
   // IIHS award, attached by public-listing-view only when the dealer has
   // IIHS's written permission AND verified this model's award.
   iihsAward: import("@/lib/iihsAwards").MatchedIihsAward | null;
+  // Dealer-paid CARFAX/AutoCheck report link (public-listing-view attaches
+  // it for used/CPO only). An EXTERNAL handoff — we link, we never read or
+  // certify the report's contents.
+  historyReport: { url: string; provider: "carfax" | "autocheck" } | null;
 }
+
+export const historyReportName = (provider: "carfax" | "autocheck"): string =>
+  provider === "autocheck" ? "AutoCheck" : "CARFAX";
 
 export interface PricePoint { captured_at: string; market_value: number | null; listing_price: number | null; below_market: number | null; position: string | null }
 
@@ -483,5 +490,6 @@ export const derivePassport = (listing: VehicleListing): PassportData => {
     dealerTrust,
     contactRouting: ((listing as unknown as { contact_routing?: PassportData["contactRouting"] }).contact_routing) ?? null,
     iihsAward: ((listing as unknown as { iihs_award?: PassportData["iihsAward"] }).iihs_award) ?? null,
+    historyReport: ((listing as unknown as { history_report?: PassportData["historyReport"] }).history_report) ?? null,
   };
 };

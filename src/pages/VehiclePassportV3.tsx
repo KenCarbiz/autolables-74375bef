@@ -5,7 +5,7 @@ import {
   RefreshCw, ShieldCheck, CheckCircle2, Star, Phone, Car, Cog, Fuel, Settings, Wind, AlertTriangle,
   Award, Wrench, DollarSign, Clock, Building2, Users, Truck, Lock, Zap, ArrowRight,
   Package, Eye, Play, TrendingUp, BadgeCheck, Gauge as GaugeIcon, Send, MapPin,
-  Sun, Navigation, Smartphone, Camera, Volume2, Palette, Snowflake,
+  Sun, Navigation, Smartphone, Camera, Volume2, Palette, Snowflake, ExternalLink,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Helmet } from "react-helmet-async";
@@ -13,7 +13,7 @@ import { useVehicleListing, type VehicleListing } from "@/hooks/useVehicleListin
 import { usePublicListing } from "@/hooks/usePublicListing";
 import { formatPhone } from "@/components/addendum/CustomerInfoSection";
 import Logo from "@/components/brand/Logo";
-import { derivePassport, computePriceHistory, fmt$, listingEquipment } from "@/lib/passportV2Data";
+import { derivePassport, computePriceHistory, fmt$, listingEquipment, historyReportName } from "@/lib/passportV2Data";
 import { resolveStickyButtons, type StickyBottomButtons } from "@/lib/stickyButtons";
 import PriceDropWatch from "@/components/listing/PriceDropWatch";
 import { listingGallery } from "@/lib/photos";
@@ -251,6 +251,9 @@ const VehiclePassportV3 = () => {
   // Packet curation: a module renders unless the dealer switched it off
   // (Vehicle File → Scan Info). Required disclosures are never curatable.
   const pv = (id: string) => packetVisible(listing, id);
+  const trackHistoryReport = (placement: string) => {
+    if (!isPreview) trackCustomerCtaClicked({ storeId: listing.store_id, vehicleId: listing.id, vin: listing.vin, source: "passport", surface: "vehicle_passport", metadata: { cta: "history_report", provider: d.historyReport?.provider ?? null, placement } });
+  };
 
   const actions = [
     ...(pv("documents") ? [{ icon: FileText, label: "Documents", onClick: () => go("documents") }] : []),
@@ -658,6 +661,14 @@ const VehiclePassportV3 = () => {
                 </ul>
               ) : <p className="text-[13px] text-[#64748B] mt-3">The full vehicle history report is available from the dealership.</p>;
             })()}
+            {d.historyReport && pv("historyReport") && (
+              <div className="mt-3 pt-3 border-t border-slate-100" onClick={(e) => e.stopPropagation()}>
+                <a href={d.historyReport.url} target="_blank" rel="noopener noreferrer" onClick={() => trackHistoryReport("history_card")} className="text-[13px] font-semibold text-[#2563EB] inline-flex items-center gap-1.5 hover:underline">
+                  View the free {historyReportName(d.historyReport.provider)} Report <ExternalLink className="w-3.5 h-3.5" />
+                </a>
+                <p className="text-[11px] text-[#94A3B8] mt-0.5">Provided at no cost by {d.dealerName}</p>
+              </div>
+            )}
             <Link onClick={() => go("vehicle-history")} className="mt-auto pt-3 self-start">View full history report</Link>
           </div>
 

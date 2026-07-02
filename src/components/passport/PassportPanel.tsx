@@ -3,10 +3,12 @@ import {
   DollarSign, TrendingUp, TrendingDown, Gauge, Clock, Car, Package, ShieldCheck,
   Star, Award, FileText, MessageSquare, Eye, CheckCircle2,
   Flame, Heart, Send, Bookmark, Users, Circle, ChevronDown, ChevronRight, MapPin, BadgeCheck, Info, AlertTriangle, History, ArrowRight, Sparkles,
-  Wrench, Zap, LifeBuoy, Calendar, CalendarDays,
+  Wrench, Zap, LifeBuoy, Calendar, CalendarDays, ExternalLink,
 } from "lucide-react";
 import type { PassportData, PricePoint, OemWarrantyView } from "@/lib/passportV2Data";
-import { fmt$, listingEquipment } from "@/lib/passportV2Data";
+import { fmt$, listingEquipment, historyReportName } from "@/lib/passportV2Data";
+import { packetVisible } from "@/lib/packetModules";
+import { trackCustomerCtaClicked } from "@/lib/engagement/customerEngagement";
 import { oemCoverageRows, type CoverageKey } from "@/lib/oemWarranty";
 import { lookupOemReference } from "@/data/oemWarrantyReference";
 import { resolveEffectiveWarranty } from "@/lib/warranty/passportWarranty";
@@ -1791,6 +1793,15 @@ function buildPanel(key: PassportPanelKey, d: PassportData, listing: VehicleList
           )}
           {hasHistory && (
             <button onClick={() => go("vehicle-history")} className="w-full h-11 rounded-xl bg-[#2563EB] hover:bg-[#1d4fd7] text-white text-[13px] font-semibold inline-flex items-center justify-center gap-2 transition-colors"><History className="w-4 h-4" /> View Full Vehicle History Report</button>
+          )}
+          {d.historyReport && packetVisible(listing, "historyReport") && (
+            <a
+              href={d.historyReport.url} target="_blank" rel="noopener noreferrer"
+              onClick={() => { if (!isPreview) trackCustomerCtaClicked({ storeId: listing.store_id, vehicleId: listing.id, vin: listing.vin, source: "passport", surface: "vehicle_passport", metadata: { cta: "history_report", provider: d.historyReport?.provider ?? null, placement: "timeline_panel" } }); }}
+              className="block text-center text-[13px] font-semibold text-[#2563EB] hover:underline"
+            >
+              Verify this timeline in the free {historyReportName(d.historyReport.provider)} Report <ExternalLink className="w-3.5 h-3.5 inline -mt-0.5" />
+            </a>
           )}
           <Disclaimer />
         </>,

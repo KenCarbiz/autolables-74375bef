@@ -2,13 +2,15 @@ import { useEffect, useMemo, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import {
   ChevronLeft, Download, Printer, Upload, ShieldCheck, CheckCircle2, Users, FileText, Wrench,
-  BadgeCheck, Gauge, Car, Clock, MessageSquare, Sparkles, AlertTriangle, ChevronDown, Factory,
+  BadgeCheck, Gauge, Car, Clock, MessageSquare, Sparkles, AlertTriangle, ChevronDown, Factory, ExternalLink,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Helmet } from "react-helmet-async";
 import { type VehicleListing } from "@/hooks/useVehicleListing";
 import Logo from "@/components/brand/Logo";
-import { derivePassport } from "@/lib/passportV2Data";
+import { derivePassport, historyReportName } from "@/lib/passportV2Data";
+import { packetVisible } from "@/lib/packetModules";
+import { trackCustomerCtaClicked } from "@/lib/engagement/customerEngagement";
 import { MOCK_LISTING } from "./VehiclePassportV3";
 import { usePublicListing } from "@/hooks/usePublicListing";
 import PassportCtaDock from "@/components/passport/PassportCtaDock";
@@ -197,9 +199,24 @@ const VehiclePassportHistory = () => {
     </ol>
   );
 
+  // Dealer-paid CARFAX/AutoCheck link (already gated used/CPO + toggle by
+  // public-listing-view); per-vehicle packet curation is the last gate.
+  const hr = d.historyReport && packetVisible(listing, "historyReport") ? d.historyReport : null;
+  const hrName = hr ? historyReportName(hr.provider) : "";
+  const trackHr = (placement: string) => {
+    if (!isPreview) trackCustomerCtaClicked({ storeId: listing.store_id, vehicleId: listing.id, vin: listing.vin, source: "passport", surface: "vehicle_passport", metadata: { cta: "history_report", provider: hr?.provider ?? null, placement } });
+  };
+
   const NotOnFile = () => missing.length === 0 ? null : (
     <div className={`${CARD} p-4`}>
-      <p className="text-[13px] text-[#64748B]">Not yet on file: {missing.join(", ")}. We only show verified records — ask {dealerName} for the full history report.</p>
+      <p className="text-[13px] text-[#64748B]">
+        Not yet on file: {missing.join(", ")}. We only show verified records —{" "}
+        {hr ? (
+          <>check the full record yourself in the <a href={hr.url} target="_blank" rel="noopener noreferrer" onClick={() => trackHr("history_page_not_on_file")} className="font-semibold text-[#2563EB] hover:underline">free {hrName} Report</a>.</>
+        ) : (
+          <>ask {dealerName} for the full history report.</>
+        )}
+      </p>
     </div>
   );
 
@@ -332,6 +349,13 @@ const VehiclePassportHistory = () => {
         {/* Actions — only things that exist */}
         <div className="px-5 mt-7">
           <div className="grid grid-cols-2 gap-3">
+            {hr && (
+              <a href={hr.url} target="_blank" rel="noopener noreferrer" onClick={() => trackHr("history_page_actions")} className={`${CARD} p-4 flex flex-col items-start gap-2 active:bg-slate-50 transition-colors col-span-2`}>
+                <span className="w-9 h-9 rounded-xl bg-blue-50 flex items-center justify-center"><ExternalLink className="w-[18px] h-[18px] text-[#2563EB]" /></span>
+                <span className="text-[13px] font-semibold leading-tight text-left">View the free {hrName} Report</span>
+                <span className="text-[11px] text-[#94A3B8] leading-tight text-left">Opens on {hr.provider === "autocheck" ? "autocheck.com" : "carfax.com"} · provided at no cost by {dealerName}</span>
+              </a>
+            )}
             <button onClick={() => window.print()} className={`${CARD} p-4 flex flex-col items-start gap-2 active:bg-slate-50 transition-colors`}>
               <span className="w-9 h-9 rounded-xl bg-blue-50 flex items-center justify-center"><Printer className="w-[18px] h-[18px] text-[#2563EB]" /></span>
               <span className="text-[13px] font-semibold leading-tight text-left">Print This Page</span>
@@ -518,6 +542,9 @@ const VehiclePassportHistory = () => {
         <section className="rounded-2xl p-6 sm:p-8 text-white text-center" style={{ background: "linear-gradient(160deg,#2563EB 0%,#1e50c8 100%)" }}>
           <h2 className="text-[24px] font-extrabold">Ready to continue?</h2>
           <div className="flex flex-wrap items-center justify-center gap-3 mt-5">
+            {hr && (
+              <a href={hr.url} target="_blank" rel="noopener noreferrer" onClick={() => trackHr("history_page_cta")} className="h-12 px-5 rounded-xl bg-white/10 border border-white/40 text-white text-[14px] font-bold inline-flex items-center gap-2 hover:bg-white/20 transition-colors"><ExternalLink className="w-5 h-5" /> View the free {hrName} Report</a>
+            )}
             <button onClick={() => go("ownership-timeline")} className="h-12 px-5 rounded-xl bg-white/10 border border-white/40 text-white text-[14px] font-bold inline-flex items-center gap-2 hover:bg-white/20 transition-colors"><Clock className="w-5 h-5" /> Ownership Timeline</button>
             <button onClick={() => go("verification")} className="h-12 px-5 rounded-xl bg-white/10 border border-white/40 text-white text-[14px] font-bold inline-flex items-center gap-2 hover:bg-white/20 transition-colors"><ShieldCheck className="w-5 h-5" /> Verification Report</button>
             <button onClick={() => go("reserve")} className="h-12 px-6 rounded-xl bg-white text-[#2563EB] text-[14px] font-bold inline-flex items-center gap-2 transition-transform hover:-translate-y-0.5"><BadgeCheck className="w-5 h-5" /> Reserve This Vehicle</button>

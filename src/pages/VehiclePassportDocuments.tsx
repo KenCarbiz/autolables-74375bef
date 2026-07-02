@@ -11,7 +11,9 @@ import { Helmet } from "react-helmet-async";
 import { type VehicleListing } from "@/hooks/useVehicleListing";
 import { formatPhone } from "@/components/addendum/CustomerInfoSection";
 import Logo from "@/components/brand/Logo";
-import { derivePassport } from "@/lib/passportV2Data";
+import { derivePassport, historyReportName } from "@/lib/passportV2Data";
+import { packetVisible } from "@/lib/packetModules";
+import { trackCustomerCtaClicked } from "@/lib/engagement/customerEngagement";
 import { listingHero } from "@/lib/photos";
 import { MOCK_LISTING } from "./VehiclePassportV3";
 import { usePublicListing } from "@/hooks/usePublicListing";
@@ -306,6 +308,23 @@ const VehiclePassportDocuments = () => {
             </div>
 
             <div className="space-y-8">
+              {/* Dealer-paid history report — an external link, not an uploaded
+                  document, so it's pinned above the groups and excluded from
+                  the document counts. */}
+              {d.historyReport && packetVisible(listing, "historyReport") && (
+                <a
+                  href={d.historyReport.url} target="_blank" rel="noopener noreferrer"
+                  onClick={() => { if (!isPreview) trackCustomerCtaClicked({ storeId: listing.store_id, vehicleId: listing.id, vin: listing.vin, source: "passport", surface: "vehicle_passport", metadata: { cta: "history_report", provider: d.historyReport?.provider ?? null, placement: "documents_page" } }); }}
+                  className={`${CARD} p-4 flex items-center gap-3 hover:border-[#2563EB] transition-colors`}
+                >
+                  <span className="w-11 h-11 rounded-xl bg-blue-50 flex items-center justify-center shrink-0"><ClipboardList className="w-5 h-5 text-[#2563EB]" /></span>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-[14px] font-bold leading-tight">{historyReportName(d.historyReport.provider)} Vehicle History Report</p>
+                    <p className="text-[12px] text-[#64748B] leading-tight mt-0.5">Opens on {d.historyReport.provider === "autocheck" ? "autocheck.com" : "carfax.com"} · provided at no cost by {d.dealerName}</p>
+                  </div>
+                  <span className="shrink-0 text-[13px] font-semibold text-[#2563EB] inline-flex items-center gap-1.5">View Report <ExternalLink className="w-4 h-4" /></span>
+                </a>
+              )}
               {grouped.length === 0 ? (
                 <div className={`${CARD} p-12 text-center`}>
                   <span className="w-14 h-14 rounded-2xl bg-slate-100 text-slate-400 flex items-center justify-center mx-auto mb-3"><FileText className="w-7 h-7" /></span>

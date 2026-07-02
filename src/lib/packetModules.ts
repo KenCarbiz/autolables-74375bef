@@ -25,6 +25,7 @@ export const PACKET_MODULES: PacketModule[] = [
   { id: "videos", label: "Videos", desc: "Walkaround videos" },
   { id: "warranty", label: "Warranty, service & accessories", desc: "Remaining warranty, service history, available accessories" },
   { id: "documents", label: "Documents", desc: "Window sticker + dealer-added PDFs" },
+  { id: "historyReport", label: "Vehicle history report link", desc: "Your free CARFAX/AutoCheck report link (used and CPO vehicles)" },
 ];
 
 // A module shows unless the dealer explicitly switched it off.

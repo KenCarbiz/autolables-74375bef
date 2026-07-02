@@ -132,6 +132,36 @@ const extractHeroImage = (html: string, baseUrl: string): string | null => {
   return /^https?:\/\//i.test(url) ? url : null;
 };
 
+// Dealer-paid vehicle history report links (CARFAX Report.cfx / cfx.link
+// shorts / AutoCheck FastLink) embedded on the dealer's own VDP. Only a link
+// whose vin param matches the crawled row's VIN is trusted — group sites
+// render sibling-store widgets with other stores' codes. cfx.link shorts are
+// opaque (no vin param) so they're accepted as-is; they were served on this
+// exact VDP.
+const CARFAX_REPORT_RE = /https?:\/\/(?:www\.)?carfax\.com\/VehicleHistory\/p\/Report\.cfx\?[^"'<>\s\\)]+/gi;
+const CFX_LINK_RE = /https?:\/\/(?:www\.)?cfx\.link\/[A-Za-z0-9_-]{4,}/gi;
+const AUTOCHECK_RE = /https?:\/\/(?:www\.)?autocheck\.com\/[^"'<>\s\\)]*vin=[A-Za-z0-9]{11,17}[^"'<>\s\\)]*/gi;
+
+const extractHistoryReportLink = (html: string, targetVin: string): string | null => {
+  const t = normVin(targetVin);
+  const decode = (raw: string) => raw.replace(/&amp;/gi, "&").replace(/\\u0026/g, "&");
+  const vinParamMatches = (raw: string): boolean => {
+    try {
+      const u = new URL(decode(raw));
+      let vin = "";
+      u.searchParams.forEach((v, k) => { if (k.toLowerCase() === "vin") vin = normVin(v); });
+      return vin === t;
+    } catch { return false; }
+  };
+  let m: RegExpExecArray | null;
+  CARFAX_REPORT_RE.lastIndex = 0;
+  while ((m = CARFAX_REPORT_RE.exec(html))) if (vinParamMatches(m[0])) return decode(m[0]);
+  AUTOCHECK_RE.lastIndex = 0;
+  while ((m = AUTOCHECK_RE.exec(html))) if (vinParamMatches(m[0])) return decode(m[0]);
+  CFX_LINK_RE.lastIndex = 0;
+  return CFX_LINK_RE.exec(html)?.[0] ?? null;
+};
+
 // Generic selling-price labels appended after each dealer's configured labels.
 // These are advertised-price brands (never MSRP/retail), so running them in the
 // custom-label tier is safe and lets common sites resolve without per-dealer
@@ -863,6 +893,20 @@ serve(async (req) => {
             .eq("tenant_id", row.tenant_id).eq("vin", row.vin).is("hero_image_url", null);
         }
       } catch { /* hero_image_url column may not be migrated yet */ }
+
+      // Harvest the dealer's own CARFAX/AutoCheck report link off their VDP —
+      // website channel only (marketplace pages embed the marketplace's own
+      // links, not the dealer's subscription link). First-seen wins; the
+      // dealer can clear/replace it from the vehicle file.
+      try {
+        if (String(row.source_label || "") === "website") {
+          const link = extractHistoryReportLink(html, row.vin);
+          if (link) {
+            await admin.from("vehicle_listings").update({ history_report_url: link })
+              .eq("tenant_id", row.tenant_id).eq("vin", row.vin).is("history_report_url", null);
+          }
+        }
+      } catch { /* history_report_url column may not be migrated yet */ }
 
       if (result.reason === "bot_challenge" && result.price == null) {
         skipped++;

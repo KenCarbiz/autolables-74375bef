@@ -157,6 +157,20 @@ serve(async (req) => {
         };
         if (Object.values(trust).some((v) => v)) row.dealer_trust = trust;
 
+        // ── Dealer-paid vehicle history report link (CARFAX / AutoCheck).
+        // Used/CPO only; the URL is dealer-provided (harvested from their own
+        // VDP or entered manually), never constructed here. Allowlisted hosts
+        // only, and the dealer kill switch hides every link at once.
+        try {
+          const hCond = String((row.condition as string) || "").toLowerCase();
+          if (["used", "cpo", "demo"].includes(hCond) && s.history_report_links_enabled !== false) {
+            const url = String((row.history_report_url as string) || "").trim();
+            if (/^https:\/\/(www\.)?(carfax\.com|cfx\.link|autocheck\.com)\//i.test(url)) {
+              row.history_report = { url, provider: /autocheck\.com/i.test(url) ? "autocheck" : "carfax" };
+            }
+          }
+        } catch { /* history link must never break the payload */ }
+
         // ── IIHS Top Safety Pick — permission-gated (the dealer flips the
         // enable flag only after IIHS grants written permission) and
         // dealer-verified per model. Text-only statement, never a logo.

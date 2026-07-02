@@ -166,6 +166,11 @@ export interface VehicleListing {
   // Packet curation — per-vehicle module visibility for the public page.
   packet_modules?: Record<string, boolean> | null;
 
+  // Dealer-paid CARFAX/AutoCheck consumer report link (harvested from the
+  // dealer's own VDP by the nightly crawl, or entered manually). The public
+  // payload carries the gated `history_report` attachment derived from it.
+  history_report_url?: string | null;
+
   // OEM Monroney window sticker pulled by VIN + cached in the oem-stickers bucket.
   oem_sticker_url?: string | null;
   oem_sticker_checked_at?: string | null;

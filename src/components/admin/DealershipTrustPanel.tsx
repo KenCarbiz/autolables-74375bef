@@ -62,6 +62,7 @@ const DealershipTrustPanel = () => {
   const [saving, setSaving] = useState(false);
   const [iihsEnabled, setIihsEnabled] = useState<boolean>(settings.iihs_awards_enabled || false);
   const [iihsAwards, setIihsAwards] = useState<IihsAward[]>(settings.iihs_awards || []);
+  const [historyLinks, setHistoryLinks] = useState<boolean>(settings.history_report_links_enabled !== false);
 
   const set = (k: TrustKey, v: string) => setCfg((c) => ({ ...c, [k]: v }));
   const patchAward = (i: number, p: Partial<IihsAward>) => setIihsAwards((a) => a.map((x, j) => (j === i ? { ...x, ...p } : x)));
@@ -71,6 +72,7 @@ const DealershipTrustPanel = () => {
       ...cfg,
       iihs_awards_enabled: iihsEnabled,
       iihs_awards: iihsAwards.filter((a) => a.year.trim() && a.make.trim() && a.model.trim()),
+      history_report_links_enabled: historyLinks,
     } as Partial<DealerSettings>);
     setSaving(false);
     if (ok !== false) toast.success("Dealership trust content saved");
@@ -163,6 +165,19 @@ const DealershipTrustPanel = () => {
             </select>
             <p className="text-[11px] text-slate-400 mt-1">How the bottom action area appears inside mobile Passport slide-outs.</p>
           </div>
+        </div>
+      </div>
+
+      <div className="rounded-2xl border border-border bg-card p-4">
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <h3 className="text-[14px] font-bold text-foreground">CARFAX / AutoCheck report links</h3>
+            <p className="text-[12px] text-slate-500 mt-0.5">Shows your dealer-paid vehicle history report link on used and CPO passports (harvested nightly from your own website's listings). Turn OFF if your subscription lapses so shoppers never land on a paywall.</p>
+          </div>
+          <label className="flex items-center gap-2 shrink-0 cursor-pointer select-none">
+            <input type="checkbox" checked={historyLinks} onChange={(e) => setHistoryLinks(e.target.checked)} className="w-4 h-4 accent-blue-600" />
+            <span className="text-[13px] font-semibold">{historyLinks ? "Enabled" : "Off"}</span>
+          </label>
         </div>
       </div>
 

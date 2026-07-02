@@ -304,6 +304,11 @@ export interface DealerSettings {
   // dealer-verified per model against iihs.org/ratings/top-safety-picks).
   iihs_awards_enabled: boolean;
   iihs_awards: IihsAward[];
+  // Kill switch for the dealer-paid CARFAX/AutoCheck report links on the
+  // passport. Links themselves are per-vehicle (harvested from the dealer's
+  // own VDP or entered manually); this hides all of them instantly — e.g.
+  // if the CARFAX subscription lapses and links would land on a paywall.
+  history_report_links_enabled: boolean;
 }
 
 export const DEFAULT_SETTINGS: DealerSettings = {
@@ -439,6 +444,7 @@ export const DEFAULT_SETTINGS: DealerSettings = {
   vehicle_agent_assignments: {},
   iihs_awards_enabled: false,
   iihs_awards: [],
+  history_report_links_enabled: true,
 };
 
 interface DealerSettingsContextType {
