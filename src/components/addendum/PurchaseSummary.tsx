@@ -4,6 +4,8 @@
 // optionally accepted, the fee, and the total. Renders on the addendum sheet
 // above the line-item detail.
 
+import { isDocFeeNegotiable } from "@/data/stateCompliance";
+
 const money = (n: number) =>
   `$${n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
@@ -70,7 +72,12 @@ const PurchaseSummary = ({
             label={`Optional you accepted · ${optionalAcceptedCount} of ${optionalAvailableCount}`}
             value={money(optionalTotal)}
           />
-          {docFee > 0 && <Row label={`${docFeeLabel} (negotiable)`} value={money(docFee)} />}
+          {docFee > 0 && (
+            <Row
+              label={state && isDocFeeNegotiable(state) ? `${docFeeLabel} (negotiable)` : docFeeLabel}
+              value={money(docFee)}
+            />
+          )}
         </div>
 
         <div className="mt-1.5 pt-1.5 border-t-2 border-foreground flex items-baseline justify-between">

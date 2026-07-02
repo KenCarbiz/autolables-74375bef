@@ -5,6 +5,7 @@ import { useAudit } from "@/contexts/AuditContext";
 import { useTenant } from "@/contexts/TenantContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { resolveBuyersGuideWarranty } from "@/lib/stateCompliance";
+import { resolveOperatingState } from "@/lib/dealerState";
 import { useVehiclePrefill, VehicleContextHeader } from "@/lib/vehiclePrefill";
 import { toast } from "sonner";
 
@@ -232,7 +233,7 @@ const BuyersGuide = () => {
   // State-aware warranty box: several states override "As-Is" with a
   // mandatory used-vehicle warranty keyed to price/mileage. Driven by the
   // dealer's operating state + this vehicle's age/mileage/price.
-  const operatingState = settings.dealer_state || settings.doc_fee_state || "";
+  const operatingState = resolveOperatingState(settings, currentStore?.state);
   const bgResolution = useMemo(
     () =>
       resolveBuyersGuideWarranty(operatingState, {

@@ -204,6 +204,9 @@ export interface DealerSettings {
   doc_fee_enabled: boolean;
   doc_fee_amount: number;
   doc_fee_state: string;  // 2-letter state code
+  // Illustrative APR for the financing-impact disclosure block on the
+  // addendum. Null keeps the built-in market-typical scenarios.
+  financing_disclosure_apr: number | null;
   // Customer-facing price on the Passport: show the advertised price (before
   // the doc fee) and disclose the fee separately, or show the final website
   // sale price (fee included). Default: advertised_before_doc.
@@ -380,6 +383,7 @@ export const DEFAULT_SETTINGS: DealerSettings = {
   doc_fee_enabled: true,
   doc_fee_amount: 0,
   doc_fee_state: "",
+  financing_disclosure_apr: null,
   price_display_mode: "advertised_before_doc",
   title_clerk_email: "",
   title_reminders_enabled: true,

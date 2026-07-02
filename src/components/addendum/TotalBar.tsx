@@ -1,5 +1,7 @@
 import { Product } from "@/hooks/useProducts";
 import { useDealerSettings } from "@/contexts/DealerSettingsContext";
+import { useTenant } from "@/contexts/TenantContext";
+import { resolveOperatingState } from "@/lib/dealerState";
 import { getDocFeeTerminology, getDocFeeForState, getDocFeeDisclosure } from "@/data/docFees";
 
 interface TotalBarProps {
@@ -16,11 +18,13 @@ interface TotalBarProps {
 
 const TotalBar = ({ installedTotal, optionalTotal, grandTotal, optionalItems, acceptedOptional, inkSaving, vehicleCondition, baseMsrp, marketValue }: TotalBarProps) => {
   const { settings } = useDealerSettings();
-  const docFeeLabel = getDocFeeTerminology(settings.doc_fee_state || settings.dealer_state || "");
-  const docFeeConfig = getDocFeeForState(settings.doc_fee_state || settings.dealer_state || "");
+  const { currentStore } = useTenant();
+  const operatingState = resolveOperatingState(settings, currentStore?.state);
+  const docFeeLabel = getDocFeeTerminology(operatingState);
+  const docFeeConfig = getDocFeeForState(operatingState);
   const docFeeAmount = settings.doc_fee_enabled ? (settings.doc_fee_amount || 0) : 0;
   const cappedNote = docFeeConfig?.maxFee && docFeeAmount > docFeeConfig.maxFee
-    ? ` (exceeds ${settings.doc_fee_state} $${docFeeConfig.maxFee} cap)`
+    ? ` (exceeds ${operatingState} $${docFeeConfig.maxFee} cap)`
     : "";
 
   const installedWithFee = installedTotal + docFeeAmount;
@@ -90,7 +94,7 @@ const TotalBar = ({ installedTotal, optionalTotal, grandTotal, optionalItems, ac
       {settings.doc_fee_enabled && docFeeAmount > 0 && (
         <div className="mt-1 pt-1 border-t border-border-custom/50">
           <p className="text-[7px] text-muted-foreground leading-tight">
-            {getDocFeeDisclosure(settings.doc_fee_state || settings.dealer_state || "", docFeeAmount)}
+            {getDocFeeDisclosure(operatingState, docFeeAmount)}
           </p>
         </div>
       )}

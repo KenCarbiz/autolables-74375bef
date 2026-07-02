@@ -22,6 +22,7 @@ import { useRecallTask, OUTCOME_LABELS, type RecallOutcome } from "@/hooks/useRe
 import { listingGallery, listingHero } from "@/lib/photos";
 import { cleanEquipmentList } from "@/lib/passportV2Data";
 import { PACKET_MODULES, packetVisible } from "@/lib/packetModules";
+import { resolveOperatingState } from "@/lib/dealerState";
 import { QRCodeSVG } from "qrcode.react";
 import GeneratedDocumentsSection from "@/components/vehicle/GeneratedDocumentsSection";
 import UsedCarDocPack from "@/components/vehicle/UsedCarDocPack";
@@ -978,7 +979,8 @@ const TabHeader = ({ title, description, action }: { title: string; description:
 const DocumentsPanel = ({ vehicle, onReload }: { vehicle: VehicleRow; onReload: () => void }) => {
   const [uploading, setUploading] = useState<string | null>(null);
   const { settings } = useDealerSettings();
-  const opState = (settings.dealer_state || settings.doc_fee_state || "").toUpperCase();
+  const { currentStore } = useTenant();
+  const opState = resolveOperatingState(settings, currentStore?.state);
   const safety = SAFETY_FORM[opState] || {
     label: "State safety inspection",
     desc: "State used-car safety inspection certificate where required.",

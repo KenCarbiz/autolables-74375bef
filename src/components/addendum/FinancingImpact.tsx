@@ -1,6 +1,8 @@
 interface FinancingImpactProps {
   addOnTotal: number;
   inkSaving?: boolean;
+  // Dealer-configured illustrative APR; falls back to market-typical rates.
+  apr?: number | null;
 }
 
 /**
@@ -12,15 +14,16 @@ interface FinancingImpactProps {
  * the consumer must see "all fees and costs over the period of
  * repayment with and without the product or service."
  */
-const FinancingImpact = ({ addOnTotal, inkSaving }: FinancingImpactProps) => {
+const FinancingImpact = ({ addOnTotal, inkSaving, apr }: FinancingImpactProps) => {
   if (addOnTotal <= 0) return null;
 
   // Common auto loan APRs and terms for disclosure
+  const dealerApr = typeof apr === "number" && apr > 0 && apr < 36 ? apr : null;
   const scenarios = [
-    { term: 48, apr: 6.5, label: "48 mo / 6.5% APR" },
-    { term: 60, apr: 6.5, label: "60 mo / 6.5% APR" },
-    { term: 72, apr: 7.0, label: "72 mo / 7.0% APR" },
-  ];
+    { term: 48, apr: dealerApr ?? 6.5 },
+    { term: 60, apr: dealerApr ?? 6.5 },
+    { term: 72, apr: dealerApr ?? 7.0 },
+  ].map((s) => ({ ...s, label: `${s.term} mo / ${s.apr}% APR` }));
 
   return (
     <div className={`px-3 py-2 rounded ${inkSaving ? "bg-card border border-border" : "bg-amber-50/50 border border-amber-200/50"}`}>

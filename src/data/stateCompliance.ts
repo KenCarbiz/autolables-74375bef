@@ -321,6 +321,14 @@ export function getStateCompliance(stateCode: string): StateCompliance {
   };
 }
 
+// Whether the state's statutory disclosure describes the doc fee as
+// negotiable (CT, OR, WA). Drives the "(negotiable)" tag on printed
+// summaries — claiming negotiability where the statute doesn't invites
+// disputes at the desk.
+export function isDocFeeNegotiable(stateCode: string): boolean {
+  return getStateCompliance(stateCode).docFeeDisclosures.some((d) => /negotiab/i.test(d));
+}
+
 /**
  * Get all disclosures that should appear on an addendum for a given state.
  * Returns them in the order they should be displayed.

@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useDealerSettings } from "@/contexts/DealerSettingsContext";
 import { useTenant } from "@/contexts/TenantContext";
 import { confirmPrintReady } from "@/lib/printReadiness";
@@ -11,6 +11,7 @@ import { useGpsTracking } from "@/hooks/useGpsTracking";
 import { useZebraPrint } from "@/hooks/useZebraPrint";
 import { useVehicleListing } from "@/hooks/useVehicleListing";
 import { useRecallLookup } from "@/hooks/useRecallLookup";
+import { useNhtsaSafety } from "@/hooks/useNhtsaSafety";
 import { saveStickerToVehicle, markDocumentPublished } from "@/lib/stickerStudio/api";
 import { cleanEquipmentList } from "@/lib/passportV2Data";
 import RecallBanner from "@/components/addendum/RecallBanner";
@@ -64,6 +65,26 @@ const UsedCarSticker = () => {
     doors: "", bodyStyle: "", marketValue: "", description: "",
     safetyOverall: "", safetyFrontal: "", safetySide: "", safetyRollover: "",
   });
+
+  // The printed star block is a government claim — pull real NHTSA ratings
+  // for the YMM and gap-fill blank fields instead of trusting typed values.
+  const nhtsaYmm = vehicle.year && vehicle.make && vehicle.model
+    ? `${vehicle.year} ${vehicle.make} ${vehicle.model}` : null;
+  const { data: nhtsaSafety } = useNhtsaSafety(nhtsaYmm, !!nhtsaYmm);
+  useEffect(() => {
+    const r = nhtsaSafety?.ratings;
+    if (!r) return;
+    setVehicle((prev) => {
+      if (prev.safetyOverall || prev.safetyFrontal || prev.safetySide || prev.safetyRollover) return prev;
+      return {
+        ...prev,
+        safetyOverall: r.overall != null ? String(r.overall) : "",
+        safetyFrontal: r.frontal != null ? String(r.frontal) : "",
+        safetySide: r.side != null ? String(r.side) : "",
+        safetyRollover: r.rollover != null ? String(r.rollover) : "",
+      };
+    });
+  }, [nhtsaSafety]);
 
   const [equipment, setEquipment] = useState<string[]>([]);
   const [showEquipment, setShowEquipment] = useState(true);
@@ -371,7 +392,7 @@ const UsedCarSticker = () => {
 
   // Star rating component
   const Stars = ({ rating, label }: { rating: string; label: string }) => {
-    const num = parseInt(rating) || 0;
+    const num = Math.min(5, Math.max(0, parseInt(rating) || 0));
     return (
       <div className="flex items-center justify-between text-[9px]">
         <span className="text-muted-foreground">{label}</span>

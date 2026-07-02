@@ -32,6 +32,7 @@ import CustomerInfoSection, { CustomerInfo, emptyCustomerInfo, composeName } fro
 import { ScrapedVehicle } from "@/hooks/useVehicleUrlScrape";
 import { useAudit } from "@/contexts/AuditContext";
 import { useTenant } from "@/contexts/TenantContext";
+import { resolveOperatingState } from "@/lib/dealerState";
 import { confirmPrintReady } from "@/lib/printReadiness";
 import { useVehicleFiles } from "@/hooks/useVehicleFiles";
 import { QRCodeSVG } from "qrcode.react";
@@ -248,13 +249,15 @@ const Index = () => {
   const [readyToken, setReadyToken] = useState("");
   const [versionLabel, setVersionLabel] = useState("");
 
+  const operatingState = resolveOperatingState(settings, currentStore?.state);
+
   // Statutory doc-fee disclosure for the operating state. Fed into the
   // compliance validator's stickerText so the required-verbiage check
   // (e.g. CT "conveyance fee" + "not a tax or government fee") matches the
   // language the TotalBar actually renders.
   const docFeeDisclosureText =
     settings.doc_fee_enabled && (settings.doc_fee_amount || 0) > 0
-      ? getDocFeeDisclosure(settings.doc_fee_state || settings.dealer_state || "", settings.doc_fee_amount)
+      ? getDocFeeDisclosure(operatingState, settings.doc_fee_amount)
       : "";
 
   // Dealer identity embedded on the addendum row so the public signer page
@@ -891,7 +894,7 @@ const Index = () => {
           totals: { installedTotal, optionalTotal },
           initials,
           optionalSelections,
-          dealer: { name: storeName, state: settings.doc_fee_state || settings.dealer_state || null },
+          dealer: { name: storeName, state: operatingState || null },
         },
         {
           tenantId: currentStore?.id || null,
@@ -942,7 +945,7 @@ const Index = () => {
     // dealer in an audit (banned phrases, missing E-SIGN, missing
     // Buyers Guide on a used car, un-initialled installed products).
     const rtFindings = runComplianceRedTeam({
-      state: settings.doc_fee_state || settings.dealer_state || "",
+      state: operatingState,
       docFeeAmount: settings.doc_fee_enabled ? settings.doc_fee_amount : undefined,
       stickerText: `${displayProducts?.map((p) => `${p.name} ${p.disclosure || ""}`).join(" ") || ""} ${docFeeDisclosureText}`,
       products: displayProducts?.map((p) => ({
@@ -1118,7 +1121,7 @@ const Index = () => {
 
     // Build the compliance receipt — surface every gate that
     // just verified before the customer ever sees the link.
-    const state = settings.doc_fee_state || settings.dealer_state || "";
+    const state = operatingState;
     const receipt: { label: string; cite?: string }[] = [
       { label: "E-SIGN consent v1 attached", cite: "15 U.S.C. §7001" },
       { label: "Payload hashed (SHA-256) for tamper evidence" },
@@ -1539,7 +1542,7 @@ const Index = () => {
               assessment={priceIntegrity}
               sellingPrice={sellingPrice}
               onSellingPriceChange={setSellingPrice}
-              docFeeLabel={getDocFeeTerminology(settings.doc_fee_state || settings.dealer_state || "")}
+              docFeeLabel={getDocFeeTerminology(operatingState)}
               vin={vehicle.vin}
               onCaptureAdvertised={captureAdvertised}
               onRescrape={rescrapeVin}
@@ -1549,7 +1552,7 @@ const Index = () => {
           )}
           <ComplianceRedTeamPanel
             findings={runComplianceRedTeam({
-              state: settings.doc_fee_state || settings.dealer_state || "",
+              state: operatingState,
               vehiclePrice: vehiclePriceNum || undefined,
               advertisedPrice: advertisedForVin?.advertised_price,
               docFeeAmount: settings.doc_fee_enabled ? settings.doc_fee_amount : undefined,
@@ -1583,7 +1586,7 @@ const Index = () => {
             </summary>
             <div className="px-1 pb-1">
               <StateRewriterPanel
-                state={settings.doc_fee_state || settings.dealer_state || null}
+                state={operatingState || null}
                 input={{
                   vehiclePrice: undefined,
                   docFeeAmount: settings.doc_fee_enabled ? settings.doc_fee_amount : undefined,
@@ -1611,8 +1614,8 @@ const Index = () => {
           optionalAcceptedCount={acceptedOptional.length}
           optionalAvailableCount={optional.length}
           docFee={settings.doc_fee_enabled ? (settings.doc_fee_amount || 0) : 0}
-          docFeeLabel={getDocFeeTerminology(settings.doc_fee_state || settings.dealer_state || "")}
-          state={settings.doc_fee_state || settings.dealer_state || null}
+          docFeeLabel={getDocFeeTerminology(operatingState)}
+          state={operatingState || null}
           inkSaving={inkSaving}
         />
 
@@ -1775,7 +1778,7 @@ const Index = () => {
             installedStartNum={1}
             inkSaving={inkSaving}
           />
-          <FinancingImpact addOnTotal={grandTotal} inkSaving={inkSaving} />
+          <FinancingImpact addOnTotal={grandTotal} apr={settings.financing_disclosure_apr} inkSaving={inkSaving} />
           <Disclosures inkSaving={inkSaving} language={disclosureLanguage} />
 
           {/* Signing QR Barcode — printed on every addendum for remote signing */}

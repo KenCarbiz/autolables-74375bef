@@ -1,6 +1,7 @@
 import { ShieldCheck, AlertTriangle } from "lucide-react";
 import { useDealerSettings } from "@/contexts/DealerSettingsContext";
 import { useTenant } from "@/contexts/TenantContext";
+import { resolveOperatingState } from "@/lib/dealerState";
 import {
   getStateCompliance,
   getAddendumDisclosures,
@@ -63,10 +64,7 @@ const Disclosures = ({ inkSaving, language = "en" }: DisclosuresProps) => {
   const { currentStore } = useTenant();
 
   const t = STRINGS[language];
-  // Match TotalBar/PurchaseSummary resolution — dealer_state must be in the
-  // chain or a tenant with only dealer_state set prints a mixed-state
-  // document (state fee wording beside federal-only disclosures).
-  const dealerState = currentStore?.state || settings.doc_fee_state || settings.dealer_state || "";
+  const dealerState = resolveOperatingState(settings, currentStore?.state);
   const compliance = getStateCompliance(dealerState);
   const stateDisclosures = getAddendumDisclosures(dealerState);
 

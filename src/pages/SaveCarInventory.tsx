@@ -9,6 +9,7 @@ import { useTenant } from "@/contexts/TenantContext";
 import { useDealerSettings } from "@/contexts/DealerSettingsContext";
 import { useAudit } from "@/contexts/AuditContext";
 import { emptyK208, K208_INSPECTION_CATEGORIES } from "@/data/ctK208Form";
+import { resolveOperatingState } from "@/lib/dealerState";
 import { QRCodeSVG } from "qrcode.react";
 import { toast } from "sonner";
 import {
@@ -63,7 +64,7 @@ const SaveCarInventory = () => {
   const [warrantyPercent, setWarrantyPercent] = useState("50");
 
   // K-208 (CT only)
-  const isConnecticut = (currentStore?.state || settings.doc_fee_state || "").toUpperCase() === "CT";
+  const isConnecticut = resolveOperatingState(settings, currentStore?.state) === "CT";
   const [k208Items, setK208Items] = useState<Record<string, "pass" | "fail" | "na" | "">>({});
 
   // Result state
@@ -156,7 +157,7 @@ const SaveCarInventory = () => {
           vehicle_vin: vin.trim().toUpperCase(),
           vehicle_ymm: `${decoded.year} ${decoded.make} ${decoded.model}`,
           dealer_name: settings.dealer_name || currentStore?.name || "",
-          dealer_state: currentStore?.state || settings.doc_fee_state || "",
+          dealer_state: resolveOperatingState(settings, currentStore?.state),
           created_at: new Date().toISOString(),
         },
         created_by: user?.id || "unknown",

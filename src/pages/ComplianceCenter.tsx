@@ -4,6 +4,7 @@ import { useTenant } from "@/contexts/TenantContext";
 import { useDealerSettings } from "@/contexts/DealerSettingsContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { getStateCompliance, FEDERAL_DISCLOSURES, FTC_BUYERS_GUIDE_SYSTEMS } from "@/data/stateCompliance";
+import { resolveOperatingState } from "@/lib/dealerState";
 import { supabase } from "@/integrations/supabase/client";
 import Logo from "@/components/brand/Logo";
 import { toast } from "sonner";
@@ -374,7 +375,7 @@ const CompliancePacketPanel = ({
 const ComplianceCenter = () => {
   const { currentStore, tenant } = useTenant();
   const { settings } = useDealerSettings();
-  const dealerState = currentStore?.state || settings.doc_fee_state || "";
+  const dealerState = resolveOperatingState(settings, currentStore?.state);
   const compliance = getStateCompliance(dealerState);
   const storeName = currentStore?.name || settings.dealer_name || "Your Dealership";
 
