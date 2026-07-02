@@ -13,6 +13,7 @@ import { resolveEffectiveWarranty } from "@/lib/warranty/passportWarranty";
 import { readBuildSheet, PACKAGE_KIND_ORDER } from "@/lib/buildSheet";
 import { readDealerAlternatives, type DealerAlternative } from "@/lib/dealerAlternatives";
 import { recordPanelView } from "@/lib/shopperIntent";
+import { useNhtsaSafety, type NhtsaSafetyResult } from "@/hooks/useNhtsaSafety";
 import type { VehicleListing } from "@/hooks/useVehicleListing";
 import {
   PassportSlideOver, Hero, Section, Check, Empty, StatRow, RangeBar, TrendChart, Ring, CARD, GREEN, BLUE,
@@ -33,7 +34,7 @@ export type PassportPanelKey =
 
 interface PanelDef { title: string; subtitle: string; body: React.ReactNode; primary?: { label: string; onClick: () => void }; secondary?: { label: string; onClick: () => void }; footerQuestion?: string; specialistLabel?: string; wide?: boolean }
 
-function buildPanel(key: PassportPanelKey, d: PassportData, listing: VehicleListing, isPreview: boolean, go: (s: string) => void, openPanel: (k: PassportPanelKey) => void): PanelDef {
+function buildPanel(key: PassportPanelKey, d: PassportData, listing: VehicleListing, isPreview: boolean, go: (s: string) => void, openPanel: (k: PassportPanelKey) => void, nhtsa: NhtsaSafetyResult | null): PanelDef {
   const price = d.price, avg = d.marketAvg, low = d.marketLow, high = d.marketHigh, below = d.belowMarket;
   const isGreat = below != null && below > 0;
   const conf = d.confScore;
@@ -915,6 +916,7 @@ function buildPanel(key: PassportPanelKey, d: PassportData, listing: VehicleList
         term: r.term,
         sub: r.sub ?? null,
         tone: r.key === "ev_battery" || r.key === "maintenance" ? "green" : "blue",
+        items: COVERAGE_COMPONENTS[r.key],
       }));
       if ((isHybrid || isEV) && !benefitRows.some((r) => r.key === "ev_battery")) {
         benefitCards.push({ icon: Zap, title: isEV ? "EV Battery" : "Hybrid Battery", term: "Extended high-voltage coverage", sub: "Confirm terms with dealer", tone: "green" });
@@ -1125,6 +1127,51 @@ function buildPanel(key: PassportPanelKey, d: PassportData, listing: VehicleList
             </div>
           ) : <Empty>Verified owner reviews appear here once the dealer connects a review source. AutoLabels never fabricates customer reviews.</Empty>}
           </div>
+          {nhtsa?.ratings && nhtsa.ratings.overall != null && (
+            <Section title="Government crash-test ratings" sub={`NHTSA 5-Star Safety Ratings for the ${nhtsa.ratings.vehicleDescription || listing.ymm}.`}>
+              <div className={`${CARD} p-5`}>
+                <div className="flex items-center gap-4">
+                  <div className="text-center shrink-0"><p className="text-[34px] font-extrabold text-[#2563EB] leading-none">{nhtsa.ratings.overall}<span className="text-[16px] text-[#94A3B8] font-bold">/5</span></p><div className="mt-1"><Stars n={nhtsa.ratings.overall} /></div></div>
+                  <div className="min-w-0">
+                    <p className="text-[15px] font-extrabold text-[#0F172A]">Overall Safety Rating</p>
+                    <p className="text-[12px] text-[#64748B] mt-0.5">U.S. government crash testing, not dealer-provided.</p>
+                  </div>
+                </div>
+                {(nhtsa.ratings.frontal != null || nhtsa.ratings.side != null || nhtsa.ratings.rollover != null) && (
+                  <div className="mt-4 grid grid-cols-3 gap-2">
+                    {([["Frontal", nhtsa.ratings.frontal], ["Side", nhtsa.ratings.side], ["Rollover", nhtsa.ratings.rollover]] as const).filter(([, v]) => v != null).map(([k, v]) => (
+                      <div key={k} className="rounded-xl border border-[#E6E8EC] bg-[#F8FAFC] px-3 py-2 text-center">
+                        <p className="text-[11px] font-semibold text-[#64748B]">{k}</p>
+                        <p className="text-[15px] font-extrabold text-[#0F172A]">{v} <Star className="w-3.5 h-3.5 inline -mt-0.5 fill-[#F59E0B] text-[#F59E0B]" /></p>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                <p className="text-[11px] text-[#94A3B8] mt-3">Source: NHTSA 5-Star Safety Ratings program (nhtsa.gov). Ratings apply to this model and configuration, not this specific vehicle.</p>
+              </div>
+            </Section>
+          )}
+          {nhtsa?.complaints && (
+            <Section title="Owner-reported issues" sub="Complaints filed with NHTSA by owners nationwide for this model year.">
+              <div className={`${CARD} p-4`}>
+                {nhtsa.complaints.count === 0 ? (
+                  <p className="text-[13px] font-semibold text-[#16A34A]">No owner complaints on file with NHTSA for this model year.</p>
+                ) : (
+                  <>
+                    <p className="text-[13px] text-[#0F172A]"><span className="font-extrabold">{nhtsa.complaints.count.toLocaleString()}</span> complaint{nhtsa.complaints.count === 1 ? "" : "s"} filed nationwide across all {listing.ymm} vehicles — not reports about this specific car.</p>
+                    {nhtsa.complaints.topComponents.length > 0 && (
+                      <div className="mt-2.5 flex flex-wrap gap-2">
+                        {nhtsa.complaints.topComponents.map((c) => (
+                          <span key={c.component} className="inline-flex items-center rounded-full border border-[#E6E8EC] bg-[#F8FAFC] px-2.5 py-1 text-[11px] font-semibold text-[#475569]">{c.component.toLowerCase().replace(/(^|[\s/])[a-z]/g, (m) => m.toUpperCase())} · {c.count}</span>
+                        ))}
+                      </div>
+                    )}
+                  </>
+                )}
+                <p className="text-[11px] text-[#94A3B8] mt-3">Source: NHTSA complaint database (nhtsa.gov). Complaints are unverified owner reports covering the entire model line.</p>
+              </div>
+            </Section>
+          )}
           {breakdown.length > 0 && (
             <Section title="Rating breakdown"><div className={`${CARD} p-4 space-y-2.5`}>{breakdown.map((b) => <RatingBar key={b.k} label={b.k} score={b.v} />)}</div></Section>
           )}
@@ -1601,67 +1648,138 @@ function buildPanel(key: PassportPanelKey, d: PassportData, listing: VehicleList
 
     case "ownership-timeline": {
       const w = d.warranty;
+      const isNew = listing.condition === "new";
+      const cpoProgs = (listing as unknown as { cpo_programs?: Array<Record<string, unknown>> }).cpo_programs || null;
+      const eff = resolveEffectiveWarranty({
+        condition: listing.condition, ymm: listing.ymm,
+        warrantyInfo: d.warranty, hasDealerOem: !!d.oemWarranty, cpoPrograms: cpoProgs,
+      });
+      const isFactoryCpo = eff.mode === "cpo_factory";
       const year = (listing.ymm || "").match(/\b(19|20)\d{2}\b/)?.[0] ?? null;
       const fmtDate = (s?: string | Date | null) => s ? new Date(s).toLocaleDateString() : null;
-      const inService = w.in_service_date || null;
+      const inService = w.in_service_date || d.history?.inServiceDate || null;
       const prep = listing.prep_status?.foreman_signed_at || null;
-      const updated = (listing as unknown as { updated_at?: string }).updated_at || null;
-      const docs = listing.documents || [];
-      const lastDoc = docs.map((x) => (x as { uploaded_at?: string }).uploaded_at).filter(Boolean).sort().pop() || null;
-      const hasHistory = d.ownerCount != null || d.accidentCount != null || d.cleanTitle || d.serviceCount > 0 || !!listing.recall_status;
-
-      const origin: TEvent[] = [
-        { title: "Manufactured", date: year, source: "OEM model year", status: year ? "estimated" : "unavailable", note: year ? "Model year on record — exact build date pending OEM build data." : "Build date is not available yet." },
-        { title: "Delivered to dealer", status: "unavailable", note: "Dealer delivery date is not available yet." },
-      ];
-      const ownership: TEvent[] = [
-        inService
-          ? { title: d.ownerCount === 1 ? "First owner — placed in service" : "Placed in service", date: fmtDate(inService), source: "Warranty in-service date", status: "verified", note: d.ownerCount === 1 ? "Single owner on record; factory warranty began on this date." : "Factory warranty coverage began on this date." }
-          : d.ownerCount != null
-            ? { title: "Ownership on record", source: "Vehicle history", status: "needs", note: `${d.ownerCount} owner${d.ownerCount === 1 ? "" : "s"} reported; exact dates pending verification.` }
-            : { title: "Ownership history", status: "unavailable", note: "Ownership records are pending verification." },
-        { title: "Registration history", status: "unavailable", note: "State-by-state registration timeline is not available yet." },
-      ];
       const services = (listing.service_records || []).filter((s) => s && (s.date || s.type || s.mileage));
-      const maintenance: TEvent[] = [
-        ...(services.length
-          ? services.map((s) => ({ title: s.type || "Service performed", date: fmtDate(s.date), mileage: s.mileage ? `${s.mileage} mi` : null, source: "Service record", status: "verified" as TStatus, note: s.notes || "Maintenance performed and recorded." }))
-          : [{ title: "Service records", status: "unavailable" as TStatus, note: "No service records are on file yet." }]),
-        prep
-          ? { title: "Dealer inspection completed", date: fmtDate(prep), source: "AutoLabels prep sign-off", status: "verified", note: "Multi-point inspection sign-off was completed." }
-          : { title: "Dealer inspection", status: "unavailable", note: "Inspection date is not available yet." },
-      ];
-      const verification: TEvent[] = [
-        { title: "VIN verified", status: listing.vin ? "verified" : "unavailable", source: listing.vin ? "VIN decode" : undefined, note: listing.vin ? "Vehicle identification number confirmed." : "VIN not available." },
-        { title: "Market data checked", status: (d.marketAvg != null || d.valueHistory.length > 0) ? "verified" : "unavailable", source: "MarketCheck", note: (d.marketAvg != null || d.valueHistory.length > 0) ? "Pricing compared against live market data." : "Market data pending." },
-        { title: "Recall status checked", status: listing.recall_status ? "verified" : "unavailable", source: "NHTSA", note: listing.recall_status ? (d.recallClear ? "No open recalls found." : "Recall campaign(s) on record.") : "Recall check pending." },
-        { title: "Warranty checked", status: d.warrantyStr ? "verified" : "unavailable", note: d.warrantyStr ? `${d.warrantyStr} of factory coverage confirmed remaining.` : "Warranty details pending." },
-        { title: "Documents uploaded", date: fmtDate(lastDoc), status: docs.length ? "verified" : "unavailable", source: docs.length ? `${docs.length} document${docs.length === 1 ? "" : "s"}` : undefined, note: docs.length ? "Dealer documents are attached to this vehicle." : "No documents uploaded yet." },
-      ];
-      const current: TEvent[] = [
-        { title: "Available today", status: listing.status === "published" ? "verified" : "needs", source: d.dealerName, note: listing.status === "published" ? `Listed and available at ${d.dealerName}.` : "Availability is being confirmed." },
-        { title: "Passport generated", date: fmtDate(updated), status: updated ? "verified" : "estimated", source: "AutoLabels", note: updated ? "This passport was last updated on this date." : "Generated by AutoLabels." },
-      ];
-      const sections: { label: string; events: TEvent[] }[] = [
-        { label: "Origin", events: origin },
-        { label: "Ownership", events: ownership },
-        { label: "Maintenance", events: maintenance },
-        { label: "AutoLabels Verification", events: verification },
-        { label: "Current Status", events: current },
-      ];
+      const hasHistory = d.ownerCount != null || d.accidentCount != null || d.cleanTitle || d.serviceCount > 0 || !!listing.recall_status;
+      const published = listing.status === "published";
+      const firstSeen = d.history?.firstSeen || null;
+      // Most recent listing-history entry approximates arrival at the current
+      // rooftop; labeled "estimated" because listing feeds can lag a transfer.
+      const arrival = (d.history?.entries || [])
+        .map((e) => e.first_seen).filter(Boolean).sort().pop() || firstSeen;
+
+      // Summary strip: only chips whose backing field is a real value. Missing
+      // data is silence here, never a "pending" placeholder.
+      const chips: { label: string; tone?: "amber" }[] = [];
+      if (isNew) chips.push({ label: "Factory new" });
+      else if (d.ownerCount != null && d.ownerCount > 0) chips.push({ label: `${d.ownerCount} owner${d.ownerCount === 1 ? "" : "s"}` });
+      if (isFactoryCpo) chips.push({ label: "Certified Pre-Owned" });
+      if (d.serviceCount > 0) chips.push({ label: `${d.serviceCount} service visit${d.serviceCount === 1 ? "" : "s"}` });
+      if (!isNew && d.accidentCount === 0) chips.push({ label: "No reported accidents" });
+      if (!isNew && d.accidentCount != null && d.accidentCount > 0) chips.push({ label: `${d.accidentCount} reported accident${d.accidentCount === 1 ? "" : "s"}`, tone: "amber" });
+      if (!isNew && d.cleanTitle) chips.push({ label: "Clean title" });
+      if (d.hasRecallCheck && d.recallClear) chips.push({ label: "No open recalls" });
+      const stripNote = chips.map((c) => c.label).join(" · ");
+
+      const fmtTerm = (months?: number | null, miles?: number | null) => {
+        if (!months || months <= 0) return null;
+        const yrs = months % 12 === 0 ? `${months / 12}-year` : `${months}-month`;
+        return miles && miles > 0 ? `${yrs} / ${miles.toLocaleString()}-mile` : yrs;
+      };
+
+      const chapters: { title: string; sub?: string; events: TEvent[] }[] = [];
+
+      if (isNew) {
+        const events: TEvent[] = [];
+        if (year) events.push({ title: `Built — ${year} model year`, source: "OEM model year", status: "estimated", note: "Model year on record; exact build date comes from the OEM build sheet." });
+        if (arrival) events.push({ title: `Arrived at ${d.dealerName}`, date: fmtDate(arrival), source: "Listing history", status: "estimated", note: "Transported new from the factory to this dealership." });
+        if (prep) events.push({ title: "Dealer preparation complete", date: fmtDate(prep), source: "AutoLabels prep sign-off", status: "verified", note: "Multi-point inspection sign-off was completed." });
+        if (published) {
+          const term = fmtTerm(eff.info.factory_months, eff.info.factory_miles);
+          events.push({ title: "Available today", source: d.dealerName, status: "verified", note: term ? `Your ${term} factory warranty starts the day you take delivery.` : `Available at ${d.dealerName} — this vehicle's history starts with you.` });
+        }
+        if (events.length) chapters.push({ title: "From the factory to you", sub: "No previous owners — this vehicle's history starts with you.", events });
+      } else {
+        const own: TEvent[] = [];
+        if (inService) own.push({ title: d.ownerCount === 1 ? "First owner — placed in service" : "First placed in service", date: fmtDate(inService), source: "Warranty in-service date", status: "verified", note: "Factory warranty coverage began on this date." });
+        if (d.ownerCount != null && d.ownerCount > 0) own.push({ title: d.ownerCount === 1 ? "One owner on record" : `${d.ownerCount} owners on record`, source: "Vehicle history", status: "verified", note: d.cleanTitle ? "Clean title — no brands on record." : "Ownership count reported by vehicle history providers." });
+        if (own.length) chapters.push({ title: inService ? `In service since ${new Date(inService).getFullYear()}` : "Ownership", sub: "Who has held this vehicle, from the records available.", events: own });
+
+        const dealerEvents: TEvent[] = [];
+        if (arrival) dealerEvents.push({ title: `Arrived at ${d.dealerName}`, date: fmtDate(arrival), source: "Listing history", status: "estimated", note: "First appeared in this dealership's inventory." });
+        if (d.recon?.inspection) dealerEvents.push({ title: `Inspected — ${d.recon.inspection.type || "dealer inspection"}`, date: fmtDate(d.recon.inspection.date), source: "Reconditioning record", status: "verified", note: d.recon.workItems.length ? `${d.recon.workItems.length} reconditioning item${d.recon.workItems.length === 1 ? "" : "s"} completed.` : d.recon.inspection.passed ? "Inspection passed." : "Inspection recorded." });
+        if (prep) dealerEvents.push({ title: "Dealer preparation complete", date: fmtDate(prep), source: "AutoLabels prep sign-off", status: "verified", note: "Multi-point inspection sign-off was completed." });
+        if (published) dealerEvents.push({ title: "Available today", source: d.dealerName, status: "verified", note: `Listed and available at ${d.dealerName}.` });
+        if (dealerEvents.length) chapters.push({ title: `At ${d.dealerName}`, sub: "Inspected and ready for its next owner.", events: dealerEvents });
+      }
+
+      // Service history: chronological when short, clustered by year when long.
+      const svcEvent = (s: NonNullable<VehicleListing["service_records"]>[number]): TEvent => ({ title: s.type || "Service performed", date: fmtDate(s.date), mileage: s.mileage ? `${s.mileage} mi` : null, source: "Service record", status: "verified", note: s.notes || "Maintenance performed and recorded." });
+      const svcYears = new Map<string, TEvent[]>();
+      for (const s of services) {
+        const y = (s.date || "").match(/\b(19|20)\d{2}\b/)?.[0] || "Undated";
+        if (!svcYears.has(y)) svcYears.set(y, []);
+        svcYears.get(y)!.push(svcEvent(s));
+      }
+      const svcClusters = Array.from(svcYears.entries()).sort((a, b) => a[0].localeCompare(b[0]));
+
+      const missing: string[] = [];
+      if (!isNew && services.length === 0) missing.push("service records");
+      if (!isNew && d.ownerCount == null) missing.push("ownership records");
+      if (!isNew && d.accidentCount == null) missing.push("accident reports");
+
+      const heroEyebrow = isNew ? "Factory New" : isFactoryCpo ? "Certified Pre-Owned" : "Ownership Timeline";
+      const heroNote = isNew ? "This vehicle's history starts with you." : stripNote || "The journey of this vehicle, from the records available.";
+
       return {
         title: "Ownership Timeline",
-        subtitle: "A clear timeline of this vehicle's ownership, service, certification, and availability history.",
+        subtitle: isNew ? "The short, confident story of a factory-new vehicle." : "The journey of this vehicle, told from verified records.",
         footerQuestion: "Questions about this vehicle's timeline?",
         primary: { label: "Contact Dealer", onClick: () => go("contact") },
         secondary: hasHistory ? { label: "View Vehicle History Report", onClick: () => go("vehicle-history") } : undefined,
         body: <>
-          <div className="md:hidden"><MHero tone="green" icon={Clock} eyebrow="Ownership Timeline" title={listing.ymm || "Timeline"} note="Ownership, service, certification, and availability history." /></div>
-          {sections.map((s) => <Section key={s.label} title={s.label}><TimelineGroup events={s.events} /></Section>)}
-          {hasHistory ? (
+          <div className="md:hidden"><MHero tone={isNew ? "blue" : "green"} icon={Clock} eyebrow={heroEyebrow} title={listing.ymm || "Timeline"} note={heroNote} /></div>
+          {chips.length >= 2 && (
+            <div className={`${CARD} p-4 hidden md:flex flex-wrap gap-2`}>
+              {chips.map((c) => (
+                <span key={c.label} className={`inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-semibold border ${c.tone === "amber" ? "border-amber-200 bg-amber-50 text-amber-800" : "border-emerald-200 bg-emerald-50/70 text-emerald-800"}`}>{c.label}</span>
+              ))}
+            </div>
+          )}
+          {chapters.slice(0, 1).map((c) => <Section key={c.title} title={c.title} sub={c.sub}><TimelineGroup events={c.events} /></Section>)}
+          {!isNew && services.length > 0 && (
+            <Section title={`Maintained — ${services.length} visit${services.length === 1 ? "" : "s"} on record`} sub="Service history reported for this vehicle.">
+              {services.length <= 5 ? (
+                <TimelineGroup events={svcClusters.flatMap(([, evs]) => evs)} />
+              ) : (
+                <div className="space-y-2">
+                  {svcClusters.map(([y, evs]) => (
+                    <details key={y} className={`${CARD} px-4 py-3`}>
+                      <summary className="cursor-pointer list-none flex items-center justify-between">
+                        <span className="text-[13px] font-bold">{y} — {evs.length} service visit{evs.length === 1 ? "" : "s"}</span>
+                        <ChevronDown className="w-4 h-4 text-[#94A3B8]" />
+                      </summary>
+                      <div className="mt-3"><TimelineGroup events={evs} /></div>
+                    </details>
+                  ))}
+                </div>
+              )}
+            </Section>
+          )}
+          {chapters.slice(1).map((c) => <Section key={c.title} title={c.title} sub={c.sub}><TimelineGroup events={c.events} /></Section>)}
+          {isFactoryCpo && (
+            <div className="rounded-2xl border border-violet-200 bg-violet-50/70 p-5">
+              <div className="flex items-center gap-2"><BadgeCheck className="w-5 h-5 text-violet-700" /><p className="text-[15px] font-extrabold text-violet-900">Certified Pre-Owned{eff.cpoProgramName ? ` — ${eff.cpoProgramName}` : ""}</p></div>
+              {eff.cpoInspectionPoints && <p className="text-[13px] text-violet-800 mt-1.5">Passed the {eff.cpoInspectionPoints}-point factory certification inspection.</p>}
+              {fmtTerm(eff.info.powertrain_months, eff.info.powertrain_miles) && <p className="text-[13px] text-violet-800 mt-1">Powertrain coverage extended to {fmtTerm(eff.info.powertrain_months, eff.info.powertrain_miles)} from original in-service.</p>}
+              {eff.cpoWrap && <p className="text-[13px] text-violet-800 mt-1">{eff.cpoWrap.programName}: {eff.cpoWrap.months} months / {eff.cpoWrap.miles ? eff.cpoWrap.miles.toLocaleString() : "unlimited"} miles from your purchase date.</p>}
+            </div>
+          )}
+          {missing.length > 0 && (
+            <p className="text-[12px] text-[#64748B]">Not yet on file: {missing.join(", ")}. We only show verified records — ask {d.dealerName} for the full history report.</p>
+          )}
+          {hasHistory && (
             <button onClick={() => go("vehicle-history")} className="w-full h-11 rounded-xl bg-[#2563EB] hover:bg-[#1d4fd7] text-white text-[13px] font-semibold inline-flex items-center justify-center gap-2 transition-colors"><History className="w-4 h-4" /> View Full Vehicle History Report</button>
-          ) : (
-            <Empty>Full vehicle history data is not available yet.</Empty>
           )}
           <Disclaimer />
         </>,
@@ -1804,35 +1922,54 @@ const NewCoverageCard = ({ title, subtitle, tone, years, miles }: {
   );
 };
 
-// Right-column list of additional factory benefits. Each row is a button that
-// opens the collapsed "More warranty details" section (keyboard accessible).
-interface BenefitRow { icon: React.ElementType; title: string; term: string; sub?: string | null; tone?: "blue" | "green" }
-const AdditionalFactoryBenefitsCard = ({ rows, onDetails }: { rows: BenefitRow[]; onDetails: () => void }) => (
-  <div className="rounded-2xl border border-[#E6E8EC] bg-white p-4 sm:p-5">
-    <p className="text-[15px] font-bold text-[#0F172A] mb-1">Additional Factory Benefits</p>
-    {rows.length > 0 ? (
-      <div className="divide-y divide-slate-100">
-        {rows.map((r) => {
-          const Icon = r.icon;
-          const c = r.tone === "green" ? "bg-emerald-50 text-[#16A34A]" : "bg-blue-50 text-[#2563EB]";
-          return (
-            <button key={r.title} onClick={onDetails} className="w-full flex items-center gap-3 py-3 text-left group">
-              <span className={`w-10 h-10 rounded-full ${c} flex items-center justify-center shrink-0`}><Icon className="w-[18px] h-[18px]" /></span>
-              <div className="min-w-0 flex-1">
-                <p className="text-[13px] font-bold text-[#0F172A] leading-tight">{r.title}</p>
-                <p className="text-[12px] text-[#64748B] leading-tight">{r.term}</p>
-                {r.sub && <p className="text-[11px] text-[#94A3B8] leading-tight mt-0.5">{r.sub}</p>}
+// Right-column list of additional factory benefits. Rows with a component
+// checklist expand inline (slide-down); rows without one open the collapsed
+// "What's Included" section instead so the chevron always responds.
+interface BenefitRow { icon: React.ElementType; title: string; term: string; sub?: string | null; tone?: "blue" | "green"; items?: string[] }
+const AdditionalFactoryBenefitsCard = ({ rows, onDetails }: { rows: BenefitRow[]; onDetails: () => void }) => {
+  const [open, setOpen] = useState<string | null>(null);
+  return (
+    <div className="rounded-2xl border border-[#E6E8EC] bg-white p-4 sm:p-5">
+      <p className="text-[15px] font-bold text-[#0F172A] mb-1">Additional Factory Benefits</p>
+      {rows.length > 0 ? (
+        <div className="divide-y divide-slate-100">
+          {rows.map((r) => {
+            const Icon = r.icon;
+            const c = r.tone === "green" ? "bg-emerald-50 text-[#16A34A]" : "bg-blue-50 text-[#2563EB]";
+            const expandable = (r.items?.length ?? 0) > 0;
+            const isOpen = open === r.title;
+            return (
+              <div key={r.title}>
+                <button
+                  onClick={() => expandable ? setOpen(isOpen ? null : r.title) : onDetails()}
+                  aria-expanded={expandable ? isOpen : undefined}
+                  className="w-full flex items-center gap-3 py-3 text-left group"
+                >
+                  <span className={`w-10 h-10 rounded-full ${c} flex items-center justify-center shrink-0`}><Icon className="w-[18px] h-[18px]" /></span>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-[13px] font-bold text-[#0F172A] leading-tight">{r.title}</p>
+                    <p className="text-[12px] text-[#64748B] leading-tight">{r.term}</p>
+                    {r.sub && <p className="text-[11px] text-[#94A3B8] leading-tight mt-0.5">{r.sub}</p>}
+                  </div>
+                  <ChevronDown className={`w-4 h-4 text-[#CBD5E1] group-hover:text-[#94A3B8] shrink-0 transition-transform ${isOpen ? "rotate-180" : expandable ? "" : "-rotate-90"}`} />
+                </button>
+                {expandable && isOpen && (
+                  <div className="pb-3 pl-[52px]">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1.5">
+                      {r.items!.map((it) => <div key={it} className="flex items-start gap-2 text-[12px] text-[#334155]"><CheckCircle2 className="w-3.5 h-3.5 text-[#16A34A] shrink-0 mt-0.5" />{it}</div>)}
+                    </div>
+                  </div>
+                )}
               </div>
-              <ChevronRight className="w-4 h-4 text-[#CBD5E1] group-hover:text-[#94A3B8] shrink-0" />
-            </button>
-          );
-        })}
-      </div>
-    ) : (
-      <p className="text-[12px] text-[#64748B] mt-2">Roadside, corrosion, and emissions coverage may apply — ask the dealer to confirm the terms for this vehicle.</p>
-    )}
-  </div>
-);
+            );
+          })}
+        </div>
+      ) : (
+        <p className="text-[12px] text-[#64748B] mt-2">Roadside, corrosion, and emissions coverage may apply — ask the dealer to confirm the terms for this vehicle.</p>
+      )}
+    </div>
+  );
+};
 
 // Used / pre-owned CPO banner (lavender). Never shown for new cars. Certified
 // cars state the fact; eligible-but-uncertified cars say "may qualify".
@@ -2439,9 +2576,10 @@ export default function PassportPanel({ panel, onClose, openPanel, d, listing, i
   // same-rooftop alternatives lead (price vs equipment vs coverage).
   useEffect(() => { if (panel) recordPanelView(panel); }, [panel]);
   const key = panel ?? shown;
+  const { data: nhtsa } = useNhtsaSafety(listing.ymm, key === "owner-reviews");
   if (!key) return null;
 
-  const def = buildPanel(key, d, listing, isPreview, go, openPanel);
+  const def = buildPanel(key, d, listing, isPreview, go, openPanel, nhtsa);
   const ctaSignals: CtaSignals = { greatPrice: (d.belowMarket ?? 0) > 0, highDemand: (d.viewCount ?? 0) > 20, highConf: (d.confScore ?? 0) >= 85, highlyRated: (d.reviewRating ?? 0) >= 4.5, hasWarranty: !!d.warrantyStr };
   const ctaVariant = d.dealerTrust.mobileCtaVariant || "dealer_availability";
   const footer = (def.primary || def.secondary) ? (
