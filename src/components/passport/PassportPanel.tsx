@@ -1229,69 +1229,6 @@ function buildPanel(key: PassportPanelKey, d: PassportData, listing: VehicleList
       };
     }
 
-    case "highlights": {
-      const hs = d.highlights;
-      const ks = listing.key_specs || {};
-      const { groups, ordered: orderedGroups, featLabels, accessories } = featureGroups(listing);
-      const reasons: string[] = [];
-      if (groups.Safety?.length) reasons.push("Advanced safety technology");
-      if (groups.Comfort?.length) reasons.push("Premium comfort and convenience");
-      if (groups.Technology?.length) reasons.push("Modern technology and connectivity");
-      if (/awd|4wd|4x4/i.test(String(ks.drivetrain || ""))) reasons.push("Confident all-weather capability");
-      if (/luxe|autograph|limited|platinum|premium|touring|signature|reserve|titanium|sensory|denali/i.test(listing.trim || "")) reasons.push("Luxury-grade appointments");
-      if (isGreat) reasons.push("Exceptional value versus the market");
-      const hasContent = featLabels.length > 0 || orderedGroups.length > 0 || hs.length > 0;
-      return {
-        title: "Vehicle Highlights", subtitle: "Explore the most important features and equipment",
-        primary: { label: "Reserve This Vehicle", onClick: () => go("reserve") },
-        secondary: { label: "View key specifications", onClick: () => openPanel("key-specs") },
-        footerQuestion: "Questions about features?", specialistLabel: "Talk to a Product Specialist",
-        body: <>
-          {hasContent ? (
-            <>
-              <div className="rounded-2xl overflow-hidden border border-[#E6E8EC] relative">
-                {listing.hero_image_url ? <img src={listing.hero_image_url} alt="" className="w-full aspect-[16/9] object-cover" /> : <div className="w-full aspect-[16/9] bg-[#1f2227] flex items-center justify-center"><Car className="w-12 h-12 text-slate-500" /></div>}
-                <div className="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent flex flex-col justify-end p-5">
-                  <p className="text-white text-[18px] font-extrabold leading-tight">Premium Equipment</p>
-                  <p className="text-white/85 text-[12px]">Everything that makes this vehicle stand out.</p>
-                </div>
-              </div>
-              {hs.length > 0 && (
-                <Section title="Feature gallery">
-                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">{hs.map((h) => (
-                    <div key={h.key} className={`${CARD} p-4 flex flex-col items-center text-center gap-1.5`}>
-                      <span className="w-10 h-10 rounded-xl bg-blue-50 flex items-center justify-center"><Award className="w-5 h-5 text-[#2563EB]" /></span>
-                      <p className="text-[12px] font-bold leading-tight">{h.label}</p>
-                      <p className="text-[10px] text-[#94A3B8]">{h.sub}</p>
-                    </div>
-                  ))}</div>
-                </Section>
-              )}
-              {orderedGroups.length > 0 && (
-                <Section title="Features by category">
-                  <div className="space-y-2">{orderedGroups.map(([name, items], i) => <Group key={name} title={name} items={items!} defaultOpen={i === 0} />)}</div>
-                </Section>
-              )}
-              {reasons.length > 0 && (
-                <Section title="Top reasons customers love this vehicle">
-                  <div className={`${CARD} p-4`}><ul className="space-y-2">{reasons.map((r) => <Check key={r}>{r}</Check>)}</ul></div>
-                </Section>
-              )}
-              {(featLabels.length > 0 || accessories.length > 0) && (
-                <Section title="Equipment & options" action={<button onClick={() => openPanel("equipment")} className="text-[12px] font-semibold text-[#2563EB] hover:underline shrink-0">View all equipment</button>}>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    {featLabels.length > 0 && <div className={`${CARD} p-4`}><p className="text-[12px] font-bold mb-2">On this vehicle <span className="text-[#94A3B8] font-semibold">{featLabels.length}</span></p><ul className="space-y-1.5">{featLabels.slice(0, 10).map((f) => <Check key={f}>{f}</Check>)}</ul></div>}
-                    {accessories.length > 0 && <div className={`${CARD} p-4`}><p className="text-[12px] font-bold mb-2">Available add-ons <span className="text-[#94A3B8] font-semibold">{accessories.length}</span></p><ul className="space-y-1.5">{accessories.slice(0, 10).map((a) => <li key={a} className="flex items-start gap-2 text-[13px] text-[#0F172A]"><Package className="w-3.5 h-3.5 text-[#2563EB] shrink-0 mt-0.5" />{a}</li>)}</ul></div>}
-                  </div>
-                </Section>
-              )}
-            </>
-          ) : <Empty>Equipment highlights appear here as the vehicle's data is decoded from its VIN.</Empty>}
-          <Disclaimer />
-        </>,
-      };
-    }
-
     case "overview": {
       const ks = listing.key_specs || {};
       const { groups } = featureGroups(listing);
@@ -1360,7 +1297,7 @@ function buildPanel(key: PassportPanelKey, d: PassportData, listing: VehicleList
         { icon: DollarSign, t: "Market Price", s: "How the price compares", fn: () => openPanel("market-price") },
         { icon: TrendingUp, t: "Market Demand", s: "Local shopper interest", fn: () => openPanel("market-demand") },
         { icon: Car, t: "Comparable Vehicles", s: "Similar listings nearby", fn: () => openPanel("comparable-vehicles") },
-        { icon: FileText, t: "Features & Specifications", s: "Equipment and specs", fn: () => openPanel("highlights") },
+        { icon: FileText, t: "Features & Equipment", s: "Packages, options, and full equipment", fn: () => openPanel("highlights") },
         { icon: Clock, t: "Price History", s: "Recent price changes", fn: () => openPanel("price-history") },
         { icon: Package, t: "Inventory Trends", s: "Local market availability", fn: () => openPanel("inventory-trend") },
         { icon: Gauge, t: "Price Confidence", s: "Why we're confident", fn: () => openPanel("price-confidence") },
@@ -1561,14 +1498,26 @@ function buildPanel(key: PassportPanelKey, d: PassportData, listing: VehicleList
       };
     }
 
+    // "highlights" is an alias — the two panels overlapped heavily, so one
+    // consolidated Features & Equipment panel serves every existing link.
+    case "highlights":
     case "equipment": {
-      const { ordered, featLabels, accessories } = featureGroups(listing);
+      const { groups, ordered, featLabels, accessories } = featureGroups(listing);
+      const ks = listing.key_specs || {};
+      const hs = d.highlights;
+      const reasons: string[] = [];
+      if (groups.Safety?.length) reasons.push("Advanced safety technology");
+      if (groups.Comfort?.length) reasons.push("Premium comfort and convenience");
+      if (groups.Technology?.length) reasons.push("Modern technology and connectivity");
+      if (/awd|4wd|4x4/i.test(String(ks.drivetrain || ""))) reasons.push("Confident all-weather capability");
+      if (/luxe|autograph|limited|platinum|premium|touring|signature|reserve|titanium|sensory|denali/i.test(listing.trim || "")) reasons.push("Luxury-grade appointments");
+      if (isGreat) reasons.push("Exceptional value versus the market");
       // Structured NeoVIN build sheet (packages / options / key features /
       // standard) — the tiered display. Older decodes without it fall back to
       // the flat categorized list.
       const sheet = readBuildSheet(listing);
       const equipCount = sheet ? sheet.keyFeatureCount + sheet.standardCount : featLabels.length;
-      const hasContent = !!sheet || featLabels.length > 0 || accessories.length > 0 || ordered.length > 0;
+      const hasContent = !!sheet || featLabels.length > 0 || accessories.length > 0 || ordered.length > 0 || hs.length > 0;
       // Domestic trucks can carry a dozen-plus packages — group them under type
       // headers once the list gets long, so the section stays scannable.
       const pkgGroups = sheet
@@ -1599,9 +1548,10 @@ function buildPanel(key: PassportPanelKey, d: PassportData, listing: VehicleList
         </details>
       );
       return {
-        title: sheet?.estValue ? `${fmt$(sheet.estValue)} in Factory Options on This Build` : "Equipment & Installed Options",
-        subtitle: sheet?.estValue ? "Everything this vehicle was built with, from the factory and dealership" : "Everything included on this vehicle from the factory and dealership",
+        title: sheet?.estValue ? `${fmt$(sheet.estValue)} in Factory Options on This Build` : "Features & Equipment",
+        subtitle: "Everything this vehicle was built with, from the factory and dealership",
         primary: { label: "Reserve This Vehicle", onClick: () => go("reserve") },
+        secondary: { label: "View full specifications", onClick: () => openPanel("key-specs") },
         footerQuestion: "Questions about the equipment?", specialistLabel: "Talk to a Product Specialist",
         body: <>
           <div className="md:hidden"><MHero tone="blue" icon={Package} eyebrow="Equipment & Options" title={`${equipCount} on this vehicle`} note={sheet?.packages.length ? `${sheet.packages.length} factory package${sheet.packages.length === 1 ? "" : "s"} installed` : accessories.length ? `${accessories.length} dealer add-on${accessories.length === 1 ? "" : "s"} available` : "Factory and dealer equipment"} /></div>
@@ -1619,6 +1569,18 @@ function buildPanel(key: PassportPanelKey, d: PassportData, listing: VehicleList
                   <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
                   <p className="text-[12px] text-amber-800 leading-snug">Equipment shown is typical for this trim. Confirm this vehicle's exact build with the dealer.</p>
                 </div>
+              )}
+              {/* Tier 1 — the highlight chips shoppers scan first */}
+              {hs.length > 0 && (
+                <Section title="Feature gallery">
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">{hs.map((h) => (
+                    <div key={h.key} className={`${CARD} p-4 flex flex-col items-center text-center gap-1.5`}>
+                      <span className="w-10 h-10 rounded-xl bg-blue-50 flex items-center justify-center"><Award className="w-5 h-5 text-[#2563EB]" /></span>
+                      <p className="text-[12px] font-bold leading-tight">{h.label}</p>
+                      <p className="text-[10px] text-[#94A3B8]">{h.sub}</p>
+                    </div>
+                  ))}</div>
+                </Section>
               )}
               {sheet ? (
                 <>
@@ -1693,6 +1655,11 @@ function buildPanel(key: PassportPanelKey, d: PassportData, listing: VehicleList
               {accessories.length > 0 && (
                 <Section title="Dealer accessories available" sub="Add-ons offered by the dealer — not factory-installed.">
                   <div className="space-y-2">{accessories.map((a) => <div key={a} className={`${CARD} p-3 flex items-center gap-2`}><Package className="w-4 h-4 text-[#2563EB] shrink-0" /><span className="text-[13px] text-[#0F172A]">{a}</span></div>)}</div>
+                </Section>
+              )}
+              {reasons.length > 0 && (
+                <Section title="Top reasons customers love this vehicle">
+                  <div className={`${CARD} p-4`}><ul className="space-y-2">{reasons.map((r) => <Check key={r}>{r}</Check>)}</ul></div>
                 </Section>
               )}
               <Section title="Build summary">

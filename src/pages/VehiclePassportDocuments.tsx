@@ -57,7 +57,7 @@ const fmtDate = (s?: string) => s ? new Date(s).toLocaleDateString("en-US", { mo
 const PASSPORT_NAV: { label: string; to?: string; panel?: string; active?: boolean }[] = [
   { label: "Overview", to: "" }, { label: "Market Intelligence", to: "market-price" }, { label: "Why This Is A Great Buy", to: "great-buy" },
   { label: "Vehicle History", to: "vehicle-history" }, { label: "Ownership Timeline", to: "ownership-timeline" }, { label: "Factory Warranty", to: "factory-warranty" },
-  { label: "What Owners Say", to: "owner-reviews" }, { label: "Vehicle Highlights", panel: "highlights" }, { label: "Specifications", panel: "key-specs" },
+  { label: "What Owners Say", to: "owner-reviews" }, { label: "Features & Equipment", panel: "highlights" }, { label: "Specifications", panel: "key-specs" },
   { label: "Why Buy From This Dealership?", to: "dealer" }, { label: "Documents", to: "documents", active: true },
 ];
 
