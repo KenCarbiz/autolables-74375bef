@@ -11,11 +11,12 @@ import { supabase } from "@/integrations/supabase/client";
 import { type VehicleListing } from "@/hooks/useVehicleListing";
 import { usePublicListing } from "@/hooks/usePublicListing";
 import { formatPhone } from "@/components/addendum/CustomerInfoSection";
-import { trackLeadSubmitted } from "@/lib/engagement/customerEngagement";
+import { trackLeadSubmitted, trackCustomerEngagement } from "@/lib/engagement/customerEngagement";
 import { estimateAffordability, DEFAULT_APR_PERCENT } from "@/lib/affordability";
 import Logo from "@/components/brand/Logo";
 import { derivePassport, fmt$, type PassportData } from "@/lib/passportV2Data";
 import { listingGallery, listingHero } from "@/lib/photos";
+import { MOCK_LISTING } from "./VehiclePassportV3";
 
 // ──────────────────────────────────────────────────────────────
 // VehiclePassportV2Detail — /passport-v2/:vehicleSlug/:section
@@ -250,10 +251,275 @@ const SectionHeading = ({ icon: Icon, title, subtitle }: { icon: React.ElementTy
   </div>
 );
 
+// ── Reserve experience — a premium two-column reservation checkout ──
+// Left: guided form (3-step trust row, labeled fields, contact method +
+// timing intent, inline validation, what-happens-next). Right: sticky
+// vehicle confidence card. Same leads-table wiring as LeadForm; the
+// method/timing context rides in notes so no schema change is needed.
+
+// Reserve analytics ride the existing engagement event vocabulary; the
+// specific reserve_* event name travels in metadata.event.
+const trackReserve = (listing: VehicleListing, event: string, extra: Record<string, unknown> = {}) =>
+  trackCustomerEngagement({
+    tenantId: listing.tenant_id, storeId: listing.store_id, vehicleId: listing.id, vin: listing.vin,
+    source: "passport", surface: "lead_form",
+    eventType: event === "reserve_page_viewed" ? "lead_form_opened" : event.endsWith("_clicked") ? "cta_clicked" : "engagement_ping",
+    metadata: { event, ...extra },
+  });
+
+const RESERVE_STEPS = ["Submit Request", "Dealer Confirms Availability", "Vehicle Held For You"];
+const RESERVE_TIMINGS = ["Today", "This week", "Just checking availability"];
+const CONTACT_METHODS: { key: string; label: string; icon: React.ElementType }[] = [
+  { key: "call", label: "Call", icon: Phone },
+  { key: "text", label: "Text", icon: MessageSquare },
+  { key: "email", label: "Email", icon: Send },
+];
+
+const reserveField = "w-full border rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500";
+
+const ReserveExperience = ({ listing, d, navigate }: { listing: VehicleListing; d: PassportData; navigate: ReturnType<typeof useNavigate> }) => {
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [phone, setPhone] = useState("");
+  const [method, setMethod] = useState<string | null>(null);
+  const [timing, setTiming] = useState<string | null>(null);
+  const [message, setMessage] = useState("");
+  const [sending, setSending] = useState(false);
+  const [sent, setSent] = useState(false);
+  const [errors, setErrors] = useState<{ name?: string; contact?: string; email?: string }>({});
+  const [started, setStarted] = useState(false);
+
+  const isPreview = typeof window !== "undefined" && new URLSearchParams(window.location.search).has("preview");
+  useEffect(() => { if (!isPreview) trackReserve(listing, "reserve_page_viewed"); }, [listing, isPreview]);
+  const markStarted = () => { if (!started) { setStarted(true); if (!isPreview) trackReserve(listing, "reserve_form_started"); } };
+
+  const modelName = (listing.ymm || "").replace(/^\d{4}\s*/, "").trim() || "Vehicle";
+  const heroSrc = listingHero(listing);
+  const stockNo = (() => { const s = (listing.mc_attributes as Record<string, unknown> | null)?.stock_no; return s ? String(s) : null; })();
+
+  const q = isPreview ? "?preview=1" : "";
+  const goBack = () => { if (!isPreview) trackReserve(listing, "back_to_passport_clicked"); navigate(`/v/${listing.slug}${q}`); };
+  const goTrade = () => { if (!isPreview) trackReserve(listing, "trade_value_clicked"); navigate(`/v/${listing.slug}/trade${q}`); };
+
+  const submit = async () => {
+    const errs: typeof errors = {};
+    if (!name.trim()) errs.name = "Enter your full name.";
+    if (!email.trim() && !phone.trim()) errs.contact = "Add a phone number or email so the dealership can reach you.";
+    if (email.trim() && !/^\S+@\S+\.\S+$/.test(email.trim())) errs.email = "That email doesn't look right.";
+    setErrors(errs);
+    if (Object.keys(errs).length) return;
+    // The sample passport must never write real leads or page a dealer.
+    if (isPreview) { setSent(true); window.scrollTo({ top: 0, behavior: "smooth" }); return; }
+    setSending(true);
+    try {
+      let src = "website";
+      let zip = "";
+      try {
+        if (sessionStorage.getItem("al_visit_src") === "qr") src = "qr_scan";
+        zip = sessionStorage.getItem("al_zip") || "";
+      } catch { /* storage unavailable */ }
+      const extras = [
+        method ? `Prefers ${method}` : "",
+        timing ? `Timing: ${timing}` : "",
+        stockNo ? `Stock ${stockNo}` : "",
+        zip ? `ZIP ${zip}` : "",
+        "via vehicle_passport_reserve_page",
+      ].filter(Boolean).join(" · ");
+      const routing = (listing as unknown as { contact_routing?: Record<string, unknown> }).contact_routing || null;
+      const basePayload = {
+        store_id: listing.store_id, name: name.trim(), email: email.trim() || "", phone: phone.trim() || "",
+        vehicle_interest: `${listing.ymm || "Vehicle"} (Reserve Vehicle)`,
+        vehicle_vin: listing.vin, source: src, status: "new",
+        notes: `[intent=reserve] Passport V2 — Reserve Vehicle · ${extras}${message.trim() ? `: ${message.trim()}` : ""}`,
+      };
+      const routedPayload = {
+        ...basePayload,
+        sub_source: "reserve_vehicle",
+        routing: routing ? {
+          source: "customer_passport",
+          routingTargetType: routing.routingTargetType ?? null,
+          routingTargetId: routing.routingTargetId ?? null,
+          routingReason: routing.routingReason ?? null,
+          displayMode: routing.displayMode ?? null,
+          afterHours: routing.afterHours ?? false,
+        } : null,
+      };
+      type LeadsTable = { from: (t: string) => { insert: (r: unknown) => Promise<{ error: unknown }> } };
+      let insErr = (await (supabase as unknown as LeadsTable).from("leads").insert(routedPayload)).error;
+      if (insErr) insErr = (await (supabase as unknown as LeadsTable).from("leads").insert(basePayload)).error;
+      if (insErr) throw insErr;
+      trackLeadSubmitted({ storeId: listing.store_id, vehicleId: listing.id, vin: listing.vin, source: src === "qr_scan" ? "window_sticker_qr" : "passport", metadata: { intent: "reserve", event: "reserve_form_submitted", contact_method: method, timing, routing_target_type: (routing?.routingTargetType as string) ?? null } });
+      supabase.functions.invoke("lead-alert", {
+        body: { slug: listing.slug, vin: listing.vin, intent: "reserve", name: name.trim(), phone: phone.trim() || null, email: email.trim() || null, source: src, sub_source: "reserve_vehicle" },
+      }).catch(() => { /* alert failure never blocks the shopper */ });
+      trackReserve(listing, "reserve_form_success");
+      setSent(true);
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    } catch {
+      trackReserve(listing, "reserve_form_error");
+      toast.error("Couldn't send — please call the dealer directly");
+    } finally { setSending(false); }
+  };
+
+  // Sticky vehicle confidence card (right rail on desktop).
+  const summaryCard = (compact = false) => (
+    <Card className={compact ? "p-3" : "p-5"}>
+      {compact ? (
+        <div className="flex items-center gap-3">
+          {heroSrc && <img src={heroSrc} alt="" className="w-16 h-12 rounded-lg object-cover shrink-0" />}
+          <div className="min-w-0 flex-1">
+            <p className="text-[13px] font-bold leading-tight truncate">{listing.ymm}{listing.trim ? ` ${listing.trim}` : ""}</p>
+            <p className="text-[15px] font-extrabold text-[#2563EB] leading-tight">{d.price != null ? fmt$(d.price) : ""}</p>
+          </div>
+          <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-full px-2 py-0.5 shrink-0">Ready to Reserve</span>
+        </div>
+      ) : (
+        <>
+          <div className="rounded-xl overflow-hidden bg-slate-100 aspect-[16/10] flex items-center justify-center">
+            {heroSrc ? <img src={heroSrc} alt={listing.ymm ?? "Vehicle"} className="w-full h-full object-cover" /> : <Car className="w-8 h-8 text-slate-300" />}
+          </div>
+          <div className="flex items-start justify-between gap-2 mt-3">
+            <p className="text-[15px] font-bold leading-tight">{listing.ymm}{listing.trim ? ` ${listing.trim}` : ""}</p>
+            <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-full px-2 py-0.5 shrink-0 mt-0.5">Ready to Reserve</span>
+          </div>
+          {d.price != null && <p className="text-[24px] font-extrabold tracking-tight text-[#2563EB] mt-1">{fmt$(d.price)}</p>}
+          <div className="mt-2 space-y-1 text-[12px] text-slate-500">
+            {listing.mileage != null && <p>{listing.mileage.toLocaleString()} miles</p>}
+            {listing.vin && <p>VIN {listing.vin}</p>}
+            {stockNo && <p>Stock #{stockNo}</p>}
+            {d.dealerName && <p className="font-semibold text-slate-700">{d.dealerName}</p>}
+          </div>
+          <ul className="mt-4 space-y-2 border-t border-[#F1F5F9] pt-4">
+            {["Fully refundable reservation request", "No online payment required", "Dealer-confirmed availability", "Linked to this exact Vehicle Passport"].map((b) => (
+              <li key={b} className="flex items-start gap-2 text-[12.5px] text-slate-700"><CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0 mt-0.5" />{b}</li>
+            ))}
+          </ul>
+          <div className="mt-4 space-y-2">
+            <button onClick={goBack} className="w-full h-11 rounded-xl border border-[#E6E8EC] text-[13px] font-semibold inline-flex items-center justify-center gap-1.5 hover:border-[#2563EB]"><ChevronLeft className="w-4 h-4" /> Back to Vehicle Passport</button>
+            <button onClick={goTrade} className="w-full h-11 rounded-xl border-2 border-[#2563EB] text-[#2563EB] text-[13px] font-bold inline-flex items-center justify-center gap-1.5"><GaugeIcon className="w-4 h-4" /> Get Trade Value</button>
+          </div>
+        </>
+      )}
+    </Card>
+  );
+
+  if (sent) return (
+    <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_360px] gap-5 items-start">
+      <Card className="p-8 text-center">
+        <CheckCircle2 className="w-14 h-14 text-emerald-500 mx-auto mb-3" />
+        <h1 className="text-[24px] font-extrabold tracking-tight">Reservation Request Sent</h1>
+        <p className="text-[14px] text-slate-500 mt-2 max-w-md mx-auto">The dealership has received your request and will confirm availability shortly.</p>
+        <div className="mt-5 mx-auto max-w-sm rounded-xl border border-[#E6E8EC] bg-slate-50 p-4 text-left">
+          <p className="text-[11px] font-bold uppercase tracking-wide text-slate-400 mb-2">We'll reach you at</p>
+          <p className="text-[14px] font-bold text-slate-900">{name}</p>
+          {phone && <p className="text-[13px] text-slate-600 mt-0.5">{phone}</p>}
+          {email && <p className="text-[13px] text-slate-600 mt-0.5">{email}</p>}
+          {(method || timing) && <p className="text-[12px] text-slate-500 mt-1.5">{[method ? `Prefers ${method}` : null, timing].filter(Boolean).join(" · ")}</p>}
+        </div>
+        <div className="flex flex-col sm:flex-row gap-2 justify-center mt-6">
+          <button onClick={goBack} className="h-11 px-5 rounded-xl bg-[#2563EB] text-white text-sm font-bold inline-flex items-center justify-center gap-2"><ChevronLeft className="w-4 h-4" /> Back to Vehicle Passport</button>
+          {d.dealerPhone && <a href={`tel:${d.dealerPhone.replace(/[^\d+]/g, "")}`} className="h-11 px-5 rounded-xl border border-slate-200 text-sm font-bold text-slate-700 inline-flex items-center justify-center gap-2"><Phone className="w-4 h-4" /> Call Dealer</a>}
+          {d.dealerPhone && <a href={`sms:${d.dealerPhone.replace(/[^\d+]/g, "")}`} className="h-11 px-5 rounded-xl border border-slate-200 text-sm font-bold text-slate-700 inline-flex items-center justify-center gap-2"><MessageSquare className="w-4 h-4" /> Text Dealer</a>}
+        </div>
+      </Card>
+      <div className="hidden lg:block lg:sticky lg:top-[72px]">{summaryCard()}</div>
+    </div>
+  );
+
+  return (
+    <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_360px] gap-5 items-start">
+      <div className="space-y-4 min-w-0">
+        {/* Compact vehicle strip stays visible on mobile without pushing the form down. */}
+        <div className="lg:hidden">{summaryCard(true)}</div>
+
+        <Card className="p-5 sm:p-6">
+          <h1 className="text-[22px] sm:text-[24px] font-extrabold tracking-tight leading-tight">Reserve This {modelName}</h1>
+          <p className="text-[13.5px] text-slate-500 mt-1.5">Submit your reservation request and the dealership will confirm availability before placing this vehicle on hold. No payment is collected online.</p>
+
+          <div className="grid grid-cols-3 gap-2 mt-5">
+            {RESERVE_STEPS.map((s, i) => (
+              <div key={s} className="rounded-xl border border-blue-100 bg-blue-50/50 px-2 py-2.5 text-center">
+                <span className="w-6 h-6 rounded-full bg-[#2563EB] text-white text-[12px] font-bold inline-flex items-center justify-center">{i + 1}</span>
+                <p className="text-[11px] font-semibold text-[#1E3A8A] mt-1.5 leading-tight">{s}</p>
+              </div>
+            ))}
+          </div>
+
+          <div className="mt-5 space-y-4" onInput={markStarted}>
+            <div>
+              <label htmlFor="rsv-name" className="block text-[12px] font-semibold text-slate-600 mb-1">Full Name *</label>
+              <input id="rsv-name" value={name} onChange={(e) => setName(e.target.value)} autoComplete="name" placeholder="Alex Morgan" aria-invalid={!!errors.name} aria-describedby={errors.name ? "rsv-name-err" : undefined} className={`${reserveField} ${errors.name ? "border-red-300" : "border-slate-200"}`} />
+              {errors.name && <p id="rsv-name-err" className="text-[12px] text-red-600 mt-1">{errors.name}</p>}
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label htmlFor="rsv-email" className="block text-[12px] font-semibold text-slate-600 mb-1">Email Address</label>
+                <input id="rsv-email" value={email} onChange={(e) => setEmail(e.target.value)} type="email" autoComplete="email" inputMode="email" placeholder="alex@example.com" aria-invalid={!!errors.email} aria-describedby={errors.email ? "rsv-email-err" : undefined} className={`${reserveField} ${errors.email ? "border-red-300" : "border-slate-200"}`} />
+                {errors.email && <p id="rsv-email-err" className="text-[12px] text-red-600 mt-1">{errors.email}</p>}
+              </div>
+              <div>
+                <label htmlFor="rsv-phone" className="block text-[12px] font-semibold text-slate-600 mb-1">Mobile Phone</label>
+                <input id="rsv-phone" value={phone} onChange={(e) => setPhone(formatPhone(e.target.value))} type="tel" autoComplete="tel" inputMode="tel" placeholder="(555) 123-4567" aria-invalid={!!errors.contact} aria-describedby={errors.contact ? "rsv-contact-err" : undefined} className={`${reserveField} ${errors.contact ? "border-red-300" : "border-slate-200"}`} />
+                {errors.contact && <p id="rsv-contact-err" className="text-[12px] text-red-600 mt-1">{errors.contact}</p>}
+              </div>
+            </div>
+            <div>
+              <p className="text-[12px] font-semibold text-slate-600 mb-1.5">Preferred Contact Method</p>
+              <div className="grid grid-cols-3 gap-2">
+                {CONTACT_METHODS.map(({ key, label, icon: Icon }) => (
+                  <button key={key} type="button" aria-pressed={method === key} onClick={() => { setMethod(key); markStarted(); if (!isPreview) trackReserve(listing, "reserve_contact_method_selected", { method: key }); }} className={`h-11 rounded-xl text-[13px] font-semibold border inline-flex items-center justify-center gap-1.5 transition-colors ${method === key ? "border-[#2563EB] bg-blue-50 text-[#2563EB]" : "border-slate-200 text-slate-600 hover:border-slate-300"}`}>
+                    <Icon className="w-4 h-4" /> {label}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div>
+              <p className="text-[12px] font-semibold text-slate-600 mb-1.5">When are you looking to move forward?</p>
+              <div className="flex flex-wrap gap-2">
+                {RESERVE_TIMINGS.map((t) => (
+                  <button key={t} type="button" aria-pressed={timing === t} onClick={() => { setTiming(t); markStarted(); if (!isPreview) trackReserve(listing, "reserve_timing_selected", { timing: t }); }} className={`h-10 px-4 rounded-xl text-[13px] font-semibold border transition-colors ${timing === t ? "border-[#2563EB] bg-blue-50 text-[#2563EB]" : "border-slate-200 text-slate-600 hover:border-slate-300"}`}>{t}</button>
+                ))}
+              </div>
+            </div>
+            <div>
+              <label htmlFor="rsv-msg" className="block text-[12px] font-semibold text-slate-600 mb-1">Message to Dealer <span className="font-normal text-slate-400">(optional)</span></label>
+              <textarea id="rsv-msg" value={message} onChange={(e) => setMessage(e.target.value)} rows={3} placeholder="Anything you'd like the dealership to know?" className={`${reserveField} border-slate-200 resize-none`} />
+            </div>
+          </div>
+
+          <button onClick={submit} disabled={sending} className="w-full h-12 mt-5 bg-[#2563EB] hover:bg-[#1d4fd7] disabled:opacity-60 text-white font-bold rounded-xl flex items-center justify-center gap-2 transition-colors">
+            {sending ? <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" /> : <><BadgeCheck className="w-5 h-5" /> Request My Reservation</>}
+          </button>
+          <p className="text-[12px] text-slate-500 text-center mt-3">No payment collected. A dealership representative will confirm availability before placing the vehicle on hold.</p>
+          <p className="text-[11px] text-slate-400 text-center mt-1.5 inline-flex w-full items-center justify-center gap-1"><Lock className="w-3 h-3 text-emerald-600" /> Secure request · No online payment · Dealer-confirmed availability</p>
+        </Card>
+
+        <Card className="p-5">
+          <p className="text-[15px] font-bold text-slate-900 mb-3">What happens next?</p>
+          <div className="space-y-3">
+            {[
+              ["We confirm availability", "The dealership verifies the vehicle is still available."],
+              ["We contact you quickly", "A team member reaches out by phone, text, or email."],
+              ["Your request is documented", "Your reservation request is tied directly to this vehicle."],
+            ].map(([t, s], i) => (
+              <div key={t} className="flex items-start gap-3">
+                <span className="w-7 h-7 rounded-full bg-blue-50 text-[#2563EB] text-[13px] font-bold flex items-center justify-center shrink-0">{i + 1}</span>
+                <div><p className="text-[13px] font-bold text-slate-800">{t}</p><p className="text-[12.5px] text-slate-500">{s}</p></div>
+              </div>
+            ))}
+          </div>
+        </Card>
+      </div>
+
+      <div className="hidden lg:block lg:sticky lg:top-[72px]">{summaryCard()}</div>
+    </div>
+  );
+};
+
 // ── Section registry ──────────────────────────────────────────
 type SectionRender = (ctx: { d: PassportData; listing: VehicleListing; slug: string; navigate: ReturnType<typeof useNavigate> }) => React.ReactNode;
 
-const SECTIONS: Record<string, { title: string; render: SectionRender }> = {
+const SECTIONS: Record<string, { title: string; render: SectionRender; wide?: boolean; hideCrossCta?: boolean; headerPill?: string }> = {
   "verification-report": {
     title: "Verification Report",
     render: ({ d }) => (
@@ -691,7 +957,10 @@ const SECTIONS: Record<string, { title: string; render: SectionRender }> = {
   },
   "reserve": {
     title: "Reserve This Vehicle",
-    render: ({ listing }) => (<><SectionHeading icon={BadgeCheck} title="Reserve This Vehicle" subtitle="Secure it today with a refundable deposit." /><Card className="p-4 mb-4 !bg-blue-50 !border-blue-100"><p className="text-[13px] text-slate-700">Submit your details and the dealership will reach out to arrange a fully refundable hold on this vehicle. No payment is collected here.</p></Card><LeadForm listing={listing} intent="reserve" label="Reserve Vehicle" cta="Request to reserve" /></>),
+    wide: true,
+    hideCrossCta: true,
+    headerPill: "Ready to Reserve",
+    render: ({ listing, d, navigate }) => <ReserveExperience listing={listing} d={d} navigate={navigate} />,
   },
   "test-drive": {
     title: "Schedule a Test Drive",
@@ -834,7 +1103,10 @@ const VehiclePassportV2Detail = () => {
   const base = location.pathname.startsWith("/v/") ? "v"
     : location.pathname.startsWith("/passport-v3") ? "passport-v3" : "passport-v2";
   const navigate = useNavigate();
-  const { listing, loading, notFound } = usePublicListing(vehicleSlug);
+  // The sample passport (/v/demo?preview=1) links into these detail pages;
+  // without preview support they dead-end at "Vehicle unavailable".
+  const isPreview = typeof window !== "undefined" && new URLSearchParams(window.location.search).has("preview");
+  const { listing, loading, notFound } = usePublicListing(vehicleSlug, { preview: isPreview, previewData: MOCK_LISTING as unknown as VehicleListing });
 
   // Old shared links to the V2-era features/specifications pages redirect to
   // the passport's richer slide-out panels (deep-linked via ?panel=).
@@ -848,7 +1120,7 @@ const VehiclePassportV2Detail = () => {
   const d = useMemo(() => (listing ? derivePassport(listing) : null), [listing]);
   const def = section && !shimPanel ? SECTIONS[section] : undefined;
 
-  const back = () => navigate(`/${base}/${vehicleSlug}`);
+  const back = () => navigate(`/${base}/${vehicleSlug}${isPreview ? "?preview=1" : ""}`);
 
   if (loading || shimPanel) return <div className="min-h-screen flex items-center justify-center bg-[#F6F7F9]"><div className="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" /></div>;
 
@@ -865,6 +1137,7 @@ const VehiclePassportV2Detail = () => {
   );
 
   const heroSrc = listingHero(listing);
+  const widthCls = def.wide ? "max-w-[1160px]" : "max-w-[760px]";
 
   return (
     <div className="min-h-screen bg-[#F6F7F9] text-[#0F172A]" style={{ fontFamily: "Inter, -apple-system, BlinkMacSystemFont, sans-serif" }}>
@@ -872,25 +1145,29 @@ const VehiclePassportV2Detail = () => {
 
       {/* Sticky top header — back + vehicle context */}
       <header className="sticky top-0 z-40 bg-white/95 backdrop-blur border-b border-[#E6E8EC]">
-        <div className="mx-auto max-w-[760px] h-14 px-3 flex items-center gap-3">
+        <div className={`mx-auto ${widthCls} h-14 px-3 flex items-center gap-3`}>
           <button onClick={back} aria-label="Back to passport" className="w-9 h-9 rounded-full hover:bg-slate-100 flex items-center justify-center shrink-0"><ChevronLeft className="w-5 h-5" /></button>
           {heroSrc && <img src={heroSrc} alt="" className="w-9 h-9 rounded-lg object-cover shrink-0" />}
           <div className="min-w-0 flex-1"><p className="text-[14px] font-bold leading-tight truncate">{listing.ymm}{listing.trim ? ` ${listing.trim}` : ""}</p>{d.price != null && <p className="text-[12px] font-bold text-[#2563EB] leading-tight">{fmt$(d.price)}</p>}</div>
+          {def.headerPill && <span className="hidden sm:inline-flex text-[11px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-full px-2.5 py-1 shrink-0">{def.headerPill}</span>}
         </div>
       </header>
 
-      <div className="mx-auto max-w-[760px] px-4 sm:px-6 py-5 pb-[calc(80px+env(safe-area-inset-bottom))] space-y-4">
+      <div className={`mx-auto ${widthCls} px-4 sm:px-6 py-5 pb-[calc(80px+env(safe-area-inset-bottom))] space-y-4`}>
         {def.render({ d, listing, slug: vehicleSlug || "", navigate })}
 
-        {/* Cross-CTA + back to passport */}
-        <Card className="p-5">
-          <p className="text-[13px] font-semibold text-slate-700 mb-3">Ready to move forward?</p>
-          <div className="grid grid-cols-2 gap-2.5">
-            <button onClick={() => navigate(`/${base}/${vehicleSlug}/reserve`)} className="h-11 rounded-xl bg-[#2563EB] text-white text-[13px] font-bold inline-flex items-center justify-center gap-1.5"><BadgeCheck className="w-4 h-4" /> Reserve</button>
-            <button onClick={() => navigate(`/${base}/${vehicleSlug}/trade`)} className="h-11 rounded-xl border-2 border-[#2563EB] text-[#2563EB] text-[13px] font-bold inline-flex items-center justify-center gap-1.5"><GaugeIcon className="w-4 h-4" /> Trade value</button>
-          </div>
-          <button onClick={back} className="w-full mt-2.5 h-11 rounded-xl border border-[#E6E8EC] text-[13px] font-semibold inline-flex items-center justify-center gap-1.5 hover:border-[#2563EB]"><ChevronLeft className="w-4 h-4" /> Back to Vehicle Passport</button>
-        </Card>
+        {/* Cross-CTA + back to passport (suppressed on pages that carry
+            their own primary action, like the reserve checkout) */}
+        {!def.hideCrossCta && (
+          <Card className="p-5">
+            <p className="text-[13px] font-semibold text-slate-700 mb-3">Ready to move forward?</p>
+            <div className="grid grid-cols-2 gap-2.5">
+              <button onClick={() => navigate(`/${base}/${vehicleSlug}/reserve`)} className="h-11 rounded-xl bg-[#2563EB] text-white text-[13px] font-bold inline-flex items-center justify-center gap-1.5"><BadgeCheck className="w-4 h-4" /> Reserve</button>
+              <button onClick={() => navigate(`/${base}/${vehicleSlug}/trade`)} className="h-11 rounded-xl border-2 border-[#2563EB] text-[#2563EB] text-[13px] font-bold inline-flex items-center justify-center gap-1.5"><GaugeIcon className="w-4 h-4" /> Trade value</button>
+            </div>
+            <button onClick={back} className="w-full mt-2.5 h-11 rounded-xl border border-[#E6E8EC] text-[13px] font-semibold inline-flex items-center justify-center gap-1.5 hover:border-[#2563EB]"><ChevronLeft className="w-4 h-4" /> Back to Vehicle Passport</button>
+          </Card>
+        )}
 
         <footer className="pt-2 pb-4">
           <div className="flex items-center justify-center gap-2 text-[12px] text-slate-500"><Lock className="w-3.5 h-3.5 text-emerald-600" /> Secure &amp; Private · 100% Free · <Logo variant="full" size={16} /></div>
