@@ -243,6 +243,9 @@ export interface PassportData {
   highlights: Highlight[];
   specRows: [string, string | null | undefined][];
   keySpecs: [string, string][];
+  // Official EPA fuel economy (fueleconomy.gov) when the epa-fuel-economy
+  // function has matched this listing. Public-domain federal data.
+  epa: { city: number | null; highway: number | null; combined: number | null; annualFuelCost: number | null; ghgScore: number | null; rangeMiles: number | null; fuelType: string | null } | null;
   overview: string;
   whyBuy: string[];
   // Reviews
@@ -490,12 +493,27 @@ export const derivePassport = (listing: VehicleListing): PassportData => {
   ];
 
   // Structured key specs (goal's "Key Specifications" card) — real values only.
+  const epaRaw = (listing as unknown as { epa_economy?: Record<string, unknown> | null }).epa_economy || null;
+  const epa = epaRaw && (epaRaw.combined != null || epaRaw.city != null) ? {
+    city: (epaRaw.city as number) ?? null,
+    highway: (epaRaw.highway as number) ?? null,
+    combined: (epaRaw.combined as number) ?? null,
+    annualFuelCost: (epaRaw.annualFuelCost as number) ?? null,
+    ghgScore: (epaRaw.ghgScore as number) ?? null,
+    rangeMiles: (epaRaw.rangeMiles as number) ?? null,
+    fuelType: (epaRaw.fuelType as string) ?? null,
+  } : null;
+
   const keySpecs = ([
     ["Engine", ks.engine],
     ["Horsepower", mc.horsepower ? `${mc.horsepower} HP` : null],
     ["Transmission", ks.transmission],
     ["Drivetrain", ks.drivetrain],
-    ["Fuel Economy", ks.mpg_city && ks.mpg_hwy ? `${ks.mpg_city}/${ks.mpg_hwy} MPG` : ks.fuel || null],
+    // Official EPA figures win over feed-provided MPG when available.
+    ["Fuel Economy", epa && epa.city && epa.highway
+      ? `${epa.city}/${epa.highway} MPG (EPA)`
+      : ks.mpg_city && ks.mpg_hwy ? `${ks.mpg_city}/${ks.mpg_hwy} MPG` : ks.fuel || null],
+    ["EPA Range", epa?.rangeMiles ? `${epa.rangeMiles} mi` : null],
     ["Exterior Color", ks.exterior_color],
     ["Interior Color", ks.interior_color],
     ["Seats", (mc.seating as string | number) ? `${mc.seating}-Passenger` : null],
@@ -562,7 +580,7 @@ export const derivePassport = (listing: VehicleListing): PassportData => {
     warranty, warrantyStr,
     oemWarranty: ((listing as unknown as { oem_warranty?: OemWarrantyView }).oem_warranty) || null,
     confScore, confLabel, confDeductions, verifiedBy, verifyRows,
-    highlights, specRows, keySpecs, overview, whyBuy,
+    highlights, specRows, keySpecs, epa, overview, whyBuy,
     reviewRating: (dealer.review_rating as number) ?? null,
     reviewCount: (dealer.review_count as number) ?? null,
     reviewUrl: (dealer.review_url as string) || (dealer.google_url as string) || (dealer.reviews_url as string) || "",

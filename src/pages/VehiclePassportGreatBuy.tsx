@@ -369,10 +369,13 @@ const VehiclePassportGreatBuy = () => {
     { k: "Ownership Score", v: ownVal != null ? `${ownVal}/100` : "—", m: ownVal != null ? "Varies" : "", a: isNew || d.ownerCount === 1 ? { text: "Stronger history", good: true } : null },
   ].filter((r) => r.m && r.v !== "—");
 
-  // Ownership cost estimate — transparent model, clearly labelled (not a vehicle-specific fact).
+  // Ownership cost estimate — transparent model, clearly labelled (not a
+  // vehicle-specific fact). Fuel uses the official EPA annual fuel cost for
+  // this vehicle when fueleconomy.gov has matched it; the rest are averages.
   const base = d.price ?? d.marketAvg ?? 45000;
   const lux = premium || base > 45000;
-  const annual = { Fuel: lux ? 2500 : 2100, Insurance: Math.round((base * 0.032) / 100) * 100, Maintenance: lux ? 1200 : 800, Repairs: lux ? 700 : 500, Registration: 320 };
+  const epaFuel = d.epa?.annualFuelCost ?? null;
+  const annual = { Fuel: epaFuel ?? (lux ? 2500 : 2100), Insurance: Math.round((base * 0.032) / 100) * 100, Maintenance: lux ? 1200 : 800, Repairs: lux ? 700 : 500, Registration: 320 };
   const annualTotal = Object.values(annual).reduce((a, b) => a + b, 0);
   const fiveYear = annualTotal * 5;
   const perMonth = Math.round(fiveYear / 60);
@@ -597,7 +600,7 @@ const VehiclePassportGreatBuy = () => {
 
         {/* Cost & comparables */}
         <div className="grid grid-cols-1 lg:grid-cols-[1fr_1.4fr] gap-5 items-start">
-          <Panel title="5-Year Ownership Cost Estimate" sub="Estimate based on fuel, insurance, maintenance, repairs, and registration averages. Actual costs vary by driver, location, and usage.">
+          <Panel title="5-Year Ownership Cost Estimate" sub={`Estimate based on ${epaFuel ? "the official EPA annual fuel cost for this vehicle plus" : "fuel,"} insurance, maintenance, repairs, and registration averages. Actual costs vary by driver, location, and usage.`}>
             <div className="grid grid-cols-3 gap-2.5">
               {[[fmt$(annualTotal), "Annual Average"], [fmt$(fiveYear), "5-Year Total"], [fmt$(perMonth), "Monthly Average"]].map(([v, k]) => (
                 <div key={k} className="rounded-xl border border-[#E6E8EC] bg-slate-50/60 p-3 text-center"><p className="text-[16px] font-extrabold text-[#0F172A]">{v}</p><p className="text-[10.5px] text-[#64748B] mt-0.5">{k}</p></div>
@@ -905,7 +908,7 @@ const VehiclePassportGreatBuy = () => {
                 {pageHeader}
                 <PrintCard>
                   <PrintH>5-Year Ownership Cost Estimate</PrintH>
-                  <p className="text-[8.5px] text-[#64748B] mt-0.5">Estimate based on fuel, insurance, maintenance, repairs, and registration averages. Actual costs vary by driver, location, and usage.</p>
+                  <p className="text-[8.5px] text-[#64748B] mt-0.5">Estimate based on {epaFuel ? "the official EPA annual fuel cost for this vehicle plus" : "fuel,"} insurance, maintenance, repairs, and registration averages. Actual costs vary by driver, location, and usage.</p>
                   <div className="grid grid-cols-3 gap-2 mt-2.5">
                     {[[fmt$(annualTotal), "Annual Average"], [fmt$(fiveYear), "5-Year Total"], [fmt$(perMonth), "Monthly Average"]].map(([v, k]) => (
                       <div key={k} className="rounded-lg border border-[#E5E7EB] bg-slate-50/60 p-2 text-center"><p className="text-[12px] font-extrabold">{v}</p><p className="text-[8px] text-[#64748B] mt-0.5">{k}</p></div>
