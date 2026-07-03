@@ -7,8 +7,10 @@
 
 import { QRCodeSVG } from "qrcode.react";
 import type { SaturdaySticker } from "./types";
-import { AL_PRINT_ICONS, type AutoLabelsPrintIconKey } from "@/components/icons/AutoLabelsToolIcons";
-import { getEquipmentIcon } from "@/lib/equipmentIcons";
+import {
+  AutoLabelsAddendumIcon, resolveAddendumProductIcon, getAddendumIconColor,
+  type AddendumIconKey,
+} from "@/components/icons/AutoLabelsAddendumIcons";
 
 type Line = { name: string; price: string; description?: string };
 type Addendum = SaturdaySticker & { installed?: Line[]; upgrades?: Line[] };
@@ -25,17 +27,12 @@ const money = (n: string | number): string | null => {
   return `$${Math.round(v).toLocaleString()}`;
 };
 
-const PIcon = ({ k, size = 13, color = T.blue, accent }: { k: AutoLabelsPrintIconKey; size?: number; color?: string; accent?: string }) => {
-  const Icon = AL_PRINT_ICONS[k];
-  return (
-    <span style={{ color, ["--al-icon-accent" as string]: accent ?? color, display: "inline-flex" }}>
-      <Icon width={size} height={size} />
-    </span>
-  );
-};
+const PIcon = ({ k, size = 13, color = T.blue }: { k: AddendumIconKey; size?: number; color?: string }) => (
+  <AutoLabelsAddendumIcon iconKey={k} size={size} color={color} />
+);
 
 // Section header bar: colored label strip with a small status tag.
-const SectionBar = ({ icon, title, tag, bg, fg }: { icon: AutoLabelsPrintIconKey; title: string; tag?: string; bg: string; fg: string }) => (
+const SectionBar = ({ icon, title, tag, bg, fg }: { icon: AddendumIconKey; title: string; tag?: string; bg: string; fg: string }) => (
   <div className="flex items-center justify-between px-2.5 py-1.5 rounded-t-[10px]" style={{ background: bg }}>
     <span className="inline-flex items-center gap-1.5 text-[8px] font-black uppercase tracking-[0.16em]" style={{ color: fg }}>
       <PIcon k={icon} size={11} color={fg} /> {title}
@@ -59,7 +56,7 @@ export const SaturdayPremiumAddendum: React.FC<Props> = ({ data }) => {
   const line2 = words.slice(2).join(" ");
   const today = new Date().toLocaleDateString(undefined, { month: "2-digit", day: "2-digit", year: "numeric" });
 
-  const infoCell = (icon: AutoLabelsPrintIconKey, label: string, value: string | null) => (
+  const infoCell = (icon: AddendumIconKey, label: string, value: string | null) => (
     <div className="flex items-start gap-1.5 px-2 py-1.5">
       <span className="mt-0.5 shrink-0"><PIcon k={icon} size={12} /></span>
       <span className="min-w-0">
@@ -69,34 +66,34 @@ export const SaturdayPremiumAddendum: React.FC<Props> = ({ data }) => {
     </div>
   );
 
-  const lineRow = (l: Line, tone: "green" | "navy") => {
-    const EqIcon = getEquipmentIcon(l.name).icon;
+  const lineRow = (l: Line & { iconKey?: string }, tone: "green" | "purple") => {
+    const iconKey = resolveAddendumProductIcon(l.name, l.iconKey);
     const priceStr = money(l.price);
+    const ctx = tone === "green" ? "installed" : "upgrade";
+    const fg = getAddendumIconColor(iconKey, ctx);
     return (
       <div key={l.name} className="flex items-center gap-1.5 px-2.5 py-[3px] border-b last:border-b-0" style={{ borderColor: "#EDF2F8" }}>
-        <span className="flex h-[15px] w-[15px] items-center justify-center rounded-[4px] shrink-0" style={{ background: tone === "green" ? T.greenSoft : T.blueSoft }}>
-          {tone === "green"
-            ? <EqIcon width={10} height={10} style={{ color: T.green }} strokeWidth={2} />
-            : <PIcon k="upgrade" size={10} color={T.navy} accent={T.blue} />}
+        <span className="flex h-[15px] w-[15px] items-center justify-center rounded-[4px] shrink-0" style={{ background: tone === "green" ? T.greenSoft : "#F4ECFF" }}>
+          <AutoLabelsAddendumIcon iconKey={iconKey} size={10} color={fg} />
         </span>
         <span className="min-w-0 flex-1">
           <span className="block text-[8px] font-extrabold leading-tight" style={{ color: T.text }}>{l.name}</span>
           {l.description && <span className="block text-[6.4px] leading-tight" style={{ color: T.muted }}>{l.description}</span>}
         </span>
-        {priceStr && <span className="shrink-0 text-[8.5px] font-black" style={{ color: tone === "green" ? T.green : T.navy }}>{priceStr}</span>}
+        {priceStr && <span className="shrink-0 text-[8.5px] font-black" style={{ color: tone === "green" ? T.green : "#6D28D9" }}>{priceStr}</span>}
       </div>
     );
   };
 
-  const TRUST: { icon: AutoLabelsPrintIconKey; t: string; s: string }[] = [
-    { icon: "quality", t: "Quality Products", s: "Professionally installed for long-lasting protection" },
-    { icon: "install", t: "Expert Installation", s: "Factory-trained technicians you can trust" },
-    { icon: "value", t: "Added Value", s: "Enhances your driving experience and vehicle value" },
-    { icon: "peace", t: "Peace of Mind", s: "Backed by our warranty and support" },
+  const TRUST: { icon: AddendumIconKey; t: string; s: string }[] = [
+    { icon: "quality-products", t: "Quality Products", s: "Professionally installed for long-lasting protection" },
+    { icon: "expert-installation", t: "Expert Installation", s: "Factory-trained technicians you can trust" },
+    { icon: "added-value", t: "Added Value", s: "Enhances your driving experience and vehicle value" },
+    { icon: "peace-of-mind", t: "Peace of Mind", s: "Backed by our warranty and support" },
   ];
-  const FOOTER_BADGES: { icon: AutoLabelsPrintIconKey; t: string }[] = [
-    { icon: "ai", t: "AI Powered" }, { icon: "ftc", t: "FTC Compliant" },
-    { icon: "updates", t: "Real-Time Updates" }, { icon: "print", t: "Print Ready" },
+  const FOOTER_BADGES: { icon: AddendumIconKey; t: string }[] = [
+    { icon: "ai-powered", t: "AI Powered" }, { icon: "ftc-compliant", t: "FTC Compliant" },
+    { icon: "real-time-updates", t: "Real-Time Updates" }, { icon: "print-ready", t: "Print Ready" },
   ];
   const QR_BULLETS = ["Photos", "Service History", "Ownership Information", "Benefits", "Documents", "Protection Products"];
 
@@ -119,7 +116,7 @@ export const SaturdayPremiumAddendum: React.FC<Props> = ({ data }) => {
 
         {/* Passport badge + title block */}
         <div className="mt-2 inline-flex items-center gap-1.5">
-          <PIcon k="passport" size={12} accent={T.blue} color={T.navy} />
+          <AutoLabelsAddendumIcon iconKey="vehicle-passport" size={12} color={T.navy} />
           <span className="text-[7.5px] font-black uppercase tracking-[0.22em]" style={{ color: T.blue }}>Vehicle Passport™</span>
         </div>
         <h1 className="mt-1 text-[30px] font-black leading-none tracking-[-0.02em]" style={{ color: T.navy }}>ADDENDUM</h1>
@@ -129,10 +126,10 @@ export const SaturdayPremiumAddendum: React.FC<Props> = ({ data }) => {
 
         {/* Vehicle info grid */}
         <section className="mt-2 grid grid-cols-2 rounded-[10px] border" style={{ borderColor: T.border }}>
-          <div className="border-b border-r" style={{ borderColor: T.border }}>{infoCell("stock", "Stock Number", vehicle.stock || null)}</div>
+          <div className="border-b border-r" style={{ borderColor: T.border }}>{infoCell("stock-number", "Stock Number", vehicle.stock || null)}</div>
           <div className="border-b" style={{ borderColor: T.border }}>{infoCell("vin", "VIN", vehicle.vin || null)}</div>
           <div className="border-r" style={{ borderColor: T.border }}>{infoCell("date", "Date", today)}</div>
-          {infoCell("price", priceLabel, baseDisplay ?? "See Dealer")}
+          {infoCell("price-msrp", priceLabel, baseDisplay ?? "See Dealer")}
         </section>
 
         {/* QR block — upper third */}
@@ -145,7 +142,7 @@ export const SaturdayPremiumAddendum: React.FC<Props> = ({ data }) => {
             <div className="mt-1 grid grid-cols-2 gap-x-2 gap-y-[2px]">
               {QR_BULLETS.map((b) => (
                 <span key={b} className="inline-flex items-center gap-1 text-[6.6px] font-bold" style={{ color: T.text }}>
-                  <PIcon k="benefit" size={8} color={T.blue} /> {b}
+                  <AutoLabelsAddendumIcon iconKey="ftc-compliant" size={8} color={T.blue} /> {b}
                 </span>
               ))}
             </div>
@@ -154,7 +151,7 @@ export const SaturdayPremiumAddendum: React.FC<Props> = ({ data }) => {
 
         {/* Installed Equipment — green */}
         <section className="mt-2 rounded-[10px] border overflow-hidden" style={{ borderColor: "#BFE3CD" }}>
-          <SectionBar icon="install" title="Installed Equipment" tag="Included" bg={T.greenSoft} fg={T.green} />
+          <SectionBar icon="protection-products" title="Installed Equipment" tag="Included" bg={T.greenSoft} fg={T.green} />
           {installed.length ? installed.map((l) => lineRow(l, "green")) : (
             <div className="px-2.5 py-1.5 text-[7px] font-semibold" style={{ color: T.muted }}>No installed equipment configured.</div>
           )}
@@ -162,12 +159,12 @@ export const SaturdayPremiumAddendum: React.FC<Props> = ({ data }) => {
 
         {/* Included Benefits — blue */}
         <section className="mt-2 rounded-[10px] border overflow-hidden" style={{ borderColor: "#BBD8F5" }}>
-          <SectionBar icon="benefit" title="Included Benefits" bg={T.blueSoft} fg={T.blue} />
+          <SectionBar icon="benefits" title="Included Benefits" bg={T.blueSoft} fg={T.blue} />
           {benefits.length ? (
             <div className="px-2.5 py-1.5 grid grid-cols-1 gap-[3px]">
               {benefits.slice(0, 6).map((b) => (
                 <span key={b} className="inline-flex items-center gap-1.5 text-[7.6px] font-bold leading-tight" style={{ color: T.text }}>
-                  <PIcon k="benefit" size={10} color={T.blue} /> {b}
+                  <AutoLabelsAddendumIcon iconKey="ftc-compliant" size={10} color={T.blue} /> {b}
                 </span>
               ))}
             </div>
@@ -179,8 +176,8 @@ export const SaturdayPremiumAddendum: React.FC<Props> = ({ data }) => {
         {/* Available Upgrades — navy, NOT INSTALLED */}
         {upgrades.length > 0 && (
           <section className="mt-2 rounded-[10px] border overflow-hidden" style={{ borderColor: T.border }}>
-            <SectionBar icon="upgrade" title="Available Upgrades" tag="Not Installed" bg="#F2F5FA" fg={T.navy} />
-            {upgrades.map((l) => lineRow(l, "navy"))}
+            <SectionBar icon="remote-start" title="Available Upgrades" tag="Not Installed" bg="#F4ECFF" fg="#6D28D9" />
+            {upgrades.map((l) => lineRow(l, "purple"))}
           </section>
         )}
 
@@ -210,7 +207,7 @@ export const SaturdayPremiumAddendum: React.FC<Props> = ({ data }) => {
         <section className="mt-auto grid grid-cols-4 gap-1.5 pt-2">
           {TRUST.map((t) => (
             <div key={t.t} className="flex flex-col items-center text-center gap-0.5">
-              <PIcon k={t.icon} size={16} color={T.navy} accent={T.blue} />
+              <AutoLabelsAddendumIcon iconKey={t.icon} size={16} color={T.navy} />
               <span className="text-[6px] font-black uppercase tracking-wide leading-tight" style={{ color: T.navy }}>{t.t}</span>
               <span className="text-[5.4px] leading-[1.25]" style={{ color: T.muted }}>{t.s}</span>
             </div>
@@ -223,7 +220,7 @@ export const SaturdayPremiumAddendum: React.FC<Props> = ({ data }) => {
           <span className="flex items-center gap-2.5">
             {FOOTER_BADGES.map((b) => (
               <span key={b.t} className="flex flex-col items-center gap-[1px]">
-                <PIcon k={b.icon} size={10} color="#ffffff" accent="#9DBDF8" />
+                <AutoLabelsAddendumIcon iconKey={b.icon} size={10} variant="light" />
                 <span className="text-[4.8px] font-bold text-white/85 whitespace-nowrap">{b.t}</span>
               </span>
             ))}
