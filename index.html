@@ -18,18 +18,20 @@
     
     
     <meta property="og:url" content="https://www.autolabels.io/" />
-    <meta property="og:image" content="https://storage.googleapis.com/gpt-engineer-file-uploads/attachments/og-images/d423242c-cb75-41c2-9a5d-55c1380c4e28">
+    <meta property="og:image" content="https://www.autolabels.io/og-image.png">
     <meta property="og:site_name" content="AutoLabels.io" />
 
     <!-- Twitter -->
     <meta name="twitter:card" content="summary_large_image" />
     
     
-    <meta name="twitter:image" content="https://storage.googleapis.com/gpt-engineer-file-uploads/attachments/og-images/d423242c-cb75-41c2-9a5d-55c1380c4e28">
+    <meta name="twitter:image" content="https://www.autolabels.io/og-image.png">
 
-    <!-- Fonts -->
+    <!-- Fonts — loaded here (not via CSS @import) so the request isn't
+         chained behind the bundled stylesheet. -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;700;800&family=Barlow:wght@400;500;600&family=Inter:wght@400;500;600;700;800&display=swap">
 
     <!-- Structured data: Organization + WebSite -->
     <script type="application/ld+json">
@@ -50,19 +52,20 @@
         "url": "https://www.autolabels.io"
       }
     </script>
+    <!-- FAQPage markup mirrors the VISIBLE FAQ on the landing page (Google
+         requires the two to match). Update both together. -->
     <script type="application/ld+json">
       {
         "@context": "https://schema.org",
         "@type": "FAQPage",
         "mainEntity": [
-          {"@type":"Question","name":"Do you handle the FTC Buyers Guide for used cars?","acceptedAnswer":{"@type":"Answer","text":"Yes — bilingual (English + Spanish), As-Is / Implied / Warranty, 16 CFR 455 compliant."}},
-          {"@type":"Question","name":"What happened to the CARS Rule?","acceptedAnswer":{"@type":"Answer","text":"The 5th Circuit vacated it on January 27, 2025. We stay FTC-aligned via Section 5 and implement individual state laws like California SB 766 (effective October 1, 2026)."}},
-          {"@type":"Question","name":"Is digital signing legally binding?","acceptedAnswer":{"@type":"Answer","text":"Yes. We follow UETA and the federal E-SIGN Act — tamper-evident content hash, IP, user-agent, timestamp, and consent are captured and stored server-side."}},
-          {"@type":"Question","name":"Can the accessory addendum be viewed from our website?","acceptedAnswer":{"@type":"Answer","text":"Yes. Every VIN has a public /v/<slug> URL with WCAG 2.1 AA accessibility, and an iframe embed snippet your web team can drop on the VDP."}},
-          {"@type":"Question","name":"What if the internet drops?","acceptedAnswer":{"@type":"Answer","text":"Draft stickers save to an offline queue and sync when the connection returns."}},
-          {"@type":"Question","name":"Does it print to Zebra?","acceptedAnswer":{"@type":"Answer","text":"Yes — ZPL direct via WebUSB, plus Brother QL, DYMO, and any CUPS/PDF printer."}},
-          {"@type":"Question","name":"What DMS integrations?","acceptedAnswer":{"@type":"Answer","text":"vAuto, VinSolutions, CDK, and Reynolds via webhooks, plus Zapier/Make for the rest."}},
-          {"@type":"Question","name":"Is there a contract?","acceptedAnswer":{"@type":"Answer","text":"Month-to-month. Cancel anytime. No setup fees."}}
+          {"@type":"Question","name":"When does AutoLabels launch?","acceptedAnswer":{"@type":"Answer","text":"We're in pilot now with select dealer groups. General availability rolls out through 2026. Early-access dealers get first access and locked-in early pricing."}},
+          {"@type":"Question","name":"Is this FTC compliant?","acceptedAnswer":{"@type":"Answer","text":"The FTC CARS Rule was vacated by the 5th Circuit in January 2025. We build to the underlying FTC Section 5 framework, 16 CFR Part 455, the Monroney Act, E-SIGN/UETA, and California SB 766 (effective October 2026). AutoLabels documents your compliance posture — it does not provide legal advice."}},
+          {"@type":"Question","name":"What does it replace?","acceptedAnswer":{"@type":"Answer","text":"Your sticker printer, addendum builder, Buyers Guide template, and signing pad — plus the spreadsheet you use to reconcile site prices to lot prices."}},
+          {"@type":"Question","name":"Where does my vehicle data come from?","acceptedAnswer":{"@type":"Answer","text":"Either your existing inventory feed, or our nightly inventory and advertised-price update that pulls your live listings and site pricing. Nothing to install or swap — your vehicles and prices flow in automatically."}},
+          {"@type":"Question","name":"What happens after I request early access?","acceptedAnswer":{"@type":"Answer","text":"We review your dealership information and follow up within one business day. Then it's three steps: review your store, brands, and volume; configure templates, disclosures, and your inventory feed; and onboard your team hands-on. Requesting access is free and requires no card."}},
+          {"@type":"Question","name":"Is there a long-term contract?","acceptedAnswer":{"@type":"Answer","text":"No. Early-access pricing is month-to-month, per rooftop. Joining the early-access list costs nothing and locks your launch pricing."}},
+          {"@type":"Question","name":"How does my inventory get in? Which DMS or feed providers work?","acceptedAnswer":{"@type":"Answer","text":"Three paths: your existing inventory feed (vAuto, VinSolutions, CDK, Reynolds, and generic feeds via DMS webhooks on Compliance Pro), a CSV import, or our nightly website sync that reads your live listings directly — no IT project required."}}
         ]
       }
     </script>

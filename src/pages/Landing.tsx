@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import Seo from "@/components/Seo";
 import Logo from "@/components/brand/Logo";
+import { QRCodeSVG } from "qrcode.react";
 import {
   ArrowRight,
   ShieldCheck,
@@ -21,10 +22,11 @@ import {
   BadgeCheck,
   Tag,
   CheckCircle2,
-  Camera,
-  RefreshCw,
   Lock,
   Palette,
+  Menu,
+  X,
+  Zap,
 } from "lucide-react";
 
 // ──────────────────────────────────────────────────────────────
@@ -37,13 +39,15 @@ import {
 // quotes, or dollar amounts.
 // ──────────────────────────────────────────────────────────────
 
+// The most convincing demo is the real customer artifact — the sample
+// Vehicle Passport rendered with placeholder data (no signup required).
+const DEMO_TO = "/v/demo?preview=1";
+
 const Landing = () => {
-  const navigate = useNavigate();
   const { user } = useAuth();
-  const goWaitlist = () => navigate(user ? "/dashboard" : "/waitlist");
-  // The most convincing demo is the real customer artifact — the sample
-  // Vehicle Passport rendered with placeholder data (no signup required).
-  const goDemo = () => navigate("/v/demo?preview=1");
+  // Real anchors (not JS buttons) so /waitlist is crawlable, middle-clickable,
+  // and announced as a link. Logged-in dealers go straight to the dashboard.
+  const waitTo = user ? "/dashboard" : "/waitlist";
 
   return (
     <div className="bg-white text-slate-900 antialiased selection:bg-blue-100">
@@ -52,27 +56,23 @@ const Landing = () => {
         description="One website pricing mistake can trigger an FTC investigation, a complaint, or a lawsuit. AutoLabels catches pricing and disclosure gaps before regulators do."
         path="/"
       />
-      <Nav user={user} onWaitlist={goWaitlist} onNav={navigate} />
+      <Nav user={user} waitTo={waitTo} />
       <main>
-        <Hero onWaitlist={goWaitlist} onDemo={goDemo} />
+        <Hero waitTo={waitTo} />
         <WhyNow />
         <TrustBand />
         <Risk />
-        <TakeThePowerBack onWaitlist={goWaitlist} />
+        <TakeThePowerBack waitTo={waitTo} />
         <HowItWorks />
-        <AutomationPipeline />
         <StickerStudioGallery />
-        <VehiclePassportSection />
-        <PrintReady />
+        <VehiclePassportSection waitTo={waitTo} />
         <WhereWeFit />
-        <Principles />
-        <PowerGrid />
         <SocialProof />
         <FAQ />
-        <PricingTeaser onWaitlist={goWaitlist} onDemo={goDemo} />
-        <FinalCTA onWaitlist={goWaitlist} onDemo={goDemo} />
+        <PricingTeaser waitTo={waitTo} />
+        <FinalCTA waitTo={waitTo} />
       </main>
-      <Footer onNav={navigate} onWaitlist={goWaitlist} />
+      <Footer waitTo={waitTo} />
     </div>
   );
 };
@@ -90,61 +90,81 @@ const NAV_LINKS = [
   { label: "FAQ", href: "#faq" },
 ];
 
-const Nav = ({
-  user,
-  onWaitlist,
-  onNav,
-}: {
-  user: unknown;
-  onWaitlist: () => void;
-  onNav: (to: string) => void;
-}) => (
-  <nav className="sticky top-0 z-50 border-b border-slate-100 bg-white/80 backdrop-blur-xl">
-    <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-6 lg:px-8">
-      <button onClick={() => onNav("/")} aria-label="AutoLabels home" className="flex items-center">
-        <Logo variant="full" size={34} />
-      </button>
-      <div className="hidden items-center gap-7 md:flex">
-        {NAV_LINKS.map((l) => (
-          <a key={l.href} href={l.href} className="text-sm text-slate-600 transition-colors hover:text-slate-900">
-            {l.label}
-          </a>
-        ))}
-      </div>
-      <div className="flex items-center gap-2">
-        {user ? (
-          <button
-            onClick={() => onNav("/dashboard")}
-            className="inline-flex h-9 items-center gap-1.5 rounded-full bg-slate-900 px-4 text-sm font-medium text-white hover:bg-slate-800"
-          >
-            Open dashboard <ArrowRight className="h-3.5 w-3.5" />
-          </button>
-        ) : (
-          <>
-            <button
-              onClick={() => onNav("/login")}
-              className="hidden h-9 items-center px-3 text-sm text-slate-600 hover:text-slate-900 md:inline-flex"
+// Link row needs ~1150px to fit; below xl a hamburger sheet carries the
+// section links and Sign in so tablets and phones always have navigation.
+const Nav = ({ user, waitTo }: { user: unknown; waitTo: string }) => {
+  const [open, setOpen] = useState(false);
+  return (
+    <nav className="sticky top-0 z-50 border-b border-slate-100 bg-white/80 backdrop-blur-xl">
+      <div className="mx-auto flex h-16 max-w-7xl items-center justify-between gap-3 px-4 sm:px-6 lg:px-8">
+        <Link to="/" aria-label="AutoLabels home" className="flex shrink-0 items-center">
+          <span className="sm:hidden"><Logo variant="full" size={24} /></span>
+          <span className="hidden sm:inline-flex"><Logo variant="full" size={34} /></span>
+        </Link>
+        <div className="hidden items-center gap-7 xl:flex">
+          {NAV_LINKS.map((l) => (
+            <a key={l.href} href={l.href} className="whitespace-nowrap text-sm text-slate-600 transition-colors hover:text-slate-900">
+              {l.label}
+            </a>
+          ))}
+        </div>
+        <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
+          {user ? (
+            <Link
+              to="/dashboard"
+              className="inline-flex h-9 items-center gap-1.5 whitespace-nowrap rounded-full bg-slate-900 px-4 text-sm font-medium text-white hover:bg-slate-800"
             >
-              Sign in
-            </button>
-            <button
-              onClick={onWaitlist}
-              className="inline-flex h-9 items-center gap-1.5 rounded-full bg-[#0B2041] px-4 text-sm font-medium text-white hover:bg-[#13315e]"
-            >
-              Request Early Access <ArrowRight className="h-3.5 w-3.5" />
-            </button>
-          </>
-        )}
+              Open dashboard <ArrowRight className="h-3.5 w-3.5" />
+            </Link>
+          ) : (
+            <>
+              <Link
+                to="/login"
+                className="hidden h-9 items-center px-3 text-sm text-slate-600 hover:text-slate-900 xl:inline-flex"
+              >
+                Sign in
+              </Link>
+              <Link
+                to={waitTo}
+                className="inline-flex h-9 items-center gap-1.5 whitespace-nowrap rounded-full bg-[#2563EB] px-2.5 text-[13px] font-medium text-white hover:bg-[#1D4ED8] sm:px-4 sm:text-sm"
+              >
+                <span className="hidden sm:inline">Request Early Access</span>
+                <span className="sm:hidden">Early access</span>
+                <ArrowRight className="hidden h-3.5 w-3.5 sm:inline" />
+              </Link>
+              <button
+                onClick={() => setOpen((v) => !v)}
+                aria-expanded={open}
+                aria-label={open ? "Close menu" : "Open menu"}
+                className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 text-slate-700 hover:bg-slate-50 xl:hidden"
+              >
+                {open ? <X className="h-4 w-4" /> : <Menu className="h-4 w-4" />}
+              </button>
+            </>
+          )}
+        </div>
       </div>
-    </div>
-  </nav>
-);
+      {open && (
+        <div className="border-t border-slate-100 bg-white px-6 pb-4 pt-2 xl:hidden">
+          {NAV_LINKS.map((l) => (
+            <a key={l.href} href={l.href} onClick={() => setOpen(false)} className="block py-2.5 text-sm font-medium text-slate-700 hover:text-slate-900">
+              {l.label}
+            </a>
+          ))}
+          <Link to="/login" className="block py-2.5 text-sm font-medium text-slate-700 hover:text-slate-900">
+            Sign in
+          </Link>
+        </div>
+      )}
+    </nav>
+  );
+};
 
 // ──────────────────────────────────────────────────────────────
 // Hero
 // ──────────────────────────────────────────────────────────────
 
-const Hero = ({ onWaitlist }: { onWaitlist: () => void; onDemo: () => void }) => (
+const Hero = ({ waitTo }: { waitTo: string }) => (
   <section className="relative isolate overflow-hidden border-b border-slate-100 bg-white">
     <div
       aria-hidden
@@ -160,7 +180,7 @@ const Hero = ({ onWaitlist }: { onWaitlist: () => void; onDemo: () => void }) =>
             <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
             <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-emerald-500" />
           </span>
-          Live website-price monitoring · FTC §5 aligned
+          FTC warned 97 dealer groups &mdash; March 2026
         </div>
         <h1 className="font-display text-[40px] font-black leading-[1.02] tracking-tighter text-slate-900 sm:text-6xl">
           The FTC doesn&rsquo;t care if it was an{" "}
@@ -173,13 +193,13 @@ const Hero = ({ onWaitlist }: { onWaitlist: () => void; onDemo: () => void }) =>
           gets one clean record, from website price to lot sticker to customer signature.
         </p>
         <div className="mt-8 flex flex-col items-start gap-3 sm:flex-row">
-          <button
-            onClick={onWaitlist}
-            className="inline-flex h-12 items-center gap-2 rounded-full bg-[#0B2041] px-6 text-sm font-semibold text-white hover:bg-[#13315e]"
+          <Link
+            to={waitTo}
+            className="inline-flex h-12 items-center gap-2 rounded-full bg-[#2563EB] px-6 text-sm font-semibold text-white hover:bg-[#1D4ED8]"
           >
             Request Early Access
             <ArrowRight className="h-4 w-4" />
-          </button>
+          </Link>
           <a
             href="#how"
             className="inline-flex h-12 items-center gap-1.5 rounded-full border border-slate-200 bg-white px-6 text-sm font-semibold text-slate-700 hover:border-slate-300 hover:bg-slate-50"
@@ -187,6 +207,7 @@ const Hero = ({ onWaitlist }: { onWaitlist: () => void; onDemo: () => void }) =>
             See how it works
           </a>
         </div>
+        <p className="mt-3 text-xs text-slate-500">Free to join · no card required · locks early-access pricing.</p>
         <div className="mt-8 grid grid-cols-1 gap-x-6 gap-y-2.5 sm:grid-cols-2">
           <HeroCheck icon={ShieldCheck} label="Website price monitoring" />
           <HeroCheck icon={FileText} label="FTC-aligned addendums" />
@@ -234,7 +255,7 @@ const ComplianceStatusCard = () => (
             </span>
             <div className="leading-none">
               <p className="font-display text-[13px] font-black tracking-tight text-slate-900">VIN defense file</p>
-              <p className="mt-1 font-mono text-[10px] tracking-tight text-slate-400">REC-2026-0617 · 142 VINs sealed</p>
+              <p className="mt-1 font-mono text-[10px] tracking-tight text-slate-500">REC-2026-0617 · 142 VINs sealed</p>
             </div>
           </div>
           <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-200/70 bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold tracking-wide text-emerald-700">
@@ -256,7 +277,7 @@ const ComplianceStatusCard = () => (
 
       <div className="border-t border-slate-100 bg-slate-50/40 px-5 pb-5 pt-4">
         <div className="mb-3 flex items-center justify-between">
-          <span className="font-mono text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-400">Website scan · exceptions</span>
+          <span className="font-mono text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-500">Website scan · exceptions</span>
           <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-semibold text-amber-700 ring-1 ring-amber-200/70">
             <AlertTriangle className="h-3 w-3" /> Caught &amp; held
           </span>
@@ -278,11 +299,11 @@ const ComplianceStatusCard = () => (
                 Record sealed
                 <span className="inline-flex items-center rounded border border-emerald-200 bg-emerald-50 px-1 py-px font-mono text-[9px] font-semibold uppercase tracking-wide text-emerald-700">tamper-evident</span>
               </p>
-              <p className="mt-0.5 truncate font-mono text-[10px] text-slate-400">sha256:9f2a1c4e…7b30 · 02:14 UTC</p>
+              <p className="mt-0.5 truncate font-mono text-[10px] text-slate-500">sha256:9f2a1c4e…7b30 · 02:14 UTC</p>
             </div>
           </div>
         </div>
-        <p className="mt-2 text-center text-[10.5px] text-slate-400">Any change to any document changes this hash.</p>
+        <p className="mt-2 text-center text-[10.5px] text-slate-500">Any change to any document changes this hash.</p>
       </div>
     </div>
   </div>
@@ -307,7 +328,7 @@ const VehicleFileCard = () => (
             </span>
             <div className="leading-none">
               <p className="font-display text-[13px] font-black tracking-tight text-slate-900">Vehicle file</p>
-              <p className="mt-1 font-mono text-[10px] tracking-tight text-slate-400">VIN &hellip;331335 &middot; auto-built from your feed</p>
+              <p className="mt-1 font-mono text-[10px] tracking-tight text-slate-500">VIN &hellip;331335 &middot; auto-built from your feed</p>
             </div>
           </div>
           <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-200/70 bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold tracking-wide text-emerald-700">
@@ -328,7 +349,7 @@ const VehicleFileCard = () => (
           </div>
           <div className="flex-shrink-0 text-right">
             <p className="font-display text-[15px] font-black tracking-tight text-slate-900 tabular-nums">$58,835</p>
-            <p className="text-[10px] font-semibold text-emerald-600">$2,444 below market</p>
+            <p className="text-[10px] font-semibold text-emerald-700">$2,444 below market</p>
           </div>
         </div>
 
@@ -348,7 +369,7 @@ const VehicleFileCard = () => (
         </div>
 
         <div className="mt-3 rounded-xl border border-slate-200 bg-slate-50/40 px-3.5 py-3">
-          <p className="mb-2 font-mono text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-400">Factory options &middot; decoded</p>
+          <p className="mb-2 font-mono text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-500">Factory options &middot; decoded</p>
           <div className="flex flex-wrap gap-1.5">
             {["Premium Pkg", "Heated Seats", "Bose Audio", "360 Camera", "ProPILOT Assist"].map((o) => (
               <span key={o} className="inline-flex items-center rounded-md border border-slate-200 bg-white px-1.5 py-0.5 text-[10.5px] font-medium text-slate-700">{o}</span>
@@ -367,8 +388,8 @@ const VehicleFileCard = () => (
 
 const FileStat = ({ label, value, tone }: { label: string; value: string; tone?: "emerald" }) => (
   <div className="rounded-xl border border-slate-200 bg-white px-3 py-2.5">
-    <p className="text-[10px] font-medium uppercase tracking-wide text-slate-400">{label}</p>
-    <p className={`mt-0.5 text-[13px] font-bold tabular-nums ${tone === "emerald" ? "text-emerald-600" : "text-slate-900"}`}>{value}</p>
+    <p className="text-[10px] font-medium uppercase tracking-wide text-slate-500">{label}</p>
+    <p className={`mt-0.5 text-[13px] font-bold tabular-nums ${tone === "emerald" ? "text-emerald-700" : "text-slate-900"}`}>{value}</p>
   </div>
 );
 
@@ -380,26 +401,41 @@ const HERO_VIEWS = [
 ];
 const HeroVisual = () => {
   const [view, setView] = useState(0);
+  // Auto-advance stops permanently after a manual selection, pauses on
+  // hover/focus, and never runs for reduced-motion users.
+  const [auto, setAuto] = useState(true);
   const [paused, setPaused] = useState(false);
   useEffect(() => {
-    if (paused) return;
+    if (!auto || paused) return;
+    if (typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
     const t = setInterval(() => setView((v) => (v + 1) % HERO_VIEWS.length), 7000);
     return () => clearInterval(t);
-  }, [paused]);
+  }, [auto, paused]);
   return (
-    <div onMouseEnter={() => setPaused(true)} onMouseLeave={() => setPaused(false)}>
-      <div className="mb-3 inline-flex items-center gap-0.5 rounded-full border border-slate-200 bg-white p-0.5 shadow-sm">
+    <div
+      onMouseEnter={() => setPaused(true)}
+      onMouseLeave={() => setPaused(false)}
+      onFocus={() => setPaused(true)}
+      onBlur={() => setPaused(false)}
+    >
+      <div role="group" aria-label="Hero example toggle" className="mb-3 inline-flex items-center gap-0.5 rounded-full border border-slate-200 bg-white p-0.5 shadow-sm">
         {HERO_VIEWS.map((hv, i) => (
           <button
             key={hv.id}
-            onClick={() => { setView(i); setPaused(true); }}
-            className={`rounded-full px-3 py-1 text-[11px] font-semibold transition-colors ${i === view ? "bg-[#0B2041] text-white" : "text-slate-500 hover:text-slate-800"}`}
+            aria-pressed={i === view}
+            onClick={() => { setView(i); setAuto(false); }}
+            className={`rounded-full px-3 py-1.5 text-[11px] font-semibold transition-colors ${i === view ? "bg-[#0B2041] text-white" : "text-slate-500 hover:text-slate-800"}`}
           >
             {hv.label}
           </button>
         ))}
       </div>
-      {view === 0 ? <ComplianceStatusCard /> : <VehicleFileCard />}
+      {/* Both cards stay mounted in one grid cell so the container sizes to
+          the tallest card — the 7s swap can never shift the page (CLS 0). */}
+      <div className="grid">
+        <div className={`col-start-1 row-start-1 ${view === 0 ? "" : "invisible"}`} aria-hidden={view !== 0}><ComplianceStatusCard /></div>
+        <div className={`col-start-1 row-start-1 ${view === 1 ? "" : "invisible"}`} aria-hidden={view !== 1}><VehicleFileCard /></div>
+      </div>
     </div>
   );
 };
@@ -418,7 +454,7 @@ const StatusRow = ({
         <p className="text-[13px] font-semibold leading-tight text-slate-900">{label}</p>
         <p className="mt-0.5 truncate text-[11px] leading-tight text-slate-500">
           {sub}
-          {mono && <span className="ml-1.5 font-mono text-[10px] text-slate-400">{mono}</span>}
+          {mono && <span className="ml-1.5 font-mono text-[10px] text-slate-500">{mono}</span>}
         </p>
       </div>
       <span className={`inline-flex flex-shrink-0 items-center gap-1 rounded-md border px-2 py-1 text-[11px] font-semibold ${chipCls}`}>
@@ -442,13 +478,6 @@ const AlertRow = ({ tone, title, detail }: { tone: "red" | "amber"; title: strin
     </div>
   );
 };
-
-const Row = ({ label, value }: { label: string; value: string }) => (
-  <div className="flex items-center justify-between text-slate-600">
-    <span>{label}</span>
-    <span className="font-semibold text-slate-900 tabular-nums">{value}</span>
-  </div>
-);
 
 // ──────────────────────────────────────────────────────────────
 // Trust band
@@ -477,7 +506,7 @@ const TrustBand = () => (
 // ──────────────────────────────────────────────────────────────
 
 const Risk = () => (
-  <section id="risk" className="border-b border-slate-100">
+  <section id="risk" className="scroll-mt-20 border-b border-slate-100 bg-white">
     <div className="mx-auto max-w-7xl px-6 py-20 lg:px-8">
       <div className="mx-auto max-w-3xl text-center">
         <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-blue-600">The risk</p>
@@ -517,6 +546,11 @@ const Risk = () => (
           reconciliation, 50-state disclosure engine, signed customer acknowledgements, and a
           tamper-evident audit log — so the regulator sees a clean record, not a missing one.
         </p>
+        <p className="mt-3 text-sm text-slate-700">
+          Every addendum is <strong className="text-slate-900">red-teamed before it prints</strong> —
+          banned phrases hard-fail, doc fees are checked against all 50 state caps, and a used car
+          can&rsquo;t go out without its Buyers Guide.
+        </p>
       </div>
     </div>
   </section>
@@ -527,7 +561,7 @@ const Risk = () => (
 // ──────────────────────────────────────────────────────────────
 
 const HowItWorks = () => (
-  <section id="how" className="border-b border-slate-100 bg-slate-50/40">
+  <section id="how" className="scroll-mt-20 border-b border-slate-100 bg-white">
     <div className="mx-auto max-w-7xl px-6 py-20 lg:px-8">
       <div className="mx-auto max-w-3xl text-center">
         <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-blue-600">How it works</p>
@@ -565,18 +599,35 @@ const HowItWorks = () => (
           body="Every scan becomes a lead. Every addendum becomes data. See what's selling, what's stuck, and what's closing — live."
         />
       </div>
+
+      {/* From arrival to windshield — the self-aware get-ready pipeline,
+          folded in here so the how-it-works story is told exactly once. */}
+      <div className="mx-auto mt-16 max-w-6xl">
+        <p className="text-center text-[11px] font-bold uppercase tracking-[0.18em] text-blue-600">From arrival to windshield</p>
+        <p className="mx-auto mt-2 max-w-2xl text-center text-sm leading-relaxed text-slate-600">
+          Point AutoLabels at your inventory &mdash; a VDP URL, a VIN, or your nightly feed &mdash; and
+          nothing prints until the work is signed off.
+        </p>
+        <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
+          {PIPELINE.map((s) => (
+            <NumberedCard key={s.num} num={s.num} title={s.title} body={s.body} />
+          ))}
+        </div>
+        <div className="mt-8 flex flex-wrap justify-center gap-2">
+          {["Itemized get-ready, not a sticky note.", "Nothing lists until it's ready.", "Every install is proven before it's advertised."].map((c) => (
+            <span key={c} className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-700">
+              <CheckCircle2 className="h-3.5 w-3.5 text-blue-600" /> {c}
+            </span>
+          ))}
+        </div>
+      </div>
     </div>
   </section>
 );
 
-// ──────────────────────────────────────────────────────────────
-// Self-aware automation — new inventory queues its own get-ready
-// (recon / detail / vendors) and the correct sticker version, gated
-// by the foreman prep sign-off. Grounded in real features:
-// useGetReady, get_ready_services, install_proofs, usePrepSignOff
-// (listing_unlocked), and the document version-lock.
-// ──────────────────────────────────────────────────────────────
-
+// New inventory queues its own get-ready (recon / detail / vendors) and the
+// correct sticker version, gated by the foreman prep sign-off. Grounded in
+// real features: useGetReady, install_proofs, usePrepSignOff, version-lock.
 const PIPELINE = [
   { num: "01", title: "Vehicle arrives", body: "Paste a VDP or VIN, or let the nightly sync pull it in. The file builds itself — decode, equipment, photos, and live market position." },
   { num: "02", title: "Get-Ready queues itself", body: "Itemized recon, inspection, detail, and accessory installs auto-assign to Service, Lot, Detail, and outside vendors — each with an owner, an email, and a cost." },
@@ -584,36 +635,6 @@ const PIPELINE = [
   { num: "04", title: "Foreman signs off", body: "The prep gate stays locked. The car can't be listed or published until it's truly ready." },
   { num: "05", title: "The right sticker goes out", body: "The correct window-sticker version and addendum generate — version-locked — and publish to the Vehicle Passport with its QR." },
 ];
-
-const AutomationPipeline = () => (
-  <section id="automation" className="border-b border-slate-100 bg-slate-50/40">
-    <div className="mx-auto max-w-7xl px-6 py-20 lg:px-8">
-      <div className="mx-auto max-w-3xl text-center">
-        <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-blue-600">Self-aware automation</p>
-        <h2 className="mt-3 font-display text-4xl font-black tracking-tighter text-slate-900 sm:text-5xl">
-          A car hits the lot. The system already knows what to do.
-        </h2>
-        <p className="mt-5 text-base leading-relaxed text-slate-600">
-          Point AutoLabels at your inventory &mdash; a VDP URL, a VIN, or your nightly feed &mdash; and it
-          builds the file, queues the get-ready, and lines up the right window-sticker version. Nothing
-          prints until the work is signed off.
-        </p>
-      </div>
-      <div className="mx-auto mt-12 grid max-w-6xl gap-4 sm:grid-cols-2 lg:grid-cols-5">
-        {PIPELINE.map((s) => (
-          <NumberedCard key={s.num} num={s.num} title={s.title} body={s.body} />
-        ))}
-      </div>
-      <div className="mx-auto mt-8 flex max-w-3xl flex-wrap justify-center gap-2">
-        {["Itemized get-ready, not a sticky note.", "Nothing lists until it's ready.", "Every install is proven before it's advertised."].map((c) => (
-          <span key={c} className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-700">
-            <CheckCircle2 className="h-3.5 w-3.5 text-blue-600" /> {c}
-          </span>
-        ))}
-      </div>
-    </div>
-  </section>
-);
 
 // ──────────────────────────────────────────────────────────────
 // Sticker Studio — template gallery (real: 18-template catalog +
@@ -629,8 +650,54 @@ const TEMPLATES = [
   { icon: Palette, title: "Your brand, every time", body: "Logo, colors, disclaimers, pricing fields, benefits, and the Vehicle Passport link — baked in." },
 ];
 
+// A believable 8.5x11 window-sticker artifact — the page sells a printed
+// product, so it shows one instead of describing one.
+const StickerMock = () => (
+  <div className="mx-auto w-full max-w-[320px] rounded-xl border border-slate-200 bg-white p-4 shadow-[0_20px_50px_-20px_rgba(11,32,65,0.3)]">
+    <div className="flex items-center justify-between border-b-2 border-[#0B2041] pb-2">
+      <div>
+        <p className="font-display text-[13px] font-black tracking-tight text-[#0B2041]">RIVERSIDE MOTORS</p>
+        <p className="text-[8px] font-semibold uppercase tracking-[0.18em] text-slate-500">Certified Pre-Owned Center</p>
+      </div>
+      <ShieldCheck className="h-5 w-5 text-[#2563EB]" />
+    </div>
+    <div className="mt-2.5 flex items-start justify-between gap-2">
+      <div>
+        <p className="font-display text-[14px] font-black leading-tight text-slate-900">2027 INFINITI QX60</p>
+        <p className="text-[9px] font-medium text-slate-500">LUXE AWD · VIN …331335</p>
+      </div>
+      <div className="text-right">
+        <p className="text-[8px] font-bold uppercase tracking-wide text-slate-500">Our Price</p>
+        <p className="font-display text-[16px] font-black tabular-nums text-[#0B2041]">$58,835</p>
+      </div>
+    </div>
+    <div className="mt-2.5 rounded-lg bg-slate-50 px-2.5 py-2">
+      <p className="text-[8px] font-bold uppercase tracking-[0.14em] text-slate-500">Installed equipment</p>
+      <div className="mt-1.5 space-y-1">
+        {[["Premium Package", "included"], ["All-Weather Protection", "$495"], ["VIN Etch Security", "$299"]].map(([n, p]) => (
+          <div key={n} className="flex items-center justify-between text-[9px] font-medium text-slate-700">
+            <span>{n}</span><span className="tabular-nums text-slate-500">{p}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+    <div className="mt-2.5 flex items-center justify-between gap-2">
+      <div className="min-w-0">
+        <p className="text-[8px] font-bold uppercase tracking-wide text-slate-500">Scan for the Vehicle Passport</p>
+        <p className="mt-0.5 text-[8px] leading-snug text-slate-500">Full disclosures, warranty, market price, and signed documents for this VIN.</p>
+      </div>
+      <div className="shrink-0 rounded-md border border-slate-200 bg-white p-1">
+        <QRCodeSVG value="https://autolabels.io/v/demo" size={44} fgColor="#0B2041" />
+      </div>
+    </div>
+    <p className="mt-2 border-t border-slate-100 pt-1.5 text-center text-[7px] leading-snug text-slate-500">
+      Optional items are not required to buy, lease, or finance. Doc fee disclosed per state rules.
+    </p>
+  </div>
+);
+
 const StickerStudioGallery = () => (
-  <section id="studio" className="border-b border-slate-100">
+  <section id="studio" className="scroll-mt-20 border-b border-slate-100 bg-slate-50/40">
     <div className="mx-auto max-w-7xl px-6 py-20 lg:px-8">
       <div className="mx-auto max-w-3xl text-center">
         <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-blue-600">Sticker Studio</p>
@@ -643,10 +710,29 @@ const StickerStudioGallery = () => (
           pricing, disclosures, and the Vehicle Passport link &mdash; and locks the moment it&rsquo;s signed.
         </p>
       </div>
-      <div className="mx-auto mt-12 grid max-w-6xl gap-5 md:grid-cols-2 lg:grid-cols-3">
-        {TEMPLATES.map((t) => (
-          <Card key={t.title} icon={t.icon} title={t.title}>{t.body}</Card>
-        ))}
+
+      <div className="mx-auto mt-12 grid max-w-6xl items-center gap-10 lg:grid-cols-[340px_minmax(0,1fr)]">
+        <StickerMock />
+        <div className="grid gap-5 sm:grid-cols-2">
+          {TEMPLATES.map((t) => (
+            <Card key={t.title} icon={t.icon} title={t.title}>{t.body}</Card>
+          ))}
+        </div>
+      </div>
+
+      {/* Print workflow — folded in from the old Print-ready section. */}
+      <div className="mx-auto mt-12 max-w-4xl">
+        <p className="text-center text-[11px] font-bold uppercase tracking-[0.18em] text-blue-600">Built for the printer, not just the browser</p>
+        <div className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          {PRINT_SPECS.map((s) => (
+            <div key={s} className="flex items-center gap-2.5 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-700">
+              <Check className="h-4 w-4 flex-shrink-0 text-blue-600" /> {s}
+            </div>
+          ))}
+        </div>
+        <p className="mx-auto mt-6 max-w-2xl text-center font-display text-base font-bold text-slate-900">
+          Print it, post it, scan it, sign it, and save it &mdash; one record per VIN.
+        </p>
       </div>
     </div>
   </section>
@@ -657,17 +743,23 @@ const StickerStudioGallery = () => (
 // (real: /v/:slug published docs + qr_scan_events analytics).
 // ──────────────────────────────────────────────────────────────
 
+// The real panel lineup shipping in /v/:slug today — the page's job is to
+// show the depth, not summarize it away.
 const PASSPORT_INCLUDES = [
-  "Vehicle specs, equipment & key features",
-  "Installed dealer equipment & included benefits",
-  "Market value & price transparency",
-  "Recall & remaining-warranty signals",
-  "Buyers Guide & disclosure documents",
-  "Signed forms & audit history",
+  "Market pricing with a confidence score",
+  "Price history & 30-day trend",
+  "Local demand & comparables in your own stock",
+  "Verified factory warranty & CPO coverage",
+  "Owner reviews + NHTSA crash-test stars",
+  "Full factory build sheet with package MSRPs",
+  "Ownership timeline & recall status",
+  "CARFAX / AutoCheck report link — from your own site",
+  "Buyers Guide, disclosures & signed documents",
+  "Every panel deep-linkable & shareable",
 ];
 
-const VehiclePassportSection = () => (
-  <section id="passport" className="border-b border-slate-100 bg-slate-50/40">
+const VehiclePassportSection = ({ waitTo }: { waitTo: string }) => (
+  <section id="passport" className="scroll-mt-20 border-b border-slate-100 bg-white">
     <div className="mx-auto max-w-7xl px-6 py-20 lg:px-8">
       <div className="mx-auto max-w-3xl text-center">
         <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-blue-600">Vehicle Passport</p>
@@ -675,8 +767,9 @@ const VehiclePassportSection = () => (
           The QR is the new sales packet &mdash; and you see every scan.
         </h2>
         <p className="mt-5 text-base leading-relaxed text-slate-600">
-          Scan the sticker and the customer gets a complete digital file for that VIN &mdash; not just a
-          PDF. Give every shopper more confidence before they ever sit at the desk.
+          Scan the sticker and the shopper gets a thirteen-panel digital showroom for that exact
+          VIN &mdash; not a PDF. Market analysis, verified warranty, crash-test stars, the factory
+          build sheet, and every signed document, before they ever sit at the desk.
         </p>
       </div>
       <div className="mx-auto mt-12 grid max-w-5xl gap-5 lg:grid-cols-2">
@@ -691,19 +784,59 @@ const VehiclePassportSection = () => (
               </li>
             ))}
           </ul>
+          <Link to={DEMO_TO} className="mt-5 inline-flex items-center gap-1.5 text-sm font-semibold text-[#2563EB] hover:underline">
+            Open the live sample Passport <ArrowRight className="h-3.5 w-3.5" />
+          </Link>
         </div>
-        <div className="rounded-2xl border border-blue-200 bg-blue-50/50 p-8">
-          <h3 className="inline-flex items-center gap-2 font-display text-lg font-bold text-slate-900">
-            <BarChart3 className="h-5 w-5 text-blue-600" /> You see every scan
-          </h3>
-          <p className="mt-4 text-sm leading-relaxed text-slate-700">
-            Each sticker carries a tracked QR. Watch scans by vehicle and by sticker type, spot your
-            most-shopped cars, and know which units are getting attention before a lead form is ever
-            filled out.
-          </p>
-          <p className="mt-5 font-display text-base font-bold text-slate-900">
-            The sticker keeps selling after the salesperson goes home.
-          </p>
+        <div className="flex flex-col gap-5">
+          <div className="rounded-2xl border border-blue-200 bg-blue-50/50 p-8">
+            <h3 className="inline-flex items-center gap-2 font-display text-lg font-bold text-slate-900">
+              <BarChart3 className="h-5 w-5 text-blue-600" /> You see every scan
+            </h3>
+            <p className="mt-4 text-sm leading-relaxed text-slate-700">
+              Each sticker carries a tracked QR. Watch scans by vehicle and by sticker type, spot your
+              most-shopped cars, and know which units are getting attention before a lead form is ever
+              filled out.
+            </p>
+            <p className="mt-5 font-display text-base font-bold text-slate-900">
+              The sticker keeps selling after the salesperson goes home.
+            </p>
+          </div>
+          <div className="flex-1 rounded-2xl border border-slate-200 bg-white p-8 shadow-sm">
+            <h3 className="inline-flex items-center gap-2 font-display text-lg font-bold text-slate-900">
+              <Zap className="h-5 w-5 text-blue-600" /> Every scan becomes a routed lead
+            </h3>
+            <p className="mt-4 text-sm leading-relaxed text-slate-700">
+              Passport leads route themselves &mdash; CRM owner, assigned salesperson, sales rotation,
+              BDC, then the manager &mdash; with timed escalation when nobody responds. Every touch is
+              logged, so speed-to-lead is provable, not anecdotal.
+            </p>
+            <p className="mt-5 font-display text-base font-bold text-slate-900">
+              No lead sits. Every touch is on the record.
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <div className="mx-auto mt-8 max-w-5xl rounded-2xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
+        <div className="flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-center">
+          <div>
+            <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-blue-600">The closer</p>
+            <h3 className="mt-1 font-display text-xl font-black tracking-tight text-slate-900">
+              &ldquo;Why This Is A Great Buy&rdquo; &mdash; a shareable buying report per vehicle.
+            </h3>
+            <p className="mt-2 max-w-2xl text-sm leading-relaxed text-slate-600">
+              Trim-honest pricing versus MSRP and same-trim comps, verified history and warranty,
+              factory package value, and local supply &mdash; the buying case your salesperson would
+              make, printed and provable.
+            </p>
+          </div>
+          <Link
+            to={waitTo}
+            className="inline-flex h-11 shrink-0 items-center gap-2 rounded-full bg-[#2563EB] px-5 text-sm font-semibold text-white hover:bg-[#1D4ED8]"
+          >
+            Request Early Access <ArrowRight className="h-4 w-4" />
+          </Link>
         </div>
       </div>
     </div>
@@ -727,32 +860,6 @@ const PRINT_SPECS = [
   "Version-locked at signing",
 ];
 
-const PrintReady = () => (
-  <section id="print" className="border-b border-slate-100">
-    <div className="mx-auto max-w-7xl px-6 py-20 lg:px-8">
-      <div className="mx-auto max-w-3xl text-center">
-        <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-blue-600">Print-ready</p>
-        <h2 className="mt-3 font-display text-4xl font-black tracking-tighter text-slate-900 sm:text-5xl">
-          Built for the printer, not just the browser.
-        </h2>
-        <p className="mt-5 text-base leading-relaxed text-slate-600">
-          Real dealership print workflows, calibrated to your label stock.
-        </p>
-      </div>
-      <div className="mx-auto mt-10 grid max-w-4xl gap-3 sm:grid-cols-2 lg:grid-cols-3">
-        {PRINT_SPECS.map((s) => (
-          <div key={s} className="flex items-center gap-2.5 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-700">
-            <Check className="h-4 w-4 flex-shrink-0 text-blue-600" /> {s}
-          </div>
-        ))}
-      </div>
-      <p className="mx-auto mt-8 max-w-2xl text-center font-display text-base font-bold text-slate-900">
-        Print it, post it, scan it, sign it, and save it &mdash; one record per VIN.
-      </p>
-    </div>
-  </section>
-);
-
 // ──────────────────────────────────────────────────────────────
 // Why now — single sourced FTC stat (cited, not fabricated). Keeps
 // the urgency factual: links the real March 2026 enforcement action.
@@ -773,7 +880,7 @@ const WhyNow = () => (
                 href="https://www.ftc.gov/news-events/news/press-releases/2026/03/ftc-warns-97-auto-dealership-groups-about-deceptive-pricing"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="ml-1 align-super text-[10px] font-semibold text-blue-300 underline-offset-2 hover:underline"
+                className="ml-1 whitespace-nowrap align-super text-[10px] font-semibold text-blue-300 underline-offset-2 hover:underline"
               >
                 FTC, 2026
               </a>
@@ -815,13 +922,13 @@ const FitCell = ({ v }: { v: boolean | "partial" }) =>
   v === true ? (
     <CheckCircle2 className="mx-auto h-4 w-4 text-emerald-600" />
   ) : v === "partial" ? (
-    <span className="text-xs font-semibold text-slate-400">partial</span>
+    <span className="text-xs font-semibold text-slate-500">partial</span>
   ) : (
     <span className="text-slate-300">&mdash;</span>
   );
 
 const WhereWeFit = () => (
-  <section id="compare" className="border-b border-slate-100 bg-slate-50/40">
+  <section id="compare" className="scroll-mt-20 border-b border-slate-100 bg-slate-50/40">
     <div className="mx-auto max-w-7xl px-6 py-20 lg:px-8">
       <div className="mx-auto max-w-3xl text-center">
         <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-blue-600">Where AutoLabels fits</p>
@@ -834,15 +941,16 @@ const WhereWeFit = () => (
         </p>
       </div>
 
-      <div className="mx-auto mt-12 max-w-5xl overflow-x-auto rounded-2xl border border-slate-200 bg-white shadow-sm">
+      <div className="relative mx-auto mt-12 max-w-5xl">
+        <div className="overflow-x-auto rounded-2xl border border-slate-200 bg-white shadow-sm">
         <table className="w-full min-w-[720px] border-collapse text-sm">
           <thead>
             <tr className="border-b border-slate-200">
-              <th className="px-4 py-3 text-left font-display text-xs font-bold uppercase tracking-wide text-slate-500">
+              <th scope="col" className="px-4 py-3 text-left font-display text-xs font-bold uppercase tracking-wide text-slate-500">
                 Category
               </th>
               {FIT_COLS.map((c) => (
-                <th key={c} className="px-3 py-3 text-center text-[11px] font-semibold leading-tight text-slate-600">
+                <th scope="col" key={c} className="px-3 py-3 text-center text-[11px] font-semibold leading-tight text-slate-600">
                   {c}
                 </th>
               ))}
@@ -853,9 +961,9 @@ const WhereWeFit = () => (
               const isUs = r.label === "AutoLabels";
               return (
                 <tr key={r.label} className={`border-b border-slate-100 last:border-0 ${isUs ? "bg-blue-50/60" : ""}`}>
-                  <td className={`px-4 py-3 text-sm ${isUs ? "font-bold text-[#0B2041]" : "font-medium text-slate-700"}`}>
+                  <th scope="row" className={`px-4 py-3 text-left text-sm ${isUs ? "font-bold text-[#0B2041]" : "font-medium text-slate-700"}`}>
                     {r.label}
-                  </td>
+                  </th>
                   {r.cells.map((v, i) => (
                     <td key={i} className="px-3 py-3 text-center">
                       <FitCell v={v} />
@@ -866,9 +974,13 @@ const WhereWeFit = () => (
             })}
           </tbody>
         </table>
+        </div>
+        {/* Scroll affordance where the table clips (phones/portrait tablets). */}
+        <div aria-hidden className="pointer-events-none absolute inset-y-0 right-0 w-12 rounded-r-2xl bg-gradient-to-l from-white to-transparent lg:hidden" />
+        <p className="mt-2 text-center text-[11px] font-medium text-slate-500 lg:hidden">Swipe to compare &rarr;</p>
       </div>
 
-      <p className="mx-auto mt-4 max-w-3xl text-center text-xs leading-relaxed text-slate-400">
+      <p className="mx-auto mt-4 max-w-3xl text-center text-xs leading-relaxed text-slate-500">
         Generalized by category; capabilities vary by vendor and plan. AutoLabels documents informed
         consent and produces a tamper-evident record &mdash; it is FTC-aligned and does not guarantee the
         outcome of any dispute.
@@ -878,97 +990,17 @@ const WhereWeFit = () => (
 );
 
 // ──────────────────────────────────────────────────────────────
-// Principles — unified card system.
-// ──────────────────────────────────────────────────────────────
-
-const PRINCIPLES = [
-  {
-    num: "01",
-    title: "Clear",
-    body: "Every price, every fee, every disclosure — in plain English. No mouse-print, no hidden math.",
-  },
-  {
-    num: "02",
-    title: "Compliant",
-    body: "FTC-aligned. State-by-state. Bilingual where required. The rules change; the platform updates.",
-  },
-  {
-    num: "03",
-    title: "Consistent",
-    body: "Every sticker, addendum, and Buyers Guide off your lot looks the same and signs the same way.",
-  },
-];
-
-const Principles = () => (
-  <section className="border-b border-slate-100">
-    <div className="mx-auto max-w-7xl px-6 py-20 lg:px-8">
-      <div className="mx-auto max-w-3xl text-center">
-        <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-blue-600">What we believe</p>
-        <h2 className="mt-3 font-display text-4xl font-black tracking-tighter text-slate-900 sm:text-5xl">
-          Three principles
-        </h2>
-      </div>
-      <div className="mx-auto mt-12 grid max-w-6xl gap-5 md:grid-cols-3">
-        {PRINCIPLES.map((p) => (
-          <NumberedCard key={p.num} num={p.num} title={p.title} body={p.body} />
-        ))}
-      </div>
-    </div>
-  </section>
-);
-
-// ──────────────────────────────────────────────────────────────
-// Power grid — features, same card system.
-// ──────────────────────────────────────────────────────────────
-
-const FEATURES = [
-  { icon: ShieldCheck, title: "FTC-aligned engine", body: "California SB 766 disclosures, multi-language support, 2-year record retention — built in." },
-  { icon: Scan, title: "VIN decode + scrape", body: "Free NHTSA decode, or paste a VDP URL and let us scrape it — VIN, equipment, colors, and price filled in automatically." },
-  { icon: BadgeCheck, title: "Complete vehicle file", body: "Your inventory feed builds a full file per VIN: factory options, fuel economy, recall status, days-on-market, and live market position — ready to drop onto a window sticker." },
-  { icon: Sparkles, title: "Rules engine", body: "Auto-assign products by year, make, model, trim, body style, or mileage. Set once, apply forever." },
-  { icon: Signature, title: "Digital signing", body: "Customer signs on their phone via QR. Every signature is cryptographically logged for audits." },
-  { icon: FileText, title: "Buyers Guide", body: "FTC As-Is / Implied / Warranty guides in English and Spanish, built to 16 CFR Part 455 — bilingual where the deal is negotiated in Spanish." },
-  { icon: BarChart3, title: "Live analytics", body: "Product acceptance rates, revenue per addendum, top hooks — every signal that matters." },
-  { icon: Camera, title: "Installer accountability", body: "If it's advertised as installed, an installer signs and photographs it — or the customer is free to decline it." },
-  { icon: RefreshCw, title: "Nightly sync", body: "Inventory and advertised prices sync automatically every night, so new vehicles arrive ready for the disclosure addendum." },
-];
-
-const PowerGrid = () => (
-  <section className="border-b border-slate-100 bg-slate-50/40">
-    <div className="mx-auto max-w-7xl px-6 py-20 lg:px-8">
-      <div className="mx-auto max-w-3xl text-center">
-        <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-blue-600">Under the hood</p>
-        <h2 className="mt-3 font-display text-4xl font-black tracking-tighter text-slate-900 sm:text-5xl">
-          Power where you need it
-        </h2>
-        <p className="mt-5 text-base leading-relaxed text-slate-700">
-          Compliance-grade tools, premium UX, zero learning curve.
-        </p>
-      </div>
-      <div className="mx-auto mt-12 grid max-w-6xl gap-5 md:grid-cols-2 lg:grid-cols-3">
-        {FEATURES.map((f) => (
-          <Card key={f.title} icon={f.icon} title={f.title}>
-            {f.body}
-          </Card>
-        ))}
-      </div>
-    </div>
-  </section>
-);
-
-// ──────────────────────────────────────────────────────────────
 // Take the power back — the pivot. Two pillars: provable add-on
 // election and price integrity. Anchored at #power for the nav.
 // ──────────────────────────────────────────────────────────────
 
-const TakeThePowerBack = ({ onWaitlist }: { onWaitlist: () => void }) => (
-  <section id="power" className="border-b border-slate-100 bg-white">
+const TakeThePowerBack = ({ waitTo }: { waitTo: string }) => (
+  <section id="power" className="scroll-mt-20 border-b border-slate-100 bg-slate-50/40">
     <div className="mx-auto max-w-7xl px-6 py-20 lg:px-8">
-      <div className="mx-auto max-w-3xl text-center">
+      <div className="mx-auto max-w-2xl text-center">
         <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-blue-600">Take the power back</p>
-        <h2 className="mt-3 font-display text-4xl font-black tracking-tighter text-slate-900 sm:text-5xl">
-          The FTC made you play defense.
-          <br className="hidden sm:block" /> Take the power back.
+        <h2 className="mt-3 font-display text-4xl font-black tracking-tighter text-slate-900 sm:text-5xl [text-wrap:balance]">
+          The FTC made you play defense. Take the power back.
         </h2>
         <p className="mt-5 text-base leading-relaxed text-slate-700">
           Scared of complaints, dealers stopped pitching add-ons and stopped putting a real price in
@@ -1042,13 +1074,13 @@ const TakeThePowerBack = ({ onWaitlist }: { onWaitlist: () => void }) => (
           Tamper-evident, not tamper-proof. AutoLabels documents informed election and strengthens
           your position under FTC Act §5 &mdash; it does not guarantee the outcome of a dispute.
         </p>
-        <button
-          onClick={onWaitlist}
-          className="inline-flex h-12 items-center gap-2 rounded-full bg-[#0B2041] px-6 text-sm font-semibold text-white hover:bg-[#13315e]"
+        <Link
+          to={waitTo}
+          className="inline-flex h-12 items-center gap-2 rounded-full bg-[#2563EB] px-6 text-sm font-semibold text-white hover:bg-[#1D4ED8]"
         >
           Request Early Access
           <ArrowRight className="h-4 w-4" />
-        </button>
+        </Link>
       </div>
     </div>
   </section>
@@ -1083,7 +1115,8 @@ const PowerPillar = ({
         </span>
       ))}
     </div>
-    <p className="mt-6 border-t border-slate-100 pt-4 font-display text-base font-bold text-slate-900">{punch}</p>
+    {/* mt-auto keeps the two cards' punchlines bottom-aligned. */}
+    <p className="mt-auto border-t border-slate-100 pt-4 font-display text-base font-bold text-slate-900">{punch}</p>
   </div>
 );
 
@@ -1091,51 +1124,35 @@ const PowerPillar = ({
 // Social proof — placeholders clearly marked.
 // ──────────────────────────────────────────────────────────────
 
+// Slim, truthful pre-launch band — no placeholder logos, no fake quotes.
+// Real testimonials and logos replace this the day they're approved.
 const SocialProof = () => (
   <section className="border-b border-slate-100">
-    <div className="mx-auto max-w-7xl px-6 py-20 lg:px-8">
-      <div className="mx-auto max-w-3xl text-center">
-        <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-blue-600">Early access</p>
-        <h2 className="mt-3 font-display text-4xl font-black tracking-tighter text-slate-900 sm:text-5xl">
-          Built with dealers, for dealers.
-        </h2>
-      </div>
-
-      {/* Dealer logo strip — placeholders */}
-      <div className="mx-auto mt-12 max-w-5xl">
-        <p className="text-center text-[11px] font-medium uppercase tracking-[0.2em] text-slate-400">
-          Pilot dealer groups · logos to follow
-        </p>
-        <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
-          {Array.from({ length: 6 }).map((_, i) => (
-            <div
-              key={i}
-              className="flex h-14 items-center justify-center rounded-lg border border-dashed border-slate-200 bg-slate-50 text-[10px] font-medium uppercase tracking-wider text-slate-400"
-            >
-              Dealer logo
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* Testimonial placeholder + credential badge */}
-      <div className="mx-auto mt-12 grid max-w-5xl gap-5 md:grid-cols-3">
-        <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm md:col-span-2">
-          <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-400">
-            Pilot quote · placeholder
+    <div className="mx-auto max-w-5xl px-6 py-16 lg:px-8">
+      <div className="grid gap-5 md:grid-cols-3">
+        <div className="flex flex-col justify-center rounded-2xl border border-slate-200 bg-white p-7 shadow-sm md:col-span-2">
+          <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-blue-600">Built with dealers, for dealers</p>
+          <h2 className="mt-2 font-display text-2xl font-black tracking-tight text-slate-900">
+            Now onboarding pilot dealer groups.
+          </h2>
+          <p className="mt-3 text-sm leading-relaxed text-slate-600">
+            The pilot cohort is deliberately small &mdash; single rooftops and select groups, onboarded
+            hands-on. Early-access dealers lock launch pricing and shape the roadmap.
           </p>
-          <blockquote className="mt-3 text-lg font-medium leading-relaxed text-slate-800">
-            &ldquo;Dealer testimonial coming soon. We&rsquo;re onboarding pilot groups now &mdash;
-            quotes will appear here once they&rsquo;re live and approved.&rdquo;
-          </blockquote>
-          <p className="mt-4 text-xs text-slate-500">— Pilot dealer, name pending approval</p>
+          <div className="mt-4 flex flex-wrap gap-2">
+            {["Pilot cohort limited", "Early-access pricing locked", "Hands-on onboarding"].map((c) => (
+              <span key={c} className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-semibold text-slate-700">
+                <CheckCircle2 className="h-3.5 w-3.5 text-blue-600" /> {c}
+              </span>
+            ))}
+          </div>
         </div>
-        <div className="flex flex-col justify-center rounded-2xl border border-slate-200 bg-gradient-to-br from-[#0B2041] to-[#13315e] p-6 text-white shadow-sm">
+        <div className="flex flex-col justify-center rounded-2xl border border-slate-200 bg-gradient-to-br from-[#0B2041] to-[#13315e] p-7 text-white shadow-sm">
           <ShieldCheck className="h-7 w-7 text-[#3BB4FF]" />
           <p className="mt-3 font-display text-lg font-bold tracking-tight">FTC-aligned</p>
           <p className="text-sm text-white/70">50-state disclosure engine</p>
-          <p className="mt-4 text-[11px] font-medium uppercase tracking-[0.18em] text-white/50">
-            Compliance posture
+          <p className="mt-4 text-[11px] font-medium uppercase tracking-[0.18em] text-white/60">
+            Built to the frameworks regulators cite
           </p>
         </div>
       </div>
@@ -1199,14 +1216,8 @@ const TIERS: { name: string; price: string; best: string; tagline: string; featu
   },
 ];
 
-const PricingTeaser = ({
-  onWaitlist,
-  onDemo,
-}: {
-  onWaitlist: () => void;
-  onDemo: () => void;
-}) => (
-  <section id="pricing" className="border-b border-slate-100 bg-slate-50/40">
+const PricingTeaser = ({ waitTo }: { waitTo: string }) => (
+  <section id="pricing" className="scroll-mt-20 border-b border-slate-100 bg-white">
     <div className="mx-auto max-w-7xl px-6 py-20 lg:px-8">
       <div className="mx-auto max-w-3xl text-center">
         <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-blue-600">Pricing</p>
@@ -1216,13 +1227,16 @@ const PricingTeaser = ({
         <p className="mt-5 text-base leading-relaxed text-slate-600">
           Per rooftop, per month. Essential is free with any Autocurb.io subscription.
         </p>
+        <p className="mt-2 text-sm font-medium text-slate-500">
+          Free to join the early-access list · no card required · month-to-month · locks early-access pricing.
+        </p>
       </div>
 
       <div className="mx-auto mt-12 grid max-w-6xl gap-5 md:grid-cols-3">
         {TIERS.map((t) => (
           <div
             key={t.name}
-            className={`relative rounded-2xl border bg-white p-6 shadow-sm ${
+            className={`relative flex flex-col rounded-2xl border bg-white p-6 shadow-sm ${
               t.featured ? "border-[#2563EB] ring-1 ring-[#2563EB]" : "border-slate-200"
             }`}
           >
@@ -1238,7 +1252,7 @@ const PricingTeaser = ({
               <span className="text-sm font-medium text-slate-500">/mo</span>
             </div>
             <p className="mt-3 text-sm leading-relaxed text-slate-600">{t.tagline}</p>
-            <ul className="mt-4 space-y-2 border-t border-slate-100 pt-4">
+            <ul className="mt-4 flex-1 space-y-2 border-t border-slate-100 pt-4">
               {t.features.map((feat) => {
                 const isHeader = feat.endsWith("plus:");
                 return (
@@ -1249,42 +1263,38 @@ const PricingTeaser = ({
                 );
               })}
             </ul>
-            <div className="mt-6">
+            <div className="mt-6 pt-2">
               {t.featured ? (
-                <button
-                  onClick={onWaitlist}
-                  className="inline-flex h-10 w-full items-center justify-center gap-1.5 rounded-full bg-[#0B2041] px-4 text-sm font-semibold text-white hover:bg-[#13315e]"
+                <Link
+                  to={waitTo}
+                  className="inline-flex h-10 w-full items-center justify-center gap-1.5 rounded-full bg-[#2563EB] px-4 text-sm font-semibold text-white hover:bg-[#1D4ED8]"
                 >
                   Request Early Access
                   <ArrowRight className="h-3.5 w-3.5" />
-                </button>
+                </Link>
               ) : (
-                <button
-                  onClick={onWaitlist}
+                <Link
+                  to={waitTo}
                   className="inline-flex h-10 w-full items-center justify-center gap-1.5 rounded-full border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 hover:bg-slate-50"
                 >
                   Request Early Access
-                </button>
+                </Link>
               )}
             </div>
           </div>
         ))}
       </div>
 
-      <div className="mt-10 flex flex-wrap items-center justify-center gap-3">
-        <button
-          onClick={onWaitlist}
-          className="inline-flex h-11 items-center gap-2 rounded-full bg-[#0B2041] px-6 text-sm font-semibold text-white hover:bg-[#13315e]"
-        >
-          Request Early Access
-          <ArrowRight className="h-4 w-4" />
-        </button>
-        <button
-          onClick={onDemo}
+      <div className="mt-10 flex flex-wrap items-center justify-center gap-5">
+        <Link
+          to={DEMO_TO}
           className="inline-flex h-11 items-center gap-2 rounded-full border border-slate-200 bg-white px-6 text-sm font-semibold text-slate-700 hover:border-slate-300 hover:bg-slate-50"
         >
           See a live Vehicle Passport
-        </button>
+        </Link>
+        <Link to={waitTo} className="inline-flex items-center gap-1.5 py-2 text-sm font-semibold text-[#2563EB] hover:underline">
+          Request early access <ArrowRight className="h-4 w-4" />
+        </Link>
       </div>
     </div>
   </section>
@@ -1311,12 +1321,24 @@ const FAQS = [
     q: "Where does my vehicle data come from?",
     a: "Either your existing inventory feed, or our nightly inventory and advertised-price update that pulls your live listings and site pricing. Nothing to install or swap — your vehicles and prices flow in automatically.",
   },
+  {
+    q: "What happens after I request early access?",
+    a: "We review your dealership information and follow up within one business day. Then it's three steps: review your store, brands, and volume; configure templates, disclosures, and your inventory feed; and onboard your team hands-on. Requesting access is free and requires no card.",
+  },
+  {
+    q: "Is there a long-term contract?",
+    a: "No. Early-access pricing is month-to-month, per rooftop. Joining the early-access list costs nothing and locks your launch pricing.",
+  },
+  {
+    q: "How does my inventory get in? Which DMS or feed providers work?",
+    a: "Three paths: your existing inventory feed (vAuto, VinSolutions, CDK, Reynolds, and generic feeds via DMS webhooks on Compliance Pro), a CSV import, or our nightly website sync that reads your live listings directly — no IT project required.",
+  },
 ];
 
 const FAQ = () => {
   const [open, setOpen] = useState<number | null>(0);
   return (
-    <section id="faq" className="border-b border-slate-100">
+    <section id="faq" className="scroll-mt-20 border-b border-slate-100 bg-slate-50/40">
       <div className="mx-auto max-w-4xl px-6 py-20 lg:px-8">
         <div className="text-center">
           <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-blue-600">FAQ</p>
@@ -1326,21 +1348,24 @@ const FAQ = () => {
         </div>
         <div className="mt-10 divide-y divide-slate-200 rounded-2xl border border-slate-200 bg-white">
           {FAQS.map((f, i) => (
-            <button
-              key={i}
-              onClick={() => setOpen(open === i ? null : i)}
-              className="w-full px-6 py-5 text-left transition-colors hover:bg-slate-50"
-            >
-              <div className="flex items-center justify-between gap-4">
+            <div key={i} className="px-6 py-5">
+              <button
+                onClick={() => setOpen(open === i ? null : i)}
+                aria-expanded={open === i}
+                aria-controls={`faq-a-${i}`}
+                className="flex w-full items-center justify-between gap-4 text-left"
+              >
                 <span className="text-base font-semibold text-slate-900">{f.q}</span>
                 <ChevronDown
-                  className={`h-4 w-4 flex-shrink-0 text-slate-400 transition-transform ${
+                  className={`h-4 w-4 flex-shrink-0 text-slate-500 transition-transform ${
                     open === i ? "rotate-180" : ""
                   }`}
                 />
-              </div>
-              {open === i && <p className="mt-3 text-sm leading-relaxed text-slate-600">{f.a}</p>}
-            </button>
+              </button>
+              {open === i && (
+                <p id={`faq-a-${i}`} className="mt-3 text-sm leading-relaxed text-slate-600">{f.a}</p>
+              )}
+            </div>
           ))}
         </div>
       </div>
@@ -1352,7 +1377,7 @@ const FAQ = () => {
 // Final CTA
 // ──────────────────────────────────────────────────────────────
 
-const FinalCTA = ({ onWaitlist, onDemo }: { onWaitlist: () => void; onDemo: () => void }) => (
+const FinalCTA = ({ waitTo }: { waitTo: string }) => (
   <section className="px-6 py-20 lg:px-8">
     <div className="relative mx-auto max-w-5xl overflow-hidden rounded-3xl bg-gradient-to-br from-[#0B2041] via-[#13315e] to-[#0B2041] px-8 py-20 text-center text-white lg:px-16">
       <div aria-hidden className="pointer-events-none absolute inset-0">
@@ -1364,20 +1389,21 @@ const FinalCTA = ({ onWaitlist, onDemo }: { onWaitlist: () => void; onDemo: () =
           Get early access.
         </h2>
         <p className="mt-5 text-lg text-white/70">First in line · Early-access pricing locked in.</p>
+        <p className="mt-2 text-sm text-white/60">California SB 766 takes effect October 2026 — be audit-ready before your state's next enforcement sweep.</p>
         <div className="mt-9 flex flex-wrap items-center justify-center gap-3">
-          <button
-            onClick={onWaitlist}
+          <Link
+            to={waitTo}
             className="inline-flex h-12 items-center gap-2 rounded-full bg-white px-6 text-sm font-semibold text-slate-950 hover:bg-white/90"
           >
             Request Early Access
             <ArrowRight className="h-4 w-4" />
-          </button>
-          <button
-            onClick={onDemo}
+          </Link>
+          <Link
+            to={DEMO_TO}
             className="inline-flex h-12 items-center gap-2 rounded-full border border-white/40 bg-white/10 px-6 text-sm font-semibold text-white hover:bg-white/20"
           >
             See a live Vehicle Passport
-          </button>
+          </Link>
         </div>
       </div>
     </div>
@@ -1388,29 +1414,75 @@ const FinalCTA = ({ onWaitlist, onDemo }: { onWaitlist: () => void; onDemo: () =
 // Footer
 // ──────────────────────────────────────────────────────────────
 
-const Footer = ({ onNav, onWaitlist }: { onNav: (to: string) => void; onWaitlist: () => void }) => (
-  <footer className="border-t border-slate-100 px-6 py-10 lg:px-8">
-    <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-4">
-      <Logo variant="full" size={24} />
-      <div className="flex flex-wrap items-center gap-4 text-xs text-slate-600">
-        {NAV_LINKS.map((l) => (
-          <a key={l.href} href={l.href} className="hover:text-slate-900">
-            {l.label}
-          </a>
+const FOOTER_COLS: { title: string; links: { label: string; href?: string; to?: string }[] }[] = [
+  {
+    title: "Product",
+    links: [
+      { label: "How it works", href: "#how" },
+      { label: "Sticker Studio", href: "#studio" },
+      { label: "Vehicle Passport", href: "#passport" },
+      { label: "Pricing", href: "#pricing" },
+      { label: "Live sample Passport", to: DEMO_TO },
+    ],
+  },
+  {
+    title: "Compliance",
+    links: [
+      { label: "The risk", href: "#risk" },
+      { label: "Take the power back", href: "#power" },
+      { label: "Where AutoLabels fits", href: "#compare" },
+      { label: "FAQ", href: "#faq" },
+    ],
+  },
+  {
+    title: "Company",
+    links: [
+      { label: "Request early access", to: "/waitlist" },
+      { label: "Sign in", to: "/login" },
+      { label: "Privacy", to: "/privacy" },
+      { label: "Terms", to: "/terms" },
+    ],
+  },
+];
+
+const Footer = ({ waitTo }: { waitTo: string }) => (
+  <footer className="border-t border-slate-100 px-6 py-12 lg:px-8">
+    <div className="mx-auto max-w-7xl">
+      <div className="grid gap-10 sm:grid-cols-2 lg:grid-cols-[minmax(0,1.4fr)_repeat(3,minmax(0,1fr))]">
+        <div>
+          <Logo variant="full" size={26} />
+          <p className="mt-3 max-w-xs text-sm leading-relaxed text-slate-600">
+            Window stickers, addendums, Buyers Guides, and QR Vehicle Passports — one
+            tamper-evident record per VIN.
+          </p>
+          <Link
+            to={waitTo}
+            className="mt-4 inline-flex h-9 items-center gap-1.5 rounded-full bg-[#2563EB] px-4 text-sm font-medium text-white hover:bg-[#1D4ED8]"
+          >
+            Request Early Access <ArrowRight className="h-3.5 w-3.5" />
+          </Link>
+        </div>
+        {FOOTER_COLS.map((col) => (
+          <div key={col.title}>
+            <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-slate-500">{col.title}</p>
+            <ul className="mt-3 space-y-1">
+              {col.links.map((l) => (
+                <li key={l.label}>
+                  {l.to ? (
+                    <Link to={l.to} className="inline-block py-1.5 text-sm text-slate-600 hover:text-slate-900">{l.label}</Link>
+                  ) : (
+                    <a href={l.href} className="inline-block py-1.5 text-sm text-slate-600 hover:text-slate-900">{l.label}</a>
+                  )}
+                </li>
+              ))}
+            </ul>
+          </div>
         ))}
-        <button onClick={() => onNav("/privacy")} className="hover:text-slate-900">Privacy</button>
-        <button onClick={() => onNav("/terms")} className="hover:text-slate-900">Terms</button>
-        <button onClick={() => onNav("/login")} className="hover:text-slate-900">Sign in</button>
-        <button
-          onClick={onWaitlist}
-          className="inline-flex h-8 items-center gap-1.5 rounded-full bg-[#0B2041] px-3 text-xs font-medium text-white hover:bg-[#13315e]"
-        >
-          Request Early Access
-        </button>
       </div>
-      <p className="text-xs text-slate-500">
-        © {new Date().getFullYear()} AutoLabels.io · Clear. Compliant. Consistent.
-      </p>
+      <div className="mt-10 flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 pt-6">
+        <p className="text-xs text-slate-500">© {new Date().getFullYear()} AutoLabels.io · Clear. Compliant. Consistent.</p>
+        <p className="text-xs text-slate-500">FTC-aligned · Tamper-evident · 50-state disclosure engine</p>
+      </div>
     </div>
   </footer>
 );
@@ -1453,13 +1525,17 @@ const NumberedCard = ({
   <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm transition-shadow hover:shadow-md">
     <div className="flex items-center justify-between">
       {Icon ? (
-        <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-gradient-to-br from-[#3BB4FF] via-[#2563EB] to-[#0B2041] text-white">
-          <Icon className="h-5 w-5" />
-        </div>
+        <>
+          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-gradient-to-br from-[#3BB4FF] via-[#2563EB] to-[#0B2041] text-white">
+            <Icon className="h-5 w-5" />
+          </div>
+          <span className="font-display text-xs font-bold tabular-nums text-[#2563EB]">{num}</span>
+        </>
       ) : (
-        <Building2 className="h-5 w-5 text-slate-300" />
+        <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-gradient-to-br from-[#3BB4FF] via-[#2563EB] to-[#0B2041] font-display text-sm font-black text-white">
+          {num}
+        </span>
       )}
-      <span className="font-display text-xs font-bold tabular-nums text-[#2563EB]">{num}</span>
     </div>
     <h3 className="mt-4 font-display text-xl font-bold tracking-tight text-slate-900">{title}</h3>
     <p className="mt-2 text-sm leading-relaxed text-slate-600">{body}</p>
