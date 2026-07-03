@@ -7,7 +7,7 @@
 // Body: { vin?, tenant_id?, batch?, force? }
 // ──────────────────────────────────────────────────────────────────────
 import { json, preflight } from "../_shared/http.ts";
-import { adminClient } from "../_shared/supabase.ts";
+import { adminClient, SERVICE_KEY } from "../_shared/supabase.ts";
 
 const MC_KEY = Deno.env.get("MARKETCHECK_API_KEY_1") || Deno.env.get("MARKETCHECK_API_KEY") || "";
 const MC_BASE = "https://api.marketcheck.com/v2";
@@ -125,7 +125,7 @@ Deno.serve(async (req) => {
   // ── Auth gate: service-role (cron) bypasses; otherwise require a
   // signed-in tenant member or platform admin for the requested tenant.
   const auth = (req.headers.get("Authorization") || "").replace(/^Bearer\s+/i, "");
-  if (auth !== serviceKey) {
+  if (!SERVICE_KEY || auth !== SERVICE_KEY) {
     const { data: ures, error: uerr } = await admin.auth.getUser(auth);
     const userId = ures?.user?.id;
     if (uerr || !userId) return json(401, { error: "authentication required" });
