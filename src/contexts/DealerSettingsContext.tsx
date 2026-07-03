@@ -10,6 +10,7 @@ import type { DocumentRules } from "@/lib/documentRules";
 import { DEFAULT_STICKY_BUTTONS, type StickyBottomButtons } from "@/lib/stickyButtons";
 import { DEFAULT_CONTACT_ROUTING, type CustomerPassportContactSettings, type PassportAgent } from "@/lib/passportRouting";
 import type { IihsAward } from "@/lib/iihsAwards";
+import { DEFAULT_TODAYS_PRICE_CUSTOM, type TodaysPriceMode, type TodaysPriceCustom } from "@/lib/todaysPrice";
 
 // A configurable internal recon/service the dealer routes to a responsible
 // party. Non-customer charge — tracked as the store's own cost.
@@ -211,6 +212,11 @@ export interface DealerSettings {
   // the doc fee) and disclose the fee separately, or show the final website
   // sale price (fee included). Default: advertised_before_doc.
   price_display_mode: "advertised_before_doc" | "website_sale_price";
+  // Today's Price page — dealer-selected wording mode plus custom copy and
+  // calculator toggles. Default is the compliance-safe Payment Estimate; the
+  // out-the-door mode is explicit opt-in, never the default.
+  todays_price_mode: TodaysPriceMode;
+  todays_price_custom: TodaysPriceCustom;
   // Office title/MCO upload. One or more clerk emails (comma/newline separated)
   // get the per-vehicle upload link + QR. Reminders re-send every N days until
   // the title/MCO is on file.
@@ -385,6 +391,8 @@ export const DEFAULT_SETTINGS: DealerSettings = {
   doc_fee_state: "",
   financing_disclosure_apr: null,
   price_display_mode: "advertised_before_doc",
+  todays_price_mode: "payment_estimate",
+  todays_price_custom: DEFAULT_TODAYS_PRICE_CUSTOM,
   title_clerk_email: "",
   title_reminders_enabled: true,
   title_reminder_days: 3,

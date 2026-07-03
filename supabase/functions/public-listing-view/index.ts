@@ -131,6 +131,10 @@ serve(async (req) => {
         // Customer-facing price display mode (advertised_before_doc default vs
         // website_sale_price). Lets the passport show the dealer's chosen price.
         if (s.price_display_mode) row.price_display_mode = s.price_display_mode;
+        // Today's Price page wording mode + custom copy (compliance-safe
+        // defaults resolve client-side when absent).
+        if (s.todays_price_mode) row.todays_price_mode = s.todays_price_mode;
+        if (s.todays_price_custom) row.todays_price_custom = s.todays_price_custom;
         // Dealer-entered passport trust content (badges + multi-source reviews).
         const trust = {
           years_in_business: (s.dealer_years_in_business as string) || "",

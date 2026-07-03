@@ -18,6 +18,7 @@ import { useVinScan } from "@/contexts/VinScanContext";
 import { toast } from "sonner";
 import { AccessoryInstallPanel } from "@/components/admin/AccessoryInstallPanel";
 import DealerProgramsPanel from "@/components/admin/DealerProgramsPanel";
+import { TODAYS_PRICE_MODE_OPTIONS, DEFAULT_TODAYS_PRICE_CUSTOM, resolveTodaysPrice } from "@/lib/todaysPrice";
 import OemWarrantyPanel from "@/components/admin/OemWarrantyPanel";
 import StickyButtonsPanel from "@/components/admin/StickyButtonsPanel";
 import DealershipTrustPanel from "@/components/admin/DealershipTrustPanel";
@@ -1341,6 +1342,68 @@ const Admin = () => {
                 <p className="text-[11px] text-muted-foreground mt-1">
                   Controls the price shown on the customer Passport. The advertised price is always compared to market before the doc fee.
                 </p>
+              </div>
+              <div className="mt-3">
+                <label className="text-xs font-semibold text-muted-foreground">Today's Price page wording</label>
+                <select
+                  value={settings.todays_price_mode || "payment_estimate"}
+                  onChange={(e) => updateSettings({ todays_price_mode: e.target.value as DealerSettings["todays_price_mode"] })}
+                  className="w-full px-3 py-2 border border-border-custom rounded text-sm"
+                >
+                  {TODAYS_PRICE_MODE_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+                </select>
+                <p className="text-[11px] text-muted-foreground mt-1">
+                  {TODAYS_PRICE_MODE_OPTIONS.find((o) => o.value === (settings.todays_price_mode || "payment_estimate"))?.hint}
+                </p>
+                {(() => {
+                  const custom = { ...DEFAULT_TODAYS_PRICE_CUSTOM, ...(settings.todays_price_custom || {}) };
+                  const setCustom = (patch: Partial<typeof custom>) => updateSettings({ todays_price_custom: { ...custom, ...patch } });
+                  const preview = resolveTodaysPrice({ todays_price_mode: settings.todays_price_mode, todays_price_custom: custom });
+                  return (
+                    <div className="mt-2 space-y-2">
+                      {settings.todays_price_mode === "custom" && (
+                        <>
+                          <div>
+                            <label className="text-xs font-semibold text-muted-foreground">Headline</label>
+                            <input value={custom.headline} onChange={(e) => setCustom({ headline: e.target.value })} placeholder="Today's Price" className="w-full px-3 py-2 border border-border-custom rounded text-sm" />
+                          </div>
+                          <div>
+                            <label className="text-xs font-semibold text-muted-foreground">Subheadline</label>
+                            <input value={custom.sub} onChange={(e) => setCustom({ sub: e.target.value })} placeholder="Personalize your payment estimate for this vehicle." className="w-full px-3 py-2 border border-border-custom rounded text-sm" />
+                          </div>
+                          <div>
+                            <label className="text-xs font-semibold text-muted-foreground">Button text</label>
+                            <input value={custom.cta} onChange={(e) => setCustom({ cta: e.target.value })} placeholder="Request Payment Details" className="w-full px-3 py-2 border border-border-custom rounded text-sm" />
+                          </div>
+                          <div>
+                            <label className="text-xs font-semibold text-muted-foreground">Disclaimer</label>
+                            <textarea value={custom.disclaimer} onChange={(e) => setCustom({ disclaimer: e.target.value })} rows={2} placeholder="Estimate only, with approved credit…" className="w-full px-3 py-2 border border-border-custom rounded text-sm resize-none" />
+                          </div>
+                          <label className="flex items-start gap-2 text-xs text-foreground">
+                            <input type="checkbox" className="mt-0.5" checked={custom.allow_otd_wording} onChange={(e) => setCustom({ allow_otd_wording: e.target.checked })} />
+                            <span>Allow out-the-door / "best price" wording in custom copy. When off, copy containing that language falls back to the safe default.</span>
+                          </label>
+                        </>
+                      )}
+                      <div className="grid grid-cols-2 gap-x-4 gap-y-1.5">
+                        {([
+                          ["show_calculator", "Show payment calculator"],
+                          ["show_down", "Show down payment slider"],
+                          ["show_term", "Show term selector"],
+                          ["show_apr", "Show APR slider"],
+                        ] as ["show_calculator" | "show_down" | "show_term" | "show_apr", string][]).map(([key, label]) => (
+                          <label key={key} className="flex items-center gap-2 text-xs text-foreground">
+                            <input type="checkbox" checked={custom[key]} onChange={(e) => setCustom({ [key]: e.target.checked })} />
+                            {label}
+                          </label>
+                        ))}
+                      </div>
+                      <p className="text-[11px] text-muted-foreground border-t border-border pt-2">
+                        Shoppers will see: <span className="font-semibold text-foreground">{preview.headline}</span> — {preview.sub} · Button: <span className="font-semibold text-foreground">{preview.cta}</span>
+                      </p>
+                    </div>
+                  );
+                })()}
               </div>
             </div>
 

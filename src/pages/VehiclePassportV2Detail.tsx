@@ -16,6 +16,7 @@ import { trackLeadSubmitted, trackCustomerEngagement } from "@/lib/engagement/cu
 import { estimateAffordability, DEFAULT_APR_PERCENT } from "@/lib/affordability";
 import Logo from "@/components/brand/Logo";
 import { derivePassport, fmt$, type PassportData } from "@/lib/passportV2Data";
+import { resolveTodaysPrice, type TodaysPriceCopy } from "@/lib/todaysPrice";
 import { listingGallery, listingHero } from "@/lib/photos";
 import { MOCK_LISTING } from "./VehiclePassportV3";
 
@@ -55,9 +56,9 @@ const Unavailable = ({ what, hint }: { what: string; hint?: string }) => (
 // extraNotes lets intent pages append structured context (test-drive time,
 // trade vehicle, ZIP) without new fields here.
 const LeadForm = ({
-  listing, intent, label, cta, onDone, extraNotes, dealerPhone,
+  listing, intent, label, cta, onDone, extraNotes, dealerPhone, flowPrefix,
 }: {
-  listing: VehicleListing; intent: string; label: string; cta: string; onDone?: () => void; extraNotes?: () => string; dealerPhone?: string | null;
+  listing: VehicleListing; intent: string; label: string; cta: string; onDone?: () => void; extraNotes?: () => string; dealerPhone?: string | null; flowPrefix?: string;
 }) => {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -65,7 +66,9 @@ const LeadForm = ({
   const [message, setMessage] = useState("");
   const [sending, setSending] = useState(false);
   const [sent, setSent] = useState(false);
+  const [started, setStarted] = useState(false);
   const navigate = useNavigate();
+  const markStarted = () => { if (!started && flowPrefix) { setStarted(true); trackFlow(listing, `${flowPrefix}_form_started`); } };
 
   const submit = async () => {
     if (!name.trim() || (!email.trim() && !phone.trim())) { toast.error("Name and a phone or email are required"); return; }
@@ -118,9 +121,13 @@ const LeadForm = ({
       supabase.functions.invoke("lead-alert", {
         body: { slug: listing.slug, vin: listing.vin, intent, name: name.trim(), phone: phone.trim() || null, email: email.trim() || null, source: src, sub_source: subSource },
       }).catch(() => { /* alert failure never blocks the shopper */ });
+      if (flowPrefix) { trackFlow(listing, `${flowPrefix}_form_submitted`); trackFlow(listing, `${flowPrefix}_form_success`); }
       setSent(true);
       onDone?.();
-    } catch { toast.error("Couldn't send — please call the dealer directly"); }
+    } catch {
+      if (flowPrefix) trackFlow(listing, `${flowPrefix}_form_error`);
+      toast.error("Couldn't send — please call the dealer directly");
+    }
     finally { setSending(false); }
   };
 
@@ -139,7 +146,7 @@ const LeadForm = ({
 
   return (
     <Card className="p-5">
-      <div className="space-y-3">
+      <div className="space-y-3" onInput={markStarted}>
         <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Your name *" className="w-full border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
         <input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="Email" type="email" className="w-full border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
         <input value={phone} onChange={(e) => setPhone(formatPhone(e.target.value))} placeholder="Phone" type="tel" className="w-full border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
@@ -156,40 +163,82 @@ const LeadForm = ({
 // Interactive payment estimator — payment shoppers are the largest used-car
 // segment, and a monthly number they CHOSE converts far better than a static
 // assumption line. The picked terms ride into the lead so the desk opens with
-// a pre-qualified conversation.
-const PaymentEstimator = ({ price, listing, dealerPhone }: { price: number; listing: VehicleListing; dealerPhone?: string | null }) => {
+// a pre-qualified conversation. Copy and which controls render come from the
+// dealer's Today's Price configuration.
+const PaymentEstimator = ({ price, listing, dealerPhone, copy }: { price: number; listing: VehicleListing; dealerPhone?: string | null; copy: TodaysPriceCopy }) => {
   const [down, setDown] = useState(() => Math.round((price * 0.1) / 500) * 500);
   const [term, setTerm] = useState(72);
   const [apr, setApr] = useState(DEFAULT_APR_PERCENT);
   const row = estimateAffordability({ price, downPayment: down, aprPercent: apr }, [term])[0];
   const TERMS = [48, 60, 72, 84];
+  const isPreview = typeof window !== "undefined" && new URLSearchParams(window.location.search).has("preview");
+  const track = (event: string, extra: Record<string, unknown> = {}) => { if (!isPreview) trackFlow(listing, event, extra); };
+  const showCalc = copy.showCalculator && (copy.showDown || copy.showTerm || copy.showApr);
   return (
     <>
-      <Card className="p-5 mb-4">
-        <div className="flex items-baseline justify-between gap-3 flex-wrap">
-          <p className="text-[14px] font-bold text-slate-900">Build your payment</p>
-          <p className="text-[26px] font-extrabold tracking-tight text-[#2563EB]">{fmt$(Math.round(row.monthly_payment))}<span className="text-[14px] font-semibold text-slate-500">/mo</span></p>
-        </div>
-        <div className="mt-4 space-y-4">
-          <div>
-            <div className="flex justify-between text-[12px] text-slate-500 mb-1"><span>Down payment</span><span className="font-bold text-slate-900">{fmt$(down)}</span></div>
-            <input type="range" min={0} max={Math.round((price * 0.4) / 500) * 500} step={500} value={down} onChange={(e) => setDown(Number(e.target.value))} className="w-full accent-[#2563EB]" />
+      {showCalc && (
+        <Card className="p-5 mb-4">
+          <div className="flex items-baseline justify-between gap-3 flex-wrap">
+            <p className="text-[14px] font-bold text-slate-900">Build your payment</p>
+            <p className="text-[26px] font-extrabold tracking-tight text-[#2563EB]">{fmt$(Math.round(row.monthly_payment))}<span className="text-[14px] font-semibold text-slate-500">/mo</span></p>
           </div>
-          <div>
-            <p className="text-[12px] text-slate-500 mb-1.5">Term</p>
-            <div className="flex gap-2">{TERMS.map((t) => (
-              <button key={t} onClick={() => setTerm(t)} className={`flex-1 h-10 rounded-xl text-[13px] font-semibold border transition-colors ${term === t ? "border-[#2563EB] bg-blue-50 text-[#2563EB]" : "border-slate-200 text-slate-600 hover:border-slate-300"}`}>{t} mo</button>
-            ))}</div>
+          <div className="mt-4 space-y-4">
+            {copy.showDown && (
+              <div>
+                <div className="flex justify-between text-[12px] text-slate-500 mb-1"><span>Down payment</span><span className="font-bold text-slate-900">{fmt$(down)}</span></div>
+                <input type="range" min={0} max={Math.round((price * 0.4) / 500) * 500} step={500} value={down} onChange={(e) => setDown(Number(e.target.value))} onPointerUp={() => track("payment_slider_changed", { down })} className="w-full accent-[#2563EB]" />
+              </div>
+            )}
+            {copy.showTerm && (
+              <div>
+                <p className="text-[12px] text-slate-500 mb-1.5">Term</p>
+                <div className="flex gap-2">{TERMS.map((t) => (
+                  <button key={t} onClick={() => { setTerm(t); track("term_selected", { term: t }); }} className={`flex-1 h-10 rounded-xl text-[13px] font-semibold border transition-colors ${term === t ? "border-[#2563EB] bg-blue-50 text-[#2563EB]" : "border-slate-200 text-slate-600 hover:border-slate-300"}`}>{t} mo</button>
+                ))}</div>
+              </div>
+            )}
+            {copy.showApr && (
+              <div>
+                <div className="flex justify-between text-[12px] text-slate-500 mb-1"><span>Est. APR</span><span className="font-bold text-slate-900">{apr.toFixed(2)}%</span></div>
+                <input type="range" min={3} max={12} step={0.25} value={apr} onChange={(e) => setApr(Number(e.target.value))} onPointerUp={() => track("apr_changed", { apr })} className="w-full accent-[#2563EB]" />
+              </div>
+            )}
           </div>
-          <div>
-            <div className="flex justify-between text-[12px] text-slate-500 mb-1"><span>Est. APR</span><span className="font-bold text-slate-900">{apr.toFixed(2)}%</span></div>
-            <input type="range" min={3} max={12} step={0.25} value={apr} onChange={(e) => setApr(Number(e.target.value))} className="w-full accent-[#2563EB]" />
-          </div>
-        </div>
-        <p className="text-[11px] text-slate-400 mt-3">Estimate only, with approved credit (WAC). Excludes tax, title, and registration. Your rate and terms are set by the lender.</p>
-      </Card>
-      <LeadForm listing={listing} intent="todays_price" label="Today's Price" cta="Get my best price on these terms" dealerPhone={dealerPhone}
-        extraNotes={() => `Payment goal ${fmt$(Math.round(row.monthly_payment))}/mo · ${term} mo · ${apr.toFixed(2)}% APR · ${fmt$(down)} down`} />
+          <p className="text-[11px] text-slate-400 mt-3">{copy.disclaimer}</p>
+        </Card>
+      )}
+      <LeadForm listing={listing} intent="todays_price" label="Today's Price" cta={copy.cta} dealerPhone={dealerPhone} flowPrefix="todays_price"
+        extraNotes={() => [`Mode ${copy.mode}`, showCalc ? `Payment goal ${fmt$(Math.round(row.monthly_payment))}/mo · ${term} mo · ${apr.toFixed(2)}% APR · ${fmt$(down)} down` : ""].filter(Boolean).join(" · ")} />
+      <p className="text-[11.5px] text-slate-500 text-center mt-3">{copy.reassurance}</p>
+      {!showCalc && <p className="text-[11px] text-slate-400 text-center mt-1.5">{copy.disclaimer}</p>}
+    </>
+  );
+};
+
+// Today's Price — headline/CTA/disclaimer resolve from the dealer's
+// configured mode (compliance-safe Payment Estimate by default).
+const TodaysPriceExperience = ({ listing, d }: { listing: VehicleListing; d: PassportData }) => {
+  const copy = useMemo(() => resolveTodaysPrice(listing as unknown as { todays_price_mode?: unknown; todays_price_custom?: unknown }), [listing]);
+  const isPreview = typeof window !== "undefined" && new URLSearchParams(window.location.search).has("preview");
+  useEffect(() => { if (!isPreview) trackFlow(listing, "todays_price_page_viewed", { mode: copy.mode }); }, [listing, isPreview, copy.mode]);
+  return (
+    <>
+      <SectionHeading icon={DollarSign} title={copy.headline} subtitle={copy.sub} />
+      {d.price != null ? (
+        <>
+          <Card className="p-5 mb-4 text-center">
+            <p className="text-[13px] font-semibold text-slate-500">{d.priceLabel}</p>
+            <p className="text-[36px] font-extrabold tracking-tight leading-none mt-1">{fmt$(d.price)}</p>
+            {d.saveVsMsrp != null && <p className="text-[14px] font-semibold text-emerald-600 mt-1">You save {fmt$(d.saveVsMsrp)} vs MSRP</p>}
+          </Card>
+          <PaymentEstimator price={d.price} listing={listing} dealerPhone={d.dealerPhone} copy={copy} />
+        </>
+      ) : (
+        <>
+          <LeadForm listing={listing} intent="todays_price" label="Today's Price" cta={copy.cta} dealerPhone={d.dealerPhone} flowPrefix="todays_price" extraNotes={() => `Mode ${copy.mode}`} />
+          <p className="text-[11.5px] text-slate-500 text-center mt-3">{copy.reassurance}</p>
+        </>
+      )}
     </>
   );
 };
@@ -1267,23 +1316,7 @@ const SECTIONS: Record<string, { title: string; render: SectionRender; wide?: bo
   },
   "todays-price": {
     title: "Today's Price",
-    render: ({ d, listing }) => (
-      <>
-        <SectionHeading icon={DollarSign} title="Get Today's Price" subtitle="Request the dealership's best out-the-door price." />
-        {d.price != null ? (
-          <>
-            <Card className="p-5 mb-4 text-center">
-              <p className="text-[13px] font-semibold text-slate-500">{d.priceLabel}</p>
-              <p className="text-[36px] font-extrabold tracking-tight leading-none mt-1">{fmt$(d.price)}</p>
-              {d.saveVsMsrp != null && <p className="text-[14px] font-semibold text-emerald-600 mt-1">You save {fmt$(d.saveVsMsrp)} vs MSRP</p>}
-            </Card>
-            <PaymentEstimator price={d.price} listing={listing} dealerPhone={d.dealerPhone} />
-          </>
-        ) : (
-          <LeadForm listing={listing} intent="todays_price" label="Today's Price" cta="Get my best price" dealerPhone={d.dealerPhone} />
-        )}
-      </>
-    ),
+    render: ({ d, listing }) => <TodaysPriceExperience listing={listing} d={d} />,
   },
   // ── Lead-capture sections ──
   "check-availability": {
@@ -1538,7 +1571,7 @@ const VehiclePassportV2Detail = () => {
               ? { key: "hold", icon: ShieldCheck, label: "Request Hold", primary: true, onClick: () => { const el = document.getElementById("reserve-form"); el?.scrollIntoView({ behavior: "smooth" }); window.setTimeout(() => document.getElementById("rsv-name")?.focus({ preventScroll: true }), 450); } }
               : section === "contact"
               ? { key: "contact", icon: Mail, label: "Contact Dealer", primary: true, onClick: () => { const el = document.getElementById("contact-form"); el?.scrollIntoView({ behavior: "smooth" }); window.setTimeout(() => document.getElementById("ct-name")?.focus({ preventScroll: true }), 450); } }
-              : { key: "price", icon: DollarSign, label: "Today's Price", primary: true, onClick: () => navigate(`/${base}/${vehicleSlug}/todays-price`) },
+              : { key: "price", icon: DollarSign, label: section === "todays-price" ? resolveTodaysPrice(listing as unknown as { todays_price_mode?: unknown }).barLabel : "Today's Price", primary: true, onClick: () => navigate(`/${base}/${vehicleSlug}/todays-price`) },
           ].map((b) => (
             <button key={b.key} onClick={b.onClick} className={`h-11 rounded-xl text-[10px] leading-[1.05] font-bold inline-flex flex-col items-center justify-center gap-0.5 text-center px-0.5 sm:h-12 sm:flex-row sm:gap-2 sm:rounded-full sm:px-7 sm:text-[13px] ${b.primary ? "bg-[#2563EB] text-white" : "border border-[#d8dce0] bg-white text-[#0F172A]"}`}>
               <b.icon className={`w-4 h-4 ${b.primary ? "" : "text-[#2563EB]"}`} /> {b.label}
