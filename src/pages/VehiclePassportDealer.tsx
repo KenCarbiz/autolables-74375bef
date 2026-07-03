@@ -1,10 +1,6 @@
 import { useMemo } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import {
-  ChevronLeft, Upload, Printer, Bookmark, ShieldCheck, CheckCircle2, Star, Award, Building2,
-  Wrench, Truck, Users, Phone, MessageSquare, MapPin, Clock, Navigation, BadgeCheck, Sparkles,
-  Car, FileText, Lock, Cog, Crown, MessageCircle, CalendarCheck, Tag,
-} from "lucide-react";
+import { ChevronLeft, Upload, Printer, Bookmark, Star, Building2 } from "lucide-react";
 import { toast } from "sonner";
 import { Helmet } from "react-helmet-async";
 import { type VehicleListing } from "@/hooks/useVehicleListing";
@@ -14,6 +10,10 @@ import { MOCK_LISTING } from "./VehiclePassportV3";
 import { usePublicListing } from "@/hooks/usePublicListing";
 import PassportCtaDock from "@/components/passport/PassportCtaDock";
 import { CARD } from "@/lib/passportTokens";
+import { DealerPageIcon, DealerPageIconBadge, type DealerPageIconKey, type DealerPageIconTone } from "@/components/icons/DealerPageIcons";
+import { OemAuthorizedBadge, resolveOemBrand, oemDisplayName } from "@/components/brand/OemLogoRegistry";
+import { oemDealerPageCopy } from "@/lib/oem/oemDealerPageCopy";
+import { DealerHeroImage, DealerMapPreview } from "@/components/artwork/DealerPageArtwork";
 
 // ──────────────────────────────────────────────────────────────
 // VehiclePassportDealer — the "Why Buy From {Tenant}" trust page, built to
@@ -22,6 +22,8 @@ import { CARD } from "@/lib/passportTokens";
 // reputation cards, service & ownership support, Visit Us, commitment
 // band, final CTA. Every module is tenant-data gated — sections shrink or
 // hide rather than showing empty placeholders, and nothing is fabricated.
+// All board assets render through the DealerPageIcons registry; header
+// utility actions (back/share/print/save) stay on the generic set.
 // ──────────────────────────────────────────────────────────────
 
 const TEXT2 = "text-[#64748B]";
@@ -38,25 +40,23 @@ const SectionTitle = ({ children, sub }: { children: React.ReactNode; sub?: stri
 );
 
 // Hero chip — translucent pill readable over the photo.
-const HeroChip = ({ icon: Icon, children, tone = "light" }: { icon: React.ElementType; children: React.ReactNode; tone?: "light" | "green" }) => (
+const HeroChip = ({ iconKey, children, tone = "light" }: { iconKey: DealerPageIconKey; children: React.ReactNode; tone?: "light" | "green" }) => (
   <span className={`inline-flex items-center gap-1.5 text-[12px] font-bold rounded-full px-3 py-1.5 backdrop-blur-sm ${tone === "green" ? "bg-emerald-500/25 border border-emerald-300/50 text-emerald-50" : "bg-white/15 border border-white/30 text-white"}`}>
-    <Icon className="w-3.5 h-3.5" /> {children}
+    <DealerPageIcon iconKey={iconKey} size={14} color="currentColor" className="shrink-0" /> {children}
   </span>
 );
 
-const TrustCard = ({ icon: Icon, title, sub, tone = "blue" }: { icon: React.ElementType; title: string; sub: string; tone?: "blue" | "green" }) => (
+const TrustCard = ({ iconKey, title, sub, tone = "blue" }: { iconKey: DealerPageIconKey; title: string; sub: string; tone?: DealerPageIconTone }) => (
   <div className={`${CARD} p-5 text-center`}>
-    <span className={`w-12 h-12 rounded-2xl flex items-center justify-center mx-auto ${tone === "green" ? "bg-emerald-50" : "bg-blue-50"}`}>
-      <Icon className={`w-6 h-6 ${tone === "green" ? "text-[#16A34A]" : "text-[#2563EB]"}`} strokeWidth={1.75} />
-    </span>
+    <DealerPageIconBadge iconKey={iconKey} tone={tone} size="md" className="mx-auto" />
     <p className="text-[14px] font-bold mt-3">{title}</p>
     <p className={`text-[12px] ${TEXT2} mt-1 leading-snug`}>{sub}</p>
   </div>
 );
 
-const ChooseRow = ({ icon: Icon, title, sub }: { icon: React.ElementType; title: string; sub: string }) => (
+const ChooseRow = ({ iconKey, title, sub }: { iconKey: DealerPageIconKey; title: string; sub: string }) => (
   <div className="flex items-start gap-3.5">
-    <span className="w-10 h-10 rounded-xl bg-blue-50 flex items-center justify-center shrink-0"><Icon className="w-5 h-5 text-[#2563EB]" strokeWidth={1.75} /></span>
+    <DealerPageIconBadge iconKey={iconKey} tone="blue" size="sm" />
     <div className="min-w-0">
       <p className="text-[13.5px] font-bold leading-tight">{title}</p>
       <p className={`text-[12.5px] ${TEXT2} leading-snug mt-0.5`}>{sub}</p>
@@ -64,9 +64,9 @@ const ChooseRow = ({ icon: Icon, title, sub }: { icon: React.ElementType; title:
   </div>
 );
 
-const ExpertiseCard = ({ icon: Icon, label }: { icon: React.ElementType; label: string }) => (
+const ExpertiseCard = ({ iconKey, label }: { iconKey: DealerPageIconKey; label: string }) => (
   <div className="rounded-xl border border-[#E6E8EC] bg-white p-4 text-center">
-    <Icon className="w-6 h-6 text-[#2563EB] mx-auto" strokeWidth={1.6} />
+    <DealerPageIconBadge iconKey={iconKey} tone="purple" size="sm" className="mx-auto" />
     <p className="text-[12px] font-bold leading-snug mt-2">{label}</p>
   </div>
 );
@@ -85,9 +85,9 @@ const ReviewCard = ({ name, rating, count, extra }: { name: string; rating: numb
   </div>
 );
 
-const SupportCard = ({ icon: Icon, title, sub }: { icon: React.ElementType; title: string; sub: string }) => (
+const SupportCard = ({ iconKey, title, sub }: { iconKey: DealerPageIconKey; title: string; sub: string }) => (
   <div className="text-center px-3">
-    <span className="w-11 h-11 rounded-2xl bg-blue-50 flex items-center justify-center mx-auto"><Icon className="w-5 h-5 text-[#2563EB]" strokeWidth={1.75} /></span>
+    <DealerPageIconBadge iconKey={iconKey} tone="blue" size="md" className="mx-auto" />
     <p className="text-[12.5px] font-bold leading-tight mt-2.5">{title}</p>
     <p className={`text-[11.5px] ${TEXT2} leading-snug mt-1`}>{sub}</p>
   </div>
@@ -133,35 +133,46 @@ const VehiclePassportDealer = () => {
   // ownership-expertise module instead. Never claim OEM status without data.
   const make = (listing.ymm || "").trim().split(/\s+/)[1] || "";
   const franchised = t.certifications.length > 0 && !!make;
-  const brand = make.toUpperCase();
+  const brandKey = resolveOemBrand(make);
+  const brand = brandKey ? oemDisplayName(brandKey) : make.toUpperCase();
+  const copy = oemDealerPageCopy(franchised ? brandKey : null);
 
   const hasLoaners = [...t.services, ...t.amenities].some((s) => /loaner/i.test(s));
   const hasPickup = /pickup|valet/i.test([t.delivery, ...t.services, ...t.amenities].join(" "));
   const hasService = t.serviceLocation === "onsite" || t.serviceLocation === "offsite";
 
-  const heroStats = [
-    hasYears ? { icon: CalendarCheck, l1: `Serving ${stateName}`, l2: `for over ${years} years` } : null,
-    t.familyOwned ? { icon: Users, l1: "Family-Owned", l2: founded ? `Since ${founded}` : "Dealership" } : null,
-    t.certifications.length > 0 ? { icon: Award, l1: "Factory", l2: "Authorized Store" } : null,
-    { icon: ShieldCheck, l1: "Transparent", l2: "Up-Front Pricing" },
-  ].filter(Boolean).slice(0, 4) as { icon: React.ElementType; l1: string; l2: string }[];
+  type HeroStat = { iconKey: DealerPageIconKey; l1: string; l2: string };
+  const heroStats: HeroStat[] = [
+    hasYears ? { iconKey: "schedule-test-drive" as const, l1: `Serving ${stateName}`, l2: `for over ${years} years` } : null,
+    t.familyOwned ? { iconKey: "customer-satisfaction" as const, l1: "Family-Owned", l2: founded ? `Since ${founded}` : "Dealership" } : null,
+    t.certifications.length > 0 ? { iconKey: "certified-pre-owned-support" as const, l1: "Factory", l2: "Authorized Store" } : null,
+  ].filter(Boolean) as HeroStat[];
+  // Backfill so the stat row never looks thin when tenant data is sparse.
+  const fallbackStats: HeroStat[] = [
+    { iconKey: "dealer-verified", l1: "Dealer", l2: "Verified" },
+    { iconKey: "factory-trained-staff", l1: "Factory-Trained", l2: "Staff" },
+    { iconKey: "transparent-pricing", l1: "Transparent", l2: "Up-Front Pricing" },
+    { iconKey: "customer-first", l1: "Customer-First", l2: "Experience" },
+    { iconKey: "vehicle-passport-partner", l1: "Vehicle Passport", l2: "Partner" },
+  ];
+  for (const f of fallbackStats) { if (heroStats.length >= 4) break; if (!heroStats.some((s) => s.iconKey === f.iconKey)) heroStats.push(f); }
 
-  const expertise = franchised
+  const expertise: { iconKey: DealerPageIconKey; label: string }[] = franchised
     ? [
-        { icon: Wrench, label: `Factory-Trained ${brand} Technicians` },
-        { icon: Cog, label: `Genuine ${brand} Parts` },
-        { icon: ShieldCheck, label: `${brand} Warranty Support` },
-        { icon: BadgeCheck, label: `${brand} Certified Pre-Owned Support` },
-        { icon: CheckCircle2, label: "Recall & Service Support" },
-        { icon: Crown, label: "Premium Ownership Experience" },
+        { iconKey: "factory-trained-technicians", label: brandKey ? copy.factoryTrainedTechniciansLabel : `Factory-Trained ${brand} Technicians` },
+        { iconKey: "genuine-oem-parts", label: brandKey ? copy.genuinePartsLabel : `Genuine ${brand} Parts` },
+        { iconKey: "warranty-support", label: brandKey ? copy.warrantySupportLabel : `${brand} Warranty Support` },
+        { iconKey: "certified-pre-owned-support", label: brandKey ? copy.certifiedPreOwnedSupportLabel : `${brand} Certified Pre-Owned Support` },
+        { iconKey: "recall-service-support", label: "Recall & Service Support" },
+        { iconKey: "luxury-ownership", label: copy.ownershipExperienceLabel },
       ]
     : [
-        { icon: Wrench, label: "Multi-Point Vehicle Inspections" },
-        { icon: FileText, label: "Complete Vehicle Disclosure" },
-        { icon: ShieldCheck, label: "Warranty Guidance" },
-        { icon: CheckCircle2, label: "Recall & Service Support" },
-        { icon: Car, label: "Every Make Welcome" },
-        { icon: Users, label: "Ownership Support After the Sale" },
+        { iconKey: "certified-service", label: "Multi-Point Vehicle Inspections" },
+        { iconKey: "complete-vehicle-disclosure", label: "Complete Vehicle Disclosure" },
+        { iconKey: "warranty-support", label: "Warranty Guidance" },
+        { iconKey: "recall-service-support", label: "Recall & Service Support" },
+        { iconKey: "loaner-vehicles", label: "Every Make Welcome" },
+        { iconKey: "customer-satisfaction", label: "Ownership Support After the Sale" },
       ];
 
   const heroBtn = "h-11 px-5 rounded-xl text-[13.5px] font-bold inline-flex items-center gap-2 transition-transform hover:-translate-y-0.5";
@@ -183,23 +194,16 @@ const VehiclePassportDealer = () => {
       </header>
 
       <main className="mx-auto max-w-[1100px] px-4 sm:px-5 py-5 space-y-8 pb-12">
-        {/* 1. HERO — image with dark overlay, chips + headline + proof + CTAs on the image */}
-        <section className="relative rounded-2xl overflow-hidden min-h-[380px] sm:min-h-[420px] flex">
-          {t.storefrontUrl
-            ? <img src={t.storefrontUrl} alt={d.dealerName} className="absolute inset-0 w-full h-full object-cover" />
-            : <div className="absolute inset-0 bg-gradient-to-br from-[#13233d] to-[#0D1B2A]" />}
-          <div className="absolute inset-0" style={{ background: "linear-gradient(105deg, rgba(7,15,28,0.88) 0%, rgba(7,15,28,0.62) 45%, rgba(7,15,28,0.30) 100%)" }} />
+        {/* 1. HERO — storefront photo or drawn dealership facade, chips + headline + proof + CTAs on the image */}
+        <DealerHeroImage src={t.storefrontUrl || null} alt={d.dealerName} className="min-h-[380px] sm:min-h-[420px]">
           <div className="relative flex-1 flex flex-col justify-between p-5 sm:p-8 text-white">
             <div className="flex items-start justify-between gap-3">
               <div className="flex flex-wrap gap-2">
-                <HeroChip icon={CheckCircle2} tone="green">Dealer Verified</HeroChip>
-                <HeroChip icon={ShieldCheck}>Vehicle Passport Partner</HeroChip>
+                <HeroChip iconKey="dealer-verified" tone="green">Dealer Verified</HeroChip>
+                <HeroChip iconKey="vehicle-passport-partner">Vehicle Passport Partner</HeroChip>
               </div>
-              {franchised && (
-                <span className="hidden sm:flex flex-col items-center bg-white text-[#0F172A] rounded-xl px-4 py-2.5 shadow-lg shrink-0">
-                  <span className="text-[13px] font-black tracking-[0.18em]">{brand}</span>
-                  <span className="text-[9px] font-bold uppercase tracking-wider text-[#64748B]">Authorized Retailer</span>
-                </span>
+              {make && (
+                <OemAuthorizedBadge brand={brandKey ?? make} label={franchised ? undefined : "Vehicle Brand Specialist"} className="hidden sm:inline-flex shrink-0" />
               )}
             </div>
 
@@ -219,7 +223,7 @@ const VehiclePassportDealer = () => {
                 <div className="flex flex-wrap items-stretch gap-x-5 gap-y-2 mt-5">
                   {heroStats.map((s, i) => (
                     <div key={s.l1} className={`flex items-center gap-2.5 ${i > 0 ? "sm:border-l sm:border-white/25 sm:pl-5" : ""}`}>
-                      <s.icon className="w-5 h-5 text-white/75 shrink-0" strokeWidth={1.75} />
+                      <DealerPageIcon iconKey={s.iconKey} size={20} color="rgba(255,255,255,0.8)" className="shrink-0" />
                       <span className="text-[12px] leading-tight font-semibold text-white/90">{s.l1}<br />{s.l2}</span>
                     </div>
                   ))}
@@ -227,22 +231,22 @@ const VehiclePassportDealer = () => {
               )}
 
               <div className="flex flex-wrap gap-2.5 mt-6">
-                <button onClick={() => go("reserve")} className={`${heroBtn} bg-[#2563EB] hover:bg-[#1d4fd7] text-white shadow-lg`}><ShieldCheck className="w-4 h-4" /> Reserve This Vehicle</button>
-                <button onClick={() => go("test-drive")} className={`${heroBtn} bg-white/95 text-[#0F172A] hover:bg-white`}><CalendarCheck className="w-4 h-4 text-[#2563EB]" /> Schedule Test Drive</button>
-                <a href={mapsUrl} target="_blank" rel="noreferrer" className={`${heroBtn} bg-white/10 border border-white/40 text-white hover:bg-white/20`}><Navigation className="w-4 h-4" /> Get Directions</a>
+                <button onClick={() => go("reserve")} className={`${heroBtn} bg-[#2563EB] hover:bg-[#1d4fd7] text-white shadow-lg`}><DealerPageIcon iconKey="reserve-vehicle" size={16} color="currentColor" /> Reserve This Vehicle</button>
+                <button onClick={() => go("test-drive")} className={`${heroBtn} bg-white/95 text-[#0F172A] hover:bg-white`}><DealerPageIcon iconKey="schedule-test-drive" size={16} color="#2563EB" /> Schedule Test Drive</button>
+                <a href={mapsUrl} target="_blank" rel="noreferrer" className={`${heroBtn} bg-white/10 border border-white/40 text-white hover:bg-white/20`}><DealerPageIcon iconKey="get-directions" size={16} color="currentColor" /> Get Directions</a>
               </div>
             </div>
           </div>
-        </section>
+        </DealerHeroImage>
 
         {/* 2. Trust at a Glance */}
         <section>
           <SectionTitle>Trust at a Glance</SectionTitle>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            <TrustCard icon={ShieldCheck} tone="green" title="Dealer Verified" sub="This vehicle is reviewed and verified by our team." />
-            <TrustCard icon={FileText} title="Vehicle Passport Enabled" sub="One transparent record for this exact VIN." />
-            <TrustCard icon={Tag} tone="green" title="Up-Front Pricing" sub="Clear pricing with all installed equipment disclosed." />
-            <TrustCard icon={Lock} title="Secure Reservation" sub="Your information is secure and never shared." />
+            <TrustCard iconKey="dealer-verified" tone="green" title="Dealer Verified" sub="This vehicle is reviewed and verified by our team." />
+            <TrustCard iconKey="vehicle-passport-partner" title="Vehicle Passport Enabled" sub="One transparent record for this exact VIN." />
+            <TrustCard iconKey="up-front-pricing" tone="green" title="Up-Front Pricing" sub="Clear pricing with all installed equipment disclosed." />
+            <TrustCard iconKey="secure-reservation" title="Secure Reservation" sub="Your information is secure and never shared." />
           </div>
         </section>
 
@@ -251,17 +255,17 @@ const VehiclePassportDealer = () => {
           <div className={`${CARD} p-6`}>
             <h2 className="text-[18px] font-extrabold tracking-tight text-center mb-5">Why Customers Choose Us</h2>
             <div className="space-y-4.5 space-y-5">
-              <ChooseRow icon={Tag} title="Transparent, Up-Front Pricing" sub="No hidden fees. All installed equipment and costs are clearly disclosed up front." />
-              <ChooseRow icon={Users} title="No Pressure Experience" sub="Our team is here to help, answer questions, and earn your business the right way." />
-              <ChooseRow icon={FileText} title="Complete Vehicle Disclosure" sub="We show you the facts, photos, service history, and everything you need to decide with confidence." />
-              <ChooseRow icon={MessageCircle} title="Prompt, Professional Communication" sub="We respond quickly and keep you informed at every step." />
-              <ChooseRow icon={ShieldCheck} title="Customer-First Approach" sub="Your time, trust, and satisfaction are our top priorities." />
+              <ChooseRow iconKey="transparent-pricing" title="Transparent, Up-Front Pricing" sub="No hidden fees. All installed equipment and costs are clearly disclosed up front." />
+              <ChooseRow iconKey="no-pressure" title="No Pressure Experience" sub="Our team is here to help, answer questions, and earn your business the right way." />
+              <ChooseRow iconKey="complete-vehicle-disclosure" title="Complete Vehicle Disclosure" sub="We show you the facts, photos, service history, and everything you need to decide with confidence." />
+              <ChooseRow iconKey="prompt-communication" title="Prompt, Professional Communication" sub="We respond quickly and keep you informed at every step." />
+              <ChooseRow iconKey="customer-first" title="Customer-First Approach" sub="Your time, trust, and satisfaction are our top priorities." />
             </div>
           </div>
           <div className={`${CARD} p-6 flex flex-col`}>
             <h2 className="text-[18px] font-extrabold tracking-tight text-center mb-5">{franchised ? `${brand} Brand Expertise` : "Vehicle & Ownership Expertise"}</h2>
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 flex-1 content-start">
-              {expertise.map((e) => <ExpertiseCard key={e.label} icon={e.icon} label={e.label} />)}
+              {expertise.map((e) => <ExpertiseCard key={e.label} iconKey={e.iconKey} label={e.label} />)}
             </div>
             <p className="mt-4 rounded-xl bg-blue-50/70 border border-blue-100 px-4 py-2.5 text-[12px] font-semibold text-[#1E3A8A] text-center leading-snug">
               {franchised
@@ -271,7 +275,7 @@ const VehiclePassportDealer = () => {
           </div>
         </section>
 
-        {/* 4. Reputation — real review sources only */}
+        {/* 4. Reputation — real review sources only, text-based source badges */}
         {(hasRating || t.reviewSources.length > 0 || t.satisfaction) && (
           <section>
             <SectionTitle>Our Reputation Speaks for Itself</SectionTitle>
@@ -282,7 +286,7 @@ const VehiclePassportDealer = () => {
               ))}
               {t.satisfaction && <ReviewCard name="Customer Satisfaction" rating={null} extra={t.satisfaction} count={null} />}
             </div>
-            <p className="text-[11.5px] text-[#94A3B8] text-center mt-3">Reviews are from verified customers across public review platforms.</p>
+            <p className="text-[11.5px] text-[#94A3B8] text-center mt-3">Reviews are from verified customers across multiple platforms.</p>
           </section>
         )}
 
@@ -291,10 +295,10 @@ const VehiclePassportDealer = () => {
           <div className={`${CARD} p-6 flex flex-col`}>
             <h2 className="text-[18px] font-extrabold tracking-tight text-center mb-5">Service & Ownership Support</h2>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 flex-1 content-start">
-              {hasService && <SupportCard icon={Wrench} title={franchised ? `${brand} Certified Service` : "Certified Service Department"} sub={t.serviceLocation === "offsite" ? "Dedicated service center nearby." : "Expert care from trained professionals."} />}
-              {hasPickup && <SupportCard icon={Truck} title="Pickup & Return Available" sub="We make service easy and convenient." />}
-              {hasLoaners && <SupportCard icon={Car} title="Loaner Vehicles Available" sub="Ask us about loaner vehicle options." />}
-              <SupportCard icon={ShieldCheck} title="Warranty & Service Guidance" sub="We help you understand your coverage." />
+              {hasService && <SupportCard iconKey="certified-service" title={copy.certifiedServiceDepartmentLabel} sub={t.serviceLocation === "offsite" ? "Dedicated service center nearby." : "Expert care from trained professionals."} />}
+              {hasPickup && <SupportCard iconKey="pickup-return" title="Pickup & Return Available" sub="We make service easy and convenient." />}
+              {hasLoaners && <SupportCard iconKey="loaner-vehicles" title="Loaner Vehicles Available" sub="Ask us about loaner vehicle options." />}
+              <SupportCard iconKey="warranty-support" title="Warranty & Service Guidance" sub="We help you understand your coverage." />
             </div>
             <p className="mt-4 rounded-xl bg-blue-50/70 border border-blue-100 px-4 py-2.5 text-[12px] font-semibold text-[#1E3A8A] text-center">We're here for you before, during, and after your purchase.</p>
           </div>
@@ -303,16 +307,12 @@ const VehiclePassportDealer = () => {
             <h2 className="text-[18px] font-extrabold tracking-tight mb-4">Visit Us</h2>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-3 text-[13px]">
-                {d.dealerAddress && <p className="flex items-start gap-2.5"><MapPin className="w-4 h-4 text-[#2563EB] mt-0.5 shrink-0" /> <span className="font-semibold leading-snug">{d.dealerAddress}</span></p>}
-                {d.dealerPhone && <p className="flex items-center gap-2.5"><Phone className="w-4 h-4 text-[#2563EB] shrink-0" /> <a href={`tel:${d.dealerPhone}`} className="font-semibold hover:text-[#2563EB]">{d.dealerPhone}</a></p>}
-                {t.hours && <p className="flex items-start gap-2.5"><Clock className="w-4 h-4 text-[#2563EB] mt-0.5 shrink-0" /> <span className="font-medium whitespace-pre-line leading-relaxed">{t.hours}</span></p>}
-                <a href={mapsUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 text-[13px] font-bold text-[#2563EB] hover:underline"><Navigation className="w-4 h-4" /> Get Directions</a>
+                {d.dealerAddress && <p className="flex items-start gap-2.5"><DealerPageIcon iconKey="address-location" size={16} color="#2563EB" className="mt-0.5 shrink-0" /> <span className="font-semibold leading-snug">{d.dealerAddress}</span></p>}
+                {d.dealerPhone && <p className="flex items-center gap-2.5"><DealerPageIcon iconKey="phone" size={16} color="#2563EB" className="shrink-0" /> <a href={`tel:${d.dealerPhone}`} className="font-semibold hover:text-[#2563EB]">{d.dealerPhone}</a></p>}
+                {t.hours && <p className="flex items-start gap-2.5"><DealerPageIcon iconKey="hours" size={16} color="#2563EB" className="mt-0.5 shrink-0" /> <span className="font-medium whitespace-pre-line leading-relaxed">{t.hours}</span></p>}
+                <a href={mapsUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 text-[13px] font-bold text-[#2563EB] hover:underline"><DealerPageIcon iconKey="map-directions" size={16} color="currentColor" /> Get Directions</a>
               </div>
-              <a href={mapsUrl} target="_blank" rel="noreferrer" className="rounded-xl border border-[#E6E8EC] bg-gradient-to-br from-slate-100 to-blue-50 min-h-[150px] flex flex-col items-center justify-center text-[#64748B] hover:border-[#2563EB] transition-colors">
-                <span className="w-10 h-10 rounded-full bg-[#2563EB] flex items-center justify-center"><MapPin className="w-5 h-5 text-white" /></span>
-                <span className="text-[12px] font-bold mt-2 text-[#0F172A]">{d.dealerName}</span>
-                <span className="text-[11px] font-semibold text-[#2563EB] mt-0.5">Open in Maps</span>
-              </a>
+              <DealerMapPreview name={d.dealerName} address={locality || d.dealerAddress || undefined} href={mapsUrl} className="rounded-xl border border-[#E6E8EC] min-h-[150px] hover:border-[#2563EB] transition-colors" />
             </div>
             {(hasService || t.financing) && (
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mt-4">
@@ -328,16 +328,16 @@ const VehiclePassportDealer = () => {
         <section className="rounded-2xl px-6 py-7 sm:px-8 text-white" style={{ background: "linear-gradient(160deg,#111f33 0%,#0D1B2A 100%)" }}>
           <p className="text-[16px] font-extrabold text-center">Our Commitment to You</p>
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-x-3 gap-y-5 mt-6">
-            {[
-              { icon: Tag, l: "Transparent, Up-Front Pricing" },
-              { icon: FileText, l: "Complete Vehicle Disclosure" },
-              { icon: Users, l: "Factory-Trained Staff" },
-              { icon: ShieldCheck, l: "A Respectful, No-Pressure Experience" },
-              { icon: MessageCircle, l: "Professional, Prompt Communication" },
-              { icon: Sparkles, l: "A Customer-First Approach" },
-            ].map((c, i) => (
+            {([
+              { iconKey: "transparent-pricing", l: "Transparent, Up-Front Pricing" },
+              { iconKey: "complete-disclosure", l: "Complete Vehicle Disclosure" },
+              { iconKey: "factory-trained-staff", l: "Factory-Trained Staff" },
+              { iconKey: "respectful-experience", l: "A Respectful, No-Pressure Experience" },
+              { iconKey: "prompt-communication", l: "Professional, Prompt Communication" },
+              { iconKey: "customer-first", l: "A Customer-First Approach" },
+            ] as { iconKey: DealerPageIconKey; l: string }[]).map((c, i) => (
               <div key={c.l} className={`flex flex-col items-center text-center gap-2 px-2 ${i > 0 ? "lg:border-l lg:border-white/15" : ""}`}>
-                <c.icon className="w-5 h-5 text-white/80" strokeWidth={1.75} />
+                <DealerPageIcon iconKey={c.iconKey} size={20} color="rgba(255,255,255,0.8)" />
                 <span className="text-[11px] font-semibold leading-snug text-white/90">{c.l}</span>
               </div>
             ))}
@@ -348,16 +348,16 @@ const VehiclePassportDealer = () => {
         <section className={`${CARD} p-6 sm:p-7 text-center`}>
           <h2 className="text-[20px] font-extrabold tracking-tight">Ready to experience the difference?</h2>
           <div className="flex flex-wrap items-center justify-center gap-2.5 mt-5">
-            <button onClick={() => go("reserve")} className="h-12 px-6 rounded-xl bg-[#2563EB] hover:bg-[#1d4fd7] text-white text-[13.5px] font-bold inline-flex items-center gap-2"><ShieldCheck className="w-4 h-4" /> Reserve This Vehicle</button>
-            <button onClick={() => go("test-drive")} className="h-12 px-5 rounded-xl border-2 border-[#2563EB] text-[#2563EB] text-[13.5px] font-bold inline-flex items-center gap-2 hover:bg-blue-50"><CalendarCheck className="w-4 h-4" /> Schedule Test Drive</button>
-            <button onClick={() => go("contact")} className="h-12 px-5 rounded-xl border border-[#E6E8EC] text-[13.5px] font-bold inline-flex items-center gap-2 hover:border-[#2563EB]"><MessageSquare className="w-4 h-4 text-[#2563EB]" /> Message Our Team</button>
-            <a href={mapsUrl} target="_blank" rel="noreferrer" className="h-12 px-5 rounded-xl border border-[#E6E8EC] text-[13.5px] font-bold inline-flex items-center gap-2 hover:border-[#2563EB]"><Navigation className="w-4 h-4 text-[#2563EB]" /> Get Directions</a>
+            <button onClick={() => go("reserve")} className="h-12 px-6 rounded-xl bg-[#2563EB] hover:bg-[#1d4fd7] text-white text-[13.5px] font-bold inline-flex items-center gap-2"><DealerPageIcon iconKey="reserve-vehicle" size={16} color="currentColor" /> Reserve This Vehicle</button>
+            <button onClick={() => go("test-drive")} className="h-12 px-5 rounded-xl border-2 border-[#2563EB] text-[#2563EB] text-[13.5px] font-bold inline-flex items-center gap-2 hover:bg-blue-50"><DealerPageIcon iconKey="schedule-test-drive" size={16} color="currentColor" /> Schedule Test Drive</button>
+            <button onClick={() => go("contact")} className="h-12 px-5 rounded-xl border border-[#E6E8EC] text-[13.5px] font-bold inline-flex items-center gap-2 hover:border-[#2563EB]"><DealerPageIcon iconKey="message-team" size={16} color="#2563EB" /> Message Our Team</button>
+            <a href={mapsUrl} target="_blank" rel="noreferrer" className="h-12 px-5 rounded-xl border border-[#E6E8EC] text-[13.5px] font-bold inline-flex items-center gap-2 hover:border-[#2563EB]"><DealerPageIcon iconKey="get-directions" size={16} color="#2563EB" /> Get Directions</a>
           </div>
         </section>
 
         <footer className="pt-1 pb-6 text-center">
           <div className="flex items-center justify-center gap-2 mb-2"><Logo variant="full" size={18} /></div>
-          <p className="text-[12px] font-semibold inline-flex items-center gap-1.5">Dealer Verified <BadgeCheck className="w-3.5 h-3.5 text-[#16A34A]" /></p>
+          <p className="text-[12px] font-semibold inline-flex items-center gap-1.5">Dealer Verified <DealerPageIcon iconKey="dealer-verified" size={14} color="#16A34A" /></p>
           <div className="flex items-center justify-center gap-4 text-[11px] font-semibold text-[#64748B] mt-2"><a href="/privacy" className="hover:text-[#2563EB]">Privacy</a><span className="text-slate-300">·</span><a href="/terms" className="hover:text-[#2563EB]">Terms</a></div>
         </footer>
       </main>

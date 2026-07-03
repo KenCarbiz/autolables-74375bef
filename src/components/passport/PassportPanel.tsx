@@ -21,6 +21,7 @@ import { readDealerAlternatives, type DealerAlternative } from "@/lib/dealerAlte
 import { rememberPassportOrigin } from "@/lib/passportOrigin";
 import { recordPanelView } from "@/lib/shopperIntent";
 import { useNhtsaSafety, type NhtsaSafetyResult } from "@/hooks/useNhtsaSafety";
+import { DealerMapPreview } from "@/components/artwork/DealerPageArtwork";
 import type { VehicleListing } from "@/hooks/useVehicleListing";
 import {
   PassportSlideOver, Hero, Section, Check, Empty, StatRow, RangeBar, TrendChart, Ring, CARD, GREEN, BLUE,
@@ -2709,14 +2710,7 @@ function VisitDealerBody({ d, listing, go, isPreview }: { d: PassportData; listi
 
       {/* Map card */}
       <div className={`${CARD} overflow-hidden`}>
-        <a href={gmaps} target="_blank" rel="noreferrer" className="block relative h-44 bg-gradient-to-br from-slate-100 via-blue-50 to-slate-100 hover:opacity-95 transition-opacity">
-          <div className="absolute inset-0 opacity-40" style={{ backgroundImage: "linear-gradient(#dbe4f0 1px, transparent 1px), linear-gradient(90deg, #dbe4f0 1px, transparent 1px)", backgroundSize: "36px 36px" }} />
-          <div className="absolute inset-0 flex flex-col items-center justify-center">
-            <span className="w-11 h-11 rounded-full bg-[#2563EB] flex items-center justify-center shadow-lg"><MapPin className="w-5 h-5 text-white" /></span>
-            <p className="text-[13.5px] font-extrabold mt-2">{d.dealerName}</p>
-            {addr && <p className="text-[11.5px] text-[#64748B] font-medium">{addr}</p>}
-          </div>
-        </a>
+        <DealerMapPreview name={d.dealerName} address={addr || undefined} href={gmaps} className="h-44" />
         <div className="p-3 flex flex-wrap gap-2 border-t border-[#F1F5F9]">
           <a href={amaps} target="_blank" rel="noreferrer" className={`${mapBtn} border border-[#E6E8EC] hover:border-[#2563EB]`}><Navigation className="w-4 h-4 text-[#2563EB]" /> Open in Apple Maps</a>
           <a href={gmaps} target="_blank" rel="noreferrer" className={`${mapBtn} border border-[#E6E8EC] hover:border-[#2563EB]`}><MapPin className="w-4 h-4 text-[#2563EB]" /> Open in Google Maps</a>
