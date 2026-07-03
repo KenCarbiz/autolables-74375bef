@@ -103,6 +103,9 @@ const PassportContactRoutingPanel = () => {
   }, [cfg, agents, previewMode]);
   const pill = closedPillCopy(preview);
   const PreviewHelpIcon = preview.afterHours ? Clock : preview.displayMode === "team" ? Headset : Users;
+  // Pill icon per the routing spec sheet: agent photo, headset for BDC/team,
+  // clock after hours, shield for the dealership default.
+  const PillIcon = preview.afterHours ? Clock : preview.displayMode === "team" ? Headset : ShieldCheck;
 
   const setHours = (day: number, field: "startTime" | "endTime" | "enabled", value: string | boolean) => {
     setCfg((c) => {
@@ -340,7 +343,11 @@ const PassportContactRoutingPanel = () => {
             {/* Closed pill */}
             <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wide mt-4 mb-1.5">Closed state</p>
             <div className="h-14 pl-4 pr-5 rounded-full text-white inline-flex items-center gap-2.5 shadow-lg" style={{ background: "linear-gradient(160deg,#2563EB 0%,#1e50c8 100%)" }}>
-              {preview.displayMode === "agent" && preview.agentPhotoUrl && !preview.afterHours ? <img src={preview.agentPhotoUrl} alt="" className="w-8 h-8 rounded-full object-cover ring-2 ring-white/40" /> : <ShieldCheck className="w-5 h-5 shrink-0" />}
+              {preview.displayMode === "agent" && preview.agentPhotoUrl && !preview.afterHours
+                ? <img src={preview.agentPhotoUrl} alt="" className="w-8 h-8 rounded-full object-cover ring-2 ring-white/40" />
+                : preview.displayMode === "agent" && !preview.afterHours
+                  ? <span className="w-8 h-8 rounded-full bg-white/15 flex items-center justify-center shrink-0"><Users className="w-4 h-4" /></span>
+                  : <PillIcon className="w-5 h-5 shrink-0" />}
               <span className="text-left leading-tight"><span className="block text-[13px] font-extrabold">{pill.title}</span><span className="block text-[11px] opacity-85">{pill.sub}</span></span>
             </div>
 
