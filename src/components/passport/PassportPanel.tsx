@@ -168,14 +168,22 @@ function buildPanel(key: PassportPanelKey, d: PassportData, listing: VehicleList
         { icon: Users, label: "Dealer Inquiries", value: isPreview ? "4" : "—" },
         { icon: Bookmark, label: "Price Saves", value: isPreview ? "11" : "—" },
       ];
-      const insights: string[] = [];
-      if (views != null) insights.push(`${views.toLocaleString()} shoppers have viewed this vehicle`);
-      if (dom != null && dom <= 30) insights.push("Recently listed — fresh to market");
-      if (dom != null && dom > 45) insights.push("On the market a while — the dealer may be flexible");
-      if (isGreat) insights.push("Priced below market average — strong value");
-      if (isPreview) { insights.push("Vehicles with this trim typically sell within 38 days"); insights.push("Comparable inventory is decreasing"); }
       const avgDom = (mc.avg_dom as number) ?? null;
       const supply = (mc.market_days_supply as number) ?? (mc.inventory_count as number) ?? null;
+      // Inventory COUNT only — market_days_supply is a days figure and must
+      // never be labeled "N nearby".
+      const invCount = (mc.inventory_count as number) ?? (mc.similar_count as number) ?? (mc.comparable_count as number) ?? null;
+      const scarce = supply != null ? supply < 30 : invCount != null ? invCount <= 10 : false;
+      const sellsFaster = dom != null && avgDom != null && avgDom > dom;
+      const priceDrop = d.priceChangeTotal != null && d.priceChangeTotal < 0 ? Math.abs(d.priceChangeTotal) : null;
+      const insights: string[] = [];
+      if (views != null) insights.push(`${views.toLocaleString()} shoppers have viewed this vehicle`);
+      if (isGreat) insights.push(d.belowMarket && d.belowMarket > 0 ? `Priced ${fmt$(d.belowMarket)} below the local market average` : "Priced below market average — strong value");
+      if (sellsFaster) insights.push(`Similar vehicles average ${avgDom} days on the market — this one is drawing interest faster`);
+      if (scarce) insights.push(invCount != null && invCount > 0 ? `Limited availability — only ${invCount} similar vehicles nearby` : "Limited similar inventory in your area right now");
+      if (priceDrop != null) insights.push(`We reduced this price ${fmt$(priceDrop)} since listing`);
+      if (dom != null && dom <= 30) insights.push("Recently listed — fresh to market");
+      if (isPreview && insights.length < 3) { insights.push("Vehicles with this trim typically sell within 38 days"); insights.push("Comparable inventory is decreasing"); }
       // Mobile-only derived content (same data, premium presentation).
       const topPct = Math.max(5, 100 - score);
       const demandWord = score >= 66 ? "High Demand" : score >= 45 ? "Moderate Demand" : "Low Demand";
@@ -305,16 +313,23 @@ function buildPanel(key: PassportPanelKey, d: PassportData, listing: VehicleList
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Section title="Local demand">
               <div className={`${CARD} p-4`}>
-                <StatRow label="Interest level" value={has ? level : "—"} />
-                <StatRow label="Nearby shoppers" value={isPreview ? "120+" : "—"} />
-                <StatRow label="Search frequency" value={isPreview ? "Above average" : "—"} />
+                {has && <StatRow label="Interest level" value={level} />}
+                {views != null && <StatRow label="Shopper views" value={views.toLocaleString()} />}
+                {(d.belowMarket ?? 0) > 0 && <StatRow label="Vs. market average" value={`${fmt$(d.belowMarket as number)} below`} />}
+                {isPreview && <StatRow label="Nearby shoppers" value="120+" />}
+                {isPreview && <StatRow label="Search frequency" value="Above average" />}
               </div>
             </Section>
             <Section title="Similar vehicles">
               <div className={`${CARD} p-4`}>
-                <StatRow label="Avg days on market" value={avgDom != null ? `${avgDom} days` : isPreview ? "38 days" : "—"} />
-                <StatRow label="Current inventory" value={supply != null ? `${supply} nearby` : isPreview ? "42 nearby" : "—"} />
-                <StatRow label="This vehicle" value={dom != null ? `${dom} days listed` : "—"} />
+                {(avgDom != null || isPreview) && <StatRow label="Avg days on market" value={avgDom != null ? `${avgDom} days` : "38 days"} />}
+                {(invCount != null || isPreview) && <StatRow label="Similar vehicles nearby" value={invCount != null ? invCount.toLocaleString() : "42"} />}
+                {dom != null && <StatRow label="This vehicle" value={`${dom} days listed`} />}
+                {sellsFaster && (
+                  <p className="mt-2 inline-flex items-center gap-1.5 text-[12px] font-bold text-[#16A34A]">
+                    <TrendingUp className="w-3.5 h-3.5" /> Drawing interest faster than the market average
+                  </p>
+                )}
               </div>
             </Section>
           </div>
@@ -327,8 +342,11 @@ function buildPanel(key: PassportPanelKey, d: PassportData, listing: VehicleList
             <div className="rounded-2xl border border-emerald-200 bg-emerald-50/70 p-4">
               <p className="text-[14px] font-extrabold text-[#16A34A]">{isGreat || score >= 66 ? "Good time to buy" : "Worth a closer look"}</p>
               <ul className="mt-2 space-y-1.5">
-                {isGreat && <Check>Priced below market average</Check>}
+                {isGreat && <Check>{(d.belowMarket ?? 0) > 0 ? `Priced ${fmt$(d.belowMarket as number)} below market average` : "Priced below market average"}</Check>}
                 {score >= 66 && <Check>Strong shopper interest right now</Check>}
+                {scarce && <Check>Limited similar inventory nearby</Check>}
+                {sellsFaster && <Check>Similar vehicles sell in {avgDom} days on average</Check>}
+                {priceDrop != null && <Check>Price already reduced {fmt$(priceDrop)}</Check>}
                 {d.warrantyStr && <Check>Factory warranty still active</Check>}
                 {dom != null && dom <= 30 && <Check>Fresh listing — best selection</Check>}
                 {!isGreat && score < 66 && <Check>Compare with similar vehicles before deciding</Check>}
@@ -619,7 +637,7 @@ function buildPanel(key: PassportPanelKey, d: PassportData, listing: VehicleList
               <ul className="mt-2.5 space-y-1.5">
                 {isGreat && <li className="flex items-start gap-2 text-[13px]"><CheckCircle2 className="w-4 h-4 shrink-0 mt-0.5" />Below market average</li>}
                 {total != null && total < 0 && <li className="flex items-start gap-2 text-[13px]"><CheckCircle2 className="w-4 h-4 shrink-0 mt-0.5" />Recent price reductions</li>}
-                {goodTime && <li className="flex items-start gap-2 text-[13px]"><CheckCircle2 className="w-4 h-4 shrink-0 mt-0.5" />Strong negotiating position</li>}
+                {goodTime && <li className="flex items-start gap-2 text-[13px]"><CheckCircle2 className="w-4 h-4 shrink-0 mt-0.5" />Strong value at today's price</li>}
                 <li className="flex items-start gap-2 text-[13px]"><CheckCircle2 className="w-4 h-4 shrink-0 mt-0.5" />Competitive market pricing</li>
               </ul>
             </div>
@@ -797,7 +815,7 @@ function buildPanel(key: PassportPanelKey, d: PassportData, listing: VehicleList
                   <p className="text-[12px] font-semibold uppercase tracking-wider opacity-85">Buyer Recommendation</p>
                   <p className="text-[18px] font-extrabold mt-1 inline-flex items-center gap-2"><Star className="w-5 h-5" /> {changePct != null && changePct < 0 ? "Inventory Is Tightening" : "Solid Time To Purchase"}</p>
                   <p className="text-[13px] opacity-90 mt-1">Now is a good time to act. Lower inventory typically means:</p>
-                  <ul className="mt-2 space-y-1.5">{["Fewer available choices", "Less negotiating leverage over time", "Potential for higher future pricing"].map((t) => <li key={t} className="flex items-start gap-2 text-[13px]"><CheckCircle2 className="w-4 h-4 shrink-0 mt-0.5" />{t}</li>)}</ul>
+                  <ul className="mt-2 space-y-1.5">{["Fewer available choices", "Popular configurations sell first", "Potential for higher future pricing"].map((t) => <li key={t} className="flex items-start gap-2 text-[13px]"><CheckCircle2 className="w-4 h-4 shrink-0 mt-0.5" />{t}</li>)}</ul>
                 </div>
 
                 <Section title="Market availability">
@@ -2568,22 +2586,70 @@ const Seg = ({ options, value, onChange }: { options: { label: string; value: st
   </div>
 );
 
-// Multi-series line chart with point tooltips (round markers, no distortion).
+// Multi-series price chart. The y-domain zooms to the data (a real $900 move
+// must be visible, not compressed by an unrelated axis), the gap between
+// market value and the dealer price is shaded — that band IS the value story
+// even when the price line is flat — and markers/annotations appear only at
+// actual change events so a steady price reads as intentional, not empty.
 const PriceChart = ({ pts, height = 170 }: { pts: { label: string; dealer: number | null; market: number | null }[]; height?: number }) => {
-  const w = 560, pad = 12, h = height;
+  const w = 560, padL = 52, padR = 64, padY = 20, h = height;
   const vals = pts.flatMap((p) => [p.dealer, p.market]).filter((n): n is number => n != null);
   if (vals.length < 2) return null;
-  const min = Math.min(...vals), max = Math.max(...vals), range = Math.max(1, max - min);
-  const x = (i: number) => pad + (i / Math.max(1, pts.length - 1)) * (w - pad * 2);
-  const y = (v: number) => pad + (1 - (v - min) / range) * (h - pad * 2);
+  const rawMin = Math.min(...vals), rawMax = Math.max(...vals);
+  const padV = Math.max((rawMax - rawMin) * 0.12, rawMax * 0.01, 100);
+  const min = rawMin - padV, max = rawMax + padV, range = Math.max(1, max - min);
+  const x = (i: number) => padL + (i / Math.max(1, pts.length - 1)) * (w - padL - padR);
+  const y = (v: number) => padY + (1 - (v - min) / range) * (h - padY * 2);
   const dline = pts.map((p, i) => (p.dealer != null ? `${x(i).toFixed(1)},${y(p.dealer).toFixed(1)}` : null)).filter(Boolean) as string[];
   const mline = pts.map((p, i) => (p.market != null ? `${x(i).toFixed(1)},${y(p.market).toFixed(1)}` : null)).filter(Boolean) as string[];
+  const dealerIdx = pts.map((p, i) => (p.dealer != null ? i : -1)).filter((i) => i >= 0);
+  const lastIdx = dealerIdx.length ? dealerIdx[dealerIdx.length - 1] : -1;
+  const changes = dealerIdx.filter((i, k) => k > 0 && pts[i].dealer !== pts[dealerIdx[k - 1]].dealer);
+  // Value band: dealer line forward, market line backward, where both exist.
+  const both = pts.map((p, i) => (p.dealer != null && p.market != null ? { i, d: p.dealer, m: p.market } : null)).filter(Boolean) as { i: number; d: number; m: number }[];
+  const band = both.length >= 2
+    ? `M ${both.map((b) => `${x(b.i).toFixed(1)},${y(b.d).toFixed(1)}`).join(" L ")} L ${[...both].reverse().map((b) => `${x(b.i).toFixed(1)},${y(b.m).toFixed(1)}`).join(" L ")} Z`
+    : null;
+  const kFmt = (v: number) => `$${Math.round(v / 100) / 10}K`;
+  const area = dline.length >= 2
+    ? `M ${dline.join(" L ")} L ${x(lastIdx).toFixed(1)},${(h - padY).toFixed(1)} L ${x(dealerIdx[0]).toFixed(1)},${(h - padY).toFixed(1)} Z`
+    : null;
   return (
     <svg viewBox={`0 0 ${w} ${h}`} className="w-full" style={{ height }} preserveAspectRatio="xMidYMid meet">
-      {[0.25, 0.5, 0.75].map((g) => <line key={g} x1={pad} x2={w - pad} y1={pad + g * (h - pad * 2)} y2={pad + g * (h - pad * 2)} stroke="#E6E8EC" strokeWidth="1" strokeDasharray="3 4" />)}
-      {mline.length >= 2 && <polyline points={mline.join(" ")} fill="none" stroke={BLUE} strokeWidth="2.5" strokeDasharray="5 4" strokeLinecap="round" strokeLinejoin="round" />}
+      <defs>
+        <linearGradient id="pc-area" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor={GREEN} stopOpacity="0.16" />
+          <stop offset="100%" stopColor={GREEN} stopOpacity="0.02" />
+        </linearGradient>
+      </defs>
+      {[rawMax, (rawMax + rawMin) / 2, rawMin].map((v, i) => (
+        <g key={i}>
+          <line x1={padL} x2={w - padR} y1={y(v)} y2={y(v)} stroke="#E6E8EC" strokeWidth="1" strokeDasharray="3 4" />
+          <text x={padL - 6} y={y(v) + 3.5} textAnchor="end" fontSize="10" fill="#94A3B8" fontWeight="600">{kFmt(v)}</text>
+        </g>
+      ))}
+      {band && <path d={band} fill={BLUE} opacity="0.06" />}
+      {area && <path d={area} fill="url(#pc-area)" />}
+      {mline.length >= 2 && <polyline points={mline.join(" ")} fill="none" stroke={BLUE} strokeWidth="2.5" strokeDasharray="5 4" strokeLinecap="round" strokeLinejoin="round" opacity="0.85" />}
       {dline.length >= 2 && <polyline points={dline.join(" ")} fill="none" stroke={GREEN} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />}
-      {pts.map((p, i) => (p.dealer != null ? <circle key={i} cx={x(i)} cy={y(p.dealer)} r="3.5" fill="#fff" stroke={GREEN} strokeWidth="2"><title>{`${p.label}: ${fmt$(p.dealer)}`}</title></circle> : null))}
+      {changes.map((i) => {
+        const prev = dealerIdx[dealerIdx.indexOf(i) - 1];
+        const delta = (pts[i].dealer as number) - (pts[prev].dealer as number);
+        const up = delta > 0;
+        return (
+          <g key={i}>
+            <circle cx={x(i)} cy={y(pts[i].dealer as number)} r="4.5" fill="#fff" stroke={up ? "#EA580C" : GREEN} strokeWidth="2.5"><title>{`${pts[i].label}: ${fmt$(pts[i].dealer as number)}`}</title></circle>
+            <text x={x(i)} y={y(pts[i].dealer as number) - 9} textAnchor="middle" fontSize="10" fontWeight="800" fill={up ? "#EA580C" : GREEN}>{up ? "+" : "−"}{fmt$(Math.abs(delta))}</text>
+          </g>
+        );
+      })}
+      {lastIdx >= 0 && (
+        <g>
+          <circle cx={x(lastIdx)} cy={y(pts[lastIdx].dealer as number)} r="4.5" fill={GREEN} stroke="#fff" strokeWidth="2" />
+          <rect x={x(lastIdx) + 7} y={y(pts[lastIdx].dealer as number) - 10} width={padR - 12} height="20" rx="6" fill={GREEN} />
+          <text x={x(lastIdx) + 7 + (padR - 12) / 2} y={y(pts[lastIdx].dealer as number) + 3.5} textAnchor="middle" fontSize="10" fontWeight="800" fill="#fff">{fmt$(pts[lastIdx].dealer as number)}</text>
+        </g>
+      )}
     </svg>
   );
 };
@@ -2607,6 +2673,11 @@ function PriceTimeline({ history }: { history: PricePoint[] }) {
         <Seg value={range} onChange={(v) => setRange(v as number)} options={[{ label: "7D", value: 7 }, { label: "30D", value: 30 }, { label: "60D", value: 60 }, { label: "90D", value: 90 }, { label: "All", value: 0 }]} />
       </div>
       <PriceChart pts={pts} />
+      {pts.length >= 2 && pts.every((p) => p.dealer === pts[0].dealer) && (
+        <p className="text-[11.5px] text-[#64748B] mt-2 inline-flex items-center gap-1.5">
+          <CheckCircle2 className="w-3.5 h-3.5 text-[#16A34A] shrink-0" /> Consistent pricing since listing — the price you see is the price we stand behind.
+        </p>
+      )}
     </div>
   );
 }
