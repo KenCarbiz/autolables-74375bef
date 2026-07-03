@@ -12,6 +12,7 @@ import { DEFAULT_CONTACT_ROUTING, type CustomerPassportContactSettings, type Pas
 import type { IihsAward } from "@/lib/iihsAwards";
 import { DEFAULT_TODAYS_PRICE_CUSTOM, type TodaysPriceMode, type TodaysPriceCustom } from "@/lib/todaysPrice";
 import type { LabelDefaults } from "@/lib/labelDefaults";
+import type { MarketDemandCompSettings } from "@/lib/compStrategy";
 
 // A configurable internal recon/service the dealer routes to a responsible
 // party. Non-customer charge — tracked as the store's own cost.
@@ -221,6 +222,9 @@ export interface DealerSettings {
   // Tenant label template defaults — which window sticker / addendum
   // template is in effect per vehicle condition (see lib/labelDefaults).
   label_defaults: LabelDefaults;
+  // Customer-facing comp strategy overrides (see lib/compStrategy) — merged
+  // over DEFAULT_COMP_SETTINGS; null means pure value-building defaults.
+  comp_settings: Partial<MarketDemandCompSettings> | null;
   // Saved configuration for the classic Used Car Sticker builder so every
   // vehicle opens with the store's preferred layout and graphics style.
   used_sticker_options: { mode: string; icon_style: string } | null;
@@ -401,6 +405,7 @@ export const DEFAULT_SETTINGS: DealerSettings = {
   todays_price_mode: "payment_estimate",
   todays_price_custom: DEFAULT_TODAYS_PRICE_CUSTOM,
   label_defaults: {},
+  comp_settings: null,
   used_sticker_options: null,
   title_clerk_email: "",
   title_reminders_enabled: true,

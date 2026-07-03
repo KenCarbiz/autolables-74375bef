@@ -92,27 +92,83 @@ Deno.serve(async (req) => {
     if (filtered.length === 0 && trim) { pass = await fetchPass(false); filtered = pass.ok ? usable(pass.b) : filtered; }
     const b = pass.b;
 
-    const comparables = filtered
-      .slice(0, 8)
-      .map((l: Record<string, unknown>) => ({
-        vin: l.vin ?? null,
-        price: num(l.price),
-        miles: num(l.miles),
-        heading: (l.heading as string) ?? ymm,
-        trim: ((l.build as Record<string, unknown>)?.trim as string) ?? null,
-        dealer: [(l.dealer as Record<string, unknown>)?.city, (l.dealer as Record<string, unknown>)?.state].filter(Boolean).join(", "),
-        distance: num(l.dist),
-      }));
+    const mapped = filtered.map((l: Record<string, unknown>) => ({
+      vin: l.vin ?? null,
+      price: num(l.price),
+      miles: num(l.miles),
+      heading: (l.heading as string) ?? ymm,
+      trim: ((l.build as Record<string, unknown>)?.trim as string) ?? null,
+      drivetrain: ((l.build as Record<string, unknown>)?.drivetrain as string) ?? null,
+      dealer: [(l.dealer as Record<string, unknown>)?.city, (l.dealer as Record<string, unknown>)?.state].filter(Boolean).join(", "),
+      distance: num(l.dist),
+      dom: num(l.dom) ?? num((l as Record<string, unknown>).dom_active),
+    }));
+
+    // ── Value-building comp strategy (mirrors src/lib/compStrategy.ts) ──
+    // Comps are sales support: by default only show comps priced at or above
+    // this vehicle (up to a 1.35x sanity ceiling), similar mileage, same trim/
+    // drivetrain where both sides are known. Dealers can widen the strategy
+    // in admin. Filtering only removes real comps — never fabricates.
+    const { data: prof } = await admin.from("dealer_profiles").select("settings").eq("tenant_id", row.tenant_id).maybeSingle();
+    const cs = { compStrategy: "value_building", minimumCompPriceRatio: 1.0, maximumCompPriceRatio: 1.35, includeLowerPricedComps: false, lowerPricedCompTolerancePercent: 3, requireSimilarMileageBand: true, mileageBandPercent: 25, requireSameTrimWhenAvailable: true, requireSameDrivetrainWhenAvailable: true, ...(((prof?.settings as Record<string, unknown>)?.comp_settings as Record<string, unknown>) || {}) } as Record<string, never> & {
+      compStrategy: string; minimumCompPriceRatio: number; maximumCompPriceRatio: number; includeLowerPricedComps: boolean;
+      lowerPricedCompTolerancePercent: number; requireSimilarMileageBand: boolean; mileageBandPercent: number;
+      requireSameTrimWhenAvailable: boolean; requireSameDrivetrainWhenAvailable: boolean;
+    };
+    const ourPrice = num(row.price);
+    const ourMiles = num(row.mileage);
+    const mcAttrs = (row.mc_attributes || {}) as Record<string, unknown>;
+    const ourDrivetrain = String(mcAttrs.drivetrain || mcAttrs.drive_type || "");
+    const normalize = (s: unknown) => String(s || "").toLowerCase().replace(/[^a-z0-9]+/g, "");
+    const normDt = (s: unknown) => {
+      const v = normalize(s);
+      if (/^(4wd|4x4|fourwheeldrive)$/.test(v)) return "4wd";
+      if (/^(awd|allwheeldrive)$/.test(v)) return "awd";
+      if (/^(fwd|frontwheeldrive)$/.test(v)) return "fwd";
+      if (/^(rwd|rearwheeldrive)$/.test(v)) return "rwd";
+      return v;
+    };
+    const inBand = (m: number | null) => m == null || ourMiles == null || Math.abs(m - ourMiles) <= ourMiles * (cs.mileageBandPercent / 100);
+    const valueFiltered = cs.compStrategy === "all_comps" ? mapped : mapped.filter((c) => {
+      let priceOk = true;
+      if (ourPrice != null && c.price != null) {
+        if (cs.compStrategy === "value_building") {
+          const floor = cs.includeLowerPricedComps ? ourPrice * (1 - cs.lowerPricedCompTolerancePercent / 100) : ourPrice * cs.minimumCompPriceRatio;
+          priceOk = c.price >= floor && c.price <= ourPrice * cs.maximumCompPriceRatio;
+        } else {
+          priceOk = c.price >= ourPrice * 0.8 && c.price <= ourPrice * cs.maximumCompPriceRatio;
+        }
+      }
+      const mileageOk = !cs.requireSimilarMileageBand || inBand(c.miles);
+      const trimOk = cs.compStrategy !== "value_building" || !cs.requireSameTrimWhenAvailable || !trim || !c.trim || normalize(c.trim) === normalize(trim);
+      const dtOk = cs.compStrategy !== "value_building" || !cs.requireSameDrivetrainWhenAvailable || !ourDrivetrain || !c.drivetrain || normDt(c.drivetrain) === normDt(ourDrivetrain);
+      return priceOk && mileageOk && trimOk && dtOk;
+    });
+    const scoreComp = (c: typeof mapped[number]) => {
+      let s = 0;
+      if (trim && c.trim && normalize(c.trim) === normalize(trim)) s += 30;
+      if (ourDrivetrain && c.drivetrain && normDt(c.drivetrain) === normDt(ourDrivetrain)) s += 20;
+      if (c.miles != null && ourMiles != null && inBand(c.miles)) s += 20;
+      if (ourPrice != null && c.price != null && c.price >= ourPrice) s += 25;
+      if (ourPrice != null && c.price != null && c.price > ourPrice) s += 10;
+      if (c.distance != null && c.distance <= 25) s += 10;
+      if (c.dom != null && c.dom <= 90) s += 5;
+      return s;
+    };
+    const comparables = valueFiltered.sort((a, b2) => scoreComp(b2) - scoreComp(a)).slice(0, 8);
 
     const nf = typeof b?.num_found === "number" ? b.num_found : parseInt(String(b?.num_found ?? ""), 10);
     const count = Number.isFinite(nf) ? nf : comparables.length;
     const stats = b?.stats?.price || {};
+    // Price stats stay market-wide (honest averages) — only the visible comp
+    // LIST is curated; the median/startingAt math is never rewritten.
     const startingAt = num(stats.min) ?? (comparables.length ? num(comparables[0].price) : null);
     const median = num(stats.median) ?? num(stats.mean);
 
-    if (count === 0 && comparables.length === 0) return json(200, { available: false, reason: "no_comps" });
+    if (count === 0 && mapped.length === 0) return json(200, { available: false, reason: "no_comps" });
+    if (comparables.length === 0) return json(200, { available: false, reason: "no_value_comps" });
 
-    return json(200, { available: true, count, startingAt, median, comparables, checkedAt: new Date().toISOString() });
+    return json(200, { available: true, count, startingAt, median, comparables, ourPrice, strategy: cs.compStrategy, checkedAt: new Date().toISOString() });
   } catch (err) {
     return json(200, { available: false, reason: err instanceof Error ? err.message : "unknown" });
   }

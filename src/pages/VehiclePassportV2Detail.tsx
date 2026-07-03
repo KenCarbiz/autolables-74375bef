@@ -926,7 +926,7 @@ const SECTIONS: Record<string, { title: string; render: SectionRender; wide?: bo
   },
   "comparable-vehicles": {
     title: "Comparable Vehicles",
-    render: ({ slug }) => <CompsSection slug={slug} />,
+    render: ({ slug, listing, d }) => <CompsSection slug={slug} listing={listing} d={d} />,
   },
   "inventory-trend": {
     title: "Inventory Trend",
@@ -1310,8 +1310,14 @@ const SECTIONS: Record<string, { title: string; render: SectionRender; wide?: bo
 };
 
 // Comparable Vehicles — fetches the marketcheck-comps function on demand.
-const CompsSection = ({ slug }: { slug: string }) => {
+// Comparable Vehicles — a sales-support view, not raw market research. The
+// server (marketcheck-comps) applies the dealer's comp strategy, which by
+// default only returns comps priced at or above this vehicle that are
+// similar enough to be a fair comparison. Aggregate stats stay market-wide
+// and honest; only the visible list is curated.
+const CompsSection = ({ slug, listing, d }: { slug: string; listing: VehicleListing; d: PassportData }) => {
   const [state, setState] = useState<"loading" | "ready" | "empty">("loading");
+  const [reason, setReason] = useState<string | null>(null);
   const [data, setData] = useState<{ count: number; startingAt: number | null; median: number | null; comparables: { vin: string | null; price: number | null; miles: number | null; heading: string; trim: string | null; dealer: string; distance: number | null }[] } | null>(null);
 
   useEffect(() => {
@@ -1321,31 +1327,68 @@ const CompsSection = ({ slug }: { slug: string }) => {
         const { data: res } = await supabase.functions.invoke("marketcheck-comps", { body: { slug } });
         if (!mounted) return;
         if (res && (res as { available?: boolean }).available) { setData(res as typeof data); setState("ready"); }
-        else setState("empty");
+        else { setReason((res as { reason?: string })?.reason ?? null); setState("empty"); }
       } catch { if (mounted) setState("empty"); }
     })();
     return () => { mounted = false; };
   }, [slug]);
 
+  const ourPrice = d.price;
+  const comps = data?.comparables ?? [];
+  const allAtOrAbove = ourPrice != null && comps.length > 0 && comps.every((c) => c.price == null || c.price >= ourPrice);
+
   return (
     <>
-      <SectionHeading icon={Car} title="Comparable Vehicles" subtitle="Similar vehicles in your area." />
+      <SectionHeading icon={Car} title="Comparable Vehicles Supporting This Value" subtitle="Similar nearby listings help show how this vehicle is positioned in the market." />
       {state === "loading" ? (
         <Card className="p-5"><div className="space-y-3">{[0, 1, 2].map((i) => <div key={i} className="h-12 bg-slate-100 rounded-xl animate-pulse" />)}</div></Card>
       ) : state === "empty" || !data ? (
-        <Unavailable what="Comparable listings" hint="A live comparable set (year, trim, mileage, and price) is sourced from MarketCheck and appears here when available for this vehicle and market." />
+        reason === "no_value_comps"
+          ? <Unavailable what="Comparable listings" hint="Not enough comparable higher-priced listings were found nearby. Only comps that are a fair, value-supporting comparison are shown here — the section stays honest instead of filling with weak matches." />
+          : <Unavailable what="Comparable listings" hint="A live comparable set (year, trim, mileage, and price) is sourced from MarketCheck and appears here when available for this vehicle and market." />
       ) : (
         <>
-          {/* Aggregate market stats only — the passport never lists other
-              dealers' individual vehicles (names, distances) to a customer. */}
           <Card className="p-5">
             <div className="flex flex-wrap items-baseline gap-x-6 gap-y-2">
-              <div><p className="text-[11px] text-slate-500">Comparable vehicles</p><p className="text-[22px] font-extrabold">{data.count.toLocaleString()}</p></div>
-              {data.startingAt != null && <div><p className="text-[11px] text-slate-500">Starting at</p><p className="text-[22px] font-extrabold text-emerald-600">{fmt$(data.startingAt)}</p></div>}
-              {data.median != null && <div><p className="text-[11px] text-slate-500">Median price</p><p className="text-[22px] font-extrabold">{fmt$(data.median)}</p></div>}
+              <div><p className="text-[11px] text-slate-500">Comparable vehicles analyzed</p><p className="text-[22px] font-extrabold">{data.count.toLocaleString()}</p></div>
+              {data.median != null && <div><p className="text-[11px] text-slate-500">Comparable median</p><p className="text-[22px] font-extrabold">{fmt$(data.median)}</p></div>}
+              {ourPrice != null && <div><p className="text-[11px] text-slate-500">This vehicle</p><p className="text-[22px] font-extrabold text-[#2563EB]">{fmt$(ourPrice)}</p></div>}
             </div>
+            {allAtOrAbove && (
+              <p className="mt-3 inline-flex items-center gap-1.5 text-[12px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-full px-2.5 py-1">
+                <CheckCircle2 className="w-3.5 h-3.5" /> This vehicle is priced below these comparable local listings.
+              </p>
+            )}
             <p className="text-[11px] text-slate-400 mt-3">Market statistics provided by MarketCheck.</p>
           </Card>
+          {comps.length > 0 && (
+            <Card className="p-5 mt-4">
+              <div className="grid grid-cols-[minmax(0,1.6fr)_auto_auto_auto] gap-x-4 gap-y-2 text-[12.5px]">
+                <span className="text-[10px] font-bold uppercase tracking-wide text-slate-400">Vehicle</span>
+                <span className="text-[10px] font-bold uppercase tracking-wide text-slate-400 text-right">Miles</span>
+                <span className="text-[10px] font-bold uppercase tracking-wide text-slate-400 text-right">Price</span>
+                <span className="text-[10px] font-bold uppercase tracking-wide text-slate-400 text-right">Difference</span>
+                <span className="font-bold text-[#0F172A] truncate">{listing.ymm}{listing.trim ? ` ${listing.trim}` : ""}</span>
+                <span className="text-right font-semibold">{listing.mileage != null ? listing.mileage.toLocaleString() : "—"}</span>
+                <span className="text-right font-extrabold text-[#2563EB]">{ourPrice != null ? fmt$(ourPrice) : "—"}</span>
+                <span className="text-right text-[11px] font-bold text-[#2563EB]">This vehicle</span>
+                {comps.map((c, i) => {
+                  const diff = ourPrice != null && c.price != null ? c.price - ourPrice : null;
+                  return (
+                    <Fragment key={c.vin || i}>
+                      <span className="text-slate-600 truncate border-t border-slate-100 pt-2">{c.heading}</span>
+                      <span className="text-right text-slate-600 border-t border-slate-100 pt-2">{c.miles != null ? c.miles.toLocaleString() : "—"}</span>
+                      <span className="text-right font-semibold border-t border-slate-100 pt-2">{c.price != null ? fmt$(c.price) : "—"}</span>
+                      <span className={`text-right font-semibold border-t border-slate-100 pt-2 ${diff != null && diff > 0 ? "text-emerald-700" : "text-slate-500"}`}>
+                        {diff == null ? "—" : diff > 0 ? `+${fmt$(diff)}` : diff === 0 ? "Same" : `−${fmt$(Math.abs(diff))}`}
+                      </span>
+                    </Fragment>
+                  );
+                })}
+              </div>
+              <p className="text-[11px] text-slate-400 mt-3">Similar nearby listings are shown when they support the local value story for this vehicle.</p>
+            </Card>
+          )}
         </>
       )}
     </>

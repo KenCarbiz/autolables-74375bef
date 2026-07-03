@@ -19,6 +19,7 @@ import { toast } from "sonner";
 import { AccessoryInstallPanel } from "@/components/admin/AccessoryInstallPanel";
 import DealerProgramsPanel from "@/components/admin/DealerProgramsPanel";
 import { TODAYS_PRICE_MODE_OPTIONS, DEFAULT_TODAYS_PRICE_CUSTOM, resolveTodaysPrice } from "@/lib/todaysPrice";
+import { COMP_STRATEGY_OPTIONS, type CompStrategy } from "@/lib/compStrategy";
 import OemWarrantyPanel from "@/components/admin/OemWarrantyPanel";
 import StickyButtonsPanel from "@/components/admin/StickyButtonsPanel";
 import DealershipTrustPanel from "@/components/admin/DealershipTrustPanel";
@@ -1344,6 +1345,30 @@ const Admin = () => {
                 <p className="text-[11px] text-muted-foreground mt-1">
                   Controls the price shown on the customer Passport. The advertised price is always compared to market before the doc fee.
                 </p>
+              </div>
+              <div className="mt-3">
+                <label className="text-xs font-semibold text-muted-foreground">Comp strategy</label>
+                <select
+                  value={settings.comp_settings?.compStrategy || "value_building"}
+                  onChange={(e) => updateSettings({ comp_settings: { ...(settings.comp_settings || {}), compStrategy: e.target.value as CompStrategy } })}
+                  className="w-full px-3 py-2 border border-border-custom rounded text-sm"
+                >
+                  {COMP_STRATEGY_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+                </select>
+                <p className="text-[11px] text-muted-foreground mt-1">
+                  Controls how comparable vehicles are selected for customer-facing market panels.{" "}
+                  {COMP_STRATEGY_OPTIONS.find((o) => o.value === (settings.comp_settings?.compStrategy || "value_building"))?.help}
+                </p>
+                {(settings.comp_settings?.compStrategy || "value_building") === "value_building" && (
+                  <label className="flex items-start gap-2 text-xs text-foreground mt-2">
+                    <input
+                      type="checkbox" className="mt-0.5"
+                      checked={!!settings.comp_settings?.includeLowerPricedComps}
+                      onChange={(e) => updateSettings({ comp_settings: { ...(settings.comp_settings || {}), includeLowerPricedComps: e.target.checked } })}
+                    />
+                    <span>Also allow slightly lower-priced comps (within 3% of this vehicle's price). Off by default so comps never undercut your vehicle.</span>
+                  </label>
+                )}
               </div>
               <div className="mt-3">
                 <label className="text-xs font-semibold text-muted-foreground">Today's Price page wording</label>
