@@ -14,6 +14,7 @@ import { lookupOemReference } from "@/data/oemWarrantyReference";
 import { resolveEffectiveWarranty } from "@/lib/warranty/passportWarranty";
 import { readBuildSheet, PACKAGE_KIND_ORDER } from "@/lib/buildSheet";
 import { getEquipmentIcon } from "@/lib/equipmentIcons";
+import { buildEquipmentPanelData } from "@/lib/equipmentPanel";
 import { readDealerAlternatives, type DealerAlternative } from "@/lib/dealerAlternatives";
 import { rememberPassportOrigin } from "@/lib/passportOrigin";
 import { recordPanelView } from "@/lib/shopperIntent";
@@ -40,7 +41,7 @@ export type PassportPanelKey = (typeof PASSPORT_PANEL_KEYS)[number];
 export const isPassportPanelKey = (v: string | null | undefined): v is PassportPanelKey =>
   !!v && (PASSPORT_PANEL_KEYS as readonly string[]).includes(v);
 
-interface PanelDef { title: string; subtitle: string; body: React.ReactNode; primary?: { label: string; onClick: () => void }; secondary?: { label: string; onClick: () => void }; footerQuestion?: string; specialistLabel?: string; footerNote?: string; wide?: boolean }
+interface PanelDef { title: string; subtitle: string; body: React.ReactNode; primary?: { label: string; onClick: () => void }; secondary?: { label: string; onClick: () => void }; footerQuestion?: string; specialistLabel?: string; footerNote?: string; wide?: boolean; xl?: boolean }
 
 function buildPanel(key: PassportPanelKey, d: PassportData, listing: VehicleListing, isPreview: boolean, go: (s: string) => void, openPanel: (k: PassportPanelKey) => void, nhtsa: NhtsaSafetyResult | null): PanelDef {
   const price = d.price, avg = d.marketAvg, low = d.marketLow, high = d.marketHigh, below = d.belowMarket;
@@ -1556,187 +1557,175 @@ function buildPanel(key: PassportPanelKey, d: PassportData, listing: VehicleList
     // consolidated Features & Equipment panel serves every existing link.
     case "highlights":
     case "equipment": {
-      const { groups, ordered, featLabels, accessories } = featureGroups(listing);
-      const ks = listing.key_specs || {};
-      const hs = d.highlights;
-      const reasons: string[] = [];
-      if (groups.Safety?.length) reasons.push("Advanced safety technology");
-      if (groups.Comfort?.length) reasons.push("Premium comfort and convenience");
-      if (groups.Technology?.length) reasons.push("Modern technology and connectivity");
-      if (/awd|4wd|4x4/i.test(String(ks.drivetrain || ""))) reasons.push("Confident all-weather capability");
-      if (/luxe|autograph|limited|platinum|premium|touring|signature|reserve|titanium|sensory|denali/i.test(listing.trim || "")) reasons.push("Luxury-grade appointments");
-      if (isGreat) reasons.push("Exceptional value versus the market");
-      // Structured NeoVIN build sheet (packages / options / key features /
-      // standard) — the tiered display. Older decodes without it fall back to
-      // the flat categorized list.
-      const sheet = readBuildSheet(listing);
-      const equipCount = sheet ? sheet.keyFeatureCount + sheet.standardCount : featLabels.length;
-      const hasContent = !!sheet || featLabels.length > 0 || accessories.length > 0 || ordered.length > 0 || hs.length > 0;
-      // Domestic trucks can carry a dozen-plus packages — group them under type
-      // headers once the list gets long, so the section stays scannable.
-      const pkgGroups = sheet
-        ? PACKAGE_KIND_ORDER.map((k) => [k, sheet.packages.filter((p) => p.kind === k)] as const).filter(([, l]) => l.length > 0)
-        : [];
-      const groupedPkgView = (sheet?.packages.length ?? 0) >= 5 && pkgGroups.length > 1;
-      const pkgTotal = sheet ? sheet.packages.reduce((a, p) => a + (p.msrp ?? 0), 0) : 0;
-      const renderPkg = (p: { name: string; msrp?: number; contents: string[]; kind: string }) => (
-        <details key={p.name} className={`${CARD} overflow-hidden group`}>
-          <summary className="cursor-pointer list-none flex items-center justify-between gap-3 px-4 py-3">
-            <span className="inline-flex items-center gap-2.5 min-w-0">
-              {(() => { const PkgIcon = getEquipmentIcon({ name: p.name, category: "package" }).icon; return (
-                <span className="w-8 h-8 rounded-lg bg-blue-50 flex items-center justify-center shrink-0"><PkgIcon className="w-4 h-4 text-[#2563EB]" strokeWidth={1.75} /></span>
-              ); })()}
-              <span className="min-w-0">
-                <span className="block text-[13px] font-bold text-[#0F172A] leading-tight">{p.name}</span>
-                {p.kind === "Equipment Group" && <span className="inline-block mt-0.5 text-[9px] font-bold uppercase tracking-wide text-[#2563EB] bg-blue-50 rounded-full px-1.5 py-0.5">Equipment Group</span>}
-              </span>
-            </span>
-            <span className="inline-flex items-center gap-2 shrink-0">
-              {p.msrp ? <span className="text-[12px] font-bold text-[#16A34A]">{fmt$(p.msrp)}</span> : null}
-              {p.contents.length > 0 && <ChevronDown className="w-4 h-4 text-[#94A3B8] group-open:rotate-180 transition-transform" />}
-            </span>
-          </summary>
-          {p.contents.length > 0 && (
-            <div className="px-4 pb-3 grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1.5">
-              {p.contents.map((c) => <div key={c} className="flex items-start gap-2 text-[12px] text-[#334155]"><CheckCircle2 className="w-3.5 h-3.5 text-[#16A34A] shrink-0 mt-0.5" />{c}</div>)}
-            </div>
-          )}
-        </details>
+      // Equipment Intelligence Panel — a wide premium drawer that turns the
+      // decoded build into a value story: stat cards, benefit-driven
+      // featured highlights, category rows, packages/options summary, and a
+      // collapsed full reference. Data via buildEquipmentPanelData; every
+      // section is real-data gated.
+      const eq = buildEquipmentPanelData(listing, d);
+      const hasContent = eq.factoryFeatureCount > 0 || eq.packageCount > 0 || eq.dealerAddonCount > 0 || eq.featuredHighlights.length > 0;
+      const statCard = (label: string, value: string, sub: string, Icon: React.ElementType, tone: "blue" | "green" = "blue") => (
+        <div className={`rounded-2xl border ${tone === "green" ? "border-emerald-200 bg-emerald-50/40" : "border-[#DDE5EE] bg-white"} p-3.5 flex flex-col gap-1.5`}>
+          <span className={`w-8 h-8 rounded-lg flex items-center justify-center ${tone === "green" ? "bg-emerald-100 text-[#1F7A4D]" : "bg-[#EAF4FF] text-[#0B6FEA]"}`}><Icon className="w-4 h-4" strokeWidth={1.75} /></span>
+          <p className="text-[10.5px] font-semibold text-[#64748B] leading-tight">{label}</p>
+          <p className={`text-[19px] font-extrabold leading-none tabular-nums ${tone === "green" ? "text-[#1F7A4D]" : "text-[#0D1B2A]"}`}>{value}</p>
+          <p className="text-[10px] text-[#94A3B8]">{sub}</p>
+        </div>
       );
       return {
-        title: sheet?.estValue ? `${fmt$(sheet.estValue)} in Factory Options on This Build` : "Features & Equipment",
+        title: eq.optionValue ? `${fmt$(eq.optionValue)} in Factory Options on This Build` : "Features & Equipment",
         subtitle: "Everything this vehicle was built with, from the factory and dealership",
+        xl: true,
         primary: { label: "Reserve This Vehicle", onClick: () => go("reserve") },
-        secondary: { label: "View full specifications", onClick: () => openPanel("key-specs") },
+        secondary: { label: "View Full Specifications", onClick: () => openPanel("key-specs") },
         footerQuestion: "Questions about the equipment?", specialistLabel: "Talk to a Product Specialist",
         body: <>
-          <div className="md:hidden"><MHero tone="blue" icon={Package} eyebrow="Equipment & Options" title={`${equipCount} on this vehicle`} note={sheet?.packages.length ? `${sheet.packages.length} factory package${sheet.packages.length === 1 ? "" : "s"} installed` : accessories.length ? `${accessories.length} dealer add-on${accessories.length === 1 ? "" : "s"} available` : "Factory and dealer equipment"} /></div>
+          <div className="md:hidden"><MHero tone="blue" icon={Package} eyebrow="Equipment & Options" title={`${eq.factoryFeatureCount} on this vehicle`} note={eq.packageCount ? `${eq.packageCount} factory package${eq.packageCount === 1 ? "" : "s"} installed` : eq.dealerAddonCount ? `${eq.dealerAddonCount} dealer add-on${eq.dealerAddonCount === 1 ? "" : "s"} available` : "Factory and dealer equipment"} /></div>
           {hasContent ? (
             <>
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                <Stat label="Factory Equipment" value={`${equipCount}`} />
-                <Stat label="Packages" value={sheet ? `${sheet.packages.length}` : "—"} />
-                <Stat label="Dealer Add-ons" value={`${accessories.length}`} />
-                <Stat label="Option Value" value={sheet?.estValue ? fmt$(sheet.estValue) : "—"} tone={sheet?.estValue ? "green" : "neutral"} />
+              {/* Value summary stat cards */}
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                {statCard("Factory Features", `${eq.factoryFeatureCount}`, "Included", CheckCircle2)}
+                {statCard("Factory Packages", `${eq.packageCount}`, "Included", Package)}
+                {statCard("Dealer Add-ons", `${eq.dealerAddonCount}`, "Added", Wrench)}
+                {statCard("Option Value", eq.optionValue ? fmt$(eq.optionValue) : "Included", eq.optionValue ? "Total Value" : "Equipment", DollarSign, "green")}
               </div>
-              {/* Generic decode = typical-for-trim, not VIN-verified — label it. */}
-              {sheet?.generic && (
-                <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2.5 flex items-start gap-2">
-                  <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+
+              {/* Generic decode = typical-for-trim, not VIN-verified — label it softly. */}
+              {eq.generic && (
+                <div className="rounded-xl border border-amber-200 bg-[#FFF7E6] px-3.5 py-2.5 flex items-start gap-2">
+                  <AlertTriangle className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
                   <p className="text-[12px] text-amber-800 leading-snug">Equipment shown is typical for this trim. Confirm this vehicle's exact build with the dealer.</p>
                 </div>
               )}
-              {/* Tier 1 — the highlight chips shoppers scan first */}
-              {hs.length > 0 && (
-                <Section title="Feature gallery">
-                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">{hs.map((h) => {
-                    const eq = getEquipmentIcon({ name: h.label, category: h.sub });
-                    return (
-                      <div key={h.key} className={`${CARD} p-4 flex flex-col items-center text-center gap-1.5`}>
-                        <span className="w-11 h-11 rounded-xl bg-blue-50 flex items-center justify-center"><eq.icon className="w-5 h-5 text-[#2563EB]" strokeWidth={1.75} /></span>
-                        <p className="text-[12px] font-bold leading-tight">{h.label}</p>
-                        <p className="text-[10px] text-[#94A3B8]">{h.sub || eq.label}</p>
-                      </div>
-                    );
-                  })}</div>
-                </Section>
-              )}
-              {sheet ? (
-                <>
-                  {/* Tier 2 — the differentiator: what THIS car has beyond the trim */}
-                  <Section title="Installed packages"
-                    sub={sheet.packages.length > 0
-                      ? `${sheet.packages.length} factory package${sheet.packages.length === 1 ? "" : "s"} on this build${pkgTotal ? ` · ${fmt$(pkgTotal)} in factory options` : ""}${listing.trim ? ` — beyond the standard ${listing.trim} trim` : ""}.`
-                      : listing.trim ? `Factory packages this vehicle was built with — beyond the standard ${listing.trim} trim.` : "Factory packages this vehicle was built with."}>
-                    {sheet.packages.length > 0 ? (
-                      groupedPkgView ? (
-                        <div className="space-y-3">
-                          {pkgGroups.map(([kind, pkgs]) => (
-                            <div key={kind}>
-                              <p className="text-[11px] font-bold uppercase tracking-wide text-[#94A3B8] mb-1.5">{kind} <span className="font-semibold">· {pkgs.length}</span></p>
-                              <div className="space-y-2">{pkgs.map(renderPkg)}</div>
-                            </div>
-                          ))}
-                        </div>
-                      ) : (
-                        <div className="space-y-2">{sheet.packages.map(renderPkg)}</div>
-                      )
-                    ) : (
-                      <p className="text-[12px] text-[#64748B]">No optional packages — this vehicle is equipped as a standard {listing.trim ? `${listing.trim} ` : ""}build.</p>
-                    )}
-                  </Section>
-                  {sheet.options.length > 0 && (
-                    <Section title="Factory options" sub="Standalone options installed on this vehicle.">
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                        {sheet.options.map((o) => {
-                          const eq = getEquipmentIcon(o.name);
-                          return (
-                            <div key={o.name} className={`${CARD} px-3.5 py-2.5 flex items-center gap-2.5`}>
-                              <span className="w-8 h-8 rounded-lg bg-blue-50 flex items-center justify-center shrink-0"><eq.icon className="w-4 h-4 text-[#2563EB]" strokeWidth={1.75} /></span>
-                              <span className="min-w-0 flex-1">
-                                <span className="block text-[12px] font-semibold text-[#0F172A] leading-tight">{o.name}</span>
-                                <span className="block text-[10px] text-[#94A3B8] mt-0.5">{eq.label}</span>
-                              </span>
-                              {o.msrp && <span className="text-[11px] font-bold text-[#16A34A] shrink-0">{fmt$(o.msrp)}</span>}
-                            </div>
-                          );
-                        })}
+
+              {/* Two-column interior */}
+              <div className="grid grid-cols-1 md:grid-cols-[minmax(0,62fr)_minmax(0,38fr)] gap-5 items-start">
+                <div className="space-y-5 min-w-0">
+                  {eq.featuredHighlights.length > 0 && (
+                    <Section title="Featured Highlights" sub="The standout features that define this build.">
+                      <div className="grid grid-cols-2 xl:grid-cols-2 gap-3">
+                        {eq.featuredHighlights.map((h) => (
+                          <div key={h.id} className={`${CARD} p-3.5 flex flex-col items-center text-center gap-1.5`}>
+                            <span className="w-10 h-10 rounded-xl bg-[#EAF4FF] flex items-center justify-center"><h.icon.icon className="w-5 h-5 text-[#0B6FEA]" strokeWidth={1.75} /></span>
+                            <p className="text-[12px] font-bold leading-tight text-[#0D1B2A]">{h.title}</p>
+                            <p className="text-[10.5px] text-[#64748B] leading-snug">{h.benefit}</p>
+                          </div>
+                        ))}
                       </div>
                     </Section>
                   )}
-                  {/* Tier 3 — key features by shopper-priority category */}
-                  {sheet.keyFeatures.length > 0 && (
-                    <Section title="Key features" sub="The equipment shoppers ask about, organized by category.">
-                      <div className="space-y-2">{sheet.keyFeatures.map(([name, items], i) => <Group key={name} title={name} items={items} defaultOpen={i === 0} iconic />)}</div>
+
+                  {eq.categories.length > 0 && (
+                    <Section title="Equipment by Category" sub="Explore features by what matters most.">
+                      <div className="space-y-2">
+                        {eq.categories.map((c) => (
+                          <details key={c.id} className={`${CARD} overflow-hidden group`}>
+                            <summary className="cursor-pointer list-none flex items-center gap-3 px-4 py-3">
+                              <span className="w-8 h-8 rounded-lg bg-[#EAF4FF] flex items-center justify-center shrink-0"><c.icon.icon className="w-4 h-4 text-[#0B6FEA]" strokeWidth={1.75} /></span>
+                              <span className="text-[13px] font-bold text-[#0F172A] flex-1 min-w-0 truncate">{c.name}</span>
+                              <span className="text-[11px] font-semibold text-[#94A3B8] shrink-0">{c.items.length} feature{c.items.length === 1 ? "" : "s"}</span>
+                              <ChevronDown className="w-4 h-4 text-[#94A3B8] group-open:rotate-180 transition-transform shrink-0" />
+                            </summary>
+                            <div className="px-4 pb-3 grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1.5">
+                              {c.items.map((it) => {
+                                const ItIcon = getEquipmentIcon(it).icon;
+                                return <div key={it} className="flex items-start gap-2 text-[12px] text-[#334155]"><ItIcon className="w-3.5 h-3.5 text-[#0B6FEA] shrink-0 mt-0.5" strokeWidth={1.75} />{it}</div>;
+                              })}
+                            </div>
+                          </details>
+                        ))}
+                      </div>
                     </Section>
                   )}
-                  {/* Tier 4 — full reference list, collapsed by default */}
-                  {sheet.standardCount > 0 && (
+
+                  {eq.completeFactoryEquipment.length > 0 && (
                     <details className={`${CARD} overflow-hidden group`}>
                       <summary className="cursor-pointer list-none flex items-center justify-between gap-3 px-4 py-3.5">
                         <span className="min-w-0">
-                          <span className="block text-[13px] font-bold text-[#0F172A] leading-tight">Complete factory equipment ({sheet.standardCount})</span>
-                          <span className="block text-[11px] text-[#94A3B8] leading-tight mt-0.5">Every standard feature on this build, for reference</span>
+                          <span className="block text-[13px] font-bold text-[#0F172A] leading-tight">Complete Factory Equipment ({eq.factoryFeatureCount})</span>
+                          <span className="block text-[11px] text-[#94A3B8] leading-tight mt-0.5">Full VIN-decoded list for reference</span>
                         </span>
                         <ChevronDown className="w-4 h-4 text-[#94A3B8] group-open:rotate-180 transition-transform shrink-0" />
                       </summary>
-                      <div className="px-3 pb-3 space-y-2">{sheet.standard.map(([name, items]) => <Group key={name} title={name} items={items} iconic />)}</div>
+                      <div className="px-3 pb-3 space-y-2">{eq.completeFactoryEquipment.map(([name, items]) => <Group key={name} title={name} items={items} iconic />)}</div>
                     </details>
                   )}
-                </>
-              ) : (
-                <>
-                  {ordered.length > 0 && (
-                    <Section title="Equipment categories">
-                      <div className="space-y-2">{ordered.map(([name, items], i) => <Group key={name} title={name} items={items} defaultOpen={i === 0} iconic />)}</div>
-                    </Section>
-                  )}
-                  {featLabels.length > 0 && (
-                    <Section title="Factory options">
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">{featLabels.slice(0, 12).map((f) => { const eq = getEquipmentIcon(f); return <IconCard key={f} icon={eq.icon} title={f} sub={eq.label} />; })}</div>
-                    </Section>
-                  )}
-                </>
-              )}
-              {accessories.length > 0 && (
-                <Section title="Dealer accessories available" sub="Add-ons offered by the dealer — not factory-installed.">
-                  <div className="space-y-2">{accessories.map((a) => { const AccIcon = getEquipmentIcon({ name: a, category: "accessory" }).icon; return <div key={a} className={`${CARD} p-3 flex items-center gap-2.5`}><span className="w-8 h-8 rounded-lg bg-blue-50 flex items-center justify-center shrink-0"><AccIcon className="w-4 h-4 text-[#2563EB]" strokeWidth={1.75} /></span><span className="text-[13px] text-[#0F172A]">{a}</span></div>; })}</div>
-                </Section>
-              )}
-              {reasons.length > 0 && (
-                <Section title="Top reasons customers love this vehicle">
-                  <div className={`${CARD} p-4`}><ul className="space-y-2">{reasons.map((r) => <Check key={r}>{r}</Check>)}</ul></div>
-                </Section>
-              )}
-              <Section title="Build summary">
-                <div className={`${CARD} p-4`}>
-                  <StatRow label="Factory equipment" value={`${equipCount} items`} />
-                  <StatRow label="Factory packages" value={sheet ? (sheet.packages.length ? `${sheet.packages.length} installed` : "None — standard build") : "Awaiting VIN decode"} />
-                  <StatRow label="Factory options" value={sheet ? (sheet.options.length ? `${sheet.options.length} installed` : "None reported") : "Awaiting VIN decode"} />
-                  <StatRow label="Dealer installed" value={accessories.length ? `${accessories.length} available` : "None reported"} />
                 </div>
-                {!sheet && <p className="text-[11px] text-[#94A3B8] mt-2">The itemized package and option breakdown appears once this VIN's build sheet is decoded.</p>}
-              </Section>
+
+                <div className="space-y-5 min-w-0">
+                  <Section title="Installed Packages" sub="Packages included on this build.">
+                    {eq.installedPackages.length > 0 ? (
+                      <div className="space-y-2">
+                        {eq.installedPackages.map((pkg) => (
+                          <details key={pkg.id} className={`${CARD} overflow-hidden group`}>
+                            <summary className="cursor-pointer list-none px-4 py-3">
+                              <span className="flex items-center justify-between gap-2">
+                                <span className="text-[13px] font-bold text-[#0F172A] leading-tight min-w-0">{pkg.name}</span>
+                                <span className="text-[10px] font-bold text-[#0B6FEA] bg-[#EAF4FF] rounded-full px-2 py-0.5 shrink-0">Included</span>
+                              </span>
+                              {pkg.value ? <span className="block text-[12px] font-bold text-[#1F7A4D] mt-1">{fmt$(pkg.value)} Value</span> : null}
+                            </summary>
+                            {pkg.contents.length > 0 && (
+                              <div className="px-4 pb-3 space-y-1.5">
+                                {pkg.contents.map((c) => <div key={c} className="flex items-start gap-2 text-[12px] text-[#334155]"><CheckCircle2 className="w-3.5 h-3.5 text-[#16A34A] shrink-0 mt-0.5" />{c}</div>)}
+                              </div>
+                            )}
+                          </details>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className={`${CARD} p-3.5`}><p className="text-[12px] text-[#64748B]">No optional packages — this vehicle is equipped as a standard {listing.trim ? `${listing.trim} ` : ""}build.</p></div>
+                    )}
+                  </Section>
+
+                  {eq.factoryOptionsSummary.length > 0 && (
+                    <Section title="Factory Options Summary" sub="Additional factory-installed options.">
+                      <div className={`${CARD} p-3.5`}>
+                        {eq.factoryOptionsSummary.slice(0, 5).map((o) => (
+                          <div key={o.id} className="flex items-center justify-between gap-2 py-1.5 text-[12.5px]">
+                            <span className="text-[#10202B] font-semibold min-w-0 truncate">{o.name}</span>
+                            <span className="shrink-0">{o.value ? <span className="font-bold text-[#1F7A4D]">{fmt$(o.value)}</span> : <span className="text-[10px] font-bold text-[#0B6FEA] bg-[#EAF4FF] rounded-full px-2 py-0.5">Included</span>}</span>
+                          </div>
+                        ))}
+                        {eq.factoryOptionsSummary.length > 5 && (
+                          <details className="group">
+                            <summary className="cursor-pointer list-none text-[12px] font-semibold text-[#0B6FEA] pt-1.5 inline-flex items-center gap-1">View all options ({eq.factoryOptionsSummary.length}) <ChevronDown className="w-3.5 h-3.5 group-open:rotate-180 transition-transform" /></summary>
+                            {eq.factoryOptionsSummary.slice(5).map((o) => (
+                              <div key={o.id} className="flex items-center justify-between gap-2 py-1.5 text-[12.5px]">
+                                <span className="text-[#10202B] font-semibold min-w-0 truncate">{o.name}</span>
+                                {o.value ? <span className="font-bold text-[#1F7A4D] shrink-0">{fmt$(o.value)}</span> : null}
+                              </div>
+                            ))}
+                          </details>
+                        )}
+                      </div>
+                    </Section>
+                  )}
+
+                  {eq.accessories.length > 0 && (
+                    <Section title="Dealer Add-ons Available" sub="Offered by the dealer — not factory-installed.">
+                      <div className="space-y-2">{eq.accessories.map((a) => { const AccIcon = getEquipmentIcon({ name: a, category: "accessory" }).icon; return <div key={a} className={`${CARD} p-3 flex items-center gap-2.5`}><span className="w-8 h-8 rounded-lg bg-[#EAF4FF] flex items-center justify-center shrink-0"><AccIcon className="w-4 h-4 text-[#0B6FEA]" strokeWidth={1.75} /></span><span className="text-[13px] text-[#0F172A]">{a}</span></div>; })}</div>
+                    </Section>
+                  )}
+
+                  {eq.customerLoveReasons.length > 0 && (
+                    <Section title="Why Customers Love This Build" sub="Real benefits that matter most.">
+                      <div className={`${CARD} p-4 space-y-3`}>
+                        {eq.customerLoveReasons.map((r) => (
+                          <div key={r.id} className="flex items-start gap-2.5">
+                            <CheckCircle2 className="w-4 h-4 text-[#16A34A] shrink-0 mt-0.5" />
+                            <div className="min-w-0">
+                              <p className="text-[12.5px] font-bold text-[#0F172A] leading-tight">{r.title}</p>
+                              <p className="text-[11px] text-[#64748B] mt-0.5">{r.description}</p>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </Section>
+                  )}
+                </div>
+              </div>
             </>
           ) : <Empty>Equipment details appear here as the vehicle's build data is decoded.</Empty>}
           <Disclaimer />
@@ -2727,7 +2716,7 @@ export default function PassportPanel({ panel, onClose, openPanel, d, listing, i
   ) : undefined;
 
   return (
-    <PassportSlideOver open={panel !== null} onClose={onClose} title={def.title} subtitle={def.subtitle} footer={footer} wide={def.wide}>
+    <PassportSlideOver open={panel !== null} onClose={onClose} title={def.title} subtitle={def.subtitle} footer={footer} wide={def.wide} xl={def.xl}>
       {def.body}
     </PassportSlideOver>
   );

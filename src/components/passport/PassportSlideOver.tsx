@@ -16,7 +16,7 @@ export const ORANGE = "#EA580C";
 export const CARD = "rounded-2xl bg-white border border-[#E6E8EC]";
 
 export function PassportSlideOver({
-  open, onClose, title, subtitle, footer, children, wide = false,
+  open, onClose, title, subtitle, footer, children, wide = false, xl = false,
 }: {
   open: boolean;
   onClose: () => void;
@@ -27,6 +27,10 @@ export function PassportSlideOver({
   // `wide` swaps the right-side drawer for a large centered modal (used by the
   // Factory Warranty panel's two-column layout). All other panels stay drawers.
   wide?: boolean;
+  // `xl` keeps the right-side drawer but widens it to a premium workspace
+  // (~820px, capped at calc(100vw - 120px)) for content-heavy panels like
+  // the equipment intelligence panel.
+  xl?: boolean;
 }) {
   const [render, setRender] = useState(open);
   const [enter, setEnter] = useState(false);
@@ -126,7 +130,7 @@ export function PassportSlideOver({
           aria-modal="true"
           aria-label={title}
           tabIndex={-1}
-          className={`absolute right-0 top-0 h-full w-full sm:w-[90vw] md:w-[600px] xl:w-[660px] 2xl:w-[680px] bg-[#F6F7F9] shadow-[0_0_60px_rgba(0,0,0,0.25)] outline-none flex flex-col transition-transform duration-200 ease-out will-change-transform ${enter ? "translate-x-0" : "translate-x-full"}`}
+          className={`absolute right-0 top-0 h-full w-full bg-[#F6F7F9] shadow-[0_0_60px_rgba(0,0,0,0.25)] outline-none flex flex-col transition-transform duration-200 ease-out will-change-transform ${xl ? "sm:w-[94vw] sm:max-w-[calc(100vw-120px)] md:w-[760px] lg:w-[820px]" : "sm:w-[90vw] md:w-[600px] xl:w-[660px] 2xl:w-[680px]"} ${enter ? "translate-x-0" : "translate-x-full"}`}
         >
           {inner}
         </div>
