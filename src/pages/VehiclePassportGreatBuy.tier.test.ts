@@ -14,7 +14,7 @@ describe("scoreTier", () => {
 
   it("never calls a 60-69 score excellent or a hard yes", () => {
     const t = scoreTier(69);
-    expect(t.label).toBe("Fair Buy");
+    expect(t.label).toBe("Worth Reviewing");
     expect(t.verdict).toBe("REVIEW CAREFULLY");
     expect(t.headline).toBe("A Vehicle Worth Reviewing.");
     expect(t.label).not.toMatch(/excellent/i);
