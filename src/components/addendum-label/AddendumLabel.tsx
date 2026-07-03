@@ -62,7 +62,9 @@ const TRUST_BADGES = [
 
 const COMPLIANCE_BADGES = [
   { iconKey: "ai_powered", label: "AI Powered" },
-  { iconKey: "ftc_compliant", label: "FTC Compliant" },
+  // Printed claim stays "aligned", never "compliant" — a certification-style
+  // claim on a customer document is exactly what the red-team bans in copy.
+  { iconKey: "ftc_compliant", label: "FTC-Aligned" },
   { iconKey: "realtime_updates", label: "Real-Time Updates" },
   { iconKey: "print_ready", label: "Print Ready" },
 ];
