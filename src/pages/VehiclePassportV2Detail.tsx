@@ -1,9 +1,10 @@
-import { useEffect, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useState } from "react";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
 import {
   ChevronLeft, Upload, Phone, MessageSquare, Send, CheckCircle2, ShieldCheck,
   TrendingUp, DollarSign, Clock, Car, Wrench, Award, Gauge as GaugeIcon, BadgeCheck,
   Building2, Truck, Star, Settings, Lock, Zap, Package, FileText, Calendar,
+  User, Mail, PenLine, RefreshCw,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Helmet } from "react-helmet-async";
@@ -267,12 +268,16 @@ const trackReserve = (listing: VehicleListing, event: string, extra: Record<stri
     metadata: { event, ...extra },
   });
 
-const RESERVE_STEPS = ["Submit Request", "Dealer Confirms Availability", "Vehicle Held For You"];
-const RESERVE_TIMINGS = ["Today", "This week", "Just checking availability"];
+const RESERVE_STEPS: { label: string; icon: React.ElementType }[] = [
+  { label: "Submit Request", icon: Send },
+  { label: "Dealer Confirms Availability", icon: ShieldCheck },
+  { label: "Vehicle Held For You", icon: Lock },
+];
+const RESERVE_TIMINGS = ["Today", "This Week", "Checking Availability"];
 const CONTACT_METHODS: { key: string; label: string; icon: React.ElementType }[] = [
   { key: "call", label: "Call", icon: Phone },
   { key: "text", label: "Text", icon: MessageSquare },
-  { key: "email", label: "Email", icon: Send },
+  { key: "email", label: "Email", icon: Mail },
 ];
 
 const reserveField = "w-full border rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500";
@@ -281,8 +286,8 @@ const ReserveExperience = ({ listing, d, navigate }: { listing: VehicleListing; 
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
-  const [method, setMethod] = useState<string | null>(null);
-  const [timing, setTiming] = useState<string | null>(null);
+  const [method, setMethod] = useState<string | null>("call");
+  const [timing, setTiming] = useState<string | null>("Today");
   const [message, setMessage] = useState("");
   const [sending, setSending] = useState(false);
   const [sent, setSent] = useState(false);
@@ -296,6 +301,9 @@ const ReserveExperience = ({ listing, d, navigate }: { listing: VehicleListing; 
   const modelName = (listing.ymm || "").replace(/^\d{4}\s*/, "").trim() || "Vehicle";
   const heroSrc = listingHero(listing);
   const stockNo = (() => { const s = (listing.mc_attributes as Record<string, unknown> | null)?.stock_no; return s ? String(s) : null; })();
+  const snap = (listing.dealer_snapshot || {}) as Record<string, unknown>;
+  const dealerLogo = (snap.logo_url as string) || "";
+  const dealerCityState = [snap.city, snap.state].filter(Boolean).join(", ");
 
   const q = isPreview ? "?preview=1" : "";
   const goBack = () => { if (!isPreview) trackReserve(listing, "back_to_passport_clicked"); navigate(`/v/${listing.slug}${q}`); };
@@ -371,32 +379,42 @@ const ReserveExperience = ({ listing, d, navigate }: { listing: VehicleListing; 
             <p className="text-[13px] font-bold leading-tight truncate">{listing.ymm}{listing.trim ? ` ${listing.trim}` : ""}</p>
             <p className="text-[15px] font-extrabold text-[#2563EB] leading-tight">{d.price != null ? fmt$(d.price) : ""}</p>
           </div>
-          <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-full px-2 py-0.5 shrink-0">Ready to Reserve</span>
+          <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-full px-2 py-0.5 shrink-0">Available Now</span>
         </div>
       ) : (
         <>
           <div className="rounded-xl overflow-hidden bg-slate-100 aspect-[16/10] flex items-center justify-center">
             {heroSrc ? <img src={heroSrc} alt={listing.ymm ?? "Vehicle"} className="w-full h-full object-cover" /> : <Car className="w-8 h-8 text-slate-300" />}
           </div>
-          <div className="flex items-start justify-between gap-2 mt-3">
-            <p className="text-[15px] font-bold leading-tight">{listing.ymm}{listing.trim ? ` ${listing.trim}` : ""}</p>
-            <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-full px-2 py-0.5 shrink-0 mt-0.5">Ready to Reserve</span>
+          <p className="text-[17px] font-extrabold leading-tight mt-3">{listing.ymm}{listing.trim ? ` ${listing.trim}` : ""}</p>
+          {d.price != null && <p className="text-[24px] font-extrabold tracking-tight text-[#2563EB] mt-0.5">{fmt$(d.price)}</p>}
+          <div className="flex flex-wrap items-center gap-y-1 mt-2.5 text-[11.5px] text-slate-500">
+            {[
+              listing.mileage != null ? <span key="mi" className="inline-flex items-center gap-1"><GaugeIcon className="w-3.5 h-3.5 text-slate-400" />{listing.mileage.toLocaleString()} miles</span> : null,
+              stockNo ? <span key="st">Stock #{stockNo}</span> : null,
+              listing.vin ? <span key="vin">VIN {listing.vin}</span> : null,
+            ].filter(Boolean).map((el, i) => <span key={i} className={i > 0 ? "pl-2.5 ml-2.5 border-l border-slate-200" : ""}>{el}</span>)}
           </div>
-          {d.price != null && <p className="text-[24px] font-extrabold tracking-tight text-[#2563EB] mt-1">{fmt$(d.price)}</p>}
-          <div className="mt-2 space-y-1 text-[12px] text-slate-500">
-            {listing.mileage != null && <p>{listing.mileage.toLocaleString()} miles</p>}
-            {listing.vin && <p>VIN {listing.vin}</p>}
-            {stockNo && <p>Stock #{stockNo}</p>}
-            {d.dealerName && <p className="font-semibold text-slate-700">{d.dealerName}</p>}
-          </div>
-          <ul className="mt-4 space-y-2 border-t border-[#F1F5F9] pt-4">
+          {(d.dealerName || dealerLogo) && (
+            <div className="flex items-center gap-3 mt-4 border-t border-[#F1F5F9] pt-4">
+              <span className="w-11 h-11 rounded-lg border border-slate-200 bg-slate-900 flex items-center justify-center overflow-hidden shrink-0">
+                {dealerLogo ? <img src={dealerLogo} alt={d.dealerName || "Dealer"} className="w-full h-full object-contain" /> : <Building2 className="w-5 h-5 text-white" />}
+              </span>
+              <div className="min-w-0">
+                <p className="text-[13.5px] font-bold text-slate-900 leading-tight truncate">{d.dealerName || "Dealership"}</p>
+                {dealerCityState && <p className="text-[12px] text-slate-500 leading-tight">{dealerCityState}</p>}
+                <span className="inline-flex items-center gap-1.5 text-[10.5px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-full px-2 py-0.5 mt-1"><span className="w-1.5 h-1.5 rounded-full bg-emerald-500" /> Available Now</span>
+              </div>
+            </div>
+          )}
+          <ul className="mt-4 space-y-2.5 border-t border-[#F1F5F9] pt-4">
             {["Fully refundable reservation request", "No online payment required", "Dealer-confirmed availability", "Linked to this exact Vehicle Passport"].map((b) => (
-              <li key={b} className="flex items-start gap-2 text-[12.5px] text-slate-700"><CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0 mt-0.5" />{b}</li>
+              <li key={b} className="flex items-start gap-2 text-[12.5px] text-slate-700"><CheckCircle2 className="w-4 h-4 text-[#2563EB] shrink-0 mt-0.5" />{b}</li>
             ))}
           </ul>
-          <div className="mt-4 space-y-2">
+          <div className="mt-4 space-y-2 border-t border-[#F1F5F9] pt-4">
             <button onClick={goBack} className="w-full h-11 rounded-xl border border-[#E6E8EC] text-[13px] font-semibold inline-flex items-center justify-center gap-1.5 hover:border-[#2563EB]"><ChevronLeft className="w-4 h-4" /> Back to Vehicle Passport</button>
-            <button onClick={goTrade} className="w-full h-11 rounded-xl border-2 border-[#2563EB] text-[#2563EB] text-[13px] font-bold inline-flex items-center justify-center gap-1.5"><GaugeIcon className="w-4 h-4" /> Get Trade Value</button>
+            <button onClick={goTrade} className="w-full h-11 rounded-xl border border-[#2563EB] text-[#2563EB] text-[13px] font-bold inline-flex items-center justify-center gap-1.5 hover:bg-blue-50"><RefreshCw className="w-4 h-4" /> Get Trade Value</button>
           </div>
         </>
       )}
@@ -432,79 +450,96 @@ const ReserveExperience = ({ listing, d, navigate }: { listing: VehicleListing; 
         {/* Compact vehicle strip stays visible on mobile without pushing the form down. */}
         <div className="lg:hidden">{summaryCard(true)}</div>
 
-        <Card className="p-5 sm:p-6">
-          <h1 className="text-[22px] sm:text-[24px] font-extrabold tracking-tight leading-tight">Reserve This {modelName}</h1>
-          <p className="text-[13.5px] text-slate-500 mt-1.5">Submit your reservation request and the dealership will confirm availability before placing this vehicle on hold. No payment is collected online.</p>
+        <div>
+          <h1 className="text-[24px] sm:text-[27px] font-extrabold tracking-tight leading-tight">Reserve This {modelName}</h1>
+          <p className="text-[13.5px] text-slate-500 mt-1.5 max-w-[560px]">Submit your reservation request and the dealership will confirm availability before placing this vehicle on hold. No payment is collected online.</p>
+        </div>
 
-          <div className="grid grid-cols-3 gap-2 mt-5">
-            {RESERVE_STEPS.map((s, i) => (
-              <div key={s} className="rounded-xl border border-blue-100 bg-blue-50/50 px-2 py-2.5 text-center">
-                <span className="w-6 h-6 rounded-full bg-[#2563EB] text-white text-[12px] font-bold inline-flex items-center justify-center">{i + 1}</span>
-                <p className="text-[11px] font-semibold text-[#1E3A8A] mt-1.5 leading-tight">{s}</p>
-              </div>
+        <Card className="px-4 py-3.5">
+          <div className="flex items-center gap-2 sm:gap-3">
+            {RESERVE_STEPS.map(({ label, icon: Icon }, i) => (
+              <Fragment key={label}>
+                {i > 0 && <span className="hidden sm:block flex-1 border-t border-dashed border-slate-200 min-w-[16px]" />}
+                <div className="flex items-center gap-2 min-w-0">
+                  <span className={`w-9 h-9 rounded-full flex items-center justify-center shrink-0 ${i === 0 ? "bg-[#2563EB] text-white" : "border border-slate-200 bg-white text-slate-400"}`}><Icon className="w-4 h-4" /></span>
+                  <span className="text-[12px] font-semibold text-slate-700 leading-tight"><span className="text-slate-400 mr-1">{i + 1}</span>{label}</span>
+                </div>
+              </Fragment>
             ))}
           </div>
+        </Card>
 
-          <div className="mt-5 space-y-4" onInput={markStarted}>
-            <div>
-              <label htmlFor="rsv-name" className="block text-[12px] font-semibold text-slate-600 mb-1">Full Name *</label>
-              <input id="rsv-name" value={name} onChange={(e) => setName(e.target.value)} autoComplete="name" placeholder="Alex Morgan" aria-invalid={!!errors.name} aria-describedby={errors.name ? "rsv-name-err" : undefined} className={`${reserveField} ${errors.name ? "border-red-300" : "border-slate-200"}`} />
-              {errors.name && <p id="rsv-name-err" className="text-[12px] text-red-600 mt-1">{errors.name}</p>}
-            </div>
+        <Card className="p-5 sm:p-6">
+          <div className="space-y-4" onInput={markStarted}>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <label htmlFor="rsv-email" className="block text-[12px] font-semibold text-slate-600 mb-1">Email Address</label>
-                <input id="rsv-email" value={email} onChange={(e) => setEmail(e.target.value)} type="email" autoComplete="email" inputMode="email" placeholder="alex@example.com" aria-invalid={!!errors.email} aria-describedby={errors.email ? "rsv-email-err" : undefined} className={`${reserveField} ${errors.email ? "border-red-300" : "border-slate-200"}`} />
-                {errors.email && <p id="rsv-email-err" className="text-[12px] text-red-600 mt-1">{errors.email}</p>}
+                <div className="relative">
+                  <User className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                  <input id="rsv-name" value={name} onChange={(e) => setName(e.target.value)} autoComplete="name" placeholder="Full Name" aria-label="Full Name" aria-invalid={!!errors.name} aria-describedby={errors.name ? "rsv-name-err" : undefined} className={`${reserveField} pl-10 ${errors.name ? "border-red-300" : "border-slate-200"}`} />
+                </div>
+                {errors.name && <p id="rsv-name-err" className="text-[12px] text-red-600 mt-1">{errors.name}</p>}
               </div>
               <div>
-                <label htmlFor="rsv-phone" className="block text-[12px] font-semibold text-slate-600 mb-1">Mobile Phone</label>
-                <input id="rsv-phone" value={phone} onChange={(e) => setPhone(formatPhone(e.target.value))} type="tel" autoComplete="tel" inputMode="tel" placeholder="(555) 123-4567" aria-invalid={!!errors.contact} aria-describedby={errors.contact ? "rsv-contact-err" : undefined} className={`${reserveField} ${errors.contact ? "border-red-300" : "border-slate-200"}`} />
-                {errors.contact && <p id="rsv-contact-err" className="text-[12px] text-red-600 mt-1">{errors.contact}</p>}
+                <div className="relative">
+                  <Mail className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                  <input id="rsv-email" value={email} onChange={(e) => setEmail(e.target.value)} type="email" autoComplete="email" inputMode="email" placeholder="Email Address" aria-label="Email Address" aria-invalid={!!errors.email} aria-describedby={errors.email ? "rsv-email-err" : undefined} className={`${reserveField} pl-10 ${errors.email ? "border-red-300" : "border-slate-200"}`} />
+                </div>
+                {errors.email && <p id="rsv-email-err" className="text-[12px] text-red-600 mt-1">{errors.email}</p>}
               </div>
             </div>
             <div>
-              <p className="text-[12px] font-semibold text-slate-600 mb-1.5">Preferred Contact Method</p>
-              <div className="grid grid-cols-3 gap-2">
-                {CONTACT_METHODS.map(({ key, label, icon: Icon }) => (
-                  <button key={key} type="button" aria-pressed={method === key} onClick={() => { setMethod(key); markStarted(); if (!isPreview) trackReserve(listing, "reserve_contact_method_selected", { method: key }); }} className={`h-11 rounded-xl text-[13px] font-semibold border inline-flex items-center justify-center gap-1.5 transition-colors ${method === key ? "border-[#2563EB] bg-blue-50 text-[#2563EB]" : "border-slate-200 text-slate-600 hover:border-slate-300"}`}>
-                    <Icon className="w-4 h-4" /> {label}
-                  </button>
-                ))}
+              <div className="relative">
+                <Phone className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                <input id="rsv-phone" value={phone} onChange={(e) => setPhone(formatPhone(e.target.value))} type="tel" autoComplete="tel" inputMode="tel" placeholder="Mobile Phone" aria-label="Mobile Phone" aria-invalid={!!errors.contact} aria-describedby={errors.contact ? "rsv-contact-err" : undefined} className={`${reserveField} pl-10 ${errors.contact ? "border-red-300" : "border-slate-200"}`} />
+              </div>
+              {errors.contact && <p id="rsv-contact-err" className="text-[12px] text-red-600 mt-1">{errors.contact}</p>}
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-[1fr_1.35fr] gap-4">
+              <div>
+                <p className="text-[12px] font-semibold text-slate-600 mb-1.5">Preferred Contact Method</p>
+                <div className="flex rounded-xl border border-slate-200 p-1 gap-1">
+                  {CONTACT_METHODS.map(({ key, label, icon: Icon }) => (
+                    <button key={key} type="button" aria-pressed={method === key} onClick={() => { setMethod(key); markStarted(); if (!isPreview) trackReserve(listing, "reserve_contact_method_selected", { method: key }); }} className={`flex-1 h-9 rounded-lg text-[12.5px] font-semibold inline-flex items-center justify-center gap-1.5 transition-colors ${method === key ? "bg-blue-50 text-[#2563EB] ring-1 ring-inset ring-[#2563EB]" : "text-slate-600 hover:bg-slate-50"}`}>
+                      <Icon className="w-3.5 h-3.5" /> {label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <p className="text-[12px] font-semibold text-slate-600 mb-1.5">Timing</p>
+                <div className="flex rounded-xl border border-slate-200 p-1 gap-1">
+                  {RESERVE_TIMINGS.map((t, i) => (
+                    <button key={t} type="button" aria-pressed={timing === t} onClick={() => { setTiming(t); markStarted(); if (!isPreview) trackReserve(listing, "reserve_timing_selected", { timing: t }); }} className={`flex-1 h-9 rounded-lg text-[12px] font-semibold inline-flex items-center justify-center gap-1.5 px-1 transition-colors ${timing === t ? "bg-blue-50 text-[#2563EB] ring-1 ring-inset ring-[#2563EB]" : "text-slate-600 hover:bg-slate-50"}`}>
+                      {i === 0 && <Calendar className="w-3.5 h-3.5" />}{t}
+                    </button>
+                  ))}
+                </div>
               </div>
             </div>
-            <div>
-              <p className="text-[12px] font-semibold text-slate-600 mb-1.5">When are you looking to move forward?</p>
-              <div className="flex flex-wrap gap-2">
-                {RESERVE_TIMINGS.map((t) => (
-                  <button key={t} type="button" aria-pressed={timing === t} onClick={() => { setTiming(t); markStarted(); if (!isPreview) trackReserve(listing, "reserve_timing_selected", { timing: t }); }} className={`h-10 px-4 rounded-xl text-[13px] font-semibold border transition-colors ${timing === t ? "border-[#2563EB] bg-blue-50 text-[#2563EB]" : "border-slate-200 text-slate-600 hover:border-slate-300"}`}>{t}</button>
-                ))}
-              </div>
-            </div>
-            <div>
-              <label htmlFor="rsv-msg" className="block text-[12px] font-semibold text-slate-600 mb-1">Message to Dealer <span className="font-normal text-slate-400">(optional)</span></label>
-              <textarea id="rsv-msg" value={message} onChange={(e) => setMessage(e.target.value)} rows={3} placeholder="Anything you'd like the dealership to know?" className={`${reserveField} border-slate-200 resize-none`} />
+            <div className="relative">
+              <PenLine className="w-4 h-4 text-slate-400 absolute left-3.5 top-3.5 pointer-events-none" />
+              <textarea id="rsv-msg" value={message} onChange={(e) => setMessage(e.target.value.slice(0, 500))} rows={4} maxLength={500} placeholder="Message to Dealer (optional)" aria-label="Message to Dealer (optional)" className={`${reserveField} pl-10 border-slate-200 resize-none`} />
+              <span className="absolute bottom-2.5 right-3.5 text-[11px] text-slate-400">{message.length} / 500</span>
             </div>
           </div>
 
-          <button onClick={submit} disabled={sending} className="w-full h-12 mt-5 bg-[#2563EB] hover:bg-[#1d4fd7] disabled:opacity-60 text-white font-bold rounded-xl flex items-center justify-center gap-2 transition-colors">
-            {sending ? <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" /> : <><BadgeCheck className="w-5 h-5" /> Request My Reservation</>}
+          <button onClick={submit} disabled={sending} className="w-full h-12 mt-4 bg-[#2563EB] hover:bg-[#1d4fd7] disabled:opacity-60 text-white font-bold rounded-xl flex items-center justify-center gap-2 transition-colors">
+            {sending ? <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" /> : <><Send className="w-4 h-4" /> Request My Reservation</>}
           </button>
-          <p className="text-[12px] text-slate-500 text-center mt-3">No payment collected. A dealership representative will confirm availability before placing the vehicle on hold.</p>
-          <p className="text-[11px] text-slate-400 text-center mt-1.5 inline-flex w-full items-center justify-center gap-1"><Lock className="w-3 h-3 text-emerald-600" /> Secure request · No online payment · Dealer-confirmed availability</p>
+          <p className="text-[11.5px] text-slate-500 text-center mt-3 inline-flex w-full items-center justify-center gap-1.5"><Lock className="w-3.5 h-3.5 text-slate-400 shrink-0" /> No payment collected. A dealership representative will confirm availability before placing the vehicle on hold.</p>
         </Card>
 
         <Card className="p-5">
-          <p className="text-[15px] font-bold text-slate-900 mb-3">What happens next?</p>
-          <div className="space-y-3">
-            {[
-              ["We confirm availability", "The dealership verifies the vehicle is still available."],
-              ["We contact you quickly", "A team member reaches out by phone, text, or email."],
-              ["Your request is documented", "Your reservation request is tied directly to this vehicle."],
-            ].map(([t, s], i) => (
-              <div key={t} className="flex items-start gap-3">
-                <span className="w-7 h-7 rounded-full bg-blue-50 text-[#2563EB] text-[13px] font-bold flex items-center justify-center shrink-0">{i + 1}</span>
-                <div><p className="text-[13px] font-bold text-slate-800">{t}</p><p className="text-[12.5px] text-slate-500">{s}</p></div>
+          <p className="text-[15px] font-bold text-slate-900 mb-1">What happens next?</p>
+          <div className="divide-y divide-[#F1F5F9]">
+            {([
+              [ShieldCheck, "We confirm availability", "A dealership representative will verify the vehicle is available and ready to reserve."],
+              [MessageSquare, "We contact you quickly", "We'll reach out using your preferred method to confirm details and answer questions."],
+              [FileText, "Your request is documented", "Your reservation request is linked to this exact Vehicle Passport for transparency."],
+            ] as [React.ElementType, string, string][]).map(([Icon, t, s]) => (
+              <div key={t} className="flex items-start gap-3 py-3">
+                <span className="w-9 h-9 rounded-full bg-blue-50 text-[#2563EB] flex items-center justify-center shrink-0"><Icon className="w-4 h-4" /></span>
+                <div><p className="text-[13px] font-bold text-slate-800">{t}</p><p className="text-[12.5px] text-slate-500 mt-0.5">{s}</p></div>
               </div>
             ))}
           </div>
@@ -959,7 +994,7 @@ const SECTIONS: Record<string, { title: string; render: SectionRender; wide?: bo
     title: "Reserve This Vehicle",
     wide: true,
     hideCrossCta: true,
-    headerPill: "Ready to Reserve",
+    headerPill: "Available Now",
     render: ({ listing, d, navigate }) => <ReserveExperience listing={listing} d={d} navigate={navigate} />,
   },
   "test-drive": {
@@ -1146,10 +1181,11 @@ const VehiclePassportV2Detail = () => {
       {/* Sticky top header — back + vehicle context */}
       <header className="sticky top-0 z-40 bg-white/95 backdrop-blur border-b border-[#E6E8EC]">
         <div className={`mx-auto ${widthCls} h-14 px-3 flex items-center gap-3`}>
-          <button onClick={back} aria-label="Back to passport" className="w-9 h-9 rounded-full hover:bg-slate-100 flex items-center justify-center shrink-0"><ChevronLeft className="w-5 h-5" /></button>
+          <button onClick={back} aria-label="Back to passport" className="w-9 h-9 rounded-full border border-slate-200 bg-white hover:bg-slate-50 flex items-center justify-center shrink-0"><ChevronLeft className="w-5 h-5" /></button>
           {heroSrc && <img src={heroSrc} alt="" className="w-9 h-9 rounded-lg object-cover shrink-0" />}
-          <div className="min-w-0 flex-1"><p className="text-[14px] font-bold leading-tight truncate">{listing.ymm}{listing.trim ? ` ${listing.trim}` : ""}</p>{d.price != null && <p className="text-[12px] font-bold text-[#2563EB] leading-tight">{fmt$(d.price)}</p>}</div>
+          <div className="min-w-0"><p className="text-[14px] font-bold leading-tight truncate">{listing.ymm}{listing.trim ? ` ${listing.trim}` : ""}</p>{d.price != null && <p className="text-[12px] font-bold text-[#2563EB] leading-tight">{fmt$(d.price)}</p>}</div>
           {def.headerPill && <span className="hidden sm:inline-flex text-[11px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-full px-2.5 py-1 shrink-0">{def.headerPill}</span>}
+          <span className="flex-1" />
         </div>
       </header>
 
@@ -1170,20 +1206,21 @@ const VehiclePassportV2Detail = () => {
         )}
 
         <footer className="pt-2 pb-4">
-          <div className="flex items-center justify-center gap-2 text-[12px] text-slate-500"><Lock className="w-3.5 h-3.5 text-emerald-600" /> Secure &amp; Private · 100% Free · <Logo variant="full" size={16} /></div>
+          <div className="flex items-center justify-center gap-2 text-[12px] text-slate-500"><Lock className="w-3.5 h-3.5 text-emerald-600" /> Secure &amp; Private · Powered by <Logo variant="full" size={16} /></div>
         </footer>
       </div>
 
-      {/* Sticky bottom action bar — Call / Text / Test Drive / Today's Price */}
+      {/* Sticky bottom action bar — Call / Text / Test Drive / Today's Price.
+          Compact grid on phones; centered pills once there's room. */}
       <div className="fixed bottom-0 inset-x-0 z-40 bg-white/95 backdrop-blur border-t border-[#E6E8EC] px-3 pt-2 pb-[calc(8px+env(safe-area-inset-bottom))]">
-        <div className="mx-auto max-w-[760px] grid grid-cols-4 gap-2">
+        <div className={`mx-auto ${widthCls} grid grid-cols-4 gap-2 sm:flex sm:justify-center sm:gap-3`}>
           {[
             { key: "call", icon: Phone, label: "Call", onClick: () => { if (d.dealerPhone) window.location.href = `tel:${d.dealerPhone}`; else navigate(`/${base}/${vehicleSlug}/contact`); } },
             { key: "text", icon: MessageSquare, label: "Text", onClick: () => navigate(`/${base}/${vehicleSlug}/text`) },
             { key: "td", icon: Clock, label: "Test Drive", onClick: () => navigate(`/${base}/${vehicleSlug}/test-drive`) },
             { key: "price", icon: DollarSign, label: "Today's Price", primary: true, onClick: () => navigate(`/${base}/${vehicleSlug}/todays-price`) },
           ].map((b) => (
-            <button key={b.key} onClick={b.onClick} className={`h-11 rounded-xl text-[10px] leading-[1.05] font-bold inline-flex flex-col items-center justify-center gap-0.5 text-center px-0.5 ${b.primary ? "bg-[#2563EB] text-white" : "border border-[#d8dce0] bg-white text-[#0F172A]"}`}>
+            <button key={b.key} onClick={b.onClick} className={`h-11 rounded-xl text-[10px] leading-[1.05] font-bold inline-flex flex-col items-center justify-center gap-0.5 text-center px-0.5 sm:h-12 sm:flex-row sm:gap-2 sm:rounded-full sm:px-7 sm:text-[13px] ${b.primary ? "bg-[#2563EB] text-white" : "border border-[#d8dce0] bg-white text-[#0F172A]"}`}>
               <b.icon className={`w-4 h-4 ${b.primary ? "" : "text-[#2563EB]"}`} /> {b.label}
             </button>
           ))}
