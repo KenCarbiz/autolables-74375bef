@@ -74,14 +74,23 @@ const PassportContactRoutingPanel = () => {
       draft = { ...draft, bdcSettings: { showBdcAsTeam: true, ...(draft.bdcSettings ?? {}), enabled: true } };
       sample = true;
     }
-    if ((previewMode === "assigned_agent" || previewMode === "smart_routing") && pool.length === 0) {
-      const demoAgent: PassportAgent = {
-        id: "__preview_sample__", name: "Alex Morgan", title: "Product Specialist",
-        status: "available", manualOverride: "available", acceptsPassportLeads: true, workingHours: [],
-      };
-      previewAgents = [demoAgent];
-      assignedAgentId = demoAgent.id;
-      sample = true;
+    if (previewMode === "assigned_agent" || previewMode === "smart_routing") {
+      if (pool.length === 0) {
+        const demoAgent: PassportAgent = {
+          id: "__preview_sample__", name: "Alex Morgan", title: "Product Specialist",
+          status: "available", manualOverride: "available", acceptsPassportLeads: true, workingHours: [],
+        };
+        previewAgents = [demoAgent];
+        assignedAgentId = demoAgent.id;
+        sample = true;
+      }
+      // With the profile toggle off, agent modes render the same neutral
+      // dealership copy as the default — an explicit mode preview should
+      // demonstrate the mode's characteristic look, so force it on here.
+      if (!draft.showAgentProfile) {
+        draft = { ...draft, showAgentProfile: true };
+        sample = true;
+      }
     }
     return {
       preview: resolveCustomerPassportRouting(draft, {
