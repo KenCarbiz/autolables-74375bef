@@ -112,7 +112,7 @@ interface Product {
   icon_type?: string;
 }
 
-type AdminTab = "home" | "products" | "rules" | "settings" | "branding" | "programs" | "analytics" | "leads" | "funnel" | "audit" | "queue" | "files" | "getready" | "inventory" | "invoices" | "warranty" | "factory-warranty" | "team" | "print-settings" | "document-rules" | "incentives" | "features" | "passport-ctas" | "passport-trust" | "passport-routing";
+type AdminTab = "home" | "products" | "rules" | "settings" | "branding" | "labels" | "programs" | "analytics" | "leads" | "funnel" | "audit" | "queue" | "files" | "getready" | "inventory" | "invoices" | "warranty" | "factory-warranty" | "team" | "print-settings" | "document-rules" | "incentives" | "features" | "passport-ctas" | "passport-trust" | "passport-routing";
 
 const emptyProduct = {
   name: "",
@@ -189,7 +189,7 @@ const FEATURE_TOGGLES: { key: keyof DealerSettings; label: string; description: 
   { key: "feature_ai_descriptions", label: "AI Descriptions", description: "Generate vehicle descriptions automatically", status: "coming_soon" },
 ];
 
-const VALID_TABS: AdminTab[] = ["home", "products", "rules", "settings", "branding", "programs", "analytics", "leads", "funnel", "audit", "queue", "files", "getready", "inventory", "invoices", "warranty", "factory-warranty", "team", "print-settings", "document-rules", "incentives", "features", "passport-ctas", "passport-trust", "passport-routing"];
+const VALID_TABS: AdminTab[] = ["home", "products", "rules", "settings", "branding", "labels", "programs", "analytics", "leads", "funnel", "audit", "queue", "files", "getready", "inventory", "invoices", "warranty", "factory-warranty", "team", "print-settings", "document-rules", "incentives", "features", "passport-ctas", "passport-trust", "passport-routing"];
 
 const Admin = () => {
   const queryClient = useQueryClient();
@@ -574,6 +574,7 @@ const Admin = () => {
     ...(settings.feature_product_rules ? [{ id: "rules" as const, label: "Rules" }] : []),
     { id: "settings", label: "Settings" },
     { id: "branding", label: "Branding" },
+    { id: "labels", label: "Label Templates" },
     { id: "programs", label: "Programs" },
     { id: "factory-warranty", label: "Factory & CPO" },
     { id: "passport-ctas", label: "Passport CTAs" },
@@ -633,7 +634,7 @@ const Admin = () => {
           const availIds = new Set(tabs.map((t) => t.id));
           const groupDefs: { id: string; label: string; ids: AdminTab[] }[] = [
             { id: "home", label: "Home", ids: ["home"] },
-            { id: "setup", label: "Branding & Setup", ids: ["branding", "programs", "factory-warranty", "incentives", "passport-ctas", "passport-trust", "passport-routing"] },
+            { id: "setup", label: "Branding & Setup", ids: ["branding", "labels", "programs", "factory-warranty", "incentives", "passport-ctas", "passport-trust", "passport-routing"] },
             { id: "products", label: "Products", ids: ["products", "rules"] },
             { id: "team", label: "Team", ids: ["team"] },
             { id: "reports", label: "Reports", ids: ["analytics", "leads", "funnel"] },
@@ -2063,10 +2064,24 @@ const Admin = () => {
               </div>
             </div>
 
-            <div className="mt-4">
-              <LabelDefaultsPanel />
-              <StickerPrintTemplates />
+          </div>
+        )}
+
+        {/* ─── Label Templates Tab ─── */}
+        {tab === "labels" && (
+          <div className="space-y-3">
+            <LabelDefaultsPanel />
+            <div className="bg-card rounded-lg p-4 shadow-premium">
+              <h4 className="text-sm font-bold text-foreground mb-1">Design your own templates</h4>
+              <p className="text-xs text-muted-foreground mb-2">
+                Browse the template gallery, customize one with your branding, then set it as a
+                default above or from the Used / New chips on any template card.
+              </p>
+              <a href="/sticker-studio" className="inline-flex items-center gap-1.5 h-9 px-3.5 rounded-md bg-primary text-primary-foreground text-xs font-semibold">
+                Open Sticker Studio
+              </a>
             </div>
+            <StickerPrintTemplates />
           </div>
         )}
 
