@@ -163,21 +163,22 @@ export interface DisplayPriceFields {
   price?: number | null;
 }
 
-// The customer-facing "Our Price" value, chosen by tenant setting. Default mode
-// shows the advertised price (before doc); website_sale_price mode shows the
-// final sale price. Falls back across fields so a vehicle that predates the
-// breakdown columns still renders its plain price.
+// The customer-facing "Our Price" value, chosen by tenant setting. The mode
+// describes what the dealer's LISTED price means:
+//   advertised_before_doc — the listed price excludes the doc fee; surfaces
+//     disclose it additively ("+ $895 doc fee · Sale $X").
+//   website_sale_price — the listed price ALREADY includes the doc fee; it is
+//     displayed unchanged with an "Incl. doc fee" note. The stored breakdown's
+//     computed website_sale_price is deliberately ignored here: it derives from
+//     the additive assumption, and adding the fee to a fee-inclusive listed
+//     price would overstate what the customer pays.
 export function resolveDisplayPrice(
   f: DisplayPriceFields,
   mode: PriceDisplayMode = DEFAULT_PRICE_DISPLAY_MODE,
 ): number | null {
   const advertised = f.advertised_price_before_doc ?? f.price ?? null;
   if (mode === "website_sale_price") {
-    return (
-      f.website_sale_price ??
-      computeWebsiteSalePrice(advertised, f.doc_fee ?? 0) ??
-      advertised
-    );
+    return advertised ?? f.website_sale_price ?? null;
   }
   return advertised;
 }
@@ -192,11 +193,9 @@ export function resolveComparePrice(
 ): number | null {
   const advertised = f.advertised_price_before_doc ?? f.price ?? null;
   if (mode === "website_sale_price") {
-    return (
-      f.website_sale_price ??
-      computeWebsiteSalePrice(advertised, f.doc_fee ?? 0) ??
-      advertised
-    );
+    // Compare the number the customer actually sees (fee-inclusive listed
+    // price) so market position math matches the displayed price.
+    return advertised ?? f.website_sale_price ?? null;
   }
   return advertised;
 }

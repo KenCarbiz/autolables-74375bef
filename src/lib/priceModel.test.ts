@@ -154,13 +154,16 @@ describe("resolveDisplayPrice / resolveComparePrice", () => {
     expect(resolveDisplayPrice(fields)).toBe(58140);
   });
 
-  it("shows the website sale price when configured", () => {
-    expect(resolveDisplayPrice(fields, "website_sale_price")).toBe(59035);
+  it("website_sale_price mode shows the listed price unchanged (it already includes the fee)", () => {
+    // The mode means "my listed price is fee-inclusive" — the display never
+    // adds the fee on top of a price that already contains it.
+    expect(resolveDisplayPrice(fields, "website_sale_price")).toBe(58140);
+    expect(resolveDisplayPrice({ website_sale_price: 59035 }, "website_sale_price")).toBe(59035);
   });
 
-  it("compares on advertised-before-doc by default (vehicle price vs vehicle price)", () => {
+  it("compares on the displayed number in both modes", () => {
     expect(resolveComparePrice(fields)).toBe(58140);
-    expect(resolveComparePrice(fields, "website_sale_price")).toBe(59035);
+    expect(resolveComparePrice(fields, "website_sale_price")).toBe(58140);
   });
 
   it("falls back to the legacy price column when breakdown fields are absent", () => {

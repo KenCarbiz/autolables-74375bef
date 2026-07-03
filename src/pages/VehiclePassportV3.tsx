@@ -506,7 +506,7 @@ const VehiclePassportV3 = () => {
                     {d.docFee ? (
                       <div className="text-[12px] text-[#64748B]">
                         {d.priceIncludesDoc
-                          ? `Incl. ${fmt$(d.docFee)} doc fee`
+                          ? `Incl. ${fmt$(d.docFee)} doc fee · ${fmt$(Math.max(0, price - d.docFee))} before doc fee`
                           : `+ ${fmt$(d.docFee)} doc fee · Sale ${fmt$(d.websiteSalePrice ?? price + d.docFee)}`}
                       </div>
                     ) : null}
