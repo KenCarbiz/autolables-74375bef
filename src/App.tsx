@@ -79,7 +79,6 @@ const BrandGuide = lazy(() => import("./pages/BrandGuide"));
 const ScanPage = lazy(() => import("./pages/ScanPage"));
 const ComplianceCenter = lazy(() => import("./pages/ComplianceCenter"));
 const ComplianceActionCenter = lazy(() => import("./pages/ComplianceActionCenter"));
-const ComplianceInbox = lazy(() => import("./pages/ComplianceInbox"));
 // Legacy per-VIN portal is retired — /vehicle/:vin redirects to the single
 // canonical Passport at /v/:vin so there is only one shopper page.
 const VehicleVinRedirect = () => {
@@ -114,7 +113,6 @@ const QrRedirect = lazy(() => import("./pages/QrRedirect"));
 const QrAnalytics = lazy(() => import("./pages/QrAnalytics"));
 const Reports = lazy(() => import("./pages/Reports"));
 const DocumentReview = lazy(() => import("./pages/DocumentReview"));
-const Setup = lazy(() => import("./pages/Setup"));
 const NewCarSticker = lazy(() => import("./pages/NewCarSticker"));
 const CpoSheet = lazy(() => import("./pages/CpoSheet"));
 const DescriptionStudio = lazy(() => import("./pages/DescriptionStudio"));
@@ -236,7 +234,8 @@ const App = () => (
                         <Route path="/dashboard/qr-analytics" element={<QrAnalytics />} />
                         <Route path="/dashboard/reports" element={<Reports />} />
                         <Route path="/dashboard/document-review" element={<DocumentReview />} />
-                        <Route path="/setup" element={<Setup />} />
+                        {/* Setup folded into Admin Home; the route stays so old links don't 404. */}
+                        <Route path="/setup" element={<Navigate to="/admin?tab=home" replace />} />
                         <Route path="/queue" element={<LotCaptureQueue />} />
                         <Route path="/inventory" element={<Inventory />} />
                         <Route path="/inventory-v2" element={<InventoryCommandCenterV2 />} />
@@ -262,7 +261,6 @@ const App = () => (
                         <Route path="/cpo-sheet" element={<CpoSheet />} />
                         <Route path="/compliance" element={<ComplianceCenter />} />
                         <Route path="/compliance-center" element={<ComplianceActionCenter />} />
-                        <Route path="/compliance-inbox" element={<ComplianceInbox />} />
                         <Route path="/description-studio" element={<DescriptionStudio />} />
                         <Route path="/description-writer" element={<DescriptionStudio />} />
                         <Route path="/add-inventory" element={<SaveCarInventory />} />

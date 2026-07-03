@@ -51,8 +51,3 @@ export const DEALS_TABS: PageTab[] = [
   { label: "Delivered", to: "/delivered" },
 ];
 
-export const VEHICLES_TABS: PageTab[] = [
-  { label: "All vehicles", to: "/inventory" },
-  { label: "Lot Queue", to: "/queue" },
-  { label: "Get-Ready", to: "/admin?tab=getready" },
-];

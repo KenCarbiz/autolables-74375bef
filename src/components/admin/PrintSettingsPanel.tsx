@@ -43,7 +43,7 @@ export default function PrintSettingsPanel() {
   return (
     <div className="space-y-5">
       <div>
-        <h2 className="text-base font-bold text-foreground inline-flex items-center gap-2"><Printer className="w-4 h-4 text-primary" /> Print settings &amp; calibration</h2>
+        <h2 className="text-base font-bold text-foreground inline-flex items-center gap-2"><Printer className="w-4 h-4 text-primary" /> Printer Calibration</h2>
         <p className="text-xs text-muted-foreground mt-0.5">Tune how window stickers (8.5×11) and addendums (4.5×11) land on your label stock. Saved settings apply to every Sticker Studio print and PDF.</p>
       </div>
 

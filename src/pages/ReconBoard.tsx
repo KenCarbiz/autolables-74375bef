@@ -91,7 +91,7 @@ export default function ReconBoard() {
     <div className="p-4 sm:p-6 max-w-7xl mx-auto">
       <div className="flex items-center justify-between mb-5">
         <div>
-          <h1 className="text-2xl font-bold text-foreground inline-flex items-center gap-2"><Wrench className="w-6 h-6 text-primary" /> Recon Workspace</h1>
+          <h1 className="text-2xl font-bold text-foreground inline-flex items-center gap-2"><Wrench className="w-6 h-6 text-primary" /> Recon Approvals</h1>
           <p className="text-sm text-muted-foreground mt-0.5">{isManager ? "Approve or decline recon work, ask service questions." : "Submit recon work and track approvals."}</p>
         </div>
         <button onClick={() => setShowNew(true)} className="h-10 px-4 rounded-lg bg-primary text-primary-foreground text-sm font-semibold inline-flex items-center gap-1.5"><Plus className="w-4 h-4" /> New estimate</button>

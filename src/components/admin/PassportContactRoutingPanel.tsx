@@ -7,7 +7,7 @@ import {
   type CustomerPassportContactSettings, type PassportAgent, type ContactMode, type RoutingPriorityItem,
 } from "@/lib/passportRouting";
 
-// Dealer admin: Customer Passport Contact Routing. Controls who shoppers
+// Dealer admin: Lead Routing. Controls who shoppers
 // reach when they reserve, value a trade, or ask for help on the passport.
 // The shopper-facing UI never exposes this machinery — the live preview
 // shows exactly what they'll see for the current configuration.

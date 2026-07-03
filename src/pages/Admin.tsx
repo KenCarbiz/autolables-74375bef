@@ -11,6 +11,8 @@ import type { ProductUpgrade } from "@/hooks/useProducts";
 import type { Json } from "@/integrations/supabase/types";
 import { useAudit } from "@/contexts/AuditContext";
 import { useTenant } from "@/contexts/TenantContext";
+import { useEntitlements } from "@/hooks/useEntitlements";
+import { ADMIN_TABS, canSeeAdminTab, firstPermittedAdminTab, type AdminTab } from "@/lib/permissions/adminTabAccess";
 import { supabase } from "@/integrations/supabase/client";
 import InstallerContactsCard from "@/components/admin/InstallerContactsCard";
 import { useNavigate, useSearchParams } from "react-router-dom";
@@ -52,7 +54,6 @@ import ReturnsQueue from "@/components/admin/ReturnsQueue";
 import { useVinQueue, QueuedVehicle } from "@/hooks/useVinQueue";
 import { useVehicleFiles } from "@/hooks/useVehicleFiles";
 import { useGetReady } from "@/hooks/useGetReady";
-import { useInventory } from "@/hooks/useInventory";
 import { useInvoices } from "@/hooks/useInvoices";
 import { useWarranty } from "@/hooks/useWarranty";
 import { useSyndicationFeed } from "@/hooks/useSyndicationFeed";
@@ -112,8 +113,6 @@ interface Product {
   price_tiers: Record<string, number> | null;
   icon_type?: string;
 }
-
-type AdminTab = "home" | "products" | "rules" | "settings" | "branding" | "labels" | "programs" | "analytics" | "leads" | "funnel" | "audit" | "queue" | "files" | "getready" | "inventory" | "invoices" | "warranty" | "factory-warranty" | "team" | "print-settings" | "document-rules" | "incentives" | "features" | "passport-ctas" | "passport-trust" | "passport-routing";
 
 const emptyProduct = {
   name: "",
@@ -190,7 +189,7 @@ const FEATURE_TOGGLES: { key: keyof DealerSettings; label: string; description: 
   { key: "feature_ai_descriptions", label: "AI Descriptions", description: "Generate vehicle descriptions automatically", status: "coming_soon" },
 ];
 
-const VALID_TABS: AdminTab[] = ["home", "products", "rules", "settings", "branding", "labels", "programs", "analytics", "leads", "funnel", "audit", "queue", "files", "getready", "inventory", "invoices", "warranty", "factory-warranty", "team", "print-settings", "document-rules", "incentives", "features", "passport-ctas", "passport-trust", "passport-routing"];
+const VALID_TABS: AdminTab[] = ADMIN_TABS;
 
 const Admin = () => {
   const queryClient = useQueryClient();
@@ -225,11 +224,18 @@ const Admin = () => {
   }, [docFeeSig, tenant?.id, settingsLoading]);
   const navigate = useNavigate();
   const { openScan } = useVinScan();
+  const { member, loading: entitlementsLoading } = useEntitlements();
+  const role = member?.role;
   const [searchParams, setSearchParams] = useSearchParams();
 
   // Read tab from URL ?tab= and keep in sync
   const urlTab = searchParams.get("tab") as AdminTab | null;
-  const [tab, setTabState] = useState<AdminTab>(urlTab && VALID_TABS.includes(urlTab) ? urlTab : "home");
+  const [tabState, setTabState] = useState<AdminTab>(urlTab && VALID_TABS.includes(urlTab) ? urlTab : "home");
+  // A tab the role can't see falls back to its first permitted tab, mirroring
+  // the unknown-tab handling above.
+  const tab: AdminTab = canSeeAdminTab(role, tabState, isAdmin)
+    ? tabState
+    : (firstPermittedAdminTab(role, isAdmin) ?? "home");
 
   const setTab = (t: AdminTab) => {
     setTabState(t);
@@ -239,10 +245,16 @@ const Admin = () => {
   // Sync tab from URL changes (sidebar links, back/forward)
   useEffect(() => {
     const paramTab = searchParams.get("tab") as AdminTab | null;
-    if (paramTab && VALID_TABS.includes(paramTab) && paramTab !== tab) {
+    if (paramTab && VALID_TABS.includes(paramTab) && paramTab !== tabState) {
       setTabState(paramTab);
     }
   }, [searchParams]);
+
+  // The Inventory admin tab is retired; the id stays valid so old
+  // ?tab=inventory deep links land on the real inventory screen.
+  useEffect(() => {
+    if (tab === "inventory") navigate("/inventory", { replace: true });
+  }, [tab, navigate]);
 
   // Leads hook for leads tab
   const { leads, exportCsv: exportLeadsCsv, updateLead } = useLeads(currentStore?.id || "");
@@ -264,11 +276,9 @@ const Admin = () => {
   const saveServices = () => { updateSettings({ get_ready_services: svcDraft }); setSvcSaved(true); setTimeout(() => setSvcSaved(false), 1800); };
   const { sendGetReadyComplete, sending: emailSending } = useEmailDistribution(currentStore?.id || "");
 
-  // Inventory, invoices, warranty
-  const { vehicles: inventoryVehicles, importCsv, deleteVehicle: deleteInvVehicle } = useInventory(currentStore?.id || "");
+  // Invoices, warranty
   const { invoices, payroll } = useInvoices(currentStore?.id || "");
   const { records: warrantyRecords, getExpiringSoon } = useWarranty(currentStore?.id || "");
-  const [csvText, setCsvText] = useState("");
   const expiringSoon = getExpiringSoon(30);
 
   // Additional integrations
@@ -279,6 +289,9 @@ const Admin = () => {
   const { getPending: getPendingTradeIns } = useTradeInLifecycle();
 
   const [products, setProducts] = useState<Product[]>([]);
+  // Doc-fee edits commit on blur behind a confirm — the change recalculates
+  // stored sale prices across inventory, so it must never fire per keystroke.
+  const [docFeeDraft, setDocFeeDraft] = useState<string | null>(null);
   const [showLibrary, setShowLibrary] = useState(false);
   const [editing, setEditing] = useState<Partial<Product> | null>(null);
   const [uploadingDoc, setUploadingDoc] = useState(false);
@@ -569,35 +582,35 @@ const Admin = () => {
 
   if (loading || fetching) return <div className="min-h-screen flex items-center justify-center bg-background"><p className="text-muted-foreground">Loading...</p></div>;
 
-  const tabs: { id: AdminTab; label: string; group?: "dealer" | "platform" }[] = [
+  const tabs: { id: AdminTab; label: string; group?: "dealer" | "platform" }[] = ([
     { id: "home", label: "Home" },
     { id: "products", label: "Products" },
     ...(settings.feature_product_rules ? [{ id: "rules" as const, label: "Rules" }] : []),
-    { id: "settings", label: "Settings" },
+    { id: "settings", label: "Store Settings" },
     { id: "branding", label: "Branding" },
     { id: "labels", label: "Label Templates" },
     { id: "programs", label: "Included with Sale" },
-    { id: "factory-warranty", label: "Factory & CPO" },
-    { id: "passport-ctas", label: "Passport CTAs" },
-    { id: "passport-trust", label: "Passport Trust" },
-    { id: "passport-routing", label: "Contact Routing" },
+    { id: "factory-warranty", label: "Factory Warranty & CPO" },
+    { id: "passport-ctas", label: "Passport Buttons" },
+    { id: "passport-trust", label: "Why Buy From Us" },
+    { id: "passport-routing", label: "Lead Routing" },
     ...(settings.feature_analytics ? [{ id: "analytics" as const, label: "Analytics" }] : []),
     ...(settings.feature_lead_capture ? [{ id: "leads" as const, label: "Leads" }] : []),
-    { id: "funnel", label: "Signing Funnel" },
+    { id: "funnel", label: "Deal Signings" },
     { id: "queue", label: "Print Queue" },
-    { id: "print-settings", label: "Print Settings" },
-    { id: "document-rules", label: "Document Rules" },
-    { id: "incentives", label: "Incentives" },
-    { id: "features", label: "Plan & Features" },
-    { id: "getready", label: "Get-Ready" },
-    ...(settings.feature_inventory ? [{ id: "inventory" as const, label: "Inventory" }] : []),
+    { id: "print-settings", label: "Printer Calibration" },
+    { id: "document-rules", label: "Approval & Review Rules" },
+    { id: "incentives", label: "Pricing & Incentives" },
+    { id: "features", label: "Plan & Billing" },
+    { id: "getready", label: "Get-Ready Setup" },
     ...(settings.feature_invoicing ? [{ id: "invoices" as const, label: "Invoices" }] : []),
-    ...(settings.feature_warranty ? [{ id: "warranty" as const, label: "Warranty" }] : []),
+    ...(settings.feature_warranty ? [{ id: "warranty" as const, label: "Warranty Records" }] : []),
     { id: "files", label: "Vehicle Files" },
     { id: "audit", label: "Audit Log" },
     { id: "team", label: "Team" },
     // Platform-admin tabs moved to /platform-admin.
-  ];
+  ] as { id: AdminTab; label: string; group?: "dealer" | "platform" }[])
+    .filter((t) => canSeeAdminTab(role, t.id, isAdmin));
 
   return (
     <div className="max-w-6xl mx-auto">
@@ -635,12 +648,13 @@ const Admin = () => {
           const availIds = new Set(tabs.map((t) => t.id));
           const groupDefs: { id: string; label: string; ids: AdminTab[] }[] = [
             { id: "home", label: "Home", ids: ["home"] },
-            { id: "setup", label: "Branding & Setup", ids: ["branding", "labels", "programs", "factory-warranty", "incentives", "passport-ctas", "passport-trust", "passport-routing"] },
-            { id: "products", label: "Products", ids: ["products", "rules"] },
-            { id: "team", label: "Team", ids: ["team"] },
+            { id: "store", label: "Store", ids: ["settings", "branding", "team", "features", "getready"] },
+            { id: "pricing", label: "Pricing", ids: ["incentives"] },
+            { id: "products", label: "Products & Programs", ids: ["products", "rules", "programs", "factory-warranty"] },
+            { id: "passport", label: "Customer Passport", ids: ["passport-ctas", "passport-trust", "passport-routing"] },
+            { id: "printing", label: "Printing & Documents", ids: ["labels", "print-settings", "document-rules", "queue", "invoices"] },
+            { id: "compliance", label: "Compliance", ids: ["audit", "files", "warranty"] },
             { id: "reports", label: "Reports", ids: ["analytics", "leads", "funnel"] },
-            { id: "compliance", label: "Compliance", ids: ["audit", "files"] },
-            { id: "advanced", label: "Advanced", ids: ["settings", "queue", "print-settings", "document-rules", "features", "getready", "inventory", "invoices", "warranty"] },
           ];
           const groups = groupDefs
             .map((g) => ({ ...g, ids: g.ids.filter((id) => availIds.has(id)) }))
@@ -1209,7 +1223,7 @@ const Admin = () => {
         {tab === "settings" && (
           <div>
             <div className="bg-card rounded-lg p-4 shadow-sm mb-4">
-              <h3 className="text-sm font-bold text-foreground mb-1">Feature Toggles</h3>
+              <h3 className="text-sm font-bold text-foreground mb-1">Optional Features</h3>
               <p className="text-xs text-muted-foreground">
                 Turn features on or off for your dealership. Disabled features won't appear on the employee-facing addendum, keeping the interface clean and focused.
               </p>
@@ -1325,8 +1339,16 @@ const Admin = () => {
                     <input
                       type="number"
                       step="0.01"
-                      value={settings.doc_fee_amount}
-                      onChange={(e) => updateSettings({ doc_fee_amount: parseFloat(e.target.value) || 0 })}
+                      value={docFeeDraft ?? String(settings.doc_fee_amount)}
+                      onChange={(e) => setDocFeeDraft(e.target.value)}
+                      onBlur={() => {
+                        if (docFeeDraft == null) return;
+                        const next = parseFloat(docFeeDraft) || 0;
+                        setDocFeeDraft(null);
+                        if (next === settings.doc_fee_amount) return;
+                        if (!window.confirm(`Change the doc fee to $${next.toFixed(2)}? This recalculates stored sale prices across your inventory.`)) return;
+                        updateSettings({ doc_fee_amount: next });
+                      }}
                       className="w-full px-3 py-2 border border-border-custom rounded text-sm"
                     />
                   </div>
@@ -1347,7 +1369,7 @@ const Admin = () => {
                 </p>
               </div>
               <div className="mt-3">
-                <label className="text-xs font-semibold text-muted-foreground">Comp strategy</label>
+                <label className="text-xs font-semibold text-muted-foreground">Market Comparison Pricing</label>
                 <select
                   value={settings.comp_settings?.compStrategy || "value_building"}
                   onChange={(e) => updateSettings({ comp_settings: { ...(settings.comp_settings || {}), compStrategy: e.target.value as CompStrategy } })}
@@ -1545,7 +1567,7 @@ const Admin = () => {
 
             {/* Nightly-ingest automation */}
             <div className="bg-card rounded-lg p-4 shadow-premium mb-3">
-              <h4 className="text-sm font-bold text-foreground mb-1">Ingest Automation</h4>
+              <h4 className="text-sm font-bold text-foreground mb-1">Feed Automation</h4>
               <p className="text-xs text-muted-foreground mb-3">When a new vehicle is ingested overnight, choose what fires automatically vs. what waits for a person to send it.</p>
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
@@ -1553,14 +1575,28 @@ const Admin = () => {
                     <span className="text-sm font-semibold text-foreground">Auto-publish customer passport on intake</span>
                     <p className="text-xs text-muted-foreground">No prep gate at intake — the passport goes live immediately. Recon, K-208, and installs happen afterward.</p>
                   </div>
-                  <Switch checked={settings.ingest_auto_publish !== false} onCheckedChange={(v) => updateSettings({ ingest_auto_publish: v })} className="data-[state=checked]:bg-teal" />
+                  <Switch
+                    checked={settings.ingest_auto_publish !== false}
+                    onCheckedChange={(v) => {
+                      if (v && !window.confirm("Auto-publish puts the customer passport live the moment a vehicle is ingested, before recon, K-208, or installs are done. Enable it?")) return;
+                      updateSettings({ ingest_auto_publish: v });
+                    }}
+                    className="data-[state=checked]:bg-teal"
+                  />
                 </div>
                 <div className="flex items-center justify-between">
                   <div className="pr-3">
                     <span className="text-sm font-semibold text-foreground">Require K-208 before finalizing</span>
                     <p className="text-xs text-muted-foreground">Block the customer disclosure from being signed until the CT K-208 safety inspection is done (used/CPO only; new cars exempt).</p>
                   </div>
-                  <Switch checked={settings.require_safety_inspection === true} onCheckedChange={(v) => updateSettings({ require_safety_inspection: v })} className="data-[state=checked]:bg-teal" />
+                  <Switch
+                    checked={settings.require_safety_inspection === true}
+                    onCheckedChange={(v) => {
+                      if (!v && !window.confirm("Turning this off lets customer disclosures be signed without a completed K-208 safety inspection. Disable the gate?")) return;
+                      updateSettings({ require_safety_inspection: v });
+                    }}
+                    className="data-[state=checked]:bg-teal"
+                  />
                 </div>
                 {settings.require_safety_inspection === true && (
                   <div className="pl-1 border-l-2 border-border-custom ml-1">
@@ -1578,6 +1614,7 @@ const Admin = () => {
                           const on = (settings.k208_authority_roles || []).includes(key);
                           return (
                             <button key={key} onClick={() => {
+                              if (!window.confirm(`${on ? "Remove" : "Add"} ${label} ${on ? "from" : "to"} the roles allowed to sign the K-208? This changes which inspections satisfy the compliance gate.`)) return;
                               const cur = settings.k208_authority_roles || [];
                               updateSettings({ k208_authority_roles: on ? cur.filter((r) => r !== key) : [...cur, key] });
                             }} className={`h-8 px-3 rounded-full text-xs font-semibold border ${on ? "border-primary bg-primary/10 text-primary" : "border-border-custom text-foreground"}`}>
@@ -1594,7 +1631,14 @@ const Admin = () => {
                     <span className="text-sm font-semibold text-foreground">Require install verification before finalizing</span>
                     <p className="text-xs text-muted-foreground">Block the customer disclosure from being signed until every pre-installed product has a verified install (photo + signature).</p>
                   </div>
-                  <Switch checked={settings.require_install_verification === true} onCheckedChange={(v) => updateSettings({ require_install_verification: v })} className="data-[state=checked]:bg-teal" />
+                  <Switch
+                    checked={settings.require_install_verification === true}
+                    onCheckedChange={(v) => {
+                      if (!v && !window.confirm("Turning this off lets customer disclosures be signed without verified install proof (photo + signature) for pre-installed products. Disable the gate?")) return;
+                      updateSettings({ require_install_verification: v });
+                    }}
+                    className="data-[state=checked]:bg-teal"
+                  />
                 </div>
                 <div>
                   <span className="text-sm font-semibold text-foreground">Recon estimate</span>
@@ -2636,53 +2680,6 @@ const Admin = () => {
         )}
 
         {/* ─── Inventory Tab ─── */}
-        {tab === "inventory" && (
-          <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <h3 className="text-sm font-semibold text-foreground">Inventory Import</h3>
-                <p className="text-xs text-muted-foreground mt-0.5">Import vehicles via CSV. Headers: vin, stock, year, make, model, trim, mileage, condition, color, price</p>
-              </div>
-            </div>
-            <div className="bg-card rounded-xl border border-border shadow-premium p-5">
-              <textarea
-                value={csvText}
-                onChange={e => setCsvText(e.target.value)}
-                placeholder={"vin,stock,year,make,model,trim,mileage,condition,color,price\n1HGCV1F3XRA000000,H12345,2026,Honda,CR-V,EX-L,12,new,White,35494"}
-                rows={6}
-                className="w-full px-3 py-2 rounded-md border border-border bg-background text-sm font-mono outline-none resize-y"
-              />
-              <button
-                onClick={() => {
-                  if (!csvText.trim()) { toast.error("Paste CSV data"); return; }
-                  const result = importCsv(csvText);
-                  toast.success(`Imported ${result.imported} vehicles. ${result.errors.length} errors.`);
-                  if (result.errors.length > 0) result.errors.forEach(e => toast.error(e));
-                  setCsvText("");
-                }}
-                className="mt-3 inline-flex items-center gap-1.5 h-9 px-4 rounded-md bg-primary text-primary-foreground text-sm font-medium hover:opacity-90"
-              >Import CSV</button>
-            </div>
-            <div className="bg-card rounded-xl border border-border shadow-premium overflow-hidden">
-              <div className="px-5 py-2.5 bg-muted/30 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">{inventoryVehicles.length} vehicles</div>
-              {inventoryVehicles.length === 0 ? (
-                <p className="px-5 py-8 text-center text-xs text-muted-foreground">No inventory yet. Import CSV or scan vehicles from the lot.</p>
-              ) : inventoryVehicles.slice(0, 20).map(v => (
-                <div key={v.id} className="px-5 py-3 border-b border-border last:border-0 flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-semibold text-foreground">{v.year} {v.make} {v.model} {v.trim}</p>
-                    <p className="text-xs text-muted-foreground font-mono">{v.vin} · Stock: {v.stock_number} · {v.mileage.toLocaleString()} mi</p>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    {v.price > 0 && <span className="text-sm font-semibold tabular-nums">${v.price.toLocaleString()}</span>}
-                    <button onClick={() => { deleteInvVehicle(v.id); toast.success("Removed"); }} className="text-xs text-destructive hover:underline">Remove</button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
         {sheetRecord && (
           <GetReadySheet
             open={!!sheetRecord}

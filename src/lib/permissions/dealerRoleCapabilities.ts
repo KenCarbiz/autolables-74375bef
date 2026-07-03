@@ -48,6 +48,7 @@ export type DealerCapability =
   | "can_manage_settings"
   | "can_manage_team"
   | "can_manage_billing"
+  | "can_manage_invoices"
   | "can_view_platform_admin"
   | "can_manage_automation";
 
@@ -78,6 +79,7 @@ const allDealerCapabilities: DealerCapability[] = [
   "can_manage_settings",
   "can_manage_team",
   "can_manage_billing",
+  "can_manage_invoices",
   "can_manage_automation",
 ];
 
@@ -185,16 +187,17 @@ export const dealerRoleCapabilityMap: Record<string, DealerCapability[]> = {
   service_advisor: serviceBase,
   detail: ["can_view_dashboard", "can_view_work_queue", "can_view_get_ready", "can_complete_get_ready", "can_upload_service_proof"],
   third_party_vendor: ["can_view_work_queue", "can_complete_get_ready", "can_upload_service_proof"],
-  office: complianceBase,
+  office: [...complianceBase, "can_manage_invoices"],
   finance: [
     ...complianceBase,
     "can_view_leads",
     "can_view_trade_values",
     "can_manage_deals",
     "can_manage_addons",
+    "can_manage_invoices",
   ],
   compliance: complianceBase,
-  biller: ["can_view_dashboard", "can_view_deals", "can_view_reports", "can_manage_billing"],
+  biller: ["can_view_dashboard", "can_view_deals", "can_view_reports", "can_manage_billing", "can_manage_invoices"],
   readonly: ["can_view_dashboard", "can_view_inventory", "can_view_work_queue", "can_view_reports"],
 };
 

@@ -50,7 +50,7 @@ const StickyButtonsPanel = () => {
     <div className="space-y-5 max-w-2xl">
       <div className="flex items-start justify-between gap-4">
         <div>
-          <h2 className="text-[22px] font-bold tracking-tight text-foreground">Passport Sticky Buttons</h2>
+          <h2 className="text-[22px] font-bold tracking-tight text-foreground">Passport Buttons</h2>
           <p className="text-sm text-slate-500 mt-1">Choose up to {MAX_STICKY_BUTTONS} call-to-action buttons for the sticky bottom bar shown to shoppers on the Vehicle Passport.</p>
         </div>
         <button onClick={save} disabled={saving || !!error} className="shrink-0 inline-flex items-center gap-1.5 h-10 px-4 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold disabled:opacity-50">

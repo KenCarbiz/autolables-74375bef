@@ -24,7 +24,7 @@ export default function DocumentRulesPanel() {
   return (
     <div className="space-y-5 max-w-3xl">
       <div>
-        <h2 className="text-base font-bold text-foreground inline-flex items-center gap-2"><ShieldCheck className="w-4 h-4 text-primary" /> Document workflow rules</h2>
+        <h2 className="text-base font-bold text-foreground inline-flex items-center gap-2"><ShieldCheck className="w-4 h-4 text-primary" /> Approval &amp; Review Rules</h2>
         <p className="text-xs text-muted-foreground mt-0.5">Configure your store's disclosure review, manager approval, and customer acknowledgment workflows for stickers, addendums, and the Vehicle Passport. These are operational workflow settings, not a legal compliance guarantee.</p>
       </div>
 

@@ -2,6 +2,7 @@ import { ReactNode, useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { useViewTransitionNavigate } from "@/lib/navigation";
 import { hasDealerCapability, type DealerCapability } from "@/lib/permissions/dealerRoleCapabilities";
+import { canSeeAdminTab, firstPermittedAdminTab } from "@/lib/permissions/adminTabAccess";
 import {
   Award,
   BarChart3,
@@ -122,6 +123,8 @@ const AppShell = ({ children }: AppShellProps) => {
   // manager (the old `!role` default-true was a latent over-grant).
   const isManager = isAdmin || hasDealerCapability(role, "can_manage_settings");
   const can = useCallback((c: DealerCapability) => hasDealerCapability(role, c, isAdmin), [role, isAdmin]);
+  // Any admin tab at all (not just can_manage_settings) opens the Settings door.
+  const anyAdminTab = isAdmin || firstPermittedAdminTab(role, isAdmin) != null;
 
   const openScan = useCallback(() => {
     if (prefersLiveScanner()) navigate("/scan");
@@ -186,7 +189,7 @@ const AppShell = ({ children }: AppShellProps) => {
       defaultOpen: false,
       items: [
         { label: "Compliance Center", path: "/compliance", icon: toolIcon("compliance-center"), capability: "can_view_compliance" },
-        { label: "Document Review", path: "/dashboard/document-review", icon: toolIcon("document-review"), capability: "can_view_compliance" },
+        { label: "Price Change Review", path: "/dashboard/document-review", icon: toolIcon("document-review"), capability: "can_view_compliance" },
         { label: "Audit Log", path: "/admin?tab=audit", icon: toolIcon("audit-log"), capability: "can_view_compliance" },
       ],
     },
@@ -194,8 +197,7 @@ const AppShell = ({ children }: AppShellProps) => {
       title: "SETTINGS",
       defaultOpen: false,
       items: [
-        { label: "Settings", path: "/admin", icon: toolIcon("settings"), capability: "can_manage_settings" },
-        { label: "Setup", path: "/setup", icon: toolIcon("setup"), capability: "can_manage_settings" },
+        ...(anyAdminTab ? [{ label: "Settings", path: "/admin", icon: toolIcon("settings") }] : []),
         { label: "Reports", path: "/dashboard/reports", icon: BarChart3, capability: "can_view_reports" },
       ],
     },
@@ -234,7 +236,6 @@ const AppShell = ({ children }: AppShellProps) => {
     "/inventory": { title: "Inventory Command Center", subtitle: "Manage, optimize, and publish your inventory with confidence." },
     "/inventory-v2": { title: "Inventory Command Center", subtitle: "Manage, optimize, and publish your inventory with confidence." },
     "/saved": { title: "Deals", subtitle: "Review saved addendums, signatures, and delivery status." },
-    "/setup": { title: "Setup", subtitle: "Configure your dealership workspace." },
     "/addendum": { title: "New Addendum", subtitle: "Create compliant addendum labels and forms." },
     "/new-car-sticker": { title: "New Car Sticker", subtitle: "Generate new vehicle window labels." },
     "/used-car-sticker": { title: "Used Car Sticker", subtitle: "Generate used vehicle buyer-facing labels." },
@@ -823,8 +824,17 @@ const AppShell = ({ children }: AppShellProps) => {
                   })}
                   <DropdownMenuSeparator />
                   <DropdownMenuLabel className="text-[10px] uppercase tracking-[0.14em] text-muted-foreground px-2">Account</DropdownMenuLabel>
-                  <DropdownMenuItem onClick={() => navigate("/admin?tab=team")} className="cursor-pointer rounded-lg"><Users className="h-4 w-4 mr-2 text-muted-foreground" /> Team & permissions</DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => navigate("/admin?tab=settings")} className="cursor-pointer rounded-lg"><Settings className="h-4 w-4 mr-2 text-muted-foreground" /> Workspace settings</DropdownMenuItem>
+                  {can("can_manage_team") && (
+                    <DropdownMenuItem onClick={() => navigate("/admin?tab=team")} className="cursor-pointer rounded-lg"><Users className="h-4 w-4 mr-2 text-muted-foreground" /> Team & permissions</DropdownMenuItem>
+                  )}
+                  {anyAdminTab && (
+                    <DropdownMenuItem
+                      onClick={() => navigate(canSeeAdminTab(role, "settings", isAdmin) ? "/admin?tab=settings" : "/admin")}
+                      className="cursor-pointer rounded-lg"
+                    >
+                      <Settings className="h-4 w-4 mr-2 text-muted-foreground" /> Workspace settings
+                    </DropdownMenuItem>
+                  )}
                   <DropdownMenuItem onClick={handleManageBilling} className="cursor-pointer rounded-lg"><CreditCard className="h-4 w-4 mr-2 text-muted-foreground" /> Plan & billing</DropdownMenuItem>
                   <DropdownMenuItem onClick={() => navigate("/trust")} className="cursor-pointer rounded-lg"><HelpCircle className="h-4 w-4 mr-2 text-muted-foreground" /> Help & trust center</DropdownMenuItem>
                   <DropdownMenuSeparator />

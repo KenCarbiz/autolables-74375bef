@@ -82,7 +82,7 @@ const DealershipTrustPanel = () => {
     <div className="space-y-5 max-w-2xl">
       <div className="flex items-start justify-between gap-4">
         <div>
-          <h2 className="text-[22px] font-bold tracking-tight text-foreground">Passport Dealership Trust</h2>
+          <h2 className="text-[22px] font-bold tracking-tight text-foreground">Why Buy From Us</h2>
           <p className="text-sm text-slate-500 mt-1">Credibility badges and reviews shown to shoppers on the Vehicle Passport. Every field is optional — only what you fill in appears, so nothing is fabricated.</p>
         </div>
         <button onClick={save} disabled={saving} className="shrink-0 inline-flex items-center gap-1.5 h-10 px-4 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold disabled:opacity-50">

@@ -32,6 +32,9 @@ import {
   CreditCard,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
+import { useEntitlements } from "@/hooks/useEntitlements";
+import { hasDealerCapability } from "@/lib/permissions/dealerRoleCapabilities";
+import { canSeeAdminTab, type AdminTab } from "@/lib/permissions/adminTabAccess";
 import { useViewTransitionNavigate } from "@/lib/navigation";
 import { useVinScan } from "@/contexts/VinScanContext";
 import { supabase } from "@/integrations/supabase/client";
@@ -44,7 +47,11 @@ interface CommandPaletteProps {
 
 const CommandPalette = ({ open, onOpenChange }: CommandPaletteProps) => {
   const { isAdmin, signOut } = useAuth();
+  const { member } = useEntitlements();
+  const role = member?.role;
   const navigate = useViewTransitionNavigate();
+  const seeTab = (tab: AdminTab) => canSeeAdminTab(role, tab, isAdmin);
+  const canManageBilling = hasDealerCapability(role, "can_manage_billing", isAdmin);
 
   const go = (path: string) => {
     onOpenChange(false);
@@ -155,32 +162,28 @@ const CommandPalette = ({ open, onOpenChange }: CommandPaletteProps) => {
 
         <CommandSeparator />
 
-        <CommandGroup heading="Admin">
-          <CommandItem onSelect={() => go("/admin?tab=products")}>
-            <Settings className="w-4 h-4 mr-2" />
-            Products
-          </CommandItem>
-          <CommandItem onSelect={() => go("/admin?tab=branding")}>
-            <Palette className="w-4 h-4 mr-2" />
-            Branding
-          </CommandItem>
-          <CommandItem onSelect={() => go("/admin?tab=settings")}>
-            <ToggleLeft className="w-4 h-4 mr-2" />
-            Feature Toggles
-          </CommandItem>
-          <CommandItem onSelect={() => go("/admin?tab=audit")}>
-            <ShieldCheck className="w-4 h-4 mr-2" />
-            Audit Log
-          </CommandItem>
-          <CommandItem onSelect={() => go("/admin?tab=leads")}>
-            <Users className="w-4 h-4 mr-2" />
-            Leads
-          </CommandItem>
-          <CommandItem onSelect={() => go("/admin?tab=analytics")}>
-            <BarChart3 className="w-4 h-4 mr-2" />
-            Analytics
-          </CommandItem>
-        </CommandGroup>
+        {(() => {
+          const adminEntries: { tab: AdminTab; label: string; icon: typeof Settings }[] = [
+            { tab: "products", label: "Products", icon: Settings },
+            { tab: "branding", label: "Branding", icon: Palette },
+            { tab: "settings", label: "Store Settings", icon: ToggleLeft },
+            { tab: "audit", label: "Audit Log", icon: ShieldCheck },
+            { tab: "leads", label: "Leads", icon: Users },
+            { tab: "analytics", label: "Analytics", icon: BarChart3 },
+          ];
+          const visible = adminEntries.filter((e) => seeTab(e.tab));
+          if (visible.length === 0) return null;
+          return (
+            <CommandGroup heading="Admin">
+              {visible.map(({ tab, label, icon: Icon }) => (
+                <CommandItem key={tab} onSelect={() => go(`/admin?tab=${tab}`)}>
+                  <Icon className="w-4 h-4 mr-2" />
+                  {label}
+                </CommandItem>
+              ))}
+            </CommandGroup>
+          );
+        })()}
 
         {isAdmin && (
           <>
@@ -209,10 +212,12 @@ const CommandPalette = ({ open, onOpenChange }: CommandPaletteProps) => {
         <CommandSeparator />
 
         <CommandGroup heading="Account">
-          <CommandItem onSelect={doManageBilling}>
-            <CreditCard className="w-4 h-4 mr-2" />
-            Manage billing
-          </CommandItem>
+          {canManageBilling && (
+            <CommandItem onSelect={doManageBilling}>
+              <CreditCard className="w-4 h-4 mr-2" />
+              Manage billing
+            </CommandItem>
+          )}
           <CommandItem onSelect={doSignOut}>
             <LogOut className="w-4 h-4 mr-2" />
             Sign out

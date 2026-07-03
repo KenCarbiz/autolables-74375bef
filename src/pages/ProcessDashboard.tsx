@@ -69,10 +69,12 @@ const ProcessDashboard = () => {
     queryKey: ["dash", "vin_queue", tenant?.id],
     enabled: !!tenant?.id,
     queryFn: async () => {
+      // vin_queue statuses are queued/processing/completed/error — "pending"
+      // never exists, which kept this tile at zero.
       const { count } = await (supabase as any)
         .from("vin_queue")
         .select("id", { count: "exact", head: true })
-        .eq("status", "pending");
+        .in("status", ["queued", "processing"]);
       return count || 0;
     },
     staleTime: 30_000,
@@ -215,8 +217,8 @@ const ProcessDashboard = () => {
     { key: "getready", cap: "can_view_get_ready", icon: Wrench, label: "Get-ready", count: getReadyInFlight, unit: getReadyInFlight === 1 ? "vehicle in recon" : "vehicles in recon", done: "all recon complete", href: "/ready-board", tone: "amber" },
     { key: "publish", cap: "can_create_documents", icon: Tag, label: "Ready to publish", count: listings.draft, unit: listings.draft === 1 ? "draft sticker" : "draft stickers", done: "every sticker is live", href: "/inventory", tone: "indigo" },
     { key: "sign", cap: "can_view_deals", icon: Send, label: "Out for signature", count: signings.open, unit: signings.open === 1 ? "signing link open" : "signing links open", done: "no signatures pending", href: "/signatures", tone: "violet" },
-    { key: "returns", cap: "can_view_compliance", icon: RotateCcw, label: "SB 766 returns", count: signings.returnsOpen, unit: signings.returnsOpen === 1 ? "return to process" : "returns to process", done: "no open returns", href: "/admin?tab=home", tone: "amber" },
-    { key: "photos", cap: "can_view_compliance", icon: Camera, label: "Install proof", count: missingInstallPhotos, unit: missingInstallPhotos === 1 ? "vehicle missing photos" : "vehicles missing photos", done: "all installs photographed", href: "/admin?tab=getready", tone: "rose" },
+    { key: "returns", cap: "can_view_compliance", icon: RotateCcw, label: "SB 766 returns", count: signings.returnsOpen, unit: signings.returnsOpen === 1 ? "return to process" : "returns to process", done: "no open returns", href: "/saved", tone: "amber" },
+    { key: "photos", cap: "can_view_compliance", icon: Camera, label: "Install proof", count: missingInstallPhotos, unit: missingInstallPhotos === 1 ? "vehicle missing photos" : "vehicles missing photos", done: "all installs photographed", href: "/prep", tone: "rose" },
   ] as PriorityItem[]).filter((p) => isAdmin || can(p.cap));
   const openPriorities = priorities.filter((p) => p.count > 0);
   const sortedPriorities = [...priorities].sort((a, b) => (b.count > 0 ? 1 : 0) - (a.count > 0 ? 1 : 0));
@@ -333,61 +335,15 @@ const ProcessDashboard = () => {
           </p>
         </div>
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
-          <FlowTile
-            num={1}
-            icon={ScanLine}
-            label="Lot capture"
-            count={vinQueueCount}
-            unit="queued"
-            empty="lot scanned"
-            href="/queue"
-            tone="sky"
-            blurb="VINs picked up by the scanner waiting to be triaged."
-          />
-          <FlowTile
-            num={2}
-            icon={Wrench}
-            label="Get-ready"
-            count={getReadyInFlight}
-            unit="in progress"
-            empty="all installed"
-            href="/admin?tab=getready"
-            tone="amber"
-            blurb="Vehicles whose pre-sale install isn't sign-off-complete."
-          />
-          <FlowTile
-            num={3}
-            icon={Tag}
-            label="Ready to publish"
-            count={listings.draft}
-            unit={listings.draft === 1 ? "draft sticker" : "draft stickers"}
-            empty="all live"
-            href="/inventory"
-            tone="indigo"
-            blurb="Sticker + addendum done, waiting for publish."
-          />
-          <FlowTile
-            num={4}
-            icon={Send}
-            label="Out for sign"
-            count={signings.open}
-            unit={signings.open === 1 ? "link open" : "links open"}
-            empty="no opens"
-            href="/signatures"
-            tone="violet"
-            blurb="Customers have a signing link; we're waiting for ink."
-          />
-          <FlowTile
-            num={5}
-            icon={CheckCircle2}
-            label="Signed"
-            count={signings.recent.length}
-            unit="this week"
-            empty="—"
-            href="/saved"
-            tone="emerald"
-            blurb="Completed customer sign-offs · audit-defense ready."
-          />
+          {([
+            { num: 1, cap: "can_edit_inventory", icon: ScanLine, label: "Lot capture", count: vinQueueCount, unit: "queued", empty: "lot scanned", href: "/queue", tone: "sky", blurb: "VINs picked up by the scanner waiting to be triaged." },
+            { num: 2, cap: "can_view_get_ready", icon: Wrench, label: "Get-ready", count: getReadyInFlight, unit: "in progress", empty: "all installed", href: "/prep", tone: "amber", blurb: "Vehicles whose pre-sale install isn't sign-off-complete." },
+            { num: 3, cap: "can_create_documents", icon: Tag, label: "Ready to publish", count: listings.draft, unit: listings.draft === 1 ? "draft sticker" : "draft stickers", empty: "all live", href: "/inventory", tone: "indigo", blurb: "Sticker + addendum done, waiting for publish." },
+            { num: 4, cap: "can_view_deals", icon: Send, label: "Out for sign", count: signings.open, unit: signings.open === 1 ? "link open" : "links open", empty: "no opens", href: "/signatures", tone: "violet", blurb: "Customers have a signing link; we're waiting for ink." },
+            { num: 5, cap: "can_view_deals", icon: CheckCircle2, label: "Signed", count: signings.recent.length, unit: "this week", empty: "—", href: "/saved", tone: "emerald", blurb: "Completed customer sign-offs · audit-defense ready." },
+          ] as (FlowTileProps & { cap: DealerCapability })[])
+            .filter((t) => isAdmin || can(t.cap))
+            .map(({ cap: _cap, ...t }) => <FlowTile key={t.num} {...t} />)}
         </div>
       </section>
 
@@ -493,65 +449,16 @@ const ProcessDashboard = () => {
           <div className="rounded-2xl border border-border bg-card shadow-sm p-4">
             <h3 className="text-xs font-bold uppercase tracking-[0.14em] text-muted-foreground mb-3">Compliance defense</h3>
             <div className="space-y-2.5">
-              <DefenseTile
-                icon={RotateCcw}
-                label="SB 766 returns"
-                count={signings.returnsOpen}
-                empty="no open returns"
-                href="/admin?tab=home"
-                cite="§11713.21 · Oct 1, 2026"
-                tone={signings.returnsOpen > 0 ? "amber" : "neutral"}
-              />
-              <DefenseTile
-                icon={Camera}
-                label="Install photos"
-                count={missingInstallPhotos}
-                empty="all installed items have photos"
-                href="/admin?tab=getready"
-                cite="FTC §5 · install proof"
-                tone={missingInstallPhotos > 0 ? "rose" : "neutral"}
-                countSuffix={missingInstallPhotos === 1 ? "vehicle missing" : "vehicles missing"}
-              />
-              <DefenseTile
-                icon={FileSignature}
-                label="Benefit text"
-                count={missingBenefit}
-                empty="every installed line has benefit copy"
-                href="/admin?tab=products"
-                cite="FTC §5 · CA SB 766"
-                tone={missingBenefit > 0 ? "rose" : "neutral"}
-                countSuffix={missingBenefit === 1 ? "vehicle missing" : "vehicles missing"}
-              />
-              <DefenseTile
-                icon={TrendingUp}
-                label="Price drift"
-                count={priceDrift.drift}
-                empty="sticker matches advertised on every published VIN"
-                href="/inventory"
-                cite="FTC §5 · March 2026 97-letter campaign"
-                tone={priceDrift.drift > 0 ? "rose" : "neutral"}
-                countSuffix={priceDrift.drift === 1 ? "published VIN" : "published VINs"}
-              />
-              <DefenseTile
-                icon={TrendingUp}
-                label="Untracked price"
-                count={priceDrift.untracked}
-                empty="every published VIN has an advertised price on file"
-                href="/inventory"
-                cite="2-yr retention · CA SB 766 §11713.21"
-                tone={priceDrift.untracked > 0 ? "amber" : "neutral"}
-                countSuffix={priceDrift.untracked === 1 ? "VIN no snapshot" : "VINs no snapshot"}
-              />
-              <DefenseTile
-                icon={ShieldCheck}
-                label="Audit-Defense ready"
-                count={signings.recent.length}
-                empty="—"
-                href="/compliance"
-                cite="self-contained · SHA-256 chain root"
-                tone="neutral"
-                countSuffix="VIN packets last 7d"
-              />
+              {([
+                { key: "returns", cap: "can_view_compliance", icon: RotateCcw, label: "SB 766 returns", count: signings.returnsOpen, empty: "no open returns", href: "/saved", cite: "§11713.21 · Oct 1, 2026", tone: signings.returnsOpen > 0 ? "amber" : "neutral" },
+                { key: "photos", cap: "can_view_get_ready", icon: Camera, label: "Install photos", count: missingInstallPhotos, empty: "all installed items have photos", href: "/prep", cite: "FTC §5 · install proof", tone: missingInstallPhotos > 0 ? "rose" : "neutral", countSuffix: missingInstallPhotos === 1 ? "vehicle missing" : "vehicles missing" },
+                { key: "benefit", cap: "can_manage_addons", icon: FileSignature, label: "Benefit text", count: missingBenefit, empty: "every installed line has benefit copy", href: "/admin?tab=products", cite: "FTC §5 · CA SB 766", tone: missingBenefit > 0 ? "rose" : "neutral", countSuffix: missingBenefit === 1 ? "vehicle missing" : "vehicles missing" },
+                { key: "drift", cap: "can_view_inventory", icon: TrendingUp, label: "Price drift", count: priceDrift.drift, empty: "sticker matches advertised on every published VIN", href: "/inventory", cite: "FTC §5 · March 2026 97-letter campaign", tone: priceDrift.drift > 0 ? "rose" : "neutral", countSuffix: priceDrift.drift === 1 ? "published VIN" : "published VINs" },
+                { key: "untracked", cap: "can_view_inventory", icon: TrendingUp, label: "Untracked price", count: priceDrift.untracked, empty: "every published VIN has an advertised price on file", href: "/inventory", cite: "2-yr retention · CA SB 766 §11713.21", tone: priceDrift.untracked > 0 ? "amber" : "neutral", countSuffix: priceDrift.untracked === 1 ? "VIN no snapshot" : "VINs no snapshot" },
+                { key: "packets", cap: "can_view_compliance", icon: ShieldCheck, label: "Audit-Defense ready", count: signings.recent.length, empty: "—", href: "/compliance", cite: "self-contained · SHA-256 chain root", tone: "neutral", countSuffix: "VIN packets last 7d" },
+              ] as (DefenseTileProps & { key: string; cap: DealerCapability })[])
+                .filter((t) => isAdmin || can(t.cap))
+                .map(({ key, cap: _cap, ...t }) => <DefenseTile key={key} {...t} />)}
             </div>
           </div>
         </aside>

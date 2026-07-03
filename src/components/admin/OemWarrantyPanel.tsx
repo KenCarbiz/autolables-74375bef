@@ -109,7 +109,7 @@ export default function OemWarrantyPanel() {
     <div className="space-y-6 max-w-3xl">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <h2 className="text-base font-bold text-foreground">Factory &amp; CPO warranty</h2>
+          <h2 className="text-base font-bold text-foreground">Factory Warranty &amp; CPO</h2>
           <p className="text-xs text-muted-foreground mt-0.5 max-w-xl">
             Verify each franchised brand's OEM factory-warranty terms — new cars show the matching
             brand's coverage on the customer passport. Only <span className="font-semibold">verified</span> terms
