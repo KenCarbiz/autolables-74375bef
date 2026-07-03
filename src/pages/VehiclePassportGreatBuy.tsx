@@ -56,11 +56,19 @@ const GB_PRINT = `
 @media print {
   html, body { background: #fff !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   .gb-screen { display: none !important; }
-  .gb-print { display: block !important; width: 100%; max-width: none; color: #0F172A; font-family: Inter, -apple-system, BlinkMacSystemFont, sans-serif; }
-  .print-page { break-after: page; page-break-after: always; }
+  /* zoom scales the report up to a readable print size; page min-height is
+     divided by the same factor so each sheet still maps to one page. */
+  .gb-print { display: block !important; width: 100%; max-width: none; color: #0F172A; font-family: Inter, -apple-system, BlinkMacSystemFont, sans-serif; zoom: 1.25; }
+  /* Each page is a full-height flex column so content owns the sheet and
+     the footer pins to the bottom edge — never floating mid-page above a
+     half-empty sheet. 9.9in leaves rounding headroom inside the 10in
+     printable area so no phantom blank pages appear. */
+  .print-page { display: flex; flex-direction: column; min-height: calc(9.9in / 1.25); break-after: page; page-break-after: always; }
   .print-page:last-child { break-after: auto; page-break-after: auto; }
+  .print-page > * { flex: 0 0 auto; }
+  .print-body { flex: 1 1 auto; display: flex; flex-direction: column; }
   .print-avoid { break-inside: avoid; page-break-inside: avoid; }
-  .print-footer { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 12px; width: 100%; font-size: 9px; color: #64748B; border-top: 1px solid #E5E7EB; padding-top: 8px; margin-top: 16px; break-inside: avoid; page-break-inside: avoid; }
+  .print-footer { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 12px; width: 100%; font-size: 9px; color: #64748B; border-top: 1px solid #E5E7EB; padding-top: 8px; margin-top: auto; break-inside: avoid; page-break-inside: avoid; }
   .print-footer * { min-width: 0; writing-mode: horizontal-tb !important; text-orientation: mixed !important; }
   .print-footer .print-meta { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 }
@@ -822,7 +830,7 @@ const VehiclePassportGreatBuy = () => {
                       </p>
                     </PrintCard>
                   </div>
-                  <div className="shrink-0" style={{ width: "3.2in" }}>
+                  <div className="shrink-0" style={{ width: "38%" }}>
                     {listing.hero_image_url && <img src={listing.hero_image_url} alt={listing.ymm ?? "Vehicle"} className="w-full rounded-lg border border-[#E5E7EB] object-cover" style={{ aspectRatio: "16/10" }} />}
                     <p className="text-[13px] font-extrabold leading-tight mt-2">{listing.ymm}{listing.trim ? ` ${listing.trim}` : ""}</p>
                     <p className="mt-0.5"><span className="text-[15px] font-extrabold">{d.price != null ? fmt$(d.price) : ""}</span>{listing.mileage != null && <span className="text-[9.5px] font-semibold text-[#64748B] ml-2">{listing.mileage.toLocaleString()} mi</span>}</p>
