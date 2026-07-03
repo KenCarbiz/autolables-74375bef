@@ -3,8 +3,10 @@ import {
   DollarSign, TrendingUp, TrendingDown, Gauge, Clock, Car, Package, ShieldCheck,
   Star, Award, FileText, MessageSquare, Eye, CheckCircle2,
   Flame, Heart, Send, Bookmark, Users, Circle, ChevronDown, ChevronRight, MapPin, BadgeCheck, Info, AlertTriangle, History, ArrowRight, Sparkles,
-  Wrench, Zap, LifeBuoy, Calendar, CalendarDays, ExternalLink,
+  Wrench, Zap, LifeBuoy, Calendar, CalendarDays, ExternalLink, Navigation, Copy, Globe, Phone,
 } from "lucide-react";
+import { toast } from "sonner";
+import { listingHero } from "@/lib/photos";
 import type { PassportData, PricePoint, OemWarrantyView } from "@/lib/passportV2Data";
 import { fmt$, listingEquipment, historyReportName } from "@/lib/passportV2Data";
 import { packetVisible } from "@/lib/packetModules";
@@ -36,6 +38,7 @@ export const PASSPORT_PANEL_KEYS = [
   "market-price", "market-demand", "price-confidence", "price-history",
   "comparable-vehicles", "inventory-trend", "factory-warranty",
   "owner-reviews", "highlights", "overview", "key-specs", "equipment", "ownership-timeline",
+  "visit-dealer",
 ] as const;
 export type PassportPanelKey = (typeof PASSPORT_PANEL_KEYS)[number];
 export const isPassportPanelKey = (v: string | null | undefined): v is PassportPanelKey =>
@@ -739,6 +742,19 @@ function buildPanel(key: PassportPanelKey, d: PassportData, listing: VehicleList
           )}
           <Disclaimer />
         </>,
+      };
+    }
+
+    case "visit-dealer": {
+      const q = encodeURIComponent(d.dealerAddress || d.dealerName);
+      return {
+        title: `Visit ${d.dealerName}`,
+        subtitle: "Get directions, view hours, and choose the best department for your visit.",
+        xl: true,
+        primary: { label: "Get Directions", onClick: () => window.open(`https://www.google.com/maps/search/?api=1&query=${q}`, "_blank", "noopener") },
+        secondary: { label: "Schedule Test Drive", onClick: () => go("test-drive") },
+        footerQuestion: "Questions before you visit?", specialistLabel: "Call the Dealership",
+        body: <VisitDealerBody d={d} listing={listing} go={go} isPreview={isPreview} />,
       };
     }
 
@@ -2654,6 +2670,126 @@ const PriceChart = ({ pts, height = 170 }: { pts: { label: string; dealer: numbe
   );
 };
 
+// Visit Dealer slide-out body — a utility panel that keeps the shopper in
+// the passport flow: map card with provider links, department selector,
+// data-gated hours, a before-you-go checklist, and the exact vehicle
+// context. Missing data falls back to "call to confirm" — never "coming
+// soon" on a customer surface.
+function VisitDealerBody({ d, listing, go, isPreview }: { d: PassportData; listing: VehicleListing; go: (s: string) => void; isPreview: boolean }) {
+  const [dept, setDept] = useState<"sales" | "service" | "parts">("sales");
+  const t = d.dealerTrust;
+  const addr = d.dealerAddress;
+  const q = encodeURIComponent(addr || d.dealerName);
+  const gmaps = `https://www.google.com/maps/search/?api=1&query=${q}`;
+  const amaps = `https://maps.apple.com/?q=${q}`;
+  const dealerTel = d.dealerPhone ? d.dealerPhone.replace(/[^\d+]/g, "") : null;
+  const hasService = t.serviceLocation === "onsite" || t.serviceLocation === "offsite";
+  const hasParts = t.services.some((s) => /part/i.test(s));
+  const hero = listingHero(listing);
+  const price = d.price;
+  const copyAddress = async () => {
+    try { await navigator.clipboard.writeText(addr || d.dealerName); toast.success("Address copied"); } catch { toast.error("Couldn't copy"); }
+  };
+  const DEPTS = [
+    { id: "sales" as const, label: "Sales", icon: Car, desc: "Vehicle viewing, trade appraisal, finance, and purchase support.", on: true },
+    { id: "service" as const, label: "Service", icon: Wrench, desc: "Warranty, recall, maintenance, and ownership support.", on: hasService },
+    { id: "parts" as const, label: "Parts", icon: Package, desc: "Genuine parts and accessories.", on: hasParts },
+  ].filter((x) => x.on);
+  const active = DEPTS.find((x) => x.id === dept) ?? DEPTS[0];
+  const hours = active.id === "sales" && t.hours ? t.hours : null;
+  const website = t.storefrontUrl ? null : null; // dealer website not in trust data; row hidden
+  const mapBtn = "flex-1 min-w-[140px] h-10 rounded-xl text-[12.5px] font-bold inline-flex items-center justify-center gap-1.5 transition-colors";
+  return (
+    <>
+      {/* Trust chips */}
+      <div className="flex flex-wrap gap-2">
+        <span className="inline-flex items-center gap-1.5 text-[11.5px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-full px-2.5 py-1"><CheckCircle2 className="w-3.5 h-3.5" /> Dealer Verified</span>
+        <span className="inline-flex items-center gap-1.5 text-[11.5px] font-bold text-[#2563EB] bg-blue-50 border border-blue-200 rounded-full px-2.5 py-1"><ShieldCheck className="w-3.5 h-3.5" /> Vehicle Passport Partner</span>
+      </div>
+
+      {/* Map card */}
+      <div className={`${CARD} overflow-hidden`}>
+        <a href={gmaps} target="_blank" rel="noreferrer" className="block relative h-44 bg-gradient-to-br from-slate-100 via-blue-50 to-slate-100 hover:opacity-95 transition-opacity">
+          <div className="absolute inset-0 opacity-40" style={{ backgroundImage: "linear-gradient(#dbe4f0 1px, transparent 1px), linear-gradient(90deg, #dbe4f0 1px, transparent 1px)", backgroundSize: "36px 36px" }} />
+          <div className="absolute inset-0 flex flex-col items-center justify-center">
+            <span className="w-11 h-11 rounded-full bg-[#2563EB] flex items-center justify-center shadow-lg"><MapPin className="w-5 h-5 text-white" /></span>
+            <p className="text-[13.5px] font-extrabold mt-2">{d.dealerName}</p>
+            {addr && <p className="text-[11.5px] text-[#64748B] font-medium">{addr}</p>}
+          </div>
+        </a>
+        <div className="p-3 flex flex-wrap gap-2 border-t border-[#F1F5F9]">
+          <a href={amaps} target="_blank" rel="noreferrer" className={`${mapBtn} border border-[#E6E8EC] hover:border-[#2563EB]`}><Navigation className="w-4 h-4 text-[#2563EB]" /> Open in Apple Maps</a>
+          <a href={gmaps} target="_blank" rel="noreferrer" className={`${mapBtn} border border-[#E6E8EC] hover:border-[#2563EB]`}><MapPin className="w-4 h-4 text-[#2563EB]" /> Open in Google Maps</a>
+          <button onClick={copyAddress} className={`${mapBtn} border border-[#E6E8EC] hover:border-[#2563EB]`}><Copy className="w-4 h-4 text-[#2563EB]" /> Copy Address</button>
+        </div>
+      </div>
+
+      {/* Department selector */}
+      {DEPTS.length > 1 && (
+        <Section title="Choose your visit type">
+          <div className="grid gap-2" style={{ gridTemplateColumns: `repeat(${DEPTS.length}, minmax(0,1fr))` }}>
+            {DEPTS.map((x) => {
+              const on = active.id === x.id;
+              return (
+                <button key={x.id} onClick={() => setDept(x.id)} aria-pressed={on}
+                  className={`rounded-xl border p-3 text-center transition-colors ${on ? "border-[#2563EB] bg-blue-50/60" : "border-[#E6E8EC] bg-white hover:border-[#B9CBE0]"}`}>
+                  <x.icon className={`w-5 h-5 mx-auto ${on ? "text-[#2563EB]" : "text-[#94A3B8]"}`} />
+                  <p className={`text-[12.5px] font-bold mt-1 ${on ? "text-[#2563EB]" : "text-[#0F172A]"}`}>{x.label}</p>
+                </button>
+              );
+            })}
+          </div>
+          <p className={`text-[12px] ${"text-[#64748B]"} mt-2`}>{active.desc}</p>
+        </Section>
+      )}
+
+      {/* Visit details */}
+      <Section title="Visit details">
+        <div className={`${CARD} p-4 space-y-2.5 text-[13px]`}>
+          <p className="flex items-start gap-2.5"><Clock className="w-4 h-4 text-[#2563EB] mt-0.5 shrink-0" /> <span className={hours ? "font-medium whitespace-pre-line leading-relaxed" : "text-[#64748B]"}>{hours || "Call the dealership to confirm current hours."}</span></p>
+          {dealerTel && <p className="flex items-center gap-2.5"><Phone className="w-4 h-4 text-[#2563EB] shrink-0" /> <a href={`tel:${dealerTel}`} className="font-bold hover:text-[#2563EB]">{d.dealerPhone}</a></p>}
+          {addr && <p className="flex items-start gap-2.5"><MapPin className="w-4 h-4 text-[#2563EB] mt-0.5 shrink-0" /> <span className="font-medium">{addr}</span></p>}
+          {website}
+        </div>
+      </Section>
+
+      {/* Before you go */}
+      <Section title="Before you go">
+        <div className={`${CARD} p-4`}>
+          <ul className="space-y-2">
+            <Check>Vehicle availability can change — reserve or call to confirm this vehicle.</Check>
+            <Check>Bring a valid driver's license for a test drive.</Check>
+            <Check>Have your trade information ready if applicable.</Check>
+            <Check>Ask about trade value before arrival to save time.</Check>
+          </ul>
+        </div>
+      </Section>
+
+      {/* Vehicle context */}
+      <Section title="You're visiting about">
+        <div className={`${CARD} p-4`}>
+          <div className="flex items-center gap-3">
+            <div className="w-20 h-14 rounded-lg overflow-hidden bg-slate-100 flex items-center justify-center shrink-0">
+              {hero ? <img src={hero} alt="" className="w-full h-full object-cover" /> : <Car className="w-6 h-6 text-slate-300" />}
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="text-[13.5px] font-bold leading-tight truncate">{listing.ymm}{listing.trim ? ` ${listing.trim}` : ""}</p>
+              <p className="text-[12.5px] text-[#64748B] mt-0.5">{price != null ? fmt$(price) : ""}{price != null && listing.mileage != null ? " · " : ""}{listing.mileage != null ? `${listing.mileage.toLocaleString()} miles` : ""}</p>
+              <p className="text-[11px] font-semibold text-[#2563EB] inline-flex items-center gap-1 mt-0.5"><ShieldCheck className="w-3 h-3" /> Vehicle Passport</p>
+            </div>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 mt-3">
+            <button onClick={() => go("reserve")} className="h-10 rounded-xl bg-[#2563EB] text-white text-[12.5px] font-bold hover:bg-[#1d4fd7]">Reserve This Vehicle</button>
+            <button onClick={() => go("test-drive")} className="h-10 rounded-xl border border-[#2563EB] text-[#2563EB] text-[12.5px] font-bold hover:bg-blue-50">Schedule Test Drive</button>
+            {dealerTel ? <a href={`tel:${dealerTel}`} className="h-10 rounded-xl border border-[#E6E8EC] text-[12.5px] font-bold inline-flex items-center justify-center gap-1.5 hover:border-[#2563EB]"><Phone className="w-3.5 h-3.5 text-[#2563EB]" /> Call Dealer</a> : <button onClick={() => go("contact")} className="h-10 rounded-xl border border-[#E6E8EC] text-[12.5px] font-bold hover:border-[#2563EB]">Message Dealer</button>}
+          </div>
+        </div>
+      </Section>
+      {isPreview && <p className="text-[11px] text-[#94A3B8]">Sample dealership shown in preview mode.</p>}
+    </>
+  );
+}
+
 function PriceTimeline({ history }: { history: PricePoint[] }) {
   const [range, setRange] = useState<number>(90);
   const pts = useMemo(() => {
@@ -2883,6 +3019,7 @@ export const PANEL_ICON: Record<PassportPanelKey, React.ElementType> = {
   "price-history": Clock, "comparable-vehicles": Car, "inventory-trend": Package,
   "factory-warranty": ShieldCheck, "owner-reviews": Star, "highlights": Award,
   "overview": FileText, "key-specs": FileText, "equipment": Package, "ownership-timeline": Clock,
+  "visit-dealer": MapPin,
 };
 
 export interface PassportPanelProps {

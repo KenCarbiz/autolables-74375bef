@@ -332,7 +332,9 @@ const VehiclePassportV3 = () => {
         window.location.href = `sms:${d.dealerPhone.replace(/[^\d+]/g, "")}?&body=${body}`;
       } else go("text");
     };
-    const directions = () => window.open(`https://maps.google.com/?q=${encodeURIComponent(d.dealerAddress || d.dealerName)}`, "_blank", "noopener");
+    // Directions stay in-flow: the premium Visit Dealer slide-out (map card,
+    // departments, hours, before-you-go) instead of bouncing to Maps.
+    const directions = () => { tapTrack("directions"); openPanel("visit-dealer"); };
     const map: Record<string, { icon: React.ElementType; onClick: () => void }> = {
       call: { icon: Phone, onClick: call },
       text: { icon: MessageSquare, onClick: text },
