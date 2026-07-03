@@ -112,6 +112,35 @@ const bucketFor = (num: number) => PANEL_CATEGORIES.find((c) => c.nums.has(num))
 // Highlight priority: features shoppers ask about first.
 const HIGHLIGHT_PRIORITY = [1, 5, 8, 10, 27, 43, 42, 23, 14, 51, 50, 34, 39, 37, 22, 29, 4, 3, 49, 53, 54];
 
+// Print curation — a window label cannot fit a 200-line decode dump. Rank
+// lines by shopper value (icon-key highlight priority, then any classified
+// feature, then generic), keep at most two lines per icon class so the list
+// stays diverse, and cap it; the QR carries the complete list.
+export function curatePrintEquipment(items: string[], max = 24): { shown: string[]; remainder: number } {
+  const clean = items.map((s) => s.trim()).filter(Boolean);
+  if (clean.length <= max) return { shown: clean, remainder: 0 };
+  const classified = clean.map((name, i) => ({ name, i, icon: getEquipmentIcon(name) }));
+  const prio = (n: number) => {
+    const p = HIGHLIGHT_PRIORITY.indexOf(n);
+    return p === -1 ? (n === 65 ? 2000 : 1000) : p;
+  };
+  const ranked = [...classified].sort((a, b) => prio(a.icon.num) - prio(b.icon.num) || a.i - b.i);
+  const perClass: Record<number, number> = {};
+  const shown: typeof ranked = [];
+  for (const x of ranked) {
+    if (shown.length >= max) break;
+    const c = perClass[x.icon.num] ?? 0;
+    if (x.icon.num !== 65 && c >= 2) continue;
+    perClass[x.icon.num] = c + 1;
+    shown.push(x);
+  }
+  for (const x of ranked) {
+    if (shown.length >= max) break;
+    if (!shown.includes(x)) shown.push(x);
+  }
+  return { shown: shown.map((x) => x.name), remainder: clean.length - shown.length };
+}
+
 export function buildEquipmentPanelData(listing: VehicleListing, d: PassportData): EquipmentPanelData {
   const sheet = readBuildSheet(listing);
   const allEquipment = listingEquipment(listing);

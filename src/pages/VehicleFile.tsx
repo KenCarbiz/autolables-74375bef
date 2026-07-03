@@ -23,6 +23,12 @@ import { PACKET_MODULES, packetVisible } from "@/lib/packetModules";
 import { resolveOperatingState } from "@/lib/dealerState";
 import { QRCodeSVG } from "qrcode.react";
 import GeneratedDocumentsSection from "@/components/vehicle/GeneratedDocumentsSection";
+import { useStickerCatalog } from "@/lib/stickerStudio/useStickerCatalog";
+import { useStickerPrefs } from "@/lib/stickerStudio/useStickerPrefs";
+import {
+  LABEL_BUILDERS, slotFor, conditionOf, resolveLabelDefault, labelRefPath,
+  type LabelKind,
+} from "@/lib/labelDefaults";
 import UsedCarDocPack from "@/components/vehicle/UsedCarDocPack";
 import DeliverySignoffs from "@/components/vehicle/DeliverySignoffs";
 import TitleMcoPanel from "@/components/vehicle/TitleMcoPanel";
@@ -1127,6 +1133,73 @@ const DocumentsPanel = ({ vehicle, onReload }: { vehicle: VehicleRow; onReload: 
   );
 };
 
+// Per-vehicle template chooser row: shows the template in effect for this
+// vehicle's condition (window or addendum slot), lets the dealer pick any
+// builder / Sticker Studio template for this one vehicle, and optionally
+// promote the pick to the store default.
+const TemplateSlotRow = ({ kind, vehicle }: { kind: LabelKind; vehicle: VehicleRow }) => {
+  const navigate = useNavigate();
+  const { settings, updateSettings } = useDealerSettings();
+  const { templates } = useStickerCatalog();
+  const { defaults: legacy } = useStickerPrefs();
+
+  const condition = conditionOf(vehicle.condition);
+  const slot = slotFor(kind, condition);
+  const storeRef = resolveLabelDefault(settings.label_defaults, slot, legacy);
+  const [ref, setRef] = useState<string>(storeRef || "");
+
+  const options = [
+    ...Object.values(LABEL_BUILDERS)
+      .filter((b) => b.kind === kind && b.conditions.includes(condition))
+      .map((b) => ({ value: `builder:${b.key}`, label: b.label })),
+    ...templates
+      .filter((t) => t.config.type === kind)
+      .map((t) => ({ value: `studio:${t.config.id}`, label: `${t.config.name} (${t.config.size})` })),
+  ];
+  const selected = ref || storeRef || "";
+  const path = selected ? labelRefPath(selected, vehicle.id) : null;
+
+  return (
+    <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+      <div className="sm:w-40 flex-shrink-0">
+        <p className="text-xs font-bold text-foreground capitalize">{kind === "window" ? "Window sticker" : "Addendum"}</p>
+        <p className="text-[10px] text-muted-foreground capitalize">{condition} vehicle</p>
+      </div>
+      <select
+        value={options.some((o) => o.value === selected) ? selected : ""}
+        onChange={(e) => setRef(e.target.value)}
+        className="flex-1 h-9 rounded-md border border-border bg-background px-2.5 text-xs min-w-0"
+      >
+        {!options.some((o) => o.value === selected) && <option value="">Choose a template…</option>}
+        {options.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+      </select>
+      <div className="flex items-center gap-1.5 flex-shrink-0">
+        {selected && selected !== storeRef && (
+          <button
+            type="button"
+            onClick={() => {
+              updateSettings({ label_defaults: { ...(settings.label_defaults || {}), [slot]: selected } });
+              toast.success(`Saved as your store default for ${condition} vehicles`);
+            }}
+            className="h-9 px-3 rounded-md border border-border text-[11px] font-semibold text-muted-foreground hover:text-foreground hover:bg-muted/40"
+          >
+            Set store default
+          </button>
+        )}
+        <button
+          type="button"
+          disabled={!path}
+          onClick={() => path && navigate(path)}
+          className="h-9 px-3.5 rounded-md bg-primary text-primary-foreground text-xs font-semibold disabled:opacity-50 inline-flex items-center gap-1.5"
+        >
+          <Printer className="w-3.5 h-3.5" />
+          Generate
+        </button>
+      </div>
+    </div>
+  );
+};
+
 const LabelsPanel = ({ vehicle }: { vehicle: VehicleRow }) => {
   const navigate = useNavigate();
   // Carry the vehicle identity into every generator so the destination form
@@ -1160,6 +1233,17 @@ const LabelsPanel = ({ vehicle }: { vehicle: VehicleRow }) => {
           from this file. When you publish to the shopper portal, the QR on the printed
           sticker resolves to <span className="font-mono">/v/{(vehicle.vin || vehicle.slug || "").toUpperCase()}</span>.
         </p>
+      </div>
+      <div className="rounded-xl border border-border bg-card p-4 space-y-3">
+        <div>
+          <h3 className="text-sm font-bold text-foreground">Label template for this vehicle</h3>
+          <p className="text-[11px] text-muted-foreground mt-0.5">
+            Defaults to your store setting (Admin → Templates); pick a different template
+            here to use it for this vehicle only.
+          </p>
+        </div>
+        <TemplateSlotRow kind="window" vehicle={vehicle} />
+        <TemplateSlotRow kind="addendum" vehicle={vehicle} />
       </div>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
         {links.map((l) => (

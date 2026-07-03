@@ -8,6 +8,10 @@ import {
 } from "@/lib/stickerStudio/templates";
 import { useStickerCatalog } from "@/lib/stickerStudio/useStickerCatalog";
 import { useStickerPrefs } from "@/lib/stickerStudio/useStickerPrefs";
+import {
+  LABEL_SLOTS, slotFor, resolveLabelDefault, parseLabelRef,
+  type LabelCondition,
+} from "@/lib/labelDefaults";
 import { LayoutTemplate, Check, Star, Paintbrush } from "lucide-react";
 
 // Demo data used only for the gallery thumbnails.
@@ -51,7 +55,7 @@ const StickerStudio = () => {
   const navigate = useNavigate();
   const [params] = useSearchParams();
   const vehicleId = params.get("vehicleId") || "";
-  const { settings } = useDealerSettings();
+  const { settings, updateSettings } = useDealerSettings();
   const { tenant } = useTenant();
   const branding = useMemo(() => brandingFromSettings(settings, tenant?.name), [settings, tenant?.name]);
 
@@ -59,25 +63,39 @@ const StickerStudio = () => {
   const [tag, setTag] = useState<StyleTag | "all">("all");
 
   const { templates: catalog, byId } = useStickerCatalog();
-  const { defaults, setDefault, clearDefault } = useStickerPrefs();
+  const { defaults: legacy } = useStickerPrefs();
+
+  // Which conditions (used/new) a studio template is the store default for.
+  const conditionsFor = (id: string): LabelCondition[] =>
+    LABEL_SLOTS
+      .filter((s) => resolveLabelDefault(settings.label_defaults, s.slot, legacy) === `studio:${id}`)
+      .map((s) => s.condition);
+
   const templates = catalog
     .filter((t) => (type === "all" || t.config.type === type) && (tag === "all" || t.config.styleTags.includes(tag)))
     .sort((a, b) => {
-      const ad = defaults[a.config.type] === a.config.id ? 0 : 1;
-      const bd = defaults[b.config.type] === b.config.id ? 0 : 1;
+      const ad = conditionsFor(a.config.id).length ? 0 : 1;
+      const bd = conditionsFor(b.config.id).length ? 0 : 1;
       return ad - bd;
     });
 
   const open = (id: string) => navigate(`/sticker-studio/${id}${vehicleId ? `?vehicleId=${vehicleId}` : ""}`);
-  const toggleDefault = (cfgType: StickerType, key: string) => {
-    if (defaults[cfgType] === key) clearDefault(cfgType);
-    else setDefault(cfgType, key);
+  const toggleDefault = (cfgType: StickerType, condition: LabelCondition, id: string) => {
+    const slot = slotFor(cfgType, condition);
+    const ref = `studio:${id}`;
+    const next = { ...(settings.label_defaults || {}) };
+    if (resolveLabelDefault(settings.label_defaults, slot, legacy) === ref) delete next[slot];
+    else next[slot] = ref;
+    updateSettings({ label_defaults: next });
   };
 
-  // Dealer's saved defaults, resolved to live templates for the quick-start row.
-  const quickStart = (["window", "addendum"] as StickerType[])
-    .map((ty) => ({ ty, template: defaults[ty] ? byId(defaults[ty]) : undefined }))
-    .filter((q): q is { ty: StickerType; template: NonNullable<ReturnType<typeof byId>> } => !!q.template);
+  // Dealer's saved defaults per slot, resolved to live templates for the quick-start row.
+  const quickStart = LABEL_SLOTS
+    .map((s) => {
+      const ref = parseLabelRef(resolveLabelDefault(settings.label_defaults, s.slot, legacy));
+      return { slotDef: s, template: ref?.kind === "studio" ? byId(ref.key) : undefined };
+    })
+    .filter((q): q is { slotDef: (typeof LABEL_SLOTS)[number]; template: NonNullable<ReturnType<typeof byId>> } => !!q.template);
 
   return (
     <div className="p-4 lg:p-6 max-w-[1400px] mx-auto space-y-5">
@@ -112,18 +130,18 @@ const StickerStudio = () => {
             <Star className="w-3.5 h-3.5" fill="currentColor" /> Quick start with your defaults
           </p>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            {quickStart.map(({ ty, template }) => (
+            {quickStart.map(({ slotDef, template }) => (
               <button
-                key={ty}
+                key={slotDef.slot}
                 type="button"
                 onClick={() => open(template.config.id)}
                 className="group flex items-center gap-3 rounded-xl border border-border bg-card p-2.5 text-left hover:border-primary hover:shadow-premium transition"
               >
                 <div className="rounded-md bg-slate-50 border border-slate-100 overflow-hidden flex items-center justify-center flex-shrink-0" style={{ width: 64, height: 64 }}>
-                  <TemplateRenderer template={template} data={SAMPLE} branding={branding} scale={ty === "addendum" ? 0.12 : 0.072} />
+                  <TemplateRenderer template={template} data={SAMPLE} branding={branding} scale={slotDef.kind === "addendum" ? 0.12 : 0.072} />
                 </div>
                 <div className="min-w-0 flex-1">
-                  <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">{ty === "window" ? "Window Sticker" : "Addendum"}</p>
+                  <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">{slotDef.title}</p>
                   <p className="text-sm font-semibold text-foreground truncate">{template.config.name}</p>
                 </div>
                 <span className="inline-flex items-center gap-1 text-xs font-semibold text-blue-600 flex-shrink-0 pr-1">Generate <Check className="w-3.5 h-3.5" /></span>
@@ -136,20 +154,30 @@ const StickerStudio = () => {
       {/* Gallery grid */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
         {templates.map((t) => {
-          const isDefault = defaults[t.config.type] === t.config.id;
+          const activeConditions = conditionsFor(t.config.id);
+          const isDefault = activeConditions.length > 0;
           return (
             <div
               key={t.config.id}
               className={`group relative text-left rounded-2xl border bg-card p-3 hover:shadow-premium transition ${isDefault ? "border-blue-500 ring-1 ring-blue-500/30" : "border-border hover:border-primary"}`}
             >
-              <button
-                type="button"
-                onClick={() => toggleDefault(t.config.type, t.config.id)}
-                title={isDefault ? "Default for this type — click to unset" : "Set as default for this type"}
-                className={`absolute top-2 right-2 z-10 inline-flex items-center justify-center w-7 h-7 rounded-full border transition ${isDefault ? "bg-blue-600 border-blue-600 text-white" : "bg-card/90 border-border text-muted-foreground hover:text-amber-500"}`}
-              >
-                <Star className="w-3.5 h-3.5" fill={isDefault ? "currentColor" : "none"} />
-              </button>
+              <div className="absolute top-2 right-2 z-10 inline-flex rounded-full border border-border bg-card/95 p-0.5 shadow-sm">
+                {(["used", "new"] as LabelCondition[]).map((c) => {
+                  const on = activeConditions.includes(c);
+                  return (
+                    <button
+                      key={c}
+                      type="button"
+                      onClick={() => toggleDefault(t.config.type, c, t.config.id)}
+                      title={on ? `Store default for ${c} vehicles — click to unset` : `Set as store default for ${c} vehicles`}
+                      className={`inline-flex items-center gap-1 px-2 h-6 rounded-full text-[10px] font-semibold uppercase tracking-wide transition ${on ? "bg-blue-600 text-white" : "text-muted-foreground hover:text-amber-500"}`}
+                    >
+                      <Star className="w-3 h-3" fill={on ? "currentColor" : "none"} />
+                      {c}
+                    </button>
+                  );
+                })}
+              </div>
               <button type="button" onClick={() => open(t.config.id)} className="block w-full text-left">
                 {/* Thumbnail — a true-scale render shrunk to fit the card */}
                 <div className="rounded-lg bg-slate-50 border border-slate-100 overflow-hidden flex items-center justify-center" style={{ height: 220 }}>
@@ -163,7 +191,9 @@ const StickerStudio = () => {
                   <span className="opacity-0 group-hover:opacity-100 transition-opacity inline-flex items-center gap-1 text-[11px] font-semibold text-blue-600 flex-shrink-0">Use <Check className="w-3 h-3" /></span>
                 </div>
                 <div className="mt-1.5 flex flex-wrap gap-1">
-                  {isDefault && <span className="text-[9px] font-semibold uppercase tracking-wide px-1.5 py-0.5 rounded bg-blue-50 text-blue-700">Default</span>}
+                  {activeConditions.map((c) => (
+                    <span key={c} className="text-[9px] font-semibold uppercase tracking-wide px-1.5 py-0.5 rounded bg-blue-50 text-blue-700">{c} default</span>
+                  ))}
                   {t.config.styleTags.map((g) => (
                     <span key={g} className="text-[9px] font-semibold uppercase tracking-wide px-1.5 py-0.5 rounded bg-muted text-muted-foreground">{g}</span>
                   ))}

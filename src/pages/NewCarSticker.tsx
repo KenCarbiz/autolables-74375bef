@@ -11,6 +11,7 @@ import { useVehicleListing } from "@/hooks/useVehicleListing";
 import { useRecallLookup } from "@/hooks/useRecallLookup";
 import { saveStickerToVehicle, markDocumentPublished } from "@/lib/stickerStudio/api";
 import { cleanEquipmentList } from "@/lib/passportV2Data";
+import { curatePrintEquipment } from "@/lib/equipmentPanel";
 import { useOemSticker } from "@/hooks/useOemSticker";
 import RecallBanner from "@/components/addendum/RecallBanner";
 import { useVehiclePrefill, VehicleContextHeader } from "@/lib/vehiclePrefill";
@@ -488,22 +489,32 @@ const NewCarSticker = () => {
               </div>
             )}
 
-            {/* Factory equipment */}
-            {equipment.filter(Boolean).length > 0 && (
-              <div className="border-b border-foreground">
-                <button onClick={() => setShowEquipment(!showEquipment)} className="w-full flex items-center justify-between px-5 py-2 text-[9px] font-bold text-foreground uppercase tracking-wider hover:bg-muted/30">
-                  <span>Standard Equipment ({equipment.filter(Boolean).length})</span>
-                  {showEquipment ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
-                </button>
-                {showEquipment && (
-                  <div className="px-5 pb-2 grid grid-cols-2 gap-x-4 gap-y-0.5">
-                    {equipment.filter(Boolean).map((item, i) => (
-                      <p key={i} className="text-[9px] text-foreground">• {item.trim()}</p>
-                    ))}
-                  </div>
-                )}
-              </div>
-            )}
+            {/* Factory equipment — curated for print; the QR carries the full list */}
+            {equipment.filter(Boolean).length > 0 && (() => {
+              const { shown, remainder } = curatePrintEquipment(equipment, 24);
+              return (
+                <div className="border-b border-foreground">
+                  <button onClick={() => setShowEquipment(!showEquipment)} className="w-full flex items-center justify-between px-5 py-2 text-[9px] font-bold text-foreground uppercase tracking-wider hover:bg-muted/30">
+                    <span>Standard Equipment Highlights ({equipment.filter(Boolean).length} total)</span>
+                    {showEquipment ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+                  </button>
+                  {showEquipment && (
+                    <>
+                      <div className="px-5 pb-1 grid grid-cols-2 gap-x-4 gap-y-0.5">
+                        {shown.map((item, i) => (
+                          <p key={i} className="text-[9px] text-foreground">• {item.trim()}</p>
+                        ))}
+                      </div>
+                      {remainder > 0 && (
+                        <p className="px-5 pb-2 text-[8px] text-muted-foreground">
+                          + {remainder} more factory features — scan the QR code for the complete equipment list.
+                        </p>
+                      )}
+                    </>
+                  )}
+                </div>
+              );
+            })()}
 
             {/* Dealer programs (FTC-structured value props) */}
             <DealerProgramsSticker programs={applicablePrograms(settings.dealer_programs, "new", "sticker")} />

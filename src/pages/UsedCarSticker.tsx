@@ -14,6 +14,7 @@ import { useRecallLookup } from "@/hooks/useRecallLookup";
 import { useNhtsaSafety } from "@/hooks/useNhtsaSafety";
 import { saveStickerToVehicle, markDocumentPublished } from "@/lib/stickerStudio/api";
 import { cleanEquipmentList } from "@/lib/passportV2Data";
+import { curatePrintEquipment } from "@/lib/equipmentPanel";
 import RecallBanner from "@/components/addendum/RecallBanner";
 import { useVehiclePrefill, VehicleContextHeader } from "@/lib/vehiclePrefill";
 import { useVehicleSpecs } from "@/hooks/useVehicleSpecs";
@@ -34,7 +35,7 @@ type StickerMode = "full" | "equipment_only" | "accessories_only";
 type IconStyle = "icons" | "graphics" | "minimal";
 
 const UsedCarSticker = () => {
-  const { settings } = useDealerSettings();
+  const { settings, updateSettings } = useDealerSettings();
   const { currentStore, tenant } = useTenant();
   const { decode, decoding } = useVinDecode();
   const { user } = useAuth();
@@ -56,6 +57,28 @@ const UsedCarSticker = () => {
 
   const [mode, setMode] = useState<StickerMode>("full");
   const [iconStyle, setIconStyle] = useState<IconStyle>("icons");
+
+  // Apply the store's saved layout options once when settings arrive; the
+  // dealer's in-session choices are never overwritten after that.
+  const appliedStoreOpts = useRef(false);
+  useEffect(() => {
+    const saved = settings.used_sticker_options;
+    if (!saved || appliedStoreOpts.current) return;
+    appliedStoreOpts.current = true;
+    if (["full", "equipment_only", "accessories_only"].includes(saved.mode)) setMode(saved.mode as StickerMode);
+    if (["icons", "graphics", "minimal"].includes(saved.icon_style)) setIconStyle(saved.icon_style as IconStyle);
+  }, [settings.used_sticker_options]);
+
+  const isStoreDefault =
+    settings.used_sticker_options?.mode === mode &&
+    settings.used_sticker_options?.icon_style === iconStyle;
+  const saveStoreDefault = () => {
+    updateSettings({
+      used_sticker_options: { mode, icon_style: iconStyle },
+      label_defaults: { ...(settings.label_defaults || {}), window_used: "builder:used-car-sticker" },
+    });
+    toast.success("Saved as your store's used window sticker default");
+  };
 
   const [vehicle, setVehicle] = useState({
     vin: "", year: "", make: "", model: "", trim: "",
@@ -511,6 +534,14 @@ const UsedCarSticker = () => {
                 >{s.label}</button>
               ))}
             </div>
+            <button
+              type="button"
+              onClick={saveStoreDefault}
+              disabled={isStoreDefault}
+              className="mt-2 w-full h-8 rounded-md border border-border text-[11px] font-semibold text-muted-foreground hover:text-foreground hover:bg-muted disabled:opacity-60"
+            >
+              {isStoreDefault ? "This layout is your store default" : "Set this layout as store default"}
+            </button>
           </CfgCard>
 
           {/* Vehicle */}
@@ -694,27 +725,38 @@ const UsedCarSticker = () => {
                   </div>
                 )}
 
-                {/* Equipment list */}
-                {equipment.filter(Boolean).length > 0 && (
-                  <div className="border-b border-foreground">
-                    <button onClick={() => setShowEquipment(!showEquipment)} className="w-full flex items-center justify-between px-5 py-2 text-[9px] font-bold text-foreground uppercase tracking-wider hover:bg-muted/30 no-print">
-                      <span>Standard & Optional Equipment ({equipment.filter(Boolean).length})</span>
-                      {showEquipment ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
-                    </button>
-                    {showEquipment && (
-                      <div className="px-5 pb-2 grid grid-cols-2 gap-x-4 gap-y-0.5">
-                        {equipment.filter(Boolean).map((item, i) => (
-                          <p key={i} className="text-[9px] text-foreground flex items-center gap-1">
-                            {iconStyle === "icons" && <Zap className="w-2.5 h-2.5 text-teal flex-shrink-0" />}
-                            {iconStyle === "graphics" && <span className="text-[8px]">✓</span>}
-                            {iconStyle === "minimal" && <span className="text-[8px] text-muted-foreground">•</span>}
-                            {item.trim()}
-                          </p>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                )}
+                {/* Equipment list — curated for print; the QR carries the full list */}
+                {equipment.filter(Boolean).length > 0 && (() => {
+                  const { shown, remainder } = curatePrintEquipment(equipment, mode === "equipment_only" ? 60 : 24);
+                  return (
+                    <div className="border-b border-foreground">
+                      <button onClick={() => setShowEquipment(!showEquipment)} className="w-full flex items-center justify-between px-5 py-2 text-[9px] font-bold text-foreground uppercase tracking-wider hover:bg-muted/30 no-print">
+                        <span>Feature Highlights ({equipment.filter(Boolean).length} total)</span>
+                        {showEquipment ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+                      </button>
+                      <p className="hidden print:block px-5 pt-2 text-[9px] font-bold text-foreground uppercase tracking-wider">Feature Highlights</p>
+                      {showEquipment && (
+                        <>
+                          <div className="px-5 pb-1 grid grid-cols-2 gap-x-4 gap-y-0.5">
+                            {shown.map((item, i) => (
+                              <p key={i} className="text-[9px] text-foreground flex items-center gap-1">
+                                {iconStyle === "icons" && <Zap className="w-2.5 h-2.5 text-teal flex-shrink-0" />}
+                                {iconStyle === "graphics" && <span className="text-[8px]">✓</span>}
+                                {iconStyle === "minimal" && <span className="text-[8px] text-muted-foreground">•</span>}
+                                {item.trim()}
+                              </p>
+                            ))}
+                          </div>
+                          {remainder > 0 && (
+                            <p className="px-5 pb-2 text-[8px] text-muted-foreground">
+                              + {remainder} more factory features — scan the QR code for the complete equipment list.
+                            </p>
+                          )}
+                        </>
+                      )}
+                    </div>
+                  );
+                })()}
 
                 {/* Description */}
                 {vehicle.description && (
