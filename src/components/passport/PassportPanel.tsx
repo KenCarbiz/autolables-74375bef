@@ -1479,6 +1479,10 @@ function buildPanel(key: PassportPanelKey, d: PassportData, listing: VehicleList
     }
 
     case "key-specs": {
+      // Technical Specifications Intelligence Panel — the engineering
+      // sibling of the equipment panel: same xl drawer, stat cards,
+      // benefit-framed highlights, and grouped spec cards. Missing values
+      // render as an intentional "Pending OEM data" state, never invented.
       const ks = listing.key_specs || {};
       const mcr = mc;
       const ksr = ks as Record<string, unknown>;
@@ -1487,65 +1491,205 @@ function buildPanel(key: PassportPanelKey, d: PassportData, listing: VehicleList
       const hp = mcr.horsepower != null ? `${mcr.horsepower} hp` : A(["horsepower"]);
       const mpg = ks.mpg_city && ks.mpg_hwy ? `${ks.mpg_city}/${ks.mpg_hwy} MPG` : A(["mpg", "combined_mpg"]);
       const seating = mcr.seating != null ? `${mcr.seating}-passenger` : A(["seating", "seats"]);
-      const quick: [string, string | null][] = [
-        ["Engine", ks.engine ? String(ks.engine) : A(["engine"])],
-        ["Transmission", ks.transmission ? String(ks.transmission) : A(["transmission"])],
-        ["Drivetrain", ks.drivetrain ? String(ks.drivetrain) : A(["drivetrain", "drive_type"])],
-        ["Horsepower", hp],
-        ["Torque", A(["torque"])],
-        ["Fuel Economy", mpg],
-        ["Fuel Type", ks.fuel ? String(ks.fuel) : A(["fuel", "fuel_type"])],
-        ["Towing", A(["towing", "towing_capacity", "max_towing"])],
-        ["Payload", A(["payload", "payload_capacity"])],
-      ];
+      const engineV = ks.engine ? String(ks.engine) : A(["engine"]);
+      const transV = ks.transmission ? String(ks.transmission) : A(["transmission"]);
+      const driveV = ks.drivetrain ? String(ks.drivetrain) : A(["drivetrain", "drive_type"]);
+      const fuelV = ks.fuel ? String(ks.fuel) : A(["fuel", "fuel_type"]);
       const perfRows: [string, string | null][] = [
-        ["Engine", ks.engine ? String(ks.engine) : A(["engine"])],
+        ["Engine", engineV],
         ["Displacement", A(["displacement", "engine_displacement"])],
         ["Horsepower", hp],
         ["Torque", A(["torque"])],
-        ["Transmission", ks.transmission ? String(ks.transmission) : null],
-        ["Drive Type", ks.drivetrain ? String(ks.drivetrain) : A(["drive_type"])],
-        ["Fuel Tank Capacity", A(["fuel_tank", "fuel_capacity", "tank_capacity"])],
-        ["Fuel Economy", mpg],
+        ["Transmission", transV],
+        ["Drive Type", driveV],
         ["0–60 mph", A(["0_60", "zero_to_sixty", "zero_sixty"])],
         ["Top Speed", A(["top_speed"])],
       ];
       const dimRows: [string, string | null][] = [
-        ["Wheelbase", A(["wheelbase"])], ["Length", A(["length", "overall_length"])], ["Width", A(["width", "overall_width"])],
-        ["Height", A(["height", "overall_height"])], ["Ground Clearance", A(["ground_clearance"])], ["Turning Radius", A(["turning_radius"])],
-        ["Cargo Capacity", A(["cargo", "cargo_capacity", "cargo_volume"])], ["Passenger Volume", A(["passenger_volume"])], ["Seating Capacity", seating],
+        ["Length", A(["length", "overall_length"])], ["Width", A(["width", "overall_width"])], ["Height", A(["height", "overall_height"])],
+        ["Wheelbase", A(["wheelbase"])], ["Ground Clearance", A(["ground_clearance"])], ["Turning Radius", A(["turning_radius"])],
+        ["Passenger Volume", A(["passenger_volume"])], ["Cargo Capacity", A(["cargo", "cargo_capacity", "cargo_volume"])], ["Seating Capacity", seating],
       ];
       const wheelRows: [string, string | null][] = [
         ["Wheel Size", A(["wheel_size", "wheels"])], ["Tire Size", A(["tire_size", "tires"])], ["Spare Tire", A(["spare_tire", "spare"])],
-        ["Wheel Material", A(["wheel_material"])], ["Recommended Tire Pressure", A(["tire_pressure"])],
+        ["Wheel Material", A(["wheel_material"])], ["Brakes", A(["brakes"])],
+      ];
+      const fuelRows: [string, string | null][] = [
+        ["Fuel Type", fuelV], ["City MPG", ks.mpg_city ? String(ks.mpg_city) : null], ["Highway MPG", ks.mpg_hwy ? String(ks.mpg_hwy) : null],
+        ["Combined MPG", A(["combined_mpg"])], ["Fuel Tank Capacity", A(["fuel_tank", "fuel_capacity", "tank_capacity"])],
+        ["Towing", A(["towing", "towing_capacity", "max_towing"])], ["Payload", A(["payload", "payload_capacity"])],
       ];
       const mechRows: [string, string | null][] = [
         ["Front Suspension", A(["front_suspension"])], ["Rear Suspension", A(["rear_suspension"])], ["Steering", A(["steering"])],
-        ["Brakes", A(["brakes"])], ["Battery", A(["battery"])], ["Alternator", A(["alternator"])], ["Hybrid System", A(["hybrid_system"])],
-        ["EV Battery", A(["ev_battery", "battery_capacity"])], ["Charging", A(["charging", "charge_time"])],
+        ["Battery", A(["battery"])], ["Hybrid System", A(["hybrid_system"])], ["EV Battery", A(["ev_battery", "battery_capacity"])], ["Charging", A(["charging", "charge_time"])],
       ];
       const safety = groups.Safety || [];
-      const hasAny = quick.some(([, v]) => v);
+      const hasAny = [engineV, transV, driveV, hp, mpg, fuelV, ...dimRows.map(([, v]) => v)].some(Boolean);
+      const counts = (rows: [string, string | null][]) => ({ ok: rows.filter(([, v]) => v).length, pending: rows.filter(([, v]) => !v).length });
+      const corePending = [engineV, transV, driveV, mpg].some((v) => !v) || [hp].some((v) => !v);
+
+      const specStat = (label: string, value: string | null, helper: string, iconName: string) => {
+        const Icon = getEquipmentIcon(iconName).icon;
+        return (
+          <div className="rounded-2xl border border-[#DDE5EE] bg-white p-3.5 flex flex-col gap-1.5">
+            <span className="w-8 h-8 rounded-lg bg-[#EAF4FF] text-[#0B6FEA] flex items-center justify-center"><Icon className="w-4 h-4" strokeWidth={1.75} /></span>
+            <p className="text-[10.5px] font-semibold text-[#64748B] leading-tight">{label}</p>
+            <p className={`text-[15px] font-extrabold leading-tight ${value ? "text-[#0D1B2A]" : "text-[#94A3B8]"}`}>{value ?? "Pending"}</p>
+            <p className="text-[10px] text-[#94A3B8]">{helper}</p>
+          </div>
+        );
+      };
+      const specRow = ([k, v]: [string, string | null]) => (
+        <div key={k} className="flex items-center justify-between gap-3 py-1.5 text-[12.5px] border-b border-[#F1F5F9] last:border-0">
+          <span className="text-[#64748B]">{k}</span>
+          {v ? <span className="font-bold text-[#10202B] text-right">{v}</span> : <span className="text-[11px] font-semibold text-[#94A3B8]">Pending OEM data</span>}
+        </div>
+      );
+      const specCard = (title: string, rows: [string, string | null][], helper?: string) => {
+        const c = counts(rows);
+        if (c.ok === 0) return (
+          <div className={`${CARD} p-4`}>
+            <p className="text-[13.5px] font-bold text-[#0D1B2A]">{title}</p>
+            <p className="text-[12px] text-[#94A3B8] mt-1.5">Pending OEM data — confirm details with the dealership.</p>
+          </div>
+        );
+        return (
+          <div className={`${CARD} p-4`}>
+            <p className="text-[13.5px] font-bold text-[#0D1B2A]">{title}</p>
+            <div className="mt-1.5">{rows.map(specRow)}</div>
+            {helper && <p className="text-[10.5px] text-[#94A3B8] mt-2">{helper}</p>}
+          </div>
+        );
+      };
+      // Benefit-framed engineering highlights from available specs only.
+      const highlights: { title: string; benefit: string; iconName: string }[] = ([
+        engineV ? { title: `${engineV} Engine`, benefit: "Strong, smooth power delivery for confident acceleration.", iconName: engineV } : null,
+        driveV ? { title: /awd|4wd|4x4/i.test(driveV) ? `${driveV} Traction` : driveV, benefit: /awd|4wd|4x4/i.test(driveV) ? "Added grip for changing weather and road conditions." : "Tuned for efficient everyday driving.", iconName: driveV } : null,
+        transV ? { title: transV, benefit: /manual|paddle|sport/i.test(transV) ? "Easy daily driving with added driver control when wanted." : "Smooth, effortless shifting.", iconName: transV } : null,
+        mpg ? { title: `${mpg} Efficiency`, benefit: "Designed to balance performance and daily usability.", iconName: `${mpg} mpg` } : null,
+        fuelV ? { title: fuelV, benefit: "Fuel requirement shown clearly before purchase.", iconName: `${fuelV} fuel type` } : null,
+        hp ? { title: hp, benefit: "Confident passing and merging power.", iconName: "engine horsepower" } : null,
+        seating ? { title: seating, benefit: "Space planned for people first.", iconName: "seating" } : null,
+      ] as ({ title: string; benefit: string; iconName: string } | null)[]).filter(Boolean).slice(0, 6) as { title: string; benefit: string; iconName: string }[];
+      const catRows: { name: string; iconName: string; rows: [string, string | null][] }[] = [
+        { name: "Performance & Drivetrain", iconName: "engine", rows: perfRows },
+        { name: "Dimensions & Space", iconName: "seating", rows: dimRows },
+        { name: "Fuel & Efficiency", iconName: "fuel type", rows: fuelRows },
+        { name: "Wheels, Tires & Brakes", iconName: "wheels", rows: wheelRows },
+        { name: "Mechanical & Chassis", iconName: "dealer add-on", rows: mechRows },
+      ];
       return {
-        title: "Technical Specifications", subtitle: "Everything you need to know about this vehicle's engineering",
+        title: "Technical Specifications",
+        subtitle: "Everything you need to know about this vehicle's engineering, size, and capability",
+        xl: true,
         primary: { label: "Reserve This Vehicle", onClick: () => go("reserve") },
+        secondary: { label: "View Equipment", onClick: () => openPanel("equipment") },
         footerQuestion: "Questions about the specifications?", specialistLabel: "Talk to a Product Specialist",
         body: <>
-          <div className="md:hidden"><MHero tone="blue" icon={FileText} eyebrow="Technical Specifications" title={listing.ymm || "Specifications"} note={[ks.engine ? String(ks.engine) : null, ks.drivetrain ? String(ks.drivetrain) : null].filter(Boolean).join(" · ") || "Verified vehicle details"} /></div>
+          <div className="md:hidden"><MHero tone="blue" icon={FileText} eyebrow="Technical Specifications" title={listing.ymm || "Specifications"} note={[engineV, driveV].filter(Boolean).join(" · ") || "Verified vehicle details"} /></div>
           {hasAny ? (
             <>
-              <Section title="Quick specs">
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">{quick.map(([k, v]) => (
-                  <div key={k} className={`${CARD} p-3`}><p className="text-[11px] text-[#94A3B8] leading-tight">{k}</p><p className={`text-[13px] font-extrabold mt-0.5 leading-tight ${v ? "text-[#0F172A]" : "text-[#CBD5E1]"}`}>{v ?? "Pending"}</p></div>
-                ))}</div>
-              </Section>
-              <SpecGroup title="Performance" rows={perfRows} />
-              <SpecGroup title="Dimensions" rows={dimRows} />
-              <SpecGroup title="Wheels & Tires" rows={wheelRows} />
-              <Section title="Safety & driver assistance">
-                {safety.length ? <div className={`${CARD} p-4`}><ul className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">{safety.map((s) => <Check key={s}>{s}</Check>)}</ul></div> : <Empty>Safety equipment appears here as the vehicle's data is decoded.</Empty>}
-              </Section>
-              <SpecGroup title="Mechanical" rows={mechRows} />
+              {/* Vehicle context line */}
+              <p className="text-[12.5px] font-semibold text-[#334155] -mt-1">{[listing.ymm, listing.trim, engineV, driveV, transV].filter(Boolean).join(" · ")}</p>
+
+              {/* Quick spec stat cards */}
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                {specStat("Engine", engineV, "Performance", engineV || "engine")}
+                {specStat("Drivetrain", driveV, "Traction", driveV || "awd")}
+                {specStat("Transmission", transV, transV && /manual|paddle/i.test(transV) ? "Manual Mode" : "Shifting", transV || "automatic")}
+                {specStat("Fuel Economy", mpg, ks.mpg_city && ks.mpg_hwy ? "City / Hwy" : "Economy", "mpg fuel economy")}
+              </div>
+
+              {/* Data confidence banner — state, not breakage */}
+              {corePending ? (
+                <div className="rounded-xl border border-amber-200 bg-[#FFF7E6] px-3.5 py-2.5 flex items-start gap-2">
+                  <AlertTriangle className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
+                  <p className="text-[12px] text-amber-800 leading-snug">Some specifications are pending OEM data. Confirm final details with the dealership.</p>
+                </div>
+              ) : (
+                <div className="rounded-xl border border-blue-100 bg-[#EAF4FF] px-3.5 py-2.5 flex items-start gap-2">
+                  <FileText className="w-4 h-4 text-[#0B6FEA] shrink-0 mt-0.5" />
+                  <p className="text-[12px] text-[#1E3A8A] leading-snug">Specifications are decoded from available vehicle data and organized for easier review.</p>
+                </div>
+              )}
+
+              {/* Two-column interior */}
+              <div className="grid grid-cols-1 md:grid-cols-[minmax(0,62fr)_minmax(0,38fr)] gap-5 items-start">
+                <div className="space-y-5 min-w-0">
+                  {highlights.length > 0 && (
+                    <Section title="Key Engineering Highlights" sub="The core technical details that define how this vehicle drives.">
+                      <div className="grid grid-cols-2 gap-3">
+                        {highlights.map((h) => {
+                          const HIcon = getEquipmentIcon(h.iconName).icon;
+                          return (
+                            <div key={h.title} className={`${CARD} p-3.5 flex flex-col items-center text-center gap-1.5`}>
+                              <span className="w-10 h-10 rounded-xl bg-[#EAF4FF] flex items-center justify-center"><HIcon className="w-5 h-5 text-[#0B6FEA]" strokeWidth={1.75} /></span>
+                              <p className="text-[12px] font-bold leading-tight text-[#0D1B2A]">{h.title}</p>
+                              <p className="text-[10.5px] text-[#64748B] leading-snug">{h.benefit}</p>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </Section>
+                  )}
+
+                  <Section title="Technical Specs by Category" sub="Browse specifications by engineering area.">
+                    <div className="space-y-2">
+                      {catRows.map((c) => {
+                        const cc = counts(c.rows);
+                        const CIcon = getEquipmentIcon(c.iconName).icon;
+                        return (
+                          <details key={c.name} className={`${CARD} overflow-hidden group`}>
+                            <summary className="cursor-pointer list-none flex items-center gap-3 px-4 py-3">
+                              <span className="w-8 h-8 rounded-lg bg-[#EAF4FF] flex items-center justify-center shrink-0"><CIcon className="w-4 h-4 text-[#0B6FEA]" strokeWidth={1.75} /></span>
+                              <span className="text-[13px] font-bold text-[#0F172A] flex-1 min-w-0 truncate">{c.name}</span>
+                              <span className="text-[11px] font-semibold text-[#94A3B8] shrink-0">{cc.ok ? `${cc.ok} available` : "Pending OEM data"}{cc.ok && cc.pending ? ` · ${cc.pending} pending` : ""}</span>
+                              <ChevronDown className="w-4 h-4 text-[#94A3B8] group-open:rotate-180 transition-transform shrink-0" />
+                            </summary>
+                            <div className="px-4 pb-3">{c.rows.map(specRow)}</div>
+                          </details>
+                        );
+                      })}
+                      {safety.length > 0 && (
+                        <details className={`${CARD} overflow-hidden group`}>
+                          <summary className="cursor-pointer list-none flex items-center gap-3 px-4 py-3">
+                            <span className="w-8 h-8 rounded-lg bg-[#EAF4FF] flex items-center justify-center shrink-0"><ShieldCheck className="w-4 h-4 text-[#0B6FEA]" strokeWidth={1.75} /></span>
+                            <span className="text-[13px] font-bold text-[#0F172A] flex-1 min-w-0 truncate">Safety Systems</span>
+                            <span className="text-[11px] font-semibold text-[#94A3B8] shrink-0">{safety.length} available</span>
+                            <ChevronDown className="w-4 h-4 text-[#94A3B8] group-open:rotate-180 transition-transform shrink-0" />
+                          </summary>
+                          <div className="px-4 pb-3 grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1.5">{safety.map((sf) => <Check key={sf}>{sf}</Check>)}</div>
+                        </details>
+                      )}
+                    </div>
+                  </Section>
+
+                  <details className={`${CARD} overflow-hidden group`}>
+                    <summary className="cursor-pointer list-none flex items-center justify-between gap-3 px-4 py-3.5">
+                      <span className="min-w-0">
+                        <span className="block text-[13px] font-bold text-[#0F172A] leading-tight">Complete Specifications Reference</span>
+                        <span className="block text-[11px] text-[#94A3B8] leading-tight mt-0.5">Full technical list for detail-oriented shoppers</span>
+                      </span>
+                      <ChevronDown className="w-4 h-4 text-[#94A3B8] group-open:rotate-180 transition-transform shrink-0" />
+                    </summary>
+                    <div className="px-4 pb-4 space-y-4">
+                      {catRows.map((c) => (
+                        <div key={c.name}>
+                          <p className="text-[11px] font-bold uppercase tracking-wide text-[#94A3B8] mb-1">{c.name}</p>
+                          {c.rows.map(specRow)}
+                        </div>
+                      ))}
+                    </div>
+                  </details>
+                </div>
+
+                <div className="space-y-5 min-w-0">
+                  {specCard("Performance & Drivetrain", perfRows)}
+                  {specCard("Dimensions & Space", dimRows, "Vehicle dimensions help estimate garage fit, passenger space, and road presence.")}
+                  {specCard("Wheels, Tires & Brakes", wheelRows)}
+                  {specCard("Fuel & Efficiency", fuelRows)}
+                </div>
+              </div>
             </>
           ) : <Empty>Specifications appear here as the vehicle's data is decoded from its VIN.</Empty>}
           <Disclaimer />
