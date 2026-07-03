@@ -343,3 +343,111 @@ export function getAutoLabelsToolIcon(iconKey: AutoLabelsToolIconKey, options?: 
   const size = options?.size ?? (variant === "sidebar" ? 20 : 16);
   return <Icon width={size} height={size} />;
 }
+
+// ── Print-document icons (Saturday addendum & label templates) ────────
+// Same locked style; keyed separately so print templates never import
+// generic icon sets. Accent strokes follow the same CSS variable.
+const VinIcon = (p: IconProps) => (
+  <Svg {...p}>
+    <rect x="3" y="6" width="18" height="12" rx="1.5" />
+    <path d="M6.5 9.5v5M9.5 9.5v5M12 9.5v5M15 9.5v5M17.5 9.5v5" stroke={ACCENT} strokeWidth={1.5} />
+  </Svg>
+);
+const StockTagIcon = (p: IconProps) => (
+  <Svg {...p}>
+    <path d="M3.5 12.5v-7A2 2 0 0 1 5.5 3.5h7L20.5 11.5a2 2 0 0 1 0 2.85l-6.15 6.15a2 2 0 0 1-2.85 0Z" />
+    <circle cx="8" cy="8" r="1.5" stroke={ACCENT} />
+  </Svg>
+);
+const DateIcon = (p: IconProps) => (
+  <Svg {...p}>
+    <rect x="3.5" y="5" width="17" height="15.5" rx="2" />
+    <path d="M3.5 9.5h17M8 3v4M16 3v4" />
+    <path d="M8 13.5h3M8 17h3M14 13.5h2.5" stroke={ACCENT} strokeWidth={1.75} />
+  </Svg>
+);
+const PriceTagIcon = (p: IconProps) => (
+  <Svg {...p}>
+    <path d="M3.5 12.5v-7A2 2 0 0 1 5.5 3.5h7L20.5 11.5a2 2 0 0 1 0 2.85l-6.15 6.15a2 2 0 0 1-2.85 0Z" />
+    <path d="M9.5 12.5c0-1 .8-1.5 1.75-1.5s1.75.5 1.75 1.5-.8 1.5-1.75 1.5-1.75.5-1.75 1.5.8 1.5 1.75 1.5 1.75-.5 1.75-1.5M11.25 9.75v1.25M11.25 17v1.25" stroke={ACCENT} strokeWidth={1.75} />
+  </Svg>
+);
+const PassportShieldIcon = (p: IconProps) => (
+  <Svg {...p}>
+    <path d="M12 2.75 18.75 5.25v5c0 4.1-2.6 6.7-6.75 8.25-4.15-1.55-6.75-4.15-6.75-8.25v-5Z" />
+    <path d="m12 7 1.1 2.25 2.5.35-1.8 1.75.4 2.45L12 12.65l-2.2 1.15.4-2.45-1.8-1.75 2.5-.35Z" stroke={ACCENT} strokeWidth={1.75} />
+  </Svg>
+);
+const RibbonQualityIcon = (p: IconProps) => (
+  <Svg {...p}>
+    <circle cx="12" cy="9" r="5.5" />
+    <path d="m9.5 8.75 1.75 1.75 3.25-3.25" stroke={ACCENT} />
+    <path d="m9 13.75-1.5 6 4.5-2.5 4.5 2.5-1.5-6" />
+  </Svg>
+);
+const InstallWrenchIcon = (p: IconProps) => (
+  <Svg {...p}>
+    <path d="M14.9 6a4.1 4.1 0 0 0-5.55 5.55L4 16.9 7.1 20l5.35-5.35A4.1 4.1 0 0 0 18 9.1l-2.35 2.35-2.5-.6-.6-2.5Z" />
+    <path d="m16.5 17.75 1.1 1.1 2-2.1" stroke={ACCENT} />
+  </Svg>
+);
+const AddedValueIcon = (p: IconProps) => (
+  <Svg {...p}>
+    <path d="M7.5 11.5 12 4l1.5 4.5h4L14 12l1 6-3-2-3 2 .5-4.5" />
+    <path d="M4 20.5h16" stroke={ACCENT} />
+  </Svg>
+);
+const PeaceOfMindIcon = (p: IconProps) => (
+  <Svg {...p}>
+    <path d="M12 2.75 18.75 5.25v5c0 4.1-2.6 6.7-6.75 8.25-4.15-1.55-6.75-4.15-6.75-8.25v-5Z" />
+    <path d="M12 7.5c1.5-1.4 4-.4 4 1.6 0 1.9-2.4 3.4-4 4.4-1.6-1-4-2.5-4-4.4 0-2 2.5-3 4-1.6Z" stroke={ACCENT} strokeWidth={1.75} />
+  </Svg>
+);
+const AiPoweredIcon = (p: IconProps) => (
+  <Svg {...p}>
+    <path d="M12 3.5 13.6 8l4.4 1.6-4.4 1.6L12 15.6l-1.6-4.4L6 9.6 10.4 8Z" />
+    <path d="m18.5 15 .8 1.95 1.95.8-1.95.8-.8 1.95-.8-1.95-1.95-.8 1.95-.8Z" stroke={ACCENT} />
+  </Svg>
+);
+const FtcCompliantIcon = (p: IconProps) => (
+  <Svg {...p}>
+    <circle cx="12" cy="12" r="8.5" />
+    <path d="m8.5 12 2.4 2.4 4.6-4.9" stroke={ACCENT} />
+  </Svg>
+);
+const RealTimeIcon = (p: IconProps) => (
+  <Svg {...p}>
+    <path d="M4.5 12a7.5 7.5 0 0 1 12.9-5.2M19.5 12a7.5 7.5 0 0 1-12.9 5.2" />
+    <path d="M17.5 3.5v3.5H14M6.5 20.5V17H10" stroke={ACCENT} />
+  </Svg>
+);
+const PrintReadyIcon = (p: IconProps) => (
+  <Svg {...p}>
+    <path d="M7 8V3.5h10V8M7 17.5H4.5V10a2 2 0 0 1 2-2h11a2 2 0 0 1 2 2v7.5H17" />
+    <rect x="7" y="14.5" width="10" height="6" rx="1" stroke={ACCENT} />
+  </Svg>
+);
+const BenefitCheckIcon = (p: IconProps) => (
+  <Svg {...p}>
+    <circle cx="12" cy="12" r="8.5" stroke={ACCENT} />
+    <path d="m8.5 12 2.4 2.4 4.6-4.9" />
+  </Svg>
+);
+const UpgradePlusIcon = (p: IconProps) => (
+  <Svg {...p}>
+    <circle cx="12" cy="12" r="8.5" />
+    <path d="M12 8.5v7M8.5 12h7" stroke={ACCENT} />
+  </Svg>
+);
+
+export type AutoLabelsPrintIconKey =
+  | "vin" | "stock" | "date" | "price" | "passport"
+  | "quality" | "install" | "value" | "peace"
+  | "ai" | "ftc" | "updates" | "print" | "benefit" | "upgrade";
+
+export const AL_PRINT_ICONS: Record<AutoLabelsPrintIconKey, (p: IconProps) => ReactNode> = {
+  vin: VinIcon, stock: StockTagIcon, date: DateIcon, price: PriceTagIcon, passport: PassportShieldIcon,
+  quality: RibbonQualityIcon, install: InstallWrenchIcon, value: AddedValueIcon, peace: PeaceOfMindIcon,
+  ai: AiPoweredIcon, ftc: FtcCompliantIcon, updates: RealTimeIcon, print: PrintReadyIcon,
+  benefit: BenefitCheckIcon, upgrade: UpgradePlusIcon,
+};

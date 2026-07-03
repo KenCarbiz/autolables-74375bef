@@ -231,7 +231,7 @@ const SATURDAY_CONFIGS: Record<string, StickerTemplateConfig> = {
     id: "addendum-saturday-premium",
     name: "Saturday Premium Addendum",
     styleTags: ["Modern", "Readability", "Compliance"],
-    useCase: "4.5x11 companion addendum strip for Saturday window stickers",
+    useCase: "4.25x11 premium branded addendum with passport QR, equipment, benefits, and upgrades",
     complianceNote: "Summarizes dealer-installed equipment and optional upgrades; full disclosure packet remains in the QR passport.",
   }),
 };

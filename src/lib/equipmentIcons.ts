@@ -183,6 +183,12 @@ const KEYWORD_RULES: { re: RegExp; num: number }[] = [
   { re: /\b(hybrid|hev)\b|\bgas.?electric\b/, num: 3 },
   { re: /\b(electric|ev|phev|plug.?in|battery electric)\b/, num: 4 },
   { re: /\bengine\b|\bv6\b|\bv8\b|\bcylinder\b|\bhorsepower\b|\bpowertrain\b|\b\d\.\d\s?l\b|\b\d\.\dl\b/, num: 1 },
+  // Dealer-installed protection products (addendum line items)
+  { re: /\bwindow tint|tint\b/, num: 14 },
+  { re: /\bpaint protection|ppf\b|\bceramic coat/, num: 14 },
+  { re: /\bwheel lock/, num: 15 },
+  { re: /\bfloor (mat|liner)|all.?weather mat/, num: 64 },
+  { re: /\bnitrogen\b|\bdoor edge guard|\bpinstripe/, num: 64 },
   // Exterior
   { re: /\b(premium|special|pearl|metallic|tri.?coat) paint\b/, num: 14 },
   { re: /\b(alloy|aluminum)\b|\bwheels?\b|\brims\b|\b\d{2}.?inch wheel/, num: 15 },
