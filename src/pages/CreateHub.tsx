@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
-  FileText, Car, Sparkles, Award, TrendingUp, ScrollText, Plus, Search,
-  ChevronRight, Clock, Lightbulb, Printer, Globe, ArrowRight, Signature,
+  FileText, Plus, Search, ChevronRight, Clock, Lightbulb, ArrowRight,
 } from "lucide-react";
+import { ToolIconBadge, type AutoLabelsToolIconKey, type ToolCategory } from "@/components/icons/AutoLabelsToolIcons";
 import { supabase } from "@/integrations/supabase/client";
 
 // /create — the AutoLabels creation hub. One data-driven launchpad for the
@@ -11,15 +11,18 @@ import { supabase } from "@/integrations/supabase/client";
 // and a right rail with real recent activity and the recommended workflow.
 // Routing to each builder is unchanged; this page only organizes entry.
 
+type ChipLabel = "Most Used" | "FTC Required" | "Compliance" | "Template" | "AI Tool" | "Sticker";
+
 interface CreateTool {
   id: string;
   title: string;
   description: string;
   category: "Compliance & Documents" | "Labels & Stickers" | "AI & Merchandising";
-  icon: typeof FileText;
+  iconKey: AutoLabelsToolIconKey;
+  iconCategory: ToolCategory;
   route: string;
   tags: string[];
-  badge?: "Most used" | "Recommended" | "Template";
+  chip?: ChipLabel;
   isQuickStart?: boolean;
   // Future tenant-level visibility hook: resolve per-dealer config here
   // rather than hardcoding — nothing else in the page assumes every tool
@@ -28,15 +31,15 @@ interface CreateTool {
 }
 
 const TOOLS: CreateTool[] = [
-  { id: "new-addendum", title: "New Addendum", description: "Add-on products + disclosures for a deal.", category: "Compliance & Documents", icon: FileText, route: "/addendum", tags: ["addendum", "products", "disclosures", "deal", "compliance"], badge: "Most used", isQuickStart: true },
-  { id: "buyers-guide", title: "Buyers Guide", description: "FTC Used Car Buyers Guide.", category: "Compliance & Documents", icon: ScrollText, route: "/buyers-guide", tags: ["buyers guide", "ftc", "used", "compliance", "as-is", "warranty"], badge: "Most used", isQuickStart: true },
-  { id: "used-vehicle-docs", title: "Used Vehicle Docs", description: "Buyers Guide + K-208 packet.", category: "Compliance & Documents", icon: ScrollText, route: "/used-vehicle-documents", tags: ["docs", "documents", "packet", "k-208", "inspection", "compliance"], badge: "Template" },
-  { id: "cpo-sheet", title: "CPO Info Sheet", description: "Certified Pre-Owned program sheet.", category: "Compliance & Documents", icon: Award, route: "/cpo-sheet", tags: ["cpo", "certified", "program", "warranty"], badge: "Template" },
-  { id: "used-car-sticker", title: "Used Car Sticker", description: "Window sticker for a used vehicle.", category: "Labels & Stickers", icon: Car, route: "/used-car-sticker", tags: ["sticker", "label", "used", "window"], badge: "Most used", isQuickStart: true },
-  { id: "new-car-sticker", title: "New Car Sticker", description: "Monroney-style new-car window label.", category: "Labels & Stickers", icon: FileText, route: "/new-car-sticker", tags: ["sticker", "label", "new", "monroney", "window"] },
-  { id: "trade-up-sticker", title: "Trade-Up Sticker", description: "Promotional trade-up sticker.", category: "Labels & Stickers", icon: TrendingUp, route: "/trade-up", tags: ["sticker", "trade", "trade-up", "promo"], badge: "Template" },
-  { id: "sticker-studio", title: "Sticker Studio", description: "Choose a style & create a sticker template.", category: "Labels & Stickers", icon: Sparkles, route: "/sticker-studio", tags: ["sticker", "studio", "template", "style", "label"], badge: "Template" },
-  { id: "description-writer", title: "Description Writer", description: "AI listing copy per marketplace.", category: "AI & Merchandising", icon: Sparkles, route: "/description-writer", tags: ["ai", "description", "copy", "listing", "marketplace", "merchandising"], badge: "Recommended", isQuickStart: true },
+  { id: "new-addendum", title: "New Addendum", description: "Add-on products + disclosures for a deal.", category: "Compliance & Documents", iconKey: "new-addendum", iconCategory: "document", route: "/addendum", tags: ["addendum", "products", "disclosures", "deal", "compliance"], chip: "Most Used", isQuickStart: true },
+  { id: "buyers-guide", title: "Buyers Guide", description: "FTC Used Car Buyers Guide.", category: "Compliance & Documents", iconKey: "buyers-guide", iconCategory: "compliance", route: "/buyers-guide", tags: ["buyers guide", "ftc", "used", "compliance", "as-is", "warranty"], chip: "FTC Required", isQuickStart: true },
+  { id: "used-vehicle-docs", title: "Used Vehicle Docs", description: "Buyers Guide + K-208 packet.", category: "Compliance & Documents", iconKey: "used-vehicle-docs", iconCategory: "compliance", route: "/used-vehicle-documents", tags: ["docs", "documents", "packet", "k-208", "inspection", "compliance"], chip: "Compliance" },
+  { id: "cpo-sheet", title: "CPO Info Sheet", description: "Certified Pre-Owned program sheet.", category: "Compliance & Documents", iconKey: "cpo-info-sheet", iconCategory: "document", route: "/cpo-sheet", tags: ["cpo", "certified", "program", "warranty"], chip: "Template" },
+  { id: "used-car-sticker", title: "Used Car Sticker", description: "Window sticker for a used vehicle.", category: "Labels & Stickers", iconKey: "used-car-sticker", iconCategory: "sticker", route: "/used-car-sticker", tags: ["sticker", "label", "used", "window"], chip: "Most Used", isQuickStart: true },
+  { id: "new-car-sticker", title: "New Car Sticker", description: "Monroney-style new-car window label.", category: "Labels & Stickers", iconKey: "new-car-sticker", iconCategory: "sticker", route: "/new-car-sticker", tags: ["sticker", "label", "new", "monroney", "window"], chip: "Sticker" },
+  { id: "trade-up-sticker", title: "Trade-Up Sticker", description: "Promotional trade-up sticker.", category: "Labels & Stickers", iconKey: "trade-up-sticker", iconCategory: "sticker", route: "/trade-up", tags: ["sticker", "trade", "trade-up", "promo"], chip: "Template" },
+  { id: "sticker-studio", title: "Sticker Studio", description: "Choose a style & create a sticker template.", category: "Labels & Stickers", iconKey: "sticker-studio", iconCategory: "sticker", route: "/sticker-studio", tags: ["sticker", "studio", "template", "style", "label"], chip: "Template" },
+  { id: "description-writer", title: "Description Writer", description: "AI listing copy per marketplace.", category: "AI & Merchandising", iconKey: "description-writer", iconCategory: "ai", route: "/description-writer", tags: ["ai", "description", "copy", "listing", "marketplace", "merchandising"], chip: "AI Tool", isQuickStart: true },
 ];
 
 const CATEGORIES: { name: CreateTool["category"]; sub: string }[] = [
@@ -45,18 +48,22 @@ const CATEGORIES: { name: CreateTool["category"]; sub: string }[] = [
   { name: "AI & Merchandising", sub: "AI-powered content to help you sell." },
 ];
 
-const badgeCls = (b: NonNullable<CreateTool["badge"]>) =>
-  b === "Most used" ? "bg-blue-50 text-blue-700 border-blue-100"
-  : b === "Recommended" ? "bg-violet-50 text-violet-700 border-violet-100"
+const badgeCls = (b: ChipLabel) =>
+  b === "Most Used" ? "bg-blue-50 text-blue-700 border-blue-100"
+  : b === "FTC Required" ? "bg-[#EEF6FF] text-[#0F5E8C] border-[#cfe4f5]"
+  : b === "Compliance" ? "bg-[#EEF6FF] text-[#0F5E8C] border-[#cfe4f5]"
+  : b === "AI Tool" ? "bg-violet-50 text-violet-700 border-violet-100"
+  : b === "Sticker" ? "bg-[#EDF7FF] text-[#0077C8] border-[#cfe7f7]"
   : "bg-slate-100 text-slate-600 border-slate-200";
 
-// Creation-shaped audit actions → recent list rows.
-const RECENT_ACTIONS: Record<string, { label: string; icon: typeof FileText; cls: string }> = {
-  listing_published: { label: "Published to shopper portal", icon: Globe, cls: "bg-emerald-50 text-emerald-600" },
-  addendum_signed: { label: "Addendum signed", icon: Signature, cls: "bg-violet-50 text-violet-600" },
-  deal_signed: { label: "Deal jacket signed", icon: Signature, cls: "bg-fuchsia-50 text-fuchsia-600" },
-  document_archived: { label: "Signed document archived", icon: FileText, cls: "bg-slate-100 text-slate-600" },
-  prep_sign_off_signed: { label: "Prep sign-off completed", icon: Printer, cls: "bg-teal-50 text-teal-600" },
+// Creation-shaped audit actions → recent list rows, using the branded
+// registry: signed/completed states render in the service-green family.
+const RECENT_ACTIONS: Record<string, { label: string; iconKey: AutoLabelsToolIconKey; category: ToolCategory }> = {
+  listing_published: { label: "Published to shopper portal", iconKey: "used-car-sticker", category: "service" },
+  addendum_signed: { label: "Addendum signed", iconKey: "new-addendum", category: "service" },
+  deal_signed: { label: "Deal jacket signed", iconKey: "deals", category: "service" },
+  document_archived: { label: "Signed document archived", iconKey: "used-vehicle-docs", category: "document" },
+  prep_sign_off_signed: { label: "Prep sign-off completed", iconKey: "prep-install", category: "service" },
 };
 
 const timeAgo = (iso: string): string => {
@@ -122,8 +129,8 @@ export default function CreateHub() {
     <button key={t.id} onClick={() => open(t)}
       className="group text-left rounded-2xl border border-border bg-card p-4 hover:border-primary hover:shadow-[0_8px_24px_-12px_rgba(37,99,235,0.25)] transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-primary">
       <div className="flex items-start justify-between gap-2">
-        <span className="grid place-items-center w-11 h-11 rounded-xl bg-primary/10 text-primary shrink-0 group-hover:bg-primary/15 transition-colors"><t.icon className="w-5 h-5" /></span>
-        {t.badge && <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${badgeCls(t.badge)}`}>{t.badge}</span>}
+        <ToolIconBadge iconKey={t.iconKey} category={t.iconCategory} variant="quick" />
+        {t.chip && <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${badgeCls(t.chip)}`}>{t.chip}</span>}
       </div>
       <p className="font-semibold text-foreground leading-tight mt-3">{t.title}</p>
       <p className="text-xs text-muted-foreground mt-1 leading-snug">{t.description}</p>
@@ -134,12 +141,12 @@ export default function CreateHub() {
   const rowCard = (t: CreateTool) => (
     <button key={t.id} onClick={() => open(t)}
       className="group w-full text-left rounded-2xl border border-border bg-card px-4 py-3.5 hover:border-primary hover:bg-muted/30 transition-colors flex items-center gap-3 min-h-[84px] focus:outline-none focus-visible:ring-2 focus-visible:ring-primary">
-      <span className="grid place-items-center w-10 h-10 rounded-xl bg-primary/10 text-primary shrink-0 group-hover:bg-primary/15 transition-colors"><t.icon className="w-5 h-5" /></span>
+      <ToolIconBadge iconKey={t.iconKey} category={t.iconCategory} variant="row" />
       <span className="min-w-0 flex-1">
         <span className="block font-semibold text-foreground leading-tight">{t.title}</span>
         <span className="block text-xs text-muted-foreground mt-0.5 leading-snug">{t.description}</span>
       </span>
-      {t.badge && <span className={`hidden sm:inline-flex text-[10px] font-bold px-2 py-0.5 rounded-full border shrink-0 ${badgeCls(t.badge)}`}>{t.badge}</span>}
+      {t.chip && <span className={`hidden sm:inline-flex text-[10px] font-bold px-2 py-0.5 rounded-full border shrink-0 ${badgeCls(t.chip)}`}>{t.chip}</span>}
       <ChevronRight className="w-4 h-4 text-muted-foreground/60 group-hover:text-primary group-hover:translate-x-0.5 transition-all shrink-0" />
     </button>
   );
@@ -227,10 +234,9 @@ export default function CreateHub() {
                 {recent.map((r) => {
                   const meta = RECENT_ACTIONS[r.action];
                   const detail = (r.details?.ymm as string) || (r.details?.vin as string) || null;
-                  const Icon = meta.icon;
                   return (
                     <li key={r.id} className="flex items-center gap-2.5 py-1.5">
-                      <span className={`grid place-items-center w-7 h-7 rounded-lg shrink-0 ${meta.cls}`}><Icon className="w-3.5 h-3.5" /></span>
+                      <span className="scale-[0.72] origin-left -mr-2"><ToolIconBadge iconKey={meta.iconKey} category={meta.category} variant="row" /></span>
                       <span className="min-w-0 flex-1">
                         <span className="block text-[12px] font-semibold text-foreground leading-tight truncate">{meta.label}</span>
                         {detail && <span className="block text-[10.5px] text-muted-foreground truncate">{detail}</span>}

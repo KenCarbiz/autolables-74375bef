@@ -62,6 +62,7 @@ import Logo from "@/components/brand/Logo";
 import CommandPalette, { useCommandPalette } from "@/components/layout/CommandPalette";
 import { ALL_PRODUCTS } from "@/components/layout/AppSwitcher";
 import { VinScanContext, prefersLiveScanner } from "@/contexts/VinScanContext";
+import { toolIcon } from "@/components/icons/AutoLabelsToolIcons";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -78,7 +79,7 @@ interface AppShellProps {
 interface NavItem {
   label: string;
   path: string;
-  icon: typeof LayoutDashboard;
+  icon: React.ElementType;
   badge?: string | number;
   featureKey?: string;
   requireManager?: boolean;
@@ -158,43 +159,43 @@ const AppShell = ({ children }: AppShellProps) => {
       title: "",
       defaultOpen: true,
       items: [
-        { label: "Home", path: "/dashboard", icon: LayoutDashboard, capability: "can_view_dashboard" },
-        { label: "Inventory", path: "/inventory", icon: Car, capability: "can_view_inventory" },
-        { label: "Deals", path: "/saved", icon: FolderOpen, capability: "can_view_deals" },
+        { label: "Home", path: "/dashboard", icon: toolIcon("home"), capability: "can_view_dashboard" },
+        { label: "Inventory", path: "/inventory", icon: toolIcon("inventory"), capability: "can_view_inventory" },
+        { label: "Deals", path: "/saved", icon: toolIcon("deals"), capability: "can_view_deals" },
       ],
     },
     create: {
       title: "CREATE",
       defaultOpen: true,
       items: [
-        { label: "Create", path: "/create", icon: Sparkles, capability: "can_create_documents" },
+        { label: "Create", path: "/create", icon: toolIcon("create"), capability: "can_create_documents" },
       ],
     },
     getready: {
       title: "GET READY",
       defaultOpen: true,
       items: [
-        { label: "Recon Approvals", path: "/recon", icon: Wrench, capability: "can_view_get_ready" },
-        { label: "Prep & Install", path: "/prep", icon: Wrench, capability: "can_view_get_ready" },
-        { label: "Service Desk", path: "/service", icon: Wrench, capability: "can_view_get_ready" },
-        { label: "Ready Board", path: "/ready-board", icon: CheckCircle2, capability: "can_view_get_ready" },
+        { label: "Recon Approvals", path: "/recon", icon: toolIcon("recon-approvals"), capability: "can_view_get_ready" },
+        { label: "Prep & Install", path: "/prep", icon: toolIcon("prep-install"), capability: "can_view_get_ready" },
+        { label: "Service Desk", path: "/service", icon: toolIcon("service-desk"), capability: "can_view_get_ready" },
+        { label: "Ready Board", path: "/ready-board", icon: toolIcon("ready-board"), capability: "can_view_get_ready" },
       ],
     },
     compliance: {
       title: "COMPLIANCE",
       defaultOpen: false,
       items: [
-        { label: "Compliance Center", path: "/compliance", icon: BookOpen, capability: "can_view_compliance" },
-        { label: "Document Review", path: "/dashboard/document-review", icon: FileWarning, capability: "can_view_compliance" },
-        { label: "Audit Log", path: "/admin?tab=audit", icon: ShieldCheck, capability: "can_view_compliance" },
+        { label: "Compliance Center", path: "/compliance", icon: toolIcon("compliance-center"), capability: "can_view_compliance" },
+        { label: "Document Review", path: "/dashboard/document-review", icon: toolIcon("document-review"), capability: "can_view_compliance" },
+        { label: "Audit Log", path: "/admin?tab=audit", icon: toolIcon("audit-log"), capability: "can_view_compliance" },
       ],
     },
     settings: {
       title: "SETTINGS",
       defaultOpen: false,
       items: [
-        { label: "Settings", path: "/admin", icon: Settings, capability: "can_manage_settings" },
-        { label: "Setup", path: "/setup", icon: Rocket, capability: "can_manage_settings" },
+        { label: "Settings", path: "/admin", icon: toolIcon("settings"), capability: "can_manage_settings" },
+        { label: "Setup", path: "/setup", icon: toolIcon("setup"), capability: "can_manage_settings" },
         { label: "Reports", path: "/dashboard/reports", icon: BarChart3, capability: "can_view_reports" },
       ],
     },
