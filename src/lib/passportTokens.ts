@@ -8,4 +8,4 @@ export const GREEN = "#16A34A";
 
 // The standard elevated passport card: rounded, hairline border, soft shadow.
 export const CARD =
-  "rounded-2xl border border-[#E6E8EC] bg-white shadow-[0_1px_2px_rgba(0,0,0,0.04),0_8px_24px_rgba(0,0,0,0.05)]";
+  "rounded-2xl border border-[#E6E8EC] bg-white shadow-[0_1px_2px_rgba(0,0,0,0.04),0_8px_24px_rgba(0,0,0,0.05)] print:break-inside-avoid print:shadow-none";

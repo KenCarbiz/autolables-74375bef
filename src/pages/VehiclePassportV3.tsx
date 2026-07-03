@@ -42,12 +42,23 @@ import { BLUE, GREEN, CARD } from "@/lib/passportTokens";
 
 const TEXT2 = "text-[#64748B]";
 
+const V3_PRINT = `
+@page { size: Letter portrait; margin: 0.5in; }
+@media print {
+  html, body { background: #fff !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .lg\\:sticky, [class*="sticky"] { position: static !important; top: auto !important; }
+  [data-module] { break-inside: avoid; page-break-inside: avoid; }
+  main { padding-bottom: 0 !important; }
+  button[aria-label] { display: none !important; }
+}
+`;
+
 const abbrevDrive = (s: string) => s.replace(/all[- ]?wheel drive/i, "AWD").replace(/front[- ]?wheel drive/i, "FWD").replace(/rear[- ]?wheel drive/i, "RWD").replace(/(four|4)[- ]?wheel drive/i, "4WD");
 
 const H2 = ({ children }: { children: React.ReactNode }) => <h2 className="text-[20px] font-bold leading-7 tracking-tight text-[#0F172A]">{children}</h2>;
 const H3 = ({ children }: { children: React.ReactNode }) => <h3 className="text-[16px] font-semibold leading-6 text-[#0F172A]">{children}</h3>;
 const Link = ({ onClick, children, className = "" }: { onClick: () => void; children: React.ReactNode; className?: string }) => (
-  <button onClick={onClick} className={`text-[13px] font-semibold text-[#2563EB] inline-flex items-center gap-1 hover:underline ${className}`}>{children} <ArrowRight className="w-3.5 h-3.5" /></button>
+  <button onClick={onClick} className={`text-[13px] font-semibold text-[#2563EB] inline-flex items-center gap-1 hover:underline print:hidden ${className}`}>{children} <ArrowRight className="w-3.5 h-3.5" /></button>
 );
 
 const Stars = ({ n, size = 16 }: { n: number; size?: number }) => (
@@ -436,14 +447,15 @@ const VehiclePassportV3 = () => {
 
   return (
     <div className="min-h-screen bg-[#F6F7F9] text-[#0F172A]" style={{ fontFamily: "Inter, -apple-system, BlinkMacSystemFont, sans-serif" }}>
+      <style>{V3_PRINT}</style>
       <Helmet><title>{`${listing.ymm}${listing.trim ? ` ${listing.trim}` : ""} — ${d.dealerName}`}</title><meta name="description" content={`${listing.ymm}${price != null ? ` · ${fmt$(price)}` : ""} · ${d.dealerName}`} />{isPreview && <meta name="robots" content="noindex" />}</Helmet>
 
       {isPreview && (
-        <div className="bg-amber-500 text-white text-center text-[12px] font-bold py-1.5 px-4">SAMPLE PREVIEW — design layout with placeholder data. Not a real listing.</div>
+        <div className="bg-amber-500 text-white text-center text-[12px] font-bold py-1.5 px-4 print:hidden">SAMPLE PREVIEW — design layout with placeholder data. Not a real listing.</div>
       )}
 
       {/* Top bar */}
-      <header className="border-b border-[#E6E8EC] bg-white">
+      <header className="border-b border-[#E6E8EC] bg-white print:hidden">
         <div className="mx-auto max-w-[1320px] px-4 sm:px-5 h-16 flex items-center justify-between">
           {listing.dealer_snapshot?.logo_url ? <img src={listing.dealer_snapshot.logo_url as string} alt="" className="h-7" /> : <Logo variant="full" size={22} />}
           <div className="flex items-center gap-3 sm:gap-5">
@@ -458,7 +470,7 @@ const VehiclePassportV3 = () => {
       {/* Return path after browsing a sibling listing — sticky so the shopper
           can always get back to the vehicle they started on. */}
       {originBack && (
-        <div className="sticky top-0 z-30 bg-[#0D1B2A] text-white">
+        <div className="sticky top-0 z-30 bg-[#0D1B2A] text-white print:hidden">
           <div className="mx-auto max-w-[1320px] px-4 sm:px-5 h-11 flex items-center justify-between gap-3">
             <a href={`/v/${originBack.slug}${isPreview ? "?preview=1" : ""}`} onClick={() => clearPassportOrigin()} className="inline-flex items-center gap-2 text-[13px] font-semibold min-w-0 hover:underline">
               <ChevronLeft className="w-4 h-4 shrink-0" />
@@ -470,6 +482,21 @@ const VehiclePassportV3 = () => {
       )}
 
       <main className="mx-auto max-w-[1320px] px-4 sm:px-5 py-5 sm:py-6 pb-[calc(92px+env(safe-area-inset-bottom))] lg:pb-6 space-y-6 max-[767px]:space-y-8 lg:space-y-7">
+        <div className="hidden print:block mb-4 pb-3 border-b border-[#E6E8EC]">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              {listing.dealer_snapshot?.logo_url
+                ? <img src={listing.dealer_snapshot.logo_url as string} alt="" className="h-6" />
+                : <span className="text-[15px] font-bold">{d.dealerName}</span>}
+              <p className="text-[15px] font-bold mt-1">{listing.ymm}{listing.trim ? ` ${listing.trim}` : ""}</p>
+            </div>
+            <div className="text-right text-[11px] text-[#64748B]">
+              <p className="text-[18px] font-extrabold text-[#0F172A]">{price != null ? fmt$(price) : ""}</p>
+              <p className="mt-0.5">VIN {listing.vin}</p>
+            </div>
+          </div>
+        </div>
+
         {/* 1–2. TOP ZONE — three-zone hero: gallery · identity · action panel */}
         <section data-module="vehicle-details" className="grid grid-cols-1 lg:grid-cols-[minmax(0,400px)_minmax(0,1fr)_310px] gap-5 items-start">
           {/* Gallery */}
@@ -478,12 +505,12 @@ const VehiclePassportV3 = () => {
               {hero ? <img src={hero} alt={listing.ymm || ""} onClick={() => go("gallery")} className="absolute inset-0 w-full h-full object-cover cursor-zoom-in" /> : <div className="absolute inset-0 flex items-center justify-center text-slate-500"><Car className="w-14 h-14" strokeWidth={1.25} /></div>}
               {photoCount > 0 && <span className="absolute left-3 top-3 text-white text-xs font-semibold px-2.5 py-1 rounded bg-black/60">{idx + 1} / {photoCount}</span>}
               {photoCount > 1 && <>
-                <button onClick={() => setIdx((i) => (i - 1 + photoCount) % photoCount)} className="absolute left-3 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full bg-white/95 hover:bg-white flex items-center justify-center shadow"><ChevronLeft className="w-5 h-5" /></button>
-                <button onClick={() => setIdx((i) => (i + 1) % photoCount)} className="absolute right-3 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full bg-white/95 hover:bg-white flex items-center justify-center shadow"><ChevronRight className="w-5 h-5" /></button>
+                <button onClick={() => setIdx((i) => (i - 1 + photoCount) % photoCount)} className="print:hidden absolute left-3 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full bg-white/95 hover:bg-white flex items-center justify-center shadow"><ChevronLeft className="w-5 h-5" /></button>
+                <button onClick={() => setIdx((i) => (i + 1) % photoCount)} className="print:hidden absolute right-3 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full bg-white/95 hover:bg-white flex items-center justify-center shadow"><ChevronRight className="w-5 h-5" /></button>
               </>}
             </div>
-            {photoCount > 1 && <div className="flex gap-2 mt-2">{gallery.slice(0, 6).map((s, i) => <button key={i} onClick={() => setIdx(i)} className="w-[60px] h-11 rounded-lg overflow-hidden bg-[#e9ecef]" style={{ outline: i === idx ? `2px solid ${BLUE}` : "2px solid transparent", outlineOffset: -2 }}><img src={s} alt="" className="w-full h-full object-cover" /></button>)}{photoCount > 6 && <button onClick={() => go("gallery")} className="w-[60px] h-11 rounded-lg bg-black/70 text-white text-[11px] font-bold">+{photoCount - 6}</button>}</div>}
-            <div className="flex gap-2 mt-2">
+            {photoCount > 1 && <div className="flex gap-2 mt-2 print:hidden">{gallery.slice(0, 6).map((s, i) => <button key={i} onClick={() => setIdx(i)} className="w-[60px] h-11 rounded-lg overflow-hidden bg-[#e9ecef]" style={{ outline: i === idx ? `2px solid ${BLUE}` : "2px solid transparent", outlineOffset: -2 }}><img src={s} alt="" className="w-full h-full object-cover" /></button>)}{photoCount > 6 && <button onClick={() => go("gallery")} className="w-[60px] h-11 rounded-lg bg-black/70 text-white text-[11px] font-bold">+{photoCount - 6}</button>}</div>}
+            <div className="flex gap-2 mt-2 print:hidden">
               <button onClick={() => go("gallery")} className={`flex-1 h-10 rounded-xl border border-[#E6E8EC] bg-white text-[13px] font-semibold inline-flex items-center justify-center gap-1.5 hover:border-[#2563EB]`}><Eye className="w-4 h-4 text-[#2563EB]" /> All Photos ({photoCount})</button>
               {pv("videos") && listing.videos?.length ? <a href={listing.videos[0].url} target="_blank" rel="noreferrer" className="flex-1 h-10 rounded-xl border border-[#E6E8EC] bg-white text-[13px] font-semibold inline-flex items-center justify-center gap-1.5 hover:border-[#2563EB]"><Play className="w-4 h-4 text-[#2563EB]" /> Walkaround Video</a> : null}
             </div>
@@ -564,7 +591,7 @@ const VehiclePassportV3 = () => {
           </div>
 
           {/* Action panel — one sticky checkout-style card */}
-          <div className="lg:sticky lg:top-6">
+          <div className="lg:sticky lg:top-6 print:hidden">
             <div className={`${CARD} p-5`}>
               {price != null && (
                 <div className="hidden lg:block">
@@ -680,7 +707,7 @@ const VehiclePassportV3 = () => {
                   {r.photos.length > 0 && (
                     <div className="grid grid-cols-3 gap-2">{r.photos.slice(0, 9).map((p, i) => <a key={i} href={p} target="_blank" rel="noreferrer" className="block rounded-lg overflow-hidden aspect-square bg-slate-100 hover:opacity-90 transition-opacity"><img src={p} alt="" loading="lazy" className="w-full h-full object-cover" /></a>)}</div>
                   )}
-                  <div className="mt-auto pt-5">
+                  <div className="mt-auto pt-5 print:hidden">
                     <div className="rounded-2xl border border-[#E6E8EC] bg-[#F8FAFC] p-5">
                       <p className="text-[15px] font-bold text-[#0F172A]">This work is already done — and included.</p>
                       <p className="text-[13px] text-[#64748B] mt-1">See your personalized out-the-door price on a vehicle that's been fully prepped and ready to drive home.</p>
@@ -954,7 +981,7 @@ const VehiclePassportV3 = () => {
         {/* FINAL CTA — the strongest conversion moment on the page; the
             floating dock hides while this block is in view. Hidden on small
             screens where the sticky bottom bar already owns this job. */}
-        <section ref={finalCtaRef} className="hidden md:block rounded-2xl p-6 sm:p-7 text-white" style={{ background: "linear-gradient(160deg,#2563EB 0%,#1e50c8 100%)" }}>
+        <section ref={finalCtaRef} className="hidden md:block rounded-2xl p-6 sm:p-7 text-white print:hidden" style={{ background: "linear-gradient(160deg,#2563EB 0%,#1e50c8 100%)" }}>
           <div className="flex flex-col lg:flex-row lg:items-center gap-5 lg:justify-between">
             <div className="flex items-start gap-3">
               <span className="w-11 h-11 rounded-xl bg-white/15 flex items-center justify-center shrink-0"><ShieldCheck className="w-6 h-6" /></span>
@@ -987,7 +1014,7 @@ const VehiclePassportV3 = () => {
               <span className="inline-flex items-center gap-1.5"><ShieldCheck className="w-3.5 h-3.5 text-[#16A34A]" /> VIN-Verified Data</span>
               <span className="inline-flex items-center gap-1.5"><FileText className="w-3.5 h-3.5 text-[#16A34A]" /> Dealer-Provided Documents</span>
             </div>
-            <div className="hidden lg:flex items-center gap-2 text-[12px]">
+            <div className="hidden lg:flex items-center gap-2 text-[12px] print:hidden">
               {sticky.enabled && sticky.items.map((it) => {
                 const a = stickyAction(it.key);
                 return <button key={it.key} onClick={a.onClick} className={`h-10 px-3.5 rounded-xl text-[12px] font-bold inline-flex items-center gap-1.5 transition-colors ${it.primary ? "bg-[#2563EB] text-white hover:bg-[#1d4fd7]" : "border border-[#E6E8EC] text-[#0F172A] hover:border-[#2563EB]"}`}><a.icon className={`w-4 h-4 ${it.primary ? "" : "text-[#2563EB]"}`} /> {it.label}</button>;
@@ -1001,7 +1028,7 @@ const VehiclePassportV3 = () => {
       </main>
 
       {/* Mobile sticky header — slides in after scrolling past the hero. */}
-      <div className={`lg:hidden fixed top-0 inset-x-0 z-40 bg-white/95 backdrop-blur border-b border-[#E6E8EC] transition-transform duration-200 ${showSticky ? "translate-y-0" : "-translate-y-full"}`}>
+      <div className={`lg:hidden print:hidden fixed top-0 inset-x-0 z-40 bg-white/95 backdrop-blur border-b border-[#E6E8EC] transition-transform duration-200 ${showSticky ? "translate-y-0" : "-translate-y-full"}`}>
         <div className="h-14 px-3 flex items-center gap-2.5">
           <button onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })} aria-label="Top" className="w-9 h-9 rounded-full hover:bg-slate-100 flex items-center justify-center shrink-0"><ChevronLeft className="w-5 h-5" /></button>
           {hero && <img src={hero} alt="" className="w-9 h-9 rounded-lg object-cover shrink-0" />}
@@ -1016,7 +1043,7 @@ const VehiclePassportV3 = () => {
           white actions, primary as the filled white pill. Buttons, order,
           primary, and labels are dealer-configurable (admin → Passport CTAs). */}
       {sticky.enabled && sticky.items.length > 0 && (
-        <div className="lg:hidden fixed bottom-0 inset-x-0 z-40 rounded-t-[20px] shadow-[0_-8px_30px_rgba(37,99,235,0.35)] px-3 pt-3 pb-[calc(10px+env(safe-area-inset-bottom))]" style={{ background: "linear-gradient(160deg,#2563EB 0%,#1e50c8 100%)" }}>
+        <div className="lg:hidden print:hidden fixed bottom-0 inset-x-0 z-40 rounded-t-[20px] shadow-[0_-8px_30px_rgba(37,99,235,0.35)] px-3 pt-3 pb-[calc(10px+env(safe-area-inset-bottom))]" style={{ background: "linear-gradient(160deg,#2563EB 0%,#1e50c8 100%)" }}>
           <div className="grid gap-2" style={{ gridTemplateColumns: `repeat(${sticky.items.length}, minmax(0,1fr))` }}>
             {sticky.items.map((it) => {
               const a = stickyAction(it.key);
@@ -1030,19 +1057,21 @@ const VehiclePassportV3 = () => {
         </div>
       )}
 
-      {!finalCtaInView && <PassportCtaDock go={go} dealerPhone={d.dealerPhone || undefined} reviewRating={d.reviewRating} advisor={adv} routing={d.contactRouting} vehicle={{ storeId: listing.store_id, vehicleId: listing.id, vin: listing.vin }} />}
+      {!finalCtaInView && <div className="print:hidden"><PassportCtaDock go={go} dealerPhone={d.dealerPhone || undefined} reviewRating={d.reviewRating} advisor={adv} routing={d.contactRouting} vehicle={{ storeId: listing.store_id, vehicleId: listing.id, vin: listing.vin }} /></div>}
 
-      <PassportInfoModal info={activeInfo} onClose={closeInfo} go={go} openPanel={(k) => setActivePanel(k as PassportPanelKey)} />
+      <div className="print:hidden">
+        <PassportInfoModal info={activeInfo} onClose={closeInfo} go={go} openPanel={(k) => setActivePanel(k as PassportPanelKey)} />
 
-      <PassportPanel
-        panel={activePanel}
-        onClose={closePanel}
-        openPanel={(key) => setActivePanel(key)}
-        d={d}
-        listing={listing}
-        isPreview={isPreview}
-        go={go}
-      />
+        <PassportPanel
+          panel={activePanel}
+          onClose={closePanel}
+          openPanel={(key) => setActivePanel(key)}
+          d={d}
+          listing={listing}
+          isPreview={isPreview}
+          go={go}
+        />
+      </div>
     </div>
   );
 };
