@@ -19,7 +19,7 @@ type Props = { data: Addendum };
 const T = {
   navy: "#0D1B2A", text: "#10202B", muted: "#64748B", border: "#DDE5EE",
   blue: "#0B6FEA", blueSoft: "#EAF4FF", green: "#1F7A4D", greenSoft: "#EAF6EF",
-  purple: "#6D28D9", purpleSoft: "#F4ECFF",
+  purple: "#6D28D9", purpleSoft: "#F4ECFF", gold: "#B45309",
 };
 
 const money = (n: string | number): string | null => {
@@ -28,16 +28,18 @@ const money = (n: string | number): string | null => {
   return `$${Math.round(v).toLocaleString()}`;
 };
 
-// Section header band: tinted strip with a white icon badge + status tag.
-const SectionBar = ({ icon, title, tag, bg, fg }: { icon: AddendumIconKey; title: string; tag?: string; bg: string; fg: string }) => (
-  <div className="flex items-center justify-between px-2.5 py-[7px] rounded-t-[10px]" style={{ background: bg }}>
-    <span className="inline-flex items-center gap-2 text-[9px] font-black uppercase tracking-[0.14em]" style={{ color: fg }}>
+// Section header band: tinted strip with a white icon badge, status tag,
+// and an optional right-aligned section total.
+const SectionBar = ({ icon, title, tag, total, bg, fg }: { icon: AddendumIconKey; title: string; tag?: string; total?: string | null; bg: string; fg: string }) => (
+  <div className="flex items-center justify-between gap-1.5 px-2.5 py-[7px] rounded-t-[10px]" style={{ background: bg }}>
+    <span className="inline-flex items-center gap-1.5 min-w-0 text-[9px] font-black uppercase tracking-[0.12em]" style={{ color: fg }}>
       <span className="flex h-[18px] w-[18px] items-center justify-center rounded-full bg-white shrink-0" style={{ border: `1px solid ${fg}2e` }}>
         <AutoLabelsAddendumIcon iconKey={icon} size={11} color={fg} />
       </span>
-      {title}
+      <span className="truncate">{title}</span>
+      {tag && <span className="shrink-0 text-[6.4px] font-black uppercase tracking-[0.1em] rounded-full px-1.5 py-[2px]" style={{ background: "#ffffff", color: fg, border: `1px solid ${fg}33` }}>{tag}</span>}
     </span>
-    {tag && <span className="text-[6.8px] font-black uppercase tracking-[0.12em] rounded-full px-2 py-[2px]" style={{ background: "#ffffff", color: fg, border: `1px solid ${fg}33` }}>{tag}</span>}
+    {total && <span className="shrink-0 text-[8.6px] font-black uppercase tracking-wide" style={{ color: fg }}><span className="text-[6.6px] tracking-[0.12em] mr-1">Total</span>{total}</span>}
   </div>
 );
 
@@ -48,9 +50,13 @@ export const SaturdayPremiumAddendum: React.FC<Props> = ({ data }) => {
   const installedTotal = installed.reduce((s, l) => s + num(l.price), 0);
   const upgradesTotal = upgrades.reduce((s, l) => s + num(l.price), 0);
   const basePrice = num(vehicle.msrp ?? "") || num(vehicle.price);
-  const priceLabel = (vehicle.msrp ? "MSRP" : (vehicle.priceLabel || dealer.pricingLabel || "Selling Price")).toUpperCase();
-  const totalsLabel = (vehicle.msrp ? "TOTAL MSRP" : priceLabel).toUpperCase();
+  const priceLabel = (vehicle.msrp ? "MSRP (Base Price)" : (vehicle.priceLabel || dealer.pricingLabel || "Selling Price")).toUpperCase();
   const baseDisplay = money(basePrice);
+  // Pricing rule: installed equipment always adds to vehicle value. The
+  // adjusted total is base + installed, every time; available upgrades stay
+  // out of the total because they are optional and not on the vehicle.
+  const adjustedTotal = basePrice > 0 ? basePrice + installedTotal : 0;
+  const adjustedDisplay = money(adjustedTotal);
   // Vehicle title on two uppercase lines: "2027 INFINITI" / "QX60 LUXE".
   const words = (vehicle.title || "").trim().split(/\s+/);
   const line1 = words.slice(0, 2).join(" ");
@@ -159,7 +165,7 @@ export const SaturdayPremiumAddendum: React.FC<Props> = ({ data }) => {
 
         {/* Installed Equipment — green */}
         <section className="mt-2.5 rounded-[10px] border overflow-hidden" style={{ borderColor: "#BFE3CD" }}>
-          <SectionBar icon="protection-products" title="Installed Equipment" tag="Included" bg={T.greenSoft} fg={T.green} />
+          <SectionBar icon="protection-products" title="Installed Equipment" tag="Included" total={money(installedTotal)} bg={T.greenSoft} fg={T.green} />
           {installed.length ? installed.map((l) => lineRow(l, "green")) : (
             <div className="px-2.5 py-2 text-[7.6px] font-semibold" style={{ color: T.muted }}>No installed equipment configured.</div>
           )}
@@ -184,27 +190,37 @@ export const SaturdayPremiumAddendum: React.FC<Props> = ({ data }) => {
         {/* Available Upgrades — purple, NOT INSTALLED */}
         {upgrades.length > 0 && (
           <section className="mt-2.5 rounded-[10px] border overflow-hidden" style={{ borderColor: "#DCCBF5" }}>
-            <SectionBar icon="remote-start" title="Available Upgrades" tag="Not Installed" bg={T.purpleSoft} fg={T.purple} />
+            <SectionBar icon="remote-start" title="Available Upgrades" tag="Not Installed" total={money(upgradesTotal)} bg={T.purpleSoft} fg={T.purple} />
             {upgrades.map((l) => lineRow(l, "purple"))}
           </section>
         )}
 
-        {/* Totals — the bottom-of-products summary with real visual gravity */}
-        <section className="mt-2.5 grid grid-cols-[1fr_1.25fr] rounded-[10px] border-2 overflow-hidden" style={{ borderColor: T.navy }}>
+        {/* Totals — installed equipment always adds to vehicle value. Left:
+            the adjusted total with real gravity; right: the arithmetic a
+            customer can follow line by line. */}
+        <section className="mt-2.5 grid grid-cols-[1fr_1.3fr] rounded-[10px] border-2 overflow-hidden" style={{ borderColor: T.navy }}>
           <div className="px-2.5 py-2.5 border-r flex flex-col justify-center" style={{ borderColor: T.border }}>
-            <div className="text-[7.4px] font-black uppercase tracking-[0.14em]" style={{ color: T.muted }}>{totalsLabel}</div>
-            <div className="mt-1 font-black leading-none tracking-tight" style={{ color: T.navy, fontSize: baseDisplay ? "26px" : "12px" }}>{baseDisplay ?? "See Dealer for Pricing"}</div>
+            <div className="text-[7.4px] font-black uppercase tracking-[0.14em]" style={{ color: T.gold }}>Adjusted Total</div>
+            <div className="mt-1 font-black leading-none tracking-tight" style={{ color: T.gold, fontSize: adjustedDisplay ? "24px" : "11px" }}>{adjustedDisplay ?? "See Dealer for Pricing"}</div>
+            <div className="mt-1 text-[6.2px] font-bold" style={{ color: T.muted }}>Base Price + Installed Equipment</div>
           </div>
-          <div className="px-2.5 py-2.5 flex flex-col justify-center">
-            <div className="flex justify-between text-[8.6px] font-bold" style={{ color: T.text }}>
-              <span>Total Installed Value</span><span style={{ color: T.green }}>{money(installedTotal) ?? "$0"}</span>
+          <div className="px-2.5 py-2 flex flex-col justify-center">
+            <div className="flex justify-between text-[8.2px] font-bold" style={{ color: T.text }}>
+              <span>Base Vehicle Price</span><span>{baseDisplay ?? "See Dealer"}</span>
+            </div>
+            <div className="flex justify-between text-[8.2px] font-bold mt-[3px]" style={{ color: T.text }}>
+              <span>Installed Equipment Value</span><span style={{ color: T.green }}>+ {money(installedTotal) ?? "$0"}</span>
+            </div>
+            <div className="flex justify-between text-[8.6px] font-black mt-[3px] pt-[3px] border-t" style={{ color: T.text, borderColor: T.border }}>
+              <span>Adjusted Total <span className="font-bold text-[6.4px]" style={{ color: T.muted }}>(Includes Installed)</span></span>
+              <span style={{ color: T.gold }}>{adjustedDisplay ?? "—"}</span>
             </div>
             {upgrades.length > 0 && (
-              <div className="flex justify-between text-[8.6px] font-bold mt-[4px]" style={{ color: T.text }}>
-                <span>Total Available Upgrades</span><span style={{ color: T.purple }}>{money(upgradesTotal) ?? "$0"}</span>
+              <div className="flex justify-between text-[8.2px] font-bold mt-[4px]" style={{ color: T.text }}>
+                <span>Available Upgrades Total</span><span style={{ color: T.purple }}>{money(upgradesTotal) ?? "$0"}</span>
               </div>
             )}
-            <div className="mt-1.5 text-[6.6px] font-semibold" style={{ color: T.muted }}>Available upgrades not included in total.</div>
+            <div className="mt-1 text-[6.2px] font-semibold italic" style={{ color: T.muted }}>Available upgrades not included in total.</div>
           </div>
         </section>
 
