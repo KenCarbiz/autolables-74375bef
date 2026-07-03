@@ -12,9 +12,13 @@
 import { json, preflight } from "../_shared/http.ts";
 import { adminClient, isServiceOrCron } from "../_shared/supabase.ts";
 
+// GOOGLE_SEARCH_CONSOLE_API_KEY is the only Google key on this project today;
+// if it's an unrestricted Google Cloud key with Places enabled it works here
+// too, otherwise Places returns 403 and the caller sees places_search_failed.
 const API_KEY = Deno.env.get("GOOGLE_PLACES_API_KEY") ||
   Deno.env.get("GOOGLE_MAPS_API_KEY") ||
-  Deno.env.get("GOOGLE_API_KEY") || "";
+  Deno.env.get("GOOGLE_API_KEY") ||
+  Deno.env.get("GOOGLE_SEARCH_CONSOLE_API_KEY") || "";
 
 const PLACES_BASE = "https://places.googleapis.com/v1";
 
