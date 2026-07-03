@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { useDealerSettings, type DealerSettings } from "@/contexts/DealerSettingsContext";
-import { toast } from "sonner";
-import { Save, Plus, Trash2, Phone, MessageSquare, ShieldCheck, RefreshCw, Users, Clock, Headset } from "lucide-react";
+import { useInstantSave } from "@/hooks/useInstantSave";
+import { Plus, Trash2, Phone, MessageSquare, ShieldCheck, RefreshCw, Users, Clock, Headset } from "lucide-react";
 import {
   resolveCustomerPassportRouting, closedPillCopy, normalizeContactRouting,
   type CustomerPassportContactSettings, type PassportAgent, type ContactMode, type RoutingPriorityItem,
@@ -39,25 +39,20 @@ const PRIORITY_LABEL: Record<RoutingPriorityItem, string> = {
 };
 
 const PassportContactRoutingPanel = () => {
-  const { settings, updateSettings } = useDealerSettings();
+  const { settings, updateSettings, loading: settingsLoading } = useDealerSettings();
   const [cfg, setCfg] = useState<CustomerPassportContactSettings>(() => normalizeContactRouting(settings.passport_contact_routing));
   const [agents, setAgents] = useState<PassportAgent[]>(() => settings.passport_agents || []);
-  const [saving, setSaving] = useState(false);
   const [previewMode, setPreviewMode] = useState<"current" | ContactMode>("current");
   const [previewOpen, setPreviewOpen] = useState(true);
 
   const patch = (p: Partial<CustomerPassportContactSettings>) => setCfg((c) => ({ ...c, ...p }));
   const patchAgent = (i: number, p: Partial<PassportAgent>) => setAgents((a) => a.map((x, j) => (j === i ? { ...x, ...p } : x)));
 
-  const save = async () => {
-    setSaving(true);
-    const ok = await updateSettings({
-      passport_contact_routing: cfg,
-      passport_agents: agents.filter((a) => a.name.trim()),
-    } as Partial<DealerSettings>);
-    setSaving(false);
-    if (ok !== false) toast.success("Contact routing saved");
-  };
+  const routingDraft = useMemo(() => ({
+    passport_contact_routing: cfg,
+    passport_agents: agents.filter((a) => a.name.trim()),
+  }) as Partial<DealerSettings>, [cfg, agents]);
+  useInstantSave(routingDraft, (v) => updateSettings(v), { ready: !settingsLoading, toastId: "contact-routing" });
 
   // Live preview: run the real resolver against the draft. When the admin
   // previews a specific mode that isn't configured yet (BDC disabled, no
@@ -121,14 +116,9 @@ const PassportContactRoutingPanel = () => {
 
   return (
     <div className="space-y-5 max-w-5xl">
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <h2 className="text-[22px] font-bold tracking-tight text-foreground">Customer Passport Contact Routing</h2>
-          <p className="text-sm text-slate-500 mt-1">Control who shoppers reach when they reserve, value a trade, or ask for help. Shoppers only ever see Reserve · Trade · Talk to us — you decide who gets the lead.</p>
-        </div>
-        <button onClick={save} disabled={saving} className="shrink-0 inline-flex items-center gap-1.5 h-10 px-4 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold disabled:opacity-50">
-          <Save className="w-4 h-4" /> {saving ? "Saving…" : "Save"}
-        </button>
+      <div>
+        <h2 className="text-[22px] font-bold tracking-tight text-foreground">Customer Passport Contact Routing</h2>
+        <p className="text-sm text-slate-500 mt-1">Control who shoppers reach when they reserve, value a trade, or ask for help. Shoppers only ever see Reserve · Trade · Talk to us — you decide who gets the lead. Changes save automatically.</p>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-[1fr_360px] gap-5 items-start">

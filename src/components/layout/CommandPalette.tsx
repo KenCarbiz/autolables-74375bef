@@ -30,6 +30,7 @@ import {
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useEntitlements } from "@/hooks/useEntitlements";
+import { useTenant } from "@/contexts/TenantContext";
 import { hasAnyDealerCapability, hasDealerCapability } from "@/lib/permissions/dealerRoleCapabilities";
 import { ADMIN_SETTINGS_INDEX, settingEntryHref } from "@/lib/adminSearchIndex";
 import { useViewTransitionNavigate } from "@/lib/navigation";
@@ -42,12 +43,59 @@ interface CommandPaletteProps {
   onOpenChange: (open: boolean) => void;
 }
 
+interface VehicleHit {
+  id: string;
+  vin: string;
+  ymm: string | null;
+  condition: string | null;
+  status: string | null;
+}
+
 const CommandPalette = ({ open, onOpenChange }: CommandPaletteProps) => {
   const { isAdmin, signOut } = useAuth();
   const { member } = useEntitlements();
+  const { tenant } = useTenant();
   const role = member?.role;
   const navigate = useViewTransitionNavigate();
   const canManageBilling = hasDealerCapability(role, "can_manage_billing", isAdmin);
+
+  // Live vehicle search: a VIN fragment, stock number, or year/make/model
+  // text queries the tenant's vehicle_listings (debounced, max 8) and lands
+  // on the vehicle file. Gated to signed-in members who can view inventory.
+  const tenantId = tenant?.id && tenant.id !== "house" ? tenant.id : null;
+  const canSearchVehicles = !!tenantId && (!!member || isAdmin) && hasDealerCapability(role, "can_view_inventory", isAdmin);
+  const [query, setQuery] = useState("");
+  const [vehicleHits, setVehicleHits] = useState<VehicleHit[]>([]);
+
+  useEffect(() => {
+    if (!open) {
+      setQuery("");
+      setVehicleHits([]);
+    }
+  }, [open]);
+
+  useEffect(() => {
+    const term = query.trim().replace(/[%,"()]/g, " ").replace(/\s+/g, " ").trim();
+    if (!open || !canSearchVehicles || term.length < 3) {
+      setVehicleHits([]);
+      return;
+    }
+    let cancelled = false;
+    const t = setTimeout(async () => {
+      const pattern = `%${term}%`;
+      const { data } = await (supabase as any)
+        .from("vehicle_listings")
+        .select("id, vin, ymm, condition, status")
+        .eq("tenant_id", tenantId)
+        .or(`vin.ilike."${pattern}",ymm.ilike."${pattern}",sticker_snapshot->>stock_number.ilike."${pattern}"`)
+        .limit(8);
+      if (!cancelled) setVehicleHits((data as VehicleHit[]) || []);
+    }, 250);
+    return () => {
+      cancelled = true;
+      clearTimeout(t);
+    };
+  }, [query, open, canSearchVehicles, tenantId]);
 
   const go = (path: string) => {
     onOpenChange(false);
@@ -87,9 +135,35 @@ const CommandPalette = ({ open, onOpenChange }: CommandPaletteProps) => {
 
   return (
     <CommandDialog open={open} onOpenChange={onOpenChange}>
-      <CommandInput placeholder="Search pages, actions, vehicles…" />
+      <CommandInput
+        placeholder="Search vehicles (VIN, stock #, year/make/model), pages, settings…"
+        value={query}
+        onValueChange={setQuery}
+      />
       <CommandList>
         <CommandEmpty>No results found.</CommandEmpty>
+
+        {vehicleHits.length > 0 && (
+          <>
+            <CommandGroup heading="Vehicles">
+              {vehicleHits.map((v) => (
+                <CommandItem
+                  key={v.id}
+                  value={`vehicle:${v.vin}:${v.id}`}
+                  keywords={[query, v.vin, v.ymm || ""]}
+                  onSelect={() => go(`/vehicle-file/${v.id}`)}
+                >
+                  <Car className="w-4 h-4 mr-2" />
+                  <span className="flex-1 min-w-0 truncate">{v.ymm || "Vehicle"}</span>
+                  <span className="ml-2 font-mono text-[11px] text-muted-foreground">
+                    …{v.vin.slice(-8)}{v.status ? ` · ${v.status}` : ""}
+                  </span>
+                </CommandItem>
+              ))}
+            </CommandGroup>
+            <CommandSeparator />
+          </>
+        )}
 
         <CommandGroup heading="Create">
           <CommandItem onSelect={() => go("/inventory?add=1")}>

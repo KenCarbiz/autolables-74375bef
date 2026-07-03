@@ -5,6 +5,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useTenant } from "@/contexts/TenantContext";
 import { toast } from "sonner";
 import { CheckCircle2, MinusCircle, Loader2, RefreshCw, QrCode, AlertTriangle, ShieldCheck, X, Printer, Send, Wrench } from "lucide-react";
+import NextStepBanner from "@/components/workflow/NextStepBanner";
 
 // /ready-board — the used-car manager's daily cockpit. Every car and where it
 // stands across the get-ready stations (Service K-208, Detail, Prep/install,
@@ -127,6 +128,8 @@ export default function ReadyBoard() {
           </button>
         </div>
       </div>
+
+      <NextStepBanner stage="ready-board" />
 
       {stats && (
         <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">

@@ -17,6 +17,7 @@ import { format } from "date-fns";
 import { ShieldCheck, Camera, Check, X, AlertTriangle, Clock, CheckCircle2, ClipboardCheck, FileText, Image as ImageIcon, Upload, FileSignature, ArrowRight, Car, Wrench, ChevronLeft, Plus } from "lucide-react";
 import EmptyState from "@/components/ui/empty-state";
 import { uploadPhoto } from "@/lib/storage";
+import NextStepBanner from "@/components/workflow/NextStepBanner";
 
 const PrepSignOff = () => {
   const { user } = useAuth();
@@ -126,6 +127,7 @@ const PrepSignOff = () => {
       <div className="min-h-screen bg-background p-6">
         <div className="max-w-6xl mx-auto">
           {viewTabs}
+          <div className="mb-6"><NextStepBanner stage="prep" /></div>
           <div className="flex items-center justify-between mb-8">
             <div>
               <h1 className="text-3xl font-bold text-foreground">Prep & Install Sign-Off</h1>

@@ -1,31 +1,24 @@
 import { useState } from "react";
 import { useDealerSettings } from "@/contexts/DealerSettingsContext";
 import { getDealerDocumentRules, DEFAULT_DOCUMENT_RULES, type DocumentRules } from "@/lib/documentRules";
-import { ShieldCheck, RefreshCw, FileSignature, Globe, Save } from "lucide-react";
-import { toast } from "sonner";
+import { useInstantSave } from "@/hooks/useInstantSave";
+import { ShieldCheck, RefreshCw, FileSignature, Globe } from "lucide-react";
 
 // Dealer document workflow rules. Reuses the DealerSettings store
 // (dealer_profiles.settings) via updateSettings — no separate table. Careful
 // language: disclosure review / manager approval / customer acknowledgment.
 export default function DocumentRulesPanel() {
-  const { settings, updateSettings } = useDealerSettings();
+  const { settings, updateSettings, loading: settingsLoading } = useDealerSettings();
   const [draft, setDraft] = useState<DocumentRules>(() => getDealerDocumentRules(settings));
-  const [saving, setSaving] = useState(false);
   const set = (k: keyof DocumentRules, v: boolean) => setDraft((d) => ({ ...d, [k]: v }));
 
-  const save = async () => {
-    setSaving(true);
-    const ok = await updateSettings({ document_rules: draft });
-    setSaving(false);
-    if (ok) toast.success("Document rules saved");
-    else toast.error("Saved locally; couldn't reach the server");
-  };
+  useInstantSave(draft, (v) => updateSettings({ document_rules: v }), { ready: !settingsLoading, delay: 400, toastId: "document-rules" });
 
   return (
     <div className="space-y-5 max-w-3xl">
       <div>
         <h2 className="text-base font-bold text-foreground inline-flex items-center gap-2"><ShieldCheck className="w-4 h-4 text-primary" /> Approval &amp; Review Rules</h2>
-        <p className="text-xs text-muted-foreground mt-0.5">Configure your store's disclosure review, manager approval, and customer acknowledgment workflows for stickers, addendums, and the Vehicle Passport. These are operational workflow settings, not a legal compliance guarantee.</p>
+        <p className="text-xs text-muted-foreground mt-0.5">Configure your store's disclosure review, manager approval, and customer acknowledgment workflows for stickers, addendums, and the Vehicle Passport. Changes save automatically. These are operational workflow settings, not a legal compliance guarantee.</p>
       </div>
 
       <Section title="Approval workflow" icon={ShieldCheck}>
@@ -63,7 +56,6 @@ export default function DocumentRulesPanel() {
       </Section>
 
       <div className="flex items-center gap-3">
-        <button onClick={save} disabled={saving} className="inline-flex items-center gap-1.5 h-9 px-3.5 rounded-md bg-primary text-primary-foreground text-sm font-semibold hover:opacity-90 disabled:opacity-50"><Save className="w-3.5 h-3.5" /> {saving ? "Saving…" : "Save rules"}</button>
         <button onClick={() => setDraft({ ...DEFAULT_DOCUMENT_RULES })} className="text-xs font-semibold text-muted-foreground hover:text-foreground">Reset to defaults</button>
       </div>
     </div>

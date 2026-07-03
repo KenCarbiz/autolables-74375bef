@@ -1,7 +1,7 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useDealerSettings, type DealerSettings } from "@/contexts/DealerSettingsContext";
-import { toast } from "sonner";
-import { Save, Plus, Trash2 } from "lucide-react";
+import { useInstantSave } from "@/hooks/useInstantSave";
+import { Plus, Trash2 } from "lucide-react";
 import type { IihsAward } from "@/lib/iihsAwards";
 
 // Dealer admin: the trust content shown on the Vehicle Passport's
@@ -35,7 +35,7 @@ const ADVISOR_FIELDS: { key: TrustKey; label: string; placeholder: string }[] = 
 ];
 
 const DealershipTrustPanel = () => {
-  const { settings, updateSettings } = useDealerSettings();
+  const { settings, updateSettings, loading: settingsLoading } = useDealerSettings();
   const [cfg, setCfg] = useState<Record<TrustKey, string>>(() => ({
     dealer_years_in_business: settings.dealer_years_in_business || "",
     dealer_satisfaction: settings.dealer_satisfaction || "",
@@ -59,35 +59,25 @@ const DealershipTrustPanel = () => {
     dealer_hours: settings.dealer_hours || "",
     mobile_slideout_cta_variant: settings.mobile_slideout_cta_variant || "dealer_availability",
   }));
-  const [saving, setSaving] = useState(false);
   const [iihsEnabled, setIihsEnabled] = useState<boolean>(settings.iihs_awards_enabled || false);
   const [iihsAwards, setIihsAwards] = useState<IihsAward[]>(settings.iihs_awards || []);
   const [historyLinks, setHistoryLinks] = useState<boolean>(settings.history_report_links_enabled !== false);
 
   const set = (k: TrustKey, v: string) => setCfg((c) => ({ ...c, [k]: v }));
   const patchAward = (i: number, p: Partial<IihsAward>) => setIihsAwards((a) => a.map((x, j) => (j === i ? { ...x, ...p } : x)));
-  const save = async () => {
-    setSaving(true);
-    const ok = await updateSettings({
-      ...cfg,
-      iihs_awards_enabled: iihsEnabled,
-      iihs_awards: iihsAwards.filter((a) => a.year.trim() && a.make.trim() && a.model.trim()),
-      history_report_links_enabled: historyLinks,
-    } as Partial<DealerSettings>);
-    setSaving(false);
-    if (ok !== false) toast.success("Dealership trust content saved");
-  };
+  const draft = useMemo(() => ({
+    ...cfg,
+    iihs_awards_enabled: iihsEnabled,
+    iihs_awards: iihsAwards.filter((a) => a.year.trim() && a.make.trim() && a.model.trim()),
+    history_report_links_enabled: historyLinks,
+  }) as Partial<DealerSettings>, [cfg, iihsEnabled, iihsAwards, historyLinks]);
+  useInstantSave(draft, (v) => updateSettings(v), { ready: !settingsLoading, toastId: "dealership-trust" });
 
   return (
     <div className="space-y-5 max-w-2xl">
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <h2 className="text-[22px] font-bold tracking-tight text-foreground">Why Buy From Us</h2>
-          <p className="text-sm text-slate-500 mt-1">Credibility badges and reviews shown to shoppers on the Vehicle Passport. Every field is optional — only what you fill in appears, so nothing is fabricated.</p>
-        </div>
-        <button onClick={save} disabled={saving} className="shrink-0 inline-flex items-center gap-1.5 h-10 px-4 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold disabled:opacity-50">
-          <Save className="w-4 h-4" /> {saving ? "Saving…" : "Save"}
-        </button>
+      <div>
+        <h2 className="text-[22px] font-bold tracking-tight text-foreground">Why Buy From Us</h2>
+        <p className="text-sm text-slate-500 mt-1">Credibility badges and reviews shown to shoppers on the Vehicle Passport. Every field is optional — only what you fill in appears, so nothing is fabricated. Changes save automatically.</p>
       </div>
 
       <div className="rounded-2xl border border-border bg-card p-4 grid grid-cols-1 sm:grid-cols-2 gap-4">

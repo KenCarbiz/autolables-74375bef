@@ -1,9 +1,11 @@
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useStaleQueue, resolveFlag, type StaleFlag } from "@/lib/stickerStudio/useStaleFlags";
 import { useAuth } from "@/contexts/AuthContext";
 import { logStickerAudit } from "@/lib/stickerStudio/api";
 import { useTenant } from "@/contexts/TenantContext";
-import { AlertTriangle, ArrowLeft, FileWarning, ExternalLink, Check, EyeOff, RefreshCw } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+import { AlertTriangle, ArrowLeft, FileWarning, ExternalLink, Check, EyeOff, RefreshCw, Printer } from "lucide-react";
 import { toast } from "sonner";
 
 const sevMeta: Record<StaleFlag["severity"], { tone: string; label: string }> = {
@@ -21,13 +23,41 @@ const DocumentReview = () => {
   const { tenant } = useTenant();
   const { flags, loading, available, reload } = useStaleQueue();
 
-  const act = async (flag: StaleFlag, status: StaleFlag["status"]) => {
+  const [queueing, setQueueing] = useState<string | null>(null);
+
+  const act = async (flag: StaleFlag, status: StaleFlag["status"], successMessage?: string) => {
     const ok = await resolveFlag(flag.id, status, user?.id);
     if (ok) {
       await logStickerAudit("stale_flag_" + status, { tenantId: tenant?.id, entityType: "generated_document", entityId: flag.generated_document_id || flag.vehicle_id, details: { field: flag.changed_field, severity: flag.severity } });
-      toast.success(`Marked ${status}`);
+      toast.success(successMessage || `Marked ${status}`);
       reload();
     } else toast.error("Action failed");
+  };
+
+  // Resolving a price-change flag usually means the sticker must be
+  // reprinted — queue the VIN into the Print department (vin_queue) so the
+  // review queue hands off to the print queue instead of dead-ending.
+  const queueReprint = async (flag: StaleFlag) => {
+    setQueueing(flag.id);
+    try {
+      const { data: veh } = await (supabase as any)
+        .from("vehicle_listings")
+        .select("vin, mileage")
+        .eq("id", flag.vehicle_id)
+        .maybeSingle();
+      if (!veh?.vin) { toast.error("Couldn't find the vehicle for this flag."); return; }
+      const { error } = await (supabase as any).from("vin_queue").insert({
+        vin: String(veh.vin).toUpperCase(),
+        stock_number: "",
+        mileage: veh.mileage != null ? String(veh.mileage) : "",
+        notes: `Reprint — ${flag.changed_field || "vehicle data"} changed`,
+        status: "queued",
+      });
+      if (error) { toast.error("Couldn't queue the reprint."); return; }
+      await act(flag, "resolved", "Reprint queued and flag resolved");
+    } finally {
+      setQueueing(null);
+    }
   };
 
   if (loading) return <p className="p-6 text-sm text-muted-foreground">Loading review queue…</p>;
@@ -71,6 +101,7 @@ const DocumentReview = () => {
                   </div>
                   <div className="flex items-center gap-1.5 flex-shrink-0">
                     <button onClick={() => navigate(`/vehicle-file/${f.vehicle_id}?tab=labels`)} className="h-7 px-2.5 rounded-md bg-white/70 border border-current/20 text-[11px] font-semibold inline-flex items-center gap-1"><ExternalLink className="w-3 h-3" /> Open vehicle</button>
+                    <button onClick={() => queueReprint(f)} disabled={queueing === f.id} className="h-7 px-2.5 rounded-md bg-white/70 border border-current/20 text-[11px] font-semibold inline-flex items-center gap-1 disabled:opacity-50"><Printer className="w-3 h-3" /> Queue reprint</button>
                     <button onClick={() => act(f, "resolved")} className="h-7 px-2.5 rounded-md bg-white/70 border border-current/20 text-[11px] font-semibold inline-flex items-center gap-1"><Check className="w-3 h-3" /> Resolve</button>
                     <button onClick={() => act(f, "ignored")} className="h-7 px-2.5 rounded-md bg-white/70 border border-current/20 text-[11px] font-semibold inline-flex items-center gap-1"><EyeOff className="w-3 h-3" /> Ignore</button>
                   </div>

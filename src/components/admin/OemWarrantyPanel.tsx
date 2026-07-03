@@ -7,8 +7,8 @@ import {
   UNLIMITED_MILES, isUnlimitedMiles,
 } from "@/lib/oemWarranty";
 import { lookupOemReference } from "@/data/oemWarrantyReference";
-import { Plus, Trash2, ShieldCheck, BadgeCheck, Save, CheckCircle2, Infinity as InfinityIcon, X, Wand2 } from "lucide-react";
-import { toast } from "sonner";
+import { useInstantSave } from "@/hooks/useInstantSave";
+import { Plus, Trash2, ShieldCheck, BadgeCheck, CheckCircle2, Infinity as InfinityIcon, X, Wand2 } from "lucide-react";
 
 // Month/mile number pair. Defined at module scope (NOT inside the panel) so its
 // component identity is stable across re-renders — a nested definition would be
@@ -54,11 +54,16 @@ const Pair = ({ mo, mi, onMo, onMi }: { mo?: number; mi?: number; onMo: (n: numb
 // their CPO programs. New cars surface the matching brand's factory warranty on
 // the passport; CPO cars surface the matching program.
 export default function OemWarrantyPanel() {
-  const { settings, updateSettings } = useDealerSettings();
+  const { settings, updateSettings, loading: settingsLoading } = useDealerSettings();
   const { user } = useAuth();
   const [warranties, setWarranties] = useState<OemFactoryWarranty[]>(settings.oem_factory_warranties || []);
   const [programs, setPrograms] = useState<CpoProgram[]>(settings.cpo_programs || []);
-  const [saving, setSaving] = useState(false);
+
+  const draft = useMemo(
+    () => ({ oem_factory_warranties: warranties, cpo_programs: programs }),
+    [warranties, programs],
+  );
+  useInstantSave(draft, (v) => updateSettings(v), { ready: !settingsLoading, toastId: "oem-warranty" });
 
   // Brands the dealer franchises but hasn't entered terms for yet — one click to add.
   const missingBrands = useMemo(() => {
@@ -93,13 +98,6 @@ export default function OemWarrantyPanel() {
   const addP = (kind: "oem" | "dealer") => setPrograms((prev) => [...prev, emptyCpoProgram(kind)]);
   const removeP = (id: string) => setPrograms((prev) => prev.filter((p) => p.id !== id));
 
-  const save = async () => {
-    setSaving(true);
-    const ok = await updateSettings({ oem_factory_warranties: warranties, cpo_programs: programs });
-    setSaving(false);
-    if (ok) toast.success("Factory & CPO terms saved");
-  };
-
   const input = "w-full h-9 px-2.5 rounded-lg border border-border bg-background text-sm text-foreground outline-none focus:border-primary";
   const num = `${input} tabular-nums`;
   const label = "text-[10px] font-bold uppercase tracking-wider text-muted-foreground";
@@ -107,18 +105,14 @@ export default function OemWarrantyPanel() {
 
   return (
     <div className="space-y-6 max-w-3xl">
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <h2 className="text-base font-bold text-foreground">Factory Warranty &amp; CPO</h2>
-          <p className="text-xs text-muted-foreground mt-0.5 max-w-xl">
-            Verify each franchised brand's OEM factory-warranty terms — new cars show the matching
-            brand's coverage on the customer passport. Only <span className="font-semibold">verified</span> terms
-            are published. Below, list your CPO programs (manufacturer-certified and dealer-certified).
-          </p>
-        </div>
-        <button onClick={save} disabled={saving} className="inline-flex flex-shrink-0 items-center gap-1.5 h-9 px-4 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold shadow-sm disabled:opacity-50">
-          <Save className="w-4 h-4" /> {saving ? "Saving…" : "Save"}
-        </button>
+      <div>
+        <h2 className="text-base font-bold text-foreground">Factory Warranty &amp; CPO</h2>
+        <p className="text-xs text-muted-foreground mt-0.5 max-w-xl">
+          Verify each franchised brand's OEM factory-warranty terms — new cars show the matching
+          brand's coverage on the customer passport. Only <span className="font-semibold">verified</span> terms
+          are published. Below, list your CPO programs (manufacturer-certified and dealer-certified).
+          Changes save automatically.
+        </p>
       </div>
 
       {/* ── OEM factory warranty by brand ── */}

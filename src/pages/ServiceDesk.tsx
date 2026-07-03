@@ -9,6 +9,7 @@ import { K208_CERTIFICATION_TEXT } from "@/data/ctK208Form";
 import { buildConsentRecord, hashPayload, fetchClientIp } from "@/lib/esign";
 import { uploadPhoto } from "@/lib/storage";
 import { Loader2, Search, QrCode, ShieldCheck, FileText, Upload, CheckCircle2, Copy, X } from "lucide-react";
+import NextStepBanner from "@/components/workflow/NextStepBanner";
 
 // /service — desktop hub for logged-in Service staff. For a chosen vehicle:
 //   1. Generate the no-login QR to hand to a tech (issue_dept_signoff_token)
@@ -54,6 +55,8 @@ export default function ServiceDesk() {
         <h1 className="font-display text-2xl font-bold tracking-tight text-foreground">Service desk</h1>
       </div>
       <p className="text-sm text-muted-foreground -mt-3">Generate a Get-Ready QR for a car, complete the CT K-208 here, or upload the title / MCO.</p>
+
+      <NextStepBanner stage="service" />
 
       <GateSettingCard tenantId={tenantId} />
       <RoleAuthorityCard tenantId={tenantId} />

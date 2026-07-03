@@ -29,7 +29,9 @@ export interface MemberRow {
   tenant_id: string;
   user_id: string | null;
   invited_email: string | null;
-  role: "owner" | "admin" | "manager" | "staff";
+  // Job-role keys from dealerRoleCapabilities (plus legacy manager/staff/
+  // sales/viewer values still stored on older rows).
+  role: string;
   accepted_at: string | null;
   invited_at: string;
 }

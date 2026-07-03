@@ -19,6 +19,9 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { useVinScan } from "@/contexts/VinScanContext";
 import { toast } from "sonner";
 import DealerProgramsPanel from "@/components/admin/DealerProgramsPanel";
+import InstallerInvoicesPanel from "@/components/admin/InstallerInvoicesPanel";
+import PassportPublishingCard from "@/components/admin/PassportPublishingCard";
+import { useInstantSave } from "@/hooks/useInstantSave";
 import { TODAYS_PRICE_MODE_OPTIONS, DEFAULT_TODAYS_PRICE_CUSTOM, resolveTodaysPrice } from "@/lib/todaysPrice";
 import { COMP_STRATEGY_OPTIONS, type CompStrategy } from "@/lib/compStrategy";
 import OemWarrantyPanel from "@/components/admin/OemWarrantyPanel";
@@ -44,7 +47,6 @@ import { format } from "date-fns";
 import { useLeads } from "@/hooks/useLeads";
 import { useVehicleFiles } from "@/hooks/useVehicleFiles";
 import { useGetReady } from "@/hooks/useGetReady";
-import { useInvoices } from "@/hooks/useInvoices";
 import { useWarranty } from "@/hooks/useWarranty";
 import { useSyndicationFeed } from "@/hooks/useSyndicationFeed";
 import { useServiceSticker } from "@/hooks/useServiceSticker";
@@ -268,12 +270,10 @@ const Admin = () => {
   // Get-Ready service catalog config (the work surface lives at /prep)
   const { getPending: getPendingGetReady } = useGetReady(currentStore?.id || "");
   const [svcDraft, setSvcDraft] = useState<GetReadyService[]>(settings.get_ready_services || []);
-  const [svcSaved, setSvcSaved] = useState(false);
   const [svcOpen, setSvcOpen] = useState(false);
-  const saveServices = () => { updateSettings({ get_ready_services: svcDraft }); setSvcSaved(true); setTimeout(() => setSvcSaved(false), 1800); };
+  useInstantSave(svcDraft, (v) => updateSettings({ get_ready_services: v }), { ready: !settingsLoading, toastId: "getready-services" });
 
-  // Invoices, warranty
-  const { invoices, payroll } = useInvoices(currentStore?.id || "");
+  // Warranty
   const { records: warrantyRecords, getExpiringSoon } = useWarranty(currentStore?.id || "");
   const expiringSoon = getExpiringSoon(30);
 
@@ -375,9 +375,11 @@ const Admin = () => {
   // asynchronously — so hydrate the form once they arrive, or the fields look
   // blank and a save would write the empty defaults back.
   const brandingHydratedRef = useRef(false);
+  const [brandingReady, setBrandingReady] = useState(false);
   useEffect(() => {
     if (settingsLoading || brandingHydratedRef.current) return;
     brandingHydratedRef.current = true;
+    setBrandingReady(true);
     setBranding({
       dealer_name: settings.dealer_name,
       dealer_tagline: settings.dealer_tagline,
@@ -410,6 +412,7 @@ const Admin = () => {
     });
   }, [settingsLoading, settings]);
   const [logoUploading, setLogoUploading] = useState(false);
+  useInstantSave(branding, (v) => updateSettings(v), { ready: brandingReady, toastId: "branding" });
 
   // VDP price-extraction "Test" — runs the scraper against a sample URL
   // and returns which configured label matched (or why it didn't), so the
@@ -563,13 +566,6 @@ const Admin = () => {
       toast.success("Rule updated");
     }
     setEditingRule(null);
-  };
-
-  const handleSaveBranding = async () => {
-    const ok = await updateSettings(branding);
-    if (ok) toast.success("Branding saved");
-    // updateSettings already surfaces a clear error toast when the save is
-    // blocked, so don't double-report here.
   };
 
   const handleToggleFeature = (key: keyof DealerSettings) => {
@@ -1576,7 +1572,12 @@ const Admin = () => {
         {/* ─── Branding Tab ─── */}
         {tab === "programs" && <DealerProgramsPanel />}
         {tab === "factory-warranty" && <OemWarrantyPanel />}
-        {tab === "passport-ctas" && <StickyButtonsPanel />}
+        {tab === "passport-ctas" && (
+          <div className="space-y-5">
+            <PassportPublishingCard />
+            <StickyButtonsPanel />
+          </div>
+        )}
         {tab === "passport-trust" && <DealershipTrustPanel />}
         {tab === "passport-routing" && <PassportContactRoutingPanel />}
 
@@ -1585,7 +1586,7 @@ const Admin = () => {
             <div className="bg-card rounded-lg p-4 shadow-sm mb-4">
               <h3 className="text-sm font-bold text-foreground mb-1">Dealership Branding</h3>
               <p className="text-xs text-muted-foreground">
-                Customize how your dealership appears on addendums and buyers guides. These settings apply to all generated documents.
+                Customize how your dealership appears on addendums and buyers guides. These settings apply to all generated documents. Changes save automatically.
               </p>
             </div>
 
@@ -1918,9 +1919,6 @@ const Admin = () => {
               </div>
 
               <div className="flex gap-3">
-                <button onClick={handleSaveBranding} className="px-6 py-2 bg-teal text-primary-foreground rounded font-semibold text-sm">
-                  Save Branding
-                </button>
                 <button
                   onClick={() => {
                     const defaults = {
@@ -2038,7 +2036,7 @@ const Admin = () => {
                 )}
               </div>
               {svcOpen && (<>
-              <p className="text-[11px] text-muted-foreground mt-1">Internal services you can add to any Get-Ready — routed to a responsible party. Non-customer charge; never billed to the buyer.</p>
+              <p className="text-[11px] text-muted-foreground mt-1">Internal services you can add to any Get-Ready — routed to a responsible party. Non-customer charge; never billed to the buyer. Changes save automatically.</p>
               <div className="mt-3 space-y-2">
                 {svcDraft.length === 0 ? (
                   <p className="text-xs text-muted-foreground">No services configured. Add reconditioning, emissions, key cut, etc.</p>
@@ -2052,9 +2050,6 @@ const Admin = () => {
                   </div>
                 ))}
               </div>
-              <div className="mt-3">
-                <button onClick={saveServices} className="px-5 py-2 bg-blue-600 text-white rounded-lg font-semibold text-sm hover:bg-blue-700">{svcSaved ? "Saved" : "Save services"}</button>
-              </div>
               </>)}
             </div>
 
@@ -2062,32 +2057,7 @@ const Admin = () => {
         )}
 
         {/* ─── Invoices Tab ─── */}
-        {tab === "invoices" && (
-          <div className="space-y-4">
-            <h3 className="text-sm font-semibold text-foreground">Installer Invoices</h3>
-            <p className="text-xs text-muted-foreground">Invoices auto-generated from product installations. Payroll entries created automatically.</p>
-            <div className="grid grid-cols-2 gap-3">
-              <StatMini icon={FileText} label="Total Invoices" value={invoices.length} color="text-blue-600" />
-              <StatMini icon={CheckCircle2} label="Payroll Entries" value={payroll.length} color="text-emerald-600" />
-            </div>
-            <div className="bg-card rounded-xl border border-border shadow-premium overflow-hidden">
-              {invoices.length === 0 ? (
-                <p className="px-5 py-8 text-center text-xs text-muted-foreground">No invoices yet. Invoices are created when products are installed via the Get-Ready system.</p>
-              ) : invoices.slice(0, 20).map(inv => (
-                <div key={inv.id} className="px-5 py-3 border-b border-border last:border-0 flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-semibold text-foreground">{inv.vehicle_ymm}</p>
-                    <p className="text-xs text-muted-foreground">Tech: {inv.technician_name} · RO: {inv.ro_number || "—"} · {format(new Date(inv.created_at), "M/d/yy")}</p>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-sm font-bold tabular-nums">${inv.total.toFixed(2)}</p>
-                    <span className={`text-[9px] font-bold uppercase px-1.5 py-0.5 rounded ${inv.status === "paid" ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-700"}`}>{inv.status}</span>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
+        {tab === "invoices" && <InstallerInvoicesPanel />}
 
         {/* ─── Warranty Tab ─── */}
         {tab === "warranty" && (

@@ -1,28 +1,22 @@
 import { useState } from "react";
 import { useDealerSettings } from "@/contexts/DealerSettingsContext";
 import { DealerProgram, emptyProgram, presetProgram, PROGRAM_PRESETS, type ProgramAppliesTo, type ProgramRequirement } from "@/lib/dealerPrograms";
-import { Plus, Trash2, ShieldCheck, GripVertical, Save, Check } from "lucide-react";
-import { toast } from "sonner";
+import { useInstantSave } from "@/hooks/useInstantSave";
+import { Plus, Trash2, ShieldCheck, GripVertical, Check } from "lucide-react";
 
 // Dealer value-proposition programs editor. FTC structure per program:
 // value (title) -> offer -> customer benefit -> disclosure, plus an optional
 // requirement (e.g. must finance) and placement toggles (sticker / packet).
 export default function DealerProgramsPanel() {
-  const { settings, updateSettings } = useDealerSettings();
+  const { settings, updateSettings, loading: settingsLoading } = useDealerSettings();
   const [programs, setPrograms] = useState<DealerProgram[]>(settings.dealer_programs || []);
-  const [saving, setSaving] = useState(false);
 
   const set = (id: string, patch: Partial<DealerProgram>) =>
     setPrograms((prev) => prev.map((p) => (p.id === id ? { ...p, ...patch } : p)));
   const add = () => setPrograms((prev) => [...prev, emptyProgram()]);
   const remove = (id: string) => setPrograms((prev) => prev.filter((p) => p.id !== id));
 
-  const save = async () => {
-    setSaving(true);
-    const ok = await updateSettings({ dealer_programs: programs });
-    setSaving(false);
-    if (ok) toast.success("Dealer programs saved");
-  };
+  useInstantSave(programs, (v) => updateSettings({ dealer_programs: v }), { ready: !settingsLoading, toastId: "dealer-programs" });
 
   const inputCls = "w-full h-9 px-2.5 rounded-lg border border-border bg-background text-sm text-foreground outline-none focus:border-primary";
   const areaCls = "w-full px-2.5 py-2 rounded-lg border border-border bg-background text-sm text-foreground outline-none focus:border-primary resize-y";
@@ -30,21 +24,16 @@ export default function DealerProgramsPanel() {
 
   return (
     <div className="space-y-4 max-w-3xl">
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <h2 className="text-base font-bold text-foreground">Included with the sale</h2>
-          <p className="text-xs text-muted-foreground mt-0.5 max-w-xl">
-            Everything your store includes with a purchase — dealer warranty, loaner vehicles,
-            maintenance, car washes, and any other value you provide. Each item follows the FTC
-            shape: state the value, the offer, the customer benefit, and the disclosure. Choose
-            where each appears (window sticker, customer packet) and any requirement such as
-            financing. These feed the sticker programs block, the addendum's Included Benefits,
-            and the customer passport.
-          </p>
-        </div>
-        <button onClick={save} disabled={saving} className="inline-flex flex-shrink-0 items-center gap-1.5 h-9 px-4 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold shadow-sm disabled:opacity-50">
-          <Save className="w-4 h-4" /> {saving ? "Saving…" : "Save"}
-        </button>
+      <div>
+        <h2 className="text-base font-bold text-foreground">Included with the sale</h2>
+        <p className="text-xs text-muted-foreground mt-0.5 max-w-xl">
+          Everything your store includes with a purchase — dealer warranty, loaner vehicles,
+          maintenance, car washes, and any other value you provide. Each item follows the FTC
+          shape: state the value, the offer, the customer benefit, and the disclosure. Choose
+          where each appears (window sticker, customer packet) and any requirement such as
+          financing. These feed the sticker programs block, the addendum's Included Benefits,
+          and the customer passport. Changes save automatically.
+        </p>
       </div>
 
       {/* One-click starters for the items dealers most commonly include. */}
@@ -66,7 +55,7 @@ export default function DealerProgramsPanel() {
             );
           })}
         </div>
-        <p className="text-[10.5px] text-muted-foreground mt-2">Presets are starting points — edit the wording and disclosure to match your store's actual policy, then Save.</p>
+        <p className="text-[10.5px] text-muted-foreground mt-2">Presets are starting points — edit the wording and disclosure to match your store's actual policy.</p>
       </div>
 
       {programs.length === 0 && (

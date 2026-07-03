@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { useReconEstimates, type ReconEstimate, type ReconLine, type ReconMessage, type NewLine } from "@/hooks/useReconEstimates";
 import { useDealerSettings, type ReconCannedService } from "@/contexts/DealerSettingsContext";
+import NextStepBanner from "@/components/workflow/NextStepBanner";
 import {
   Wrench, CheckCircle2, XCircle, Clock, Plus, Trash2, Printer, MessageSquare, Send, Loader2, Car, ShieldAlert, DollarSign,
 } from "lucide-react";
@@ -96,6 +97,8 @@ export default function ReconBoard() {
         </div>
         <button onClick={() => setShowNew(true)} className="h-10 px-4 rounded-lg bg-primary text-primary-foreground text-sm font-semibold inline-flex items-center gap-1.5"><Plus className="w-4 h-4" /> New estimate</button>
       </div>
+
+      <div className="mb-5"><NextStepBanner stage="recon" /></div>
 
       <div className="grid lg:grid-cols-[minmax(0,380px)_1fr] gap-5">
         {/* List */}

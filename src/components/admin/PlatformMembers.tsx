@@ -1,11 +1,15 @@
 import { useMemo, useState } from "react";
 import { useAdminPlatform, type MemberRow } from "@/hooks/useAdminPlatform";
+import { dealerRoleCapabilityMap, roleDisplayName } from "@/lib/permissions/dealerRoleCapabilities";
 import { toast } from "sonner";
 import { Users, Search, Trash2 } from "lucide-react";
 import { SortHeader, TablePagination, useSortAndPaginate, toCsv, downloadCsv, useTableDensity, DensityToggle } from "./tablePrimitives";
 import { TableEmptyState } from "./TableEmptyState";
 
-const ROLES: MemberRow["role"][] = ["owner", "admin", "manager", "staff"];
+// The full job-role list from the capability source of truth, so this picker
+// can never drift from the access model. Legacy values (staff/sales/viewer)
+// stay valid on existing rows via the (current) fallback option below.
+const ROLES: string[] = Object.keys(dealerRoleCapabilityMap);
 
 const formatDate = (s: string | null) => {
   if (!s) return "—";
@@ -158,11 +162,14 @@ export const PlatformMembers = () => {
                   <td className={rowClass}>
                     <select
                       value={m.role}
-                      onChange={(e) => handleRoleChange(m, e.target.value as MemberRow["role"])}
-                      className="h-8 px-2 rounded-md border border-border bg-background text-xs font-semibold capitalize"
+                      onChange={(e) => handleRoleChange(m, e.target.value)}
+                      className="h-8 px-2 rounded-md border border-border bg-background text-xs font-semibold"
                     >
+                      {!ROLES.includes(m.role) && (
+                        <option value={m.role}>{roleDisplayName(m.role)} (current)</option>
+                      )}
                       {ROLES.map((r) => (
-                        <option key={r} value={r}>{r}</option>
+                        <option key={r} value={r}>{roleDisplayName(r)}</option>
                       ))}
                     </select>
                   </td>

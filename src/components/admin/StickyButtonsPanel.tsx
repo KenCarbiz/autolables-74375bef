@@ -1,21 +1,20 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useDealerSettings } from "@/contexts/DealerSettingsContext";
 import {
   STICKY_BUTTON_OPTIONS, STICKY_LABELS, MAX_STICKY_BUTTONS, DEFAULT_STICKY_BUTTONS,
   validateStickyButtons, type StickyBottomButtons,
 } from "@/lib/stickyButtons";
-import { toast } from "sonner";
-import { ChevronUp, ChevronDown, X, Plus, Save, Star } from "lucide-react";
+import { useInstantSave } from "@/hooks/useInstantSave";
+import { ChevronUp, ChevronDown, X, Plus, Star } from "lucide-react";
 
 // Dealer admin: configure the Vehicle Passport's sticky bottom CTA bar.
 // Choose up to 4 buttons, reorder them, pick the primary, and edit labels.
 const StickyButtonsPanel = () => {
-  const { settings, updateSettings } = useDealerSettings();
+  const { settings, updateSettings, loading: settingsLoading } = useDealerSettings();
   const [cfg, setCfg] = useState<StickyBottomButtons>(() => {
     const s = settings.sticky_bottom_buttons;
     return s && Array.isArray(s.buttons) ? JSON.parse(JSON.stringify(s)) : JSON.parse(JSON.stringify(DEFAULT_STICKY_BUTTONS));
   });
-  const [saving, setSaving] = useState(false);
 
   const reindex = (buttons: StickyBottomButtons["buttons"]) => buttons.map((b, i) => ({ ...b, order: i + 1 }));
   const usedKeys = new Set(cfg.buttons.map((b) => b.key));
@@ -38,24 +37,14 @@ const StickyButtonsPanel = () => {
   const setLabel = (key: string, label: string) => setCfg((c) => ({ ...c, buttons: c.buttons.map((b) => b.key === key ? { ...b, label } : b) }));
 
   const error = validateStickyButtons(cfg);
-  const save = async () => {
-    if (error) { toast.error(error); return; }
-    setSaving(true);
-    const ok = await updateSettings({ sticky_bottom_buttons: { ...cfg, buttons: reindex(cfg.buttons) } });
-    setSaving(false);
-    if (ok !== false) toast.success("Sticky buttons saved");
-  };
+  const draft = useMemo(() => ({ sticky_bottom_buttons: { ...cfg, buttons: reindex(cfg.buttons) } }), [cfg]);
+  useInstantSave(draft, (v) => updateSettings(v), { ready: !settingsLoading, enabled: !error, toastId: "sticky-buttons" });
 
   return (
     <div className="space-y-5 max-w-2xl">
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <h2 className="text-[22px] font-bold tracking-tight text-foreground">Passport Buttons</h2>
-          <p className="text-sm text-slate-500 mt-1">Choose up to {MAX_STICKY_BUTTONS} call-to-action buttons for the sticky bottom bar shown to shoppers on the Vehicle Passport.</p>
-        </div>
-        <button onClick={save} disabled={saving || !!error} className="shrink-0 inline-flex items-center gap-1.5 h-10 px-4 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold disabled:opacity-50">
-          <Save className="w-4 h-4" /> {saving ? "Saving…" : "Save"}
-        </button>
+      <div>
+        <h2 className="text-[22px] font-bold tracking-tight text-foreground">Passport Buttons</h2>
+        <p className="text-sm text-slate-500 mt-1">Choose up to {MAX_STICKY_BUTTONS} call-to-action buttons for the sticky bottom bar shown to shoppers on the Vehicle Passport. Changes save automatically.</p>
       </div>
 
       {/* Enable */}
