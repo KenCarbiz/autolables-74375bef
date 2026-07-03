@@ -5,6 +5,7 @@ import { useTenant } from "@/contexts/TenantContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { useDealerDocumentRules } from "@/lib/documentRules";
 import { useProducts } from "@/hooks/useProducts";
+import { applicablePrograms } from "@/lib/dealerPrograms";
 import { cleanEquipmentList } from "@/lib/passportV2Data";
 import { curatePrintEquipment } from "@/lib/equipmentPanel";
 import { useUsageLimits } from "@/lib/entitlements/useUsageLimits";
@@ -35,7 +36,7 @@ const StickerStudioGenerator = () => {
   const navigate = useNavigate();
   const { byId } = useStickerCatalog();
   const baseTemplate = byId(templateId) || getStudioTemplate(templateId);
-  const { settings } = useDealerSettings();
+  const { settings, loading: settingsLoading } = useDealerSettings();
   const { tenant } = useTenant();
   const { user } = useAuth();
   const rules = useDealerDocumentRules();
@@ -108,7 +109,7 @@ const StickerStudioGenerator = () => {
   useEffect(() => {
     if (seededItems.current || !template) return;
     if (prefill.active && prefill.loading) return;
-    if (products === undefined) return;
+    if (products === undefined || settingsLoading) return;
     seededItems.current = true;
     const cfgNow = template.config;
     const m = mapProductsToStickerItems(products.map((p) => ({
@@ -119,18 +120,26 @@ const StickerStudioGenerator = () => {
     const factory = cfgNow.type === "window" && v && (v.options.length || v.features.length)
       ? curatePrintEquipment(cleanEquipmentList([...v.options, ...v.features]), cfgNow.maxItems.installed).shown
       : [];
+    // Included-with-sale items (dealer warranty, loaner cars, …) fill the
+    // benefits section alongside no-charge products.
+    const programs = applicablePrograms(settings.dealer_programs, v?.condition || "", "sticker");
     setData((prev) => {
       const blank = (arr: StickerLineItem[]) => arr.every((i) => !i.name.trim());
       const installedSeed = [...m.installed, ...factory.map((n) => ({ name: n }))]
         .slice(0, cfgNow.maxItems.installed);
+      const benefitNames = new Set(m.benefits.map((b) => b.name.toLowerCase()));
+      const benefitsSeed = [
+        ...m.benefits,
+        ...programs.filter((p) => !benefitNames.has(p.title.trim().toLowerCase())).map((p) => ({ name: p.title.trim() })),
+      ].slice(0, cfgNow.maxItems.benefits);
       return {
         ...prev,
         installed: blank(prev.installed) && installedSeed.length ? installedSeed : prev.installed,
         upgrades: blank(prev.upgrades) && m.upgrades.length ? m.upgrades.slice(0, cfgNow.maxItems.upgrades) : prev.upgrades,
-        benefits: blank(prev.benefits) && m.benefits.length ? m.benefits.slice(0, cfgNow.maxItems.benefits) : prev.benefits,
+        benefits: blank(prev.benefits) && benefitsSeed.length ? benefitsSeed : prev.benefits,
       };
     });
-  }, [template, products, prefill.active, prefill.loading, prefill.vehicle]);
+  }, [template, products, prefill.active, prefill.loading, prefill.vehicle, settingsLoading, settings.dealer_programs]);
 
   // Seed dealer default benefits + addendum wording from the template
   // customization once, only into an untouched (blank) field.

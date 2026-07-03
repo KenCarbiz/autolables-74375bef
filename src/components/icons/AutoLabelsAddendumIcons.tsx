@@ -38,7 +38,7 @@ export type AddendumIconKey =
   | "engine" | "drivetrain" | "transmission" | "horsepower" | "torque"
   | "fuel-type" | "fuel-economy" | "dimensions" | "wheels-tires" | "brakes"
   | "quality-products" | "expert-installation" | "added-value" | "peace-of-mind"
-  | "autolabels-powered" | "ai-powered" | "ftc-compliant" | "real-time-updates" | "print-ready"
+  | "autolabels-powered" | "ai-powered" | "ftc-aligned" | "ftc-compliant" | "real-time-updates" | "print-ready"
   | "generic-product";
 
 type P = SVGProps<SVGSVGElement>;
@@ -228,6 +228,12 @@ const ICONS: Record<AddendumIconKey, (p: P) => ReactNode> = {
   "ai-powered": (p) => (
     <S {...p}><rect x="6.5" y="6.5" width="11" height="11" rx="2" /><path d="M9.5 3.5v3M14.5 3.5v3M9.5 17.5v3M14.5 17.5v3M3.5 9.5h3M3.5 14.5h3M17.5 9.5h3M17.5 14.5h3" strokeWidth={1.5} /><path d="m10 14.5 2-5 2 5M10.7 13h2.6" strokeWidth={1.5} /></S>
   ),
+  // "FTC Aligned" — never label this "FTC Compliant"; that reads as a legal
+  // certification the platform must not claim. "ftc-compliant" stays as a
+  // back-compat alias for stored template data only.
+  "ftc-aligned": (p) => (
+    <S {...p}><circle cx="12" cy="12" r="8.5" /><path d="m8.5 12 2.4 2.4 4.6-4.9" /></S>
+  ),
   "ftc-compliant": (p) => (
     <S {...p}><circle cx="12" cy="12" r="8.5" /><path d="m8.5 12 2.4 2.4 4.6-4.9" /></S>
   ),
@@ -268,7 +274,7 @@ const KEY_CONTEXT: Partial<Record<AddendumIconKey, AddendumIconContext>> = {
   engine: "spec", drivetrain: "spec", transmission: "spec", horsepower: "spec", torque: "spec",
   "fuel-type": "spec", "fuel-economy": "spec", dimensions: "spec", "wheels-tires": "spec", brakes: "spec",
   "quality-products": "trust", "expert-installation": "trust", "added-value": "trust", "peace-of-mind": "trust",
-  "autolabels-powered": "footer", "ai-powered": "footer", "ftc-compliant": "footer",
+  "autolabels-powered": "footer", "ai-powered": "footer", "ftc-aligned": "footer", "ftc-compliant": "footer",
   "real-time-updates": "footer", "print-ready": "footer",
 };
 

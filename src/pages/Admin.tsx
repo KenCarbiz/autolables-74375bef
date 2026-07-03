@@ -163,7 +163,7 @@ const FEATURE_TOGGLES: { key: keyof DealerSettings; label: string; description: 
   { key: "feature_vin_barcode", label: "VIN Barcode", description: "Show scannable VIN barcode on addendum", status: "active" },
   { key: "feature_product_icons", label: "Product Icons", description: "Show category icons next to products on the addendum", status: "active" },
   { key: "feature_product_rules", label: "Product Rules", description: "Auto-assign products based on vehicle Year/Make/Model/Trim", status: "active" },
-  { key: "feature_buyers_guide", label: "Buyers Guide", description: "Generate FTC-compliant Buyers Guides (As-Is / Implied / Warranty)", status: "active" },
+  { key: "feature_buyers_guide", label: "Buyers Guide", description: "Generate FTC-aligned Buyers Guides (As-Is / Implied / Warranty)", status: "active" },
   { key: "feature_spanish_buyers_guide", label: "Spanish Buyers Guide", description: "Enable Spanish language option for Buyers Guides (FTC-canonical translation per 16 CFR Part 455)", status: "active" },
   { key: "feature_multilang_buyers_guide", label: "Multilang Buyers Guide", description: "Enable Vietnamese / Korean / Chinese options for the FTC Buyers Guide. Dealer-courtesy translations for the California market — verify each language reads correctly for your customer base before enabling.", status: "active" },
   { key: "feature_lead_capture", label: "Lead Capture", description: "Capture customer name, phone, and email when sending QR signing links", status: "active" },
@@ -575,7 +575,7 @@ const Admin = () => {
     { id: "settings", label: "Settings" },
     { id: "branding", label: "Branding" },
     { id: "labels", label: "Label Templates" },
-    { id: "programs", label: "Programs" },
+    { id: "programs", label: "Included with Sale" },
     { id: "factory-warranty", label: "Factory & CPO" },
     { id: "passport-ctas", label: "Passport CTAs" },
     { id: "passport-trust", label: "Passport Trust" },
@@ -750,7 +750,7 @@ const Admin = () => {
             { icon: FileSignature, title: "Build Addendum", subtitle: "Create a signable addendum", onClick: () => navigate("/addendum") },
             { icon: Sparkles, title: "New Car Sticker", subtitle: "Monroney-style window label", onClick: () => navigate("/new-car-sticker") },
             { icon: Car, title: "Used Car Sticker", subtitle: "Addendum for used inventory", onClick: () => navigate("/used-car-sticker") },
-            { icon: BookOpen, title: "Buyers Guide", subtitle: "FTC-compliant 16 CFR § 455", onClick: () => navigate("/buyers-guide") },
+            { icon: BookOpen, title: "Buyers Guide", subtitle: "FTC-aligned · 16 CFR § 455", onClick: () => navigate("/buyers-guide") },
             { icon: ShieldCheck, title: "Compliance Center", subtitle: "Audit trail and regs", onClick: () => navigate("/compliance") },
           ];
 

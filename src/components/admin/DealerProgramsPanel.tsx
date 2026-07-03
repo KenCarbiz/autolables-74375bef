@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useDealerSettings } from "@/contexts/DealerSettingsContext";
-import { DealerProgram, emptyProgram, type ProgramAppliesTo, type ProgramRequirement } from "@/lib/dealerPrograms";
-import { Plus, Trash2, ShieldCheck, GripVertical, Save } from "lucide-react";
+import { DealerProgram, emptyProgram, presetProgram, PROGRAM_PRESETS, type ProgramAppliesTo, type ProgramRequirement } from "@/lib/dealerPrograms";
+import { Plus, Trash2, ShieldCheck, GripVertical, Save, Check } from "lucide-react";
 import { toast } from "sonner";
 
 // Dealer value-proposition programs editor. FTC structure per program:
@@ -32,12 +32,14 @@ export default function DealerProgramsPanel() {
     <div className="space-y-4 max-w-3xl">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <h2 className="text-base font-bold text-foreground">Dealer programs &amp; value propositions</h2>
+          <h2 className="text-base font-bold text-foreground">Included with the sale</h2>
           <p className="text-xs text-muted-foreground mt-0.5 max-w-xl">
-            Programs you offer on every vehicle — e.g. a 10-year / 100,000-mile powertrain on
-            pre-owned, a lifetime powertrain on new, or free maintenance. Each follows the FTC
+            Everything your store includes with a purchase — dealer warranty, loaner vehicles,
+            maintenance, car washes, and any other value you provide. Each item follows the FTC
             shape: state the value, the offer, the customer benefit, and the disclosure. Choose
-            where each appears and any requirement (such as financing).
+            where each appears (window sticker, customer packet) and any requirement such as
+            financing. These feed the sticker programs block, the addendum's Included Benefits,
+            and the customer passport.
           </p>
         </div>
         <button onClick={save} disabled={saving} className="inline-flex flex-shrink-0 items-center gap-1.5 h-9 px-4 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold shadow-sm disabled:opacity-50">
@@ -45,10 +47,32 @@ export default function DealerProgramsPanel() {
         </button>
       </div>
 
+      {/* One-click starters for the items dealers most commonly include. */}
+      <div className="rounded-2xl border border-border bg-card p-3.5">
+        <p className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground mb-2">Quick add — common items</p>
+        <div className="flex flex-wrap gap-1.5">
+          {PROGRAM_PRESETS.map((preset) => {
+            const added = programs.some((p) => p.title.trim().toLowerCase() === preset.fields.title.toLowerCase());
+            return (
+              <button
+                key={preset.key}
+                type="button"
+                disabled={added}
+                onClick={() => { const prog = presetProgram(preset.key); if (prog) setPrograms((prev) => [...prev, prog]); }}
+                className={`inline-flex items-center gap-1 h-8 px-3 rounded-full border text-xs font-semibold transition-colors ${added ? "border-emerald-200 bg-emerald-50 text-emerald-700 cursor-default" : "border-border bg-background text-foreground hover:border-primary"}`}
+              >
+                {added ? <Check className="w-3 h-3" /> : <Plus className="w-3 h-3" />} {preset.label}
+              </button>
+            );
+          })}
+        </div>
+        <p className="text-[10.5px] text-muted-foreground mt-2">Presets are starting points — edit the wording and disclosure to match your store's actual policy, then Save.</p>
+      </div>
+
       {programs.length === 0 && (
         <div className="rounded-2xl border border-dashed border-border p-6 text-center">
           <ShieldCheck className="w-8 h-8 text-muted-foreground/40 mx-auto mb-2" />
-          <p className="text-sm text-muted-foreground">No programs yet. Add your first dealership value proposition.</p>
+          <p className="text-sm text-muted-foreground">Nothing configured yet. Quick-add a common item above, or add your own.</p>
         </div>
       )}
 
@@ -138,7 +162,7 @@ export default function DealerProgramsPanel() {
       })}
 
       <button onClick={add} className="inline-flex items-center gap-1.5 h-9 px-4 rounded-xl border border-border bg-card hover:bg-muted text-sm font-semibold text-foreground">
-        <Plus className="w-4 h-4" /> Add program
+        <Plus className="w-4 h-4" /> Add custom item
       </button>
     </div>
   );

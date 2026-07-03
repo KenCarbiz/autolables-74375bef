@@ -101,7 +101,7 @@ export const SaturdayPremiumAddendum: React.FC<Props> = ({ data }) => {
     { icon: "peace-of-mind", t: "Peace of Mind", s: "Backed by our warranty and support" },
   ];
   const FOOTER_BADGES: { icon: AddendumIconKey; t: string }[] = [
-    { icon: "ai-powered", t: "AI Powered" }, { icon: "ftc-compliant", t: "FTC Compliant" },
+    { icon: "ai-powered", t: "AI Powered" }, { icon: "ftc-aligned", t: "FTC Aligned" },
     { icon: "real-time-updates", t: "Real-Time Updates" }, { icon: "print-ready", t: "Print Ready" },
   ];
   const QR_BULLETS = ["Photos", "Service History", "Ownership Information", "Benefits", "Documents", "Protection Products"];
@@ -156,7 +156,7 @@ export const SaturdayPremiumAddendum: React.FC<Props> = ({ data }) => {
             <div className="mt-2 grid grid-cols-2 gap-x-2.5 gap-y-[5px]">
               {QR_BULLETS.map((b) => (
                 <span key={b} className="inline-flex items-center gap-1.5 text-[7.4px] font-bold leading-tight" style={{ color: T.text }}>
-                  <AutoLabelsAddendumIcon iconKey="ftc-compliant" size={10} color={T.blue} /> {b}
+                  <AutoLabelsAddendumIcon iconKey="ftc-aligned" size={10} color={T.blue} /> {b}
                 </span>
               ))}
             </div>
@@ -178,7 +178,7 @@ export const SaturdayPremiumAddendum: React.FC<Props> = ({ data }) => {
             <div className="px-2.5 py-2 grid grid-cols-1 gap-[5px]">
               {benefits.slice(0, 6).map((b) => (
                 <span key={b} className="inline-flex items-center gap-2 text-[8.6px] font-bold leading-tight" style={{ color: T.text }}>
-                  <AutoLabelsAddendumIcon iconKey="ftc-compliant" size={11} color={T.blue} /> {b}
+                  <AutoLabelsAddendumIcon iconKey="ftc-aligned" size={11} color={T.blue} /> {b}
                 </span>
               ))}
             </div>

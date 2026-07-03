@@ -548,7 +548,7 @@ const ComplianceCenter = () => {
             If an AG or the FTC comes asking, your records are ready.
           </BestPractice>
           <BestPractice num="05" title="Have your attorney review your disclosures">
-            This platform provides industry-standard FTC-compliant disclosures. But YOUR attorney should review them
+            This platform provides industry-standard FTC-aligned disclosures. But YOUR attorney should review them
             for your specific state and business. You can customize any disclosure through the admin panel.
           </BestPractice>
         </div>
@@ -584,7 +584,7 @@ const ComplianceCenter = () => {
             </p>
           </div>
           <p className="text-xs text-muted-foreground mb-3 leading-relaxed">
-            This platform generates FTC-compliant Buyers Guides that match all requirements.
+            This platform generates FTC-aligned Buyers Guides built to the 16 CFR § 455 specifications.
             However, you must ensure:
           </p>
           <div className="space-y-2">

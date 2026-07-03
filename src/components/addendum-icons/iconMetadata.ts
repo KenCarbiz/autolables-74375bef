@@ -258,7 +258,7 @@ export const ADDENDUM_ICON_DEFS: AddendumIconDef[] = [
   d("D012", "Window Sticker", "documents", WindowSticker, "custom", "blue", ["window sticker", "monroney", "label"], custom),
   d("D013", "Addendum", "documents", AddendumSheet, "custom", "blue", ["addendum", "supplemental", "sticker"], custom),
   d("D014", "Buyers Guide", "documents", BuyersGuide, "custom", "navy", ["buyers guide", "ftc", "as-is"], custom),
-  d("D015", "FTC Compliant", "documents", ShieldCheck, "lucide", "green", ["ftc", "compliant", "regulation"], { description: "Alias of PR201 FTC Compliant — same artwork, documents-range ID.", use: "Use PR201 for new work; D015 exists for documents-range callers" }),
+  d("D015", "FTC Aligned", "documents", ShieldCheck, "lucide", "green", ["ftc", "aligned", "regulation"], { description: "Alias of PR201 FTC Aligned — same artwork, documents-range ID.", use: "Use PR201 for new work; D015 exists for documents-range callers" }),
   d("D016", "Title Record", "documents", FileWarning, "lucide", "navy", ["title", "brand", "record"], placeholder),
   d("D017", "Barcode", "documents", Barcode, "lucide", "navy", ["barcode", "vin", "scan"]),
 
@@ -310,7 +310,7 @@ export const ADDENDUM_ICON_DEFS: AddendumIconDef[] = [
   // ══ 200-series — "Missing Addendum Icons" reference sheet ══════
 
   // ── PR — Pricing / Compliance ────────────────────────────────
-  d("PR201", "FTC Compliant", "pricing_compliance", ShieldCheck, "lucide", "blue", ["ftc", "compliance", "pricing", "disclosure", "legal"], { use: "Compliance footer, pricing transparency, addendum validation" }),
+  d("PR201", "FTC Aligned", "pricing_compliance", ShieldCheck, "lucide", "blue", ["ftc", "aligned", "pricing", "disclosure"], { use: "Compliance footer, pricing transparency, addendum validation" }),
   d("PR202", "Price Locked", "pricing_compliance", PriceLocked, "custom", "blue", ["price", "locked", "guaranteed"], custom),
   d("PR203", "Price Updated", "pricing_compliance", PriceUpdated, "custom", "blue", ["price", "updated", "refreshed"], custom),
   d("PR204", "Disclosure", "pricing_compliance", ScrollText, "lucide", "blue", ["disclosure", "terms", "legal"]),
