@@ -1,7 +1,10 @@
 import { useMemo, useState } from "react";
 import { useDealerSettings, type DealerSettings } from "@/contexts/DealerSettingsContext";
 import { useInstantSave } from "@/hooks/useInstantSave";
-import { Plus, Trash2 } from "lucide-react";
+import { useTenant } from "@/contexts/TenantContext";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
+import { Plus, Trash2, RefreshCw } from "lucide-react";
 import type { IihsAward } from "@/lib/iihsAwards";
 
 // Dealer admin: the trust content shown on the Vehicle Passport's
@@ -73,6 +76,27 @@ const DealershipTrustPanel = () => {
   }) as Partial<DealerSettings>, [cfg, iihsEnabled, iihsAwards, historyLinks]);
   useInstantSave(draft, (v) => updateSettings(v), { ready: !settingsLoading, toastId: "dealership-trust" });
 
+  const { tenant } = useTenant();
+  const tenantId = tenant?.id && tenant.id !== "house" ? tenant.id : null;
+  const [googleSyncing, setGoogleSyncing] = useState(false);
+  const refreshGoogle = async () => {
+    if (!tenantId) { toast.error("No dealership selected"); return; }
+    setGoogleSyncing(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("google-reviews", { body: { tenant_id: tenantId } });
+      if (error || !data?.ok) {
+        const code = (data as { error?: string } | null)?.error;
+        toast.error(code === "place_not_found" ? "Google couldn't find this dealership — check the dealer name and address in Branding." : "Couldn't refresh the Google rating right now.");
+        return;
+      }
+      set("dealer_google_rating", String(data.rating));
+      set("dealer_google_count", String(data.count));
+      toast.success(`Google rating updated: ${data.rating} (${Number(data.count).toLocaleString()} reviews) — matched "${data.matched}"`);
+    } finally {
+      setGoogleSyncing(false);
+    }
+  };
+
   return (
     <div className="space-y-5 max-w-2xl">
       <div>
@@ -89,6 +113,13 @@ const DealershipTrustPanel = () => {
             {f.hint && <p className="text-[11px] text-slate-400 mt-1">{f.hint}</p>}
           </div>
         ))}
+        <div className="sm:col-span-2 flex items-center justify-between gap-3 border-t border-border pt-3">
+          <p className="text-[12px] text-slate-500">Pull your live Google rating and review count instead of typing them.</p>
+          <button onClick={refreshGoogle} disabled={googleSyncing}
+            className="inline-flex items-center gap-1.5 h-9 px-3.5 rounded-lg border border-border bg-background text-[13px] font-semibold hover:bg-muted disabled:opacity-60 shrink-0">
+            <RefreshCw className={`w-3.5 h-3.5 ${googleSyncing ? "animate-spin" : ""}`} /> Refresh from Google
+          </button>
+        </div>
       </div>
 
       <div className="rounded-2xl border border-border bg-card p-4">
