@@ -17,11 +17,15 @@ const RULES: { prefix: string; cap: DealerCapability }[] = [
   { prefix: "/dashboard/qr-analytics", cap: "can_view_reports" },
   { prefix: "/dashboard/document-review", cap: "can_view_compliance" },
   { prefix: "/compliance", cap: "can_view_compliance" },
+  { prefix: "/compliance-center", cap: "can_manage_compliance" },
   { prefix: "/recon", cap: "can_view_get_ready" },
   { prefix: "/prep", cap: "can_view_get_ready" },
   { prefix: "/service", cap: "can_view_get_ready" },
   { prefix: "/ready-board", cap: "can_view_get_ready" },
   { prefix: "/add-inventory", cap: "can_edit_inventory" },
+  { prefix: "/queue", cap: "can_view_work_queue" },
+  { prefix: "/leads", cap: "can_view_leads" },
+  { prefix: "/titles", cap: "can_view_compliance" },
 ];
 
 export default function RouteCapabilityGuard({ children }: { children: ReactNode }) {

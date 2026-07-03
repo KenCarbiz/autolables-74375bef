@@ -112,6 +112,8 @@ const DevConnecticutSmokeTest = lazy(() => import("./pages/DevConnecticutSmokeTe
 const QrRedirect = lazy(() => import("./pages/QrRedirect"));
 const QrAnalytics = lazy(() => import("./pages/QrAnalytics"));
 const Reports = lazy(() => import("./pages/Reports"));
+const Leads = lazy(() => import("./pages/Leads"));
+const Titles = lazy(() => import("./pages/Titles"));
 const DocumentReview = lazy(() => import("./pages/DocumentReview"));
 const NewCarSticker = lazy(() => import("./pages/NewCarSticker"));
 const CpoSheet = lazy(() => import("./pages/CpoSheet"));
@@ -237,6 +239,8 @@ const App = () => (
                         {/* Setup folded into Admin Home; the route stays so old links don't 404. */}
                         <Route path="/setup" element={<Navigate to="/admin?tab=home" replace />} />
                         <Route path="/queue" element={<LotCaptureQueue />} />
+                        <Route path="/leads" element={<Leads />} />
+                        <Route path="/titles" element={<Titles />} />
                         <Route path="/inventory" element={<Inventory />} />
                         <Route path="/inventory-v2" element={<InventoryCommandCenterV2 />} />
                         <Route path="/dashboard-legacy" element={<Navigate to="/dashboard" replace />} />
@@ -249,6 +253,7 @@ const App = () => (
                         <Route path="/saved" element={<SavedAddendums />} />
                         <Route path="/signed" element={<SavedAddendums stage="signed" />} />
                         <Route path="/delivered" element={<SavedAddendums stage="delivered" />} />
+                        <Route path="/returns" element={<SavedAddendums stage="returns" />} />
                         <Route path="/signatures" element={<SignatureQueue /> } />
                         <Route path="/buyers-guide" element={<BuyersGuide />} />
                         <Route path="/used-vehicle-documents" element={<UsedVehicleDocuments />} />

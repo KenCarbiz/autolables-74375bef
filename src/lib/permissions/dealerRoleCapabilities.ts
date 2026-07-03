@@ -247,7 +247,7 @@ const ROLE_HOME: Record<string, string> = {
   service_manager: "/ready-board",
   service_advisor: "/service",
   detail: "/service",
-  office: "/dashboard/document-review",
+  office: "/titles",
   finance: "/saved",
   compliance: "/compliance",
   biller: "/dashboard",

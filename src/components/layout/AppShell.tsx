@@ -15,6 +15,7 @@ import {
   ChevronDown,
   ChevronLeft,
   ChevronRight,
+  ClipboardList,
   CreditCard,
   ExternalLink,
   FilePlus2,
@@ -56,6 +57,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useTenant } from "@/contexts/TenantContext";
 import { useDealerSettings } from "@/contexts/DealerSettingsContext";
 import { useEntitlements } from "@/hooks/useEntitlements";
+import { useNavBadges } from "@/hooks/useNavBadges";
 import { useAudit } from "@/contexts/AuditContext";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -148,11 +150,17 @@ const AppShell = ({ children }: AppShellProps) => {
   const [openSections, setOpenSections] = useState<Record<string, boolean>>({
     main: true,
     create: true,
+    work: true,
     getready: true,
     compliance: true,
+    office: false,
     settings: true,
     platform: true,
   });
+
+  // Worklist counts on the nav rows that represent queues; 0 renders no badge.
+  const badges = useNavBadges();
+  const badge = (n: number) => (n > 0 ? n : undefined);
 
   // Consolidated, capability-gated nav. The ~19 `?tab=` rows now live behind the
   // single "Settings" door (the Admin page is already tabbed); the 9 document
@@ -164,7 +172,7 @@ const AppShell = ({ children }: AppShellProps) => {
       items: [
         { label: "Home", path: "/dashboard", icon: toolIcon("home"), capability: "can_view_dashboard" },
         { label: "Inventory", path: "/inventory", icon: toolIcon("inventory"), capability: "can_view_inventory" },
-        { label: "Deals", path: "/saved", icon: toolIcon("deals"), capability: "can_view_deals" },
+        { label: "Deals", path: "/saved", icon: toolIcon("deals"), capability: "can_view_deals", badge: badge(badges.returns) },
       ],
     },
     create: {
@@ -174,11 +182,19 @@ const AppShell = ({ children }: AppShellProps) => {
         { label: "Create", path: "/create", icon: toolIcon("create"), capability: "can_create_documents" },
       ],
     },
+    work: {
+      title: "WORK",
+      defaultOpen: true,
+      items: [
+        { label: "Work Queue", path: "/queue", icon: ClipboardList, capability: "can_view_work_queue", badge: badge(badges.workQueue) },
+        { label: "Leads", path: "/leads", icon: Users, capability: "can_view_leads", featureKey: "feature_lead_capture", badge: badge(badges.leads) },
+      ],
+    },
     getready: {
       title: "GET READY",
       defaultOpen: true,
       items: [
-        { label: "Recon Approvals", path: "/recon", icon: toolIcon("recon-approvals"), capability: "can_view_get_ready" },
+        { label: "Recon Approvals", path: "/recon", icon: toolIcon("recon-approvals"), capability: "can_view_get_ready", badge: badge(badges.reconApprovals) },
         { label: "Prep & Install", path: "/prep", icon: toolIcon("prep-install"), capability: "can_view_get_ready" },
         { label: "Service Desk", path: "/service", icon: toolIcon("service-desk"), capability: "can_view_get_ready" },
         { label: "Ready Board", path: "/ready-board", icon: toolIcon("ready-board"), capability: "can_view_get_ready" },
@@ -189,8 +205,17 @@ const AppShell = ({ children }: AppShellProps) => {
       defaultOpen: false,
       items: [
         { label: "Compliance Center", path: "/compliance", icon: toolIcon("compliance-center"), capability: "can_view_compliance" },
-        { label: "Price Change Review", path: "/dashboard/document-review", icon: toolIcon("document-review"), capability: "can_view_compliance" },
+        { label: "Compliance Tasks", path: "/compliance-center", icon: ShieldCheck, capability: "can_manage_compliance", badge: badge(badges.complianceTasks) },
+        { label: "Price Change Review", path: "/dashboard/document-review", icon: toolIcon("document-review"), capability: "can_view_compliance", badge: badge(badges.priceChangeReview) },
         { label: "Audit Log", path: "/admin?tab=audit", icon: toolIcon("audit-log"), capability: "can_view_compliance" },
+      ],
+    },
+    office: {
+      title: "OFFICE",
+      defaultOpen: false,
+      items: [
+        { label: "Titles", path: "/titles", icon: FileText, capability: "can_view_compliance" },
+        { label: "Invoices", path: "/admin?tab=invoices", icon: ScrollText, capability: "can_manage_invoices" },
       ],
     },
     settings: {

@@ -7,14 +7,16 @@ import { format } from "date-fns";
 import { Search, FileText, ArrowLeft, Eye, Plus, Printer, ShieldCheck, Mail, Pencil, Truck } from "lucide-react";
 import EmptyState from "@/components/ui/empty-state";
 import PageTabs, { DEALS_TABS } from "@/components/layout/PageTabs";
+import ReturnsQueue from "@/components/admin/ReturnsQueue";
 import { toast } from "sonner";
 
-export type DealStage = "saved" | "signed" | "delivered";
+export type DealStage = "saved" | "signed" | "delivered" | "returns";
 
 const STAGE_META: Record<DealStage, { title: string; subtitle: string; empty: string }> = {
   saved: { title: "Saved Addendums", subtitle: "Drafts you're still building, with live price-integrity checks.", empty: "Drafts you're still building live here. Start one to fill this list." },
   signed: { title: "Signed — Awaiting Delivery", subtitle: "Signed deals waiting to be marked delivered.", empty: "Signed deals appear here until you mark them delivered." },
   delivered: { title: "Delivered", subtitle: "Completed, audit-defense-ready deals.", empty: "Delivered deals are archived here." },
+  returns: { title: "SB 766 Returns", subtitle: "Open return requests with their legal countdown, plus resolved history.", empty: "No return activity yet." },
 };
 
 const SavedAddendums = ({ stage = "saved" }: { stage?: DealStage }) => {
@@ -110,6 +112,15 @@ const SavedAddendums = ({ stage = "saved" }: { stage?: DealStage }) => {
           </button>
         </div>
 
+        {stage === "returns" ? (
+          <div className="space-y-3">
+            <ReturnsQueue />
+            <p className="text-xs text-muted-foreground">
+              Shows every signed deal with SB 766 return activity. Requested returns carry the 3-day countdown and must be resolved from here.
+            </p>
+          </div>
+        ) : (
+        <>
         {/* Search */}
         <div className="relative mb-6">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
@@ -223,6 +234,8 @@ const SavedAddendums = ({ stage = "saved" }: { stage?: DealStage }) => {
               </div>
             </div>
           </>
+        )}
+        </>
         )}
       </div>
     </div>

@@ -18,7 +18,6 @@ import InstallerContactsCard from "@/components/admin/InstallerContactsCard";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useVinScan } from "@/contexts/VinScanContext";
 import { toast } from "sonner";
-import { AccessoryInstallPanel } from "@/components/admin/AccessoryInstallPanel";
 import DealerProgramsPanel from "@/components/admin/DealerProgramsPanel";
 import { TODAYS_PRICE_MODE_OPTIONS, DEFAULT_TODAYS_PRICE_CUSTOM, resolveTodaysPrice } from "@/lib/todaysPrice";
 import { COMP_STRATEGY_OPTIONS, type CompStrategy } from "@/lib/compStrategy";
@@ -29,14 +28,9 @@ import PassportContactRoutingPanel from "@/components/admin/PassportContactRouti
 import PrintSettingsPanel from "@/components/admin/PrintSettingsPanel";
 import DocumentRulesPanel from "@/components/admin/DocumentRulesPanel";
 import EnabledFeaturesPanel from "@/components/admin/EnabledFeaturesPanel";
-import { GetReadySheet } from "@/components/admin/GetReadySheet";
-import type { GetReadyRecord } from "@/hooks/useGetReady";
-import { EmailDistributionPanel } from "@/components/admin/EmailDistributionPanel";
-import { StartGetReadyModal } from "@/components/admin/StartGetReadyModal";
 import StickerPrintTemplates from "@/components/admin/StickerPrintTemplates";
 import LabelDefaultsPanel from "@/components/admin/LabelDefaultsPanel";
 import { InventoryFeedHealth } from "@/components/admin/InventoryFeedHealth";
-import { OpenSigningsList } from "@/components/admin/OpenSigningsList";
 import { AddonElectionsPanel } from "@/components/admin/AddonElectionsPanel";
 import { PriceIntegrityPanel } from "@/components/admin/PriceIntegrityPanel";
 import { PriceAuditPanel } from "@/components/admin/PriceAuditPanel";
@@ -44,14 +38,10 @@ import { IncentivesSettingsPanel } from "@/components/admin/IncentivesSettingsPa
 import MarketcheckSyncCard from "@/components/admin/MarketcheckSyncCard";
 import MarketcheckDataHealthCard from "@/components/admin/MarketcheckDataHealthCard";
 import TeamPanel from "@/components/admin/TeamPanel";
-import { useEmailDistribution } from "@/hooks/useEmailDistribution";
 import { ProductIcon, PRODUCT_ICON_KEYS } from "@/components/addendum/productIcons";
 import { STATE_DOC_FEES } from "@/data/docFees";
 import { format } from "date-fns";
 import { useLeads } from "@/hooks/useLeads";
-import SigningFunnelWidget from "@/components/admin/SigningFunnelWidget";
-import ReturnsQueue from "@/components/admin/ReturnsQueue";
-import { useVinQueue, QueuedVehicle } from "@/hooks/useVinQueue";
 import { useVehicleFiles } from "@/hooks/useVehicleFiles";
 import { useGetReady } from "@/hooks/useGetReady";
 import { useInvoices } from "@/hooks/useInvoices";
@@ -65,15 +55,12 @@ import type { VehicleFile as VehicleFileType, StickerType } from "@/types/vehicl
 import {
   Download,
   ShieldCheck,
-  BarChart3,
-  Users,
   Search,
   ArrowUpRight,
   FileText,
   CheckCircle2,
   Clock,
   ScanLine,
-  Trash2,
   Printer,
   RotateCcw,
   Car,
@@ -250,31 +237,40 @@ const Admin = () => {
     }
   }, [searchParams]);
 
-  // The Inventory admin tab is retired; the id stays valid so old
-  // ?tab=inventory deep links land on the real inventory screen.
+  // Retired tab ids stay valid so old deep links resolve, but their content
+  // now lives on standalone screens — redirect instead of rendering here.
   useEffect(() => {
     if (tab === "inventory") navigate("/inventory", { replace: true });
+    else if (tab === "analytics") navigate("/dashboard/reports?tab=analytics", { replace: true });
+    else if (tab === "funnel") navigate("/dashboard/reports?tab=signings", { replace: true });
+    else if (tab === "leads") navigate("/leads", { replace: true });
+    else if (tab === "queue") navigate("/queue", { replace: true });
   }, [tab, navigate]);
 
-  // Leads hook for leads tab
-  const { leads, exportCsv: exportLeadsCsv, updateLead } = useLeads(currentStore?.id || "");
+  // Command-palette deep links carry ?panel=<anchor>; scroll to the card once
+  // the tab body has rendered. Presentation-only.
+  const panelParam = searchParams.get("panel");
+  useEffect(() => {
+    if (!panelParam) return;
+    const t = setTimeout(() => {
+      document.getElementById(panelParam)?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 150);
+    return () => clearTimeout(t);
+  }, [panelParam, tab]);
 
-  // VIN queue for print queue tab
-  const { queue: vinQueue, updateItem: updateQueueItem, removeItem: removeQueueItem, clearCompleted } = useVinQueue();
+  // Leads count for the home KPI (the lead workspace itself lives at /leads)
+  const { leads } = useLeads(currentStore?.id || "");
 
   // Vehicle files for compliance tracking
   const { files: vehicleFiles, stats: fileStats, findByVin } = useVehicleFiles(currentStore?.id || "");
   const [fileSearch, setFileSearch] = useState("");
 
-  // Get-Ready tracking
-  const [sheetRecord, setSheetRecord] = useState<GetReadyRecord | null>(null);
-  const { records: getReadyRecords, getPending: getPendingGetReady, validateTimeline, markAccessoryInstalled, markInventory, createGetReady } = useGetReady(currentStore?.id || "");
-  const [startGetReadyOpen, setStartGetReadyOpen] = useState(false);
+  // Get-Ready service catalog config (the work surface lives at /prep)
+  const { getPending: getPendingGetReady } = useGetReady(currentStore?.id || "");
   const [svcDraft, setSvcDraft] = useState<GetReadyService[]>(settings.get_ready_services || []);
   const [svcSaved, setSvcSaved] = useState(false);
   const [svcOpen, setSvcOpen] = useState(false);
   const saveServices = () => { updateSettings({ get_ready_services: svcDraft }); setSvcSaved(true); setTimeout(() => setSvcSaved(false), 1800); };
-  const { sendGetReadyComplete, sending: emailSending } = useEmailDistribution(currentStore?.id || "");
 
   // Invoices, warranty
   const { invoices, payroll } = useInvoices(currentStore?.id || "");
@@ -596,10 +592,6 @@ const Admin = () => {
     { id: "passport-ctas", label: "Passport Buttons" },
     { id: "passport-trust", label: "Why Buy From Us" },
     { id: "passport-routing", label: "Lead Routing" },
-    ...(settings.feature_analytics ? [{ id: "analytics" as const, label: "Analytics" }] : []),
-    ...(settings.feature_lead_capture ? [{ id: "leads" as const, label: "Leads" }] : []),
-    { id: "funnel", label: "Deal Signings" },
-    { id: "queue", label: "Print Queue" },
     { id: "print-settings", label: "Printer Calibration" },
     { id: "document-rules", label: "Approval & Review Rules" },
     { id: "incentives", label: "Pricing & Incentives" },
@@ -654,9 +646,8 @@ const Admin = () => {
             { id: "pricing", label: "Pricing", ids: ["incentives"] },
             { id: "products", label: "Products & Programs", ids: ["products", "rules", "programs", "factory-warranty"] },
             { id: "passport", label: "Customer Passport", ids: ["passport-ctas", "passport-trust", "passport-routing"] },
-            { id: "printing", label: "Printing & Documents", ids: ["labels", "print-settings", "document-rules", "queue", "invoices"] },
+            { id: "printing", label: "Printing & Documents", ids: ["labels", "print-settings", "document-rules", "invoices"] },
             { id: "compliance", label: "Compliance", ids: ["audit", "files", "warranty"] },
-            { id: "reports", label: "Reports", ids: ["analytics", "leads", "funnel"] },
           ];
           const groups = groupDefs
             .map((g) => ({ ...g, ids: g.ids.filter((id) => availIds.has(id)) }))
@@ -904,7 +895,7 @@ const Admin = () => {
 
                 {/* Pending get-ready */}
                 <button
-                  onClick={() => setTab("getready")}
+                  onClick={() => navigate("/prep?view=installs")}
                   className="text-left bg-card rounded-xl border border-border shadow-premium p-4 hover:shadow-md transition-shadow"
                 >
                   <p className="text-[10px] font-semibold uppercase tracking-label" style={{ color: "#F59E0B" }}>
@@ -918,7 +909,7 @@ const Admin = () => {
 
                 {/* Leads (30 days) */}
                 <button
-                  onClick={() => setTab("leads")}
+                  onClick={() => navigate("/leads")}
                   className="text-left bg-card rounded-xl border border-border shadow-premium p-4 hover:shadow-md transition-shadow"
                 >
                   <p className="text-[10px] font-semibold uppercase tracking-label" style={{ color: "#10B981" }}>
@@ -1232,7 +1223,7 @@ const Admin = () => {
             </div>
 
             {/* Paper Size Settings */}
-            <div className="bg-card rounded-lg p-4 shadow-sm mb-3">
+            <div id="paper-size" className="bg-card rounded-lg p-4 shadow-sm mb-3">
               <h4 className="text-sm font-bold text-foreground mb-2">Addendum Paper Size</h4>
               <p className="text-xs text-muted-foreground mb-3">Addendum scales to this size. FTC Buyers Guide stays at its federally-mandated minimum (11" × 7¼", 16 CFR § 455).</p>
               <div className="flex gap-2 flex-wrap">
@@ -1281,7 +1272,7 @@ const Admin = () => {
             </div>
 
             {/* Product Default Mode */}
-            <div className="bg-card rounded-lg p-4 shadow-sm mb-3">
+            <div id="product-default-mode" className="bg-card rounded-lg p-4 shadow-sm mb-3">
               <h4 className="text-sm font-bold text-foreground mb-2">Product Default Mode</h4>
               <p className="text-xs text-muted-foreground mb-3">Choose how products appear on every addendum by default. Employees can override per-product at signing if enabled.</p>
               <div className="flex gap-2 flex-wrap">
@@ -1310,156 +1301,11 @@ const Admin = () => {
               </div>
             </div>
 
-            {/* Dealer Documentation Fee */}
-            <div className="bg-card rounded-lg p-4 shadow-sm mb-3">
-              <h4 className="text-sm font-bold text-foreground mb-2">Dealer Documentation Fee</h4>
-              <p className="text-xs text-muted-foreground mb-3">Add a state-compliant documentation fee to every addendum. The correct terminology auto-applies based on your state.</p>
-              <div className="flex items-center justify-between mb-3">
-                <span className="text-sm font-semibold text-foreground">Enable Doc Fee</span>
-                <Switch
-                  checked={!!settings.doc_fee_enabled}
-                  onCheckedChange={(v) => updateSettings({ doc_fee_enabled: v })}
-                  className="data-[state=checked]:bg-teal"
-                />
-              </div>
-              {settings.doc_fee_enabled && (
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="text-xs font-semibold text-muted-foreground">State</label>
-                    <select
-                      value={settings.doc_fee_state}
-                      onChange={(e) => updateSettings({ doc_fee_state: e.target.value })}
-                      className="w-full px-3 py-2 border border-border-custom rounded text-sm"
-                    >
-                      {STATE_DOC_FEES.map(s => (
-                        <option key={s.stateCode} value={s.stateCode}>{s.state} — "{s.terminology}"{s.maxFee ? ` (max $${s.maxFee})` : ""}</option>
-                      ))}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="text-xs font-semibold text-muted-foreground">Amount ($)</label>
-                    <input
-                      type="number"
-                      step="0.01"
-                      value={docFeeDraft ?? String(settings.doc_fee_amount)}
-                      onChange={(e) => setDocFeeDraft(e.target.value)}
-                      onBlur={() => {
-                        if (docFeeDraft == null) return;
-                        const next = parseFloat(docFeeDraft) || 0;
-                        setDocFeeDraft(null);
-                        if (next === settings.doc_fee_amount) return;
-                        if (!window.confirm(`Change the doc fee to $${next.toFixed(2)}? This recalculates stored sale prices across your inventory.`)) return;
-                        updateSettings({ doc_fee_amount: next });
-                      }}
-                      className="w-full px-3 py-2 border border-border-custom rounded text-sm"
-                    />
-                  </div>
-                </div>
-              )}
-              <div className="mt-3">
-                <label className="text-xs font-semibold text-muted-foreground">Customer price display</label>
-                <select
-                  value={settings.price_display_mode || "advertised_before_doc"}
-                  onChange={(e) => updateSettings({ price_display_mode: e.target.value as DealerSettings["price_display_mode"] })}
-                  className="w-full px-3 py-2 border border-border-custom rounded text-sm"
-                >
-                  <option value="advertised_before_doc">Advertised price (before doc fee) — disclose fee separately</option>
-                  <option value="website_sale_price">Website sale price (doc fee included)</option>
-                </select>
-                <p className="text-[11px] text-muted-foreground mt-1">
-                  Controls the price shown on the customer Passport. The advertised price is always compared to market before the doc fee.
-                </p>
-              </div>
-              <div className="mt-3">
-                <label className="text-xs font-semibold text-muted-foreground">Market Comparison Pricing</label>
-                <select
-                  value={settings.comp_settings?.compStrategy || "value_building"}
-                  onChange={(e) => updateSettings({ comp_settings: { ...(settings.comp_settings || {}), compStrategy: e.target.value as CompStrategy } })}
-                  className="w-full px-3 py-2 border border-border-custom rounded text-sm"
-                >
-                  {COMP_STRATEGY_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-                </select>
-                <p className="text-[11px] text-muted-foreground mt-1">
-                  Controls how comparable vehicles are selected for customer-facing market panels.{" "}
-                  {COMP_STRATEGY_OPTIONS.find((o) => o.value === (settings.comp_settings?.compStrategy || "value_building"))?.help}
-                </p>
-                {(settings.comp_settings?.compStrategy || "value_building") === "value_building" && (
-                  <label className="flex items-start gap-2 text-xs text-foreground mt-2">
-                    <input
-                      type="checkbox" className="mt-0.5"
-                      checked={!!settings.comp_settings?.includeLowerPricedComps}
-                      onChange={(e) => updateSettings({ comp_settings: { ...(settings.comp_settings || {}), includeLowerPricedComps: e.target.checked } })}
-                    />
-                    <span>Also allow slightly lower-priced comps (within 3% of this vehicle's price). Off by default so comps never undercut your vehicle.</span>
-                  </label>
-                )}
-              </div>
-              <div className="mt-3">
-                <label className="text-xs font-semibold text-muted-foreground">Today's Price page wording</label>
-                <select
-                  value={settings.todays_price_mode || "payment_estimate"}
-                  onChange={(e) => updateSettings({ todays_price_mode: e.target.value as DealerSettings["todays_price_mode"] })}
-                  className="w-full px-3 py-2 border border-border-custom rounded text-sm"
-                >
-                  {TODAYS_PRICE_MODE_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-                </select>
-                <p className="text-[11px] text-muted-foreground mt-1">
-                  {TODAYS_PRICE_MODE_OPTIONS.find((o) => o.value === (settings.todays_price_mode || "payment_estimate"))?.hint}
-                </p>
-                {(() => {
-                  const custom = { ...DEFAULT_TODAYS_PRICE_CUSTOM, ...(settings.todays_price_custom || {}) };
-                  const setCustom = (patch: Partial<typeof custom>) => updateSettings({ todays_price_custom: { ...custom, ...patch } });
-                  const preview = resolveTodaysPrice({ todays_price_mode: settings.todays_price_mode, todays_price_custom: custom });
-                  return (
-                    <div className="mt-2 space-y-2">
-                      {settings.todays_price_mode === "custom" && (
-                        <>
-                          <div>
-                            <label className="text-xs font-semibold text-muted-foreground">Headline</label>
-                            <input value={custom.headline} onChange={(e) => setCustom({ headline: e.target.value })} placeholder="Today's Price" className="w-full px-3 py-2 border border-border-custom rounded text-sm" />
-                          </div>
-                          <div>
-                            <label className="text-xs font-semibold text-muted-foreground">Subheadline</label>
-                            <input value={custom.sub} onChange={(e) => setCustom({ sub: e.target.value })} placeholder="Personalize your payment estimate for this vehicle." className="w-full px-3 py-2 border border-border-custom rounded text-sm" />
-                          </div>
-                          <div>
-                            <label className="text-xs font-semibold text-muted-foreground">Button text</label>
-                            <input value={custom.cta} onChange={(e) => setCustom({ cta: e.target.value })} placeholder="Request Payment Details" className="w-full px-3 py-2 border border-border-custom rounded text-sm" />
-                          </div>
-                          <div>
-                            <label className="text-xs font-semibold text-muted-foreground">Disclaimer</label>
-                            <textarea value={custom.disclaimer} onChange={(e) => setCustom({ disclaimer: e.target.value })} rows={2} placeholder="Estimate only, with approved credit…" className="w-full px-3 py-2 border border-border-custom rounded text-sm resize-none" />
-                          </div>
-                          <label className="flex items-start gap-2 text-xs text-foreground">
-                            <input type="checkbox" className="mt-0.5" checked={custom.allow_otd_wording} onChange={(e) => setCustom({ allow_otd_wording: e.target.checked })} />
-                            <span>Allow out-the-door / "best price" wording in custom copy. When off, copy containing that language falls back to the safe default.</span>
-                          </label>
-                        </>
-                      )}
-                      <div className="grid grid-cols-2 gap-x-4 gap-y-1.5">
-                        {([
-                          ["show_calculator", "Show payment calculator"],
-                          ["show_down", "Show down payment slider"],
-                          ["show_term", "Show term selector"],
-                          ["show_apr", "Show APR slider"],
-                        ] as ["show_calculator" | "show_down" | "show_term" | "show_apr", string][]).map(([key, label]) => (
-                          <label key={key} className="flex items-center gap-2 text-xs text-foreground">
-                            <input type="checkbox" checked={custom[key]} onChange={(e) => setCustom({ [key]: e.target.checked })} />
-                            {label}
-                          </label>
-                        ))}
-                      </div>
-                      <p className="text-[11px] text-muted-foreground border-t border-border pt-2">
-                        Shoppers will see: <span className="font-semibold text-foreground">{preview.headline}</span> — {preview.sub} · Button: <span className="font-semibold text-foreground">{preview.cta}</span>
-                      </p>
-                    </div>
-                  );
-                })()}
-              </div>
-            </div>
+            {/* Doc fee + customer price display + comps + Today's Price moved
+                to the Pricing & Incentives tab (?tab=incentives). */}
 
             {/* Title / MCO capture */}
-            <div className="bg-card rounded-lg p-4 shadow-premium mb-3">
+            <div id="title-clerk" className="bg-card rounded-lg p-4 shadow-premium mb-3">
               <h4 className="text-sm font-bold text-foreground mb-1">Title / MCO Upload</h4>
               <p className="text-xs text-muted-foreground mb-3">The office gets a per-vehicle link + QR to upload the title (used) or MCO (new), front and back, into the private vehicle file.</p>
               <div className="space-y-3">
@@ -1505,7 +1351,7 @@ const Admin = () => {
             </div>
 
             {/* Shopper engagement loop */}
-            <div className="bg-card rounded-lg p-4 shadow-premium mb-3">
+            <div id="shopper-engagement" className="bg-card rounded-lg p-4 shadow-premium mb-3">
               <h4 className="text-sm font-bold text-foreground mb-1">Shopper Engagement</h4>
               <p className="text-xs text-muted-foreground mb-3">Get alerted when a shopper opens a vehicle packet, and automatically re-engage shoppers by email when a price drops.</p>
               <div className="space-y-3">
@@ -1539,7 +1385,7 @@ const Admin = () => {
             </div>
 
             {/* Recon approval gate */}
-            <div className="bg-card rounded-lg p-4 shadow-premium mb-3">
+            <div id="recon-approval" className="bg-card rounded-lg p-4 shadow-premium mb-3">
               <h4 className="text-sm font-bold text-foreground mb-1">Recon Approval</h4>
               <p className="text-xs text-muted-foreground mb-3">When service submits a recon estimate, line items at or under this amount clear automatically so work isn't stalled. Anything higher routes to the used-car manager to approve or decline.</p>
               <div className="space-y-3">
@@ -1568,7 +1414,7 @@ const Admin = () => {
             </div>
 
             {/* Nightly-ingest automation */}
-            <div className="bg-card rounded-lg p-4 shadow-premium mb-3">
+            <div id="feed-automation" className="bg-card rounded-lg p-4 shadow-premium mb-3">
               <h4 className="text-sm font-bold text-foreground mb-1">Feed Automation</h4>
               <p className="text-xs text-muted-foreground mb-3">When a new vehicle is ingested overnight, choose what fires automatically vs. what waits for a person to send it.</p>
               <div className="space-y-3">
@@ -1686,7 +1532,7 @@ const Admin = () => {
             </div>
 
             {/* Integrations status */}
-            <div className="bg-card rounded-lg p-4 shadow-premium mb-3">
+            <div id="integrations" className="bg-card rounded-lg p-4 shadow-premium mb-3">
               <h4 className="text-sm font-bold text-foreground mb-2">Integration Status</h4>
               <p className="text-xs text-muted-foreground mb-3">Optional services that power scraping, SMS, and AI. Contact AutoLabels support to turn these on for your store.</p>
               <div className="space-y-2 text-xs">
@@ -1702,7 +1548,7 @@ const Admin = () => {
 
             {/* Feature Toggle list — coming_soon entries hidden so the
                 panel only shows switches that actually do something. */}
-            <div className="space-y-2">
+            <div id="feature-toggles" className="space-y-2">
               {FEATURE_TOGGLES.filter(ft => ft.status !== "coming_soon").map((ft) => (
                 <div key={ft.key} className="bg-card rounded-lg p-4 shadow-sm flex items-center justify-between">
                   <div className="flex-1 min-w-0">
@@ -2156,337 +2002,29 @@ const Admin = () => {
           </div>
         )}
 
-        {/* ─── Analytics Tab ─── */}
-        {tab === "analytics" && (
-          <div className="space-y-4">
-            <div className="bg-card rounded-xl border border-border shadow-premium p-5">
-              <div className="flex items-center gap-2 mb-1">
-                <BarChart3 className="w-4 h-4 text-blue-600" />
-                <h3 className="text-sm font-semibold text-foreground">Addendum Analytics</h3>
-              </div>
-              <p className="text-xs text-muted-foreground">Performance metrics from your saved addendums.</p>
-            </div>
+        {/* Analytics + Deal Signings live at /dashboard/reports; Leads at
+            /leads; the VIN print queue at /queue. Their ?tab= ids redirect. */}
 
-            {(() => {
-              const allA = auditEntries.filter(e => e.store_id === (currentStore?.id || ""));
-              const created = allA.filter(e => e.action === "addendum_created").length;
-              const sent = allA.filter(e => e.action === "addendum_sent").length;
-              const printed = allA.filter(e => e.action === "addendum_printed").length;
-              const pdfs = allA.filter(e => e.action === "addendum_pdf").length;
-              return (
-                <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-                  <StatMini icon={FileText} label="Addendums Created" value={created} color="text-blue-600" />
-                  <StatMini icon={ArrowUpRight} label="Sent to Customer" value={sent} color="text-emerald-600" />
-                  <StatMini icon={Download} label="PDFs Generated" value={pdfs} color="text-purple-600" />
-                  <StatMini icon={CheckCircle2} label="Printed" value={printed} color="text-amber-600" />
-                </div>
-              );
-            })()}
-
-            <div className="bg-card rounded-xl border border-border shadow-premium p-5">
-              <h4 className="text-sm font-semibold text-foreground mb-3">Recent Compliance Events</h4>
-              <div className="space-y-2 max-h-64 overflow-y-auto">
-                {auditEntries
-                  .filter(e => e.store_id === (currentStore?.id || ""))
-                  .slice(-20).reverse()
-                  .map(e => (
-                    <div key={e.id} className="flex items-center justify-between py-1.5 border-b border-border last:border-0">
-                      <div>
-                        <p className="text-xs font-medium text-foreground capitalize">{e.action.replace(/_/g, " ")}</p>
-                        <p className="text-[10px] text-muted-foreground">{e.entity_type} · {e.entity_id || "—"}</p>
-                      </div>
-                      <span className="text-[10px] text-muted-foreground tabular-nums">{format(new Date(e.created_at), "M/d h:mm a")}</span>
-                    </div>
-                  ))}
-                {auditEntries.filter(e => e.store_id === (currentStore?.id || "")).length === 0 && (
-                  <p className="text-xs text-muted-foreground py-6 text-center">No analytics data yet. Create and sign addendums to see metrics.</p>
-                )}
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* ─── Signing Funnel Tab (Wave 26) ─── */}
-        {/* Dedicated home for Process Dashboard FlowTile #4
-            "Out for sign." Was previously colocated under leads;
-            the dashboard linked at /admin?tab=funnel which never
-            existed (broken link). This tab consolidates the
-            funnel widget + an open-signings list so a manager
-            sees every shopper currently mid-flow at a glance. */}
-        {tab === "funnel" && (
-          <div className="space-y-4">
-            <SigningFunnelWidget />
-            {/* Wave 29 — per-row visibility under the aggregate
-                widget. Dealers see WHICH shoppers hold unsigned
-                links + can copy/re-engage/defend per row. */}
-            <OpenSigningsList />
-            <AddonElectionsPanel storeId={currentStore?.id || ""} />
-          </div>
-        )}
-
-        {/* ─── Leads Tab ─── */}
-        {tab === "leads" && (
-          <div className="space-y-4">
-            {/* SB 766 returns — top priority because open return
-                requests have a countdown and a legal obligation. */}
-            <ReturnsQueue />
-
-            {/* Signing funnel — shows where shoppers drop off
-                between first contact and a signed addendum.
-                Populated by the record_signing_event RPC fired from
-                MobileSigning on open + first interaction. */}
-            <SigningFunnelWidget />
-
-            <div className="flex items-center justify-between">
-              <div>
-                <div className="flex items-center gap-2">
-                  <Users className="w-4 h-4 text-blue-600" />
-                  <h3 className="text-sm font-semibold text-foreground">Captured Leads</h3>
-                </div>
-                <p className="text-xs text-muted-foreground mt-0.5">Leads captured from QR scans and signing links.</p>
-              </div>
-              <button
-                onClick={() => {
-                  const csv = exportLeadsCsv();
-                  const blob = new Blob([csv], { type: "text/csv" });
-                  const url = URL.createObjectURL(blob);
-                  const a = document.createElement("a");
-                  a.href = url;
-                  a.download = `leads-${currentStore?.name || "export"}-${new Date().toISOString().slice(0, 10)}.csv`;
-                  a.click();
-                  URL.revokeObjectURL(url);
-                  toast.success("Leads exported as CSV");
-                }}
-                disabled={leads.length === 0}
-                className="inline-flex items-center gap-1.5 h-9 px-3 rounded-md border border-border text-sm font-medium hover:bg-muted transition-colors disabled:opacity-40"
-              >
-                <Download className="w-3.5 h-3.5" />
-                Export CSV
-              </button>
-            </div>
-
-            <div className="bg-card rounded-xl border border-border shadow-premium overflow-hidden">
-              {leads.length === 0 ? (
-                <div className="px-5 py-12 text-center">
-                  <Users className="w-8 h-8 text-muted-foreground/30 mx-auto mb-3" />
-                  <p className="text-sm font-medium text-foreground">No leads captured yet</p>
-                  <p className="text-xs text-muted-foreground mt-1">Send addendums to customers via QR codes to start capturing leads.</p>
-                </div>
-              ) : (
-                <table className="w-full text-sm">
-                  <thead className="bg-muted/30">
-                    <tr className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-                      <th className="text-left px-4 py-2.5">Date</th>
-                      <th className="text-left py-2.5">Name</th>
-                      <th className="text-left py-2.5">Phone</th>
-                      <th className="text-left py-2.5">Email</th>
-                      <th className="text-left py-2.5">Vehicle</th>
-                      <th className="text-left py-2.5">Source</th>
-                      <th className="text-left py-2.5">Status</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {leads.map(l => (
-                      <tr key={l.id} className="border-t border-border hover:bg-muted/20">
-                        <td className="px-4 py-2.5 text-xs tabular-nums text-muted-foreground">{format(new Date(l.captured_at), "M/d/yy")}</td>
-                        <td className="py-2.5 text-sm font-medium">{l.name || "—"}</td>
-                        <td className="py-2.5 text-xs text-muted-foreground">{l.phone || "—"}</td>
-                        <td className="py-2.5 text-xs text-muted-foreground">{l.email || "—"}</td>
-                        <td className="py-2.5 text-xs">{l.vehicle_interest || "—"}</td>
-                        <td className="py-2.5"><span className="text-[10px] font-semibold bg-muted px-1.5 py-0.5 rounded">{l.source}</span></td>
-                        <td className="py-2.5">
-                          <select
-                            value={l.status}
-                            onChange={(e) => updateLead(l.id, { status: e.target.value as "new" | "contacted" | "converted" | "lost" })}
-                            className="text-[10px] font-semibold bg-muted border-0 rounded px-1.5 py-0.5 cursor-pointer"
-                          >
-                            <option value="new">New</option>
-                            <option value="contacted">Contacted</option>
-                            <option value="converted">Converted</option>
-                            <option value="lost">Lost</option>
-                          </select>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              )}
-            </div>
-          </div>
-        )}
-
-        {/* ─── Print Queue Tab ─── */}
-        {tab === "queue" && (
-          <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <div className="flex items-center gap-2">
-                  <ScanLine className="w-4 h-4 text-blue-600" />
-                  <h3 className="text-sm font-semibold text-foreground">Inventory Print Queue</h3>
-                </div>
-                <p className="text-xs text-muted-foreground mt-0.5">
-                  Vehicles scanned from the lot. Review, customize, and print stickers.
-                </p>
-              </div>
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => {
-                    clearCompleted();
-                    toast.success("Cleared completed items");
-                  }}
-                  className="inline-flex items-center gap-1.5 h-9 px-3 rounded-md border border-border text-xs font-medium hover:bg-muted transition-colors"
-                >
-                  <RotateCcw className="w-3.5 h-3.5" />
-                  Clear Completed
-                </button>
-                <button
-                  onClick={openScan}
-                  className="inline-flex items-center gap-1.5 h-9 px-3 rounded-md bg-primary text-primary-foreground text-xs font-medium hover:opacity-90"
-                >
-                  <ScanLine className="w-3.5 h-3.5" />
-                  Scan More
-                </button>
-              </div>
-            </div>
-
-            <div className="bg-card rounded-xl border border-border shadow-premium overflow-hidden">
-              {vinQueue.length === 0 ? (
-                <div className="px-5 py-12 text-center">
-                  <ScanLine className="w-8 h-8 text-muted-foreground/30 mx-auto mb-3" />
-                  <p className="text-sm font-medium text-foreground">No vehicles in queue</p>
-                  <p className="text-xs text-muted-foreground mt-1">Go to the lot, open the scanner on your phone, and scan VINs to populate this queue.</p>
-                  <button
-                    onClick={openScan}
-                    className="mt-4 inline-flex items-center gap-1.5 h-9 px-4 rounded-md bg-primary text-primary-foreground text-xs font-medium hover:opacity-90"
-                  >
-                    <ScanLine className="w-3.5 h-3.5" />
-                    Open Scanner
-                  </button>
-                </div>
-              ) : (
-                <div>
-                  {/* Queue header */}
-                  <div className="px-5 py-3 bg-muted/30 flex items-center justify-between text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-                    <span>{vinQueue.length} vehicle{vinQueue.length !== 1 ? "s" : ""} in queue</span>
-                    <span>{vinQueue.filter(q => q.status === "queued").length} awaiting print</span>
-                  </div>
-
-                  {vinQueue.map(item => {
-                    const decoded = (item.decoded_data as any)?.decoded;
-                    const ymm = decoded?.ymm || `VIN: ${item.vin}`;
-                    const isQueued = item.status === "queued";
-                    const isCompleted = item.status === "completed";
-
-                    return (
-                      <div
-                        key={item.id}
-                        className={`px-5 py-4 border-b border-border last:border-0 ${isCompleted ? "opacity-50" : ""}`}
-                      >
-                        <div className="flex items-start justify-between gap-3">
-                          <div className="flex items-start gap-3 flex-1 min-w-0">
-                            <div className={`w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0 ${
-                              isCompleted ? "bg-emerald-50" : "bg-muted"
-                            }`}>
-                              {isCompleted ? (
-                                <CheckCircle2 className="w-5 h-5 text-emerald-500" />
-                              ) : (
-                                <Car className="w-5 h-5 text-muted-foreground" />
-                              )}
-                            </div>
-                            <div className="flex-1 min-w-0">
-                              <p className="text-sm font-semibold text-foreground truncate">{ymm}</p>
-                              <div className="flex items-center gap-3 mt-0.5 text-xs text-muted-foreground">
-                                {item.stock_number && <span>Stock: {item.stock_number}</span>}
-                                {item.mileage && <span>{parseInt(item.mileage).toLocaleString()} mi</span>}
-                                {item.condition && <span className="capitalize">{item.condition}</span>}
-                              </div>
-                              <p className="text-[10px] text-muted-foreground mt-0.5 font-mono">{item.vin}</p>
-                              {item.notes && <p className="text-[10px] text-muted-foreground mt-0.5 italic">{item.notes}</p>}
-                              <p className="text-[10px] text-muted-foreground mt-1">
-                                Scanned {format(new Date(item.scanned_at), "M/d/yy h:mm a")}
-                              </p>
-                            </div>
-                          </div>
-
-                          <div className="flex items-center gap-1.5 flex-shrink-0">
-                            {isQueued && (
-                              <>
-                                <button
-                                  onClick={() => {
-                                    // Navigate to addendum builder with this vehicle's data pre-filled
-                                    const params = new URLSearchParams();
-                                    params.set("vin", item.vin);
-                                    params.set("stock", item.stock_number || "");
-                                    params.set("ymm", decoded?.ymm || "");
-                                    navigate(`/?${params.toString()}`);
-                                    updateQueueItem(item.id, { status: "processing" });
-                                  }}
-                                  className="inline-flex items-center gap-1 h-8 px-3 rounded-md bg-primary text-primary-foreground text-xs font-medium hover:opacity-90"
-                                >
-                                  <Printer className="w-3 h-3" />
-                                  Print
-                                </button>
-                                <button
-                                  onClick={() => {
-                                    updateQueueItem(item.id, { status: "completed" });
-                                    toast.success("Marked complete");
-                                  }}
-                                  className="h-8 w-8 rounded-md border border-border flex items-center justify-center hover:bg-muted"
-                                >
-                                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
-                                </button>
-                              </>
-                            )}
-                            <button
-                              onClick={() => {
-                                removeQueueItem(item.id);
-                                toast.success("Removed from queue");
-                              }}
-                              className="h-8 w-8 rounded-md border border-border flex items-center justify-center hover:bg-destructive/5"
-                            >
-                              <Trash2 className="w-3.5 h-3.5 text-destructive" />
-                            </button>
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-          </div>
-        )}
-
-        {/* ─── Get-Ready Tab ─── */}
+        {/* ─── Get-Ready Setup Tab ─── */}
+        {/* Config only. The install-proof work surface (records, photos,
+            F&I notify) lives on /prep under Install Proof. */}
         {tab === "getready" && (
           <div className="space-y-4">
-            {/* Wave 19 — email distribution panel surfaces here
-                because get-ready completion is the workflow that
-                consumes the F&I list. Edits propagate via the
-                Wave 14.6 realtime sync. */}
-            <EmailDistributionPanel storeId={currentStore?.id || ""} />
-
             <div className="flex items-center justify-between">
               <div>
                 <div className="flex items-center gap-2">
                   <Clock className="w-4 h-4 text-blue-600" />
-                  <h3 className="text-sm font-semibold text-foreground">Vehicle Get-Ready Tracker</h3>
+                  <h3 className="text-sm font-semibold text-foreground">Get-Ready Setup</h3>
                 </div>
                 <p className="text-xs text-muted-foreground mt-0.5">
-                  Track vehicle preparation from acquisition to inventory-ready. Proves accessories installed before listing date.
+                  Configure the internal service catalog. Day-to-day install proof and records live in{" "}
+                  <button onClick={() => navigate("/prep?view=installs")} className="text-blue-600 font-semibold hover:underline">Prep &amp; Install</button>.
                 </p>
               </div>
-              <button
-                onClick={() => setStartGetReadyOpen(true)}
-                className="h-10 px-4 rounded-xl bg-blue-600 text-white text-sm font-semibold hover:bg-blue-700 shadow-sm shadow-blue-600/30 ring-1 ring-inset ring-white/15 inline-flex items-center gap-2 shrink-0"
-              >
-                <Plus className="w-4 h-4" /> Start Get-Ready
-              </button>
             </div>
-            <StartGetReadyModal open={startGetReadyOpen} onClose={() => setStartGetReadyOpen(false)} onCreate={createGetReady} />
 
             {/* Configurable internal service catalog (non-customer charge) */}
-            <div className="rounded-2xl border border-border-custom bg-card p-4">
+            <div id="getready-catalog" className="rounded-2xl border border-border-custom bg-card p-4">
               <div className="flex items-center justify-between">
                 <button onClick={() => setSvcOpen((o) => !o)} className="flex items-center gap-2 text-left min-w-0">
                   <span className={`text-muted-foreground transition-transform ${svcOpen ? "rotate-90" : ""}`}>›</span>
@@ -2520,175 +2058,7 @@ const Admin = () => {
               </>)}
             </div>
 
-            {/* Stats */}
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-              <StatMini icon={Clock} label="Pending" value={getReadyRecords.filter(r => r.status === "pending" || r.status === "in_progress").length} color="text-amber-600" />
-              <StatMini icon={CheckCircle2} label="Ready" value={getReadyRecords.filter(r => r.status === "ready").length} color="text-emerald-600" />
-              <StatMini icon={Car} label="In Inventory" value={getReadyRecords.filter(r => r.status === "inventory").length} color="text-blue-600" />
-              <StatMini icon={FileText} label="Total" value={getReadyRecords.length} color="text-foreground" />
-            </div>
-
-            {/* Records list */}
-            <div className="bg-card rounded-xl border border-border shadow-premium overflow-hidden">
-              {getReadyRecords.length === 0 ? (
-                <div className="px-5 py-12 text-center">
-                  <Clock className="w-8 h-8 text-muted-foreground/30 mx-auto mb-3" />
-                  <p className="text-sm font-medium text-foreground">No get-ready records yet</p>
-                  <p className="text-xs text-muted-foreground mt-1">When you create a sticker for a vehicle, a get-ready record can be generated automatically.</p>
-                </div>
-              ) : (
-                <div>
-                  <div className="px-5 py-2.5 bg-muted/30 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground flex items-center justify-between">
-                    <span>{getReadyRecords.length} vehicle{getReadyRecords.length !== 1 ? "s" : ""}</span>
-                    <span>{getPendingGetReady().length} pending</span>
-                  </div>
-                  {getReadyRecords.map(record => {
-                    const timeline = validateTimeline(record);
-                    const completedItems = record.items.filter(i => i.status === "complete").length;
-                    const totalItems = record.items.length;
-                    const pct = totalItems > 0 ? Math.round((completedItems / totalItems) * 100) : 0;
-
-                    return (
-                      <div key={record.id} className="px-5 py-4 border-b border-border last:border-0">
-                        <div className="flex items-start justify-between gap-3">
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2">
-                              <p className="text-sm font-semibold text-foreground truncate">{record.ymm}</p>
-                              <span className={`text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded ${
-                                record.status === "inventory" ? "bg-blue-50 text-blue-700" :
-                                record.status === "ready" ? "bg-emerald-50 text-emerald-700" :
-                                "bg-amber-50 text-amber-700"
-                              }`}>{record.status.replace(/_/g, " ")}</span>
-                              {record.inspectionRequired && (
-                                <span
-                                  className={`text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded ${
-                                    record.inspectionComplete ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-700"
-                                  }`}
-                                  title={record.inspectionComplete ? "Safety inspection on file" : "Safety inspection required before delivery"}
-                                >
-                                  {record.inspectionComplete ? "Inspection done" : "Inspection due"}
-                                  {record.inspectionFormType ? ` · ${record.inspectionFormType}` : ""}
-                                </span>
-                              )}
-                            </div>
-                            <div className="flex items-center gap-3 mt-0.5 text-xs text-muted-foreground">
-                              <span className="font-mono">{record.vin}</span>
-                              {record.stockNumber && <span>Stock: {record.stockNumber}</span>}
-                              <button
-                                onClick={() => setSheetRecord(record)}
-                                className="inline-flex items-center gap-1 text-[10px] font-semibold text-navy hover:underline"
-                              >
-                                Installer sheet
-                              </button>
-                            </div>
-
-                            {/* Timeline dates */}
-                            <div className="mt-2 flex flex-wrap gap-3 text-[10px]">
-                              <span className="text-muted-foreground">Acquired: <strong className="text-foreground">{record.acquiredDate ? format(new Date(record.acquiredDate), "M/d/yy") : "—"}</strong></span>
-                              <span className="text-muted-foreground">Get-Ready: <strong className="text-foreground">{record.getReadyCompleteDate ? format(new Date(record.getReadyCompleteDate), "M/d/yy") : "In progress"}</strong></span>
-                              <span className="text-muted-foreground">Inventory: <strong className="text-foreground">{record.inventoryDate ? format(new Date(record.inventoryDate), "M/d/yy") : "Pending"}</strong></span>
-                            </div>
-
-                            {/* Progress bar */}
-                            <div className="mt-2 flex items-center gap-2">
-                              <div className="flex-1 h-1.5 bg-muted rounded-full overflow-hidden">
-                                <div className={`h-full rounded-full ${pct === 100 ? "bg-emerald-500" : "bg-blue-500"}`} style={{ width: `${pct}%` }} />
-                              </div>
-                              <span className="text-[10px] text-muted-foreground tabular-nums">{completedItems}/{totalItems}</span>
-                            </div>
-
-                            {/* Timeline warnings */}
-                            {!timeline.valid && (
-                              <div className="mt-2 space-y-1">
-                                {timeline.warnings.map((w, i) => (
-                                  <p key={i} className="text-[10px] text-destructive font-medium flex items-start gap-1">
-                                    <span className="flex-shrink-0">⚠</span> {w}
-                                  </p>
-                                ))}
-                              </div>
-                            )}
-
-                            {/* Wave 17 — per-accessory install panel.
-                                Renders the photos + signature workflow
-                                for every pending accessory. Already-
-                                installed rows show as compact green
-                                summary chips with photo count + signed
-                                indicator. Provides install-time proof
-                                that flows into the Audit-Defense Packet. */}
-                            {record.accessoriesToInstall && record.accessoriesToInstall.length > 0 && (
-                              <div className="mt-3">
-                                <AccessoryInstallPanel
-                                  record={record}
-                                  onMarkInstalled={async (recordId, productId, installedBy, proof) => {
-                                    await markAccessoryInstalled(recordId, productId, installedBy, proof);
-                                  }}
-                                />
-                              </div>
-                            )}
-
-                            {/* Wave 19 — "Send to inventory + notify
-                                F&I". Fires the get-ready completion
-                                email to subscribed recipients, then
-                                marks the record as inventory. If no
-                                subscribers exist, the email no-ops
-                                quietly (with a toast nudge) but the
-                                inventory move still happens. */}
-                            {record.status === "ready" && (
-                              <div className="mt-3 flex items-center justify-end">
-                                <button
-                                  disabled={emailSending}
-                                  onClick={async () => {
-                                    const accessories = (record.accessoriesToInstall || []).map(a => ({
-                                      name: a.productName,
-                                      installed: a.installed,
-                                      installedDate: a.installedDate,
-                                      installedBy: a.installedBy,
-                                      photoCount: (a.install_photos || []).length,
-                                      signed: !!a.installer_signature_data,
-                                    }));
-                                    const sent = await sendGetReadyComplete({
-                                      dealerName: currentStore?.name || settings.dealer_name || "Your dealership",
-                                      vehicleYmm: record.ymm,
-                                      vehicleVin: record.vin,
-                                      stockNumber: record.stockNumber,
-                                      acquiredDate: record.acquiredDate,
-                                      getReadyStartDate: record.getReadyStartDate,
-                                      getReadyCompleteDate: record.getReadyCompleteDate || new Date().toISOString(),
-                                      accessories,
-                                      deepLinkUrl: `${window.location.origin}/admin?tab=files`,
-                                    });
-                                    await markInventory(record.id);
-                                    if (sent) {
-                                      toast.success("Notified F&I distribution · moved to inventory");
-                                    } else {
-                                      toast.info("Moved to inventory · no F&I subscribers on file yet");
-                                    }
-                                  }}
-                                  className="inline-flex items-center gap-1.5 h-9 px-4 rounded-lg bg-gradient-to-r from-[#3BB4FF] to-[#1E90FF] text-white text-xs font-display font-black shadow-premium hover:brightness-110 disabled:opacity-60"
-                                >
-                                  {emailSending ? "Sending…" : "Send to inventory · notify F&I"}
-                                </button>
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
           </div>
-        )}
-
-        {/* ─── Inventory Tab ─── */}
-        {sheetRecord && (
-          <GetReadySheet
-            open={!!sheetRecord}
-            onClose={() => setSheetRecord(null)}
-            record={sheetRecord}
-            dealerName={currentStore?.name || settings.dealer_name}
-          />
         )}
 
         {/* ─── Invoices Tab ─── */}
@@ -2894,7 +2264,179 @@ const Admin = () => {
         {tab === "print-settings" && <PrintSettingsPanel />}
 
         {tab === "document-rules" && <DocumentRulesPanel />}
-        {tab === "incentives" && <IncentivesSettingsPanel />}
+
+        {/* ─── Pricing & Incentives Tab ─── */}
+        {/* All customer-price controls in one place: doc fee, price display,
+            comps, Today's Price wording, incentive programs, elections, and
+            the price audit/integrity panels (moved here from the audit tab). */}
+        {tab === "incentives" && (
+          <div className="space-y-4">
+            <div id="doc-fee" className="bg-card rounded-lg p-4 shadow-sm">
+              <h4 className="text-sm font-bold text-foreground mb-2">Dealer Documentation Fee</h4>
+              <p className="text-xs text-muted-foreground mb-3">Add a state-compliant documentation fee to every addendum. The correct terminology auto-applies based on your state.</p>
+              <div className="flex items-center justify-between mb-3">
+                <span className="text-sm font-semibold text-foreground">Enable Doc Fee</span>
+                <Switch
+                  checked={!!settings.doc_fee_enabled}
+                  onCheckedChange={(v) => updateSettings({ doc_fee_enabled: v })}
+                  className="data-[state=checked]:bg-teal"
+                />
+              </div>
+              {settings.doc_fee_enabled && (
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-xs font-semibold text-muted-foreground">State</label>
+                    <select
+                      value={settings.doc_fee_state}
+                      onChange={(e) => updateSettings({ doc_fee_state: e.target.value })}
+                      className="w-full px-3 py-2 border border-border-custom rounded text-sm"
+                    >
+                      {STATE_DOC_FEES.map(s => (
+                        <option key={s.stateCode} value={s.stateCode}>{s.state} — "{s.terminology}"{s.maxFee ? ` (max $${s.maxFee})` : ""}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-xs font-semibold text-muted-foreground">Amount ($)</label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      value={docFeeDraft ?? String(settings.doc_fee_amount)}
+                      onChange={(e) => setDocFeeDraft(e.target.value)}
+                      onBlur={() => {
+                        if (docFeeDraft == null) return;
+                        const next = parseFloat(docFeeDraft) || 0;
+                        setDocFeeDraft(null);
+                        if (next === settings.doc_fee_amount) return;
+                        if (!window.confirm(`Change the doc fee to $${next.toFixed(2)}? This recalculates stored sale prices across your inventory.`)) return;
+                        updateSettings({ doc_fee_amount: next });
+                      }}
+                      className="w-full px-3 py-2 border border-border-custom rounded text-sm"
+                    />
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div id="price-display" className="bg-card rounded-lg p-4 shadow-sm">
+              <h4 className="text-sm font-bold text-foreground mb-2">Customer Price Display</h4>
+              <select
+                value={settings.price_display_mode || "advertised_before_doc"}
+                onChange={(e) => updateSettings({ price_display_mode: e.target.value as DealerSettings["price_display_mode"] })}
+                className="w-full px-3 py-2 border border-border-custom rounded text-sm"
+              >
+                <option value="advertised_before_doc">Advertised price (before doc fee) — disclose fee separately</option>
+                <option value="website_sale_price">Website sale price (doc fee included)</option>
+              </select>
+              <p className="text-[11px] text-muted-foreground mt-1">
+                Controls the price shown on the customer Passport. The advertised price is always compared to market before the doc fee.
+              </p>
+            </div>
+
+            <div id="comp-strategy" className="bg-card rounded-lg p-4 shadow-sm">
+              <h4 className="text-sm font-bold text-foreground mb-2">Market Comparison Pricing</h4>
+              <select
+                value={settings.comp_settings?.compStrategy || "value_building"}
+                onChange={(e) => updateSettings({ comp_settings: { ...(settings.comp_settings || {}), compStrategy: e.target.value as CompStrategy } })}
+                className="w-full px-3 py-2 border border-border-custom rounded text-sm"
+              >
+                {COMP_STRATEGY_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+              </select>
+              <p className="text-[11px] text-muted-foreground mt-1">
+                Controls how comparable vehicles are selected for customer-facing market panels.{" "}
+                {COMP_STRATEGY_OPTIONS.find((o) => o.value === (settings.comp_settings?.compStrategy || "value_building"))?.help}
+              </p>
+              {(settings.comp_settings?.compStrategy || "value_building") === "value_building" && (
+                <label className="flex items-start gap-2 text-xs text-foreground mt-2">
+                  <input
+                    type="checkbox" className="mt-0.5"
+                    checked={!!settings.comp_settings?.includeLowerPricedComps}
+                    onChange={(e) => updateSettings({ comp_settings: { ...(settings.comp_settings || {}), includeLowerPricedComps: e.target.checked } })}
+                  />
+                  <span>Also allow slightly lower-priced comps (within 3% of this vehicle's price). Off by default so comps never undercut your vehicle.</span>
+                </label>
+              )}
+            </div>
+
+            <div id="todays-price" className="bg-card rounded-lg p-4 shadow-sm">
+              <h4 className="text-sm font-bold text-foreground mb-2">Today's Price page wording</h4>
+              <select
+                value={settings.todays_price_mode || "payment_estimate"}
+                onChange={(e) => updateSettings({ todays_price_mode: e.target.value as DealerSettings["todays_price_mode"] })}
+                className="w-full px-3 py-2 border border-border-custom rounded text-sm"
+              >
+                {TODAYS_PRICE_MODE_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+              </select>
+              <p className="text-[11px] text-muted-foreground mt-1">
+                {TODAYS_PRICE_MODE_OPTIONS.find((o) => o.value === (settings.todays_price_mode || "payment_estimate"))?.hint}
+              </p>
+              {(() => {
+                const custom = { ...DEFAULT_TODAYS_PRICE_CUSTOM, ...(settings.todays_price_custom || {}) };
+                const setCustom = (patch: Partial<typeof custom>) => updateSettings({ todays_price_custom: { ...custom, ...patch } });
+                const preview = resolveTodaysPrice({ todays_price_mode: settings.todays_price_mode, todays_price_custom: custom });
+                return (
+                  <div className="mt-2 space-y-2">
+                    {settings.todays_price_mode === "custom" && (
+                      <>
+                        <div>
+                          <label className="text-xs font-semibold text-muted-foreground">Headline</label>
+                          <input value={custom.headline} onChange={(e) => setCustom({ headline: e.target.value })} placeholder="Today's Price" className="w-full px-3 py-2 border border-border-custom rounded text-sm" />
+                        </div>
+                        <div>
+                          <label className="text-xs font-semibold text-muted-foreground">Subheadline</label>
+                          <input value={custom.sub} onChange={(e) => setCustom({ sub: e.target.value })} placeholder="Personalize your payment estimate for this vehicle." className="w-full px-3 py-2 border border-border-custom rounded text-sm" />
+                        </div>
+                        <div>
+                          <label className="text-xs font-semibold text-muted-foreground">Button text</label>
+                          <input value={custom.cta} onChange={(e) => setCustom({ cta: e.target.value })} placeholder="Request Payment Details" className="w-full px-3 py-2 border border-border-custom rounded text-sm" />
+                        </div>
+                        <div>
+                          <label className="text-xs font-semibold text-muted-foreground">Disclaimer</label>
+                          <textarea value={custom.disclaimer} onChange={(e) => setCustom({ disclaimer: e.target.value })} rows={2} placeholder="Estimate only, with approved credit…" className="w-full px-3 py-2 border border-border-custom rounded text-sm resize-none" />
+                        </div>
+                        <label className="flex items-start gap-2 text-xs text-foreground">
+                          <input type="checkbox" className="mt-0.5" checked={custom.allow_otd_wording} onChange={(e) => setCustom({ allow_otd_wording: e.target.checked })} />
+                          <span>Allow out-the-door / "best price" wording in custom copy. When off, copy containing that language falls back to the safe default.</span>
+                        </label>
+                      </>
+                    )}
+                    <div className="grid grid-cols-2 gap-x-4 gap-y-1.5">
+                      {([
+                        ["show_calculator", "Show payment calculator"],
+                        ["show_down", "Show down payment slider"],
+                        ["show_term", "Show term selector"],
+                        ["show_apr", "Show APR slider"],
+                      ] as ["show_calculator" | "show_down" | "show_term" | "show_apr", string][]).map(([key, label]) => (
+                        <label key={key} className="flex items-center gap-2 text-xs text-foreground">
+                          <input type="checkbox" checked={custom[key]} onChange={(e) => setCustom({ [key]: e.target.checked })} />
+                          {label}
+                        </label>
+                      ))}
+                    </div>
+                    <p className="text-[11px] text-muted-foreground border-t border-border pt-2">
+                      Shoppers will see: <span className="font-semibold text-foreground">{preview.headline}</span> — {preview.sub} · Button: <span className="font-semibold text-foreground">{preview.cta}</span>
+                    </p>
+                  </div>
+                );
+              })()}
+            </div>
+
+            <div id="incentive-programs">
+              <IncentivesSettingsPanel />
+            </div>
+            <div id="addon-elections">
+              <AddonElectionsPanel storeId={currentStore?.id || ""} />
+            </div>
+            <div id="price-audit">
+              <PriceAuditPanel />
+            </div>
+            {isAdmin && (
+              <div id="price-integrity">
+                <PriceIntegrityPanel />
+              </div>
+            )}
+          </div>
+        )}
 
         {tab === "features" && <EnabledFeaturesPanel />}
 
@@ -2904,8 +2446,6 @@ const Admin = () => {
                 cross-VIN price reconciliation overview stays super-admin only. */}
             <MarketcheckSyncCard />
             <MarketcheckDataHealthCard />
-            <PriceAuditPanel />
-            {isAdmin && <PriceIntegrityPanel />}
             <div className="flex items-center justify-between flex-wrap gap-2">
               <div>
                 <div className="flex items-center gap-2">

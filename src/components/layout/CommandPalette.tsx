@@ -24,17 +24,14 @@ import {
   Plus,
   LogOut,
   Settings,
-  Palette,
-  ToggleLeft,
   Users,
-  BarChart3,
   Store,
   CreditCard,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useEntitlements } from "@/hooks/useEntitlements";
-import { hasDealerCapability } from "@/lib/permissions/dealerRoleCapabilities";
-import { canSeeAdminTab, type AdminTab } from "@/lib/permissions/adminTabAccess";
+import { hasAnyDealerCapability, hasDealerCapability } from "@/lib/permissions/dealerRoleCapabilities";
+import { ADMIN_SETTINGS_INDEX, settingEntryHref } from "@/lib/adminSearchIndex";
 import { useViewTransitionNavigate } from "@/lib/navigation";
 import { useVinScan } from "@/contexts/VinScanContext";
 import { supabase } from "@/integrations/supabase/client";
@@ -50,7 +47,6 @@ const CommandPalette = ({ open, onOpenChange }: CommandPaletteProps) => {
   const { member } = useEntitlements();
   const role = member?.role;
   const navigate = useViewTransitionNavigate();
-  const seeTab = (tab: AdminTab) => canSeeAdminTab(role, tab, isAdmin);
   const canManageBilling = hasDealerCapability(role, "can_manage_billing", isAdmin);
 
   const go = (path: string) => {
@@ -163,22 +159,23 @@ const CommandPalette = ({ open, onOpenChange }: CommandPaletteProps) => {
         <CommandSeparator />
 
         {(() => {
-          const adminEntries: { tab: AdminTab; label: string; icon: typeof Settings }[] = [
-            { tab: "products", label: "Products", icon: Settings },
-            { tab: "branding", label: "Branding", icon: Palette },
-            { tab: "settings", label: "Store Settings", icon: ToggleLeft },
-            { tab: "audit", label: "Audit Log", icon: ShieldCheck },
-            { tab: "leads", label: "Leads", icon: Users },
-            { tab: "analytics", label: "Analytics", icon: BarChart3 },
-          ];
-          const visible = adminEntries.filter((e) => seeTab(e.tab));
+          // Generated settings index: label OR dealer-vocabulary keywords match
+          // the typed query (cmdk matches value + keywords), gated per-tab caps.
+          const visible = ADMIN_SETTINGS_INDEX.filter((entry) =>
+            hasAnyDealerCapability(role, entry.caps, isAdmin)
+          );
           if (visible.length === 0) return null;
           return (
-            <CommandGroup heading="Admin">
-              {visible.map(({ tab, label, icon: Icon }) => (
-                <CommandItem key={tab} onSelect={() => go(`/admin?tab=${tab}`)}>
-                  <Icon className="w-4 h-4 mr-2" />
-                  {label}
+            <CommandGroup heading="Settings">
+              {visible.map((entry) => (
+                <CommandItem
+                  key={`${entry.tab}:${entry.panel || ""}:${entry.label}`}
+                  value={`${entry.label} ${entry.tab} ${entry.panel || ""}`}
+                  keywords={entry.keywords}
+                  onSelect={() => go(settingEntryHref(entry))}
+                >
+                  <Settings className="w-4 h-4 mr-2" />
+                  {entry.label}
                 </CommandItem>
               ))}
             </CommandGroup>

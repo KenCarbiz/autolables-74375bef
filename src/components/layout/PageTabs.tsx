@@ -49,5 +49,6 @@ export const DEALS_TABS: PageTab[] = [
   { label: "Out for Signature", to: "/signatures" },
   { label: "Signed", to: "/signed" },
   { label: "Delivered", to: "/delivered" },
+  { label: "Returns", to: "/returns" },
 ];
 

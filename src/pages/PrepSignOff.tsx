@@ -3,12 +3,18 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { useTenant } from "@/contexts/TenantContext";
 import { useAudit } from "@/contexts/AuditContext";
+import { useDealerSettings } from "@/contexts/DealerSettingsContext";
 import { usePrepSignOff, type InstallPhoto, type InstalledAccessory } from "@/hooks/usePrepSignOff";
-import { useGetReady } from "@/hooks/useGetReady";
+import { useGetReady, type GetReadyRecord } from "@/hooks/useGetReady";
+import { useEmailDistribution } from "@/hooks/useEmailDistribution";
+import { AccessoryInstallPanel } from "@/components/admin/AccessoryInstallPanel";
+import { EmailDistributionPanel } from "@/components/admin/EmailDistributionPanel";
+import { GetReadySheet } from "@/components/admin/GetReadySheet";
+import { StartGetReadyModal } from "@/components/admin/StartGetReadyModal";
 import SignaturePad from "@/components/addendum/SignaturePad";
 import { toast } from "sonner";
 import { format } from "date-fns";
-import { ShieldCheck, Camera, Check, X, AlertTriangle, ClipboardCheck, Image as ImageIcon, Upload, FileSignature, ArrowRight, Car, Wrench, ChevronLeft } from "lucide-react";
+import { ShieldCheck, Camera, Check, X, AlertTriangle, Clock, CheckCircle2, ClipboardCheck, FileText, Image as ImageIcon, Upload, FileSignature, ArrowRight, Car, Wrench, ChevronLeft, Plus } from "lucide-react";
 import EmptyState from "@/components/ui/empty-state";
 import { uploadPhoto } from "@/lib/storage";
 
@@ -18,7 +24,7 @@ const PrepSignOff = () => {
   const { log } = useAudit();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
-  const view = (searchParams.get("view") || "list") as "list" | "new" | "detail";
+  const view = (searchParams.get("view") || "list") as "list" | "new" | "detail" | "installs";
   const id = searchParams.get("id") || "";
   const storeId = currentStore?.id || "";
   const { signOffs, pending, ready, createSignOff, signOff, reject, override, isListingAllowed } = usePrepSignOff(storeId);
@@ -52,6 +58,26 @@ const PrepSignOff = () => {
     if (!user) navigate("/login");
   }, [user, navigate]);
 
+  // Hoisted above the view branches so the hook order never changes when the
+  // ?view= param flips between list/new/detail/installs.
+  const filtered = useMemo(() => {
+    if (filter === "all") return signOffs;
+    if (filter === "pending") return signOffs.filter(s => s.status === "pending");
+    if (filter === "signed") return signOffs.filter(s => s.status === "signed");
+    if (filter === "rejected") return signOffs.filter(s => s.status === "rejected");
+    return signOffs;
+  }, [signOffs, filter]);
+
+  const signedToday = useMemo(() =>
+    signOffs.filter(s => s.signed_at && new Date(s.signed_at).toDateString() === new Date().toDateString()).length,
+    [signOffs]
+  );
+
+  const rejectedThisWeek = useMemo(() => {
+    const now = Date.now();
+    return signOffs.filter(s => s.status === "rejected" && (now - new Date(s.updated_at).getTime()) < 7 * 24 * 60 * 60 * 1000).length;
+  }, [signOffs]);
+
   if (!currentStore)
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -61,29 +87,45 @@ const PrepSignOff = () => {
       </div>
     );
 
-  // LIST VIEW
-  if (view === "list") {
-    const filtered = useMemo(() => {
-      if (filter === "all") return signOffs;
-      if (filter === "pending") return signOffs.filter(s => s.status === "pending");
-      if (filter === "signed") return signOffs.filter(s => s.status === "signed");
-      if (filter === "rejected") return signOffs.filter(s => s.status === "rejected");
-      return signOffs;
-    }, [signOffs, filter]);
+  const viewTabs = (
+    <div className="mb-6 overflow-x-auto">
+      <div className="inline-flex items-center gap-1 rounded-xl border border-border bg-muted/60 p-1">
+        {([
+          { key: "list", label: "Sign-Offs" },
+          { key: "installs", label: "Install Proof" },
+        ] as const).map((t) => (
+          <button
+            key={t.key}
+            onClick={() => setSearchParams(t.key === "list" ? {} : { view: t.key })}
+            className={`h-8 px-3.5 rounded-lg text-[13px] font-semibold whitespace-nowrap transition-all ${
+              (view === t.key || (t.key === "list" && view !== "installs")) ? "bg-card text-foreground shadow-sm ring-1 ring-border" : "text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            {t.label}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
 
-    const signedToday = useMemo(() =>
-      signOffs.filter(s => s.signed_at && new Date(s.signed_at).toDateString() === new Date().toDateString()).length,
-      [signOffs]
-    );
-
-    const rejectedThisWeek = useMemo(() => {
-      const now = Date.now();
-      return signOffs.filter(s => s.status === "rejected" && (now - new Date(s.updated_at).getTime()) < 7 * 24 * 60 * 60 * 1000).length;
-    }, [signOffs]);
-
+  // INSTALL PROOF VIEW — the get-ready work surface (moved from /admin?tab=getready)
+  if (view === "installs") {
     return (
       <div className="min-h-screen bg-background p-6">
         <div className="max-w-6xl mx-auto">
+          {viewTabs}
+          <InstallProofView storeId={storeId} storeName={currentStore.name} />
+        </div>
+      </div>
+    );
+  }
+
+  // LIST VIEW
+  if (view === "list") {
+    return (
+      <div className="min-h-screen bg-background p-6">
+        <div className="max-w-6xl mx-auto">
+          {viewTabs}
           <div className="flex items-center justify-between mb-8">
             <div>
               <h1 className="text-3xl font-bold text-foreground">Prep & Install Sign-Off</h1>
@@ -822,6 +864,205 @@ const PrepSignOff = () => {
 
   return null;
 };
+
+// Get-Ready install-proof work surface (moved from /admin?tab=getready):
+// records list with per-accessory photo+signature proof and the
+// "send to inventory / notify F&I" completion step. Config (the service
+// catalog) stays on Admin > Get-Ready Setup.
+const InstallProofView = ({ storeId, storeName }: { storeId: string; storeName: string }) => {
+  const { settings } = useDealerSettings();
+  const { records: getReadyRecords, getPending: getPendingGetReady, validateTimeline, markAccessoryInstalled, markInventory, createGetReady } = useGetReady(storeId);
+  const { sendGetReadyComplete, sending: emailSending } = useEmailDistribution(storeId);
+  const [startGetReadyOpen, setStartGetReadyOpen] = useState(false);
+  const [sheetRecord, setSheetRecord] = useState<GetReadyRecord | null>(null);
+
+  return (
+    <div className="space-y-4">
+      <EmailDistributionPanel storeId={storeId} />
+
+      <div className="flex items-center justify-between">
+        <div>
+          <div className="flex items-center gap-2">
+            <Clock className="w-4 h-4 text-blue-600" />
+            <h3 className="text-sm font-semibold text-foreground">Vehicle Get-Ready Tracker</h3>
+          </div>
+          <p className="text-xs text-muted-foreground mt-0.5">
+            Track vehicle preparation from acquisition to inventory-ready. Proves accessories installed before listing date.
+          </p>
+        </div>
+        <button
+          onClick={() => setStartGetReadyOpen(true)}
+          className="h-10 px-4 rounded-xl bg-blue-600 text-white text-sm font-semibold hover:bg-blue-700 shadow-sm shadow-blue-600/30 ring-1 ring-inset ring-white/15 inline-flex items-center gap-2 shrink-0"
+        >
+          <Plus className="w-4 h-4" /> Start Get-Ready
+        </button>
+      </div>
+      <StartGetReadyModal open={startGetReadyOpen} onClose={() => setStartGetReadyOpen(false)} onCreate={createGetReady} />
+
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        <InstallStat icon={Clock} label="Pending" value={getReadyRecords.filter(r => r.status === "pending" || r.status === "in_progress").length} color="text-amber-600" />
+        <InstallStat icon={CheckCircle2} label="Ready" value={getReadyRecords.filter(r => r.status === "ready").length} color="text-emerald-600" />
+        <InstallStat icon={Car} label="In Inventory" value={getReadyRecords.filter(r => r.status === "inventory").length} color="text-blue-600" />
+        <InstallStat icon={FileText} label="Total" value={getReadyRecords.length} color="text-foreground" />
+      </div>
+
+      <div className="bg-card rounded-xl border border-border shadow-premium overflow-hidden">
+        {getReadyRecords.length === 0 ? (
+          <div className="px-5 py-12 text-center">
+            <Clock className="w-8 h-8 text-muted-foreground/30 mx-auto mb-3" />
+            <p className="text-sm font-medium text-foreground">No get-ready records yet</p>
+            <p className="text-xs text-muted-foreground mt-1">When you create a sticker for a vehicle, a get-ready record can be generated automatically.</p>
+          </div>
+        ) : (
+          <div>
+            <div className="px-5 py-2.5 bg-muted/30 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground flex items-center justify-between">
+              <span>{getReadyRecords.length} vehicle{getReadyRecords.length !== 1 ? "s" : ""}</span>
+              <span>{getPendingGetReady().length} pending</span>
+            </div>
+            {getReadyRecords.map(record => {
+              const timeline = validateTimeline(record);
+              const completedItems = record.items.filter(i => i.status === "complete").length;
+              const totalItems = record.items.length;
+              const pct = totalItems > 0 ? Math.round((completedItems / totalItems) * 100) : 0;
+
+              return (
+                <div key={record.id} className="px-5 py-4 border-b border-border last:border-0">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <p className="text-sm font-semibold text-foreground truncate">{record.ymm}</p>
+                        <span className={`text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded ${
+                          record.status === "inventory" ? "bg-blue-50 text-blue-700" :
+                          record.status === "ready" ? "bg-emerald-50 text-emerald-700" :
+                          "bg-amber-50 text-amber-700"
+                        }`}>{record.status.replace(/_/g, " ")}</span>
+                        {record.inspectionRequired && (
+                          <span
+                            className={`text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded ${
+                              record.inspectionComplete ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-700"
+                            }`}
+                            title={record.inspectionComplete ? "Safety inspection on file" : "Safety inspection required before delivery"}
+                          >
+                            {record.inspectionComplete ? "Inspection done" : "Inspection due"}
+                            {record.inspectionFormType ? ` · ${record.inspectionFormType}` : ""}
+                          </span>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-3 mt-0.5 text-xs text-muted-foreground">
+                        <span className="font-mono">{record.vin}</span>
+                        {record.stockNumber && <span>Stock: {record.stockNumber}</span>}
+                        <button
+                          onClick={() => setSheetRecord(record)}
+                          className="inline-flex items-center gap-1 text-[10px] font-semibold text-navy hover:underline"
+                        >
+                          Installer sheet
+                        </button>
+                      </div>
+
+                      <div className="mt-2 flex flex-wrap gap-3 text-[10px]">
+                        <span className="text-muted-foreground">Acquired: <strong className="text-foreground">{record.acquiredDate ? format(new Date(record.acquiredDate), "M/d/yy") : "—"}</strong></span>
+                        <span className="text-muted-foreground">Get-Ready: <strong className="text-foreground">{record.getReadyCompleteDate ? format(new Date(record.getReadyCompleteDate), "M/d/yy") : "In progress"}</strong></span>
+                        <span className="text-muted-foreground">Inventory: <strong className="text-foreground">{record.inventoryDate ? format(new Date(record.inventoryDate), "M/d/yy") : "Pending"}</strong></span>
+                      </div>
+
+                      <div className="mt-2 flex items-center gap-2">
+                        <div className="flex-1 h-1.5 bg-muted rounded-full overflow-hidden">
+                          <div className={`h-full rounded-full ${pct === 100 ? "bg-emerald-500" : "bg-blue-500"}`} style={{ width: `${pct}%` }} />
+                        </div>
+                        <span className="text-[10px] text-muted-foreground tabular-nums">{completedItems}/{totalItems}</span>
+                      </div>
+
+                      {!timeline.valid && (
+                        <div className="mt-2 space-y-1">
+                          {timeline.warnings.map((w, i) => (
+                            <p key={i} className="text-[10px] text-destructive font-medium flex items-start gap-1">
+                              <AlertTriangle className="w-3 h-3 flex-shrink-0 mt-0.5" /> {w}
+                            </p>
+                          ))}
+                        </div>
+                      )}
+
+                      {/* Per-accessory install proof: photos + signature per
+                          pending accessory; installed rows collapse to summary
+                          chips. Flows into the Audit-Defense Packet. */}
+                      {record.accessoriesToInstall && record.accessoriesToInstall.length > 0 && (
+                        <div className="mt-3">
+                          <AccessoryInstallPanel
+                            record={record}
+                            onMarkInstalled={async (recordId, productId, installedBy, proof) => {
+                              await markAccessoryInstalled(recordId, productId, installedBy, proof);
+                            }}
+                          />
+                        </div>
+                      )}
+
+                      {/* Completion: notify the F&I distribution then move the
+                          record to inventory; no subscribers still moves it. */}
+                      {record.status === "ready" && (
+                        <div className="mt-3 flex items-center justify-end">
+                          <button
+                            disabled={emailSending}
+                            onClick={async () => {
+                              const accessories = (record.accessoriesToInstall || []).map(a => ({
+                                name: a.productName,
+                                installed: a.installed,
+                                installedDate: a.installedDate,
+                                installedBy: a.installedBy,
+                                photoCount: (a.install_photos || []).length,
+                                signed: !!a.installer_signature_data,
+                              }));
+                              const sent = await sendGetReadyComplete({
+                                dealerName: storeName || settings.dealer_name || "Your dealership",
+                                vehicleYmm: record.ymm,
+                                vehicleVin: record.vin,
+                                stockNumber: record.stockNumber,
+                                acquiredDate: record.acquiredDate,
+                                getReadyStartDate: record.getReadyStartDate,
+                                getReadyCompleteDate: record.getReadyCompleteDate || new Date().toISOString(),
+                                accessories,
+                                deepLinkUrl: `${window.location.origin}/admin?tab=files`,
+                              });
+                              await markInventory(record.id);
+                              if (sent) {
+                                toast.success("Notified F&I distribution · moved to inventory");
+                              } else {
+                                toast.info("Moved to inventory · no F&I subscribers on file yet");
+                              }
+                            }}
+                            className="inline-flex items-center gap-1.5 h-9 px-4 rounded-lg bg-gradient-to-r from-[#3BB4FF] to-[#1E90FF] text-white text-xs font-display font-black shadow-premium hover:brightness-110 disabled:opacity-60"
+                          >
+                            {emailSending ? "Sending…" : "Send to inventory · notify F&I"}
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      {sheetRecord && (
+        <GetReadySheet
+          open={!!sheetRecord}
+          onClose={() => setSheetRecord(null)}
+          record={sheetRecord}
+          dealerName={storeName || settings.dealer_name}
+        />
+      )}
+    </div>
+  );
+};
+
+const InstallStat = ({ icon: Icon, label, value, color }: { icon: typeof FileText; label: string; value: number; color: string }) => (
+  <div className="bg-card rounded-xl border border-border shadow-premium p-4">
+    <Icon className={`w-4 h-4 ${color} mb-2`} />
+    <div className="text-2xl font-semibold tracking-tight font-display tabular-nums text-foreground">{value}</div>
+    <p className="text-[11px] text-muted-foreground mt-0.5">{label}</p>
+  </div>
+);
 
 interface RejectModalProps {
   vin: string;
