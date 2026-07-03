@@ -17,6 +17,7 @@ import { MOCK_LISTING } from "./VehiclePassportV3";
 import { usePublicListing } from "@/hooks/usePublicListing";
 import PassportCtaDock from "@/components/passport/PassportCtaDock";
 import { GREEN, CARD } from "@/lib/passportTokens";
+import { QRCodeSVG } from "qrcode.react";
 
 // ──────────────────────────────────────────────────────────────
 // VehiclePassportGreatBuy — /v/:slug/great-buy
@@ -44,6 +45,51 @@ const GB_ANIM = `
 }
 @media print { .gb-fade { animation: none; } }
 `;
+
+// Print is a purpose-built 8.5x11 report, never the responsive web layout:
+// the screen DOM is hidden wholesale and a dedicated .gb-print document
+// renders instead. The footer uses grid + nowrap so it can never collapse
+// into the vertical letter stack the flex footer produced in print.
+const GB_PRINT = `
+@page { size: Letter portrait; margin: 0.5in; }
+.gb-print { display: none; }
+@media print {
+  html, body { background: #fff !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .gb-screen { display: none !important; }
+  .gb-print { display: block !important; width: 100%; max-width: none; color: #0F172A; font-family: Inter, -apple-system, BlinkMacSystemFont, sans-serif; }
+  .print-page { break-after: page; page-break-after: always; }
+  .print-page:last-child { break-after: auto; page-break-after: auto; }
+  .print-avoid { break-inside: avoid; page-break-inside: avoid; }
+  .print-footer { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 12px; width: 100%; font-size: 9px; color: #64748B; border-top: 1px solid #E5E7EB; padding-top: 8px; margin-top: 16px; break-inside: avoid; page-break-inside: avoid; }
+  .print-footer * { min-width: 0; writing-mode: horizontal-tb !important; text-orientation: mixed !important; }
+  .print-footer .print-meta { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+}
+`;
+
+// Static (non-animated) confidence ring for the printed report.
+const PrintRing = ({ score, color, size = 110 }: { score: number; color: string; size?: number }) => {
+  const r = size / 2 - 9, c = 2 * Math.PI * r;
+  return (
+    <div className="relative shrink-0" style={{ width: size, height: size }}>
+      <svg viewBox={`0 0 ${size} ${size}`} className="w-full h-full -rotate-90">
+        <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="#E6E8EC" strokeWidth="9" />
+        <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke={color} strokeWidth="9" strokeLinecap="round" strokeDasharray={c} strokeDashoffset={c * (1 - score / 100)} />
+      </svg>
+      <div className="absolute inset-0 flex flex-col items-center justify-center">
+        <span className={`${size >= 100 ? "text-[24px]" : "text-[18px]"} font-extrabold leading-none`}>{score}<span className={size >= 100 ? "text-[13px]" : "text-[10px]"}>%</span></span>
+        {size >= 100 && <span className="text-[6.5px] font-bold tracking-[0.12em] text-[#94A3B8] mt-0.5">CONFIDENCE SCORE</span>}
+      </div>
+    </div>
+  );
+};
+
+const PrintCard = ({ children, className = "", tone = "default" }: { children: React.ReactNode; className?: string; tone?: "default" | "amber" | "emerald" | "blue" }) => (
+  <div className={`print-avoid rounded-xl border p-3.5 ${tone === "amber" ? "border-amber-200 bg-amber-50/50" : tone === "emerald" ? "border-emerald-200 bg-emerald-50/50" : tone === "blue" ? "border-blue-200 bg-blue-50/40" : "border-[#E5E7EB] bg-white"} ${className}`}>{children}</div>
+);
+
+const PrintH = ({ children }: { children: React.ReactNode }) => (
+  <h2 className="text-[15px] font-extrabold tracking-tight text-[#0F172A]">{children}</h2>
+);
 
 const prefersReducedMotion = () =>
   typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -417,6 +463,8 @@ const VehiclePassportGreatBuy = () => {
     <div className="min-h-screen bg-[#F6F7F9] text-[#0F172A]" style={{ fontFamily: "Inter, -apple-system, BlinkMacSystemFont, sans-serif" }}>
       <Helmet><title>{`AutoLabels Buying Report — ${listing.ymm}`}</title>{isPreview && <meta name="robots" content="noindex" />}</Helmet>
       <style>{GB_ANIM}</style>
+      <style>{GB_PRINT}</style>
+      <div className="gb-screen">
       {isPreview && <div className="bg-amber-500 text-white text-center text-[12px] font-bold py-1.5 px-4">SAMPLE PREVIEW — design layout with placeholder data. Not a real listing.</div>}
 
       <header className="border-b border-[#E6E8EC] bg-white sticky top-0 z-20">
@@ -694,6 +742,274 @@ const VehiclePassportGreatBuy = () => {
       </main>
 
       {!ctaInView && <PassportCtaDock go={go} dealerPhone={d.dealerPhone || undefined} reviewRating={d.reviewRating} advisor={d.dealerTrust} routing={d.contactRouting} vehicle={{ storeId: listing.store_id, vehicleId: listing.id, vin: listing.vin }} />}
+      </div>
+
+      {/* ── Print-only Vehicle Intelligence Report (8.5x11) ─────────────
+          A purpose-built five-page document; the screen layout above is
+          hidden entirely in print. */}
+      <div className="gb-print">
+        {(() => {
+          const passportUrl = `${window.location.origin}/v/${slug}`;
+          const pageHeader = (
+            <div className="flex items-end justify-between border-b border-[#E5E7EB] pb-2 mb-4">
+              <div className="flex items-center gap-3">
+                <Logo variant="full" size={16} />
+                <span className="text-[13px] font-extrabold tracking-tight">Vehicle Intelligence Report</span>
+              </div>
+              <span className="text-[8.5px] text-[#64748B]">Generated {generatedAt} &nbsp;|&nbsp; VIN {listing.vin}{d.dealerName ? ` | ${d.dealerName}` : ""}</span>
+            </div>
+          );
+          const pageFooter = (page: number) => (
+            <div className="print-footer">
+              <Logo variant="full" size={12} />
+              <span className="print-meta">Vehicle Intelligence Report &nbsp;|&nbsp; Generated {generatedAt} &nbsp;|&nbsp; VIN {listing.vin}{d.dealerName ? ` | ${d.dealerName}` : ""}</span>
+              <span style={{ whiteSpace: "nowrap" }}>Page {page} of 5</span>
+            </div>
+          );
+          const scoreBar = (b: { icon: LucideIcon; label: string; score: number | null; note: string }) => (
+            <PrintCard key={b.label} tone={b.score == null ? "amber" : "default"} className="!p-3">
+              <div className="flex items-center justify-between gap-2">
+                <span className="inline-flex items-center gap-1.5 min-w-0"><b.icon className="w-3.5 h-3.5 text-[#2563EB] shrink-0" /><span className="text-[10px] font-bold truncate">{b.label}</span></span>
+                {b.score == null
+                  ? <span className="text-[8.5px] font-bold text-amber-700 whitespace-nowrap">Confirm</span>
+                  : <span className="text-[11px] font-extrabold whitespace-nowrap">{b.score}<span className="text-[8px] text-[#94A3B8]">/100</span></span>}
+              </div>
+              <div className="h-[5px] rounded-full bg-slate-100 overflow-hidden mt-1.5">
+                {b.score != null && <div className="h-full rounded-full" style={{ width: `${b.score}%`, background: b.score >= 80 ? "#22C55E" : b.score >= 70 ? BLUE_HEX : "#94A3B8" }} />}
+              </div>
+              <p className="text-[8.5px] text-[#64748B] mt-1.5 leading-snug">{b.note}</p>
+            </PrintCard>
+          );
+          const strengthsList = (
+            <PrintCard>
+              <PrintH>Verified Strengths</PrintH>
+              <ul className="mt-2 space-y-1.5">{why.slice(0, 8).map((w) => <li key={w} className="flex items-start gap-1.5 text-[9.5px]"><CheckCircle2 className="w-3 h-3 text-[#16A34A] shrink-0 mt-px" />{w}</li>)}</ul>
+            </PrintCard>
+          );
+          const confirmList = (
+            <PrintCard tone="amber">
+              <PrintH>Confirm Before Purchase</PrintH>
+              {confirmRows.length ? (
+                <ul className="mt-2 space-y-1.5">{confirmRows.map((k) => <li key={k} className="flex items-start gap-1.5 text-[9.5px] text-[#334155]"><Info className="w-3 h-3 text-amber-500 shrink-0 mt-px" />{k}</li>)}</ul>
+              ) : <p className="mt-2 text-[9.5px] text-[#334155]">Nothing outstanding — the key records in this report are verified.</p>}
+            </PrintCard>
+          );
+          return (
+            <>
+              {/* Page 1 — Executive summary */}
+              <section className="print-page">
+                {pageHeader}
+                <div className="flex gap-5">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-4">
+                      {score != null ? <PrintRing score={score} color={tier.color} /> : <div className="w-[110px] h-[110px] rounded-full border-2 border-dashed border-[#E6E8EC] flex items-center justify-center text-[8.5px] text-[#94A3B8] text-center px-3 shrink-0">Score pending verification</div>}
+                      <div className="min-w-0">
+                        <h1 className="text-[24px] font-extrabold tracking-tight leading-tight">{tier.headline}</h1>
+                        <p className="text-[10px] text-[#64748B] mt-1 leading-relaxed">Verified ownership, equipment, market position, and dealer data indicate this vehicle is worth serious consideration.</p>
+                      </div>
+                    </div>
+                    {trustBadges.length > 0 && (
+                      <div className="flex flex-wrap gap-1.5 mt-3">
+                        {trustBadges.map((b) => <span key={b} className="inline-flex items-center gap-1 text-[8.5px] font-semibold bg-emerald-50 border border-emerald-200 rounded-full px-2 py-0.5"><CheckCircle2 className="w-2.5 h-2.5 text-[#16A34A]" />{b}</span>)}
+                      </div>
+                    )}
+                    <PrintCard tone="blue" className="mt-3">
+                      <p className="text-[9.5px] leading-relaxed text-[#334155]">
+                        This {listing.ymm}{listing.trim ? ` ${listing.trim}` : ""} shows {strengthWords.length ? strengthWords.join(", ") : "verified"} signals.{confirmWords.length ? ` Confirm ${confirmWords.join(", ")} with the dealer before moving forward.` : " The verified data in this report supports moving forward."}
+                      </p>
+                    </PrintCard>
+                  </div>
+                  <div className="shrink-0" style={{ width: "3.2in" }}>
+                    {listing.hero_image_url && <img src={listing.hero_image_url} alt={listing.ymm ?? "Vehicle"} className="w-full rounded-lg border border-[#E5E7EB] object-cover" style={{ aspectRatio: "16/10" }} />}
+                    <p className="text-[13px] font-extrabold leading-tight mt-2">{listing.ymm}{listing.trim ? ` ${listing.trim}` : ""}</p>
+                    <p className="mt-0.5"><span className="text-[15px] font-extrabold">{d.price != null ? fmt$(d.price) : ""}</span>{listing.mileage != null && <span className="text-[9.5px] font-semibold text-[#64748B] ml-2">{listing.mileage.toLocaleString()} mi</span>}</p>
+                    {facts.length > 0 && (
+                      <div className="flex flex-wrap gap-1 mt-1.5">
+                        {facts.map((f) => <span key={f} className="text-[8px] font-semibold text-[#334155] bg-slate-100 border border-slate-200 rounded-full px-1.5 py-0.5">{f}</span>)}
+                      </div>
+                    )}
+                    {d.dealerName && <p className="text-[9px] font-semibold text-[#334155] mt-2 inline-flex items-center gap-1"><BadgeCheck className="w-3 h-3 text-[#16A34A]" /> {d.dealerName}</p>}
+                  </div>
+                </div>
+                {pageFooter(1)}
+              </section>
+
+              {/* Page 2 — AI summary + score breakdown */}
+              <section className="print-page">
+                {pageHeader}
+                <PrintCard>
+                  <PrintH>AI Buying Summary</PrintH>
+                  <p className="text-[9.5px] leading-relaxed text-[#334155] mt-1.5">
+                    This {listing.ymm}{listing.trim ? ` ${listing.trim}` : ""} ranks among the stronger vehicles currently available in your market. It combines{" "}
+                    {[d.belowMarket && d.belowMarket > 0 ? "below-market pricing" : null, lowMiles ? "low mileage" : null, d.cleanTitle && d.accidentCount === 0 ? "a clean ownership history" : null, d.warrantyStr ? "remaining factory warranty" : null, d.reviewRating != null && d.reviewRating >= 4.5 ? "strong owner satisfaction" : null].filter(Boolean).join(", ") || "verified vehicle data"}{" "}
+                    {d.belowMarket && d.belowMarket > 0 && d.price != null ? `— at ${fmt$(d.price)}, that's ${fmt$(d.belowMarket)} under comparable listings.` : "into a well-rounded purchase."}
+                  </p>
+                  {insights.length > 0 && (
+                    <div className="grid grid-cols-3 gap-2 mt-2.5">
+                      {insights.map(({ icon: Icon, label }) => (
+                        <div key={label} className="rounded-lg border border-blue-100 bg-blue-50/50 px-2 py-2 flex items-center gap-1.5">
+                          <Icon className="w-3 h-3 text-[#2563EB] shrink-0" /><span className="text-[8.5px] font-semibold text-[#1E3A8A] leading-tight">{label}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </PrintCard>
+                <div className="mt-4">
+                  <PrintH>Buying Score Breakdown</PrintH>
+                  <p className="text-[8.5px] text-[#64748B] mt-0.5">Pending items do not prevent review but should be verified before delivery.</p>
+                  {verified.length > 0 && <p className="text-[7.5px] font-bold uppercase tracking-[0.12em] text-emerald-700 mt-2.5">Verified Strengths</p>}
+                  <div className="grid grid-cols-2 gap-2 mt-1.5">{verified.map(scoreBar)}</div>
+                  {pendingCards.length > 0 && (
+                    <>
+                      <p className="text-[7.5px] font-bold uppercase tracking-[0.12em] text-amber-700 mt-3">Confirm Before Purchase</p>
+                      <div className="grid grid-cols-2 gap-2 mt-1.5">{pendingCards.map(scoreBar)}</div>
+                    </>
+                  )}
+                </div>
+                {pageFooter(2)}
+              </section>
+
+              {/* Page 3 — Strengths, confirmations, market comparison */}
+              <section className="print-page">
+                {pageHeader}
+                <div className="grid grid-cols-2 gap-3">
+                  {strengthsList}
+                  {confirmList}
+                </div>
+                <div className="mt-4 print-avoid">
+                  <PrintH>Market Comparison</PrintH>
+                  <p className="text-[8.5px] text-[#64748B] mt-0.5">How this vehicle compares to similar listings.</p>
+                  <table className="w-full mt-2 border border-[#E5E7EB] rounded-lg" style={{ borderCollapse: "collapse" }}>
+                    <thead>
+                      <tr className="bg-slate-50 text-left">
+                        {["Metric", "This Vehicle", "Market Average", "Advantage"].map((h) => <th key={h} className="text-[7.5px] font-bold uppercase tracking-wide text-[#64748B] px-2.5 py-1.5 border-b border-[#E5E7EB]">{h}</th>)}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {posRows.map((r) => (
+                        <tr key={r.k} className="border-b border-[#F1F5F9]">
+                          <td className="text-[9px] text-[#64748B] px-2.5 py-1.5">{r.k}</td>
+                          <td className="text-[9px] font-extrabold px-2.5 py-1.5">{r.v}</td>
+                          <td className="text-[9px] text-[#64748B] px-2.5 py-1.5">{r.m}</td>
+                          <td className="px-2.5 py-1.5">{r.a ? <span className={`text-[8px] font-bold rounded-full px-1.5 py-0.5 border ${r.a.good ? "bg-emerald-50 text-emerald-700 border-emerald-200" : "bg-slate-100 text-slate-600 border-slate-200"}`}>{r.a.text}</span> : <span className="text-[#CBD5E1] text-[9px]">—</span>}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                {pageFooter(3)}
+              </section>
+
+              {/* Page 4 — Ownership cost + comparables */}
+              <section className="print-page">
+                {pageHeader}
+                <PrintCard>
+                  <PrintH>5-Year Ownership Cost Estimate</PrintH>
+                  <p className="text-[8.5px] text-[#64748B] mt-0.5">Estimate based on fuel, insurance, maintenance, repairs, and registration averages. Actual costs vary by driver, location, and usage.</p>
+                  <div className="grid grid-cols-3 gap-2 mt-2.5">
+                    {[[fmt$(annualTotal), "Annual Average"], [fmt$(fiveYear), "5-Year Total"], [fmt$(perMonth), "Monthly Average"]].map(([v, k]) => (
+                      <div key={k} className="rounded-lg border border-[#E5E7EB] bg-slate-50/60 p-2 text-center"><p className="text-[12px] font-extrabold">{v}</p><p className="text-[8px] text-[#64748B] mt-0.5">{k}</p></div>
+                    ))}
+                  </div>
+                  <svg viewBox="0 0 300 80" className="w-full mt-2.5" style={{ maxHeight: "1.1in" }} aria-hidden="true">
+                    {[0, 0.5, 1].map((f) => (
+                      <g key={f}>
+                        <line x1="34" x2="292" y1={62 - f * 48} y2={62 - f * 48} stroke="#F1F5F9" strokeWidth="1" />
+                        <text x="28" y={65 - f * 48} textAnchor="end" fontSize="7" fill="#94A3B8">{fmtK(fiveYear * f)}</text>
+                      </g>
+                    ))}
+                    <polyline fill="none" stroke="#2563EB" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" points={[1, 2, 3, 4, 5].map((yr, i) => `${48 + i * 58},${62 - (yr / 5) * 48}`).join(" ")} />
+                    {[1, 2, 3, 4, 5].map((yr, i) => (
+                      <g key={yr}>
+                        <circle cx={48 + i * 58} cy={62 - (yr / 5) * 48} r="2.5" fill="#2563EB" stroke="#fff" strokeWidth="1" />
+                        <text x={48 + i * 58} y={74} textAnchor="middle" fontSize="7" fill="#64748B">Year {yr}</text>
+                      </g>
+                    ))}
+                  </svg>
+                </PrintCard>
+                {similar.length > 0 && (
+                  <div className="mt-4 print-avoid">
+                    <PrintH>Similar Vehicles in Your Market</PrintH>
+                    <p className="text-[8.5px] text-[#64748B] mt-0.5">Comparable listings and why this vehicle may be the stronger choice.</p>
+                    <div className="space-y-2 mt-2">
+                      <PrintCard tone="blue" className="!p-2.5 flex items-center gap-3">
+                        {listing.hero_image_url && <img src={listing.hero_image_url} alt="" className="rounded-md object-cover shrink-0" style={{ width: "1.1in", aspectRatio: "16/10" }} />}
+                        <div className="min-w-0 flex-1">
+                          <p className="text-[9.5px] font-extrabold leading-tight">{listing.ymm}{listing.trim ? ` ${listing.trim}` : ""} <span className="text-[7px] font-bold text-white bg-[#2563EB] rounded px-1 py-0.5 ml-1 align-middle">THIS VEHICLE</span></p>
+                          <p className="text-[8px] text-[#94A3B8]">{listing.mileage != null ? `${listing.mileage.toLocaleString()} mi` : ""}</p>
+                          <p className="text-[8.5px] text-[#334155] mt-0.5">{subjectPros.join(" · ")}</p>
+                        </div>
+                        <span className="text-[11px] font-extrabold shrink-0">{d.price != null ? fmt$(d.price) : "—"}</span>
+                      </PrintCard>
+                      {similar.map((sv, i) => (
+                        <PrintCard key={i} className="!p-2.5 flex items-center gap-3">
+                          {sv.image && <img src={sv.image} alt="" className="rounded-md object-cover shrink-0" style={{ width: "1.1in", aspectRatio: "16/10" }} />}
+                          <div className="min-w-0 flex-1">
+                            <p className="text-[9.5px] font-extrabold leading-tight">{sv.ymm}{sv.trim ? ` ${sv.trim}` : ""}</p>
+                            <p className="text-[8px] text-[#94A3B8]">{sv.mi > 0 ? `${sv.mi.toLocaleString()} mi` : ""}</p>
+                            <p className="text-[8.5px] text-[#334155] mt-0.5">{compSignals(sv).map((sig) => sig.text).join(" · ")}</p>
+                          </div>
+                          <span className="text-[11px] font-extrabold shrink-0">{fmt$(sv.price)}</span>
+                        </PrintCard>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {pageFooter(4)}
+              </section>
+
+              {/* Page 5 — Recommendation + decision + printed action block */}
+              <section className="print-page">
+                {pageHeader}
+                <PrintCard tone={score != null && score >= 80 ? "emerald" : "default"}>
+                  <p className="text-[7.5px] font-bold uppercase tracking-wide text-[#64748B]">AutoLabels Recommendation</p>
+                  <div className="flex items-center justify-between gap-4 mt-1">
+                    <div className="min-w-0">
+                      <p className="text-[16px] font-extrabold leading-tight">{tier.verdict}</p>
+                      <p className="text-[9.5px] text-[#334155] leading-relaxed mt-1">{recCopy}</p>
+                    </div>
+                    {score != null && <PrintRing score={score} color={score >= 60 ? GREEN : tier.color} size={72} />}
+                  </div>
+                </PrintCard>
+                <div className="grid grid-cols-2 gap-3 mt-3">
+                  <PrintCard>
+                    <PrintH>Buying Decision Matrix</PrintH>
+                    <div className="mt-1.5">
+                      {matrix.map((m) => (
+                        <div key={m.k} className="flex items-center justify-between gap-3 py-[3px] border-b border-[#F1F5F9]">
+                          <span className="text-[9px]">{m.k}</span>
+                          <span className={`text-[8px] font-bold px-1.5 py-0.5 rounded-full border ${ratingPill(m.s)}`}>{m.k === "Overall" && m.s == null ? "Pending" : ratingLabel(m.s)}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </PrintCard>
+                  <PrintCard>
+                    <PrintH>Why Buy Now?</PrintH>
+                    <ul className="mt-1.5 space-y-1.5">{buyNow.slice(0, 5).map((b) => <li key={b} className="flex items-start gap-1.5 text-[9px] leading-snug"><TrendingUp className="w-3 h-3 text-[#16A34A] shrink-0 mt-px" />{b}</li>)}</ul>
+                  </PrintCard>
+                </div>
+                <PrintCard tone="blue" className="mt-3 flex items-center gap-4">
+                  <div className="min-w-0 flex-1">
+                    <p className="text-[12px] font-extrabold">Ready to move forward on this {shortModel}?</p>
+                    <p className="text-[9.5px] font-semibold text-[#1E3A8A] mt-1">Reserve this vehicle &nbsp;·&nbsp; Schedule a test drive &nbsp;·&nbsp; Contact dealer</p>
+                    <p className="text-[8.5px] text-[#334155] mt-1">{[d.dealerName, d.dealerPhone].filter(Boolean).join(" · ")}</p>
+                  </div>
+                  {!isPreview && (
+                    <div className="shrink-0 text-center">
+                      <QRCodeSVG value={passportUrl} size={62} />
+                      <p className="text-[6.5px] font-bold text-[#64748B] mt-1">SCAN TO VIEW FULL<br />VEHICLE PASSPORT</p>
+                    </div>
+                  )}
+                </PrintCard>
+                <p className="text-[7.5px] text-[#94A3B8] leading-relaxed mt-3">
+                  Powered by verified dealer data, market intelligence, and AutoLabels AI. Market values and cost estimates are provided by third-party data sources, are estimates only, and may vary by region and time. Confirm all details, pricing, and availability directly with the dealership before purchase. Generated {generatedAt} · VIN {listing.vin} · Verified {verifyDate}.
+                </p>
+                {pageFooter(5)}
+              </section>
+            </>
+          );
+        })()}
+      </div>
     </div>
   );
 };
