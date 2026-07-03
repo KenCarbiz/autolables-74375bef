@@ -60,9 +60,9 @@ const REASSURANCE = "No obligation. A dealership representative will review your
 const MODE_COPY: Record<Exclude<TodaysPriceMode, "custom">, Omit<TodaysPriceCopy, "showCalculator" | "showDown" | "showTerm" | "showApr">> = {
   payment_estimate: {
     mode: "payment_estimate",
-    headline: "Today's Price",
-    sub: "Personalize your payment estimate for this vehicle.",
-    cta: "Request Payment Details",
+    headline: "Today's Price & Payment Options",
+    sub: "Personalize your estimate for this vehicle. Final terms are reviewed by the dealership.",
+    cta: "Request My Payment Details",
     reassurance: REASSURANCE,
     disclaimer: "Estimate only, with approved credit. Excludes tax, title, registration, and dealer/state fees where applicable. Final terms are subject to lender approval and dealership confirmation.",
     barLabel: "Payment Details",
