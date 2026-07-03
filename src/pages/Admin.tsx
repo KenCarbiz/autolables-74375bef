@@ -580,7 +580,9 @@ const Admin = () => {
     updateSettings({ [key]: !settings[key] });
   };
 
-  if (loading || fetching) return <div className="min-h-screen flex items-center justify-center bg-background"><p className="text-muted-foreground">Loading...</p></div>;
+  // Wait for the member row too — the tab filter needs the role before it can
+  // decide which tabs exist, otherwise deep links flash the wrong tab.
+  if (loading || fetching || entitlementsLoading) return <div className="min-h-screen flex items-center justify-center bg-background"><p className="text-muted-foreground">Loading...</p></div>;
 
   const tabs: { id: AdminTab; label: string; group?: "dealer" | "platform" }[] = ([
     { id: "home", label: "Home" },
