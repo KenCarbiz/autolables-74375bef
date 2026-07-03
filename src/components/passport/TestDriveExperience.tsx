@@ -7,7 +7,7 @@ import { type VehicleListing } from "@/hooks/useVehicleListing";
 import { formatPhone } from "@/components/addendum/CustomerInfoSection";
 import { trackLeadSubmitted, trackCustomerEngagement } from "@/lib/engagement/customerEngagement";
 import { fmt$, type PassportData } from "@/lib/passportV2Data";
-import { listingHero } from "@/lib/photos";
+import { listingGallery, listingHero } from "@/lib/photos";
 import { AutoLabelsSpecIcon, SpecIconBadge, type AutoLabelsSpecIconKey } from "@/components/icons/AutoLabelsSpecIcons";
 
 // ──────────────────────────────────────────────────────────────
@@ -46,9 +46,21 @@ const IconField = ({
   </div>
 );
 
-const INPUT = "w-full h-[52px] border border-[#DDE5EE] rounded-xl pl-11 pr-4 text-sm text-[#10202B] placeholder:text-[#8CA3BC] focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white";
+// Form fields are rounded rectangles (12px) — deliberately NOT pills.
+const INPUT = "w-full h-[50px] border border-[#DDE5EE] rounded-[12px] pl-11 pr-4 text-sm text-[#10202B] placeholder:text-[#8CA3BC] focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white";
+
+// Numbered step chip for the form's two-step structure.
+const StepChip = ({ n, label }: { n: number; label: string }) => (
+  <p className="flex items-center gap-2 text-[13.5px] font-bold text-[#0D1B2A]">
+    <span className="w-6 h-6 rounded-full bg-[#0B6FEA] text-white text-[12px] font-black flex items-center justify-center shrink-0">{n}</span>
+    {label}
+  </p>
+);
 
 // Wide vehicle context card — the customer schedules for this exact vehicle.
+// Trust content (rating, review count, years in business) is the tenant's
+// own configured data via dealer_trust; nothing here is ever fabricated,
+// and each line hides when the dealer hasn't provided it.
 const VehicleContextCard = ({ listing, d }: { listing: VehicleListing; d: PassportData }) => {
   const hero = listingHero(listing);
   const mc = (listing.mc_attributes || {}) as Record<string, unknown>;
@@ -57,39 +69,75 @@ const VehicleContextCard = ({ listing, d }: { listing: VehicleListing; d: Passpo
     ...(mc.carfax_1_owner === true ? [{ icon: "shield-check" as AutoLabelsSpecIconKey, label: "1-Owner" }] : []),
     { icon: "passport", label: "Vehicle Passport" },
   ];
+  const photoCount = listingGallery(listing).length;
   const dealerTel = d.dealerPhone ? d.dealerPhone.replace(/[^\d+]/g, "") : null;
+  const trust = d.dealerTrust;
+  const rating = parseFloat(trust.googleRating);
+  const hasRating = Number.isFinite(rating) && rating > 0 && rating <= 5;
+  const count = parseInt(trust.googleCount.replace(/[^\d]/g, ""), 10);
+  const hasCount = Number.isFinite(count) && count > 0;
+  const years = parseInt(trust.yearsInBusiness.replace(/[^\d]/g, ""), 10);
+  const hasYears = Number.isFinite(years) && years > 0;
+  const chip = "inline-flex items-center gap-1.5 h-7 px-2.5 rounded-lg border text-[12px] font-semibold";
   return (
     <div className={`${CARD} p-4 sm:p-5`}>
-      <div className="flex flex-col sm:flex-row sm:items-center gap-4">
-        <div className="w-full sm:w-44 aspect-[16/10] sm:aspect-[4/3] rounded-xl overflow-hidden bg-slate-100 flex items-center justify-center shrink-0">
+      <div className="flex flex-col lg:flex-row lg:items-center gap-4 lg:gap-5">
+        <div className="relative w-full sm:w-72 lg:w-64 aspect-[16/10] rounded-xl overflow-hidden bg-slate-100 flex items-center justify-center shrink-0">
           {hero ? <img src={hero} alt={listing.ymm ?? "Vehicle"} className="w-full h-full object-cover" /> : <Car className="w-8 h-8 text-slate-300" />}
+          {photoCount > 1 && (
+            <span className="absolute bottom-2 left-2 inline-flex items-center gap-1.5 text-[11px] font-bold text-white bg-black/60 rounded-lg px-2 py-1">
+              <AutoLabelsSpecIcon name="camera" className="w-3.5 h-3.5" accent="#FFFFFF" /> {photoCount} Photos
+            </span>
+          )}
         </div>
         <div className="min-w-0 flex-1">
-          <p className="text-[18px] font-extrabold leading-tight text-[#0D1B2A]">{listing.ymm}{listing.trim ? ` ${listing.trim}` : ""}</p>
+          <p className="text-[19px] font-extrabold leading-tight text-[#0D1B2A]">{listing.ymm}{listing.trim ? ` ${listing.trim}` : ""}</p>
           <p className="mt-1.5 flex items-baseline gap-3 flex-wrap">
-            {d.price != null && <span className="text-[22px] font-extrabold tracking-tight text-[#0B6FEA]">{fmt$(d.price)}</span>}
+            {d.price != null && <span className="text-[24px] font-extrabold tracking-tight text-[#0B6FEA]">{fmt$(d.price)}</span>}
             {listing.mileage != null && (
               <span className="inline-flex items-center gap-1.5 text-[13px] font-semibold text-[#64748B]">
                 <AutoLabelsSpecIcon name="odometer" className="w-4 h-4 text-[#8CA3BC]" accent="currentColor" /> {listing.mileage.toLocaleString()} miles
               </span>
             )}
           </p>
-          <div className="flex flex-wrap gap-x-4 gap-y-1.5 mt-2.5">
+          <div className="flex flex-wrap gap-1.5 mt-2.5">
+            <span className={`${chip} border-emerald-200 bg-emerald-50 text-emerald-700`}>
+              <CheckCircle2 className="w-3.5 h-3.5" /> Available Now
+            </span>
             {badges.map((b) => (
-              <span key={b.label} className="inline-flex items-center gap-1.5 text-[12px] font-semibold text-[#334155]">
-                <AutoLabelsSpecIcon name={b.icon} className="w-4 h-4 text-[#0B6FEA]" /> {b.label}
+              <span key={b.label} className={`${chip} border-[#D3E6FB] bg-[#F5FAFF] text-[#0B6FEA]`}>
+                <AutoLabelsSpecIcon name={b.icon} className="w-3.5 h-3.5" /> {b.label}
               </span>
             ))}
           </div>
+          {(hasRating || hasCount) && (
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 mt-3 pt-3 border-t border-[#F1F5F9]">
+              {hasCount && (
+                <span className="inline-flex items-center gap-1.5 text-[12px] font-semibold text-[#334155]">
+                  <AutoLabelsSpecIcon name="people" className="w-4 h-4 text-[#0B6FEA]" /> Trusted by {count.toLocaleString()}+ reviewers
+                </span>
+              )}
+              {hasRating && (
+                <span className="inline-flex items-center gap-1.5 text-[12px] font-semibold text-[#334155]">
+                  Rated {trust.googleRating}/5
+                  <span className="text-amber-500 tracking-tight text-[13px]" aria-hidden>
+                    {"★".repeat(Math.round(rating))}{"☆".repeat(Math.max(0, 5 - Math.round(rating)))}
+                  </span>
+                </span>
+              )}
+              {hasYears && <span className="text-[12px] font-semibold text-[#64748B]">{years} years in business</span>}
+            </div>
+          )}
         </div>
-        <div className="shrink-0 sm:text-right space-y-1.5">
-          {d.dealerName && <p className="text-[13px] font-bold text-[#0D1B2A]">{d.dealerName}</p>}
+        <div className="shrink-0 lg:pl-5 lg:border-l lg:border-[#F1F5F9] space-y-1.5 lg:max-w-[220px]">
+          {d.dealerName && <p className="text-[13.5px] font-bold text-[#0D1B2A]">{d.dealerName}</p>}
+          {d.dealerAddress && <p className="text-[12px] font-medium text-[#64748B] leading-snug">{d.dealerAddress}</p>}
           {dealerTel && (
             <a href={`tel:${dealerTel}`} className="inline-flex items-center gap-1.5 text-[12.5px] font-semibold text-[#0B6FEA]">
-              <Phone className="w-3.5 h-3.5" /> Questions? Call {formatPhone(d.dealerPhone!)}
+              <Phone className="w-3.5 h-3.5" /> {formatPhone(d.dealerPhone!)}
             </a>
           )}
-          <p className="text-[11.5px] text-[#64748B] inline-flex items-center gap-1.5 sm:justify-end">
+          <p className="text-[11.5px] text-[#64748B] inline-flex items-center gap-1.5">
             <AutoLabelsSpecIcon name="lock" className="w-3.5 h-3.5 text-[#1F7A4D]" accent="currentColor" /> Secure &amp; Private · No Obligation
           </p>
         </div>
@@ -133,6 +181,7 @@ const TestDriveExperience = ({ listing, d, navigate }: { listing: VehicleListing
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
+  const [method, setMethod] = useState<string>("text");
   const [message, setMessage] = useState("");
   const [sending, setSending] = useState(false);
   const [sent, setSent] = useState(false);
@@ -172,6 +221,7 @@ const TestDriveExperience = ({ listing, d, navigate }: { listing: VehicleListing
       const extras = [
         date ? `Requested ${date}` : "",
         windowDef ? `${windowDef.label} (${windowDef.range})` : "",
+        method ? `Prefers ${method}` : "",
         stockNo ? `Stock ${stockNo}` : "",
         zip ? `ZIP ${zip}` : "",
         "via vehicle_passport_test_drive_page",
@@ -273,14 +323,14 @@ const TestDriveExperience = ({ listing, d, navigate }: { listing: VehicleListing
 
             {/* Step 1 — date + time of day */}
             <div className="mt-6">
-              <p className="text-[13.5px] font-bold text-[#0D1B2A]">1. When works for you?</p>
+              <StepChip n={1} label="Choose a preferred time" />
               <div className="grid grid-cols-1 md:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)] gap-3 mt-3">
                 <div className="relative">
                   <input
                     type="date" value={date} min={new Date().toISOString().slice(0, 10)}
                     onChange={(e) => { setDate(e.target.value); markStarted(); }}
                     aria-label="Select a date"
-                    className="w-full h-[52px] border border-[#DDE5EE] rounded-xl px-4 pr-11 text-sm text-[#10202B] focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                    className="w-full h-[50px] border border-[#DDE5EE] rounded-[12px] px-4 pr-11 text-sm text-[#10202B] focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
                   />
                   <span className="absolute right-3.5 top-1/2 -translate-y-1/2 text-[#8CA3BC] pointer-events-none">
                     <AutoLabelsSpecIcon name="calendar" className="w-[18px] h-[18px]" accent="currentColor" />
@@ -308,7 +358,26 @@ const TestDriveExperience = ({ listing, d, navigate }: { listing: VehicleListing
 
             {/* Step 2 — contact details */}
             <div className="mt-6" onInput={markStarted}>
-              <p className="text-[13.5px] font-bold text-[#0D1B2A]">2. Your contact details</p>
+              <div className="flex items-center justify-between gap-3 flex-wrap">
+                <StepChip n={2} label="Your contact details" />
+                <div className="flex items-center gap-2">
+                  <span className="text-[11.5px] font-semibold text-[#64748B]">Preferred contact method</span>
+                  <div className="inline-flex rounded-[10px] border border-[#DDE5EE] bg-white p-0.5">
+                    {([["call", "phone", "Call"], ["text", "message", "Text"], ["email", "email", "Email"]] as [string, AutoLabelsSpecIconKey, string][]).map(([key, icon, label]) => {
+                      const on = method === key;
+                      return (
+                        <button
+                          key={key} type="button" aria-pressed={on}
+                          onClick={() => { setMethod(key); markStarted(); }}
+                          className={`inline-flex items-center gap-1.5 h-8 px-3 rounded-[8px] text-[12px] font-semibold transition-colors ${on ? "bg-[#EAF4FF] text-[#0B6FEA] border border-[#0B6FEA]" : "text-[#64748B] hover:text-[#10202B]"}`}
+                        >
+                          <AutoLabelsSpecIcon name={icon} className="w-3.5 h-3.5" accent="currentColor" /> {label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-3">
                 <div>
                   <IconField icon="user">
@@ -335,7 +404,7 @@ const TestDriveExperience = ({ listing, d, navigate }: { listing: VehicleListing
                   <textarea
                     value={message} onChange={(e) => setMessage(e.target.value)}
                     placeholder="Anything you'd like the dealer to know? (optional)" rows={3}
-                    className="w-full min-h-[84px] border border-[#DDE5EE] rounded-xl pl-11 pr-4 py-3.5 text-sm text-[#10202B] placeholder:text-[#8CA3BC] focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none bg-white"
+                    className="w-full min-h-[76px] border border-[#DDE5EE] rounded-[14px] pl-11 pr-4 py-3.5 text-sm text-[#10202B] placeholder:text-[#8CA3BC] focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none bg-white"
                   />
                 </div>
               </div>

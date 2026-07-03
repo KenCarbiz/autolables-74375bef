@@ -112,10 +112,24 @@ const StickerStudioGenerator = () => {
     if (products === undefined || settingsLoading) return;
     seededItems.current = true;
     const cfgNow = template.config;
-    const m = mapProductsToStickerItems(products.map((p) => ({
-      id: p.id, name: p.name, price: p.price,
-      badge_type: p.badge_type, price_in_advertised: p.price_in_advertised,
-    })));
+    // Seed straight from the catalog WITH each product's default price —
+    // installed equipment value must always be visible and feed the adjusted
+    // total. Supabase numeric columns arrive as strings, so coerce instead of
+    // typeof-checking (that check is why prices used to seed as blank).
+    // (mapProductsToStickerItems keeps its stricter signed-packet semantics
+    // for "Load packet items".)
+    const priceNum = (p: { price: number }) => {
+      const n = typeof p.price === "number" ? p.price : parseFloat(String(p.price ?? ""));
+      return Number.isFinite(n) && n > 0 ? n : 0;
+    };
+    const m = {
+      installed: products.filter((p) => p.badge_type === "installed" && priceNum(p) > 0)
+        .map((p) => ({ name: p.name, price: String(priceNum(p)), note: p.subtitle || "" })),
+      upgrades: products.filter((p) => p.badge_type === "optional" && priceNum(p) > 0)
+        .map((p) => ({ name: p.name, price: String(priceNum(p)), note: p.subtitle || "" })),
+      benefits: products.filter((p) => priceNum(p) <= 0)
+        .map((p) => ({ name: p.name })),
+    };
     const v = prefill.vehicle;
     const factory = cfgNow.type === "window" && v && (v.options.length || v.features.length)
       ? curatePrintEquipment(cleanEquipmentList([...v.options, ...v.features]), cfgNow.maxItems.installed).shown
@@ -348,8 +362,8 @@ const StickerStudioGenerator = () => {
       </div>
       {data[keyName].map((it, i) => (
         <div key={i} className="flex gap-1.5">
-          <input value={it.name} onChange={(e) => setItem(keyName, i, { name: e.target.value })} placeholder="Item name" className={`${input} flex-1`} />
-          <input value={it.price} onChange={(e) => setItem(keyName, i, { price: e.target.value })} placeholder="$" className={`${input} w-20`} />
+          <input value={it.name} onChange={(e) => setItem(keyName, i, { name: e.target.value })} placeholder="Item name" className={`${input} flex-1 min-w-0`} />
+          <input value={it.price} onChange={(e) => setItem(keyName, i, { price: e.target.value })} placeholder="$" className={`${input} !w-24 flex-none`} inputMode="decimal" />
           <button onClick={() => removeItem(keyName, i)} className="h-9 w-9 flex-shrink-0 inline-flex items-center justify-center rounded-md border border-border text-rose-600 hover:bg-rose-50"><Trash2 className="w-3.5 h-3.5" /></button>
         </div>
       ))}

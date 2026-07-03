@@ -50,7 +50,9 @@ export function mapProductsToStickerItems(products: SnapshotProduct[] | null | u
   let optionalTotal = 0;
 
   for (const p of list) {
-    const price = typeof p.price === "number" ? p.price : 0;
+    // Numeric DB columns can arrive as strings — coerce, never typeof-gate.
+    const raw = typeof p.price === "number" ? p.price : parseFloat(String(p.price ?? ""));
+    const price = Number.isFinite(raw) && raw > 0 ? raw : 0;
     if (isInstalled(p)) {
       if (aboveAdvertised(p)) {
         // Added above advertised — priced + additive, flagged for disclosure.
