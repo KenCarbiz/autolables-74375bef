@@ -1,5 +1,8 @@
 import { describe, it, expect } from "vitest";
-import { displayPrice, sumLines, isCompact, splitProducts, programsToBenefits, fmtCurrency } from "./labelData";
+import {
+  displayPrice, sumLines, isCompact, splitProducts, programsToBenefits, fmtCurrency,
+  configForVariant, resolveConfig, resolvePrice, DEFAULT_TEMPLATE_CONFIG,
+} from "./labelData";
 import { resolveIconId } from "./iconResolver";
 import type { Product } from "@/hooks/useProducts";
 import type { DealerProgram } from "@/lib/dealerPrograms";
@@ -62,6 +65,32 @@ describe("totals and layout", () => {
   it("formats currency without cents", () => {
     expect(fmtCurrency(46000)).toBe("$46,000");
     expect(fmtCurrency(null)).toBe("");
+  });
+});
+
+describe("template config + variants", () => {
+  it("resolveConfig fills defaults and lets overrides win", () => {
+    expect(resolveConfig()).toEqual(DEFAULT_TEMPLATE_CONFIG);
+    expect(resolveConfig({ showTrustBadges: false }).showTrustBadges).toBe(false);
+    expect(resolveConfig({ showTrustBadges: false }).showInstalledProducts).toBe(true);
+  });
+  it("variants flip only their intended switches", () => {
+    expect(configForVariant("premium_full")).toEqual(DEFAULT_TEMPLATE_CONFIG);
+    expect(configForVariant("no_upgrades").showAvailableUpgrades).toBe(false);
+    expect(configForVariant("no_installed").showInstalledProducts).toBe(false);
+    const ftc = configForVariant("ftc_minimal");
+    expect(ftc.showTrustBadges).toBe(false);
+    expect(ftc.showIncludedBenefits).toBe(false);
+    expect(ftc.disclosureMode).toBe("full");
+    expect(configForVariant("new").priceLabel).toBe("Total MSRP");
+    expect(configForVariant("used").priceLabel).toBe("Selling Price");
+    expect(configForVariant("cpo").priceLabel).toBe("Selling Price");
+  });
+  it("resolvePrice defers to displayPrice on auto and forces a fixed label otherwise", () => {
+    const v = { condition: "used", msrp: 46000, price: 39000 };
+    expect(resolvePrice(v, resolveConfig())).toEqual({ label: "TOTAL PRICE", value: 39000 });
+    expect(resolvePrice(v, resolveConfig({ priceLabel: "Selling Price" }))).toEqual({ label: "SELLING PRICE", value: 39000 });
+    expect(resolvePrice(v, configForVariant("new"))).toEqual({ label: "TOTAL MSRP", value: 39000 });
   });
 });
 

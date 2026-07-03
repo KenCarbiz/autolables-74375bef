@@ -4,7 +4,7 @@ import type { DealerProgram } from "@/lib/dealerPrograms";
 import { bucketForVehicle, resolveTierPrice } from "@/types/product";
 
 // ──────────────────────────────────────────────────────────────
-// 4.5in x 11in addendum label — data assembly and calculations.
+// 4.25in x 11in addendum label — data assembly and calculations.
 // The label is self-aware: everything renders from the tenant's
 // settings and the vehicle's inventory record. Nothing here invents
 // a value; missing data hides its row (the layout collapses upward).
@@ -57,7 +57,99 @@ export interface AddendumLabelData {
   upgrades: LabelProductLine[];
   generatedDate: string;
   compact: boolean;
+  // Per-dealer / per-variant presentation rules. Optional so every existing
+  // caller keeps working; AddendumLabel merges this over DEFAULT_TEMPLATE_CONFIG.
+  config?: Partial<TemplateConfig>;
 }
+
+// ──────────────────────────────────────────────────────────────
+// Template configuration — the label is one engine driven by config.
+// A variant is just a named preset of these switches; a dealer can also
+// override any switch directly. Nothing here fabricates data: config only
+// decides which real sections show and how prices/disclosures read.
+// ──────────────────────────────────────────────────────────────
+
+// "auto" defers to displayPrice (MSRP for new, price for used); the rest
+// force a fixed customer-facing label regardless of condition.
+export type PriceLabelMode = "auto" | "MSRP" | "Market Price" | "Selling Price" | "Total MSRP";
+
+export type AddendumVariant =
+  | "premium_full"     // v1 — everything on, the printed mockup
+  | "ftc_minimal"      // stripped to identity + required disclosure, no marketing
+  | "new"              // new-vehicle framing — Total MSRP
+  | "used"             // used-vehicle framing — Selling Price
+  | "cpo"              // certified pre-owned — Selling Price, benefits kept
+  | "no_upgrades"      // hide the available-upgrades section
+  | "no_installed";    // hide the installed-equipment section
+
+export interface TemplateConfig {
+  priceLabel: PriceLabelMode;
+  showInstalledProducts: boolean;
+  showIncludedBenefits: boolean;
+  showAvailableUpgrades: boolean;
+  showTrustBadges: boolean;
+  showFooterComplianceBadges: boolean;
+  installedProductsIncludedInTotal: boolean;
+  availableUpgradesIncludedInTotal: boolean;
+  disclosureMode: "short" | "full" | "none";
+}
+
+export const DEFAULT_TEMPLATE_CONFIG: TemplateConfig = {
+  priceLabel: "auto",
+  showInstalledProducts: true,
+  showIncludedBenefits: true,
+  showAvailableUpgrades: true,
+  showTrustBadges: true,
+  showFooterComplianceBadges: true,
+  installedProductsIncludedInTotal: true,
+  availableUpgradesIncludedInTotal: false,
+  disclosureMode: "short",
+};
+
+// Named presets. Each returns a full config so the caller never has to
+// remember which switches a variant flips; overrides layer on top of this.
+export const configForVariant = (variant: AddendumVariant): TemplateConfig => {
+  const base = { ...DEFAULT_TEMPLATE_CONFIG };
+  switch (variant) {
+    case "ftc_minimal":
+      return { ...base, showTrustBadges: false, showIncludedBenefits: false, disclosureMode: "full" };
+    case "new":
+      return { ...base, priceLabel: "Total MSRP" };
+    case "used":
+      return { ...base, priceLabel: "Selling Price" };
+    case "cpo":
+      return { ...base, priceLabel: "Selling Price" };
+    case "no_upgrades":
+      return { ...base, showAvailableUpgrades: false };
+    case "no_installed":
+      return { ...base, showInstalledProducts: false };
+    case "premium_full":
+    default:
+      return base;
+  }
+};
+
+export const resolveConfig = (config?: Partial<TemplateConfig>): TemplateConfig =>
+  ({ ...DEFAULT_TEMPLATE_CONFIG, ...(config ?? {}) });
+
+// The label a customer reads for the headline price. "auto" keeps the
+// condition-aware behavior; any explicit mode wins so a dealer can print
+// "Selling Price" on a new car if that's how they merchandise it.
+const FORCED_PRICE_LABELS: Record<Exclude<PriceLabelMode, "auto">, string> = {
+  "MSRP": "MSRP",
+  "Market Price": "MARKET PRICE",
+  "Selling Price": "SELLING PRICE",
+  "Total MSRP": "TOTAL MSRP",
+};
+
+export const resolvePrice = (
+  v: Pick<LabelVehicle, "condition" | "msrp" | "price">,
+  config: TemplateConfig,
+): { label: string; value: number | null } => {
+  const base = displayPrice(v);
+  if (config.priceLabel === "auto") return base;
+  return { label: FORCED_PRICE_LABELS[config.priceLabel], value: base.value };
+};
 
 export const fmtCurrency = (v?: number | null): string =>
   v == null || !Number.isFinite(v) ? "" : `$${Math.round(v).toLocaleString("en-US")}`;

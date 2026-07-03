@@ -10,11 +10,18 @@ import { confirmPrintReady } from "@/lib/printReadiness";
 import { packetVisible } from "@/lib/packetModules";
 import AddendumLabel from "@/components/addendum-label/AddendumLabel";
 import {
-  type AddendumLabelData, splitProducts, programsToBenefits, isCompact, fmtDate,
+  type AddendumLabelData, type AddendumVariant, splitProducts, programsToBenefits,
+  isCompact, fmtDate, configForVariant,
 } from "@/components/addendum-label/labelData";
 
+const VARIANTS: AddendumVariant[] = [
+  "premium_full", "ftc_minimal", "new", "used", "cpo", "no_upgrades", "no_installed",
+];
+const isVariant = (v: string | null): v is AddendumVariant =>
+  !!v && (VARIANTS as string[]).includes(v);
+
 // ──────────────────────────────────────────────────────────────
-// /addendum-label/:id — the 4.5in x 11in self-aware addendum label
+// /addendum-label/:id — the 4.25in x 11in self-aware addendum label
 // for one inventory vehicle. Everything on the page is assembled from
 // the tenant's settings and the vehicle_listings row: identity, price,
 // products by disposition, dealer programs as benefits, and a QR to
@@ -76,6 +83,8 @@ const AddendumLabelPrint = () => {
   const { id } = useParams<{ id: string }>();
   const [params] = useSearchParams();
   const isPreview = params.has("preview");
+  const variantParam = params.get("variant");
+  const variant: AddendumVariant | null = isVariant(variantParam) ? variantParam : null;
   const navigate = useNavigate();
   const { currentStore } = useTenant();
   const { settings } = useDealerSettings();
@@ -102,7 +111,8 @@ const AddendumLabelPrint = () => {
   }, [id, isPreview]);
 
   const data: AddendumLabelData | null = useMemo(() => {
-    if (isPreview) return SAMPLE;
+    const config = variant ? configForVariant(variant) : undefined;
+    if (isPreview) return { ...SAMPLE, config };
     if (!listing) return null;
     const mc = (listing.mc_attributes || {}) as Record<string, unknown>;
     const { year, make, model } = splitYmm(listing.ymm || "");
@@ -137,8 +147,9 @@ const AddendumLabelPrint = () => {
       upgrades,
       generatedDate: fmtDate(),
       compact: isCompact(installed, benefits, upgrades),
+      config,
     };
-  }, [isPreview, listing, products, settings, currentStore]);
+  }, [isPreview, listing, products, settings, currentStore, variant]);
 
   const doPrint = () => {
     if (!isPreview && !confirmPrintReady(settings, currentStore?.name, (blockers) => blockers.forEach((b) => toast.error(b.message)))) return;
@@ -152,7 +163,7 @@ const AddendumLabelPrint = () => {
     <div className="min-h-screen bg-slate-100">
       <style>{`
         @media print {
-          @page { size: 4.5in 11in; margin: 0; }
+          @page { size: 4.25in 11in; margin: 0; }
           body { margin: 0; }
           .no-print { display: none !important; }
           .addendum-label-wrap { margin: 0 !important; box-shadow: none !important; }
@@ -161,13 +172,13 @@ const AddendumLabelPrint = () => {
       `}</style>
       <div className="no-print sticky top-0 z-10 bg-white border-b border-slate-200 px-4 h-14 flex items-center justify-between">
         <button onClick={() => navigate(-1)} className="text-[13px] font-semibold text-[#2563EB] inline-flex items-center gap-1"><ChevronLeft className="w-4 h-4" /> Back</button>
-        <p className="text-[13px] font-bold">Addendum Label · 4.5" x 11"{isPreview ? " · SAMPLE" : ""}</p>
+        <p className="text-[13px] font-bold">Addendum Label · 4.25" x 11"{variant ? ` · ${variant.replace(/_/g, " ")}` : ""}{isPreview ? " · SAMPLE" : ""}</p>
         <div className="flex items-center gap-2">
           <button onClick={doPrint} className="h-9 px-4 rounded-lg bg-[#2563EB] text-white text-[13px] font-semibold inline-flex items-center gap-1.5"><Printer className="w-4 h-4" /> Print</button>
           <button onClick={doPrint} className="h-9 px-3 rounded-lg border border-slate-200 text-[13px] font-semibold inline-flex items-center gap-1.5" title="Use your browser's Save as PDF destination"><Download className="w-4 h-4" /> PDF</button>
         </div>
       </div>
-      <div className="addendum-label-wrap mx-auto my-6 shadow-xl" style={{ width: "4.5in" }}>
+      <div className="addendum-label-wrap mx-auto my-6 shadow-xl" style={{ width: "4.25in" }}>
         <AddendumLabel data={data} />
       </div>
     </div>
