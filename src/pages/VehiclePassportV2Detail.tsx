@@ -258,13 +258,13 @@ const SectionHeading = ({ icon: Icon, title, subtitle }: { icon: React.ElementTy
 // vehicle confidence card. Same leads-table wiring as LeadForm; the
 // method/timing context rides in notes so no schema change is needed.
 
-// Reserve analytics ride the existing engagement event vocabulary; the
-// specific reserve_* event name travels in metadata.event.
-const trackReserve = (listing: VehicleListing, event: string, extra: Record<string, unknown> = {}) =>
+// Action-flow analytics (reserve / contact) ride the existing engagement
+// event vocabulary; the specific flow event name travels in metadata.event.
+const trackFlow = (listing: VehicleListing, event: string, extra: Record<string, unknown> = {}) =>
   trackCustomerEngagement({
     tenantId: listing.tenant_id, storeId: listing.store_id, vehicleId: listing.id, vin: listing.vin,
     source: "passport", surface: "lead_form",
-    eventType: event === "reserve_page_viewed" ? "lead_form_opened" : event.endsWith("_clicked") ? "cta_clicked" : "engagement_ping",
+    eventType: event.endsWith("_viewed") ? "lead_form_opened" : event.endsWith("_clicked") ? "cta_clicked" : "engagement_ping",
     metadata: { event, ...extra },
   });
 
@@ -291,16 +291,16 @@ const ReserveExperience = ({ listing, d, navigate }: { listing: VehicleListing; 
   const [started, setStarted] = useState(false);
 
   const isPreview = typeof window !== "undefined" && new URLSearchParams(window.location.search).has("preview");
-  useEffect(() => { if (!isPreview) trackReserve(listing, "reserve_page_viewed"); }, [listing, isPreview]);
-  const markStarted = () => { if (!started) { setStarted(true); if (!isPreview) trackReserve(listing, "reserve_form_started"); } };
+  useEffect(() => { if (!isPreview) trackFlow(listing, "reserve_page_viewed"); }, [listing, isPreview]);
+  const markStarted = () => { if (!started) { setStarted(true); if (!isPreview) trackFlow(listing, "reserve_form_started"); } };
 
   const modelName = (listing.ymm || "").replace(/^\d{4}\s*/, "").trim() || "Vehicle";
   const heroSrc = listingHero(listing);
   const stockNo = (() => { const s = (listing.mc_attributes as Record<string, unknown> | null)?.stock_no; return s ? String(s) : null; })();
 
   const q = isPreview ? "?preview=1" : "";
-  const goBack = () => { if (!isPreview) trackReserve(listing, "back_to_passport_clicked"); navigate(`/v/${listing.slug}${q}`); };
-  const goTrade = () => { if (!isPreview) trackReserve(listing, "trade_value_clicked"); navigate(`/v/${listing.slug}/trade${q}`); };
+  const goBack = () => { if (!isPreview) trackFlow(listing, "back_to_passport_clicked"); navigate(`/v/${listing.slug}${q}`); };
+  const goTrade = () => { if (!isPreview) trackFlow(listing, "trade_value_clicked"); navigate(`/v/${listing.slug}/trade${q}`); };
 
   const submit = async () => {
     const errs: typeof errors = {};
@@ -353,11 +353,11 @@ const ReserveExperience = ({ listing, d, navigate }: { listing: VehicleListing; 
       supabase.functions.invoke("lead-alert", {
         body: { slug: listing.slug, vin: listing.vin, intent: "reserve", name: name.trim(), phone: phone.trim() || null, email: email.trim() || null, source: src, sub_source: "reserve_vehicle" },
       }).catch(() => { /* alert failure never blocks the shopper */ });
-      trackReserve(listing, "reserve_form_success");
+      trackFlow(listing, "reserve_form_success");
       setSent(true);
       window.scrollTo({ top: 0, behavior: "smooth" });
     } catch {
-      trackReserve(listing, "reserve_form_error");
+      trackFlow(listing, "reserve_form_error");
       toast.error("Couldn't send — please call the dealer directly");
     } finally { setSending(false); }
   };
@@ -489,7 +489,7 @@ const ReserveExperience = ({ listing, d, navigate }: { listing: VehicleListing; 
               <p className="text-[12px] font-semibold text-slate-600 mb-1.5">Preferred Contact Method</p>
               <div className="grid grid-cols-3 gap-2">
                 {CONTACT_METHODS.map(({ key, label, icon: Icon }) => (
-                  <button key={key} type="button" aria-pressed={method === key} onClick={() => { setMethod(key); markStarted(); if (!isPreview) trackReserve(listing, "reserve_contact_method_selected", { method: key }); }} className={`h-11 rounded-xl text-[13px] inline-flex items-center justify-center gap-1.5 border transition-colors ${method === key ? "bg-[#2563EB] border-[#2563EB] text-white font-bold" : "border-slate-200 text-slate-600 font-semibold hover:border-slate-300"}`}>
+                  <button key={key} type="button" aria-pressed={method === key} onClick={() => { setMethod(key); markStarted(); if (!isPreview) trackFlow(listing, "reserve_contact_method_selected", { method: key }); }} className={`h-11 rounded-xl text-[13px] inline-flex items-center justify-center gap-1.5 border transition-colors ${method === key ? "bg-[#2563EB] border-[#2563EB] text-white font-bold" : "border-slate-200 text-slate-600 font-semibold hover:border-slate-300"}`}>
                     <Icon className="w-4 h-4" /> {label}
                   </button>
                 ))}
@@ -499,7 +499,7 @@ const ReserveExperience = ({ listing, d, navigate }: { listing: VehicleListing; 
               <p className="text-[12px] font-semibold text-slate-600 mb-1.5">When would you like to move forward?</p>
               <div className="flex flex-wrap gap-2">
                 {RESERVE_TIMINGS.map((t) => (
-                  <button key={t} type="button" aria-pressed={timing === t} onClick={() => { setTiming(t); markStarted(); if (!isPreview) trackReserve(listing, "reserve_timing_selected", { timing: t }); }} className={`h-10 px-4 rounded-full text-[13px] font-semibold border transition-colors ${timing === t ? "border-[#2563EB] bg-blue-50 text-[#2563EB]" : "border-slate-200 text-slate-600 hover:border-slate-300"}`}>{t}</button>
+                  <button key={t} type="button" aria-pressed={timing === t} onClick={() => { setTiming(t); markStarted(); if (!isPreview) trackFlow(listing, "reserve_timing_selected", { timing: t }); }} className={`h-10 px-4 rounded-full text-[13px] font-semibold border transition-colors ${timing === t ? "border-[#2563EB] bg-blue-50 text-[#2563EB]" : "border-slate-200 text-slate-600 hover:border-slate-300"}`}>{t}</button>
                 ))}
               </div>
             </div>
@@ -539,6 +539,322 @@ const ReserveExperience = ({ listing, d, navigate }: { listing: VehicleListing; 
       </div>
 
       <div className="hidden lg:block lg:sticky lg:top-24">{summaryCard()}</div>
+    </div>
+  );
+};
+
+// ── Contact experience — the same action-page system as Reserve ──
+// Left: guided form (3-step strip, inquiry topic selector with dynamic
+// message placeholders, labeled fields, contact method, inline validation)
+// plus what-happens-next. Right: sticky vehicle confidence card + quick
+// actions. Same leads-table wiring; topic/method context rides in notes.
+
+const CONTACT_STEPS = ["Choose Topic", "Share Contact Info", "Dealer Replies"];
+const CONTACT_TOPICS: { key: string; label: string; icon: React.ElementType; placeholder: (v: string) => string }[] = [
+  { key: "availability", label: "Availability", icon: Car, placeholder: (v) => `I'm interested in this ${v}. Is it still available?` },
+  { key: "price", label: "Price Question", icon: DollarSign, placeholder: (v) => `I have a question about the price on this ${v}.` },
+  { key: "financing", label: "Financing", icon: FileText, placeholder: () => "I'd like to ask about financing options for this vehicle." },
+  { key: "trade", label: "Trade-In", icon: RefreshCw, placeholder: () => "I have a trade-in and would like to understand my options." },
+  { key: "history", label: "Vehicle History", icon: Clock, placeholder: () => "I'd like more information about the vehicle history." },
+  { key: "warranty", label: "Warranty / Recall", icon: ShieldCheck, placeholder: () => "I'd like more information about warranty coverage or recall status." },
+  { key: "other", label: "Other", icon: MessageSquare, placeholder: () => "I have a question about this vehicle." },
+];
+
+const ContactExperience = ({ listing, d, navigate }: { listing: VehicleListing; d: PassportData; navigate: ReturnType<typeof useNavigate> }) => {
+  const [topic, setTopic] = useState("availability");
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [phone, setPhone] = useState("");
+  const [method, setMethod] = useState<string | null>("text");
+  const [message, setMessage] = useState("");
+  const [sending, setSending] = useState(false);
+  const [sent, setSent] = useState(false);
+  const [errors, setErrors] = useState<{ name?: string; contact?: string; email?: string }>({});
+  const [started, setStarted] = useState(false);
+
+  const isPreview = typeof window !== "undefined" && new URLSearchParams(window.location.search).has("preview");
+  useEffect(() => { if (!isPreview) trackFlow(listing, "contact_dealer_page_viewed"); }, [listing, isPreview]);
+  const markStarted = () => { if (!started) { setStarted(true); if (!isPreview) trackFlow(listing, "contact_form_started"); } };
+
+  const mc = (listing.mc_attributes || {}) as Record<string, unknown>;
+  const shortModel = (typeof mc.model === "string" && mc.model.trim()) || (listing.ymm || "").replace(/^\d{4}\s*/, "").trim() || "Vehicle";
+  const vehicleLabel = `${listing.ymm || "vehicle"}${listing.trim ? ` ${listing.trim}` : ""}`;
+  const heroSrc = listingHero(listing);
+  const stockNo = mc.stock_no ? String(mc.stock_no) : null;
+  const topicDef = CONTACT_TOPICS.find((t) => t.key === topic) ?? CONTACT_TOPICS[0];
+  const dealerTel = d.dealerPhone ? d.dealerPhone.replace(/[^\d+]/g, "") : null;
+
+  const q = isPreview ? "?preview=1" : "";
+  const goBack = () => { if (!isPreview) trackFlow(listing, "back_to_passport_clicked"); navigate(`/v/${listing.slug}${q}`); };
+  const goTrade = () => { if (!isPreview) trackFlow(listing, "trade_value_clicked"); navigate(`/v/${listing.slug}/trade${q}`); };
+  const goReserve = () => { if (!isPreview) trackFlow(listing, "reserve_vehicle_clicked"); navigate(`/v/${listing.slug}/reserve${q}`); };
+  const goTestDrive = () => { if (!isPreview) trackFlow(listing, "test_drive_clicked"); navigate(`/v/${listing.slug}/test-drive${q}`); };
+  const trackCall = () => { if (!isPreview) trackFlow(listing, "call_dealer_clicked"); };
+  const trackText = () => { if (!isPreview) trackFlow(listing, "text_dealer_clicked"); };
+
+  const submit = async () => {
+    const errs: typeof errors = {};
+    if (!name.trim()) errs.name = "Enter your full name.";
+    if (!email.trim() && !phone.trim()) errs.contact = "Add a phone number or email so the dealership can reach you.";
+    if (email.trim() && !/^\S+@\S+\.\S+$/.test(email.trim())) errs.email = "That email doesn't look right.";
+    setErrors(errs);
+    if (Object.keys(errs).length) return;
+    // The sample passport must never write real leads or page a dealer.
+    if (isPreview) { setSent(true); window.scrollTo({ top: 0, behavior: "smooth" }); return; }
+    setSending(true);
+    try {
+      let src = "website";
+      let zip = "";
+      try {
+        if (sessionStorage.getItem("al_visit_src") === "qr") src = "qr_scan";
+        zip = sessionStorage.getItem("al_zip") || "";
+      } catch { /* storage unavailable */ }
+      const extras = [
+        `Topic: ${topicDef.label}`,
+        method ? `Prefers ${method}` : "",
+        stockNo ? `Stock ${stockNo}` : "",
+        zip ? `ZIP ${zip}` : "",
+        "via vehicle_passport_contact_dealer_page",
+      ].filter(Boolean).join(" · ");
+      const routing = (listing as unknown as { contact_routing?: Record<string, unknown> }).contact_routing || null;
+      const basePayload = {
+        store_id: listing.store_id, name: name.trim(), email: email.trim() || "", phone: phone.trim() || "",
+        vehicle_interest: `${listing.ymm || "Vehicle"} (Contact Dealer)`,
+        vehicle_vin: listing.vin, source: src, status: "new",
+        notes: `[intent=contact] Passport V2 — Contact Dealer · ${extras}${message.trim() ? `: ${message.trim()}` : ""}`,
+      };
+      const routedPayload = {
+        ...basePayload,
+        sub_source: "contact",
+        routing: routing ? {
+          source: "customer_passport",
+          routingTargetType: routing.routingTargetType ?? null,
+          routingTargetId: routing.routingTargetId ?? null,
+          routingReason: routing.routingReason ?? null,
+          displayMode: routing.displayMode ?? null,
+          afterHours: routing.afterHours ?? false,
+        } : null,
+      };
+      type LeadsTable = { from: (t: string) => { insert: (r: unknown) => Promise<{ error: unknown }> } };
+      let insErr = (await (supabase as unknown as LeadsTable).from("leads").insert(routedPayload)).error;
+      if (insErr) insErr = (await (supabase as unknown as LeadsTable).from("leads").insert(basePayload)).error;
+      if (insErr) throw insErr;
+      trackLeadSubmitted({ storeId: listing.store_id, vehicleId: listing.id, vin: listing.vin, source: src === "qr_scan" ? "window_sticker_qr" : "passport", metadata: { intent: "contact", event: "contact_form_submitted", topic, contact_method: method, routing_target_type: (routing?.routingTargetType as string) ?? null } });
+      supabase.functions.invoke("lead-alert", {
+        body: { slug: listing.slug, vin: listing.vin, intent: "contact", name: name.trim(), phone: phone.trim() || null, email: email.trim() || null, source: src, sub_source: "contact", topic: topicDef.label },
+      }).catch(() => { /* alert failure never blocks the shopper */ });
+      trackFlow(listing, "contact_form_success");
+      setSent(true);
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    } catch {
+      trackFlow(listing, "contact_form_error");
+      toast.error("Couldn't send — please call the dealer directly");
+    } finally { setSending(false); }
+  };
+
+  // Sticky vehicle confidence card (right rail on desktop).
+  const summaryCard = (compact = false) => (
+    <Card className={compact ? "p-3" : "p-5"}>
+      {compact ? (
+        <div className="flex items-center gap-3">
+          {heroSrc && <img src={heroSrc} alt="" className="w-16 h-12 rounded-lg object-cover shrink-0" />}
+          <div className="min-w-0 flex-1">
+            <p className="text-[13px] font-bold leading-tight truncate">{listing.ymm}{listing.trim ? ` ${listing.trim}` : ""}</p>
+            <p className="text-[15px] font-extrabold text-[#2563EB] leading-tight">{d.price != null ? fmt$(d.price) : ""}</p>
+          </div>
+          <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-full px-2 py-0.5 shrink-0">Available Now</span>
+        </div>
+      ) : (
+        <>
+          <div className="rounded-xl overflow-hidden bg-slate-100 aspect-[16/10] flex items-center justify-center">
+            {heroSrc ? <img src={heroSrc} alt={listing.ymm ?? "Vehicle"} className="w-full h-full object-cover" /> : <Car className="w-8 h-8 text-slate-300" />}
+          </div>
+          <div className="flex items-start justify-between gap-2 mt-3.5">
+            <p className="text-[17px] font-extrabold leading-tight">{listing.ymm}{listing.trim ? ` ${listing.trim}` : ""}</p>
+            <span className="text-[10.5px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-full px-2.5 py-1 shrink-0 mt-0.5">Available Now</span>
+          </div>
+          {d.price != null && <p className="text-[26px] font-extrabold tracking-tight text-[#2563EB] mt-1">{fmt$(d.price)}</p>}
+          <div className="mt-3 space-y-2 text-[12.5px] text-slate-600">
+            {listing.mileage != null && <p className="flex items-center gap-2"><GaugeIcon className="w-4 h-4 text-slate-400 shrink-0" /> {listing.mileage.toLocaleString()} miles</p>}
+            {listing.vin && <p className="flex items-center gap-2"><FileText className="w-4 h-4 text-slate-400 shrink-0" /> VIN <span className="text-slate-500">{listing.vin}</span></p>}
+            {stockNo && <p className="flex items-center gap-2"><Package className="w-4 h-4 text-slate-400 shrink-0" /> Stock <span className="text-slate-500">#{stockNo}</span></p>}
+            {d.dealerName && <p className="flex items-center gap-2"><Building2 className="w-4 h-4 text-slate-400 shrink-0" /> {d.dealerName}</p>}
+          </div>
+          <ul className="mt-4 space-y-2.5 border-t border-[#F1F5F9] pt-4">
+            {["Message tied to this exact vehicle", "Dealer receives vehicle details automatically", "No obligation", "Vehicle Passport included"].map((b) => (
+              <li key={b} className="flex items-start gap-2 text-[12.5px] text-slate-700"><CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0 mt-0.5" />{b}</li>
+            ))}
+          </ul>
+          <div className="mt-4 space-y-2 border-t border-[#F1F5F9] pt-4">
+            <button onClick={goBack} className="w-full h-11 rounded-xl border border-[#E6E8EC] text-[13px] font-semibold inline-flex items-center justify-center gap-1.5 hover:border-[#2563EB]"><ChevronLeft className="w-4 h-4" /> Back to Vehicle Passport</button>
+            <button onClick={goReserve} className="w-full h-11 rounded-xl border border-[#2563EB] text-[#2563EB] text-[13px] font-bold inline-flex items-center justify-center gap-1.5 hover:bg-blue-50"><BadgeCheck className="w-4 h-4" /> Reserve This Vehicle</button>
+            <button onClick={goTrade} className="w-full h-11 rounded-xl border border-[#2563EB] text-[#2563EB] text-[13px] font-bold inline-flex items-center justify-center gap-1.5 hover:bg-blue-50"><RefreshCw className="w-4 h-4" /> Get Trade Value</button>
+          </div>
+        </>
+      )}
+    </Card>
+  );
+
+  // Quick paths for shoppers who don't want to wait on a form reply.
+  const fasterCard = (
+    <Card className="p-5">
+      <p className="text-[15px] font-bold text-slate-900">Need something faster?</p>
+      <div className="grid grid-cols-2 gap-2.5 mt-3">
+        {dealerTel && <a href={`tel:${dealerTel}`} onClick={trackCall} className="h-11 rounded-xl border border-[#E6E8EC] text-[13px] font-semibold inline-flex items-center justify-center gap-1.5 hover:border-[#2563EB]"><Phone className="w-4 h-4 text-[#2563EB]" /> Call Dealer</a>}
+        {dealerTel && <a href={`sms:${dealerTel}`} onClick={trackText} className="h-11 rounded-xl border border-[#E6E8EC] text-[13px] font-semibold inline-flex items-center justify-center gap-1.5 hover:border-[#2563EB]"><MessageSquare className="w-4 h-4 text-[#2563EB]" /> Text Dealer</a>}
+        <button onClick={goTestDrive} className="h-11 rounded-xl border border-[#E6E8EC] text-[13px] font-semibold inline-flex items-center justify-center gap-1.5 hover:border-[#2563EB]"><Calendar className="w-4 h-4 text-[#2563EB]" /> Schedule Test Drive</button>
+        <button onClick={goReserve} className="h-11 rounded-xl border border-[#E6E8EC] text-[13px] font-semibold inline-flex items-center justify-center gap-1.5 hover:border-[#2563EB]"><BadgeCheck className="w-4 h-4 text-[#2563EB]" /> Reserve Vehicle</button>
+      </div>
+    </Card>
+  );
+
+  if (sent) return (
+    <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_360px] gap-7 items-start">
+      <Card className="p-8 text-center">
+        <CheckCircle2 className="w-14 h-14 text-emerald-500 mx-auto mb-3" />
+        <h1 className="text-[24px] font-extrabold tracking-tight">Message Sent</h1>
+        <p className="text-[14px] text-slate-500 mt-2 max-w-md mx-auto">{d.dealerName || "The dealership"} received your message and will reply shortly.</p>
+        <div className="mt-5 mx-auto max-w-sm rounded-xl border border-[#E6E8EC] bg-white p-3 flex items-center gap-3 text-left">
+          {heroSrc && <img src={heroSrc} alt="" className="w-16 h-12 rounded-lg object-cover shrink-0" />}
+          <div className="min-w-0">
+            <p className="text-[13px] font-bold leading-tight truncate">{listing.ymm}{listing.trim ? ` ${listing.trim}` : ""}</p>
+            {d.price != null && <p className="text-[14px] font-extrabold text-[#2563EB] leading-tight">{fmt$(d.price)}</p>}
+          </div>
+        </div>
+        <div className="mt-3 mx-auto max-w-sm rounded-xl border border-[#E6E8EC] bg-slate-50 p-4 text-left">
+          <p className="text-[11px] font-bold uppercase tracking-wide text-slate-400 mb-2">Your inquiry</p>
+          <p className="text-[13px] font-semibold text-slate-800">{topicDef.label}</p>
+          <p className="text-[14px] font-bold text-slate-900 mt-2">{name}</p>
+          {phone && <p className="text-[13px] text-slate-600 mt-0.5">{phone}</p>}
+          {email && <p className="text-[13px] text-slate-600 mt-0.5">{email}</p>}
+          {method && <p className="text-[12px] text-slate-500 mt-1.5">Prefers {method}</p>}
+          {message.trim() && <p className="text-[12.5px] text-slate-600 mt-2 border-t border-slate-200 pt-2 italic">"{message.trim()}"</p>}
+        </div>
+        <div className="flex flex-wrap gap-2 justify-center mt-6">
+          <button onClick={goBack} className="h-11 px-5 rounded-xl bg-[#2563EB] text-white text-sm font-bold inline-flex items-center justify-center gap-2"><ChevronLeft className="w-4 h-4" /> Back to Vehicle Passport</button>
+          {dealerTel && <a href={`tel:${dealerTel}`} onClick={trackCall} className="h-11 px-5 rounded-xl border border-slate-200 text-sm font-bold text-slate-700 inline-flex items-center justify-center gap-2"><Phone className="w-4 h-4" /> Call Dealer</a>}
+          {dealerTel && <a href={`sms:${dealerTel}`} onClick={trackText} className="h-11 px-5 rounded-xl border border-slate-200 text-sm font-bold text-slate-700 inline-flex items-center justify-center gap-2"><MessageSquare className="w-4 h-4" /> Text Dealer</a>}
+          <button onClick={goReserve} className="h-11 px-5 rounded-xl border border-slate-200 text-sm font-bold text-slate-700 inline-flex items-center justify-center gap-2"><BadgeCheck className="w-4 h-4" /> Reserve This Vehicle</button>
+          <button onClick={goTestDrive} className="h-11 px-5 rounded-xl border border-slate-200 text-sm font-bold text-slate-700 inline-flex items-center justify-center gap-2"><Calendar className="w-4 h-4" /> Schedule Test Drive</button>
+        </div>
+      </Card>
+      <div className="hidden lg:block lg:sticky lg:top-24">{summaryCard()}</div>
+    </div>
+  );
+
+  return (
+    <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_360px] gap-7 items-start">
+      <div className="space-y-4 min-w-0">
+        {/* Compact vehicle strip stays visible on mobile without pushing the form down. */}
+        <div className="lg:hidden">{summaryCard(true)}</div>
+
+        <div id="contact-form" className="scroll-mt-20">
+        <Card className="p-5 sm:p-7">
+          <h1 className="text-[24px] sm:text-[27px] font-extrabold tracking-tight leading-tight">Contact {d.dealerName || "the Dealership"} About This {shortModel}</h1>
+          <p className="text-[13.5px] text-slate-500 mt-1.5 max-w-[560px]">Ask a question about availability, pricing, financing, trade value, history, warranty, or next steps.</p>
+
+          {/* Slim progress strip — supports the form without dominating it. */}
+          <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50/50 px-4 py-2.5 flex items-center gap-2 sm:gap-3">
+            {CONTACT_STEPS.map((label, i) => (
+              <Fragment key={label}>
+                {i > 0 && <span className="hidden sm:block flex-1 border-t border-slate-200 min-w-[14px]" />}
+                <div className="flex items-center gap-1.5 min-w-0">
+                  <span className={`w-6 h-6 rounded-full text-[11px] font-bold flex items-center justify-center shrink-0 ${i === 0 ? "bg-[#2563EB] text-white" : "bg-white border border-slate-300 text-slate-500"}`}>{i + 1}</span>
+                  <span className="text-[12px] font-semibold text-slate-700 leading-tight">{label}</span>
+                </div>
+              </Fragment>
+            ))}
+          </div>
+
+          <div className="mt-5">
+            <p className="text-[12px] font-semibold text-slate-600 mb-1.5">What can we help with?</p>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+              {CONTACT_TOPICS.map(({ key, label, icon: Icon }) => (
+                <button key={key} type="button" aria-pressed={topic === key} onClick={() => { setTopic(key); markStarted(); if (!isPreview) trackFlow(listing, "contact_topic_selected", { topic: key }); }} className={`h-11 rounded-xl text-[12.5px] inline-flex items-center justify-center gap-1.5 border px-2 transition-colors ${topic === key ? "border-[#2563EB] bg-blue-50 text-[#2563EB] font-bold" : "border-slate-200 text-slate-600 font-semibold hover:border-slate-300"}`}>
+                  <Icon className="w-4 h-4 shrink-0" /> <span className="truncate">{label}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="mt-5 space-y-3.5" onInput={markStarted}>
+            <div>
+              <label htmlFor="ct-msg" className="block text-[12px] font-semibold text-slate-600 mb-1">Message to Dealer <span className="font-normal text-slate-400">(optional)</span></label>
+              <div className="relative">
+                <PenLine className="w-4 h-4 text-slate-400 absolute left-3.5 top-3.5 pointer-events-none" />
+                <textarea id="ct-msg" value={message} onChange={(e) => setMessage(e.target.value.slice(0, 500))} rows={3} maxLength={500} placeholder={topicDef.placeholder(vehicleLabel)} className={`${reserveField} pl-10 border-slate-200 resize-none`} />
+                <span className="absolute bottom-2.5 right-3.5 text-[11px] text-slate-400">{message.length} / 500</span>
+              </div>
+            </div>
+            <div>
+              <label htmlFor="ct-name" className="block text-[12px] font-semibold text-slate-600 mb-1">Full Name *</label>
+              <div className="relative">
+                <User className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                <input id="ct-name" value={name} onChange={(e) => setName(e.target.value)} autoComplete="name" placeholder="Alex Morgan" aria-invalid={!!errors.name} aria-describedby={errors.name ? "ct-name-err" : undefined} className={`${reserveField} pl-10 ${errors.name ? "border-red-300" : "border-slate-200"}`} />
+              </div>
+              {errors.name && <p id="ct-name-err" className="text-[12px] text-red-600 mt-1">{errors.name}</p>}
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+              <div>
+                <label htmlFor="ct-email" className="block text-[12px] font-semibold text-slate-600 mb-1">Email Address</label>
+                <div className="relative">
+                  <Mail className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                  <input id="ct-email" value={email} onChange={(e) => setEmail(e.target.value)} type="email" autoComplete="email" inputMode="email" placeholder="alex@example.com" aria-invalid={!!errors.email} aria-describedby={errors.email ? "ct-email-err" : undefined} className={`${reserveField} pl-10 ${errors.email ? "border-red-300" : "border-slate-200"}`} />
+                </div>
+                {errors.email && <p id="ct-email-err" className="text-[12px] text-red-600 mt-1">{errors.email}</p>}
+              </div>
+              <div>
+                <label htmlFor="ct-phone" className="block text-[12px] font-semibold text-slate-600 mb-1">Mobile Phone</label>
+                <div className="relative">
+                  <Phone className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                  <input id="ct-phone" value={phone} onChange={(e) => setPhone(formatPhone(e.target.value))} type="tel" autoComplete="tel" inputMode="tel" placeholder="(555) 123-4567" aria-invalid={!!errors.contact} aria-describedby={errors.contact ? "ct-contact-err" : undefined} className={`${reserveField} pl-10 ${errors.contact ? "border-red-300" : "border-slate-200"}`} />
+                </div>
+                {errors.contact && <p id="ct-contact-err" className="text-[12px] text-red-600 mt-1">{errors.contact}</p>}
+              </div>
+            </div>
+            <div>
+              <p className="text-[12px] font-semibold text-slate-600 mb-1.5">Preferred Contact Method *</p>
+              <div className="grid grid-cols-3 gap-2">
+                {CONTACT_METHODS.map(({ key, label, icon: Icon }) => (
+                  <button key={key} type="button" aria-pressed={method === key} onClick={() => { setMethod(key); markStarted(); if (!isPreview) trackFlow(listing, "contact_method_selected", { method: key }); }} className={`h-11 rounded-xl text-[13px] inline-flex items-center justify-center gap-1.5 border transition-colors ${method === key ? "bg-[#2563EB] border-[#2563EB] text-white font-bold" : "border-slate-200 text-slate-600 font-semibold hover:border-slate-300"}`}>
+                    <Icon className="w-4 h-4" /> {label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          <button onClick={submit} disabled={sending} className="w-full h-12 mt-4 bg-[#2563EB] hover:bg-[#1d4fd7] disabled:opacity-60 text-white font-bold rounded-xl flex items-center justify-center gap-2 transition-colors">
+            {sending ? <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" /> : <><Send className="w-4 h-4" /> Ask About This {shortModel}</>}
+          </button>
+          <p className="text-[11.5px] text-slate-500 text-center mt-3">No obligation. A dealership representative will reply by your preferred contact method.</p>
+          <p className="text-[11px] text-slate-400 text-center mt-1.5 inline-flex w-full items-center justify-center gap-1.5 flex-wrap"><Lock className="w-3 h-3 text-slate-400 shrink-0" /> Secure request · Dealer-reviewed inquiry · No obligation</p>
+        </Card>
+        </div>
+
+        <Card className="p-5 sm:p-6">
+          <p className="text-[16px] font-bold text-slate-900">What Happens After You Submit?</p>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-5 mt-4">
+            {([
+              [FileText, "Your message is tied to this vehicle", "The dealership receives your question with the exact VIN, stock number, and Vehicle Passport."],
+              [User, "A specialist reviews your request", "Your selected topic helps the dealer route your inquiry correctly."],
+              [MessageSquare, "You receive a reply", "A team member contacts you by phone, text, or email."],
+            ] as [React.ElementType, string, string][]).map(([Icon, t, s]) => (
+              <div key={t} className="flex items-start gap-3">
+                <Icon className="w-6 h-6 text-[#2563EB] shrink-0 mt-0.5" strokeWidth={1.75} />
+                <div><p className="text-[13px] font-bold text-slate-800 leading-snug">{t}</p><p className="text-[12px] text-slate-500 mt-1">{s}</p></div>
+              </div>
+            ))}
+          </div>
+        </Card>
+
+        <div className="lg:hidden">{fasterCard}</div>
+      </div>
+
+      <div className="hidden lg:block lg:sticky lg:top-24 space-y-4">
+        {summaryCard()}
+        {fasterCard}
+      </div>
     </div>
   );
 };
@@ -976,7 +1292,10 @@ const SECTIONS: Record<string, { title: string; render: SectionRender; wide?: bo
   },
   "contact": {
     title: "Contact the Dealer",
-    render: ({ listing }) => (<><SectionHeading icon={MessageSquare} title="Contact the Dealer" subtitle="Send a message and a specialist will reply." /><LeadForm listing={listing} intent="contact" label="Contact Dealer" cta="Send message" /></>),
+    wide: true,
+    hideCrossCta: true,
+    headerPill: "Available Now",
+    render: ({ listing, d, navigate }) => <ContactExperience listing={listing} d={d} navigate={navigate} />,
   },
   "trade": {
     title: "Value My Trade",
@@ -1213,10 +1532,12 @@ const VehiclePassportV2Detail = () => {
             { key: "call", icon: Phone, label: "Call", onClick: () => { if (d.dealerPhone) window.location.href = `tel:${d.dealerPhone}`; else navigate(`/${base}/${vehicleSlug}/contact`); } },
             { key: "text", icon: MessageSquare, label: "Text", onClick: () => navigate(`/${base}/${vehicleSlug}/text`) },
             { key: "td", icon: Clock, label: "Test Drive", onClick: () => navigate(`/${base}/${vehicleSlug}/test-drive`) },
-            // On the reserve page the primary bar action IS the reservation —
-            // Today's Price would compete with the page goal.
+            // On the action pages (reserve / contact) the primary bar action IS
+            // the page goal — Today's Price would compete with it.
             section === "reserve"
               ? { key: "hold", icon: ShieldCheck, label: "Request Hold", primary: true, onClick: () => { const el = document.getElementById("reserve-form"); el?.scrollIntoView({ behavior: "smooth" }); window.setTimeout(() => document.getElementById("rsv-name")?.focus({ preventScroll: true }), 450); } }
+              : section === "contact"
+              ? { key: "contact", icon: Mail, label: "Contact Dealer", primary: true, onClick: () => { const el = document.getElementById("contact-form"); el?.scrollIntoView({ behavior: "smooth" }); window.setTimeout(() => document.getElementById("ct-name")?.focus({ preventScroll: true }), 450); } }
               : { key: "price", icon: DollarSign, label: "Today's Price", primary: true, onClick: () => navigate(`/${base}/${vehicleSlug}/todays-price`) },
           ].map((b) => (
             <button key={b.key} onClick={b.onClick} className={`h-11 rounded-xl text-[10px] leading-[1.05] font-bold inline-flex flex-col items-center justify-center gap-0.5 text-center px-0.5 sm:h-12 sm:flex-row sm:gap-2 sm:rounded-full sm:px-7 sm:text-[13px] ${b.primary ? "bg-[#2563EB] text-white" : "border border-[#d8dce0] bg-white text-[#0F172A]"}`}>
