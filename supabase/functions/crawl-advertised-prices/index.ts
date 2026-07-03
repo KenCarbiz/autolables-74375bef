@@ -625,13 +625,15 @@ serve(async (req) => {
   let renderBudget = FIRECRAWL_KEY ? (body.test_url ? 1 : (targetVin ? 3 : 30)) : 0;
 
   // ── Auth gate ────────────────────────────────────────────────
-  // Two callers: (1) the nightly cron with the service-role key — full
-  // batch over all tenants; (2) a signed-in dealer admin clicking
-  // "Start scraping" on their inventory page — restricted to their own
-  // tenant. A JWT caller MUST pass their tenant_id and be a member of it
-  // (or a platform admin).
+  // Two callers: (1) the scheduled cron with the service-role key or the
+  // shared cron secret — full batch over all tenants; (2) a signed-in
+  // dealer admin clicking "Start scraping" on their inventory page —
+  // restricted to their own tenant. A JWT caller MUST pass their
+  // tenant_id and be a member of it (or a platform admin).
   const auth = (req.headers.get("Authorization") || "").replace(/^Bearer\s+/i, "");
-  if (auth !== serviceKey) {
+  const cronSecret = Deno.env.get("MARKETCHECK_CRON_SECRET") || "";
+  const isCron = !!cronSecret && (req.headers.get("x-cron-secret") || "") === cronSecret;
+  if (auth !== serviceKey && !isCron) {
     const { data: ures, error: uerr } = await admin.auth.getUser(auth);
     const userId = ures?.user?.id;
     if (uerr || !userId) {
