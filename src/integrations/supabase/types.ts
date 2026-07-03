@@ -4961,6 +4961,8 @@ export type Database = {
           doc_fee: number | null
           documents: Json
           enriched_at: string | null
+          epa_checked_at: string | null
+          epa_economy: Json | null
           factory_sticker_url: string | null
           features: Json
           feed_source: string | null
@@ -5040,6 +5042,8 @@ export type Database = {
           doc_fee?: number | null
           documents?: Json
           enriched_at?: string | null
+          epa_checked_at?: string | null
+          epa_economy?: Json | null
           factory_sticker_url?: string | null
           features?: Json
           feed_source?: string | null
@@ -5119,6 +5123,8 @@ export type Database = {
           doc_fee?: number | null
           documents?: Json
           enriched_at?: string | null
+          epa_checked_at?: string | null
+          epa_economy?: Json | null
           factory_sticker_url?: string | null
           features?: Json
           feed_source?: string | null
@@ -6023,6 +6029,8 @@ export type Database = {
           doc_fee: number | null
           documents: Json
           enriched_at: string | null
+          epa_checked_at: string | null
+          epa_economy: Json | null
           factory_sticker_url: string | null
           features: Json
           feed_source: string | null
