@@ -342,7 +342,10 @@ function buildPanel(key: PassportPanelKey, d: PassportData, listing: VehicleList
 
     case "price-confidence": {
       const ks = listing.key_specs || {};
-      const equipPct = Math.min(100, ((listing.features?.length ?? 0) + Object.keys(ks).length) * 12);
+      // Equipment spans the top-level features column AND the decoded
+      // mc_attributes options/features (where the NeoVIN pull lands) — the
+      // features column alone left fully-decoded cars reading "Pending".
+      const equipPct = Math.min(100, (listingEquipment(listing).length + Object.keys(ks).length) * 12);
       const factors: { label: string; pct: number; status?: string }[] = [
         { label: "Comparable Market Data", pct: avg != null ? 100 : 30 },
         { label: "Dealer Price Position", pct: 100 },
