@@ -13,6 +13,7 @@ import { oemCoverageRows, type CoverageKey } from "@/lib/oemWarranty";
 import { lookupOemReference } from "@/data/oemWarrantyReference";
 import { resolveEffectiveWarranty } from "@/lib/warranty/passportWarranty";
 import { readBuildSheet, PACKAGE_KIND_ORDER } from "@/lib/buildSheet";
+import { getEquipmentIcon } from "@/lib/equipmentIcons";
 import { readDealerAlternatives, type DealerAlternative } from "@/lib/dealerAlternatives";
 import { rememberPassportOrigin } from "@/lib/passportOrigin";
 import { recordPanelView } from "@/lib/shopperIntent";
@@ -1579,7 +1580,9 @@ function buildPanel(key: PassportPanelKey, d: PassportData, listing: VehicleList
         <details key={p.name} className={`${CARD} overflow-hidden group`}>
           <summary className="cursor-pointer list-none flex items-center justify-between gap-3 px-4 py-3">
             <span className="inline-flex items-center gap-2.5 min-w-0">
-              <span className="w-8 h-8 rounded-lg bg-blue-50 flex items-center justify-center shrink-0"><Package className="w-4 h-4 text-[#2563EB]" /></span>
+              {(() => { const PkgIcon = getEquipmentIcon({ name: p.name, category: "package" }).icon; return (
+                <span className="w-8 h-8 rounded-lg bg-blue-50 flex items-center justify-center shrink-0"><PkgIcon className="w-4 h-4 text-[#2563EB]" strokeWidth={1.75} /></span>
+              ); })()}
               <span className="min-w-0">
                 <span className="block text-[13px] font-bold text-[#0F172A] leading-tight">{p.name}</span>
                 {p.kind === "Equipment Group" && <span className="inline-block mt-0.5 text-[9px] font-bold uppercase tracking-wide text-[#2563EB] bg-blue-50 rounded-full px-1.5 py-0.5">Equipment Group</span>}
@@ -1623,13 +1626,16 @@ function buildPanel(key: PassportPanelKey, d: PassportData, listing: VehicleList
               {/* Tier 1 — the highlight chips shoppers scan first */}
               {hs.length > 0 && (
                 <Section title="Feature gallery">
-                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">{hs.map((h) => (
-                    <div key={h.key} className={`${CARD} p-4 flex flex-col items-center text-center gap-1.5`}>
-                      <span className="w-10 h-10 rounded-xl bg-blue-50 flex items-center justify-center"><Award className="w-5 h-5 text-[#2563EB]" /></span>
-                      <p className="text-[12px] font-bold leading-tight">{h.label}</p>
-                      <p className="text-[10px] text-[#94A3B8]">{h.sub}</p>
-                    </div>
-                  ))}</div>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">{hs.map((h) => {
+                    const eq = getEquipmentIcon({ name: h.label, category: h.sub });
+                    return (
+                      <div key={h.key} className={`${CARD} p-4 flex flex-col items-center text-center gap-1.5`}>
+                        <span className="w-11 h-11 rounded-xl bg-blue-50 flex items-center justify-center"><eq.icon className="w-5 h-5 text-[#2563EB]" strokeWidth={1.75} /></span>
+                        <p className="text-[12px] font-bold leading-tight">{h.label}</p>
+                        <p className="text-[10px] text-[#94A3B8]">{h.sub || eq.label}</p>
+                      </div>
+                    );
+                  })}</div>
                 </Section>
               )}
               {sheet ? (
@@ -1659,19 +1665,26 @@ function buildPanel(key: PassportPanelKey, d: PassportData, listing: VehicleList
                   {sheet.options.length > 0 && (
                     <Section title="Factory options" sub="Standalone options installed on this vehicle.">
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                        {sheet.options.map((o) => (
-                          <div key={o.name} className={`${CARD} px-3.5 py-2.5 flex items-center justify-between gap-2`}>
-                            <span className="text-[12px] font-semibold text-[#0F172A] leading-tight">{o.name}</span>
-                            {o.msrp && <span className="text-[11px] font-bold text-[#16A34A] shrink-0">{fmt$(o.msrp)}</span>}
-                          </div>
-                        ))}
+                        {sheet.options.map((o) => {
+                          const eq = getEquipmentIcon(o.name);
+                          return (
+                            <div key={o.name} className={`${CARD} px-3.5 py-2.5 flex items-center gap-2.5`}>
+                              <span className="w-8 h-8 rounded-lg bg-blue-50 flex items-center justify-center shrink-0"><eq.icon className="w-4 h-4 text-[#2563EB]" strokeWidth={1.75} /></span>
+                              <span className="min-w-0 flex-1">
+                                <span className="block text-[12px] font-semibold text-[#0F172A] leading-tight">{o.name}</span>
+                                <span className="block text-[10px] text-[#94A3B8] mt-0.5">{eq.label}</span>
+                              </span>
+                              {o.msrp && <span className="text-[11px] font-bold text-[#16A34A] shrink-0">{fmt$(o.msrp)}</span>}
+                            </div>
+                          );
+                        })}
                       </div>
                     </Section>
                   )}
                   {/* Tier 3 — key features by shopper-priority category */}
                   {sheet.keyFeatures.length > 0 && (
                     <Section title="Key features" sub="The equipment shoppers ask about, organized by category.">
-                      <div className="space-y-2">{sheet.keyFeatures.map(([name, items], i) => <Group key={name} title={name} items={items} defaultOpen={i === 0} />)}</div>
+                      <div className="space-y-2">{sheet.keyFeatures.map(([name, items], i) => <Group key={name} title={name} items={items} defaultOpen={i === 0} iconic />)}</div>
                     </Section>
                   )}
                   {/* Tier 4 — full reference list, collapsed by default */}
@@ -1684,7 +1697,7 @@ function buildPanel(key: PassportPanelKey, d: PassportData, listing: VehicleList
                         </span>
                         <ChevronDown className="w-4 h-4 text-[#94A3B8] group-open:rotate-180 transition-transform shrink-0" />
                       </summary>
-                      <div className="px-3 pb-3 space-y-2">{sheet.standard.map(([name, items]) => <Group key={name} title={name} items={items} />)}</div>
+                      <div className="px-3 pb-3 space-y-2">{sheet.standard.map(([name, items]) => <Group key={name} title={name} items={items} iconic />)}</div>
                     </details>
                   )}
                 </>
@@ -1692,19 +1705,19 @@ function buildPanel(key: PassportPanelKey, d: PassportData, listing: VehicleList
                 <>
                   {ordered.length > 0 && (
                     <Section title="Equipment categories">
-                      <div className="space-y-2">{ordered.map(([name, items], i) => <Group key={name} title={name} items={items} defaultOpen={i === 0} />)}</div>
+                      <div className="space-y-2">{ordered.map(([name, items], i) => <Group key={name} title={name} items={items} defaultOpen={i === 0} iconic />)}</div>
                     </Section>
                   )}
                   {featLabels.length > 0 && (
                     <Section title="Factory options">
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">{featLabels.slice(0, 12).map((f) => <IconCard key={f} icon={Award} title={f} />)}</div>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">{featLabels.slice(0, 12).map((f) => { const eq = getEquipmentIcon(f); return <IconCard key={f} icon={eq.icon} title={f} sub={eq.label} />; })}</div>
                     </Section>
                   )}
                 </>
               )}
               {accessories.length > 0 && (
                 <Section title="Dealer accessories available" sub="Add-ons offered by the dealer — not factory-installed.">
-                  <div className="space-y-2">{accessories.map((a) => <div key={a} className={`${CARD} p-3 flex items-center gap-2`}><Package className="w-4 h-4 text-[#2563EB] shrink-0" /><span className="text-[13px] text-[#0F172A]">{a}</span></div>)}</div>
+                  <div className="space-y-2">{accessories.map((a) => { const AccIcon = getEquipmentIcon({ name: a, category: "accessory" }).icon; return <div key={a} className={`${CARD} p-3 flex items-center gap-2.5`}><span className="w-8 h-8 rounded-lg bg-blue-50 flex items-center justify-center shrink-0"><AccIcon className="w-4 h-4 text-[#2563EB]" strokeWidth={1.75} /></span><span className="text-[13px] text-[#0F172A]">{a}</span></div>; })}</div>
                 </Section>
               )}
               {reasons.length > 0 && (
@@ -2494,14 +2507,18 @@ const Chip = ({ children }: { children: React.ReactNode }) => (
   <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-[#0F172A] bg-slate-100 rounded-full px-2.5 py-1">{children}</span>
 );
 
-const Group = ({ title, items, defaultOpen }: { title: string; items: string[]; defaultOpen?: boolean }) => (
+const Group = ({ title, items, defaultOpen, iconic }: { title: string; items: string[]; defaultOpen?: boolean; iconic?: boolean }) => (
   <details className={`${CARD} overflow-hidden group`} open={defaultOpen}>
     <summary className="cursor-pointer list-none flex items-center justify-between gap-3 px-4 py-3 text-[13px] font-bold text-[#0F172A]">
       <span className="inline-flex items-center gap-2">{title} <span className="text-[11px] font-semibold text-[#94A3B8]">{items.length}</span></span>
       <ChevronDown className="w-4 h-4 text-[#94A3B8] group-open:rotate-180 transition-transform shrink-0" />
     </summary>
     <div className="px-4 pb-3 grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1.5">
-      {items.map((it) => <div key={it} className="flex items-start gap-2 text-[12px] text-[#334155]"><CheckCircle2 className="w-3.5 h-3.5 text-[#16A34A] shrink-0 mt-0.5" />{it}</div>)}
+      {items.map((it) => {
+        if (!iconic) return <div key={it} className="flex items-start gap-2 text-[12px] text-[#334155]"><CheckCircle2 className="w-3.5 h-3.5 text-[#16A34A] shrink-0 mt-0.5" />{it}</div>;
+        const EqIcon = getEquipmentIcon({ name: it, category: title }).icon;
+        return <div key={it} className="flex items-start gap-2 text-[12px] text-[#334155]"><EqIcon className="w-3.5 h-3.5 text-[#2563EB] shrink-0 mt-0.5" strokeWidth={1.75} />{it}</div>;
+      })}
     </div>
   </details>
 );
