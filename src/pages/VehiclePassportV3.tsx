@@ -48,6 +48,9 @@ const V3_PRINT = `
   html, body { background: #fff !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   .lg\\:sticky, [class*="sticky"] { position: static !important; top: auto !important; }
   [data-module] { break-inside: avoid; page-break-inside: avoid; }
+  section[data-module="vehicle-details"] { break-inside: auto; page-break-inside: auto; }
+  section[data-module="vehicle-details"] > div:first-child { break-inside: avoid; page-break-inside: avoid; }
+  section[data-module="vehicle-details"] [class*="aspect-"] { aspect-ratio: auto !important; height: 3.1in !important; }
   main { padding-bottom: 0 !important; }
   button[aria-label] { display: none !important; }
 }
@@ -498,12 +501,12 @@ const VehiclePassportV3 = () => {
         </div>
 
         {/* 1–2. TOP ZONE — three-zone hero: gallery · identity · action panel */}
-        <section data-module="vehicle-details" className="grid grid-cols-1 lg:grid-cols-[minmax(0,400px)_minmax(0,1fr)_310px] gap-5 items-start">
+        <section data-module="vehicle-details" className="grid grid-cols-1 lg:grid-cols-[minmax(0,400px)_minmax(0,1fr)_310px] gap-5 items-start print:block print:space-y-4">
           {/* Gallery */}
           <div>
             <div className="relative overflow-hidden rounded-2xl bg-[#1f2227] aspect-[4/3] max-[767px]:aspect-[5/4]">
               {hero ? <img src={hero} alt={listing.ymm || ""} onClick={() => go("gallery")} className="absolute inset-0 w-full h-full object-cover cursor-zoom-in" /> : <div className="absolute inset-0 flex items-center justify-center text-slate-500"><Car className="w-14 h-14" strokeWidth={1.25} /></div>}
-              {photoCount > 0 && <span className="absolute left-3 top-3 text-white text-xs font-semibold px-2.5 py-1 rounded bg-black/60">{idx + 1} / {photoCount}</span>}
+              {photoCount > 0 && <span className="print:hidden absolute left-3 top-3 text-white text-xs font-semibold px-2.5 py-1 rounded bg-black/60">{idx + 1} / {photoCount}</span>}
               {photoCount > 1 && <>
                 <button onClick={() => setIdx((i) => (i - 1 + photoCount) % photoCount)} className="print:hidden absolute left-3 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full bg-white/95 hover:bg-white flex items-center justify-center shadow"><ChevronLeft className="w-5 h-5" /></button>
                 <button onClick={() => setIdx((i) => (i + 1) % photoCount)} className="print:hidden absolute right-3 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full bg-white/95 hover:bg-white flex items-center justify-center shadow"><ChevronRight className="w-5 h-5" /></button>
@@ -645,7 +648,7 @@ const VehiclePassportV3 = () => {
                 <div className="flex items-center gap-1.5 mb-2"><c.icon className="w-4 h-4 text-[#2563EB]" /><span className="text-[12px] font-semibold text-[#64748B]">{c.title}</span></div>
                 {c.donut != null ? <div className="flex flex-col items-center text-center"><Donut pct={c.donut} label={`${c.donut}`} /><p className="text-[14px] font-extrabold text-[#16A34A] leading-tight mt-2">{c.strong}</p><p className="text-[11px] text-[#64748B] leading-snug">{c.sub}</p></div>
                   : <><p className={`text-[16px] font-extrabold leading-tight ${/Great|High|Excellent|^-/.test(String(c.strong)) ? "text-[#16A34A]" : "text-[#0F172A]"}`}>{c.strong}</p><p className="text-[11px] text-[#64748B] leading-snug mt-0.5 flex-1">{c.sub}</p>{c.comps ? <div className="flex gap-1 mt-2">{[0, 1, 2].map((i) => <div key={i} className="flex-1 h-8 rounded bg-[#F1F5F9] flex items-center justify-center"><Car className="w-4 h-4 text-[#94A3B8]" /></div>)}</div> : c.chart}</>}
-                <button onClick={(e) => { e.stopPropagation(); openPanel(c.section as PassportPanelKey, e); }} className="mt-2.5 text-[12px] font-semibold text-[#2563EB] inline-flex items-center gap-1 hover:underline">{c.cta} <ArrowRight className="w-3.5 h-3.5" /></button>
+                <button onClick={(e) => { e.stopPropagation(); openPanel(c.section as PassportPanelKey, e); }} className="print:hidden mt-2.5 text-[12px] font-semibold text-[#2563EB] inline-flex items-center gap-1 hover:underline">{c.cta} <ArrowRight className="w-3.5 h-3.5" /></button>
               </div>
             ))}
           </div>
@@ -726,10 +729,10 @@ const VehiclePassportV3 = () => {
             cards hide entirely when there's no data to show, so the row never
             renders empty customer-facing cards. */}
         <section>
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-none xl:grid-flow-col xl:auto-cols-fr gap-6 items-stretch">
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-none xl:grid-flow-col xl:auto-cols-fr gap-6 items-stretch print:block print:space-y-5">
           {/* Why this vehicle checks out */}
           {pv("insights") && (
-          <div className={`${CARD} p-5 flex flex-col max-[767px]:p-6 max-[767px]:ring-1 max-[767px]:ring-blue-200 max-[767px]:shadow-[0_10px_30px_rgba(37,99,235,0.10)]`}>
+          <div className={`${CARD} p-5 flex flex-col max-[767px]:p-6 max-[767px]:ring-1 max-[767px]:ring-blue-200 max-[767px]:shadow-[0_10px_30px_rgba(37,99,235,0.10)] print:ring-0 print:shadow-none`}>
             <H3>Why This Vehicle Checks Out</H3>
             {d.confScore != null && (
               <div className="flex items-center justify-between gap-2 mt-3 rounded-xl bg-emerald-50/60 border border-emerald-100 px-3 py-2">
@@ -900,7 +903,7 @@ const VehiclePassportV3 = () => {
         {/* 7. CHAPTER 3 — ABOUT THIS VEHICLE */}
         <section>
           <div className="mb-4"><H2>About This Vehicle</H2><p className={`text-[13px] ${TEXT2} mt-0.5`}>Highlights and a quick look at how it's equipped.</p></div>
-          <div className="grid grid-cols-1 lg:grid-cols-[1fr_1.4fr] gap-6 items-stretch">
+          <div className="grid grid-cols-1 lg:grid-cols-[1fr_1.4fr] gap-6 items-stretch print:block print:space-y-5">
           {/* Highlights */}
           {pv("factoryOptions") && (
           <div data-module="highlights" className={`${CARD} p-5 flex flex-col`}>
