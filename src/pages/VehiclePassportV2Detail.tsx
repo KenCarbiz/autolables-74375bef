@@ -17,6 +17,7 @@ import Logo from "@/components/brand/Logo";
 import { derivePassport, fmt$, type PassportData } from "@/lib/passportV2Data";
 import { resolveTodaysPrice } from "@/lib/todaysPrice";
 import TodaysPriceExperience from "@/components/passport/TodaysPriceExperience";
+import TestDriveExperience from "@/components/passport/TestDriveExperience";
 import { listingGallery, listingHero } from "@/lib/photos";
 import { MOCK_LISTING } from "./VehiclePassportV3";
 
@@ -157,33 +158,6 @@ const LeadForm = ({
       </button>
       <p className="text-[11px] text-slate-400 text-center mt-3">By submitting, you agree to be contacted by the dealership about this vehicle.</p>
     </Card>
-  );
-};
-
-// Test-drive request with a concrete time commitment — a date + window is a
-// micro-contract that raises show rates versus "we'll call you."
-const TestDriveForm = ({ listing, dealerPhone }: { listing: VehicleListing; dealerPhone?: string | null }) => {
-  const [date, setDate] = useState("");
-  const [window_, setWindow] = useState("");
-  const WINDOWS = ["Morning", "Afternoon", "Evening"];
-  return (
-    <>
-      <Card className="p-5 mb-4">
-        <p className="text-[13px] font-bold text-slate-900 mb-2.5">When works for you?</p>
-        <input type="date" value={date} min={new Date().toISOString().slice(0, 10)} onChange={(e) => setDate(e.target.value)}
-          className="w-full border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
-        <div className="flex gap-2 mt-3">
-          {WINDOWS.map((w) => (
-            <button key={w} onClick={() => setWindow(window_ === w ? "" : w)}
-              className={`flex-1 h-10 rounded-xl text-[13px] font-semibold border transition-colors ${window_ === w ? "border-[#2563EB] bg-blue-50 text-[#2563EB]" : "border-slate-200 text-slate-600 hover:border-slate-300"}`}>
-              {w}
-            </button>
-          ))}
-        </div>
-      </Card>
-      <LeadForm listing={listing} intent="test_drive" label="Test Drive" cta="Request test drive" dealerPhone={dealerPhone}
-        extraNotes={() => [date ? `Requested ${date}` : "", window_].filter(Boolean).join(" ")} />
-    </>
   );
 };
 
@@ -1262,7 +1236,10 @@ const SECTIONS: Record<string, { title: string; render: SectionRender; wide?: bo
   },
   "test-drive": {
     title: "Schedule a Test Drive",
-    render: ({ listing, d }) => (<><SectionHeading icon={Calendar} title="Schedule a Test Drive" subtitle="Pick a time that works and we'll confirm." /><TestDriveForm listing={listing} dealerPhone={d.dealerPhone} /></>),
+    wide: true,
+    hideCrossCta: true,
+    headerPill: "Available Now",
+    render: ({ listing, d, navigate }) => <TestDriveExperience listing={listing} d={d} navigate={navigate} />,
   },
   "text": {
     title: "Text the Dealer",
@@ -1483,7 +1460,9 @@ const VehiclePassportV2Detail = () => {
           {[
             { key: "call", icon: Phone, label: "Call", onClick: () => { if (d.dealerPhone) window.location.href = `tel:${d.dealerPhone}`; else navigate(`/${base}/${vehicleSlug}/contact`); } },
             { key: "text", icon: MessageSquare, label: "Text", onClick: () => navigate(`/${base}/${vehicleSlug}/text`) },
-            { key: "td", icon: Clock, label: "Test Drive", onClick: () => navigate(`/${base}/${vehicleSlug}/test-drive`) },
+            section === "test-drive"
+              ? { key: "td", icon: Clock, label: "Test Drive", onClick: () => { const el = document.getElementById("td-form"); el?.scrollIntoView({ behavior: "smooth" }); window.setTimeout(() => document.getElementById("td-name")?.focus({ preventScroll: true }), 450); } }
+              : { key: "td", icon: Clock, label: "Test Drive", onClick: () => navigate(`/${base}/${vehicleSlug}/test-drive`) },
             // On the action pages (reserve / contact) the primary bar action IS
             // the page goal — Today's Price would compete with it.
             section === "reserve"

@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
-  Phone, MessageSquare, Mail, Lock, ShieldCheck, CheckCircle2, Gauge, Copy,
+  Phone, MessageSquare, Mail, Lock, ShieldCheck, CheckCircle2,
   Send, User, PenLine, Car, ChevronLeft, Info,
 } from "lucide-react";
+import { AutoLabelsSpecIcon, type AutoLabelsSpecIconKey } from "@/components/icons/AutoLabelsSpecIcons";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { type VehicleListing } from "@/hooks/useVehicleListing";
@@ -96,40 +97,51 @@ const VehicleSummaryCard = ({ listing, d }: { listing: VehicleListing; d: Passpo
   const mc = (listing.mc_attributes || {}) as Record<string, unknown>;
   const stockNo = mc.stock_no ? String(mc.stock_no) : null;
   const spec = (label: string) => d.keySpecs.find(([k]) => k === label)?.[1] ?? null;
+  // Each vehicle fact carries its own AutoLabels spec icon — mileage reads as
+  // an odometer, 4WD as a drivetrain, never four identical gauges.
   const facts = [
-    listing.mileage != null ? `${listing.mileage.toLocaleString()} miles` : null,
-    spec("Drivetrain"), spec("Engine"), spec("Transmission"),
-  ].filter(Boolean) as string[];
-  const details: [string, React.ReactNode][] = [
-    ...(stockNo ? [["Stock #", stockNo] as [string, React.ReactNode]] : []),
-    ...(listing.vin ? [["VIN", (
+    listing.mileage != null ? { icon: "odometer" as AutoLabelsSpecIconKey, label: `${listing.mileage.toLocaleString()} miles` } : null,
+    spec("Drivetrain") ? { icon: "drivetrain" as AutoLabelsSpecIconKey, label: spec("Drivetrain") as string } : null,
+    spec("Engine") ? { icon: "engine" as AutoLabelsSpecIconKey, label: spec("Engine") as string } : null,
+    spec("Transmission") ? { icon: "shifter" as AutoLabelsSpecIconKey, label: spec("Transmission") as string } : null,
+  ].filter(Boolean) as { icon: AutoLabelsSpecIconKey; label: string }[];
+  const details: [string, AutoLabelsSpecIconKey, React.ReactNode][] = [
+    ...(stockNo ? [["Stock #", "price-tag", stockNo] as [string, AutoLabelsSpecIconKey, React.ReactNode]] : []),
+    ...(listing.vin ? [["VIN", "vin-barcode", (
       <span key="vin" className="inline-flex items-center gap-1.5 min-w-0"><span className="font-mono text-[11.5px] truncate">{listing.vin}</span>
-        <button onClick={async () => { try { await navigator.clipboard.writeText(listing.vin); toast.success("VIN copied"); } catch { /* unavailable */ } }} aria-label="Copy VIN" className="text-[#64748B] hover:text-[#10202B] shrink-0"><Copy className="w-3 h-3" /></button>
+        <button onClick={async () => { try { await navigator.clipboard.writeText(listing.vin); toast.success("VIN copied"); } catch { /* unavailable */ } }} aria-label="Copy VIN" className="text-[#64748B] hover:text-[#10202B] shrink-0"><AutoLabelsSpecIcon name="copy" className="w-3.5 h-3.5" accent="currentColor" /></button>
       </span>
-    )] as [string, React.ReactNode]] : []),
-    ...(spec("Exterior Color") ? [["Exterior", spec("Exterior Color")] as [string, React.ReactNode]] : []),
-    ...(spec("Interior Color") ? [["Interior", spec("Interior Color")] as [string, React.ReactNode]] : []),
+    )] as [string, AutoLabelsSpecIconKey, React.ReactNode]] : []),
+    ...(spec("Exterior Color") ? [["Exterior", "paint", spec("Exterior Color")] as [string, AutoLabelsSpecIconKey, React.ReactNode]] : []),
+    ...(spec("Interior Color") ? [["Interior", "seat", spec("Interior Color")] as [string, AutoLabelsSpecIconKey, React.ReactNode]] : []),
   ];
   return (
     <div className={`${CARD} overflow-hidden`}>
       <div className="relative aspect-[16/10] bg-slate-100 flex items-center justify-center">
         {hero ? <img src={hero} alt={listing.ymm ?? "Vehicle"} className="w-full h-full object-cover" /> : <Car className="w-10 h-10 text-slate-300" />}
-        {gallery.length > 1 && <span className="absolute top-2.5 right-2.5 text-[11px] font-bold text-white bg-black/55 rounded-lg px-2 py-1">{gallery.length} Photos</span>}
+        {gallery.length > 1 && <span className="absolute top-2.5 right-2.5 inline-flex items-center gap-1.5 text-[11px] font-bold text-white bg-black/55 rounded-lg px-2 py-1"><AutoLabelsSpecIcon name="camera" className="w-3.5 h-3.5" accent="#FFFFFF" /> {gallery.length} Photos</span>}
       </div>
       <div className="p-5">
         <p className="text-[17px] font-extrabold leading-tight text-[#0D1B2A]">{listing.ymm}{listing.trim ? ` ${listing.trim}` : ""}</p>
         {d.price != null && <p className="mt-1"><span className="text-[24px] font-extrabold tracking-tight text-[#0D1B2A]">{fmt$(d.price)}</span><span className="text-[12px] font-semibold text-[#64748B] ml-2">{d.priceLabel}</span></p>}
         {facts.length > 0 && (
           <div className="flex flex-wrap gap-x-4 gap-y-1.5 mt-3 text-[12.5px] text-[#334155]">
-            {facts.map((f) => <span key={f} className="inline-flex items-center gap-1.5"><Gauge className="w-3.5 h-3.5 text-[#94A3B8]" /> {f}</span>)}
+            {facts.map((f) => (
+              <span key={f.label} className="inline-flex items-center gap-1.5">
+                <AutoLabelsSpecIcon name={f.icon} className="w-4 h-4 text-[#3D5876] shrink-0" /> {f.label}
+              </span>
+            ))}
           </div>
         )}
         {details.length > 0 && (
           <div className="grid grid-cols-2 gap-x-4 gap-y-2.5 mt-4 pt-4 border-t border-[#F1F5F9]">
-            {details.map(([k, v]) => (
-              <div key={k} className="min-w-0">
-                <p className="text-[10px] font-bold uppercase tracking-wide text-[#94A3B8]">{k}</p>
-                <p className="text-[12.5px] font-semibold text-[#10202B] truncate mt-0.5">{v}</p>
+            {details.map(([k, icon, v]) => (
+              <div key={k} className="min-w-0 flex items-start gap-2">
+                <AutoLabelsSpecIcon name={icon} className="w-4 h-4 text-[#3D5876] shrink-0 mt-0.5" />
+                <div className="min-w-0">
+                  <p className="text-[10px] font-bold uppercase tracking-wide text-[#94A3B8]">{k}</p>
+                  <p className="text-[12.5px] font-semibold text-[#10202B] truncate mt-0.5">{v}</p>
+                </div>
               </div>
             ))}
           </div>
