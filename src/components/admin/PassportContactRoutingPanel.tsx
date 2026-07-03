@@ -59,15 +59,38 @@ const PassportContactRoutingPanel = () => {
     if (ok !== false) toast.success("Contact routing saved");
   };
 
-  // Live preview: run the real resolver against the draft.
-  const preview = useMemo(() => {
-    const draft = previewMode === "current" ? cfg : { ...cfg, contactMode: previewMode };
+  // Live preview: run the real resolver against the draft. When the admin
+  // previews a specific mode that isn't configured yet (BDC disabled, no
+  // agents entered), the resolver would silently fall back to dealership
+  // default and the selector would appear stuck — so the preview injects
+  // sample data for that mode and labels it as a sample.
+  const { preview, previewSample } = useMemo(() => {
     const pool = agents.filter((a) => a.name.trim());
-    return resolveCustomerPassportRouting(draft, {
-      agents: pool,
-      assignedAgentId: pool[0]?.id ?? null,
-      now: new Date(),
-    });
+    let draft = previewMode === "current" ? cfg : { ...cfg, contactMode: previewMode };
+    let previewAgents = pool;
+    let assignedAgentId = pool[0]?.id ?? null;
+    let sample = false;
+    if (previewMode === "bdc" && !draft.bdcSettings?.enabled) {
+      draft = { ...draft, bdcSettings: { showBdcAsTeam: true, ...(draft.bdcSettings ?? {}), enabled: true } };
+      sample = true;
+    }
+    if ((previewMode === "assigned_agent" || previewMode === "smart_routing") && pool.length === 0) {
+      const demoAgent: PassportAgent = {
+        id: "__preview_sample__", name: "Alex Morgan", title: "Product Specialist",
+        status: "available", manualOverride: "available", acceptsPassportLeads: true, workingHours: [],
+      };
+      previewAgents = [demoAgent];
+      assignedAgentId = demoAgent.id;
+      sample = true;
+    }
+    return {
+      preview: resolveCustomerPassportRouting(draft, {
+        agents: previewAgents,
+        assignedAgentId,
+        now: new Date(),
+      }),
+      previewSample: sample,
+    };
   }, [cfg, agents, previewMode]);
   const pill = closedPillCopy(preview);
   const PreviewHelpIcon = preview.afterHours ? Clock : preview.displayMode === "team" ? Headset : Users;
@@ -299,6 +322,11 @@ const PassportContactRoutingPanel = () => {
               </select>
             </div>
             <p className="text-[11px] text-slate-400 mt-1">Exactly what the shopper sees. Routed to: {preview.routingTargetType.replace(/_/g, " ")}{preview.afterHours ? " · after hours" : ""}</p>
+            {previewSample && (
+              <p className="text-[11px] font-medium text-amber-600 mt-1">
+                Sample preview — {previewMode === "bdc" ? "enable the BDC queue" : "add an agent"} above and save to make this mode live.
+              </p>
+            )}
 
             {/* Closed pill */}
             <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wide mt-4 mb-1.5">Closed state</p>
