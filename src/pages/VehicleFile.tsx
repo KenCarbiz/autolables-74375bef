@@ -17,10 +17,8 @@ import { formatPhone, composeName } from "@/components/addendum/CustomerInfoSect
 import EmptyState from "@/components/ui/empty-state";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { InstallProofList } from "@/components/admin/InstallProofList";
-import { useVehicleSpecs } from "@/hooks/useVehicleSpecs";
 import { useRecallTask, OUTCOME_LABELS, type RecallOutcome } from "@/hooks/useRecallTask";
 import { listingGallery, listingHero } from "@/lib/photos";
-import { cleanEquipmentList } from "@/lib/passportV2Data";
 import { PACKET_MODULES, packetVisible } from "@/lib/packetModules";
 import { resolveOperatingState } from "@/lib/dealerState";
 import { QRCodeSVG } from "qrcode.react";
@@ -28,7 +26,6 @@ import GeneratedDocumentsSection from "@/components/vehicle/GeneratedDocumentsSe
 import UsedCarDocPack from "@/components/vehicle/UsedCarDocPack";
 import DeliverySignoffs from "@/components/vehicle/DeliverySignoffs";
 import TitleMcoPanel from "@/components/vehicle/TitleMcoPanel";
-import ShopperFocus from "@/components/vehicle/ShopperFocus";
 import VehicleEvidenceTimeline from "@/components/vehicle/VehicleEvidenceTimeline";
 
 // ──────────────────────────────────────────────────────────────
@@ -159,20 +156,6 @@ const readinessSummary = (v: VehicleRow, recall?: RecallReviewState) => {
   const pct = Math.round((done / checks.length) * 100);
   return { checks, done, pct, remaining: checks.filter((c) => !c.ok) };
 };
-
-// Short pill labels for the readiness status bar's "Missing:" chips.
-const shortCheck = (label: string): string => (({
-  "Vehicle created": "Created",
-  "VIN decoded": "VIN",
-  "Published to shopper portal": "Publish",
-  "Recall checked": "Recall",
-  "Open Recall Review Required": "Recall Review",
-  "Prep & install signed off": "Prep & Install",
-  "Documents attached": "Documents",
-  "Service history": "Service",
-  "Remaining warranty": "Warranty",
-  "Available accessories": "Accessories",
-} as Record<string, string>)[label] || label);
 
 const VehicleFile = () => {
   const { id } = useParams<{ id: string }>();
@@ -353,7 +336,6 @@ const VehicleFile = () => {
     { id: "evidence",  label: "Evidence",  icon: Activity },
   ];
 
-  const ready = readinessSummary(vehicle, recall);
   const heroMc = (vehicle.mc_attributes || {}) as Record<string, unknown>;
   const stockNo = (heroMc.stock_no as string) || ((vehicle.sticker_snapshot?.decoded as Record<string, unknown> | undefined)?.stock as string) || null;
   const gallery: string[] = listingGallery(vehicle);
@@ -388,25 +370,36 @@ const VehicleFile = () => {
 
         <div className="mt-3 rounded-2xl border border-border bg-card shadow-sm overflow-hidden">
           <div className="flex flex-col lg:flex-row gap-0 p-5 lg:p-6">
-            {/* Vehicle photo */}
-            <div className={`lg:w-[340px] shrink-0 h-56 lg:h-[248px] rounded-2xl overflow-hidden flex items-center justify-center bg-gradient-to-br ${
-              vehicle.condition === "new" ? "from-blue-500/15 to-blue-600/5 text-blue-600" :
-              vehicle.condition === "cpo" ? "from-violet-500/15 to-violet-600/5 text-violet-600" :
-              "from-slate-400/15 to-slate-500/5 text-slate-500"
-            }`}>
-              {gallery.length ? (
-                <div className="relative w-full h-full rounded-2xl overflow-hidden">
-                  <img src={gallery[safeImg]} alt={vehicle.ymm || "vehicle"} className="w-full h-full object-cover" />
-                  {gallery.length > 1 && (
-                    <>
-                      <button onClick={(e) => { e.stopPropagation(); setImgIdx((safeImg - 1 + gallery.length) % gallery.length); }} aria-label="Previous photo" className="absolute left-1.5 top-1/2 -translate-y-1/2 w-7 h-7 rounded-full bg-black/45 text-white flex items-center justify-center hover:bg-black/65 transition-colors"><ArrowLeft className="w-4 h-4" /></button>
-                      <button onClick={(e) => { e.stopPropagation(); setImgIdx((safeImg + 1) % gallery.length); }} aria-label="Next photo" className="absolute right-1.5 top-1/2 -translate-y-1/2 w-7 h-7 rounded-full bg-black/45 text-white flex items-center justify-center hover:bg-black/65 transition-colors"><ChevronRight className="w-4 h-4" /></button>
-                      <span className="absolute bottom-1.5 left-1.5 text-[10px] font-semibold px-1.5 py-0.5 rounded bg-black/55 text-white tabular-nums">{safeImg + 1} / {gallery.length}</span>
-                    </>
-                  )}
+            {/* Vehicle photo + thumbnail strip */}
+            <div className="lg:w-[340px] shrink-0">
+              <div className={`h-56 lg:h-[248px] rounded-2xl overflow-hidden flex items-center justify-center bg-gradient-to-br ${
+                vehicle.condition === "new" ? "from-blue-500/15 to-blue-600/5 text-blue-600" :
+                vehicle.condition === "cpo" ? "from-violet-500/15 to-violet-600/5 text-violet-600" :
+                "from-slate-400/15 to-slate-500/5 text-slate-500"
+              }`}>
+                {gallery.length ? (
+                  <div className="relative w-full h-full rounded-2xl overflow-hidden">
+                    <img src={gallery[safeImg]} alt={vehicle.ymm || "vehicle"} className="w-full h-full object-cover" />
+                    {gallery.length > 1 && (
+                      <>
+                        <button onClick={(e) => { e.stopPropagation(); setImgIdx((safeImg - 1 + gallery.length) % gallery.length); }} aria-label="Previous photo" className="absolute left-1.5 top-1/2 -translate-y-1/2 w-7 h-7 rounded-full bg-black/45 text-white flex items-center justify-center hover:bg-black/65 transition-colors"><ArrowLeft className="w-4 h-4" /></button>
+                        <button onClick={(e) => { e.stopPropagation(); setImgIdx((safeImg + 1) % gallery.length); }} aria-label="Next photo" className="absolute right-1.5 top-1/2 -translate-y-1/2 w-7 h-7 rounded-full bg-black/45 text-white flex items-center justify-center hover:bg-black/65 transition-colors"><ChevronRight className="w-4 h-4" /></button>
+                        <span className="absolute bottom-1.5 left-1.5 text-[10px] font-semibold px-1.5 py-0.5 rounded bg-black/55 text-white tabular-nums">{safeImg + 1} / {gallery.length}</span>
+                      </>
+                    )}
+                  </div>
+                ) : (
+                  <Car className="w-16 h-16" strokeWidth={1.25} />
+                )}
+              </div>
+              {gallery.length > 1 && (
+                <div className="hidden lg:flex items-center gap-1.5 mt-2">
+                  {gallery.slice(0, 6).map((src, i) => (
+                    <button key={src + i} onClick={() => setImgIdx(i)} aria-label={`Photo ${i + 1}`} className={`w-[50px] h-9 rounded-lg overflow-hidden border-2 transition-colors ${i === safeImg ? "border-blue-600" : "border-transparent hover:border-border"}`}>
+                      <img src={src} alt="" className="w-full h-full object-cover" />
+                    </button>
+                  ))}
                 </div>
-              ) : (
-                <Car className="w-16 h-16" strokeWidth={1.25} />
               )}
             </div>
 
@@ -524,42 +517,6 @@ const VehicleFile = () => {
                 </div>
               </div>
 
-              {/* Readiness status bar — compact (~72px), bottom-aligned with
-                  the photo. Always communicates remaining work, including for
-                  published vehicles. */}
-              <div className={`mt-5 lg:mt-auto rounded-xl border px-4 py-3 flex items-center gap-4 ${
-                vehicle.status === "published" ? "border-emerald-200 bg-emerald-50/60" : "border-amber-200 bg-amber-50/60"
-              }`}>
-                <ReadinessRing pct={ready.pct} tone={vehicle.status === "published" ? "emerald" : "amber"} />
-                <div className="min-w-0">
-                  <p className={`text-sm font-bold ${vehicle.status === "published" ? "text-emerald-800" : "text-amber-800"}`}>
-                    {vehicle.status === "published" ? "Published vehicle" : "Draft vehicle"}
-                  </p>
-                  <p className="text-xs text-muted-foreground truncate">
-                    {vehicle.status === "published"
-                      ? "Live on the shopper portal."
-                      : ready.remaining.length === 0
-                        ? "All set — click Publish to Shopper Portal."
-                        : "This vehicle is not ready to publish"}
-                  </p>
-                </div>
-                {ready.remaining.length > 0 && (
-                  <div className="hidden sm:flex items-center gap-2 lg:ml-auto min-w-0">
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground shrink-0">Missing:</span>
-                    <div className="flex items-center gap-1.5 flex-wrap">
-                      {ready.remaining.slice(0, 4).map((c) => (
-                        <span key={c.label} className={`inline-flex items-center gap-1.5 h-7 px-2.5 rounded-full bg-white border text-[11px] font-semibold ${c.blocks ? "text-red-700 border-red-200" : "text-amber-700 border-amber-200"}`}>
-                          <span className={`w-1.5 h-1.5 rounded-full ${c.blocks ? "bg-red-500" : "bg-amber-500"}`} />
-                          {shortCheck(c.label)}
-                        </span>
-                      ))}
-                      {ready.remaining.length > 4 && (
-                        <span className="text-[11px] font-semibold text-muted-foreground">+{ready.remaining.length - 4}</span>
-                      )}
-                    </div>
-                  </div>
-                )}
-              </div>
             </div>
           </div>
         </div>
@@ -681,11 +638,29 @@ const PRETTY_ACTION: Record<string, string> = {
 const prettyAction = (a: string) =>
   PRETTY_ACTION[a] || a.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
 
+// "Today, 1:32 PM" for same-day timestamps, short date+time otherwise.
+const fmtWhen = (iso: string | null | undefined): string | null => {
+  if (!iso) return null;
+  const d = new Date(iso);
+  const sameDay = d.toDateString() === new Date().toDateString();
+  const time = d.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
+  return sameDay ? `Today, ${time}` : d.toLocaleString(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
+};
+
+// Label/value row shared by the snapshot status cards.
+const StatRow = ({ label, value, tone }: { label: string; value: React.ReactNode; tone?: "emerald" | "amber" | "muted" }) => (
+  <div className="flex items-center justify-between gap-3 text-sm">
+    <span className="text-muted-foreground">{label}</span>
+    <span className={`font-semibold text-right tabular-nums ${tone === "emerald" ? "text-emerald-600" : tone === "amber" ? "text-amber-600" : tone === "muted" ? "text-muted-foreground" : "text-foreground"}`}>{value}</span>
+  </div>
+);
+
+const snapBtn = "h-9 rounded-lg border border-border bg-card hover:bg-muted text-foreground text-xs font-semibold inline-flex items-center justify-center gap-1.5 transition-colors disabled:opacity-50";
+const snapBtnPrimary = "h-9 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold inline-flex items-center justify-center gap-1.5 transition-colors disabled:opacity-50";
+
 const OverviewPanel = ({ vehicle, onTab, recall }: { vehicle: VehicleRow; onTab: (t: TabId) => void; recall: ReturnType<typeof useRecallTask> }) => {
   const [events, setEvents] = useState<AuditEvent[]>([]);
   const [loadingEvents, setLoadingEvents] = useState(true);
-  const { fetchSpecs, loading: pullingSpecs } = useVehicleSpecs();
-  const [pulledOptions, setPulledOptions] = useState<string[]>([]);
 
   useEffect(() => {
     let cancelled = false;
@@ -715,98 +690,136 @@ const OverviewPanel = ({ vehicle, onTab, recall }: { vehicle: VehicleRow; onTab:
 
   const { checks, pct, remaining } = readinessSummary(vehicle, recall);
   const notReady = pct < 100;
-  const ringTone = pct === 100 ? "#10B981" : pct >= 60 ? "#2563EB" : "#F59E0B";
-  const decoded = (vehicle.sticker_snapshot?.decoded as Record<string, unknown> | undefined) || undefined;
+  const ringColor = notReady ? "#F59E0B" : "#10B981";
   const publicUrl = `${window.location.origin}/v/${(vehicle.vin || vehicle.slug || "").toUpperCase()}`;
+  const published = vehicle.status === "published";
+  const mc = (vehicle.mc_attributes || {}) as Record<string, unknown>;
+  const stockNo = (mc.stock_no as string) || ((vehicle.sticker_snapshot?.decoded as Record<string, unknown> | undefined)?.stock as string) || null;
+  const sourceLabel = (() => { const v = mc.source ?? mc.seller_type ?? mc.inventory_type; return v ? String(v).toUpperCase() : null; })();
+  const lastShopperView = events.find((e) => e.action === "listing_viewed")?.created_at || null;
+
+  // "Vehicle created" is always true — noise in a task list.
+  const taskChecks = checks.filter((c) => c.label !== "Vehicle created");
+  const shownChecks = taskChecks.slice(0, 6);
+  const moreCount = taskChecks.length - shownChecks.length;
+
+  const copyPortalLink = async () => {
+    try { await navigator.clipboard.writeText(publicUrl); toast.success("Link copied"); }
+    catch { toast.error("Couldn't copy the link"); }
+  };
+  const copyVinLocal = async () => {
+    try { await navigator.clipboard.writeText(vehicle.vin); toast.success("VIN copied"); }
+    catch { toast.error("Couldn't copy the VIN"); }
+  };
 
   const quick: { label: string; icon: typeof Car; tone: string; onClick: () => void }[] = [
     { label: "Generate Sticker", icon: Printer, tone: "bg-indigo-50 text-indigo-600", onClick: () => onTab("labels") },
     { label: "Create Addendum", icon: FileText, tone: "bg-violet-50 text-violet-600", onClick: () => onTab("addendum") },
     { label: "Upload Documents", icon: Upload, tone: "bg-slate-100 text-slate-600", onClick: () => onTab("documents") },
     { label: "Customer Sign-off", icon: Signature, tone: "bg-fuchsia-50 text-fuchsia-600", onClick: () => onTab("sign") },
-    { label: "Publish Vehicle", icon: Globe, tone: "bg-emerald-50 text-emerald-600", onClick: () => onTab("labels") },
     // Only open the public passport when it actually exists — an unpublished
     // vehicle's /v/{vin} renders "Vehicle unavailable", so route drafts to the
     // publish flow instead of a blank page.
-    vehicle.status === "published"
+    published
       ? { label: "Open Shopper Portal", icon: ExternalLink, tone: "bg-blue-50 text-blue-600", onClick: () => window.open(publicUrl, "_blank", "noopener") }
       : { label: "Publish to Go Live", icon: Globe, tone: "bg-blue-50 text-blue-600", onClick: () => onTab("labels") },
   ];
 
-  const mc = (vehicle.mc_attributes || {}) as Record<string, unknown>;
-  // Left-column key specs for Vehicle Information.
-  const specs = ([
-    ["Trim", vehicle.trim ?? decoded?.trim ?? null],
-    ["Engine", mc.engine ?? decoded?.engine ?? null],
-    ["Drivetrain", mc.drivetrain ?? null],
-    ["Exterior Color", mc.exterior_color ?? null],
-    ["Interior Color", mc.interior_color ?? null],
-    ["Fuel Type", mc.fuel_type ?? decoded?.fuelType ?? null],
-  ] as [string, unknown][])
-    .filter(([, v]) => v != null && String(v).trim() !== "")
-    .map(([label, v]) => ({ label, value: String(v) }));
-
-  // Market & history insights from the MarketCheck feed (one-owner, clean
-  // title, days-on-market, price movement, seller type).
-  const mcStrArr = (v: unknown): string[] => {
-    if (Array.isArray(v)) return v.map((x) => typeof x === "string" ? x : (x && typeof x === "object" ? String((x as Record<string, unknown>).name ?? (x as Record<string, unknown>).label ?? (x as Record<string, unknown>).description ?? "") : String(x ?? ""))).map((s) => s.trim()).filter(Boolean);
-    if (typeof v === "string") return v.split(/[,;|]/).map((s) => s.trim()).filter(Boolean);
-    return [];
-  };
-  const optionsList = cleanEquipmentList([...mcStrArr(mc.options), ...mcStrArr(mc.features), ...pulledOptions]);
-  const handlePullSpecs = async () => {
-    const r = await fetchSpecs({ vin: vehicle.vin, tenantId: vehicle.tenant_id, vehicleId: vehicle.id });
-    if (r) setPulledOptions([...r.options, ...r.features]);
-  };
-  // Customer-packet completeness — nine shareable signals.
-  const packetItems: { label: string; ok: boolean }[] = [
-    { label: "VIN decoded", ok: !!vehicle.ymm },
-    { label: "Photos", ok: (vehicle.photos?.length || 0) > 0 },
-    { label: "Description", ok: !!(vehicle as unknown as Record<string, unknown>).description },
-    { label: "Recall checked", ok: !!vehicle.recall_status },
-    { label: "Documents", ok: (vehicle.documents?.length || 0) > 0 },
-    { label: "Sticker published", ok: vehicle.status === "published" },
-    { label: "Warranty info", ok: !!vehicle.warranty_info && Object.keys(vehicle.warranty_info).length > 0 },
-    { label: "Service history", ok: (vehicle.service_records?.length || 0) > 0 },
-    { label: "Accessories", ok: (vehicle.available_accessories?.length || 0) > 0 },
+  // Compact reference pairs for the Vehicle Information card.
+  const infoPairs: { label: string; value: React.ReactNode }[] = [
+    { label: "VIN", value: <span className="font-mono text-[12px]">{vehicle.vin}</span> },
+    { label: "Year / Make / Model / Trim", value: `${vehicle.ymm || "—"}${vehicle.trim ? ` ${vehicle.trim}` : ""}` },
+    ...(stockNo ? [{ label: "Stock #", value: stockNo }] : []),
+    { label: "Created", value: new Date(vehicle.created_at).toLocaleDateString() },
+    ...(vehicle.mileage != null ? [{ label: "Mileage", value: `${vehicle.mileage.toLocaleString()} mi` }] : []),
+    { label: "Last sync", value: vehicle.enriched_at ? new Date(vehicle.enriched_at).toLocaleString(undefined, { month: "numeric", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit" }) : "Not synced" },
+    ...(vehicle.price != null ? [{ label: "Price", value: `$${vehicle.price.toLocaleString()}` }] : []),
+    ...(sourceLabel ? [{ label: "Source", value: sourceLabel }] : []),
   ];
-  const packetDone = packetItems.filter((p) => p.ok).length;
-  const packetPct = Math.round((packetDone / packetItems.length) * 100);
 
   return (
     <div className="space-y-6">
-      <div className="grid grid-cols-1 lg:grid-cols-[1.3fr_1fr_1fr] gap-4">
-        {/* Vehicle Readiness */}
-        <Card title="Vehicle Readiness" action={<span className={`text-[11px] font-bold px-2 py-0.5 rounded-full ${notReady ? "bg-amber-100 text-amber-700" : "bg-emerald-100 text-emerald-700"}`}>{pct}% · {notReady ? "Not ready" : "Ready"}</span>}>
-          <div className="flex items-center gap-6">
-            <div className="relative w-[144px] h-[144px] shrink-0">
-              <svg className="w-[144px] h-[144px] -rotate-90" viewBox="0 0 120 120">
-                <circle cx="60" cy="60" r="52" fill="none" stroke="currentColor" strokeWidth="9" className="text-muted" />
-                <circle cx="60" cy="60" r="52" fill="none" stroke={ringTone} strokeWidth="9" strokeLinecap="round" strokeDasharray={2 * Math.PI * 52} strokeDashoffset={2 * Math.PI * 52 * (1 - pct / 100)} className="transition-[stroke-dashoffset] duration-700" />
-              </svg>
-              <div className="absolute inset-0 flex flex-col items-center justify-center">
-                <span className="font-display text-[36px] font-black tabular-nums text-foreground leading-none">{pct}%</span>
-                <span className={`text-[11px] font-bold uppercase tracking-wide mt-0.5 ${notReady ? "text-amber-600" : "text-emerald-600"}`}>{notReady ? "Not Ready" : "Ready"}</span>
+      <div>
+        <h2 className="text-[20px] font-bold tracking-tight text-foreground">Vehicle Health Snapshot</h2>
+        <p className="text-sm text-slate-500 mt-0.5">Operational status, shopper readiness, pricing intelligence, and missing items for this vehicle.</p>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 items-stretch">
+        {/* 1 — Packet Completeness (the anchor card) */}
+        <Card title="Packet Completeness" className="flex flex-col" action={
+          <span className={`text-[11px] font-bold px-2 py-0.5 rounded-full ${notReady ? "bg-amber-100 text-amber-700" : "bg-emerald-100 text-emerald-700"}`}>{pct}% · {notReady ? "Not ready" : "Ready"}</span>
+        }>
+          <div className="flex items-start gap-5 flex-1">
+            <div className="flex flex-col items-center shrink-0">
+              <div className="relative w-[104px] h-[104px]">
+                <svg className="w-[104px] h-[104px] -rotate-90" viewBox="0 0 120 120">
+                  <circle cx="60" cy="60" r="52" fill="none" stroke="currentColor" strokeWidth="10" className="text-muted" />
+                  <circle cx="60" cy="60" r="52" fill="none" stroke={ringColor} strokeWidth="10" strokeLinecap="round" strokeDasharray={2 * Math.PI * 52} strokeDashoffset={2 * Math.PI * 52 * (1 - pct / 100)} className="transition-[stroke-dashoffset] duration-700" />
+                </svg>
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <span className="font-display text-[26px] font-black tabular-nums text-foreground leading-none">{pct}%</span>
+                </div>
               </div>
+              <span className="text-[11px] font-semibold text-muted-foreground mt-2">{remaining.length} task{remaining.length === 1 ? "" : "s"} remaining</span>
             </div>
-            <ul className="flex-1 space-y-2 min-w-0">
-              {checks.map((c) => (
-                <li key={c.label} className="flex items-center justify-between gap-2 text-xs">
-                  <span className="inline-flex items-center gap-2 min-w-0">
-                    {c.ok ? <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" /> : <CircleAlert className="w-4 h-4 text-amber-500 shrink-0" />}
-                    <span className={`truncate ${c.ok ? "text-foreground font-medium" : "text-muted-foreground"}`}>{c.label}</span>
-                  </span>
-                  <span className="text-[10px] text-muted-foreground whitespace-nowrap">{c.when ? new Date(c.when).toLocaleDateString() : c.ok ? "done" : "pending"}</span>
+            <ul className="flex-1 space-y-2 min-w-0 pt-0.5">
+              {shownChecks.map((c) => (
+                <li key={c.label} className="flex items-center gap-2 text-xs min-w-0">
+                  {c.ok ? <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" /> : <CircleAlert className="w-4 h-4 text-amber-500 shrink-0" />}
+                  <span className={`truncate ${c.ok ? "text-foreground font-medium" : "text-amber-700 font-medium"}`}>{c.label}</span>
                 </li>
               ))}
+              {moreCount > 0 && <li className="text-[11px] font-semibold text-muted-foreground pl-6">+{moreCount} more</li>}
             </ul>
           </div>
-          <div className="flex items-center justify-between pt-3 mt-1 border-t border-border">
-            <span className="text-[11px] font-semibold text-amber-600">{remaining.length} task{remaining.length === 1 ? "" : "s"} remaining</span>
-            <button onClick={() => onTab("labels")} className="text-[11px] font-semibold text-blue-600 hover:underline inline-flex items-center gap-1">View all tasks <ChevronRight className="w-3 h-3" /></button>
+          <button onClick={() => onTab("labels")} className="mt-auto pt-1 text-[12px] font-semibold text-blue-600 hover:underline inline-flex items-center justify-center gap-1 w-full">View missing items <ChevronRight className="w-3.5 h-3.5" /></button>
+        </Card>
+
+        {/* 2 — Shopper Portal status */}
+        <Card title="Shopper Portal" className="flex flex-col" action={
+          <span className={`text-[11px] font-bold px-2 py-0.5 rounded-full ${published ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"}`}>{published ? "Live" : "Draft"}</span>
+        }>
+          <div className="space-y-2.5 flex-1">
+            <StatRow label="Published on" value={vehicle.published_at ? new Date(vehicle.published_at).toLocaleDateString() : "Not published"} tone={vehicle.published_at ? undefined : "muted"} />
+            <StatRow label="Last shopper view" value={fmtWhen(lastShopperView) ?? "No views yet"} tone={lastShopperView ? undefined : "muted"} />
+            <StatRow label="Passport URL" value={published ? "Live" : "Not live"} tone={published ? "emerald" : "amber"} />
+            <StatRow label="QR / Preview" value="Available" />
+          </div>
+          <div className="grid grid-cols-2 gap-2 mt-auto pt-1">
+            {published
+              ? <a href={publicUrl} target="_blank" rel="noreferrer" className={snapBtn}><ExternalLink className="w-3.5 h-3.5" /> View shopper page</a>
+              : <button onClick={() => onTab("labels")} className={snapBtnPrimary}><Globe className="w-3.5 h-3.5" /> Publish vehicle</button>}
+            <button onClick={copyPortalLink} className={snapBtn}><Copy className="w-3.5 h-3.5" /> Copy link</button>
           </div>
         </Card>
 
+        {/* 3 — Recall Status */}
+        <RecallCard vehicle={vehicle} recall={recall} />
+
+        {/* 4 — Vehicle Information (reference only) */}
+        <Card title="Vehicle Information" className="flex flex-col">
+          <div className="grid grid-cols-2 gap-x-5 gap-y-3 flex-1">
+            {infoPairs.map((p) => (
+              <div key={p.label} className="min-w-0">
+                <p className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground">{p.label}</p>
+                <p className="text-[13px] font-semibold text-foreground truncate mt-0.5">{p.value}</p>
+              </div>
+            ))}
+          </div>
+          <div className="grid grid-cols-2 gap-2 mt-auto pt-1">
+            <button onClick={() => onTab("scan")} className={snapBtn}><FileText className="w-3.5 h-3.5" /> Edit vehicle</button>
+            <button onClick={copyVinLocal} className={snapBtn}><Copy className="w-3.5 h-3.5" /> Copy VIN</button>
+          </div>
+        </Card>
+
+        {/* 5 — Market Pricing */}
+        <MarketPricingCard vehicle={vehicle} />
+
+        {/* 6 — Shopper Focus */}
+        <ShopperFocusCard vehicle={vehicle} onTab={onTab} />
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         {/* Activity Feed */}
         <Card title="Activity Feed" action={<button onClick={() => onTab("evidence")} className="text-[11px] font-semibold text-blue-600 hover:underline">View all</button>}>
           {loadingEvents ? (
@@ -846,7 +859,7 @@ const OverviewPanel = ({ vehicle, onTab, recall }: { vehicle: VehicleRow; onTab:
 
         {/* Quick Actions */}
         <Card title="Quick Actions">
-          <div className="space-y-2">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
             {quick.map((a) => (
               <button
                 key={a.label}
@@ -861,87 +874,6 @@ const OverviewPanel = ({ vehicle, onTab, recall }: { vehicle: VehicleRow; onTab:
               </button>
             ))}
           </div>
-        </Card>
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-[1.3fr_1fr_1fr] gap-4">
-        {/* Vehicle Information — specs + packages */}
-        <Card title="Vehicle Information" action={<button onClick={() => onTab("scan")} className="text-[11px] font-semibold text-blue-600 hover:underline">Edit</button>}>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3">
-            <div className="space-y-2">
-              {specs.length > 0 ? specs.map((e) => (
-                <div key={e.label} className="flex items-center justify-between gap-2 text-sm">
-                  <span className="text-muted-foreground">{e.label}</span>
-                  <span className="font-medium text-foreground text-right truncate">{e.value}</span>
-                </div>
-              )) : (
-                <p className="text-sm text-muted-foreground">Decode the VIN to populate specs.</p>
-              )}
-            </div>
-            <div>
-              <p className="text-[11px] font-bold uppercase tracking-wide text-muted-foreground mb-2">Packages &amp; Options</p>
-              {optionsList.length > 0 ? (
-                <ul className="space-y-1.5">
-                  {optionsList.slice(0, 6).map((o) => (
-                    <li key={o} className="flex items-center gap-1.5 text-sm text-foreground"><CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 shrink-0" /><span className="truncate">{o}</span></li>
-                  ))}
-                  {optionsList.length > 6 && (
-                    <li><button onClick={() => onTab("scan")} className="text-[11px] font-semibold text-blue-600 hover:underline">View all ({optionsList.length})</button></li>
-                  )}
-                </ul>
-              ) : (
-                <button onClick={handlePullSpecs} disabled={pullingSpecs || !vehicle.vin} className="text-[11px] font-semibold text-blue-600 hover:underline disabled:opacity-50 inline-flex items-center gap-1"><Sparkles className="w-3 h-3" />{pullingSpecs ? "Pulling…" : "Pull factory options"}</button>
-              )}
-            </div>
-          </div>
-        </Card>
-
-        {/* Recall + Packet Completeness, stacked */}
-        <div className="space-y-4">
-          <RecallCard vehicle={vehicle} recall={recall} />
-          <MarketPricingCard vehicle={vehicle} />
-          <ShopperFocus vin={vehicle.vin} tenantId={vehicle.tenant_id} />
-          <Card title="Packet Completeness">
-            <div className="flex items-end justify-between gap-2">
-              <span className="font-display text-3xl font-black tabular-nums text-foreground leading-none">{packetPct}%</span>
-              <span className="text-xs text-muted-foreground">{packetDone} of {packetItems.length} complete</span>
-            </div>
-            <div className="h-2 rounded-full bg-muted overflow-hidden mt-2">
-              <div className="h-full rounded-full bg-amber-500 transition-all" style={{ width: `${packetPct}%` }} />
-            </div>
-            <button onClick={() => onTab("scan")} className="text-[11px] font-semibold text-blue-600 hover:underline inline-flex items-center gap-1 mt-1">View details <ChevronRight className="w-3 h-3" /></button>
-          </Card>
-        </div>
-
-        {/* Shopper Portal Preview */}
-        <Card title="Shopper Portal Preview">
-          <div className="flex items-stretch gap-3">
-            <div className="flex-1 rounded-xl border border-border/70 bg-muted/40 h-32 overflow-hidden flex items-center justify-center text-muted-foreground">
-              {listingHero(vehicle) ? (
-                <img src={listingHero(vehicle)} alt={vehicle.ymm || "vehicle"} className="w-full h-full object-cover" />
-              ) : (
-                <Car className="w-9 h-9" strokeWidth={1.25} />
-              )}
-            </div>
-            <div className="w-32 h-32 rounded-xl border border-border/70 bg-white p-2 shrink-0 flex flex-col items-center justify-center gap-1">
-              <QRCodeSVG value={publicUrl} size={92} />
-              <span className="text-[9px] font-semibold uppercase tracking-wide text-muted-foreground">Scan to view</span>
-            </div>
-          </div>
-          {vehicle.status === "published"
-            ? <a href={publicUrl} target="_blank" rel="noreferrer" className="block text-xs text-blue-600 font-mono break-all hover:underline bg-blue-50/60 rounded-lg px-2.5 py-1.5">{publicUrl}</a>
-            : <span className="block text-xs text-muted-foreground font-mono break-all bg-muted/40 rounded-lg px-2.5 py-1.5">{publicUrl}</span>
-          }
-          <div className="grid grid-cols-2 gap-2">
-            {vehicle.status === "published"
-              ? <a href={publicUrl} target="_blank" rel="noreferrer" className="h-9 rounded-lg border border-border bg-card hover:bg-muted text-foreground text-xs font-semibold inline-flex items-center justify-center gap-1.5"><ExternalLink className="w-3.5 h-3.5" /> Preview Page</a>
-              : <button disabled className="h-9 rounded-lg border border-border bg-card text-muted-foreground text-xs font-semibold inline-flex items-center justify-center gap-1.5 opacity-50 cursor-not-allowed"><ExternalLink className="w-3.5 h-3.5" /> Preview Page</button>
-            }
-            <button onClick={() => vehicle.status === "published" ? window.open(publicUrl, "_blank", "noopener") : onTab("labels")} className="h-9 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold inline-flex items-center justify-center gap-1.5">
-              {vehicle.status === "published" ? <><Globe className="w-3.5 h-3.5" /> Open in Shopper Portal</> : <><Printer className="w-3.5 h-3.5" /> Generate Sticker</>}
-            </button>
-          </div>
-          {vehicle.status !== "published" && <p className="text-[10px] text-muted-foreground">Publish to make this page live for shoppers.</p>}
         </Card>
       </div>
     </div>
@@ -2282,37 +2214,6 @@ const eventVisual = (action: string): { icon: typeof CheckCircle2; cls: string }
   return { icon: CheckCircle2, cls: "bg-emerald-50 text-emerald-600" };
 };
 
-// Compact SVG progress ring for the readiness banner.
-const ReadinessRing = ({ pct, tone }: { pct: number; tone: "emerald" | "amber" }) => {
-  const r = 16;
-  const c = 2 * Math.PI * r;
-  const stroke = tone === "emerald" ? "#10B981" : "#F59E0B";
-  return (
-    <div className="relative w-12 h-12 shrink-0">
-      <svg className="w-12 h-12 -rotate-90" viewBox="0 0 40 40">
-        <circle cx="20" cy="20" r={r} fill="none" stroke="currentColor" strokeWidth="4" className="text-muted" />
-        <circle
-          cx="20" cy="20" r={r} fill="none" stroke={stroke} strokeWidth="4" strokeLinecap="round"
-          strokeDasharray={c} strokeDashoffset={c - (c * pct) / 100}
-        />
-      </svg>
-      <span className="absolute inset-0 flex items-center justify-center text-[11px] font-bold tabular-nums text-foreground">{pct}%</span>
-    </div>
-  );
-};
-
-const Item = ({ ok, label, when }: { ok: boolean; label: string; when: string | null }) => (
-  <li className="flex items-center justify-between gap-2">
-    <span className="inline-flex items-center gap-2">
-      <span className={`w-1.5 h-1.5 rounded-full ${ok ? "bg-emerald-500" : "bg-slate-300"}`} />
-      <span className={ok ? "text-foreground" : "text-muted-foreground"}>{label}</span>
-    </span>
-    <span className="text-[10px] text-muted-foreground">
-      {when ? new Date(when).toLocaleDateString() : "pending"}
-    </span>
-  </li>
-);
-
 // Service Get Ready: record the recall outcome (one of three) with the required
 // service detail. Resolving the task clears the publish blocker (a "No fix
 // available" outcome keeps the recall visible but is still a recorded review).
@@ -2438,18 +2339,25 @@ const RecallCard = ({ vehicle, recall }: { vehicle: VehicleRow; recall: ReturnTy
   if (status === "open_recalls" && open > 0) {
     return (
       <>
-        {/* Compact status card — never dumps the full recall text inline. */}
-        <Card title="Recall Status" action={btn("Check again")}>
-          <div className="flex items-center gap-2.5">
-            <span className="w-9 h-9 rounded-xl bg-red-100 text-red-600 flex items-center justify-center shrink-0"><ShieldAlert className="w-5 h-5" /></span>
-            <div>
-              <p className="text-sm font-semibold text-red-700">Open Recall Found</p>
-              <p className="text-[11px] text-muted-foreground">{open} active manufacturer recall{open === 1 ? "" : "s"} require{open === 1 ? "s" : ""} service review.</p>
+        {/* Compact amber action card — attention, not alarm; never dumps the
+            full recall text inline. */}
+        <Card title="Recall Status" className="flex flex-col" action={
+          <div className="flex items-center gap-2">
+            <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-700">Action Needed</span>
+            {btn("Check again")}
+          </div>
+        }>
+          <div className="flex items-start gap-2.5 flex-1">
+            <span className="w-9 h-9 rounded-xl bg-amber-100 text-amber-600 flex items-center justify-center shrink-0"><ShieldAlert className="w-5 h-5" /></span>
+            <div className="min-w-0">
+              <p className="text-sm font-bold text-foreground">Recall Review Required</p>
+              <p className="text-[12px] text-muted-foreground mt-0.5 leading-relaxed">Open recall detected ({open} active). Service must confirm whether it is completed, no fix is available, or does not apply to this vehicle.</p>
             </div>
           </div>
-          <button onClick={() => setDetailsOpen(true)} className="mt-2.5 text-[12px] font-semibold text-blue-600 inline-flex items-center gap-1 hover:underline">
-            View Recall Details <ChevronRight className="w-3.5 h-3.5" />
-          </button>
+          <div className="space-y-2 mt-auto pt-1">
+            <button onClick={() => setDetailsOpen(true)} className="w-full h-9 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold inline-flex items-center justify-center gap-1.5 transition-colors"><ShieldAlert className="w-3.5 h-3.5" /> Open recall review</button>
+            <button onClick={() => setDetailsOpen(true)} className="w-full h-9 rounded-lg border border-border bg-card hover:bg-muted text-foreground text-xs font-semibold inline-flex items-center justify-center gap-1.5 transition-colors"><FileText className="w-3.5 h-3.5" /> Add service note</button>
+          </div>
         </Card>
 
         {/* Right slide-out — full OEM/NHTSA detail + the service outcome actions. */}
@@ -2483,8 +2391,13 @@ const RecallCard = ({ vehicle, recall }: { vehicle: VehicleRow; recall: ReturnTy
   }
   if (status === "error") {
     return (
-      <Card title="Recall Status" action={btn("Try again")}>
-        <div className="flex items-center gap-2.5">
+      <Card title="Recall Status" className="flex flex-col" action={
+        <div className="flex items-center gap-2">
+          <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-700">Error</span>
+          {btn("Try again")}
+        </div>
+      }>
+        <div className="flex items-center gap-2.5 flex-1">
           <span className="w-9 h-9 rounded-xl bg-amber-100 text-amber-600 flex items-center justify-center shrink-0"><AlertTriangle className="w-5 h-5" /></span>
           <div><p className="text-sm font-semibold text-foreground">Recall check failed</p><p className="text-[11px] text-muted-foreground">We could not check recalls right now. Try again.</p></div>
         </div>
@@ -2493,8 +2406,13 @@ const RecallCard = ({ vehicle, recall }: { vehicle: VehicleRow; recall: ReturnTy
   }
   if (status === "clear") {
     return (
-      <Card title="Recall Status" action={btn("Check again")}>
-        <div className="flex items-center gap-2.5">
+      <Card title="Recall Status" className="flex flex-col" action={
+        <div className="flex items-center gap-2">
+          <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700">Clear</span>
+          {btn("Check again")}
+        </div>
+      }>
+        <div className="flex items-center gap-2.5 flex-1">
           <span className="w-9 h-9 rounded-xl bg-emerald-100 text-emerald-600 flex items-center justify-center shrink-0"><ShieldCheck className="w-5 h-5" /></span>
           <div><p className="text-sm font-semibold text-foreground">No active recalls</p><p className="text-[11px] text-muted-foreground">Last checked {checkedAt ? new Date(checkedAt).toLocaleDateString() : "today"}</p></div>
         </div>
@@ -2502,8 +2420,13 @@ const RecallCard = ({ vehicle, recall }: { vehicle: VehicleRow; recall: ReturnTy
     );
   }
   return (
-    <Card title="Recall Status" action={btn("Run recall check")}>
-      <div className="flex items-center gap-2.5">
+    <Card title="Recall Status" className="flex flex-col" action={
+      <div className="flex items-center gap-2">
+        <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-muted text-muted-foreground">Not checked</span>
+        {btn("Run recall check")}
+      </div>
+    }>
+      <div className="flex items-center gap-2.5 flex-1">
         <span className="w-9 h-9 rounded-xl bg-muted text-muted-foreground flex items-center justify-center shrink-0"><ShieldCheck className="w-5 h-5" /></span>
         <div><p className="text-sm font-semibold text-foreground">Not checked yet</p><p className="text-[11px] text-muted-foreground">Recall status has not been checked yet.</p></div>
       </div>
@@ -2556,61 +2479,148 @@ const MarketPricingCard = ({ vehicle }: { vehicle: VehicleRow }) => {
   };
 
   const cfg = MARKET_LABEL[pos] || MARKET_LABEL.unknown;
-  const action = (
-    <button onClick={run} disabled={checking} className="text-[11px] font-semibold text-blue-600 hover:underline disabled:opacity-50">
-      {checking ? "Checking…" : market ? "Refresh" : "Check market price"}
-    </button>
-  );
   // The delta is derived from the two figures ON the card, never from a
   // stored belowMarket computed against an older price basis (which is how
   // "$24,876 vs $19,495" once labeled itself "$4,486 above market").
   const below = market != null && vehicle.price != null ? Math.round(market - vehicle.price) : 0;
-  const valueLabel = valueSource === "comps_median" ? "Comp median (mileage-blind)" : valueSource === "marketcheck_predict" ? "Predicted value (mileage-adj.)" : "Market value";
+  const valueLabel = valueSource === "comps_median" ? "Comp median (mileage-blind)" : valueSource === "marketcheck_predict" ? "Market average (mileage-adj.)" : "Market average";
+  const publicUrl = `${window.location.origin}/v/${(vehicle.vin || vehicle.slug || "").toUpperCase()}`;
+  const comps = (vehicle as unknown as { comparables?: { miles?: number | null }[] }).comparables;
+  const compCount = Array.isArray(comps) ? comps.length : 0;
+  const compMiles = Array.isArray(comps) ? comps.map((c) => Number(c?.miles)).filter((n) => Number.isFinite(n) && n > 0) : [];
+  const avgCompMiles = compMiles.length >= 2 ? Math.round(compMiles.reduce((a, b) => a + b, 0) / compMiles.length) : null;
 
   return (
-    <Card title="Market Pricing" action={action}>
+    <Card title="Market Pricing" className="flex flex-col" action={
+      <span className={`inline-flex items-center gap-1.5 text-[11px] font-bold px-2 py-0.5 rounded-full ${cfg.cls}`}>
+        <span className={`w-1.5 h-1.5 rounded-full ${cfg.dot}`} />
+        {market ? (below > 0 ? "Below Market" : below < 0 ? "Above Market" : cfg.label) : cfg.label}
+      </span>
+    }>
       {market ? (
-        <div className="space-y-2">
-          <span className={`inline-flex items-center gap-1.5 text-[11px] font-bold px-2 py-1 rounded-lg ${cfg.cls}`}>
-            <span className={`w-1.5 h-1.5 rounded-full ${cfg.dot}`} />
-            {cfg.label}
-            {below > 0 ? ` · $${below.toLocaleString()} below market` : below < 0 ? ` · $${(-below).toLocaleString()} above market` : ""}
-          </span>
-          <div className="flex items-center justify-between text-sm pt-1">
-            <span className="text-muted-foreground">Your price</span>
-            <span className="font-semibold tabular-nums text-foreground">{vehicle.price ? `$${vehicle.price.toLocaleString()}` : "—"}</span>
+        <>
+          <div className="flex-1 space-y-2.5">
+            <div>
+              <span className="font-display text-[30px] font-black tabular-nums text-foreground leading-none">{vehicle.price != null ? `$${vehicle.price.toLocaleString()}` : "—"}</span>
+              <p className="text-[11px] text-muted-foreground mt-1">Current advertised price</p>
+            </div>
+            <div className="grid grid-cols-2 gap-x-5 pt-1">
+              <div>
+                <p className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground">{valueLabel}</p>
+                <p className="text-[15px] font-bold tabular-nums text-foreground mt-0.5">${market.toLocaleString()}</p>
+              </div>
+              <div>
+                <p className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground">Market difference</p>
+                <p className={`text-[15px] font-bold tabular-nums mt-0.5 ${below > 0 ? "text-emerald-600" : below < 0 ? "text-amber-600" : "text-foreground"}`}>
+                  {below === 0 ? "At market" : `$${Math.abs(below).toLocaleString()} ${below > 0 ? "below" : "above"}`}
+                </p>
+              </div>
+            </div>
+            <p className="text-[12px] inline-flex items-center gap-1.5 text-emerald-700 font-semibold pt-0.5">
+              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" /> Supported by market data{compCount > 0 ? ` · ${compCount} comparables` : ""}
+            </p>
+            {valueSource === "comps_median" && avgCompMiles != null && vehicle.mileage != null && vehicle.mileage < avgCompMiles * 0.7 && (
+              <p className="text-[11px] text-muted-foreground">Comps average {Math.round((avgCompMiles - vehicle.mileage) / 1000)}k more miles than this vehicle — a raw comp median under-values it. Re-pull for a mileage-adjusted value.</p>
+            )}
           </div>
-          <div className="flex items-center justify-between text-sm">
-            <span className="text-muted-foreground">{valueLabel}</span>
-            <span className="font-semibold tabular-nums text-foreground">${market.toLocaleString()}</span>
+          <div className="grid grid-cols-2 gap-2 mt-auto pt-1">
+            {vehicle.status === "published"
+              ? <a href={`${publicUrl}?panel=market-price`} target="_blank" rel="noreferrer" className="h-9 rounded-lg border border-border bg-card hover:bg-muted text-foreground text-xs font-semibold inline-flex items-center justify-center gap-1.5 transition-colors"><ExternalLink className="w-3.5 h-3.5" /> View pricing report</a>
+              : <button disabled title="Publish the vehicle to open the shopper pricing report" className="h-9 rounded-lg border border-border bg-card text-muted-foreground text-xs font-semibold inline-flex items-center justify-center gap-1.5 opacity-50 cursor-not-allowed"><ExternalLink className="w-3.5 h-3.5" /> View pricing report</button>}
+            <button onClick={run} disabled={checking} className="h-9 rounded-lg border border-border bg-card hover:bg-muted text-foreground text-xs font-semibold inline-flex items-center justify-center gap-1.5 transition-colors disabled:opacity-50">
+              <RefreshCw className={`w-3.5 h-3.5 ${checking ? "animate-spin" : ""}`} /> {checking ? "Syncing…" : "Re-pull market data"}
+            </button>
           </div>
-          {(() => {
-            const mm = ((vehicle as unknown as { market_meta?: Record<string, unknown> }).market_meta || {}) as Record<string, unknown>;
-            const comps = (vehicle as unknown as { comparables?: { miles?: number | null }[] }).comparables;
-            const compCount = Array.isArray(comps) ? comps.length : 0;
-            const compMiles = Array.isArray(comps) ? comps.map((c) => Number(c?.miles)).filter((n) => Number.isFinite(n) && n > 0) : [];
-            const avgCompMiles = compMiles.length >= 2 ? Math.round(compMiles.reduce((a, b) => a + b, 0) / compMiles.length) : null;
-            const daysSupply = mm.market_days_supply != null ? Math.round(Number(mm.market_days_supply)) : null;
-            // price_percentile = % of comps priced below this car; low = well priced.
-            const pct = mm.price_percentile != null ? Math.max(1, Math.round(Number(mm.price_percentile))) : null;
-            return (
-              <>
-                {compCount > 0 && <div className="flex items-center justify-between text-sm"><span className="text-muted-foreground">Comparables</span><span className="font-semibold tabular-nums text-foreground">{compCount} nearby</span></div>}
-                {avgCompMiles != null && vehicle.mileage != null && (
-                  <div className="flex items-center justify-between text-sm"><span className="text-muted-foreground">Comp mileage</span><span className="font-semibold tabular-nums text-foreground">Avg {avgCompMiles.toLocaleString()} mi{vehicle.mileage < avgCompMiles ? ` · yours ${vehicle.mileage.toLocaleString()}` : ""}</span></div>
-                )}
-                {daysSupply != null && <div className="flex items-center justify-between text-sm"><span className="text-muted-foreground">Days supply</span><span className="font-semibold tabular-nums text-foreground">{daysSupply} days</span></div>}
-                {pct != null && <div className="flex items-center justify-between text-sm"><span className="text-muted-foreground">Price rank</span><span className="font-semibold tabular-nums text-foreground">{pct >= 100 ? "Priced above all comps" : pct <= 50 ? `Top ${pct}% best priced` : `Above ${pct}% of comps`}</span></div>}
-                {avgCompMiles != null && vehicle.mileage != null && vehicle.mileage < avgCompMiles * 0.7 && (
-                  <p className="text-[11px] text-muted-foreground pt-1">Comps average {Math.round(((avgCompMiles - vehicle.mileage) / 1000))}k more miles than this vehicle — a raw comp median under-values it. Use Refresh for a mileage-adjusted value.</p>
-                )}
-              </>
-            );
-          })()}
-        </div>
+        </>
       ) : (
-        <p className="text-sm text-muted-foreground">No market price yet. Run a check to compare this vehicle's price to the MarketCheck market value and position.</p>
+        <>
+          <p className="text-sm text-muted-foreground flex-1">No market price yet. Run a check to compare this vehicle's price to the MarketCheck market value and position.</p>
+          <button onClick={run} disabled={checking} className="w-full h-9 mt-auto rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold inline-flex items-center justify-center gap-1.5 transition-colors disabled:opacity-50">
+            <RefreshCw className={`w-3.5 h-3.5 ${checking ? "animate-spin" : ""}`} /> {checking ? "Checking…" : "Check market price"}
+          </button>
+        </>
       )}
+    </Card>
+  );
+};
+
+// ── Shopper Focus — engagement snapshot for the health grid ──────────
+// Big number is the listing's lifetime view_count; rows come from the
+// passport_engagement module timers and customer_engagement_events. All
+// fields are real-data gated — an empty packet shows an honest empty state.
+const mmssLocal = (sec: number) => `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, "0")}`;
+const FOCUS_MODULE_LABEL: Record<string, string> = {
+  "vehicle-details": "Vehicle details", market: "Market intelligence", "market-price": "Price confidence",
+  "price-history": "Price history", warranty: "Warranty", "factory-warranty": "Warranty",
+  "vehicle-history": "Vehicle history", "great-buy": "Buying report", gallery: "Photos",
+  highlights: "Highlights", overview: "Overview", "key-specs": "Specifications", equipment: "Equipment",
+};
+const focusLabel = (k: string) => FOCUS_MODULE_LABEL[k] || k.replace(/[-_]/g, " ").replace(/^\w/, (c) => c.toUpperCase());
+
+const ShopperFocusCard = ({ vehicle, onTab }: { vehicle: VehicleRow; onTab: (t: TabId) => void }) => {
+  const [stats, setStats] = useState<{ totalSeconds: number; sessions: number; topModule: string | null; lastEvent: string | null; ctaClicks: number; leads: number } | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      if (!vehicle.vin || !vehicle.tenant_id) { setStats({ totalSeconds: 0, sessions: 0, topModule: null, lastEvent: null, ctaClicks: 0, leads: 0 }); return; }
+      try {
+        const vin = vehicle.vin.toUpperCase();
+        const [engRes, evRes] = await Promise.all([
+          (supabase as any).from("passport_engagement").select("module, seconds, session_id").eq("tenant_id", vehicle.tenant_id).eq("vin", vin).limit(5000),
+          (supabase as any).from("customer_engagement_events").select("event_type, created_at").eq("tenant_id", vehicle.tenant_id).eq("vin", vin).order("created_at", { ascending: false }).limit(2000),
+        ]);
+        const eng = (engRes.data || []) as { module: string; seconds: number; session_id: string }[];
+        const evs = (evRes.data || []) as { event_type: string; created_at: string }[];
+        const by = new Map<string, number>();
+        const sess = new Set<string>();
+        for (const r of eng) { by.set(r.module, (by.get(r.module) || 0) + (r.seconds || 0)); sess.add(r.session_id); }
+        const top = [...by.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ?? null;
+        if (!cancelled) setStats({
+          totalSeconds: eng.reduce((t, r) => t + (r.seconds || 0), 0),
+          sessions: sess.size,
+          topModule: top,
+          lastEvent: evs[0]?.created_at ?? null,
+          ctaClicks: evs.filter((e) => e.event_type === "cta_clicked").length,
+          leads: evs.filter((e) => e.event_type === "lead_form_opened").length,
+        });
+      } catch {
+        if (!cancelled) setStats({ totalSeconds: 0, sessions: 0, topModule: null, lastEvent: null, ctaClicks: 0, leads: 0 });
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [vehicle.vin, vehicle.tenant_id]);
+
+  const views = vehicle.view_count || 0;
+  const empty = !stats || (views === 0 && stats.sessions === 0 && !stats.lastEvent);
+
+  return (
+    <Card title="Shopper Focus" className="flex flex-col" action={
+      <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-muted text-muted-foreground">All time</span>
+    }>
+      {!stats ? (
+        <p className="text-xs text-muted-foreground flex-1">Loading engagement…</p>
+      ) : empty ? (
+        <p className="text-sm text-muted-foreground flex-1">No shopper sessions recorded yet. Engagement appears here once a customer opens this vehicle's passport.</p>
+      ) : (
+        <div className="flex-1 space-y-2.5">
+          <div className="flex items-end gap-2">
+            <span className="font-display text-[30px] font-black tabular-nums text-foreground leading-none">{views.toLocaleString()}</span>
+            <span className="text-[11px] text-muted-foreground pb-0.5">shopper view{views === 1 ? "" : "s"}</span>
+          </div>
+          <div className="space-y-2 pt-1">
+            <StatRow label="Last viewed" value={fmtWhen(stats.lastEvent) ?? "—"} />
+            <StatRow label="CTA clicks" value={stats.ctaClicks.toLocaleString()} />
+            <StatRow label="Lead forms opened" value={stats.leads.toLocaleString()} />
+            <StatRow label="Time on packet" value={stats.totalSeconds > 0 ? mmssLocal(stats.totalSeconds) : "—"} />
+            <StatRow label="Sessions" value={stats.sessions.toLocaleString()} />
+          </div>
+          {stats.topModule && (
+            <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-blue-700 bg-blue-50 border border-blue-100 rounded-full px-2.5 py-1"><Tag className="w-3 h-3" /> Most interest: {focusLabel(stats.topModule)}</span>
+          )}
+        </div>
+      )}
+      <button onClick={() => onTab("customer")} className="mt-auto pt-1 text-[12px] font-semibold text-blue-600 hover:underline inline-flex items-center justify-center gap-1 w-full">View shopper activity <ChevronRight className="w-3.5 h-3.5" /></button>
     </Card>
   );
 };
