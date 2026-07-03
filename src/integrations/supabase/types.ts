@@ -1983,6 +1983,85 @@ export type Database = {
           },
         ]
       }
+      get_ready_invoices: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          get_ready_record_id: string
+          id: string
+          invoice_number: string
+          invoiced_at: string
+          line_items: Json
+          paid_at: string | null
+          ro_number: string
+          status: string
+          stock_number: string
+          tenant_id: string
+          total: number
+          updated_at: string
+          vin: string
+          ymm: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          get_ready_record_id: string
+          id?: string
+          invoice_number: string
+          invoiced_at?: string
+          line_items?: Json
+          paid_at?: string | null
+          ro_number?: string
+          status?: string
+          stock_number?: string
+          tenant_id: string
+          total?: number
+          updated_at?: string
+          vin: string
+          ymm?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          get_ready_record_id?: string
+          id?: string
+          invoice_number?: string
+          invoiced_at?: string
+          line_items?: Json
+          paid_at?: string | null
+          ro_number?: string
+          status?: string
+          stock_number?: string
+          tenant_id?: string
+          total?: number
+          updated_at?: string
+          vin?: string
+          ymm?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "get_ready_invoices_get_ready_record_id_fkey"
+            columns: ["get_ready_record_id"]
+            isOneToOne: false
+            referencedRelation: "get_ready_records"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "get_ready_invoices_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenant_summary"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "get_ready_invoices_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       get_ready_nudge_log: {
         Row: {
           id: string
