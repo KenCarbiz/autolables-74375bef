@@ -10,7 +10,9 @@ import { useState, type ReactNode } from "react";
 import { DealerPageIcon } from "@/components/icons/DealerPageIcons";
 
 const HERO_OVERLAY =
-  "linear-gradient(90deg, rgba(5,18,38,0.88) 0%, rgba(5,18,38,0.62) 42%, rgba(5,18,38,0.22) 100%)";
+  "linear-gradient(90deg, rgba(5,18,38,0.92) 0%, rgba(5,18,38,0.78) 28%, rgba(5,18,38,0.42) 58%, rgba(5,18,38,0.16) 100%)";
+const HERO_OVERLAY_BOTTOM =
+  "linear-gradient(0deg, rgba(5,18,38,0.54) 0%, rgba(5,18,38,0) 100%)";
 
 // Illustrated dealership facade: showroom glass wall, entrance tower with
 // sign band, service wing, canopy, two showroom cars, flag, ground line.
@@ -99,10 +101,15 @@ export function DealerHeroImage({
 }: { src?: string | null; alt: string; overlay?: boolean; className?: string; children?: ReactNode }) {
   const [broken, setBroken] = useState(false);
   return (
-    <section className={`relative rounded-2xl overflow-hidden flex ${className ?? ""}`}>
+    <section className={`relative rounded-[22px] overflow-hidden flex ${className ?? ""}`}>
       <DealershipFacadeArt />
-      {src && !broken && <img src={src} alt={alt} onError={() => setBroken(true)} className="absolute inset-0 w-full h-full object-cover" />}
-      {overlay && <div className="absolute inset-0" style={{ background: HERO_OVERLAY }} />}
+      {src && !broken && <img src={src} alt={alt} onError={() => setBroken(true)} className="absolute inset-0 w-full h-full object-cover" style={{ objectPosition: "center 42%" }} />}
+      {overlay && (
+        <>
+          <div className="absolute inset-0 z-[1]" style={{ background: HERO_OVERLAY }} />
+          <div className="absolute inset-x-0 bottom-0 z-[1] h-[38%]" style={{ background: HERO_OVERLAY_BOTTOM }} />
+        </>
+      )}
       {children}
     </section>
   );

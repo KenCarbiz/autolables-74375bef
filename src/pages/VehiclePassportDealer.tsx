@@ -40,11 +40,20 @@ const SectionTitle = ({ children, sub }: { children: React.ReactNode; sub?: stri
 );
 
 // Hero chip — translucent pill readable over the photo.
-const HeroChip = ({ iconKey, children, tone = "light" }: { iconKey: DealerPageIconKey; children: React.ReactNode; tone?: "light" | "green" }) => (
-  <span className={`inline-flex items-center gap-1.5 text-[12px] font-bold rounded-full px-3 py-1.5 backdrop-blur-sm ${tone === "green" ? "bg-emerald-500/25 border border-emerald-300/50 text-emerald-50" : "bg-white/15 border border-white/30 text-white"}`}>
+const HeroChip = ({ iconKey, children, tone = "blue" }: { iconKey: DealerPageIconKey; children: React.ReactNode; tone?: "blue" | "green" }) => (
+  <span className={`inline-flex items-center gap-1.5 h-7 text-[13px] font-bold rounded-full px-3 backdrop-blur-[8px] text-white border ${tone === "green" ? "bg-[rgba(16,185,129,0.22)] border-[rgba(52,211,153,0.6)]" : "bg-[rgba(11,111,234,0.22)] border-[rgba(147,197,253,0.5)]"}`}>
     <DealerPageIcon iconKey={iconKey} size={14} color="currentColor" className="shrink-0" /> {children}
   </span>
 );
+
+// Deterministic hero sizing per the approved goal: large fixed-height card
+// on desktop, slightly shorter on tight laptop screens, natural flow on
+// mobile where the content stacks.
+const HERO_CSS = `
+.wb-hero { min-height: 410px; }
+@media (min-width: 1280px) { .wb-hero { height: 410px; min-height: 0; } }
+@media (min-width: 1280px) and (max-height: 850px) { .wb-hero { height: 380px; } }
+`;
 
 const TrustCard = ({ iconKey, title, sub, tone = "blue" }: { iconKey: DealerPageIconKey; title: string; sub: string; tone?: DealerPageIconTone }) => (
   <div className={`${CARD} p-5 text-center`}>
@@ -141,21 +150,25 @@ const VehiclePassportDealer = () => {
   const hasPickup = /pickup|valet/i.test([t.delivery, ...t.services, ...t.amenities].join(" "));
   const hasService = t.serviceLocation === "onsite" || t.serviceLocation === "offsite";
 
-  type HeroStat = { iconKey: DealerPageIconKey; l1: string; l2: string };
+  type HeroStat = { iconKey: DealerPageIconKey; label: string };
+  // Round tenure down to the nearest 5 so the claim always understates
+  // ("over 30 years" at 33) instead of overstating.
+  const yearsRounded = hasYears && years >= 5 ? Math.floor(years / 5) * 5 : years;
+  const hasAwards = t.certifications.some((c) => /award/i.test(c));
   const heroStats: HeroStat[] = [
-    hasYears ? { iconKey: "schedule-test-drive" as const, l1: `Serving ${stateName}`, l2: `for over ${years} years` } : null,
-    t.familyOwned ? { iconKey: "customer-satisfaction" as const, l1: "Family-Owned", l2: founded ? `Since ${founded}` : "Dealership" } : null,
-    t.certifications.length > 0 ? { iconKey: "certified-pre-owned-support" as const, l1: "Factory", l2: "Authorized Store" } : null,
+    hasYears ? { iconKey: "schedule-test-drive" as const, label: `Serving ${stateName} for over ${yearsRounded} years` } : null,
+    t.familyOwned ? { iconKey: "customer-first" as const, label: founded ? `Family-Owned Since ${founded}` : "Family-Owned Dealership" } : null,
+    hasAwards
+      ? { iconKey: "customer-satisfaction" as const, label: "Multiple Award Winning Store" }
+      : t.certifications.length > 0 ? { iconKey: "certified-pre-owned-support" as const, label: "Factory Authorized Store" } : null,
   ].filter(Boolean) as HeroStat[];
   // Backfill so the stat row never looks thin when tenant data is sparse.
   const fallbackStats: HeroStat[] = [
-    { iconKey: "dealer-verified", l1: "Dealer", l2: "Verified" },
-    { iconKey: "factory-trained-staff", l1: "Factory-Trained", l2: "Staff" },
-    { iconKey: "transparent-pricing", l1: "Transparent", l2: "Up-Front Pricing" },
-    { iconKey: "customer-first", l1: "Customer-First", l2: "Experience" },
-    { iconKey: "vehicle-passport-partner", l1: "Vehicle Passport", l2: "Partner" },
+    { iconKey: "dealer-verified", label: "Dealer Verified Store" },
+    { iconKey: "transparent-pricing", label: "Transparent Up-Front Pricing" },
+    { iconKey: "customer-first", label: "Customer-First Experience" },
   ];
-  for (const f of fallbackStats) { if (heroStats.length >= 4) break; if (!heroStats.some((s) => s.iconKey === f.iconKey)) heroStats.push(f); }
+  for (const f of fallbackStats) { if (heroStats.length >= 3) break; if (!heroStats.some((s) => s.iconKey === f.iconKey)) heroStats.push(f); }
 
   const expertise: { iconKey: DealerPageIconKey; label: string }[] = franchised
     ? [
@@ -175,7 +188,7 @@ const VehiclePassportDealer = () => {
         { iconKey: "customer-satisfaction", label: "Ownership Support After the Sale" },
       ];
 
-  const heroBtn = "h-11 px-5 rounded-xl text-[13.5px] font-bold inline-flex items-center gap-2 transition-transform hover:-translate-y-0.5";
+  const heroBtn = "h-12 rounded-[10px] text-[13.5px] font-extrabold inline-flex items-center gap-2 transition-transform hover:-translate-y-0.5";
 
   return (
     <div className="min-h-screen bg-[#F6F7F9] text-[#0F172A]" style={{ fontFamily: "Inter, -apple-system, BlinkMacSystemFont, sans-serif" }}>
@@ -194,50 +207,59 @@ const VehiclePassportDealer = () => {
       </header>
 
       <main className="mx-auto max-w-[1100px] px-4 sm:px-5 py-5 space-y-8 pb-12">
-        {/* 1. HERO — storefront photo or drawn dealership facade, chips + headline + proof + CTAs on the image */}
-        <DealerHeroImage src={t.storefrontUrl || null} alt={d.dealerName} className="min-h-[380px] sm:min-h-[420px]">
-          <div className="relative flex-1 flex flex-col justify-between p-5 sm:p-8 text-white">
-            <div className="flex items-start justify-between gap-3">
-              <div className="flex flex-wrap gap-2">
+        {/* 1. HERO — locked spec: fixed-height image card, layered left + bottom
+            overlays, badges top-left, OEM card top-right, headline/reviews/proof
+            on the left, CTAs anchored lower-right over the image. */}
+        <style>{HERO_CSS}</style>
+        {/* Hero breaks out to the spec's 1200px width on wide desktops while the
+            rest of the page stays on the 1100px grid. */}
+        <div className="xl:-mx-[50px]">
+        <DealerHeroImage src={t.storefrontUrl || null} alt={d.dealerName} className="wb-hero">
+          <div className="relative z-[2] flex-1 flex flex-col text-white p-5 sm:p-[38px] sm:pb-[30px]">
+            {make && (
+              <div className="absolute right-4 top-4 sm:right-[26px] sm:top-[26px] hidden sm:block">
+                <OemAuthorizedBadge brand={brandKey ?? make} label={franchised ? "Authorized Retailer" : "Vehicle Brand Specialist"} />
+              </div>
+            )}
+
+            <div className="lg:w-[56%] lg:max-w-[620px]">
+              <div className="flex flex-wrap gap-2 mb-[28px] sm:mb-[34px]">
                 <HeroChip iconKey="dealer-verified" tone="green">Dealer Verified</HeroChip>
                 <HeroChip iconKey="vehicle-passport-partner">Vehicle Passport Partner</HeroChip>
               </div>
-              {make && (
-                <OemAuthorizedBadge brand={brandKey ?? make} label={franchised ? undefined : "Vehicle Brand Specialist"} className="hidden sm:inline-flex shrink-0" />
-              )}
-            </div>
 
-            <div className="mt-8">
-              <h1 className="text-[32px] sm:text-[42px] font-extrabold tracking-tight leading-[1.05] max-w-xl">Why Buy From<br />{d.dealerName}</h1>
-              <p className="text-[14.5px] text-white/85 mt-2.5 max-w-md">A transparent, customer-first experience built around this exact vehicle.</p>
+              <h1 className="text-[34px] sm:text-[46px] xl:text-[50px] font-[850] tracking-[-0.035em] leading-[0.98] mb-4">Why Buy From<br />{d.dealerName}</h1>
+              <p className="text-[17px] sm:text-[19px] leading-[1.35] font-medium text-white/[0.94] max-w-[520px] mb-5">A transparent, customer-first experience built around this exact vehicle.</p>
 
               {hasRating && (
-                <div className="flex items-center gap-2.5 mt-4 flex-wrap">
-                  <Stars n={rating} size={18} className="text-amber-400" />
-                  <span className="text-[17px] font-extrabold">{rating.toFixed(1)}</span>
-                  {hasCount && <span className="text-[13px] text-white/80 border-l border-white/30 pl-2.5">{count.toLocaleString()} Google Reviews</span>}
+                <div className="flex items-center gap-3 mb-6 flex-wrap">
+                  <Stars n={rating} size={22} className="text-[#FBBF24]" />
+                  <span className="text-[20px] font-extrabold leading-none">{rating.toFixed(1)}</span>
+                  {hasCount && <span className="text-[15px] font-[650] text-white/[0.92] border-l border-white/30 pl-3">{count.toLocaleString()} Google Reviews</span>}
+                  <span className="w-7 h-7 rounded-full bg-white text-[#4285F4] text-[15px] font-black flex items-center justify-center" aria-label="Google">G</span>
                 </div>
               )}
 
               {heroStats.length > 0 && (
-                <div className="flex flex-wrap items-stretch gap-x-5 gap-y-2 mt-5">
+                <div className="flex flex-wrap items-center gap-y-2.5">
                   {heroStats.map((s, i) => (
-                    <div key={s.l1} className={`flex items-center gap-2.5 ${i > 0 ? "sm:border-l sm:border-white/25 sm:pl-5" : ""}`}>
-                      <DealerPageIcon iconKey={s.iconKey} size={20} color="rgba(255,255,255,0.8)" className="shrink-0" />
-                      <span className="text-[12px] leading-tight font-semibold text-white/90">{s.l1}<br />{s.l2}</span>
+                    <div key={s.label} className={`flex items-center gap-2.5 ${i < heroStats.length - 1 ? "sm:border-r sm:border-white/[0.35] sm:pr-[14px] sm:mr-[14px]" : ""} pr-4 sm:pr-0`}>
+                      <DealerPageIcon iconKey={s.iconKey} size={24} color="rgba(255,255,255,0.95)" className="shrink-0" />
+                      <span className="text-[14px] leading-[1.2] font-[750] max-w-[112px]">{s.label}</span>
                     </div>
                   ))}
                 </div>
               )}
+            </div>
 
-              <div className="flex flex-wrap gap-2.5 mt-6">
-                <button onClick={() => go("reserve")} className={`${heroBtn} bg-[#2563EB] hover:bg-[#1d4fd7] text-white shadow-lg`}><DealerPageIcon iconKey="reserve-vehicle" size={16} color="currentColor" /> Reserve This Vehicle</button>
-                <button onClick={() => go("test-drive")} className={`${heroBtn} bg-white/95 text-[#0F172A] hover:bg-white`}><DealerPageIcon iconKey="schedule-test-drive" size={16} color="#2563EB" /> Schedule Test Drive</button>
-                <a href={mapsUrl} target="_blank" rel="noreferrer" className={`${heroBtn} bg-white/10 border border-white/40 text-white hover:bg-white/20`}><DealerPageIcon iconKey="get-directions" size={16} color="currentColor" /> Get Directions</a>
-              </div>
+            <div className="flex flex-wrap gap-3 mt-7 xl:mt-0 xl:absolute xl:right-[42px] xl:bottom-[30px] xl:justify-end">
+              <button onClick={() => go("reserve")} className={`${heroBtn} px-5 bg-[#0B6FEA] hover:bg-[#0a63d2] text-white shadow-[0_10px_24px_rgba(11,111,234,0.32)]`}><DealerPageIcon iconKey="reserve-vehicle" size={16} color="currentColor" /> Reserve This Vehicle</button>
+              <button onClick={() => go("test-drive")} className={`${heroBtn} px-[18px] bg-white/[0.96] border border-white/80 text-[#0B3B78] hover:bg-white`}><DealerPageIcon iconKey="schedule-test-drive" size={16} color="currentColor" /> Schedule Test Drive</button>
+              <a href={mapsUrl} target="_blank" rel="noreferrer" className={`${heroBtn} px-[18px] bg-white/[0.96] border border-white/80 text-[#0B3B78] hover:bg-white`}><DealerPageIcon iconKey="get-directions" size={16} color="currentColor" /> Get Directions</a>
             </div>
           </div>
         </DealerHeroImage>
+        </div>
 
         {/* 2. Trust at a Glance */}
         <section>

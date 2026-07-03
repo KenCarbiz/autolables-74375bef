@@ -131,11 +131,11 @@ export function OemAuthorizedBadge({
   const key = resolveOemBrand(brand);
   const name = key ? oemDisplayName(key) : String(brand).toUpperCase();
   return (
-    <span className={`inline-flex flex-col items-center bg-white text-[#0F172A] rounded-xl px-4 py-2.5 shadow-lg ${className ?? ""}`}>
+    <span className={`inline-flex flex-col items-center justify-center text-center min-w-[132px] min-h-[78px] bg-[rgba(255,255,255,0.96)] text-[#0D1B2A] rounded-2xl px-4 py-3 shadow-[0_12px_32px_rgba(0,0,0,0.18)] ${className ?? ""}`}>
       {logoUrl
-        ? <img src={logoUrl} alt={name} className="h-5 object-contain" />
-        : <span className="text-[13px] font-black tracking-[0.18em] uppercase leading-none">{name}</span>}
-      <span className="text-[9px] font-bold uppercase tracking-wider text-[#64748B] mt-1">{label ?? "Authorized Retailer"}</span>
+        ? <img src={logoUrl} alt={name} className="h-6 object-contain" />
+        : <span className="text-[18px] font-extrabold tracking-[0.12em] uppercase leading-none">{name}</span>}
+      <span className="text-[12px] font-bold text-[#334155] mt-1.5">{label ?? "Authorized Retailer"}</span>
     </span>
   );
 }
