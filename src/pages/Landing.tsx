@@ -29,7 +29,7 @@ import {
 
 // ──────────────────────────────────────────────────────────────
 // Landing — Wave 35. Pre-launch / waitlist positioning.
-// Every CTA is "Join Wait List Now"
+// Every CTA is "Request Early Access" (matches the /waitlist form verb)
 // (secondary). One card system across the whole page.
 // Legal discipline: "FTC-aligned" (CARS Rule was vacated 1/2025),
 // "documents" consent (never "guarantees compliance"),
@@ -41,7 +41,9 @@ const Landing = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
   const goWaitlist = () => navigate(user ? "/dashboard" : "/waitlist");
-  const goDemo = () => navigate("/onboarding?intent=demo");
+  // The most convincing demo is the real customer artifact — the sample
+  // Vehicle Passport rendered with placeholder data (no signup required).
+  const goDemo = () => navigate("/v/demo?preview=1");
 
   return (
     <div className="bg-white text-slate-900 antialiased selection:bg-blue-100">
@@ -81,7 +83,7 @@ const Landing = () => {
 
 const NAV_LINKS = [
   { label: "The risk", href: "#risk" },
-  { label: "Take back power", href: "#power" },
+  { label: "Take the power back", href: "#power" },
   { label: "How it works", href: "#how" },
   { label: "Compare", href: "#compare" },
   { label: "Pricing", href: "#pricing" },
@@ -129,7 +131,7 @@ const Nav = ({
               onClick={onWaitlist}
               className="inline-flex h-9 items-center gap-1.5 rounded-full bg-[#0B2041] px-4 text-sm font-medium text-white hover:bg-[#13315e]"
             >
-              Join Wait List Now <ArrowRight className="h-3.5 w-3.5" />
+              Request Early Access <ArrowRight className="h-3.5 w-3.5" />
             </button>
           </>
         )}
@@ -175,7 +177,7 @@ const Hero = ({ onWaitlist }: { onWaitlist: () => void; onDemo: () => void }) =>
             onClick={onWaitlist}
             className="inline-flex h-12 items-center gap-2 rounded-full bg-[#0B2041] px-6 text-sm font-semibold text-white hover:bg-[#13315e]"
           >
-            Join Wait List Now
+            Request Early Access
             <ArrowRight className="h-4 w-4" />
           </button>
           <a
@@ -190,8 +192,8 @@ const Hero = ({ onWaitlist }: { onWaitlist: () => void; onDemo: () => void }) =>
           <HeroCheck icon={FileText} label="FTC-aligned addendums" />
           <HeroCheck icon={QrCode} label="Window stickers + Vehicle Passports" />
           <HeroCheck icon={Signature} label="Customer digital signatures" />
-          <HeroCheck icon={BadgeCheck} label="Legal audit trails" />
-          <HeroCheck icon={Building2} label="50-state compliance" />
+          <HeroCheck icon={BadgeCheck} label="Tamper-evident audit trail" />
+          <HeroCheck icon={Building2} label="50-state disclosure engine" />
         </div>
       </div>
 
@@ -249,7 +251,7 @@ const ComplianceStatusCard = () => (
         <StatusRow label="Advertised price locked to all-in" sub="Signing blocked until the price matches" chip="Enforced" tone="navy" />
         <StatusRow label="Disclosures signed &amp; hash-sealed" sub="E-sign consent · IP · UTC time" mono="sha-256" chip="Sealed" />
         <StatusRow label="Installer proof, per pre-installed item" sub="Sign-off + install photo on file" chip="Verified" />
-        <StatusRow label="Website price screenshot at signing" sub="Timestamped image of the live listing" chip="Captured" />
+        <StatusRow label="Website price screenshot on file" sub="Timestamped at the pre-signature re-check" chip="Captured" />
       </div>
 
       <div className="border-t border-slate-100 bg-slate-50/40 px-5 pb-5 pt-4">
@@ -503,8 +505,9 @@ const Risk = () => (
           dealer enforcement units that pull records on demand.
         </Card>
         <Card icon={ShieldCheck} title="Recall exposure">
-          Federal law restricts the sale of vehicles under open recalls. NHTSA campaign data must
-          be checked at the time of sale, not at intake.
+          Selling a new vehicle under an open recall is federally prohibited, and used-car recall
+          disclosure is a growing FTC and state-AG target. AutoLabels checks NHTSA campaigns at
+          listing, re-checks at signing, and hard-stops on do-not-drive orders.
         </Card>
       </div>
 
@@ -541,13 +544,13 @@ const HowItWorks = () => (
           num="01"
           icon={Scan}
           title="Decode"
-          body="VIN to full factory build sheet in under 800ms via NHTSA. Auto-pull year, make, model, trim, and standard equipment."
+          body="VIN to a decoded spec sheet in under a second via NHTSA — year, make, model, trim, and standard equipment, auto-filled."
         />
         <NumberedCard
           num="02"
           icon={FileText}
           title="Stick"
-          body="Build a fully-compliant dealer addendum with products, pricing, FTC disclosures, and state-specific doc fees in under a minute."
+          body="Build an FTC-aligned dealer addendum — products, pricing, disclosures, and your state's doc fee — audit-ready in under a minute."
         />
         <NumberedCard
           num="03"
@@ -921,10 +924,10 @@ const Principles = () => (
 const FEATURES = [
   { icon: ShieldCheck, title: "FTC-aligned engine", body: "California SB 766 disclosures, multi-language support, 2-year record retention — built in." },
   { icon: Scan, title: "VIN decode + scrape", body: "Free NHTSA decode, or paste a VDP URL and let us scrape it — VIN, equipment, colors, and price filled in automatically." },
-  { icon: BadgeCheck, title: "Complete vehicle file", body: "Your inventory feed builds a full file per VIN: factory options, fuel economy, one-owner and clean-title flags, days-on-market, and live market position — ready to drop onto a window sticker." },
+  { icon: BadgeCheck, title: "Complete vehicle file", body: "Your inventory feed builds a full file per VIN: factory options, fuel economy, recall status, days-on-market, and live market position — ready to drop onto a window sticker." },
   { icon: Sparkles, title: "Rules engine", body: "Auto-assign products by year, make, model, trim, body style, or mileage. Set once, apply forever." },
   { icon: Signature, title: "Digital signing", body: "Customer signs on their phone via QR. Every signature is cryptographically logged for audits." },
-  { icon: FileText, title: "Buyers Guide", body: "FTC As-Is / Implied / Warranty guides in English + Spanish. Satisfies federal and state requirements." },
+  { icon: FileText, title: "Buyers Guide", body: "FTC As-Is / Implied / Warranty guides in English and Spanish, built to 16 CFR Part 455 — bilingual where the deal is negotiated in Spanish." },
   { icon: BarChart3, title: "Live analytics", body: "Product acceptance rates, revenue per addendum, top hooks — every signal that matters." },
   { icon: Camera, title: "Installer accountability", body: "If it's advertised as installed, an installer signs and photographs it — or the customer is free to decline it." },
   { icon: RefreshCw, title: "Nightly sync", body: "Inventory and advertised prices sync automatically every night, so new vehicles arrive ready for the disclosure addendum." },
@@ -982,8 +985,7 @@ const TakeThePowerBack = ({ onWaitlist }: { onWaitlist: () => void }) => (
           You did everything right. The customer wanted it, you sold it, you installed it. Then weeks
           later comes the call: <em>&ldquo;I never agreed to that,&rdquo;</em> or <em>&ldquo;your
           salesperson told me it was required.&rdquo;</em> Until now an honest dealer had no way to
-          answer that — no pre-installed product to point to, just word against word in an
-          FTC-hostile market.
+          answer that — no pre-installed product to point to, just your word against theirs.
         </p>
         <p className="mt-4 text-sm leading-relaxed text-slate-700">
           Now you have the receipt. Before delivery, the customer sees each product priced, sees it
@@ -1044,7 +1046,7 @@ const TakeThePowerBack = ({ onWaitlist }: { onWaitlist: () => void }) => (
           onClick={onWaitlist}
           className="inline-flex h-12 items-center gap-2 rounded-full bg-[#0B2041] px-6 text-sm font-semibold text-white hover:bg-[#13315e]"
         >
-          Join Wait List Now
+          Request Early Access
           <ArrowRight className="h-4 w-4" />
         </button>
       </div>
@@ -1133,7 +1135,7 @@ const SocialProof = () => (
           <p className="mt-3 font-display text-lg font-bold tracking-tight">FTC-aligned</p>
           <p className="text-sm text-white/70">50-state disclosure engine</p>
           <p className="mt-4 text-[11px] font-medium uppercase tracking-[0.18em] text-white/50">
-            Compliance credential
+            Compliance posture
           </p>
         </div>
       </div>
@@ -1150,13 +1152,13 @@ const TIERS: { name: string; price: string; best: string; tagline: string; featu
     name: "Essential",
     price: "$299",
     best: "Single-store dealers",
-    tagline: "Everything one rooftop needs to print compliant labels and close clean, signed deals.",
+    tagline: "Everything one rooftop needs to print audit-ready window stickers and close clean, signed deals.",
     features: [
       "New + used car window stickers & dealer addendums",
       "FTC Buyers Guide — English + Spanish",
       "VIN decode + NHTSA recall & Takata stop-sale banner",
       "Customer digital signing on any phone via QR",
-      "Shopper vehicle packet (QR + website embed)",
+      "Vehicle Passport for every shopper (QR + website embed)",
       "Tamper-evident audit log",
       "Up to 75 VINs / month · email support",
     ],
@@ -1181,16 +1183,16 @@ const TIERS: { name: string; price: string; best: string; tagline: string; featu
   {
     name: "Compliance Pro",
     price: "$1,499",
-    best: "Groups that want airtight, audit-ready deals",
+    best: "Groups that want every deal audit-ready",
     tagline: "Everything in Unlimited, plus the price-integrity and evidence layer that makes every deal defensible.",
     features: [
       "Everything in Unlimited, plus:",
-      "Automatic nightly inventory + advertised-price sync — and a one-click instant price re-check on any VIN, so the number on the deal always matches your live website the moment before the customer signs",
-      "Website price verification as a hard signing gate — a deal can't be signed out of price integrity",
+      "Nightly inventory + advertised-price sync, with one-click re-check on any VIN — the deal number matches your live website the moment before the customer signs",
+      "Website price verification as a hard signing gate — no deal signs while the contract price and the advertised price disagree",
       "Live re-scrape + timestamped website-price screenshot captured at signing",
       "Per-VIN tamper-evident defense file (SHA-256 chain)",
       "Verified installer sign-off + photo on pre-installed products",
-      "50-state disclosure engine (CA SB 766, NY, FL, TX, +44)",
+      "50-state disclosure engine (CA SB 766, NY, TX, FL + 46 more)",
       "Prep + install compliance gate · multi-language addendums",
       "DMS webhooks · dedicated success manager",
     ],
@@ -1212,7 +1214,7 @@ const PricingTeaser = ({
           Simple pricing. Three tiers.
         </h2>
         <p className="mt-5 text-base leading-relaxed text-slate-600">
-          Per rooftop, per month. Free Unlimited plan with any Autocurb.io subscription.
+          Per rooftop, per month. Essential is free with any Autocurb.io subscription.
         </p>
       </div>
 
@@ -1253,7 +1255,7 @@ const PricingTeaser = ({
                   onClick={onWaitlist}
                   className="inline-flex h-10 w-full items-center justify-center gap-1.5 rounded-full bg-[#0B2041] px-4 text-sm font-semibold text-white hover:bg-[#13315e]"
                 >
-                  Join Wait List Now
+                  Request Early Access
                   <ArrowRight className="h-3.5 w-3.5" />
                 </button>
               ) : (
@@ -1261,7 +1263,7 @@ const PricingTeaser = ({
                   onClick={onWaitlist}
                   className="inline-flex h-10 w-full items-center justify-center gap-1.5 rounded-full border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 hover:bg-slate-50"
                 >
-                  Join Wait List Now
+                  Request Early Access
                 </button>
               )}
             </div>
@@ -1269,13 +1271,19 @@ const PricingTeaser = ({
         ))}
       </div>
 
-      <div className="mt-10 flex justify-center">
+      <div className="mt-10 flex flex-wrap items-center justify-center gap-3">
         <button
           onClick={onWaitlist}
           className="inline-flex h-11 items-center gap-2 rounded-full bg-[#0B2041] px-6 text-sm font-semibold text-white hover:bg-[#13315e]"
         >
-          Join Wait List Now
+          Request Early Access
           <ArrowRight className="h-4 w-4" />
+        </button>
+        <button
+          onClick={onDemo}
+          className="inline-flex h-11 items-center gap-2 rounded-full border border-slate-200 bg-white px-6 text-sm font-semibold text-slate-700 hover:border-slate-300 hover:bg-slate-50"
+        >
+          See a live Vehicle Passport
         </button>
       </div>
     </div>
@@ -1353,16 +1361,22 @@ const FinalCTA = ({ onWaitlist, onDemo }: { onWaitlist: () => void; onDemo: () =
       </div>
       <div className="relative">
         <h2 className="font-display text-4xl font-black tracking-tighter sm:text-5xl">
-          Join the wait list.
+          Get early access.
         </h2>
-        <p className="mt-5 text-lg text-white/70">Be first in line · Early-access pricing.</p>
-        <div className="mt-9 flex items-center justify-center">
+        <p className="mt-5 text-lg text-white/70">First in line · Early-access pricing locked in.</p>
+        <div className="mt-9 flex flex-wrap items-center justify-center gap-3">
           <button
             onClick={onWaitlist}
             className="inline-flex h-12 items-center gap-2 rounded-full bg-white px-6 text-sm font-semibold text-slate-950 hover:bg-white/90"
           >
-            Join Wait List Now
+            Request Early Access
             <ArrowRight className="h-4 w-4" />
+          </button>
+          <button
+            onClick={onDemo}
+            className="inline-flex h-12 items-center gap-2 rounded-full border border-white/40 bg-white/10 px-6 text-sm font-semibold text-white hover:bg-white/20"
+          >
+            See a live Vehicle Passport
           </button>
         </div>
       </div>
@@ -1391,7 +1405,7 @@ const Footer = ({ onNav, onWaitlist }: { onNav: (to: string) => void; onWaitlist
           onClick={onWaitlist}
           className="inline-flex h-8 items-center gap-1.5 rounded-full bg-[#0B2041] px-3 text-xs font-medium text-white hover:bg-[#13315e]"
         >
-          Join Wait List Now
+          Request Early Access
         </button>
       </div>
       <p className="text-xs text-slate-500">
