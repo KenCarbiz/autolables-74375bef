@@ -39,7 +39,7 @@ export type PassportPanelKey = (typeof PASSPORT_PANEL_KEYS)[number];
 export const isPassportPanelKey = (v: string | null | undefined): v is PassportPanelKey =>
   !!v && (PASSPORT_PANEL_KEYS as readonly string[]).includes(v);
 
-interface PanelDef { title: string; subtitle: string; body: React.ReactNode; primary?: { label: string; onClick: () => void }; secondary?: { label: string; onClick: () => void }; footerQuestion?: string; specialistLabel?: string; wide?: boolean }
+interface PanelDef { title: string; subtitle: string; body: React.ReactNode; primary?: { label: string; onClick: () => void }; secondary?: { label: string; onClick: () => void }; footerQuestion?: string; specialistLabel?: string; footerNote?: string; wide?: boolean }
 
 function buildPanel(key: PassportPanelKey, d: PassportData, listing: VehicleListing, isPreview: boolean, go: (s: string) => void, openPanel: (k: PassportPanelKey) => void, nhtsa: NhtsaSafetyResult | null): PanelDef {
   const price = d.price, avg = d.marketAvg, low = d.marketLow, high = d.marketHigh, below = d.belowMarket;
@@ -341,16 +341,18 @@ function buildPanel(key: PassportPanelKey, d: PassportData, listing: VehicleList
 
     case "price-confidence": {
       const ks = listing.key_specs || {};
-      const factors = [
-        { label: "Market Data", pct: avg != null ? 100 : 30 },
-        { label: "Dealer Pricing", pct: 100 },
-        { label: "Vehicle History", pct: (d.cleanTitle || d.ownerCount != null || d.accidentCount != null) ? 90 : 40 },
+      const equipPct = Math.min(100, ((listing.features?.length ?? 0) + Object.keys(ks).length) * 12);
+      const factors: { label: string; pct: number; status?: string }[] = [
+        { label: "Comparable Market Data", pct: avg != null ? 100 : 30 },
+        { label: "Dealer Price Position", pct: 100 },
+        { label: "History Signals", pct: (d.cleanTitle || d.ownerCount != null || d.accidentCount != null) ? 90 : 40 },
         { label: "Mileage", pct: listing.mileage != null ? 100 : 0 },
         { label: "Condition", pct: (d.serviceCount > 0 || listing.prep_status?.foreman_signed_at) ? 90 : 55 },
-        { label: "Equipment", pct: Math.min(100, ((listing.features?.length ?? 0) + Object.keys(ks).length) * 12) },
-        { label: "Regional Demand", pct: (d.viewCount != null || d.dom != null) ? 75 : 40 },
+        { label: "Equipment", pct: equipPct, status: equipPct >= 40 ? "Verified" : "Pending" },
+        { label: "Local Demand", pct: (d.viewCount != null || d.dom != null) ? 75 : 40 },
       ];
       const hasCarfaxDoc = (listing.documents || []).some((x) => /carfax/i.test(`${x.type} ${x.name}`));
+      // Used sources lead; unavailable ones stay visible for transparency.
       const sources = [
         { name: "MarketCheck", on: avg != null || Object.keys(mc).length > 0 },
         { name: "CARFAX", on: typeof mc.carfax_clean_title === "boolean" || hasCarfaxDoc },
@@ -360,92 +362,140 @@ function buildPanel(key: PassportPanelKey, d: PassportData, listing: VehicleList
         { name: "Local Listings", on: avg != null },
         { name: "Auction Data", on: false },
         { name: "Dealer Pricing", on: true },
-      ];
+      ].sort((a, b) => Number(b.on) - Number(a.on));
       const compCount = (mc.similar_count as number) ?? (mc.comparable_count as number) ?? null;
-      const coverage = compCount != null ? compCount : isPreview ? 1200 : null;
+      const coverage = compCount != null ? compCount : d.comparables.length > 0 ? d.comparables.length : isPreview ? 31 : null;
+      const coverageApprox = compCount == null && d.comparables.length === 0;
       const faqs = [
         { q: "Why isn't every vehicle 100%?", a: "Confidence reflects how much verified data is available. Newer listings or rare models have fewer comparables, which lowers the score until more data arrives." },
         { q: "How often is pricing updated?", a: "Market values refresh as new comparable listings and sales are reported — typically every day the vehicle is live." },
         { q: "What data sources are used?", a: "A blend of MarketCheck market data, dealer pricing, vehicle history, recall status, and equipment decoded from the VIN." },
+        { q: "Does this guarantee the final selling price?", a: "No. This report supports price confidence using available data, but final pricing, taxes, fees, trade value, and dealer terms should be confirmed directly with the dealership." },
       ];
       const connectedCount = sources.filter((s) => s.on).length;
-      const confWord = conf == null ? "" : conf >= 85 ? "High Confidence" : conf >= 70 ? "Good Confidence" : "Fair Confidence";
+      // "Fair" reads as a verdict on the car; the label describes data support.
+      const confWord = conf == null ? "" : conf >= 75 ? "High Confidence" : conf >= 50 ? "Supported by Market Data" : "Building Confidence";
+      const confExplain = "This score reflects available market, pricing, mileage, condition, and vehicle-history signals. Higher scores mean fewer unknowns.";
+      const scale = conf != null ? (
+        <div className="grid grid-cols-3 gap-1.5">
+          {[{ n: "Low Confidence", r: "0 – 49", a: conf < 50 }, { n: "Supported", r: "50 – 74", a: conf >= 50 && conf < 75 }, { n: "High Confidence", r: "75 – 100", a: conf >= 75 }].map((b) => (
+            <div key={b.n} className={`relative text-center rounded-lg py-1.5 border ${b.a ? "bg-emerald-50 border-emerald-200" : "border-transparent"}`}>
+              {b.a && <span className="absolute -top-2.5 left-1/2 -translate-x-1/2 text-[9px] text-emerald-500 leading-none">▼</span>}
+              <p className={`text-[11px] font-bold leading-tight ${b.a ? "text-emerald-700" : "text-[#64748B]"}`}>{b.n}</p>
+              <p className={`text-[10px] ${b.a ? "text-emerald-600" : "text-[#94A3B8]"}`}>{b.r}</p>
+            </div>
+          ))}
+        </div>
+      ) : null;
+      const coverageCard = coverage != null ? (
+        <div className={`${CARD} p-4 flex items-center gap-4`}>
+          <span className="w-11 h-11 rounded-xl bg-blue-50 text-[#2563EB] flex items-center justify-center shrink-0"><Users className="w-5 h-5" /></span>
+          <div className="min-w-0">
+            <p className="text-[15px] font-extrabold leading-tight">{coverage.toLocaleString()}{coverageApprox ? "+" : ""} Comparable Vehicles Analyzed</p>
+            <p className="text-[12px] text-[#64748B] mt-0.5">Local listings and similar trim-level vehicles were reviewed to support this price.</p>
+          </div>
+        </div>
+      ) : <Empty>Comparable-vehicle coverage appears once MarketCheck data is available.</Empty>;
+      const sourcesBlock = (
+        <Section title="Verified Data Sources" sub="These sources were used in this report.">
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">{sources.map((s) => <Source key={s.name} name={s.name} on={s.on} />)}</div>
+          <p className="text-[11px] text-[#94A3B8] mt-2">Unavailable sources are shown for transparency and may vary by vehicle.</p>
+        </Section>
+      );
+      const analyzeBlock = (
+        <Section title="What AutoLabels Analyzes" sub="We analyze multiple data points to build this confidence score.">
+          <div className={`${CARD} p-4`}><ul className="grid grid-cols-2 gap-1.5">{["Market pricing", "Mileage", "Condition", "Equipment", "Vehicle history", "Regional inventory", "Demand", "Historical pricing", "Dealer pricing"].map((b) => <Check key={b}>{b}</Check>)}</ul></div>
+        </Section>
+      );
+      // The stability verdict is computed, never asserted: a visibly moving
+      // line with a "Stable" caption reads as broken (or dishonest).
+      const stabFirst = marketSeries[0], stabLast = marketSeries[marketSeries.length - 1];
+      const stabShift = marketSeries.length >= 2 && stabFirst ? (stabLast - stabFirst) / stabFirst : 0;
+      const stabStable = Math.abs(stabShift) < 0.03;
+      const stabilityBlock = (
+        <Section title="Confidence Stability" sub="Last 30 days">
+          {marketSeries.length >= 2 ? (
+            <div className={`${CARD} p-4`}>
+              <TrendChart market={marketSeries} height={90} />
+              <div className="flex items-start gap-2 mt-2">
+                <span className={`inline-flex items-center gap-1 text-[10px] font-bold rounded-full border px-2 py-0.5 shrink-0 mt-0.5 ${stabStable ? "text-emerald-700 bg-emerald-50 border-emerald-200" : "text-blue-700 bg-blue-50 border-blue-200"}`}><ShieldCheck className="w-3 h-3" /> {stabStable ? "Stable" : stabShift < 0 ? "Market softening" : "Market rising"}</span>
+                <p className="text-[12px] text-[#64748B]">{stabStable
+                  ? "Valuation inputs have remained stable over the last 30 days — no major pricing, mileage, or market-data shifts detected."
+                  : `Market values for comparable vehicles have ${stabShift < 0 ? "eased" : "risen"} about ${Math.round(Math.abs(stabShift) * 100)}% over the tracked period; this valuation reflects the latest data.`}</p>
+              </div>
+            </div>
+          ) : (
+            <div className={`${CARD} p-4`}>
+              <p className="text-[13px] font-bold text-[#0F172A]">Tracking began recently</p>
+              <p className="text-[12px] text-[#64748B] mt-0.5">Stability insights appear after this listing collects 30 days of pricing history.</p>
+            </div>
+          )}
+        </Section>
+      );
       return {
-        title: "Price Confidence", subtitle: "Why AutoLabels is confident in this valuation",
+        title: "Price Confidence Report", subtitle: "Why this vehicle's price is supported by verified market data",
         primary: { label: "Reserve This Vehicle", onClick: () => go("reserve") },
+        footerQuestion: "Questions about this price?", specialistLabel: "Talk to a vehicle specialist",
+        footerNote: "No obligation · Dealer confirmed",
         body: <>
           {/* ── Mobile (<768px) — premium confidence dashboard ── */}
           <div className="md:hidden space-y-4">
             {conf != null ? (
-              <div className="rounded-2xl p-5 text-white text-center" style={{ background: "linear-gradient(160deg,#0f7a3d 0%,#16A34A 100%)" }}>
+              <div className="rounded-2xl p-5 text-white text-center" style={{ background: conf >= 50 ? "linear-gradient(160deg,#0f7a3d 0%,#16A34A 100%)" : "linear-gradient(160deg,#334155 0%,#475569 100%)" }}>
                 <div className="flex justify-center"><AnimatedRing pct={conf} color="#ffffff" /></div>
                 <p className="text-[13px] font-bold opacity-90 mt-2">Confidence Score</p>
                 <p className="text-[18px] font-extrabold">{confWord}</p>
-                <p className="text-[13px] opacity-90 mt-2 leading-snug">A {conf}% score means we're confident this vehicle is priced right for the current market.</p>
+                <p className="text-[12.5px] opacity-90 mt-2 leading-snug">{confExplain}</p>
               </div>
             ) : <Empty>A confidence score appears once enough vehicle and market data has been verified.</Empty>}
+            {scale && <div className={`${CARD} p-3 pt-4`}>{scale}</div>}
 
-            <div className="grid grid-cols-3 gap-3">
-              <div className={`${CARD} p-4 text-center`}><p className="text-[18px] font-extrabold leading-none">{coverage != null ? `${coverage >= 1000 ? `${Math.round(coverage / 100) / 10}k` : coverage}${compCount == null ? "+" : ""}` : "—"}</p><p className="text-[10px] text-[#94A3B8] mt-1">Comparables</p></div>
+            {coverageCard}
+
+            <div className="grid grid-cols-2 gap-3">
               <div className={`${CARD} p-4 text-center`}><p className="text-[18px] font-extrabold leading-none">{connectedCount}</p><p className="text-[10px] text-[#94A3B8] mt-1">Data Sources</p></div>
               <div className={`${CARD} p-4 text-center`}><p className="text-[18px] font-extrabold leading-none">Today</p><p className="text-[10px] text-[#94A3B8] mt-1">Updated</p></div>
             </div>
 
-            <Section title="Confidence factors">
-              <div className={`${CARD} p-4 space-y-3`}>{factors.map((f) => <FactorBar key={f.label} label={f.label} pct={f.pct} />)}</div>
+            <Section title="Confidence Factors" sub="How much verified data supports each factor.">
+              <div className={`${CARD} p-4 space-y-3`}>{factors.map((f) => <FactorBar key={f.label} label={f.label} pct={f.pct} status={f.status} />)}</div>
             </Section>
 
-            <Section title="Data sources">
-              <div className="grid grid-cols-2 gap-2">{sources.map((s) => <Source key={s.name} name={s.name} on={s.on} />)}</div>
-            </Section>
+            {sourcesBlock}
+            {analyzeBlock}
+            {stabilityBlock}
 
-            {marketSeries.length >= 2 && (
-              <Section title="Confidence timeline" sub="Last 30 days">
-                <div className={`${CARD} p-4`}><TrendChart market={marketSeries} height={90} /><p className="text-[12px] text-[#64748B] mt-1">Valuation inputs have stayed stable over the last 30 days.</p></div>
-              </Section>
-            )}
-
-            <Section title="How we analyze">
-              <div className={`${CARD} p-4`}><ul className="grid grid-cols-2 gap-1.5">{["Market pricing", "Mileage", "Condition", "Equipment", "Vehicle history", "Regional demand", "Historical pricing", "Dealer pricing"].map((b) => <Check key={b}>{b}</Check>)}</ul></div>
-            </Section>
-
-            <Section title="FAQ">
+            <Section title="Frequently Asked Questions">
               <div className="space-y-2">{faqs.map((f) => <Faq key={f.q} q={f.q} a={f.a} />)}</div>
             </Section>
             <Disclaimer />
           </div>
 
-          {/* ── Desktop / tablet (≥768px) — unchanged ── */}
+          {/* ── Desktop / tablet (≥768px) ── */}
           <div className="hidden md:block space-y-5">
           {conf != null ? (
-            <div className={`${CARD} p-5 flex items-center gap-5`}>
-              <div className="flex flex-col items-center shrink-0"><Ring pct={conf} size={120} /><p className="text-[13px] font-extrabold text-[#16A34A] mt-1">{d.confLabel || (conf >= 85 ? "Excellent" : "Good")}</p></div>
-              <div className="min-w-0"><p className="text-[14px] font-bold">Confidence Score</p><p className="text-[12px] text-[#64748B] mt-0.5">A blend of verified vehicle data and live market signals. Higher means fewer unknowns in the valuation.</p></div>
+            <div className={`${CARD} p-5`}>
+              <div className="flex items-center gap-5">
+                <div className="shrink-0"><Ring pct={conf} size={120} /></div>
+                <div className="min-w-0">
+                  <p className="text-[15px] font-bold">Confidence Score</p>
+                  <p className="text-[14px] font-extrabold mt-0.5" style={{ color: conf >= 50 ? "#16A34A" : "#D97706" }}>{confWord}</p>
+                  <p className="text-[12px] text-[#64748B] mt-1.5">{confExplain}</p>
+                </div>
+              </div>
+              <div className="mt-5 pt-1">{scale}</div>
             </div>
           ) : <Empty>A confidence score appears once enough vehicle and market data has been verified.</Empty>}
-          <Section title="Confidence factors" sub="How much verified data supports each input.">
-            <div className={`${CARD} p-4 space-y-3`}>{factors.map((f) => <FactorBar key={f.label} label={f.label} pct={f.pct} />)}</div>
+
+          {coverageCard}
+
+          <Section title="Confidence Factors" sub="How much verified data supports each factor.">
+            <div className={`${CARD} p-4 space-y-3`}>{factors.map((f) => <FactorBar key={f.label} label={f.label} pct={f.pct} status={f.status} />)}</div>
           </Section>
-          <Section title="Data sources">
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">{sources.map((s) => <Source key={s.name} name={s.name} on={s.on} />)}</div>
-          </Section>
-          <Section title="Similar vehicle coverage">
-            {coverage != null ? (
-              <div className={`${CARD} p-4 flex items-center gap-4`}>
-                <p className="text-[28px] font-extrabold text-[#2563EB] leading-none shrink-0">{coverage.toLocaleString()}{compCount == null ? "+" : ""}</p>
-                <p className="text-[12px] text-[#64748B]">Comparable vehicles analyzed. A larger sample size increases pricing confidence.</p>
-              </div>
-            ) : <Empty>Comparable-vehicle coverage appears once MarketCheck data is available.</Empty>}
-          </Section>
-          <Section title="Methodology">
-            <div className={`${CARD} p-4`}><p className="text-[12px] text-[#64748B] mb-2">AutoLabels analyzes:</p><ul className="grid grid-cols-2 gap-1.5">{["Market pricing", "Mileage", "Condition", "Equipment", "Vehicle history", "Regional inventory", "Demand", "Historical pricing", "Dealer pricing"].map((b) => <Check key={b}>{b}</Check>)}</ul></div>
-          </Section>
-          <Section title="Confidence timeline" sub="Last 30 days">
-            {marketSeries.length >= 2 ? (
-              <div className={`${CARD} p-4`}><TrendChart market={marketSeries} height={90} /><p className="text-[12px] text-[#64748B] mt-1">Valuation inputs have remained stable over the last 30 days.</p></div>
-            ) : <Empty>A 30-day confidence timeline appears once enough pricing history is collected.</Empty>}
-          </Section>
-          <Section title="FAQ">
+          {sourcesBlock}
+          {analyzeBlock}
+          {stabilityBlock}
+          <Section title="Frequently Asked Questions">
             <div className="space-y-2">{faqs.map((f) => <Faq key={f.q} q={f.q} a={f.a} />)}</div>
           </Section>
           <Disclaimer />
@@ -1846,12 +1896,21 @@ const Gauge3 = ({ value }: { value: number }) => (
   </div>
 );
 
-const FactorBar = ({ label, pct }: { label: string; pct: number }) => (
-  <div>
-    <div className="flex justify-between text-[12px] mb-1"><span className="text-[#0F172A] font-medium">{label}</span><span className="text-[#64748B]">{pct >= 85 ? "Strong" : pct >= 55 ? "Good" : pct > 0 ? "Limited" : "—"}</span></div>
-    <div className="h-2 rounded-full bg-slate-100 overflow-hidden"><div className="h-full rounded-full bg-[#2563EB]" style={{ width: `${Math.max(0, Math.min(100, pct))}%` }} /></div>
-  </div>
-);
+// Every factor carries a visible status — a blank row reads as broken. The
+// status is a soft chip: green for strong/good/verified, amber for pending.
+const FactorBar = ({ label, pct, status }: { label: string; pct: number; status?: string }) => {
+  const s = status ?? (pct >= 85 ? "Strong" : pct >= 55 ? "Good" : "Pending");
+  const amber = s === "Pending" || s === "Limited";
+  return (
+    <div>
+      <div className="flex justify-between items-center gap-2 text-[12px] mb-1">
+        <span className="text-[#0F172A] font-medium">{label}</span>
+        <span className={`text-[10px] font-bold rounded-full border px-2 py-0.5 shrink-0 ${amber ? "bg-amber-50 text-amber-700 border-amber-200" : s === "Strong" ? "bg-emerald-50 text-emerald-700 border-emerald-200" : "bg-emerald-50/60 text-emerald-700 border-emerald-100"}`}>{s}</span>
+      </div>
+      <div className="h-2 rounded-full bg-slate-100 overflow-hidden"><div className="h-full rounded-full bg-[#2563EB]" style={{ width: `${Math.max(0, Math.min(100, pct))}%` }} /></div>
+    </div>
+  );
+};
 
 const Source = ({ name, on }: { name: string; on: boolean }) => (
   <div className={`flex items-center gap-2 rounded-xl border px-3 py-2 text-[12px] font-semibold ${on ? "border-emerald-200 bg-emerald-50/60 text-[#0F172A]" : "border-[#E6E8EC] bg-white text-[#94A3B8]"}`}>
@@ -2636,9 +2695,12 @@ export default function PassportPanel({ panel, onClose, openPanel, d, listing, i
           <p className="text-[13px] font-semibold text-[#0F172A] leading-tight">{def.footerQuestion ?? "Questions about this vehicle?"}</p>
           <button onClick={() => go("contact")} className="mt-0.5 text-[12px] font-semibold text-[#2563EB] inline-flex items-center gap-1.5 hover:underline"><MessageSquare className="w-3.5 h-3.5" /> {def.specialistLabel ?? "Talk to a Vehicle Specialist"}</button>
         </div>
-        <div className="shrink-0 flex items-center gap-2">
-          {def.secondary && <button onClick={def.secondary.onClick} className="h-11 px-4 rounded-xl border border-[#E6E8EC] bg-white text-[13px] font-semibold text-[#0F172A] hover:border-[#2563EB] transition-colors">{def.secondary.label}</button>}
-          {def.primary && <button onClick={def.primary.onClick} className="h-11 px-5 rounded-xl bg-[#2563EB] hover:bg-[#1d4fd7] text-white text-[14px] font-semibold inline-flex items-center justify-center gap-2 transition-colors"><ShieldCheck className="w-4 h-4" /> {def.primary.label}</button>}
+        <div className="shrink-0 flex flex-col items-end gap-1">
+          <div className="flex items-center gap-2">
+            {def.secondary && <button onClick={def.secondary.onClick} className="h-11 px-4 rounded-xl border border-[#E6E8EC] bg-white text-[13px] font-semibold text-[#0F172A] hover:border-[#2563EB] transition-colors">{def.secondary.label}</button>}
+            {def.primary && <button onClick={def.primary.onClick} className="h-11 px-5 rounded-xl bg-[#2563EB] hover:bg-[#1d4fd7] text-white text-[14px] font-semibold inline-flex items-center justify-center gap-2 transition-colors"><ShieldCheck className="w-4 h-4" /> {def.primary.label}</button>}
+          </div>
+          {def.footerNote && <p className="text-[11px] text-[#94A3B8]">{def.footerNote}</p>}
         </div>
       </div>
     </>
