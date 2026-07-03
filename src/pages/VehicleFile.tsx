@@ -2523,20 +2523,34 @@ const MARKET_LABEL: Record<string, { label: string; cls: string; dot: string }> 
 const MarketPricingCard = ({ vehicle }: { vehicle: VehicleRow }) => {
   const [pos, setPos] = useState<string>(vehicle.market_position || "unknown");
   const [market, setMarket] = useState<number | null>(vehicle.market_value);
-  const [below, setBelow] = useState<number>(vehicle.market_payload?.belowMarket ?? 0);
+  // How the stored value was produced: vehicle-enrich writes source
+  // "comps_median" (raw comp prices, mileage-blind); the Refresh button's
+  // predict call is mileage-adjusted. Label accordingly so the desk knows
+  // what it's comparing against.
+  const [valueSource, setValueSource] = useState<string>(((vehicle.market_payload as Record<string, unknown> | null)?.source as string) ?? ((vehicle.market_payload as Record<string, unknown> | null)?.rawProvider as string) ?? "");
   const [checking, setChecking] = useState(false);
 
   const run = async () => {
     if (!vehicle.vin) { toast.error("No VIN to check"); return; }
     if (!vehicle.price) { toast.error("Set a price on this vehicle first"); return; }
+    if (!vehicle.tenant_id) { toast.error("This vehicle has no tenant assigned — market pricing needs one."); return; }
     setChecking(true);
     try {
       const { data, error } = await supabase.functions.invoke("marketcheck-market-pricing", { body: { vin: vehicle.vin, tenant_id: vehicle.tenant_id } });
-      if (error) throw error;
-      const d = (data || {}) as { error?: string; position?: string; marketValue?: number | null; belowMarket?: number };
+      // Surface the server's actual message instead of a generic failure —
+      // "authentication required" vs "listing_not_found" vs a crashed function
+      // need very different fixes.
+      if (error) {
+        let detail = "";
+        try { detail = String(await (error as { context?: Response }).context?.text?.() ?? "").slice(0, 120); } catch { /* ignore */ }
+        toast.error(`Market pricing check failed${detail ? ` — ${detail}` : ""}`);
+        return;
+      }
+      const d = (data || {}) as { error?: string; position?: string; marketValue?: number | null };
       if (d.error === "not_configured") toast.error("Market pricing isn't configured yet (MarketCheck key).");
+      else if (d.error) toast.error(`Couldn't get a market value (${d.error}). Try again.`);
       else if (!d.marketValue) toast.error("Couldn't get a market value right now. Try again.");
-      else { setPos(d.position || "unknown"); setMarket(d.marketValue ?? null); setBelow(d.belowMarket ?? 0); toast.success("Market price updated"); }
+      else { setPos(d.position || "unknown"); setMarket(d.marketValue ?? null); setValueSource("marketcheck_predict"); toast.success("Market price updated"); }
     } catch { toast.error("Market pricing check failed"); }
     finally { setChecking(false); }
   };
@@ -2547,6 +2561,11 @@ const MarketPricingCard = ({ vehicle }: { vehicle: VehicleRow }) => {
       {checking ? "Checking…" : market ? "Refresh" : "Check market price"}
     </button>
   );
+  // The delta is derived from the two figures ON the card, never from a
+  // stored belowMarket computed against an older price basis (which is how
+  // "$24,876 vs $19,495" once labeled itself "$4,486 above market").
+  const below = market != null && vehicle.price != null ? Math.round(market - vehicle.price) : 0;
+  const valueLabel = valueSource === "comps_median" ? "Comp median (mileage-blind)" : valueSource === "marketcheck_predict" ? "Predicted value (mileage-adj.)" : "Market value";
 
   return (
     <Card title="Market Pricing" action={action}>
@@ -2562,21 +2581,29 @@ const MarketPricingCard = ({ vehicle }: { vehicle: VehicleRow }) => {
             <span className="font-semibold tabular-nums text-foreground">{vehicle.price ? `$${vehicle.price.toLocaleString()}` : "—"}</span>
           </div>
           <div className="flex items-center justify-between text-sm">
-            <span className="text-muted-foreground">Market value</span>
+            <span className="text-muted-foreground">{valueLabel}</span>
             <span className="font-semibold tabular-nums text-foreground">${market.toLocaleString()}</span>
           </div>
           {(() => {
             const mm = ((vehicle as unknown as { market_meta?: Record<string, unknown> }).market_meta || {}) as Record<string, unknown>;
-            const comps = (vehicle as unknown as { comparables?: unknown[] }).comparables;
+            const comps = (vehicle as unknown as { comparables?: { miles?: number | null }[] }).comparables;
             const compCount = Array.isArray(comps) ? comps.length : 0;
+            const compMiles = Array.isArray(comps) ? comps.map((c) => Number(c?.miles)).filter((n) => Number.isFinite(n) && n > 0) : [];
+            const avgCompMiles = compMiles.length >= 2 ? Math.round(compMiles.reduce((a, b) => a + b, 0) / compMiles.length) : null;
             const daysSupply = mm.market_days_supply != null ? Math.round(Number(mm.market_days_supply)) : null;
             // price_percentile = % of comps priced below this car; low = well priced.
             const pct = mm.price_percentile != null ? Math.max(1, Math.round(Number(mm.price_percentile))) : null;
             return (
               <>
                 {compCount > 0 && <div className="flex items-center justify-between text-sm"><span className="text-muted-foreground">Comparables</span><span className="font-semibold tabular-nums text-foreground">{compCount} nearby</span></div>}
+                {avgCompMiles != null && vehicle.mileage != null && (
+                  <div className="flex items-center justify-between text-sm"><span className="text-muted-foreground">Comp mileage</span><span className="font-semibold tabular-nums text-foreground">Avg {avgCompMiles.toLocaleString()} mi{vehicle.mileage < avgCompMiles ? ` · yours ${vehicle.mileage.toLocaleString()}` : ""}</span></div>
+                )}
                 {daysSupply != null && <div className="flex items-center justify-between text-sm"><span className="text-muted-foreground">Days supply</span><span className="font-semibold tabular-nums text-foreground">{daysSupply} days</span></div>}
-                {pct != null && <div className="flex items-center justify-between text-sm"><span className="text-muted-foreground">Price rank</span><span className="font-semibold tabular-nums text-foreground">{pct <= 50 ? `Top ${pct}% best priced` : `Above ${pct}% of comps`}</span></div>}
+                {pct != null && <div className="flex items-center justify-between text-sm"><span className="text-muted-foreground">Price rank</span><span className="font-semibold tabular-nums text-foreground">{pct >= 100 ? "Priced above all comps" : pct <= 50 ? `Top ${pct}% best priced` : `Above ${pct}% of comps`}</span></div>}
+                {avgCompMiles != null && vehicle.mileage != null && vehicle.mileage < avgCompMiles * 0.7 && (
+                  <p className="text-[11px] text-muted-foreground pt-1">Comps average {Math.round(((avgCompMiles - vehicle.mileage) / 1000))}k more miles than this vehicle — a raw comp median under-values it. Use Refresh for a mileage-adjusted value.</p>
+                )}
               </>
             );
           })()}
