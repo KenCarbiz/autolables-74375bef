@@ -33,7 +33,7 @@ export function brandingFromSettings(
 ): StickerBranding {
   return {
     dealerName: settings.dealer_name || tenantName || "Your Dealership",
-    address: [settings.dealer_city, settings.dealer_state].filter(Boolean).join(", "),
+    address: [settings.dealer_address, [settings.dealer_city, settings.dealer_state].filter(Boolean).join(", ")].filter(Boolean).join(", "),
     phone: settings.dealer_phone || "",
     website: settings.used_inventory_url || "",
     logoUrl: settings.dealer_logo_url || "",

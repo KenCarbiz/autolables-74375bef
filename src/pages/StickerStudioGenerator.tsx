@@ -4,7 +4,9 @@ import { useDealerSettings } from "@/contexts/DealerSettingsContext";
 import { useTenant } from "@/contexts/TenantContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { useDealerDocumentRules } from "@/lib/documentRules";
+import { useProducts } from "@/hooks/useProducts";
 import { cleanEquipmentList } from "@/lib/passportV2Data";
+import { curatePrintEquipment } from "@/lib/equipmentPanel";
 import { useUsageLimits } from "@/lib/entitlements/useUsageLimits";
 import { useAssetReadiness } from "@/lib/stickerStudio/useAssetReadiness";
 import { transitionDocument } from "@/lib/stickerStudio/documentWorkflow";
@@ -93,11 +95,42 @@ const StickerStudioGenerator = () => {
         (v.mpgCity && v.mpgHwy) ? `${v.mpgCity}/${v.mpgHwy} MPG` : v.mpgCity ? `${v.mpgCity} MPG` : v.fuelType,
       ].filter(Boolean).join(" · ") || prev.specs,
       qrUrl: v.slug ? `${origin}/v/${v.slug}` : v.vin ? `${origin}/v/${v.vin}` : prev.qrUrl,
-      installed: (v.options.length || v.features.length)
-        ? cleanEquipmentList([...v.options, ...v.features]).slice(0, 12).map((n) => ({ name: n }))
-        : prev.installed,
     }));
   });
+
+  // Seed line items from real data once both sources have settled: the
+  // tenant's active product catalog fills installed / optional / benefit
+  // lines with their signing-flow pricing semantics, and (window templates
+  // only) the vehicle file's factory equipment fills any remaining installed
+  // capacity, value-ranked. Never overwrites lines the dealer has typed.
+  const { data: products } = useProducts();
+  const seededItems = useRef(false);
+  useEffect(() => {
+    if (seededItems.current || !template) return;
+    if (prefill.active && prefill.loading) return;
+    if (products === undefined) return;
+    seededItems.current = true;
+    const cfgNow = template.config;
+    const m = mapProductsToStickerItems(products.map((p) => ({
+      id: p.id, name: p.name, price: p.price,
+      badge_type: p.badge_type, price_in_advertised: p.price_in_advertised,
+    })));
+    const v = prefill.vehicle;
+    const factory = cfgNow.type === "window" && v && (v.options.length || v.features.length)
+      ? curatePrintEquipment(cleanEquipmentList([...v.options, ...v.features]), cfgNow.maxItems.installed).shown
+      : [];
+    setData((prev) => {
+      const blank = (arr: StickerLineItem[]) => arr.every((i) => !i.name.trim());
+      const installedSeed = [...m.installed, ...factory.map((n) => ({ name: n }))]
+        .slice(0, cfgNow.maxItems.installed);
+      return {
+        ...prev,
+        installed: blank(prev.installed) && installedSeed.length ? installedSeed : prev.installed,
+        upgrades: blank(prev.upgrades) && m.upgrades.length ? m.upgrades.slice(0, cfgNow.maxItems.upgrades) : prev.upgrades,
+        benefits: blank(prev.benefits) && m.benefits.length ? m.benefits.slice(0, cfgNow.maxItems.benefits) : prev.benefits,
+      };
+    });
+  }, [template, products, prefill.active, prefill.loading, prefill.vehicle]);
 
   // Seed dealer default benefits + addendum wording from the template
   // customization once, only into an untouched (blank) field.
