@@ -23,10 +23,12 @@ serve(async (req) => {
   }
 
   const probes: { name: string; url: string }[] = [
-    { name: "sales_stats_ymm", url: `${MC_BASE}/sales/car?api_key=${MC_KEY}&make=infiniti&model=q50&year=2021&geo=state:CT` },
-    { name: "sales_stats_plain", url: `${MC_BASE}/sales/car?api_key=${MC_KEY}&make=infiniti&model=q50&year=2021` },
-    { name: "recents_search", url: `${MC_BASE}/search/car/recents?api_key=${MC_KEY}&make=infiniti&model=q50&year=2021&rows=2` },
-    { name: "active_control", url: `${MC_BASE}/search/car/active?api_key=${MC_KEY}&make=infiniti&model=q50&year=2021&rows=1` },
+    { name: "sales_make_only", url: `${MC_BASE}/sales/car?api_key=${MC_KEY}&make=infiniti` },
+    { name: "sales_model_year", url: `${MC_BASE}/sales/car?api_key=${MC_KEY}&make=infiniti&model=q50&year=2021` },
+    { name: "sales_state", url: `${MC_BASE}/sales/car?api_key=${MC_KEY}&make=infiniti&model=q50&year=2021&state=CT` },
+    { name: "sales_city_state", url: `${MC_BASE}/sales/car?api_key=${MC_KEY}&make=infiniti&model=q50&year=2021&city_state=hartford|CT` },
+    { name: "sales_trim", url: `${MC_BASE}/sales/car?api_key=${MC_KEY}&make=infiniti&model=q50&year=2021&trim=luxe&state=CT` },
+    { name: "recents_geo", url: `${MC_BASE}/search/car/recents?api_key=${MC_KEY}&make=infiniti&model=q50&year=2021&state=CT&rows=2` },
   ];
 
   const results: Record<string, unknown>[] = [];
