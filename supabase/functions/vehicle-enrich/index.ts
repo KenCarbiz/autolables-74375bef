@@ -384,6 +384,82 @@ async function fetchMds(ymm: string | null, condition: string, zip: string | nul
   } catch { return null; }
 }
 
+// ── MarketCheck: recently-SOLD stats for this model in the dealer's state ──
+// /sales/car ignores model/year/trim — it aggregates at make+state level only —
+// so real model-scoped sold data comes from /search/car/recents, which honors
+// year+make+model+state and returns recently-delisted (sold) listings. Ladder:
+// model+year+state → model+state → make-level /sales/car (diagnostics only;
+// the client never displays make scope). Only the count and medians are kept —
+// market_meta ships to anonymous shoppers, so no listing rows, dealer names,
+// VINs, URLs, or min/max/mean ever leave this function.
+async function fetchSoldStats(ymm: string | null, condition: string, state: string | null) {
+  try {
+    if (!ymm || !state) return null;
+    const parts = ymm.split(/\s+/);
+    const year = parts[0] && /^\d{4}$/.test(parts[0]) ? parts[0] : "";
+    const make = year ? parts[1] : parts[0];
+    const model = year ? parts.slice(2).join(" ") : parts.slice(1).join(" ");
+    if (!make || !model) return null;
+    const carType = condition === "new" ? "new" : "used";
+    const median = (xs: number[]) => {
+      const s = [...xs].sort((a, z) => a - z);
+      return s.length ? s[Math.floor(s.length / 2)] : null;
+    };
+    const finish = (r: { count: number; price_median: number | null; dom_median: number | null; miles_median: number | null }, scope: string) => ({
+      count: r.count,
+      price_median: r.price_median,
+      dom_median: r.dom_median,
+      miles_median: r.miles_median,
+      scope,
+      state,
+      window_days: 90,
+      checked_at: new Date().toISOString(),
+      source: scope === "make_state" ? "marketcheck_sales" : "marketcheck_recents",
+    });
+    const run = async (useYear: boolean) => {
+      const p = new URLSearchParams({ api_key: MC_KEY, car_type: carType, make, model, state, rows: "50", start: "0" });
+      if (useYear && year) p.set("year", year);
+      const res = await mcFetch(`${MC_BASE}/search/car/recents?${p.toString()}`, 12000);
+      if (!res || !res.ok) return null;
+      // deno-lint-ignore no-explicit-any
+      const b: any = await res.json().catch(() => ({}));
+      // deno-lint-ignore no-explicit-any
+      const rows: any[] = Array.isArray(b?.listings) ? b.listings : [];
+      const count = num(b?.num_found) ?? rows.length;
+      const vals = (field: string) =>
+        // deno-lint-ignore no-explicit-any
+        rows.map((l: any) => num(l?.[field])).filter((n): n is number => n != null && n > 0);
+      return { count, price_median: median(vals("price")), dom_median: median(vals("dom")), miles_median: median(vals("miles")) };
+    };
+    const r1 = await run(true);
+    if (r1 && r1.count >= 5) return finish(r1, "model_year_state");
+    const r2 = await run(false);
+    if (r2 && r2.count >= 5) return finish(r2, "model_state");
+    // Still thin at model scope: one make-level /sales/car call. Use the
+    // response's *_stats medians directly (this endpoint returns aggregates).
+    const sp = new URLSearchParams({ api_key: MC_KEY, car_type: carType, make, state });
+    const sres = await mcFetch(`${MC_BASE}/sales/car?${sp.toString()}`, 12000);
+    if (sres && sres.ok) {
+      // deno-lint-ignore no-explicit-any
+      const sb: any = await sres.json().catch(() => ({}));
+      const count = num(sb?.count ?? sb?.num_found ?? sb?.sales_count);
+      if (count != null && count > 0) {
+        return finish({
+          count,
+          price_median: num(sb?.price_stats?.median),
+          dom_median: num(sb?.dom_stats?.median),
+          miles_median: num(sb?.miles_stats?.median),
+        }, "make_state");
+      }
+    }
+    // Make-level also failed: a thin model-scoped answer still beats nothing
+    // (the estimate branch stays live because count < 5).
+    if (r2 && r2.count > 0) return finish(r2, "model_state");
+    if (r1 && r1.count > 0) return finish(r1, "model_year_state");
+    return null;
+  } catch { return null; }
+}
+
 // ── Recall lookup: MarketCheck (VIN-specific) → NHTSA (free) fallback ──
 // MarketCheck recalls come from the licensed 3rd-party AutoRecalls product,
 // which returns nothing until that product's terms are accepted in the
@@ -528,10 +604,15 @@ serve(async (req) => {
   // is exactly why Comparables came back empty for every car.
   // deno-lint-ignore no-explicit-any
   let zip: string | null = body.zip || (row.dealer_snapshot as any)?.zip || null;
-  if (!zip) {
+  // Operating state scopes the sold-stats (recents/sales) lookups; same
+  // snapshot-then-profile fallback as zip. No state → sold stats skip entirely.
+  // deno-lint-ignore no-explicit-any
+  let dealerState: string | null = String((row.dealer_snapshot as any)?.state || "").trim().toUpperCase() || null;
+  if (!zip || !dealerState) {
     const { data: prof } = await admin.from("dealer_profiles").select("settings").eq("tenant_id", tenantId).maybeSingle();
     const pset = (prof?.settings || {}) as Record<string, string>;
-    zip = pset.dealer_zip || pset.zip || pset.doc_fee_zip || null;
+    if (!zip) zip = pset.dealer_zip || pset.zip || pset.doc_fee_zip || null;
+    if (!dealerState) dealerState = (pset.dealer_state || pset.doc_fee_state || "").trim().toUpperCase() || null;
   }
 
   const ymm = (row.ymm as string | null) || null;
@@ -556,6 +637,7 @@ serve(async (req) => {
   const predict = wantMC ? await fetchPredict(vin, miles, condition, zip) : null;
   const comps = wantMC ? await fetchComps(ymm, condition, zip, price, vin, subjectTrim, dealerName) : null;
   const mds = wantMC && INCLUDE_MDS ? await fetchMds(ymm, condition, zip) : null;
+  const soldStats = wantMC ? await fetchSoldStats(ymm, condition, dealerState) : null;
   const history = wantMC ? await fetchHistory(vin) : null;
   const recalls = wantMC ? await fetchRecalls(vin, ymm) : null;
   const blackbook = await blackbookP;
@@ -594,14 +676,19 @@ serve(async (req) => {
   } else if (mds?.mds != null) {
     patch.market_meta = { market_days_supply: mds.mds, inventory_count: mds.count, checked_at: mds.checked_at };
   }
+  if (soldStats) {
+    patch.market_meta = { ...((patch.market_meta as Record<string, unknown> | undefined) ?? {}), sold_stats: soldStats };
+  }
   if (patch.market_meta) {
     // MDS = active inventory ÷ 45-day sales rate, so units sold in the last
     // 45 days ≈ inventory * 45 / MDS — a real velocity figure for the market.
+    // Real model-scoped sold data (count >= 5) supersedes this estimate, and
+    // the estimate only runs off the MDS call's OWN inventory count — the
+    // comps-search count is a different geometry and inflates the figure.
     const mm = patch.market_meta as Record<string, unknown>;
-    const mdsV = Number(mm.market_days_supply);
-    const inv = Number(mm.inventory_count);
-    if (Number.isFinite(mdsV) && mdsV > 0 && Number.isFinite(inv) && inv > 0) {
-      mm.sold_45d_estimate = Math.round((inv * 45) / mdsV);
+    const realSold = soldStats != null && soldStats.count >= 5 && soldStats.scope !== "make_state";
+    if (!realSold && mds?.mds != null && mds.mds > 0 && mds.count != null && mds.count > 0) {
+      mm.sold_45d_estimate = Math.round((mds.count * 45) / mds.mds);
     }
   }
   if (history) {
@@ -638,6 +725,8 @@ serve(async (req) => {
       comps_listings_returned: comps?.debug?.listings_returned ?? null,
       comps_http: comps?.debug?.http ?? null,
       market_days_supply: mds?.mds ?? null,
+      sold_stats_count: soldStats?.count ?? null,
+      sold_stats_scope: soldStats?.scope ?? null,
       history: history?.available ? (history.entries?.length ?? 0) : 0,
       owners: history?.owners ?? null,
       in_service_date: history?.inServiceDate ?? null,

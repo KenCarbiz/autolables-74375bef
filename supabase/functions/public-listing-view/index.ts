@@ -665,7 +665,9 @@ serve(async (req) => {
       }
       if (row.blackbook && typeof row.blackbook === "object") {
         const bb = row.blackbook as Record<string, unknown>;
-        row.blackbook = { available: bb.available === true, retail: bb.retail ?? null, checked_at: bb.checked_at ?? null };
+        // tradein ships as an independent-guide value row; wholesale (and the
+        // raw provider payload) stays stripped from the anonymous view.
+        row.blackbook = { available: bb.available === true, retail: bb.retail ?? null, tradein: bb.tradein ?? null, checked_at: bb.checked_at ?? null };
       }
       if (row.history_payload && typeof row.history_payload === "object") {
         const hp = row.history_payload as Record<string, unknown>;
