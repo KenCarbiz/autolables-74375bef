@@ -3,10 +3,10 @@ import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import Seo from "@/components/Seo";
 import Logo from "@/components/brand/Logo";
+import LandingIcon from "@/components/brand/LandingIcon";
 import { QRCodeSVG } from "qrcode.react";
 import {
-  ArrowRight, CheckCircle2, ShieldCheck, Car, QrCode, Layers, Building2,
-  FileCheck, BadgeCheck, ScanLine, Package, CalendarClock,
+  ArrowRight, CheckCircle2, ShieldCheck, Car, QrCode, Package, CalendarClock,
 } from "lucide-react";
 
 const ROLES = [
@@ -19,17 +19,19 @@ const VOLUMES = ["Under 50 units", "50–100 units", "100–250 units", "250–5
 
 const BENEFIT_CHIPS = ["FTC-aligned addendums", "VIN-decoded vehicle data", "QR-connected packets"];
 
+// Icons come from the locked /public SVG set (blue gradient tile baked in) —
+// same system as the landing page, rendered bare via LandingIcon.
 const FEATURES = [
-  { icon: Layers, title: "Inventory-aware labels", body: "Generate vehicle-specific labels from VIN, trim, pricing, installed products, and inventory feed data." },
-  { icon: Building2, title: "Dealer-branded packets", body: "Apply your store logo, dealership details, disclaimers, and QR codes to every label automatically." },
-  { icon: ShieldCheck, title: "Disclosure engine, 50 states", body: "Generate FTC-aligned addendum disclosures, Buyers Guides, warranty selections, and state-specific disclosure language automatically." },
-  { icon: ScanLine, title: "QR-connected vehicle passport", body: "Link every printed label back to the live vehicle record — disclosures, media, warranty, and packet included." },
+  { icon: "/inventory_feed_sync_icon_transparent.svg", title: "Inventory-aware labels", body: "Generate vehicle-specific labels from VIN, trim, pricing, installed products, and inventory feed data." },
+  { icon: "/dealer_tenant_logo_icon_transparent.svg", title: "Dealer-branded packets", body: "Apply your store logo, dealership details, disclaimers, and QR codes to every label automatically." },
+  { icon: "/fifty_state_disclosure_engine_icon_transparent.svg", title: "Disclosure engine, 50 states", body: "Generate FTC-aligned addendum disclosures, Buyers Guides, warranty selections, and state-specific disclosure language automatically." },
+  { icon: "/vehicle_passport_link_icon_transparent.svg", title: "QR-connected vehicle passport", body: "Link every printed label back to the live vehicle record — disclosures, media, warranty, and packet included." },
 ];
 
 const TRUST_ROW = [
-  { icon: ShieldCheck, title: "Secure dealership onboarding", body: "We never sell your information or share it with other stores." },
-  { icon: FileCheck, title: "Built for automotive compliance workflows", body: "Designed around real dealership label, addendum, and disclosure processes." },
-  { icon: BadgeCheck, title: "Early-access spots reviewed manually", body: "We onboard the right stores the right way." },
+  { icon: "/secure_compliance_cloud_icon_transparent.svg", title: "Secure dealership onboarding", body: "We never sell your information or share it with other stores." },
+  { icon: "/ftc_aligned_addendums_icon_transparent.svg", title: "Built for automotive compliance workflows", body: "Designed around real dealership label, addendum, and disclosure processes." },
+  { icon: "/foreman_signoff_icon_transparent.svg", title: "Early-access spots reviewed manually", body: "We onboard the right stores the right way." },
 ];
 
 // Compliance vocabulary is deliberate: "FTC-Aligned", never "FTC Compliant"
@@ -60,9 +62,7 @@ const FeatureCards = ({ className }: { className: string }) => (
   <div className={className}>
     {FEATURES.map((c) => (
       <div key={c.title} className="rounded-[20px] border border-[#E6EAF0] bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:shadow-[0_16px_40px_-24px_rgba(6,25,74,0.3)]">
-        <span className="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-blue-50">
-          <c.icon className="h-5 w-5 text-[#2563EB]" />
-        </span>
+        <LandingIcon src={c.icon} alt={c.title} />
         <p className="mt-3 text-[14px] font-bold text-[#06194A]">{c.title}</p>
         <p className="mt-1.5 text-[12.5px] leading-relaxed text-[#53627A]">{c.body}</p>
       </div>
@@ -498,9 +498,7 @@ const Waitlist = () => {
               <div className="mt-16 grid grid-cols-1 gap-4 border-t border-[#E6EAF0] pt-10 sm:grid-cols-3">
                 {TRUST_ROW.map((t) => (
                   <div key={t.title} className="flex items-start gap-3">
-                    <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-blue-50">
-                      <t.icon className="h-[18px] w-[18px] text-[#2563EB]" />
-                    </span>
+                    <LandingIcon src={t.icon} alt={t.title} className="h-10 w-10" />
                     <div>
                       <p className="text-[13px] font-bold text-[#06194A]">{t.title}</p>
                       <p className="mt-0.5 text-[12px] leading-relaxed text-[#53627A]">{t.body}</p>

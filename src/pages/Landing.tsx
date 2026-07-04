@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import Seo from "@/components/Seo";
 import Logo from "@/components/brand/Logo";
+import LandingIcon from "@/components/brand/LandingIcon";
 import { QRCodeSVG } from "qrcode.react";
 import {
   ArrowRight,
@@ -73,25 +74,6 @@ const landingIcons = {
   fiftyStateDisclosureEngine: "/fifty_state_disclosure_engine_icon_transparent.svg",
 };
 
-// Size comes through className (default 48px) so h-10/h-14 variants can't
-// collide with a baked-in h-12 in the Tailwind cascade.
-const LandingIcon = ({
-  src,
-  alt,
-  className = "h-12 w-12",
-}: {
-  src: string;
-  alt: string;
-  className?: string;
-}) => (
-  <img
-    src={src}
-    alt={alt}
-    className={`object-contain shrink-0 ${className}`}
-    loading="lazy"
-    draggable={false}
-  />
-);
 
 const Landing = () => {
   const { user } = useAuth();
