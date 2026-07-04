@@ -8,7 +8,7 @@ import { toast } from "sonner";
 import { Helmet } from "react-helmet-async";
 import { type VehicleListing } from "@/hooks/useVehicleListing";
 import Logo from "@/components/brand/Logo";
-import { derivePassport, historyReportName } from "@/lib/passportV2Data";
+import { derivePassport, historyReportName, ratingTier } from "@/lib/passportV2Data";
 import { packetVisible } from "@/lib/packetModules";
 import { trackCustomerCtaClicked } from "@/lib/engagement/customerEngagement";
 import { MOCK_LISTING } from "./VehiclePassportV3";
@@ -88,10 +88,13 @@ const VehiclePassportHistory = () => {
 
   const isNewCar = listing.condition === "new";
   const isCpo = listing.condition === "cpo";
-  // A new car has no history to grade — the data-confidence score would read
+  // A new car has no history to grade — the History & Title factor would read
   // as a fabricated "history score", so it is suppressed for new vehicles.
+  // This page's score IS the History & Title factor of the unified rating
+  // (confScore is its exported alias), with its deduction receipt as evidence.
   const score = isNewCar ? null : d.confScore;
-  const tier = score == null ? null : score >= 90 ? "Excellent" : score >= 80 ? "Very Good" : score >= 70 ? "Good" : "Fair";
+  const tier = score == null ? null : ratingTier(score).label;
+  const strongTier = score != null && score >= 70;
   const deductions = isNewCar ? [] : d.confDeductions;
   const year = Number((listing.ymm || "").match(/\b(19|20)\d{2}\b/)?.[0]) || null;
   const age = year ? Math.max(1, new Date().getFullYear() - year) : null;
@@ -305,9 +308,9 @@ const VehiclePassportHistory = () => {
                       <circle cx="80" cy="80" r="70" fill="none" stroke="#E6E8EC" strokeWidth="12" />
                       <circle cx="80" cy="80" r="70" fill="none" stroke="#16A34A" strokeWidth="12" strokeLinecap="round" strokeDasharray={2 * Math.PI * 70} strokeDashoffset={ringFill ? (2 * Math.PI * 70) * (1 - score / 100) : 2 * Math.PI * 70} style={{ transition: "stroke-dashoffset 1s ease-out" }} />
                     </svg>
-                    <div className="absolute inset-0 flex flex-col items-center justify-center"><span className="text-[48px] font-extrabold leading-none text-[#0F172A]">{score}</span><span className="text-[13px] font-bold text-[#94A3B8] mt-1">Data Confidence</span></div>
+                    <div className="absolute inset-0 flex flex-col items-center justify-center"><span className="text-[48px] font-extrabold leading-none text-[#0F172A]">{score}</span><span className="text-[13px] font-bold text-[#94A3B8] mt-1">History & Title</span></div>
                   </div>
-                  {tier && tier !== "Fair" && <p className="text-[16px] font-extrabold text-[#16A34A] mt-3">{tier}</p>}
+                  {strongTier && <p className="text-[16px] font-extrabold text-[#16A34A] mt-3">{tier}</p>}
                   <div className="mt-3 text-left max-w-[320px] mx-auto"><DeductionReceipt compact /></div>
                 </>
               )}
@@ -487,7 +490,7 @@ const VehiclePassportHistory = () => {
               <div className="text-center lg:text-left">
                 {score != null ? (
                   <>
-                    <p className="text-[20px] font-extrabold text-[#16A34A] leading-tight">{tier && tier !== "Fair" ? `${tier} · Data Confidence` : "Data Confidence"}</p>
+                    <p className="text-[20px] font-extrabold text-[#16A34A] leading-tight">{strongTier ? `${tier} · History & Title` : "History & Title"}</p>
                     <p className={`text-[13px] ${TEXT2} mt-1`}>Scored only from verified signals — deductions are itemized below, never hidden.</p>
                     <div className="mt-3 max-w-[420px] mx-auto lg:mx-0 text-left"><DeductionReceipt compact /></div>
                   </>

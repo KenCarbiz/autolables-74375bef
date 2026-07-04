@@ -13,7 +13,7 @@ import { useVehicleListing, type VehicleListing } from "@/hooks/useVehicleListin
 import { usePublicListing } from "@/hooks/usePublicListing";
 import { formatPhone } from "@/components/addendum/CustomerInfoSection";
 import Logo from "@/components/brand/Logo";
-import { derivePassport, computePriceHistory, fmt$, listingEquipment, historyReportName, deriveSoldClaims } from "@/lib/passportV2Data";
+import { derivePassport, deriveRating, ratingTier, computePriceHistory, fmt$, listingEquipment, historyReportName, deriveSoldClaims } from "@/lib/passportV2Data";
 import { resolveStickyButtons, type StickyBottomButtons } from "@/lib/stickyButtons";
 import PriceDropWatch from "@/components/listing/PriceDropWatch";
 import { listingGallery } from "@/lib/photos";
@@ -242,6 +242,7 @@ const VehiclePassportV3 = () => {
   const [savedState, setSavedState] = useState<boolean | null>(null);
 
   const d = useMemo(() => (listing ? derivePassport(listing) : null), [listing]);
+  const rating = useMemo(() => (listing && d ? deriveRating(listing, d) : null), [listing, d]);
   const { data: nhtsa } = useNhtsaSafety(listing?.ymm, !!listing?.ymm);
   // Photos module off = lead photo only, no gallery chrome (server also
   // trims the payload; this keeps preview/mock rendering honest).
@@ -434,8 +435,8 @@ const VehiclePassportV3 = () => {
     demandParts.length
       ? { icon: TrendingUp, title: "Market Demand", strong: (d.viewCount ?? 0) > 20 ? "High Interest" : "Active", sub: demandParts.join(" · "), section: "market-demand", cta: "View report" }
       : null,
-    d.marketAvg != null
-      ? { icon: GaugeIcon, title: "Price Confidence", strong: d.belowMarket && d.belowMarket > 0 ? "Excellent" : "Supported", sub: "by market data", donut: d.confScore, section: "price-confidence", cta: "View report" }
+    d.marketAvg != null && rating?.overall != null
+      ? { icon: GaugeIcon, title: "Price Confidence", strong: ratingTier(rating.overall).label, sub: "overall vehicle score", donut: rating.overall, section: "price-confidence", cta: "View report" }
       : null,
     priceChange7d != null && priceChange7d < 0
       ? { icon: Clock, title: "Price History", strong: `-${fmt$(Math.abs(priceChange7d))}`, sub: "price decreased", chart: <Spark points={priceSeries} color="#7C3AED" />, section: "price-history", cta: "View history" }
@@ -829,10 +830,10 @@ const VehiclePassportV3 = () => {
           {pv("insights") && (
           <div className={`${CARD} p-5 flex flex-col max-[767px]:p-6 max-[767px]:ring-1 max-[767px]:ring-blue-200 max-[767px]:shadow-[0_10px_30px_rgba(37,99,235,0.10)] print:ring-0 print:shadow-none`}>
             <H3>Why This Vehicle Checks Out</H3>
-            {d.confScore != null && (
+            {rating?.overall != null && (
               <div className="flex items-center justify-between gap-2 mt-3 rounded-xl bg-emerald-50/60 border border-emerald-100 px-3 py-2">
                 <p className="text-[12px] font-bold text-emerald-800 inline-flex items-center gap-1">
-                  {d.confScore}% Confidence · {d.confScore >= 85 ? "Excellent Value" : d.confScore >= 75 ? "Strong Value" : "Supported by Market Data"}
+                  {rating.overall}% Confidence · {ratingTier(rating.overall).label}
                 </p>
                 <button onClick={(e) => openInfo("score-meaning", e)} aria-label="What does this score mean?" className="w-5 h-5 inline-flex items-center justify-center shrink-0"><Info className="w-3.5 h-3.5 text-emerald-600/70" /></button>
               </div>
@@ -1174,7 +1175,7 @@ const VehiclePassportV3 = () => {
           <button onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })} aria-label="Top" className="w-9 h-9 rounded-full hover:bg-slate-100 flex items-center justify-center shrink-0"><ChevronLeft className="w-5 h-5" /></button>
           {hero && <img src={hero} alt="" className="w-9 h-9 rounded-lg object-cover shrink-0" />}
           <div className="min-w-0 flex-1"><p className="text-[13px] font-bold leading-tight truncate">{listing.ymm || "Vehicle"}</p>{price != null && <p className="text-[12px] font-bold text-[#2563EB] leading-tight">{fmt$(price)}</p>}</div>
-          {d.confScore != null && <span className="inline-flex items-center gap-1 text-[11px] font-bold text-[#16A34A] bg-emerald-50 border border-emerald-200 rounded-full px-2 py-1 shrink-0"><ShieldCheck className="w-3 h-3" />{d.confScore}</span>}
+          {rating?.overall != null && <span className="inline-flex items-center gap-1 text-[11px] font-bold text-[#16A34A] bg-emerald-50 border border-emerald-200 rounded-full px-2 py-1 shrink-0"><ShieldCheck className="w-3 h-3" />{rating.overall}</span>}
           <button onClick={handleShare} aria-label="Share" className="w-9 h-9 rounded-full hover:bg-slate-100 flex items-center justify-center shrink-0"><Upload className="w-[18px] h-[18px] text-[#64748B]" /></button>
         </div>
       </div>

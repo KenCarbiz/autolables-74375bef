@@ -8,7 +8,7 @@ import {
 import { toast } from "sonner";
 import { listingHero } from "@/lib/photos";
 import type { PassportData, PricePoint, OemWarrantyView } from "@/lib/passportV2Data";
-import { fmt$, listingEquipment, historyReportName, deriveSoldClaims } from "@/lib/passportV2Data";
+import { fmt$, listingEquipment, historyReportName, deriveSoldClaims, deriveRating, ratingTier } from "@/lib/passportV2Data";
 import { packetVisible } from "@/lib/packetModules";
 import { trackCustomerCtaClicked } from "@/lib/engagement/customerEngagement";
 import { oemCoverageRows, type CoverageKey } from "@/lib/oemWarranty";
@@ -50,7 +50,10 @@ interface PanelDef { title: string; subtitle: string; body: React.ReactNode; pri
 function buildPanel(key: PassportPanelKey, d: PassportData, listing: VehicleListing, isPreview: boolean, go: (s: string) => void, openPanel: (k: PassportPanelKey) => void, nhtsa: NhtsaSafetyResult | null): PanelDef {
   const price = d.price, avg = d.marketAvg, low = d.marketLow, high = d.marketHigh, below = d.belowMarket;
   const isGreat = below != null && below > 0;
-  const conf = d.confScore;
+  // The unified rating: overall drives every confidence ring in these panels;
+  // the factor list drives the price-confidence breakdown.
+  const rating = deriveRating(listing, d);
+  const conf = rating.overall;
   const sold = deriveSoldClaims(d, listing.mileage ?? null, listing.condition);
   // Merge enrichment market_meta (percentile, radius, similar_count, avg_dom,
   // inventory) into mc so the panels read real ingest data, not just mc_attributes.
@@ -154,8 +157,8 @@ function buildPanel(key: PassportPanelKey, d: PassportData, listing: VehicleList
           {conf != null && conf >= 70 && (
             <Section title="AutoLabels Confidence">
               <div className={`${CARD} p-4 flex items-center gap-5`}>
-                <div className="flex flex-col items-center shrink-0"><Ring pct={conf} /><p className="text-[12px] font-extrabold text-[#16A34A] mt-1">{conf >= 85 ? "High Confidence" : "Good Confidence"}</p></div>
-                <div className="min-w-0"><p className="text-[12px] text-[#64748B] mb-2">Our price analysis is based on:</p><ul className="grid grid-cols-1 gap-1.5">{["Live market data", "Dealer pricing data", "Regional demand", "Vehicle history", "Mileage & condition", "Equipment & features"].map((b) => <Check key={b}>{b}</Check>)}</ul></div>
+                <div className="flex flex-col items-center shrink-0"><Ring pct={conf} /><p className="text-[12px] font-extrabold text-[#16A34A] mt-1">{ratingTier(conf).label}</p></div>
+                <div className="min-w-0"><p className="text-[12px] text-[#64748B] mb-2">This score is built from the measured factors:</p><ul className="grid grid-cols-1 gap-1.5">{rating.factors.filter((f) => f.score != null).map((f) => <Check key={f.key}>{f.label}</Check>)}</ul></div>
               </div>
             </Section>
           )}
@@ -414,20 +417,10 @@ function buildPanel(key: PassportPanelKey, d: PassportData, listing: VehicleList
 
     case "price-confidence": {
       const ks = listing.key_specs || {};
-      // Equipment spans the top-level features column AND the decoded
-      // mc_attributes options/features (where the NeoVIN pull lands) — the
-      // features column alone left fully-decoded cars reading "Pending".
-      const equipPct = Math.min(100, (listingEquipment(listing).length + Object.keys(ks).length) * 12);
-      // Factors without enough verified data are omitted entirely — a factor
-      // row never renders as "Pending".
-      const factors: { label: string; pct: number; status?: string }[] = ([
-        avg != null ? { label: "Comparable Market Data", pct: 100 } : null,
-        (d.cleanTitle || d.ownerCount != null || d.accidentCount != null) ? { label: "History Signals", pct: 90 } : null,
-        listing.mileage != null ? { label: "Mileage", pct: 100 } : null,
-        (d.serviceCount > 0 || listing.prep_status?.foreman_signed_at) ? { label: "Condition", pct: 90 } : null,
-        equipPct >= 40 ? { label: "Equipment", pct: equipPct, status: "Verified" } : null,
-        (d.viewCount != null || d.dom != null) ? { label: "Local Demand", pct: 75 } : null,
-      ] as ({ label: string; pct: number; status?: string } | null)[]).filter(Boolean) as { label: string; pct: number; status?: string }[];
+      // The real rating factors — measured factors only, each with its
+      // evidence lines. A factor without real data is omitted entirely; a
+      // factor row never renders as "Pending" and never as a fixed percentage.
+      const factors = rating.factors.filter((f) => f.score != null);
       const hasCarfaxDoc = (listing.documents || []).some((x) => /carfax/i.test(`${x.type} ${x.name}`));
       const sources = [
         { name: "Live Market Data", on: avg != null || Object.keys(mc).length > 0 },
@@ -450,11 +443,15 @@ function buildPanel(key: PassportPanelKey, d: PassportData, listing: VehicleList
       // Below 70 the confidence module doesn't render at all — the panel falls
       // through to the verified-strengths content instead of a weak score.
       const showConf = conf != null && conf >= 70;
-      const confWord = conf != null && conf >= 75 ? "High Confidence" : "Supported by Market Data";
-      const confExplain = "This score reflects available market, pricing, mileage, condition, and vehicle-history signals. Higher scores mean fewer unknowns.";
+      const confWord = ratingTier(conf).label;
+      const confExplain = "This score blends the measured factors below — price vs market, history, demand, equipment, and coverage. Factors without real data are left out, never guessed.";
       const scale = showConf ? (
-        <div className="grid grid-cols-2 gap-1.5">
-          {[{ n: "Supported", r: "50 – 74", a: (conf as number) < 75 }, { n: "High Confidence", r: "75 – 100", a: (conf as number) >= 75 }].map((b) => (
+        <div className="grid grid-cols-3 gap-1.5">
+          {[
+            { n: "Solid", r: "70 – 79", a: (conf as number) < 80 },
+            { n: "Strong", r: "80 – 89", a: (conf as number) >= 80 && (conf as number) < 90 },
+            { n: "Exceptional", r: "90 – 100", a: (conf as number) >= 90 },
+          ].map((b) => (
             <div key={b.n} className={`relative text-center rounded-lg py-1.5 border ${b.a ? "bg-emerald-50 border-emerald-200" : "border-transparent"}`}>
               {b.a && <span className="absolute -top-2.5 left-1/2 -translate-x-1/2 text-[9px] text-emerald-500 leading-none">▼</span>}
               <p className={`text-[11px] font-bold leading-tight ${b.a ? "text-emerald-700" : "text-[#64748B]"}`}>{b.n}</p>
@@ -527,8 +524,13 @@ function buildPanel(key: PassportPanelKey, d: PassportData, listing: VehicleList
             </div>
 
             {factors.length > 0 && (
-              <Section title="Confidence Factors" sub="How much verified data supports each factor.">
-                <div className={`${CARD} p-4 space-y-3`}>{factors.map((f) => <FactorBar key={f.label} label={f.label} pct={f.pct} status={f.status} />)}</div>
+              <Section title="Rating Factors" sub="Only measured factors are scored — each shows the evidence behind it.">
+                <div className={`${CARD} p-4 space-y-4`}>{factors.map((f) => (
+                  <div key={f.key}>
+                    <FactorBar label={f.label} pct={f.score as number} status={ratingTier(f.score).label} />
+                    {f.evidence.length > 0 && <ul className="mt-1.5 space-y-0.5">{f.evidence.map((e) => <li key={e} className="text-[11px] text-[#94A3B8] leading-snug">{e}</li>)}</ul>}
+                  </div>
+                ))}</div>
               </Section>
             )}
 
@@ -561,8 +563,13 @@ function buildPanel(key: PassportPanelKey, d: PassportData, listing: VehicleList
           {coverageCard}
 
           {factors.length > 0 && (
-            <Section title="Confidence Factors" sub="How much verified data supports each factor.">
-              <div className={`${CARD} p-4 space-y-3`}>{factors.map((f) => <FactorBar key={f.label} label={f.label} pct={f.pct} status={f.status} />)}</div>
+            <Section title="Rating Factors" sub="Only measured factors are scored — each shows the evidence behind it.">
+              <div className={`${CARD} p-4 space-y-4`}>{factors.map((f) => (
+                <div key={f.key}>
+                  <FactorBar label={f.label} pct={f.score as number} status={ratingTier(f.score).label} />
+                  {f.evidence.length > 0 && <ul className="mt-1.5 space-y-0.5">{f.evidence.map((e) => <li key={e} className="text-[11px] text-[#94A3B8] leading-snug">{e}</li>)}</ul>}
+                </div>
+              ))}</div>
             </Section>
           )}
           {sourcesBlock}

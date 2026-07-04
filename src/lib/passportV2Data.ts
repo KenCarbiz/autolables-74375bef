@@ -248,7 +248,9 @@ export interface PassportData {
   // Factory & CPO terms, attached by public-listing-view). Drives the
   // factory-warranty slide-out's full presentation.
   oemWarranty: OemWarrantyView | null;
-  // Confidence
+  // Confidence — confScore is the History & Title factor of deriveRating
+  // (the labeled-deduction engine). Kept exported under its old name for
+  // surfaces not yet migrated to the unified rating.
   confScore: number | null;
   confLabel: string;
   confDeductions: { label: string; points: number }[];
@@ -687,6 +689,229 @@ export const derivePassport = (listing: VehicleListing): PassportData => {
     contactRouting: ((listing as unknown as { contact_routing?: PassportData["contactRouting"] }).contact_routing) ?? null,
     iihsAward: ((listing as unknown as { iihs_award?: PassportData["iihsAward"] }).iihs_award) ?? null,
     historyReport: ((listing as unknown as { history_report?: PassportData["historyReport"] }).history_report) ?? null,
+  };
+};
+
+// ── Unified vehicle rating ─────────────────────────────────────
+// One rating object every passport surface projects from. Each factor scores
+// only when it has a real input — never a presence-triggered baseline — and
+// carries the evidence lines that justify its score. The overall is a weighted
+// mean over measured factors only.
+
+export type RatingFactorKey = "price" | "history" | "demand" | "equipment" | "coverage";
+
+export interface RatingFactor {
+  key: RatingFactorKey;
+  label: string;
+  score: number | null;
+  weight: number;
+  evidence: string[];
+}
+
+export interface RatingTier {
+  id: "exceptional" | "strong" | "solid" | "fair" | "closer-look" | "pending";
+  label: string;
+  // Buy-framed variant of the same band, for surfaces that speak in verdicts
+  // (GreatBuy). The bands are identical — only the framing differs.
+  buyLabel: string;
+}
+
+// The single tier table. Every surface that labels a rating band must read it
+// from here so a given score can never carry two different names.
+export const ratingTier = (s: number | null): RatingTier =>
+  s == null ? { id: "pending", label: "Pending", buyLabel: "Pending Verification" }
+  : s >= 90 ? { id: "exceptional", label: "Exceptional", buyLabel: "Exceptional Buy" }
+  : s >= 80 ? { id: "strong", label: "Strong", buyLabel: "Strong Buy" }
+  : s >= 70 ? { id: "solid", label: "Solid", buyLabel: "Solid Buy" }
+  : s >= 60 ? { id: "fair", label: "Fair", buyLabel: "Fair" }
+  : { id: "closer-look", label: "Worth a Closer Look", buyLabel: "Worth a Closer Look" };
+
+export interface VehicleRating {
+  overall: number | null;
+  tier: RatingTier;
+  factors: RatingFactor[];
+  coverage: { measured: number; total: number; sources: number };
+}
+
+// Minimal build-sheet value read (sum of known package/option MSRPs).
+// Duplicated from buildSheet.ts because that module imports from this one —
+// importing it back would create a cycle.
+const buildSheetValue = (listing: VehicleListing): number | null => {
+  const mc = (listing.mc_attributes || {}) as Record<string, unknown>;
+  const raw = mc.build_sheet as Record<string, unknown> | null | undefined;
+  if (!raw || typeof raw !== "object") return null;
+  const rows = [
+    ...(Array.isArray(raw.packages) ? raw.packages : []),
+    ...(Array.isArray(raw.options) ? raw.options : []),
+  ] as Record<string, unknown>[];
+  const msrps = rows.map((r) => Number(r?.msrp)).filter((n) => Number.isFinite(n) && n > 0);
+  return msrps.length ? msrps.reduce((a, b) => a + b, 0) : null;
+};
+
+const clampScore = (lo: number, hi: number, v: number) => Math.max(lo, Math.min(hi, Math.round(v)));
+
+export const deriveRating = (listing: VehicleListing, d: PassportData): VehicleRating => {
+  const isNew = String((listing as { condition?: string }).condition || "").toLowerCase() === "new";
+  const m = d.marketMeta;
+
+  // Price vs Market — continuous around a real anchor. Anchor preference:
+  // recently-sold median (strict gate), full-market median/mean from the same
+  // enrich pass, live market average, MSRP for a new car. No anchor, no score.
+  const soldAnchor = m.soldDisplayable && m.soldCount != null && m.soldCount >= 8
+    && m.soldScope === "model_year_state" && m.soldPriceMedian != null ? m.soldPriceMedian : null;
+  const statsAnchor = m.priceMedian ?? m.priceMean;
+  const anchor = soldAnchor ?? statsAnchor ?? d.marketAvg ?? (isNew ? d.msrp : null);
+  const priceEvidence: string[] = [];
+  let priceScore: number | null = null;
+  if (anchor != null && anchor > 0 && d.price != null) {
+    const pct = ((d.price - anchor) / anchor) * 100;
+    // 80 at the anchor, +2 per percent below (cap 98), -2 per percent above
+    // (floor 55) — continuous, so a $200 move can never flip a whole band.
+    priceScore = clampScore(55, 98, 80 - pct * 2);
+    if (soldAnchor != null) {
+      priceEvidence.push(`Median of ${m.soldCount!.toLocaleString()} recently sold in ${m.soldState ?? "your state"}, 90 days`);
+    } else if (statsAnchor != null || d.marketAvg != null) {
+      priceEvidence.push(m.similarCount != null
+        ? `Checked against ${m.similarCount.toLocaleString()} similar listings${m.radius != null ? ` within ${m.radius} miles` : ""}`
+        : "Checked against live local market data");
+    } else {
+      priceEvidence.push(d.msrp != null && d.price <= d.msrp
+        ? `Compared against the ${fmt$(d.msrp)} factory sticker for this build`
+        : "Compared against the factory sticker for this build");
+    }
+    // A dollar anchor is printable only when it sits at or above our price;
+    // above the anchor the evidence speaks in bands, never a cheaper figure.
+    if (d.price <= anchor) {
+      priceEvidence.push(pct <= -1
+        ? `Priced ${fmt$(anchor - d.price)} under the market benchmark`
+        : "Priced right at the market benchmark");
+    } else {
+      priceEvidence.push(pct < 3
+        ? `Within ${Math.max(1, Math.round(pct))}% of the market benchmark`
+        : "Priced above the market benchmark for the model line");
+    }
+  }
+
+  // Demand & Velocity — null unless at least one real input exists.
+  const demandInputs: { score: number; line: string }[] = [];
+  if (m.soldDisplayable && m.soldDomMedian != null && m.soldDomMedian >= 1) {
+    const sd = Math.round(m.soldDomMedian);
+    demandInputs.push({ score: sd <= 30 ? 90 : sd <= 45 ? 80 : sd <= 60 ? 68 : 55, line: `Similar vehicles typically sell in ~${sd} days here` });
+  }
+  if (d.dom != null && m.avgDom != null && m.avgDom > 0) {
+    const r = d.dom / m.avgDom;
+    demandInputs.push({ score: r <= 0.5 ? 90 : r <= 1 ? 78 : r <= 1.5 ? 60 : 48, line: `${d.dom} days listed vs a ${m.avgDom}-day market average` });
+  }
+  if (m.daysSupply != null) {
+    demandInputs.push({ score: m.daysSupply < 30 ? 88 : m.daysSupply < 60 ? 72 : 55, line: `${Math.round(m.daysSupply)}-day local supply of similar vehicles` });
+  }
+  if (d.viewCount != null && d.viewCount >= 5) {
+    demandInputs.push({ score: clampScore(40, 95, 40 + d.viewCount), line: `${d.viewCount.toLocaleString()} shoppers have viewed this vehicle` });
+  }
+  const demandScore = demandInputs.length
+    ? clampScore(5, 95, demandInputs.reduce((a, b) => a + b.score, 0) / demandInputs.length)
+    : null;
+
+  // History & Title — this IS the labeled-deduction engine (confScore); the
+  // deduction receipt is its evidence. Excluded for new cars (no history to
+  // grade), which redistributes its weight across the measured factors.
+  const historyEvidence = d.confScore == null ? [] : d.confDeductions.length
+    ? d.confDeductions.map((x) => `${x.label} (−${x.points} pts)`)
+    : ["Every known history signal on this vehicle is clean"];
+
+  // Equipment & Build — continuous on the decoded count plus known factory
+  // option value. Null when nothing was decoded from the VIN.
+  const equipCount = listingEquipment(listing).length;
+  const optValue = buildSheetValue(listing);
+  const equipEvidence: string[] = [];
+  let equipScore: number | null = null;
+  if (equipCount > 0 || optValue != null) {
+    const base = equipCount > 0 ? clampScore(55, 90, 55 + equipCount * 2.5) : 60;
+    equipScore = Math.min(96, Math.round(base + (optValue ? Math.min(8, optValue / 1500) : 0)));
+    if (equipCount > 0) equipEvidence.push(`${equipCount} options decoded from VIN`);
+    if (optValue) equipEvidence.push(`${fmt$(optValue)} in factory packages`);
+  }
+
+  // Coverage & Care — warranty remainder, dealer-included coverage, service
+  // records, dated recon sign-off. Condition credit requires a dated sign-off
+  // or real service records; there is no default.
+  const covInputs: { score: number; line: string }[] = [];
+  const dealerCov = d.dealerCoverage.find((c) => c.mode === "included") || null;
+  const factoryScore = (() => {
+    if (!d.warrantyStr || d.warrantyExpired) return null;
+    const w = d.warranty;
+    if (w.in_service_date && w.factory_months) {
+      const end = new Date(w.in_service_date);
+      end.setMonth(end.getMonth() + w.factory_months);
+      const monthsLeft = Math.max(0, end.getTime() - Date.now()) / (1000 * 60 * 60 * 24 * 30.4);
+      return clampScore(55, 98, 55 + (monthsLeft / w.factory_months) * 43);
+    }
+    return 80;
+  })();
+  if (factoryScore != null) {
+    covInputs.push({
+      score: factoryScore,
+      line: isNew ? `Full factory coverage — ${d.warrantyStr}` : `${d.warrantyStr} factory coverage on the books`,
+    });
+  }
+  if (dealerCov) {
+    covInputs.push({
+      score: dealerCov.lifetime ? 96 : 90,
+      line: dealerCov.lifetime
+        ? `Lifetime ${dealerCov.coverage || "powertrain"} coverage included by the dealer`
+        : `Dealer ${dealerCov.coverage || "coverage"} included`,
+    });
+  }
+  if (d.serviceCount > 0) {
+    covInputs.push({ score: clampScore(70, 92, 70 + d.serviceCount * 4), line: `${d.serviceCount} service record${d.serviceCount === 1 ? "" : "s"} on file` });
+  }
+  const signedAt = listing.prep_status?.foreman_signed_at || null;
+  if (signedAt) {
+    covInputs.push({ score: 90, line: `Reconditioning signed off ${new Date(signedAt).toLocaleDateString()}` });
+  }
+  const covScore = covInputs.length
+    ? Math.round(covInputs.reduce((a, b) => a + b.score, 0) / covInputs.length)
+    : null;
+  const covEvidence = covInputs.map((c) => c.line);
+  if (covScore != null && d.warrantyStr && d.warrantyExpired) {
+    covEvidence.push("Factory term has ended — ask the dealer about available coverage");
+  }
+
+  const factors: RatingFactor[] = [
+    { key: "price", label: "Price vs Market", score: priceScore, weight: 30, evidence: priceEvidence },
+    ...(isNew ? [] : [{ key: "history" as const, label: "History & Title", score: d.confScore, weight: 25, evidence: historyEvidence }]),
+    { key: "demand", label: "Demand & Velocity", score: demandScore, weight: 15, evidence: demandInputs.map((x) => x.line) },
+    { key: "equipment", label: "Equipment & Build", score: equipScore, weight: 15, evidence: equipEvidence },
+    { key: "coverage", label: "Coverage & Care", score: covScore, weight: 15, evidence: covEvidence },
+  ];
+
+  // Overall: weighted mean over measured factors only. It needs at least two
+  // measured factors, one of which must be Price or History — a car scored on
+  // demand and equipment alone would be a rating without a spine.
+  const measured = factors.filter((f) => f.score != null);
+  const anchored = measured.some((f) => f.key === "price" || f.key === "history");
+  const overall = measured.length >= 2 && anchored
+    ? Math.min(97, Math.round(
+        measured.reduce((s, f) => s + (f.score as number) * f.weight, 0) /
+        measured.reduce((s, f) => s + f.weight, 0),
+      ))
+    : null;
+
+  const mc = (listing.mc_attributes || {}) as Record<string, unknown>;
+  const sources = [
+    anchor != null || m.similarCount != null,
+    typeof mc.carfax_clean_title === "boolean" || d.ownerCount != null || d.accidentCount != null,
+    d.hasRecallCheck,
+    equipCount > 0 || optValue != null,
+    !!d.warrantyStr || dealerCov != null,
+    d.serviceCount > 0 || !!signedAt,
+  ].filter(Boolean).length;
+
+  return {
+    overall,
+    tier: ratingTier(overall),
+    factors,
+    coverage: { measured: measured.length, total: factors.length, sources },
   };
 };
 

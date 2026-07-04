@@ -10,7 +10,7 @@ import { toast } from "sonner";
 import { Helmet } from "react-helmet-async";
 import { type VehicleListing } from "@/hooks/useVehicleListing";
 import Logo from "@/components/brand/Logo";
-import { derivePassport, fmt$, listingEquipment, type PassportData } from "@/lib/passportV2Data";
+import { derivePassport, deriveRating, fmt$, listingEquipment, type PassportData } from "@/lib/passportV2Data";
 import { listingHero } from "@/lib/photos";
 import { MOCK_LISTING } from "./VehiclePassportV3";
 import { usePublicListing } from "@/hooks/usePublicListing";
@@ -41,16 +41,17 @@ interface Row {
   status: Status; source: string; lines: string[]; note?: string;
 }
 
-// Circular score gauge (real confidence score).
-const ScoreRing = ({ score }: { score: number | null }) => {
-  const r = 54, c = 2 * Math.PI * r, off = c * (1 - (score ?? 0) / 100);
+// Data-coverage meter — how many rating factor groups have real, measured
+// data. A coverage figure, never a quality score.
+const CoverageRing = ({ measured, total }: { measured: number; total: number }) => {
+  const r = 54, c = 2 * Math.PI * r, off = c * (1 - (total > 0 ? measured / total : 0));
   return (
     <div className="relative w-[140px] h-[140px] shrink-0">
       <svg viewBox="0 0 128 128" className="w-full h-full -rotate-90">
         <circle cx="64" cy="64" r={r} fill="none" stroke="#E6E8EC" strokeWidth="10" />
         <circle cx="64" cy="64" r={r} fill="none" stroke="#16A34A" strokeWidth="10" strokeLinecap="round" strokeDasharray={c} strokeDashoffset={off} />
       </svg>
-      <div className="absolute inset-0 flex flex-col items-center justify-center"><span className="text-[34px] font-extrabold text-[#0F172A] leading-none">{score ?? "—"}</span><span className="text-[12px] font-bold text-[#94A3B8]">{score != null ? "/100" : "Pending"}</span></div>
+      <div className="absolute inset-0 flex flex-col items-center justify-center"><span className="text-[30px] font-extrabold text-[#0F172A] leading-none">{measured}<span className="text-[16px] text-[#94A3B8]">/{total}</span></span><span className="text-[11px] font-bold text-[#94A3B8] mt-1">Data Coverage</span></div>
     </div>
   );
 };
@@ -90,11 +91,14 @@ const buildRows = (d: PassportData, listing: VehicleListing): Row[] => {
     hasHistory ? { key: "history", icon: FileText, title: "Vehicle History", desc: "Accident, damage, and ownership history",
       status: "verified" as Status, source: "Vehicle history records",
       lines: [d.ownerCount != null ? `${d.ownerCount === 1 ? "One owner" : `${d.ownerCount} owners`} on record` : null, d.accidentCount != null ? (d.accidentCount === 0 ? "No accidents reported" : `${d.accidentCount} accident(s) reported`) : null, "Service record availability checked"].filter(Boolean) as string[] } : null,
+    // Open recalls and title brands are real issues found by the check, not
+    // soft "attention" notes — they surface with an honest issue status.
     { key: "recall", icon: ShieldCheck, title: "Recall Verification", desc: "Open recalls and manufacturer campaigns",
-      status: !d.hasRecallCheck ? "pending" : d.recallClear ? "verified" : "attention", source: "NHTSA",
-      lines: [d.hasRecallCheck ? (d.recallClear ? "No open recalls" : `${d.openRecalls ?? "One or more"} open recall(s)`) : "Recall check pending", "Checked against NHTSA campaigns"] },
+      status: !d.hasRecallCheck ? "pending" : d.recallClear ? "verified" : "issue", source: "NHTSA",
+      lines: [d.hasRecallCheck ? (d.recallClear ? "No open recalls" : `${d.openRecalls ?? "One or more"} open recall(s)`) : "Recall check pending", "Checked against NHTSA campaigns"],
+      note: d.hasRecallCheck && !d.recallClear ? "Ask the dealership about the open recall remedy before purchase." : undefined },
     { key: "title", icon: ClipboardList, title: "Title & Brand Check", desc: "Title status, brands, and lien information",
-      status: d.titleStatus === "clean" ? "verified" : d.titleStatus === "branded" ? "attention" : "pending", source: "Title records",
+      status: d.titleStatus === "clean" ? "verified" : d.titleStatus === "branded" ? "issue" : "pending", source: "Title records",
       lines: d.titleStatus === "clean" ? ["Clean title — no brands on record", "Salvage / flood / lemon / rebuilt indicators checked"]
         : d.titleStatus === "branded" ? ["Title brand on record — review with the dealership"]
         : ["Title record available from the dealership"],
@@ -103,7 +107,7 @@ const buildRows = (d: PassportData, listing: VehicleListing): Row[] => {
       status: "verified" as Status, source: "Vehicle history / DMS",
       lines: [`Reported mileage: ${listing.mileage.toLocaleString()} mi`, "Confirm mileage history with the dealer's history report"] } : null,
     { key: "market", icon: DollarSign, title: "Market Data Verification", desc: "Pricing, comparables, and market positioning",
-      status: d.marketAvg != null ? "verified" : "pending", source: "MarketCheck",
+      status: d.marketAvg != null ? "verified" : "pending", source: "Live market data",
       lines: [d.marketAvg != null && d.price != null && d.price <= d.marketAvg ? `Market average ${fmt$(d.marketAvg)}` : d.marketAvg != null ? "Compared against live market data" : "Market pricing pending", d.belowMarket && d.belowMarket > 0 ? `${fmt$(d.belowMarket)} below market` : "Market position checked", "Comparable listings reviewed"] },
     { key: "warranty", icon: BadgeCheck, title: "Warranty Check", desc: "Factory warranty and extended coverage",
       status: d.warrantyStr ? "verified" : "pending", source: "OEM warranty estimate",
@@ -134,6 +138,7 @@ const VehiclePassportVerification = () => {
   const { listing, loading, notFound } = usePublicListing(vehicleSlug, { preview: isPreview, previewData: MOCK_LISTING as unknown as VehicleListing });
 
   const d = useMemo(() => (listing ? derivePassport(listing) : null), [listing]);
+  const rating = useMemo(() => (listing && d ? deriveRating(listing, d) : null), [listing, d]);
   const rows = useMemo(() => (d && listing ? buildRows(d, listing) : []), [d, listing]);
   const counts = useMemo(() => ({
     verified: rows.filter((r) => r.status === "verified").length,
@@ -146,16 +151,17 @@ const VehiclePassportVerification = () => {
     <div className="min-h-screen flex items-center justify-center px-6 bg-[#F6F7F9]"><div className="text-center"><ShieldCheck className="w-12 h-12 text-slate-300 mx-auto mb-4" /><h1 className="text-xl font-bold">Report unavailable</h1><p className="text-sm text-slate-500 mt-2">This vehicle's verification report could not be found.</p></div></div>
   );
 
-  // Never invent a score: when there aren't enough verified signals to compute
-  // one, the report says Pending instead of fabricating a 90.
-  const score = d.confScore;
+  // The header meter is data COVERAGE — how many rating factor groups have
+  // measured data — never a quality score dressed up as verification.
+  const cov = rating?.coverage ?? { measured: 0, total: 0, sources: 0 };
+  const covLine = `${cov.measured} of ${cov.total} factor groups measured · ${cov.sources} data source${cov.sources === 1 ? "" : "s"}`;
   const back = () => navigate(`/v/${listing.slug || vehicleSlug}${isPreview ? "?preview=1" : ""}`);
   const go = (section: string) => navigate(`/v/${listing.slug || vehicleSlug}/${section}${isPreview ? "?preview=1" : ""}`);
   const sourcesUsed = [
     { on: !!listing.ymm, label: "OEM / VIN decode" },
     { on: d.accidentCount != null || d.ownerCount != null || d.cleanTitle, label: "Vehicle history" },
     { on: d.hasRecallCheck, label: "NHTSA recalls" },
-    { on: d.marketAvg != null, label: "MarketCheck" },
+    { on: d.marketAvg != null, label: "Live market data" },
     { on: !!d.warrantyStr, label: "OEM warranty" },
     { on: d.serviceCount > 0, label: "Service records" },
   ];
@@ -163,7 +169,6 @@ const VehiclePassportVerification = () => {
   const hero = listingHero(listing);
   const reportTime = (() => { const t = (listing as unknown as { market_checked_at?: string }).market_checked_at || listing.updated_at; return t ? new Date(t) : new Date(); })();
   const share = async () => { try { if (navigator.share) { await navigator.share({ title: "AutoLabels Verified Report", url: window.location.href }); return; } } catch { return; } await navigator.clipboard.writeText(window.location.href); toast.success("Report link copied"); };
-  const tier = score == null ? null : score >= 90 ? "Excellent" : score >= 75 ? "Very Good" : score >= 60 ? "Good" : "Fair";
   const isToday = reportTime.toDateString() === new Date().toDateString();
   // Real report date everywhere — never a hardcoded "today".
   const reportDateLbl = isToday ? "today" : reportTime.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
@@ -191,16 +196,16 @@ const VehiclePassportVerification = () => {
           <div className="text-center mt-6">
             <p className="text-[13px] font-semibold text-[#64748B]">AutoLabels Verified Report</p>
             <p className="text-[12px] text-[#94A3B8] mt-0.5">Verified {isToday ? "Today" : reportTime.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}</p>
-            {score != null && (
+            {cov.total > 0 && (
               <>
                 <div className="relative w-[200px] h-[200px] mx-auto mt-5">
                   <svg viewBox="0 0 160 160" className="w-full h-full -rotate-90">
                     <circle cx="80" cy="80" r="70" fill="none" stroke="#E6E8EC" strokeWidth="12" />
-                    <circle cx="80" cy="80" r="70" fill="none" stroke="#16A34A" strokeWidth="12" strokeLinecap="round" strokeDasharray={2 * Math.PI * 70} strokeDashoffset={ringFill ? (2 * Math.PI * 70) * (1 - score / 100) : 2 * Math.PI * 70} style={{ transition: "stroke-dashoffset 1s ease-out" }} />
+                    <circle cx="80" cy="80" r="70" fill="none" stroke="#16A34A" strokeWidth="12" strokeLinecap="round" strokeDasharray={2 * Math.PI * 70} strokeDashoffset={ringFill ? (2 * Math.PI * 70) * (1 - cov.measured / cov.total) : 2 * Math.PI * 70} style={{ transition: "stroke-dashoffset 1s ease-out" }} />
                   </svg>
-                  <div className="absolute inset-0 flex flex-col items-center justify-center"><span className="text-[56px] font-extrabold leading-none text-[#0F172A]">{score}</span><span className="text-[13px] font-bold text-[#94A3B8] mt-1">Trust Score</span></div>
+                  <div className="absolute inset-0 flex flex-col items-center justify-center"><span className="text-[44px] font-extrabold leading-none text-[#0F172A]">{cov.measured}<span className="text-[22px] text-[#94A3B8]">/{cov.total}</span></span><span className="text-[13px] font-bold text-[#94A3B8] mt-1">Data Coverage</span></div>
                 </div>
-                {tier && <span className="inline-flex items-center gap-1.5 mt-4 px-4 py-1.5 rounded-full bg-emerald-50 text-[#16A34A] text-[14px] font-bold"><CheckCircle2 className="w-[18px] h-[18px]" /> {tier}</span>}
+                <span className="inline-flex items-center gap-1.5 mt-4 px-4 py-1.5 rounded-full bg-emerald-50 text-[#16A34A] text-[13px] font-bold"><CheckCircle2 className="w-[18px] h-[18px]" /> {covLine}</span>
               </>
             )}
           </div>
@@ -227,7 +232,7 @@ const VehiclePassportVerification = () => {
           <h2 className="text-[18px] font-bold mb-3">Verification</h2>
           <div className="space-y-2.5">
             {rows.map((r) => {
-              const st = mStatus(r.status); const isOpen = mOpen === r.key; const amber = r.status === "attention";
+              const st = mStatus(r.status); const isOpen = mOpen === r.key; const amber = r.status === "attention" || r.status === "issue";
               return (
                 <div key={r.key} className={`${CARD} overflow-hidden`}>
                   <button onClick={() => setMOpen(isOpen ? null : r.key)} className="w-full min-h-[64px] flex items-center gap-3 px-4 py-3 text-left">
@@ -337,10 +342,10 @@ const VehiclePassportVerification = () => {
               {/* Hero card */}
               <div className={`${CARD} p-6`}>
                 <div className="flex flex-col lg:flex-row lg:items-center gap-6">
-                  {score != null && <ScoreRing score={score} />}
+                  {cov.total > 0 && <CoverageRing measured={cov.measured} total={cov.total} />}
                   <div className="flex-1 min-w-0">
-                    <h2 className="text-[20px] font-bold">{score != null && score >= 90 ? "Excellent. This vehicle is verified." : score != null && score >= 75 ? "Verified with a few items to review." : "Verification in progress."}</h2>
-                    <p className="text-[14px] text-[#64748B] mt-1">Our comprehensive verification process confirms this vehicle's information is accurate and trustworthy.</p>
+                    <h2 className="text-[20px] font-bold">{counts.issue > 0 ? "Verified — review the flagged items with the dealership." : counts.attention > 0 ? "Verified with a few items to review." : counts.verified > 0 ? "Verified. The records on this vehicle check out." : "Verification in progress."}</h2>
+                    <p className="text-[14px] text-[#64748B] mt-1">{covLine}. Our verification process confirms this vehicle's information against independent data sources.</p>
                     <div className="flex flex-wrap gap-x-8 gap-y-2 mt-4">
                       {([{ icon: CheckCircle2, cls: "text-[#16A34A]", v: counts.verified, l: "Verified" }, counts.attention > 0 ? { icon: AlertTriangle, cls: "text-[#F59E0B]", v: counts.attention, l: "Attention" } : null, counts.issue > 0 ? { icon: MinusCircle, cls: "text-[#94A3B8]", v: counts.issue, l: "Issues Found" } : null].filter(Boolean) as { icon: React.ElementType; cls: string; v: number; l: string }[]).map((m, i) => (
                         <div key={i} className="flex items-center gap-2"><m.icon className={`w-5 h-5 ${m.cls}`} /><span className="text-[18px] font-extrabold">{m.v}</span><span className="text-[13px] text-[#64748B]">{m.l}</span></div>
@@ -369,7 +374,7 @@ const VehiclePassportVerification = () => {
                     return (
                       <div key={r.key} id={`v-${r.key}`}>
                         <button onClick={() => setOpen((o) => ({ ...o, [r.key]: !o[r.key] }))} className="w-full flex items-center gap-3 py-3.5 text-left">
-                          <span className="w-9 h-9 rounded-lg bg-emerald-50 flex items-center justify-center shrink-0"><r.icon className="w-[18px] h-[18px] text-[#16A34A]" /></span>
+                          <span className={`w-9 h-9 rounded-lg flex items-center justify-center shrink-0 ${r.status === "attention" || r.status === "issue" ? "bg-amber-50" : "bg-emerald-50"}`}><r.icon className={`w-[18px] h-[18px] ${r.status === "attention" || r.status === "issue" ? "text-[#D97706]" : "text-[#16A34A]"}`} /></span>
                           <div className="min-w-0 flex-1"><p className="text-[14px] font-semibold leading-tight">{r.title}</p><p className="text-[12px] text-[#64748B] truncate">{r.desc}</p></div>
                           <span className={`inline-flex items-center gap-1.5 text-[13px] font-semibold shrink-0 ${ui.cls}`}><ui.icon className="w-4 h-4" /> {ui.label}</span>
                           <ChevronDown className={`w-4 h-4 text-[#94A3B8] shrink-0 transition-transform ${open[r.key] ? "rotate-180" : ""}`} />
@@ -434,7 +439,7 @@ const VehiclePassportVerification = () => {
       </div>
 
       {modal === "process" && <Modal title="About our verification process" onClose={() => setModal(null)} body="AutoLabels verifies vehicle information using dealership-provided data, OEM data, marketplace data, recall data, title and brand indicators, vehicle history sources, and internal quality checks. Results are intended to help shoppers understand the vehicle more clearly and should be verified with the dealer before purchase." />}
-      {modal === "sources" && <Modal title="Data sources" onClose={() => setModal(null)} body="This report draws on the data sources that have information available for this vehicle — vehicle history records, OEM/VIN decode, NHTSA recall data, MarketCheck market data, and dealer-provided service and media. Only sources that contributed data for this specific vehicle are shown. Availability varies by vehicle and region." />}
+      {modal === "sources" && <Modal title="Data sources" onClose={() => setModal(null)} body="This report draws on the data sources that have information available for this vehicle — vehicle history records, OEM/VIN decode, NHTSA recall data, live market data, and dealer-provided service and media. Only sources that contributed data for this specific vehicle are shown. Availability varies by vehicle and region." />}
       {modal === "promise" && <Modal title="Our Verification Promise" onClose={() => setModal(null)} body="AutoLabels is committed to transparency. We verify every vehicle using trusted third-party data sources and a structured inspection process, and we clearly distinguish verified data from items that still need dealer confirmation. We never present unconfirmed information as verified." />}
 
       <PassportCtaDock go={go} dealerPhone={d.dealerPhone || undefined} reviewRating={d.reviewRating} advisor={d.dealerTrust} routing={d.contactRouting} vehicle={{ storeId: listing.store_id, vehicleId: listing.id, vin: listing.vin }} />
