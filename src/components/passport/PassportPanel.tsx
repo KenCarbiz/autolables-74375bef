@@ -773,7 +773,7 @@ function buildPanel(key: PassportPanelKey, d: PassportData, listing: VehicleList
                 {lowest != null && price != null && price <= lowest && <Check>At its lowest recorded asking price</Check>}
                 {isGreat && <Check>Priced below the market average</Check>}
                 {sold.soldPrice && <Check>Below what similar vehicles recently sold for</Check>}
-                {total != null && total < 0 && <Check>Price has trended down since listing</Check>}
+                {total != null && total < 0 && <Check>Price has trended down since first tracked</Check>}
                 {total != null && total > 0 && <Check>Priced to today's market</Check>}
                 {(total == null || total === 0) && <Check>Price has been stable — likely to hold</Check>}
               </ul>
@@ -2920,7 +2920,7 @@ function PriceTimeline({ history }: { history: PricePoint[] }) {
       <PriceChart pts={pts} />
       {pts.length >= 2 && pts.every((p) => p.dealer === pts[0].dealer) && (
         <p className="text-[11.5px] text-[#64748B] mt-2 inline-flex items-center gap-1.5">
-          <CheckCircle2 className="w-3.5 h-3.5 text-[#16A34A] shrink-0" /> Consistent pricing since listing — the price you see is the price we stand behind.
+          <CheckCircle2 className="w-3.5 h-3.5 text-[#16A34A] shrink-0" /> Consistent pricing since first tracked — the price you see is the price we stand behind.
         </p>
       )}
     </div>

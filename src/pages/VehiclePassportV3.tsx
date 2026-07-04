@@ -13,7 +13,7 @@ import { useVehicleListing, type VehicleListing } from "@/hooks/useVehicleListin
 import { usePublicListing } from "@/hooks/usePublicListing";
 import { formatPhone } from "@/components/addendum/CustomerInfoSection";
 import Logo from "@/components/brand/Logo";
-import { derivePassport, computePriceHistory, fmt$, listingEquipment, historyReportName } from "@/lib/passportV2Data";
+import { derivePassport, computePriceHistory, fmt$, listingEquipment, historyReportName, deriveSoldClaims } from "@/lib/passportV2Data";
 import { resolveStickyButtons, type StickyBottomButtons } from "@/lib/stickyButtons";
 import PriceDropWatch from "@/components/listing/PriceDropWatch";
 import { listingGallery } from "@/lib/photos";
@@ -373,6 +373,7 @@ const VehiclePassportV3 = () => {
   // the 16-row stored sample never supplies a rank claim or a denominator —
   // it is an API page, not the market. Sentiment must match the adjacent
   // Market Price card: positive iff belowMarket > 0. Null = no tile.
+  const sold = deriveSoldClaims(d, listing.mileage ?? null, listing.condition);
   const compStory = ((): { strong: string; sub: string } | null => {
     const ourPrice = d.price;
     const mkt = d.marketAvg;
@@ -395,6 +396,9 @@ const VehiclePassportV3 = () => {
         strong: `${fmt$(bm)} Below Comps`,
         sub: N != null && N >= 3 ? `vs ${N} ${noun} nearby` : `Comp average ${fmt$(mkt)}`,
       };
+    }
+    if (sold.soldPrice && d.marketMeta.soldCount != null && d.marketMeta.soldState) {
+      return { strong: "Below Typical Sold Price", sub: `vs ${d.marketMeta.soldCount} sold in ${d.marketMeta.soldState}, 90 days` };
     }
     if (ourPrice <= mkt * 1.02) {
       return {
@@ -419,6 +423,7 @@ const VehiclePassportV3 = () => {
   const demandParts = [
     d.viewCount != null && d.viewCount >= 5 ? `${d.viewCount.toLocaleString()} views` : null,
     domFavorable ? `${d.dom} days on market` : null,
+    sold.velocity && d.marketMeta.soldCount != null ? `${d.marketMeta.soldCount} sold in 90 days` : null,
   ].filter(Boolean) as string[];
   const mi = ([
     d.belowMarket && d.belowMarket > 0
@@ -616,15 +621,14 @@ const VehiclePassportV3 = () => {
                         ? `Lifetime ${dw.coverage || "Powertrain"}${dw.disclosure ? "" : " — for as long as you own it"}`
                         : [dw.termYears ? `${dw.termYears}-Yr` : null, dw.termMiles ? `${Math.round(dw.termMiles / 1000)}K-Mi` : null].filter(Boolean).join("/") + ` ${dw.coverage || "Warranty"}`)
                     : null;
-                  const idBadges = [
+                  const idBadges = ([
                     dwChip && dwChip.trim() !== "" ? dwChip.trim() : null,
                     d.priceChangeTotal != null && d.priceChangeTotal < 0 ? `Reduced ${fmt$(Math.abs(d.priceChangeTotal))}` : null,
                     d.ownerCount === 1 ? "One Owner" : null,
                     d.dealerVerified ? "Dealer Verified" : null,
                     d.marketAvg != null || d.comparables.length > 0 ? "Market Data Verified" : null,
                     d.recallClear ? "Recall Checked" : null,
-                    highlights.length > 0 ? "Equipment Decoded" : null,
-                  ].filter(Boolean) as string[];
+                  ].filter(Boolean) as string[]).slice(0, 4);
                   return idBadges.length ? (
                     <div className="flex flex-wrap gap-1.5 mt-2.5">
                       {idBadges.map((b) => <span key={b} className="inline-flex items-center gap-1 text-[11px] font-semibold text-[#0F172A] bg-emerald-50 border border-emerald-200 rounded-full px-2.5 py-1"><CheckCircle2 className="w-3 h-3 text-[#16A34A]" />{b}</span>)}
@@ -644,6 +648,7 @@ const VehiclePassportV3 = () => {
                       </div>
                     ) : null}
                     {d.saveVsMsrp != null && <div className="text-[13px] font-semibold text-[#16A34A]">You save {fmt$(d.saveVsMsrp)}</div>}
+                    {d.belowOriginalMsrp != null && <div className="text-[13px] font-semibold text-[#16A34A]">{fmt$(d.belowOriginalMsrp)} below original MSRP</div>}
                   </div>
                 )}
               </div>
@@ -698,9 +703,14 @@ const VehiclePassportV3 = () => {
                 </div>
               )}
               {(d.saveVsMsrp || (d.belowMarket && d.belowMarket > 0)) && (
-                <div className="mt-3 lg:mt-3 rounded-xl border border-emerald-200 bg-emerald-50/70 px-3 py-2 flex items-center gap-2">
-                  <BadgeCheck className="w-4 h-4 text-[#16A34A] shrink-0" />
-                  <p className="text-[12px] font-bold text-emerald-800">{fmt$(d.saveVsMsrp || d.belowMarket)} {d.saveVsMsrp ? "below MSRP" : "below market"}</p>
+                <div className="mt-3 lg:mt-3 rounded-xl border border-emerald-200 bg-emerald-50/70 px-3 py-2">
+                  <div className="flex items-center gap-2">
+                    <BadgeCheck className="w-4 h-4 text-[#16A34A] shrink-0" />
+                    <p className="text-[12px] font-bold text-emerald-800">{fmt$(d.saveVsMsrp || d.belowMarket)} {d.saveVsMsrp ? "below MSRP" : "below market"}</p>
+                  </div>
+                  {d.belowMarket != null && d.belowMarket > 0 && d.marketMeta.similarCount != null && d.marketMeta.similarCount >= 5 && (
+                    <p className="text-[11px] text-emerald-800/80 mt-1">Compared against {d.marketMeta.similarCount.toLocaleString()} similar listings {d.marketMeta.radius != null ? `within ${d.marketMeta.radius} miles` : "in the region"} · live market data</p>
+                  )}
                 </div>
               )}
               <button onClick={() => go("todays-price")} className="mt-4 w-full h-12 rounded-xl bg-[#2563EB] hover:bg-[#1d4fd7] text-white text-[14px] font-bold inline-flex items-center justify-center gap-2"><DollarSign className="w-4 h-4" /> See My Price</button>
@@ -726,7 +736,7 @@ const VehiclePassportV3 = () => {
         {/* 4. MARKET INTELLIGENCE */}
         {pv("marketValue") && mi.length > 0 && (
         <section data-module="market" className={`${CARD} p-5`}>
-          <div className="flex items-center justify-between"><div><H2>{d.belowMarket && d.belowMarket > 0 ? `Priced ${fmt$(d.belowMarket)} Under the Local Market` : "Market Intelligence"}</H2><p className={`text-[13px] ${TEXT2} mt-0.5`}>Independent pricing, demand, and value analysis for this vehicle.</p></div><span className="text-[12px] text-[#94A3B8] inline-flex items-center gap-1">Powered by MarketCheck<button onClick={(e) => openInfo("data-sources", e)} aria-label="Data sources explained" className="w-4 h-4 inline-flex items-center justify-center"><Info className="w-3.5 h-3.5 text-[#94A3B8]" /></button></span></div>
+          <div className="flex items-center justify-between"><div><H2>{d.belowMarket && d.belowMarket > 0 ? `Priced ${fmt$(d.belowMarket)} Under the Local Market` : "Market Intelligence"}</H2><p className={`text-[13px] ${TEXT2} mt-0.5`}>Independent pricing, demand, and value analysis for this vehicle.</p></div><span className="text-[12px] text-[#94A3B8] inline-flex items-center gap-1">Live market data{d.marketMeta.similarCount != null && d.marketMeta.similarCount >= 5 ? ` · ${d.marketMeta.similarCount.toLocaleString()} similar listings reviewed` : ""}<button onClick={(e) => openInfo("data-sources", e)} aria-label="Data sources explained" className="w-4 h-4 inline-flex items-center justify-center"><Info className="w-3.5 h-3.5 text-[#94A3B8]" /></button></span></div>
           <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-4 mt-5">
             {mi.map((c) => (
               <div key={c.section} onClick={(e) => openPanel(c.section as PassportPanelKey, e)} className="rounded-xl border border-[#E6E8EC] p-4 flex flex-col cursor-pointer hover:border-[#2563EB] transition-colors">
@@ -833,10 +843,23 @@ const VehiclePassportV3 = () => {
                 nhtsaOverall != null && nhtsaOverall >= 4 ? `NHTSA ${nhtsaOverall}-Star Overall` : null,
                 d.iihsAward ? d.iihsAward.label : null,
               ].filter(Boolean) as string[];
+              // The flagship comp sentence: a named sample, a radius, and a
+              // count it beats — only when the data actually supports it.
+              const compN = d.marketMeta.similarCount, compPct = d.marketMeta.percentile, compRadius = d.marketMeta.radius;
+              const modelName = (listing.ymm || "").split(/\s+/).slice(2).join(" ").trim();
+              const compNoun = `similar ${modelName ? `${modelName} ` : ""}listings`;
+              const flagship = compN != null && compN >= 5
+                ? compPct != null && compPct <= 50
+                  ? `We compared ${compN.toLocaleString()} ${compNoun}${compRadius != null ? ` within ${compRadius} miles` : ""}. This one is priced below ${Math.round((compN * (100 - compPct)) / 100)} of them.`
+                  : compPct == null && d.belowMarket != null && d.belowMarket > 0
+                    ? `We compared ${compN.toLocaleString()} ${compNoun}${compRadius != null ? ` within ${compRadius} miles` : ""} — this one is ${fmt$(d.belowMarket)} under their average.`
+                    : null
+                : null;
               const checksOut = Array.from(new Set([
                 ...(d.dealerVerified ? ["Dealer-verified listing"] : []),
-                ...d.whyBuy,
-                ...(d.marketAvg != null ? ["Market-supported price"] : []),
+                ...(flagship ? [flagship] : []),
+                ...(flagship ? d.whyBuy.filter((b) => !/below market average/.test(b)) : d.whyBuy),
+                ...(!flagship && d.marketAvg != null ? ["Market-supported price"] : []),
               ])).slice(0, 6);
               return <>
                 {safetyChips.length > 0 && (

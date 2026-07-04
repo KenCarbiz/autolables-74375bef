@@ -10,7 +10,7 @@ import { toast } from "sonner";
 import { Helmet } from "react-helmet-async";
 import { type VehicleListing } from "@/hooks/useVehicleListing";
 import Logo from "@/components/brand/Logo";
-import { derivePassport, fmt$, listingEquipment } from "@/lib/passportV2Data";
+import { derivePassport, fmt$, listingEquipment, deriveSoldClaims } from "@/lib/passportV2Data";
 import { readDealerAlternatives } from "@/lib/dealerAlternatives";
 import { readBuildSheet } from "@/lib/buildSheet";
 import { MOCK_LISTING } from "./VehiclePassportV3";
@@ -242,6 +242,7 @@ const VehiclePassportGreatBuy = () => {
   };
 
   const mc = (listing.mc_attributes || {}) as Record<string, unknown>;
+  const sold = deriveSoldClaims(d, listing.mileage ?? null, listing.condition);
   const score = d.confScore;
   const tier = scoreTier(score);
   // price_percentile = % of comps priced BELOW this car, so a low percentile
@@ -257,13 +258,13 @@ const VehiclePassportGreatBuy = () => {
   // definition, so those factors are full-credit rather than "pending" — there
   // is no report to wait on.
   const isNew = listing.condition === "new";
-  // Same-trim comp subset: when at least two same-trim comps carry prices,
-  // their average is the honest anchor — the mixed-trim average punishes a
-  // flagship build for costing more than base cars.
+  // The stored comparables are value-floored server-side (every row prices at
+  // or above ours), so any average over them is biased upward by construction
+  // and can never anchor a price claim. Same-trim rows still serve as counts.
+  // The honest anchor is the full-market median/mean from the enrich pass.
   const trimLc = (listing.trim || "").trim().toLowerCase();
   const sameTrimComps = trimLc ? d.comparables.filter((c) => (c.trim || "").trim().toLowerCase() === trimLc && c.price != null && c.price > 0) : [];
-  const trimAvg = sameTrimComps.length >= 2 ? Math.round(sameTrimComps.reduce((a, c) => a + (c.price as number), 0) / sameTrimComps.length) : null;
-  const priceAnchor = trimAvg ?? d.marketAvg;
+  const priceAnchor = d.marketMeta.priceMedian ?? d.marketMeta.priceMean ?? d.marketAvg;
   const pctVsAnchor = priceAnchor != null && d.price != null ? Math.round(((d.price - priceAnchor) / priceAnchor) * 100) : null;
   // New cars anchor to their own sticker — trim-exact by construction. Used
   // cars use the ±3% "at market" band (a few percent off the average is
@@ -274,13 +275,13 @@ const VehiclePassportGreatBuy = () => {
     msrpDelta != null ? (msrpDelta > 0 ? Math.min(94, 86 + Math.round(msrpDelta / 1000)) : msrpDelta === 0 ? 85 : 72)
     : d.belowMarket && d.belowMarket > 0 ? 94
     : pctVsAnchor != null ? (pctVsAnchor <= -3 ? 90 : pctVsAnchor < 3 ? 80 : 72)
-    : d.saveVsMsrp ? 85 : null;
+    : null;
   const priceNote =
     msrpDelta != null && msrpDelta > 0 ? `${fmt$(msrpDelta)} below MSRP — sticker for this exact build is ${fmt$(d.msrp!)}`
     : msrpDelta != null && msrpDelta === 0 ? "Priced at MSRP for this exact build"
     : msrpDelta != null ? `Priced ${fmt$(-msrpDelta)} above the ${fmt$(d.msrp!)} sticker for this build`
     : d.belowMarket && d.belowMarket > 0 ? `${fmt$(d.belowMarket)} below market average`
-    : pctVsAnchor != null && pctVsAnchor < 3 ? `Within 3% of the ${trimAvg != null ? `${listing.trim} trim` : "market"} average${gbSheet?.estValue ? ` — includes ${fmt$(gbSheet.estValue)} in factory options` : ""}`
+    : pctVsAnchor != null && pctVsAnchor < 3 ? `Within 3% of the market average${gbSheet?.estValue ? ` — includes ${fmt$(gbSheet.estValue)} in factory options` : ""}`
     : pctVsAnchor != null ? `Above the market average${gbSheet?.estValue ? ` — carries ${fmt$(gbSheet.estValue)} in factory packages the average comparable may not include` : " for the model line"}`
     : d.marketAvg != null ? "Near the market average" : "Awaiting market data";
   const histVal = isNew ? 97 : d.cleanTitle && d.accidentCount === 0 ? 96 : d.accidentCount === 0 ? 84 : (typeof mc.carfax_clean_title === "boolean" || d.accidentCount != null) ? 70 : null;
@@ -293,21 +294,24 @@ const VehiclePassportGreatBuy = () => {
         ? `Lifetime ${dealerCov.coverage || "powertrain"} coverage included by the dealer for as long as you own the vehicle`
         : `${[dealerCov.termYears ? `${dealerCov.termYears}-year` : null, dealerCov.termMiles ? `${dealerCov.termMiles.toLocaleString()}-mile` : null].filter(Boolean).join(" / ")} dealer ${dealerCov.coverage || "warranty"} included`)
     : null;
-  const factoryWarVal = d.warrantyStr ? (() => { const w = d.warranty; if (w.in_service_date && w.factory_months) { const end = new Date(w.in_service_date); end.setMonth(end.getMonth() + w.factory_months); const left = Math.max(0, end.getTime() - Date.now()) / (1000 * 60 * 60 * 24 * 30.4); return Math.round(Math.max(55, Math.min(98, 55 + (left / w.factory_months) * 43))); } return 80; })() : null;
+  // Known-expired factory coverage scores nothing — a floor would grade a
+  // lapsed warranty as if it still protected the buyer.
+  const factoryWarVal = d.warrantyStr && !d.warrantyExpired ? (() => { const w = d.warranty; if (w.in_service_date && w.factory_months) { const end = new Date(w.in_service_date); end.setMonth(end.getMonth() + w.factory_months); const left = Math.max(0, end.getTime() - Date.now()) / (1000 * 60 * 60 * 24 * 30.4); return Math.round(Math.max(55, Math.min(98, 55 + (left / w.factory_months) * 43))); } return 80; })() : null;
   const warVal = dealerCov ? Math.max(factoryWarVal ?? 0, dealerCov.lifetime ? 96 : 90) : factoryWarVal;
   // Equipment count spans the top-level features column AND the decoded
   // mc_attributes.options/.features (where the VIN decode lands) — not just the
   // features column, which the NeoVIN pull never writes to.
   const equipCount = listingEquipment(listing).length;
   const equipVal = equipCount > 0 ? Math.min(96, 60 + (equipCount + (premium ? 3 : 0)) * 6) : null;
-  const demandVal = (d.viewCount != null || d.dom != null) ? ((d.viewCount ?? 0) > 20 ? 88 : 74) : null;
+  const soldFast = d.marketMeta.soldDisplayable && d.marketMeta.soldDomMedian != null && d.marketMeta.soldDomMedian <= 45;
+  const demandVal = (d.viewCount != null || d.dom != null || soldFast) ? ((d.viewCount ?? 0) > 20 ? 88 : soldFast ? 84 : 74) : null;
   const dealerVal = d.dealerTrust.googleRating ? Math.round(Math.min(98, (Number(d.dealerTrust.googleRating) / 5) * 100)) : d.verifyRows.length > 0 ? 82 : null;
   const condVal = (d.serviceCount > 0 || listing.prep_status?.foreman_signed_at) ? 90 : (listing.condition === "new" ? 92 : 74);
   const breakdown: { icon: LucideIcon; label: string; score: number | null; note: string }[] = [
     { icon: DollarSign, label: "Price Value", score: priceVal, note: priceNote },
     { icon: Users, label: "Ownership", score: ownVal, note: isNew ? "New — you are the first owner" : d.ownerCount === 1 ? "One previous owner" : d.ownerCount != null ? `${d.ownerCount} previous owners` : "Confirm with dealer" },
     { icon: Package, label: "Equipment", score: equipVal, note: gbSheet?.packages.length ? `${gbSheet.packages.length} factory package${gbSheet.packages.length === 1 ? "" : "s"}${gbSheet.estValue ? ` · ${fmt$(gbSheet.estValue)} in options` : ""}` : equipCount > 0 ? `${equipCount} equipment highlights decoded` : "Confirm with dealer" },
-    { icon: ShieldCheck, label: "Warranty", score: warVal, note: dealerCovLabel || (d.warrantyStr && !d.warrantyExpired ? (d.warranty.in_service_date && d.warranty.factory_months ? `${d.warrantyStr} of factory coverage remains` : `${d.warrantyStr} factory term — remaining coverage confirmed at the dealership`) : "Confirm with dealer") },
+    { icon: ShieldCheck, label: "Warranty", score: warVal, note: dealerCovLabel || (d.warrantyStr && !d.warrantyExpired ? (d.warranty.in_service_date && d.warranty.factory_months ? `${d.warrantyStr} of factory coverage remains` : `${d.warrantyStr} factory term — remaining coverage confirmed at the dealership`) : d.warrantyStr && d.warrantyExpired ? "Factory term has ended — ask the dealer about available coverage" : "Confirm with dealer") },
     { icon: FileText, label: "Vehicle History", score: histVal, note: isNew ? "New vehicle — no accident or title history" : d.cleanTitle && d.accidentCount === 0 ? "Clean title, no accidents reported" : histVal != null ? "History reviewed where data exists" : "Confirm details" },
     { icon: TrendingUp, label: "Market Demand", score: demandVal, note: d.viewCount != null ? `${d.viewCount.toLocaleString()} shopper views` : "Demand tracked once live" },
     { icon: Wrench, label: "Condition", score: condVal, note: d.serviceCount > 0 ? `${d.serviceCount} service records on file` : listing.condition === "new" ? "New vehicle" : "Inspected" },
@@ -349,6 +353,7 @@ const VehiclePassportGreatBuy = () => {
   if (oemVerified) why.push("OEM data verified");
   if (d.belowMarket && d.belowMarket > 0) why.push(`Priced ${fmt$(d.belowMarket)} below market`);
   if (d.saveVsMsrp) why.push(`${fmt$(d.saveVsMsrp)} below MSRP`);
+  else if (d.belowOriginalMsrp) why.push(`${fmt$(d.belowOriginalMsrp)} below original MSRP`);
   if (topPct) why.push(topPct);
   if (d.cleanTitle && d.accidentCount === 0) why.push("Clean title and history");
   if (dealerCovLabel) why.push(dealerCovLabel);
@@ -366,9 +371,9 @@ const VehiclePassportGreatBuy = () => {
   ].filter(Boolean) as string[];
 
   // Market comparison — rows render only when the market cell holds a real
-  // figure (a table of "Pending" reads as an unfinished report).
-  const compMiles = d.comparables.map((c) => c.miles).filter((m): m is number => m != null && m > 0);
-  const avgCompMiles = compMiles.length >= 2 ? Math.round(compMiles.reduce((a, b) => a + b, 0) / compMiles.length) : null;
+  // figure (a table of "Pending" reads as an unfinished report). Miles come
+  // from the full-market mean, never the value-floored comparables sample.
+  const avgCompMiles = d.marketMeta.milesMean != null ? Math.round(d.marketMeta.milesMean) : null;
   type Adv = { text: string; good: boolean } | null;
   const priceAboveAnchor = pctVsAnchor != null && pctVsAnchor > 0 && !(d.belowMarket && d.belowMarket > 0);
   const priceAdv: Adv =
@@ -378,11 +383,23 @@ const VehiclePassportGreatBuy = () => {
   const mmRaw = ((listing as unknown as { market_meta?: Record<string, unknown> }).market_meta || {}) as Record<string, unknown>;
   const trimCount = mmRaw.trim_count != null && Number.isFinite(Number(mmRaw.trim_count)) ? Number(mmRaw.trim_count) : null;
   type PosRow = { k: string; v: string; m: string; a: Adv };
+  // A dollar anchor renders only when it sits at or above our price — the
+  // sold-price median row is additionally gated by the strict sold-price claim.
+  const anchorPrintable = priceAnchor != null && d.price != null && priceAnchor >= d.price;
   const posRows: PosRow[] = ([
-    { k: "Price", v: d.price != null ? fmt$(d.price) : "—", m: priceAboveAnchor ? (gbSheet?.estValue ? `Carries ${fmt$(gbSheet.estValue)} in factory packages the average comparable may not include` : "Priced to today's market for its trim") : trimAvg != null ? `${fmt$(trimAvg)} (${listing.trim})` : d.marketAvg != null ? `${fmt$(d.marketAvg)}${d.marketMeta.trimMatched === false && listing.trim ? " (all trims)" : ""}` : isPreview ? "$71,400" : "", a: priceAboveAnchor ? null : priceAdv },
+    { k: "Price", v: d.price != null ? fmt$(d.price) : "—", m: priceAboveAnchor ? (gbSheet?.estValue ? `Carries ${fmt$(gbSheet.estValue)} in factory packages the average comparable may not include` : "Priced to today's market for its trim") : anchorPrintable ? `${fmt$(priceAnchor)}${d.marketMeta.trimMatched === false && listing.trim ? " (all trims)" : ""}` : d.marketAvg != null && d.price != null && d.marketAvg >= d.price ? fmt$(d.marketAvg) : isPreview ? "$71,400" : "", a: priceAboveAnchor ? null : priceAdv },
+    sold.soldPrice && d.marketMeta.soldPriceMedian != null
+      ? { k: "Typical Sold Price", v: d.price != null ? fmt$(d.price) : "—", m: `${fmt$(d.marketMeta.soldPriceMedian)} (sold median, 90 days)`, a: { text: `${fmt$(sold.soldPrice.amount)} below`, good: true } }
+      : null,
     { k: "Mileage", v: listing.mileage != null ? `${listing.mileage.toLocaleString()} mi` : "—", m: avgCompMiles != null ? `${avgCompMiles.toLocaleString()} mi` : isPreview ? "24,000 mi" : "", a: avgCompMiles != null && listing.mileage != null ? (listing.mileage < avgCompMiles ? { text: "Lower mileage", good: true } : null) : isPreview ? { text: "Lower mileage", good: true } : null },
+    sold.milesAdv && listing.mileage != null && d.marketMeta.soldMilesMedian != null
+      ? { k: "Miles vs Sold", v: `${listing.mileage.toLocaleString()} mi`, m: `${Math.round(d.marketMeta.soldMilesMedian).toLocaleString()} mi (sold median)`, a: { text: "Under sold median", good: true } }
+      : null,
     d.dom != null && d.marketMeta.avgDom != null && d.dom <= d.marketMeta.avgDom
       ? { k: "Market Days", v: `${d.dom} days`, m: `${d.marketMeta.avgDom} days`, a: d.dom < d.marketMeta.avgDom ? { text: "Shorter time", good: true } : null }
+      : null,
+    sold.velocity && d.dom != null && d.marketMeta.soldDomMedian != null && d.dom < d.marketMeta.soldDomMedian
+      ? { k: "Days to Sell", v: `${d.dom} days listed`, m: `~${Math.round(d.marketMeta.soldDomMedian)} days (sold median)`, a: { text: "Moving faster", good: true } }
       : null,
     trimCount != null && trimCount <= 5
       ? { k: "Availability", v: `1 of ${trimCount}`, m: "Builds like this nearby", a: trimCount <= 3 || sameTrimComps.length <= 2 ? { text: "Rare build", good: true } : null }
@@ -453,6 +470,7 @@ const VehiclePassportGreatBuy = () => {
   if (gbSheet?.estValue) buyNow.push(`Built with ${fmt$(gbSheet.estValue)} in valuable factory packages.`);
   if (d.ownerCount === 1) buyNow.push("One-owner vehicles like this are becoming harder to find.");
   if (d.belowMarket && d.belowMarket > 0) buyNow.push("Priced below the market average right now.");
+  if (sold.velocity) buyNow.push(`${sold.velocity}.`);
   if (d.saveVsMsrp) buyNow.push(`Priced ${fmt$(d.saveVsMsrp)} below MSRP.`);
   if (d.verifyRows.length > 0) buyNow.push("Dealer verified and ready for the next step.");
   if (d.dom != null && d.marketMeta.avgDom != null && d.dom < d.marketMeta.avgDom) buyNow.push("Market days are favorable compared with similar listings.");
@@ -563,7 +581,7 @@ const VehiclePassportGreatBuy = () => {
         <section className={`${CARD} gb-fade p-5 sm:p-6`} style={{ animationDelay: "120ms" }}>
           <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1.15fr)_auto_230px] gap-6 items-center">
             <div>
-              <div className="flex items-center gap-2"><span className="w-6 h-6 rounded-lg bg-blue-50 text-[#2563EB] flex items-center justify-center shrink-0"><Sparkles className="w-3.5 h-3.5" /></span><H2>AI Buying Summary</H2></div>
+              <div className="flex items-center gap-2"><span className="w-6 h-6 rounded-lg bg-blue-50 text-[#2563EB] flex items-center justify-center shrink-0"><Sparkles className="w-3.5 h-3.5" /></span><H2>Buying Summary</H2></div>
               <p className="text-[13px] leading-relaxed text-[#334155] mt-2.5">{aiSummary}</p>
             </div>
             {insights.length > 0 && (
@@ -769,7 +787,7 @@ const VehiclePassportGreatBuy = () => {
               <p className="text-[11.5px] text-[#94A3B8]">Generated {generatedAt} · VIN {listing.vin}{d.dealerName ? ` · ${d.dealerName}` : ""} · Verified {verifyDate}</p>
             </div>
           </div>
-          <p className="text-[11.5px] text-[#94A3B8] inline-flex items-center gap-1.5"><Sparkles className="w-3.5 h-3.5 text-[#2563EB]" /> Powered by verified dealer data, market intelligence, and AutoLabels AI.</p>
+          <p className="text-[11.5px] text-[#94A3B8] inline-flex items-center gap-1.5"><Sparkles className="w-3.5 h-3.5 text-[#2563EB]" /> Powered by verified dealer records and live market data.</p>
         </footer>
       </main>
 
@@ -870,7 +888,7 @@ const VehiclePassportGreatBuy = () => {
               <section className="print-page">
                 {pageHeader}
                 <PrintCard>
-                  <PrintH>AI Buying Summary</PrintH>
+                  <PrintH>Buying Summary</PrintH>
                   <p className="text-[9.5px] leading-relaxed text-[#334155] mt-1.5">{aiSummary}</p>
                   {insights.length > 0 && (
                     <div className="grid grid-cols-3 gap-2 mt-2.5">
@@ -1030,7 +1048,7 @@ const VehiclePassportGreatBuy = () => {
                   )}
                 </PrintCard>
                 <p className="text-[7.5px] text-[#94A3B8] leading-relaxed mt-3">
-                  Powered by verified dealer data, market intelligence, and AutoLabels AI. Market values and cost estimates are provided by third-party data sources, are estimates only, and may vary by region and time. Confirm all details, pricing, and availability directly with the dealership before purchase. Generated {generatedAt} · VIN {listing.vin} · Verified {verifyDate}.
+                  Powered by verified dealer records and live market data. Market values and cost estimates are provided by third-party data sources, are estimates only, and may vary by region and time. Confirm all details, pricing, and availability directly with the dealership before purchase. Generated {generatedAt} · VIN {listing.vin} · Verified {verifyDate}.
                 </p>
                 {pageFooter(5)}
               </section>
