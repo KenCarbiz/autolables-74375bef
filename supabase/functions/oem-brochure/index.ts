@@ -60,8 +60,8 @@ async function firecrawlSearch(query: string): Promise<Hit[]> {
     .filter((h: Hit) => h.url);
 }
 
-// Prefer direct PDFs, then brochure-ish landing pages.
-const scoreHit = (h: Hit, model: string): number => {
+// Prefer direct PDFs, then brochure-ish landing pages, then the right year.
+const scoreHit = (h: Hit, model: string, year: number | null): number => {
   const u = h.url.toLowerCase();
   const t = `${h.title || ""} ${h.description || ""}`.toLowerCase();
   let s = 0;
@@ -69,7 +69,14 @@ const scoreHit = (h: Hit, model: string): number => {
   if (u.includes("brochure") || u.includes("ebrochure")) s += 30;
   if (t.includes("brochure")) s += 15;
   if (u.includes(model.toLowerCase().replace(/\s+/g, "-")) || u.includes(model.toLowerCase().replace(/\s+/g, ""))) s += 10;
+  if (year && (u.includes(String(year)) || t.includes(String(year)))) s += 20;
   return s;
+};
+
+// The model year the brochure itself is for, when the URL/title carries one.
+const yearOf = (h: Hit): number | null => {
+  const m = `${h.url} ${h.title || ""}`.match(/\b(19|20)\d{2}\b/);
+  return m ? Number.parseInt(m[0], 10) : null;
 };
 
 Deno.serve(async (req) => {
@@ -118,29 +125,37 @@ Deno.serve(async (req) => {
   }
   if (!hits.length) return json(404, { error: "brochure_not_found", query });
 
-  hits.sort((a, b) => scoreHit(b, model) - scoreHit(a, model));
+  hits.sort((a, b) => scoreHit(b, model, year) - scoreHit(a, model, year));
   const best = hits[0];
 
-  // Confirm the link is actually reachable before caching it.
-  let ok = false;
+  // Confirm the link is not dead before caching it. OEM CDNs often bot-block
+  // server-side probes (403), which a real browser sails through — only a
+  // hard 404/410 disqualifies the link.
+  const probe = (method: string) => fetch(best.url, {
+    method,
+    headers: { "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36", Accept: "*/*" },
+    signal: AbortSignal.timeout(12000),
+    redirect: "follow",
+  });
+  let status = 0;
   try {
-    const head = await fetch(best.url, { method: "HEAD", signal: AbortSignal.timeout(12000), redirect: "follow" });
-    ok = head.ok;
-    if (!ok && head.status === 405) {
-      const get = await fetch(best.url, { method: "GET", signal: AbortSignal.timeout(12000), redirect: "follow" });
-      ok = get.ok;
-    }
-  } catch { ok = false; }
-  if (!ok) return json(404, { error: "brochure_unreachable", url: best.url });
+    let res = await probe("HEAD");
+    if (!res.ok && res.status !== 403) res = await probe("GET");
+    status = res.status;
+  } catch { status = 0; }
+  if (status === 404 || status === 410 || status === 0) {
+    return json(404, { error: "brochure_unreachable", url: best.url, status });
+  }
+  const brochureYear = yearOf(best) ?? year;
 
   // The unique index is expression-based (lower(make), lower(model), year),
   // which upsert can't target by name — replace via delete + insert instead.
   let del = admin.from("oem_brochure_links").delete().ilike("make", make).ilike("model", model);
-  del = year === null ? del.is("year", null) : del.eq("year", year);
+  del = brochureYear === null ? del.is("year", null) : del.eq("year", brochureYear);
   await del;
   await admin.from("oem_brochure_links").insert(
-    { make, model, year, url: best.url, title: best.title || null, source: "oem_site", verified_at: new Date().toISOString() },
+    { make, model, year: brochureYear, url: best.url, title: best.title || null, source: "oem_site", verified_at: new Date().toISOString() },
   );
 
-  return json(200, { ok: true, cached: false, url: best.url, title: best.title || null, year });
+  return json(200, { ok: true, cached: false, url: best.url, title: best.title || null, year: brochureYear });
 });
