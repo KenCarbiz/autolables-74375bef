@@ -360,7 +360,7 @@ function buildPanel(key: PassportPanelKey, d: PassportData, listing: VehicleList
           )}
           <Section title="Buying recommendation">
             <div className="rounded-2xl border border-emerald-200 bg-emerald-50/70 p-4">
-              <p className="text-[14px] font-extrabold text-[#16A34A]">{isGreat || score >= 66 ? "Good time to buy" : "Worth a closer look"}</p>
+              <p className="text-[14px] font-extrabold text-[#16A34A]">{isGreat || score >= 66 ? "Good time to buy" : "See it in person"}</p>
               <ul className="mt-2 space-y-1.5">
                 {isGreat && <Check>{(d.belowMarket ?? 0) > 0 ? `Priced ${fmt$(d.belowMarket as number)} below market average` : "Priced below market average"}</Check>}
                 {score >= 66 && <Check>Strong shopper interest right now</Check>}
@@ -2689,7 +2689,8 @@ const PriceChart = ({ pts, height = 170 }: { pts: { label: string; dealer: numbe
   const mline = pts.map((p, i) => (p.market != null ? `${x(i).toFixed(1)},${y(p.market).toFixed(1)}` : null)).filter(Boolean) as string[];
   const dealerIdx = pts.map((p, i) => (p.dealer != null ? i : -1)).filter((i) => i >= 0);
   const lastIdx = dealerIdx.length ? dealerIdx[dealerIdx.length - 1] : -1;
-  const changes = dealerIdx.filter((i, k) => k > 0 && pts[i].dealer !== pts[dealerIdx[k - 1]].dealer);
+  // Annotate reductions only — an increase never gets a "+$X" callout.
+  const changes = dealerIdx.filter((i, k) => k > 0 && (pts[i].dealer as number) < (pts[dealerIdx[k - 1]].dealer as number));
   // Value band: dealer line forward, market line backward, where both exist.
   const both = pts.map((p, i) => (p.dealer != null && p.market != null ? { i, d: p.dealer, m: p.market } : null)).filter(Boolean) as { i: number; d: number; m: number }[];
   const band = both.length >= 2
@@ -2720,11 +2721,10 @@ const PriceChart = ({ pts, height = 170 }: { pts: { label: string; dealer: numbe
       {changes.map((i) => {
         const prev = dealerIdx[dealerIdx.indexOf(i) - 1];
         const delta = (pts[i].dealer as number) - (pts[prev].dealer as number);
-        const up = delta > 0;
         return (
           <g key={i}>
-            <circle cx={x(i)} cy={y(pts[i].dealer as number)} r="4.5" fill="#fff" stroke={up ? "#EA580C" : GREEN} strokeWidth="2.5"><title>{`${pts[i].label}: ${fmt$(pts[i].dealer as number)}`}</title></circle>
-            <text x={x(i)} y={y(pts[i].dealer as number) - 9} textAnchor="middle" fontSize="10" fontWeight="800" fill={up ? "#EA580C" : GREEN}>{up ? "+" : "−"}{fmt$(Math.abs(delta))}</text>
+            <circle cx={x(i)} cy={y(pts[i].dealer as number)} r="4.5" fill="#fff" stroke={GREEN} strokeWidth="2.5"><title>{`${pts[i].label}: ${fmt$(pts[i].dealer as number)}`}</title></circle>
+            <text x={x(i)} y={y(pts[i].dealer as number) - 9} textAnchor="middle" fontSize="10" fontWeight="800" fill={GREEN}>−{fmt$(Math.abs(delta))}</text>
           </g>
         );
       })}
