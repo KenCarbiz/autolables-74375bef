@@ -455,6 +455,9 @@ export const derivePassport = (listing: VehicleListing): PassportData => {
   })();
   // Mirrors PassportPanel's factory-warranty "active" logic: coverage is
   // alive when either the basic term's time or its mileage allowance remains.
+  // Expired means KNOWN exhausted — when neither signal is computable (no real
+  // in-service date, no finite mileage cap) the status is unknown, never
+  // expired, so terms still render without a fabricated countdown.
   const warrantyExpired = (() => {
     if (isNew) return false;
     const monthsLeft = (() => {
@@ -466,6 +469,7 @@ export const derivePassport = (listing: VehicleListing): PassportData => {
     })();
     const milesLeft = warranty.factory_miles && warranty.factory_miles > 0 && listing.mileage != null
       ? Math.max(warranty.factory_miles - listing.mileage, 0) : null;
+    if (monthsLeft == null && milesLeft == null) return false;
     return !((monthsLeft != null && monthsLeft > 0) || (milesLeft != null && milesLeft > 0));
   })();
 
