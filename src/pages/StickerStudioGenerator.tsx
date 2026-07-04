@@ -5,7 +5,7 @@ import { useTenant } from "@/contexts/TenantContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { useDealerDocumentRules } from "@/lib/documentRules";
 import { useProducts } from "@/hooks/useProducts";
-import { applicablePrograms } from "@/lib/dealerPrograms";
+import { applicablePrograms, programMode, termLabel } from "@/lib/dealerPrograms";
 import { cleanEquipmentList } from "@/lib/passportV2Data";
 import { curatePrintEquipment } from "@/lib/equipmentPanel";
 import { useUsageLimits } from "@/lib/entitlements/useUsageLimits";
@@ -137,6 +137,14 @@ const StickerStudioGenerator = () => {
     // Included-with-sale items (dealer warranty, loaner cars, …) fill the
     // benefits section alongside no-charge products.
     const programs = applicablePrograms(settings.dealer_programs, v?.condition || "", "sticker");
+    const programName = (p: (typeof programs)[number]) => {
+      const t = termLabel(p);
+      return t ? `${p.title.trim()} — ${t}` : p.title.trim();
+    };
+    const includedProgs = programs.filter((p) => programMode(p) === "included");
+    // "Available" programs (e.g. an optional dealer CPO upgrade) belong in the
+    // Available Upgrades band — offered, priced if configured, never in total.
+    const availableProgs = programs.filter((p) => programMode(p) === "available");
     setData((prev) => {
       const blank = (arr: StickerLineItem[]) => arr.every((i) => !i.name.trim());
       const installedSeed = [...m.installed, ...factory.map((n) => ({ name: n }))]
@@ -144,12 +152,18 @@ const StickerStudioGenerator = () => {
       const benefitNames = new Set(m.benefits.map((b) => b.name.toLowerCase()));
       const benefitsSeed = [
         ...m.benefits,
-        ...programs.filter((p) => !benefitNames.has(p.title.trim().toLowerCase())).map((p) => ({ name: p.title.trim() })),
+        ...includedProgs.filter((p) => !benefitNames.has(p.title.trim().toLowerCase())).map((p) => ({ name: programName(p) })),
       ].slice(0, cfgNow.maxItems.benefits);
+      const upgradeNames = new Set(m.upgrades.map((u) => u.name.toLowerCase()));
+      const upgradesSeed = [
+        ...m.upgrades,
+        ...availableProgs.filter((p) => !upgradeNames.has(p.title.trim().toLowerCase()))
+          .map((p) => ({ name: programName(p), price: p.price && p.price > 0 ? String(p.price) : "" })),
+      ].slice(0, cfgNow.maxItems.upgrades);
       return {
         ...prev,
         installed: blank(prev.installed) && installedSeed.length ? installedSeed : prev.installed,
-        upgrades: blank(prev.upgrades) && m.upgrades.length ? m.upgrades.slice(0, cfgNow.maxItems.upgrades) : prev.upgrades,
+        upgrades: blank(prev.upgrades) && upgradesSeed.length ? upgradesSeed : prev.upgrades,
         benefits: blank(prev.benefits) && benefitsSeed.length ? benefitsSeed : prev.benefits,
       };
     });

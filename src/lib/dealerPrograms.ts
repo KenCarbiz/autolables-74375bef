@@ -11,6 +11,9 @@
 
 export type ProgramAppliesTo = "all" | "new" | "used" | "cpo";
 export type ProgramRequirement = "none" | "finance" | "custom";
+// included = part of the sale (addendum Included Benefits); available = an
+// optional upgrade the customer can add (addendum Available Upgrades).
+export type ProgramMode = "included" | "available";
 
 export interface DealerProgram {
   id: string;
@@ -24,6 +27,16 @@ export interface DealerProgram {
   requirementText: string; // detail shown for finance / custom requirements
   showOnSticker: boolean;
   showOnPacket: boolean;
+  mode?: ProgramMode;      // absent = "included" (pre-existing programs)
+  price?: number | null;   // optional price shown when mode is "available"
+  // Dealer-branded coverage (lifetime powertrain, dealer CPO, …). Warranty
+  // programs can additionally surface in the passport's warranty panel.
+  isWarranty?: boolean;
+  coverage?: string;       // e.g. "Powertrain", "Dealer CPO", "Comprehensive"
+  termYears?: number | null;
+  termMiles?: number | null;
+  lifetime?: boolean;
+  showOnWarrantyPanel?: boolean;
 }
 
 export const emptyProgram = (): DealerProgram => ({
@@ -38,13 +51,21 @@ export const emptyProgram = (): DealerProgram => ({
   requirementText: "",
   showOnSticker: false,
   showOnPacket: true,
+  mode: "included",
+  price: null,
+  isWarranty: false,
+  coverage: "",
+  termYears: null,
+  termMiles: null,
+  lifetime: false,
+  showOnWarrantyPanel: false,
 });
 
 // Common included-with-sale items a dealer can add in one click, pre-filled
 // in the FTC value/offer/benefit/disclosure shape and then edited to match
 // the store's real policy. Disclosures stay generic on purpose — the dealer
 // owns the final wording.
-export const PROGRAM_PRESETS: { key: string; label: string; fields: Pick<DealerProgram, "title" | "offer" | "benefit" | "disclosure"> }[] = [
+export const PROGRAM_PRESETS: { key: string; label: string; fields: Partial<DealerProgram> & Pick<DealerProgram, "title" | "offer" | "benefit" | "disclosure"> }[] = [
   {
     key: "dealer-warranty", label: "Dealer Warranty",
     fields: {
@@ -52,6 +73,29 @@ export const PROGRAM_PRESETS: { key: string; label: string; fields: Pick<DealerP
       offer: "Included limited powertrain coverage on qualifying vehicles — engine, transmission, and drive components.",
       benefit: "Major repairs are covered after the sale, at no extra cost to you.",
       disclosure: "Coverage term, components, and eligibility vary by vehicle. See dealer for the written warranty, exclusions, and any deductible.",
+      isWarranty: true, coverage: "Powertrain", showOnWarrantyPanel: true,
+    },
+  },
+  {
+    key: "lifetime-powertrain", label: "Lifetime Powertrain",
+    fields: {
+      title: "Lifetime Powertrain Warranty",
+      offer: "Dealer-added lifetime powertrain coverage on every qualifying new vehicle — engine, transmission, and drive components for as long as you own it.",
+      benefit: "Coverage that never expires while you own the vehicle — protection the factory warranty can't match.",
+      disclosure: "Valid for the original purchaser; requires factory-scheduled maintenance with documented service. See dealer for the written warranty, exclusions, and eligibility.",
+      appliesTo: "new", isWarranty: true, coverage: "Powertrain", lifetime: true,
+      showOnWarrantyPanel: true, showOnSticker: true,
+    },
+  },
+  {
+    key: "dealer-cpo", label: "Dealer CPO Warranty",
+    fields: {
+      title: "Dealer Certified Pre-Owned Warranty",
+      offer: "Our own certified pre-owned coverage — 10-year / 100,000-mile powertrain protection on qualifying pre-owned vehicles.",
+      benefit: "Long-term coverage on a pre-owned vehicle, backed by this dealership.",
+      disclosure: "Measured from the vehicle's original in-service date. Eligibility, covered components, and deductible are defined in the written warranty. See dealer for details.",
+      appliesTo: "used", isWarranty: true, coverage: "Dealer CPO",
+      termYears: 10, termMiles: 100000, showOnWarrantyPanel: true,
     },
   },
   {
@@ -150,4 +194,31 @@ export function requirementLabel(p: DealerProgram): string | null {
   if (p.requirement === "none") return null;
   if (p.requirement === "finance") return p.requirementText.trim() || "With dealer financing";
   return p.requirementText.trim() || "Conditions apply";
+}
+
+// Absent mode means "included" — programs predate the field.
+export const programMode = (p: DealerProgram): ProgramMode => (p.mode === "available" ? "available" : "included");
+
+// "Lifetime", "10-Year / 100,000-Mile", "5-Year", "60,000-Mile", or null.
+export function termLabel(p: DealerProgram): string | null {
+  if (p.lifetime) return "Lifetime";
+  const y = p.termYears && p.termYears > 0 ? `${p.termYears}-Year` : null;
+  const m = p.termMiles && p.termMiles > 0 ? `${p.termMiles.toLocaleString()}-Mile` : null;
+  if (y && m) return `${y} / ${m}`;
+  return y || m;
+}
+
+// Dealer-branded coverage rows for the passport warranty panel.
+export function warrantyPanelPrograms(
+  programs: DealerProgram[] | null | undefined,
+  condition: string | null | undefined
+): DealerProgram[] {
+  return (programs || []).filter(
+    (p) =>
+      p.enabled &&
+      p.isWarranty === true &&
+      p.showOnWarrantyPanel === true &&
+      (p.title.trim() || p.offer.trim()) &&
+      matchesCondition(p.appliesTo, condition)
+  );
 }

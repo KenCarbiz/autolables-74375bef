@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { emptyProgram, applicablePrograms, requirementLabel, type DealerProgram } from "./dealerPrograms";
+import { emptyProgram, applicablePrograms, requirementLabel, type DealerProgram, programMode, termLabel, warrantyPanelPrograms } from "./dealerPrograms";
 
 const prog = (over: Partial<DealerProgram> = {}): DealerProgram => ({
   ...emptyProgram(),
@@ -66,5 +66,32 @@ describe("requirementLabel", () => {
   it("labels a custom requirement, defaulting when no text given", () => {
     expect(requirementLabel(prog({ requirement: "custom", requirementText: "" }))).toBe("Conditions apply");
     expect(requirementLabel(prog({ requirement: "custom", requirementText: "In-stock only" }))).toBe("In-stock only");
+  });
+});
+
+describe("warranty benefit helpers", () => {
+  it("programMode defaults to included for legacy programs", () => {
+    const p = emptyProgram();
+    delete (p as Partial<DealerProgram>).mode;
+    expect(programMode(p)).toBe("included");
+    expect(programMode({ ...p, mode: "available" })).toBe("available");
+  });
+
+  it("termLabel formats lifetime, years, miles, and combinations", () => {
+    const p = emptyProgram();
+    expect(termLabel(p)).toBeNull();
+    expect(termLabel({ ...p, lifetime: true })).toBe("Lifetime");
+    expect(termLabel({ ...p, termYears: 10 })).toBe("10-Year");
+    expect(termLabel({ ...p, termMiles: 100000 })).toBe("100,000-Mile");
+    expect(termLabel({ ...p, termYears: 10, termMiles: 100000 })).toBe("10-Year / 100,000-Mile");
+  });
+
+  it("warrantyPanelPrograms filters to enabled warranty programs matching the condition", () => {
+    const base = { ...emptyProgram(), title: "Dealer CPO", isWarranty: true, showOnWarrantyPanel: true, appliesTo: "used" as const };
+    expect(warrantyPanelPrograms([base], "used")).toHaveLength(1);
+    expect(warrantyPanelPrograms([base], "new")).toHaveLength(0);
+    expect(warrantyPanelPrograms([{ ...base, showOnWarrantyPanel: false }], "used")).toHaveLength(0);
+    expect(warrantyPanelPrograms([{ ...base, isWarranty: false }], "used")).toHaveLength(0);
+    expect(warrantyPanelPrograms([{ ...base, enabled: false }], "used")).toHaveLength(0);
   });
 });

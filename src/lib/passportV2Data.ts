@@ -297,6 +297,13 @@ export interface PassportData {
   // it for used/CPO only). An EXTERNAL handoff — we link, we never read or
   // certify the report's contents.
   historyReport: { url: string; provider: "carfax" | "autocheck" } | null;
+  // Dealer-branded warranty programs (lifetime powertrain, dealer CPO)
+  // flagged for the warranty panel by the dealer, condition-filtered
+  // server-side. mode "available" = optional upgrade, not included.
+  dealerCoverage: {
+    title: string; coverage: string; termYears: number | null; termMiles: number | null;
+    lifetime: boolean; mode: "included" | "available"; offer: string; disclosure: string;
+  }[];
 }
 
 export const historyReportName = (provider: "carfax" | "autocheck"): string =>
@@ -591,6 +598,16 @@ export const derivePassport = (listing: VehicleListing): PassportData => {
     offers,
     valueHistory, priceChange7d, priceChangeTotal,
     dealerTrust,
+    dealerCoverage: (Array.isArray((listing as { dealer_coverage?: unknown[] }).dealer_coverage) ? (listing as unknown as { dealer_coverage: Record<string, unknown>[] }).dealer_coverage : []).map((c) => ({
+      title: String(c.title || ""),
+      coverage: String(c.coverage || ""),
+      termYears: typeof c.term_years === "number" ? c.term_years : null,
+      termMiles: typeof c.term_miles === "number" ? c.term_miles : null,
+      lifetime: c.lifetime === true,
+      mode: c.mode === "available" ? "available" as const : "included" as const,
+      offer: String(c.offer || ""),
+      disclosure: String(c.disclosure || ""),
+    })),
     contactRouting: ((listing as unknown as { contact_routing?: PassportData["contactRouting"] }).contact_routing) ?? null,
     iihsAward: ((listing as unknown as { iihs_award?: PassportData["iihsAward"] }).iihs_award) ?? null,
     historyReport: ((listing as unknown as { history_report?: PassportData["historyReport"] }).history_report) ?? null,

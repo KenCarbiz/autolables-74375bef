@@ -140,6 +140,28 @@ serve(async (req) => {
         if (s.packet_module_defaults && typeof s.packet_module_defaults === "object") {
           row.packet_defaults = s.packet_module_defaults;
         }
+        // Dealer-branded warranty programs (lifetime powertrain, dealer CPO)
+        // flagged for the passport warranty panel, filtered to this vehicle's
+        // condition. Included vs available mode rides along for the badge.
+        try {
+          const progs = Array.isArray(s.dealer_programs) ? s.dealer_programs as Record<string, unknown>[] : [];
+          const cond = String((row.condition as string) || "").toLowerCase();
+          const applies = (a: unknown) => !a || a === "all" || String(a).toLowerCase() === cond;
+          const cov = progs
+            .filter((p) => p && p.enabled !== false && p.isWarranty === true && p.showOnWarrantyPanel === true &&
+              (String(p.title || "").trim() || String(p.offer || "").trim()) && applies(p.appliesTo))
+            .map((p) => ({
+              title: String(p.title || ""),
+              coverage: String(p.coverage || ""),
+              term_years: typeof p.termYears === "number" ? p.termYears : null,
+              term_miles: typeof p.termMiles === "number" ? p.termMiles : null,
+              lifetime: p.lifetime === true,
+              mode: p.mode === "available" ? "available" : "included",
+              offer: String(p.offer || ""),
+              disclosure: String(p.disclosure || ""),
+            }));
+          if (cov.length) row.dealer_coverage = cov;
+        } catch { /* dealer coverage optional */ }
         // Dealer-entered passport trust content (badges + multi-source reviews).
         const trust = {
           years_in_business: (s.dealer_years_in_business as string) || "",
@@ -585,7 +607,7 @@ serve(async (req) => {
       if (!vis("marketValue")) delete row.value_history;
       if (!vis("warranty")) {
         delete row.warranty_info; delete row.oem_warranty; delete row.cpo_programs;
-        delete row.service_records; delete row.available_accessories;
+        delete row.service_records; delete row.available_accessories; delete row.dealer_coverage;
       }
       const docs = Array.isArray(row.documents) ? row.documents as { type?: string }[] : [];
       if (!vis("documents")) {

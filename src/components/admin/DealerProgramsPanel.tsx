@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useDealerSettings } from "@/contexts/DealerSettingsContext";
-import { DealerProgram, emptyProgram, presetProgram, PROGRAM_PRESETS, type ProgramAppliesTo, type ProgramRequirement } from "@/lib/dealerPrograms";
+import { DealerProgram, emptyProgram, presetProgram, programMode, termLabel, PROGRAM_PRESETS, type ProgramAppliesTo, type ProgramRequirement, type ProgramMode } from "@/lib/dealerPrograms";
 import { useInstantSave } from "@/hooks/useInstantSave";
 import { Plus, Trash2, ShieldCheck, GripVertical, Check } from "lucide-react";
 
@@ -136,15 +136,80 @@ export default function DealerProgramsPanel() {
               </div>
             </div>
 
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div>
+                <label className={labelCls}>How it's offered</label>
+                <select value={programMode(p)} onChange={(e) => set(p.id, { mode: e.target.value as ProgramMode })} className={inputCls}>
+                  <option value="included">Included with the sale</option>
+                  <option value="available">Available as an upgrade</option>
+                </select>
+              </div>
+              <div>
+                <label className={labelCls}>{programMode(p) === "available" ? "Upgrade price (optional)" : "—"}</label>
+                <input
+                  type="number" min={0}
+                  value={p.price ?? ""}
+                  onChange={(e) => set(p.id, { price: e.target.value === "" ? null : Number(e.target.value) })}
+                  disabled={programMode(p) !== "available"}
+                  placeholder="1495"
+                  className={`${inputCls} disabled:opacity-40`}
+                />
+              </div>
+              <div className="flex items-end pb-1.5">
+                <label className="inline-flex items-center gap-1.5 text-[12px] font-medium text-foreground cursor-pointer">
+                  <input type="checkbox" checked={p.isWarranty === true} onChange={(e) => set(p.id, { isWarranty: e.target.checked })} />
+                  This is a dealer warranty
+                </label>
+              </div>
+            </div>
+
+            {p.isWarranty && (
+              <div className="rounded-xl border border-border bg-muted/30 p-3 grid grid-cols-2 sm:grid-cols-4 gap-3">
+                <div>
+                  <label className={labelCls}>Coverage</label>
+                  <input value={p.coverage || ""} onChange={(e) => set(p.id, { coverage: e.target.value })} placeholder="Powertrain" className={inputCls} />
+                </div>
+                <div>
+                  <label className={labelCls}>Term (years)</label>
+                  <input type="number" min={0} value={p.termYears ?? ""} disabled={p.lifetime === true}
+                    onChange={(e) => set(p.id, { termYears: e.target.value === "" ? null : Number(e.target.value) })}
+                    placeholder="10" className={`${inputCls} disabled:opacity-40`} />
+                </div>
+                <div>
+                  <label className={labelCls}>Term (miles)</label>
+                  <input type="number" min={0} value={p.termMiles ?? ""} disabled={p.lifetime === true}
+                    onChange={(e) => set(p.id, { termMiles: e.target.value === "" ? null : Number(e.target.value) })}
+                    placeholder="100000" className={`${inputCls} disabled:opacity-40`} />
+                </div>
+                <div className="flex items-end pb-1.5">
+                  <label className="inline-flex items-center gap-1.5 text-[12px] font-medium text-foreground cursor-pointer">
+                    <input type="checkbox" checked={p.lifetime === true} onChange={(e) => set(p.id, { lifetime: e.target.checked, ...(e.target.checked ? { termYears: null, termMiles: null } : {}) })} />
+                    Lifetime
+                  </label>
+                </div>
+                {termLabel(p) && (
+                  <p className="col-span-2 sm:col-span-4 text-[11px] text-muted-foreground">
+                    Shows as: <span className="font-semibold text-foreground">{p.title.trim() || "Warranty"} — {termLabel(p)}</span>
+                  </p>
+                )}
+              </div>
+            )}
+
             <div className="flex flex-wrap items-center gap-4 pt-1">
               <label className="inline-flex items-center gap-1.5 text-[12px] font-medium text-foreground cursor-pointer">
                 <input type="checkbox" checked={p.showOnSticker} onChange={(e) => set(p.id, { showOnSticker: e.target.checked })} />
-                Show on window sticker
+                Show on window sticker &amp; addendum
               </label>
               <label className="inline-flex items-center gap-1.5 text-[12px] font-medium text-foreground cursor-pointer">
                 <input type="checkbox" checked={p.showOnPacket} onChange={(e) => set(p.id, { showOnPacket: e.target.checked })} />
                 Show on customer packet
               </label>
+              {p.isWarranty && (
+                <label className="inline-flex items-center gap-1.5 text-[12px] font-medium text-foreground cursor-pointer">
+                  <input type="checkbox" checked={p.showOnWarrantyPanel === true} onChange={(e) => set(p.id, { showOnWarrantyPanel: e.target.checked })} />
+                  Show in passport warranty section
+                </label>
+              )}
             </div>
           </section>
         );

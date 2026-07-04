@@ -1005,7 +1005,7 @@ function buildPanel(key: PassportPanelKey, d: PassportData, listing: VehicleList
       const benefitRows = cov.filter((r) => r.key === "corrosion" || r.key === "roadside" || r.key === "ev_battery" || r.key === "maintenance");
       const includedRows = cov.filter((r) => r.key === "basic" || r.key === "powertrain");
       const cpoTerm = (mo: unknown, mi: unknown) => [Number(mo) ? `${Math.round(Number(mo) / 12)} yr` : null, Number(mi) ? `${(Number(mi) / 1000).toFixed(0)}K mi` : null].filter(Boolean).join(" / ");
-      const hasData = !!(d.warrantyStr || d.oemWarranty || eff.usedLibrary || isFactoryCpo);
+      const hasData = !!(d.warrantyStr || d.oemWarranty || eff.usedLibrary || isFactoryCpo || d.dealerCoverage.length);
       // ── Goal-layout derived values ──────────────────────────────────────
       // A new car's factory warranty is active by definition (starts at
       // delivery); used/CPO rely on the calculated remaining coverage.
@@ -1088,6 +1088,40 @@ function buildPanel(key: PassportPanelKey, d: PassportData, listing: VehicleList
                 </div>
               </div>
             </div>
+
+            {/* Dealer-added coverage: the store's own branded warranties
+                (lifetime powertrain, dealer CPO). Renders only when the dealer
+                configured a warranty program for this vehicle's condition. */}
+            {d.dealerCoverage.length > 0 && (
+              <div className="rounded-2xl border border-[#E6E8EC] bg-white p-4 sm:p-5">
+                <p className="text-[15px] font-bold text-[#0F172A]">Dealer-Added Coverage</p>
+                <p className="text-[12px] text-[#64748B] mb-3">Additional protection from {d.dealerName} on top of the factory terms.</p>
+                <div className="space-y-3">
+                  {d.dealerCoverage.map((c, i) => {
+                    const term = c.lifetime ? "Lifetime" : [
+                      c.termYears ? `${c.termYears}-Year` : null,
+                      c.termMiles ? `${c.termMiles.toLocaleString()}-Mile` : null,
+                    ].filter(Boolean).join(" / ") || null;
+                    const included = c.mode === "included";
+                    return (
+                      <div key={i} className={`rounded-xl border p-3.5 ${included ? "border-emerald-200 bg-emerald-50/50" : "border-[#E6E8EC] bg-slate-50/60"}`}>
+                        <div className="flex items-start justify-between gap-3 flex-wrap">
+                          <div className="min-w-0">
+                            <p className="text-[14px] font-bold text-[#0F172A] leading-tight">{c.title}{term ? ` — ${term}` : ""}</p>
+                            {c.coverage && <p className="text-[11px] font-semibold uppercase tracking-wide text-[#64748B] mt-0.5">{c.coverage}</p>}
+                          </div>
+                          <span className={`shrink-0 inline-flex items-center h-6 px-2.5 rounded-full text-[11px] font-bold ${included ? "bg-emerald-100 text-emerald-700" : "bg-blue-50 text-[#2563EB]"}`}>
+                            {included ? "Included" : "Available Upgrade"}
+                          </span>
+                        </div>
+                        {c.offer && <p className="text-[12.5px] text-[#475569] leading-snug mt-1.5">{c.offer}</p>}
+                        {c.disclosure && <p className="text-[11px] text-[#94A3B8] leading-snug mt-1.5">{c.disclosure}</p>}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
 
             {/* Certified Pre-Owned: certified copy for factory-CPO cars, "may
                 qualify" only at a matching franchise. Cross-brand used cars get
