@@ -179,6 +179,7 @@ export interface PassportData {
   msrp: number | null;
   priceLabel: string;
   estMonthly: number | null;
+  paymentAssumptions: string;
   saveVsMsrp: number | null;
   // Doc-fee model. `price` already reflects priceMode; docFee/websiteSalePrice
   // let the surface disclose the fee. priceIncludesDoc = the displayed price is
@@ -222,6 +223,7 @@ export interface PassportData {
   ownerCount: number | null;
   accidentCount: number | null;
   cleanTitle: boolean;
+  titleStatus: "clean" | "branded" | "unknown";
   serviceCount: number;
   recallClear: boolean;
   openRecalls: number | null;
@@ -229,6 +231,7 @@ export interface PassportData {
   // Warranty
   warranty: NonNullable<VehicleListing["warranty_info"]>;
   warrantyStr: string | null;
+  warrantyExpired: boolean;
   // Full OEM coverage breakdown for new/CPO cars (from the dealer's verified
   // Factory & CPO terms, attached by public-listing-view). Drives the
   // factory-warranty slide-out's full presentation.
@@ -238,6 +241,7 @@ export interface PassportData {
   confLabel: string;
   confDeductions: { label: string; points: number }[];
   verifiedBy: string[];
+  dealerVerified: boolean;
   verifyRows: VerifyRow[];
   // Content
   highlights: Highlight[];
@@ -330,7 +334,10 @@ export const computePriceHistory = (listing: VehicleListing): { valueHistory: Pr
     if (priced.length < 2 || latestPrice == null) return null;
     const latestT = new Date(priced[priced.length - 1].captured_at).getTime();
     const weekAgo = latestT - 7 * 24 * 60 * 60 * 1000;
-    const prior = [...priced].reverse().find((h) => new Date(h.captured_at).getTime() <= weekAgo) ?? priced[0];
+    // True 7-day window only — a since-first-capture delta must not be
+    // labeled as a 7-day trend.
+    const prior = [...priced].reverse().find((h) => new Date(h.captured_at).getTime() <= weekAgo);
+    if (!prior) return null;
     return latestPrice - prior.listing_price!;
   })();
   return { valueHistory, priceChange7d, priceChangeTotal };
@@ -415,6 +422,7 @@ export const derivePassport = (listing: VehicleListing): PassportData => {
     const m = Math.round((principal * r) / (1 - Math.pow(1 + r, -n)));
     return isFinite(m) ? m : null;
   })();
+  const paymentAssumptions = "72 mo · 10% down · 7.49% APR example";
 
   // A brand-new car has had no prior owners. For everything else, only trust a
   // real owner signal (MarketCheck owner_count or a CARFAX one-owner flag) —
@@ -422,18 +430,43 @@ export const derivePassport = (listing: VehicleListing): PassportData => {
   // listing spells (a car relisted by 12 dealers is NOT a 12-owner car).
   const isNew = String((listing as { condition?: string }).condition || "").toLowerCase() === "new";
   const ownerCount = isNew ? 0 : ((mc.owner_count as number) ?? (mc.carfax_1_owner === true ? 1 : null));
-  const accidentCount = (mc.accident_count as number) ?? (mc.carfax_clean_title === true ? 0 : null);
+  const accidentCount = (mc.accident_count as number) ?? null;
   const cleanTitle = mc.carfax_clean_title === true;
+  const titleBrand = String((mc.title_brand ?? mc.title_status ?? "") as string).trim();
+  const titleStatus: PassportData["titleStatus"] = cleanTitle
+    ? "clean"
+    : mc.carfax_clean_title === false || (titleBrand !== "" && !/^clean/i.test(titleBrand)) ? "branded" : "unknown";
   const serviceCount = listing.service_records?.length ?? 0;
   const recallClear = listing.recall_status === "clear";
   const openRecalls = listing.open_recall_count ?? null;
   const hasRecallCheck = !!listing.recall_status;
+  const verificationChecks =
+    (listingEquipment(listing).length > 0 ? 1 : 0) +
+    (marketAvg != null || marketMeta.similarCount != null ? 1 : 0) +
+    (hasRecallCheck ? 1 : 0) +
+    ((listing.photos?.length ?? 0) > 0 || listing.hero_image_url ? 1 : 0);
+  const dealerVerified = verificationChecks >= 2;
 
   const warranty = listing.warranty_info || {};
   const warrantyStr = (() => {
     const yrs = warranty.factory_months ? Math.round(warranty.factory_months / 12) : null;
     const mi = warranty.factory_miles ? `${(warranty.factory_miles / 1000).toFixed(0)},000 mi` : null;
     return [yrs ? `${yrs} yr` : null, mi].filter(Boolean).join(" / ") || null;
+  })();
+  // Mirrors PassportPanel's factory-warranty "active" logic: coverage is
+  // alive when either the basic term's time or its mileage allowance remains.
+  const warrantyExpired = (() => {
+    if (isNew) return false;
+    const monthsLeft = (() => {
+      if (!warranty.in_service_date || !warranty.factory_months) return null;
+      const end = new Date(warranty.in_service_date);
+      end.setMonth(end.getMonth() + warranty.factory_months);
+      const ms = end.getTime() - Date.now();
+      return ms > 0 ? Math.round(ms / (1000 * 60 * 60 * 24 * 30.4)) : 0;
+    })();
+    const milesLeft = warranty.factory_miles && warranty.factory_miles > 0 && listing.mileage != null
+      ? Math.max(warranty.factory_miles - listing.mileage, 0) : null;
+    return !((monthsLeft != null && monthsLeft > 0) || (milesLeft != null && milesLeft > 0));
   })();
 
   // Falsifiable confidence score: start high and subtract LABELED deductions
@@ -487,7 +520,9 @@ export const derivePassport = (listing: VehicleListing): PassportData => {
   listingEquipment(listing).forEach((label, i) => { if (highlights.length < 8) highlights.push({ key: `f${i}`, label, sub: "Feature" }); });
 
   const overview = listing.description ||
-    `The ${listing.ymm}${listing.trim ? " " + listing.trim : ""} pairs a ${ks.engine || "capable"} powertrain with ${ks.drivetrain || "a refined drivetrain"} and a well-equipped cabin.`;
+    (ks.engine || ks.drivetrain
+      ? `The ${listing.ymm}${listing.trim ? " " + listing.trim : ""} pairs a ${ks.engine || "capable"} powertrain with ${ks.drivetrain || "a refined drivetrain"} and a well-equipped cabin.`
+      : "");
 
   const specRows: [string, string | null | undefined][] = [
     ["Exterior Color", ks.exterior_color as string | undefined],
@@ -529,9 +564,9 @@ export const derivePassport = (listing: VehicleListing): PassportData => {
   const whyBuy: string[] = [];
   if (saveVsMsrp) whyBuy.push(`Priced ${fmt$(saveVsMsrp)} below MSRP`);
   if (belowMarket && belowMarket > 0) whyBuy.push(`${fmt$(belowMarket)} below market average`);
-  if (warrantyStr) whyBuy.push("Factory warranty remaining");
+  if (warrantyStr && !warrantyExpired) whyBuy.push("Factory warranty remaining");
   if (recallClear) whyBuy.push("No open recalls");
-  whyBuy.push("Dealer-verified listing");
+  if (dealerVerified) whyBuy.push("Dealer-verified listing");
   if (ownerCount === 1) whyBuy.push("One owner — personal use");
   if (listing.mileage != null && listing.mileage < 30000) whyBuy.push(`Low mileage — ${listing.mileage.toLocaleString()} mi`);
   if (listing.trim && /luxe|autograph|limited|platinum|premium|touring|sport|signature|reserve|titanium|sensory|denali/i.test(listing.trim)) whyBuy.push(`Premium trim — ${listing.trim}`);
@@ -577,16 +612,16 @@ export const derivePassport = (listing: VehicleListing): PassportData => {
   };
 
   return {
-    price, msrp, priceLabel, estMonthly, saveVsMsrp,
+    price, msrp, priceLabel, estMonthly, paymentAssumptions, saveVsMsrp,
     docFee, websiteSalePrice, priceMode, priceIncludesDoc,
     recon: (listing as unknown as { recon?: PassportData["recon"] }).recon ?? null,
     marketAvg, marketLow, marketHigh, belowMarket,
     marketMeta, comparables, blackbook, marketCheckedAt, history,
-    viewCount: listing.view_count ?? null, dom: (mc.dom as number) ?? marketMeta.avgDom ?? null,
-    ownerCount, accidentCount, cleanTitle, serviceCount, recallClear, openRecalls, hasRecallCheck,
-    warranty, warrantyStr,
+    viewCount: listing.view_count ?? null, dom: (mc.dom as number) ?? null,
+    ownerCount, accidentCount, cleanTitle, titleStatus, serviceCount, recallClear, openRecalls, hasRecallCheck,
+    warranty, warrantyStr, warrantyExpired,
     oemWarranty: ((listing as unknown as { oem_warranty?: OemWarrantyView }).oem_warranty) || null,
-    confScore, confLabel, confDeductions, verifiedBy, verifyRows,
+    confScore, confLabel, confDeductions, verifiedBy, dealerVerified, verifyRows,
     highlights, specRows, keySpecs, epa, overview, whyBuy,
     reviewRating: (dealer.review_rating as number) ?? null,
     reviewCount: (dealer.review_count as number) ?? null,

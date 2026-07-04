@@ -24,6 +24,7 @@ import { readPassportOrigin, clearPassportOrigin, type PassportOrigin } from "@/
 import { trackPassportOpened, trackWindowStickerScanned, trackCustomerCtaClicked } from "@/lib/engagement/customerEngagement";
 import { packetVisible } from "@/lib/packetModules";
 import PassportPanel, { isPassportPanelKey, type PassportPanelKey } from "@/components/passport/PassportPanel";
+import { useNhtsaSafety } from "@/hooks/useNhtsaSafety";
 import PassportCtaDock from "@/components/passport/PassportCtaDock";
 import PassportInfoModal, { type InfoModalKey } from "@/components/passport/PassportInfoModal";
 import { Info } from "lucide-react";
@@ -241,6 +242,7 @@ const VehiclePassportV3 = () => {
   const [savedState, setSavedState] = useState<boolean | null>(null);
 
   const d = useMemo(() => (listing ? derivePassport(listing) : null), [listing]);
+  const { data: nhtsa } = useNhtsaSafety(listing?.ymm, !!listing?.ymm);
   // Photos module off = lead photo only, no gallery chrome (server also
   // trims the payload; this keeps preview/mock rendering honest).
   const gallery = useMemo(() => {
@@ -366,25 +368,22 @@ const VehiclePassportV3 = () => {
     return map[key] || { icon: CheckCircle2, onClick: () => go("check-availability") };
   };
 
-  const compPrices = d.comparables.map((c) => (c as { price?: number }).price).filter((p): p is number => typeof p === "number" && p > 0);
   // Value-first comp story per the locked hierarchy: belowMarket is the spine
   // signal, counts come from the REAL market (marketMeta.similarCount), and
   // the 16-row stored sample never supplies a rank claim or a denominator —
   // it is an API page, not the market. Sentiment must match the adjacent
-  // Market Price card: positive iff belowMarket > 0.
-  const compStory = (() => {
+  // Market Price card: positive iff belowMarket > 0. Null = no tile.
+  const compStory = ((): { strong: string; sub: string } | null => {
     const ourPrice = d.price;
     const mkt = d.marketAvg;
     const bm = d.belowMarket;
     const N = d.marketMeta.similarCount;
     const isNewCar = String(listing.condition || "").toLowerCase() === "new";
     const noun = isNewCar ? "same-model" : "comparable";
-    const pctRaw = d.marketMeta.percentile;
-    const pct = pctRaw == null ? null : (pctRaw <= 1 ? Math.round(pctRaw * 100) : pctRaw);
+    const pct = d.marketMeta.percentile;
     if (ourPrice == null || mkt == null) {
       if (N) return { strong: `${N} Comps Reviewed`, sub: `Local ${noun} vehicles analyzed` };
-      if (compPrices.length) return { strong: `${compPrices.length} Comps Reviewed`, sub: "Similar vehicles via MarketCheck" };
-      return { strong: "Comp set", sub: "Similar vehicles via MarketCheck" };
+      return null;
     }
     if (bm != null && bm > 0) {
       if (pct != null && pct <= 25 && N != null && N >= 5) {
@@ -407,29 +406,46 @@ const VehiclePassportV3 = () => {
     if (supply != null && supply > 0 && supply <= 30) {
       return { strong: "In-Demand Locally", sub: `${supply}-day local supply` };
     }
-    return {
-      strong: N ? `${N} ${isNewCar ? "Same-Model" : "Comparable"} Nearby` : "Local Market",
-      sub: `Market average ${fmt$(mkt)}`,
-    };
+    if (buildSheet?.estValue) {
+      return { strong: "Factory Options Included", sub: `Includes ${fmt$(buildSheet.estValue)} in factory options` };
+    }
+    if (N) {
+      return { strong: `${N} ${isNewCar ? "Same-Model" : "Comparable"} Nearby`, sub: `${isNewCar ? "Same-model" : "Similar"} vehicles nearby` };
+    }
+    return null;
   })();
-  const mi = [
-    { icon: DollarSign, title: "Market Price", strong: d.belowMarket && d.belowMarket > 0 ? "Great Price" : d.marketAvg != null ? "Market Price" : "Pending",
-      sub: d.belowMarket && d.belowMarket > 0 ? `${fmt$(d.belowMarket)} below market average` : d.marketAvg != null ? `Market avg ${fmt$(d.marketAvg)}` : "Awaiting MarketCheck", chart: <Spark points={marketSeries} />, section: "market-price", cta: "View report" },
-    { icon: TrendingUp, title: "Market Demand", strong: (d.viewCount != null || d.dom != null) ? ((d.viewCount ?? 0) > 20 ? "High Interest" : "Active") : "Pending",
-      sub: [d.viewCount != null ? `${d.viewCount.toLocaleString()} views` : null, d.dom != null ? `${d.dom} days on market` : null].filter(Boolean).join(" · ") || "Tracked once live", chart: null, section: "market-demand", cta: "View report" },
-    { icon: GaugeIcon, title: "Price Confidence", strong: d.belowMarket && d.belowMarket > 0 ? "Excellent" : d.marketAvg != null ? "Supported" : "Pending",
-      sub: d.marketAvg != null ? "by market data" : "Awaiting MarketCheck", donut: d.confScore, section: "price-confidence", cta: "View report" },
-    { icon: Clock, title: "Price History", strong: priceChange7d != null && priceChange7d !== 0 ? `${priceChange7d < 0 ? "-" : "+"}${fmt$(Math.abs(priceChange7d))}` : "7-Day Trend",
-      sub: priceChange7d != null ? (priceChange7d < 0 ? "price decreased" : priceChange7d > 0 ? "price increased" : "stable") : "History builds over time", chart: <Spark points={priceSeries} color="#7C3AED" />, section: "price-history", cta: "View history" },
-    { icon: Car, title: "Comparable Vehicles", strong: compStory.strong,
-      sub: compStory.sub, comps: false, section: "comparable-vehicles", cta: "View comp set" },
-  ];
+  type MiTile = { icon: React.ElementType; title: string; strong: string; sub: string; chart?: React.ReactNode; donut?: number | null; comps?: boolean; section: string; cta: string };
+  const domFavorable = d.dom != null && (d.marketMeta.avgDom != null ? d.dom <= d.marketMeta.avgDom : d.dom <= 30);
+  const demandParts = [
+    d.viewCount != null && d.viewCount >= 5 ? `${d.viewCount.toLocaleString()} views` : null,
+    domFavorable ? `${d.dom} days on market` : null,
+  ].filter(Boolean) as string[];
+  const mi = ([
+    d.belowMarket && d.belowMarket > 0
+      ? { icon: DollarSign, title: "Market Price", strong: "Great Price", sub: `${fmt$(d.belowMarket)} below market average`, chart: <Spark points={marketSeries} />, section: "market-price", cta: "View report" }
+      : d.marketAvg != null && d.price != null && d.price <= d.marketAvg
+        ? { icon: DollarSign, title: "Market Price", strong: "Market Price", sub: `Market avg ${fmt$(d.marketAvg)}`, chart: <Spark points={marketSeries} />, section: "market-price", cta: "View report" }
+        : null,
+    demandParts.length
+      ? { icon: TrendingUp, title: "Market Demand", strong: (d.viewCount ?? 0) > 20 ? "High Interest" : "Active", sub: demandParts.join(" · "), section: "market-demand", cta: "View report" }
+      : null,
+    d.marketAvg != null
+      ? { icon: GaugeIcon, title: "Price Confidence", strong: d.belowMarket && d.belowMarket > 0 ? "Excellent" : "Supported", sub: "by market data", donut: d.confScore, section: "price-confidence", cta: "View report" }
+      : null,
+    priceChange7d != null && priceChange7d < 0
+      ? { icon: Clock, title: "Price History", strong: `-${fmt$(Math.abs(priceChange7d))}`, sub: "price decreased", chart: <Spark points={priceSeries} color="#7C3AED" />, section: "price-history", cta: "View history" }
+      : null,
+    compStory
+      ? { icon: Car, title: "Comparable Vehicles", strong: compStory.strong, sub: compStory.sub, comps: false, section: "comparable-vehicles", cta: "View comp set" }
+      : null,
+  ] as (MiTile | null)[]).filter((t): t is MiTile => t != null);
 
   const highlights: { icon: React.ElementType; t: string; s: string }[] = [];
   // Specs are written into mc_attributes by the pull; key_specs is usually
   // empty, so merge mc_attributes in (mapping its field names) before reading.
   const mc = (listing.mc_attributes || {}) as Record<string, unknown>;
   const ksRaw = (listing.key_specs || {}) as Record<string, unknown>;
+  const stockNo = mc.stock_no ? String(mc.stock_no) : ((listing as unknown as { stock_number?: string | null }).stock_number || null);
   const ks = {
     engine: (ksRaw.engine ?? mc.engine ?? undefined) as string | undefined,
     drivetrain: (ksRaw.drivetrain ?? mc.drivetrain ?? undefined) as string | undefined,
@@ -484,7 +500,15 @@ const VehiclePassportV3 = () => {
   if (dt.familyOwned) dealerChips.push({ icon: Building2, t: "Family Owned", s: dt.yearsInBusiness ? `Since ${new Date().getFullYear() - Number(dt.yearsInBusiness)}` : "Locally owned" });
   else if (dt.yearsInBusiness) dealerChips.push({ icon: Building2, t: "Established", s: `Since ${new Date().getFullYear() - Number(dt.yearsInBusiness)}` });
   if (dt.googleRating) dealerChips.push({ icon: Star, t: "Top Rated", s: `${dt.googleRating} Google Rating` });
-  if (dt.certifications.length) dealerChips.push({ icon: Wrench, t: "Factory Certified", s: dt.certifications[0] });
+  if (dt.certifications.length) {
+    // "Factory Certified" only when the cert text names this vehicle's make;
+    // otherwise the cert speaks for itself.
+    const make = (listing.ymm || "").replace(/^\d{4}\s+/, "").split(/\s+/)[0] || "";
+    const factoryCert = make ? dt.certifications.find((c) => c.toLowerCase().includes(make.toLowerCase())) : undefined;
+    dealerChips.push(factoryCert
+      ? { icon: Wrench, t: "Factory Certified", s: factoryCert }
+      : { icon: Wrench, t: dt.certifications[0], s: "Dealer certification" });
+  }
   if (dt.serviceLocation === "onsite") dealerChips.push({ icon: Settings, t: "Service Center", s: "On-site" });
   else if (dt.serviceLocation === "offsite") dealerChips.push({ icon: Settings, t: "Service Center", s: "Off-site" });
   if (dt.delivery && dt.delivery !== "none") dealerChips.push({ icon: Truck, t: "Delivery Available", s: cap(dt.delivery) });
@@ -565,7 +589,7 @@ const VehiclePassportV3 = () => {
             </div>
             {photoCount > 1 && <div className="flex gap-2 mt-2 print:hidden">{gallery.slice(0, 6).map((s, i) => <button key={i} onClick={() => setIdx(i)} className="w-[60px] h-11 rounded-lg overflow-hidden bg-[#e9ecef]" style={{ outline: i === idx ? `2px solid ${BLUE}` : "2px solid transparent", outlineOffset: -2 }}><img src={s} alt="" className="w-full h-full object-cover" /></button>)}{photoCount > 6 && <button onClick={() => go("gallery")} className="w-[60px] h-11 rounded-lg bg-black/70 text-white text-[11px] font-bold">+{photoCount - 6}</button>}</div>}
             <div className="flex gap-2 mt-2 print:hidden">
-              {pv("photos") && <button onClick={() => go("gallery")} className={`flex-1 h-10 rounded-xl border border-[#E6E8EC] bg-white text-[13px] font-semibold inline-flex items-center justify-center gap-1.5 hover:border-[#2563EB]`}><Eye className="w-4 h-4 text-[#2563EB]" /> All Photos ({photoCount})</button>}
+              {pv("photos") && photoCount > 1 && <button onClick={() => go("gallery")} className={`flex-1 h-10 rounded-xl border border-[#E6E8EC] bg-white text-[13px] font-semibold inline-flex items-center justify-center gap-1.5 hover:border-[#2563EB]`}><Eye className="w-4 h-4 text-[#2563EB]" /> All Photos ({photoCount})</button>}
               {pv("videos") && listing.videos?.length ? <a href={listing.videos[0].url} target="_blank" rel="noreferrer" className="flex-1 h-10 rounded-xl border border-[#E6E8EC] bg-white text-[13px] font-semibold inline-flex items-center justify-center gap-1.5 hover:border-[#2563EB]"><Play className="w-4 h-4 text-[#2563EB]" /> Walkaround Video</a> : null}
             </div>
           </div>
@@ -580,23 +604,26 @@ const VehiclePassportV3 = () => {
                 </div>
                 <h1 className="text-[30px] font-bold leading-9 tracking-tight">{listing.ymm}{listing.trim ? <span className="text-[#64748B] font-semibold"> {listing.trim}</span> : null}</h1>
                 <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1 mt-2 text-[13px] text-[#64748B]">
-                  <span><span className="font-semibold text-[#0F172A]">VIN</span> {listing.vin}</span><span className="text-slate-300">•</span>
-                  <span>Stock # {listing.vin.slice(-6)}</span>{listing.mileage != null && <><span className="text-slate-300">•</span><span>{listing.mileage.toLocaleString()} mi</span></>}
+                  <span><span className="font-semibold text-[#0F172A]">VIN</span> {listing.vin}</span>
+                  {stockNo && <><span className="text-slate-300">•</span><span>Stock # {stockNo}</span></>}{listing.mileage != null && <><span className="text-slate-300">•</span><span>{listing.mileage.toLocaleString()} mi</span></>}
                 </div>
                 {(() => {
                   const dw = d.dealerCoverage.find((c) => c.mode === "included");
+                  // 16 CFR 239.4: a lifetime claim must define its measuring
+                  // life — inline when the program has no disclosure text.
                   const dwChip = dw
                     ? (dw.lifetime
-                        ? `Lifetime ${dw.coverage || "Powertrain"}`
+                        ? `Lifetime ${dw.coverage || "Powertrain"}${dw.disclosure ? "" : " — for as long as you own it"}`
                         : [dw.termYears ? `${dw.termYears}-Yr` : null, dw.termMiles ? `${Math.round(dw.termMiles / 1000)}K-Mi` : null].filter(Boolean).join("/") + ` ${dw.coverage || "Warranty"}`)
                     : null;
                   const idBadges = [
                     dwChip && dwChip.trim() !== "" ? dwChip.trim() : null,
+                    d.priceChangeTotal != null && d.priceChangeTotal < 0 ? `Reduced ${fmt$(Math.abs(d.priceChangeTotal))}` : null,
                     d.ownerCount === 1 ? "One Owner" : null,
-                    d.verifyRows.length > 0 ? "Dealer Verified" : null,
+                    d.dealerVerified ? "Dealer Verified" : null,
                     d.marketAvg != null || d.comparables.length > 0 ? "Market Data Verified" : null,
                     d.recallClear ? "Recall Checked" : null,
-                    highlights.length > 0 ? "Equipment Verified" : null,
+                    highlights.length > 0 ? "Equipment Decoded" : null,
                   ].filter(Boolean) as string[];
                   return idBadges.length ? (
                     <div className="flex flex-wrap gap-1.5 mt-2.5">
@@ -622,7 +649,7 @@ const VehiclePassportV3 = () => {
               </div>
 
               {/* Verification card */}
-              {d.verifyRows.length > 0 && (
+              {d.dealerVerified && d.verifyRows.length > 0 && (
                 <div className={`${CARD} p-5`}>
                   <div className="flex items-start gap-2">
                     <button onClick={() => go("verification")} className="flex items-center gap-2.5 text-left flex-1 min-w-0">
@@ -665,7 +692,7 @@ const VehiclePassportV3 = () => {
                         : `+ ${fmt$(d.docFee)} doc fee · Sale ${fmt$(d.websiteSalePrice ?? price + d.docFee)}`}</p>
                     ) : null}
                     {buildSheet?.estValue ? <p className="font-semibold text-[#16A34A]">Incl. {fmt$(buildSheet.estValue)} in factory options</p> : null}
-                    {pv("payment") && d.estMonthly != null && <p>Est. {fmt$(d.estMonthly)}/mo</p>}
+                    {pv("payment") && d.estMonthly != null && <p>Est. {fmt$(d.estMonthly)}/mo <span className="text-[11px] text-[#94A3B8]">{d.paymentAssumptions}</span></p>}
                     {d.msrp != null && <p>MSRP {fmt$(d.msrp)}</p>}
                   </div>
                 </div>
@@ -697,7 +724,7 @@ const VehiclePassportV3 = () => {
         </section>
 
         {/* 4. MARKET INTELLIGENCE */}
-        {pv("marketValue") && (
+        {pv("marketValue") && mi.length > 0 && (
         <section data-module="market" className={`${CARD} p-5`}>
           <div className="flex items-center justify-between"><div><H2>{d.belowMarket && d.belowMarket > 0 ? `Priced ${fmt$(d.belowMarket)} Under the Local Market` : "Market Intelligence"}</H2><p className={`text-[13px] ${TEXT2} mt-0.5`}>Independent pricing, demand, and value analysis for this vehicle.</p></div><span className="text-[12px] text-[#94A3B8] inline-flex items-center gap-1">Powered by MarketCheck<button onClick={(e) => openInfo("data-sources", e)} aria-label="Data sources explained" className="w-4 h-4 inline-flex items-center justify-center"><Info className="w-3.5 h-3.5 text-[#94A3B8]" /></button></span></div>
           <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-4 mt-5">
@@ -729,7 +756,7 @@ const VehiclePassportV3 = () => {
               <div className="bg-[#0F172A] px-6 py-6 sm:px-8 sm:py-7">
                 <div className="flex flex-wrap items-center justify-between gap-5">
                   <div className="min-w-0">
-                    <p className="text-[12px] font-semibold uppercase tracking-wider text-emerald-400 inline-flex items-center gap-1.5"><BadgeCheck className="w-4 h-4" /> Dealer-Certified Reconditioning</p>
+                    <p className="text-[12px] font-semibold uppercase tracking-wider text-emerald-400 inline-flex items-center gap-1.5"><BadgeCheck className="w-4 h-4" /> Dealer-Completed Reconditioning</p>
                     <h2 className="text-[22px] sm:text-[26px] font-bold text-white leading-tight mt-1.5">{substantial ? "Everything we did to get this vehicle ready for you" : "Inspected and prepped for you"}</h2>
                     <p className="text-[13px] text-slate-300 mt-1.5 max-w-xl">{substantial
                       ? <>Before this {listing.ymm || "vehicle"} was listed, our team completed and documented {stepCount} reconditioning, safety, and detailing step{stepCount === 1 ? "" : "s"} — so you can buy with total confidence.</>
@@ -801,54 +828,62 @@ const VehiclePassportV3 = () => {
               </div>
             )}
             {(() => {
+              const nhtsaOverall = nhtsa?.ratings?.overall ?? null;
+              const safetyChips = [
+                nhtsaOverall != null && nhtsaOverall >= 4 ? `NHTSA ${nhtsaOverall}-Star Overall` : null,
+                d.iihsAward ? d.iihsAward.label : null,
+              ].filter(Boolean) as string[];
               const checksOut = Array.from(new Set([
-                ...(d.verifyRows.length > 0 ? ["Dealer-verified listing"] : []),
-                ...(d.iihsAward ? [d.iihsAward.label] : []),
+                ...(d.dealerVerified ? ["Dealer-verified listing"] : []),
                 ...d.whyBuy,
                 ...(d.marketAvg != null ? ["Market-supported price"] : []),
               ])).slice(0, 6);
-              return <ul className="mt-3 space-y-2">{(checksOut.length ? checksOut : ["Details confirmed at the dealership"]).map((b, i) => <li key={i} className="flex items-start gap-2 text-[13px]"><CheckCircle2 className="w-4 h-4 text-[#16A34A] shrink-0 mt-0.5" />{b}</li>)}</ul>;
+              return <>
+                {safetyChips.length > 0 && (
+                  <div className="flex flex-wrap gap-1.5 mt-3">
+                    {safetyChips.map((c) => <span key={c} className="inline-flex items-center gap-1 text-[11px] font-semibold text-[#0F172A] bg-blue-50 border border-blue-100 rounded-full px-2.5 py-1"><ShieldCheck className="w-3 h-3 text-[#2563EB]" />{c}</span>)}
+                  </div>
+                )}
+                <ul className="mt-3 space-y-2">{(checksOut.length ? checksOut : ["Details confirmed at the dealership"]).map((b, i) => <li key={i} className="flex items-start gap-2 text-[13px]"><CheckCircle2 className="w-4 h-4 text-[#16A34A] shrink-0 mt-0.5" />{b}</li>)}</ul>
+              </>;
             })()}
             <Link onClick={() => go("great-buy")} className="mt-auto pt-3 self-start">See full buying report</Link>
           </div>
           )}
 
-          {/* Confirm before purchase — transparent next steps, framed as
-              confirmation items rather than warnings. Known negatives
-              (accidents, open recalls) are disclosed here, never hidden. */}
-          <div className={`${CARD} p-5 flex flex-col`}>
-            <H3>Confirm Before Purchase</H3>
-            {(() => {
-              const isNewCar = listing.condition === "new";
-              const rows = [
-                d.openRecalls != null && d.openRecalls > 0 ? { t: `${d.openRecalls} open recall${d.openRecalls === 1 ? "" : "s"} need${d.openRecalls === 1 ? "s" : ""} remedy`, s: "Ask the dealer about the fix before purchase." } : null,
-                d.accidentCount != null && d.accidentCount > 0 ? { t: `${d.accidentCount} reported accident${d.accidentCount === 1 ? "" : "s"}`, s: "Review the full history report and reconditioning work." } : null,
-                !d.warrantyStr ? { t: "Confirm remaining warranty coverage", s: "The dealership can verify what factory coverage remains." } : null,
-                !isNewCar && d.serviceCount === 0 ? { t: "Confirm service records", s: "Ask which maintenance records are on file." } : null,
-                !isNewCar ? { t: "Review the full vehicle history report", s: d.historyReport ? `A free ${historyReportName(d.historyReport.provider)} report is provided below.` : "Available from the dealership." } : null,
-                { t: "Confirm final fees and availability", s: "Taxes, registration, and availability are confirmed by the dealer." },
-              ].filter(Boolean) as { t: string; s: string }[];
-              return (
+          {/* Confirm before purchase — required disclosures only (open
+              recalls, accidents, title brands), never hidden when present;
+              the card does not render when there is nothing to disclose. */}
+          {(() => {
+            const rows = [
+              d.openRecalls != null && d.openRecalls > 0 ? { t: `${d.openRecalls} open recall${d.openRecalls === 1 ? "" : "s"} need${d.openRecalls === 1 ? "s" : ""} remedy`, s: "Ask the dealer about the fix before purchase." } : null,
+              d.accidentCount != null && d.accidentCount > 0 ? { t: `${d.accidentCount} reported accident${d.accidentCount === 1 ? "" : "s"}`, s: "Review the full history report and reconditioning work." } : null,
+              d.titleStatus === "branded" ? { t: "Title brand reported", s: "Review the title history with the dealer." } : null,
+            ].filter(Boolean) as { t: string; s: string }[];
+            if (!rows.length) return null;
+            return (
+              <div className={`${CARD} p-5 flex flex-col`}>
+                <H3>Confirm Before Purchase</H3>
                 <div className="mt-3 space-y-2.5">
-                  {rows.slice(0, 5).map((r) => (
+                  {rows.map((r) => (
                     <div key={r.t} className="rounded-xl border border-amber-100 bg-amber-50/50 p-3 flex items-start gap-2">
                       <Info className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
                       <div className="min-w-0"><p className="text-[12.5px] font-semibold text-[#0F172A] leading-tight">{r.t}</p><p className="text-[11px] text-[#64748B] mt-0.5">{r.s}</p></div>
                     </div>
                   ))}
                 </div>
-              );
-            })()}
-            {d.historyReport && pv("historyReport") && (
-              <div className="mt-3 pt-3 border-t border-slate-100" onClick={(e) => e.stopPropagation()}>
-                <a href={d.historyReport.url} target="_blank" rel="noopener noreferrer" onClick={() => trackHistoryReport("history_card")} className="text-[13px] font-semibold text-[#2563EB] inline-flex items-center gap-1.5 hover:underline">
-                  View the free {historyReportName(d.historyReport.provider)} Report <ExternalLink className="w-3.5 h-3.5" />
-                </a>
-                <p className="text-[11px] text-[#94A3B8] mt-0.5">Provided at no cost by {d.dealerName}</p>
+                {d.historyReport && pv("historyReport") && (
+                  <div className="mt-3 pt-3 border-t border-slate-100" onClick={(e) => e.stopPropagation()}>
+                    <a href={d.historyReport.url} target="_blank" rel="noopener noreferrer" onClick={() => trackHistoryReport("history_card")} className="text-[13px] font-semibold text-[#2563EB] inline-flex items-center gap-1.5 hover:underline">
+                      View the free {historyReportName(d.historyReport.provider)} Report <ExternalLink className="w-3.5 h-3.5" />
+                    </a>
+                    <p className="text-[11px] text-[#94A3B8] mt-0.5">Provided at no cost by {d.dealerName}</p>
+                  </div>
+                )}
+                <Link onClick={() => go("vehicle-history")} className="mt-auto pt-3 self-start">View full history report</Link>
               </div>
-            )}
-            <Link onClick={() => go("vehicle-history")} className="mt-auto pt-3 self-start">View full history report</Link>
-          </div>
+            );
+          })()}
 
           {/* Ownership Timeline */}
           <div onClick={(e) => openPanel("ownership-timeline", e)} className={`${CARD} p-5 flex flex-col cursor-pointer hover:border-[#2563EB] transition-colors`}>
@@ -859,7 +894,7 @@ const VehiclePassportV3 = () => {
                 d.warranty.in_service_date ? { d: new Date(d.warranty.in_service_date).toLocaleDateString(), t: "Placed in service", s: "Warranty begins", c: "bg-emerald-500" } : null,
                 d.ownerCount != null ? { d: d.ownerCount === 0 ? "New" : d.ownerCount === 1 ? "Single owner" : `${d.ownerCount} owners`, t: d.ownerCount === 0 ? "You'd be the first owner" : "First owner", s: d.ownerCount === 0 ? "No prior owners" : "Personal use", c: "bg-emerald-500" } : null,
                 d.serviceCount > 0 ? { d: `${d.serviceCount} records`, t: "Regular service", s: "Well maintained", c: "bg-emerald-500" } : null,
-                listing.prep_status?.foreman_signed_at ? { d: new Date(listing.prep_status.foreman_signed_at).toLocaleDateString(), t: "AutoLabels certified", s: "Multi-point sign-off", c: "bg-emerald-500" } : null,
+                listing.prep_status?.foreman_signed_at ? { d: new Date(listing.prep_status.foreman_signed_at).toLocaleDateString(), t: "Dealer inspection sign-off", s: "Prep work completed", c: "bg-emerald-500" } : null,
                 { d: "Today", t: "Ready for you", s: "At the dealership", c: "bg-[#2563EB]" },
               ].filter(Boolean) as { d: string; t: string; s: string; c: string }[]).map((e, i) => <li key={i} className="relative"><span className={`absolute -left-[22px] top-1 w-3 h-3 rounded-full ${e.c} ring-2 ring-white`} /><p className="text-[12px] font-bold">{e.d} · {e.t}</p><p className="text-[11px] text-[#64748B]">{e.s}</p></li>)}
             </ol>
@@ -869,7 +904,7 @@ const VehiclePassportV3 = () => {
           {/* Factory Warranty — hidden entirely when no coverage data exists;
               the Confirm Before Purchase card carries the confirm-with-dealer
               row instead of an empty card. */}
-          {pv("warranty") && d.warrantyStr && (
+          {pv("warranty") && d.warrantyStr && (!d.warrantyExpired || d.dealerCoverage.length > 0) && (
           <div data-module="warranty" className={`${CARD} p-5 flex flex-col`}>
             {(() => {
               const w = d.warranty;
@@ -893,7 +928,7 @@ const VehiclePassportV3 = () => {
               };
               const b2b = calc(w.factory_months, w.factory_miles);
               const ptw = (w.powertrain_months != null || w.powertrain_miles != null) ? calc(w.powertrain_months, w.powertrain_miles) : null;
-              const active = !!d.warrantyStr;
+              const active = !d.warrantyExpired;
               type CpoView = { name?: string; basic_months?: number; basic_miles?: number; powertrain_months?: number; powertrain_miles?: number };
               const cpo = listing.condition === "cpo" ? (listing as unknown as { cpo_programs?: CpoView[] }).cpo_programs?.[0] : null;
               const cpoTerm = cpo ? [(cpo.powertrain_months ?? cpo.basic_months) ? `${Math.round(((cpo.powertrain_months ?? cpo.basic_months) as number) / 12)} yr` : null, ((cpo.powertrain_miles ?? cpo.basic_miles) === -1) ? "Unlimited mi" : (cpo.powertrain_miles ?? cpo.basic_miles) ? `${(((cpo.powertrain_miles ?? cpo.basic_miles) as number) / 1000).toFixed(0)}K mi` : null].filter(Boolean).join(" / ") : "";
@@ -922,11 +957,11 @@ const VehiclePassportV3 = () => {
               };
               return <>
                 <div className="flex items-center justify-between gap-2">
-                  <div className="flex items-center gap-1.5"><H3>Factory Warranty</H3><button onClick={(e) => openInfo("warranty-terms", e)} aria-label="Warranty terminology" className="w-6 h-6 rounded-full hover:bg-slate-100 flex items-center justify-center"><Info className="w-3.5 h-3.5 text-[#94A3B8]" /></button></div>
+                  <div className="flex items-center gap-1.5"><H3>{active ? "Factory Warranty" : "Warranty Coverage"}</H3><button onClick={(e) => openInfo("warranty-terms", e)} aria-label="Warranty terminology" className="w-6 h-6 rounded-full hover:bg-slate-100 flex items-center justify-center"><Info className="w-3.5 h-3.5 text-[#94A3B8]" /></button></div>
                   {active && <span className="text-[9px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700">{isNew ? "Full Coverage" : "Active"}</span>}
                 </div>
-                <p className="text-[11px] text-[#94A3B8] mt-0.5">{isNew ? "Starts When You Purchase" : "Coverage Remaining"}</p>
-                {d.warrantyStr ? (
+                <p className="text-[11px] text-[#94A3B8] mt-0.5">{isNew ? "Starts When You Purchase" : active ? "Coverage Remaining" : "Dealer Coverage"}</p>
+                {active ? (
                   <div className="mt-3 space-y-3">
                     {b2b.pct != null && <Bar label="Bumper-to-Bumper" tone="blue" pct={b2b.pct} sub={b2b.label} />}
                     {ptw && ptw.pct != null && <Bar label="Powertrain" tone="green" pct={ptw.pct} sub={ptw.label} />}
@@ -936,7 +971,19 @@ const VehiclePassportV3 = () => {
                       <p className="text-[11px] font-medium text-emerald-800 leading-snug">{confidence}</p>
                     </div>
                   </div>
-                ) : <p className="text-[13px] text-[#64748B] mt-3">Coverage details confirmed at the dealership.</p>}
+                ) : (
+                  <div className="mt-3 space-y-3">
+                    {d.dealerCoverage.map((c, i) => (
+                      <div key={i} className="flex items-start gap-2 rounded-lg bg-emerald-50 px-2.5 py-2">
+                        <ShieldCheck className="w-4 h-4 text-[#16A34A] shrink-0 mt-0.5" />
+                        <div className="min-w-0">
+                          <p className="text-[12px] font-semibold text-[#0F172A]">{c.title || c.coverage || "Dealer coverage"}{c.mode === "included" ? " — included" : " — available"}</p>
+                          {(c.lifetime || c.termYears || c.termMiles) && <p className="text-[11px] text-[#64748B]">{c.lifetime ? "For as long as you own the vehicle" : [c.termYears ? `${c.termYears} yr` : null, c.termMiles ? `${Math.round(c.termMiles / 1000)}K mi` : null].filter(Boolean).join(" / ")}</p>}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </>;
             })()}
             <Link onClick={() => openPanel("factory-warranty")} className="mt-auto pt-3 self-start">View complete warranty</Link>
@@ -951,7 +998,7 @@ const VehiclePassportV3 = () => {
             {d.reviewRating != null && <div className="flex items-center gap-2.5 mt-2"><span className="text-[32px] font-extrabold text-[#0F172A] leading-none">{d.reviewRating.toFixed(1)}</span><div><Stars n={d.reviewRating} />{d.reviewCount != null && <p className="text-[11px] text-[#64748B] mt-0.5">{d.reviewCount.toLocaleString()} Reviews</p>}</div></div>}
             {d.dealerTrust.reviewSources.length > 0 ? (
               <div className="mt-3 space-y-3">{d.dealerTrust.reviewSources.slice(0, 3).map((r, i) => <div key={i}><div className="flex items-center gap-2"><span className="text-[12px] font-bold">{r.name}</span>{r.rating != null && <Stars n={r.rating} size={12} />}</div>{r.quote && <p className="text-[12px] text-[#64748B] leading-snug">"{r.quote}"</p>}</div>)}</div>
-            ) : <p className="text-[13px] text-[#64748B] mt-3">Verified dealership reviews appear here when the dealer connects a review source.</p>}
+            ) : null}
             <Link onClick={() => openPanel("owner-reviews")} className="mt-auto pt-3 self-start">Read all reviews</Link>
           </div>
           )}
@@ -963,7 +1010,7 @@ const VehiclePassportV3 = () => {
           <div className="mb-4"><H2>About This Vehicle</H2><p className={`text-[13px] ${TEXT2} mt-0.5`}>Highlights and a quick look at how it's equipped.</p></div>
           <div className="grid grid-cols-1 lg:grid-cols-[1fr_1.4fr] gap-6 items-stretch print:block print:space-y-5">
           {/* Highlights */}
-          {pv("factoryOptions") && (
+          {pv("factoryOptions") && (highlights.length > 0 || (buildSheet?.packages.length ?? 0) > 0) && (
           <div data-module="highlights" className={`${CARD} p-5 flex flex-col`}>
             <H3>Vehicle Highlights</H3>
             {buildSheet && buildSheet.packages.length > 0 && (
@@ -974,9 +1021,10 @@ const VehiclePassportV3 = () => {
                 {buildSheet.estValue ? ` — ${fmt$(buildSheet.estValue)} in options beyond a standard ${listing.trim || "build"}` : ""}
               </p>
             )}
-            {highlights.length ? (
+            {highlights.length > 0 && (
               <div className="flex flex-wrap gap-1.5 mt-3.5">{highlights.slice(0, 12).map((h, i) => <span key={i} className="inline-flex items-center gap-1.5 text-[12px] font-semibold text-[#334155] bg-slate-50 border border-slate-200 rounded-full pl-2 pr-3 py-1.5"><h.icon className="w-3.5 h-3.5 text-[#2563EB] shrink-0" strokeWidth={1.75} />{h.t}<span className="text-[10px] font-medium text-[#94A3B8]">{h.s}</span></span>)}</div>
-            ) : <p className="text-[13px] text-[#64748B] mt-3">Equipment highlights appear here as the vehicle's data is decoded.</p>}
+            )}
+            {d.epa?.annualFuelCost != null && <p className="text-[12px] text-[#64748B] mt-2.5"><span className="font-semibold text-[#0F172A]">EPA-estimated fuel cost:</span> {fmt$(d.epa.annualFuelCost)}/yr</p>}
             <div className="mt-auto pt-3 flex items-center gap-4">
               <Link onClick={() => openPanel("highlights")} className="self-start">All features &amp; equipment</Link>
               <Link onClick={() => openPanel("key-specs")} className="self-start">Full specifications</Link>
@@ -1014,10 +1062,10 @@ const VehiclePassportV3 = () => {
               // platform-true facts so this section never renders empty.
               const city = (listing.dealer_snapshot?.city as string) || "";
               const fallback: { icon: React.ElementType; t: string; s: string }[] = [
-                ...(d.verifyRows.length > 0 ? [{ icon: ShieldCheck, t: "Dealer-Verified Vehicle", s: "Checked against trusted data sources" }] : []),
+                ...(d.dealerVerified && d.verifyRows.length > 0 ? [{ icon: ShieldCheck, t: "Dealer-Verified Vehicle", s: "Checked against trusted data sources" }] : []),
                 { icon: FileText, t: "Vehicle Passport Transparency", s: "One record for this exact VIN" },
                 ...((listing.documents?.length ?? 0) > 0 ? [{ icon: FileText, t: "Documents Available", s: "Source documents on file" }] : []),
-                { icon: BadgeCheck, t: "Secure Reservation Request", s: "Refundable, dealer-confirmed" },
+                { icon: BadgeCheck, t: "Secure Reservation Request", s: "No payment required · dealer-confirmed" },
                 ...(city ? [{ icon: MapPin, t: `Local ${city} Dealer`, s: "See it in person" }] : []),
                 { icon: MessageSquare, t: "Contact the Dealer Directly", s: "Call, text, or message" },
               ];
@@ -1049,20 +1097,29 @@ const VehiclePassportV3 = () => {
               <div>
                 <h2 className="text-[22px] font-extrabold leading-tight">Ready to take the next step on this {(listing.ymm || "").split(/\s+/).slice(2).join(" ").trim() || "vehicle"}?</h2>
                 <p className="text-[13px] opacity-90 mt-0.5">Reserve the vehicle, schedule a test drive, or contact the dealer to confirm final details.</p>
+                {(() => {
+                  const dw = d.dealerCoverage.find((c) => c.mode === "included");
+                  const reconSteps = d.recon ? d.recon.workItems.length + (d.recon.inspection ? 1 : 0) + d.recon.thirdParty.length : 0;
+                  const recap = [
+                    d.belowMarket && d.belowMarket > 0 ? `${fmt$(d.belowMarket)} below market` : null,
+                    buildSheet?.estValue ? `${fmt$(buildSheet.estValue)} in factory options` : null,
+                    dw?.title ? `${dw.title} included` : null,
+                    reconSteps > 0 ? `${reconSteps}-point reconditioning complete` : null,
+                  ].filter(Boolean).slice(0, 3) as string[];
+                  return recap.length ? (
+                    <div className="flex flex-wrap gap-1.5 mt-3">
+                      {recap.map((c) => <span key={c} className="inline-flex items-center gap-1.5 text-[11.5px] font-bold bg-white/15 border border-white/30 rounded-full px-3 py-1"><CheckCircle2 className="w-3.5 h-3.5" />{c}</span>)}
+                    </div>
+                  ) : null;
+                })()}
               </div>
             </div>
             <div className="flex flex-wrap items-center gap-2.5">
               <button onClick={() => go("reserve")} className="h-11 px-5 rounded-xl bg-white text-[#2563EB] text-[13.5px] font-bold inline-flex items-center gap-2 transition-transform hover:-translate-y-0.5"><BadgeCheck className="w-[18px] h-[18px]" /> Reserve This Vehicle</button>
               <button onClick={() => go("test-drive")} className="h-11 px-4 rounded-xl bg-white/10 border border-white/40 text-white text-[13.5px] font-bold inline-flex items-center gap-2 hover:bg-white/20 transition-colors"><Clock className="w-[18px] h-[18px]" /> Schedule Test Drive</button>
               <button onClick={() => go("contact")} className="h-11 px-4 rounded-xl bg-white/10 border border-white/40 text-white text-[13.5px] font-bold inline-flex items-center gap-2 hover:bg-white/20 transition-colors"><MessageSquare className="w-[18px] h-[18px]" /> Contact Dealer</button>
-              <button onClick={() => window.print()} className="h-11 px-4 rounded-xl bg-white/10 border border-white/40 text-white text-[13.5px] font-bold inline-flex items-center gap-2 hover:bg-white/20 transition-colors"><Printer className="w-[18px] h-[18px]" /> Download Vehicle Passport</button>
+              <button onClick={() => window.print()} className="h-11 px-4 rounded-xl bg-white/10 border border-white/40 text-white text-[13.5px] font-bold inline-flex items-center gap-2 hover:bg-white/20 transition-colors"><Printer className="w-[18px] h-[18px]" /> Print Vehicle Passport</button>
             </div>
-          </div>
-          <div className="flex flex-wrap items-center gap-x-6 gap-y-2 mt-5 pt-4 border-t border-white/20 text-[12px] font-semibold opacity-90">
-            <span className="inline-flex items-center gap-1.5"><Lock className="w-4 h-4" /> Secure &amp; Private</span>
-            <span className="inline-flex items-center gap-1.5"><ShieldCheck className="w-4 h-4" /> VIN-Verified Data</span>
-            <span className="inline-flex items-center gap-1.5"><FileText className="w-4 h-4" /> Dealer-Provided Documents</span>
-            <span className="inline-flex items-center gap-1.5"><CheckCircle2 className="w-4 h-4" /> No Obligation</span>
           </div>
         </section>
 

@@ -34,13 +34,13 @@ export const PriceDropWatch = ({ slug, enabled = true }: Props) => {
   if (state === "done") return (
     <div className="rounded-2xl border border-emerald-200 bg-emerald-50/70 p-4 flex items-center gap-3">
       <span className="w-9 h-9 rounded-xl bg-emerald-100 flex items-center justify-center shrink-0"><Check className="w-5 h-5 text-[#16A34A]" /></span>
-      <div><p className="text-[14px] font-bold text-[#16A34A]">You're on the list</p><p className="text-[12px] text-[#64748B]">We'll email you the moment this price drops.</p></div>
+      <div><p className="text-[14px] font-bold text-[#16A34A]">You're on the list</p><p className="text-[12px] text-[#64748B]">We'll email you about price and availability updates for this vehicle.</p></div>
     </div>
   );
 
   return (
     <div className="rounded-2xl border border-[#E6E8EC] bg-white p-4 shadow-[0_1px_2px_rgba(0,0,0,0.04),0_8px_24px_rgba(0,0,0,0.05)]">
-      <p className="text-[13px] font-semibold inline-flex items-center gap-1.5 mb-2"><BellRing className="w-4 h-4 text-[#2563EB]" /> Notify me if the price drops</p>
+      <p className="text-[13px] font-semibold inline-flex items-center gap-1.5 mb-2"><BellRing className="w-4 h-4 text-[#2563EB]" /> Get price &amp; availability alerts</p>
       <div className="space-y-2">
         <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Your name (optional)" className="w-full h-10 px-3 rounded-xl border border-[#E6E8EC] text-sm outline-none focus:border-[#2563EB]" />
         <div className="flex gap-2">
