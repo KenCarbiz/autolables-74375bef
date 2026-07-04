@@ -21,6 +21,7 @@ import { toast } from "sonner";
 import DealerProgramsPanel from "@/components/admin/DealerProgramsPanel";
 import InstallerInvoicesPanel from "@/components/admin/InstallerInvoicesPanel";
 import PassportPublishingCard from "@/components/admin/PassportPublishingCard";
+import PacketDefaultsPanel from "@/components/admin/PacketDefaultsPanel";
 import { useInstantSave } from "@/hooks/useInstantSave";
 import { TODAYS_PRICE_MODE_OPTIONS, DEFAULT_TODAYS_PRICE_CUSTOM, resolveTodaysPrice } from "@/lib/todaysPrice";
 import { COMP_STRATEGY_OPTIONS, type CompStrategy } from "@/lib/compStrategy";
@@ -1587,6 +1588,7 @@ const Admin = () => {
         {tab === "factory-warranty" && <OemWarrantyPanel />}
         {tab === "passport-ctas" && (
           <div className="space-y-5">
+            <PacketDefaultsPanel />
             <PassportPublishingCard />
             <StickyButtonsPanel />
           </div>

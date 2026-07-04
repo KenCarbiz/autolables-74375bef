@@ -137,7 +137,11 @@ const VehiclePassportDocuments = () => {
   const { listing, loading, notFound } = usePublicListing(vehicleSlug, { preview: isPreview, previewData: MOCK_LISTING as unknown as VehicleListing });
 
   const d = useMemo(() => (listing ? derivePassport(listing) : null), [listing]);
-  const allDocs = useMemo(() => ((listing?.documents as Doc[] | undefined) || []).filter((x) => x.name && x.url), [listing]);
+  // Server strips excluded docs on live listings; this mirrors it for
+  // preview/mock data so curation previews stay honest.
+  const allDocs = useMemo(() => ((listing?.documents as Doc[] | undefined) || [])
+    .filter((x) => x.name && x.url)
+    .filter((x) => (x.type === "window_sticker" ? packetVisible(listing, "oemSticker") : packetVisible(listing, "documents"))), [listing]);
   // Real most-recent upload date — never a hardcoded timestamp.
   const lastUpdated = useMemo(() => {
     const ts = allDocs.map((x) => x.uploaded_at).filter((t): t is string => !!t).sort().pop();

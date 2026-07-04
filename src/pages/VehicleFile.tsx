@@ -1302,9 +1302,19 @@ const ScanInfoPanel = ({ vehicle, onReload }: { vehicle: VehicleRow; onReload: (
   const [accessories, setAccessories] = useState<AvailableAccessory[]>(vehicle.available_accessories || []);
   const [packetModules, setPacketModules] = useState<Record<string, boolean>>(vehicle.packet_modules || {});
   const [saving, setSaving] = useState(false);
+  const { settings: dealerSettings } = useDealerSettings();
+  const storeDefaults = dealerSettings.packet_module_defaults || {};
 
-  const toggleModule = (id: string) =>
-    setPacketModules((prev) => ({ ...prev, [id]: prev[id] === false }));
+  // Three states per module: explicit show, explicit hide, or inherit the
+  // store-wide template. Click cycles inherit -> on -> off -> inherit.
+  const cycleModule = (id: string) =>
+    setPacketModules((prev) => {
+      const next = { ...prev };
+      if (prev[id] === undefined) next[id] = true;
+      else if (prev[id] === true) next[id] = false;
+      else delete next[id];
+      return next;
+    });
 
   const save = async () => {
     setSaving(true);
@@ -1362,18 +1372,26 @@ const ScanInfoPanel = ({ vehicle, onReload }: { vehicle: VehicleRow; onReload: (
         <p className="text-[13px] text-slate-500 mt-0.5">Toggle the sections shoppers see. Recall, price, and verified installs always show.</p>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mt-3">
           {PACKET_MODULES.map((m) => {
-            const on = packetVisible({ packet_modules: packetModules }, m.id);
+            const override = packetModules[m.id];
+            const inherited = override === undefined;
+            const on = packetVisible({ packet_modules: packetModules, packet_defaults: storeDefaults }, m.id);
             return (
               <button
                 key={m.id}
-                onClick={() => toggleModule(m.id)}
+                onClick={() => cycleModule(m.id)}
                 aria-pressed={on}
+                title="Click to cycle: inherit store default, always show, always hide"
                 className={`text-left rounded-2xl border bg-card shadow-[0_1px_3px_rgba(0,0,0,0.06)] p-5 flex flex-col gap-3 min-h-[150px] transition hover:shadow-md ${on ? "border-border" : "border-border opacity-75"}`}
               >
                 <h4 className="text-sm font-bold text-foreground">{m.label}</h4>
                 <p className="text-[13px] text-slate-500 leading-relaxed flex-1">{m.desc}</p>
-                <span className={`inline-flex items-center gap-1.5 self-start h-7 px-3 rounded-full text-xs font-semibold ${on ? "bg-emerald-50 text-emerald-700 border border-emerald-200" : "bg-slate-100 text-slate-500 border border-slate-200"}`}>
-                  <span className={`w-1.5 h-1.5 rounded-full ${on ? "bg-emerald-500" : "bg-slate-400"}`} /> {on ? "Enabled" : "Disabled"}
+                <span className="flex items-center gap-2 flex-wrap">
+                  <span className={`inline-flex items-center gap-1.5 h-7 px-3 rounded-full text-xs font-semibold ${on ? "bg-emerald-50 text-emerald-700 border border-emerald-200" : "bg-slate-100 text-slate-500 border border-slate-200"}`}>
+                    <span className={`w-1.5 h-1.5 rounded-full ${on ? "bg-emerald-500" : "bg-slate-400"}`} /> {on ? "Enabled" : "Disabled"}
+                  </span>
+                  <span className={`inline-flex items-center h-7 px-2.5 rounded-full text-[11px] font-semibold ${inherited ? "bg-blue-50 text-blue-700 border border-blue-200" : "bg-slate-50 text-slate-600 border border-slate-200"}`}>
+                    {inherited ? "Store default" : "This vehicle"}
+                  </span>
                 </span>
               </button>
             );

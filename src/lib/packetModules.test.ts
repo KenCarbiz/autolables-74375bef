@@ -33,4 +33,15 @@ describe("packetVisible", () => {
     expect(packetVisible(null, "photos")).toBe(true);
     expect(packetVisible(undefined, "photos")).toBe(true);
   });
+
+  it("falls back to the store default when the vehicle has no override", () => {
+    expect(packetVisible({ packet_defaults: { photos: false } }, "photos")).toBe(false);
+    expect(packetVisible({ packet_modules: {}, packet_defaults: { photos: false } }, "photos")).toBe(false);
+    expect(packetVisible({ packet_defaults: { photos: true } }, "photos")).toBe(true);
+  });
+
+  it("lets a vehicle override beat the store default in both directions", () => {
+    expect(packetVisible({ packet_modules: { photos: true }, packet_defaults: { photos: false } }, "photos")).toBe(true);
+    expect(packetVisible({ packet_modules: { photos: false }, packet_defaults: { photos: true } }, "photos")).toBe(false);
+  });
 });

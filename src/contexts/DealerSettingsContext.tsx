@@ -268,6 +268,7 @@ export interface DealerSettings {
   // whether Initial Inventory Detail needs photos, and which service tasks
   // require photo proof (comma-separated task labels).
   prep_require_ro: boolean;
+  packet_module_defaults: Record<string, boolean>; // store-wide passport module template
   prep_detail_photos_required: boolean;
   prep_service_photo_tasks: string;
   // Compliance
@@ -442,6 +443,7 @@ export const DEFAULT_SETTINGS: DealerSettings = {
     { label: "Windshield chip repair", category: "glass", severity: "recommended", labor_cost: 0, parts_cost: 0 },
   ],
   prep_require_ro: false,
+  packet_module_defaults: {},
   prep_detail_photos_required: false,
   prep_service_photo_tasks: "Mud flaps installed, Running boards installed",
   cars_act_mode: false,

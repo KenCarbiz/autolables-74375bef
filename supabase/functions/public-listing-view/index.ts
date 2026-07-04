@@ -135,6 +135,11 @@ serve(async (req) => {
         // defaults resolve client-side when absent).
         if (s.todays_price_mode) row.todays_price_mode = s.todays_price_mode;
         if (s.todays_price_custom) row.todays_price_custom = s.todays_price_custom;
+        // Store-wide packet module template; per-vehicle packet_modules
+        // overrides it (see the curation enforcement before the response).
+        if (s.packet_module_defaults && typeof s.packet_module_defaults === "object") {
+          row.packet_defaults = s.packet_module_defaults;
+        }
         // Dealer-entered passport trust content (badges + multi-source reviews).
         const trust = {
           years_in_business: (s.dealer_years_in_business as string) || "",
@@ -535,6 +540,42 @@ serve(async (req) => {
         }
       }
     } catch { /* notification is best-effort; never block the shopper view */ }
+
+    // ── Packet curation enforcement. A module the dealer excluded must not
+    // ship in the public payload at all — client gating alone would still
+    // leak the data to anyone reading the response. Per-vehicle override
+    // wins, then the store template, then visible.
+    try {
+      const perVehicle = (row.packet_modules ?? null) as Record<string, boolean> | null;
+      const storeDefaults = (row.packet_defaults ?? null) as Record<string, boolean> | null;
+      const vis = (id: string): boolean => {
+        const v = perVehicle?.[id];
+        if (typeof v === "boolean") return v;
+        const d = storeDefaults?.[id];
+        if (typeof d === "boolean") return d;
+        return true;
+      };
+      if (!vis("historyReport")) { delete row.history_report; delete row.history_report_url; }
+      if (!vis("recon")) delete row.recon;
+      if (!vis("videos")) delete row.videos;
+      if (!vis("description")) delete row.description;
+      if (!vis("marketValue")) delete row.value_history;
+      if (!vis("warranty")) {
+        delete row.warranty_info; delete row.oem_warranty; delete row.cpo_programs;
+        delete row.service_records; delete row.available_accessories;
+      }
+      const docs = Array.isArray(row.documents) ? row.documents as { type?: string }[] : [];
+      if (!vis("documents")) {
+        row.documents = vis("oemSticker") ? docs.filter((d) => d?.type === "window_sticker") : [];
+      } else if (!vis("oemSticker")) {
+        row.documents = docs.filter((d) => d?.type !== "window_sticker");
+      }
+      // Photos off = no gallery; the single lead photo stays so the packet
+      // header is never an empty frame.
+      if (!vis("photos") && Array.isArray(row.photos)) {
+        row.photos = (row.photos as unknown[]).slice(0, 1);
+      }
+    } catch { /* curation is best-effort shaping; never block the shopper view */ }
 
     return json(200, { listing: row });
   } catch (err) {

@@ -240,7 +240,12 @@ const VehiclePassportV3 = () => {
   const [savedState, setSavedState] = useState<boolean | null>(null);
 
   const d = useMemo(() => (listing ? derivePassport(listing) : null), [listing]);
-  const gallery = useMemo(() => (listing ? listingGallery(listing) : ([] as string[])), [listing]);
+  // Photos module off = lead photo only, no gallery chrome (server also
+  // trims the payload; this keeps preview/mock rendering honest).
+  const gallery = useMemo(() => {
+    const g = listing ? listingGallery(listing) : ([] as string[]);
+    return packetVisible(listing, "photos") ? g : g.slice(0, 1);
+  }, [listing]);
   // Engagement events (schema + dealer dashboard already exist; these are the
   // missing call sites). Fire once per listing load, never in preview.
   useEffect(() => {
@@ -516,7 +521,7 @@ const VehiclePassportV3 = () => {
             </div>
             {photoCount > 1 && <div className="flex gap-2 mt-2 print:hidden">{gallery.slice(0, 6).map((s, i) => <button key={i} onClick={() => setIdx(i)} className="w-[60px] h-11 rounded-lg overflow-hidden bg-[#e9ecef]" style={{ outline: i === idx ? `2px solid ${BLUE}` : "2px solid transparent", outlineOffset: -2 }}><img src={s} alt="" className="w-full h-full object-cover" /></button>)}{photoCount > 6 && <button onClick={() => go("gallery")} className="w-[60px] h-11 rounded-lg bg-black/70 text-white text-[11px] font-bold">+{photoCount - 6}</button>}</div>}
             <div className="flex gap-2 mt-2 print:hidden">
-              <button onClick={() => go("gallery")} className={`flex-1 h-10 rounded-xl border border-[#E6E8EC] bg-white text-[13px] font-semibold inline-flex items-center justify-center gap-1.5 hover:border-[#2563EB]`}><Eye className="w-4 h-4 text-[#2563EB]" /> All Photos ({photoCount})</button>
+              {pv("photos") && <button onClick={() => go("gallery")} className={`flex-1 h-10 rounded-xl border border-[#E6E8EC] bg-white text-[13px] font-semibold inline-flex items-center justify-center gap-1.5 hover:border-[#2563EB]`}><Eye className="w-4 h-4 text-[#2563EB]" /> All Photos ({photoCount})</button>}
               {pv("videos") && listing.videos?.length ? <a href={listing.videos[0].url} target="_blank" rel="noreferrer" className="flex-1 h-10 rounded-xl border border-[#E6E8EC] bg-white text-[13px] font-semibold inline-flex items-center justify-center gap-1.5 hover:border-[#2563EB]"><Play className="w-4 h-4 text-[#2563EB]" /> Walkaround Video</a> : null}
             </div>
           </div>

@@ -37,6 +37,7 @@ export const ADMIN_SETTINGS_INDEX: SettingEntry[] = [
   e("Factory Warranty & CPO", "factory-warranty", ["oem warranty", "cpo", "certified pre-owned", "remaining coverage"]),
   e("Passport Buttons", "passport-ctas", ["sticky buttons", "cta", "call to action", "shopper buttons"]),
   e("Passport Publishing", "passport-ctas", ["auto publish", "auto-publish", "passport publishing", "go live", "publish on intake"], "passport-publishing"),
+  e("Customer Packet Defaults", "passport-ctas", ["packet", "modules", "curation", "ipacket", "hide module", "passport modules", "customer packet"], "packet-defaults"),
   e("Why Buy From Us", "passport-trust", ["trust badges", "dealership story", "reviews", "value props"]),
   e("Lead Routing", "passport-routing", ["contact routing", "who gets leads", "text routing", "passport contact"]),
   e("Analytics", "analytics", ["reports", "metrics", "addendum stats", "compliance events"]),

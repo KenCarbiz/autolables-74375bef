@@ -28,11 +28,20 @@ export const PACKET_MODULES: PacketModule[] = [
   { id: "historyReport", label: "Vehicle history report link", desc: "Your free CARFAX/AutoCheck report link (used and CPO vehicles)" },
 ];
 
-// A module shows unless the dealer explicitly switched it off.
+// Resolution order: per-vehicle override, then the store-wide default
+// template (packet_defaults, attached to the public payload from dealer
+// settings), then visible. A vehicle entry only overrides when explicitly
+// boolean — absent means "inherit the store default".
 export const packetVisible = (
-  listing: { packet_modules?: Record<string, boolean> | null } | null | undefined,
+  listing: {
+    packet_modules?: Record<string, boolean> | null;
+    packet_defaults?: Record<string, boolean> | null;
+  } | null | undefined,
   id: string
 ): boolean => {
-  const m = listing?.packet_modules;
-  return !m || m[id] !== false;
+  const v = listing?.packet_modules?.[id];
+  if (typeof v === "boolean") return v;
+  const d = listing?.packet_defaults?.[id];
+  if (typeof d === "boolean") return d;
+  return true;
 };
