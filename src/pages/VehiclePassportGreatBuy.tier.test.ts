@@ -9,16 +9,20 @@ describe("scoreTier", () => {
     expect(scoreTier(79)).toMatchObject({ label: "Good Buy", verdict: "Good Candidate — Confirm Final Details" });
     expect(scoreTier(70)).toMatchObject({ label: "Good Buy" });
     expect(scoreTier(55)).toMatchObject({ label: "Needs Review", verdict: "Needs Review — Confirm Key Details" });
-    expect(scoreTier(42)).toMatchObject({ label: "Proceed With Caution", verdict: "Confirm Key Details Before Moving Forward" });
+    expect(scoreTier(42)).toMatchObject({ label: "Worth a Closer Look", verdict: "Worth a Closer Look — Talk to the Dealer About This Vehicle", color: "#2563EB" });
   });
 
   it("frames a 60-69 score as a candidate with details to confirm — never excellent, never a warning", () => {
     const t = scoreTier(69);
     expect(t.label).toBe("Worth Reviewing");
-    expect(t.headline).toBe("Strong Buy Candidate");
+    expect(t.headline).toBe("Worth Reviewing");
     expect(t.verdict).toBe("Good Candidate — Confirm Final Details");
     expect(t.label).not.toMatch(/excellent/i);
     expect(t.verdict).not.toMatch(/carefully|caution/i);
+  });
+
+  it("never renders red for any tier", () => {
+    for (const s of [95, 85, 75, 65, 55, 42, 10]) expect(scoreTier(s).color).not.toBe("#DC2626");
   });
 
   it("holds a pending state when the score is null", () => {

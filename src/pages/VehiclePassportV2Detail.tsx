@@ -15,6 +15,7 @@ import { formatPhone } from "@/components/addendum/CustomerInfoSection";
 import { trackLeadSubmitted, trackCustomerEngagement } from "@/lib/engagement/customerEngagement";
 import Logo from "@/components/brand/Logo";
 import { derivePassport, fmt$, type PassportData } from "@/lib/passportV2Data";
+import { readBuildSheet } from "@/lib/buildSheet";
 import { resolveTodaysPrice } from "@/lib/todaysPrice";
 import TodaysPriceExperience from "@/components/passport/TodaysPriceExperience";
 import TestDriveExperience from "@/components/passport/TestDriveExperience";
@@ -36,6 +37,36 @@ const Card = ({ children, className = "" }: { children: React.ReactNode; classNa
   <div className={`rounded-2xl border border-[#E6E8EC] bg-white shadow-[0_1px_2px_rgba(0,0,0,0.04),0_8px_24px_rgba(0,0,0,0.05)] ${className}`}>{children}</div>
 );
 
+const leadErrorMessage = (dealerPhone?: string | null): React.ReactNode => {
+  const tel = dealerPhone ? dealerPhone.replace(/[^\d+]/g, "") : "";
+  return tel
+    ? <span>Couldn't send — <a href={`tel:${tel}`} className="font-bold underline">call the dealership</a> instead</span>
+    : "Couldn't send — please call the dealer directly";
+};
+
+// Compact deal-recap chips — only chips whose underlying data exists.
+const dealRecapChips = (listing: VehicleListing, d: PassportData): string[] => {
+  const bs = readBuildSheet(listing);
+  const cov = d.dealerCoverage.find((c) => c.mode === "included");
+  const reconPoints = d.recon?.workItems.length ?? 0;
+  return [
+    d.belowMarket && d.belowMarket > 0 ? `${fmt$(d.belowMarket)} below market` : null,
+    bs?.estValue ? `${fmt$(bs.estValue)} in factory options` : null,
+    cov?.title || null,
+    reconPoints > 0 ? `${reconPoints}-point reconditioning` : null,
+  ].filter(Boolean) as string[];
+};
+
+const DealRecap = ({ listing, d, className = "" }: { listing: VehicleListing; d: PassportData; className?: string }) => {
+  const chips = dealRecapChips(listing, d);
+  if (!chips.length) return null;
+  return (
+    <div className={`flex flex-wrap gap-1.5 ${className}`}>
+      {chips.map((c) => <span key={c} className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-full px-2.5 py-1"><CheckCircle2 className="w-3 h-3 shrink-0" />{c}</span>)}
+    </div>
+  );
+};
+
 const Stars = ({ n, size = 16 }: { n: number; size?: number }) => (
   <div className="inline-flex items-center gap-0.5">
     {[0, 1, 2, 3, 4].map((i) => (
@@ -45,13 +76,24 @@ const Stars = ({ n, size = 16 }: { n: number; size?: number }) => (
 );
 
 // Honest "data not available yet" panel with a dealer-facing hint.
-const Unavailable = ({ what, hint }: { what: string; hint?: string }) => (
-  <Card className="p-6 text-center">
-    <span className="w-12 h-12 rounded-2xl bg-slate-100 text-slate-400 flex items-center justify-center mx-auto mb-3"><Package className="w-6 h-6" /></span>
-    <p className="text-[15px] font-bold text-slate-700">{what} isn't available yet</p>
-    <p className="text-[13px] text-slate-500 mt-1.5 max-w-sm mx-auto">{hint || "The dealership can add this information to the vehicle's passport. Contact them for the latest details."}</p>
-  </Card>
-);
+const Unavailable = ({ what, hint }: { what: string; hint?: string }) => {
+  const navigate = useNavigate();
+  const location = useLocation();
+  const params = useParams<{ vehicleSlug?: string; slug?: string }>();
+  const slug = params.vehicleSlug ?? params.slug;
+  const base = location.pathname.startsWith("/v/") ? "v" : location.pathname.startsWith("/passport-v3") ? "passport-v3" : "passport-v2";
+  const q = typeof window !== "undefined" && new URLSearchParams(window.location.search).has("preview") ? "?preview=1" : "";
+  return (
+    <Card className="p-6 text-center">
+      <span className="w-12 h-12 rounded-2xl bg-slate-100 text-slate-400 flex items-center justify-center mx-auto mb-3"><Package className="w-6 h-6" /></span>
+      <p className="text-[15px] font-bold text-slate-700">{what} isn't available yet</p>
+      <p className="text-[13px] text-slate-500 mt-1.5 max-w-sm mx-auto">{hint || "The dealership can add this information to the vehicle's passport. Contact them for the latest details."}</p>
+      {slug && (
+        <button onClick={() => navigate(`/${base}/${slug}/contact${q}`)} className="mt-4 h-11 px-5 rounded-xl bg-[#2563EB] text-white text-[13px] font-bold inline-flex items-center justify-center gap-2"><MessageSquare className="w-4 h-4" /> Contact the dealership</button>
+      )}
+    </Card>
+  );
+};
 
 // ── Lead-capture form (shared by contact / trade / reserve / etc.) ──
 // extraNotes lets intent pages append structured context (test-drive time,
@@ -127,7 +169,7 @@ const LeadForm = ({
       onDone?.();
     } catch {
       if (flowPrefix) trackFlow(listing, `${flowPrefix}_form_error`);
-      toast.error("Couldn't send — please call the dealer directly");
+      toast.error(leadErrorMessage(dealerPhone));
     }
     finally { setSending(false); }
   };
@@ -172,8 +214,7 @@ const Sparkline = ({ points }: { points: number[] }) => {
     const y = pad + (1 - (p - min) / span) * (h - pad * 2);
     return `${x.toFixed(1)},${y.toFixed(1)}`;
   });
-  const down = points[points.length - 1] <= points[0];
-  const stroke = down ? "#059669" : "#e11d48";
+  const stroke = "#059669";
   return (
     <svg viewBox={`0 0 ${w} ${h}`} className="w-full h-28 mt-3" preserveAspectRatio="none">
       <polyline points={coords.join(" ")} fill="none" stroke={stroke} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
@@ -209,7 +250,7 @@ const trackFlow = (listing: VehicleListing, event: string, extra: Record<string,
   });
 
 const RESERVE_STEPS = ["Submit Request", "Dealer Confirms Availability", "Vehicle Held For You"];
-const RESERVE_TIMINGS = ["Today", "This Week", "Checking Availability"];
+const RESERVE_TIMINGS = ["Today", "This Week"];
 const CONTACT_METHODS: { key: string; label: string; icon: React.ElementType }[] = [
   { key: "call", label: "Call", icon: Phone },
   { key: "text", label: "Text", icon: MessageSquare },
@@ -298,7 +339,7 @@ const ReserveExperience = ({ listing, d, navigate }: { listing: VehicleListing; 
       window.scrollTo({ top: 0, behavior: "smooth" });
     } catch {
       trackFlow(listing, "reserve_form_error");
-      toast.error("Couldn't send — please call the dealer directly");
+      toast.error(leadErrorMessage(d.dealerPhone));
     } finally { setSending(false); }
   };
 
@@ -312,7 +353,7 @@ const ReserveExperience = ({ listing, d, navigate }: { listing: VehicleListing; 
             <p className="text-[13px] font-bold leading-tight truncate">{listing.ymm}{listing.trim ? ` ${listing.trim}` : ""}</p>
             <p className="text-[15px] font-extrabold text-[#2563EB] leading-tight">{d.price != null ? fmt$(d.price) : ""}</p>
           </div>
-          <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-full px-2 py-0.5 shrink-0">Available Now</span>
+          <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-full px-2 py-0.5 shrink-0">Currently Listed</span>
         </div>
       ) : (
         <>
@@ -321,7 +362,7 @@ const ReserveExperience = ({ listing, d, navigate }: { listing: VehicleListing; 
           </div>
           <div className="flex items-start justify-between gap-2 mt-3.5">
             <p className="text-[17px] font-extrabold leading-tight">{listing.ymm}{listing.trim ? ` ${listing.trim}` : ""}</p>
-            <span className="text-[10.5px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-full px-2.5 py-1 shrink-0 mt-0.5">Ready to Reserve</span>
+            <span className="text-[10.5px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-full px-2.5 py-1 shrink-0 mt-0.5">Currently Listed</span>
           </div>
           {d.price != null && <p className="text-[26px] font-extrabold tracking-tight text-[#2563EB] mt-1">{fmt$(d.price)}</p>}
           <div className="mt-3 space-y-2 text-[12.5px] text-slate-600">
@@ -330,8 +371,9 @@ const ReserveExperience = ({ listing, d, navigate }: { listing: VehicleListing; 
             {stockNo && <p className="flex items-center gap-2"><Package className="w-4 h-4 text-slate-400 shrink-0" /> Stock <span className="text-slate-500">#{stockNo}</span></p>}
             {d.dealerName && <p className="flex items-center gap-2"><Building2 className="w-4 h-4 text-slate-400 shrink-0" /> {d.dealerName}</p>}
           </div>
+          <DealRecap listing={listing} d={d} className="mt-3" />
           <ul className="mt-4 space-y-2.5 border-t border-[#F1F5F9] pt-4">
-            {["Fully refundable reservation request", "No online payment required", "Dealer-confirmed availability", "Linked to this exact Vehicle Passport"].map((b) => (
+            {["No payment required — the dealership confirms everything with you.", "Dealer-confirmed availability", "Linked to this exact Vehicle Passport"].map((b) => (
               <li key={b} className="flex items-start gap-2 text-[12.5px] text-slate-700"><CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0 mt-0.5" />{b}</li>
             ))}
           </ul>
@@ -593,7 +635,7 @@ const ContactExperience = ({ listing, d, navigate }: { listing: VehicleListing; 
       window.scrollTo({ top: 0, behavior: "smooth" });
     } catch {
       trackFlow(listing, "contact_form_error");
-      toast.error("Couldn't send — please call the dealer directly");
+      toast.error(leadErrorMessage(d.dealerPhone));
     } finally { setSending(false); }
   };
 
@@ -607,7 +649,7 @@ const ContactExperience = ({ listing, d, navigate }: { listing: VehicleListing; 
             <p className="text-[13px] font-bold leading-tight truncate">{listing.ymm}{listing.trim ? ` ${listing.trim}` : ""}</p>
             <p className="text-[15px] font-extrabold text-[#2563EB] leading-tight">{d.price != null ? fmt$(d.price) : ""}</p>
           </div>
-          <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-full px-2 py-0.5 shrink-0">Available Now</span>
+          <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-full px-2 py-0.5 shrink-0">Currently Listed</span>
         </div>
       ) : (
         <>
@@ -616,7 +658,7 @@ const ContactExperience = ({ listing, d, navigate }: { listing: VehicleListing; 
           </div>
           <div className="flex items-start justify-between gap-2 mt-3.5">
             <p className="text-[17px] font-extrabold leading-tight">{listing.ymm}{listing.trim ? ` ${listing.trim}` : ""}</p>
-            <span className="text-[10.5px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-full px-2.5 py-1 shrink-0 mt-0.5">Available Now</span>
+            <span className="text-[10.5px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-full px-2.5 py-1 shrink-0 mt-0.5">Currently Listed</span>
           </div>
           {d.price != null && <p className="text-[26px] font-extrabold tracking-tight text-[#2563EB] mt-1">{fmt$(d.price)}</p>}
           <div className="mt-3 space-y-2 text-[12.5px] text-slate-600">
@@ -625,6 +667,7 @@ const ContactExperience = ({ listing, d, navigate }: { listing: VehicleListing; 
             {stockNo && <p className="flex items-center gap-2"><Package className="w-4 h-4 text-slate-400 shrink-0" /> Stock <span className="text-slate-500">#{stockNo}</span></p>}
             {d.dealerName && <p className="flex items-center gap-2"><Building2 className="w-4 h-4 text-slate-400 shrink-0" /> {d.dealerName}</p>}
           </div>
+          <DealRecap listing={listing} d={d} className="mt-3" />
           <ul className="mt-4 space-y-2.5 border-t border-[#F1F5F9] pt-4">
             {["Message tied to this exact vehicle", "Dealer receives vehicle details automatically", "No obligation", "Vehicle Passport included"].map((b) => (
               <li key={b} className="flex items-start gap-2 text-[12.5px] text-slate-700"><CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0 mt-0.5" />{b}</li>
@@ -812,7 +855,7 @@ const SECTIONS: Record<string, { title: string; render: SectionRender; wide?: bo
     title: "Verification Report",
     render: ({ d }) => (
       <>
-        <SectionHeading icon={ShieldCheck} title="Verification Report" subtitle="Every check we ran against trusted automotive data." />
+        <SectionHeading icon={ShieldCheck} title="Verification Report" subtitle="Every check on this vehicle against trusted automotive data." />
         <Card className="p-5 !border-emerald-200 !bg-emerald-50/40">
           <div className="space-y-3">
             {d.verifyRows.map((r) => (
@@ -835,25 +878,35 @@ const SECTIONS: Record<string, { title: string; render: SectionRender; wide?: bo
   },
   "market-price": {
     title: "Market Price Analysis",
-    render: ({ d }) => (
-      <>
-        <SectionHeading icon={DollarSign} title="Market Price Analysis" subtitle="How this vehicle's price compares to the market." />
-        {d.marketAvg != null && d.price != null ? (
-          <Card className="p-5">
-            {d.belowMarket && d.belowMarket > 0 && <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-emerald-600 text-white text-[13px] font-bold mb-3"><BadgeCheck className="w-4 h-4" /> Great Price · {fmt$(d.belowMarket)} below market average</div>}
-            <div className="grid grid-cols-3 text-center text-[13px] gap-2">
-              <div className="rounded-xl bg-slate-50 py-3"><div className="text-slate-500 text-[11px]">Market Low</div><div className="font-bold mt-0.5">{fmt$(d.marketLow ?? Math.round(d.marketAvg * 0.9))}</div></div>
-              <div className="rounded-xl bg-emerald-50 py-3"><div className="text-emerald-600 text-[11px]">Our Price</div><div className="font-extrabold text-emerald-700 mt-0.5">{fmt$(d.price)}</div></div>
-              <div className="rounded-xl bg-slate-50 py-3"><div className="text-slate-500 text-[11px]">Market High</div><div className="font-bold mt-0.5">{fmt$(d.marketHigh ?? Math.round(d.marketAvg * 1.1))}</div></div>
-            </div>
-            <div className="mt-3 flex items-center justify-between text-[13px] rounded-xl bg-slate-50 px-4 py-3">
-              <span className="text-slate-500">Market average</span><span className="font-bold">{fmt$(d.marketAvg)}</span>
-            </div>
-            <p className="text-[11px] text-slate-400 mt-3 leading-snug">Market values provided by MarketCheck and third-party data sources. Actual market conditions may vary by region and time.</p>
-          </Card>
-        ) : <Unavailable what="Market pricing" hint="Live MarketCheck comparables are not yet available for this vehicle." />}
-      </>
-    ),
+    render: ({ d }) => {
+      const hasRange = d.marketLow != null && d.marketHigh != null;
+      const showAvg = d.marketAvg != null && d.price != null && d.price <= d.marketAvg;
+      return (
+        <>
+          <SectionHeading icon={DollarSign} title="Market Price Analysis" subtitle="How this vehicle's price compares to the market." />
+          {d.price != null && (hasRange || showAvg) ? (
+            <Card className="p-5">
+              {d.belowMarket && d.belowMarket > 0 && <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-emerald-600 text-white text-[13px] font-bold mb-3"><BadgeCheck className="w-4 h-4" /> Great Price · {fmt$(d.belowMarket)} below market average</div>}
+              {hasRange ? (
+                <div className="grid grid-cols-3 text-center text-[13px] gap-2">
+                  <div className="rounded-xl bg-slate-50 py-3"><div className="text-slate-500 text-[11px]">Market Low</div><div className="font-bold mt-0.5">{fmt$(d.marketLow)}</div></div>
+                  <div className="rounded-xl bg-emerald-50 py-3"><div className="text-emerald-600 text-[11px]">Our Price</div><div className="font-extrabold text-emerald-700 mt-0.5">{fmt$(d.price)}</div></div>
+                  <div className="rounded-xl bg-slate-50 py-3"><div className="text-slate-500 text-[11px]">Market High</div><div className="font-bold mt-0.5">{fmt$(d.marketHigh)}</div></div>
+                </div>
+              ) : (
+                <div className="rounded-xl bg-emerald-50 text-center text-[13px] py-3"><div className="text-emerald-600 text-[11px]">Our Price</div><div className="font-extrabold text-emerald-700 mt-0.5">{fmt$(d.price)}</div></div>
+              )}
+              {showAvg && (
+                <div className="mt-3 flex items-center justify-between text-[13px] rounded-xl bg-slate-50 px-4 py-3">
+                  <span className="text-slate-500">Market average</span><span className="font-bold">{fmt$(d.marketAvg)}</span>
+                </div>
+              )}
+              <p className="text-[11px] text-slate-400 mt-3 leading-snug">Market values provided by third-party data sources. Actual market conditions may vary by region and time.</p>
+            </Card>
+          ) : <Unavailable what="Market pricing" hint="Live market comparables are not yet available for this vehicle." />}
+        </>
+      );
+    },
   },
   "market-demand": {
     title: "Market Demand",
@@ -884,7 +937,7 @@ const SECTIONS: Record<string, { title: string; render: SectionRender; wide?: bo
             <ul className="mt-3 space-y-2.5 text-[14px]">
               <li className="flex items-center gap-2.5"><CheckCircle2 className="w-4 h-4 text-emerald-600" />Priced below market average</li>
               <li className="flex items-center gap-2.5"><CheckCircle2 className="w-4 h-4 text-emerald-600" />Backed by live market comparables</li>
-              <li className="flex items-center gap-2.5"><CheckCircle2 className="w-4 h-4 text-emerald-600" />Independently analyzed by MarketCheck</li>
+              <li className="flex items-center gap-2.5"><CheckCircle2 className="w-4 h-4 text-emerald-600" />Compared against live market data</li>
             </ul>
             <p className="text-[11px] text-slate-400 mt-3">Powered by MarketCheck.</p>
           </Card>
@@ -905,11 +958,11 @@ const SECTIONS: Record<string, { title: string; render: SectionRender; wide?: bo
             <>
               <Card className="p-5 mb-4">
                 <div className="flex flex-wrap items-baseline gap-x-6 gap-y-2">
-                  {d.priceChange7d != null && (
-                    <div><p className="text-[11px] text-slate-500">7-Day change</p><p className={`text-[20px] font-extrabold ${d.priceChange7d < 0 ? "text-emerald-600" : d.priceChange7d > 0 ? "text-rose-600" : "text-slate-900"}`}>{d.priceChange7d === 0 ? "No change" : `${d.priceChange7d < 0 ? "-" : "+"}${fmt$(Math.abs(d.priceChange7d))}`}</p></div>
+                  {d.priceChange7d != null && d.priceChange7d <= 0 && (
+                    <div><p className="text-[11px] text-slate-500">7-Day change</p><p className={`text-[20px] font-extrabold ${d.priceChange7d < 0 ? "text-emerald-600" : "text-slate-900"}`}>{d.priceChange7d === 0 ? "No change" : `-${fmt$(Math.abs(d.priceChange7d))}`}</p></div>
                   )}
-                  {d.priceChangeTotal != null && (
-                    <div><p className="text-[11px] text-slate-500">Since first tracked</p><p className={`text-[20px] font-extrabold ${d.priceChangeTotal < 0 ? "text-emerald-600" : d.priceChangeTotal > 0 ? "text-rose-600" : "text-slate-900"}`}>{d.priceChangeTotal === 0 ? "No change" : `${d.priceChangeTotal < 0 ? "-" : "+"}${fmt$(Math.abs(d.priceChangeTotal))}`}</p></div>
+                  {d.priceChangeTotal != null && d.priceChangeTotal <= 0 && (
+                    <div><p className="text-[11px] text-slate-500">Since first tracked</p><p className={`text-[20px] font-extrabold ${d.priceChangeTotal < 0 ? "text-emerald-600" : "text-slate-900"}`}>{d.priceChangeTotal === 0 ? "No change" : `-${fmt$(Math.abs(d.priceChangeTotal))}`}</p></div>
                   )}
                 </div>
                 <Sparkline points={pts.map((p) => p.listing_price as number)} />
@@ -924,7 +977,7 @@ const SECTIONS: Record<string, { title: string; render: SectionRender; wide?: bo
                 <p className="text-[11px] text-slate-400 mt-3">Powered by MarketCheck price tracking.</p>
               </Card>
             </>
-          ) : <Unavailable what="Price history" hint="We need at least two captured price points to show a trend. Tracking continues as MarketCheck re-checks this vehicle." />}
+          ) : <Unavailable what="Price history" hint="We need at least two captured price points to show a trend. Tracking continues as this vehicle is re-checked." />}
         </>
       );
     },
@@ -932,15 +985,6 @@ const SECTIONS: Record<string, { title: string; render: SectionRender; wide?: bo
   "comparable-vehicles": {
     title: "Comparable Vehicles",
     render: ({ slug, listing, d }) => <CompsSection slug={slug} listing={listing} d={d} />,
-  },
-  "inventory-trend": {
-    title: "Inventory Trend",
-    render: () => (
-      <>
-        <SectionHeading icon={Package} title="Inventory Trend" subtitle="Market supply for this model." />
-        <Unavailable what="Inventory trend" hint="30-day inventory movement for comparable vehicles is sourced from MarketCheck and appears here when available." />
-      </>
-    ),
   },
   "specifications": {
     title: "Specifications",
@@ -1037,7 +1081,7 @@ const SECTIONS: Record<string, { title: string; render: SectionRender; wide?: bo
         {d.warrantyStr ? (() => {
           const w = d.warranty;
           const milesLeft = w.factory_miles != null && listing.mileage != null ? Math.max(0, w.factory_miles - listing.mileage) : w.factory_miles ?? null;
-          const milesPct = w.factory_miles && listing.mileage != null ? Math.max(4, 100 - Math.min(100, (listing.mileage / w.factory_miles) * 100)) : 65;
+          const milesPct = w.factory_miles && listing.mileage != null ? Math.max(4, 100 - Math.min(100, (listing.mileage / w.factory_miles) * 100)) : null;
           let yrsLeft: number | null = null; let expiry: string | null = null;
           if (w.in_service_date && w.factory_months) {
             const end = new Date(w.in_service_date); end.setMonth(end.getMonth() + w.factory_months);
@@ -1046,9 +1090,9 @@ const SECTIONS: Record<string, { title: string; render: SectionRender; wide?: bo
           }
           return (
             <Card className="p-5">
-              <span className="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wide text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-full px-2 py-0.5 mb-2"><ShieldCheck className="w-3 h-3" /> OEM Verified</span>
+              <span className="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wide text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-full px-2 py-0.5 mb-2"><ShieldCheck className="w-3 h-3" /> OEM Data</span>
               <p className="text-base font-bold">Factory warranty remaining</p>
-              <div className="mt-3 h-3 rounded-full bg-slate-100 overflow-hidden"><div className="h-full rounded-full bg-emerald-500" style={{ width: `${milesPct}%` }} /></div>
+              {milesPct != null && <div className="mt-3 h-3 rounded-full bg-slate-100 overflow-hidden"><div className="h-full rounded-full bg-emerald-500" style={{ width: `${milesPct}%` }} /></div>}
               <div className="flex items-center gap-6 mt-3 text-[14px]">
                 {yrsLeft != null && <span><span className="font-bold">{yrsLeft >= 1 ? `${Math.floor(yrsLeft)} yr` : `${Math.round(yrsLeft * 12)} mo`}</span> <span className="text-slate-500">remaining</span></span>}
                 {milesLeft != null && <span><span className="font-bold">{milesLeft.toLocaleString()} mi</span> <span className="text-slate-500">remaining</span></span>}
@@ -1146,14 +1190,6 @@ const SECTIONS: Record<string, { title: string; render: SectionRender; wide?: bo
   "dealer": {
     title: "About the Dealership",
     render: ({ d }) => {
-      const chips = [
-        { icon: Building2, t: "Family Owned", s: "Trusted locally" },
-        { icon: Star, t: d.reviewRating != null ? `${d.reviewRating.toFixed(1)} Rating` : "Top Rated", s: d.reviewCount != null ? `${d.reviewCount.toLocaleString()} reviews` : "Verified buyers" },
-        { icon: Wrench, t: "Factory Certified", s: "Trained technicians" },
-        { icon: Settings, t: "Service Center", s: "On-site" },
-        { icon: Truck, t: "Delivery", s: "Available" },
-        { icon: ShieldCheck, t: "Customer Commitment", s: "No pressure" },
-      ];
       return (
         <>
           <SectionHeading icon={Building2} title={d.dealerName} subtitle="Why shoppers buy here." />
@@ -1167,11 +1203,6 @@ const SECTIONS: Record<string, { title: string; render: SectionRender; wide?: bo
                 {d.dealerTrust.bbbRating && <div className="text-center"><p className="text-[24px] font-extrabold text-[#2563EB] leading-none">{d.dealerTrust.bbbRating}</p><p className="text-[11px] text-slate-500 mt-1">BBB Rating</p></div>}
               </div>
             )}
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-5">
-              {chips.map((c, i) => (
-                <div key={i} className="flex items-start gap-3"><span className="w-11 h-11 rounded-xl bg-blue-50 flex items-center justify-center shrink-0"><c.icon className="w-5 h-5 text-[#2563EB]" /></span><div><p className="text-[14px] font-bold leading-tight">{c.t}</p><p className="text-[12px] text-slate-500 mt-0.5">{c.s}</p></div></div>
-              ))}
-            </div>
             {d.dealerTrust.certifications.length > 0 && (
               <div className="flex flex-wrap gap-2 mt-5">
                 {d.dealerTrust.certifications.map((c, i) => <span key={i} className="inline-flex items-center gap-1.5 text-[12px] font-semibold text-slate-700 bg-slate-100 rounded-full px-3 py-1.5"><Award className="w-3.5 h-3.5 text-[#2563EB]" />{c}</span>)}
@@ -1219,24 +1250,24 @@ const SECTIONS: Record<string, { title: string; render: SectionRender; wide?: bo
   // ── Lead-capture sections ──
   "check-availability": {
     title: "Check Availability",
-    render: ({ listing }) => (<><SectionHeading icon={CheckCircle2} title="Check Availability" subtitle="Confirm this vehicle is still available and get details." /><LeadForm listing={listing} intent="check_availability" label="Check Availability" cta="Check availability" /></>),
+    render: ({ listing, d }) => (<><SectionHeading icon={CheckCircle2} title="Check Availability" subtitle="Confirm this vehicle is still available and get details." /><DealRecap listing={listing} d={d} className="mb-3" /><LeadForm listing={listing} intent="check_availability" label="Check Availability" cta="Check availability" dealerPhone={d.dealerPhone} /></>),
   },
   "contact": {
     title: "Contact the Dealer",
     wide: true,
     hideCrossCta: true,
-    headerPill: "Available Now",
+    headerPill: "Currently Listed",
     render: ({ listing, d, navigate }) => <ContactExperience listing={listing} d={d} navigate={navigate} />,
   },
   "trade": {
     title: "Value My Trade",
-    render: ({ listing }) => (<><SectionHeading icon={GaugeIcon} title="Value My Trade" subtitle="Know your trade value in minutes." /><LeadForm listing={listing} intent="trade" label="Value My Trade" cta="Get my trade value" /></>),
+    render: ({ listing, d }) => (<><SectionHeading icon={GaugeIcon} title="Value My Trade" subtitle="Know your trade value in minutes." /><DealRecap listing={listing} d={d} className="mb-3" /><LeadForm listing={listing} intent="trade" label="Value My Trade" cta="Get my trade value" dealerPhone={d.dealerPhone} /></>),
   },
   "reserve": {
     title: "Reserve This Vehicle",
     wide: true,
     hideCrossCta: true,
-    headerPill: "Available Now",
+    headerPill: "Currently Listed",
     render: ({ listing, d, navigate }) => <ReserveExperience listing={listing} d={d} navigate={navigate} />,
   },
   "test-drive": {
@@ -1323,7 +1354,7 @@ const SECTIONS: Record<string, { title: string; render: SectionRender; wide?: bo
 const CompsSection = ({ slug, listing, d }: { slug: string; listing: VehicleListing; d: PassportData }) => {
   const [state, setState] = useState<"loading" | "ready" | "empty">("loading");
   const [reason, setReason] = useState<string | null>(null);
-  const [data, setData] = useState<{ count: number; startingAt: number | null; median: number | null; comparables: { vin: string | null; price: number | null; miles: number | null; heading: string; trim: string | null; dealer: string; distance: number | null }[] } | null>(null);
+  const [data, setData] = useState<{ count: number; median: number | null; comparables: { vin: string | null; price: number | null; miles: number | null; heading: string; trim: string | null; dealer: string; distance: number | null }[] } | null>(null);
 
   useEffect(() => {
     let mounted = true;
@@ -1349,14 +1380,14 @@ const CompsSection = ({ slug, listing, d }: { slug: string; listing: VehicleList
         <Card className="p-5"><div className="space-y-3">{[0, 1, 2].map((i) => <div key={i} className="h-12 bg-slate-100 rounded-xl animate-pulse" />)}</div></Card>
       ) : state === "empty" || !data ? (
         reason === "no_value_comps"
-          ? <Unavailable what="Comparable listings" hint="Not enough comparable higher-priced listings were found nearby. Only comps that are a fair, value-supporting comparison are shown here — the section stays honest instead of filling with weak matches." />
+          ? <Unavailable what="Comparable listings" hint="A fair comparison set isn't available for this vehicle right now." />
           : <Unavailable what="Comparable listings" hint="A live comparable set (year, trim, mileage, and price) is sourced from MarketCheck and appears here when available for this vehicle and market." />
       ) : (
         <>
           <Card className="p-5">
             <div className="flex flex-wrap items-baseline gap-x-6 gap-y-2">
-              <div><p className="text-[11px] text-slate-500">Comparable vehicles analyzed</p><p className="text-[22px] font-extrabold">{data.count.toLocaleString()}</p></div>
-              {data.median != null && <div><p className="text-[11px] text-slate-500">Comparable median</p><p className="text-[22px] font-extrabold">{fmt$(data.median)}</p></div>}
+              <div><p className="text-[11px] text-slate-500">Comparable vehicles analyzed</p><p className="text-[22px] font-extrabold">{(d.marketMeta.similarCount ?? data.count).toLocaleString()}</p></div>
+              {data.median != null && ourPrice != null && data.median >= ourPrice && <div><p className="text-[11px] text-slate-500">Comparable median</p><p className="text-[22px] font-extrabold">{fmt$(data.median)}</p></div>}
               {ourPrice != null && <div><p className="text-[11px] text-slate-500">This vehicle</p><p className="text-[22px] font-extrabold text-[#2563EB]">{fmt$(ourPrice)}</p></div>}
             </div>
             {allAtOrAbove && (
@@ -1391,7 +1422,7 @@ const CompsSection = ({ slug, listing, d }: { slug: string; listing: VehicleList
                   );
                 })}
               </div>
-              <p className="text-[11px] text-slate-400 mt-3">Similar nearby listings are shown when they support the local value story for this vehicle.</p>
+              <p className="text-[11px] text-slate-400 mt-3">Comparable listings provided by MarketCheck.</p>
             </Card>
           )}
         </>
@@ -1448,7 +1479,14 @@ const VehiclePassportV2Detail = () => {
 
   if (notFound || !listing || !d) return (
     <div className="min-h-screen flex items-center justify-center px-6 bg-[#F6F7F9]">
-      <div className="text-center"><Package className="w-12 h-12 text-slate-300 mx-auto mb-4" /><h1 className="text-xl font-bold">Vehicle unavailable</h1><p className="text-sm text-slate-500 mt-2">This listing may have been sold or unpublished.</p></div>
+      <div className="text-center">
+        <Package className="w-12 h-12 text-slate-300 mx-auto mb-4" />
+        <h1 className="text-xl font-bold">This vehicle may have just sold</h1>
+        <p className="text-sm text-slate-500 mt-2">Ask {d?.dealerName || "the dealership"} about similar vehicles in stock.</p>
+        {d?.dealerPhone && (
+          <a href={`tel:${d.dealerPhone.replace(/[^\d+]/g, "")}`} className="mt-4 h-11 px-5 rounded-xl bg-[#2563EB] text-white text-sm font-bold inline-flex items-center justify-center gap-2"><Phone className="w-4 h-4" /> Call {d.dealerName || "the dealership"}</a>
+        )}
+      </div>
     </div>
   );
 

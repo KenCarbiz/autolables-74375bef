@@ -204,7 +204,7 @@ const CATALOG: DocDescriptor[] = [
         const lines = (rc?.campaigns || []).map((c) => `${c.campaignNumber ? c.campaignNumber + ": " : ""}${c.summary || c.component || "Open campaign"}`);
         return { status: "action_required", statusText: "Recall Pending — See Dealer", detailLines: lines.length ? lines : ["One or more open recalls on record. Contact the dealer before purchase."] };
       }
-      return { status: "on_file", statusText: "No Open Recalls — NHTSA Verified", date: rc?.checked_at, detailLines: ["This vehicle has no open NHTSA safety recalls on record and passes all safety checks."] };
+      return { status: "on_file", statusText: "No Open Recalls — NHTSA Verified", date: rc?.checked_at, detailLines: ["This vehicle has no open NHTSA safety recalls on record."] };
     },
   },
   {
@@ -840,9 +840,9 @@ const PublicDocuments = () => {
               <Lock className="w-6 h-6" />
             </div>
             <div>
-              <p className="font-black text-slate-900 mb-1">All documents are verified and secure.</p>
+              <p className="font-black text-slate-900 mb-1">Stored securely and available on any device.</p>
               <ul className="grid grid-cols-1 sm:grid-cols-2 gap-x-5 gap-y-1">
-                {["Checked for compliance and accuracy", "Virus scanned and encrypted", "Stored securely in the cloud", "Always accessible on any device"].map((t) => (
+                {["Virus scanned and encrypted", "Stored securely in the cloud"].map((t) => (
                   <li key={t} className="flex items-center gap-1.5 text-xs text-slate-600">
                     <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 shrink-0" /> {t}
                   </li>
@@ -909,7 +909,7 @@ const PublicDocuments = () => {
           <p className="text-sm text-slate-600 leading-relaxed">
             All documents on this page are authentic and unaltered. Pricing documents reflect this vehicle's complete
             advertised selling price. Optional products and services are itemized separately and require written customer
-            authorization prior to purchase. This vehicle is presented using AutoLabels' FTC-aligned 50-state disclosure engine.
+            authorization prior to purchase.
           </p>
           <p className="text-xs text-slate-400 mt-3">
             {dealerName}

@@ -44,9 +44,10 @@ const ScoreRing = ({ score, size = 156 }: { score: number; size?: number }) => {
 };
 
 // Mobile accordion card (one open at a time, ≥64px touch target).
-type MStatus = "verified" | "attention";
+type MStatus = "verified" | "attention" | "info";
 const MAcc = ({ open, onToggle, icon: Icon, title, desc, status, children }: { open: boolean; onToggle: () => void; icon: React.ElementType; title: string; desc: string; status: MStatus; children: React.ReactNode }) => {
   const sc = status === "verified" ? { c: "text-[#16A34A]", bg: "bg-emerald-50", l: "Verified" }
+    : status === "info" ? { c: "text-[#64748B]", bg: "bg-slate-100", l: "Available" }
     : { c: "text-[#D97706]", bg: "bg-amber-50", l: "Needs Review" };
   return (
     <div className={`${CARD} overflow-hidden`}>
@@ -65,7 +66,7 @@ const VehiclePassportHistory = () => {
   const params = useParams<{ vehicleSlug?: string; slug?: string }>();
   const vehicleSlug = params.vehicleSlug ?? params.slug;
   const navigate = useNavigate();
-  const [mOpen, setMOpen] = useState<string | null>("title");  // mobile: one accordion open
+  const [mOpen, setMOpen] = useState<string | null>(null);  // mobile: one accordion open
   const [ringFill, setRingFill] = useState(false);              // mobile: ring fills on load
 
   useEffect(() => { const r = requestAnimationFrame(() => setRingFill(true)); return () => cancelAnimationFrame(r); }, []);
@@ -146,15 +147,20 @@ const VehiclePassportHistory = () => {
     </section>
   );
 
-  const TitleVerdict = () => d.cleanTitle ? (
+  const TitleVerdict = () => d.titleStatus === "clean" ? (
     <div className="rounded-2xl border border-emerald-200 bg-emerald-50/70 p-5 flex items-center gap-3">
       <CheckCircle2 className="w-7 h-7 text-[#16A34A] shrink-0" />
       <div><p className="text-[16px] font-extrabold text-[#16A34A]">Clean title — no brands on record</p><p className="text-[12px] text-[#64748B]">No salvage, flood, lemon, or rebuilt brands reported by vehicle history providers.</p></div>
     </div>
-  ) : (
+  ) : d.titleStatus === "branded" ? (
     <div className="rounded-2xl border border-amber-200 bg-amber-50/70 p-5 flex items-center gap-3">
       <AlertTriangle className="w-7 h-7 text-[#D97706] shrink-0" />
-      <div><p className="text-[16px] font-extrabold text-[#B45309]">Title status pending dealer confirmation</p><p className="text-[12px] text-[#64748B]">Ask {dealerName} for the title record before purchase.</p></div>
+      <div><p className="text-[16px] font-extrabold text-[#B45309]">Title brand on record</p><p className="text-[12px] text-[#64748B]">Review the title record with {dealerName}.</p></div>
+    </div>
+  ) : (
+    <div className="rounded-2xl border border-[#E6E8EC] bg-white p-5 flex items-center gap-3">
+      <FileText className="w-7 h-7 text-[#64748B] shrink-0" />
+      <div><p className="text-[16px] font-extrabold text-[#0F172A]">Title record available from the dealership</p><p className="text-[12px] text-[#64748B]">Ask {dealerName} and we'll walk you through it.</p></div>
     </div>
   );
 
@@ -210,11 +216,11 @@ const VehiclePassportHistory = () => {
   const NotOnFile = () => missing.length === 0 ? null : (
     <div className={`${CARD} p-4`}>
       <p className="text-[13px] text-[#64748B]">
-        Not yet on file: {missing.join(", ")}. We only show verified records —{" "}
+        Want the full report?{" "}
         {hr ? (
-          <>check the full record yourself in the <a href={hr.url} target="_blank" rel="noopener noreferrer" onClick={() => trackHr("history_page_not_on_file")} className="font-semibold text-[#2563EB] hover:underline">free {hrName} Report</a>.</>
+          <>View the <a href={hr.url} target="_blank" rel="noopener noreferrer" onClick={() => trackHr("history_page_not_on_file")} className="font-semibold text-[#2563EB] hover:underline">free {hrName} Report</a>.</>
         ) : (
-          <>ask {dealerName} for the full history report.</>
+          <>Ask us and we'll send it.</>
         )}
       </p>
     </div>
@@ -242,15 +248,19 @@ const VehiclePassportHistory = () => {
             <div className="text-center mt-6">
               <p className="text-[13px] font-semibold text-[#64748B]">Vehicle History Summary</p>
               {updatedLbl && <p className="text-[12px] text-[#94A3B8] mt-0.5">{updatedLbl}</p>}
-              <div className="relative w-[160px] h-[160px] mx-auto mt-5">
-                <svg viewBox="0 0 160 160" className="w-full h-full -rotate-90">
-                  <circle cx="80" cy="80" r="70" fill="none" stroke="#E6E8EC" strokeWidth="12" />
-                  {score != null && <circle cx="80" cy="80" r="70" fill="none" stroke="#16A34A" strokeWidth="12" strokeLinecap="round" strokeDasharray={2 * Math.PI * 70} strokeDashoffset={ringFill ? (2 * Math.PI * 70) * (1 - score / 100) : 2 * Math.PI * 70} style={{ transition: "stroke-dashoffset 1s ease-out" }} />}
-                </svg>
-                <div className="absolute inset-0 flex flex-col items-center justify-center"><span className="text-[48px] font-extrabold leading-none text-[#0F172A]">{score ?? "—"}</span><span className="text-[13px] font-bold text-[#94A3B8] mt-1">Data Confidence</span></div>
-              </div>
-              {tier ? <p className="text-[16px] font-extrabold text-[#16A34A] mt-3">{tier}</p> : <p className="text-[14px] font-semibold text-[#94A3B8] mt-3">Not enough verified signals to score this vehicle yet</p>}
-              {score != null && <div className="mt-3 text-left max-w-[320px] mx-auto"><DeductionReceipt compact /></div>}
+              {score != null && (
+                <>
+                  <div className="relative w-[160px] h-[160px] mx-auto mt-5">
+                    <svg viewBox="0 0 160 160" className="w-full h-full -rotate-90">
+                      <circle cx="80" cy="80" r="70" fill="none" stroke="#E6E8EC" strokeWidth="12" />
+                      <circle cx="80" cy="80" r="70" fill="none" stroke="#16A34A" strokeWidth="12" strokeLinecap="round" strokeDasharray={2 * Math.PI * 70} strokeDashoffset={ringFill ? (2 * Math.PI * 70) * (1 - score / 100) : 2 * Math.PI * 70} style={{ transition: "stroke-dashoffset 1s ease-out" }} />
+                    </svg>
+                    <div className="absolute inset-0 flex flex-col items-center justify-center"><span className="text-[48px] font-extrabold leading-none text-[#0F172A]">{score}</span><span className="text-[13px] font-bold text-[#94A3B8] mt-1">Data Confidence</span></div>
+                  </div>
+                  {tier && tier !== "Fair" && <p className="text-[16px] font-extrabold text-[#16A34A] mt-3">{tier}</p>}
+                  <div className="mt-3 text-left max-w-[320px] mx-auto"><DeductionReceipt compact /></div>
+                </>
+              )}
             </div>
           )}
         </div>
@@ -297,7 +307,7 @@ const VehiclePassportHistory = () => {
         ) : (
           <div className="px-5 mt-7 space-y-2.5">
             <h2 className="text-[18px] font-bold mb-1">History Details</h2>
-            <MAcc open={mOpen === "title"} onToggle={() => setMOpen(mOpen === "title" ? null : "title")} icon={FileText} title="Title" desc={d.cleanTitle ? "Clean title on record" : "Confirm with dealer"} status={d.cleanTitle ? "verified" : "attention"}>
+            <MAcc open={mOpen === "title"} onToggle={() => setMOpen(mOpen === "title" ? null : "title")} icon={FileText} title="Title" desc={d.titleStatus === "clean" ? "Clean title on record" : d.titleStatus === "branded" ? "Title brand on record" : "Record available from the dealership"} status={d.titleStatus === "clean" ? "verified" : d.titleStatus === "branded" ? "attention" : "info"}>
               <TitleVerdict />
             </MAcc>
             {d.accidentCount != null && (
@@ -392,7 +402,7 @@ const VehiclePassportHistory = () => {
       <main className="hidden md:block mx-auto max-w-[1100px] px-4 sm:px-5 py-6 space-y-5">
         <div>
           <h1 className="text-[28px] sm:text-[34px] font-bold tracking-tight leading-tight">{isNewCar ? "Vehicle Provenance" : "Vehicle History Summary"}</h1>
-          <p className={`text-[14px] ${TEXT2} mt-1`}>{isNewCar ? "The born-new record of this vehicle, from the factory to the showroom." : "The records on file for this vehicle — and exactly what's still pending."}</p>
+          <p className={`text-[14px] ${TEXT2} mt-1`}>{isNewCar ? "The born-new record of this vehicle, from the factory to the showroom." : "The records on file — everything we've verified for this vehicle."}</p>
         </div>
 
         {/* Hero */}
@@ -411,14 +421,23 @@ const VehiclePassportHistory = () => {
               </div>
             </div>
           ) : (
-            <div className="grid grid-cols-1 lg:grid-cols-[auto_1fr_auto] items-center gap-6">
-              <div className="flex justify-center">
-                {score != null ? <ScoreRing score={score} /> : <div className="w-[156px] h-[156px] rounded-full border-2 border-dashed border-[#E6E8EC] flex items-center justify-center text-[12px] text-[#94A3B8] text-center px-5">Not enough verified signals to score yet</div>}
-              </div>
+            <div className={`grid grid-cols-1 ${score != null ? "lg:grid-cols-[auto_1fr_auto]" : "lg:grid-cols-[1fr_auto]"} items-center gap-6`}>
+              {score != null && (
+                <div className="flex justify-center"><ScoreRing score={score} /></div>
+              )}
               <div className="text-center lg:text-left">
-                {tier ? <p className="text-[20px] font-extrabold text-[#16A34A] leading-tight">{tier} · Data Confidence</p> : <p className="text-[20px] font-extrabold text-[#94A3B8] leading-tight">Data Confidence Pending</p>}
-                <p className={`text-[13px] ${TEXT2} mt-1`}>Scored only from verified signals — deductions are itemized below, never hidden.</p>
-                <div className="mt-3 max-w-[420px] mx-auto lg:mx-0 text-left"><DeductionReceipt compact /></div>
+                {score != null ? (
+                  <>
+                    <p className="text-[20px] font-extrabold text-[#16A34A] leading-tight">{tier && tier !== "Fair" ? `${tier} · Data Confidence` : "Data Confidence"}</p>
+                    <p className={`text-[13px] ${TEXT2} mt-1`}>Scored only from verified signals — deductions are itemized below, never hidden.</p>
+                    <div className="mt-3 max-w-[420px] mx-auto lg:mx-0 text-left"><DeductionReceipt compact /></div>
+                  </>
+                ) : (
+                  <>
+                    <p className="text-[20px] font-extrabold leading-tight">{listing.ymm}{listing.trim ? ` ${listing.trim}` : ""}</p>
+                    <p className={`text-[13px] ${TEXT2} mt-1`}>The records on file for this vehicle are summarized below.</p>
+                  </>
+                )}
               </div>
               <div className="rounded-2xl border border-[#E6E8EC] overflow-hidden w-full lg:w-[200px]">
                 {listing.hero_image_url ? <img src={listing.hero_image_url} alt="" className="w-full aspect-[4/3] object-cover" /> : <div className="w-full aspect-[4/3] bg-[#1f2227] flex items-center justify-center"><Car className="w-9 h-9 text-slate-500" /></div>}

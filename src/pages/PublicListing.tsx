@@ -597,8 +597,8 @@ const PublicListingBody = () => {
                     <MarketGauge price={price} avg={marketAvg} />
                   </div>
                   <div className="flex justify-between text-[11px] mt-2">
-                    <div><div className="text-[#6b727a]">Market Avg</div><div className="font-bold">{fmt$(marketAvg)}</div></div>
-                    {marketHigh > 0 && <div className="text-right"><div className="text-[#6b727a]">Market High</div><div className="font-bold">{fmt$(marketHigh)}</div></div>}
+                    {price <= marketAvg && <div><div className="text-[#6b727a]">Market Avg</div><div className="font-bold">{fmt$(marketAvg)}</div></div>}
+                    {marketHigh > 0 && <div className="text-right ml-auto"><div className="text-[#6b727a]">Market High</div><div className="font-bold">{fmt$(marketHigh)}</div></div>}
                   </div>
                 </>
               ) : (

@@ -122,9 +122,9 @@ export const scoreTier = (s: number | null) =>
   : s >= 90 ? { label: "Excellent Buy", headline: "Excellent Buy Candidate", verdict: "Excellent Candidate — Move Forward with Confidence", color: GREEN }
   : s >= 80 ? { label: "Strong Buy", headline: "Strong Buy Candidate", verdict: "Strong Candidate — Move Forward with Confidence", color: GREEN }
   : s >= 70 ? { label: "Good Buy", headline: "Strong Buy Candidate", verdict: "Good Candidate — Confirm Final Details", color: BLUE_HEX }
-  : s >= 60 ? { label: "Worth Reviewing", headline: "Strong Buy Candidate", verdict: "Good Candidate — Confirm Final Details", color: BLUE_HEX }
+  : s >= 60 ? { label: "Worth Reviewing", headline: "Worth Reviewing", verdict: "Good Candidate — Confirm Final Details", color: BLUE_HEX }
   : s >= 50 ? { label: "Needs Review", headline: "Worth a Closer Look", verdict: "Needs Review — Confirm Key Details", color: AMBER_HEX }
-  : { label: "Proceed With Caution", headline: "Confirm Details Before Moving Forward", verdict: "Confirm Key Details Before Moving Forward", color: "#DC2626" };
+  : { label: "Worth a Closer Look", headline: "Talk to the Dealer About This Vehicle", verdict: "Worth a Closer Look — Talk to the Dealer About This Vehicle", color: BLUE_HEX };
 
 const H2 = ({ children }: { children: React.ReactNode }) => <h2 className="text-[19px] font-bold leading-7 tracking-tight text-[#0F172A]">{children}</h2>;
 
@@ -290,7 +290,7 @@ const VehiclePassportGreatBuy = () => {
   const dealerCov = d.dealerCoverage.find((c) => c.mode === "included") || null;
   const dealerCovLabel = dealerCov
     ? (dealerCov.lifetime
-        ? `Lifetime ${dealerCov.coverage || "powertrain"} coverage included by the dealer`
+        ? `Lifetime ${dealerCov.coverage || "powertrain"} coverage included by the dealer for as long as you own the vehicle`
         : `${[dealerCov.termYears ? `${dealerCov.termYears}-year` : null, dealerCov.termMiles ? `${dealerCov.termMiles.toLocaleString()}-mile` : null].filter(Boolean).join(" / ")} dealer ${dealerCov.coverage || "warranty"} included`)
     : null;
   const factoryWarVal = d.warrantyStr ? (() => { const w = d.warranty; if (w.in_service_date && w.factory_months) { const end = new Date(w.in_service_date); end.setMonth(end.getMonth() + w.factory_months); const left = Math.max(0, end.getTime() - Date.now()) / (1000 * 60 * 60 * 24 * 30.4); return Math.round(Math.max(55, Math.min(98, 55 + (left / w.factory_months) * 43))); } return 80; })() : null;
@@ -307,7 +307,7 @@ const VehiclePassportGreatBuy = () => {
     { icon: DollarSign, label: "Price Value", score: priceVal, note: priceNote },
     { icon: Users, label: "Ownership", score: ownVal, note: isNew ? "New — you are the first owner" : d.ownerCount === 1 ? "One previous owner" : d.ownerCount != null ? `${d.ownerCount} previous owners` : "Confirm with dealer" },
     { icon: Package, label: "Equipment", score: equipVal, note: gbSheet?.packages.length ? `${gbSheet.packages.length} factory package${gbSheet.packages.length === 1 ? "" : "s"}${gbSheet.estValue ? ` · ${fmt$(gbSheet.estValue)} in options` : ""}` : equipCount > 0 ? `${equipCount} equipment highlights decoded` : "Confirm with dealer" },
-    { icon: ShieldCheck, label: "Warranty", score: warVal, note: dealerCovLabel || (d.warrantyStr ? `${d.warrantyStr} of factory coverage remains` : "Confirm with dealer") },
+    { icon: ShieldCheck, label: "Warranty", score: warVal, note: dealerCovLabel || (d.warrantyStr && !d.warrantyExpired ? (d.warranty.in_service_date && d.warranty.factory_months ? `${d.warrantyStr} of factory coverage remains` : `${d.warrantyStr} factory term — remaining coverage confirmed at the dealership`) : "Confirm with dealer") },
     { icon: FileText, label: "Vehicle History", score: histVal, note: isNew ? "New vehicle — no accident or title history" : d.cleanTitle && d.accidentCount === 0 ? "Clean title, no accidents reported" : histVal != null ? "History reviewed where data exists" : "Confirm details" },
     { icon: TrendingUp, label: "Market Demand", score: demandVal, note: d.viewCount != null ? `${d.viewCount.toLocaleString()} shopper views` : "Demand tracked once live" },
     { icon: Wrench, label: "Condition", score: condVal, note: d.serviceCount > 0 ? `${d.serviceCount} service records on file` : listing.condition === "new" ? "New vehicle" : "Inspected" },
@@ -352,7 +352,7 @@ const VehiclePassportGreatBuy = () => {
   if (topPct) why.push(topPct);
   if (d.cleanTitle && d.accidentCount === 0) why.push("Clean title and history");
   if (dealerCovLabel) why.push(dealerCovLabel);
-  if (d.warrantyStr) why.push("Factory warranty remaining");
+  if (d.warrantyStr && !d.warrantyExpired) why.push("Factory warranty remaining");
   if (d.reviewRating != null && d.reviewRating >= 4.5) why.push("Excellent owner reviews");
   if (lowMiles) why.push(`Low mileage — ${listing.mileage!.toLocaleString()} mi`);
   if (d.recallClear) why.push("No open recalls");
@@ -363,8 +363,6 @@ const VehiclePassportGreatBuy = () => {
     !d.warrantyStr ? "Confirm remaining warranty coverage with the dealer." : null,
     !d.recallClear && !isNew ? "Review open recall status." : null,
     !isNew && (d.accidentCount == null || d.ownerCount == null) ? "Confirm final vehicle history details." : null,
-    premium ? "Luxury-brand maintenance can cost more than mainstream brands." : null,
-    premium ? "Premium fuel may be recommended — confirm the requirement." : null,
   ].filter(Boolean) as string[];
 
   // Market comparison — rows render only when the market cell holds a real
@@ -372,20 +370,26 @@ const VehiclePassportGreatBuy = () => {
   const compMiles = d.comparables.map((c) => c.miles).filter((m): m is number => m != null && m > 0);
   const avgCompMiles = compMiles.length >= 2 ? Math.round(compMiles.reduce((a, b) => a + b, 0) / compMiles.length) : null;
   type Adv = { text: string; good: boolean } | null;
+  const priceAboveAnchor = pctVsAnchor != null && pctVsAnchor > 0 && !(d.belowMarket && d.belowMarket > 0);
   const priceAdv: Adv =
     d.belowMarket && d.belowMarket > 0 ? { text: `${fmt$(d.belowMarket)} below`, good: true }
     : pctVsAnchor != null && pctVsAnchor <= 0 ? { text: "Better value", good: true }
-    : pctVsAnchor != null && pctVsAnchor < 3 ? { text: "At market", good: false }
-    : gbSheet?.estValue ? { text: "Premium build", good: false }
     : null;
-  const posRows: { k: string; v: string; m: string; a: Adv }[] = [
-    { k: "Price", v: d.price != null ? fmt$(d.price) : "—", m: trimAvg != null ? `${fmt$(trimAvg)} (${listing.trim})` : d.marketAvg != null ? `${fmt$(d.marketAvg)}${d.marketMeta.trimMatched === false && listing.trim ? " (all trims)" : ""}` : isPreview ? "$71,400" : "", a: priceAdv },
-    { k: "Mileage", v: listing.mileage != null ? `${listing.mileage.toLocaleString()} mi` : "—", m: avgCompMiles != null ? `${avgCompMiles.toLocaleString()} mi` : isPreview ? "24,000 mi" : "", a: avgCompMiles != null && listing.mileage != null ? (listing.mileage < avgCompMiles ? { text: "Lower mileage", good: true } : { text: "Above average", good: false }) : isPreview ? { text: "Lower mileage", good: true } : null },
-    { k: "Market Days", v: d.dom != null ? `${d.dom} days` : "—", m: d.marketMeta.avgDom != null ? `${d.marketMeta.avgDom} days` : isPreview ? "38 days" : "", a: d.dom != null && d.marketMeta.avgDom != null && d.dom < d.marketMeta.avgDom ? { text: "Shorter time", good: true } : null },
-    { k: "Units Available", v: (d.marketMeta.similarCount ?? (d.comparables.length || null)) != null ? `${d.marketMeta.similarCount ?? d.comparables.length}` : "—", m: listing.trim && d.comparables.length >= 5 ? `${sameTrimComps.length} this trim shown` : "", a: listing.trim && d.comparables.length >= 5 && sameTrimComps.length <= 2 ? { text: "More available", good: true } : null },
+  const mmRaw = ((listing as unknown as { market_meta?: Record<string, unknown> }).market_meta || {}) as Record<string, unknown>;
+  const trimCount = mmRaw.trim_count != null && Number.isFinite(Number(mmRaw.trim_count)) ? Number(mmRaw.trim_count) : null;
+  type PosRow = { k: string; v: string; m: string; a: Adv };
+  const posRows: PosRow[] = ([
+    { k: "Price", v: d.price != null ? fmt$(d.price) : "—", m: priceAboveAnchor ? (gbSheet?.estValue ? `Carries ${fmt$(gbSheet.estValue)} in factory packages the average comparable may not include` : "Priced to today's market for its trim") : trimAvg != null ? `${fmt$(trimAvg)} (${listing.trim})` : d.marketAvg != null ? `${fmt$(d.marketAvg)}${d.marketMeta.trimMatched === false && listing.trim ? " (all trims)" : ""}` : isPreview ? "$71,400" : "", a: priceAboveAnchor ? null : priceAdv },
+    { k: "Mileage", v: listing.mileage != null ? `${listing.mileage.toLocaleString()} mi` : "—", m: avgCompMiles != null ? `${avgCompMiles.toLocaleString()} mi` : isPreview ? "24,000 mi" : "", a: avgCompMiles != null && listing.mileage != null ? (listing.mileage < avgCompMiles ? { text: "Lower mileage", good: true } : null) : isPreview ? { text: "Lower mileage", good: true } : null },
+    d.dom != null && d.marketMeta.avgDom != null && d.dom <= d.marketMeta.avgDom
+      ? { k: "Market Days", v: `${d.dom} days`, m: `${d.marketMeta.avgDom} days`, a: d.dom < d.marketMeta.avgDom ? { text: "Shorter time", good: true } : null }
+      : null,
+    trimCount != null && trimCount <= 5
+      ? { k: "Availability", v: `1 of ${trimCount}`, m: "Builds like this nearby", a: trimCount <= 3 || sameTrimComps.length <= 2 ? { text: "Rare build", good: true } : null }
+      : null,
     { k: "Equipment Score", v: equipVal != null ? `${equipVal}/100` : "—", m: equipVal != null ? "Varies" : "", a: gbSheet?.estValue ? { text: "Better equipped", good: true } : null },
     { k: "Ownership Score", v: ownVal != null ? `${ownVal}/100` : "—", m: ownVal != null ? "Varies" : "", a: isNew || d.ownerCount === 1 ? { text: "Stronger history", good: true } : null },
-  ].filter((r) => r.m && r.v !== "—");
+  ] as (PosRow | null)[]).filter((r): r is PosRow => r != null && !!r.m && r.v !== "—");
 
   // Ownership cost estimate — transparent model, clearly labelled (not a
   // vehicle-specific fact). Fuel uses the official EPA annual fuel cost for
@@ -418,7 +422,7 @@ const VehiclePassportGreatBuy = () => {
   const compSignals = (s: SimilarCard): { text: string; good: boolean }[] => {
     const out: { text: string; good: boolean }[] = [];
     if (s.mi > 0 && listing.mileage != null) out.push(s.mi > listing.mileage ? { text: "Higher mileage", good: false } : { text: "Lower mileage", good: true });
-    if (s.price > 0 && d.price != null) out.push(s.price > d.price ? { text: `${fmt$(s.price - d.price)} more`, good: false } : { text: "Lower price", good: true });
+    if (s.price > 0 && d.price != null && s.price > d.price) out.push({ text: `${fmt$(s.price - d.price)} more`, good: false });
     if (s.tag) out.push({ text: s.tag + (s.tagDetail ? ` — ${s.tagDetail}` : ""), good: s.tone === "blue" || s.tone === "green" });
     return out.slice(0, 3);
   };
@@ -427,7 +431,7 @@ const VehiclePassportGreatBuy = () => {
     d.verifyRows.length > 0 ? "Dealer verified" : null,
     gbSheet?.estValue ? "Better equipment" : null,
     d.belowMarket && d.belowMarket > 0 ? "Below market price" : null,
-    d.warrantyStr ? "Warranty remains" : null,
+    d.warrantyStr && !d.warrantyExpired ? "Warranty remains" : null,
     avgCompMiles != null && listing.mileage != null && listing.mileage < avgCompMiles ? "Lower mileage" : null,
   ].filter(Boolean).slice(0, 3) as string[];
 
@@ -458,7 +462,7 @@ const VehiclePassportGreatBuy = () => {
     ? `None of the comparable listings shown matches this ${listing.trim} build.`
     : `Only ${sameTrimComps.length} of the comparable listings shown ${sameTrimComps.length === 1 ? "is" : "are"} a ${listing.trim}.`);
   if (dealerCovLabel && buyNow.length < 4) buyNow.push(`${dealerCovLabel}.`);
-  if (d.warrantyStr && buyNow.length < 4) buyNow.push("Factory warranty is still active.");
+  if (d.warrantyStr && !d.warrantyExpired && buyNow.length < 4) buyNow.push("Factory warranty is still active.");
 
   // Recommendation copy: strengths from verified data plus the specific
   // items a careful shopper should confirm — an insight, not a warning.
@@ -466,7 +470,7 @@ const VehiclePassportGreatBuy = () => {
     isNew || d.ownerCount === 1 ? "strong ownership" : null,
     (gbSheet?.packages.length ?? 0) > 0 || equipCount >= 8 ? "equipment" : null,
     priceVal != null && priceVal >= 80 ? "market-position" : null,
-    d.warrantyStr ? "warranty" : null,
+    d.warrantyStr && !d.warrantyExpired ? "warranty" : null,
   ].filter(Boolean) as string[];
   const confirmWords = [
     !d.warrantyStr ? "remaining warranty coverage" : null,
@@ -479,7 +483,17 @@ const VehiclePassportGreatBuy = () => {
   const shortModel = (listing.ymm || "").split(/\s+/).slice(2).join(" ").trim() || "vehicle";
   const verifyDate = listing.prep_status?.foreman_signed_at ? new Date(listing.prep_status.foreman_signed_at).toLocaleDateString() : new Date().toLocaleDateString();
   const generatedAt = new Date().toLocaleString();
-  const recTint = score != null && score < 50 ? "bg-[#1E293B] border-[#334155] text-white" : score != null && score >= 80 ? "bg-emerald-50/70 border-emerald-200" : "bg-white border-[#E6E8EC]";
+  const recTint = score != null && score >= 80 ? "bg-emerald-50/70 border-emerald-200" : "bg-white border-[#E6E8EC]";
+  const strongTier = score != null && score >= 70;
+  const heroEndorsement =
+    score == null ? null
+    : strongTier ? "Verified ownership, equipment, market position, and dealer data indicate this vehicle is worth serious consideration."
+    : "Here's what we verified about this vehicle — ownership, equipment, market position, and dealer data.";
+  const vehLabel = `${listing.ymm}${listing.trim ? ` ${listing.trim}` : ""}`;
+  const aiStrengths = [d.belowMarket && d.belowMarket > 0 ? "below-market pricing" : null, lowMiles ? "low mileage" : null, d.cleanTitle && d.accidentCount === 0 ? "a clean ownership history" : null, d.warrantyStr && !d.warrantyExpired ? "remaining factory warranty" : null, d.reviewRating != null && d.reviewRating >= 4.5 ? "strong owner satisfaction" : null].filter(Boolean).join(", ") || "verified vehicle data";
+  const aiSummary = strongTier
+    ? `This ${vehLabel} ranks among the stronger vehicles currently available in your market. It combines ${aiStrengths} ${d.belowMarket && d.belowMarket > 0 && d.price != null ? `— at ${fmt$(d.price)}, that's ${fmt$(d.belowMarket)} under comparable listings.` : "into a well-rounded purchase."}`
+    : `Here's what we verified on this ${vehLabel}: ${aiStrengths}. We'll confirm the final details with you.`;
 
   return (
     <div className="min-h-screen bg-[#F6F7F9] text-[#0F172A]" style={{ fontFamily: "Inter, -apple-system, BlinkMacSystemFont, sans-serif" }}>
@@ -517,7 +531,7 @@ const VehiclePassportGreatBuy = () => {
               </div>
               <div className="text-center sm:text-left min-w-0">
                 <h1 className="text-[28px] sm:text-[32px] font-extrabold tracking-tight leading-tight">{tier.headline}</h1>
-                <p className={`text-[14px] ${TEXT2} mt-2 max-w-[480px] mx-auto sm:mx-0`}>Verified ownership, equipment, market position, and dealer data indicate this vehicle is worth serious consideration.</p>
+                {heroEndorsement && <p className={`text-[14px] ${TEXT2} mt-2 max-w-[480px] mx-auto sm:mx-0`}>{heroEndorsement}</p>}
                 {trustBadges.length > 0 && (
                   <div className="flex flex-wrap gap-2 mt-4 justify-center sm:justify-start">
                     {trustBadges.map((b) => <span key={b} className="inline-flex items-center gap-1.5 text-[12px] font-semibold text-[#0F172A] bg-emerald-50 border border-emerald-200 rounded-full px-3 py-1.5"><CheckCircle2 className="w-3.5 h-3.5 text-[#16A34A]" />{b}</span>)}
@@ -550,11 +564,7 @@ const VehiclePassportGreatBuy = () => {
           <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1.15fr)_auto_230px] gap-6 items-center">
             <div>
               <div className="flex items-center gap-2"><span className="w-6 h-6 rounded-lg bg-blue-50 text-[#2563EB] flex items-center justify-center shrink-0"><Sparkles className="w-3.5 h-3.5" /></span><H2>AI Buying Summary</H2></div>
-              <p className="text-[13px] leading-relaxed text-[#334155] mt-2.5">
-                This {listing.ymm}{listing.trim ? ` ${listing.trim}` : ""} ranks among the stronger vehicles currently available in your market. It combines{" "}
-                {[d.belowMarket && d.belowMarket > 0 ? "below-market pricing" : null, lowMiles ? "low mileage" : null, d.cleanTitle && d.accidentCount === 0 ? "a clean ownership history" : null, d.warrantyStr ? "remaining factory warranty" : null, d.reviewRating != null && d.reviewRating >= 4.5 ? "strong owner satisfaction" : null].filter(Boolean).join(", ") || "verified vehicle data"}{" "}
-                {d.belowMarket && d.belowMarket > 0 && d.price != null ? `— at ${fmt$(d.price)}, that's ${fmt$(d.belowMarket)} under comparable listings.` : "into a well-rounded purchase."}
-              </p>
+              <p className="text-[13px] leading-relaxed text-[#334155] mt-2.5">{aiSummary}</p>
             </div>
             {insights.length > 0 && (
               <div className="grid grid-cols-3 gap-2">
@@ -568,7 +578,7 @@ const VehiclePassportGreatBuy = () => {
             )}
             <div className="flex flex-col items-center gap-1.5">
               <button onClick={() => go("reserve")} className="h-11 px-5 w-full rounded-xl bg-[#2563EB] text-white text-[14px] font-bold inline-flex items-center justify-center gap-2 hover:bg-[#1e50c8] transition-colors"><ShieldCheck className="w-4 h-4" /> Reserve This Vehicle</button>
-              <p className="text-[11px] text-[#64748B]">No obligation. Fully refundable.</p>
+              <p className="text-[11px] text-[#64748B]">No obligation. No payment required.</p>
             </div>
           </div>
         </section>
@@ -576,7 +586,7 @@ const VehiclePassportGreatBuy = () => {
         {/* Buying score breakdown: verified vs confirm-before-purchase */}
         <section className={`${CARD} p-5 sm:p-6`}>
           <H2>Buying Score Breakdown</H2>
-          <p className={`text-[13px] ${TEXT2} mt-1`}>Some items may require dealer confirmation before purchase. Pending items do not prevent review but should be verified before delivery.</p>
+          <p className={`text-[13px] ${TEXT2} mt-1`}>We'll confirm the final details with you.</p>
           <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-emerald-700 mt-4">Verified Strengths</p>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mt-2">{verified.map((b) => <ScoreCard key={b.label} {...b} />)}</div>
           {pendingCards.length > 0 && (
@@ -612,16 +622,16 @@ const VehiclePassportGreatBuy = () => {
               ))}
             </div>
             {premium && listing.trim && pctVsAnchor != null && pctVsAnchor >= -3 && !(d.belowMarket && d.belowMarket > 0) && (
-              <p className="text-[11px] text-[#64748B] mt-3">Priced at market for its trim — {listing.trim} is a top trim level, and the market range includes lower-equipped builds.</p>
+              <p className="text-[11px] text-[#64748B] mt-3">Priced to today's market for its trim — {listing.trim} is a top trim level, and the market range includes lower-equipped builds.</p>
             )}
           </Panel>
         </div>
 
         {/* Cost & comparables */}
         <div className="grid grid-cols-1 lg:grid-cols-[1fr_1.4fr] gap-5 items-start">
-          <Panel title="5-Year Ownership Cost Estimate" sub={`Estimate based on ${epaFuel ? "the official EPA annual fuel cost for this vehicle plus" : "fuel,"} insurance, maintenance, repairs, and registration averages. Actual costs vary by driver, location, and usage.`}>
+          <Panel title="5-Year Ownership Cost Estimate" sub={`Estimate based on ${epaFuel ? "the official EPA annual fuel cost for this vehicle plus" : "fuel,"} insurance, maintenance, repairs, and registration averages. Your costs will vary.`}>
             <div className="grid grid-cols-3 gap-2.5">
-              {[[fmt$(annualTotal), "Annual Average"], [fmt$(fiveYear), "5-Year Total"], [fmt$(perMonth), "Monthly Average"]].map(([v, k]) => (
+              {[[fmt$(perMonth), "Monthly Average"], [fmt$(annualTotal), "Annual Average"], [fmt$(fiveYear), "5-Year Total"]].map(([v, k]) => (
                 <div key={k} className="rounded-xl border border-[#E6E8EC] bg-slate-50/60 p-3 text-center"><p className="text-[16px] font-extrabold text-[#0F172A]">{v}</p><p className="text-[10.5px] text-[#64748B] mt-0.5">{k}</p></div>
               ))}
             </div>
@@ -683,18 +693,18 @@ const VehiclePassportGreatBuy = () => {
           <div className="flex flex-col sm:flex-row sm:items-center gap-5 sm:justify-between">
             <div className="min-w-0">
               <div className="flex items-center gap-2">
-                <span className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 ${score != null && score < 50 ? "bg-white/10 text-white" : "bg-emerald-50 text-[#16A34A] border border-emerald-100"}`}><Sparkles className="w-4 h-4" /></span>
-                <p className={`text-[12px] font-bold uppercase tracking-wide ${score != null && score < 50 ? "text-white/80" : "text-[#64748B]"}`}>AutoLabels Recommendation</p>
+                <span className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0 bg-emerald-50 text-[#16A34A] border border-emerald-100"><Sparkles className="w-4 h-4" /></span>
+                <p className="text-[12px] font-bold uppercase tracking-wide text-[#64748B]">AutoLabels Recommendation</p>
               </div>
-              <p className="text-[22px] sm:text-[24px] font-extrabold leading-tight mt-2.5" style={score != null && score < 50 ? { color: "#FCA5A5" } : { color: "#0F172A" }}>{tier.verdict}</p>
-              <p className={`text-[13.5px] leading-relaxed mt-2 max-w-[640px] ${score != null && score < 50 ? "text-white/85" : "text-[#334155]"}`}>{recCopy}</p>
+              <p className="text-[22px] sm:text-[24px] font-extrabold leading-tight mt-2.5 text-[#0F172A]">{tier.verdict}</p>
+              <p className="text-[13.5px] leading-relaxed mt-2 max-w-[640px] text-[#334155]">{recCopy}</p>
             </div>
             {score != null && (
               <div className="flex items-center gap-4 shrink-0">
                 <MiniDonut pct={score} color={score >= 60 ? GREEN : tier.color} />
                 <div>
-                  <p className={`text-[12px] font-bold ${score < 50 ? "text-white/80" : "text-[#0F172A]"}`}>Confidence Level</p>
-                  <p className={`text-[12px] ${score < 50 ? "text-white/70" : "text-[#64748B]"}`}>Based on verified data<br />in this report.</p>
+                  <p className="text-[12px] font-bold text-[#0F172A]">Confidence Level</p>
+                  <p className="text-[12px] text-[#64748B]">Based on verified data<br />in this report.</p>
                 </div>
               </div>
             )}
@@ -743,7 +753,7 @@ const VehiclePassportGreatBuy = () => {
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-x-6 gap-y-2 mt-5 pt-4 border-t border-white/20 text-[12px] font-semibold opacity-90">
-            <span className="inline-flex items-center gap-1.5"><ShieldCheck className="w-4 h-4" /> Refundable Reservation</span>
+            <span className="inline-flex items-center gap-1.5"><ShieldCheck className="w-4 h-4" /> No Payment Required</span>
             <span className="inline-flex items-center gap-1.5"><Car className="w-4 h-4" /> Dealer-Confirmed Hold</span>
             <span className="inline-flex items-center gap-1.5"><Lock className="w-4 h-4" /> Secure Request</span>
             <span className="inline-flex items-center gap-1.5"><CheckCircle2 className="w-4 h-4" /> No Obligation</span>
@@ -827,7 +837,7 @@ const VehiclePassportGreatBuy = () => {
                       {score != null ? <PrintRing score={score} color={tier.color} /> : <div className="w-[110px] h-[110px] rounded-full border-2 border-dashed border-[#E6E8EC] flex items-center justify-center text-[8.5px] text-[#94A3B8] text-center px-3 shrink-0">Score pending verification</div>}
                       <div className="min-w-0">
                         <h1 className="text-[24px] font-extrabold tracking-tight leading-tight">{tier.headline}</h1>
-                        <p className="text-[10px] text-[#64748B] mt-1 leading-relaxed">Verified ownership, equipment, market position, and dealer data indicate this vehicle is worth serious consideration.</p>
+                        {heroEndorsement && <p className="text-[10px] text-[#64748B] mt-1 leading-relaxed">{heroEndorsement}</p>}
                       </div>
                     </div>
                     {trustBadges.length > 0 && (
@@ -861,11 +871,7 @@ const VehiclePassportGreatBuy = () => {
                 {pageHeader}
                 <PrintCard>
                   <PrintH>AI Buying Summary</PrintH>
-                  <p className="text-[9.5px] leading-relaxed text-[#334155] mt-1.5">
-                    This {listing.ymm}{listing.trim ? ` ${listing.trim}` : ""} ranks among the stronger vehicles currently available in your market. It combines{" "}
-                    {[d.belowMarket && d.belowMarket > 0 ? "below-market pricing" : null, lowMiles ? "low mileage" : null, d.cleanTitle && d.accidentCount === 0 ? "a clean ownership history" : null, d.warrantyStr ? "remaining factory warranty" : null, d.reviewRating != null && d.reviewRating >= 4.5 ? "strong owner satisfaction" : null].filter(Boolean).join(", ") || "verified vehicle data"}{" "}
-                    {d.belowMarket && d.belowMarket > 0 && d.price != null ? `— at ${fmt$(d.price)}, that's ${fmt$(d.belowMarket)} under comparable listings.` : "into a well-rounded purchase."}
-                  </p>
+                  <p className="text-[9.5px] leading-relaxed text-[#334155] mt-1.5">{aiSummary}</p>
                   {insights.length > 0 && (
                     <div className="grid grid-cols-3 gap-2 mt-2.5">
                       {insights.map(({ icon: Icon, label }) => (
@@ -878,7 +884,7 @@ const VehiclePassportGreatBuy = () => {
                 </PrintCard>
                 <div className="mt-4">
                   <PrintH>Buying Score Breakdown</PrintH>
-                  <p className="text-[8.5px] text-[#64748B] mt-0.5">Pending items do not prevent review but should be verified before delivery.</p>
+                  <p className="text-[8.5px] text-[#64748B] mt-0.5">We'll confirm the final details with you.</p>
                   {verified.length > 0 && <p className="text-[7.5px] font-bold uppercase tracking-[0.12em] text-emerald-700 mt-2.5">Verified Strengths</p>}
                   <div className="grid grid-cols-2 gap-2 mt-1.5">{verified.map(scoreBar)}</div>
                   {pendingCards.length > 0 && (
@@ -927,9 +933,9 @@ const VehiclePassportGreatBuy = () => {
                 {pageHeader}
                 <PrintCard>
                   <PrintH>5-Year Ownership Cost Estimate</PrintH>
-                  <p className="text-[8.5px] text-[#64748B] mt-0.5">Estimate based on {epaFuel ? "the official EPA annual fuel cost for this vehicle plus" : "fuel,"} insurance, maintenance, repairs, and registration averages. Actual costs vary by driver, location, and usage.</p>
+                  <p className="text-[8.5px] text-[#64748B] mt-0.5">Estimate based on {epaFuel ? "the official EPA annual fuel cost for this vehicle plus" : "fuel,"} insurance, maintenance, repairs, and registration averages. Your costs will vary.</p>
                   <div className="grid grid-cols-3 gap-2 mt-2.5">
-                    {[[fmt$(annualTotal), "Annual Average"], [fmt$(fiveYear), "5-Year Total"], [fmt$(perMonth), "Monthly Average"]].map(([v, k]) => (
+                    {[[fmt$(perMonth), "Monthly Average"], [fmt$(annualTotal), "Annual Average"], [fmt$(fiveYear), "5-Year Total"]].map(([v, k]) => (
                       <div key={k} className="rounded-lg border border-[#E5E7EB] bg-slate-50/60 p-2 text-center"><p className="text-[12px] font-extrabold">{v}</p><p className="text-[8px] text-[#64748B] mt-0.5">{k}</p></div>
                     ))}
                   </div>

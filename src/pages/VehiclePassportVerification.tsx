@@ -10,7 +10,7 @@ import { toast } from "sonner";
 import { Helmet } from "react-helmet-async";
 import { type VehicleListing } from "@/hooks/useVehicleListing";
 import Logo from "@/components/brand/Logo";
-import { derivePassport, fmt$, type PassportData } from "@/lib/passportV2Data";
+import { derivePassport, fmt$, listingEquipment, type PassportData } from "@/lib/passportV2Data";
 import { listingHero } from "@/lib/photos";
 import { MOCK_LISTING } from "./VehiclePassportV3";
 import { usePublicListing } from "@/hooks/usePublicListing";
@@ -82,35 +82,40 @@ const NAV = [
 const buildRows = (d: PassportData, listing: VehicleListing): Row[] => {
   const hasHistory = d.accidentCount != null || d.ownerCount != null || d.cleanTitle;
   const photoCount = (listing.photos || []).length + (listing.hero_image_url ? 1 : 0);
-  return [
+  const equipCount = listingEquipment(listing).length;
+  const rows: (Row | null)[] = [
     { key: "vin", icon: Hash, title: "VIN Verification", desc: "VIN decoding, format validation, and database checks",
       status: listing.vin && listing.ymm ? "verified" : "pending", source: "OEM / VIN decode",
       lines: [`VIN format ${/^[A-HJ-NPR-Z0-9]{17}$/i.test(listing.vin || "") ? "valid" : "unconfirmed"}`, listing.ymm ? `Decoded: ${listing.ymm}${listing.trim ? ` ${listing.trim}` : ""}` : "Decode pending"] },
-    { key: "history", icon: FileText, title: "Vehicle History", desc: "Accident, damage, and ownership history",
-      status: hasHistory ? "verified" : "pending", source: "Vehicle history records",
-      lines: [d.ownerCount != null ? `${d.ownerCount === 1 ? "One owner" : `${d.ownerCount} owners`} on record` : "Ownership: not available", d.accidentCount != null ? (d.accidentCount === 0 ? "No accidents reported" : `${d.accidentCount} accident(s) reported`) : "Accident history: not available", "Service record availability checked"] },
+    hasHistory ? { key: "history", icon: FileText, title: "Vehicle History", desc: "Accident, damage, and ownership history",
+      status: "verified" as Status, source: "Vehicle history records",
+      lines: [d.ownerCount != null ? `${d.ownerCount === 1 ? "One owner" : `${d.ownerCount} owners`} on record` : null, d.accidentCount != null ? (d.accidentCount === 0 ? "No accidents reported" : `${d.accidentCount} accident(s) reported`) : null, "Service record availability checked"].filter(Boolean) as string[] } : null,
     { key: "recall", icon: ShieldCheck, title: "Recall Verification", desc: "Open recalls and manufacturer campaigns",
       status: !d.hasRecallCheck ? "pending" : d.recallClear ? "verified" : "attention", source: "NHTSA",
       lines: [d.hasRecallCheck ? (d.recallClear ? "No open recalls" : `${d.openRecalls ?? "One or more"} open recall(s)`) : "Recall check pending", "Checked against NHTSA campaigns"] },
     { key: "title", icon: ClipboardList, title: "Title & Brand Check", desc: "Title status, brands, and lien information",
-      status: d.cleanTitle ? "verified" : "pending", source: "Title records",
-      lines: [d.cleanTitle ? "Clean title — no brands on record" : "Title brand: dealer confirmation needed", "Salvage / flood / lemon / rebuilt indicators checked"], note: d.cleanTitle ? undefined : "Confirm title status with the dealer before purchase." },
-    { key: "odometer", icon: GaugeIcon, title: "Odometer Verification", desc: "Mileage consistency and rollback detection",
-      status: listing.mileage != null ? "verified" : "pending", source: "Vehicle history / DMS",
-      lines: [listing.mileage != null ? `Reported mileage: ${listing.mileage.toLocaleString()} mi` : "Mileage: not available", "Confirm mileage history with the dealer's history report"] },
+      status: d.titleStatus === "clean" ? "verified" : d.titleStatus === "branded" ? "attention" : "pending", source: "Title records",
+      lines: d.titleStatus === "clean" ? ["Clean title — no brands on record", "Salvage / flood / lemon / rebuilt indicators checked"]
+        : d.titleStatus === "branded" ? ["Title brand on record — review with the dealership"]
+        : ["Title record available from the dealership"],
+      note: d.titleStatus === "branded" ? "Review the title brand with the dealership." : undefined },
+    listing.mileage != null ? { key: "odometer", icon: GaugeIcon, title: "Odometer Verification", desc: "Mileage consistency and rollback detection",
+      status: "verified" as Status, source: "Vehicle history / DMS",
+      lines: [`Reported mileage: ${listing.mileage.toLocaleString()} mi`, "Confirm mileage history with the dealer's history report"] } : null,
     { key: "market", icon: DollarSign, title: "Market Data Verification", desc: "Pricing, comparables, and market positioning",
       status: d.marketAvg != null ? "verified" : "pending", source: "MarketCheck",
-      lines: [d.marketAvg != null ? `Market average ${fmt$(d.marketAvg)}` : "Market pricing pending", d.belowMarket && d.belowMarket > 0 ? `${fmt$(d.belowMarket)} below market` : "Market position checked", "Comparable listings reviewed"] },
+      lines: [d.marketAvg != null && d.price != null && d.price <= d.marketAvg ? `Market average ${fmt$(d.marketAvg)}` : d.marketAvg != null ? "Compared against live market data" : "Market pricing pending", d.belowMarket && d.belowMarket > 0 ? `${fmt$(d.belowMarket)} below market` : "Market position checked", "Comparable listings reviewed"] },
     { key: "warranty", icon: BadgeCheck, title: "Warranty Check", desc: "Factory warranty and extended coverage",
-      status: d.warrantyStr ? "attention" : "pending", source: "OEM warranty estimate",
-      lines: [d.warrantyStr ? `Estimated factory coverage: ${d.warrantyStr}` : "Warranty: dealer confirmation needed", "Coverage status estimated from OEM data"], note: "Confirm exact remaining coverage with the dealer." },
-    { key: "service", icon: Wrench, title: "Service History", desc: "Maintenance and service records",
-      status: d.serviceCount > 0 ? "verified" : "pending", source: "Dealer-provided records",
-      lines: [d.serviceCount > 0 ? `${d.serviceCount} service record(s) on file` : "No service records on file", "Maintenance confidence assessed"] },
-    { key: "media", icon: ImageIcon, title: "Media & Equipment Check", desc: "Photos, features, and equipment verification",
-      status: photoCount > 0 ? "verified" : "pending", source: "Dealer media / decode",
-      lines: [photoCount > 0 ? `${photoCount} photo(s) present` : "No photos on file", `${(listing.features || []).length} equipment item(s) decoded`, "Image / equipment match checked"] },
+      status: d.warrantyStr ? "verified" : "pending", source: "OEM warranty estimate",
+      lines: [d.warrantyStr ? `Estimated factory coverage: ${d.warrantyStr}` : "Warranty: dealer confirmation needed", "Coverage status estimated from OEM data"], note: d.warrantyStr ? undefined : "Confirm exact remaining coverage with the dealer." },
+    d.serviceCount > 0 ? { key: "service", icon: Wrench, title: "Service History", desc: "Maintenance and service records",
+      status: "verified" as Status, source: "Dealer-provided records",
+      lines: [`${d.serviceCount} service record(s) on file`, "Maintenance confidence assessed"] } : null,
+    photoCount > 0 || equipCount > 0 ? { key: "media", icon: ImageIcon, title: "Media & Equipment Check", desc: "Photos, features, and equipment verification",
+      status: "verified" as Status, source: "Dealer media / decode",
+      lines: [photoCount > 0 ? `${photoCount} photo(s) present` : null, equipCount > 0 ? `${equipCount} equipment item(s) decoded` : null, "Image / equipment match checked"].filter(Boolean) as string[] } : null,
   ];
+  return rows.filter((r): r is Row => r != null);
 };
 
 const VehiclePassportVerification = () => {
@@ -158,17 +163,17 @@ const VehiclePassportVerification = () => {
   const hero = listingHero(listing);
   const reportTime = (() => { const t = (listing as unknown as { market_checked_at?: string }).market_checked_at || listing.updated_at; return t ? new Date(t) : new Date(); })();
   const share = async () => { try { if (navigator.share) { await navigator.share({ title: "AutoLabels Verified Report", url: window.location.href }); return; } } catch { return; } await navigator.clipboard.writeText(window.location.href); toast.success("Report link copied"); };
-  const toGlance = [
-    { icon: CheckCircle2, cls: "text-[#16A34A]", label: "Verified checks", value: `${counts.verified}` },
-    { icon: AlertTriangle, cls: "text-[#F59E0B]", label: "Attention items", value: `${counts.attention}` },
-    { icon: MinusCircle, cls: "text-[#EF4444]", label: "Issues found", value: `${counts.issue}` },
-    { icon: Database, cls: "text-[#2563EB]", label: "Data sources", value: `${liveSources.length}` },
-    { icon: Clock, cls: "text-[#64748B]", label: "Last updated", value: "Today" },
-  ];
-  const tier = score == null ? "Pending" : score >= 90 ? "Excellent" : score >= 75 ? "Very Good" : score >= 60 ? "Good" : "Fair";
+  const tier = score == null ? null : score >= 90 ? "Excellent" : score >= 75 ? "Very Good" : score >= 60 ? "Good" : "Fair";
   const isToday = reportTime.toDateString() === new Date().toDateString();
   // Real report date everywhere — never a hardcoded "today".
   const reportDateLbl = isToday ? "today" : reportTime.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+  const toGlance = [
+    { icon: CheckCircle2, cls: "text-[#16A34A]", label: "Verified checks", value: `${counts.verified}` },
+    counts.attention > 0 ? { icon: AlertTriangle, cls: "text-[#F59E0B]", label: "Attention items", value: `${counts.attention}` } : null,
+    counts.issue > 0 ? { icon: MinusCircle, cls: "text-[#EF4444]", label: "Issues found", value: `${counts.issue}` } : null,
+    { icon: Database, cls: "text-[#2563EB]", label: "Data sources", value: `${liveSources.length}` },
+    { icon: Clock, cls: "text-[#64748B]", label: "Last updated", value: isToday ? "Today" : reportDateLbl },
+  ].filter(Boolean) as { icon: React.ElementType; cls: string; label: string; value: string }[];
   const mStatus = (s: Status) =>
     s === "verified" ? { label: "Verified", cls: "text-[#16A34A]" }
     : s === "attention" ? { label: "Needs Review", cls: "text-[#D97706]" }
@@ -186,14 +191,18 @@ const VehiclePassportVerification = () => {
           <div className="text-center mt-6">
             <p className="text-[13px] font-semibold text-[#64748B]">AutoLabels Verified Report</p>
             <p className="text-[12px] text-[#94A3B8] mt-0.5">Verified {isToday ? "Today" : reportTime.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}</p>
-            <div className="relative w-[200px] h-[200px] mx-auto mt-5">
-              <svg viewBox="0 0 160 160" className="w-full h-full -rotate-90">
-                <circle cx="80" cy="80" r="70" fill="none" stroke="#E6E8EC" strokeWidth="12" />
-                <circle cx="80" cy="80" r="70" fill="none" stroke="#16A34A" strokeWidth="12" strokeLinecap="round" strokeDasharray={2 * Math.PI * 70} strokeDashoffset={ringFill ? (2 * Math.PI * 70) * (1 - (score ?? 0) / 100) : 2 * Math.PI * 70} style={{ transition: "stroke-dashoffset 1s ease-out" }} />
-              </svg>
-              <div className="absolute inset-0 flex flex-col items-center justify-center"><span className="text-[56px] font-extrabold leading-none text-[#0F172A]">{score ?? "—"}</span><span className="text-[13px] font-bold text-[#94A3B8] mt-1">{score != null ? "Trust Score" : "Score Pending"}</span></div>
-            </div>
-            <span className="inline-flex items-center gap-1.5 mt-4 px-4 py-1.5 rounded-full bg-emerald-50 text-[#16A34A] text-[14px] font-bold"><CheckCircle2 className="w-[18px] h-[18px]" /> {tier}</span>
+            {score != null && (
+              <>
+                <div className="relative w-[200px] h-[200px] mx-auto mt-5">
+                  <svg viewBox="0 0 160 160" className="w-full h-full -rotate-90">
+                    <circle cx="80" cy="80" r="70" fill="none" stroke="#E6E8EC" strokeWidth="12" />
+                    <circle cx="80" cy="80" r="70" fill="none" stroke="#16A34A" strokeWidth="12" strokeLinecap="round" strokeDasharray={2 * Math.PI * 70} strokeDashoffset={ringFill ? (2 * Math.PI * 70) * (1 - score / 100) : 2 * Math.PI * 70} style={{ transition: "stroke-dashoffset 1s ease-out" }} />
+                  </svg>
+                  <div className="absolute inset-0 flex flex-col items-center justify-center"><span className="text-[56px] font-extrabold leading-none text-[#0F172A]">{score}</span><span className="text-[13px] font-bold text-[#94A3B8] mt-1">Trust Score</span></div>
+                </div>
+                {tier && <span className="inline-flex items-center gap-1.5 mt-4 px-4 py-1.5 rounded-full bg-emerald-50 text-[#16A34A] text-[14px] font-bold"><CheckCircle2 className="w-[18px] h-[18px]" /> {tier}</span>}
+              </>
+            )}
           </div>
         </div>
 
@@ -205,11 +214,11 @@ const VehiclePassportVerification = () => {
         </div>
 
         <div className="px-5 mt-6 grid grid-cols-3 gap-3">
-          {[
+          {([
             { icon: CheckCircle2, cls: "text-[#16A34A]", v: `${counts.verified}`, l: "Verified" },
-            { icon: AlertTriangle, cls: "text-[#D97706]", v: `${counts.attention}`, l: "Needs Review" },
-            { icon: Clock, cls: "text-[#64748B]", v: "Today", l: "Updated" },
-          ].map((m, i) => (
+            counts.attention > 0 ? { icon: AlertTriangle, cls: "text-[#D97706]", v: `${counts.attention}`, l: "Needs Review" } : null,
+            { icon: Clock, cls: "text-[#64748B]", v: isToday ? "Today" : reportDateLbl, l: "Updated" },
+          ].filter(Boolean) as { icon: React.ElementType; cls: string; v: string; l: string }[]).map((m, i) => (
             <div key={i} className={`${CARD} p-4 text-center`}><m.icon className={`w-6 h-6 mx-auto ${m.cls}`} /><p className="text-[18px] font-extrabold mt-1.5 leading-none">{m.v}</p><p className="text-[11px] text-[#94A3B8] mt-1">{m.l}</p></div>
           ))}
         </div>
@@ -275,9 +284,10 @@ const VehiclePassportVerification = () => {
         </div>
       </div>
 
-      {/* Mobile sticky bottom — Back to Vehicle */}
+      {/* Mobile sticky bottom — primary Reserve action + back link */}
       <div className="md:hidden fixed bottom-0 inset-x-0 z-40 bg-white/85 backdrop-blur border-t border-[#E6E8EC] px-4 pt-3 pb-[calc(12px+env(safe-area-inset-bottom))]">
-        <button onClick={back} className="w-full h-[52px] rounded-2xl bg-[#16A34A] active:bg-[#15803d] text-white text-[15px] font-bold inline-flex items-center justify-center gap-2 transition-transform active:scale-[0.99]"><ChevronLeft className="w-5 h-5" /> Back to Vehicle</button>
+        <button onClick={() => go("reserve")} className="w-full h-[52px] rounded-2xl bg-[#2563EB] active:bg-[#1d4fd7] text-white text-[15px] font-bold inline-flex items-center justify-center gap-2 transition-transform active:scale-[0.99]"><ShieldCheck className="w-5 h-5" /> Reserve This Vehicle</button>
+        <button onClick={back} className="w-full mt-2 h-9 text-[13px] font-semibold text-[#64748B] inline-flex items-center justify-center gap-1"><ChevronLeft className="w-4 h-4" /> Back to Vehicle Passport</button>
       </div>
 
       {/* Desktop + tablet (≥768px) — unchanged three-column report. */}
@@ -296,7 +306,7 @@ const VehiclePassportVerification = () => {
           </nav>
           <div className="mt-5 rounded-xl border border-[#E6E8EC] bg-[#fafbfc] p-4">
             <p className="text-[13px] font-bold">Questions about this report?</p>
-            <p className="text-[12px] text-[#64748B] mt-1">Our specialists are here to help you understand any part of this report.</p>
+            <p className="text-[12px] text-[#64748B] mt-1">{d.dealerName || "The dealership"}'s team can walk you through any part of this report.</p>
             <button onClick={() => navigate(`/v/${listing.slug || vehicleSlug}/contact`)} className="mt-3 w-full h-9 rounded-lg border border-[#E6E8EC] bg-white text-[12px] font-bold inline-flex items-center justify-center gap-1.5 hover:border-[#2563EB]"><MessageSquare className="w-3.5 h-3.5 text-[#2563EB]" /> Contact a Specialist</button>
           </div>
         </aside>
@@ -327,12 +337,12 @@ const VehiclePassportVerification = () => {
               {/* Hero card */}
               <div className={`${CARD} p-6`}>
                 <div className="flex flex-col lg:flex-row lg:items-center gap-6">
-                  <ScoreRing score={score} />
+                  {score != null && <ScoreRing score={score} />}
                   <div className="flex-1 min-w-0">
                     <h2 className="text-[20px] font-bold">{score != null && score >= 90 ? "Excellent. This vehicle is verified." : score != null && score >= 75 ? "Verified with a few items to review." : "Verification in progress."}</h2>
                     <p className="text-[14px] text-[#64748B] mt-1">Our comprehensive verification process confirms this vehicle's information is accurate and trustworthy.</p>
                     <div className="flex flex-wrap gap-x-8 gap-y-2 mt-4">
-                      {[{ icon: CheckCircle2, cls: "text-[#16A34A]", v: counts.verified, l: "Verified" }, { icon: AlertTriangle, cls: "text-[#F59E0B]", v: counts.attention, l: "Attention" }, { icon: MinusCircle, cls: "text-[#94A3B8]", v: counts.issue, l: "Issues Found" }].map((m, i) => (
+                      {([{ icon: CheckCircle2, cls: "text-[#16A34A]", v: counts.verified, l: "Verified" }, counts.attention > 0 ? { icon: AlertTriangle, cls: "text-[#F59E0B]", v: counts.attention, l: "Attention" } : null, counts.issue > 0 ? { icon: MinusCircle, cls: "text-[#94A3B8]", v: counts.issue, l: "Issues Found" } : null].filter(Boolean) as { icon: React.ElementType; cls: string; v: number; l: string }[]).map((m, i) => (
                         <div key={i} className="flex items-center gap-2"><m.icon className={`w-5 h-5 ${m.cls}`} /><span className="text-[18px] font-extrabold">{m.v}</span><span className="text-[13px] text-[#64748B]">{m.l}</span></div>
                       ))}
                     </div>

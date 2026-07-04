@@ -256,8 +256,8 @@ const VehiclePassportDocuments = () => {
               {lastUpdated && <p className="text-[12px] text-[#94A3B8] mt-2 inline-flex items-center gap-1.5"><Clock className="w-3.5 h-3.5" /> Last updated: {lastUpdated}</p>}
             </div>
             <div className="flex items-center gap-3 flex-wrap">
-              <span className="inline-flex items-center gap-1.5 text-[13px] font-semibold text-[#0F172A]"><span className="w-6 h-6 rounded-full bg-emerald-50 flex items-center justify-center"><CheckCircle2 className="w-3.5 h-3.5 text-[#16A34A]" /></span>{total} Documents Available</span>
-              <span className="inline-flex items-center gap-1.5 text-[13px] font-semibold text-[#16A34A] bg-emerald-50 rounded-full px-3 py-1.5"><ShieldCheck className="w-4 h-4" /> Dealer Provided</span>
+              {total > 0 && <span className="inline-flex items-center gap-1.5 text-[13px] font-semibold text-[#0F172A]"><span className="w-6 h-6 rounded-full bg-emerald-50 flex items-center justify-center"><CheckCircle2 className="w-3.5 h-3.5 text-[#16A34A]" /></span>{total} Documents Available</span>}
+              {total > 0 && <span className="inline-flex items-center gap-1.5 text-[13px] font-semibold text-[#16A34A] bg-emerald-50 rounded-full px-3 py-1.5"><ShieldCheck className="w-4 h-4" /> Dealer Provided</span>}
               {total > 0 && !isPreview && (
                 <button onClick={() => setEmailOpen((v) => !v)} className="inline-flex items-center gap-1.5 h-10 px-4 rounded-xl bg-[#2563EB] hover:bg-[#1d4fd7] text-white text-[13px] font-bold transition-colors"><Upload className="w-4 h-4" /> Email me this packet</button>
               )}
@@ -267,18 +267,29 @@ const VehiclePassportDocuments = () => {
           {emailOpen && <div className="mt-5"><EmailPacketCard listing={listing} docs={allDocs} onClose={() => setEmailOpen(false)} /></div>}
 
           {/* Hero card */}
-          <div className={`${CARD} p-6 mt-5 flex flex-col lg:flex-row lg:items-center gap-6`}>
-            <span className="w-14 h-14 rounded-2xl bg-emerald-50 flex items-center justify-center shrink-0"><ShieldCheck className="w-7 h-7 text-[#16A34A]" /></span>
-            <div className="flex-1">
-              <h2 className="text-[18px] font-bold">Vehicle Documentation</h2>
-              <p className="text-[14px] text-[#64748B]">Everything you need in one place.</p>
-              <p className="text-[12px] text-[#94A3B8] mt-1">All available documents have been verified and uploaded by the dealership.</p>
+          {total > 0 ? (
+            <div className={`${CARD} p-6 mt-5 flex flex-col lg:flex-row lg:items-center gap-6`}>
+              <span className="w-14 h-14 rounded-2xl bg-emerald-50 flex items-center justify-center shrink-0"><ShieldCheck className="w-7 h-7 text-[#16A34A]" /></span>
+              <div className="flex-1">
+                <h2 className="text-[18px] font-bold">Vehicle Documentation</h2>
+                <p className="text-[14px] text-[#64748B]">Everything you need in one place.</p>
+                <p className="text-[12px] text-[#94A3B8] mt-1">All available documents have been verified and uploaded by the dealership.</p>
+              </div>
+              <div className="lg:w-[360px] shrink-0">
+                <p className="text-[15px] font-bold mb-1.5"><span className="text-[20px] font-extrabold">{total}</span> of {total} Documents Available</p>
+                <div className="h-2.5 rounded-full bg-slate-100 overflow-hidden"><div className="h-full rounded-full bg-[#16A34A]" style={{ width: "100%" }} /></div>
+              </div>
             </div>
-            <div className="lg:w-[360px] shrink-0">
-              <p className="text-[15px] font-bold mb-1.5"><span className="text-[20px] font-extrabold">{total}</span> of {total} Documents Available</p>
-              <div className="h-2.5 rounded-full bg-slate-100 overflow-hidden"><div className="h-full rounded-full bg-[#16A34A]" style={{ width: total ? "100%" : "0%" }} /></div>
+          ) : (
+            <div className={`${CARD} p-6 mt-5 flex flex-col lg:flex-row lg:items-center gap-6`}>
+              <span className="w-14 h-14 rounded-2xl bg-blue-50 flex items-center justify-center shrink-0"><FileText className="w-7 h-7 text-[#2563EB]" /></span>
+              <div className="flex-1">
+                <h2 className="text-[18px] font-bold">Request documents</h2>
+                <p className="text-[14px] text-[#64748B]">{d.dealerName || "The dealership"} will send them to you.</p>
+              </div>
+              <button onClick={() => navigate(pp("contact"))} className="h-11 px-5 rounded-xl bg-[#2563EB] hover:bg-[#1d4fd7] text-white text-[13px] font-bold inline-flex items-center justify-center gap-1.5 shrink-0"><MessageSquare className="w-4 h-4" /> Request Documents</button>
             </div>
-          </div>
+          )}
 
           {/* Toolbar */}
           <div className="flex flex-wrap items-center gap-3 mt-5">
@@ -351,11 +362,19 @@ const VehiclePassportDocuments = () => {
                 );
               })()}
               {grouped.length === 0 ? (
-                <div className={`${CARD} p-12 text-center`}>
-                  <span className="w-14 h-14 rounded-2xl bg-slate-100 text-slate-400 flex items-center justify-center mx-auto mb-3"><FileText className="w-7 h-7" /></span>
-                  <p className="text-[15px] font-bold text-[#475569]">No documents available{cat !== "all" ? " in this category" : ""}{q ? " for your search" : ""}.</p>
-                  <p className="text-[13px] text-[#64748B] mt-1.5">Documents the dealership uploads will appear here automatically.</p>
-                </div>
+                total === 0 ? (
+                  <div className={`${CARD} p-12 text-center`}>
+                    <span className="w-14 h-14 rounded-2xl bg-blue-50 text-[#2563EB] flex items-center justify-center mx-auto mb-3"><FileText className="w-7 h-7" /></span>
+                    <p className="text-[15px] font-bold text-[#475569]">Request documents — {d.dealerName || "the dealership"} will send them.</p>
+                    <button onClick={() => navigate(pp("contact"))} className="mt-4 h-11 px-5 rounded-xl bg-[#2563EB] hover:bg-[#1d4fd7] text-white text-[13px] font-bold inline-flex items-center justify-center gap-1.5"><MessageSquare className="w-4 h-4" /> Request Documents</button>
+                  </div>
+                ) : (
+                  <div className={`${CARD} p-12 text-center`}>
+                    <span className="w-14 h-14 rounded-2xl bg-slate-100 text-slate-400 flex items-center justify-center mx-auto mb-3"><FileText className="w-7 h-7" /></span>
+                    <p className="text-[15px] font-bold text-[#475569]">No documents available{cat !== "all" ? " in this category" : ""}{q ? " for your search" : ""}.</p>
+                    <p className="text-[13px] text-[#64748B] mt-1.5">Documents the dealership uploads will appear here automatically.</p>
+                  </div>
+                )
               ) : grouped.map(({ c, docs }) => (
                 <div key={c.key}>
                   <button onClick={() => setCollapsed((s) => ({ ...s, [c.key]: !s[c.key] }))} className="w-full flex items-center justify-between mb-3">
