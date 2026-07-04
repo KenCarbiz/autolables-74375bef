@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { Navigate, useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { useTenant } from "@/contexts/TenantContext";
 import { useAudit } from "@/contexts/AuditContext";
@@ -78,6 +78,11 @@ const PrepSignOff = () => {
     const now = Date.now();
     return signOffs.filter(s => s.status === "rejected" && (now - new Date(s.updated_at).getTime()) < 7 * 24 * 60 * 60 * 1000).length;
   }, [signOffs]);
+
+  // QR deep links land on /prep?vin=<VIN> or /prep/<VIN>; both resolve to the
+  // mobile work-event flow. The desktop page below stays for manager use.
+  const vinDeepLink = (searchParams.get("vin") || "").trim();
+  if (vinDeepLink) return <Navigate to={`/prep/${vinDeepLink.toUpperCase()}`} replace />;
 
   if (!currentStore)
     return (
@@ -218,12 +223,21 @@ const PrepSignOff = () => {
                       <td className="px-6 py-4 text-sm text-foreground">{s.foreman_name}</td>
                       <td className="px-6 py-4 text-sm text-muted-foreground">{format(new Date(s.updated_at), "MMM d, h:mm a")}</td>
                       <td className="px-6 py-4">
-                        <button
-                          onClick={() => setSearchParams({ view: "detail", id: s.id })}
-                          className="px-3 py-1 bg-blue-600 text-white text-sm rounded-md hover:bg-blue-700 font-medium"
-                        >
-                          Review & Sign
-                        </button>
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={() => setSearchParams({ view: "detail", id: s.id })}
+                            className="px-3 py-1 bg-blue-600 text-white text-sm rounded-md hover:bg-blue-700 font-medium"
+                          >
+                            Review & Sign
+                          </button>
+                          <button
+                            onClick={() => navigate(`/prep/${s.vin}`)}
+                            className="px-3 py-1 border border-border text-sm rounded-md text-foreground hover:border-blue-300 font-medium"
+                            title="Open the QR mobile work-event flow for this VIN"
+                          >
+                            Mobile flow
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))}

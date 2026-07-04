@@ -45,6 +45,7 @@ export interface AuditLogEntry {
     | "inventory_imported"
     | "prep_sign_off_created" | "prep_sign_off_signed"
     | "prep_sign_off_rejected" | "prep_sign_off_overridden"
+    | "work_event_submitted" | "prep_vehicle_approved"
     | "listing_published" | "listing_viewed" | "listing_archived"
     | "compliance_block" | "price_integrity_block";
   entity_type: string;           // "addendum", "product", "rule", etc.

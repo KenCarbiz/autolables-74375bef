@@ -273,6 +273,19 @@ const Admin = () => {
   const [svcOpen, setSvcOpen] = useState(false);
   useInstantSave(svcDraft, (v) => updateSettings({ get_ready_services: v }), { ready: !settingsLoading, toastId: "getready-services" });
 
+  // Mobile prep sign-off rules (/prep/:vin). The photo-task list hydrates once
+  // from async settings before instant-save arms, like the branding form.
+  const prepTasksHydratedRef = useRef(false);
+  const [prepTasksReady, setPrepTasksReady] = useState(false);
+  const [prepPhotoTasksDraft, setPrepPhotoTasksDraft] = useState("");
+  useEffect(() => {
+    if (settingsLoading || prepTasksHydratedRef.current) return;
+    prepTasksHydratedRef.current = true;
+    setPrepTasksReady(true);
+    setPrepPhotoTasksDraft(settings.prep_service_photo_tasks);
+  }, [settingsLoading, settings]);
+  useInstantSave(prepPhotoTasksDraft, (v) => updateSettings({ prep_service_photo_tasks: v }), { ready: prepTasksReady, toastId: "prep-rules" });
+
   // Warranty
   const { records: warrantyRecords, getExpiringSoon } = useWarranty(currentStore?.id || "");
   const expiringSoon = getExpiringSoon(30);
@@ -2051,6 +2064,50 @@ const Admin = () => {
                 ))}
               </div>
               </>)}
+            </div>
+
+            {/* Mobile prep sign-off rules (QR flow at /prep/:vin) */}
+            <div id="getready-prep-rules" className="rounded-2xl border border-border-custom bg-card p-4">
+              <p className="text-sm font-bold text-foreground">Mobile prep sign-off</p>
+              <p className="text-[11px] text-muted-foreground mt-1">
+                Rules for the QR work-event flow at /prep/&lt;VIN&gt;. Changes save automatically.
+              </p>
+              <div className="mt-3 space-y-3">
+                <label className="flex items-center gap-3">
+                  <input
+                    type="checkbox"
+                    checked={settings.prep_require_ro}
+                    onChange={async (e) => {
+                      const ok = await updateSettings({ prep_require_ro: e.target.checked });
+                      if (ok) toast.success("Saved", { id: "prep-rules" });
+                    }}
+                    className="w-4 h-4 accent-blue-600"
+                  />
+                  <span className="text-sm text-foreground">Require RO number on Service Install sign-offs</span>
+                </label>
+                <label className="flex items-center gap-3">
+                  <input
+                    type="checkbox"
+                    checked={settings.prep_detail_photos_required}
+                    onChange={async (e) => {
+                      const ok = await updateSettings({ prep_detail_photos_required: e.target.checked });
+                      if (ok) toast.success("Saved", { id: "prep-rules" });
+                    }}
+                    className="w-4 h-4 accent-blue-600"
+                  />
+                  <span className="text-sm text-foreground">Require photos on Initial Inventory Detail</span>
+                </label>
+                <div>
+                  <label className="block text-xs font-semibold text-foreground mb-1">Service tasks that require photo proof</label>
+                  <input
+                    value={prepPhotoTasksDraft}
+                    onChange={(e) => setPrepPhotoTasksDraft(e.target.value)}
+                    placeholder="Mud flaps installed, Running boards installed"
+                    className="w-full px-3 py-2 border border-border-custom rounded text-sm bg-background text-foreground"
+                  />
+                  <p className="text-[10px] text-muted-foreground mt-1">Comma-separated task labels. Matching Service Install tasks show a camera icon and block submit until a photo is attached.</p>
+                </div>
+              </div>
             </div>
 
           </div>

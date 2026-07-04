@@ -264,6 +264,12 @@ export interface DealerSettings {
   // Preprinted recon choices service can pick to document faster. Self-aware:
   // frequently-added items can be promoted into this list.
   recon_canned_services: ReconCannedService[];
+  // Mobile prep sign-off (/prep/:vin) rules. RO number on Service Install,
+  // whether Initial Inventory Detail needs photos, and which service tasks
+  // require photo proof (comma-separated task labels).
+  prep_require_ro: boolean;
+  prep_detail_photos_required: boolean;
+  prep_service_photo_tasks: string;
   // Compliance
   cars_act_mode: boolean;
   retention_years: number;
@@ -435,6 +441,9 @@ export const DEFAULT_SETTINGS: DealerSettings = {
     { label: "Full detail", category: "detail", severity: "recommended", labor_cost: 0, parts_cost: 0 },
     { label: "Windshield chip repair", category: "glass", severity: "recommended", labor_cost: 0, parts_cost: 0 },
   ],
+  prep_require_ro: false,
+  prep_detail_photos_required: false,
+  prep_service_photo_tasks: "Mud flaps installed, Running boards installed",
   cars_act_mode: false,
   retention_years: 7,
   required_languages: ["en"],

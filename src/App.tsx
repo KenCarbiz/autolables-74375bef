@@ -109,6 +109,7 @@ const StickerTestLabel = lazy(() => import("./pages/StickerTestLabel"));
 const DevHeroPreview = lazy(() => import("./pages/DevHeroPreview"));
 const DevSaturdayPreview = lazy(() => import("./pages/DevSaturdayPreview"));
 const DevConnecticutSmokeTest = lazy(() => import("./pages/DevConnecticutSmokeTest"));
+const DevPrepMobilePreview = lazy(() => import("./pages/DevPrepMobilePreview"));
 const QrRedirect = lazy(() => import("./pages/QrRedirect"));
 const QrAnalytics = lazy(() => import("./pages/QrAnalytics"));
 const Reports = lazy(() => import("./pages/Reports"));
@@ -130,6 +131,7 @@ const VehiclePassportHistory = lazy(() => import("./pages/VehiclePassportHistory
 const VehiclePassportDealer = lazy(() => import("./pages/VehiclePassportDealer"));
 const PublicDocuments = lazy(() => import("./pages/PublicDocuments"));
 const PrepSignOff = lazy(() => import("./pages/PrepSignOff"));
+const PrepMobile = lazy(() => import("./pages/PrepMobile"));
 const ReconBoard = lazy(() => import("./pages/ReconBoard"));
 const ServiceInspection = lazy(() => import("./pages/ServiceInspection"));
 const NotFound = lazy(() => import("./pages/NotFound"));
@@ -227,6 +229,7 @@ const App = () => (
                       <Route path="/dev/hero-preview" element={<DevHeroPreview />} />
                       <Route path="/dev/saturday-preview" element={<DevSaturdayPreview />} />
                       <Route path="/dev/connecticut-smoke-test" element={<DevConnecticutSmokeTest />} />
+                      <Route path="/dev/prep-mobile-preview" element={<DevPrepMobilePreview />} />
                       <Route path="/q/:token" element={<QrRedirect />} />
 
                       <Route element={<GatedLayout />}>
@@ -270,6 +273,7 @@ const App = () => (
                         <Route path="/description-writer" element={<DescriptionStudio />} />
                         <Route path="/add-inventory" element={<SaveCarInventory />} />
                         <Route path="/prep" element={<PrepSignOff />} />
+                        <Route path="/prep/:vin" element={<PrepMobile />} />
                         <Route path="/recon" element={<ReconBoard />} />
                         <Route path="/service" element={<ServiceDesk />} />
                         <Route path="/ready-board" element={<ReadyBoard />} />
