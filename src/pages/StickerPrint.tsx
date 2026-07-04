@@ -4,6 +4,7 @@ import {
   templateFromConfig, TemplateRenderer,
   type StickerData, type StickerBranding, type StickerTemplateConfig, type StickerRenderOptions,
 } from "@/lib/stickerStudio/templates";
+import { saturdayTemplateFromConfig } from "@/lib/stickerStudio/saturdayTemplates";
 import { buildPrintCss, normalizeCalibration, PAPER, type PrintCalibration } from "@/lib/stickerStudio/printConfig";
 import { PrintGuides } from "@/lib/stickerStudio/PrintGuides";
 
@@ -56,7 +57,13 @@ const StickerPrint = () => {
     return () => { document.head.removeChild(style); if (t) window.clearTimeout(t); };
   }, [payload]);
 
-  const template = useMemo(() => (payload ? templateFromConfig(payload.config) : null), [payload]);
+  // Saturday premium designs live in their own registry; resolve them first
+  // (same chain as useStickerCatalog) or the print falls back to the plain
+  // engine and prints a different sheet than the studio preview.
+  const template = useMemo(
+    () => (payload ? saturdayTemplateFromConfig(payload.config) ?? templateFromConfig(payload.config) : null),
+    [payload],
+  );
 
   if (missing) {
     return (

@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
+import { STUDIO_SATURDAY_TEMPLATES, saturdayTemplateFromConfig } from "./saturdayTemplates";
 import { renderToStaticMarkup } from "react-dom/server";
-import { getStudioTemplate, type StickerData, type StickerBranding } from "./templates";
+import { getStudioTemplate, type StickerData, type StickerBranding, templateFromConfig } from "./templates";
 
 const DATA: StickerData = {
   vehicleTitle: "2027 INFINITI QX60 LUXE", vin: "5N1AL1F87VC331335", stock: "I21567",
@@ -48,5 +49,18 @@ describe("premium window templates", () => {
 
   it("Big Price sticker shows the CALL FOR PRICE fallback", () => {
     expect(render("window-bold", { ...DATA, price: "", msrp: "" })).toContain("CALL FOR PRICE");
+  });
+});
+
+// StickerPrint resolves saturdayTemplateFromConfig first — a Saturday config
+// must never fall back to the generic engine or the printed sheet differs
+// from the studio preview.
+describe("saturday template print resolution", () => {
+  it("resolves every saturday id to its saturday renderer", () => {
+    for (const t of STUDIO_SATURDAY_TEMPLATES) {
+      const resolved = saturdayTemplateFromConfig(t.config) ?? templateFromConfig(t.config);
+      expect(resolved.Render).toBe(t.Render);
+      expect(templateFromConfig(t.config).Render).not.toBe(t.Render);
+    }
   });
 });
