@@ -1007,6 +1007,7 @@ const DocumentsPanel = ({ vehicle, onReload }: { vehicle: VehicleRow; onReload: 
   const isUsed = vehicle.condition !== "new";
   const slots: Array<{ type: string; label: string; desc: string }> = isUsed
     ? [
+        { type: "factory_sticker", label: "OEM window sticker (Monroney)", desc: "Original factory window sticker PDF, image, or link — shows to shoppers in the packet." },
         { type: "buyers_guide", label: "FTC Buyers Guide (used)", desc: "Required used-car window form — As-Is vs warranty (16 CFR Part 455). Spanish where the sale is conducted in Spanish." },
         { type: "safety_inspection", label: safety.label, desc: safety.desc },
         { type: "emissions", label: "Emissions / smog certificate", desc: "State emissions certificate where required." },
@@ -1043,12 +1044,10 @@ const DocumentsPanel = ({ vehicle, onReload }: { vehicle: VehicleRow; onReload: 
         title="Documents"
         description="Files available to shoppers and dealership staff — upload PDFs, links, brochures, reports, and warranty paperwork."
       />
-      <UsedCarDocPack vehicleId={vehicle.id} vin={vehicle.vin} condition={vehicle.condition} />
-      <TitleMcoPanel vin={vehicle.vin} tenantId={vehicle.tenant_id} condition={vehicle.condition} />
-      <div className="rounded-2xl border border-border bg-card shadow-[0_1px_3px_rgba(0,0,0,0.05)] p-5">
-        <GeneratedDocumentsSection vehicleId={vehicle.id} />
-      </div>
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div>
+        <h3 className="text-[15px] font-bold text-foreground">Uploads &amp; Links</h3>
+        <p className="text-[13px] text-slate-500 mt-0.5 mb-3">Click Upload to attach a PDF or image, or Add link to paste a URL. Everything here appears in the shopper packet's Documents page.</p>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
       {slots.map((s) => (
         <div key={s.type} className="rounded-2xl border border-border bg-card shadow-[0_1px_3px_rgba(0,0,0,0.05)] p-5 space-y-2">
           <div className="flex items-center justify-between">
@@ -1128,6 +1127,12 @@ const DocumentsPanel = ({ vehicle, onReload }: { vehicle: VehicleRow; onReload: 
           )}
         </div>
       ))}
+        </div>
+      </div>
+      <UsedCarDocPack vehicleId={vehicle.id} vin={vehicle.vin} condition={vehicle.condition} />
+      <TitleMcoPanel vin={vehicle.vin} tenantId={vehicle.tenant_id} condition={vehicle.condition} />
+      <div className="rounded-2xl border border-border bg-card shadow-[0_1px_3px_rgba(0,0,0,0.05)] p-5">
+        <GeneratedDocumentsSection vehicleId={vehicle.id} />
       </div>
     </div>
   );
