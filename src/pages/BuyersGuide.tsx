@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { useDealerSettings } from "@/contexts/DealerSettingsContext";
+import { includedWarrantyPrograms, termLabel } from "@/lib/dealerPrograms";
 import { useAudit } from "@/contexts/AuditContext";
 import { useTenant } from "@/contexts/TenantContext";
 import { useAuth } from "@/contexts/AuthContext";
@@ -253,6 +254,19 @@ const BuyersGuide = () => {
     [operatingState, vehicle.year, vehicle.mileage, vehicle.price]
   );
 
+  // Dealer-warranty cross-check (16 CFR 455): if this store advertises an
+  // included dealer warranty on used/CPO vehicles (sticker, packet, or
+  // passport), the Guide cannot say "As-Is — No Dealer Warranty" — statements
+  // elsewhere may not contradict the Guide, and the Guide controls.
+  const dealerWarranties = useMemo(
+    () => includedWarrantyPrograms(settings.dealer_programs, "used"),
+    [settings.dealer_programs],
+  );
+  const dealerWarrantyLock = dealerWarranties.length > 0;
+  const dealerWarrantyReason = dealerWarrantyLock
+    ? `This store advertises "${dealerWarranties[0].title}" as included on used vehicles — the Buyers Guide must reflect it, so As-Is can't be selected. Turn the program off in Included with Sale if it doesn't apply.`
+    : "";
+
   // Auto-populate the box + statutory floor whenever the inputs change.
   // Forced states lock As-Is; dealers may still RAISE warranty terms.
   useEffect(() => {
@@ -262,6 +276,13 @@ const BuyersGuide = () => {
       setWarrantyPct(`${bgResolution.minPct}%`);
     }
   }, [bgResolution]);
+
+  useEffect(() => {
+    if (!dealerWarrantyLock) return;
+    setGuideType((cur) => (cur === "as-is" ? "warranty" : cur));
+    const t = termLabel(dealerWarranties[0]);
+    if (t) setWarrantyDuration((cur) => (cur === "30 Days / 1,000 Miles" ? t.replace(/-/g, " ") : cur));
+  }, [dealerWarrantyLock, dealerWarranties]);
 
   const L = LABELS[lang];
 
@@ -332,13 +353,13 @@ const BuyersGuide = () => {
         <div className="flex flex-col gap-1">
           <div className="flex gap-1 bg-muted rounded-md p-0.5">
             {(["as-is", "implied", "warranty"] as GuideType[]).map((t) => {
-              const locked = bgResolution.forced && t === "as-is";
+              const locked = (bgResolution.forced || dealerWarrantyLock) && t === "as-is";
               return (
                 <button
                   key={t}
                   onClick={() => { if (!locked) setGuideType(t); }}
                   disabled={locked}
-                  title={locked ? bgResolution.reason : undefined}
+                  title={locked ? (bgResolution.forced ? bgResolution.reason : dealerWarrantyReason) : undefined}
                   className={`text-[12px] font-semibold px-3 py-1.5 rounded ${guideType === t ? "bg-navy text-primary-foreground" : "text-muted-foreground hover:text-foreground"} ${locked ? "opacity-40 cursor-not-allowed line-through" : ""}`}
                 >
                   {t === "as-is" ? "As-Is" : t === "implied" ? "Implied" : "Warranty"}
@@ -350,6 +371,9 @@ const BuyersGuide = () => {
             <p className="text-[10px] text-amber-700 max-w-xs">
               {bgResolution.reason}{bgResolution.citation ? ` (${bgResolution.citation})` : ""} — confirm with counsel.
             </p>
+          )}
+          {dealerWarrantyLock && !bgResolution.forced && (
+            <p className="text-[10px] text-amber-700 max-w-xs">{dealerWarrantyReason} (16 CFR 455)</p>
           )}
         </div>
         {(settings.feature_spanish_buyers_guide || settings.feature_multilang_buyers_guide) && (

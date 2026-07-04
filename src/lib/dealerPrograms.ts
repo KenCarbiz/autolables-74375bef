@@ -79,22 +79,26 @@ export const PROGRAM_PRESETS: { key: string; label: string; fields: Partial<Deal
   {
     key: "lifetime-powertrain", label: "Lifetime Powertrain",
     fields: {
-      title: "Lifetime Powertrain Warranty",
+      title: "Lifetime Powertrain Limited Warranty",
       offer: "Dealer-added lifetime powertrain coverage on every qualifying new vehicle — engine, transmission, and drive components for as long as you own it.",
       benefit: "Coverage that never expires while you own the vehicle — protection the factory warranty can't match.",
-      disclosure: "Valid for the original purchaser; requires factory-scheduled maintenance with documented service. See dealer for the written warranty, exclusions, and eligibility.",
+      // 16 CFR 239.4: a "lifetime" claim must state the life it's measured by.
+      disclosure: "\"Lifetime\" means for as long as the original purchaser owns this vehicle; coverage ends on sale, trade, or transfer. Requires documented factory-scheduled maintenance. The full written limited warranty, including exclusions and any deductible, is available for your review before purchase.",
       appliesTo: "new", isWarranty: true, coverage: "Powertrain", lifetime: true,
       showOnWarrantyPanel: true, showOnSticker: true,
     },
   },
   {
-    key: "dealer-cpo", label: "Dealer CPO Warranty",
+    key: "dealer-cpo", label: "Dealer Pre-Owned Warranty",
+    // Deliberately NOT titled "Certified": several states (CA Veh. Code
+    // 11713.18 among them) restrict advertising a used car as certified.
+    // Dealers who run a true certification program can rename it themselves.
     fields: {
-      title: "Dealer Certified Pre-Owned Warranty",
-      offer: "Our own certified pre-owned coverage — 10-year / 100,000-mile powertrain protection on qualifying pre-owned vehicles.",
+      title: "Dealer-Backed Pre-Owned Limited Warranty",
+      offer: "Our own pre-owned coverage — 10-year / 100,000-mile powertrain protection on qualifying pre-owned vehicles, backed by this dealership.",
       benefit: "Long-term coverage on a pre-owned vehicle, backed by this dealership.",
-      disclosure: "Measured from the vehicle's original in-service date. Eligibility, covered components, and deductible are defined in the written warranty. See dealer for details.",
-      appliesTo: "used", isWarranty: true, coverage: "Dealer CPO",
+      disclosure: "Measured from the vehicle's original in-service date. Eligibility, covered components, and deductible are defined in the written limited warranty, available for your review before purchase. This is a dealer program, not a manufacturer certified pre-owned program.",
+      appliesTo: "used", isWarranty: true, coverage: "Dealer Powertrain",
       termYears: 10, termMiles: 100000, showOnWarrantyPanel: true,
     },
   },
@@ -168,9 +172,15 @@ export const presetProgram = (key: string): DealerProgram | null => {
   return preset ? { ...emptyProgram(), ...preset.fields } : null;
 };
 
-const matchesCondition = (appliesTo: ProgramAppliesTo, condition: string | null | undefined): boolean => {
-  if (appliesTo === "all") return true;
+// "used" subsumes "cpo": a dealer's used-car program (e.g. dealer CPO
+// coverage) is meant for certified cars too — matching strictly would hide
+// the program on exactly the cars it targets. Missing appliesTo = all, the
+// same default the server applies. Mirror any change here in
+// public-listing-view's applies().
+const matchesCondition = (appliesTo: ProgramAppliesTo | undefined, condition: string | null | undefined): boolean => {
+  if (!appliesTo || appliesTo === "all") return true;
   const c = (condition || "").toLowerCase();
+  if (appliesTo === "used") return c === "used" || c === "cpo";
   return appliesTo === c;
 };
 
@@ -218,6 +228,25 @@ export function warrantyPanelPrograms(
       p.enabled &&
       p.isWarranty === true &&
       p.showOnWarrantyPanel === true &&
+      (p.title.trim() || p.offer.trim()) &&
+      matchesCondition(p.appliesTo, condition)
+  );
+}
+
+// Dealer warranties INCLUDED with the sale and advertised on any customer
+// surface. When one applies, the FTC Buyers Guide cannot honestly say
+// "As-Is — No Dealer Warranty" (16 CFR 455: statements elsewhere may not
+// contradict the Guide, and the Guide controls).
+export function includedWarrantyPrograms(
+  programs: DealerProgram[] | null | undefined,
+  condition: string | null | undefined
+): DealerProgram[] {
+  return (programs || []).filter(
+    (p) =>
+      p.enabled &&
+      p.isWarranty === true &&
+      programMode(p) === "included" &&
+      (p.showOnSticker || p.showOnPacket || p.showOnWarrantyPanel === true) &&
       (p.title.trim() || p.offer.trim()) &&
       matchesCondition(p.appliesTo, condition)
   );

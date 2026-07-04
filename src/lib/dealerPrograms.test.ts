@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { emptyProgram, applicablePrograms, requirementLabel, type DealerProgram, programMode, termLabel, warrantyPanelPrograms } from "./dealerPrograms";
+import { emptyProgram, applicablePrograms, requirementLabel, type DealerProgram, programMode, termLabel, warrantyPanelPrograms, includedWarrantyPrograms } from "./dealerPrograms";
 
 const prog = (over: Partial<DealerProgram> = {}): DealerProgram => ({
   ...emptyProgram(),
@@ -93,5 +93,38 @@ describe("warranty benefit helpers", () => {
     expect(warrantyPanelPrograms([{ ...base, showOnWarrantyPanel: false }], "used")).toHaveLength(0);
     expect(warrantyPanelPrograms([{ ...base, isWarranty: false }], "used")).toHaveLength(0);
     expect(warrantyPanelPrograms([{ ...base, enabled: false }], "used")).toHaveLength(0);
+  });
+});
+
+describe("condition matching semantics", () => {
+  const used = { ...emptyProgram(), title: "Dealer Pre-Owned Warranty", appliesTo: "used" as const, isWarranty: true, showOnWarrantyPanel: true };
+
+  it("used programs also match cpo vehicles", () => {
+    expect(warrantyPanelPrograms([used], "cpo")).toHaveLength(1);
+    expect(warrantyPanelPrograms([used], "used")).toHaveLength(1);
+    expect(warrantyPanelPrograms([used], "new")).toHaveLength(0);
+  });
+
+  it("missing appliesTo behaves as all", () => {
+    const p = { ...used };
+    delete (p as Partial<DealerProgram>).appliesTo;
+    expect(warrantyPanelPrograms([p], "new")).toHaveLength(1);
+  });
+});
+
+describe("includedWarrantyPrograms (Buyers Guide cross-check)", () => {
+  const base = { ...emptyProgram(), title: "Dealer Limited Powertrain Warranty", isWarranty: true, appliesTo: "used" as const, showOnPacket: true };
+
+  it("returns included, customer-visible warranty programs for the condition", () => {
+    expect(includedWarrantyPrograms([base], "used")).toHaveLength(1);
+    expect(includedWarrantyPrograms([base], "cpo")).toHaveLength(1);
+    expect(includedWarrantyPrograms([base], "new")).toHaveLength(0);
+  });
+
+  it("excludes available-mode upgrades, disabled, non-warranty, and unplaced programs", () => {
+    expect(includedWarrantyPrograms([{ ...base, mode: "available" }], "used")).toHaveLength(0);
+    expect(includedWarrantyPrograms([{ ...base, enabled: false }], "used")).toHaveLength(0);
+    expect(includedWarrantyPrograms([{ ...base, isWarranty: false }], "used")).toHaveLength(0);
+    expect(includedWarrantyPrograms([{ ...base, showOnPacket: false, showOnSticker: false, showOnWarrantyPanel: false }], "used")).toHaveLength(0);
   });
 });

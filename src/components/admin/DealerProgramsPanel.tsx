@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useDealerSettings } from "@/contexts/DealerSettingsContext";
 import { DealerProgram, emptyProgram, presetProgram, programMode, termLabel, PROGRAM_PRESETS, type ProgramAppliesTo, type ProgramRequirement, type ProgramMode } from "@/lib/dealerPrograms";
 import { useInstantSave } from "@/hooks/useInstantSave";
@@ -9,14 +9,25 @@ import { Plus, Trash2, ShieldCheck, GripVertical, Check } from "lucide-react";
 // requirement (e.g. must finance) and placement toggles (sticker / packet).
 export default function DealerProgramsPanel() {
   const { settings, updateSettings, loading: settingsLoading } = useDealerSettings();
-  const [programs, setPrograms] = useState<DealerProgram[]>(settings.dealer_programs || []);
+  // Hydrate once from async settings before instant-save arms (branding-form
+  // pattern) — initializing from a cold cache and saving would clobber the
+  // programs already in the database.
+  const [programs, setPrograms] = useState<DealerProgram[]>([]);
+  const hydratedRef = useRef(false);
+  const [ready, setReady] = useState(false);
+  useEffect(() => {
+    if (settingsLoading || hydratedRef.current) return;
+    hydratedRef.current = true;
+    setPrograms(settings.dealer_programs || []);
+    setReady(true);
+  }, [settingsLoading, settings]);
 
   const set = (id: string, patch: Partial<DealerProgram>) =>
     setPrograms((prev) => prev.map((p) => (p.id === id ? { ...p, ...patch } : p)));
   const add = () => setPrograms((prev) => [...prev, emptyProgram()]);
   const remove = (id: string) => setPrograms((prev) => prev.filter((p) => p.id !== id));
 
-  useInstantSave(programs, (v) => updateSettings({ dealer_programs: v }), { ready: !settingsLoading, toastId: "dealer-programs" });
+  useInstantSave(programs, (v) => updateSettings({ dealer_programs: v }), { ready, toastId: "dealer-programs" });
 
   const inputCls = "w-full h-9 px-2.5 rounded-lg border border-border bg-background text-sm text-foreground outline-none focus:border-primary";
   const areaCls = "w-full px-2.5 py-2 rounded-lg border border-border bg-background text-sm text-foreground outline-none focus:border-primary resize-y";
@@ -25,14 +36,14 @@ export default function DealerProgramsPanel() {
   return (
     <div className="space-y-4 max-w-3xl">
       <div>
-        <h2 className="text-base font-bold text-foreground">Included with the sale</h2>
+        <h2 className="text-base font-bold text-foreground">Included with the sale &amp; dealer warranties</h2>
         <p className="text-xs text-muted-foreground mt-0.5 max-w-xl">
-          Everything your store includes with a purchase — dealer warranty, loaner vehicles,
-          maintenance, car washes, and any other value you provide. Each item follows the FTC
-          shape: state the value, the offer, the customer benefit, and the disclosure. Choose
-          where each appears (window sticker, customer packet) and any requirement such as
-          financing. These feed the sticker programs block, the addendum's Included Benefits,
-          and the customer passport. Changes save automatically.
+          The value your store adds to a deal — dealer warranties, loaner vehicles, maintenance,
+          car washes — offered either included with the sale or as an optional upgrade. Each item
+          follows the FTC shape: state the value, the offer, the customer benefit, and the
+          disclosure. An item only appears once it has a title, a placement toggle, and a matching
+          vehicle condition. Included items feed the addendum's Included Benefits; upgrades feed
+          Available Upgrades. Changes save automatically.
         </p>
       </div>
 
@@ -195,7 +206,23 @@ export default function DealerProgramsPanel() {
               </div>
             )}
 
-            <div className="flex flex-wrap items-center gap-4 pt-1">
+            {/certified/i.test(`${p.title} ${p.offer}`) && (
+              <p className="text-[11px] text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+                Several states (including California) restrict advertising a used vehicle as
+                "certified" unless it meets a defined inspection program and the buyer receives a
+                completed inspection report before sale. Confirm eligibility before using this wording.
+              </p>
+            )}
+            {p.isWarranty && p.requirement === "finance" && (
+              <p className="text-[11px] text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+                Conditioning a warranty on dealer financing draws add-on scrutiny under FTC Act
+                Section 5 and state UDAP laws. Confirm this structure with counsel.
+              </p>
+            )}
+
+            <div className="pt-1">
+              <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-1.5">Where it appears</p>
+              <div className="flex flex-wrap items-center gap-4">
               <label className="inline-flex items-center gap-1.5 text-[12px] font-medium text-foreground cursor-pointer">
                 <input type="checkbox" checked={p.showOnSticker} onChange={(e) => set(p.id, { showOnSticker: e.target.checked })} />
                 Show on window sticker &amp; addendum
@@ -210,6 +237,7 @@ export default function DealerProgramsPanel() {
                   Show in passport warranty section
                 </label>
               )}
+              </div>
             </div>
           </section>
         );

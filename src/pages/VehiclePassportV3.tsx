@@ -541,7 +541,14 @@ const VehiclePassportV3 = () => {
                   <span>Stock # {listing.vin.slice(-6)}</span>{listing.mileage != null && <><span className="text-slate-300">•</span><span>{listing.mileage.toLocaleString()} mi</span></>}
                 </div>
                 {(() => {
+                  const dw = d.dealerCoverage.find((c) => c.mode === "included");
+                  const dwChip = dw
+                    ? (dw.lifetime
+                        ? `Lifetime ${dw.coverage || "Powertrain"}`
+                        : [dw.termYears ? `${dw.termYears}-Yr` : null, dw.termMiles ? `${Math.round(dw.termMiles / 1000)}K-Mi` : null].filter(Boolean).join("/") + ` ${dw.coverage || "Warranty"}`)
+                    : null;
                   const idBadges = [
+                    dwChip && dwChip.trim() !== "" ? dwChip.trim() : null,
                     d.ownerCount === 1 ? "One Owner" : null,
                     d.verifyRows.length > 0 ? "Dealer Verified" : null,
                     d.marketAvg != null || d.comparables.length > 0 ? "Market Data Verified" : null,

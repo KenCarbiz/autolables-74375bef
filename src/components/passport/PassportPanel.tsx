@@ -1115,7 +1115,8 @@ function buildPanel(key: PassportPanelKey, d: PassportData, listing: VehicleList
                           </span>
                         </div>
                         {c.offer && <p className="text-[12.5px] text-[#475569] leading-snug mt-1.5">{c.offer}</p>}
-                        {c.disclosure && <p className="text-[11px] text-[#94A3B8] leading-snug mt-1.5">{c.disclosure}</p>}
+                        {c.disclosure && <p className="text-[11.5px] text-[#64748B] leading-snug mt-1.5">{c.disclosure}</p>}
+                        {c.mode === "available" && <p className="text-[11px] font-semibold text-[#64748B] mt-1.5">Optional — not required to purchase or finance the vehicle.</p>}
                       </div>
                     );
                   })}

@@ -146,7 +146,14 @@ serve(async (req) => {
         try {
           const progs = Array.isArray(s.dealer_programs) ? s.dealer_programs as Record<string, unknown>[] : [];
           const cond = String((row.condition as string) || "").toLowerCase();
-          const applies = (a: unknown) => !a || a === "all" || String(a).toLowerCase() === cond;
+          // Mirrors matchesCondition in src/lib/dealerPrograms.ts: missing
+          // appliesTo = all, and "used" subsumes "cpo".
+          const applies = (a: unknown) => {
+            const v = String(a || "all").toLowerCase();
+            if (v === "all") return true;
+            if (v === "used") return cond === "used" || cond === "cpo";
+            return v === cond;
+          };
           const cov = progs
             .filter((p) => p && p.enabled !== false && p.isWarranty === true && p.showOnWarrantyPanel === true &&
               (String(p.title || "").trim() || String(p.offer || "").trim()) && applies(p.appliesTo))

@@ -113,6 +113,10 @@ export default function OemWarrantyPanel() {
           are published. Below, list your CPO programs (manufacturer-certified and dealer-certified).
           Changes save automatically.
         </p>
+        <p className="text-xs text-muted-foreground mt-1.5 max-w-xl">
+          Adding your store's own warranty (lifetime powertrain, dealer pre-owned coverage)?
+          That lives in <a href="/admin?tab=programs" className="font-semibold text-primary hover:underline">Included with Sale &amp; Warranties</a>.
+        </p>
       </div>
 
       {/* ── OEM factory warranty by brand ── */}

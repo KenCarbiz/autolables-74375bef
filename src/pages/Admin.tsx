@@ -597,7 +597,7 @@ const Admin = () => {
     { id: "settings", label: "Store Settings" },
     { id: "branding", label: "Branding" },
     { id: "labels", label: "Label Templates" },
-    { id: "programs", label: "Included with Sale" },
+    { id: "programs", label: "Included with Sale & Warranties" },
     { id: "factory-warranty", label: "Factory Warranty & CPO" },
     { id: "passport-ctas", label: "Passport Buttons" },
     { id: "passport-trust", label: "Why Buy From Us" },

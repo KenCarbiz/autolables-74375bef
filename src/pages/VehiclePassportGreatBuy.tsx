@@ -285,7 +285,16 @@ const VehiclePassportGreatBuy = () => {
     : d.marketAvg != null ? "Near the market average" : "Awaiting market data";
   const histVal = isNew ? 97 : d.cleanTitle && d.accidentCount === 0 ? 96 : d.accidentCount === 0 ? 84 : (typeof mc.carfax_clean_title === "boolean" || d.accidentCount != null) ? 70 : null;
   const ownVal = isNew ? 96 : d.ownerCount === 1 ? 93 : d.ownerCount != null ? 72 : null;
-  const warVal = d.warrantyStr ? (() => { const w = d.warranty; if (w.in_service_date && w.factory_months) { const end = new Date(w.in_service_date); end.setMonth(end.getMonth() + w.factory_months); const left = Math.max(0, end.getTime() - Date.now()) / (1000 * 60 * 60 * 24 * 30.4); return Math.round(Math.max(55, Math.min(98, 55 + (left / w.factory_months) * 43))); } return 80; })() : null;
+  // Included dealer coverage (lifetime powertrain, dealer pre-owned warranty)
+  // floors the warranty score high — it doesn't decay like factory time.
+  const dealerCov = d.dealerCoverage.find((c) => c.mode === "included") || null;
+  const dealerCovLabel = dealerCov
+    ? (dealerCov.lifetime
+        ? `Lifetime ${dealerCov.coverage || "powertrain"} coverage included by the dealer`
+        : `${[dealerCov.termYears ? `${dealerCov.termYears}-year` : null, dealerCov.termMiles ? `${dealerCov.termMiles.toLocaleString()}-mile` : null].filter(Boolean).join(" / ")} dealer ${dealerCov.coverage || "warranty"} included`)
+    : null;
+  const factoryWarVal = d.warrantyStr ? (() => { const w = d.warranty; if (w.in_service_date && w.factory_months) { const end = new Date(w.in_service_date); end.setMonth(end.getMonth() + w.factory_months); const left = Math.max(0, end.getTime() - Date.now()) / (1000 * 60 * 60 * 24 * 30.4); return Math.round(Math.max(55, Math.min(98, 55 + (left / w.factory_months) * 43))); } return 80; })() : null;
+  const warVal = dealerCov ? Math.max(factoryWarVal ?? 0, dealerCov.lifetime ? 96 : 90) : factoryWarVal;
   // Equipment count spans the top-level features column AND the decoded
   // mc_attributes.options/.features (where the VIN decode lands) — not just the
   // features column, which the NeoVIN pull never writes to.
@@ -298,7 +307,7 @@ const VehiclePassportGreatBuy = () => {
     { icon: DollarSign, label: "Price Value", score: priceVal, note: priceNote },
     { icon: Users, label: "Ownership", score: ownVal, note: isNew ? "New — you are the first owner" : d.ownerCount === 1 ? "One previous owner" : d.ownerCount != null ? `${d.ownerCount} previous owners` : "Confirm with dealer" },
     { icon: Package, label: "Equipment", score: equipVal, note: gbSheet?.packages.length ? `${gbSheet.packages.length} factory package${gbSheet.packages.length === 1 ? "" : "s"}${gbSheet.estValue ? ` · ${fmt$(gbSheet.estValue)} in options` : ""}` : equipCount > 0 ? `${equipCount} equipment highlights decoded` : "Confirm with dealer" },
-    { icon: ShieldCheck, label: "Warranty", score: warVal, note: d.warrantyStr ? `${d.warrantyStr} of factory coverage remains` : "Confirm with dealer" },
+    { icon: ShieldCheck, label: "Warranty", score: warVal, note: dealerCovLabel || (d.warrantyStr ? `${d.warrantyStr} of factory coverage remains` : "Confirm with dealer") },
     { icon: FileText, label: "Vehicle History", score: histVal, note: isNew ? "New vehicle — no accident or title history" : d.cleanTitle && d.accidentCount === 0 ? "Clean title, no accidents reported" : histVal != null ? "History reviewed where data exists" : "Confirm details" },
     { icon: TrendingUp, label: "Market Demand", score: demandVal, note: d.viewCount != null ? `${d.viewCount.toLocaleString()} shopper views` : "Demand tracked once live" },
     { icon: Wrench, label: "Condition", score: condVal, note: d.serviceCount > 0 ? `${d.serviceCount} service records on file` : listing.condition === "new" ? "New vehicle" : "Inspected" },
@@ -342,6 +351,7 @@ const VehiclePassportGreatBuy = () => {
   if (d.saveVsMsrp) why.push(`${fmt$(d.saveVsMsrp)} below MSRP`);
   if (topPct) why.push(topPct);
   if (d.cleanTitle && d.accidentCount === 0) why.push("Clean title and history");
+  if (dealerCovLabel) why.push(dealerCovLabel);
   if (d.warrantyStr) why.push("Factory warranty remaining");
   if (d.reviewRating != null && d.reviewRating >= 4.5) why.push("Excellent owner reviews");
   if (lowMiles) why.push(`Low mileage — ${listing.mileage!.toLocaleString()} mi`);
@@ -447,6 +457,7 @@ const VehiclePassportGreatBuy = () => {
   if (listing.trim && d.comparables.length >= 5 && sameTrimComps.length <= 2 && buyNow.length < 5) buyNow.push(sameTrimComps.length === 0
     ? `None of the ${d.comparables.length} comparable listings nearby matches this ${listing.trim} build.`
     : `Only ${sameTrimComps.length} of ${d.comparables.length} nearby comparables ${sameTrimComps.length === 1 ? "is" : "are"} a ${listing.trim}.`);
+  if (dealerCovLabel && buyNow.length < 4) buyNow.push(`${dealerCovLabel}.`);
   if (d.warrantyStr && buyNow.length < 4) buyNow.push("Factory warranty is still active.");
 
   // Recommendation copy: strengths from verified data plus the specific
