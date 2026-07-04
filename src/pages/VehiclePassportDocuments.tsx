@@ -331,25 +331,6 @@ const VehiclePassportDocuments = () => {
                   <span className="shrink-0 text-[13px] font-semibold text-[#2563EB] inline-flex items-center gap-1.5">View Report <ExternalLink className="w-4 h-4" /></span>
                 </a>
               )}
-              {(() => {
-                const b = (listing as { oem_brochure?: { url: string; title?: string | null; year?: number | null } }).oem_brochure;
-                if (!b?.url || !packetVisible(listing, "brochure")) return null;
-                const mk = (listing.ymm || "").trim().split(/\s+/)[1] || "manufacturer";
-                return (
-                  <a
-                    href={b.url} target="_blank" rel="noopener noreferrer"
-                    onClick={() => { if (!isPreview) trackCustomerCtaClicked({ storeId: listing.store_id, vehicleId: listing.id, vin: listing.vin, source: "passport", surface: "vehicle_passport", metadata: { cta: "oem_brochure", placement: "documents_page" } }); }}
-                    className={`${CARD} p-4 flex items-center gap-3 hover:border-[#2563EB] transition-colors`}
-                  >
-                    <span className="w-11 h-11 rounded-xl bg-blue-50 flex items-center justify-center shrink-0"><FileText className="w-5 h-5 text-[#2563EB]" /></span>
-                    <div className="min-w-0 flex-1">
-                      <p className="text-[14px] font-bold leading-tight">Official {mk.toUpperCase()} Brochure{b.year ? ` (${b.year})` : ""}</p>
-                      <p className="text-[12px] text-[#64748B] leading-tight mt-0.5">Opens on the manufacturer's website</p>
-                    </div>
-                    <span className="shrink-0 text-[13px] font-semibold text-[#2563EB] inline-flex items-center gap-1.5">View Brochure <ExternalLink className="w-4 h-4" /></span>
-                  </a>
-                );
-              })()}
               {grouped.length === 0 ? (
                 <div className={`${CARD} p-12 text-center`}>
                   <span className="w-14 h-14 rounded-2xl bg-slate-100 text-slate-400 flex items-center justify-center mx-auto mb-3"><FileText className="w-7 h-7" /></span>
