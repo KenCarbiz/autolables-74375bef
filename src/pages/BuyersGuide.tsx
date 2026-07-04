@@ -258,10 +258,12 @@ const BuyersGuide = () => {
   // included dealer warranty on used/CPO vehicles (sticker, packet, or
   // passport), the Guide cannot say "As-Is — No Dealer Warranty" — statements
   // elsewhere may not contradict the Guide, and the Guide controls.
-  const dealerWarranties = useMemo(
-    () => includedWarrantyPrograms(settings.dealer_programs, "used"),
-    [settings.dealer_programs],
-  );
+  const dealerWarranties = useMemo(() => {
+    const suppressed = new Set(
+      (Array.isArray(prefill.vehicle?.raw?.suppressed_programs) ? (prefill.vehicle!.raw.suppressed_programs as unknown[]) : []).map(String),
+    );
+    return includedWarrantyPrograms(settings.dealer_programs, "used").filter((p) => !suppressed.has(p.id));
+  }, [settings.dealer_programs, prefill.vehicle]);
   const dealerWarrantyLock = dealerWarranties.length > 0;
   const dealerWarrantyReason = dealerWarrantyLock
     ? `This store advertises "${dealerWarranties[0].title}" as included on used vehicles — the Buyers Guide must reflect it, so As-Is can't be selected. Turn the program off in Included with Sale if it doesn't apply.`

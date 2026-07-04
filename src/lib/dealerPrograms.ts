@@ -177,7 +177,7 @@ export const presetProgram = (key: string): DealerProgram | null => {
 // the program on exactly the cars it targets. Missing appliesTo = all, the
 // same default the server applies. Mirror any change here in
 // public-listing-view's applies().
-const matchesCondition = (appliesTo: ProgramAppliesTo | undefined, condition: string | null | undefined): boolean => {
+export const programMatchesCondition = (appliesTo: ProgramAppliesTo | undefined, condition: string | null | undefined): boolean => {
   if (!appliesTo || appliesTo === "all") return true;
   const c = (condition || "").toLowerCase();
   if (appliesTo === "used") return c === "used" || c === "cpo";
@@ -194,7 +194,7 @@ export function applicablePrograms(
     (p) =>
       p.enabled &&
       (p.title.trim() || p.offer.trim()) &&
-      matchesCondition(p.appliesTo, condition) &&
+      programMatchesCondition(p.appliesTo, condition) &&
       (placement === "sticker" ? p.showOnSticker : p.showOnPacket)
   );
 }
@@ -229,7 +229,7 @@ export function warrantyPanelPrograms(
       p.isWarranty === true &&
       p.showOnWarrantyPanel === true &&
       (p.title.trim() || p.offer.trim()) &&
-      matchesCondition(p.appliesTo, condition)
+      programMatchesCondition(p.appliesTo, condition)
   );
 }
 
@@ -248,6 +248,6 @@ export function includedWarrantyPrograms(
       programMode(p) === "included" &&
       (p.showOnSticker || p.showOnPacket || p.showOnWarrantyPanel === true) &&
       (p.title.trim() || p.offer.trim()) &&
-      matchesCondition(p.appliesTo, condition)
+      programMatchesCondition(p.appliesTo, condition)
   );
 }

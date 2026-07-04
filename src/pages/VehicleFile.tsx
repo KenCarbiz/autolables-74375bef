@@ -4,6 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useTenant } from "@/contexts/TenantContext";
 import { useDealerSettings } from "@/contexts/DealerSettingsContext";
+import { programMatchesCondition, programMode, termLabel as programTermLabel, type DealerProgram } from "@/lib/dealerPrograms";
 import { toast } from "sonner";
 import {
   ArrowLeft, Car, FileText, Wrench, Tag, Signature, Globe,
@@ -89,6 +90,7 @@ interface VehicleRow {
   photos: string[] | null;
   mc_attributes: Record<string, unknown> | null;
   packet_modules: Record<string, boolean> | null;
+  suppressed_programs: string[] | null;
   recall_status: string | null;
   recall_checked_at: string | null;
   open_recall_count: number | null;
@@ -1346,6 +1348,7 @@ const ScanInfoPanel = ({ vehicle, onReload }: { vehicle: VehicleRow; onReload: (
   const [warranty, setWarranty] = useState<WarrantyInfo>(vehicle.warranty_info || {});
   const [accessories, setAccessories] = useState<AvailableAccessory[]>(vehicle.available_accessories || []);
   const [packetModules, setPacketModules] = useState<Record<string, boolean>>(vehicle.packet_modules || {});
+  const [suppressedPrograms, setSuppressedPrograms] = useState<string[]>(vehicle.suppressed_programs || []);
   const [saving, setSaving] = useState(false);
   const { settings: dealerSettings } = useDealerSettings();
   const storeDefaults = dealerSettings.packet_module_defaults || {};
@@ -1372,8 +1375,11 @@ const ScanInfoPanel = ({ vehicle, onReload }: { vehicle: VehicleRow; onReload: (
     };
     let { error } = await (supabase as any)
       .from("vehicle_listings")
-      .update({ ...base, packet_modules: packetModules })
+      .update({ ...base, packet_modules: packetModules, suppressed_programs: suppressedPrograms })
       .eq("id", vehicle.id);
+    if (error && /suppressed_programs/i.test(error.message || "")) {
+      ({ error } = await (supabase as any).from("vehicle_listings").update({ ...base, packet_modules: packetModules }).eq("id", vehicle.id));
+    }
     if (error && /column|schema cache|packet_modules/i.test(error.message || "")) {
       ({ error } = await (supabase as any).from("vehicle_listings").update(base).eq("id", vehicle.id));
     }
@@ -1446,6 +1452,45 @@ const ScanInfoPanel = ({ vehicle, onReload }: { vehicle: VehicleRow; onReload: (
           })}
         </div>
       </div>
+
+      {/* Dealer programs on this vehicle — per-VIN opt-out of store-wide
+          claims (a lifetime powertrain may not apply to this exact unit). */}
+      {(() => {
+        const applicable = ((dealerSettings.dealer_programs || []) as DealerProgram[]).filter(
+          (p) => p.enabled && (p.title.trim() || p.offer.trim()) && programMatchesCondition(p.appliesTo, vehicle.condition || ""),
+        );
+        if (!applicable.length) return null;
+        const toggle = (id: string) =>
+          setSuppressedPrograms((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
+        return (
+          <section className="rounded-2xl border border-border bg-card shadow-[0_1px_3px_rgba(0,0,0,0.06)] p-6 space-y-3">
+            <div>
+              <h3 className="text-base font-bold text-foreground">Dealer Programs on This Vehicle</h3>
+              <p className="text-[13px] text-slate-500 mt-0.5">Store-wide programs that match this vehicle. Turn one off here if this exact unit doesn't qualify (mileage cap, branded title) — it disappears from this vehicle's sticker, packet, and warranty panel only.</p>
+            </div>
+            <div className="space-y-2">
+              {applicable.map((p) => {
+                const off = suppressedPrograms.includes(p.id);
+                const term = programTermLabel(p);
+                return (
+                  <div key={p.id} className={`flex items-center justify-between gap-3 rounded-xl border border-border px-3.5 py-2.5 ${off ? "opacity-60 bg-muted/30" : "bg-background"}`}>
+                    <div className="min-w-0">
+                      <p className="text-[13.5px] font-semibold text-foreground truncate">{p.title || p.offer}{term ? ` — ${term}` : ""}</p>
+                      <p className="text-[11.5px] text-slate-500">{programMode(p) === "included" ? "Included with the sale" : "Available upgrade"}{p.isWarranty ? " · Dealer warranty" : ""}</p>
+                    </div>
+                    <button
+                      onClick={() => toggle(p.id)}
+                      className={`shrink-0 h-8 px-3 rounded-lg border text-[12px] font-bold ${off ? "border-border text-slate-500 hover:bg-muted" : "border-emerald-200 bg-emerald-50 text-emerald-700"}`}
+                    >
+                      {off ? "Off for this vehicle" : "Showing"}
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          </section>
+        );
+      })()}
 
       {/* Service history */}
       <section className="rounded-2xl border border-border bg-card shadow-[0_1px_3px_rgba(0,0,0,0.06)] p-6 space-y-4">

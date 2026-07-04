@@ -154,8 +154,10 @@ serve(async (req) => {
             if (v === "used") return cond === "used" || cond === "cpo";
             return v === cond;
           };
+          const suppressed = new Set((Array.isArray(row.suppressed_programs) ? row.suppressed_programs as unknown[] : []).map(String));
           const cov = progs
             .filter((p) => p && p.enabled !== false && p.isWarranty === true && p.showOnWarrantyPanel === true &&
+              !suppressed.has(String(p.id || "")) &&
               (String(p.title || "").trim() || String(p.offer || "").trim()) && applies(p.appliesTo))
             .map((p) => ({
               title: String(p.title || ""),

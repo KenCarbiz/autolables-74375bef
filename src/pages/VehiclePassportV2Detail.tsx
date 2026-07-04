@@ -501,12 +501,17 @@ const CONTACT_TOPICS: { key: string; label: string; icon: React.ElementType; pla
 ];
 
 const ContactExperience = ({ listing, d, navigate }: { listing: VehicleListing; d: PassportData; navigate: ReturnType<typeof useNavigate> }) => {
-  const [topic, setTopic] = useState("availability");
+  // Deep links can preselect a topic and seed the message (e.g. the warranty
+  // panel's "Ask about this coverage" passes ?topic=warranty&about=<program>).
+  const qp = typeof window !== "undefined" ? new URLSearchParams(window.location.search) : null;
+  const qpTopic = qp?.get("topic") || "";
+  const qpAbout = (qp?.get("about") || "").slice(0, 120);
+  const [topic, setTopic] = useState(CONTACT_TOPICS.some((t) => t.key === qpTopic) ? qpTopic : "availability");
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
   const [method, setMethod] = useState<string | null>("text");
-  const [message, setMessage] = useState("");
+  const [message, setMessage] = useState(qpAbout ? `I'd like to learn more about ${qpAbout}.` : "");
   const [sending, setSending] = useState(false);
   const [sent, setSent] = useState(false);
   const [errors, setErrors] = useState<{ name?: string; contact?: string; email?: string }>({});

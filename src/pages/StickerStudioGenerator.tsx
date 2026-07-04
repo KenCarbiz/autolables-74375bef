@@ -136,7 +136,11 @@ const StickerStudioGenerator = () => {
       : [];
     // Included-with-sale items (dealer warranty, loaner cars, …) fill the
     // benefits section alongside no-charge products.
-    const programs = applicablePrograms(settings.dealer_programs, v?.condition || "", "sticker");
+    const suppressedIds = new Set(
+      (Array.isArray(v?.raw?.suppressed_programs) ? (v!.raw.suppressed_programs as unknown[]) : []).map(String),
+    );
+    const programs = applicablePrograms(settings.dealer_programs, v?.condition || "", "sticker")
+      .filter((p) => !suppressedIds.has(p.id));
     const programName = (p: (typeof programs)[number]) => {
       const t = termLabel(p);
       return t ? `${p.title.trim()} — ${t}` : p.title.trim();

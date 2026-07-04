@@ -1116,7 +1116,20 @@ function buildPanel(key: PassportPanelKey, d: PassportData, listing: VehicleList
                         </div>
                         {c.offer && <p className="text-[12.5px] text-[#475569] leading-snug mt-1.5">{c.offer}</p>}
                         {c.disclosure && <p className="text-[11.5px] text-[#64748B] leading-snug mt-1.5">{c.disclosure}</p>}
-                        {c.mode === "available" && <p className="text-[11px] font-semibold text-[#64748B] mt-1.5">Optional — not required to purchase or finance the vehicle.</p>}
+                        {c.mode === "available" && (
+                          <div className="flex items-center justify-between gap-3 mt-2 flex-wrap">
+                            <p className="text-[11px] font-semibold text-[#64748B]">Optional — not required to purchase or finance the vehicle.</p>
+                            <button
+                              onClick={() => {
+                                if (!isPreview) trackCustomerCtaClicked({ storeId: listing.store_id, vehicleId: listing.id, vin: listing.vin, source: "passport", surface: "vehicle_passport", metadata: { cta: "upgrade_inquiry", program: c.title, placement: "warranty_panel" } });
+                                go(`contact?topic=warranty&about=${encodeURIComponent(c.title)}`);
+                              }}
+                              className="shrink-0 inline-flex items-center h-8 px-3 rounded-lg bg-[#2563EB] text-white text-[12px] font-bold hover:bg-[#1d4fd7]"
+                            >
+                              Ask about this coverage
+                            </button>
+                          </div>
+                        )}
                       </div>
                     );
                   })}

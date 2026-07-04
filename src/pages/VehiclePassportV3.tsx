@@ -290,7 +290,7 @@ const VehiclePassportV3 = () => {
     <div className="min-h-screen flex items-center justify-center px-6 bg-[#F6F7F9]"><div className="text-center"><Package className="w-12 h-12 text-slate-300 mx-auto mb-4" /><h1 className="text-xl font-bold">Vehicle unavailable</h1><p className="text-sm text-slate-500 mt-2">This listing may have been sold or unpublished.</p></div></div>
   );
 
-  const go = (section: string) => navigate(`/v/${listing.slug || vehicleSlug}/${section}${isPreview ? "?preview=1" : ""}`);
+  const go = (section: string) => navigate(`/v/${listing.slug || vehicleSlug}/${section}${isPreview ? (section.includes("?") ? "&" : "?") + "preview=1" : ""}`);
   const viewUrl = publicUrl(listing.slug);
   // Decoded build sheet: the dollar story (packages + option value) for the
   // hero price block and highlights strip.

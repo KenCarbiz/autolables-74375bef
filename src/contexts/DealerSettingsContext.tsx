@@ -612,12 +612,19 @@ export const DealerSettingsProvider = ({ children }: { children: ReactNode }) =>
       // Supabase returns RLS denials in `error` (it does not throw), so check
       // it explicitly and tell the dealer when a save didn't reach the server —
       // otherwise edits silently live in cache and vanish on reload.
-      const { error } = await (supabase as any)
-        .from("dealer_profiles")
-        .upsert(
-          { tenant_id: tenantId, settings: next, updated_by: user.id },
-          { onConflict: "tenant_id" }
-        );
+      // Prefer the server-side merge RPC: it patches only the keys this save
+      // touched, so concurrent editors on other panels aren't clobbered. Fall
+      // back to the full-snapshot upsert until the migration is applied.
+      let { error } = await (supabase as any)
+        .rpc("merge_dealer_settings", { _tenant_id: tenantId, _patch: updates });
+      if (error && /function|merge_dealer_settings|schema cache/i.test(error.message || "")) {
+        ({ error } = await (supabase as any)
+          .from("dealer_profiles")
+          .upsert(
+            { tenant_id: tenantId, settings: next, updated_by: user.id },
+            { onConflict: "tenant_id" }
+          ));
+      }
       if (error) {
         // eslint-disable-next-line no-console
         console.warn("dealer_profiles upsert failed:", error.message);

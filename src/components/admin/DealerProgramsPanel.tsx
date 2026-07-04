@@ -67,6 +67,11 @@ export default function DealerProgramsPanel() {
           })}
         </div>
         <p className="text-[10.5px] text-muted-foreground mt-2">Presets are starting points — edit the wording and disclosure to match your store's actual policy.</p>
+        <p className="text-[10.5px] text-muted-foreground mt-1">
+          See what shoppers see: <a href="/v/demo?preview=1&panel=factory-warranty" target="_blank" rel="noreferrer" className="font-semibold text-primary hover:underline">sample passport warranty panel</a>
+          {" · "}
+          <a href="/v/demo?preview=1" target="_blank" rel="noreferrer" className="font-semibold text-primary hover:underline">sample passport</a>
+        </p>
       </div>
 
       {programs.length === 0 && (
