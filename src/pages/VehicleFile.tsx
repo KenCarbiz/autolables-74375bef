@@ -1010,6 +1010,7 @@ const DocumentsPanel = ({ vehicle, onReload }: { vehicle: VehicleRow; onReload: 
   const slots: Array<{ type: string; label: string; desc: string }> = isUsed
     ? [
         { type: "factory_sticker", label: "OEM window sticker (Monroney)", desc: "Original factory window sticker PDF, image, or link — shows to shoppers in the packet." },
+        { type: "brochure", label: "Vehicle brochure", desc: "OEM or dealer brochure PDF / link — shows to shoppers in the packet's Documents page." },
         { type: "buyers_guide", label: "FTC Buyers Guide (used)", desc: "Required used-car window form — As-Is vs warranty (16 CFR Part 455). Spanish where the sale is conducted in Spanish." },
         { type: "safety_inspection", label: safety.label, desc: safety.desc },
         { type: "emissions", label: "Emissions / smog certificate", desc: "State emissions certificate where required." },
@@ -1019,12 +1020,11 @@ const DocumentsPanel = ({ vehicle, onReload }: { vehicle: VehicleRow; onReload: 
         { type: "title", label: "Title / application", desc: "Title, reassignment, or title application." },
         { type: "warranty", label: "Warranty / service contract", desc: "Limited warranty, service contract (VSC), or GAP documents." },
         { type: "we_owe", label: "\"We owe\" / Due bill", desc: "Items the dealership agreed to deliver post-sale (e.g. pending install)." },
-        { type: "brochure", label: "Product brochure", desc: "OEM or dealer marketing PDF / link — appears on the shopper page." },
         { type: "other", label: "Other", desc: "Anything else relevant to the deal jacket." },
       ]
     : [
         { type: "factory_sticker", label: "Factory window sticker", desc: "OEM Monroney PDF / image — we'll show it to the buyer at signing." },
-        { type: "brochure", label: "Product brochure", desc: "OEM or dealer marketing PDF / link — appears on the shopper page." },
+        { type: "brochure", label: "Vehicle brochure", desc: "OEM or dealer brochure PDF / link — shows to shoppers in the packet's Documents page." },
         { type: "carfax", label: "Carfax / AutoCheck", desc: "Vehicle history report." },
         { type: "warranty", label: "Warranty / service contract", desc: "Limited warranty, service contract (VSC), or GAP documents." },
         { type: "we_owe", label: "\"We owe\" / Due bill", desc: "Items the dealership agreed to deliver post-sale." },
@@ -1046,6 +1046,9 @@ const DocumentsPanel = ({ vehicle, onReload }: { vehicle: VehicleRow; onReload: 
         title="Documents"
         description="Files available to shoppers and dealership staff — upload PDFs, links, brochures, reports, and warranty paperwork."
       />
+      {/* OEM brochure link — auto-harvested from the manufacturer's own site */}
+      <BrochureFinderRow vehicle={vehicle} />
+
       <div>
         <h3 className="text-[15px] font-bold text-foreground">Uploads &amp; Links</h3>
         <p className="text-[13px] text-slate-500 mt-0.5 mb-3">Click Upload to attach a PDF or image, or Add link to paste a URL. Everything here appears in the shopper packet's Documents page.</p>
@@ -1416,9 +1419,6 @@ const ScanInfoPanel = ({ vehicle, onReload }: { vehicle: VehicleRow; onReload: (
           </button>
         }
       />
-
-      {/* OEM brochure link — harvested from the manufacturer's own site */}
-      <BrochureFinderRow vehicle={vehicle} />
 
       {/* Passport modules — module cards, same language as Documents */}
       <div>
