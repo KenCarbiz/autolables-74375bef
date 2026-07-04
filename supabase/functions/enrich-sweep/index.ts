@@ -48,6 +48,30 @@ async function runSweep(sweepStart: string, depth: number) {
         });
         if (!res.ok) failures++;
       } catch { failures++; /* a failed enrich is retried next sweep, not this one */ }
+      // Full build sheet: vehicle-enrich covers market/recall/value but NOT the
+      // VIN options/features decode — that's marketcheck-specs, historically
+      // on-demand only, which left most inventory with an empty equipment list
+      // (and the passport's Equipment factor stuck on Pending). Decode any VIN
+      // still missing both lists; skipped once populated, so each VIN costs one
+      // decode ever, not one per sweep.
+      try {
+        const { data: lrow } = await admin
+          .from("vehicle_listings").select("mc_attributes")
+          .eq("tenant_id", r.tenant_id).eq("vin", r.vin).maybeSingle();
+        // deno-lint-ignore no-explicit-any
+        const mc = (lrow?.mc_attributes ?? {}) as Record<string, any>;
+        const hasSpecs = (Array.isArray(mc.options) && mc.options.length > 0) ||
+          (Array.isArray(mc.features) && mc.features.length > 0);
+        if (!hasSpecs && Date.now() < deadline) {
+          const sres = await fetch(`${SUPABASE_URL}/functions/v1/marketcheck-specs`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json", Authorization: `Bearer ${SERVICE_KEY}` },
+            body: JSON.stringify({ tenant_id: r.tenant_id, vin: r.vin }),
+            signal: AbortSignal.timeout(45000),
+          });
+          if (!sres.ok) failures++;
+        }
+      } catch { failures++; /* specs retried next sweep */ }
       // Liveness guard: stamp enriched_at no matter the outcome so this VIN drops
       // out of next_enrich_batch FOR THIS SWEEP. vehicle-enrich already stamps on
       // its normal path, but its early returns (no MarketCheck key, invalid VIN,
