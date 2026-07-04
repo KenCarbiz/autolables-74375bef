@@ -367,8 +367,28 @@ const VehiclePassportV3 = () => {
   };
 
   const compPrices = d.comparables.map((c) => (c as { price?: number }).price).filter((p): p is number => typeof p === "number" && p > 0);
-  const compFrom = compPrices.length ? Math.min(...compPrices) : null;
   const compCount = d.comparables.length || d.marketMeta.similarCount || 0;
+  // Value-first comp story: lead with how many comps this price beats or the
+  // gap to the comp average — never "similar vehicles from $X", which reads
+  // as an invitation to go buy the cheaper one. Falls back to an honest
+  // neutral count when the price sits above the pack.
+  const compStory = (() => {
+    const ourPrice = d.price;
+    if (!compPrices.length || ourPrice == null) {
+      return compCount
+        ? { strong: `${compCount} Reviewed`, sub: "Local comparable vehicles analyzed" }
+        : { strong: "Comp set", sub: "Similar vehicles via MarketCheck" };
+    }
+    const above = compPrices.filter((p) => p >= ourPrice).length;
+    const avgComp = Math.round(compPrices.reduce((a, b) => a + b, 0) / compPrices.length);
+    if (above >= Math.ceil(compPrices.length / 2)) {
+      return { strong: `Below ${above} of ${compPrices.length} Comps`, sub: `Comp average ${fmt$(avgComp)} nearby` };
+    }
+    if (avgComp > ourPrice) {
+      return { strong: `${fmt$(avgComp - ourPrice)} Under Comps`, sub: `Average of ${compPrices.length} comparable vehicles` };
+    }
+    return { strong: `${compPrices.length} Comps Reviewed`, sub: "Priced within the local market range" };
+  })();
   const mi = [
     { icon: DollarSign, title: "Market Price", strong: d.belowMarket && d.belowMarket > 0 ? "Great Price" : d.marketAvg != null ? "Market Price" : "Pending",
       sub: d.belowMarket && d.belowMarket > 0 ? `${fmt$(d.belowMarket)} below market average` : d.marketAvg != null ? `Market avg ${fmt$(d.marketAvg)}` : "Awaiting MarketCheck", chart: <Spark points={marketSeries} />, section: "market-price", cta: "View report" },
@@ -378,8 +398,8 @@ const VehiclePassportV3 = () => {
       sub: d.marketAvg != null ? "by market data" : "Awaiting MarketCheck", donut: d.confScore, section: "price-confidence", cta: "View report" },
     { icon: Clock, title: "Price History", strong: priceChange7d != null && priceChange7d !== 0 ? `${priceChange7d < 0 ? "-" : "+"}${fmt$(Math.abs(priceChange7d))}` : "7-Day Trend",
       sub: priceChange7d != null ? (priceChange7d < 0 ? "price decreased" : priceChange7d > 0 ? "price increased" : "stable") : "History builds over time", chart: <Spark points={priceSeries} color="#7C3AED" />, section: "price-history", cta: "View history" },
-    { icon: Car, title: "Comparable Vehicles", strong: compCount ? `${compCount} Nearby` : "Comp set",
-      sub: compFrom != null ? `Similar vehicles from ${fmt$(compFrom)}` : "Similar vehicles via MarketCheck", comps: false, section: "comparable-vehicles", cta: "View comp set" },
+    { icon: Car, title: "Comparable Vehicles", strong: compStory.strong,
+      sub: compStory.sub, comps: false, section: "comparable-vehicles", cta: "View comp set" },
   ];
 
   const highlights: { icon: React.ElementType; t: string; s: string }[] = [];
