@@ -5331,6 +5331,116 @@ export type Database = {
         }
         Relationships: []
       }
+      vehicle_work_events: {
+        Row: {
+          company_name: string | null
+          content_hash: string | null
+          correction_of: string | null
+          created_at: string
+          created_by: string | null
+          event_type: string
+          id: string
+          listing_id: string | null
+          locked: boolean
+          notes: string | null
+          photos: Json
+          reason: string | null
+          ro_number: string | null
+          signature_data: string | null
+          signature_type: string | null
+          signer_name: string | null
+          status: string
+          tasks: Json
+          tech_name: string | null
+          tenant_id: string
+          updated_at: string
+          user_agent: string | null
+          vin: string
+          visit_number: number | null
+        }
+        Insert: {
+          company_name?: string | null
+          content_hash?: string | null
+          correction_of?: string | null
+          created_at?: string
+          created_by?: string | null
+          event_type: string
+          id?: string
+          listing_id?: string | null
+          locked?: boolean
+          notes?: string | null
+          photos?: Json
+          reason?: string | null
+          ro_number?: string | null
+          signature_data?: string | null
+          signature_type?: string | null
+          signer_name?: string | null
+          status?: string
+          tasks?: Json
+          tech_name?: string | null
+          tenant_id: string
+          updated_at?: string
+          user_agent?: string | null
+          vin: string
+          visit_number?: number | null
+        }
+        Update: {
+          company_name?: string | null
+          content_hash?: string | null
+          correction_of?: string | null
+          created_at?: string
+          created_by?: string | null
+          event_type?: string
+          id?: string
+          listing_id?: string | null
+          locked?: boolean
+          notes?: string | null
+          photos?: Json
+          reason?: string | null
+          ro_number?: string | null
+          signature_data?: string | null
+          signature_type?: string | null
+          signer_name?: string | null
+          status?: string
+          tasks?: Json
+          tech_name?: string | null
+          tenant_id?: string
+          updated_at?: string
+          user_agent?: string | null
+          vin?: string
+          visit_number?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "vehicle_work_events_correction_of_fkey"
+            columns: ["correction_of"]
+            isOneToOne: false
+            referencedRelation: "vehicle_work_events"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "vehicle_work_events_listing_id_fkey"
+            columns: ["listing_id"]
+            isOneToOne: false
+            referencedRelation: "vehicle_listings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "vehicle_work_events_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenant_summary"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "vehicle_work_events_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       vin_queue: {
         Row: {
           condition: string | null
