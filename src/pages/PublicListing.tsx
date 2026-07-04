@@ -585,7 +585,7 @@ const PublicListingBody = () => {
             {/* Market Price */}
             <div className="border border-[#eceef0] rounded-xl p-5">
               <div className="text-base font-bold">Market Price Analysis</div>
-              <div className="text-[11px] text-[#9aa0a8] mt-0.5">Powered by MarketCheck</div>
+              <div className="text-[11px] text-[#9aa0a8] mt-0.5">Powered by live market data</div>
               {marketAvg > 0 ? (
                 <>
                   <div className="flex justify-between items-end mt-[14px]">
@@ -604,7 +604,7 @@ const PublicListingBody = () => {
               ) : (
                 <div className="mt-[14px]">
                   <div className="text-[26px] font-extrabold">{fmt$(price)}</div>
-                  <p className="text-xs text-[#6b727a] mt-1">Market comparison appears here once MarketCheck data is available for this vehicle.</p>
+                  <p className="text-xs text-[#6b727a] mt-1">Market comparison appears here once live market data is available for this vehicle.</p>
                 </div>
               )}
             </div>

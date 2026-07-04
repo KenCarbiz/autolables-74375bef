@@ -80,7 +80,7 @@ function buildInfo(key: InfoModalKey, go: (s: string) => void, openPanel: ((k: s
         body: <>
           <Para>AutoLabels draws on multiple independent sources. Each contributes a different piece of the picture, and availability varies by vehicle and region.</Para>
           <SourceGrid items={[
-            { name: "MarketCheck", contributes: "Live market pricing and comparable listings." },
+            { name: "Live Market Data", contributes: "Live market pricing and comparable listings." },
             { name: "NHTSA", contributes: "Open recall campaigns and safety data." },
             { name: "EPA", contributes: "Official fuel economy figures from fueleconomy.gov." },
             { name: "OEM", contributes: "Manufacturer build data, equipment, and specifications." },

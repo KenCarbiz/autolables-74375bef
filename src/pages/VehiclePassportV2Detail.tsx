@@ -870,7 +870,7 @@ const SECTIONS: Record<string, { title: string; render: SectionRender; wide?: bo
             <div className="flex flex-wrap gap-2">
               {d.verifiedBy.map((v) => <span key={v} className="inline-flex items-center gap-1 text-[12px] font-semibold text-slate-700 bg-slate-100 rounded-full px-3 py-1.5"><CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />{v}</span>)}
             </div>
-            <p className="text-[11px] text-slate-400 mt-3 leading-snug">Verification reflects data provided by third-party sources (vehicle history, MarketCheck, NHTSA) and the dealership. Confirm details directly with the dealer before purchase.</p>
+            <p className="text-[11px] text-slate-400 mt-3 leading-snug">Verification reflects data provided by third-party sources (vehicle history, live market data, NHTSA) and the dealership. Confirm details directly with the dealer before purchase.</p>
           </Card>
         )}
       </>
@@ -939,10 +939,10 @@ const SECTIONS: Record<string, { title: string; render: SectionRender; wide?: bo
               <li className="flex items-center gap-2.5"><CheckCircle2 className="w-4 h-4 text-emerald-600" />Backed by live market comparables</li>
               <li className="flex items-center gap-2.5"><CheckCircle2 className="w-4 h-4 text-emerald-600" />Compared against live market data</li>
             </ul>
-            <p className="text-[11px] text-slate-400 mt-3">Powered by MarketCheck.</p>
+            <p className="text-[11px] text-slate-400 mt-3">Powered by live market data.</p>
           </Card>
         ) : d.marketAvg != null ? (
-          <Card className="p-5"><p className="text-xl font-extrabold text-blue-600">Fair</p><p className="text-[14px] text-slate-600 mt-0.5">Priced in line with the local market.</p><p className="text-[11px] text-slate-400 mt-3">Powered by MarketCheck.</p></Card>
+          <Card className="p-5"><p className="text-xl font-extrabold text-blue-600">Fair</p><p className="text-[14px] text-slate-600 mt-0.5">Priced in line with the local market.</p><p className="text-[11px] text-slate-400 mt-3">Powered by live market data.</p></Card>
         ) : <Unavailable what="Price confidence" hint="Confidence requires market comparables, which aren't available yet for this vehicle." />}
       </>
     ),
@@ -974,7 +974,7 @@ const SECTIONS: Record<string, { title: string; render: SectionRender; wide?: bo
                     <div key={i} className="flex justify-between gap-4 border-b border-slate-100 pb-2"><span className="text-slate-500">{new Date(p.captured_at).toLocaleDateString()}</span><span className="font-semibold">{fmt$(p.listing_price)}</span></div>
                   ))}
                 </div>
-                <p className="text-[11px] text-slate-400 mt-3">Powered by MarketCheck price tracking.</p>
+                <p className="text-[11px] text-slate-400 mt-3">Powered by live market price tracking.</p>
               </Card>
             </>
           ) : <Unavailable what="Price history" hint="We need at least two captured price points to show a trend. Tracking continues as this vehicle is re-checked." />}
@@ -1381,7 +1381,7 @@ const CompsSection = ({ slug, listing, d }: { slug: string; listing: VehicleList
       ) : state === "empty" || !data ? (
         reason === "no_value_comps"
           ? <Unavailable what="Comparable listings" hint="A fair comparison set isn't available for this vehicle right now." />
-          : <Unavailable what="Comparable listings" hint="A live comparable set (year, trim, mileage, and price) is sourced from MarketCheck and appears here when available for this vehicle and market." />
+          : <Unavailable what="Comparable listings" hint="A live comparable set (year, trim, mileage, and price) is sourced from live market data and appears here when available for this vehicle and market." />
       ) : (
         <>
           <Card className="p-5">
@@ -1395,7 +1395,7 @@ const CompsSection = ({ slug, listing, d }: { slug: string; listing: VehicleList
                 <CheckCircle2 className="w-3.5 h-3.5" /> This vehicle is priced below these comparable local listings.
               </p>
             )}
-            <p className="text-[11px] text-slate-400 mt-3">Market statistics provided by MarketCheck.</p>
+            <p className="text-[11px] text-slate-400 mt-3">Market statistics from live market data.</p>
           </Card>
           {comps.length > 0 && (
             <Card className="p-5 mt-4">
@@ -1422,7 +1422,7 @@ const CompsSection = ({ slug, listing, d }: { slug: string; listing: VehicleList
                   );
                 })}
               </div>
-              <p className="text-[11px] text-slate-400 mt-3">Comparable listings provided by MarketCheck.</p>
+              <p className="text-[11px] text-slate-400 mt-3">Comparable listings from live market data.</p>
             </Card>
           )}
         </>
