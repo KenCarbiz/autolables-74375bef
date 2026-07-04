@@ -248,11 +248,14 @@ export default function MarketPriceSlideOver({ open, onClose, d, listing, isPrev
   if (updatedLabel) comparedAgainst.push(updatedLabel);
 
   // "Why it's a Great Price" — gated on real signals.
+  // price_percentile = % of the local market priced BELOW this car (0 = the
+  // cheapest). Convert to praise ("priced lower than X%") and only when the
+  // car sits in the cheaper half — a raw percentile reads like a grade.
   const percentile = (mc.price_percentile as number) ?? null;
   const why: string[] = [];
   if (isGreat) why.push("Priced below local market");
-  if (percentile != null) why.push(`Lower than ${percentile}% of similar vehicles`);
-  else if (isPreview) why.push("Lower than 91% of similar vehicles");
+  if (percentile != null && percentile <= 50) why.push(`Priced lower than ${100 - percentile}% of similar vehicles`);
+  else if (percentile == null && isPreview) why.push("Priced lower than 91% of similar vehicles");
   if (listing.mileage != null && listing.mileage < 30000) why.push(`Low mileage (${listing.mileage.toLocaleString()} mi)`);
   if (d.ownerCount === 1) why.push("One owner");
   if (d.cleanTitle && d.accidentCount === 0) why.push("Clean history");

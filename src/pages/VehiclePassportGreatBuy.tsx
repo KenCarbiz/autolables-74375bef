@@ -382,7 +382,7 @@ const VehiclePassportGreatBuy = () => {
     { k: "Price", v: d.price != null ? fmt$(d.price) : "—", m: trimAvg != null ? `${fmt$(trimAvg)} (${listing.trim})` : d.marketAvg != null ? `${fmt$(d.marketAvg)}${d.marketMeta.trimMatched === false && listing.trim ? " (all trims)" : ""}` : isPreview ? "$71,400" : "", a: priceAdv },
     { k: "Mileage", v: listing.mileage != null ? `${listing.mileage.toLocaleString()} mi` : "—", m: avgCompMiles != null ? `${avgCompMiles.toLocaleString()} mi` : isPreview ? "24,000 mi" : "", a: avgCompMiles != null && listing.mileage != null ? (listing.mileage < avgCompMiles ? { text: "Lower mileage", good: true } : { text: "Above average", good: false }) : isPreview ? { text: "Lower mileage", good: true } : null },
     { k: "Market Days", v: d.dom != null ? `${d.dom} days` : "—", m: d.marketMeta.avgDom != null ? `${d.marketMeta.avgDom} days` : isPreview ? "38 days" : "", a: d.dom != null && d.marketMeta.avgDom != null && d.dom < d.marketMeta.avgDom ? { text: "Shorter time", good: true } : null },
-    { k: "Units Available", v: d.comparables.length > 0 ? `${d.comparables.length}` : "—", m: listing.trim && d.comparables.length >= 5 ? `${sameTrimComps.length} this trim` : "", a: listing.trim && d.comparables.length >= 5 && sameTrimComps.length <= 2 ? { text: "More available", good: true } : null },
+    { k: "Units Available", v: (d.marketMeta.similarCount ?? (d.comparables.length || null)) != null ? `${d.marketMeta.similarCount ?? d.comparables.length}` : "—", m: listing.trim && d.comparables.length >= 5 ? `${sameTrimComps.length} this trim shown` : "", a: listing.trim && d.comparables.length >= 5 && sameTrimComps.length <= 2 ? { text: "More available", good: true } : null },
     { k: "Equipment Score", v: equipVal != null ? `${equipVal}/100` : "—", m: equipVal != null ? "Varies" : "", a: gbSheet?.estValue ? { text: "Better equipped", good: true } : null },
     { k: "Ownership Score", v: ownVal != null ? `${ownVal}/100` : "—", m: ownVal != null ? "Varies" : "", a: isNew || d.ownerCount === 1 ? { text: "Stronger history", good: true } : null },
   ].filter((r) => r.m && r.v !== "—");
@@ -455,8 +455,8 @@ const VehiclePassportGreatBuy = () => {
   else if (isPreview && buyNow.length < 4) buyNow.push("Market days are favorable compared with similar listings.");
   if ((d.viewCount ?? 0) > 20 && buyNow.length < 5) buyNow.push("High shopper interest in your area.");
   if (listing.trim && d.comparables.length >= 5 && sameTrimComps.length <= 2 && buyNow.length < 5) buyNow.push(sameTrimComps.length === 0
-    ? `None of the ${d.comparables.length} comparable listings nearby matches this ${listing.trim} build.`
-    : `Only ${sameTrimComps.length} of ${d.comparables.length} nearby comparables ${sameTrimComps.length === 1 ? "is" : "are"} a ${listing.trim}.`);
+    ? `None of the comparable listings shown matches this ${listing.trim} build.`
+    : `Only ${sameTrimComps.length} of the comparable listings shown ${sameTrimComps.length === 1 ? "is" : "are"} a ${listing.trim}.`);
   if (dealerCovLabel && buyNow.length < 4) buyNow.push(`${dealerCovLabel}.`);
   if (d.warrantyStr && buyNow.length < 4) buyNow.push("Factory warranty is still active.");
 

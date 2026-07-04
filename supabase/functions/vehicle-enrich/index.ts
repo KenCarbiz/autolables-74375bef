@@ -162,7 +162,18 @@ async function fetchComps(ymm: string | null, condition: string, zip: string | n
     if (!r) return null;
     const debug = { num_found: r.numFound, listings_returned: r.rawCount, http: r.http, radius: zip ? 100 : null };
 
-    const comparables = r.rows.slice(0, 16).map((l) => ({
+    // The rows arrive price-ASCENDING, so an unfiltered slice stores the
+    // CHEAPEST page of the market — exactly the sample a value-building
+    // customer surface must not run its math on. Store the at-or-above-price
+    // comps first (mirrors compStrategy's minimum ratio of 1.0); cheaper rows
+    // only pad a thin set and stay available for honest aggregate stats.
+    // deno-lint-ignore no-explicit-any
+    const rowPrice = (l: any) => num(l.price);
+    const atOrAbove = listingPrice != null ? r.rows.filter((l) => (rowPrice(l) ?? 0) >= listingPrice) : r.rows;
+    const belowRows = listingPrice != null ? r.rows.filter((l) => (rowPrice(l) ?? 0) < listingPrice && (rowPrice(l) ?? 0) > 0) : [];
+    const sampleRows = [...atOrAbove, ...belowRows.reverse()].slice(0, 16);
+
+    const comparables = sampleRows.map((l) => ({
       vin: l.vin ?? null,
       ymm: l.heading ?? ([l.build?.year, l.build?.make, l.build?.model].filter(Boolean).join(" ") || null),
       trim: l.build?.trim ?? null,
@@ -174,20 +185,52 @@ async function fetchComps(ymm: string | null, condition: string, zip: string | n
       image: l.media?.photo_links?.[0] ?? null,
     })).filter((c) => c.price != null);
 
-    // Stats computed from the returned listings (the `stats` facet is omitted).
-    const prices = comparables.map((c) => c.price as number).filter((n) => n > 0).sort((a, z) => a - z);
+    // Stats computed from ALL returned rows (not the value-floored stored
+    // sample, which deliberately skews at-or-above price) so any "market
+    // average" a surface derives stays honest.
+    // deno-lint-ignore no-explicit-any
+    const allPrices = r.rows.map((l: any) => num(l.price)).filter((n): n is number => n != null && n > 0).sort((a, z) => a - z);
+    const prices = allPrices;
     const doms = (r.rows.map((l) => num(l.dom)).filter((n): n is number => n != null && n > 0));
     const median = prices.length ? prices[Math.floor(prices.length / 2)] : null;
     const mean = prices.length ? Math.round(prices.reduce((a, b) => a + b, 0) / prices.length) : null;
     const avgDom = doms.length ? Math.round(doms.reduce((a, b) => a + b, 0) / doms.length) : null;
     const stats = { min: prices[0] ?? null, mean, median, max: prices[prices.length - 1] ?? null };
     const count = r.numFound ?? comparables.length;
-    const cheaper = listingPrice != null ? comparables.filter((c) => (c.price as number) < listingPrice).length : null;
-    const percentile = listingPrice != null && comparables.length ? Math.round((cheaper! / comparables.length) * 100) : null;
+
+    // True market rank: count the listings priced UNDER ours across the FULL
+    // winning-tier search (rows=1, we only read num_found) — the 16-row page
+    // must never be the percentile denominator. Falls back to the page-derived
+    // number only when the count call fails.
+    let cheaperCount: number | null = null;
+    if (listingPrice != null && listingPrice > 0 && count > 0) {
+      const cp = new URLSearchParams({ api_key: MC_KEY, car_type: carType, rows: "1", start: "0" });
+      const banded = tier === "trim_year_band" || tier === "year_band" || tier === "band";
+      if ((tier === "trim_year_band" || tier === "year_band" || tier === "year") && year) cp.set("year", year);
+      if (make) cp.set("make", make);
+      if (model) cp.set("model", model);
+      if (tier === "trim_year_band" && trim) cp.set("trim", trim);
+      if (zip) { cp.set("zip", zip); cp.set("radius", "100"); }
+      const floor = banded ? Math.round(listingPrice * 0.65) : 1;
+      cp.set("price_range", `${floor}-${Math.max(Math.round(listingPrice) - 1, 1)}`);
+      const res = await mcFetch(`${MC_BASE}/search/car/active?${cp.toString()}`, 10000);
+      if (res && res.ok) {
+        // deno-lint-ignore no-explicit-any
+        const cb: any = await res.json().catch(() => ({}));
+        cheaperCount = num(cb?.num_found);
+      }
+    }
+    const sampleCheaper = listingPrice != null && allPrices.length
+      ? allPrices.filter((n) => n < listingPrice).length : null;
+    const cheaper = cheaperCount ?? sampleCheaper;
+    const percentile = listingPrice != null && cheaper != null && count > 0
+      ? Math.min(100, Math.round((cheaper / count) * 100)) : null;
     const meta = {
       similar_count: count,
       search_radius: zip ? 100 : null,
       price_percentile: percentile,
+      cheaper_count: cheaper,
+      rank_basis: cheaperCount != null ? "market" : "sample",
       relaxation_tier: tier,
       trim_matched: tier === "trim_year_band",
       avg_dom: avgDom,

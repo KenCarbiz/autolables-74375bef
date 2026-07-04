@@ -391,8 +391,10 @@ function buildPanel(key: PassportPanelKey, d: PassportData, listing: VehicleList
         { name: "Dealer Pricing", on: true },
       ].sort((a, b) => Number(b.on) - Number(a.on));
       const compCount = (mc.similar_count as number) ?? (mc.comparable_count as number) ?? null;
-      const coverage = compCount != null ? compCount : d.comparables.length > 0 ? d.comparables.length : isPreview ? 31 : null;
-      const coverageApprox = compCount == null && d.comparables.length === 0;
+      // similar_count only — the stored sample is an API page, never the
+      // market size; without a real count show the approx/pending treatment.
+      const coverage = compCount != null ? compCount : isPreview ? 31 : null;
+      const coverageApprox = compCount == null;
       const faqs = [
         { q: "Why isn't every vehicle 100%?", a: "Confidence reflects how much verified data is available. Newer listings or rare models have fewer comparables, which lowers the score until more data arrives." },
         { q: "How often is pricing updated?", a: "Market values refresh as new comparable listings and sales are reported — typically every day the vehicle is live." },

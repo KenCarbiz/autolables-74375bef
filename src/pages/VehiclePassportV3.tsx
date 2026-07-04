@@ -367,27 +367,50 @@ const VehiclePassportV3 = () => {
   };
 
   const compPrices = d.comparables.map((c) => (c as { price?: number }).price).filter((p): p is number => typeof p === "number" && p > 0);
-  const compCount = d.comparables.length || d.marketMeta.similarCount || 0;
-  // Value-first comp story: lead with how many comps this price beats or the
-  // gap to the comp average — never "similar vehicles from $X", which reads
-  // as an invitation to go buy the cheaper one. Falls back to an honest
-  // neutral count when the price sits above the pack.
+  // Value-first comp story per the locked hierarchy: belowMarket is the spine
+  // signal, counts come from the REAL market (marketMeta.similarCount), and
+  // the 16-row stored sample never supplies a rank claim or a denominator —
+  // it is an API page, not the market. Sentiment must match the adjacent
+  // Market Price card: positive iff belowMarket > 0.
   const compStory = (() => {
     const ourPrice = d.price;
-    if (!compPrices.length || ourPrice == null) {
-      return compCount
-        ? { strong: `${compCount} Reviewed`, sub: "Local comparable vehicles analyzed" }
-        : { strong: "Comp set", sub: "Similar vehicles via MarketCheck" };
+    const mkt = d.marketAvg;
+    const bm = d.belowMarket;
+    const N = d.marketMeta.similarCount;
+    const isNewCar = String(listing.condition || "").toLowerCase() === "new";
+    const noun = isNewCar ? "same-model" : "comparable";
+    const pctRaw = d.marketMeta.percentile;
+    const pct = pctRaw == null ? null : (pctRaw <= 1 ? Math.round(pctRaw * 100) : pctRaw);
+    if (ourPrice == null || mkt == null) {
+      if (N) return { strong: `${N} Comps Reviewed`, sub: `Local ${noun} vehicles analyzed` };
+      if (compPrices.length) return { strong: `${compPrices.length} Comps Reviewed`, sub: "Similar vehicles via MarketCheck" };
+      return { strong: "Comp set", sub: "Similar vehicles via MarketCheck" };
     }
-    const above = compPrices.filter((p) => p >= ourPrice).length;
-    const avgComp = Math.round(compPrices.reduce((a, b) => a + b, 0) / compPrices.length);
-    if (above >= Math.ceil(compPrices.length / 2)) {
-      return { strong: `Below ${above} of ${compPrices.length} Comps`, sub: `Comp average ${fmt$(avgComp)} nearby` };
+    if (bm != null && bm > 0) {
+      if (pct != null && pct <= 25 && N != null && N >= 5) {
+        if (pct <= 2) return { strong: "Best Price Nearby", sub: `Lowest of ${N} ${noun} nearby` };
+        const beats = Math.round((N * (100 - pct)) / 100);
+        return { strong: `Below ${beats} of ${N}`, sub: `Of ${N} ${noun} vehicles nearby` };
+      }
+      return {
+        strong: `${fmt$(bm)} Below Comps`,
+        sub: N != null && N >= 3 ? `vs ${N} ${noun} nearby` : `Comp average ${fmt$(mkt)}`,
+      };
     }
-    if (avgComp > ourPrice) {
-      return { strong: `${fmt$(avgComp - ourPrice)} Under Comps`, sub: `Average of ${compPrices.length} comparable vehicles` };
+    if (ourPrice <= mkt * 1.02) {
+      return {
+        strong: N ? `${N} ${isNewCar ? "Same-Model" : "Comparable"} Nearby` : "Priced at Market",
+        sub: isNewCar ? "In line with same-model inventory" : "In line with the local market",
+      };
     }
-    return { strong: `${compPrices.length} Comps Reviewed`, sub: "Priced within the local market range" };
+    const supply = d.marketMeta.daysSupply;
+    if (supply != null && supply > 0 && supply <= 30) {
+      return { strong: "In-Demand Locally", sub: `${supply}-day local supply` };
+    }
+    return {
+      strong: N ? `${N} ${isNewCar ? "Same-Model" : "Comparable"} Nearby` : "Local Market",
+      sub: `Market average ${fmt$(mkt)}`,
+    };
   })();
   const mi = [
     { icon: DollarSign, title: "Market Price", strong: d.belowMarket && d.belowMarket > 0 ? "Great Price" : d.marketAvg != null ? "Market Price" : "Pending",
