@@ -2549,6 +2549,45 @@ export type Database = {
           },
         ]
       }
+      oem_brochure_links: {
+        Row: {
+          created_at: string
+          id: string
+          make: string
+          model: string
+          source: string
+          title: string | null
+          updated_at: string
+          url: string
+          verified_at: string | null
+          year: number | null
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          make: string
+          model: string
+          source?: string
+          title?: string | null
+          updated_at?: string
+          url: string
+          verified_at?: string | null
+          year?: number | null
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          make?: string
+          model?: string
+          source?: string
+          title?: string | null
+          updated_at?: string
+          url?: string
+          verified_at?: string | null
+          year?: number | null
+        }
+        Relationships: []
+      }
       onboarding_profiles: {
         Row: {
           billing: Json
