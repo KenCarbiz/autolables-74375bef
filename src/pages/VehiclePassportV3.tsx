@@ -948,19 +948,7 @@ const VehiclePassportV3 = () => {
                 </div>
               </div>
             )}
-            <div className="mt-auto pt-3 flex items-center gap-4 flex-wrap">
-              <Link onClick={() => openPanel("overview")}>Read full overview</Link>
-              {(() => {
-                const b = (listing as { oem_brochure?: { url: string; year?: number | null } }).oem_brochure;
-                if (!b?.url || !pv("brochure")) return null;
-                const mk = (listing.ymm || "").trim().split(/\s+/)[1] || "";
-                return (
-                  <a href={b.url} target="_blank" rel="noopener noreferrer" className="text-[13px] font-semibold text-[#2563EB] inline-flex items-center gap-1.5 hover:underline">
-                    Official {mk.toUpperCase()} brochure{b.year ? ` (${b.year})` : ""} <ExternalLink className="w-3.5 h-3.5" />
-                  </a>
-                );
-              })()}
-            </div>
+            <Link onClick={() => openPanel("overview")} className="mt-auto pt-3 self-start">Read full overview</Link>
           </div>
           )}
           </div>
