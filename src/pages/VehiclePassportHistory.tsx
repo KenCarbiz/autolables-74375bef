@@ -68,6 +68,7 @@ const VehiclePassportHistory = () => {
   const navigate = useNavigate();
   const [mOpen, setMOpen] = useState<string | null>(null);  // mobile: one accordion open
   const [ringFill, setRingFill] = useState(false);              // mobile: ring fills on load
+  const [recallOpen, setRecallOpen] = useState(false);
 
   useEffect(() => { const r = requestAnimationFrame(() => setRingFill(true)); return () => cancelAnimationFrame(r); }, []);
 
@@ -107,6 +108,24 @@ const VehiclePassportHistory = () => {
   const cpoProgram = isCpo ? (listing as unknown as { cpo_programs?: CpoView[] }).cpo_programs?.[0] ?? null : null;
 
   const services = (listing.service_records || []).filter((s) => s && (s.date || s.type || s.mileage));
+
+  const recallCampaigns = ((listing.open_recall_count ?? 0) > 0 ? listing.recall_check?.campaigns ?? [] : [])
+    .filter((c) => c.component || c.summary || c.remedy);
+
+  // Odometer trail renders only when every dated sighting is non-decreasing —
+  // a decrease renders nothing at all (absence is neutral, never an accusation).
+  const mileageTrail = (() => {
+    const pts = (d.history?.entries ?? [])
+      .filter((e) => (e.miles ?? 0) > 0)
+      .map((e) => ({ miles: e.miles as number, date: e.first_seen || e.last_seen || "", at: new Date(e.first_seen || e.last_seen || "").getTime() }))
+      .filter((p) => !Number.isNaN(p.at))
+      .sort((a, b) => a.at - b.at);
+    if (pts.length < 2) return null;
+    for (let i = 1; i < pts.length; i++) if (pts[i].miles < pts[i - 1].miles) return null;
+    const distinct = pts.filter((p, i) => i === 0 || p.miles !== pts[i - 1].miles);
+    return distinct.length >= 2 ? distinct.slice(-4) : null;
+  })();
+  const monthYear = (s: string) => new Date(s).toLocaleDateString("en-US", { month: "short", year: "numeric" });
 
   // Glance tiles: known values only — an unknown renders nothing, not "Pending".
   const glance = [
@@ -213,6 +232,37 @@ const VehiclePassportHistory = () => {
     if (!isPreview) trackCustomerCtaClicked({ storeId: listing.store_id, vehicleId: listing.id, vin: listing.vin, source: "passport", surface: "vehicle_passport", metadata: { cta: "history_report", provider: hr?.provider ?? null, placement } });
   };
 
+  const RecallDetails = () => recallCampaigns.length === 0 ? null : (
+    <div className="mt-3 rounded-xl border border-amber-200 bg-white overflow-hidden">
+      <button onClick={() => setRecallOpen((v) => !v)} className="w-full flex items-center justify-between gap-2 px-4 py-3 text-left">
+        <span className="text-[13px] font-bold text-[#B45309]">Recall details</span>
+        <ChevronDown className={`w-4 h-4 text-[#D97706] shrink-0 transition-transform ${recallOpen ? "rotate-180" : ""}`} />
+      </button>
+      {recallOpen && (
+        <div className="px-4 pb-4 space-y-3">
+          {recallCampaigns.map((c, i) => (
+            <div key={c.campaignNumber || i} className="border-t border-[#EEF1F4] pt-3 first:border-t-0 first:pt-0">
+              <p className="text-[13px] font-bold">{c.component || `NHTSA campaign${c.campaignNumber ? ` ${c.campaignNumber}` : ""}`}</p>
+              {c.summary && <p className="text-[12px] text-[#64748B] mt-0.5">{c.summary}</p>}
+              {c.remedy && <p className="text-[12px] font-semibold text-[#0F172A] mt-1">Remedy: free repair at any authorized dealer</p>}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+
+  const MileageTrail = () => mileageTrail == null ? null : (
+    <div className={`${CARD} p-4`}>
+      <p className="text-[12px] font-bold text-[#64748B]">Mileage record</p>
+      <p className="text-[14px] font-extrabold mt-1.5">
+        {mileageTrail.map((p) => p.miles.toLocaleString()).join(" → ")} miles
+        <span className="text-[#16A34A]"> — consistent odometer record</span>
+      </p>
+      <p className="text-[11px] text-[#94A3B8] mt-0.5">{mileageTrail.map((p) => monthYear(p.date)).join(" → ")}</p>
+    </div>
+  );
+
   const NotOnFile = () => missing.length === 0 ? null : (
     <div className={`${CARD} p-4`}>
       <p className="text-[13px] text-[#64748B]">
@@ -301,7 +351,10 @@ const VehiclePassportHistory = () => {
             {d.hasRecallCheck && (d.recallClear ? (
               <div className="rounded-2xl border border-emerald-200 bg-emerald-50/70 p-4"><p className="text-[15px] font-extrabold text-[#16A34A] inline-flex items-center gap-1.5"><CheckCircle2 className="w-5 h-5" /> No Open Recalls</p><p className="text-[12px] text-[#64748B] mt-1">No active manufacturer recalls were found with NHTSA.</p></div>
             ) : (
-              <div className="rounded-2xl border border-amber-200 bg-amber-50/70 p-4"><p className="text-[15px] font-extrabold text-[#B45309] inline-flex items-center gap-1.5"><AlertTriangle className="w-5 h-5" /> Open recall on record</p><p className="text-[12px] text-[#64748B] mt-1">Ask the dealer to confirm completion before delivery.</p></div>
+              <div>
+                <div className="rounded-2xl border border-amber-200 bg-amber-50/70 p-4"><p className="text-[15px] font-extrabold text-[#B45309] inline-flex items-center gap-1.5"><AlertTriangle className="w-5 h-5" /> Open recall on record</p><p className="text-[12px] text-[#64748B] mt-1">Ask the dealer to confirm completion before delivery.</p></div>
+                <RecallDetails />
+              </div>
             ))}
           </div>
         ) : (
@@ -337,11 +390,17 @@ const VehiclePassportHistory = () => {
                 </div>
               </MAcc>
             )}
+            <MileageTrail />
             {d.hasRecallCheck && (
               <MAcc open={mOpen === "recall"} onToggle={() => setMOpen(mOpen === "recall" ? null : "recall")} icon={BadgeCheck} title="Recall Status" desc="Open recalls (NHTSA)" status={d.recallClear ? "verified" : "attention"}>
                 {d.recallClear ? (
                   <div className="rounded-xl border border-emerald-200 bg-emerald-50/70 p-4"><p className="text-[15px] font-extrabold text-[#16A34A] inline-flex items-center gap-1.5"><CheckCircle2 className="w-5 h-5" /> No Open Recalls</p><p className="text-[12px] text-[#64748B] mt-1">No active manufacturer recalls were found.</p></div>
-                ) : <p className="text-[13px] text-[#92400E]">{d.openRecalls ?? "Open"} recall(s) — confirm completion with the dealer.</p>}
+                ) : (
+                  <>
+                    <p className="text-[13px] text-[#92400E]">{d.openRecalls ?? "Open"} recall(s) — confirm completion with the dealer.</p>
+                    <RecallDetails />
+                  </>
+                )}
               </MAcc>
             )}
             <NotOnFile />
@@ -461,6 +520,7 @@ const VehiclePassportHistory = () => {
                 ) : (
                   <div className="rounded-2xl border border-amber-200 bg-amber-50/70 p-5 flex items-center gap-3"><AlertTriangle className="w-7 h-7 text-[#D97706] shrink-0" /><div><p className="text-[16px] font-extrabold text-[#B45309]">Open recall on record</p><p className="text-[12px] text-[#64748B]">Ask the dealer to confirm completion before delivery.</p></div></div>
                 )}
+                {!d.recallClear && <RecallDetails />}
               </Section>
             )}
           </>
@@ -534,6 +594,8 @@ const VehiclePassportHistory = () => {
               </Section>
             )}
 
+            <MileageTrail />
+
             {d.hasRecallCheck && (
               <Section title="Recall Status">
                 {d.recallClear ? (
@@ -543,6 +605,7 @@ const VehiclePassportHistory = () => {
                 ) : (
                   <div className="rounded-2xl border border-amber-200 bg-amber-50/70 p-5 flex items-center gap-3"><AlertTriangle className="w-7 h-7 text-[#D97706] shrink-0" /><div><p className="text-[16px] font-extrabold text-[#B45309]">Open recall on record</p><p className="text-[12px] text-[#64748B]">Ask the dealer to confirm completion before delivery.</p></div></div>
                 )}
+                {!d.recallClear && <RecallDetails />}
               </Section>
             )}
 

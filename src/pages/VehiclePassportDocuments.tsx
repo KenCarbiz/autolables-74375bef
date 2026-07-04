@@ -361,6 +361,20 @@ const VehiclePassportDocuments = () => {
                   </a>
                 );
               })()}
+              {listing.oem_sticker_url && packetVisible(listing, "oemSticker") && !allDocs.some((x) => x.type === "window_sticker") && (
+                <a
+                  href={listing.oem_sticker_url} target="_blank" rel="noopener noreferrer"
+                  onClick={() => { if (!isPreview) trackCustomerCtaClicked({ storeId: listing.store_id, vehicleId: listing.id, vin: listing.vin, source: "passport", surface: "vehicle_passport", metadata: { cta: "oem_window_sticker", placement: "documents_page" } }); }}
+                  className={`${CARD} p-4 flex items-center gap-3 hover:border-[#2563EB] transition-colors`}
+                >
+                  <span className="w-11 h-11 rounded-xl bg-blue-50 flex items-center justify-center shrink-0"><FileText className="w-5 h-5 text-[#2563EB]" /></span>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-[14px] font-bold leading-tight">Original Window Sticker</p>
+                    <p className="text-[12px] text-[#64748B] leading-tight mt-0.5">Original factory window sticker — MSRP and factory equipment as built.</p>
+                  </div>
+                  <span className="shrink-0 text-[13px] font-semibold text-[#2563EB] inline-flex items-center gap-1.5">View Sticker <ExternalLink className="w-4 h-4" /></span>
+                </a>
+              )}
               {grouped.length === 0 ? (
                 total === 0 ? (
                   <div className={`${CARD} p-12 text-center`}>

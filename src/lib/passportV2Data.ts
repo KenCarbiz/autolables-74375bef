@@ -1,5 +1,6 @@
 import type { VehicleListing } from "@/hooks/useVehicleListing";
 import { resolveDisplayPrice, getPriceDisplayMode, type PriceDisplayMode } from "@/lib/priceModel";
+import { DEFAULT_APR_PERCENT } from "@/lib/affordability";
 import type { OemFactoryWarranty } from "@/lib/oemWarranty";
 
 // The OEM coverage breakdown public-listing-view attaches to a new/CPO listing.
@@ -181,6 +182,9 @@ export interface PassportData {
   estMonthly: number | null;
   paymentAssumptions: string;
   saveVsMsrp: number | null;
+  // Used cars are almost always below their original sticker — that's
+  // depreciation, not a discount, so it must never render as "You save".
+  belowOriginalMsrp: number | null;
   // Doc-fee model. `price` already reflects priceMode; docFee/websiteSalePrice
   // let the surface disclose the fee. priceIncludesDoc = the displayed price is
   // the website sale price (fee already inside) vs advertised-before-doc.
@@ -207,7 +211,15 @@ export interface PassportData {
   viewCount: number | null;
   dom: number | null;
   // Enrichment (pulled at ingest by vehicle-enrich)
-  marketMeta: { percentile: number | null; radius: number | null; similarCount: number | null; avgDom: number | null; daysSupply: number | null; inventoryCount: number | null; checkedAt: string | null; trimMatched: boolean | null };
+  marketMeta: {
+    percentile: number | null; radius: number | null; similarCount: number | null; avgDom: number | null;
+    daysSupply: number | null; inventoryCount: number | null; checkedAt: string | null; trimMatched: boolean | null;
+    priceMedian: number | null; priceMean: number | null; milesMean: number | null;
+    // market_meta.sold_stats — recently-delisted medians from the enrich pass.
+    soldCount: number | null; soldPriceMedian: number | null; soldDomMedian: number | null; soldMilesMedian: number | null;
+    soldScope: string | null; soldState: string | null; soldCheckedAt: string | null;
+    soldDisplayable: boolean;
+  };
   comparables: { vin?: string | null; ymm?: string | null; trim?: string | null; miles?: number | null; price?: number | null; dist?: number | null; dealer?: string | null; dom?: number | null; image?: string | null }[];
   blackbook: { tradeinClean: number | null; retailClean: number | null; wholesaleClean: number | null; available: boolean } | null;
   marketCheckedAt: string | null;
@@ -335,8 +347,13 @@ export const computePriceHistory = (listing: VehicleListing): { valueHistory: Pr
     const latestT = new Date(priced[priced.length - 1].captured_at).getTime();
     const weekAgo = latestT - 7 * 24 * 60 * 60 * 1000;
     // True 7-day window only — a since-first-capture delta must not be
-    // labeled as a 7-day trend.
-    const prior = [...priced].reverse().find((h) => new Date(h.captured_at).getTime() <= weekAgo);
+    // labeled as a 7-day trend, and a prior point older than ~10 days is a
+    // stale anchor, not a week-over-week comparison.
+    const staleFloor = latestT - 10 * 24 * 60 * 60 * 1000;
+    const prior = [...priced].reverse().find((h) => {
+      const t = new Date(h.captured_at).getTime();
+      return t <= weekAgo && t >= staleFloor;
+    });
     if (!prior) return null;
     return latestPrice - prior.listing_price!;
   })();
@@ -365,11 +382,23 @@ export const derivePassport = (listing: VehicleListing): PassportData => {
 
   const mm = ((listing as unknown as { market_meta?: Record<string, unknown> }).market_meta || {}) as Record<string, unknown>;
   const n = (v: unknown): number | null => (v != null && Number.isFinite(Number(v)) ? Number(v) : null);
+  const ps = (mm.price_stats || {}) as Record<string, unknown>;
+  const ss = (mm.sold_stats || {}) as Record<string, unknown>;
+  const soldCount = n(ss.count);
+  const soldScope = (ss.scope as string) || null;
+  const soldCheckedAt = (ss.checked_at as string) || null;
   const marketMeta = {
     percentile: n(mm.price_percentile), radius: n(mm.search_radius), similarCount: n(mm.similar_count),
     avgDom: n(mm.avg_dom), daysSupply: n(mm.market_days_supply), inventoryCount: n(mm.inventory_count),
     checkedAt: (mm.checked_at as string) || null,
     trimMatched: typeof mm.trim_matched === "boolean" ? mm.trim_matched : null,
+    priceMedian: n(ps.median), priceMean: n(ps.mean), milesMean: n(mm.miles_mean),
+    soldCount, soldPriceMedian: n(ss.price_median), soldDomMedian: n(ss.dom_median), soldMilesMedian: n(ss.miles_median),
+    soldScope, soldState: (ss.state as string) || null, soldCheckedAt,
+    // Make-level scope is too loose for a customer claim, and stale sold data
+    // must age out rather than keep asserting "last 90 days".
+    soldDisplayable: soldScope != null && soldScope !== "make_state" && soldCount != null && soldCount >= 5
+      && soldCheckedAt != null && Date.now() - new Date(soldCheckedAt).getTime() <= 45 * 86400000,
   };
   const comparables = Array.isArray((listing as unknown as { comparables?: unknown }).comparables)
     ? ((listing as unknown as { comparables: PassportData["comparables"] }).comparables) : [];
@@ -409,26 +438,34 @@ export const derivePassport = (listing: VehicleListing): PassportData => {
     priceMode,
   );
   const priceIncludesDoc = priceMode === "website_sale_price";
+  const isNew = String((listing as { condition?: string }).condition || "").toLowerCase() === "new";
   const msrp = (mc.msrp as number) ?? null;
   const marketAvg = listing.market_value ?? null;
   const marketHigh = (mp.high as number) ?? null;
   const marketLow = (mp.low as number) ?? null;
-  const belowMarket = (mp.belowMarket as number) ?? (marketAvg != null && price != null && price < marketAvg ? marketAvg - price : null);
+  // market_value is the freshest VIN-level predict; the stored
+  // market_payload.belowMarket was frozen at enrich time against a price that
+  // may since have changed, so it only serves as a fallback.
+  const belowMarket = marketAvg != null
+    ? (price != null && price < marketAvg ? marketAvg - price : null)
+    : (mp.belowMarket as number) ?? null;
   const priceLabel = (dealer.price_label as string) || "Our Price";
-  const saveVsMsrp = msrp != null && price != null && msrp > price ? msrp - price : null;
+  // "You save" vs MSRP is only true for a new car; a used car below its
+  // original sticker is depreciation, exposed separately as belowOriginalMsrp.
+  const saveVsMsrp = isNew && msrp != null && price != null && msrp > price ? msrp - price : null;
+  const belowOriginalMsrp = !isNew && msrp != null && price != null && msrp > price ? msrp - price : null;
   const estMonthly = (() => {
     if (price == null) return null;
-    const r = 0.0749 / 12, n = 72, principal = price * 0.9;
+    const r = DEFAULT_APR_PERCENT / 100 / 12, n = 72, principal = price * 0.9;
     const m = Math.round((principal * r) / (1 - Math.pow(1 + r, -n)));
     return isFinite(m) ? m : null;
   })();
-  const paymentAssumptions = "72 mo · 10% down · 7.49% APR example";
+  const paymentAssumptions = `72 mo · 10% down · ${DEFAULT_APR_PERCENT}% APR example`;
 
   // A brand-new car has had no prior owners. For everything else, only trust a
   // real owner signal (MarketCheck owner_count or a CARFAX one-owner flag) —
   // never the listing-history "owners" estimate, which counts distinct dealer
   // listing spells (a car relisted by 12 dealers is NOT a 12-owner car).
-  const isNew = String((listing as { condition?: string }).condition || "").toLowerCase() === "new";
   const ownerCount = isNew ? 0 : ((mc.owner_count as number) ?? (mc.carfax_1_owner === true ? 1 : null));
   const accidentCount = (mc.accident_count as number) ?? null;
   const cleanTitle = mc.carfax_clean_title === true;
@@ -453,24 +490,24 @@ export const derivePassport = (listing: VehicleListing): PassportData => {
     const mi = warranty.factory_miles ? `${(warranty.factory_miles / 1000).toFixed(0)},000 mi` : null;
     return [yrs ? `${yrs} yr` : null, mi].filter(Boolean).join(" / ") || null;
   })();
-  // Mirrors PassportPanel's factory-warranty "active" logic: coverage is
-  // alive when either the basic term's time or its mileage allowance remains.
-  // Expired means KNOWN exhausted — when neither signal is computable (no real
-  // in-service date, no finite mileage cap) the status is unknown, never
-  // expired, so terms still render without a fabricated countdown.
+  // Factory terms are whichever-comes-first: coverage is alive only while
+  // EVERY known limit has remainder. A single known limit governs alone; when
+  // neither signal is computable (no real in-service date, no finite mileage
+  // cap) the status is unknown, never expired, so terms still render without a
+  // fabricated countdown. Time uses the raw end-date comparison — rounding to
+  // months would call 1-15 days of real coverage "expired".
   const warrantyExpired = (() => {
     if (isNew) return false;
-    const monthsLeft = (() => {
+    const timeRemains = (() => {
       if (!warranty.in_service_date || !warranty.factory_months) return null;
       const end = new Date(warranty.in_service_date);
       end.setMonth(end.getMonth() + warranty.factory_months);
-      const ms = end.getTime() - Date.now();
-      return ms > 0 ? Math.round(ms / (1000 * 60 * 60 * 24 * 30.4)) : 0;
+      return end.getTime() - Date.now() > 0;
     })();
-    const milesLeft = warranty.factory_miles && warranty.factory_miles > 0 && listing.mileage != null
-      ? Math.max(warranty.factory_miles - listing.mileage, 0) : null;
-    if (monthsLeft == null && milesLeft == null) return false;
-    return !((monthsLeft != null && monthsLeft > 0) || (milesLeft != null && milesLeft > 0));
+    const milesRemain = warranty.factory_miles && warranty.factory_miles > 0 && listing.mileage != null
+      ? warranty.factory_miles - listing.mileage > 0 : null;
+    if (timeRemains == null && milesRemain == null) return false;
+    return timeRemains === false || milesRemain === false;
   })();
 
   // Falsifiable confidence score: start high and subtract LABELED deductions
@@ -481,16 +518,15 @@ export const derivePassport = (listing: VehicleListing): PassportData => {
     (typeof mc.carfax_clean_title === "boolean" ? 1 : 0) + (accidentCount != null ? 1 : 0) +
     (ownerCount != null ? 1 : 0) + (listing.recall_status ? 1 : 0) +
     (serviceCount > 0 ? 1 : 0) + (warrantyStr ? 1 : 0);
-  const isNewCar = listing.condition === "new";
   const confDeductions: { label: string; points: number }[] = [];
   const ded = (cond: boolean, label: string, points: number) => { if (cond) confDeductions.push({ label, points }); };
   ded(typeof mc.carfax_clean_title === "boolean" && !cleanTitle, "Title not confirmed clean", 14);
   ded(accidentCount != null && accidentCount > 0, `${accidentCount} reported accident${accidentCount === 1 ? "" : "s"}`, Math.min(18, (accidentCount ?? 0) * 9));
-  ded(!isNewCar && ownerCount != null && ownerCount > 1, `${ownerCount} previous owners`, 6);
+  ded(!isNew && ownerCount != null && ownerCount > 1, `${ownerCount} previous owners`, 6);
   ded(!!listing.recall_status && !recallClear, "Open recall — needs remedy", 12);
-  ded(!isNewCar && serviceCount === 0 && knownSignals >= 2, "No service records on file", 4);
+  ded(!isNew && serviceCount === 0 && knownSignals >= 2, "No service records on file", 4);
   ded(!warrantyStr && knownSignals >= 2, "No factory warranty remaining", 5);
-  ded(!isNewCar && typeof mc.carfax_clean_title !== "boolean" && accidentCount == null, "History report not yet attached", 7);
+  ded(!isNew && typeof mc.carfax_clean_title !== "boolean" && accidentCount == null, "History report not yet attached", 7);
   const confScore = knownSignals >= 2
     ? Math.max(35, 97 - confDeductions.reduce((s, x) => s + x.points, 0))
     : null;
@@ -498,7 +534,7 @@ export const derivePassport = (listing: VehicleListing): PassportData => {
 
   const verifiedBy = [
     { label: "Vehicle History", on: typeof mc.carfax_clean_title === "boolean" || ownerCount != null },
-    { label: "MarketCheck", on: marketAvg != null || Object.keys(mc).length > 0 },
+    { label: "Live Market Data", on: marketAvg != null || Object.keys(mc).length > 0 },
     { label: "NHTSA", on: !!listing.recall_status },
   ].filter((x) => x.on).map((x) => x.label);
 
@@ -506,7 +542,7 @@ export const derivePassport = (listing: VehicleListing): PassportData => {
     { label: "VIN Verified", done: !!listing.vin },
     { label: "Vehicle History", done: typeof mc.carfax_clean_title === "boolean" || ownerCount != null || accidentCount != null },
     { label: "Recall Verification", done: !!listing.recall_status },
-    { label: "Market Data", done: marketAvg != null || verifiedBy.includes("MarketCheck") },
+    { label: "Market Data", done: marketAvg != null || verifiedBy.includes("Live Market Data") },
     { label: "Title & Brand", done: cleanTitle },
     { label: "Warranty Checked", done: !!warrantyStr },
     { label: "Service History", done: serviceCount > 0 },
@@ -567,6 +603,7 @@ export const derivePassport = (listing: VehicleListing): PassportData => {
 
   const whyBuy: string[] = [];
   if (saveVsMsrp) whyBuy.push(`Priced ${fmt$(saveVsMsrp)} below MSRP`);
+  else if (belowOriginalMsrp) whyBuy.push(`Priced ${fmt$(belowOriginalMsrp)} below original MSRP`);
   if (belowMarket && belowMarket > 0) whyBuy.push(`${fmt$(belowMarket)} below market average`);
   if (warrantyStr && !warrantyExpired) whyBuy.push("Factory warranty remaining");
   if (recallClear) whyBuy.push("No open recalls");
@@ -616,7 +653,7 @@ export const derivePassport = (listing: VehicleListing): PassportData => {
   };
 
   return {
-    price, msrp, priceLabel, estMonthly, paymentAssumptions, saveVsMsrp,
+    price, msrp, priceLabel, estMonthly, paymentAssumptions, saveVsMsrp, belowOriginalMsrp,
     docFee, websiteSalePrice, priceMode, priceIncludesDoc,
     recon: (listing as unknown as { recon?: PassportData["recon"] }).recon ?? null,
     marketAvg, marketLow, marketHigh, belowMarket,
@@ -651,4 +688,43 @@ export const derivePassport = (listing: VehicleListing): PassportData => {
     iihsAward: ((listing as unknown as { iihs_award?: PassportData["iihsAward"] }).iihs_award) ?? null,
     historyReport: ((listing as unknown as { history_report?: PassportData["historyReport"] }).history_report) ?? null,
   };
+};
+
+// ── Sold-data claim gates ──────────────────────────────────────
+// Every customer-facing claim built on market_meta.sold_stats passes through
+// one of these gates; a claim is null unless its evidence bar is met, and the
+// sold-price gate is the strictest — it may print a dollar figure, which by
+// construction is above our price, never below it.
+export interface SoldClaims {
+  velocity: string | null;
+  soldPrice: { headline: string; sub: string; amount: number } | null;
+  sellTime: string | null;
+  milesAdv: string | null;
+}
+
+export const deriveSoldClaims = (d: PassportData, mileage: number | null, condition?: string | null): SoldClaims => {
+  const m = d.marketMeta;
+  const none: SoldClaims = { velocity: null, soldPrice: null, sellTime: null, milesAdv: null };
+  if (!m.soldDisplayable || m.soldCount == null || !m.soldState) return none;
+  const isNewCar = String(condition || "").toLowerCase() === "new";
+  const noun = isNewCar ? "same-model vehicles" : "similar vehicles";
+  const velocity = `${m.soldCount.toLocaleString()} ${noun} sold in ${m.soldState} in the last 90 days`;
+  const aboveMarket = d.marketAvg != null && d.price != null && d.price > d.marketAvg;
+  const soldPrice = m.soldCount >= 10 && m.soldScope === "model_year_state" && m.soldPriceMedian != null
+    && d.price != null && d.price <= m.soldPriceMedian * 0.97
+    && (mileage == null || m.soldMilesMedian == null || mileage <= m.soldMilesMedian * 1.25)
+    && !aboveMarket
+    ? {
+        headline: `Priced ${fmt$(m.soldPriceMedian - d.price)} below the typical sold price`,
+        sub: `Median of ${m.soldCount.toLocaleString()} recently sold in ${m.soldState}, last 90 days`,
+        amount: m.soldPriceMedian - d.price,
+      }
+    : null;
+  const sellTime = m.soldDomMedian != null && m.soldDomMedian >= 1 && m.soldDomMedian <= 60
+    ? `Similar vehicles typically sell within ~${Math.round(m.soldDomMedian)} days here`
+    : null;
+  const milesAdv = mileage != null && m.soldMilesMedian != null && m.soldMilesMedian >= mileage * 1.15
+    ? `${mileage.toLocaleString()} miles — under the ${Math.round(m.soldMilesMedian).toLocaleString()}-mile median of recently sold vehicles`
+    : null;
+  return { velocity, soldPrice, sellTime, milesAdv };
 };
