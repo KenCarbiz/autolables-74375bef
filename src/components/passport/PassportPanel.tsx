@@ -8,7 +8,7 @@ import {
 import { toast } from "sonner";
 import { listingHero } from "@/lib/photos";
 import type { PassportData, PricePoint, OemWarrantyView } from "@/lib/passportV2Data";
-import { fmt$, listingEquipment, historyReportName } from "@/lib/passportV2Data";
+import { fmt$, listingEquipment, historyReportName, deriveSoldClaims } from "@/lib/passportV2Data";
 import { packetVisible } from "@/lib/packetModules";
 import { trackCustomerCtaClicked } from "@/lib/engagement/customerEngagement";
 import { oemCoverageRows, type CoverageKey } from "@/lib/oemWarranty";
@@ -51,6 +51,7 @@ function buildPanel(key: PassportPanelKey, d: PassportData, listing: VehicleList
   const price = d.price, avg = d.marketAvg, low = d.marketLow, high = d.marketHigh, below = d.belowMarket;
   const isGreat = below != null && below > 0;
   const conf = d.confScore;
+  const sold = deriveSoldClaims(d, listing.mileage ?? null, listing.condition);
   // Merge enrichment market_meta (percentile, radius, similar_count, avg_dom,
   // inventory) into mc so the panels read real ingest data, not just mc_attributes.
   const mc = { ...(listing.mc_attributes || {}), ...((listing as unknown as { market_meta?: Record<string, unknown> }).market_meta || {}) } as Record<string, unknown>;
@@ -83,6 +84,7 @@ function buildPanel(key: PassportPanelKey, d: PassportData, listing: VehicleList
       const percentile = (mc.price_percentile as number) ?? null;
       const why: string[] = [];
       if (isGreat) why.push("Priced below local market");
+      if (sold.soldPrice) why.push(sold.soldPrice.headline);
       // price_percentile = % of comps priced below this car, so "priced lower
       // than N%" is the complement — and only belongs in a praise list when
       // the car actually sits in the cheaper half.
@@ -180,8 +182,18 @@ function buildPanel(key: PassportPanelKey, d: PassportData, listing: VehicleList
       const viewsShown = views != null && views >= 5 ? views : null;
       const domFav = dom != null && (avgDom != null ? dom <= avgDom : dom <= 30) ? dom : null;
       const has = viewsShown != null || domFav != null;
-      const score = (() => { let s = 50; if (views != null) s += Math.min(30, views / 3); if (dom != null) { if (dom <= 30) s += 15; else if (dom > 60) s -= 20; else s += 5; } return Math.max(5, Math.min(95, Math.round(s))); })();
-      const level = score >= 66 ? "High Interest" : score >= 40 ? "Moderate Interest" : "Building Interest";
+      const radius = d.marketMeta.radius;
+      // Demand score from real inputs only — no synthetic baseline. Fewer than
+      // two real inputs is too thin to score, so the ring doesn't render.
+      const score = (() => {
+        const inputs: number[] = [];
+        if (viewsShown != null) inputs.push(Math.min(95, 30 + Math.round(viewsShown * 0.7)));
+        if (dom != null) inputs.push(avgDom != null ? (dom <= avgDom * 0.5 ? 90 : dom <= avgDom ? 70 : dom <= avgDom * 1.5 ? 45 : 25) : dom <= 30 ? 70 : dom <= 60 ? 50 : 30);
+        const ds = (mc.market_days_supply as number) ?? null;
+        if (ds != null) inputs.push(ds < 30 ? 85 : ds < 60 ? 60 : 40);
+        return inputs.length >= 2 ? Math.max(5, Math.min(95, Math.round(inputs.reduce((a, b) => a + b, 0) / inputs.length))) : null;
+      })();
+      const level = score == null ? null : score >= 66 ? "High Interest" : score >= 40 ? "Moderate Interest" : "Building Interest";
       const supply = (mc.market_days_supply as number) ?? (mc.inventory_count as number) ?? null;
       // Inventory COUNT only — market_days_supply is a days figure and must
       // never be labeled "N nearby".
@@ -193,28 +205,47 @@ function buildPanel(key: PassportPanelKey, d: PassportData, listing: VehicleList
       const cutCount = (mc.comp_price_cut_count as number) ?? null;
       const cutTotal = (mc.comp_price_cut_total as number) ?? null;
       const trimCount = (mc.trim_count as number) ?? null;
+      // "Priced right from day one" is only provable when tracking actually
+      // covers the listing's start; otherwise the honest claim is that no
+      // price cut has been needed while tracked.
+      const firstSnapAt = d.valueHistory.length ? new Date(d.valueHistory[0].captured_at).getTime() : null;
+      const listedAt = (() => {
+        const c = (listing as unknown as { created_at?: string | null }).created_at || d.history?.firstSeen || null;
+        return c ? new Date(c).getTime() : null;
+      })();
+      const trackedFromListing = firstSnapAt != null && listedAt != null && firstSnapAt - listedAt <= 7 * 86400000;
+      const nearWord = radius != null ? `within ${radius} miles` : "in the region";
       const insights: string[] = [];
       if (viewsShown != null) insights.push(`${viewsShown.toLocaleString()} shoppers have viewed this vehicle`);
       if (isGreat) insights.push(d.belowMarket && d.belowMarket > 0 ? `Priced ${fmt$(d.belowMarket)} below the local market average` : "Priced below market average — strong value");
       if (sellsFaster) insights.push(`Similar vehicles average ${avgDom} days on the market — this one is drawing interest faster`);
-      if (!sellsFaster && avgDom != null && avgDom <= 60) insights.push(`Similar vehicles sell in ~${avgDom} days here`);
-      if (sold45 != null && sold45 > 0) insights.push(`~${sold45.toLocaleString()} sold nearby in the last 45 days`);
-      if (cutCount != null && cutCount > 0 && cutTotal != null && cutTotal >= 5 && priceDrop == null) insights.push(`${cutCount} of ${cutTotal} comparable listings have cut their price — this one was priced right from day one`);
-      if (trimCount != null && trimCount >= 1 && trimCount <= 5) insights.push(`1 of only ${trimCount} builds like this within 100 miles`);
-      if (scarce) insights.push(invCount != null && invCount > 0 ? `Limited availability — only ${invCount} similar vehicles nearby` : "Limited similar inventory in your area right now");
-      if (priceDrop != null) insights.push(`We reduced this price ${fmt$(priceDrop)} since listing`);
+      // avg_dom is active-listing days on market, not time-to-sell — only real
+      // sold data supports a "sell within N days" claim.
+      if (sold.sellTime) insights.push(sold.sellTime);
+      else if (!sellsFaster && avgDom != null && avgDom <= 60) insights.push(`Similar listings average ~${avgDom} days on market`);
+      if (sold.velocity) insights.push(sold.velocity);
+      else if (sold45 != null && sold45 > 0) insights.push(`~${sold45.toLocaleString()} sold ${nearWord} in the last 45 days (estimated)`);
+      if (cutCount != null && cutCount > 0 && cutTotal != null && cutTotal >= 5 && priceDrop == null) insights.push(`${cutCount} of ${cutTotal} comparable listings have cut their price — this one ${trackedFromListing ? "was priced right from day one" : "has not needed a price cut"}`);
+      if (trimCount != null && trimCount >= 1 && trimCount <= 5) insights.push(`1 of only ${trimCount} builds like this ${nearWord}`);
+      if (scarce) insights.push(invCount != null && invCount > 0 ? `Limited availability — only ${invCount} similar vehicles ${nearWord}` : `Limited similar inventory ${nearWord} right now`);
+      if (priceDrop != null) insights.push(`We reduced this price ${fmt$(priceDrop)} since first tracked`);
       if (dom != null && dom <= 30) insights.push("Recently listed — fresh to market");
       if (isPreview && insights.length < 3) { insights.push("Vehicles with this trim typically sell within 38 days"); insights.push("Comparable inventory is decreasing"); }
       // Mobile-only derived content (same data, premium presentation).
-      const demandWord = score >= 66 ? "High Demand" : score >= 45 ? "Moderate Demand" : "Newly Listed";
-      const temp = score >= 80 ? { l: "Very Hot", c: "#DC2626" } : score >= 66 ? { l: "Hot", c: "#EA580C" } : score >= 45 ? { l: "Warm", c: "#D97706" } : { l: "New to Market", c: "#2563EB" };
+      const demandWord = (score ?? 0) >= 66 ? "High Demand" : (score ?? 0) >= 45 ? "Moderate Demand" : "Newly Listed";
+      const temp = score == null ? null : score >= 80 ? { l: "Very Hot", c: "#DC2626" } : score >= 66 ? { l: "Hot", c: "#EA580C" } : score >= 45 ? { l: "Warm", c: "#D97706" } : { l: "New to Market", c: "#2563EB" };
       const supplyLevel = supply != null ? (supply < 30 ? "Low" : supply < 60 ? "Balanced" : "Ample") : isPreview ? "Low" : "—";
+      // Sold medians are the only honest "days to sell" figure — avg_dom is
+      // active-listing days on market and must be labeled as such.
+      const soldDom = d.marketMeta.soldDisplayable && d.marketMeta.soldDomMedian != null ? Math.round(d.marketMeta.soldDomMedian) : null;
       // Never show the raw days-supply / market inventory count to a customer —
       // it can be in the thousands and reads terribly. Qualitative level only.
       const kpis = [
         { icon: Eye, label: "Active Shoppers", value: viewsShown != null ? viewsShown.toLocaleString() : isPreview ? "89" : "—" },
         { icon: Car, label: "Similar Vehicles", value: supplyLevel },
-        { icon: Clock, label: "Avg Days to Sell", value: avgDom != null ? `${avgDom} Days` : isPreview ? "12 Days" : "—" },
+        soldDom != null
+          ? { icon: Clock, label: "Avg Days to Sell", value: `${soldDom} Days` }
+          : { icon: Clock, label: "Avg Days on Market", value: avgDom != null ? `${avgDom} Days` : isPreview ? "12 Days" : "—" },
         { icon: TrendingUp, label: "Weekly Searches", value: isPreview ? "120" : "—" },
         { icon: Heart, label: "Saved by Shoppers", value: isPreview ? "38" : "—" },
         { icon: MapPin, label: "Local Availability", value: supplyLevel },
@@ -222,20 +253,20 @@ function buildPanel(key: PassportPanelKey, d: PassportData, listing: VehicleList
       const snapshot = [
         { l: "Inventory Level", v: supplyLevel },
         { l: "Average Days on Market", v: avgDom != null ? `${avgDom} Days` : domFav != null ? `${domFav} Days` : isPreview ? "12 Days" : "—" },
-        { l: "Search Activity", v: isPreview ? "Above Average" : has ? level : "—" },
+        { l: "Search Activity", v: isPreview ? "Above Average" : level ?? "—" },
         { l: "Local Availability", v: supplyLevel },
         { l: "Average Price", v: avg != null && price != null && price <= avg ? fmt$(avg) : isPreview ? fmt$(61300) : "—" },
       ];
       const invSeries = isPreview ? [20, 19, 18, 17, 16, 15, 14] : [];
       const shopperTrend = isPreview ? "+18%" : null;
-      const goodTime = isGreat || score >= 66;
+      const goodTime = isGreat || (score ?? 0) >= 66;
       return {
         title: "Market Demand Analysis", subtitle: "How popular this vehicle is in your market",
         primary: { label: "Reserve This Vehicle", onClick: () => go("reserve") },
         body: <>
           {/* ── Mobile (<768px) — premium market-intelligence dashboard ── */}
           <div className="md:hidden space-y-4">
-            {has && (
+            {score != null && (
               <div className="rounded-2xl p-5 text-white" style={{ background: "linear-gradient(160deg,#0f7a3d 0%,#16A34A 100%)" }}>
                 <p className="inline-flex items-center gap-1.5 text-[13px] font-bold uppercase tracking-wider opacity-95"><Flame className="w-4 h-4" /> {demandWord.replace("Demand", "Market Demand")}</p>
                 <div className="flex flex-col items-center mt-4">
@@ -270,10 +301,12 @@ function buildPanel(key: PassportPanelKey, d: PassportData, listing: VehicleList
             </Section>
 
             <div className="grid grid-cols-2 gap-3">
-              <div className={`${CARD} p-4`}>
-                <p className="text-[12px] text-[#64748B]">Market Temperature</p>
-                <p className="text-[18px] font-extrabold mt-1 inline-flex items-center gap-1.5" style={{ color: temp.c }}><Flame className="w-4 h-4" /> {temp.l}</p>
-              </div>
+              {temp != null && (
+                <div className={`${CARD} p-4`}>
+                  <p className="text-[12px] text-[#64748B]">Market Temperature</p>
+                  <p className="text-[18px] font-extrabold mt-1 inline-flex items-center gap-1.5" style={{ color: temp.c }}><Flame className="w-4 h-4" /> {temp.l}</p>
+                </div>
+              )}
               <div className={`${CARD} p-4`}>
                 <p className="text-[12px] text-[#64748B]">Shopper Activity</p>
                 {shopperTrend ? <p className="text-[18px] font-extrabold text-[#16A34A] mt-1 inline-flex items-center gap-1"><TrendingUp className="w-4 h-4" /> {shopperTrend}</p> : <p className="text-[14px] font-bold text-[#94A3B8] mt-1">Tracking</p>}
@@ -312,9 +345,9 @@ function buildPanel(key: PassportPanelKey, d: PassportData, listing: VehicleList
 
           {/* ── Desktop / tablet (≥768px) — unchanged ── */}
           <div className="hidden md:block space-y-5">
-          <Hero icon={Flame} tone={has ? "green" : "neutral"} label={has ? level : "Now Available"}
+          <Hero icon={Flame} tone={has ? "green" : "neutral"} label={level ?? (has ? "Shopper Interest" : "Now Available")}
             note={has ? [viewsShown != null ? `${viewsShown.toLocaleString()} views` : null, domFav != null ? `${domFav} days on market` : null].filter(Boolean).join(" · ") || "Demand Score" : "See it in person — book a test drive."} />
-          {has && (
+          {score != null && (
             <Section title="Demand level" sub="Relative to typical listing activity in your area.">
               <div className={`${CARD} p-4`}><Gauge3 value={score} /></div>
             </Section>
@@ -333,7 +366,7 @@ function buildPanel(key: PassportPanelKey, d: PassportData, listing: VehicleList
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Section title="Local demand">
               <div className={`${CARD} p-4`}>
-                {has && <StatRow label="Interest level" value={level} />}
+                {level != null && <StatRow label="Interest level" value={level} />}
                 {viewsShown != null && <StatRow label="Shopper views" value={viewsShown.toLocaleString()} />}
                 {(d.belowMarket ?? 0) > 0 && <StatRow label="Vs. market average" value={`${fmt$(d.belowMarket as number)} below`} />}
                 {isPreview && <StatRow label="Nearby shoppers" value="120+" />}
@@ -360,16 +393,16 @@ function buildPanel(key: PassportPanelKey, d: PassportData, listing: VehicleList
           )}
           <Section title="Buying recommendation">
             <div className="rounded-2xl border border-emerald-200 bg-emerald-50/70 p-4">
-              <p className="text-[14px] font-extrabold text-[#16A34A]">{isGreat || score >= 66 ? "Good time to buy" : "See it in person"}</p>
+              <p className="text-[14px] font-extrabold text-[#16A34A]">{goodTime ? "Good time to buy" : "See it in person"}</p>
               <ul className="mt-2 space-y-1.5">
                 {isGreat && <Check>{(d.belowMarket ?? 0) > 0 ? `Priced ${fmt$(d.belowMarket as number)} below market average` : "Priced below market average"}</Check>}
-                {score >= 66 && <Check>Strong shopper interest right now</Check>}
-                {scarce && <Check>Limited similar inventory nearby</Check>}
-                {sellsFaster && <Check>Similar vehicles sell in {avgDom} days on average</Check>}
+                {score != null && score >= 66 && <Check>Strong shopper interest right now</Check>}
+                {scarce && <Check>Limited similar inventory {nearWord}</Check>}
+                {sold.sellTime ? <Check>{sold.sellTime}</Check> : sellsFaster && <Check>Similar vehicles average {avgDom} days on market</Check>}
                 {priceDrop != null && <Check>Price already reduced {fmt$(priceDrop)}</Check>}
                 {d.warrantyStr && !d.warrantyExpired && <Check>Factory warranty still active</Check>}
                 {dom != null && dom <= 30 && <Check>Fresh listing — best selection</Check>}
-                {!isGreat && score < 66 && <Check>See it in person — book a test drive</Check>}
+                {!goodTime && <Check>See it in person — book a test drive</Check>}
               </ul>
             </div>
           </Section>
@@ -588,16 +621,16 @@ function buildPanel(key: PassportPanelKey, d: PassportData, listing: VehicleList
               <div className="rounded-2xl p-5 text-white" style={{ background: "linear-gradient(160deg,#0f7a3d 0%,#16A34A 100%)" }}>
                 <div className="flex items-center gap-3">
                   <span className="w-12 h-12 rounded-2xl bg-white/15 flex items-center justify-center shrink-0"><TrendingDown className="w-6 h-6" /></span>
-                  <div><p className="text-[13px] font-bold uppercase tracking-wider opacity-95">{trendLabel}</p><p className="text-[26px] font-extrabold leading-tight">{savings != null ? fmt$(savings) : price != null ? fmt$(price) : ""}</p><p className="text-[12px] opacity-90">{d.belowMarket && d.belowMarket > 0 ? "Below market" : savings != null ? "Reduced since listed" : "Current price"}</p></div>
+                  <div><p className="text-[13px] font-bold uppercase tracking-wider opacity-95">{trendLabel}</p><p className="text-[26px] font-extrabold leading-tight">{savings != null ? fmt$(savings) : price != null ? fmt$(price) : ""}</p><p className="text-[12px] opacity-90">{d.belowMarket && d.belowMarket > 0 ? "Below market" : savings != null ? "Reduced since first tracked" : "Current price"}</p></div>
                 </div>
-                <p className="text-[13px] opacity-90 mt-3 leading-snug">{total != null && total < 0 && d.belowMarket && d.belowMarket > 0 ? "This vehicle has been reduced and is currently priced below market value." : total != null && total < 0 ? "This vehicle's asking price has been reduced since it was listed." : total != null && total > 0 ? "Priced to today's market." : "Every price adjustment is recorded for full transparency."}</p>
+                <p className="text-[13px] opacity-90 mt-3 leading-snug">{total != null && total < 0 && d.belowMarket && d.belowMarket > 0 ? "This vehicle has been reduced and is currently priced below market value." : total != null && total < 0 ? "This vehicle's asking price has been reduced since we began tracking it." : total != null && total > 0 ? "Priced to today's market." : "Every price adjustment is recorded for full transparency."}</p>
               </div>
             )}
 
             {has && (
               <div className="grid grid-cols-2 gap-3">
                 {price != null && <div className={`${CARD} p-4`}><p className="text-[20px] font-extrabold leading-none">{fmt$(price)}</p><p className="text-[11px] text-[#94A3B8] mt-1">Current Price</p></div>}
-                {originalPrice != null && price != null && originalPrice > price && <div className={`${CARD} p-4`}><p className="text-[20px] font-extrabold leading-none text-[#94A3B8]">{fmt$(originalPrice)}</p><p className="text-[11px] text-[#94A3B8] mt-1">Original Price</p></div>}
+                {originalPrice != null && price != null && originalPrice > price && <div className={`${CARD} p-4`}><p className="text-[20px] font-extrabold leading-none text-[#94A3B8]">{fmt$(originalPrice)}</p><p className="text-[11px] text-[#94A3B8] mt-1">First Tracked Price</p></div>}
                 {reductions > 0 && <div className={`${CARD} p-4`}><p className="text-[20px] font-extrabold leading-none">{reductions}</p><p className="text-[11px] text-[#94A3B8] mt-1">Price Reductions</p></div>}
                 {savings != null && <div className={`${CARD} p-4`}><p className="text-[20px] font-extrabold leading-none text-[#16A34A]">{fmt$(savings)}</p><p className="text-[11px] text-[#94A3B8] mt-1">Total Savings</p></div>}
               </div>
@@ -664,6 +697,7 @@ function buildPanel(key: PassportPanelKey, d: PassportData, listing: VehicleList
                 <p className="text-[18px] font-extrabold inline-flex items-center gap-2"><CheckCircle2 className="w-6 h-6" /> Excellent Time To Purchase</p>
                 <ul className="mt-2.5 space-y-1.5">
                   {isGreat && <li className="flex items-start gap-2 text-[13px]"><CheckCircle2 className="w-4 h-4 shrink-0 mt-0.5" />Below market average</li>}
+                  {sold.soldPrice && <li className="flex items-start gap-2 text-[13px]"><CheckCircle2 className="w-4 h-4 shrink-0 mt-0.5" />Below what similar vehicles recently sold for</li>}
                   {total != null && total < 0 && <li className="flex items-start gap-2 text-[13px]"><CheckCircle2 className="w-4 h-4 shrink-0 mt-0.5" />Recent price reductions</li>}
                   <li className="flex items-start gap-2 text-[13px]"><CheckCircle2 className="w-4 h-4 shrink-0 mt-0.5" />Strong value at today's price</li>
                   {isGreat && <li className="flex items-start gap-2 text-[13px]"><CheckCircle2 className="w-4 h-4 shrink-0 mt-0.5" />Competitive market pricing</li>}
@@ -691,7 +725,7 @@ function buildPanel(key: PassportPanelKey, d: PassportData, listing: VehicleList
           <div className="hidden md:block space-y-5">
           <Hero icon={Clock} tone={total != null && total < 0 ? "green" : "neutral"} label={trendLabel}
             value={price != null ? fmt$(price) : undefined}
-            note={total != null && total < 0 ? `Down ${fmt$(Math.abs(total))} since listed` : recent != null && recent < 0 ? `Down ${fmt$(Math.abs(recent))} in 7 days` : "Priced to today's market."} />
+            note={total != null && total < 0 ? `Down ${fmt$(Math.abs(total))} since first tracked` : recent != null && recent < 0 ? `Down ${fmt$(Math.abs(recent))} in 7 days` : "Priced to today's market."} />
           {has && (
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
               {total != null && total < 0 && <Stat label="Price Change" value={`-${fmt$(Math.abs(total))}`} tone="green" />}
@@ -738,6 +772,7 @@ function buildPanel(key: PassportPanelKey, d: PassportData, listing: VehicleList
               <ul className="mt-2 space-y-1.5">
                 {lowest != null && price != null && price <= lowest && <Check>At its lowest recorded asking price</Check>}
                 {isGreat && <Check>Priced below the market average</Check>}
+                {sold.soldPrice && <Check>Below what similar vehicles recently sold for</Check>}
                 {total != null && total < 0 && <Check>Price has trended down since listing</Check>}
                 {total != null && total > 0 && <Check>Priced to today's market</Check>}
                 {(total == null || total === 0) && <Check>Price has been stable — likely to hold</Check>}
@@ -956,7 +991,19 @@ function buildPanel(key: PassportPanelKey, d: PassportData, listing: VehicleList
       const fuel = String(ks.fuel || "").toLowerCase();
       const isHybrid = /hybrid/.test(fuel), isEV = /electric|ev\b/.test(fuel);
       const coverageType = w.powertrain_months ? "Powertrain Coverage" : "Basic Coverage";
-      const active = !!(basic.left && basic.left > 0) || !!(milesLeft && milesLeft > 0);
+      // Whichever-comes-first: active only while EVERY known limit has
+      // remainder. Time uses the raw end-date (rounded months would call 1-15
+      // days of real coverage expired); a single known limit governs alone.
+      const basicTimeRemains = (() => {
+        if (!w.in_service_date || !w.factory_months) return null;
+        const end = new Date(w.in_service_date);
+        end.setMonth(end.getMonth() + w.factory_months);
+        return end.getTime() - Date.now() > 0;
+      })();
+      const basicMilesRemain = milesLeft != null ? milesLeft > 0 : null;
+      const active = basicTimeRemains == null && basicMilesRemain == null
+        ? false
+        : basicTimeRemains !== false && basicMilesRemain !== false;
       const protections = isPreview ? [
         { t: "Extended Vehicle Service Contract", s: "Bumper-to-bumper protection beyond the factory term.", len: "Up to 7 yr / 100K mi" },
         { t: "Prepaid Maintenance Plan", s: "Lock in scheduled service at today's pricing.", len: "3 yr / 36K mi" },
@@ -2131,7 +2178,7 @@ const Delta = ({ kind, delta }: { kind: "dealer" | "market"; delta: number }) =>
   if (delta <= 0) return null;
   return (
     <span className="inline-flex items-center gap-1 font-semibold text-[#64748B]">
-      <TrendingUp className="w-3.5 h-3.5" /> Market average up {fmt$(delta)} in 30 days — today's price locks it in
+      <TrendingUp className="w-3.5 h-3.5" /> Market average up {fmt$(delta)} since tracking began — today's price locks it in
     </span>
   );
 };
