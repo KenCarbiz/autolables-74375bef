@@ -10,8 +10,12 @@ import { PackageOpen } from "lucide-react";
 const PacketDefaultsPanel = () => {
   const { settings, updateSettings, loading } = useDealerSettings();
   const [defaults, setDefaults] = useState<Record<string, boolean>>(settings.packet_module_defaults || {});
+  const [historyLinks, setHistoryLinks] = useState<boolean>(settings.history_report_links_enabled !== false);
 
-  const draft = useMemo(() => ({ packet_module_defaults: defaults }), [defaults]);
+  const draft = useMemo(
+    () => ({ packet_module_defaults: defaults, history_report_links_enabled: historyLinks }),
+    [defaults, historyLinks],
+  );
   useInstantSave(draft, (v) => updateSettings(v), { ready: !loading, toastId: "packet-defaults" });
 
   const isOn = (id: string) => defaults[id] !== false;
@@ -58,6 +62,20 @@ const PacketDefaultsPanel = () => {
           override are not affected.
         </p>
       )}
+      <div className="flex items-center justify-between gap-3 border-t border-border pt-3.5 mt-4">
+        <div className="min-w-0">
+          <p className="text-[13px] font-bold text-foreground">CARFAX / AutoCheck report links</p>
+          <p className="text-[12px] text-slate-500 mt-0.5">
+            Store-wide kill switch for your dealer-paid history report links (harvested nightly from your own
+            website). Turn OFF if your subscription lapses so shoppers never land on a paywall. Overrides the
+            module toggle above.
+          </p>
+        </div>
+        <label className="flex items-center gap-2 shrink-0 cursor-pointer select-none">
+          <input type="checkbox" checked={historyLinks} onChange={(e) => setHistoryLinks(e.target.checked)} className="w-4 h-4 accent-blue-600" />
+          <span className="text-[13px] font-semibold">{historyLinks ? "Enabled" : "Off"}</span>
+        </label>
+      </div>
     </div>
   );
 };
