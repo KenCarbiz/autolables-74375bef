@@ -25,6 +25,7 @@ export const PACKET_MODULES: PacketModule[] = [
   { id: "videos", label: "Videos", desc: "Walkaround videos" },
   { id: "warranty", label: "Warranty, service & accessories", desc: "Remaining warranty, service history, available accessories" },
   { id: "documents", label: "Documents", desc: "Window sticker + dealer-added PDFs" },
+  { id: "brochure", label: "OEM brochure", desc: "Link to the manufacturer's official model brochure" },
   { id: "historyReport", label: "Vehicle history report link", desc: "Your free CARFAX/AutoCheck report link (used and CPO vehicles)" },
 ];
 

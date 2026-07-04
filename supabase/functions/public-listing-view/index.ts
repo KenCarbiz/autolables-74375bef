@@ -541,6 +541,28 @@ serve(async (req) => {
       }
     } catch { /* notification is best-effort; never block the shopper view */ }
 
+    // ── Official OEM brochure link from the global harvest cache: exact
+    // model year first, otherwise the nearest within two model years.
+    try {
+      const parts = String((row.ymm as string) || "").trim().split(/\s+/);
+      const yr = Number.parseInt(parts[0] || "", 10) || null;
+      const mk = parts[1] || "";
+      const md = parts.slice(2).join(" ");
+      if (mk && md) {
+        const { data: bl } = await admin
+          .from("oem_brochure_links")
+          .select("url, title, year")
+          .ilike("make", mk).ilike("model", md)
+          .order("year", { ascending: false, nullsFirst: false })
+          .limit(6);
+        const rows = (bl || []) as { url: string; title: string | null; year: number | null }[];
+        const pick = (yr ? rows.find((r) => r.year === yr) : rows[0]) ||
+          rows.find((r) => r.year != null && yr != null && Math.abs(r.year - yr) <= 2) ||
+          (!yr ? rows[0] : undefined);
+        if (pick) row.oem_brochure = { url: pick.url, title: pick.title, year: pick.year };
+      }
+    } catch { /* brochure link optional */ }
+
     // ── Packet curation enforcement. A module the dealer excluded must not
     // ship in the public payload at all — client gating alone would still
     // leak the data to anyone reading the response. Per-vehicle override
@@ -556,6 +578,7 @@ serve(async (req) => {
         return true;
       };
       if (!vis("historyReport")) { delete row.history_report; delete row.history_report_url; }
+      if (!vis("brochure")) delete row.oem_brochure;
       if (!vis("recon")) delete row.recon;
       if (!vis("videos")) delete row.videos;
       if (!vis("description")) delete row.description;

@@ -1296,6 +1296,46 @@ interface AddendumRow {
 // /v/:slug scan: service history, remaining warranty, and accessories still
 // available for this vehicle. Saved straight onto vehicle_listings, which the
 // public RPC returns, so changes appear on the shopper page immediately.
+const BrochureFinderRow = ({ vehicle }: { vehicle: VehicleRow }) => {
+  const [busy, setBusy] = useState(false);
+  const [found, setFound] = useState<{ url: string; year?: number | null } | null>(null);
+  const parts = (vehicle.ymm || "").trim().split(/\s+/);
+  const year = Number.parseInt(parts[0] || "", 10) || null;
+  const make = parts[1] || "";
+  const model = parts.slice(2).join(" ");
+  const find = async () => {
+    if (!make || !model) { toast.error("Vehicle year/make/model is incomplete"); return; }
+    setBusy(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("oem-brochure", { body: { make, model, year } });
+      if (error || !data?.ok) {
+        const code = (data as { error?: string } | null)?.error;
+        toast.error(code === "make_not_supported" ? `No official brochure source configured for ${make}.` : `No official ${make} brochure found for this model.`);
+        return;
+      }
+      setFound({ url: data.url, year: data.year });
+      toast.success(`Official brochure linked${data.cached ? "" : " (newly harvested)"} — it now shows in the shopper packet.`);
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <section className="rounded-2xl border border-border bg-card shadow-[0_1px_3px_rgba(0,0,0,0.06)] p-5 flex items-center justify-between gap-4 flex-wrap">
+      <div className="min-w-0">
+        <h3 className="text-[15px] font-bold text-foreground">OEM Brochure</h3>
+        <p className="text-[13px] text-slate-500 mt-0.5">
+          {found
+            ? <>Linked to the manufacturer's official brochure{found.year ? ` (${found.year})` : ""}. <a href={found.url} target="_blank" rel="noreferrer" className="text-blue-600 font-semibold">Open</a></>
+            : <>Search the manufacturer's own site for the official {make || "model"} brochure and link it on the shopper packet.</>}
+        </p>
+      </div>
+      <button onClick={find} disabled={busy} className="shrink-0 inline-flex items-center gap-1.5 h-9 px-3.5 rounded-lg border border-border text-[13px] font-semibold hover:bg-muted disabled:opacity-60">
+        {busy ? "Searching…" : found ? "Search again" : "Find OEM brochure"}
+      </button>
+    </section>
+  );
+};
+
 const ScanInfoPanel = ({ vehicle, onReload }: { vehicle: VehicleRow; onReload: () => void }) => {
   const [records, setRecords] = useState<ServiceRecord[]>(vehicle.service_records || []);
   const [warranty, setWarranty] = useState<WarrantyInfo>(vehicle.warranty_info || {});
@@ -1365,6 +1405,9 @@ const ScanInfoPanel = ({ vehicle, onReload }: { vehicle: VehicleRow; onReload: (
           </button>
         }
       />
+
+      {/* OEM brochure link — harvested from the manufacturer's own site */}
+      <BrochureFinderRow vehicle={vehicle} />
 
       {/* Passport modules — module cards, same language as Documents */}
       <div>
