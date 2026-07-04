@@ -765,10 +765,23 @@ serve(async (req) => {
             await admin.from("vehicle_listings").update({ mc_raw: l })
               .eq("tenant_id", cfg.tenant_id).eq("vin", vin)
               .then(() => undefined, () => undefined);
-            await admin.from("vehicle_value_history").insert({
-              tenant_id: cfg.tenant_id, vin, source: "marketcheck_sync",
-              listing_price: price ?? null, payload: l, captured_at: new Date().toISOString(),
-            }).then(() => undefined, () => undefined);
+            // Skip the snapshot when the price hasn't moved since the last
+            // capture — a nightly sync of an unchanged lot was appending an
+            // identical row per car per run, bloating the timeline table.
+            const { data: lastSnap } = await admin.from("vehicle_value_history")
+              .select("listing_price, market_value")
+              .eq("tenant_id", cfg.tenant_id).eq("vin", vin)
+              .order("captured_at", { ascending: false }).limit(1)
+              .then((r) => r, () => ({ data: null }));
+            const last = Array.isArray(lastSnap) ? lastSnap[0] as { listing_price?: number | null; market_value?: number | null } | undefined : undefined;
+            const lastPrice = last?.listing_price != null ? Number(last.listing_price) : null;
+            const samePrice = last !== undefined && lastPrice === (price ?? null) && last.market_value == null;
+            if (!samePrice) {
+              await admin.from("vehicle_value_history").insert({
+                tenant_id: cfg.tenant_id, vin, source: "marketcheck_sync",
+                listing_price: price ?? null, payload: l, captured_at: new Date().toISOString(),
+              }).then(() => undefined, () => undefined);
+            }
 
             // 3) advertised_prices — website price snapshot on change.
             if (price != null) {

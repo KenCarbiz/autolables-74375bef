@@ -249,9 +249,11 @@ serve(async (req) => {
         // warranty terms per brand in admin; here we match the listing's make
         // and, when the listing itself carries no warranty_info, synthesize it
         // so the passport shows the factory coverage. New cars have no prior
-        // in-service date — the full term carries forward from the listing
-        // date, so we stamp published_at/created_at/today as the start. Only
-        // VERIFIED terms are used.
+        // in-service date — the clock starts at delivery, so today stands in.
+        // Used/CPO must use the vehicle's REAL in-service date (vehicle-enrich
+        // derives it from listing history); when none exists the date is
+        // omitted so the client never counts down from a fabricated start.
+        // Only VERIFIED terms are used.
         const ymm = String((row.ymm as string) || "").toUpperCase();
         const cond = String((row.condition as string) || "").toLowerCase();
         const hasWarranty = row.warranty_info && Object.keys(row.warranty_info as object).length > 0;
@@ -263,12 +265,9 @@ serve(async (req) => {
             return b.length > 1 && x?.verified === true && ymm.includes(b);
           });
           if (w) {
-            // A new, unregistered car's factory clock hasn't started — coverage
-            // begins at delivery — so its warranty start always rolls forward to
-            // today. Used/CPO keep their real in-service (publish) date.
-            const start = cond === "new"
-              ? new Date().toISOString()
-              : ((row.published_at as string) || (row.created_at as string) || new Date().toISOString());
+            const realInService = ((row.history_payload as { inServiceDate?: string | null } | null)?.inServiceDate as string | null)
+              || ((row.in_service_date as string) || null);
+            const start = cond === "new" ? new Date().toISOString() : realInService;
             // Unlimited (sentinel -1) or unset miles → omit the cap so the
             // passport renders a time-only term and never does negative-mile math.
             const finiteMiles = (n: unknown) => { const v = Number(n); return v > 0 ? v : undefined; };
@@ -284,7 +283,7 @@ serve(async (req) => {
               factory_miles: finiteMiles(bMiles),
               powertrain_months: Number(ptMonths) || undefined,
               powertrain_miles: finiteMiles(ptMiles),
-              in_service_date: String(start).slice(0, 10),
+              ...(start ? { in_service_date: String(start).slice(0, 10) } : {}),
             };
             // Full coverage breakdown for the passport's factory-warranty
             // slide-out (bumper-to-bumper, powertrain, corrosion, roadside,
@@ -355,16 +354,18 @@ serve(async (req) => {
     } catch { /* dealer identity optional */ }
 
     // ── Attach real captured price/market history for this VIN (Passport V2
-    // Price History). Read-only, service role; oldest→newest, capped.
+    // Price History). Read-only, service role; the MOST RECENT 60 snapshots
+    // (an ascending fetch freezes long-listed cars in their oldest window),
+    // re-sorted oldest→newest for the client.
     try {
       if (row.vin) {
         const { data: hist } = await admin
           .from("vehicle_value_history")
           .select("captured_at, market_value, listing_price, below_market, position")
           .eq("vin", String(row.vin).toUpperCase())
-          .order("captured_at", { ascending: true })
+          .order("captured_at", { ascending: false })
           .limit(60);
-        if (Array.isArray(hist) && hist.length) row.value_history = hist;
+        if (Array.isArray(hist) && hist.length) row.value_history = hist.reverse();
       }
     } catch { /* history optional — Passport shows a pending state */ }
 
@@ -630,6 +631,65 @@ serve(async (req) => {
         row.photos = (row.photos as unknown[]).slice(0, 1);
       }
     } catch { /* curation is best-effort shaping; never block the shopper view */ }
+
+    // ── Anonymous payload whitelist. The RPC returns the raw row; before it
+    // ships to a shopper, drop anything that identifies competitors or helps
+    // find a cheaper car (below-price comps, cheaper counts, wholesale/trade
+    // values, other dealers' names/VINs/URLs).
+    try {
+      const ourPrice = (() => { const n = Number(row.price); return Number.isFinite(n) && n > 0 ? n : null; })();
+      if (Array.isArray(row.comparables)) {
+        row.comparables = (row.comparables as Record<string, unknown>[])
+          .filter((c) => {
+            const p = Number(c?.price);
+            if (!Number.isFinite(p) || p <= 0) return false;
+            return ourPrice == null || p >= ourPrice;
+          })
+          .map((c) => ({
+            price: c.price ?? null, miles: c.miles ?? null, ymm: c.ymm ?? null,
+            trim: c.trim ?? null, dist: c.dist ?? null, dom: c.dom ?? null, image: c.image ?? null,
+          }));
+      }
+      if (row.market_meta && typeof row.market_meta === "object") {
+        const mm = row.market_meta as Record<string, unknown>;
+        delete mm.cheaper_count;
+        delete mm.rank_basis;
+      }
+      if (row.market_payload && typeof row.market_payload === "object") {
+        const mp = row.market_payload as Record<string, unknown>;
+        row.market_payload = {
+          marketValue: mp.marketValue ?? null, low: mp.low ?? null, high: mp.high ?? null,
+          belowMarket: mp.belowMarket ?? null, position: mp.position ?? null,
+          source: mp.source ?? null, checked_at: mp.checked_at ?? null,
+        };
+      }
+      if (row.blackbook && typeof row.blackbook === "object") {
+        const bb = row.blackbook as Record<string, unknown>;
+        row.blackbook = { available: bb.available === true, retail: bb.retail ?? null, checked_at: bb.checked_at ?? null };
+      }
+      if (row.history_payload && typeof row.history_payload === "object") {
+        const hp = row.history_payload as Record<string, unknown>;
+        row.history_payload = {
+          available: hp.available === true,
+          entries: (Array.isArray(hp.entries) ? hp.entries as Record<string, unknown>[] : []).map((e) => ({
+            miles: e.miles ?? null,
+            seller_type: e.seller_type ?? null,
+            inventory_type: e.inventory_type ?? null,
+            first_seen: e.first_seen ?? null,
+            last_seen: e.last_seen ?? null,
+          })),
+          owners: hp.owners ?? null,
+          inServiceDate: hp.inServiceDate ?? null,
+          firstSeen: hp.firstSeen ?? null,
+          checked_at: hp.checked_at ?? null,
+          source: hp.source ?? null,
+        };
+      }
+    } catch {
+      // Fail CLOSED: if sanitation breaks, the raw payloads must not ship.
+      delete row.comparables; delete row.market_meta; delete row.market_payload;
+      delete row.blackbook; delete row.history_payload;
+    }
 
     return json(200, { listing: row });
   } catch (err) {

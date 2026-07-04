@@ -6,7 +6,7 @@
 // spent when a shopper actually opens the comp set.
 //
 // Body: { slug: string }
-// Returns: { count, startingAt, median, comparables: [...], checkedAt }
+// Returns: { count, median, comparables: [...], checkedAt }
 //          or { available: false, reason } when MarketCheck isn't configured
 //          or has no comps — the page then shows an honest pending state.
 // ──────────────────────────────────────────────────────────────────────
@@ -60,6 +60,7 @@ Deno.serve(async (req) => {
     // dealer's own rooftop — a mismatched comp set reads as "off" and sends
     // shoppers elsewhere. Try trim-matched first; relax to model-level only if
     // that yields nothing usable.
+    const priceForBand = num(row.price);
     const buildParams = (useTrim: boolean) => {
       const p = new URLSearchParams({ api_key: MC_KEY, car_type: row.condition === "new" ? "new" : "used", rows: "20", sort_by: "price", sort_order: "asc", stats: "price" });
       if (year && /^\d{4}$/.test(year)) p.set("year", year);
@@ -67,6 +68,10 @@ Deno.serve(async (req) => {
       if (model.length) p.set("model", model.join(" "));
       if (useTrim && trim) p.set("trim", trim);
       if (zip) { p.set("zip", zip); p.set("radius", "150"); }
+      // Scope the search UPWARD from our price (mirrors vehicle-enrich's
+      // banding): a price-ascending unbounded search returns the 20 CHEAPEST
+      // cars in the market, which the value filter below then discards.
+      if (priceForBand) p.set("price_range", `${Math.round(priceForBand)}-${Math.round(priceForBand * 1.35)}`);
       return p;
     };
     const usable = (b: { listings?: unknown }) => (Array.isArray(b?.listings) ? b.listings : [])
@@ -160,15 +165,12 @@ Deno.serve(async (req) => {
     const nf = typeof b?.num_found === "number" ? b.num_found : parseInt(String(b?.num_found ?? ""), 10);
     const count = Number.isFinite(nf) ? nf : comparables.length;
     const stats = b?.stats?.price || {};
-    // Price stats stay market-wide (honest averages) — only the visible comp
-    // LIST is curated; the median/startingAt math is never rewritten.
-    const startingAt = num(stats.min) ?? (comparables.length ? num(comparables[0].price) : null);
     const median = num(stats.median) ?? num(stats.mean);
 
     if (count === 0 && mapped.length === 0) return json(200, { available: false, reason: "no_comps" });
     if (comparables.length === 0) return json(200, { available: false, reason: "no_value_comps" });
 
-    return json(200, { available: true, count, startingAt, median, comparables, ourPrice, strategy: cs.compStrategy, checkedAt: new Date().toISOString() });
+    return json(200, { available: true, count, median, comparables, ourPrice, strategy: cs.compStrategy, checkedAt: new Date().toISOString() });
   } catch (err) {
     return json(200, { available: false, reason: err instanceof Error ? err.message : "unknown" });
   }

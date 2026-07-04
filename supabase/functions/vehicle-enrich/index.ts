@@ -196,6 +196,22 @@ async function fetchComps(ymm: string | null, condition: string, zip: string | n
     const mean = prices.length ? Math.round(prices.reduce((a, b) => a + b, 0) / prices.length) : null;
     const avgDom = doms.length ? Math.round(doms.reduce((a, b) => a + b, 0) / doms.length) : null;
     const stats = { min: prices[0] ?? null, mean, median, max: prices[prices.length - 1] ?? null };
+    const milesAll = r.rows.map((l) => num(l.miles)).filter((n): n is number => n != null && n > 0);
+    const milesMean = milesAll.length ? Math.round(milesAll.reduce((a, b) => a + b, 0) / milesAll.length) : null;
+    const domsSorted = [...doms].sort((a, z) => a - z);
+    const domMedian = domsSorted.length ? domsSorted[Math.floor(domsSorted.length / 2)] : null;
+    // Price-cut signal across the full returned sample: MarketCheck rows carry
+    // ref_price (prior price) and price_change_percent when a listing has
+    // moved. Cuts among competitors are urgency evidence for OUR car.
+    let cutTotal = 0, cutCount = 0;
+    for (const l of r.rows) {
+      const pct = num(l.price_change_percent);
+      const ref = num(l.ref_price);
+      const cur = rowPrice(l);
+      if (pct == null && ref == null) continue;
+      cutTotal++;
+      if ((pct != null && pct < 0) || (pct == null && ref != null && cur != null && cur < ref)) cutCount++;
+    }
     const count = r.numFound ?? comparables.length;
 
     // True market rank: count the listings priced UNDER ours across the FULL
@@ -223,8 +239,38 @@ async function fetchComps(ymm: string | null, condition: string, zip: string | n
     const sampleCheaper = listingPrice != null && allPrices.length
       ? allPrices.filter((n) => n < listingPrice).length : null;
     const cheaper = cheaperCount ?? sampleCheaper;
-    const percentile = listingPrice != null && cheaper != null && count > 0
-      ? Math.min(100, Math.round((cheaper / count) * 100)) : null;
+    // Percentile only from the market-wide count: the sample fallback mixes a
+    // 50-row-page numerator with a whole-market denominator, which understates
+    // the rank. Better null (honest pending) than a fabricated number.
+    const percentile = listingPrice != null && cheaperCount != null && count > 0
+      ? Math.min(100, Math.round((cheaperCount / count) * 100)) : null;
+
+    // Trim scarcity: how many of THIS trim exist in the same geometry. When
+    // the winning tier already trim-matched, similar_count IS the trim count;
+    // otherwise one rows=1 count call answers it.
+    let trimCount: number | null = null;
+    try {
+      if (tier === "trim_year_band") {
+        trimCount = count;
+      } else if (trim) {
+        const tp = new URLSearchParams({ api_key: MC_KEY, car_type: carType, rows: "1", start: "0" });
+        if ((tier === "year_band" || tier === "year") && year) tp.set("year", year);
+        if (make) tp.set("make", make);
+        if (model) tp.set("model", model);
+        tp.set("trim", trim);
+        if (zip) { tp.set("zip", zip); tp.set("radius", "100"); }
+        if ((tier === "year_band" || tier === "band") && listingPrice && listingPrice > 0) {
+          tp.set("price_range", `${Math.round(listingPrice * 0.65)}-${Math.round(listingPrice * 1.35)}`);
+        }
+        const tres = await mcFetch(`${MC_BASE}/search/car/active?${tp.toString()}`, 10000);
+        if (tres && tres.ok) {
+          // deno-lint-ignore no-explicit-any
+          const tb: any = await tres.json().catch(() => ({}));
+          trimCount = num(tb?.num_found);
+        }
+      }
+    } catch { /* trim scarcity optional */ }
+
     const meta = {
       similar_count: count,
       search_radius: zip ? 100 : null,
@@ -236,6 +282,11 @@ async function fetchComps(ymm: string | null, condition: string, zip: string | n
       avg_dom: avgDom,
       market_days_supply: null as number | null,  // filled by fetchMds when the plan supports it
       inventory_count: count,
+      price_stats: { mean, median },
+      miles_mean: milesMean,
+      dom_median: domMedian,
+      ...(cutTotal > 0 ? { comp_price_cut_count: cutCount, comp_price_cut_total: cutTotal } : {}),
+      ...(trimCount != null ? { trim_count: trimCount } : {}),
       checked_at: new Date().toISOString(),
     };
     // median (fallback to mean) lets the caller backfill market_value when
@@ -542,6 +593,16 @@ serve(async (req) => {
       : comps.meta;
   } else if (mds?.mds != null) {
     patch.market_meta = { market_days_supply: mds.mds, inventory_count: mds.count, checked_at: mds.checked_at };
+  }
+  if (patch.market_meta) {
+    // MDS = active inventory ÷ 45-day sales rate, so units sold in the last
+    // 45 days ≈ inventory * 45 / MDS — a real velocity figure for the market.
+    const mm = patch.market_meta as Record<string, unknown>;
+    const mdsV = Number(mm.market_days_supply);
+    const inv = Number(mm.inventory_count);
+    if (Number.isFinite(mdsV) && mdsV > 0 && Number.isFinite(inv) && inv > 0) {
+      mm.sold_45d_estimate = Math.round((inv * 45) / mdsV);
+    }
   }
   if (history) {
     patch.history_payload = history;
