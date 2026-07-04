@@ -5130,6 +5130,7 @@ export type Database = {
           status: string
           sticker_snapshot: Json
           store_id: string
+          suppressed_programs: Json
           tenant_id: string | null
           trim: string | null
           updated_at: string
@@ -5211,6 +5212,7 @@ export type Database = {
           status?: string
           sticker_snapshot?: Json
           store_id: string
+          suppressed_programs?: Json
           tenant_id?: string | null
           trim?: string | null
           updated_at?: string
@@ -5292,6 +5294,7 @@ export type Database = {
           status?: string
           sticker_snapshot?: Json
           store_id?: string
+          suppressed_programs?: Json
           tenant_id?: string | null
           trim?: string | null
           updated_at?: string
@@ -6308,6 +6311,7 @@ export type Database = {
           status: string
           sticker_snapshot: Json
           store_id: string
+          suppressed_programs: Json
           tenant_id: string | null
           trim: string | null
           updated_at: string
@@ -6410,6 +6414,10 @@ export type Database = {
       marketcheck_prune_inventory: {
         Args: { _live_vins: string[]; _tenant_id: string }
         Returns: Json
+      }
+      merge_dealer_settings: {
+        Args: { _patch: Json; _tenant_id: string }
+        Returns: boolean
       }
       merge_scraped_vdp: {
         Args: {
