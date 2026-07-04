@@ -9,7 +9,7 @@
 // Auth: tenant user JWT or service role.
 // ──────────────────────────────────────────────────────────────────────
 import { json, preflight } from "../_shared/http.ts";
-import { SERVICE_KEY, adminClient } from "../_shared/supabase.ts";
+import { adminClient, isServiceOrCron } from "../_shared/supabase.ts";
 
 const FIRECRAWL_KEY = Deno.env.get("FIRECRAWL_API_KEY_1") || Deno.env.get("FIRECRAWL_API_KEY") || "";
 
@@ -76,10 +76,10 @@ Deno.serve(async (req) => {
   const pf = preflight(req);
   if (pf) return pf;
 
-  const jwt = (req.headers.get("Authorization") || "").replace(/^Bearer\s+/i, "");
-  if (!jwt) return json(401, { error: "missing bearer token" });
   const admin = adminClient();
-  if (jwt !== SERVICE_KEY) {
+  if (!isServiceOrCron(req)) {
+    const jwt = (req.headers.get("Authorization") || "").replace(/^Bearer\s+/i, "");
+    if (!jwt) return json(401, { error: "missing bearer token" });
     const { data: ures } = await admin.auth.getUser(jwt);
     if (!ures?.user?.id) return json(401, { error: "unauthorized" });
   }
