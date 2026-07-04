@@ -1,0 +1,48 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+
+  <defs>
+    <linearGradient id="tileGradient" x1="220" y1="135" x2="790" y2="875" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#1FA6FF"/>
+      <stop offset="0.46" stop-color="#006DF2"/>
+      <stop offset="1" stop-color="#0034B8"/>
+    </linearGradient>
+    <linearGradient id="topGloss" x1="245" y1="170" x2="775" y2="620" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#FFFFFF" stop-opacity="0.30"/>
+      <stop offset="0.55" stop-color="#FFFFFF" stop-opacity="0.06"/>
+      <stop offset="1" stop-color="#FFFFFF" stop-opacity="0"/>
+    </linearGradient>
+    <linearGradient id="edgeGlow" x1="512" y1="120" x2="512" y2="904" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#FFFFFF" stop-opacity="0.95"/>
+      <stop offset="0.5" stop-color="#7DD3FF" stop-opacity="0.42"/>
+      <stop offset="1" stop-color="#00B7FF" stop-opacity="0.86"/>
+    </linearGradient>
+    <filter id="tileShadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="18" stdDeviation="22" flood-color="#0057D9" flood-opacity="0.35"/>
+    </filter>
+    <filter id="glyphShadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="8" stdDeviation="8" flood-color="#001D78" flood-opacity="0.38"/>
+    </filter>
+    <clipPath id="tileClip">
+      <rect x="126" y="126" width="772" height="772" rx="132" ry="132"/>
+    </clipPath>
+  </defs>
+
+
+  <g filter="url(#tileShadow)">
+    <rect x="126" y="126" width="772" height="772" rx="132" ry="132" fill="url(#tileGradient)"/>
+    <path clip-path="url(#tileClip)" d="M126 662 C330 590 560 560 898 424 L898 898 L126 898 Z" fill="#002BBD" opacity="0.28"/>
+    <rect x="126" y="126" width="772" height="772" rx="132" ry="132" fill="url(#topGloss)"/>
+    <rect x="138" y="138" width="748" height="748" rx="120" ry="120" fill="none" stroke="url(#edgeGlow)" stroke-width="8"/>
+    <rect x="122" y="122" width="780" height="780" rx="136" ry="136" fill="none" stroke="#075CFF" stroke-width="10" opacity="0.82"/>
+  </g>
+
+  <g filter="url(#glyphShadow)" fill="none" stroke="#FFFFFF" stroke-linecap="round" stroke-linejoin="round">
+
+    <!-- customer opt-in approval: person + check badge -->
+    <circle cx="458" cy="356" r="92" stroke-width="42"/>
+    <path d="M294 690 C316 560 374 502 458 502 C542 502 600 560 622 690" stroke-width="42"/>
+    <circle cx="676" cy="654" r="132" stroke-width="42" fill="#0051D9"/>
+    <path d="M612 656 L660 704 L746 604" stroke-width="50"/>
+
+  </g>
+</svg>
