@@ -182,7 +182,7 @@ const Hero = ({ waitTo }: { waitTo: string }) => (
           </span>
           FTC warned 97 dealer groups &mdash; March 2026
         </div>
-        <h1 className="font-display text-[40px] font-black leading-[1.02] tracking-tighter text-slate-900 sm:text-6xl">
+        <h1 className="font-barlow-condensed text-[44px] font-extrabold uppercase leading-[0.98] tracking-[0.01em] text-slate-900 sm:text-7xl">
           The FTC doesn&rsquo;t care if it was an{" "}
           <span className="text-blue-600">accident.</span>
         </h1>
@@ -344,11 +344,11 @@ const VehicleFileCard = () => (
       <div className="px-5 pb-5 pt-4">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
-            <p className="font-display text-[15px] font-black tracking-tight text-slate-900">2027 INFINITI QX60 LUXE</p>
+            <p className="font-mono text-[15px] font-semibold tracking-tight text-slate-900">2027 INFINITI QX60 LUXE</p>
             <p className="mt-0.5 text-[11px] text-slate-500">Deep Emerald &middot; Graphite leather</p>
           </div>
           <div className="flex-shrink-0 text-right">
-            <p className="font-display text-[15px] font-black tracking-tight text-slate-900 tabular-nums">$58,835</p>
+            <p className="font-mono text-[15px] font-semibold tracking-tight text-slate-900 tabular-nums">$58,835</p>
             <p className="text-[10px] font-semibold text-emerald-700">$2,444 below market</p>
           </div>
         </div>
@@ -510,7 +510,7 @@ const Risk = () => (
     <div className="mx-auto max-w-7xl px-6 py-20 lg:px-8">
       <div className="mx-auto max-w-3xl text-center">
         <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-blue-600">The risk</p>
-        <h2 className="mt-3 font-display text-4xl font-black tracking-tighter text-slate-900 sm:text-5xl">
+        <h2 className="mt-3 font-barlow-condensed text-4xl font-extrabold tracking-normal text-slate-900 sm:text-5xl">
           One bad label can cost you the lot.
         </h2>
         <p className="mt-5 text-lg leading-relaxed text-slate-600">
@@ -565,7 +565,7 @@ const HowItWorks = () => (
     <div className="mx-auto max-w-7xl px-6 py-20 lg:px-8">
       <div className="mx-auto max-w-3xl text-center">
         <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-blue-600">How it works</p>
-        <h2 className="mt-3 font-display text-4xl font-black tracking-tighter text-slate-900 sm:text-5xl">
+        <h2 className="mt-3 font-barlow-condensed text-4xl font-extrabold tracking-normal text-slate-900 sm:text-5xl">
           Four verbs. One platform.
         </h2>
         <p className="mt-5 text-base leading-relaxed text-slate-600">
@@ -663,12 +663,12 @@ const StickerMock = () => (
     </div>
     <div className="mt-2.5 flex items-start justify-between gap-2">
       <div>
-        <p className="font-display text-[14px] font-black leading-tight text-slate-900">2027 INFINITI QX60</p>
+        <p className="font-mono text-[14px] font-semibold leading-tight text-slate-900">2027 INFINITI QX60</p>
         <p className="text-[9px] font-medium text-slate-500">LUXE AWD · VIN …331335</p>
       </div>
       <div className="text-right">
         <p className="text-[8px] font-bold uppercase tracking-wide text-slate-500">Our Price</p>
-        <p className="font-display text-[16px] font-black tabular-nums text-[#0B2041]">$58,835</p>
+        <p className="font-mono text-[16px] font-semibold tabular-nums text-[#0B2041]">$58,835</p>
       </div>
     </div>
     <div className="mt-2.5 rounded-lg bg-slate-50 px-2.5 py-2">
@@ -701,7 +701,7 @@ const StickerStudioGallery = () => (
     <div className="mx-auto max-w-7xl px-6 py-20 lg:px-8">
       <div className="mx-auto max-w-3xl text-center">
         <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-blue-600">Sticker Studio</p>
-        <h2 className="mt-3 font-display text-4xl font-black tracking-tighter text-slate-900 sm:text-5xl">
+        <h2 className="mt-3 font-barlow-condensed text-4xl font-extrabold tracking-normal text-slate-900 sm:text-5xl">
           Pick a template. The sticker builds itself.
         </h2>
         <p className="mt-5 text-base leading-relaxed text-slate-600">
@@ -763,7 +763,7 @@ const VehiclePassportSection = ({ waitTo }: { waitTo: string }) => (
     <div className="mx-auto max-w-7xl px-6 py-20 lg:px-8">
       <div className="mx-auto max-w-3xl text-center">
         <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-blue-600">Vehicle Passport</p>
-        <h2 className="mt-3 font-display text-4xl font-black tracking-tighter text-slate-900 sm:text-5xl">
+        <h2 className="mt-3 font-barlow-condensed text-4xl font-extrabold tracking-normal text-slate-900 sm:text-5xl">
           The QR is the new sales packet &mdash; and you see every scan.
         </h2>
         <p className="mt-5 text-base leading-relaxed text-slate-600">
@@ -774,7 +774,7 @@ const VehiclePassportSection = ({ waitTo }: { waitTo: string }) => (
       </div>
       <div className="mx-auto mt-12 grid max-w-5xl gap-5 lg:grid-cols-2">
         <div className="rounded-2xl border border-slate-200 bg-white p-8 shadow-sm">
-          <h3 className="inline-flex items-center gap-2 font-display text-lg font-bold text-slate-900">
+          <h3 className="inline-flex items-center gap-2 font-barlow-condensed text-lg font-bold text-slate-900">
             <QrCode className="h-5 w-5 text-blue-600" /> Inside every Passport
           </h3>
           <ul className="mt-4 space-y-2.5">
@@ -790,7 +790,7 @@ const VehiclePassportSection = ({ waitTo }: { waitTo: string }) => (
         </div>
         <div className="flex flex-col gap-5">
           <div className="rounded-2xl border border-blue-200 bg-blue-50/50 p-8">
-            <h3 className="inline-flex items-center gap-2 font-display text-lg font-bold text-slate-900">
+            <h3 className="inline-flex items-center gap-2 font-barlow-condensed text-lg font-bold text-slate-900">
               <BarChart3 className="h-5 w-5 text-blue-600" /> You see every scan
             </h3>
             <p className="mt-4 text-sm leading-relaxed text-slate-700">
@@ -803,7 +803,7 @@ const VehiclePassportSection = ({ waitTo }: { waitTo: string }) => (
             </p>
           </div>
           <div className="flex-1 rounded-2xl border border-slate-200 bg-white p-8 shadow-sm">
-            <h3 className="inline-flex items-center gap-2 font-display text-lg font-bold text-slate-900">
+            <h3 className="inline-flex items-center gap-2 font-barlow-condensed text-lg font-bold text-slate-900">
               <Zap className="h-5 w-5 text-blue-600" /> Every scan becomes a routed lead
             </h3>
             <p className="mt-4 text-sm leading-relaxed text-slate-700">
@@ -822,7 +822,7 @@ const VehiclePassportSection = ({ waitTo }: { waitTo: string }) => (
         <div className="flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-center">
           <div>
             <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-blue-600">The closer</p>
-            <h3 className="mt-1 font-display text-xl font-black tracking-tight text-slate-900">
+            <h3 className="mt-1 font-barlow-condensed text-xl font-extrabold tracking-normal text-slate-900">
               &ldquo;Why This Is A Great Buy&rdquo; &mdash; a shareable buying report per vehicle.
             </h3>
             <p className="mt-2 max-w-2xl text-sm leading-relaxed text-slate-600">
@@ -932,7 +932,7 @@ const WhereWeFit = () => (
     <div className="mx-auto max-w-7xl px-6 py-20 lg:px-8">
       <div className="mx-auto max-w-3xl text-center">
         <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-blue-600">Where AutoLabels fits</p>
-        <h2 className="mt-3 font-display text-4xl font-black tracking-tighter text-slate-900 sm:text-5xl">
+        <h2 className="mt-3 font-barlow-condensed text-4xl font-extrabold tracking-normal text-slate-900 sm:text-5xl">
           Four tools&rsquo; jobs. One record.
         </h2>
         <p className="mt-5 text-base leading-relaxed text-slate-600">
@@ -999,7 +999,7 @@ const TakeThePowerBack = ({ waitTo }: { waitTo: string }) => (
     <div className="mx-auto max-w-7xl px-6 py-20 lg:px-8">
       <div className="mx-auto max-w-2xl text-center">
         <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-blue-600">Take the power back</p>
-        <h2 className="mt-3 font-display text-4xl font-black tracking-tighter text-slate-900 sm:text-5xl [text-wrap:balance]">
+        <h2 className="mt-3 font-barlow-condensed text-4xl font-extrabold tracking-normal text-slate-900 sm:text-5xl [text-wrap:balance]">
           The FTC made you play defense. Take the power back.
         </h2>
         <p className="mt-5 text-base leading-relaxed text-slate-700">
@@ -1010,7 +1010,7 @@ const TakeThePowerBack = ({ waitTo }: { waitTo: string }) => (
 
       <div className="mx-auto mt-10 max-w-4xl rounded-2xl border border-blue-200 bg-blue-50/50 p-8">
         <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-blue-600">For the dealer who sells it, not pre-installs it</p>
-        <h3 className="mt-2 font-display text-2xl font-black tracking-tight text-slate-900">
+        <h3 className="mt-2 font-barlow-condensed text-2xl font-extrabold tracking-normal text-slate-900">
           You sell exterior &amp; interior protection — and install it when the car is delivered.
         </h3>
         <p className="mt-4 text-sm leading-relaxed text-slate-700">
@@ -1106,7 +1106,7 @@ const PowerPillar = ({
       <Icon className="h-5 w-5" />
     </div>
     <p className="mt-5 text-[11px] font-bold uppercase tracking-[0.16em] text-blue-600">{eyebrow}</p>
-    <h3 className="mt-1.5 font-display text-2xl font-black tracking-tight text-slate-900">{title}</h3>
+    <h3 className="mt-1.5 font-barlow-condensed text-2xl font-extrabold tracking-normal text-slate-900">{title}</h3>
     <div className="mt-3 text-sm leading-relaxed text-slate-600">{body}</div>
     <div className="mt-5 flex flex-wrap gap-2">
       {chips.map((c) => (
@@ -1132,7 +1132,7 @@ const SocialProof = () => (
       <div className="grid gap-5 md:grid-cols-3">
         <div className="flex flex-col justify-center rounded-2xl border border-slate-200 bg-white p-7 shadow-sm md:col-span-2">
           <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-blue-600">Built with dealers, for dealers</p>
-          <h2 className="mt-2 font-display text-2xl font-black tracking-tight text-slate-900">
+          <h2 className="mt-2 font-barlow-condensed text-2xl font-extrabold tracking-normal text-slate-900">
             Now onboarding pilot dealer groups.
           </h2>
           <p className="mt-3 text-sm leading-relaxed text-slate-600">
@@ -1149,7 +1149,7 @@ const SocialProof = () => (
         </div>
         <div className="flex flex-col justify-center rounded-2xl border border-slate-200 bg-gradient-to-br from-[#0B2041] to-[#13315e] p-7 text-white shadow-sm">
           <ShieldCheck className="h-7 w-7 text-[#3BB4FF]" />
-          <p className="mt-3 font-display text-lg font-bold tracking-tight">FTC-aligned</p>
+          <p className="mt-3 font-barlow-condensed text-lg font-bold tracking-normal">FTC-aligned</p>
           <p className="text-sm text-white/70">50-state disclosure engine</p>
           <p className="mt-4 text-[11px] font-medium uppercase tracking-[0.18em] text-white/60">
             Built to the frameworks regulators cite
@@ -1221,7 +1221,7 @@ const PricingTeaser = ({ waitTo }: { waitTo: string }) => (
     <div className="mx-auto max-w-7xl px-6 py-20 lg:px-8">
       <div className="mx-auto max-w-3xl text-center">
         <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-blue-600">Pricing</p>
-        <h2 className="mt-3 font-display text-4xl font-black tracking-tighter text-slate-900 sm:text-5xl">
+        <h2 className="mt-3 font-barlow-condensed text-4xl font-extrabold tracking-normal text-slate-900 sm:text-5xl">
           Simple pricing. Three tiers.
         </h2>
         <p className="mt-5 text-base leading-relaxed text-slate-600">
@@ -1245,10 +1245,10 @@ const PricingTeaser = ({ waitTo }: { waitTo: string }) => (
                 Most popular
               </span>
             )}
-            <h3 className="font-display text-xl font-bold tracking-tight text-slate-900">{t.name}</h3>
+            <h3 className="font-barlow-condensed text-xl font-bold tracking-normal text-slate-900">{t.name}</h3>
             <p className="mt-1 text-[11px] font-bold uppercase tracking-wider text-blue-600">{t.best}</p>
             <div className="mt-3 flex items-baseline gap-1">
-              <span className="font-display text-4xl font-black tracking-tighter text-slate-900">{t.price}</span>
+              <span className="font-barlow-condensed text-4xl font-extrabold tracking-normal text-slate-900 tabular-nums">{t.price}</span>
               <span className="text-sm font-medium text-slate-500">/mo</span>
             </div>
             <p className="mt-3 text-sm leading-relaxed text-slate-600">{t.tagline}</p>
@@ -1342,7 +1342,7 @@ const FAQ = () => {
       <div className="mx-auto max-w-4xl px-6 py-20 lg:px-8">
         <div className="text-center">
           <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-blue-600">FAQ</p>
-          <h2 className="mt-3 font-display text-4xl font-black tracking-tighter text-slate-900 sm:text-5xl">
+          <h2 className="mt-3 font-barlow-condensed text-4xl font-extrabold tracking-normal text-slate-900 sm:text-5xl">
             Questions, answered.
           </h2>
         </div>
@@ -1385,7 +1385,7 @@ const FinalCTA = ({ waitTo }: { waitTo: string }) => (
         <div className="absolute bottom-0 left-0 h-64 w-64 rounded-full bg-[#2563EB]/25 blur-3xl" />
       </div>
       <div className="relative">
-        <h2 className="font-display text-4xl font-black tracking-tighter sm:text-5xl">
+        <h2 className="font-barlow-condensed text-4xl font-extrabold tracking-normal sm:text-5xl">
           Get early access.
         </h2>
         <p className="mt-5 text-lg text-white/70">First in line · Early-access pricing locked in.</p>
@@ -1506,7 +1506,7 @@ const Card = ({
     <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-blue-50 text-[#2563EB]">
       <Icon className="h-5 w-5" />
     </div>
-    <h3 className="mt-4 font-display text-lg font-bold tracking-tight text-slate-900">{title}</h3>
+    <h3 className="mt-4 font-barlow-condensed text-lg font-bold tracking-normal text-slate-900">{title}</h3>
     <p className="mt-2 text-sm leading-relaxed text-slate-600">{children}</p>
   </div>
 );
@@ -1537,7 +1537,7 @@ const NumberedCard = ({
         </span>
       )}
     </div>
-    <h3 className="mt-4 font-display text-xl font-bold tracking-tight text-slate-900">{title}</h3>
+    <h3 className="mt-4 font-barlow-condensed text-xl font-bold tracking-normal text-slate-900">{title}</h3>
     <p className="mt-2 text-sm leading-relaxed text-slate-600">{body}</p>
   </div>
 );
