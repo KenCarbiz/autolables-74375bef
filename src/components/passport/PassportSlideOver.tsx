@@ -218,21 +218,36 @@ export function RangeBar({ low, avg, high, dealer }: { low: number; avg: number;
   );
 }
 
-export function TrendChart({ market = [], dealer = [], height = 150 }: { market?: number[]; dealer?: number[]; height?: number }) {
+// Sparse pricing snapshots are unevenly spaced, so x-positions come from the
+// capture timestamps (shared across both series) whenever they're supplied;
+// index spacing is only the fallback for series without timestamps. A market
+// line needs 3+ points to be a trend rather than a misleading segment.
+export function TrendChart({ market = [], dealer = [], marketAt = [], dealerAt = [], height = 150 }: { market?: number[]; dealer?: number[]; marketAt?: number[]; dealerAt?: number[]; height?: number }) {
   const w = 560, h = height, pad = 8;
-  const all = [...market, ...dealer].filter((n) => Number.isFinite(n));
+  const mkt = market.length >= 3 ? market : [];
+  const all = [...mkt, ...dealer].filter((n) => Number.isFinite(n));
   if (all.length < 2) return null;
   const min = Math.min(...all), max = Math.max(...all), range = Math.max(1, max - min);
-  const path = (pts: number[]) =>
-    pts.map((p, i) => `${(pad + (i / Math.max(1, pts.length - 1)) * (w - pad * 2)).toFixed(1)},${(pad + (1 - (p - min) / range) * (h - pad * 2)).toFixed(1)}`).join(" ");
+  const times = [
+    ...(mkt.length && marketAt.length === mkt.length ? marketAt : []),
+    ...(dealer.length && dealerAt.length === dealer.length ? dealerAt : []),
+  ].filter((n) => Number.isFinite(n));
+  const t0 = times.length ? Math.min(...times) : null;
+  const t1 = times.length ? Math.max(...times) : null;
+  const xAt = (i: number, n: number, at: number[]) =>
+    at.length === n && t0 != null && t1 != null && t1 > t0
+      ? pad + ((at[i] - t0) / (t1 - t0)) * (w - pad * 2)
+      : pad + (i / Math.max(1, n - 1)) * (w - pad * 2);
+  const path = (pts: number[], at: number[]) =>
+    pts.map((p, i) => `${xAt(i, pts.length, at).toFixed(1)},${(pad + (1 - (p - min) / range) * (h - pad * 2)).toFixed(1)}`).join(" ");
   return (
     <svg viewBox={`0 0 ${w} ${h}`} className="w-full" style={{ height }} preserveAspectRatio="none">
       {[0.25, 0.5, 0.75].map((g) => (
         <line key={g} x1={pad} x2={w - pad} y1={pad + g * (h - pad * 2)} y2={pad + g * (h - pad * 2)} stroke="#E6E8EC" strokeWidth="1" strokeDasharray="3 4" />
       ))}
-      {market.length >= 2 && <polyline points={path(market)} fill="none" stroke={BLUE} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" strokeDasharray="5 4" />}
-      {dealer.length >= 2 && <polyline points={path(dealer)} fill="none" stroke={GREEN} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />}
-      {dealer.length >= 2 && (() => { const p = path(dealer).split(" ").pop()!.split(","); return <circle cx={p[0]} cy={p[1]} r="3.5" fill={GREEN} />; })()}
+      {mkt.length >= 3 && <polyline points={path(mkt, marketAt)} fill="none" stroke={BLUE} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" strokeDasharray="5 4" />}
+      {dealer.length >= 2 && <polyline points={path(dealer, dealerAt)} fill="none" stroke={GREEN} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />}
+      {dealer.length >= 2 && (() => { const p = path(dealer, dealerAt).split(" ").pop()!.split(","); return <circle cx={p[0]} cy={p[1]} r="3.5" fill={GREEN} />; })()}
     </svg>
   );
 }

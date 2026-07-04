@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import {
   DollarSign, TrendingUp, TrendingDown, Gauge, Clock, Car, Package, ShieldCheck,
   Star, Award, FileText, MessageSquare, Eye, CheckCircle2,
-  Flame, Heart, Send, Bookmark, Users, Circle, ChevronDown, ChevronRight, MapPin, BadgeCheck, Info, AlertTriangle, History, ArrowRight, Sparkles,
+  Flame, Heart, Users, Circle, ChevronDown, ChevronRight, MapPin, BadgeCheck, Info, AlertTriangle, History, ArrowRight, Sparkles,
   Wrench, Zap, LifeBuoy, Calendar, CalendarDays, ExternalLink, Navigation, Copy, Globe, Phone,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -56,6 +56,8 @@ function buildPanel(key: PassportPanelKey, d: PassportData, listing: VehicleList
   const mc = { ...(listing.mc_attributes || {}), ...((listing as unknown as { market_meta?: Record<string, unknown> }).market_meta || {}) } as Record<string, unknown>;
   const marketSeries = d.valueHistory.filter((h) => h.market_value != null).map((h) => h.market_value as number);
   const dealerSeries = d.valueHistory.filter((h) => h.listing_price != null).map((h) => h.listing_price as number);
+  const marketAt = d.valueHistory.filter((h) => h.market_value != null).map((h) => new Date(h.captured_at).getTime());
+  const dealerAt = d.valueHistory.filter((h) => h.listing_price != null).map((h) => new Date(h.captured_at).getTime());
 
   switch (key) {
     case "market-price": {
@@ -64,13 +66,19 @@ function buildPanel(key: PassportPanelKey, d: PassportData, listing: VehicleList
       const radius = (mc.search_radius as number) ?? null;
       const checkedRaw = (listing as unknown as { market_checked_at?: string }).market_checked_at
         ?? (listing.market_payload as { checked_at?: string } | null)?.checked_at ?? null;
-      const updated = checkedRaw ? `Updated ${new Date(checkedRaw).toLocaleDateString()}` : isPreview ? "Updated today" : null;
+      const checkedFresh = checkedRaw != null && Date.now() - new Date(checkedRaw).getTime() <= 14 * 86400000;
+      const updated = checkedFresh ? `Updated ${new Date(checkedRaw as string).toLocaleDateString()}` : isPreview ? "Updated today" : null;
+      const trimMatched = mc.trim_matched === true;
       const comparedAgainst: string[] = [];
       if (compCount != null) comparedAgainst.push(`${compCount.toLocaleString()} similar vehicles`); else if (isPreview) comparedAgainst.push("42 similar vehicles");
       if (radius != null) comparedAgainst.push(`${radius}-mile radius`); else if (isPreview) comparedAgainst.push("150-mile radius");
-      if (year) comparedAgainst.push(`Same year (${year})`);
-      if (listing.mileage != null) comparedAgainst.push(`Similar mileage (${Math.round(listing.mileage / 1000)}k±)`);
-      if (listing.trim) comparedAgainst.push(`Same trim (${listing.trim})`);
+      if (trimMatched) {
+        if (year) comparedAgainst.push(`Same year (${year})`);
+        if (listing.mileage != null) comparedAgainst.push(`Similar mileage (${Math.round(listing.mileage / 1000)}k±)`);
+        if (listing.trim) comparedAgainst.push(`Same trim (${listing.trim})`);
+      } else if (compCount == null) {
+        comparedAgainst.push("Similar vehicles nearby");
+      }
       if (updated) comparedAgainst.push(updated);
       const percentile = (mc.price_percentile as number) ?? null;
       const why: string[] = [];
@@ -86,17 +94,21 @@ function buildPanel(key: PassportPanelKey, d: PassportData, listing: VehicleList
       const priceAlts = readDealerAlternatives(listing);
       const dealerDelta = d.priceChangeTotal;
       const marketDelta = marketSeries.length >= 2 ? marketSeries[marketSeries.length - 1] - marketSeries[0] : null;
+      const mpOptValue = readBuildSheet(listing)?.estValue ?? null;
+      const mpNote = isGreat
+        ? (conf != null ? `Confidence ${conf}%` : "Priced below the local market average")
+        : mpOptValue ? `This build carries ${fmt$(mpOptValue)} in factory options` : "Priced to today's market";
       return {
-        title: "Market Pricing Analysis", subtitle: "How AutoLabels determined this price",
+        title: "Market Pricing Analysis", subtitle: "How this price compares to the market",
         primary: { label: "Reserve This Vehicle", onClick: () => go("reserve") },
         body: <>
-          <div className="md:hidden"><MHero tone={isGreat ? "green" : "blue"} icon={ShieldCheck} eyebrow={isGreat ? "Great Price" : avg != null ? "Market Price" : "Pricing"} title={isGreat ? `${fmt$(below)} Below Market` : avg != null && price != null ? fmt$(price) : "Pending"} note={conf != null ? `Confidence ${conf}%` : avg != null ? `Near the ${fmt$(avg)} market average` : "Market comparison appears once MarketCheck data is available."} /></div>
+          <div className="md:hidden"><MHero tone={isGreat ? "green" : "blue"} icon={ShieldCheck} eyebrow={isGreat ? "Great Price" : "Today's Price"} title={isGreat ? `${fmt$(below)} Below Market` : price != null ? fmt$(price) : "Priced to Today's Market"} note={mpNote} /></div>
           <div className="hidden md:block">
-            <Hero icon={ShieldCheck} tone={isGreat ? "green" : "neutral"} label={isGreat ? "Great Price" : avg != null ? "Market Price" : "Pricing Pending"}
-              value={isGreat ? `${fmt$(below)} Below Market` : undefined}
-              note={conf != null ? `Confidence: ${conf}%` : avg != null ? `Near the ${fmt$(avg)} market average` : "Market comparison appears once MarketCheck data is available."} />
+            <Hero icon={ShieldCheck} tone={isGreat ? "green" : "neutral"} label={isGreat ? "Great Price" : "Today's Price"}
+              value={isGreat ? `${fmt$(below)} Below Market` : price != null ? fmt$(price) : undefined}
+              note={mpNote} />
           </div>
-          {low != null && high != null && avg != null && price != null ? (
+          {low != null && high != null && avg != null && price != null && price <= avg && (
             <div className={`${CARD} p-5`}>
               <div className="grid grid-cols-3 text-center mb-1">
                 <div><p className="text-[11px] text-[#64748B]">Low Market</p><p className="text-[14px] font-bold">{fmt$(low)}</p></div>
@@ -105,7 +117,7 @@ function buildPanel(key: PassportPanelKey, d: PassportData, listing: VehicleList
               </div>
               <RangeBar low={low} avg={avg} high={high} dealer={price} />
             </div>
-          ) : <Empty>The market price range appears once enough comparable listings are available.</Empty>}
+          )}
           {(comparedAgainst.length > 0 || why.length > 0) && (
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               {comparedAgainst.length > 0 && <div className={`${CARD} p-4`}><p className="text-[13px] font-bold mb-2.5">Compared against</p><ul className="space-y-2">{comparedAgainst.map((t) => <Check key={t}>{t}</Check>)}</ul></div>}
@@ -122,33 +134,33 @@ function buildPanel(key: PassportPanelKey, d: PassportData, listing: VehicleList
               </div>
             </Section>
           )}
-          <Section title="Pricing Trend (30 Days)">
-            {(marketSeries.length >= 2 || dealerSeries.length >= 2) ? (
+          {(marketSeries.length >= 3 || dealerSeries.length >= 2) && (
+            <Section title="Pricing Trend">
               <div className={`${CARD} p-4`}>
                 <div className="flex items-center gap-4 mb-2 text-[11px] font-semibold">
-                  <span className="inline-flex items-center gap-1.5 text-[#64748B]"><span className="w-4 border-t-2 border-dashed border-[#2563EB]" /> Market avg</span>
-                  <span className="inline-flex items-center gap-1.5 text-[#16A34A]"><span className="w-4 border-t-2 border-[#16A34A]" /> Dealer price</span>
+                  {marketSeries.length >= 3 && <span className="inline-flex items-center gap-1.5 text-[#64748B]"><span className="w-4 border-t-2 border-dashed border-[#2563EB]" /> Market avg</span>}
+                  {dealerSeries.length >= 2 && <span className="inline-flex items-center gap-1.5 text-[#16A34A]"><span className="w-4 border-t-2 border-[#16A34A]" /> Dealer price</span>}
                 </div>
-                <TrendChart market={marketSeries} dealer={dealerSeries} />
+                <TrendChart market={marketSeries} dealer={dealerSeries} marketAt={marketAt} dealerAt={dealerAt} />
                 <div className="flex flex-wrap gap-x-5 gap-y-1 mt-2 text-[12px]">
-                  {marketDelta != null && <Delta label="Market average" delta={marketDelta} />}
-                  {dealerDelta != null && <Delta label="Dealer price" delta={dealerDelta} />}
+                  {marketDelta != null && <Delta kind="market" delta={marketDelta} />}
+                  {dealerDelta != null && <Delta kind="dealer" delta={dealerDelta} />}
                 </div>
               </div>
-            ) : <Empty>Pricing trend will appear once enough market data is available.</Empty>}
-          </Section>
-          {conf != null && (
+            </Section>
+          )}
+          {conf != null && conf >= 70 && (
             <Section title="AutoLabels Confidence">
               <div className={`${CARD} p-4 flex items-center gap-5`}>
-                <div className="flex flex-col items-center shrink-0"><Ring pct={conf} /><p className="text-[12px] font-extrabold text-[#16A34A] mt-1">{conf >= 85 ? "High Confidence" : conf >= 70 ? "Good Confidence" : "Fair Confidence"}</p></div>
-                <div className="min-w-0"><p className="text-[12px] text-[#64748B] mb-2">Our price analysis is based on:</p><ul className="grid grid-cols-1 gap-1.5">{["MarketCheck data", "Dealer pricing data", "Regional demand", "Vehicle history", "Mileage & condition", "Equipment & features"].map((b) => <Check key={b}>{b}</Check>)}</ul></div>
+                <div className="flex flex-col items-center shrink-0"><Ring pct={conf} /><p className="text-[12px] font-extrabold text-[#16A34A] mt-1">{conf >= 85 ? "High Confidence" : "Good Confidence"}</p></div>
+                <div className="min-w-0"><p className="text-[12px] text-[#64748B] mb-2">Our price analysis is based on:</p><ul className="grid grid-cols-1 gap-1.5">{["Live market data", "Dealer pricing data", "Regional demand", "Vehicle history", "Mileage & condition", "Equipment & features"].map((b) => <Check key={b}>{b}</Check>)}</ul></div>
               </div>
             </Section>
           )}
           {d.blackbook?.available && (d.blackbook.retailClean != null || d.blackbook.tradeinClean != null) && (
             <Section title="Independent valuation" sub="Black Book — a third-party industry guide.">
               <div className={`${CARD} p-4`}>
-                {d.blackbook.retailClean != null && <StatRow label="Retail value (clean)" value={fmt$(d.blackbook.retailClean)} />}
+                {d.blackbook.retailClean != null && (price == null || price <= d.blackbook.retailClean) && <StatRow label="Retail value (clean)" value={fmt$(d.blackbook.retailClean)} />}
                 {d.blackbook.tradeinClean != null && <StatRow label="Trade-in value (clean)" value={fmt$(d.blackbook.tradeinClean)} />}
                 {d.blackbook.wholesaleClean != null && <StatRow label="Wholesale value (clean)" value={fmt$(d.blackbook.wholesaleClean)} />}
                 {price != null && d.blackbook.retailClean != null && <p className={`text-[12px] font-semibold mt-2 ${price <= d.blackbook.retailClean ? "text-[#16A34A]" : "text-[#64748B]"}`}>{price <= d.blackbook.retailClean ? `${fmt$(d.blackbook.retailClean - price)} under Black Book retail` : "Priced near Black Book retail"}</p>}
@@ -162,17 +174,14 @@ function buildPanel(key: PassportPanelKey, d: PassportData, listing: VehicleList
 
     case "market-demand": {
       const views = d.viewCount, dom = d.dom;
-      const has = views != null || dom != null;
+      const avgDom = (mc.avg_dom as number) ?? null;
+      // Customer-visible gates: view counts only once they're meaningful, and
+      // days-on-market only when it's a favorable signal.
+      const viewsShown = views != null && views >= 5 ? views : null;
+      const domFav = dom != null && (avgDom != null ? dom <= avgDom : dom <= 30) ? dom : null;
+      const has = viewsShown != null || domFav != null;
       const score = (() => { let s = 50; if (views != null) s += Math.min(30, views / 3); if (dom != null) { if (dom <= 30) s += 15; else if (dom > 60) s -= 20; else s += 5; } return Math.max(5, Math.min(95, Math.round(s))); })();
       const level = score >= 66 ? "High Interest" : score >= 40 ? "Moderate Interest" : "Building Interest";
-      const activity = [
-        { icon: Eye, label: "Views", value: views != null ? views.toLocaleString() : isPreview ? "89" : "—" },
-        { icon: Heart, label: "Favorites", value: isPreview ? "14" : "—" },
-        { icon: Send, label: "Lead Requests", value: isPreview ? "6" : "—" },
-        { icon: Users, label: "Dealer Inquiries", value: isPreview ? "4" : "—" },
-        { icon: Bookmark, label: "Price Saves", value: isPreview ? "11" : "—" },
-      ];
-      const avgDom = (mc.avg_dom as number) ?? null;
       const supply = (mc.market_days_supply as number) ?? (mc.inventory_count as number) ?? null;
       // Inventory COUNT only — market_days_supply is a days figure and must
       // never be labeled "N nearby".
@@ -180,23 +189,30 @@ function buildPanel(key: PassportPanelKey, d: PassportData, listing: VehicleList
       const scarce = supply != null ? supply < 30 : invCount != null ? invCount <= 10 : false;
       const sellsFaster = dom != null && avgDom != null && avgDom > dom;
       const priceDrop = d.priceChangeTotal != null && d.priceChangeTotal < 0 ? Math.abs(d.priceChangeTotal) : null;
+      const sold45 = (mc.sold_45d_estimate as number) ?? null;
+      const cutCount = (mc.comp_price_cut_count as number) ?? null;
+      const cutTotal = (mc.comp_price_cut_total as number) ?? null;
+      const trimCount = (mc.trim_count as number) ?? null;
       const insights: string[] = [];
-      if (views != null) insights.push(`${views.toLocaleString()} shoppers have viewed this vehicle`);
+      if (viewsShown != null) insights.push(`${viewsShown.toLocaleString()} shoppers have viewed this vehicle`);
       if (isGreat) insights.push(d.belowMarket && d.belowMarket > 0 ? `Priced ${fmt$(d.belowMarket)} below the local market average` : "Priced below market average — strong value");
       if (sellsFaster) insights.push(`Similar vehicles average ${avgDom} days on the market — this one is drawing interest faster`);
+      if (!sellsFaster && avgDom != null && avgDom <= 60) insights.push(`Similar vehicles sell in ~${avgDom} days here`);
+      if (sold45 != null && sold45 > 0) insights.push(`~${sold45.toLocaleString()} sold nearby in the last 45 days`);
+      if (cutCount != null && cutCount > 0 && cutTotal != null && cutTotal >= 5 && priceDrop == null) insights.push(`${cutCount} of ${cutTotal} comparable listings have cut their price — this one was priced right from day one`);
+      if (trimCount != null && trimCount >= 1 && trimCount <= 5) insights.push(`1 of only ${trimCount} builds like this within 100 miles`);
       if (scarce) insights.push(invCount != null && invCount > 0 ? `Limited availability — only ${invCount} similar vehicles nearby` : "Limited similar inventory in your area right now");
       if (priceDrop != null) insights.push(`We reduced this price ${fmt$(priceDrop)} since listing`);
       if (dom != null && dom <= 30) insights.push("Recently listed — fresh to market");
       if (isPreview && insights.length < 3) { insights.push("Vehicles with this trim typically sell within 38 days"); insights.push("Comparable inventory is decreasing"); }
       // Mobile-only derived content (same data, premium presentation).
-      const topPct = Math.max(5, 100 - score);
-      const demandWord = score >= 66 ? "High Demand" : score >= 45 ? "Moderate Demand" : "Low Demand";
-      const temp = score >= 80 ? { l: "Very Hot", c: "#DC2626" } : score >= 66 ? { l: "Hot", c: "#EA580C" } : score >= 45 ? { l: "Warm", c: "#D97706" } : { l: "Cold", c: "#2563EB" };
+      const demandWord = score >= 66 ? "High Demand" : score >= 45 ? "Moderate Demand" : "Newly Listed";
+      const temp = score >= 80 ? { l: "Very Hot", c: "#DC2626" } : score >= 66 ? { l: "Hot", c: "#EA580C" } : score >= 45 ? { l: "Warm", c: "#D97706" } : { l: "New to Market", c: "#2563EB" };
       const supplyLevel = supply != null ? (supply < 30 ? "Low" : supply < 60 ? "Balanced" : "Ample") : isPreview ? "Low" : "—";
       // Never show the raw days-supply / market inventory count to a customer —
       // it can be in the thousands and reads terribly. Qualitative level only.
       const kpis = [
-        { icon: Eye, label: "Active Shoppers", value: views != null ? views.toLocaleString() : isPreview ? "89" : "—" },
+        { icon: Eye, label: "Active Shoppers", value: viewsShown != null ? viewsShown.toLocaleString() : isPreview ? "89" : "—" },
         { icon: Car, label: "Similar Vehicles", value: supplyLevel },
         { icon: Clock, label: "Avg Days to Sell", value: avgDom != null ? `${avgDom} Days` : isPreview ? "12 Days" : "—" },
         { icon: TrendingUp, label: "Weekly Searches", value: isPreview ? "120" : "—" },
@@ -205,10 +221,10 @@ function buildPanel(key: PassportPanelKey, d: PassportData, listing: VehicleList
       ];
       const snapshot = [
         { l: "Inventory Level", v: supplyLevel },
-        { l: "Average Days on Market", v: avgDom != null ? `${avgDom} Days` : dom != null ? `${dom} Days` : isPreview ? "12 Days" : "—" },
+        { l: "Average Days on Market", v: avgDom != null ? `${avgDom} Days` : domFav != null ? `${domFav} Days` : isPreview ? "12 Days" : "—" },
         { l: "Search Activity", v: isPreview ? "Above Average" : has ? level : "—" },
         { l: "Local Availability", v: supplyLevel },
-        { l: "Average Price", v: avg != null ? fmt$(avg) : isPreview ? fmt$(61300) : "—" },
+        { l: "Average Price", v: avg != null && price != null && price <= avg ? fmt$(avg) : isPreview ? fmt$(61300) : "—" },
       ];
       const invSeries = isPreview ? [20, 19, 18, 17, 16, 15, 14] : [];
       const shopperTrend = isPreview ? "+18%" : null;
@@ -219,20 +235,21 @@ function buildPanel(key: PassportPanelKey, d: PassportData, listing: VehicleList
         body: <>
           {/* ── Mobile (<768px) — premium market-intelligence dashboard ── */}
           <div className="md:hidden space-y-4">
-            <div className="rounded-2xl p-5 text-white" style={{ background: "linear-gradient(160deg,#0f7a3d 0%,#16A34A 100%)" }}>
-              <p className="inline-flex items-center gap-1.5 text-[13px] font-bold uppercase tracking-wider opacity-95"><Flame className="w-4 h-4" /> {has ? `${demandWord.replace("Demand", "Market Demand")}` : "Demand Tracking"}</p>
-              {has && <p className="text-[13px] opacity-90 mt-1 leading-snug">Estimated to be in the top ~{topPct}% of similar vehicles searched in your area.</p>}
-              <div className="flex flex-col items-center mt-4">
-                <AnimatedRing pct={score} color="#ffffff" label="Demand" />
-                <p className="text-[13px] font-bold opacity-90 mt-2">Demand Score</p>
-                <p className="text-[17px] font-extrabold">{demandWord}</p>
+            {has && (
+              <div className="rounded-2xl p-5 text-white" style={{ background: "linear-gradient(160deg,#0f7a3d 0%,#16A34A 100%)" }}>
+                <p className="inline-flex items-center gap-1.5 text-[13px] font-bold uppercase tracking-wider opacity-95"><Flame className="w-4 h-4" /> {demandWord.replace("Demand", "Market Demand")}</p>
+                <div className="flex flex-col items-center mt-4">
+                  <AnimatedRing pct={score} color="#ffffff" label="Demand" />
+                  <p className="text-[13px] font-bold opacity-90 mt-2">Demand Score</p>
+                  <p className="text-[17px] font-extrabold">{demandWord}</p>
+                </div>
+                <div className="mt-4">
+                  <div className="relative h-2 rounded-full bg-white/25"><span className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-4 h-4 rounded-full bg-white shadow" style={{ left: `${score}%` }} /></div>
+                  <div className="flex justify-between text-[11px] font-bold opacity-80 mt-1.5"><span>LOW</span><span>HIGH</span></div>
+                </div>
+                <p className="text-[11px] opacity-80 mt-3 text-center">Updated using live market activity.</p>
               </div>
-              <div className="mt-4">
-                <div className="relative h-2 rounded-full bg-white/25"><span className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-4 h-4 rounded-full bg-white shadow" style={{ left: `${score}%` }} /></div>
-                <div className="flex justify-between text-[11px] font-bold opacity-80 mt-1.5"><span>LOW</span><span>HIGH</span></div>
-              </div>
-              <p className="text-[11px] opacity-80 mt-3 text-center">Updated using live market activity.</p>
-            </div>
+            )}
 
             <div className="grid grid-cols-2 gap-3">
               {kpis.filter((k) => k.value !== "\u2014").map((k) => (
@@ -264,11 +281,11 @@ function buildPanel(key: PassportPanelKey, d: PassportData, listing: VehicleList
               </div>
             </div>
 
-            <Section title="Inventory trend" sub="Comparable vehicles, last 30 days.">
-              {invSeries.length >= 2 ? (
+            {isPreview && invSeries.length >= 2 && (
+              <Section title="Inventory trend" sub="Comparable vehicles, last 30 days.">
                 <div className={`${CARD} p-4`}><TrendChart dealer={invSeries} height={110} /><p className="text-[11px] text-[#94A3B8] mt-1">Sample trend shown in preview mode.</p></div>
-              ) : <Empty>Inventory trend appears once enough market snapshots are collected.</Empty>}
-            </Section>
+              </Section>
+            )}
 
             {insights.length > 0 && (
               <Section title="Market insights">
@@ -280,14 +297,14 @@ function buildPanel(key: PassportPanelKey, d: PassportData, listing: VehicleList
 
             <div className="rounded-2xl p-5 text-white" style={{ background: "linear-gradient(160deg,#0f7a3d 0%,#16A34A 100%)" }}>
               <p className="text-[12px] font-semibold uppercase tracking-wider opacity-85">Our Recommendation</p>
-              <p className="text-[20px] font-extrabold mt-1 inline-flex items-center gap-2"><CheckCircle2 className="w-6 h-6" /> {goodTime ? "Good Time To Buy" : "Worth A Closer Look"}</p>
-              <p className="text-[13px] opacity-90 mt-1.5 leading-snug">{goodTime ? "Pricing is competitive while demand stays strong. Waiting may reduce your selection as inventory declines." : "Compare with similar vehicles and recent pricing before deciding."}</p>
+              <p className="text-[20px] font-extrabold mt-1 inline-flex items-center gap-2"><CheckCircle2 className="w-6 h-6" /> {goodTime ? "Good Time To Buy" : "See It In Person"}</p>
+              <p className="text-[13px] opacity-90 mt-1.5 leading-snug">{goodTime ? "Pricing is competitive while demand stays strong. Waiting may reduce your selection as inventory declines." : "Book a test drive — the best way to know this is your vehicle is from behind the wheel."}</p>
             </div>
 
             <Section title="Should you buy now?">
               <div className={`${CARD} p-4`}>
-                <p className={`text-[22px] font-extrabold ${goodTime ? "text-[#16A34A]" : "text-[#0F172A]"}`}>{goodTime ? "Yes." : "Maybe."}</p>
-                <p className="text-[13px] text-[#64748B] mt-1 leading-snug">{goodTime ? "Based on today's inventory levels and pricing, this vehicle is a strong value in the current market." : "The numbers are reasonable — weigh it against comparable listings nearby."}</p>
+                <p className={`text-[22px] font-extrabold ${goodTime ? "text-[#16A34A]" : "text-[#0F172A]"}`}>{goodTime ? "Yes." : "See it in person."}</p>
+                <p className="text-[13px] text-[#64748B] mt-1 leading-snug">{goodTime ? "Based on today's inventory levels and pricing, this vehicle is a strong value in the current market." : "Book a test drive — experience this vehicle firsthand and let our team answer every question."}</p>
               </div>
             </Section>
             <Disclaimer />
@@ -295,30 +312,29 @@ function buildPanel(key: PassportPanelKey, d: PassportData, listing: VehicleList
 
           {/* ── Desktop / tablet (≥768px) — unchanged ── */}
           <div className="hidden md:block space-y-5">
-          <Hero icon={Flame} tone={has ? "green" : "neutral"} label={has ? level : "Demand tracking"}
-            note={has ? [views != null ? `${views.toLocaleString()} views` : null, dom != null ? `${dom} days on market` : null].filter(Boolean).join(" · ") || "Demand Score" : "Demand signals appear once this listing has been live."} />
+          <Hero icon={Flame} tone={has ? "green" : "neutral"} label={has ? level : "Now Available"}
+            note={has ? [viewsShown != null ? `${viewsShown.toLocaleString()} views` : null, domFav != null ? `${domFav} days on market` : null].filter(Boolean).join(" · ") || "Demand Score" : "See it in person — book a test drive."} />
           {has && (
             <Section title="Demand level" sub="Relative to typical listing activity in your area.">
               <div className={`${CARD} p-4`}><Gauge3 value={score} /></div>
             </Section>
           )}
-          <Section title="Buyer activity">
-            <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
-              {activity.map((a) => (
-                <div key={a.label} className={`${CARD} p-3 text-center`}>
-                  <a.icon className="w-4 h-4 text-[#2563EB] mx-auto" />
-                  <p className="text-[18px] font-extrabold mt-1 leading-none">{a.value}</p>
-                  <p className="text-[10px] text-[#94A3B8] mt-1 leading-tight">{a.label}</p>
+          {(viewsShown != null || isPreview) && (
+            <Section title="Buyer activity">
+              <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+                <div className={`${CARD} p-3 text-center`}>
+                  <Eye className="w-4 h-4 text-[#2563EB] mx-auto" />
+                  <p className="text-[18px] font-extrabold mt-1 leading-none">{viewsShown != null ? viewsShown.toLocaleString() : "89"}</p>
+                  <p className="text-[10px] text-[#94A3B8] mt-1 leading-tight">Views</p>
                 </div>
-              ))}
-            </div>
-            {!isPreview && <p className="text-[11px] text-[#94A3B8] mt-2">Some activity metrics populate as the listing gathers data.</p>}
-          </Section>
+              </div>
+            </Section>
+          )}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Section title="Local demand">
               <div className={`${CARD} p-4`}>
                 {has && <StatRow label="Interest level" value={level} />}
-                {views != null && <StatRow label="Shopper views" value={views.toLocaleString()} />}
+                {viewsShown != null && <StatRow label="Shopper views" value={viewsShown.toLocaleString()} />}
                 {(d.belowMarket ?? 0) > 0 && <StatRow label="Vs. market average" value={`${fmt$(d.belowMarket as number)} below`} />}
                 {isPreview && <StatRow label="Nearby shoppers" value="120+" />}
                 {isPreview && <StatRow label="Search frequency" value="Above average" />}
@@ -327,8 +343,8 @@ function buildPanel(key: PassportPanelKey, d: PassportData, listing: VehicleList
             <Section title="Similar vehicles">
               <div className={`${CARD} p-4`}>
                 {(avgDom != null || isPreview) && <StatRow label="Avg days on market" value={avgDom != null ? `${avgDom} days` : "38 days"} />}
-                {(invCount != null || isPreview) && <StatRow label="Similar vehicles nearby" value={invCount != null ? invCount.toLocaleString() : "42"} />}
-                {dom != null && <StatRow label="This vehicle" value={`${dom} days listed`} />}
+                {invCount != null && invCount < 50 ? <StatRow label="Similar vehicles nearby" value={invCount.toLocaleString()} /> : supplyLevel !== "—" && <StatRow label="Local availability" value={supplyLevel} />}
+                {domFav != null && <StatRow label="This vehicle" value={`${domFav} days listed`} />}
                 {sellsFaster && (
                   <p className="mt-2 inline-flex items-center gap-1.5 text-[12px] font-bold text-[#16A34A]">
                     <TrendingUp className="w-3.5 h-3.5" /> Drawing interest faster than the market average
@@ -351,9 +367,9 @@ function buildPanel(key: PassportPanelKey, d: PassportData, listing: VehicleList
                 {scarce && <Check>Limited similar inventory nearby</Check>}
                 {sellsFaster && <Check>Similar vehicles sell in {avgDom} days on average</Check>}
                 {priceDrop != null && <Check>Price already reduced {fmt$(priceDrop)}</Check>}
-                {d.warrantyStr && <Check>Factory warranty still active</Check>}
+                {d.warrantyStr && !d.warrantyExpired && <Check>Factory warranty still active</Check>}
                 {dom != null && dom <= 30 && <Check>Fresh listing — best selection</Check>}
-                {!isGreat && score < 66 && <Check>Compare with similar vehicles before deciding</Check>}
+                {!isGreat && score < 66 && <Check>See it in person — book a test drive</Check>}
               </ul>
             </div>
           </Section>
@@ -369,45 +385,43 @@ function buildPanel(key: PassportPanelKey, d: PassportData, listing: VehicleList
       // mc_attributes options/features (where the NeoVIN pull lands) — the
       // features column alone left fully-decoded cars reading "Pending".
       const equipPct = Math.min(100, (listingEquipment(listing).length + Object.keys(ks).length) * 12);
-      const factors: { label: string; pct: number; status?: string }[] = [
-        { label: "Comparable Market Data", pct: avg != null ? 100 : 30 },
-        { label: "Dealer Price Position", pct: 100 },
-        { label: "History Signals", pct: (d.cleanTitle || d.ownerCount != null || d.accidentCount != null) ? 90 : 40 },
-        { label: "Mileage", pct: listing.mileage != null ? 100 : 0 },
-        { label: "Condition", pct: (d.serviceCount > 0 || listing.prep_status?.foreman_signed_at) ? 90 : 55 },
-        { label: "Equipment", pct: equipPct, status: equipPct >= 40 ? "Verified" : "Pending" },
-        { label: "Local Demand", pct: (d.viewCount != null || d.dom != null) ? 75 : 40 },
-      ];
+      // Factors without enough verified data are omitted entirely — a factor
+      // row never renders as "Pending".
+      const factors: { label: string; pct: number; status?: string }[] = ([
+        avg != null ? { label: "Comparable Market Data", pct: 100 } : null,
+        (d.cleanTitle || d.ownerCount != null || d.accidentCount != null) ? { label: "History Signals", pct: 90 } : null,
+        listing.mileage != null ? { label: "Mileage", pct: 100 } : null,
+        (d.serviceCount > 0 || listing.prep_status?.foreman_signed_at) ? { label: "Condition", pct: 90 } : null,
+        equipPct >= 40 ? { label: "Equipment", pct: equipPct, status: "Verified" } : null,
+        (d.viewCount != null || d.dom != null) ? { label: "Local Demand", pct: 75 } : null,
+      ] as ({ label: string; pct: number; status?: string } | null)[]).filter(Boolean) as { label: string; pct: number; status?: string }[];
       const hasCarfaxDoc = (listing.documents || []).some((x) => /carfax/i.test(`${x.type} ${x.name}`));
-      // Used sources lead; unavailable ones stay visible for transparency.
       const sources = [
-        { name: "MarketCheck", on: avg != null || Object.keys(mc).length > 0 },
+        { name: "Live Market Data", on: avg != null || Object.keys(mc).length > 0 },
         { name: "CARFAX", on: typeof mc.carfax_clean_title === "boolean" || hasCarfaxDoc },
-        { name: "AutoCheck", on: false },
         { name: "OEM", on: Object.keys(ks).length > 0 },
         { name: "NHTSA", on: !!listing.recall_status },
         { name: "Local Listings", on: avg != null },
-        { name: "Auction Data", on: false },
         { name: "Dealer Pricing", on: true },
-      ].sort((a, b) => Number(b.on) - Number(a.on));
+      ].filter((s) => s.on);
       const compCount = (mc.similar_count as number) ?? (mc.comparable_count as number) ?? null;
       // similar_count only — the stored sample is an API page, never the
       // market size; without a real count show the approx/pending treatment.
       const coverage = compCount != null ? compCount : isPreview ? 31 : null;
       const coverageApprox = compCount == null;
       const faqs = [
-        { q: "Why isn't every vehicle 100%?", a: "Confidence reflects how much verified data is available. Newer listings or rare models have fewer comparables, which lowers the score until more data arrives." },
         { q: "How often is pricing updated?", a: "Market values refresh as new comparable listings and sales are reported — typically every day the vehicle is live." },
-        { q: "What data sources are used?", a: "A blend of MarketCheck market data, dealer pricing, vehicle history, recall status, and equipment decoded from the VIN." },
-        { q: "Does this guarantee the final selling price?", a: "No. This report supports price confidence using available data, but final pricing, taxes, fees, trade value, and dealer terms should be confirmed directly with the dealership." },
+        { q: "What data sources are used?", a: "A blend of live market data, dealer pricing, vehicle history, recall status, and equipment decoded from the VIN." },
       ];
-      const connectedCount = sources.filter((s) => s.on).length;
-      // "Fair" reads as a verdict on the car; the label describes data support.
-      const confWord = conf == null ? "" : conf >= 75 ? "High Confidence" : conf >= 50 ? "Supported by Market Data" : "Building Confidence";
+      const connectedCount = sources.length;
+      // Below 70 the confidence module doesn't render at all — the panel falls
+      // through to the verified-strengths content instead of a weak score.
+      const showConf = conf != null && conf >= 70;
+      const confWord = conf != null && conf >= 75 ? "High Confidence" : "Supported by Market Data";
       const confExplain = "This score reflects available market, pricing, mileage, condition, and vehicle-history signals. Higher scores mean fewer unknowns.";
-      const scale = conf != null ? (
-        <div className="grid grid-cols-3 gap-1.5">
-          {[{ n: "Low Confidence", r: "0 – 49", a: conf < 50 }, { n: "Supported", r: "50 – 74", a: conf >= 50 && conf < 75 }, { n: "High Confidence", r: "75 – 100", a: conf >= 75 }].map((b) => (
+      const scale = showConf ? (
+        <div className="grid grid-cols-2 gap-1.5">
+          {[{ n: "Supported", r: "50 – 74", a: (conf as number) < 75 }, { n: "High Confidence", r: "75 – 100", a: (conf as number) >= 75 }].map((b) => (
             <div key={b.n} className={`relative text-center rounded-lg py-1.5 border ${b.a ? "bg-emerald-50 border-emerald-200" : "border-transparent"}`}>
               {b.a && <span className="absolute -top-2.5 left-1/2 -translate-x-1/2 text-[9px] text-emerald-500 leading-none">▼</span>}
               <p className={`text-[11px] font-bold leading-tight ${b.a ? "text-emerald-700" : "text-[#64748B]"}`}>{b.n}</p>
@@ -424,11 +438,10 @@ function buildPanel(key: PassportPanelKey, d: PassportData, listing: VehicleList
             <p className="text-[12px] text-[#64748B] mt-0.5">Local listings and similar trim-level vehicles were reviewed to support this price.</p>
           </div>
         </div>
-      ) : <Empty>Comparable-vehicle coverage appears once MarketCheck data is available.</Empty>;
+      ) : null;
       const sourcesBlock = (
         <Section title="Verified Data Sources" sub="These sources were used in this report.">
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">{sources.map((s) => <Source key={s.name} name={s.name} on={s.on} />)}</div>
-          <p className="text-[11px] text-[#94A3B8] mt-2">Unavailable sources are shown for transparency and may vary by vehicle.</p>
         </Section>
       );
       const analyzeBlock = (
@@ -437,46 +450,40 @@ function buildPanel(key: PassportPanelKey, d: PassportData, listing: VehicleList
         </Section>
       );
       // The stability verdict is computed, never asserted: a visibly moving
-      // line with a "Stable" caption reads as broken (or dishonest).
+      // line with a "Stable" caption reads as broken (or dishonest). A falling
+      // market never renders — the block only shows stable or rising trends.
       const stabFirst = marketSeries[0], stabLast = marketSeries[marketSeries.length - 1];
       const stabShift = marketSeries.length >= 2 && stabFirst ? (stabLast - stabFirst) / stabFirst : 0;
       const stabStable = Math.abs(stabShift) < 0.03;
-      const stabilityBlock = (
-        <Section title="Confidence Stability" sub="Last 30 days">
-          {marketSeries.length >= 2 ? (
-            <div className={`${CARD} p-4`}>
-              <TrendChart market={marketSeries} height={90} />
-              <div className="flex items-start gap-2 mt-2">
-                <span className={`inline-flex items-center gap-1 text-[10px] font-bold rounded-full border px-2 py-0.5 shrink-0 mt-0.5 ${stabStable ? "text-emerald-700 bg-emerald-50 border-emerald-200" : "text-blue-700 bg-blue-50 border-blue-200"}`}><ShieldCheck className="w-3 h-3" /> {stabStable ? "Stable" : stabShift < 0 ? "Market softening" : "Market rising"}</span>
-                <p className="text-[12px] text-[#64748B]">{stabStable
-                  ? "Valuation inputs have remained stable over the last 30 days — no major pricing, mileage, or market-data shifts detected."
-                  : `Market values for comparable vehicles have ${stabShift < 0 ? "eased" : "risen"} about ${Math.round(Math.abs(stabShift) * 100)}% over the tracked period; this valuation reflects the latest data.`}</p>
-              </div>
+      const stabilityBlock = marketSeries.length >= 3 && stabShift > -0.03 ? (
+        <Section title="Confidence Stability" sub="Tracked market data">
+          <div className={`${CARD} p-4`}>
+            <TrendChart market={marketSeries} marketAt={marketAt} height={90} />
+            <div className="flex items-start gap-2 mt-2">
+              <span className={`inline-flex items-center gap-1 text-[10px] font-bold rounded-full border px-2 py-0.5 shrink-0 mt-0.5 ${stabStable ? "text-emerald-700 bg-emerald-50 border-emerald-200" : "text-blue-700 bg-blue-50 border-blue-200"}`}><ShieldCheck className="w-3 h-3" /> {stabStable ? "Stable" : "Market rising"}</span>
+              <p className="text-[12px] text-[#64748B]">{stabStable
+                ? "Valuation inputs have remained stable over the tracked period — no major pricing, mileage, or market-data shifts detected."
+                : `Market values for comparable vehicles have risen about ${Math.round(Math.abs(stabShift) * 100)}% over the tracked period — today's price locks it in.`}</p>
             </div>
-          ) : (
-            <div className={`${CARD} p-4`}>
-              <p className="text-[13px] font-bold text-[#0F172A]">Tracking began recently</p>
-              <p className="text-[12px] text-[#64748B] mt-0.5">Stability insights appear after this listing collects 30 days of pricing history.</p>
-            </div>
-          )}
+          </div>
         </Section>
-      );
+      ) : null;
       return {
         title: "Price Confidence Report", subtitle: "Why this vehicle's price is supported by verified market data",
         primary: { label: "Reserve This Vehicle", onClick: () => go("reserve") },
-        footerQuestion: "Questions about this price?", specialistLabel: "Talk to a vehicle specialist",
+        footerQuestion: "Want to see it in person?", specialistLabel: "Talk to a vehicle specialist",
         footerNote: "No obligation · Dealer confirmed",
         body: <>
           {/* ── Mobile (<768px) — premium confidence dashboard ── */}
           <div className="md:hidden space-y-4">
-            {conf != null ? (
-              <div className="rounded-2xl p-5 text-white text-center" style={{ background: conf >= 50 ? "linear-gradient(160deg,#0f7a3d 0%,#16A34A 100%)" : "linear-gradient(160deg,#334155 0%,#475569 100%)" }}>
-                <div className="flex justify-center"><AnimatedRing pct={conf} color="#ffffff" /></div>
+            {showConf && (
+              <div className="rounded-2xl p-5 text-white text-center" style={{ background: "linear-gradient(160deg,#0f7a3d 0%,#16A34A 100%)" }}>
+                <div className="flex justify-center"><AnimatedRing pct={conf as number} color="#ffffff" /></div>
                 <p className="text-[13px] font-bold opacity-90 mt-2">Confidence Score</p>
                 <p className="text-[18px] font-extrabold">{confWord}</p>
                 <p className="text-[12.5px] opacity-90 mt-2 leading-snug">{confExplain}</p>
               </div>
-            ) : <Empty>A confidence score appears once enough vehicle and market data has been verified.</Empty>}
+            )}
             {scale && <div className={`${CARD} p-3 pt-4`}>{scale}</div>}
 
             {coverageCard}
@@ -486,9 +493,11 @@ function buildPanel(key: PassportPanelKey, d: PassportData, listing: VehicleList
               <div className={`${CARD} p-4 text-center`}><p className="text-[18px] font-extrabold leading-none">Today</p><p className="text-[10px] text-[#94A3B8] mt-1">Updated</p></div>
             </div>
 
-            <Section title="Confidence Factors" sub="How much verified data supports each factor.">
-              <div className={`${CARD} p-4 space-y-3`}>{factors.map((f) => <FactorBar key={f.label} label={f.label} pct={f.pct} status={f.status} />)}</div>
-            </Section>
+            {factors.length > 0 && (
+              <Section title="Confidence Factors" sub="How much verified data supports each factor.">
+                <div className={`${CARD} p-4 space-y-3`}>{factors.map((f) => <FactorBar key={f.label} label={f.label} pct={f.pct} status={f.status} />)}</div>
+              </Section>
+            )}
 
             {sourcesBlock}
             {analyzeBlock}
@@ -502,25 +511,27 @@ function buildPanel(key: PassportPanelKey, d: PassportData, listing: VehicleList
 
           {/* ── Desktop / tablet (≥768px) ── */}
           <div className="hidden md:block space-y-5">
-          {conf != null ? (
+          {showConf && (
             <div className={`${CARD} p-5`}>
               <div className="flex items-center gap-5">
-                <div className="shrink-0"><Ring pct={conf} size={120} /></div>
+                <div className="shrink-0"><Ring pct={conf as number} size={120} /></div>
                 <div className="min-w-0">
                   <p className="text-[15px] font-bold">Confidence Score</p>
-                  <p className="text-[14px] font-extrabold mt-0.5" style={{ color: conf >= 50 ? "#16A34A" : "#D97706" }}>{confWord}</p>
+                  <p className="text-[14px] font-extrabold mt-0.5" style={{ color: "#16A34A" }}>{confWord}</p>
                   <p className="text-[12px] text-[#64748B] mt-1.5">{confExplain}</p>
                 </div>
               </div>
               <div className="mt-5 pt-1">{scale}</div>
             </div>
-          ) : <Empty>A confidence score appears once enough vehicle and market data has been verified.</Empty>}
+          )}
 
           {coverageCard}
 
-          <Section title="Confidence Factors" sub="How much verified data supports each factor.">
-            <div className={`${CARD} p-4 space-y-3`}>{factors.map((f) => <FactorBar key={f.label} label={f.label} pct={f.pct} status={f.status} />)}</div>
-          </Section>
+          {factors.length > 0 && (
+            <Section title="Confidence Factors" sub="How much verified data supports each factor.">
+              <div className={`${CARD} p-4 space-y-3`}>{factors.map((f) => <FactorBar key={f.label} label={f.label} pct={f.pct} status={f.status} />)}</div>
+            </Section>
+          )}
           {sourcesBlock}
           {analyzeBlock}
           {stabilityBlock}
@@ -541,11 +552,13 @@ function buildPanel(key: PassportPanelKey, d: PassportData, listing: VehicleList
       const lowest = lows.length ? Math.min(...lows) : null;
       const highest = lows.length ? Math.max(...lows) : null;
       const daysListed = d.dom ?? (priced.length ? Math.round((Date.now() - new Date(priced[0].captured_at).getTime()) / 86400000) : null);
-      const trendLabel = total == null || total === 0 ? "Price Stable" : total < 0 ? "Price Reduced" : "Recently Increased";
+      const trendLabel = !has ? "Today's Price" : total != null && total < 0 ? "Price Reduced" : total != null && total > 0 ? "Priced to Today's Market" : "Price Stable";
+      // Increases never render as timeline events — they collapse into the
+      // neutral "Priced to today's market" framing. Only reductions are shown.
       const events = priced.slice(1).map((h, i) => {
         const prev = priced[i].listing_price as number, cur = h.listing_price as number;
         return { date: new Date(h.captured_at).toLocaleDateString(), before: prev, after: cur, delta: cur - prev };
-      }).filter((e) => e.delta !== 0).reverse();
+      }).filter((e) => e.delta < 0).reverse();
       const pctDiff = avg != null && price != null ? Math.round(((price - avg) / avg) * 100) : null;
       // A few percent off the market AVERAGE is normal spread, not a verdict —
       // ±3% reads as "priced at market" (neutral). Only color beyond the band,
@@ -553,7 +566,7 @@ function buildPanel(key: PassportPanelKey, d: PassportData, listing: VehicleList
       const priceBand = pctDiff == null ? null : pctDiff <= -3 ? "below" : pctDiff >= 3 ? "above" : "at";
       const phOptValue = readBuildSheet(listing)?.estValue ?? null;
       const originalPrice = priced.length ? (priced[0].listing_price as number) : null;
-      const reductions = events.filter((e) => e.delta < 0).length;
+      const reductions = events.length;
       const savings = total != null && total < 0 ? -total : (d.belowMarket && d.belowMarket > 0 ? d.belowMarket : null);
       const trendPct = total != null && originalPrice ? Math.round((total / originalPrice) * 1000) / 10 : null;
       const marketDiff = price != null && avg != null ? price - avg : null;
@@ -571,63 +584,71 @@ function buildPanel(key: PassportPanelKey, d: PassportData, listing: VehicleList
         body: <>
           {/* ── Mobile (<768px) — premium pricing-intelligence dashboard ── */}
           <div className="md:hidden space-y-4">
-            <div className="rounded-2xl p-5 text-white" style={{ background: "linear-gradient(160deg,#0f7a3d 0%,#16A34A 100%)" }}>
-              <div className="flex items-center gap-3">
-                <span className="w-12 h-12 rounded-2xl bg-white/15 flex items-center justify-center shrink-0"><TrendingDown className="w-6 h-6" /></span>
-                <div><p className="text-[13px] font-bold uppercase tracking-wider opacity-95">{trendLabel}</p><p className="text-[26px] font-extrabold leading-tight">{savings != null ? fmt$(savings) : price != null ? fmt$(price) : "—"}</p><p className="text-[12px] opacity-90">{d.belowMarket && d.belowMarket > 0 ? "Below market" : savings != null ? "Reduced since listed" : "Current price"}</p></div>
+            {has && (
+              <div className="rounded-2xl p-5 text-white" style={{ background: "linear-gradient(160deg,#0f7a3d 0%,#16A34A 100%)" }}>
+                <div className="flex items-center gap-3">
+                  <span className="w-12 h-12 rounded-2xl bg-white/15 flex items-center justify-center shrink-0"><TrendingDown className="w-6 h-6" /></span>
+                  <div><p className="text-[13px] font-bold uppercase tracking-wider opacity-95">{trendLabel}</p><p className="text-[26px] font-extrabold leading-tight">{savings != null ? fmt$(savings) : price != null ? fmt$(price) : ""}</p><p className="text-[12px] opacity-90">{d.belowMarket && d.belowMarket > 0 ? "Below market" : savings != null ? "Reduced since listed" : "Current price"}</p></div>
+                </div>
+                <p className="text-[13px] opacity-90 mt-3 leading-snug">{total != null && total < 0 && d.belowMarket && d.belowMarket > 0 ? "This vehicle has been reduced and is currently priced below market value." : total != null && total < 0 ? "This vehicle's asking price has been reduced since it was listed." : total != null && total > 0 ? "Priced to today's market." : "Every price adjustment is recorded for full transparency."}</p>
               </div>
-              <p className="text-[13px] opacity-90 mt-3 leading-snug">{total != null && total < 0 && d.belowMarket && d.belowMarket > 0 ? "This vehicle has been reduced and is currently priced below market value." : total != null && total < 0 ? "This vehicle's asking price has been reduced since it was listed." : "Every price adjustment is recorded for full transparency."}</p>
-            </div>
+            )}
 
-            <div className="grid grid-cols-2 gap-3">
-              <div className={`${CARD} p-4`}><p className="text-[20px] font-extrabold leading-none">{price != null ? fmt$(price) : "—"}</p><p className="text-[11px] text-[#94A3B8] mt-1">Current Price</p></div>
-              <div className={`${CARD} p-4`}><p className="text-[20px] font-extrabold leading-none text-[#94A3B8]">{originalPrice != null ? fmt$(originalPrice) : "—"}</p><p className="text-[11px] text-[#94A3B8] mt-1">Original Price</p></div>
-              <div className={`${CARD} p-4`}><p className="text-[20px] font-extrabold leading-none">{reductions || (has ? "0" : "—")}</p><p className="text-[11px] text-[#94A3B8] mt-1">Price Reductions</p></div>
-              <div className={`${CARD} p-4`}><p className="text-[20px] font-extrabold leading-none text-[#16A34A]">{savings != null ? fmt$(savings) : "—"}</p><p className="text-[11px] text-[#94A3B8] mt-1">Total Savings</p></div>
-            </div>
+            {has && (
+              <div className="grid grid-cols-2 gap-3">
+                {price != null && <div className={`${CARD} p-4`}><p className="text-[20px] font-extrabold leading-none">{fmt$(price)}</p><p className="text-[11px] text-[#94A3B8] mt-1">Current Price</p></div>}
+                {originalPrice != null && price != null && originalPrice > price && <div className={`${CARD} p-4`}><p className="text-[20px] font-extrabold leading-none text-[#94A3B8]">{fmt$(originalPrice)}</p><p className="text-[11px] text-[#94A3B8] mt-1">Original Price</p></div>}
+                {reductions > 0 && <div className={`${CARD} p-4`}><p className="text-[20px] font-extrabold leading-none">{reductions}</p><p className="text-[11px] text-[#94A3B8] mt-1">Price Reductions</p></div>}
+                {savings != null && <div className={`${CARD} p-4`}><p className="text-[20px] font-extrabold leading-none text-[#16A34A]">{fmt$(savings)}</p><p className="text-[11px] text-[#94A3B8] mt-1">Total Savings</p></div>}
+              </div>
+            )}
 
             {has ? (
               <>
                 <Section title="Price trend"><PriceTimeline history={priced} /></Section>
-                {trendPct != null && (
+                {trendPct != null && trendPct < 0 && (
                   <div className={`${CARD} p-4`}>
                     <p className="text-[12px] text-[#64748B]">Price Trend</p>
-                    <p className={`text-[18px] font-extrabold inline-flex items-center gap-1.5 ${trendPct <= 0 ? "text-[#16A34A]" : "text-[#EA580C]"}`}>{trendPct <= 0 ? <TrendingDown className="w-4 h-4" /> : <TrendingUp className="w-4 h-4" />} {trendPct <= 0 ? "Down" : "Up"} {Math.abs(trendPct)}%</p>
-                    <p className="text-[12px] text-[#64748B] mt-1 leading-snug">This vehicle's price has {trendPct <= 0 ? "decreased" : "increased"} while the market average stayed relatively stable.</p>
+                    <p className="text-[18px] font-extrabold inline-flex items-center gap-1.5 text-[#16A34A]"><TrendingDown className="w-4 h-4" /> Down {Math.abs(trendPct)}%</p>
+                    <p className="text-[12px] text-[#64748B] mt-1 leading-snug">This vehicle's price has decreased while the market average stayed relatively stable.</p>
                   </div>
                 )}
                 <Section title="Price change timeline">
                   {events.length ? (
                     <ol className="relative border-l-2 border-emerald-100 ml-1.5 pl-4 space-y-4">{events.map((e, i) => (
                       <li key={i} className="relative">
-                        <span className={`absolute -left-[22px] top-1 w-3 h-3 rounded-full ring-2 ring-white ${e.delta < 0 ? "bg-emerald-500" : "bg-orange-500"}`} />
+                        <span className="absolute -left-[22px] top-1 w-3 h-3 rounded-full ring-2 ring-white bg-emerald-500" />
                         <p className="text-[12px] text-[#94A3B8]">{e.date}</p>
-                        <p className={`text-[15px] font-extrabold inline-flex items-center gap-1.5 ${e.delta < 0 ? "text-[#16A34A]" : "text-[#EA580C]"}`}>{e.delta < 0 ? <TrendingDown className="w-4 h-4" /> : <TrendingUp className="w-4 h-4" />} {e.delta < 0 ? "Price Reduced" : "Price Increased"} {e.delta < 0 ? "-" : "+"}{fmt$(Math.abs(e.delta))}</p>
+                        <p className="text-[15px] font-extrabold inline-flex items-center gap-1.5 text-[#16A34A]"><TrendingDown className="w-4 h-4" /> Price Reduced -{fmt$(Math.abs(e.delta))}</p>
                         {i === 0 && <p className="text-[12px] text-[#64748B] mt-0.5">Current price {fmt$(e.after)}</p>}
                       </li>
                     ))}</ol>
-                  ) : <Empty>No price changes recorded yet — the asking price has held steady.</Empty>}
+                  ) : <Empty>Priced to today's market from day one.</Empty>}
                 </Section>
               </>
-            ) : <Empty>Price history will appear here once the asking price has been tracked over time.</Empty>}
+            ) : <Empty>Priced to today's market — reserve now to secure this price.</Empty>}
 
-            {pctDiff != null && (
+            {pctDiff != null && priceBand !== "above" && (
               <Section title="Market comparison">
                 <div className={`${CARD} divide-y divide-[#F1F5F9]`}>
                   <div className="flex items-center justify-between px-4 py-3"><span className="text-[12px] text-[#64748B]">Market Average</span><span className="text-[15px] font-extrabold">{fmt$(avg)}</span></div>
                   <div className="flex items-center justify-between px-4 py-3"><span className="text-[12px] text-[#64748B]">Current Vehicle</span><span className="text-[15px] font-extrabold">{fmt$(price)}</span></div>
                 </div>
-                <div className={`mt-2 rounded-2xl border p-4 ${priceBand === "below" ? "border-emerald-200 bg-emerald-50/70" : priceBand === "at" ? "border-[#E6E8EC] bg-slate-50" : "border-[#E6E8EC] bg-white"}`}>
+                <div className={`mt-2 rounded-2xl border p-4 ${priceBand === "below" ? "border-emerald-200 bg-emerald-50/70" : "border-[#E6E8EC] bg-slate-50"}`}>
                   <div className="flex items-center justify-between">
-                    <span className="text-[13px] font-bold text-[#0F172A]">{priceBand === "below" ? "Below Market" : priceBand === "at" ? "Priced At Market" : "Position"}</span>
+                    <span className="text-[13px] font-bold text-[#0F172A]">{priceBand === "below" ? "Below Market" : "Priced At Market"}</span>
                     <span className={`text-[14px] font-extrabold ${priceBand === "below" ? "text-[#16A34A]" : "text-[#0F172A]"}`}>
-                      {priceBand === "at" ? `Within ${Math.abs(pctDiff)}% of average` : `${marketDiff != null ? `${marketDiff < 0 ? "-" : "+"}${fmt$(Math.abs(marketDiff))} · ` : ""}${Math.abs(pctDiff)}% ${pctDiff <= 0 ? "below" : "above"} average`}
+                      {priceBand === "at" ? `Within ${Math.abs(pctDiff)}% of average` : `${marketDiff != null ? `-${fmt$(Math.abs(marketDiff))} · ` : ""}${Math.abs(pctDiff)}% below average`}
                     </span>
                   </div>
-                  {priceBand === "above" && phOptValue ? <p className="text-[12px] text-[#64748B] mt-1.5">This build carries {fmt$(phOptValue)} in factory options — the market average includes lower-equipped vehicles.</p> : null}
                 </div>
               </Section>
             )}
+            {priceBand === "above" && phOptValue ? (
+              <Section title="Why this price">
+                <div className={`${CARD} p-4`}><p className="text-[13px] text-[#0F172A] leading-snug">This build carries {fmt$(phOptValue)} in factory options — the market average includes lower-equipped vehicles.</p></div>
+              </Section>
+            ) : null}
 
             {isGreat && (
               <Section title="Market position">
@@ -638,27 +659,31 @@ function buildPanel(key: PassportPanelKey, d: PassportData, listing: VehicleList
               </Section>
             )}
 
-            <div className="rounded-2xl p-5 text-white" style={{ background: "linear-gradient(160deg,#0f7a3d 0%,#16A34A 100%)" }}>
-              <p className="text-[18px] font-extrabold inline-flex items-center gap-2"><CheckCircle2 className="w-6 h-6" /> {goodTime ? "Excellent Time To Purchase" : "Worth A Closer Look"}</p>
-              <ul className="mt-2.5 space-y-1.5">
-                {isGreat && <li className="flex items-start gap-2 text-[13px]"><CheckCircle2 className="w-4 h-4 shrink-0 mt-0.5" />Below market average</li>}
-                {total != null && total < 0 && <li className="flex items-start gap-2 text-[13px]"><CheckCircle2 className="w-4 h-4 shrink-0 mt-0.5" />Recent price reductions</li>}
-                {goodTime && <li className="flex items-start gap-2 text-[13px]"><CheckCircle2 className="w-4 h-4 shrink-0 mt-0.5" />Strong value at today's price</li>}
-                <li className="flex items-start gap-2 text-[13px]"><CheckCircle2 className="w-4 h-4 shrink-0 mt-0.5" />Competitive market pricing</li>
-              </ul>
-            </div>
+            {goodTime && (
+              <div className="rounded-2xl p-5 text-white" style={{ background: "linear-gradient(160deg,#0f7a3d 0%,#16A34A 100%)" }}>
+                <p className="text-[18px] font-extrabold inline-flex items-center gap-2"><CheckCircle2 className="w-6 h-6" /> Excellent Time To Purchase</p>
+                <ul className="mt-2.5 space-y-1.5">
+                  {isGreat && <li className="flex items-start gap-2 text-[13px]"><CheckCircle2 className="w-4 h-4 shrink-0 mt-0.5" />Below market average</li>}
+                  {total != null && total < 0 && <li className="flex items-start gap-2 text-[13px]"><CheckCircle2 className="w-4 h-4 shrink-0 mt-0.5" />Recent price reductions</li>}
+                  <li className="flex items-start gap-2 text-[13px]"><CheckCircle2 className="w-4 h-4 shrink-0 mt-0.5" />Strong value at today's price</li>
+                  {isGreat && <li className="flex items-start gap-2 text-[13px]"><CheckCircle2 className="w-4 h-4 shrink-0 mt-0.5" />Competitive market pricing</li>}
+                </ul>
+              </div>
+            )}
 
             <Section title="Should you buy now?">
               <div className={`${CARD} p-4`}>
-                <p className={`text-[22px] font-extrabold ${goodTime ? "text-[#16A34A]" : "text-[#0F172A]"}`}>{goodTime ? "Yes." : "Maybe."}</p>
-                <p className="text-[13px] text-[#64748B] mt-1 leading-snug">{goodTime ? "Based on current pricing and recent reductions, this vehicle is a strong buying opportunity. Waiting may reduce available inventory with little added pricing advantage." : "The pricing is reasonable — compare it against similar listings before deciding."}</p>
+                <p className={`text-[22px] font-extrabold ${goodTime ? "text-[#16A34A]" : "text-[#0F172A]"}`}>{goodTime ? "Yes." : "See it in person."}</p>
+                <p className="text-[13px] text-[#64748B] mt-1 leading-snug">{goodTime ? "Based on current pricing and recent reductions, this vehicle is a strong buying opportunity. Waiting may reduce available inventory with little added pricing advantage." : "Book a test drive — experience this vehicle firsthand and let our team answer every question."}</p>
               </div>
             </Section>
 
-            <div className={`${CARD} p-4 flex items-start gap-2.5`}>
-              <ShieldCheck className="w-5 h-5 text-[#16A34A] shrink-0 mt-0.5" />
-              <div><p className="text-[13px] font-bold">Transparent Pricing</p><p className="text-[12px] text-[#64748B]">Every price adjustment is recorded and shown here for complete pricing transparency.</p></div>
-            </div>
+            {has && (total == null || total <= 0) && (
+              <div className={`${CARD} p-4 flex items-start gap-2.5`}>
+                <ShieldCheck className="w-5 h-5 text-[#16A34A] shrink-0 mt-0.5" />
+                <div><p className="text-[13px] font-bold">Transparent Pricing</p><p className="text-[12px] text-[#64748B]">Every price adjustment is recorded and shown here for complete pricing transparency.</p></div>
+              </div>
+            )}
             <Disclaimer />
           </div>
 
@@ -666,13 +691,15 @@ function buildPanel(key: PassportPanelKey, d: PassportData, listing: VehicleList
           <div className="hidden md:block space-y-5">
           <Hero icon={Clock} tone={total != null && total < 0 ? "green" : "neutral"} label={trendLabel}
             value={price != null ? fmt$(price) : undefined}
-            note={total != null && total !== 0 ? `${total < 0 ? "Down" : "Up"} ${fmt$(Math.abs(total))} since listed` : recent != null && recent !== 0 ? `${recent < 0 ? "Down" : "Up"} ${fmt$(Math.abs(recent))} in 7 days` : "Each price change is recorded here."} />
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            <Stat label="Price Change" value={total != null ? `${total < 0 ? "-" : total > 0 ? "+" : ""}${fmt$(Math.abs(total))}` : "—"} tone={total != null && total < 0 ? "green" : "neutral"} />
-            <Stat label="Days Listed" value={daysListed != null ? String(daysListed) : "—"} />
-            <Stat label="Lowest Price" value={lowest != null ? fmt$(lowest) : "—"} />
-            <Stat label="Highest Price" value={highest != null ? fmt$(highest) : "—"} />
-          </div>
+            note={total != null && total < 0 ? `Down ${fmt$(Math.abs(total))} since listed` : recent != null && recent < 0 ? `Down ${fmt$(Math.abs(recent))} in 7 days` : "Priced to today's market."} />
+          {has && (
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              {total != null && total < 0 && <Stat label="Price Change" value={`-${fmt$(Math.abs(total))}`} tone="green" />}
+              {daysListed != null && <Stat label="Days Listed" value={String(daysListed)} />}
+              {lowest != null && price != null && price <= lowest && <Stat label="Lowest Price" value={fmt$(lowest)} />}
+              {highest != null && price != null && highest > price && <Stat label="Highest Price" value={fmt$(highest)} />}
+            </div>
+          )}
           {has ? (
             <>
               <Section title="Price timeline"><PriceTimeline history={priced} /></Section>
@@ -680,34 +707,39 @@ function buildPanel(key: PassportPanelKey, d: PassportData, listing: VehicleList
                 {events.length ? (
                   <div className="space-y-3">{events.map((e, i) => (
                     <div key={i} className={`${CARD} p-3 flex items-center gap-3`}>
-                      <span className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${e.delta < 0 ? "bg-emerald-50" : "bg-orange-50"}`}>{e.delta < 0 ? <TrendingDown className="w-4 h-4 text-[#16A34A]" /> : <TrendingUp className="w-4 h-4 text-[#EA580C]" />}</span>
-                      <div className="min-w-0 flex-1"><p className="text-[13px] font-semibold leading-tight">{e.delta < 0 ? "Price reduced" : "Price increased"} {fmt$(Math.abs(e.delta))}</p><p className="text-[11px] text-[#94A3B8]">{e.date} · Dealer updated pricing</p></div>
+                      <span className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0 bg-emerald-50"><TrendingDown className="w-4 h-4 text-[#16A34A]" /></span>
+                      <div className="min-w-0 flex-1"><p className="text-[13px] font-semibold leading-tight">Price reduced {fmt$(Math.abs(e.delta))}</p><p className="text-[11px] text-[#94A3B8]">{e.date} · Dealer updated pricing</p></div>
                       <p className="text-[12px] text-[#64748B] shrink-0 text-right">{fmt$(e.before)} <span className="text-[#94A3B8]">→</span> <span className="font-bold text-[#0F172A]">{fmt$(e.after)}</span></p>
                     </div>
                   ))}</div>
-                ) : <Empty>No price changes recorded yet — the asking price has held steady.</Empty>}
+                ) : <Empty>Priced to today's market from day one.</Empty>}
               </Section>
             </>
-          ) : <Empty>Price history will appear here once the asking price has been tracked over time.</Empty>}
-          {pctDiff != null && (
+          ) : <Empty>Priced to today's market — reserve now to secure this price.</Empty>}
+          {pctDiff != null && priceBand !== "above" && (
             <Section title="Market comparison">
               <div className={`${CARD} p-4`}>
                 <div className="flex items-center justify-between"><span className="text-[12px] text-[#64748B]">This vehicle</span><span className="text-[14px] font-extrabold">{fmt$(price)}</span></div>
                 <div className="flex items-center justify-between mt-1.5"><span className="text-[12px] text-[#64748B]">Average market price</span><span className="text-[14px] font-semibold text-[#0F172A]">{fmt$(avg)}</span></div>
                 <div className={`mt-2 pt-2 border-t border-[#F1F5F9] text-[13px] font-semibold ${priceBand === "below" ? "text-[#16A34A]" : "text-[#0F172A]"}`}>
-                  {priceBand === "below" ? `${Math.abs(pctDiff)}% below market average` : priceBand === "at" ? `Priced at market — within ${Math.abs(pctDiff)}% of average` : `${pctDiff}% above market average`}
+                  {priceBand === "below" ? `${Math.abs(pctDiff)}% below market average` : `Priced at market — within ${Math.abs(pctDiff)}% of average`}
                 </div>
-                {priceBand === "above" && phOptValue ? <p className="text-[12px] text-[#64748B] mt-1.5">This build carries {fmt$(phOptValue)} in factory options — the average includes lower-equipped vehicles.</p> : null}
               </div>
             </Section>
           )}
+          {priceBand === "above" && phOptValue ? (
+            <Section title="Why this price">
+              <div className={`${CARD} p-4`}><p className="text-[13px] text-[#0F172A] leading-snug">This build carries {fmt$(phOptValue)} in factory options — the market average includes lower-equipped vehicles.</p></div>
+            </Section>
+          ) : null}
           <Section title="Price recommendation">
             <div className="rounded-2xl border border-emerald-200 bg-emerald-50/70 p-4">
-              <p className="text-[14px] font-extrabold text-[#16A34A]">{lowest != null && price != null && price <= lowest && isGreat ? "Excellent time to purchase" : isGreat ? "Strong value right now" : "Worth a closer look"}</p>
+              <p className="text-[14px] font-extrabold text-[#16A34A]">{lowest != null && price != null && price <= lowest && isGreat ? "Excellent time to purchase" : isGreat ? "Strong value right now" : "See it in person"}</p>
               <ul className="mt-2 space-y-1.5">
                 {lowest != null && price != null && price <= lowest && <Check>At its lowest recorded asking price</Check>}
                 {isGreat && <Check>Priced below the market average</Check>}
                 {total != null && total < 0 && <Check>Price has trended down since listing</Check>}
+                {total != null && total > 0 && <Check>Priced to today's market</Check>}
                 {(total == null || total === 0) && <Check>Price has been stable — likely to hold</Check>}
               </ul>
             </div>
@@ -766,22 +798,19 @@ function buildPanel(key: PassportPanelKey, d: PassportData, listing: VehicleList
       const changePct = (mc.inventory_change_pct as number) ?? (isPreview ? -12 : null);
       const avgDom = (mc.avg_dom as number) ?? (isPreview ? 38 : null);
       const hasData = supply != null;
-      const trendLabel = changePct == null ? "Stable Inventory" : changePct < 0 ? `Inventory Down ${Math.abs(changePct)}%` : changePct > 0 ? `Inventory Up ${changePct}%` : "Stable Inventory";
+      // Rising inventory never renders — it collapses into "Stable Inventory".
+      const trendLabel = changePct != null && changePct < 0 ? `Inventory Down ${Math.abs(changePct)}%` : "Stable Inventory";
       const SCARCITY = ["Abundant", "Moderate", "Limited", "Scarce"];
       const scarcityIdx = supply == null ? -1 : supply < 30 ? 3 : supply < 50 ? 2 : supply < 90 ? 1 : 0;
       // Never show the raw market-days-supply / inventory count to a customer
       // (it can be in the thousands) — qualitative levels only, on every
       // breakpoint. The raw number stays internal to the math above.
       const supplyWord = supply == null ? null : supply < 30 ? "Tight" : supply < 60 ? "Balanced" : "Ample";
-      const competition = (d.viewCount ?? 0) > 20 || isPreview ? "High" : "Moderate";
-      const localScore = (() => { let s = 50; if (changePct != null && changePct < 0) s += 15; if (supply != null) { if (supply < 30) s += 20; else if (supply < 60) s += 10; } if (competition === "High") s += 14; return Math.max(20, Math.min(96, s)); })();
-      const scoreLabel = localScore >= 80 ? "Highly Competitive" : localScore >= 60 ? "Moderately Competitive" : "Balanced";
-      const distBuckets = [{ b: "0–25 mi", n: isPreview ? 12 : 0 }, { b: "25–50 mi", n: isPreview ? 16 : 0 }, { b: "50–100 mi", n: isPreview ? 8 : 0 }, { b: "100+ mi", n: isPreview ? 6 : 0 }];
-      const maxDist = Math.max(1, ...distBuckets.map((x) => x.n));
+      const highCompetition = (d.viewCount ?? 0) > 20 || isPreview;
       const invInsights: { icon: React.ElementType; text: string }[] = [];
       if (changePct != null && changePct < 0) invInsights.push({ icon: TrendingDown, text: "Inventory continues to decline — lower supply means more competition." });
       if (isPreview) invInsights.push({ icon: TrendingUp, text: "New listings are entering the market slower than vehicles are selling." });
-      if ((d.viewCount ?? 0) > 20 || isPreview) invInsights.push({ icon: Flame, text: "Similar vehicles are selling faster than last month." });
+      if (isPreview) invInsights.push({ icon: Flame, text: "Similar vehicles are selling faster than last month." });
       return {
         title: "Inventory Trends", subtitle: "Understand local inventory and market availability",
         primary: { label: "Reserve This Vehicle", onClick: () => go("reserve") },
@@ -795,28 +824,27 @@ function buildPanel(key: PassportPanelKey, d: PassportData, listing: VehicleList
                     <span className="w-12 h-12 rounded-2xl bg-white/15 flex items-center justify-center shrink-0"><Package className="w-6 h-6" /></span>
                     <div><p className="text-[13px] font-bold uppercase tracking-wider opacity-95">{changePct != null && changePct < 0 ? "Inventory Tightening" : "Inventory Stable"}</p><p className="text-[24px] font-extrabold leading-tight">{supplyWord} Supply</p></div>
                   </div>
-                  {changePct != null && changePct !== 0 && <p className="text-[13px] opacity-90 mt-3 leading-snug">Inventory has {changePct < 0 ? "declined" : "grown"} {Math.abs(changePct)}% over the past 30 days.</p>}
+                  {changePct != null && changePct < 0 && <p className="text-[13px] opacity-90 mt-3 leading-snug">Inventory has declined {Math.abs(changePct)}% over the past 30 days.</p>}
                   <p className="text-[11px] opacity-80 mt-2">Updated using live market inventory.</p>
                 </div>
 
-                <Section title="Inventory trend">
-                  <InventoryTrendChart isPreview={isPreview} />
-                  <div className="grid grid-cols-2 gap-3 mt-3">
-                    <div className={`${CARD} p-4`}><TrendingDown className="w-5 h-5 text-[#16A34A]" /><p className="text-[20px] font-extrabold mt-1 leading-none text-[#16A34A]">{changePct != null ? `${changePct > 0 ? "+" : ""}${changePct}%` : "—"}</p><p className="text-[10px] text-[#94A3B8] mt-1">vs 30 days ago</p></div>
-                    <div className={`${CARD} p-4`}><Clock className="w-5 h-5 text-[#2563EB]" /><p className="text-[20px] font-extrabold mt-1 leading-none">{avgDom != null ? `${avgDom}d` : "—"}</p><p className="text-[10px] text-[#94A3B8] mt-1">Avg days on market</p></div>
+                {(changePct != null && changePct < 0) || avgDom != null ? (
+                  <div className="grid grid-cols-2 gap-3">
+                    {changePct != null && changePct < 0 && <div className={`${CARD} p-4`}><TrendingDown className="w-5 h-5 text-[#16A34A]" /><p className="text-[20px] font-extrabold mt-1 leading-none text-[#16A34A]">{changePct}%</p><p className="text-[10px] text-[#94A3B8] mt-1">vs 30 days ago</p></div>}
+                    {avgDom != null && <div className={`${CARD} p-4`}><Clock className="w-5 h-5 text-[#2563EB]" /><p className="text-[20px] font-extrabold mt-1 leading-none">{avgDom}d</p><p className="text-[10px] text-[#94A3B8] mt-1">Avg days on market</p></div>}
                   </div>
-                </Section>
+                ) : null}
 
                 <Section title="Market snapshot">
                   <div className={`${CARD} divide-y divide-[#F1F5F9]`}>
-                    {[
-                      { i: Package, l: "Supply Level", v: supplyWord ?? "—", c: "text-[#0F172A]" },
-                      { i: TrendingDown, l: "30-Day Change", v: changePct != null ? `${changePct > 0 ? "+" : ""}${changePct}%` : "—", c: changePct != null && changePct < 0 ? "text-[#16A34A]" : "text-[#0F172A]" },
-                      { i: Clock, l: "Average Days on Market", v: avgDom != null ? `${avgDom} Days` : "—", c: "text-[#0F172A]" },
-                      { i: TrendingDown, l: "Market Trend", v: changePct != null && changePct < 0 ? "Declining" : "Stable", c: "text-[#16A34A]" },
-                      { i: Flame, l: "Competition Level", v: competition, c: competition === "High" ? "text-[#EA580C]" : "text-[#0F172A]" },
-                      { i: TrendingUp, l: "Buyer Demand", v: competition === "High" ? "Strong" : "Moderate", c: "text-[#16A34A]" },
-                    ].map((r) => (
+                    {([
+                      supplyWord ? { i: Package, l: "Supply Level", v: supplyWord, c: "text-[#0F172A]" } : null,
+                      changePct != null && changePct < 0 ? { i: TrendingDown, l: "30-Day Change", v: `${changePct}%`, c: "text-[#16A34A]" } : null,
+                      avgDom != null ? { i: Clock, l: "Average Days on Market", v: `${avgDom} Days`, c: "text-[#0F172A]" } : null,
+                      changePct != null && changePct < 0 ? { i: TrendingDown, l: "Market Trend", v: "Declining", c: "text-[#16A34A]" } : null,
+                      highCompetition ? { i: Flame, l: "Competition Level", v: "High", c: "text-[#EA580C]" } : null,
+                      highCompetition ? { i: TrendingUp, l: "Buyer Demand", v: "Strong", c: "text-[#16A34A]" } : null,
+                    ].filter(Boolean) as { i: React.ElementType; l: string; v: string; c: string }[]).map((r) => (
                       <div key={r.l} className="flex items-center justify-between px-4 py-3"><span className="text-[12px] text-[#64748B] inline-flex items-center gap-2"><r.i className="w-4 h-4 text-[#94A3B8]" />{r.l}</span><span className={`text-[15px] font-extrabold ${r.c}`}>{r.v}</span></div>
                     ))}
                   </div>
@@ -846,28 +874,11 @@ function buildPanel(key: PassportPanelKey, d: PassportData, listing: VehicleList
                   </div>
                 </Section>
 
-                <Section title="Availability by distance">
-                  <div className={`${CARD} p-4 space-y-3`}>{distBuckets.map((r) => (
-                    <div key={r.b} className="flex items-center gap-3">
-                      <span className="text-[12px] text-[#64748B] w-20 shrink-0 inline-flex items-center gap-1"><MapPin className="w-3 h-3" />{r.b}</span>
-                      <div className="flex-1 h-3 rounded-full bg-slate-100 overflow-hidden"><div className="h-full rounded-full bg-[#2563EB]" style={{ width: `${Math.max(6, (r.n / maxDist) * 100)}%` }} /></div>
-                      <span className="text-[14px] font-extrabold w-7 text-right">{r.n || "—"}</span>
-                    </div>
-                  ))}</div>
-                </Section>
-
-                <Section title="Local inventory score">
-                  <div className={`${CARD} p-4 flex items-center gap-5`}>
-                    <AnimatedRing pct={localScore} size={104} color={BLUE} />
-                    <div><p className="text-[15px] font-extrabold">{scoreLabel}</p><p className="text-[12px] text-[#64748B] mt-0.5">How competitive the local market is for this vehicle right now.</p></div>
-                  </div>
-                </Section>
-
                 <Section title="If you wait…">
                   <div className={`${CARD} p-4`}><p className="text-[13px] text-[#64748B] leading-snug">{changePct != null && changePct < 0 ? "Inventory is currently declining. Waiting may reduce your available choices and increase competition from other buyers." : "Inventory is steady for now. Pricing and selection can still shift as the market moves."}</p></div>
                 </Section>
               </>
-            ) : <Empty>Inventory trend data will appear here once enough comparable listings have been tracked over time.</Empty>}
+            ) : <Empty>Every vehicle is unique in today's market — reserve this one or book a test drive to make sure you don't miss it.</Empty>}
             <Disclaimer />
           </div>
 
@@ -875,27 +886,26 @@ function buildPanel(key: PassportPanelKey, d: PassportData, listing: VehicleList
           <div className="hidden md:block space-y-5">
           <Hero icon={Package} tone={changePct != null && changePct < 0 ? "green" : "neutral"} label={trendLabel}
             value={supplyWord ? `${supplyWord} supply` : undefined}
-            note={hasData ? "Comparable availability in your local market." : "30-day market supply trends appear once enough data is available."} />
+            note={hasData ? "Comparable availability in your local market." : "Every vehicle is unique in today's market — reserve this one or book a test drive to make sure you don't miss it."} />
           {hasData ? (
             <>
-              <Section title="Inventory trend"><InventoryTrendChart isPreview={isPreview} /></Section>
               <Section title="Local market summary">
                 <div className={`${CARD} p-4`}>
-                  <StatRow label="Average days on market" value={avgDom != null ? `${avgDom} days` : "—"} />
-                  <StatRow label="Average selling price" value={avg != null ? fmt$(avg) : isPreview ? fmt$(61300) : "—"} />
-                  <StatRow label="Supply level" value={supplyWord ?? "—"} />
-                  <StatRow label="Demand level" value={(d.viewCount ?? 0) > 20 || isPreview ? "High" : "Moderate"} />
-                  <StatRow label="Updated" value="Today" />
+                  {avgDom != null && <StatRow label="Average days on market" value={`${avgDom} days`} />}
+                  {avg != null && price != null && price <= avg && <StatRow label="Average selling price" value={fmt$(avg)} />}
+                  {supplyWord && <StatRow label="Supply level" value={supplyWord} />}
+                  {highCompetition && <StatRow label="Demand level" value="High" />}
                 </div>
               </Section>
-              <Section title="Inventory forecast">
-                <div className={`${CARD} p-4`}><ul className="space-y-2">
-                  {changePct != null && changePct < 0 && <Check>Inventory likely to keep decreasing over the next 30 days</Check>}
-                  {((d.viewCount ?? 0) > 20 || isPreview) && <Check>Demand expected to remain high</Check>}
-                  {isPreview && <Check>More comparable vehicles arriving next month</Check>}
-                  {!isPreview && changePct == null && <Check tone="orange">Forecast refines as more market data is collected</Check>}
-                </ul></div>
-              </Section>
+              {((changePct != null && changePct < 0) || highCompetition) && (
+                <Section title="Inventory forecast">
+                  <div className={`${CARD} p-4`}><ul className="space-y-2">
+                    {changePct != null && changePct < 0 && <Check>Inventory likely to keep decreasing over the next 30 days</Check>}
+                    {highCompetition && <Check>Demand expected to remain high</Check>}
+                    {isPreview && <Check>More comparable vehicles arriving next month</Check>}
+                  </ul></div>
+                </Section>
+              )}
               <Section title="Buyer recommendation">
                 <div className="rounded-2xl border border-emerald-200 bg-emerald-50/70 p-4">
                   <p className="text-[14px] font-extrabold text-[#16A34A]">{changePct != null && changePct < 0 ? "Inventory is tightening — good time to act" : "Solid time to purchase"}</p>
@@ -903,23 +913,12 @@ function buildPanel(key: PassportPanelKey, d: PassportData, listing: VehicleList
                     {changePct != null && changePct < 0 && <Check>Fewer comparable vehicles available locally</Check>}
                     {isGreat && <Check>This vehicle is priced below market</Check>}
                     {supply != null && supply < 30 && <Check>Limited local availability for this configuration</Check>}
-                    {d.warrantyStr && <Check>Strong resale outlook with warranty remaining</Check>}
+                    {d.warrantyStr && !d.warrantyExpired && <Check>Strong resale outlook with warranty remaining</Check>}
                   </ul>
                 </div>
               </Section>
-              <Section title="Nearby availability" sub="Comparable vehicles by distance (illustrative).">
-                <div className={`${CARD} p-4`}>
-                  {[{ b: "0–10 mi", n: isPreview ? 8 : 0 }, { b: "10–25 mi", n: isPreview ? 14 : 0 }, { b: "25–50 mi", n: isPreview ? 12 : 0 }, { b: "50+ mi", n: isPreview ? 8 : 0 }].map((r) => (
-                    <div key={r.b} className="flex items-center gap-3 py-1.5">
-                      <span className="text-[12px] text-[#64748B] w-16 shrink-0 inline-flex items-center gap-1"><MapPin className="w-3 h-3" />{r.b}</span>
-                      <div className="flex-1 h-2.5 rounded-full bg-slate-100 overflow-hidden"><div className="h-full rounded-full bg-[#2563EB]" style={{ width: `${Math.min(100, r.n * 6)}%` }} /></div>
-                      <span className="text-[12px] font-semibold w-7 text-right">{r.n || "—"}</span>
-                    </div>
-                  ))}
-                </div>
-              </Section>
             </>
-          ) : <Empty>Inventory trend data will appear here once enough comparable listings have been tracked over time. Lower supply of similar vehicles generally means stronger pricing.</Empty>}
+          ) : <Empty>Every vehicle is unique in today's market — reserve this one or book a test drive to make sure you don't miss it.</Empty>}
           <Disclaimer />
           </div>
         </>,
@@ -1032,6 +1031,54 @@ function buildPanel(key: PassportPanelKey, d: PassportData, listing: VehicleList
         const el = document.getElementById("warr-whats-included") as HTMLDetailsElement | null;
         if (el) { el.open = true; el.scrollIntoView({ behavior: "smooth", block: "nearest" }); }
       };
+      // Dealer-added coverage: the store's own branded warranties (lifetime
+      // powertrain, dealer CPO). Renders only when the dealer configured a
+      // warranty program for this vehicle's condition. When factory coverage
+      // has ended, this block leads the panel instead of the factory status.
+      const dealerCoverageBlock = d.dealerCoverage.length > 0 ? (
+        <div className="rounded-2xl border border-[#E6E8EC] bg-white p-4 sm:p-5">
+          <p className="text-[15px] font-bold text-[#0F172A]">Dealer-Added Coverage</p>
+          <p className="text-[12px] text-[#64748B] mb-3">Additional protection from {d.dealerName}{statusActive ? " on top of the factory terms" : ""}.</p>
+          <div className="space-y-3">
+            {d.dealerCoverage.map((c, i) => {
+              const term = c.lifetime ? "Lifetime" : [
+                c.termYears ? `${c.termYears}-Year` : null,
+                c.termMiles ? `${c.termMiles.toLocaleString()}-Mile` : null,
+              ].filter(Boolean).join(" / ") || null;
+              const included = c.mode === "included";
+              return (
+                <div key={i} className={`rounded-xl border p-3.5 ${included ? "border-emerald-200 bg-emerald-50/50" : "border-[#E6E8EC] bg-slate-50/60"}`}>
+                  <div className="flex items-start justify-between gap-3 flex-wrap">
+                    <div className="min-w-0">
+                      <p className="text-[14px] font-bold text-[#0F172A] leading-tight">{c.title}{term ? ` — ${term}` : ""}</p>
+                      {c.coverage && <p className="text-[11px] font-semibold uppercase tracking-wide text-[#64748B] mt-0.5">{c.coverage}</p>}
+                    </div>
+                    <span className={`shrink-0 inline-flex items-center h-6 px-2.5 rounded-full text-[11px] font-bold ${included ? "bg-emerald-100 text-emerald-700" : "bg-blue-50 text-[#2563EB]"}`}>
+                      {included ? "Included" : "Available Upgrade"}
+                    </span>
+                  </div>
+                  {c.offer && <p className="text-[12.5px] text-[#475569] leading-snug mt-1.5">{c.offer}</p>}
+                  {c.disclosure && <p className="text-[11.5px] text-[#64748B] leading-snug mt-1.5">{c.disclosure}</p>}
+                  {c.mode === "available" && (
+                    <div className="flex items-center justify-between gap-3 mt-2 flex-wrap">
+                      <p className="text-[11px] font-semibold text-[#64748B]">Optional — not required to purchase or finance the vehicle.</p>
+                      <button
+                        onClick={() => {
+                          if (!isPreview) trackCustomerCtaClicked({ storeId: listing.store_id, vehicleId: listing.id, vin: listing.vin, source: "passport", surface: "vehicle_passport", metadata: { cta: "upgrade_inquiry", program: c.title, placement: "warranty_panel" } });
+                          go(`contact?topic=warranty&about=${encodeURIComponent(c.title)}`);
+                        }}
+                        className="shrink-0 inline-flex items-center h-8 px-3 rounded-lg bg-[#2563EB] text-white text-[12px] font-bold hover:bg-[#1d4fd7]"
+                      >
+                        Ask about this coverage
+                      </button>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      ) : null;
       return {
         title: "Factory Warranty",
         subtitle: "See what's covered and for how long.",
@@ -1040,104 +1087,57 @@ function buildPanel(key: PassportPanelKey, d: PassportData, listing: VehicleList
         footerQuestion: "Questions about warranty?", specialistLabel: "Talk to a Warranty Specialist",
         body: hasData ? (
           <div className="space-y-5">
-            <div className="space-y-5">
-              <div className="space-y-5">
-                <WarrantyStatusCard
-                  active={statusActive}
-                  startLabel={statusStart}
-                  startSub={statusStartSub}
-                  endDate={isNew ? null : endDate}
-                  endMiles={isNew ? null : endMiles}
-                />
-                <div className="rounded-2xl border border-[#E6E8EC] bg-white p-4 sm:p-5">
-                  <p className="text-[15px] font-bold text-[#0F172A] mb-3">Coverage at a Glance</p>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    {isNew ? (
-                      <>
-                        {hasBasic && <NewCoverageCard title="Bumper-to-Bumper" subtitle="Basic Vehicle Coverage" tone="blue" years={yTerm(w.factory_months)} miles={mTerm(w.factory_miles)} />}
-                        {hasPt && <NewCoverageCard title="Powertrain" subtitle="Engine, Transmission & Drivetrain" tone="green" years={yTerm(w.powertrain_months)} miles={mTerm(w.powertrain_miles)} />}
-                      </>
-                    ) : (
-                      <>
-                        {hasBasic && <CoverageCard title="Bumper-to-Bumper" subtitle={isFactoryCpo && eff.cpoProgramName ? "CPO Vehicle Coverage" : "Basic Vehicle Coverage"} tone="blue" pct={b2bPct} years={yrsRemain(basic.left)} miles={milesRemainLbl(milesLeft)} expiresDate={basic.date} expiresMiles={milesCapLbl(expMilesOf(w.factory_miles))} />}
-                        {hasPt && <CoverageCard title="Powertrain" subtitle="Engine, Transmission & Drivetrain" tone="green" pct={ptPct} years={yrsRemain(pt.left)} miles={milesRemainLbl(ptMilesLeft)} expiresDate={pt.date} expiresMiles={milesCapLbl(expMilesOf(w.powertrain_miles))} />}
-                        {eff.cpoWrap && (
-                          <NewCoverageCard title={eff.cpoWrap.programName} subtitle="Additional CPO coverage from purchase" tone="green"
-                            years={eff.cpoWrap.months ? `${Math.round(eff.cpoWrap.months / 12) || 1} ${eff.cpoWrap.months >= 24 ? "Years" : "Year"}` : null}
-                            miles={eff.cpoWrap.unlimitedMiles ? "Unlimited Miles" : eff.cpoWrap.miles ? `${eff.cpoWrap.miles.toLocaleString()} Miles` : null} />
-                        )}
-                      </>
-                    )}
-                  </div>
-                  {isNew && (
-                    <div className="mt-3 flex items-start gap-2 rounded-xl bg-emerald-50 px-3 py-2.5">
-                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 mt-[6px] shrink-0" />
-                      <p className="text-[12px] font-medium text-emerald-800 leading-snug">Factory coverage begins when you take delivery of your vehicle.</p>
-                    </div>
-                  )}
-                  {isFactoryCpo && (
-                    <div className="mt-3 flex items-start gap-2 rounded-xl bg-emerald-50 px-3 py-2.5">
-                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 mt-[6px] shrink-0" />
-                      <p className="text-[12px] font-medium text-emerald-800 leading-snug">{brand ? `${brand} ` : ""}Certified Pre-Owned extends this vehicle's factory coverage{eff.cpoInspectionPoints ? ` and includes a ${eff.cpoInspectionPoints} inspection` : ""}.</p>
-                    </div>
-                  )}
-                  {eff.secondOwnerReduced && !isFactoryCpo && (
-                    <div className="mt-3 flex items-start gap-2 rounded-xl bg-slate-50 px-3 py-2.5">
-                      <span className="w-1.5 h-1.5 rounded-full bg-slate-400 mt-[6px] shrink-0" />
-                      <p className="text-[12px] font-medium text-[#64748B] leading-snug">Powertrain shown at second-owner terms — {brand || "this manufacturer"} reduces powertrain coverage when the vehicle transfers from the original owner.</p>
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-
-            {/* Dealer-added coverage: the store's own branded warranties
-                (lifetime powertrain, dealer CPO). Renders only when the dealer
-                configured a warranty program for this vehicle's condition. */}
-            {d.dealerCoverage.length > 0 && (
+            {!statusActive && dealerCoverageBlock}
+            <WarrantyStatusCard
+              active={statusActive}
+              startLabel={statusStart}
+              startSub={statusStartSub}
+              endDate={isNew ? null : endDate}
+              endMiles={isNew ? null : endMiles}
+            />
+            {(statusActive || eff.cpoWrap) && (
               <div className="rounded-2xl border border-[#E6E8EC] bg-white p-4 sm:p-5">
-                <p className="text-[15px] font-bold text-[#0F172A]">Dealer-Added Coverage</p>
-                <p className="text-[12px] text-[#64748B] mb-3">Additional protection from {d.dealerName} on top of the factory terms.</p>
-                <div className="space-y-3">
-                  {d.dealerCoverage.map((c, i) => {
-                    const term = c.lifetime ? "Lifetime" : [
-                      c.termYears ? `${c.termYears}-Year` : null,
-                      c.termMiles ? `${c.termMiles.toLocaleString()}-Mile` : null,
-                    ].filter(Boolean).join(" / ") || null;
-                    const included = c.mode === "included";
-                    return (
-                      <div key={i} className={`rounded-xl border p-3.5 ${included ? "border-emerald-200 bg-emerald-50/50" : "border-[#E6E8EC] bg-slate-50/60"}`}>
-                        <div className="flex items-start justify-between gap-3 flex-wrap">
-                          <div className="min-w-0">
-                            <p className="text-[14px] font-bold text-[#0F172A] leading-tight">{c.title}{term ? ` — ${term}` : ""}</p>
-                            {c.coverage && <p className="text-[11px] font-semibold uppercase tracking-wide text-[#64748B] mt-0.5">{c.coverage}</p>}
-                          </div>
-                          <span className={`shrink-0 inline-flex items-center h-6 px-2.5 rounded-full text-[11px] font-bold ${included ? "bg-emerald-100 text-emerald-700" : "bg-blue-50 text-[#2563EB]"}`}>
-                            {included ? "Included" : "Available Upgrade"}
-                          </span>
-                        </div>
-                        {c.offer && <p className="text-[12.5px] text-[#475569] leading-snug mt-1.5">{c.offer}</p>}
-                        {c.disclosure && <p className="text-[11.5px] text-[#64748B] leading-snug mt-1.5">{c.disclosure}</p>}
-                        {c.mode === "available" && (
-                          <div className="flex items-center justify-between gap-3 mt-2 flex-wrap">
-                            <p className="text-[11px] font-semibold text-[#64748B]">Optional — not required to purchase or finance the vehicle.</p>
-                            <button
-                              onClick={() => {
-                                if (!isPreview) trackCustomerCtaClicked({ storeId: listing.store_id, vehicleId: listing.id, vin: listing.vin, source: "passport", surface: "vehicle_passport", metadata: { cta: "upgrade_inquiry", program: c.title, placement: "warranty_panel" } });
-                                go(`contact?topic=warranty&about=${encodeURIComponent(c.title)}`);
-                              }}
-                              className="shrink-0 inline-flex items-center h-8 px-3 rounded-lg bg-[#2563EB] text-white text-[12px] font-bold hover:bg-[#1d4fd7]"
-                            >
-                              Ask about this coverage
-                            </button>
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
+                <p className="text-[15px] font-bold text-[#0F172A] mb-3">Coverage at a Glance</p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {isNew ? (
+                    <>
+                      {hasBasic && <NewCoverageCard title="Bumper-to-Bumper" subtitle="Basic Vehicle Coverage" tone="blue" years={yTerm(w.factory_months)} miles={mTerm(w.factory_miles)} />}
+                      {hasPt && <NewCoverageCard title="Powertrain" subtitle="Engine, Transmission & Drivetrain" tone="green" years={yTerm(w.powertrain_months)} miles={mTerm(w.powertrain_miles)} />}
+                    </>
+                  ) : (
+                    <>
+                      {statusActive && hasBasic && <CoverageCard title="Bumper-to-Bumper" subtitle={isFactoryCpo && eff.cpoProgramName ? "CPO Vehicle Coverage" : "Basic Vehicle Coverage"} tone="blue" pct={b2bPct} years={yrsRemain(basic.left)} miles={milesRemainLbl(milesLeft)} expiresDate={basic.date} expiresMiles={milesCapLbl(expMilesOf(w.factory_miles))} />}
+                      {statusActive && hasPt && <CoverageCard title="Powertrain" subtitle="Engine, Transmission & Drivetrain" tone="green" pct={ptPct} years={yrsRemain(pt.left)} miles={milesRemainLbl(ptMilesLeft)} expiresDate={pt.date} expiresMiles={milesCapLbl(expMilesOf(w.powertrain_miles))} />}
+                      {eff.cpoWrap && (
+                        <NewCoverageCard title={eff.cpoWrap.programName} subtitle="Additional CPO coverage from purchase" tone="green"
+                          years={eff.cpoWrap.months ? `${Math.round(eff.cpoWrap.months / 12) || 1} ${eff.cpoWrap.months >= 24 ? "Years" : "Year"}` : null}
+                          miles={eff.cpoWrap.unlimitedMiles ? "Unlimited Miles" : eff.cpoWrap.miles ? `${eff.cpoWrap.miles.toLocaleString()} Miles` : null} />
+                      )}
+                    </>
+                  )}
                 </div>
+                {isNew && (
+                  <div className="mt-3 flex items-start gap-2 rounded-xl bg-emerald-50 px-3 py-2.5">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 mt-[6px] shrink-0" />
+                    <p className="text-[12px] font-medium text-emerald-800 leading-snug">Factory coverage begins when you take delivery of your vehicle.</p>
+                  </div>
+                )}
+                {isFactoryCpo && (
+                  <div className="mt-3 flex items-start gap-2 rounded-xl bg-emerald-50 px-3 py-2.5">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 mt-[6px] shrink-0" />
+                    <p className="text-[12px] font-medium text-emerald-800 leading-snug">{brand ? `${brand} ` : ""}Certified Pre-Owned extends this vehicle's factory coverage{eff.cpoInspectionPoints ? ` and includes a ${eff.cpoInspectionPoints} inspection` : ""}.</p>
+                  </div>
+                )}
+                {eff.secondOwnerReduced && !isFactoryCpo && (
+                  <div className="mt-3 flex items-start gap-2 rounded-xl bg-slate-50 px-3 py-2.5">
+                    <span className="w-1.5 h-1.5 rounded-full bg-slate-400 mt-[6px] shrink-0" />
+                    <p className="text-[12px] font-medium text-[#64748B] leading-snug">Powertrain shown at second-owner terms — {brand || "this manufacturer"} reduces powertrain coverage when the vehicle transfers from the original owner.</p>
+                  </div>
+                )}
               </div>
             )}
+
+            {statusActive && dealerCoverageBlock}
 
             {/* Certified Pre-Owned: certified copy for factory-CPO cars, "may
                 qualify" only at a matching franchise. Cross-brand used cars get
@@ -1208,7 +1208,7 @@ function buildPanel(key: PassportPanelKey, d: PassportData, listing: VehicleList
                   ? includedRows.map((r) => <p key={r.key}><span className="font-semibold text-[#0F172A]">{r.label}</span> — {r.sub} ({r.term}).</p>)
                   : <><p><span className="font-semibold text-[#0F172A]">Bumper-to-Bumper</span> — most vehicle systems and components.</p><p><span className="font-semibold text-[#0F172A]">Powertrain</span> — engine, transmission, and drivetrain.</p></>}
               </WAcc>
-              <WAcc icon={AlertTriangle} title="What's NOT Covered" sub="See general exclusions and limitations">
+              <WAcc icon={Info} title="Coverage details" sub="General exclusions and limitations">
                 <p>Routine maintenance and wear items (brake pads, wiper blades, tires, fluids).</p>
                 <p>Damage from accidents, misuse, modification, or lack of maintenance.</p>
                 <p>Cosmetic wear, glass, and items covered by separate manufacturer warranties.</p>
@@ -1240,7 +1240,12 @@ function buildPanel(key: PassportPanelKey, d: PassportData, listing: VehicleList
 
             <Disclaimer />
           </div>
-        ) : <Empty>Warranty coverage details are confirmed at the dealership for this vehicle.</Empty>,
+        ) : (
+          <Empty>
+            Warranty coverage details are confirmed at the dealership for this vehicle.
+            <button onClick={() => go("contact")} className="block mt-2 text-[13px] font-semibold text-[#2563EB] hover:underline">Contact the dealership</button>
+          </Empty>
+        ),
       };
     }
 
@@ -1248,7 +1253,10 @@ function buildPanel(key: PassportPanelKey, d: PassportData, listing: VehicleList
       const sources = d.dealerTrust.reviewSources;
       const ks = listing.key_specs || {};
       const rating = d.reviewRating;
-      const label = rating == null ? "" : rating >= 4.5 ? "Excellent" : rating >= 4 ? "Very Good" : rating >= 3 ? "Good" : "Mixed";
+      // Below 3.5 no verdict label renders — the number speaks for itself.
+      const label = rating == null ? "" : rating >= 4.5 ? "Excellent" : rating >= 4 ? "Very Good" : rating >= 3.5 ? "Good" : "";
+      const hasReviewData = rating != null || sources.length > 0;
+      const hasNhtsaData = nhtsa?.ratings?.overall != null || !!nhtsa?.complaints || !!d.iihsAward;
       const sourceNames = Array.from(new Set(sources.map((s) => s.name))).slice(0, 4);
       // Per-category breakdown, sentiment, and themes are not in our data model;
       // they only render behind the SAMPLE PREVIEW banner so we never invent reviews.
@@ -1272,16 +1280,16 @@ function buildPanel(key: PassportPanelKey, d: PassportData, listing: VehicleList
         primary: { label: "Reserve This Vehicle", onClick: () => go("reserve") },
         secondary: { label: "Read all reviews", onClick: () => go("owner-reviews") },
         footerQuestion: "Have questions about ownership?",
-        body: <>
-          {rating != null && <div className="md:hidden"><MHero tone="green" icon={Star} ringPct={Math.round((rating / 5) * 100)} eyebrow={`${rating.toFixed(1)} / 5 · ${label}`} title="Owner Reviews" note={[sourceNames.length > 0 ? `Based on ${sourceNames.join(", ")}` : null, d.reviewCount != null ? `${d.reviewCount.toLocaleString()} reviews` : null].filter(Boolean).join(" · ")} /></div>}
-          <div className={rating != null ? "hidden md:block" : undefined}>
-          {rating != null ? (
-            <div className={`${CARD} p-5 flex items-center gap-4`}>
-              <div className="text-center shrink-0"><p className="text-[34px] font-extrabold text-[#2563EB] leading-none">{rating.toFixed(1)}</p><div className="mt-1"><Stars n={rating} /></div>{d.reviewCount != null && <p className="text-[11px] text-[#64748B] mt-1">{d.reviewCount.toLocaleString()} reviews</p>}</div>
-              <div className="min-w-0"><p className="text-[15px] font-extrabold text-[#16A34A]">{label}</p>{sourceNames.length > 0 && <p className="text-[12px] text-[#64748B] mt-0.5">Based on {sourceNames.join(", ")}</p>}<p className="text-[11px] text-[#94A3B8] mt-1">AutoLabels aggregates reviews and does not edit or filter them.</p></div>
+        body: (hasReviewData || hasNhtsaData) ? <>
+          {rating != null && <div className="md:hidden"><MHero tone="green" icon={Star} ringPct={Math.round((rating / 5) * 100)} eyebrow={`${rating.toFixed(1)} / 5${label ? ` · ${label}` : ""}`} title="Owner Reviews" note={[sourceNames.length > 0 ? `Based on ${sourceNames.join(", ")}` : null, d.reviewCount != null ? `${d.reviewCount.toLocaleString()} reviews` : null].filter(Boolean).join(" · ")} /></div>}
+          {rating != null && (
+            <div className="hidden md:block">
+              <div className={`${CARD} p-5 flex items-center gap-4`}>
+                <div className="text-center shrink-0"><p className="text-[34px] font-extrabold text-[#2563EB] leading-none">{rating.toFixed(1)}</p><div className="mt-1"><Stars n={rating} /></div>{d.reviewCount != null && <p className="text-[11px] text-[#64748B] mt-1">{d.reviewCount.toLocaleString()} reviews</p>}</div>
+                <div className="min-w-0">{label && <p className="text-[15px] font-extrabold text-[#16A34A]">{label}</p>}{sourceNames.length > 0 && <p className="text-[12px] text-[#64748B] mt-0.5">Based on {sourceNames.join(", ")}</p>}</div>
+              </div>
             </div>
-          ) : <Empty>Verified owner reviews appear here once the dealer connects a review source. AutoLabels never fabricates customer reviews.</Empty>}
-          </div>
+          )}
           {nhtsa?.ratings && nhtsa.ratings.overall != null && (
             <Section title="Government crash-test ratings" sub={`NHTSA 5-Star Safety Ratings for the ${nhtsa.ratings.vehicleDescription || listing.ymm}.`}>
               <div className={`${CARD} p-5`}>
@@ -1317,26 +1325,24 @@ function buildPanel(key: PassportPanelKey, d: PassportData, listing: VehicleList
               </div>
             </Section>
           )}
-          {nhtsa?.complaints && (
-            <Section title="Owner-reported issues" sub="Complaints filed with NHTSA by owners nationwide for this model year.">
-              <div className={`${CARD} p-4`}>
-                {nhtsa.complaints.count === 0 ? (
-                  <p className="text-[13px] font-semibold text-[#16A34A]">No owner complaints on file with NHTSA for this model year.</p>
-                ) : (
-                  <>
-                    <p className="text-[13px] text-[#0F172A]"><span className="font-extrabold">{nhtsa.complaints.count.toLocaleString()}</span> complaint{nhtsa.complaints.count === 1 ? "" : "s"} filed nationwide across all {listing.ymm} vehicles — not reports about this specific car.</p>
-                    {nhtsa.complaints.topComponents.length > 0 && (
-                      <div className="mt-2.5 flex flex-wrap gap-2">
-                        {nhtsa.complaints.topComponents.map((c) => (
-                          <span key={c.component} className="inline-flex items-center rounded-full border border-[#E6E8EC] bg-[#F8FAFC] px-2.5 py-1 text-[11px] font-semibold text-[#475569]">{c.component.toLowerCase().replace(/(^|[\s/])[a-z]/g, (m) => m.toUpperCase())} · {c.count}</span>
-                        ))}
-                      </div>
-                    )}
-                  </>
-                )}
-                <p className="text-[11px] text-[#94A3B8] mt-3">Source: NHTSA complaint database (nhtsa.gov). Complaints are unverified owner reports covering the entire model line.</p>
-              </div>
-            </Section>
+          {nhtsa?.complaints && nhtsa.complaints.count === 0 && (
+            <div className={`${CARD} p-4`}>
+              <p className="text-[13px] font-semibold text-[#16A34A]">No owner complaints on file with NHTSA for this model year.</p>
+              <p className="text-[11px] text-[#94A3B8] mt-2">Source: NHTSA complaint database (nhtsa.gov).</p>
+            </div>
+          )}
+          {nhtsa?.complaints && nhtsa.complaints.count > 0 && (
+            <Accordion title="Model-line owner reports">
+              <p>{nhtsa.complaints.count.toLocaleString()} report{nhtsa.complaints.count === 1 ? "" : "s"} filed nationwide across all {listing.ymm} vehicles — not reports about this specific car.</p>
+              {nhtsa.complaints.topComponents.length > 0 && (
+                <div className="mt-2.5 flex flex-wrap gap-2">
+                  {nhtsa.complaints.topComponents.map((c) => (
+                    <span key={c.component} className="inline-flex items-center rounded-full border border-[#E6E8EC] bg-[#F8FAFC] px-2.5 py-1 text-[11px] font-semibold text-[#475569]">{c.component.toLowerCase().replace(/(^|[\s/])[a-z]/g, (m) => m.toUpperCase())} · {c.count}</span>
+                  ))}
+                </div>
+              )}
+              <p className="text-[11px] text-[#94A3B8] mt-3">Source: NHTSA complaint database (nhtsa.gov). Reports are unverified and cover the entire model line.</p>
+            </Accordion>
           )}
           {breakdown.length > 0 && (
             <Section title="Rating breakdown"><div className={`${CARD} p-4 space-y-2.5`}>{breakdown.map((b) => <RatingBar key={b.k} label={b.k} score={b.v} />)}</div></Section>
@@ -1364,6 +1370,17 @@ function buildPanel(key: PassportPanelKey, d: PassportData, listing: VehicleList
               <div className="rounded-2xl border border-emerald-200 bg-emerald-50/70 p-4 flex flex-wrap gap-2">{recsU.map((r) => <Chip key={r}>{r}</Chip>)}</div>
             </Section>
           )}
+          <Disclaimer />
+        </> : <>
+          {recsU.length > 0 && (
+            <Section title="Well suited for" sub="Based on this vehicle's configuration.">
+              <div className="rounded-2xl border border-emerald-200 bg-emerald-50/70 p-4 flex flex-wrap gap-2">{recsU.map((r) => <Chip key={r}>{r}</Chip>)}</div>
+            </Section>
+          )}
+          <Empty>
+            Curious what owners say about this vehicle? Our team is happy to share the ownership experience.
+            <button onClick={() => go("contact")} className="block mt-2 text-[13px] font-semibold text-[#2563EB] hover:underline">Ask our team</button>
+          </Empty>
           <Disclaimer />
         </>,
       };
@@ -1567,7 +1584,7 @@ function buildPanel(key: PassportPanelKey, d: PassportData, listing: VehicleList
       // Technical Specifications Intelligence Panel — the engineering
       // sibling of the equipment panel: same xl drawer, stat cards,
       // benefit-framed highlights, and grouped spec cards. Missing values
-      // render as an intentional "Pending OEM data" state, never invented.
+      // are omitted entirely, never invented or labeled pending.
       const ks = listing.key_specs || {};
       const mcr = mc;
       const ksr = ks as Record<string, unknown>;
@@ -1611,33 +1628,28 @@ function buildPanel(key: PassportPanelKey, d: PassportData, listing: VehicleList
       const safety = groups.Safety || [];
       const hasAny = [engineV, transV, driveV, hp, mpg, fuelV, ...dimRows.map(([, v]) => v)].some(Boolean);
       const counts = (rows: [string, string | null][]) => ({ ok: rows.filter(([, v]) => v).length, pending: rows.filter(([, v]) => !v).length });
-      const corePending = [engineV, transV, driveV, mpg].some((v) => !v) || [hp].some((v) => !v);
 
       const specStat = (label: string, value: string | null, helper: string, iconName: string) => {
+        if (!value) return null;
         const Icon = getEquipmentIcon(iconName).icon;
         return (
           <div className="rounded-2xl border border-[#DDE5EE] bg-white p-3.5 flex flex-col gap-1.5">
             <span className="w-8 h-8 rounded-lg bg-[#EAF4FF] text-[#0B6FEA] flex items-center justify-center"><Icon className="w-4 h-4" strokeWidth={1.75} /></span>
             <p className="text-[10.5px] font-semibold text-[#64748B] leading-tight">{label}</p>
-            <p className={`text-[15px] font-extrabold leading-tight ${value ? "text-[#0D1B2A]" : "text-[#94A3B8]"}`}>{value ?? "Pending"}</p>
+            <p className="text-[15px] font-extrabold leading-tight text-[#0D1B2A]">{value}</p>
             <p className="text-[10px] text-[#94A3B8]">{helper}</p>
           </div>
         );
       };
-      const specRow = ([k, v]: [string, string | null]) => (
+      const specRow = ([k, v]: [string, string | null]) => v ? (
         <div key={k} className="flex items-center justify-between gap-3 py-1.5 text-[12.5px] border-b border-[#F1F5F9] last:border-0">
           <span className="text-[#64748B]">{k}</span>
-          {v ? <span className="font-bold text-[#10202B] text-right">{v}</span> : <span className="text-[11px] font-semibold text-[#94A3B8]">Pending OEM data</span>}
+          <span className="font-bold text-[#10202B] text-right">{v}</span>
         </div>
-      );
+      ) : null;
       const specCard = (title: string, rows: [string, string | null][], helper?: string) => {
         const c = counts(rows);
-        if (c.ok === 0) return (
-          <div className={`${CARD} p-4`}>
-            <p className="text-[13.5px] font-bold text-[#0D1B2A]">{title}</p>
-            <p className="text-[12px] text-[#94A3B8] mt-1.5">Pending OEM data — confirm details with the dealership.</p>
-          </div>
-        );
+        if (c.ok === 0) return null;
         return (
           <div className={`${CARD} p-4`}>
             <p className="text-[13.5px] font-bold text-[#0D1B2A]">{title}</p>
@@ -1685,18 +1697,10 @@ function buildPanel(key: PassportPanelKey, d: PassportData, listing: VehicleList
                 {specStat("Fuel Economy", mpg, ks.mpg_city && ks.mpg_hwy ? "City / Hwy" : "Economy", "mpg fuel economy")}
               </div>
 
-              {/* Data confidence banner — state, not breakage */}
-              {corePending ? (
-                <div className="rounded-xl border border-amber-200 bg-[#FFF7E6] px-3.5 py-2.5 flex items-start gap-2">
-                  <AlertTriangle className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
-                  <p className="text-[12px] text-amber-800 leading-snug">Some specifications are pending OEM data. Confirm final details with the dealership.</p>
-                </div>
-              ) : (
-                <div className="rounded-xl border border-blue-100 bg-[#EAF4FF] px-3.5 py-2.5 flex items-start gap-2">
-                  <FileText className="w-4 h-4 text-[#0B6FEA] shrink-0 mt-0.5" />
-                  <p className="text-[12px] text-[#1E3A8A] leading-snug">Specifications are decoded from available vehicle data and organized for easier review.</p>
-                </div>
-              )}
+              <div className="rounded-xl border border-blue-100 bg-[#EAF4FF] px-3.5 py-2.5 flex items-start gap-2">
+                <FileText className="w-4 h-4 text-[#0B6FEA] shrink-0 mt-0.5" />
+                <p className="text-[12px] text-[#1E3A8A] leading-snug">Specifications are decoded from available vehicle data and organized for easier review.</p>
+              </div>
 
               {/* Two-column interior */}
               <div className="grid grid-cols-1 md:grid-cols-[minmax(0,62fr)_minmax(0,38fr)] gap-5 items-start">
@@ -1722,13 +1726,14 @@ function buildPanel(key: PassportPanelKey, d: PassportData, listing: VehicleList
                     <div className="space-y-2">
                       {catRows.map((c) => {
                         const cc = counts(c.rows);
+                        if (cc.ok === 0) return null;
                         const CIcon = getEquipmentIcon(c.iconName).icon;
                         return (
                           <details key={c.name} className={`${CARD} overflow-hidden group`}>
                             <summary className="cursor-pointer list-none flex items-center gap-3 px-4 py-3">
                               <span className="w-8 h-8 rounded-lg bg-[#EAF4FF] flex items-center justify-center shrink-0"><CIcon className="w-4 h-4 text-[#0B6FEA]" strokeWidth={1.75} /></span>
                               <span className="text-[13px] font-bold text-[#0F172A] flex-1 min-w-0 truncate">{c.name}</span>
-                              <span className="text-[11px] font-semibold text-[#94A3B8] shrink-0">{cc.ok ? `${cc.ok} available` : "Pending OEM data"}{cc.ok && cc.pending ? ` · ${cc.pending} pending` : ""}</span>
+                              <span className="text-[11px] font-semibold text-[#94A3B8] shrink-0">{cc.ok} available</span>
                               <ChevronDown className="w-4 h-4 text-[#94A3B8] group-open:rotate-180 transition-transform shrink-0" />
                             </summary>
                             <div className="px-4 pb-3">{c.rows.map(specRow)}</div>
@@ -1758,7 +1763,7 @@ function buildPanel(key: PassportPanelKey, d: PassportData, listing: VehicleList
                       <ChevronDown className="w-4 h-4 text-[#94A3B8] group-open:rotate-180 transition-transform shrink-0" />
                     </summary>
                     <div className="px-4 pb-4 space-y-4">
-                      {catRows.map((c) => (
+                      {catRows.filter((c) => counts(c.rows).ok > 0).map((c) => (
                         <div key={c.name}>
                           <p className="text-[11px] font-bold uppercase tracking-wide text-[#94A3B8] mb-1">{c.name}</p>
                           {c.rows.map(specRow)}
@@ -1822,10 +1827,7 @@ function buildPanel(key: PassportPanelKey, d: PassportData, listing: VehicleList
 
               {/* Generic decode = typical-for-trim, not VIN-verified — label it softly. */}
               {eq.generic && (
-                <div className="rounded-xl border border-amber-200 bg-[#FFF7E6] px-3.5 py-2.5 flex items-start gap-2">
-                  <AlertTriangle className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
-                  <p className="text-[12px] text-amber-800 leading-snug">Equipment shown is typical for this trim. Confirm this vehicle's exact build with the dealer.</p>
-                </div>
+                <p className="text-[12px] text-[#94A3B8]">Confirm this vehicle's exact build with our team.</p>
               )}
 
               {/* Two-column interior */}
@@ -2092,7 +2094,7 @@ function buildPanel(key: PassportPanelKey, d: PassportData, listing: VehicleList
             </div>
           )}
           {missing.length > 0 && (
-            <p className="text-[12px] text-[#64748B]">Not yet on file: {missing.join(", ")}. We only show verified records — ask {d.dealerName} for the full history report.</p>
+            <p className="text-[12px] text-[#64748B]">Want the complete picture? Ask {d.dealerName} for the full history report.</p>
           )}
           {hasHistory && (
             <button onClick={() => go("vehicle-history")} className="w-full h-11 rounded-xl bg-[#2563EB] hover:bg-[#1d4fd7] text-white text-[13px] font-semibold inline-flex items-center justify-center gap-2 transition-colors"><History className="w-4 h-4" /> View Full Vehicle History Report</button>
@@ -2114,12 +2116,25 @@ function buildPanel(key: PassportPanelKey, d: PassportData, listing: VehicleList
 }
 
 // ── Small shared bits used by the panels ──────────────────────
-const Delta = ({ label, delta }: { label: string; delta: number }) => (
-  <span className={`inline-flex items-center gap-1 font-semibold ${delta <= 0 ? "text-[#16A34A]" : "text-[#64748B]"}`}>
-    {delta <= 0 ? <TrendingDown className="w-3.5 h-3.5" /> : <TrendingUp className="w-3.5 h-3.5" />}
-    {label} {delta <= 0 ? "decreased" : "increased"}{delta !== 0 ? ` ${fmt$(Math.abs(delta))}` : ""}
-  </span>
-);
+// Customer-visible price movement renders only when it works FOR the shopper:
+// dealer price reductions, or a rising market as cost-to-wait. Dealer price
+// increases and a falling market never render.
+const Delta = ({ kind, delta }: { kind: "dealer" | "market"; delta: number }) => {
+  if (kind === "dealer") {
+    if (delta >= 0) return null;
+    return (
+      <span className="inline-flex items-center gap-1 font-semibold text-[#16A34A]">
+        <TrendingDown className="w-3.5 h-3.5" /> Price reduced {fmt$(Math.abs(delta))}
+      </span>
+    );
+  }
+  if (delta <= 0) return null;
+  return (
+    <span className="inline-flex items-center gap-1 font-semibold text-[#64748B]">
+      <TrendingUp className="w-3.5 h-3.5" /> Market average up {fmt$(delta)} in 30 days — today's price locks it in
+    </span>
+  );
+};
 
 const Gauge3 = ({ value }: { value: number }) => (
   <div>
@@ -2130,16 +2145,15 @@ const Gauge3 = ({ value }: { value: number }) => (
   </div>
 );
 
-// Every factor carries a visible status — a blank row reads as broken. The
-// status is a soft chip: green for strong/good/verified, amber for pending.
+// Factors without enough data are omitted upstream, so every rendered row
+// carries a positive status chip — "Pending" never reaches a customer.
 const FactorBar = ({ label, pct, status }: { label: string; pct: number; status?: string }) => {
-  const s = status ?? (pct >= 85 ? "Strong" : pct >= 55 ? "Good" : "Pending");
-  const amber = s === "Pending" || s === "Limited";
+  const s = status ?? (pct >= 85 ? "Strong" : "Good");
   return (
     <div>
       <div className="flex justify-between items-center gap-2 text-[12px] mb-1">
         <span className="text-[#0F172A] font-medium">{label}</span>
-        <span className={`text-[10px] font-bold rounded-full border px-2 py-0.5 shrink-0 ${amber ? "bg-amber-50 text-amber-700 border-amber-200" : s === "Strong" ? "bg-emerald-50 text-emerald-700 border-emerald-200" : "bg-emerald-50/60 text-emerald-700 border-emerald-100"}`}>{s}</span>
+        <span className={`text-[10px] font-bold rounded-full border px-2 py-0.5 shrink-0 ${s === "Strong" ? "bg-emerald-50 text-emerald-700 border-emerald-200" : "bg-emerald-50/60 text-emerald-700 border-emerald-100"}`}>{s}</span>
       </div>
       <div className="h-2 rounded-full bg-slate-100 overflow-hidden"><div className="h-full rounded-full bg-[#2563EB]" style={{ width: `${Math.max(0, Math.min(100, pct))}%` }} /></div>
     </div>
@@ -2207,15 +2221,15 @@ const CoverageCard = ({ title, subtitle, pct, tone, years, miles, expiresDate, e
 // the in-service start and the calculated end (date + mileage).
 const WarrantyStatusCard = ({ active, startLabel, startSub, endDate, endMiles }: {
   active: boolean; startLabel: string; startSub?: string | null; endDate?: string | null; endMiles?: number | null;
-}) => (
+}) => active ? (
   <div className="rounded-2xl border border-emerald-200 bg-emerald-50/60 p-5">
     <div className="flex flex-col sm:flex-row sm:items-center gap-5">
       <div className="flex items-start gap-3.5 min-w-0 flex-1">
         <span className="w-14 h-14 rounded-2xl bg-emerald-100 flex items-center justify-center shrink-0"><ShieldCheck className="w-7 h-7 text-[#16A34A]" /></span>
         <div className="min-w-0">
           <p className="text-[13px] font-bold text-[#0F172A]">Factory Warranty</p>
-          <p className={`text-[26px] font-extrabold leading-none tracking-wide mt-0.5 ${active ? "text-[#16A34A]" : "text-[#64748B]"}`}>{active ? "ACTIVE" : "EXPIRED"}</p>
-          <p className="text-[12px] text-[#64748B] mt-1.5 leading-snug">{active ? "Your factory warranty is in effect. You're covered." : "Factory coverage has ended for this vehicle."}</p>
+          <p className="text-[26px] font-extrabold leading-none tracking-wide mt-0.5 text-[#16A34A]">ACTIVE</p>
+          <p className="text-[12px] text-[#64748B] mt-1.5 leading-snug">Your factory warranty is in effect. You're covered.</p>
         </div>
       </div>
       <div className="flex items-stretch gap-6 sm:border-l sm:border-emerald-200/70 sm:pl-6">
@@ -2233,6 +2247,11 @@ const WarrantyStatusCard = ({ active, startLabel, startSub, endDate, endMiles }:
         )}
       </div>
     </div>
+  </div>
+) : (
+  <div className={`${CARD} px-4 py-3 flex items-center gap-2.5`}>
+    <ShieldCheck className="w-4 h-4 text-[#94A3B8] shrink-0" />
+    <p className="text-[13px] text-[#64748B]">Factory coverage ended — ask our team about the extended coverage options for this vehicle.</p>
   </div>
 );
 
@@ -2578,7 +2597,7 @@ interface CtaSignals { greatPrice: boolean; highDemand: boolean; highConf: boole
 interface CtaDef { badge: string; btn: string; sub: string; action: "reserve" | "protect"; tone: "green" | "orange" | "blue" }
 const ctaFor = (panelKey: string, s: CtaSignals): CtaDef => {
   switch (panelKey) {
-    case "market-price": return { badge: s.greatPrice ? "Great Price Available Today" : "Vehicle Available Today", btn: s.greatPrice ? "Lock In This Price" : "Reserve This Vehicle", sub: s.greatPrice ? "This price is below market and ready to lock in." : "Secure this vehicle while it's still available.", action: "reserve", tone: s.greatPrice ? "green" : "blue" };
+    case "market-price": return { badge: s.greatPrice ? "Great Price Available Today" : "Vehicle Available Today", btn: s.greatPrice ? "Reserve at This Price" : "Reserve This Vehicle", sub: s.greatPrice ? "The dealership confirms availability." : "Secure this vehicle while it's still available.", action: "reserve", tone: s.greatPrice ? "green" : "blue" };
     case "market-demand": return { badge: s.highDemand ? "High Demand In Your Market" : "Vehicle Available Today", btn: s.highDemand ? "Claim This Vehicle" : "Reserve This Vehicle", sub: s.highDemand ? "High-demand vehicles go fast." : "Secure this vehicle while it's still available.", action: "reserve", tone: "green" };
     // Urgency copy only when the data supports it — a fabricated scarcity badge
     // above an honest empty state poisons the page's verification premise.
@@ -2588,9 +2607,9 @@ const ctaFor = (panelKey: string, s: CtaSignals): CtaDef => {
     case "inventory-trend": return s.highDemand
       ? { badge: "Strong Local Interest", btn: "Reserve This Vehicle", sub: "Shopper activity on this vehicle is above average.", action: "reserve", tone: "orange" }
       : { badge: "Vehicle Available Today", btn: "Reserve This Vehicle", sub: "Secure this vehicle while it's still available.", action: "reserve", tone: "blue" };
-    case "price-confidence": return { badge: s.highConf ? "Verified Best Value" : "Independently Verified", btn: s.highConf ? "Reserve With Confidence" : "Reserve This Vehicle", sub: "This price has been independently verified.", action: "reserve", tone: "green" };
+    case "price-confidence": return { badge: "Supported by Market Data", btn: s.highConf ? "Reserve With Confidence" : "Reserve This Vehicle", sub: "This price is supported by live market data.", action: "reserve", tone: "green" };
     case "factory-warranty": return { badge: s.hasWarranty ? "Warranty Coverage Available" : "Vehicle Available Today", btn: s.hasWarranty ? "Protect This Vehicle" : "Reserve This Vehicle", sub: s.hasWarranty ? "Secure remaining factory protection." : "Secure this vehicle while it's still available.", action: s.hasWarranty ? "protect" : "reserve", tone: "green" };
-    case "owner-reviews": return { badge: s.highlyRated ? "Highly Rated By Owners" : "Trusted Dealer Reviews", btn: "Reserve This Vehicle", sub: "Owners love this vehicle.", action: "reserve", tone: "green" };
+    case "owner-reviews": return { badge: s.highlyRated ? "Highly Rated By Owners" : "Trusted Dealer Reviews", btn: "Reserve This Vehicle", sub: "Shoppers rate this dealership highly.", action: "reserve", tone: "green" };
     default: return { badge: "Vehicle Available Today", btn: "Reserve This Vehicle", sub: "Secure this vehicle while it's still available.", action: "reserve", tone: "blue" };
   }
 };
@@ -2637,8 +2656,7 @@ function MobileCtaFooter({ variant, panelKey, go, signals }: { variant: string; 
       <div>
         <p className="text-[11px] font-semibold text-[#94A3B8] uppercase tracking-wider mb-2">You're looking at</p>
         <div className="flex flex-wrap gap-1.5 mb-3">{chips.map((c) => <span key={c} className="text-[11px] font-semibold text-[#16A34A] bg-emerald-50 border border-emerald-200 rounded-full px-2.5 py-1">{c}</span>)}</div>
-        <button onClick={primary} className="w-full min-h-[52px] rounded-2xl bg-[#2563EB] active:bg-[#1d4fd7] text-white text-[15px] font-bold inline-flex items-center justify-center gap-2 transition-all active:scale-[0.99]">Continue With This Vehicle</button>
-        <p className="text-[11px] text-[#94A3B8] text-center mt-1.5">Review your next steps before reserving.</p>
+        <button onClick={primary} className="w-full min-h-[52px] rounded-2xl bg-[#2563EB] active:bg-[#1d4fd7] text-white text-[15px] font-bold inline-flex items-center justify-center gap-2 transition-all active:scale-[0.99]">Reserve This Vehicle</button>
         <TrustRow items={TRUST_PROGRESSIVE} />
       </div>
     );
@@ -2863,25 +2881,6 @@ function PriceTimeline({ history }: { history: PricePoint[] }) {
 }
 
 
-function InventoryTrendChart({ isPreview }: { isPreview: boolean }) {
-  const [range, setRange] = useState<number>(90);
-  const series = useMemo(() => {
-    if (!isPreview) return [] as number[];
-    const n = range >= 180 ? 12 : range >= 90 ? 9 : range >= 60 ? 6 : 4;
-    return Array.from({ length: n }, (_, i) => Math.round(56 - i * (12 / n) - (i % 2)));
-  }, [isPreview, range]);
-  return (
-    <div className={`${CARD} p-4`}>
-      <div className="flex items-center justify-between gap-3 mb-3 flex-wrap">
-        <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-[#16A34A]"><span className="w-4 border-t-2 border-[#16A34A]" /> Inventory count</span>
-        <Seg value={range} onChange={(v) => setRange(v as number)} options={[{ label: "30D", value: 30 }, { label: "60D", value: 60 }, { label: "90D", value: 90 }, { label: "180D", value: 180 }]} />
-      </div>
-      {series.length >= 2 ? <TrendChart dealer={series} height={140} /> : <Empty>Inventory time-series appears once enough market snapshots are collected.</Empty>}
-      {isPreview && <p className="text-[11px] text-[#94A3B8] mt-2">Sample trend shown in preview mode.</p>}
-    </div>
-  );
-}
-
 const RatingBar = ({ label, score }: { label: string; score: number }) => (
   <div className="flex items-center gap-3">
     <span className="text-[12px] text-[#0F172A] w-24 shrink-0">{label}</span>
@@ -3028,21 +3027,6 @@ const IconCard = ({ icon: Icon, title, sub }: { icon: React.ElementType; title: 
   </div>
 );
 
-// Spec section that names which fields are still pending OEM data instead of
-// fabricating numbers (per Batch 4: never invent specifications).
-const SpecGroup = ({ title, rows }: { title: string; rows: [string, string | null][] }) => {
-  const present = rows.filter(([, v]) => v);
-  const missing = rows.filter(([, v]) => !v).map(([k]) => k);
-  return (
-    <Section title={title}>
-      <div className={`${CARD} p-4`}>
-        {present.length ? present.map(([k, v]) => <StatRow key={k} label={k} value={v as string} />) : <p className="text-[12px] text-[#64748B]">Pending OEM data.</p>}
-        {present.length > 0 && missing.length > 0 && <p className="text-[11px] text-[#94A3B8] mt-2">Pending OEM data: {missing.join(", ")}.</p>}
-      </div>
-    </Section>
-  );
-};
-
 const Meter = ({ label, value, unit, pct }: { label: string; value: string; unit: string; pct: number }) => (
   <div>
     <div className="flex justify-between text-[12px]"><span className="text-[#64748B]">{label}</span><span className="font-bold">{value} <span className="text-[#94A3B8] font-medium">{unit}</span></span></div>
@@ -3054,7 +3038,7 @@ const Stars = ({ n, size = 16 }: { n: number; size?: number }) => (
   <span className="inline-flex items-center gap-0.5">{[0, 1, 2, 3, 4].map((i) => <Star key={i} style={{ width: size, height: size }} className="text-amber-400" fill={i < Math.round(n) ? "#F59E0B" : "none"} strokeWidth={1.5} />)}</span>
 );
 
-const Disclaimer = () => <p className="text-[11px] text-[#94A3B8] pt-1">Information is provided by trusted third parties and is accurate to the best of our knowledge. Verify details with the dealer.</p>;
+const Disclaimer = () => <p className="text-[11px] text-[#94A3B8] pt-1">Details are accurate to the best of our knowledge — confirm final details with our team.</p>;
 
 // Card → icon hint used by the trigger map (kept here so the page just
 // passes a key). Not rendered; documents intent for future panels.
@@ -3089,7 +3073,7 @@ export default function PassportPanel({ panel, onClose, openPanel, d, listing, i
   if (!key) return null;
 
   const def = buildPanel(key, d, listing, isPreview, go, openPanel, nhtsa);
-  const ctaSignals: CtaSignals = { greatPrice: (d.belowMarket ?? 0) > 0, highDemand: (d.viewCount ?? 0) > 20, highConf: (d.confScore ?? 0) >= 85, highlyRated: (d.reviewRating ?? 0) >= 4.5, hasWarranty: !!d.warrantyStr };
+  const ctaSignals: CtaSignals = { greatPrice: (d.belowMarket ?? 0) > 0, highDemand: (d.viewCount ?? 0) > 20, highConf: (d.confScore ?? 0) >= 85, highlyRated: (d.reviewRating ?? 0) >= 4.5, hasWarranty: !!d.warrantyStr && !d.warrantyExpired };
   const ctaVariant = d.dealerTrust.mobileCtaVariant || "dealer_availability";
   const footer = (def.primary || def.secondary) ? (
     <>
