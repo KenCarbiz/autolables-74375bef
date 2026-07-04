@@ -9,14 +9,11 @@ import {
   ShieldCheck,
   Scan,
   FileText,
-  Signature,
   BarChart3,
   Sparkles,
   Check,
   AlertTriangle,
   Gavel,
-  Eye,
-  Building2,
   QrCode,
   ChevronDown,
   BadgeCheck,
@@ -42,6 +39,59 @@ import {
 // The most convincing demo is the real customer artifact — the sample
 // Vehicle Passport rendered with placeholder data (no signup required).
 const DEMO_TO = "/v/demo?preview=1";
+
+// Landing icon system — final locked SVGs committed in /public (blue gradient
+// tile, white glyph, transparent canvas). Rendered bare via LandingIcon: the
+// tile is baked into the SVG, so no wrapper box or background is ever added.
+const landingIcons = {
+  ftcEnforcement: "/ftc_enforcement_gavel_shield_icon_transparent.svg",
+  advertisedPriceLiability: "/advertised_price_liability_icon_transparent.svg",
+  stateAgAudits: "/state_ag_audit_icon_transparent.svg",
+  recallExposure: "/recall_exposure_alert_icon_transparent.svg",
+
+  sellAddonsWithoutFear: "/sell_addons_without_fear_icon_transparent.svg",
+  ownYourPrice: "/own_your_price_icon_transparent.svg",
+  signedProof: "/sign_signature_icon_transparent.svg",
+  auditDefenseFile: "/audit_defense_file_icon_transparent.svg",
+
+  decode: "/decode_vin_scan_icon_transparent.svg",
+  stick: "/stick_label_icon_transparent.svg",
+  sign: "/sign_signature_icon_transparent.svg",
+  close: "/close_sales_intelligence_icon_transparent.svg",
+
+  vehicleArrives: "/vehicle_arrives_scan_icon_transparent.svg",
+  getReadyQueues: "/get_ready_queue_icon_transparent.svg",
+  installersProveWork: "/verified_camera_icon_transparent.svg",
+  foremanSignsOff: "/foreman_signoff_icon_transparent.svg",
+  rightStickerGoesOut: "/right_sticker_goes_out_icon_transparent.svg",
+
+  websitePriceMonitoring: "/website_price_monitoring_icon_transparent.svg",
+  windowStickersVehiclePassports: "/window_stickers_vehicle_passports_icon_transparent.svg",
+  tamperEvidentAuditTrail: "/tamper_evident_audit_trail_icon_transparent.svg",
+  ftcAlignedAddendums: "/ftc_aligned_addendums_icon_transparent.svg",
+  customerDigitalSignatures: "/customer_digital_signatures_icon_transparent.svg",
+  fiftyStateDisclosureEngine: "/fifty_state_disclosure_engine_icon_transparent.svg",
+};
+
+// Size comes through className (default 48px) so h-10/h-14 variants can't
+// collide with a baked-in h-12 in the Tailwind cascade.
+const LandingIcon = ({
+  src,
+  alt,
+  className = "h-12 w-12",
+}: {
+  src: string;
+  alt: string;
+  className?: string;
+}) => (
+  <img
+    src={src}
+    alt={alt}
+    className={`object-contain shrink-0 ${className}`}
+    loading="lazy"
+    draggable={false}
+  />
+);
 
 const Landing = () => {
   const { user } = useAuth();
@@ -208,13 +258,13 @@ const Hero = ({ waitTo }: { waitTo: string }) => (
           </a>
         </div>
         <p className="mt-3 text-xs text-slate-500">Free to join · no card required · locks early-access pricing.</p>
-        <div className="mt-8 grid grid-cols-1 gap-x-6 gap-y-2.5 sm:grid-cols-2">
-          <HeroCheck icon={ShieldCheck} label="Website price monitoring" />
-          <HeroCheck icon={FileText} label="FTC-aligned addendums" />
-          <HeroCheck icon={QrCode} label="Window stickers + Vehicle Passports" />
-          <HeroCheck icon={Signature} label="Customer digital signatures" />
-          <HeroCheck icon={BadgeCheck} label="Tamper-evident audit trail" />
-          <HeroCheck icon={Building2} label="50-state disclosure engine" />
+        <div className="mt-8 grid grid-cols-1 gap-x-6 gap-y-3 sm:grid-cols-2">
+          <HeroCheck iconSrc={landingIcons.websitePriceMonitoring} label="Website price monitoring" />
+          <HeroCheck iconSrc={landingIcons.ftcAlignedAddendums} label="FTC-aligned addendums" />
+          <HeroCheck iconSrc={landingIcons.windowStickersVehiclePassports} label="Window stickers + Vehicle Passports" />
+          <HeroCheck iconSrc={landingIcons.customerDigitalSignatures} label="Customer digital signatures" />
+          <HeroCheck iconSrc={landingIcons.tamperEvidentAuditTrail} label="Tamper-evident audit trail" />
+          <HeroCheck iconSrc={landingIcons.fiftyStateDisclosureEngine} label="50-state disclosure engine" />
         </div>
       </div>
 
@@ -225,11 +275,9 @@ const Hero = ({ waitTo }: { waitTo: string }) => (
   </section>
 );
 
-const HeroCheck = ({ icon: Icon, label }: { icon: IconType; label: string }) => (
-  <div className="flex items-center gap-2.5 text-sm text-slate-700">
-    <span className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-blue-50 text-[#2563EB]">
-      <Icon className="h-3.5 w-3.5" />
-    </span>
+const HeroCheck = ({ iconSrc, label }: { iconSrc: string; label: string }) => (
+  <div className="flex items-center gap-3 text-sm text-slate-700">
+    <LandingIcon src={iconSrc} alt={label} className="h-14 w-14" />
     <span className="font-medium">{label}</span>
   </div>
 );
@@ -521,19 +569,19 @@ const Risk = () => (
       </div>
 
       <div className="mx-auto mt-12 grid max-w-6xl gap-5 sm:grid-cols-2 lg:grid-cols-4">
-        <Card icon={Gavel} title="FTC enforcement">
+        <Card iconSrc={landingIcons.ftcEnforcement} title="FTC enforcement">
           FTC Act §5 and 16 CFR Part 455 target undisclosed add-ons, bait pricing, and missing consent.
           Investigations begin with a website crawl, not a customer complaint.
         </Card>
-        <Card icon={AlertTriangle} title="Advertised-price liability">
+        <Card iconSrc={landingIcons.advertisedPriceLiability} title="Advertised-price liability">
           Selling a vehicle for more than the advertised price exposes the dealer to refunds,
           rescission, and state UDAP penalties — even when the mismatch was a typo.
         </Card>
-        <Card icon={Eye} title="State AG audits">
+        <Card iconSrc={landingIcons.stateAgAudits} title="State AG audits">
           California (SB 766, eff. Oct 2026), Massachusetts, New York, and Maryland have active
           dealer enforcement units that pull records on demand.
         </Card>
-        <Card icon={ShieldCheck} title="Recall exposure">
+        <Card iconSrc={landingIcons.recallExposure} title="Recall exposure">
           Selling a new vehicle under an open recall is federally prohibited, and used-car recall
           disclosure is a growing FTC and state-AG target. AutoLabels checks NHTSA campaigns at
           listing, re-checks at signing, and hard-stops on do-not-drive orders.
@@ -576,25 +624,25 @@ const HowItWorks = () => (
       <div className="mx-auto mt-12 grid max-w-6xl gap-5 md:grid-cols-2 lg:grid-cols-4">
         <NumberedCard
           num="01"
-          icon={Scan}
+          iconSrc={landingIcons.decode}
           title="Decode"
           body="VIN to a decoded spec sheet in under a second via NHTSA — year, make, model, trim, and standard equipment, auto-filled."
         />
         <NumberedCard
           num="02"
-          icon={FileText}
+          iconSrc={landingIcons.stick}
           title="Stick"
           body="Build an FTC-aligned dealer addendum — products, pricing, disclosures, and your state's doc fee — audit-ready in under a minute."
         />
         <NumberedCard
           num="03"
-          icon={Signature}
+          iconSrc={landingIcons.sign}
           title="Sign"
           body="Customer scans a QR, signs on their phone, and every action lands in your audit log. No paper, no chasing signatures."
         />
         <NumberedCard
           num="04"
-          icon={BarChart3}
+          iconSrc={landingIcons.close}
           title="Close"
           body="Every scan becomes a lead. Every addendum becomes data. See what's selling, what's stuck, and what's closing — live."
         />
@@ -610,7 +658,7 @@ const HowItWorks = () => (
         </p>
         <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
           {PIPELINE.map((s) => (
-            <NumberedCard key={s.num} num={s.num} title={s.title} body={s.body} />
+            <NumberedCard key={s.num} num={s.num} iconSrc={s.icon} title={s.title} body={s.body} />
           ))}
         </div>
         <div className="mt-8 flex flex-wrap justify-center gap-2">
@@ -629,11 +677,11 @@ const HowItWorks = () => (
 // correct sticker version, gated by the foreman prep sign-off. Grounded in
 // real features: useGetReady, install_proofs, usePrepSignOff, version-lock.
 const PIPELINE = [
-  { num: "01", title: "Vehicle arrives", body: "Paste a VDP or VIN, or let the nightly sync pull it in. The file builds itself — decode, equipment, photos, and live market position." },
-  { num: "02", title: "Get-Ready queues itself", body: "Itemized recon, inspection, detail, and accessory installs auto-assign to Service, Lot, Detail, and outside vendors — each with an owner, an email, and a cost." },
-  { num: "03", title: "Installers prove the work", body: "Every item advertised as installed gets an installer signature and a photo. No proof, no claim." },
-  { num: "04", title: "Foreman signs off", body: "The prep gate stays locked. The car can't be listed or published until it's truly ready." },
-  { num: "05", title: "The right sticker goes out", body: "The correct window-sticker version and addendum generate — version-locked — and publish to the Vehicle Passport with its QR." },
+  { num: "01", icon: landingIcons.vehicleArrives, title: "Vehicle arrives", body: "Paste a VDP or VIN, or let the nightly sync pull it in. The file builds itself — decode, equipment, photos, and live market position." },
+  { num: "02", icon: landingIcons.getReadyQueues, title: "Get-Ready queues itself", body: "Itemized recon, inspection, detail, and accessory installs auto-assign to Service, Lot, Detail, and outside vendors — each with an owner, an email, and a cost." },
+  { num: "03", icon: landingIcons.installersProveWork, title: "Installers prove the work", body: "Every item advertised as installed gets an installer signature and a photo. No proof, no claim." },
+  { num: "04", icon: landingIcons.foremanSignsOff, title: "Foreman signs off", body: "The prep gate stays locked. The car can't be listed or published until it's truly ready." },
+  { num: "05", icon: landingIcons.rightStickerGoesOut, title: "The right sticker goes out", body: "The correct window-sticker version and addendum generate — version-locked — and publish to the Vehicle Passport with its QR." },
 ];
 
 // ──────────────────────────────────────────────────────────────
@@ -1037,7 +1085,7 @@ const TakeThePowerBack = ({ waitTo }: { waitTo: string }) => (
 
       <div className="mx-auto mt-12 grid max-w-5xl gap-5 lg:grid-cols-2">
         <PowerPillar
-          icon={BadgeCheck}
+          iconSrc={landingIcons.sellAddonsWithoutFear}
           eyebrow="Profitable add-on election"
           title="Sell add-ons without fear."
           body="F&I is your most profitable revenue — and your most exposed. AutoLabels captures per-item, informed election: the customer sees each product's price, sees it's optional, sees the benefit, and signs. Every yes is provable."
@@ -1045,7 +1093,7 @@ const TakeThePowerBack = ({ waitTo }: { waitTo: string }) => (
           punch="Every yes, provable."
         />
         <PowerPillar
-          icon={Tag}
+          iconSrc={landingIcons.ownYourPrice}
           eyebrow="Price integrity"
           title="Own your price. Prove you honored it."
           body={
@@ -1069,6 +1117,27 @@ const TakeThePowerBack = ({ waitTo }: { waitTo: string }) => (
         />
       </div>
 
+      <div className="mx-auto mt-5 grid max-w-5xl gap-5 sm:grid-cols-2">
+        <div className="flex items-center gap-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+          <LandingIcon src={landingIcons.signedProof} alt="Signed proof" className="h-10 w-10" />
+          <div>
+            <p className="font-barlow-condensed text-lg font-bold text-slate-900">Signed proof</p>
+            <p className="mt-0.5 text-sm leading-relaxed text-slate-600">
+              Every election initialed and e-signed — consent, IP, timestamp, and content hash on file.
+            </p>
+          </div>
+        </div>
+        <div className="flex items-center gap-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+          <LandingIcon src={landingIcons.auditDefenseFile} alt="Audit defense file" className="h-10 w-10" />
+          <div>
+            <p className="font-barlow-condensed text-lg font-bold text-slate-900">Audit defense file</p>
+            <p className="mt-0.5 text-sm leading-relaxed text-slate-600">
+              One tamper-evident record per VIN — ready to hand to counsel or a regulator.
+            </p>
+          </div>
+        </div>
+      </div>
+
       <div className="mx-auto mt-10 flex max-w-2xl flex-col items-center gap-4 text-center">
         <p className="text-xs leading-relaxed text-slate-500">
           Tamper-evident, not tamper-proof. AutoLabels documents informed election and strengthens
@@ -1087,14 +1156,14 @@ const TakeThePowerBack = ({ waitTo }: { waitTo: string }) => (
 );
 
 const PowerPillar = ({
-  icon: Icon,
+  iconSrc,
   eyebrow,
   title,
   body,
   chips,
   punch,
 }: {
-  icon: IconType;
+  iconSrc: string;
   eyebrow: string;
   title: string;
   body: React.ReactNode;
@@ -1102,9 +1171,7 @@ const PowerPillar = ({
   punch: string;
 }) => (
   <div className="flex flex-col rounded-2xl border border-slate-200 bg-white p-8 shadow-sm">
-    <div className="flex h-11 w-11 items-center justify-center rounded-lg bg-blue-50 text-[#2563EB]">
-      <Icon className="h-5 w-5" />
-    </div>
+    <LandingIcon src={iconSrc} alt={title} />
     <p className="mt-5 text-[11px] font-bold uppercase tracking-[0.16em] text-blue-600">{eyebrow}</p>
     <h3 className="mt-1.5 font-barlow-condensed text-2xl font-extrabold tracking-normal text-slate-900">{title}</h3>
     <div className="mt-3 text-sm leading-relaxed text-slate-600">{body}</div>
@@ -1493,19 +1560,27 @@ const Footer = ({ waitTo }: { waitTo: string }) => (
 
 type IconType = typeof Scan;
 
+// icon (Lucide, blue-box wrapper) survives for cards outside the landing icon
+// system (Sticker Studio templates); iconSrc renders the bare gradient-tile SVG.
 const Card = ({
   icon: Icon,
+  iconSrc,
   title,
   children,
 }: {
-  icon: IconType;
+  icon?: IconType;
+  iconSrc?: string;
   title: string;
   children: React.ReactNode;
 }) => (
   <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm transition-shadow hover:shadow-md">
-    <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-blue-50 text-[#2563EB]">
-      <Icon className="h-5 w-5" />
-    </div>
+    {iconSrc ? (
+      <LandingIcon src={iconSrc} alt={title} />
+    ) : Icon ? (
+      <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-blue-50 text-[#2563EB]">
+        <Icon className="h-5 w-5" />
+      </div>
+    ) : null}
     <h3 className="mt-4 font-barlow-condensed text-lg font-bold tracking-normal text-slate-900">{title}</h3>
     <p className="mt-2 text-sm leading-relaxed text-slate-600">{children}</p>
   </div>
@@ -1513,29 +1588,19 @@ const Card = ({
 
 const NumberedCard = ({
   num,
-  icon: Icon,
+  iconSrc,
   title,
   body,
 }: {
   num: string;
-  icon?: IconType;
+  iconSrc: string;
   title: string;
   body: string;
 }) => (
   <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm transition-shadow hover:shadow-md">
-    <div className="flex items-center justify-between">
-      {Icon ? (
-        <>
-          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-gradient-to-br from-[#3BB4FF] via-[#2563EB] to-[#0B2041] text-white">
-            <Icon className="h-5 w-5" />
-          </div>
-          <span className="font-display text-xs font-bold tabular-nums text-[#2563EB]">{num}</span>
-        </>
-      ) : (
-        <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-gradient-to-br from-[#3BB4FF] via-[#2563EB] to-[#0B2041] font-display text-sm font-black text-white">
-          {num}
-        </span>
-      )}
+    <div className="flex items-start justify-between">
+      <LandingIcon src={iconSrc} alt={title} />
+      <span className="font-display text-xs font-bold tabular-nums text-[#2563EB]">{num}</span>
     </div>
     <h3 className="mt-4 font-barlow-condensed text-xl font-bold tracking-normal text-slate-900">{title}</h3>
     <p className="mt-2 text-sm leading-relaxed text-slate-600">{body}</p>
