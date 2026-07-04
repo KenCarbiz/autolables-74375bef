@@ -80,13 +80,11 @@ function buildInfo(key: InfoModalKey, go: (s: string) => void, openPanel: ((k: s
         body: <>
           <Para>AutoLabels draws on multiple independent sources. Each contributes a different piece of the picture, and availability varies by vehicle and region.</Para>
           <SourceGrid items={[
-            { name: "CARFAX", contributes: "Vehicle history — accidents, title events, service records." },
-            { name: "AutoCheck", contributes: "Alternative history report and an auction-based history score." },
-            { name: "NMVTIS", contributes: "Federal title-brand and total-loss records." },
-            { name: "OEM", contributes: "Manufacturer build data, equipment, and specifications." },
             { name: "MarketCheck", contributes: "Live market pricing and comparable listings." },
             { name: "NHTSA", contributes: "Open recall campaigns and safety data." },
-            { name: "Kelley Blue Book", contributes: "Independent vehicle valuation guidance." },
+            { name: "EPA", contributes: "Official fuel economy figures from fueleconomy.gov." },
+            { name: "OEM", contributes: "Manufacturer build data, equipment, and specifications." },
+            { name: "Dealership Records", contributes: "Service, reconditioning, and inspection records from the selling dealer." },
           ]} />
           <Callout tone="green">Only sources that have data for this specific vehicle contribute to its report. We never present unconfirmed information as verified.</Callout>
         </>,

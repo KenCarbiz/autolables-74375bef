@@ -689,9 +689,9 @@ const MobileSigning = () => {
           )}
 
           <div>
-            <p className="text-[10px] font-mono uppercase tracking-[0.18em] text-slate-500">Legally binding</p>
+            <p className="text-[10px] font-mono uppercase tracking-[0.18em] text-slate-500">Your record is protected</p>
             <p className="text-[12px] text-slate-700 leading-relaxed mt-1">
-              Every product, price, initial, and consent you reviewed is SHA-256 hashed and stored with your IP and device info — defensible under the federal E-SIGN Act and your state's UETA.
+              Your signed record is tamper-evident — the exact document you signed is cryptographically sealed so no one can change it afterward.
             </p>
           </div>
 
@@ -1354,7 +1354,7 @@ const MobileSigning = () => {
           {submitting ? "Signing…" : "Sign and finalize"}
         </button>
         <p className="text-center text-[10px] font-mono uppercase tracking-wider text-slate-500">
-          By signing, you're hashed, archived, and legally bound.
+          Your signed copy is securely recorded and a copy is sent to you.
         </p>
         </div>
       </div>

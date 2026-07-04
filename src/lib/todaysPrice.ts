@@ -55,7 +55,7 @@ export const DEFAULT_TODAYS_PRICE_CUSTOM: TodaysPriceCustom = {
   allow_otd_wording: false,
 };
 
-const REASSURANCE = "No obligation. A dealership representative will review your request and follow up with available payment details.";
+const REASSURANCE = "A dealership representative will review your request and follow up with available payment details.";
 
 const MODE_COPY: Record<Exclude<TodaysPriceMode, "custom">, Omit<TodaysPriceCopy, "showCalculator" | "showDown" | "showTerm" | "showApr">> = {
   payment_estimate: {
@@ -72,7 +72,7 @@ const MODE_COPY: Record<Exclude<TodaysPriceMode, "custom">, Omit<TodaysPriceCopy
     headline: "Confirm Today's Price",
     sub: "Request confirmation of current availability and pricing.",
     cta: "Confirm Price & Availability",
-    reassurance: "No obligation. A dealership representative will confirm availability and pricing with you directly.",
+    reassurance: "A dealership representative will confirm availability and pricing with you directly.",
     disclaimer: "Pricing and availability are subject to dealership confirmation. Taxes, title, registration, and applicable fees may vary.",
     barLabel: "Confirm Price",
   },
@@ -81,7 +81,7 @@ const MODE_COPY: Record<Exclude<TodaysPriceMode, "custom">, Omit<TodaysPriceCopy
     headline: "Request Out-the-Door Details",
     sub: "Ask the dealership for taxes, fees, registration, and final purchase details.",
     cta: "Request Out-the-Door Details",
-    reassurance: "No obligation. A dealership representative will follow up with the full purchase breakdown.",
+    reassurance: "A dealership representative will follow up with the full purchase breakdown.",
     disclaimer: "Out-the-door estimates may vary based on taxes, registration, trade value, lender approval, and dealership confirmation.",
     barLabel: "OTD Details",
   },
@@ -90,7 +90,7 @@ const MODE_COPY: Record<Exclude<TodaysPriceMode, "custom">, Omit<TodaysPriceCopy
     headline: "Estimate Your Payment",
     sub: "Adjust down payment, term, and rate to explore your estimated monthly payment.",
     cta: "Request Finance Details",
-    reassurance: "No obligation. A dealership finance specialist will follow up with available options.",
+    reassurance: "A dealership finance specialist will follow up with available options.",
     disclaimer: "Estimate only, with approved credit. Final payment, rate, and terms are subject to lender approval.",
     barLabel: "Finance Details",
   },

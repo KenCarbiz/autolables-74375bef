@@ -81,8 +81,8 @@ export default function PassportCtaDock({ go, dealerPhone, reviewRating, advisor
           <button onClick={toggle} aria-label="Close" className="absolute top-3 right-3 w-7 h-7 rounded-full bg-white/15 hover:bg-white/25 flex items-center justify-center transition-colors"><X className="w-4 h-4" /></button>
           {r?.afterHours ? (
             <>
-              <h2 className="text-[20px] font-extrabold leading-tight text-center px-5">We're closed right now.</h2>
-              <p className="text-[12px] opacity-90 text-center mt-1">Send us a message and our team will follow up as soon as we open.</p>
+              <h2 className="text-[20px] font-extrabold leading-tight text-center px-5">Request a callback — we'll reach out when we open.</h2>
+              <p className="text-[12px] opacity-90 text-center mt-1">We're closed right now, but your message goes straight to our team.</p>
             </>
           ) : (
             <>

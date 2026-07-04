@@ -12,6 +12,7 @@ import { formatPhone } from "@/components/addendum/CustomerInfoSection";
 import { trackLeadSubmitted, trackCustomerEngagement } from "@/lib/engagement/customerEngagement";
 import { estimateAffordability, DEFAULT_APR_PERCENT } from "@/lib/affordability";
 import { fmt$, type PassportData } from "@/lib/passportV2Data";
+import { readBuildSheet } from "@/lib/buildSheet";
 import { listingGallery, listingHero } from "@/lib/photos";
 import { resolveTodaysPrice } from "@/lib/todaysPrice";
 
@@ -151,20 +152,38 @@ const VehicleSummaryCard = ({ listing, d }: { listing: VehicleListing; d: Passpo
   );
 };
 
-const PriceTransparencyCard = ({ d }: { d: PassportData }) => (
-  <div className={`${CARD} p-5`}>
-    <p className="text-[15px] font-bold text-[#0D1B2A]">Price Transparency</p>
-    {d.price != null && <p className="mt-2"><span className="text-[22px] font-extrabold tracking-tight text-[#0D1B2A]">{fmt$(d.price)}</span><span className="text-[12px] font-semibold text-[#64748B] ml-2">{d.priceLabel}</span></p>}
-    <p className="text-[12.5px] text-[#64748B] leading-relaxed mt-2">This estimate is for planning only. Taxes, title, registration, doc fee, dealer/state fees, and lender requirements may affect final terms.</p>
-    <div className="grid grid-cols-2 gap-2 mt-4 pt-4 border-t border-[#F1F5F9]">
-      {[["No Obligation", CheckCircle2], ["Secure & Private", Lock], ["Dealer Reviewed", ShieldCheck], ["Vehicle-Specific", Car]].map(([label, Icon]) => (
-        <span key={label as string} className="inline-flex items-center gap-1.5 text-[11.5px] font-semibold text-[#334155]">
-          {(() => { const I = Icon as React.ElementType; return <I className="w-3.5 h-3.5 text-[#0B6FEA] shrink-0" />; })()} {label as string}
-        </span>
-      ))}
+const PriceTransparencyCard = ({ listing, d }: { listing: VehicleListing; d: PassportData }) => {
+  const optionsValue = readBuildSheet(listing)?.estValue ?? null;
+  const includedCoverage = d.dealerCoverage.find((c) => c.mode === "included" && c.title) ?? null;
+  const recap: string[] = [
+    ...(d.belowMarket && d.belowMarket > 0 ? [`${fmt$(d.belowMarket)} below market`] : []),
+    ...(optionsValue ? [`${fmt$(optionsValue)} in factory options`] : []),
+    ...(includedCoverage ? [`${includedCoverage.title} included`] : []),
+  ].slice(0, 3);
+  return (
+    <div className={`${CARD} p-5`}>
+      <p className="text-[15px] font-bold text-[#0D1B2A]">Price Transparency</p>
+      {d.price != null && <p className="mt-2"><span className="text-[22px] font-extrabold tracking-tight text-[#0D1B2A]">{fmt$(d.price)}</span><span className="text-[12px] font-semibold text-[#64748B] ml-2">{d.priceLabel}</span></p>}
+      <p className="text-[12.5px] text-[#64748B] leading-relaxed mt-2">Excludes tax, title, registration, and fees.</p>
+      {recap.length > 0 && (
+        <div className="flex flex-wrap gap-1.5 mt-3">
+          {recap.map((label) => (
+            <span key={label} className="inline-flex items-center gap-1.5 h-7 px-2.5 rounded-lg border border-emerald-200 bg-emerald-50 text-emerald-700 text-[12px] font-semibold">
+              <CheckCircle2 className="w-3.5 h-3.5" /> {label}
+            </span>
+          ))}
+        </div>
+      )}
+      <div className="grid grid-cols-2 gap-2 mt-4 pt-4 border-t border-[#F1F5F9]">
+        {[["Up-Front Pricing", CheckCircle2], ["Secure & Private", Lock], ["Dealer Reviewed", ShieldCheck], ["Vehicle-Specific", Car]].map(([label, Icon]) => (
+          <span key={label as string} className="inline-flex items-center gap-1.5 text-[11.5px] font-semibold text-[#334155]">
+            {(() => { const I = Icon as React.ElementType; return <I className="w-3.5 h-3.5 text-[#0B6FEA] shrink-0" />; })()} {label as string}
+          </span>
+        ))}
+      </div>
     </div>
-  </div>
-);
+  );
+};
 
 const WHAT_NEXT: [string, string][] = [
   ["Submit your payment request", "Tell us a little about yourself and your preferences."],
@@ -300,7 +319,7 @@ const TodaysPriceExperience = ({ listing, d }: { listing: VehicleListing; d: Pas
         {/* Left column */}
         <div className="space-y-5 min-w-0 order-2 lg:order-1">
           <VehicleSummaryCard listing={listing} d={d} />
-          <PriceTransparencyCard d={d} />
+          <PriceTransparencyCard listing={listing} d={d} />
           <div className="hidden lg:block"><WhatHappensNextCard /></div>
         </div>
 

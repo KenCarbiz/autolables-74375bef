@@ -34,11 +34,11 @@ export default function TrustStrip({ listing }: { listing: any }) {
   const sr = (listing.service_records?.length || 0) as number;
   if (sr > 0) badges.push({ icon: Wrench, title: "Full Service History", sub: `${sr} service record${sr === 1 ? "" : "s"}`, tone: "green" });
 
-  if (["great_deal", "good_deal", "fair_deal"].includes(listing.market_position)) {
+  if (["below_market", "great_deal", "good_deal"].includes(listing.market_position)) {
     const below = listing.market_payload?.belowMarket;
     badges.push({ icon: TrendingDown, title: "Priced Below Market", sub: below ? `$${Number(below).toLocaleString()} below average` : "Competitively priced", tone: "green" });
-  } else if (listing.market_position === "above_market") {
-    badges.push({ icon: TrendingDown, title: "Priced At Market", sub: "Fair market value", tone: "blue" });
+  } else if (["at_market", "fair_deal"].includes(listing.market_position)) {
+    badges.push({ icon: TrendingDown, title: "Priced At Market", sub: "In line with comparable listings", tone: "blue" });
   }
 
   if (cond === "new") badges.push({ icon: Sparkles, title: "Factory New", sub: "0 miles — never titled", tone: "blue" });

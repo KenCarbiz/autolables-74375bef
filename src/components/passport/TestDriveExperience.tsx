@@ -7,6 +7,7 @@ import { type VehicleListing } from "@/hooks/useVehicleListing";
 import { formatPhone } from "@/components/addendum/CustomerInfoSection";
 import { trackLeadSubmitted, trackCustomerEngagement } from "@/lib/engagement/customerEngagement";
 import { fmt$, type PassportData } from "@/lib/passportV2Data";
+import { readBuildSheet } from "@/lib/buildSheet";
 import { listingGallery, listingHero } from "@/lib/photos";
 import { AutoLabelsSpecIcon, SpecIconBadge, type AutoLabelsSpecIconKey } from "@/components/icons/AutoLabelsSpecIcons";
 
@@ -70,6 +71,13 @@ const VehicleContextCard = ({ listing, d }: { listing: VehicleListing; d: Passpo
     { icon: "passport", label: "Vehicle Passport" },
   ];
   const photoCount = listingGallery(listing).length;
+  const optionsValue = readBuildSheet(listing)?.estValue ?? null;
+  const includedCoverage = d.dealerCoverage.find((c) => c.mode === "included" && c.title) ?? null;
+  const recap: string[] = [
+    ...(d.belowMarket && d.belowMarket > 0 ? [`${fmt$(d.belowMarket)} below market`] : []),
+    ...(optionsValue ? [`${fmt$(optionsValue)} in factory options`] : []),
+    ...(includedCoverage ? [`${includedCoverage.title} included`] : []),
+  ].slice(0, 3);
   const dealerTel = d.dealerPhone ? d.dealerPhone.replace(/[^\d+]/g, "") : null;
   const trust = d.dealerTrust;
   const rating = parseFloat(trust.googleRating);
@@ -107,6 +115,11 @@ const VehicleContextCard = ({ listing, d }: { listing: VehicleListing; d: Passpo
             {badges.map((b) => (
               <span key={b.label} className={`${chip} border-[#D3E6FB] bg-[#F5FAFF] text-[#0B6FEA]`}>
                 <AutoLabelsSpecIcon name={b.icon} className="w-3.5 h-3.5" /> {b.label}
+              </span>
+            ))}
+            {recap.map((label) => (
+              <span key={label} className={`${chip} border-emerald-200 bg-emerald-50 text-emerald-700`}>
+                <AutoLabelsSpecIcon name="shield-check" className="w-3.5 h-3.5" /> {label}
               </span>
             ))}
           </div>
@@ -387,15 +400,17 @@ const TestDriveExperience = ({ listing, d, navigate }: { listing: VehicleListing
                 </div>
                 <div>
                   <IconField icon="email">
-                    <input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="Email address *" type="email" autoComplete="email" className={`${INPUT} ${errors.email ? "border-rose-400" : ""}`} />
+                    <input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="Email address" type="email" autoComplete="email" className={`${INPUT} ${errors.email ? "border-rose-400" : ""}`} />
                   </IconField>
                   {errors.email && <p className="text-[11.5px] text-rose-600 mt-1">{errors.email}</p>}
                 </div>
                 <div>
                   <IconField icon="phone">
-                    <input value={phone} onChange={(e) => setPhone(formatPhone(e.target.value))} placeholder="Phone number *" type="tel" autoComplete="tel" className={INPUT} />
+                    <input value={phone} onChange={(e) => setPhone(formatPhone(e.target.value))} placeholder="Phone number" type="tel" autoComplete="tel" className={INPUT} />
                   </IconField>
-                  {errors.contact && <p className="text-[11.5px] text-rose-600 mt-1">{errors.contact}</p>}
+                  {errors.contact
+                    ? <p className="text-[11.5px] text-rose-600 mt-1">{errors.contact}</p>
+                    : <p className="text-[11.5px] text-[#8CA3BC] mt-1">Email or phone — whichever you prefer.</p>}
                 </div>
                 <div className="relative">
                   <span className="absolute left-3.5 top-4 text-[#8CA3BC] pointer-events-none">
@@ -419,7 +434,7 @@ const TestDriveExperience = ({ listing, d, navigate }: { listing: VehicleListing
               </button>
               <p className="text-[11.5px] text-[#8CA3BC] text-center mt-3 inline-flex items-center gap-1.5 w-full justify-center">
                 <AutoLabelsSpecIcon name="lock" className="w-3.5 h-3.5 shrink-0" accent="currentColor" />
-                We'll never share your information. By submitting, you agree to be contacted by the dealership about this vehicle.
+                Your information goes only to the dealership. By submitting, you agree to be contacted by the dealership about this vehicle.
               </p>
           </div>
         </div>

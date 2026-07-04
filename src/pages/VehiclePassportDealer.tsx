@@ -137,11 +137,13 @@ const VehiclePassportDealer = () => {
   const mapsQuery = encodeURIComponent(d.dealerAddress || d.dealerName);
   const mapsUrl = `https://www.google.com/maps/search/?api=1&query=${mapsQuery}`;
 
-  // Franchise heuristic: factory certifications on file mean this store is an
-  // authorized retailer for the vehicle's make; independents get the generic
-  // ownership-expertise module instead. Never claim OEM status without data.
+  // OEM-authorization language renders ONLY when the dealer has explicitly
+  // flagged the store as a franchise (dealer_trust.oem_franchise). Free-text
+  // certifications never imply factory authorization; without the flag the
+  // dealer's own certification text renders as neutral chips instead.
   const make = (listing.ymm || "").trim().split(/\s+/)[1] || "";
-  const franchised = t.certifications.length > 0 && !!make;
+  const rawTrust = (listing as unknown as { dealer_trust?: { oem_franchise?: boolean | string } }).dealer_trust;
+  const franchised = (rawTrust?.oem_franchise === true || rawTrust?.oem_franchise === "yes") && !!make;
   const brandKey = resolveOemBrand(make);
   const brand = brandKey ? oemDisplayName(brandKey) : make.toUpperCase();
   const copy = oemDealerPageCopy(franchised ? brandKey : null);
@@ -160,7 +162,11 @@ const VehiclePassportDealer = () => {
     t.familyOwned ? { iconKey: "customer-first" as const, label: founded ? `Family-Owned Since ${founded}` : "Family-Owned Dealership" } : null,
     hasAwards
       ? { iconKey: "customer-satisfaction" as const, label: "Multiple Award Winning Store" }
-      : t.certifications.length > 0 ? { iconKey: "certified-pre-owned-support" as const, label: "Factory Authorized Store" } : null,
+      : franchised
+        ? { iconKey: "certified-pre-owned-support" as const, label: "Factory Authorized Store" }
+        : t.certifications.length > 0
+          ? { iconKey: "certified-pre-owned-support" as const, label: t.certifications[0] }
+          : null,
   ].filter(Boolean) as HeroStat[];
   // Backfill so the stat row never looks thin when tenant data is sparse.
   const fallbackStats: HeroStat[] = [
@@ -180,13 +186,47 @@ const VehiclePassportDealer = () => {
         { iconKey: "luxury-ownership", label: copy.ownershipExperienceLabel },
       ]
     : [
-        { iconKey: "certified-service", label: "Multi-Point Vehicle Inspections" },
-        { iconKey: "complete-vehicle-disclosure", label: "Complete Vehicle Disclosure" },
-        { iconKey: "warranty-support", label: "Warranty Guidance" },
-        { iconKey: "recall-service-support", label: "Recall & Service Support" },
-        { iconKey: "loaner-vehicles", label: "Every Make Welcome" },
-        { iconKey: "customer-satisfaction", label: "Ownership Support After the Sale" },
-      ];
+        ...t.certifications.slice(0, 2).map((c) => ({ iconKey: "certified-pre-owned-support" as const, label: c })),
+        { iconKey: "certified-service" as const, label: "Multi-Point Vehicle Inspections" },
+        { iconKey: "complete-vehicle-disclosure" as const, label: "Complete Vehicle Disclosure" },
+        { iconKey: "warranty-support" as const, label: "Warranty Guidance" },
+        { iconKey: "recall-service-support" as const, label: "Recall & Service Support" },
+        { iconKey: "loaner-vehicles" as const, label: "Every Make Welcome" },
+        { iconKey: "customer-satisfaction" as const, label: "Ownership Support After the Sale" },
+      ].slice(0, 6);
+
+  // "Why Customers Choose Us" leads with the dealer's own facts (tenure,
+  // review quote, amenities) and backfills with the generic rows.
+  const quoted = t.reviewSources.find((r) => r.quote);
+  type ChooseItem = { iconKey: DealerPageIconKey; title: string; sub: string };
+  const chooseRows: ChooseItem[] = [
+    hasYears ? { iconKey: "schedule-test-drive" as const, title: `${years} Years Serving ${stateName}`, sub: founded ? `${t.familyOwned ? "Family-owned and operated" : "In business"} since ${founded}.` : `${years} years of local experience.` } : null,
+    quoted ? { iconKey: "customer-satisfaction" as const, title: `What ${quoted.name} Reviewers Say`, sub: `"${quoted.quote}"` } : null,
+    t.amenities.length > 0 ? { iconKey: "loaner-vehicles" as const, title: "Amenities for Your Visit", sub: t.amenities.slice(0, 4).join(" · ") } : null,
+  ].filter(Boolean) as ChooseItem[];
+  const chooseDefaults: ChooseItem[] = [
+    { iconKey: "transparent-pricing", title: "Transparent, Up-Front Pricing", sub: "No hidden fees. All installed equipment and costs are clearly disclosed up front." },
+    { iconKey: "no-pressure", title: "No Pressure Experience", sub: "Our team is here to help, answer questions, and earn your business the right way." },
+    { iconKey: "complete-vehicle-disclosure", title: "Complete Vehicle Disclosure", sub: "We show you the facts, photos, service history, and everything you need to decide with confidence." },
+    { iconKey: "prompt-communication", title: "Prompt, Professional Communication", sub: "We respond quickly and keep you informed at every step." },
+    { iconKey: "customer-first", title: "Customer-First Approach", sub: "Your time, trust, and satisfaction are our top priorities." },
+  ];
+  for (const row of chooseDefaults) { if (chooseRows.length >= 5) break; chooseRows.push(row); }
+
+  const commitments: { iconKey: DealerPageIconKey; l: string }[] = [
+    { iconKey: "transparent-pricing", l: "Transparent, Up-Front Pricing" },
+    { iconKey: "complete-disclosure", l: "Complete Vehicle Disclosure" },
+    franchised
+      ? { iconKey: "factory-trained-staff", l: "Factory-Trained Staff" }
+      : { iconKey: "factory-trained-staff", l: t.certifications[0] || "Knowledgeable, Experienced Staff" },
+    { iconKey: "respectful-experience", l: "A Respectful, No-Pressure Experience" },
+    t.satisfaction
+      ? { iconKey: "customer-satisfaction", l: `${t.satisfaction} Customer Satisfaction` }
+      : { iconKey: "prompt-communication", l: "Professional, Prompt Communication" },
+    t.familyOwned
+      ? { iconKey: "customer-first", l: founded ? `Family-Owned Since ${founded}` : "Family-Owned & Operated" }
+      : { iconKey: "customer-first", l: "A Customer-First Approach" },
+  ];
 
   const heroBtn = "h-12 rounded-[10px] text-[13.5px] font-extrabold inline-flex items-center gap-2 transition-transform hover:-translate-y-0.5";
 
@@ -261,14 +301,20 @@ const VehiclePassportDealer = () => {
         </DealerHeroImage>
         </div>
 
-        {/* 2. Trust at a Glance */}
+        {/* 2. Trust at a Glance — dealer-entered facts first, generic fallback */}
         <section>
           <SectionTitle>Trust at a Glance</SectionTitle>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             <TrustCard iconKey="dealer-verified" tone="green" title="Dealer Verified" sub="This vehicle is reviewed and verified by our team." />
-            <TrustCard iconKey="vehicle-passport-partner" title="Vehicle Passport Enabled" sub="One transparent record for this exact VIN." />
-            <TrustCard iconKey="up-front-pricing" tone="green" title="Up-Front Pricing" sub="Clear pricing with all installed equipment disclosed." />
-            <TrustCard iconKey="secure-reservation" title="Secure Reservation" sub="Your information is secure and never shared." />
+            {hasYears
+              ? <TrustCard iconKey="schedule-test-drive" title={`${years} Years in Business`} sub={founded ? `Serving ${stateName} since ${founded}.` : `Serving ${stateName} for ${years} years.`} />
+              : <TrustCard iconKey="vehicle-passport-partner" title="Vehicle Passport Enabled" sub="One transparent record for this exact VIN." />}
+            {t.satisfaction
+              ? <TrustCard iconKey="customer-satisfaction" tone="green" title="Customer Satisfaction" sub={`${t.satisfaction} reported by our customers.`} />
+              : <TrustCard iconKey="up-front-pricing" tone="green" title="Up-Front Pricing" sub="Clear pricing with all installed equipment disclosed." />}
+            {t.familyOwned
+              ? <TrustCard iconKey="customer-first" title={founded ? `Family-Owned Since ${founded}` : "Family-Owned Dealership"} sub="Local ownership, accountable to this community." />
+              : <TrustCard iconKey="secure-reservation" title="Secure Reservation" sub="Your information is secure and never shared." />}
           </div>
         </section>
 
@@ -277,11 +323,7 @@ const VehiclePassportDealer = () => {
           <div className={`${CARD} p-6`}>
             <h2 className="text-[18px] font-extrabold tracking-tight text-center mb-5">Why Customers Choose Us</h2>
             <div className="space-y-4.5 space-y-5">
-              <ChooseRow iconKey="transparent-pricing" title="Transparent, Up-Front Pricing" sub="No hidden fees. All installed equipment and costs are clearly disclosed up front." />
-              <ChooseRow iconKey="no-pressure" title="No Pressure Experience" sub="Our team is here to help, answer questions, and earn your business the right way." />
-              <ChooseRow iconKey="complete-vehicle-disclosure" title="Complete Vehicle Disclosure" sub="We show you the facts, photos, service history, and everything you need to decide with confidence." />
-              <ChooseRow iconKey="prompt-communication" title="Prompt, Professional Communication" sub="We respond quickly and keep you informed at every step." />
-              <ChooseRow iconKey="customer-first" title="Customer-First Approach" sub="Your time, trust, and satisfaction are our top priorities." />
+              {chooseRows.map((row) => <ChooseRow key={row.title} iconKey={row.iconKey} title={row.title} sub={row.sub} />)}
             </div>
           </div>
           <div className={`${CARD} p-6 flex flex-col`}>
@@ -350,14 +392,7 @@ const VehiclePassportDealer = () => {
         <section className="rounded-2xl px-6 py-7 sm:px-8 text-white" style={{ background: "linear-gradient(160deg,#111f33 0%,#0D1B2A 100%)" }}>
           <p className="text-[16px] font-extrabold text-center">Our Commitment to You</p>
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-x-3 gap-y-5 mt-6">
-            {([
-              { iconKey: "transparent-pricing", l: "Transparent, Up-Front Pricing" },
-              { iconKey: "complete-disclosure", l: "Complete Vehicle Disclosure" },
-              { iconKey: "factory-trained-staff", l: "Factory-Trained Staff" },
-              { iconKey: "respectful-experience", l: "A Respectful, No-Pressure Experience" },
-              { iconKey: "prompt-communication", l: "Professional, Prompt Communication" },
-              { iconKey: "customer-first", l: "A Customer-First Approach" },
-            ] as { iconKey: DealerPageIconKey; l: string }[]).map((c, i) => (
+            {commitments.map((c, i) => (
               <div key={c.l} className={`flex flex-col items-center text-center gap-2 px-2 ${i > 0 ? "lg:border-l lg:border-white/15" : ""}`}>
                 <DealerPageIcon iconKey={c.iconKey} size={20} color="rgba(255,255,255,0.8)" />
                 <span className="text-[11px] font-semibold leading-snug text-white/90">{c.l}</span>
