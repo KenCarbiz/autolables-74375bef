@@ -564,6 +564,18 @@ export const resolveBuyersGuideWarranty = (
     box: "warranty", forced: true, minDurationDays: days, minMiles: mi, minPct: pct,
     citation, reason, needsVerification: true,
   });
+  // States that prohibit disclaiming implied warranties on a dealer used-car
+  // sale — the "As Is - No Dealer Warranty" box is unlawful, so the Guide must
+  // use the "Implied Warranties Only" front (the second official form variant).
+  // Distinct from the statutory-warranty states above (which mandate specific
+  // FLOOR terms); here the dealer simply cannot go "as is". Forced so the UI
+  // locks As-Is; needsVerification so it reads "confirm with counsel" rather
+  // than asserting the list as settled law.
+  const impliedForced = (citation: string): BuyersGuideResolution => ({
+    box: "implied", forced: true, minDurationDays: 0, minMiles: 0, minPct: 0,
+    citation, needsVerification: true,
+    reason: "This state prohibits selling a used vehicle 'as is' — the Guide must use the Implied Warranties Only form.",
+  });
 
   switch (code) {
     case "CT": {
@@ -592,11 +604,25 @@ export const resolveBuyersGuideWarranty = (
     case "ME":
     case "WI":
       return {
-        box: "implied", forced: false, minDurationDays: 0, minMiles: 0, minPct: 0,
+        box: "implied", forced: true, minDurationDays: 0, minMiles: 0, minPct: 0,
         citation: code === "ME" ? "Maine Used Car Information Act" : "Wis. Admin. Code Trans 139",
-        reason: `${code === "ME" ? "Maine" : "Wisconsin"} uses its own state Buyers Guide; defaulting to Implied Warranties.`,
+        reason: `${code === "ME" ? "Maine" : "Wisconsin"} is exempt from the federal rule and mandates its OWN state Buyers Guide — use the ${code === "ME" ? "Maine" : "Wisconsin"} form, not the federal one. Implied Warranties shown as the safe federal-equivalent until the state form is uploaded.`,
         needsVerification: true,
       };
+    // As-is-prohibited states → Implied Warranties Only front. Citations are the
+    // implied-warranty / used-car statutes most commonly relied on; counsel
+    // should confirm before treating any as settled (needsVerification).
+    case "CA": return impliedForced("Song-Beverly Consumer Warranty Act, Cal. Civ. Code §1792");
+    case "DC": return impliedForced("D.C. Code §28:2-314");
+    case "KS": return impliedForced("Kan. Stat. Ann. §50-639");
+    case "LA": return impliedForced("La. Civ. Code art. 2520 (redhibition)");
+    case "MD": return impliedForced("Md. Code, Com. Law §2-316.1");
+    case "MN": return impliedForced("Minn. Stat. §325G.18 (used-vehicle warranty)");
+    case "MS": return impliedForced("Miss. Code Ann. §11-7-18");
+    case "OR": return impliedForced("Or. Rev. Stat. §72.3160");
+    case "RI": return impliedForced("R.I. Gen. Laws §31-5.4 (used-vehicle warranty)");
+    case "VT": return impliedForced("Vt. Stat. Ann. tit. 9 §4173");
+    case "WV": return impliedForced("W. Va. Code §46A-6-107");
     default:
       return asIs();
   }

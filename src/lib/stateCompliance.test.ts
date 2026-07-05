@@ -4,6 +4,7 @@ import {
   validateAddendum,
   summarizeFindings,
   STATE_RULES,
+  resolveBuyersGuideWarranty,
   type ComplianceDraft,
 } from "./stateCompliance";
 
@@ -175,6 +176,50 @@ describe("validateAddendum — CA SB 766 3-day ack", () => {
       threeDayAck: false,
     });
     expect(findings.find((f) => f.id === "three-day-return-ack-missing")).toBeUndefined();
+  });
+});
+
+describe("resolveBuyersGuideWarranty — per-state Buyers Guide front", () => {
+  it("defaults to the As-Is front where state law permits it", () => {
+    // Majority of states allow as-is; TX and FL are classic examples.
+    expect(resolveBuyersGuideWarranty("TX", {}).box).toBe("as-is");
+    expect(resolveBuyersGuideWarranty("FL", {}).box).toBe("as-is");
+    expect(resolveBuyersGuideWarranty("TX", {}).forced).toBe(false);
+  });
+
+  it("forces the Implied Warranties Only front in as-is-prohibited states", () => {
+    for (const st of ["CA", "DC", "KS", "LA", "MD", "MN", "MS", "OR", "RI", "VT", "WV"]) {
+      const r = resolveBuyersGuideWarranty(st, {});
+      expect(r.box, st).toBe("implied");
+      expect(r.forced, st).toBe(true);
+      expect(r.needsVerification, st).toBe(true);
+    }
+  });
+
+  it("routes Maine and Wisconsin to their own state form (forced, flagged)", () => {
+    for (const st of ["ME", "WI"]) {
+      const r = resolveBuyersGuideWarranty(st, {});
+      expect(r.box, st).toBe("implied");
+      expect(r.forced, st).toBe(true);
+      expect(r.reason, st).toMatch(/own state Buyers Guide/i);
+    }
+  });
+
+  it("returns statutory-warranty floors keyed to the vehicle in mandate states", () => {
+    // Massachusetts: under 40k miles → 90 day / 3,750 mi / 100% floor.
+    const ma = resolveBuyersGuideWarranty("MA", { mileage: 20000 });
+    expect(ma.box).toBe("warranty");
+    expect(ma.forced).toBe(true);
+    expect(ma.minDurationDays).toBe(90);
+    // ...but As-Is is allowed again once the car is old enough.
+    expect(resolveBuyersGuideWarranty("MA", { mileage: 130000 }).box).toBe("as-is");
+  });
+
+  it("respects Connecticut / New York price + mileage thresholds", () => {
+    expect(resolveBuyersGuideWarranty("CT", { price: 2000 }).box).toBe("as-is");
+    expect(resolveBuyersGuideWarranty("CT", { price: 6000 }).box).toBe("warranty");
+    expect(resolveBuyersGuideWarranty("NY", { price: 1000 }).box).toBe("as-is");
+    expect(resolveBuyersGuideWarranty("NY", { price: 20000, mileage: 20000 }).box).toBe("warranty");
   });
 });
 
