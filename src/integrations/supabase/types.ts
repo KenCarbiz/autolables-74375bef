@@ -5140,6 +5140,7 @@ export type Database = {
           view_count: number
           vin: string
           warranty_info: Json
+          website_price_term: string | null
           website_sale_price: number | null
           ymm: string | null
         }
@@ -5222,6 +5223,7 @@ export type Database = {
           view_count?: number
           vin: string
           warranty_info?: Json
+          website_price_term?: string | null
           website_sale_price?: number | null
           ymm?: string | null
         }
@@ -5304,6 +5306,7 @@ export type Database = {
           view_count?: number
           vin?: string
           warranty_info?: Json
+          website_price_term?: string | null
           website_sale_price?: number | null
           ymm?: string | null
         }
@@ -6321,6 +6324,7 @@ export type Database = {
           view_count: number
           vin: string
           warranty_info: Json
+          website_price_term: string | null
           website_sale_price: number | null
           ymm: string | null
         }[]
