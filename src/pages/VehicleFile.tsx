@@ -34,6 +34,7 @@ import UsedCarDocPack from "@/components/vehicle/UsedCarDocPack";
 import DeliverySignoffs from "@/components/vehicle/DeliverySignoffs";
 import TitleMcoPanel from "@/components/vehicle/TitleMcoPanel";
 import VehicleEvidenceTimeline from "@/components/vehicle/VehicleEvidenceTimeline";
+import ShopperActivityDrawer from "@/components/vehicle/ShopperActivityDrawer";
 
 // ──────────────────────────────────────────────────────────────
 // VehicleFile — /vehicle-file/:id
@@ -2754,6 +2755,9 @@ const focusLabel = (k: string) => FOCUS_MODULE_LABEL[k] || k.replace(/[-_]/g, " 
 
 const ShopperFocusCard = ({ vehicle, onTab }: { vehicle: VehicleRow; onTab: (t: TabId) => void }) => {
   const [stats, setStats] = useState<{ totalSeconds: number; sessions: number; topModule: string | null; lastEvent: string | null; ctaClicks: number; leads: number } | null>(null);
+  const [activityOpen, setActivityOpen] = useState(false);
+  const focusStock = ((vehicle.mc_attributes || {}) as Record<string, unknown>).stock_no as string
+    || ((vehicle.sticker_snapshot?.decoded as Record<string, unknown> | undefined)?.stock as string) || null;
 
   useEffect(() => {
     let cancelled = false;
@@ -2815,7 +2819,19 @@ const ShopperFocusCard = ({ vehicle, onTab }: { vehicle: VehicleRow; onTab: (t: 
           )}
         </div>
       )}
-      <button onClick={() => onTab("customer")} className="mt-auto pt-1 text-[12px] font-semibold text-blue-600 hover:underline inline-flex items-center justify-center gap-1 w-full">View shopper activity <ChevronRight className="w-3.5 h-3.5" /></button>
+      <button onClick={() => setActivityOpen(true)} className="mt-auto pt-1 text-[12px] font-semibold text-blue-600 hover:underline inline-flex items-center justify-center gap-1 w-full">View shopper activity <ChevronRight className="w-3.5 h-3.5" /></button>
+      <ShopperActivityDrawer
+        open={activityOpen}
+        onOpenChange={setActivityOpen}
+        vin={vehicle.vin}
+        tenantId={vehicle.tenant_id}
+        vehicleId={vehicle.id}
+        viewCount={vehicle.view_count}
+        title={vehicle.ymm || vehicle.vin}
+        trim={vehicle.trim}
+        stock={focusStock}
+        thumbnailUrl={listingHero(vehicle) || null}
+      />
     </Card>
   );
 };
