@@ -9,6 +9,7 @@ import {
   DEFAULT_PRICE_DISPLAY_MODE,
   resolvePriceLabel,
   getPriceLabelSetting,
+  buildDiscountBreakdown,
 } from "./priceModel";
 
 describe("normalizeCurrency", () => {
@@ -223,6 +224,89 @@ describe("resolvePriceLabel", () => {
     expect(resolvePriceLabel(undefined)).toBe("Our Price");
     // A dealer-name argument never leaks into a non-dealer preset.
     expect(resolvePriceLabel({ preset: "our_price" }, "Harte")).toBe("Our Price");
+  });
+});
+
+describe("buildDiscountBreakdown", () => {
+  it("reproduces the Harte QX60 website ladder exactly (derives dealer discount from a known rebate)", () => {
+    // Real captured data: MSRP 61895, price 55598, retail_cash 5000, doc 895,
+    // dealer_discount NOT captured. Website shows Dealer Discount 1297 + Retail
+    // Cash 5000 → 55598, + Conveyance 895 → Sale 56493.
+    const b = buildDiscountBreakdown({
+      msrp: 61895,
+      advertisedBeforeDoc: 55598,
+      price: 55598,
+      docFee: 895,
+      dealerDiscount: null,
+      retailCash: 5000,
+    })!;
+    expect(b).not.toBeNull();
+    expect(b.msrp).toBe(61895);
+    expect(b.ourPrice).toBe(55598);
+    expect(b.salePrice).toBe(56493);
+    expect(b.totalSavings).toBe(6297);
+    expect(b.lines.map((l) => [l.label, l.amount, l.derived])).toEqual([
+      ["Dealer Discount", 1297, true],
+      ["Retail Cash", 5000, false],
+    ]);
+    // The discount lines must always reconcile to MSRP − ourPrice.
+    expect(b.lines.reduce((s, l) => s + l.amount, 0)).toBe(b.totalSavings);
+  });
+
+  it("shows both captured components when they reconcile", () => {
+    const b = buildDiscountBreakdown({ msrp: 61895, price: 55598, docFee: 895, dealerDiscount: 1297, retailCash: 5000 })!;
+    expect(b.lines.map((l) => [l.label, l.amount, l.derived])).toEqual([
+      ["Dealer Discount", 1297, false],
+      ["Retail Cash", 5000, false],
+    ]);
+  });
+
+  it("adds an 'Additional Savings' line when captured components under-account for the gap", () => {
+    const b = buildDiscountBreakdown({ msrp: 61895, price: 55598, dealerDiscount: 1297, retailCash: null })!;
+    expect(b.lines.map((l) => l.label)).toEqual(["Dealer Discount", "Additional Savings"]);
+    expect(b.lines.reduce((s, l) => s + l.amount, 0)).toBe(6297);
+  });
+
+  it("collapses to a single Total Savings line when captured components overstate the gap", () => {
+    // dealer 2000 + cash 5000 = 7000 > real gap 6297 → don't show a discount that
+    // doesn't reconcile to the price.
+    const b = buildDiscountBreakdown({ msrp: 61895, price: 55598, dealerDiscount: 2000, retailCash: 5000 })!;
+    expect(b.lines).toHaveLength(1);
+    expect(b.lines[0].label).toBe("Total Savings");
+    expect(b.lines[0].amount).toBe(6297);
+  });
+
+  it("shows a neutral Total Savings line when no component detail is captured", () => {
+    const b = buildDiscountBreakdown({ msrp: 61895, price: 55598, docFee: 895 })!;
+    expect(b.lines).toEqual([{ key: "savings", label: "Total Savings", amount: 6297, derived: false }]);
+    expect(b.salePrice).toBe(56493);
+  });
+
+  it("returns null when there is no savings story (no MSRP, or MSRP at/below price)", () => {
+    expect(buildDiscountBreakdown({ msrp: null, price: 55598 })).toBeNull();
+    expect(buildDiscountBreakdown({ msrp: 55598, price: 55598 })).toBeNull();
+    expect(buildDiscountBreakdown({ msrp: 54000, price: 55598 })).toBeNull();
+  });
+
+  it("uses the lower of feed price and scraped advertised price for ourPrice", () => {
+    // A scrape that landed above the feed is a mis-parse; a scrape below is a real
+    // price drop we honor — mirroring resolveDisplayPrice.
+    const dropped = buildDiscountBreakdown({ msrp: 61895, advertisedBeforeDoc: 54000, price: 55598 })!;
+    expect(dropped.ourPrice).toBe(54000);
+    const misparse = buildDiscountBreakdown({ msrp: 61895, advertisedBeforeDoc: 60000, price: 55598 })!;
+    expect(misparse.ourPrice).toBe(55598);
+  });
+
+  it("backs the doc fee out of a fee-inclusive listed price in website_sale_price mode", () => {
+    // Listed 56493 already includes the 895 fee; ourPrice (pre-doc) is 55598 and
+    // savings compares MSRP to the pre-doc price like-for-like.
+    const b = buildDiscountBreakdown(
+      { msrp: 61895, price: 56493, docFee: 895, retailCash: 5000 },
+      "website_sale_price",
+    )!;
+    expect(b.ourPrice).toBe(55598);
+    expect(b.salePrice).toBe(56493);
+    expect(b.totalSavings).toBe(6297);
   });
 });
 

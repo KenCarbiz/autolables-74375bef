@@ -226,6 +226,115 @@ export function getPriceDisplayMode(settings: unknown): PriceDisplayMode {
 }
 
 // ──────────────────────────────────────────────────────────────────────
+// Discount / savings breakdown — the customer-facing "MSRP → dealer discount
+// → retail cash → your price → + doc fee → sale price" ladder that mirrors the
+// dealer's own website. Every line is a captured number or pure arithmetic off
+// the captured numbers; nothing is invented, and the discount lines ALWAYS sum
+// to the real MSRP−price gap so the customer can never see savings that don't
+// reconcile to the actual price (an FTC exposure). Returns null when there is
+// no genuine savings story (no MSRP, or MSRP at/below the price), so the UI
+// simply omits the card rather than showing a $0 or negative "discount".
+// ──────────────────────────────────────────────────────────────────────
+
+export interface DiscountLine {
+  key: "dealer_discount" | "retail_cash" | "savings";
+  label: string;
+  amount: number;   // positive magnitude subtracted from MSRP
+  derived: boolean; // true when computed as a remainder, not a captured column
+}
+
+export interface DiscountBreakdown {
+  msrp: number;
+  lines: DiscountLine[]; // in MSRP→price order; guaranteed to sum to totalSavings
+  totalSavings: number;  // msrp − ourPrice
+  savingsPct: number;    // totalSavings / msrp * 100
+  ourPrice: number;      // the vehicle price BEFORE the doc fee
+  docFee: number | null; // rendered as an added line when > 0
+  salePrice: number | null; // ourPrice + docFee (the fee-inclusive final)
+}
+
+export interface DiscountBreakdownInput {
+  msrp?: number | null;
+  advertisedBeforeDoc?: number | null;
+  price?: number | null;
+  docFee?: number | null;
+  dealerDiscount?: number | null;
+  retailCash?: number | null;
+}
+
+const DISCOUNT_TOLERANCE = 1; // dollars
+
+// A captured discount column is only meaningful as a positive magnitude above
+// the tolerance; anything else (null, 0, NaN) is treated as "not captured".
+const posMag = (n: number | null | undefined): number | null =>
+  n != null && Number.isFinite(n) && Math.abs(n) > DISCOUNT_TOLERANCE ? Math.abs(n) : null;
+
+export function buildDiscountBreakdown(
+  input: DiscountBreakdownInput,
+  mode: PriceDisplayMode = DEFAULT_PRICE_DISPLAY_MODE,
+): DiscountBreakdown | null {
+  const msrp = input.msrp != null && Number.isFinite(input.msrp) ? input.msrp : null;
+  // The vehicle price the customer sees, chosen the same way the headline is —
+  // the lower of the feed price and the scraped advertised price.
+  const listed = lowerAdvertised({ advertised_price_before_doc: input.advertisedBeforeDoc, price: input.price });
+  if (msrp == null || listed == null) return null;
+
+  const docFee = posMag(input.docFee);
+  // ourPrice is the pre-doc vehicle price. In website_sale_price mode the listed
+  // number already includes the doc fee, so back it out to compare against MSRP
+  // (a pre-doc sticker) like-for-like; the fee-inclusive number is the sale price.
+  const ourPrice = mode === "website_sale_price" && docFee ? listed - docFee : listed;
+  const salePrice = mode === "website_sale_price" ? listed : docFee ? ourPrice + docFee : ourPrice;
+
+  const totalSavings = Math.round(msrp - ourPrice);
+  if (totalSavings <= DISCOUNT_TOLERANCE) return null; // MSRP at/below price — no story
+
+  const dealer = posMag(input.dealerDiscount);
+  const cash = posMag(input.retailCash);
+
+  const lines: DiscountLine[] = [];
+  if (dealer == null && cash == null) {
+    // No component detail captured — a single honest total, no attribution.
+    lines.push({ key: "savings", label: "Total Savings", amount: totalSavings, derived: false });
+  } else {
+    // Dealer discount first (captured, or the remainder after a known rebate),
+    // then retail cash — matching the dealer's own site order.
+    let dealerAmt = dealer;
+    if (dealerAmt == null) {
+      const rem = Math.round(totalSavings - (cash ?? 0));
+      if (rem > DISCOUNT_TOLERANCE) dealerAmt = rem;
+    }
+    if (dealerAmt && dealerAmt > DISCOUNT_TOLERANCE) {
+      lines.push({ key: "dealer_discount", label: "Dealer Discount", amount: dealerAmt, derived: dealer == null });
+    }
+    if (cash) lines.push({ key: "retail_cash", label: "Retail Cash", amount: cash, derived: false });
+
+    // Reconcile: the lines must sum to the real MSRP−price gap. A positive
+    // remainder becomes an "Additional Savings" line; if captured columns
+    // overstate the gap (parse drift), collapse to one trustworthy total.
+    const sum = lines.reduce((s, l) => s + l.amount, 0);
+    const diff = Math.round(totalSavings - sum);
+    if (diff > DISCOUNT_TOLERANCE) {
+      lines.push({ key: "savings", label: "Additional Savings", amount: diff, derived: true });
+    } else if (diff < -DISCOUNT_TOLERANCE) {
+      lines.length = 0;
+      lines.push({ key: "savings", label: "Total Savings", amount: totalSavings, derived: false });
+    }
+  }
+  if (!lines.length) lines.push({ key: "savings", label: "Total Savings", amount: totalSavings, derived: false });
+
+  return {
+    msrp,
+    lines,
+    totalSavings,
+    savingsPct: (totalSavings / msrp) * 100,
+    ourPrice,
+    docFee,
+    salePrice,
+  };
+}
+
+// ──────────────────────────────────────────────────────────────────────
 // Price LABEL — what the dealer CALLS their price on customer surfaces.
 // This is display text only; it never changes the price VALUE or the doc-fee
 // inclusion decided by price_display_mode. Stored on dealer_profiles.settings

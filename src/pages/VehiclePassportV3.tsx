@@ -23,6 +23,7 @@ import { readBuildSheet } from "@/lib/buildSheet";
 import { readPassportOrigin, clearPassportOrigin, type PassportOrigin } from "@/lib/passportOrigin";
 import { trackPassportOpened, trackWindowStickerScanned, trackCustomerCtaClicked, trackCustomerEngagement } from "@/lib/engagement/customerEngagement";
 import { packetVisible } from "@/lib/packetModules";
+import type { DiscountBreakdown } from "@/lib/priceModel";
 import PassportPanel, { isPassportPanelKey, type PassportPanelKey } from "@/components/passport/PassportPanel";
 import { useNhtsaSafety } from "@/hooks/useNhtsaSafety";
 import PassportCtaDock from "@/components/passport/PassportCtaDock";
@@ -42,6 +43,43 @@ import { BLUE, GREEN, CARD } from "@/lib/passportTokens";
 // ──────────────────────────────────────────────────────────────
 
 const TEXT2 = "text-[#64748B]";
+
+// The MSRP → discounts → your price → + doc fee → sale price ladder, mirroring
+// the dealer's own VDP. Every row is a real or reconciled number from
+// buildDiscountBreakdown; the discount lines always sum to MSRP − our price.
+function PriceLadder({ b, priceLabel }: { b: DiscountBreakdown; priceLabel: string }) {
+  const row = (label: React.ReactNode, value: React.ReactNode, cls = "") => (
+    <div className={`flex items-baseline justify-between gap-3 ${cls}`}>
+      <span className="truncate">{label}</span>
+      <span className="shrink-0 tabular-nums">{value}</span>
+    </div>
+  );
+  return (
+    <div className="mt-3 rounded-xl border border-slate-200 bg-slate-50/70 px-3 py-2.5 text-[12px] text-[#64748B]">
+      {row("MSRP", <span className="font-semibold text-[#0F172A]">{fmt$(b.msrp)}</span>)}
+      {b.lines.map((l) => (
+        <div key={l.key} className="mt-1">
+          {row(l.label, <span className="font-semibold text-[#16A34A]">−{fmt$(l.amount)}</span>, "text-[#16A34A]")}
+        </div>
+      ))}
+      {row(
+        <span className="font-bold text-[#0F172A]">{priceLabel}</span>,
+        <span className="font-extrabold text-[#0F172A]">{fmt$(b.ourPrice)}</span>,
+        "mt-2 pt-2 border-t border-slate-200",
+      )}
+      {b.docFee ? (
+        <>
+          <div className="mt-1">{row("+ Conveyance / doc fee", <span className="font-semibold text-[#0F172A]">{fmt$(b.docFee)}</span>)}</div>
+          {row(
+            <span className="font-bold text-[#0F172A]">Sale price</span>,
+            <span className="font-extrabold text-[#0F172A]">{fmt$(b.salePrice ?? b.ourPrice)}</span>,
+            "mt-2 pt-2 border-t border-slate-200",
+          )}
+        </>
+      ) : null}
+    </div>
+  );
+}
 
 const V3_PRINT = `
 @page { size: Letter portrait; margin: 0.5in; }
@@ -775,15 +813,21 @@ const VehiclePassportV3 = () => {
                   <div className="lg:hidden mt-3">
                     <div className="text-[13px] font-semibold text-[#64748B]">{d.priceLabel}</div>
                     <div className="text-[26px] font-extrabold leading-8">{fmt$(price)}</div>
-                    {d.docFee ? (
-                      <div className="text-[12px] text-[#64748B]">
-                        {d.priceIncludesDoc
-                          ? `Incl. ${fmt$(d.docFee)} doc fee · ${fmt$(Math.max(0, price - d.docFee))} before doc fee`
-                          : `+ ${fmt$(d.docFee)} doc fee · Sale ${fmt$(d.websiteSalePrice ?? price + d.docFee)}`}
-                      </div>
-                    ) : null}
-                    {d.saveVsMsrp != null && <div className="text-[13px] font-semibold text-[#16A34A]">You save {fmt$(d.saveVsMsrp)}</div>}
-                    {d.belowOriginalMsrp != null && <div className="text-[13px] font-semibold text-[#16A34A]">{fmt$(d.belowOriginalMsrp)} below original MSRP</div>}
+                    {d.priceBreakdown ? (
+                      <PriceLadder b={d.priceBreakdown} priceLabel={d.priceLabel} />
+                    ) : (
+                      <>
+                        {d.docFee ? (
+                          <div className="text-[12px] text-[#64748B]">
+                            {d.priceIncludesDoc
+                              ? `Incl. ${fmt$(d.docFee)} doc fee · ${fmt$(Math.max(0, price - d.docFee))} before doc fee`
+                              : `+ ${fmt$(d.docFee)} doc fee · Sale ${fmt$(d.websiteSalePrice ?? price + d.docFee)}`}
+                          </div>
+                        ) : null}
+                        {d.saveVsMsrp != null && <div className="text-[13px] font-semibold text-[#16A34A]">You save {fmt$(d.saveVsMsrp)}</div>}
+                        {d.belowOriginalMsrp != null && <div className="text-[13px] font-semibold text-[#16A34A]">{fmt$(d.belowOriginalMsrp)} below original MSRP</div>}
+                      </>
+                    )}
                   </div>
                 )}
               </div>
@@ -826,28 +870,37 @@ const VehiclePassportV3 = () => {
                   <div className="text-[12px] font-semibold text-[#64748B]">{d.priceLabel}</div>
                   <div className="text-[30px] font-extrabold leading-9 tracking-tight">{fmt$(price)}</div>
                   <div className="mt-1 space-y-0.5 text-[12px] text-[#64748B]">
-                    {d.docFee ? (
+                    {!d.priceBreakdown && d.docFee ? (
                       <p>{d.priceIncludesDoc
                         ? `Incl. ${fmt$(d.docFee)} doc fee · ${fmt$(Math.max(0, price - d.docFee))} before doc fee`
                         : `+ ${fmt$(d.docFee)} doc fee · Sale ${fmt$(d.websiteSalePrice ?? price + d.docFee)}`}</p>
                     ) : null}
                     {buildSheet?.estValue ? <p className="font-semibold text-[#16A34A]">Incl. {fmt$(buildSheet.estValue)} in factory options</p> : null}
                     {pv("payment") && d.estMonthly != null && <p>Est. {fmt$(d.estMonthly)}/mo <span className="text-[11px] text-[#94A3B8]">{d.paymentAssumptions}</span></p>}
-                    {d.msrp != null && <p>MSRP {fmt$(d.msrp)}</p>}
+                    {!d.priceBreakdown && d.msrp != null && <p>MSRP {fmt$(d.msrp)}</p>}
                   </div>
+                  {d.priceBreakdown && <PriceLadder b={d.priceBreakdown} priceLabel={d.priceLabel} />}
                 </div>
               )}
-              {(d.saveVsMsrp || (d.belowMarket && d.belowMarket > 0)) && (
+              {(() => {
+                // With the savings ladder present, MSRP savings are itemized there —
+                // reserve this chip for the below-market signal to avoid double-counting.
+                const msrpChip = !d.priceBreakdown && d.saveVsMsrp ? d.saveVsMsrp : null;
+                const mktChip = d.belowMarket && d.belowMarket > 0 ? d.belowMarket : null;
+                const amt = msrpChip ?? mktChip;
+                if (amt == null) return null;
+                return (
                 <div className="mt-3 lg:mt-3 rounded-xl border border-emerald-200 bg-emerald-50/70 px-3 py-2">
                   <div className="flex items-center gap-2">
                     <BadgeCheck className="w-4 h-4 text-[#16A34A] shrink-0" />
-                    <p className="text-[12px] font-bold text-emerald-800">{fmt$(d.saveVsMsrp || d.belowMarket)} {d.saveVsMsrp ? "below MSRP" : "below market"}</p>
+                    <p className="text-[12px] font-bold text-emerald-800">{fmt$(amt)} {msrpChip ? "below MSRP" : "below market"}</p>
                   </div>
                   {d.belowMarket != null && d.belowMarket > 0 && d.marketMeta.similarCount != null && d.marketMeta.similarCount >= 5 && (
                     <p className="text-[11px] text-emerald-800/80 mt-1">Compared against {d.marketMeta.similarCount.toLocaleString()} similar listings {d.marketMeta.radius != null ? `within ${d.marketMeta.radius} miles` : "in the region"} · live market data</p>
                   )}
                 </div>
-              )}
+                );
+              })()}
               <button onClick={() => go("todays-price")} className="mt-4 w-full h-12 rounded-xl bg-[#2563EB] hover:bg-[#1d4fd7] text-white text-[14px] font-bold inline-flex items-center justify-center gap-2"><DollarSign className="w-4 h-4" /> See My Price</button>
               <button onClick={() => go("reserve")} className="mt-2 w-full h-11 rounded-xl border border-[#2563EB] text-[#2563EB] text-[13.5px] font-bold inline-flex items-center justify-center gap-2 hover:bg-blue-50 transition-colors"><BadgeCheck className="w-4 h-4" /> Reserve This Vehicle</button>
               <div className="grid grid-cols-2 gap-2 mt-3">

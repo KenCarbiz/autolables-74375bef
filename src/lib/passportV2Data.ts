@@ -1,5 +1,5 @@
 import type { VehicleListing } from "@/hooks/useVehicleListing";
-import { resolveDisplayPrice, getPriceDisplayMode, type PriceDisplayMode } from "@/lib/priceModel";
+import { resolveDisplayPrice, getPriceDisplayMode, buildDiscountBreakdown, type PriceDisplayMode, type DiscountBreakdown } from "@/lib/priceModel";
 import { DEFAULT_APR_PERCENT } from "@/lib/affordability";
 import type { OemFactoryWarranty } from "@/lib/oemWarranty";
 
@@ -195,6 +195,11 @@ export interface PassportData {
   websiteSalePrice: number | null;
   priceMode: PriceDisplayMode;
   priceIncludesDoc: boolean;
+  // The MSRP → discounts → your price → + doc fee → sale price ladder that
+  // mirrors the dealer's own website. Null when there is no genuine savings
+  // story (no MSRP, or MSRP at/below the price). Every line reconciles to the
+  // real MSRP−price gap; see buildDiscountBreakdown.
+  priceBreakdown: DiscountBreakdown | null;
   // Customer-safe reconditioning & inspection summary (injected by
   // public-listing-view from the dealer's prep/detail/install/inspection
   // sign-offs). Null until the dealership records reconditioning work.
@@ -432,7 +437,7 @@ export const derivePassport = (listing: VehicleListing): PassportData => {
   // doc fee is disclosed separately by the surface; market math compares on the
   // same value the dealer displays.
   const lp = listing as unknown as {
-    advertised_price_before_doc?: number | null; doc_fee?: number | null; website_sale_price?: number | null; price_display_mode?: unknown; price_label?: string | null; website_price_term?: string | null;
+    advertised_price_before_doc?: number | null; doc_fee?: number | null; website_sale_price?: number | null; price_display_mode?: unknown; price_label?: string | null; website_price_term?: string | null; dealer_discount?: number | null; retail_cash?: number | null;
   };
   const priceMode: PriceDisplayMode = getPriceDisplayMode({ price_display_mode: lp.price_display_mode });
   const advBeforeDoc = lp.advertised_price_before_doc ?? listing.price ?? null;
@@ -445,6 +450,23 @@ export const derivePassport = (listing: VehicleListing): PassportData => {
   const priceIncludesDoc = priceMode === "website_sale_price";
   const isNew = String((listing as { condition?: string }).condition || "").toLowerCase() === "new";
   const msrp = (mc.msrp as number) ?? null;
+  // The savings ladder that mirrors the dealer's own VDP. Only meaningful when a
+  // real MSRP sits above the price — for a used car below its original sticker
+  // that gap is depreciation, not a discount, so we suppress the breakdown there
+  // and expose it only as belowOriginalMsrp.
+  const priceBreakdown = isNew
+    ? buildDiscountBreakdown(
+        {
+          msrp,
+          advertisedBeforeDoc: advBeforeDoc,
+          price: listing.price,
+          docFee,
+          dealerDiscount: lp.dealer_discount ?? null,
+          retailCash: lp.retail_cash ?? null,
+        },
+        priceMode,
+      )
+    : null;
   const marketAvg = listing.market_value ?? null;
   const marketHigh = (mp.high as number) ?? null;
   const marketLow = (mp.low as number) ?? null;
@@ -663,7 +685,7 @@ export const derivePassport = (listing: VehicleListing): PassportData => {
 
   return {
     price, msrp, priceLabel, websitePriceTerm, estMonthly, paymentAssumptions, saveVsMsrp, belowOriginalMsrp,
-    docFee, websiteSalePrice, priceMode, priceIncludesDoc,
+    docFee, websiteSalePrice, priceMode, priceIncludesDoc, priceBreakdown,
     recon: (listing as unknown as { recon?: PassportData["recon"] }).recon ?? null,
     marketAvg, marketLow, marketHigh, belowMarket,
     marketMeta, comparables, blackbook, marketCheckedAt, history,
