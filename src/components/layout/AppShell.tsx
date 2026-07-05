@@ -511,10 +511,6 @@ const AppShell = ({ children }: AppShellProps) => {
     }
   };
 
-  const openProduct = (url: string) => {
-    if (url.startsWith("http")) window.open(url, "_blank", "noreferrer");
-    else navigate(url);
-  };
 
   // Role-aware mobile bottom nav: Scan stays the raised center; the four side
   // slots are filled from the role's capabilities (a service writer gets Get
