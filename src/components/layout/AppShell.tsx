@@ -106,6 +106,22 @@ const productIcon = (id: string) => {
   return Truck;
 };
 
+// Family apps shown in the user-menu "Switch app" section. Access is
+// gated on AutoCurb's product_ids (source of truth for cross-app
+// subscriptions), fetched via platform-entitlements on dropdown open.
+interface FamilyApp {
+  id: string;
+  name: string;
+  icon: React.ElementType;
+  url: string;
+  entitlementKey: string;
+}
+const FAMILY_APPS: FamilyApp[] = [
+  { id: "autolabels", name: "AutoLabels", icon: Tag,   url: "",                          entitlementKey: "autolabels" },
+  { id: "autocurb",   name: "AutoCurb",   icon: Car,   url: "https://autocurb.io/admin", entitlementKey: "autocurb"   },
+  { id: "autofilm",   name: "AutoFilm",   icon: Video, url: "https://autofilm.io/admin", entitlementKey: "autofilm"   },
+];
+
 const AppShell = ({ children }: AppShellProps) => {
   const { user, isAdmin, signOut } = useAuth();
   const { tenant, currentStore, stores, setCurrentStore } = useTenant();
