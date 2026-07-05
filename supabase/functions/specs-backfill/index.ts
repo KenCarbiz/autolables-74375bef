@@ -24,7 +24,7 @@ async function run(depth: number) {
       .from("vehicle_listings")
       .select("tenant_id, vin")
       .eq("status", "published")
-      .is("mc_attributes->options", null)
+      .is("mc_attributes->>options", null)
       .limit(4);
     const batch = (rows as { tenant_id: string; vin: string }[] | null) || [];
     if (batch.length === 0) { console.log(`specs-backfill: done (decoded ${decoded}, failed ${failed})`); return; }
@@ -49,7 +49,7 @@ async function run(depth: number) {
   if (depth < MAX_DEPTH) {
     const admin2 = adminClient();
     const { data: more } = await admin2.from("vehicle_listings")
-      .select("vin").eq("status", "published").is("mc_attributes->options", null).limit(1);
+      .select("vin").eq("status", "published").is("mc_attributes->>options", null).limit(1);
     if (((more as unknown[]) || []).length > 0) {
       await fetch(`${SUPABASE_URL}/functions/v1/specs-backfill`, {
         method: "POST",
