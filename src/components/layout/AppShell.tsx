@@ -853,20 +853,40 @@ const AppShell = ({ children }: AppShellProps) => {
                   </div>
                   <DropdownMenuSeparator />
                   <DropdownMenuLabel className="text-[10px] uppercase tracking-[0.14em] text-muted-foreground px-2">Switch app</DropdownMenuLabel>
-                  {ALL_PRODUCTS.map((product) => {
-                    const Icon = productIcon(product.id);
+                  {FAMILY_APPS.map((app) => {
+                    const Icon = app.icon;
+                    const isCurrent = app.id === "autolabels";
+                    const unlocked = isCurrent || platformProductIds.includes(app.entitlementKey);
                     return (
-                      <DropdownMenuItem key={product.id} onClick={() => openProduct(product.url)} className="cursor-pointer py-2 rounded-lg">
-                        <div className="mr-3 flex h-9 w-9 items-center justify-center rounded-xl bg-muted">
-                          <Icon className="h-4 w-4" />
+                      <DropdownMenuItem
+                        key={app.id}
+                        disabled={!unlocked || isCurrent}
+                        onSelect={(event) => {
+                          if (isCurrent || !unlocked) { event.preventDefault(); return; }
+                          if (app.url.startsWith("http")) window.location.href = app.url;
+                          else navigate(app.url);
+                        }}
+                        className={`py-2 rounded-lg ${unlocked && !isCurrent ? "cursor-pointer" : "cursor-default"} ${!unlocked ? "opacity-60" : ""}`}
+                      >
+                        <div className={`mr-3 flex h-9 w-9 items-center justify-center rounded-xl ${unlocked ? "bg-muted" : "bg-muted/60"}`}>
+                          <Icon className={`h-4 w-4 ${unlocked ? "" : "text-muted-foreground"}`} />
                         </div>
                         <div className="min-w-0 flex-1">
-                          <div className="flex items-center gap-1 text-sm font-semibold">{product.name}{product.url.startsWith("http") && <ExternalLink className="h-3 w-3 text-muted-foreground" />}</div>
-                          <div className="truncate text-[11px] text-muted-foreground">{product.description}</div>
+                          <div className="flex items-center gap-1.5 text-sm font-semibold">
+                            {app.name}
+                            {!unlocked && <Lock className="h-3 w-3 text-muted-foreground" />}
+                          </div>
+                          {!unlocked && (
+                            <div className="text-[11px] text-muted-foreground">Upgrade to unlock</div>
+                          )}
                         </div>
+                        {isCurrent && (
+                          <span className="ml-2 h-2 w-2 rounded-full bg-emerald-500" aria-label="Current app" />
+                        )}
                       </DropdownMenuItem>
                     );
                   })}
+                  <DropdownMenuSeparator />
                   <DropdownMenuSeparator />
                   <DropdownMenuLabel className="text-[10px] uppercase tracking-[0.14em] text-muted-foreground px-2">Account</DropdownMenuLabel>
                   {can("can_manage_team") && (
