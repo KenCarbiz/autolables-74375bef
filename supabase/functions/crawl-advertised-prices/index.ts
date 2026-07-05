@@ -998,7 +998,31 @@ serve(async (req) => {
       try {
         const comp = extractPriceComponents(html);
         const bd = buildBreakdown(newPrice, comp, cfg.docFee);
-        if (bd.advertised_price_before_doc != null) {
+        // FTC-critical guard: the advertised price the platform stores and
+        // protects must never land ABOVE the dealer's own inventory/feed price.
+        // A scrape above the feed means the extractor grabbed the sticker/MSRP
+        // or a lease/finance figure, not the sale price (seen on a QX60 that
+        // scraped $62,225 against a $55,598 feed). A real website price DROP is
+        // below the feed and is still written. On a mis-parse we record a
+        // warning and leave the good price untouched rather than corrupt the
+        // advertised-price evidence.
+        const { data: lrow } = await admin.from("vehicle_listings")
+          .select("price").eq("tenant_id", row.tenant_id).eq("vin", row.vin).maybeSingle();
+        const feedPrice = Number(lrow?.price) || null;
+        const misparse = bd.advertised_price_before_doc != null && feedPrice != null
+          && bd.advertised_price_before_doc > feedPrice * 1.02;
+        if (misparse) {
+          await admin.from("vehicle_listings").update({
+            price_parse_status: "warning",
+            price_parse_notes: `Scraped advertised ${bd.advertised_price_before_doc} exceeds feed price ${feedPrice} by >2% — likely a sticker/MSRP or lease mis-parse; advertised price left unchanged.`,
+            price_last_verified_at: new Date().toISOString(),
+          }).eq("tenant_id", row.tenant_id).eq("vin", row.vin);
+          await admin.from("audit_log").insert({
+            action: "advertised_price_crawl_error", entity_type: "advertised_price",
+            entity_id: row.vin, store_id: row.tenant_id,
+            details: { vin: row.vin, reason: "advertised_above_feed", scraped: bd.advertised_price_before_doc, feed: feedPrice, url: fetchUrl },
+          }).then(() => undefined, () => undefined);
+        } else if (bd.advertised_price_before_doc != null) {
           await admin.from("vehicle_listings").update({
             advertised_price_before_doc: bd.advertised_price_before_doc,
             doc_fee: bd.doc_fee,
@@ -1011,6 +1035,7 @@ serve(async (req) => {
             price_last_verified_at: new Date().toISOString(),
           }).eq("tenant_id", row.tenant_id).eq("vin", row.vin);
         }
+        if (misparse) { skipped++; continue; }
       } catch { /* price breakdown columns may not be migrated yet */ }
 
       // Skip a no-op write only when nothing changed AND we have no fresh
