@@ -29,7 +29,9 @@ import {
   PlayCircle,
   LayoutDashboard,
   LayoutTemplate,
+  Lock,
   LogOut,
+  Video,
   Menu,
   Package,
   Palette,
@@ -63,7 +65,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import Logo from "@/components/brand/Logo";
 import CommandPalette, { useCommandPalette } from "@/components/layout/CommandPalette";
-import { ALL_PRODUCTS } from "@/components/layout/AppSwitcher";
+import { usePlatformEntitlements } from "@/hooks/usePlatformEntitlements";
 import { VinScanContext, prefersLiveScanner } from "@/contexts/VinScanContext";
 import { toolIcon } from "@/components/icons/AutoLabelsToolIcons";
 import {
@@ -103,6 +105,22 @@ const productIcon = (id: string) => {
   return Truck;
 };
 
+// Family apps shown in the user-menu "Switch app" section. Access is
+// gated on AutoCurb's product_ids (source of truth for cross-app
+// subscriptions), fetched via platform-entitlements on dropdown open.
+interface FamilyApp {
+  id: string;
+  name: string;
+  icon: React.ElementType;
+  url: string;
+  entitlementKey: string;
+}
+const FAMILY_APPS: FamilyApp[] = [
+  { id: "autolabels", name: "AutoLabels", icon: Tag,   url: "",                          entitlementKey: "autolabels" },
+  { id: "autocurb",   name: "AutoCurb",   icon: Car,   url: "https://autocurb.io/admin", entitlementKey: "autocurb"   },
+  { id: "autofilm",   name: "AutoFilm",   icon: Video, url: "https://autofilm.io/admin", entitlementKey: "autofilm"   },
+];
+
 const AppShell = ({ children }: AppShellProps) => {
   const { user, isAdmin, signOut } = useAuth();
   const { tenant, currentStore, stores, setCurrentStore } = useTenant();
@@ -114,6 +132,7 @@ const AppShell = ({ children }: AppShellProps) => {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [showMobileQr, setShowMobileQr] = useState(false);
   const { open: paletteOpen, setOpen: setPaletteOpen } = useCommandPalette();
+  const { productIds: platformProductIds, load: loadPlatformProducts } = usePlatformEntitlements();
   const [storeFilter, setStoreFilter] = useState("");
   const [marketCheckConnected, setMarketCheckConnected] = useState(false);
   const [marketCheckLabel, setMarketCheckLabel] = useState("MarketCheck Pending");
@@ -491,10 +510,6 @@ const AppShell = ({ children }: AppShellProps) => {
     }
   };
 
-  const openProduct = (url: string) => {
-    if (url.startsWith("http")) window.open(url, "_blank", "noreferrer");
-    else navigate(url);
-  };
 
   // Role-aware mobile bottom nav: Scan stays the raised center; the four side
   // slots are filled from the role's capabilities (a service writer gets Get
@@ -804,7 +819,7 @@ const AppShell = ({ children }: AppShellProps) => {
                 </DropdownMenuContent>
               </DropdownMenu>
 
-              <DropdownMenu>
+              <DropdownMenu onOpenChange={(open) => { if (open) void loadPlatformProducts(); }}>
                 <DropdownMenuTrigger asChild>
                   <button className="flex items-center gap-2 rounded-full pl-1 pr-2 py-1 hover:bg-muted" title={user?.email || "Account"}>
                     <span className="h-9 w-9 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-sm font-black shadow-sm">
@@ -833,20 +848,40 @@ const AppShell = ({ children }: AppShellProps) => {
                   </div>
                   <DropdownMenuSeparator />
                   <DropdownMenuLabel className="text-[10px] uppercase tracking-[0.14em] text-muted-foreground px-2">Switch app</DropdownMenuLabel>
-                  {ALL_PRODUCTS.map((product) => {
-                    const Icon = productIcon(product.id);
+                  {FAMILY_APPS.map((app) => {
+                    const Icon = app.icon;
+                    const isCurrent = app.id === "autolabels";
+                    const unlocked = isCurrent || platformProductIds.includes(app.entitlementKey);
                     return (
-                      <DropdownMenuItem key={product.id} onClick={() => openProduct(product.url)} className="cursor-pointer py-2 rounded-lg">
-                        <div className="mr-3 flex h-9 w-9 items-center justify-center rounded-xl bg-muted">
-                          <Icon className="h-4 w-4" />
+                      <DropdownMenuItem
+                        key={app.id}
+                        disabled={!unlocked || isCurrent}
+                        onSelect={(event) => {
+                          if (isCurrent || !unlocked) { event.preventDefault(); return; }
+                          if (app.url.startsWith("http")) window.location.href = app.url;
+                          else navigate(app.url);
+                        }}
+                        className={`py-2 rounded-lg ${unlocked && !isCurrent ? "cursor-pointer" : "cursor-default"} ${!unlocked ? "opacity-60" : ""}`}
+                      >
+                        <div className={`mr-3 flex h-9 w-9 items-center justify-center rounded-xl ${unlocked ? "bg-muted" : "bg-muted/60"}`}>
+                          <Icon className={`h-4 w-4 ${unlocked ? "" : "text-muted-foreground"}`} />
                         </div>
                         <div className="min-w-0 flex-1">
-                          <div className="flex items-center gap-1 text-sm font-semibold">{product.name}{product.url.startsWith("http") && <ExternalLink className="h-3 w-3 text-muted-foreground" />}</div>
-                          <div className="truncate text-[11px] text-muted-foreground">{product.description}</div>
+                          <div className="flex items-center gap-1.5 text-sm font-semibold">
+                            {app.name}
+                            {!unlocked && <Lock className="h-3 w-3 text-muted-foreground" />}
+                          </div>
+                          {!unlocked && (
+                            <div className="text-[11px] text-muted-foreground">Upgrade to unlock</div>
+                          )}
                         </div>
+                        {isCurrent && (
+                          <span className="ml-2 h-2 w-2 rounded-full bg-emerald-500" aria-label="Current app" />
+                        )}
                       </DropdownMenuItem>
                     );
                   })}
+                  <DropdownMenuSeparator />
                   <DropdownMenuSeparator />
                   <DropdownMenuLabel className="text-[10px] uppercase tracking-[0.14em] text-muted-foreground px-2">Account</DropdownMenuLabel>
                   {can("can_manage_team") && (
