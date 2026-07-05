@@ -54,13 +54,18 @@ export interface EquipmentPanelData {
 
 // Shopper-facing category buckets, mapped from the numbered equipment icon
 // registry so classification stays consistent with the icon key.
+// Every icon class maps to exactly one bucket, so the full decoded set always
+// has a home. The final "More Features" bucket catches only the generic
+// fallback icon (65) — features the classifier could not place — so nothing is
+// ever dropped or silently folded into an unrelated category.
 const PANEL_CATEGORIES: { id: string; name: string; iconNum: number; nums: Set<number> }[] = [
   { id: "performance", name: "Performance & Drivetrain", iconNum: 1, nums: new Set([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]) },
   { id: "comfort", name: "Comfort & Interior", iconNum: 21, nums: new Set([20, 21, 22, 23, 24, 25, 26, 47, 48, 49, 50, 51, 52]) },
   { id: "technology", name: "Technology & Audio", iconNum: 28, nums: new Set([27, 28, 29, 30, 31, 32, 33, 42, 43, 44, 45, 46, 57]) },
   { id: "safety", name: "Safety & Driver Assistance", iconNum: 41, nums: new Set([34, 35, 36, 37, 38, 39, 40, 41]) },
-  { id: "exterior", name: "Exterior & Appearance", iconNum: 13, nums: new Set([13, 14, 15, 16, 17, 18, 19, 58]) },
-  { id: "convenience", name: "Convenience", iconNum: 54, nums: new Set([53, 54, 55, 56, 59, 60, 61, 62, 63, 64, 65]) },
+  { id: "exterior", name: "Exterior Styling", iconNum: 13, nums: new Set([13, 14, 15, 16, 17, 18, 19, 58]) },
+  { id: "convenience", name: "Convenience", iconNum: 54, nums: new Set([53, 54, 55, 56, 59, 60, 61, 62, 63, 64]) },
+  { id: "more", name: "More Features", iconNum: 59, nums: new Set([65]) },
 ];
 
 // Curated benefit copy per icon class — plain-English customer language,
@@ -105,9 +110,10 @@ const CATEGORY_FALLBACK_BENEFIT: Record<string, string> = {
   safety: "Peace of mind on every drive",
   exterior: "Styling that stands out",
   convenience: "Small touches that save time",
+  more: "Additional equipment on this build",
 };
 
-const bucketFor = (num: number) => PANEL_CATEGORIES.find((c) => c.nums.has(num)) ?? PANEL_CATEGORIES[5];
+const bucketFor = (num: number) => PANEL_CATEGORIES.find((c) => c.nums.has(num)) ?? PANEL_CATEGORIES[PANEL_CATEGORIES.length - 1];
 
 // Highlight priority: features shoppers ask about first.
 const HIGHLIGHT_PRIORITY = [1, 5, 8, 10, 27, 43, 42, 23, 14, 51, 50, 34, 39, 37, 22, 29, 4, 3, 49, 53, 54];
