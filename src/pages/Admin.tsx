@@ -213,6 +213,26 @@ const Admin = () => {
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [docFeeSig, tenant?.id, settingsLoading]);
+  // Most-recent price term the crawl detected off this dealer's own VDP, shown
+  // in the "Match my website" price-label preview. Null until a crawl captures
+  // one. Cast: website_price_term is a fresh column not yet in generated types.
+  const [detectedWebsiteTerm, setDetectedWebsiteTerm] = useState<string | null>(null);
+  useEffect(() => {
+    if (!tenant?.id || tenant.id === "house") { setDetectedWebsiteTerm(null); return; }
+    let cancelled = false;
+    (async () => {
+      const { data } = await (supabase as any)
+        .from("vehicle_listings")
+        .select("website_price_term")
+        .eq("tenant_id", tenant.id)
+        .not("website_price_term", "is", null)
+        .order("price_last_verified_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (!cancelled) setDetectedWebsiteTerm((data?.website_price_term as string) || null);
+    })();
+    return () => { cancelled = true; };
+  }, [tenant?.id]);
   const navigate = useNavigate();
   const { openScan } = useVinScan();
   const { member, loading: entitlementsLoading } = useEntitlements();
@@ -2365,7 +2385,7 @@ const Admin = () => {
               {(() => {
                 const label = settings.price_label || DEFAULT_PRICE_LABEL;
                 const setLabel = (patch: Partial<typeof label>) => updateSettings({ price_label: { ...label, ...patch } });
-                const preview = resolvePriceLabel(label, settings.dealer_name);
+                const preview = resolvePriceLabel(label, settings.dealer_name, detectedWebsiteTerm);
                 return (
                   <div className="mt-3 pt-3 border-t border-border">
                     <label className="text-xs font-semibold text-muted-foreground">Price label</label>
@@ -2384,10 +2404,22 @@ const Admin = () => {
                         className="w-full px-3 py-2 border border-border-custom rounded text-sm mt-2"
                       />
                     )}
-                    <p className="text-[11px] text-muted-foreground mt-1">
-                      Wording only — never changes the price. Customers will see:{" "}
-                      <span className="font-semibold text-foreground">{preview}</span>
-                    </p>
+                    {label.preset === "website" && !detectedWebsiteTerm ? (
+                      <p className="text-[11px] text-muted-foreground mt-1 italic">
+                        We'll use your website's price term once the nightly price check detects it; showing "Our Price" until then.
+                      </p>
+                    ) : label.preset === "website" ? (
+                      <p className="text-[11px] text-muted-foreground mt-1">
+                        Wording only — never changes the price. Customers will see:{" "}
+                        <span className="font-semibold text-foreground">{preview}</span>{" "}
+                        <span className="text-muted-foreground">— detected from your website</span>
+                      </p>
+                    ) : (
+                      <p className="text-[11px] text-muted-foreground mt-1">
+                        Wording only — never changes the price. Customers will see:{" "}
+                        <span className="font-semibold text-foreground">{preview}</span>
+                      </p>
+                    )}
                   </div>
                 );
               })()}

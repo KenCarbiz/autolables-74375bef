@@ -371,17 +371,20 @@ serve(async (req) => {
     // ── Resolve the dealer's customer-facing price LABEL to a display string.
     // Display text only — it never changes the price value or the doc-fee mode.
     // Mirrors resolvePriceLabel in src/lib/priceModel.ts (edge functions can't
-    // import from src). "dealer" substitutes the dealership name.
+    // import from src). "dealer" substitutes the dealership name; "website"
+    // mirrors the term the dealer's own VDP uses (website_price_term).
     try {
       const preset = String((priceLabelSetting?.preset ?? "our_price") as string);
       const dealerName = String(((row.dealer_snapshot as Record<string, unknown> | null)?.name as string) || "").trim();
       const custom = String((priceLabelSetting?.custom ?? "") as string).trim();
+      const websiteTerm = String((row.website_price_term as string) || "").trim();
       const resolved =
         preset === "advertised" ? "Advertised Price"
         : preset === "best" ? "Best Price"
         : preset === "one_price" ? "One Price"
         : preset === "sale" ? "Sale Price"
         : preset === "dealer" ? (dealerName ? `${dealerName} Price` : "Our Price")
+        : preset === "website" ? (websiteTerm || "Our Price")
         : preset === "custom" ? (custom || "Our Price")
         : "Our Price";
       row.price_label = resolved;

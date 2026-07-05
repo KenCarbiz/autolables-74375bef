@@ -202,6 +202,15 @@ describe("resolvePriceLabel", () => {
     expect(resolvePriceLabel({ preset: "dealer" }, null)).toBe("Our Price");
   });
 
+  it("mirrors the website term for the 'website' preset, falling back when absent", () => {
+    expect(resolvePriceLabel({ preset: "website" }, "Harte", "Sale Price")).toBe("Sale Price");
+    expect(resolvePriceLabel({ preset: "website" }, null, "  Internet Price  ")).toBe("Internet Price");
+    // No term captured yet → "Our Price" until the nightly crawl detects it.
+    expect(resolvePriceLabel({ preset: "website" }, "Harte", "")).toBe("Our Price");
+    expect(resolvePriceLabel({ preset: "website" }, "Harte", null)).toBe("Our Price");
+    expect(resolvePriceLabel({ preset: "website" })).toBe("Our Price");
+  });
+
   it("uses the custom text, falling back to 'Our Price' when empty", () => {
     expect(resolvePriceLabel({ preset: "custom", custom: "Today's Deal" })).toBe("Today's Deal");
     expect(resolvePriceLabel({ preset: "custom", custom: "  Deal  " })).toBe("Deal");

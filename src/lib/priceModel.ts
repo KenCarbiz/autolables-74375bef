@@ -230,7 +230,8 @@ export function getPriceDisplayMode(settings: unknown): PriceDisplayMode {
 // This is display text only; it never changes the price VALUE or the doc-fee
 // inclusion decided by price_display_mode. Stored on dealer_profiles.settings
 // as { preset, custom? }. The "dealer" preset substitutes the dealership name
-// ("Harte Price"); "custom" uses free text.
+// ("Harte Price"); "website" mirrors the term the dealer's own VDP uses next to
+// its price (vehicle_listings.website_price_term); "custom" uses free text.
 // ──────────────────────────────────────────────────────────────────────
 
 export type PriceLabelPreset =
@@ -240,6 +241,7 @@ export type PriceLabelPreset =
   | "one_price"
   | "sale"
   | "dealer"
+  | "website"
   | "custom";
 
 export interface PriceLabelSetting {
@@ -259,6 +261,7 @@ export const PRICE_LABEL_PRESETS: { value: PriceLabelPreset; label: string; samp
   { value: "one_price", label: "One Price", sample: "One Price" },
   { value: "sale", label: "Sale Price", sample: "Sale Price" },
   { value: "dealer", label: "{Dealer} Price (uses your dealership name)" },
+  { value: "website", label: "Match my website" },
   { value: "custom", label: "Custom…" },
 ];
 
@@ -271,16 +274,20 @@ const PRICE_LABEL_FIXED: Partial<Record<PriceLabelPreset, string>> = {
 };
 
 // Resolve the display string a shopper sees for the price header. Falls back to
-// "Our Price" for an unset setting, an empty custom string, or a "dealer" preset
-// with no dealership name available.
+// "Our Price" for an unset setting, an empty custom string, a "dealer" preset
+// with no dealership name, or a "website" preset with no term captured yet.
 export function resolvePriceLabel(
   setting: PriceLabelSetting | null | undefined,
   dealerName?: string | null,
+  websiteTerm?: string | null,
 ): string {
   const preset = setting?.preset;
   if (preset === "dealer") {
     const name = (dealerName || "").trim();
     return name ? `${name} Price` : "Our Price";
+  }
+  if (preset === "website") {
+    return (websiteTerm || "").trim() || "Our Price";
   }
   if (preset === "custom") {
     return (setting?.custom || "").trim() || "Our Price";

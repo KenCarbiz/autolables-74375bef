@@ -477,6 +477,24 @@ const buildBreakdown = (extractedPrice: number | null, comp: PriceComponents, co
   return { advertised_price_before_doc: advertised, doc_fee: docFee, website_sale_price: websiteSale, retail_cash: comp.retailCash, dealer_discount: comp.dealerDiscount, price_parse_status: status, price_parse_notes: notes };
 };
 
+// Clean the label text the extractor found next to the price (e.g. "SALE
+// PRICE:", "  internet price ") into a human-readable term for the passport
+// ("Sale Price", "Internet Price"). Returns null when it's not a sensible price
+// term — no letters, or a bare number — so we never store junk. Title-cases each
+// word, strips a trailing colon, collapses whitespace, and caps at ~24 chars.
+const cleanWebsitePriceTerm = (raw: string | null | undefined): string | null => {
+  const s = String(raw ?? "").replace(/[:\s]+$/, "").replace(/\s+/g, " ").trim();
+  if (!s) return null;
+  if (!/[A-Za-z]/.test(s)) return null;           // bare number / symbols only
+  if (/^\$?[\d,.]+$/.test(s)) return null;         // a price, not a label
+  const titled = s.split(" ").map((w) =>
+    /[A-Z]/.test(w) && w === w.toUpperCase() && w.length > 1
+      ? w.charAt(0) + w.slice(1).toLowerCase()     // ALL-CAPS → Title
+      : w.charAt(0).toUpperCase() + w.slice(1)
+  ).join(" ");
+  return titled.slice(0, 24).trim();
+};
+
 // Browser-like UA shared by the seeded crawl and discovery fetches.
 const UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36";
 const FETCH_HEADERS = { "User-Agent": UA, "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8", "Accept-Language": "en-US,en;q=0.9" };
@@ -1023,7 +1041,11 @@ serve(async (req) => {
             details: { vin: row.vin, reason: "advertised_above_feed", scraped: bd.advertised_price_before_doc, feed: feedPrice, url: fetchUrl },
           }).then(() => undefined, () => undefined);
         } else if (bd.advertised_price_before_doc != null) {
-          await admin.from("vehicle_listings").update({
+          // The terminology the dealer's own VDP uses next to its price, cleaned
+          // for the passport's "Match my website" label option. Only written on
+          // this clean (non-misparse) branch, and only when it's a real term.
+          const websiteTerm = cleanWebsitePriceTerm(result.matched_label);
+          const cleanUpdate: Record<string, unknown> = {
             advertised_price_before_doc: bd.advertised_price_before_doc,
             doc_fee: bd.doc_fee,
             website_sale_price: bd.website_sale_price,
@@ -1033,7 +1055,10 @@ serve(async (req) => {
             price_parse_status: bd.price_parse_status,
             price_parse_notes: bd.price_parse_notes,
             price_last_verified_at: new Date().toISOString(),
-          }).eq("tenant_id", row.tenant_id).eq("vin", row.vin);
+          };
+          if (websiteTerm) cleanUpdate.website_price_term = websiteTerm;
+          await admin.from("vehicle_listings").update(cleanUpdate)
+            .eq("tenant_id", row.tenant_id).eq("vin", row.vin);
         }
         if (misparse) { skipped++; continue; }
       } catch { /* price breakdown columns may not be migrated yet */ }

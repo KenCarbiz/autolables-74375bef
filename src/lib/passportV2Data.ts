@@ -179,6 +179,9 @@ export interface PassportData {
   price: number | null;
   msrp: number | null;
   priceLabel: string;
+  // The term the dealer's own VDP uses next to its price (e.g. "Sale Price"),
+  // captured by the advertised-price crawl. Powers the "Match my website" label.
+  websitePriceTerm: string | null;
   estMonthly: number | null;
   paymentAssumptions: string;
   saveVsMsrp: number | null;
@@ -429,7 +432,7 @@ export const derivePassport = (listing: VehicleListing): PassportData => {
   // doc fee is disclosed separately by the surface; market math compares on the
   // same value the dealer displays.
   const lp = listing as unknown as {
-    advertised_price_before_doc?: number | null; doc_fee?: number | null; website_sale_price?: number | null; price_display_mode?: unknown; price_label?: string | null;
+    advertised_price_before_doc?: number | null; doc_fee?: number | null; website_sale_price?: number | null; price_display_mode?: unknown; price_label?: string | null; website_price_term?: string | null;
   };
   const priceMode: PriceDisplayMode = getPriceDisplayMode({ price_display_mode: lp.price_display_mode });
   const advBeforeDoc = lp.advertised_price_before_doc ?? listing.price ?? null;
@@ -455,6 +458,7 @@ export const derivePassport = (listing: VehicleListing): PassportData => {
   // price_label setting + dealership name into a string). Legacy snapshots may
   // carry it on dealer_snapshot; default is "Our Price".
   const priceLabel = (lp.price_label as string) || (dealer.price_label as string) || "Our Price";
+  const websitePriceTerm = (lp.website_price_term as string) || null;
   // "You save" vs MSRP is only true for a new car; a used car below its
   // original sticker is depreciation, exposed separately as belowOriginalMsrp.
   const saveVsMsrp = isNew && msrp != null && price != null && msrp > price ? msrp - price : null;
@@ -658,7 +662,7 @@ export const derivePassport = (listing: VehicleListing): PassportData => {
   };
 
   return {
-    price, msrp, priceLabel, estMonthly, paymentAssumptions, saveVsMsrp, belowOriginalMsrp,
+    price, msrp, priceLabel, websitePriceTerm, estMonthly, paymentAssumptions, saveVsMsrp, belowOriginalMsrp,
     docFee, websiteSalePrice, priceMode, priceIncludesDoc,
     recon: (listing as unknown as { recon?: PassportData["recon"] }).recon ?? null,
     marketAvg, marketLow, marketHigh, belowMarket,
