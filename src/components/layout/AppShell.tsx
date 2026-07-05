@@ -66,7 +66,6 @@ import { toast } from "sonner";
 import Logo from "@/components/brand/Logo";
 import CommandPalette, { useCommandPalette } from "@/components/layout/CommandPalette";
 import { usePlatformEntitlements } from "@/hooks/usePlatformEntitlements";
-import { usePlatformEntitlements } from "@/hooks/usePlatformEntitlements";
 import { VinScanContext, prefersLiveScanner } from "@/contexts/VinScanContext";
 import { toolIcon } from "@/components/icons/AutoLabelsToolIcons";
 import {
