@@ -48,7 +48,10 @@ export type CustomerEngagementPayload = {
   metadata?: Record<string, unknown>;
 };
 
-const SESSION_KEY = "autolabels_engagement_session_id";
+// Share ONE session id per visit with usePassportEngagement (al_passport_sid)
+// so per-section dwell and the clickstream merge into a single session in the
+// Shopper Activity timeline instead of appearing as two separate visits.
+const SESSION_KEY = "al_passport_sid";
 const VISITOR_KEY = "autolabels_engagement_visitor_id";
 
 const randomId = (prefix: string) => {
