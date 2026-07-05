@@ -337,7 +337,7 @@ const VehiclePassportDocuments = () => {
                   <span className="w-11 h-11 rounded-xl bg-blue-50 flex items-center justify-center shrink-0"><ClipboardList className="w-5 h-5 text-[#2563EB]" /></span>
                   <div className="min-w-0 flex-1">
                     <p className="text-[14px] font-bold leading-tight">{historyReportName(d.historyReport.provider)} Vehicle History Report</p>
-                    <p className="text-[12px] text-[#64748B] leading-tight mt-0.5">Opens on {d.historyReport.provider === "autocheck" ? "autocheck.com" : "carfax.com"} · provided at no cost by {d.dealerName}</p>
+                    <p className="text-[12px] text-[#64748B] leading-tight mt-0.5">{d.historyReport.source === "vin" ? `Official ${historyReportName(d.historyReport.provider)} record for this VIN` : `Opens on ${d.historyReport.provider === "autocheck" ? "autocheck.com" : "carfax.com"} · provided at no cost by ${d.dealerName}`}</p>
                   </div>
                   <span className="shrink-0 text-[13px] font-semibold text-[#2563EB] inline-flex items-center gap-1.5">View Report <ExternalLink className="w-4 h-4" /></span>
                 </a>

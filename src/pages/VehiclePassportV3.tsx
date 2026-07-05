@@ -920,9 +920,9 @@ const VehiclePassportV3 = () => {
                 {d.historyReport && pv("historyReport") && (
                   <div className="mt-3 pt-3 border-t border-slate-100" onClick={(e) => e.stopPropagation()}>
                     <a href={d.historyReport.url} target="_blank" rel="noopener noreferrer" onClick={() => trackHistoryReport("history_card")} className="text-[13px] font-semibold text-[#2563EB] inline-flex items-center gap-1.5 hover:underline">
-                      View the free {historyReportName(d.historyReport.provider)} Report <ExternalLink className="w-3.5 h-3.5" />
+                      {d.historyReport.source === "vin" ? `View the ${historyReportName(d.historyReport.provider)} record` : `View the free ${historyReportName(d.historyReport.provider)} Report`} <ExternalLink className="w-3.5 h-3.5" />
                     </a>
-                    <p className="text-[11px] text-[#94A3B8] mt-0.5">Provided at no cost by {d.dealerName}</p>
+                    {d.historyReport.source !== "vin" && <p className="text-[11px] text-[#94A3B8] mt-0.5">Provided at no cost by {d.dealerName}</p>}
                   </div>
                 )}
                 <Link onClick={() => go("vehicle-history")} className="mt-auto pt-3 self-start">View full history report</Link>

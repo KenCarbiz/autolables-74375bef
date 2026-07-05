@@ -314,7 +314,7 @@ export interface PassportData {
   // Dealer-paid CARFAX/AutoCheck report link (public-listing-view attaches
   // it for used/CPO only). An EXTERNAL handoff — we link, we never read or
   // certify the report's contents.
-  historyReport: { url: string; provider: "carfax" | "autocheck" } | null;
+  historyReport: { url: string; provider: "carfax" | "autocheck"; source?: "dealer" | "vin" } | null;
   // Dealer-branded warranty programs (lifetime powertrain, dealer CPO)
   // flagged for the warranty panel by the dealer, condition-filtered
   // server-side. mode "available" = optional upgrade, not included.

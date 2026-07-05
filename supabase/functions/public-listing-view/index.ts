@@ -197,16 +197,26 @@ serve(async (req) => {
         };
         if (Object.values(trust).some((v) => v)) row.dealer_trust = trust;
 
-        // ── Dealer-paid vehicle history report link (CARFAX / AutoCheck).
-        // Used/CPO only; the URL is dealer-provided (harvested from their own
-        // VDP or entered manually), never constructed here. Allowlisted hosts
-        // only, and the dealer kill switch hides every link at once.
+        // ── Vehicle history report link (CARFAX / AutoCheck). Used/CPO only,
+        // and the dealer kill switch hides every link at once. The dealer's own
+        // link (harvested from their VDP or entered manually) is preferred; when
+        // there is none, fall back to the official CARFAX per-VIN record so the
+        // report reaches every eligible vehicle MarketCheck confirms a CARFAX
+        // for — not only the few whose VDP exposed a scrapeable link. The source
+        // marker lets the surfaces drop the "no cost" wording on the fallback.
         try {
           const hCond = String((row.condition as string) || "").toLowerCase();
           if (["used", "cpo", "demo"].includes(hCond) && s.history_report_links_enabled !== false) {
             const url = String((row.history_report_url as string) || "").trim();
             if (/^https:\/\/(www\.)?(carfax\.com|cfx\.link|autocheck\.com)\//i.test(url)) {
-              row.history_report = { url, provider: /autocheck\.com/i.test(url) ? "autocheck" : "carfax" };
+              row.history_report = { url, provider: /autocheck\.com/i.test(url) ? "autocheck" : "carfax", source: "dealer" };
+            } else {
+              const mc = (row.mc_attributes ?? {}) as Record<string, unknown>;
+              const carfaxKnown = mc.carfax_1_owner != null || mc.carfax_clean_title != null;
+              const vin = String((row.vin as string) || "").trim().toUpperCase();
+              if (carfaxKnown && /^[A-HJ-NPR-Z0-9]{17}$/.test(vin)) {
+                row.history_report = { url: `https://www.carfax.com/vehicle/${vin}`, provider: "carfax", source: "vin" };
+              }
             }
           }
         } catch { /* history link must never break the payload */ }

@@ -424,8 +424,8 @@ const VehiclePassportHistory = () => {
             {hr && (
               <a href={hr.url} target="_blank" rel="noopener noreferrer" onClick={() => trackHr("history_page_actions")} className={`${CARD} p-4 flex flex-col items-start gap-2 active:bg-slate-50 transition-colors col-span-2`}>
                 <span className="w-9 h-9 rounded-xl bg-blue-50 flex items-center justify-center"><ExternalLink className="w-[18px] h-[18px] text-[#2563EB]" /></span>
-                <span className="text-[13px] font-semibold leading-tight text-left">View the free {hrName} Report</span>
-                <span className="text-[11px] text-[#94A3B8] leading-tight text-left">Opens on {hr.provider === "autocheck" ? "autocheck.com" : "carfax.com"} · provided at no cost by {dealerName}</span>
+                <span className="text-[13px] font-semibold leading-tight text-left">{hr.source === "vin" ? `View the ${hrName} record` : `View the free ${hrName} Report`}</span>
+                <span className="text-[11px] text-[#94A3B8] leading-tight text-left">{hr.source === "vin" ? `Official ${hrName} record for this VIN` : `Opens on ${hr.provider === "autocheck" ? "autocheck.com" : "carfax.com"} · provided at no cost by ${dealerName}`}</span>
               </a>
             )}
             <button onClick={() => window.print()} className={`${CARD} p-4 flex flex-col items-start gap-2 active:bg-slate-50 transition-colors`}>
