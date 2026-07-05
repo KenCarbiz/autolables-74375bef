@@ -4,6 +4,7 @@
 
 import { resolveUsedVehicleWarrantyCompliance, type UsedVehicleWarrantyRuleInput } from "./UsedVehicleWarrantyCompliance";
 import { buildDefaultFTCBuyersGuideData, type FTCBuyersGuideData, type FTCWarrantyCoverageLine } from "./FTCBuyersGuide";
+import { resolveBuyersGuideForm, type BuyersGuideForm } from "@/lib/buyersGuideForms";
 
 export type FTCDecisionVehicleInput = {
   year: string | number;
@@ -47,6 +48,11 @@ export type FTCBuyersGuideDecision = {
   reasons: string[];
   blockingWarnings: string[];
   counselReviewRequired: boolean;
+  // Which official Buyers Guide document applies. For Maine and Wisconsin this
+  // is their own state form (with an assetUrl to the official PDF) rather than
+  // the federal FTC form; usesStateForm short-circuits the FTC data above.
+  buyersGuideForm: BuyersGuideForm;
+  usesStateForm: boolean;
 };
 
 const asNumber = (value?: string | number) => {
@@ -87,6 +93,10 @@ export const decideFTCBuyersGuide = (input: {
   const state = input.vehicle.saleState.toUpperCase();
   const currentYear = input.currentYear || new Date().getFullYear();
   const age = vehicleAge(input.vehicle.year, currentYear);
+  // Maine and Wisconsin are exempt from the FTC rule and mandate their own
+  // forms — the packet must pull the state PDF, not the federal Buyers Guide.
+  const buyersGuideForm = resolveBuyersGuideForm(state);
+  const usesStateForm = buyersGuideForm.authority === "state";
   const warrantyCompliance = resolveUsedVehicleWarrantyCompliance({
     saleState: state,
     modelYear: asNumber(input.vehicle.year) || currentYear,
@@ -122,6 +132,7 @@ export const decideFTCBuyersGuide = (input: {
 
   const reasons = [
     `Sale state: ${state}`,
+    usesStateForm ? `${buyersGuideForm.formName} applies — ${state} is exempt from the FTC rule and mandates its own form.` : undefined,
     age !== undefined ? `Vehicle age: ${age} years` : "Vehicle age unavailable",
     `Warranty disposition: ${warrantyCompliance.disposition}`,
     stateRequiresWarranty ? "State-required warranty path selected." : undefined,
@@ -162,10 +173,14 @@ export const decideFTCBuyersGuide = (input: {
     warrantyCompliance,
     decisionCode,
     required: true,
-    requiredForms: warrantyCompliance.requiredForms,
+    // In Maine/Wisconsin the required document is the state form, not the FTC
+    // one; elsewhere it is whatever the warranty rule requires.
+    requiredForms: usesStateForm ? [buyersGuideForm.formName] : warrantyCompliance.requiredForms,
     reasons,
     blockingWarnings,
     counselReviewRequired: blockingWarnings.length > 0,
+    buyersGuideForm,
+    usesStateForm,
   };
 };
 
