@@ -824,7 +824,7 @@ const AppShell = ({ children }: AppShellProps) => {
                 </DropdownMenuContent>
               </DropdownMenu>
 
-              <DropdownMenu>
+              <DropdownMenu onOpenChange={(open) => { if (open) void loadPlatformProducts(); }}>
                 <DropdownMenuTrigger asChild>
                   <button className="flex items-center gap-2 rounded-full pl-1 pr-2 py-1 hover:bg-muted" title={user?.email || "Account"}>
                     <span className="h-9 w-9 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-sm font-black shadow-sm">
