@@ -21,7 +21,7 @@ import { usePassportEngagement } from "@/lib/passportEngagement";
 import { isVehicleSaved, toggleSavedVehicle } from "@/lib/savedVehicles";
 import { readBuildSheet } from "@/lib/buildSheet";
 import { readPassportOrigin, clearPassportOrigin, type PassportOrigin } from "@/lib/passportOrigin";
-import { trackPassportOpened, trackWindowStickerScanned, trackCustomerCtaClicked } from "@/lib/engagement/customerEngagement";
+import { trackPassportOpened, trackWindowStickerScanned, trackCustomerCtaClicked, trackCustomerEngagement } from "@/lib/engagement/customerEngagement";
 import { packetVisible } from "@/lib/packetModules";
 import PassportPanel, { isPassportPanelKey, type PassportPanelKey } from "@/components/passport/PassportPanel";
 import { useNhtsaSafety } from "@/hooks/useNhtsaSafety";
@@ -319,6 +319,62 @@ const VehiclePassportV3 = () => {
   }, [listing?.id, isPreview]);
   // Shopper Focus Breakdown — time per module + open panel (skipped in preview).
   usePassportEngagement(listing?.slug || vehicleSlug, activePanel, !isPreview);
+
+  // Page-level engagement signals the module-dwell tracker doesn't cover:
+  // scroll depth (25/50/75/100%, once each per session) and time-on-page
+  // (a 30s ping + a final elapsed reading on unload). Distinct from
+  // usePassportEngagement, which credits per-module seconds. Never in preview.
+  const vid = listing?.id;
+  const vvin = listing?.vin;
+  const vstore = listing?.store_id;
+  useEffect(() => {
+    if (!vid || isPreview || typeof window === "undefined") return;
+    const base = {
+      storeId: vstore, vehicleId: vid, vin: vvin,
+      source: "passport" as const, surface: "vehicle_passport" as const,
+    };
+    const start = Date.now();
+    const elapsed = () => Math.round((Date.now() - start) / 1000);
+
+    const fired = new Set<number>();
+    const seenKey = (p: number) => `al_scroll_${vid}_${p}`;
+    [25, 50, 75, 100].forEach((p) => {
+      try { if (sessionStorage.getItem(seenKey(p))) fired.add(p); } catch { /* ignore */ }
+    });
+    const onScroll = () => {
+      const doc = document.documentElement;
+      const max = (doc.scrollHeight || 0) - window.innerHeight;
+      const pct = max > 0 ? ((window.scrollY || 0) / max) * 100 : 100;
+      for (const p of [25, 50, 75, 100]) {
+        if (pct >= p && !fired.has(p)) {
+          fired.add(p);
+          try { sessionStorage.setItem(seenKey(p), "1"); } catch { /* ignore */ }
+          trackCustomerEngagement({ ...base, eventType: "scroll_depth", metadata: { percent: p } });
+        }
+      }
+    };
+    window.addEventListener("scroll", onScroll, { passive: true });
+    onScroll();
+
+    const pingTimer = window.setTimeout(() => {
+      trackCustomerEngagement({ ...base, eventType: "time_on_page", metadata: { seconds: elapsed() } });
+    }, 30_000);
+
+    let closed = false;
+    const onHide = () => {
+      if (closed) return;
+      closed = true;
+      trackCustomerEngagement({ ...base, eventType: "time_on_page", metadata: { seconds: elapsed(), final: true } });
+    };
+    window.addEventListener("pagehide", onHide);
+
+    return () => {
+      window.removeEventListener("scroll", onScroll);
+      window.removeEventListener("pagehide", onHide);
+      window.clearTimeout(pingTimer);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [vid, isPreview]);
 
   // "Back to the vehicle you were viewing" — set when the shopper clicked a
   // dealer-alternative card on another passport. Cleared once they return.

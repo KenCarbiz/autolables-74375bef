@@ -1,1 +1,6 @@
 project_id = "onnbmmdbrsgytfozfozn"
+
+# record-engagement is a public analytics sink hit via navigator.sendBeacon,
+# which cannot attach the anon apikey header, so JWT verification must be off.
+[functions.record-engagement]
+verify_jwt = false

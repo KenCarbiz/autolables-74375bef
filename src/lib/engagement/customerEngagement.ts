@@ -1,5 +1,3 @@
-import { supabase } from "@/integrations/supabase/client";
-
 export type CustomerEngagementSource = "passport" | "window_sticker_qr" | "website" | "email" | "sms" | "direct" | "unknown";
 export type CustomerEngagementSurface = "vehicle_passport" | "window_sticker" | "public_listing" | "document_packet" | "document_viewer" | "lead_form" | "unknown";
 export type CustomerEngagementEventType =
@@ -84,9 +82,18 @@ const detectDeviceType = () => {
   return "desktop";
 };
 
+// Public write path. Anon has no RLS INSERT grant on
+// customer_engagement_events, so the old direct .insert() silently
+// dropped every event. record-engagement inserts via the service role
+// and re-derives ip/device/geo authoritatively; the device hint below
+// is advisory only. sendBeacon is preferred because it survives page
+// unload (exit/last events), and neither transport is ever awaited in
+// the UI path.
+const ENGAGEMENT_ENDPOINT = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/record-engagement`;
+
 export const trackCustomerEngagement = async (payload: CustomerEngagementPayload) => {
   try {
-    const { error } = await (supabase as any).from("customer_engagement_events").insert({
+    const event = {
       tenant_id: payload.tenantId || null,
       store_id: payload.storeId || null,
       vehicle_id: payload.vehicleId || null,
@@ -104,11 +111,23 @@ export const trackCustomerEngagement = async (payload: CustomerEngagementPayload
       qr_token: payload.qrToken || null,
       referrer: typeof document !== "undefined" ? document.referrer || null : null,
       landing_url: typeof window !== "undefined" ? window.location.href : null,
-      user_agent: typeof navigator !== "undefined" ? navigator.userAgent : null,
       device_type: detectDeviceType(),
       metadata: payload.metadata || {},
-    });
-    if (error) throw error;
+    };
+    const bodyText = JSON.stringify({ event });
+
+    if (typeof navigator !== "undefined" && typeof navigator.sendBeacon === "function") {
+      const ok = navigator.sendBeacon(ENGAGEMENT_ENDPOINT, new Blob([bodyText], { type: "application/json" }));
+      if (ok) return;
+    }
+    // sendBeacon unavailable or queue full — fall back to keepalive fetch so
+    // the request still completes if the page is unloading.
+    void fetch(ENGAGEMENT_ENDPOINT, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: bodyText,
+      keepalive: true,
+    }).catch(() => {});
   } catch (err) {
     console.warn("Customer engagement event was not recorded", err);
   }
