@@ -43,11 +43,14 @@ export interface RawEngagementEventRow {
   occurred_at: string;
 }
 
+// qr_scan_events stores the raw user_agent (no pre-parsed device/browser) plus
+// edge-derived geo. Device/browser are derived here from the UA at read time.
 export interface RawQrScanRow {
-  device_type?: string | null;
-  browser?: string | null;
+  user_agent?: string | null;
   referrer?: string | null;
-  sticker_type?: string | null;
+  country?: string | null;
+  region?: string | null;
+  city?: string | null;
   scanned_at: string;
 }
 
@@ -331,6 +334,27 @@ const locationOf = (e: { city?: string | null; region?: string | null; country?:
 
 const uniqSorted = (items: (string | null | undefined)[]): string[] =>
   [...new Set(items.filter((i): i is string => i != null && String(i).trim() !== ""))].sort();
+
+// qr_scan_events has no pre-parsed device/browser — derive coarse buckets from
+// the raw user_agent so QR scans still contribute to shopper context.
+const uaDevice = (ua?: string | null): string | null => {
+  const s = (ua || "").toLowerCase();
+  if (!s) return null;
+  if (/ipad|tablet|playbook|silk|(android(?!.*mobile))/.test(s)) return "tablet";
+  if (/mobi|iphone|ipod|android|blackberry|iemobile|opera mini/.test(s)) return "mobile";
+  return "desktop";
+};
+const uaBrowser = (ua?: string | null): string | null => {
+  const s = (ua || "").toLowerCase();
+  if (!s) return null;
+  if (/edg\//.test(s)) return "Edge";
+  if (/opr\/|opera/.test(s)) return "Opera";
+  if (/samsungbrowser/.test(s)) return "Samsung Internet";
+  if (/firefox|fxios/.test(s)) return "Firefox";
+  if (/chrome|crios/.test(s)) return "Chrome";
+  if (/safari/.test(s)) return "Safari";
+  return null;
+};
 
 // ── The empty summary — used for no-data and as a safe default. ──────────
 
@@ -706,9 +730,9 @@ export function buildShopperActivity(input: ShopperActivityInput): ShopperActivi
   }
   const shopperContext: ShopperContext = {
     hasAny: events.length > 0 || qrScans.length > 0,
-    locations: uniqSorted([...events.map(locationOf), ...qrScans.map(() => null)]),
-    devices: uniqSorted([...events.map((e) => e.device_type), ...qrScans.map((q) => q.device_type)]),
-    browsers: uniqSorted([...events.map((e) => e.browser), ...qrScans.map((q) => q.browser)]),
+    locations: uniqSorted([...events.map(locationOf), ...qrScans.map(locationOf)]),
+    devices: uniqSorted([...events.map((e) => e.device_type), ...qrScans.map((q) => uaDevice(q.user_agent))]),
+    browsers: uniqSorted([...events.map((e) => e.browser), ...qrScans.map((q) => uaBrowser(q.user_agent))]),
     oses: uniqSorted(events.map((e) => e.os)),
     sources: uniqSorted(events.map((e) => e.source)),
     referrers: uniqSorted([...events.map((e) => e.referrer), ...qrScans.map((q) => q.referrer)]),

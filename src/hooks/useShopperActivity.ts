@@ -104,7 +104,7 @@ export function useShopperActivity({ vin, tenantId, vehicleId, viewCount, enable
           ? (() => {
               const q = db
                 .from("qr_scan_events")
-                .select("device_type, browser, referrer, sticker_type, scanned_at")
+                .select("user_agent, referrer, country, region, city, scanned_at")
                 .eq("tenant_id", tenantId)
                 .eq("vehicle_id", vehicleId)
                 .order("scanned_at", { ascending: false })
