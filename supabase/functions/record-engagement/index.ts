@@ -132,9 +132,22 @@ const buildRow = (e: any, ip: string | null, ua: string, geo: { country: string 
   const device = parseUa(ua);
 
   // event_label and section are not columns — fold them into metadata so the
-  // signal survives without violating the schema.
-  const rawMeta = e.metadata && typeof e.metadata === "object" && !Array.isArray(e.metadata) ? e.metadata : {};
-  const metadata: Row = { ...rawMeta };
+  // signal survives without violating the schema. Cap the client's metadata so
+  // a bloated or hostile payload can't balloon the jsonb column or its GIN
+  // index: at most 20 keys, keys and string values clamped, non-scalars dropped.
+  const rawMeta = e.metadata && typeof e.metadata === "object" && !Array.isArray(e.metadata)
+    ? e.metadata as Record<string, unknown> : {};
+  const metadata: Row = {};
+  let metaKeys = 0;
+  for (const [k, v] of Object.entries(rawMeta)) {
+    if (metaKeys >= 20) break;
+    const key = str(k, 60);
+    if (!key) continue;
+    if (typeof v === "string") metadata[key] = str(v, 300);
+    else if (typeof v === "number" || typeof v === "boolean" || v === null) metadata[key] = v;
+    else continue; // drop nested objects/arrays — analytics metadata is flat scalars
+    metaKeys++;
+  }
   const label = str(e.event_label, 200);
   const section = str(e.section, 200);
   if (label && metadata.event_label == null) metadata.event_label = label;
