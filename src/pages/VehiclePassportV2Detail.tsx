@@ -890,11 +890,11 @@ const SECTIONS: Record<string, { title: string; render: SectionRender; wide?: bo
               {hasRange ? (
                 <div className="grid grid-cols-3 text-center text-[13px] gap-2">
                   <div className="rounded-xl bg-slate-50 py-3"><div className="text-slate-500 text-[11px]">Market Low</div><div className="font-bold mt-0.5">{fmt$(d.marketLow)}</div></div>
-                  <div className="rounded-xl bg-emerald-50 py-3"><div className="text-emerald-600 text-[11px]">Our Price</div><div className="font-extrabold text-emerald-700 mt-0.5">{fmt$(d.price)}</div></div>
+                  <div className="rounded-xl bg-emerald-50 py-3"><div className="text-emerald-600 text-[11px]">{d.priceLabel}</div><div className="font-extrabold text-emerald-700 mt-0.5">{fmt$(d.price)}</div></div>
                   <div className="rounded-xl bg-slate-50 py-3"><div className="text-slate-500 text-[11px]">Market High</div><div className="font-bold mt-0.5">{fmt$(d.marketHigh)}</div></div>
                 </div>
               ) : (
-                <div className="rounded-xl bg-emerald-50 text-center text-[13px] py-3"><div className="text-emerald-600 text-[11px]">Our Price</div><div className="font-extrabold text-emerald-700 mt-0.5">{fmt$(d.price)}</div></div>
+                <div className="rounded-xl bg-emerald-50 text-center text-[13px] py-3"><div className="text-emerald-600 text-[11px]">{d.priceLabel}</div><div className="font-extrabold text-emerald-700 mt-0.5">{fmt$(d.price)}</div></div>
               )}
               {showAvg && (
                 <div className="mt-3 flex items-center justify-between text-[13px] rounded-xl bg-slate-50 px-4 py-3">

@@ -13,6 +13,7 @@ import type { IihsAward } from "@/lib/iihsAwards";
 import { DEFAULT_TODAYS_PRICE_CUSTOM, type TodaysPriceMode, type TodaysPriceCustom } from "@/lib/todaysPrice";
 import type { LabelDefaults } from "@/lib/labelDefaults";
 import type { MarketDemandCompSettings } from "@/lib/compStrategy";
+import { DEFAULT_PRICE_LABEL, type PriceLabelSetting } from "@/lib/priceModel";
 
 // A configurable internal recon/service the dealer routes to a responsible
 // party. Non-customer charge — tracked as the store's own cost.
@@ -214,6 +215,10 @@ export interface DealerSettings {
   // the doc fee) and disclose the fee separately, or show the final website
   // sale price (fee included). Default: advertised_before_doc.
   price_display_mode: "advertised_before_doc" | "website_sale_price";
+  // Customer-facing price LABEL — what the dealer calls their price on the
+  // passport (e.g. "Our Price", "Best Price", "Harte Price"). Display text only;
+  // it never changes the price value or the doc-fee inclusion above.
+  price_label: PriceLabelSetting;
   // Today's Price page — dealer-selected wording mode plus custom copy and
   // calculator toggles. Default is the compliance-safe Payment Estimate; the
   // out-the-door mode is explicit opt-in, never the default.
@@ -409,6 +414,7 @@ export const DEFAULT_SETTINGS: DealerSettings = {
   doc_fee_state: "",
   financing_disclosure_apr: null,
   price_display_mode: "advertised_before_doc",
+  price_label: DEFAULT_PRICE_LABEL,
   todays_price_mode: "payment_estimate",
   todays_price_custom: DEFAULT_TODAYS_PRICE_CUSTOM,
   label_defaults: {},

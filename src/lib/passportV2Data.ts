@@ -429,7 +429,7 @@ export const derivePassport = (listing: VehicleListing): PassportData => {
   // doc fee is disclosed separately by the surface; market math compares on the
   // same value the dealer displays.
   const lp = listing as unknown as {
-    advertised_price_before_doc?: number | null; doc_fee?: number | null; website_sale_price?: number | null; price_display_mode?: unknown;
+    advertised_price_before_doc?: number | null; doc_fee?: number | null; website_sale_price?: number | null; price_display_mode?: unknown; price_label?: string | null;
   };
   const priceMode: PriceDisplayMode = getPriceDisplayMode({ price_display_mode: lp.price_display_mode });
   const advBeforeDoc = lp.advertised_price_before_doc ?? listing.price ?? null;
@@ -451,7 +451,10 @@ export const derivePassport = (listing: VehicleListing): PassportData => {
   const belowMarket = marketAvg != null
     ? (price != null && price < marketAvg ? marketAvg - price : null)
     : (mp.belowMarket as number) ?? null;
-  const priceLabel = (dealer.price_label as string) || "Our Price";
+  // Server-resolved price label (public-listing-view resolves the dealer's
+  // price_label setting + dealership name into a string). Legacy snapshots may
+  // carry it on dealer_snapshot; default is "Our Price".
+  const priceLabel = (lp.price_label as string) || (dealer.price_label as string) || "Our Price";
   // "You save" vs MSRP is only true for a new car; a used car below its
   // original sticker is depreciation, exposed separately as belowOriginalMsrp.
   const saveVsMsrp = isNew && msrp != null && price != null && msrp > price ? msrp - price : null;

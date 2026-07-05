@@ -7,6 +7,8 @@ import {
   resolveComparePrice,
   getPriceDisplayMode,
   DEFAULT_PRICE_DISPLAY_MODE,
+  resolvePriceLabel,
+  getPriceLabelSetting,
 } from "./priceModel";
 
 describe("normalizeCurrency", () => {
@@ -180,5 +182,46 @@ describe("getPriceDisplayMode", () => {
   });
   it("honors a valid configured mode", () => {
     expect(getPriceDisplayMode({ price_display_mode: "website_sale_price" })).toBe("website_sale_price");
+  });
+});
+
+describe("resolvePriceLabel", () => {
+  it("maps each fixed preset to its display text", () => {
+    expect(resolvePriceLabel({ preset: "our_price" })).toBe("Our Price");
+    expect(resolvePriceLabel({ preset: "advertised" })).toBe("Advertised Price");
+    expect(resolvePriceLabel({ preset: "best" })).toBe("Best Price");
+    expect(resolvePriceLabel({ preset: "one_price" })).toBe("One Price");
+    expect(resolvePriceLabel({ preset: "sale" })).toBe("Sale Price");
+  });
+
+  it("substitutes the dealership name for the 'dealer' preset", () => {
+    expect(resolvePriceLabel({ preset: "dealer" }, "Harte")).toBe("Harte Price");
+    expect(resolvePriceLabel({ preset: "dealer" }, "  Harte INFINITI  ")).toBe("Harte INFINITI Price");
+    // No dealership name available → safe fallback, never "undefined Price".
+    expect(resolvePriceLabel({ preset: "dealer" }, "")).toBe("Our Price");
+    expect(resolvePriceLabel({ preset: "dealer" }, null)).toBe("Our Price");
+  });
+
+  it("uses the custom text, falling back to 'Our Price' when empty", () => {
+    expect(resolvePriceLabel({ preset: "custom", custom: "Today's Deal" })).toBe("Today's Deal");
+    expect(resolvePriceLabel({ preset: "custom", custom: "  Deal  " })).toBe("Deal");
+    expect(resolvePriceLabel({ preset: "custom", custom: "" })).toBe("Our Price");
+    expect(resolvePriceLabel({ preset: "custom" })).toBe("Our Price");
+  });
+
+  it("defaults to 'Our Price' when unset or malformed", () => {
+    expect(resolvePriceLabel(null)).toBe("Our Price");
+    expect(resolvePriceLabel(undefined)).toBe("Our Price");
+    // A dealer-name argument never leaks into a non-dealer preset.
+    expect(resolvePriceLabel({ preset: "our_price" }, "Harte")).toBe("Our Price");
+  });
+});
+
+describe("getPriceLabelSetting", () => {
+  it("reads the setting off dealer_profiles.settings, defaulting when absent", () => {
+    expect(getPriceLabelSetting(null)).toEqual({ preset: "our_price" });
+    expect(getPriceLabelSetting({})).toEqual({ preset: "our_price" });
+    expect(getPriceLabelSetting({ price_label: { preset: "best" } })).toEqual({ preset: "best", custom: undefined });
+    expect(getPriceLabelSetting({ price_label: { preset: "custom", custom: "Deal" } })).toEqual({ preset: "custom", custom: "Deal" });
   });
 });

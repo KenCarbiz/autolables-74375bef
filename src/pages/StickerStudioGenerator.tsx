@@ -19,6 +19,7 @@ import StickerPacketReviewPanel from "@/components/sticker/StickerPacketReviewPa
 import { FileCheck2, QrCode as QrIcon, AlertTriangle } from "lucide-react";
 import { useVehiclePrefill } from "@/lib/vehiclePrefill";
 import { getStudioTemplate, TemplateRenderer, type StickerData, type StickerLineItem, type StickerRenderOptions, type LabelMode } from "@/lib/stickerStudio/templates";
+import { resolvePriceLabel } from "@/lib/priceModel";
 import { useStickerCatalog } from "@/lib/stickerStudio/useStickerCatalog";
 import { useDealerPrintSettings } from "@/lib/stickerStudio/useDealerPrintSettings";
 import { useTemplateCustomization } from "@/lib/stickerStudio/useTemplateCustomization";
@@ -523,7 +524,7 @@ const StickerStudioGenerator = () => {
             </div>
           </div>
           <div className={`flex justify-center rounded-2xl border border-border p-4 overflow-auto ${labelMode === "black" ? "bg-slate-800" : "bg-slate-100"}`}>
-            <TemplateRenderer template={template} data={data} branding={branding} scale={previewScale} capture={sheetRef} options={options} />
+            <TemplateRenderer template={template} data={{ ...data, priceLabel: data.priceLabel || resolvePriceLabel(settings.price_label, tenant?.name || settings.dealer_name) }} branding={branding} scale={previewScale} capture={sheetRef} options={options} />
           </div>
         </div>
       </div>

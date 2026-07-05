@@ -54,6 +54,9 @@ export interface StickerData {
   msrp?: string;
   price?: string;
   specs?: string; // pre-joined key specs, e.g. "3.5L V6 · AWD · 9-Speed Auto · 20/25 MPG"
+  // Dealer-configured customer price label (e.g. "Best Price", "Harte Price").
+  // Display text only; defaults to "Our Price". Never shown for an MSRP-only car.
+  priceLabel?: string;
   installed: StickerLineItem[];
   upgrades: StickerLineItem[];
   benefits: StickerLineItem[];
@@ -377,7 +380,7 @@ function PassportPremiumSheet({ config, data, branding, options }: TemplateRende
       {/* Price + QR row */}
       <div className="mt-4 grid grid-cols-5 gap-4">
         <div className="col-span-3 rounded-2xl p-4 flex flex-col justify-center" style={{ backgroundColor: pal.bandBg, border: `1px solid ${accent}33` }}>
-          <span className="text-[10px] font-bold uppercase tracking-[0.16em]" style={{ color: pal.subInk }}>{money(data.price) ? "Our Price" : "MSRP"}</span>
+          <span className="text-[10px] font-bold uppercase tracking-[0.16em]" style={{ color: pal.subInk }}>{money(data.price) ? (data.priceLabel || "Our Price") : "MSRP"}</span>
           <span className="font-black tabular-nums leading-none text-[44px]" style={{ color: accent }}>{price || "Contact dealer"}</span>
           {showMsrp && <span className="mt-1 text-[12px]" style={{ color: pal.faintInk }}>MSRP <span className="line-through">{money(data.msrp)}</span></span>}
         </div>
@@ -440,7 +443,7 @@ function BigPriceSheet({ config, data, branding, options }: TemplateRenderProps)
 
       {/* Huge price */}
       <div className="mt-3">
-        <span className="block text-[12px] font-bold uppercase tracking-[0.2em]" style={{ color: pal.subInk }}>{money(data.price) ? "Our Price" : money(data.msrp) ? "MSRP" : ""}</span>
+        <span className="block text-[12px] font-bold uppercase tracking-[0.2em]" style={{ color: pal.subInk }}>{money(data.price) ? (data.priceLabel || "Our Price") : money(data.msrp) ? "MSRP" : ""}</span>
         <span className="block font-black tabular-nums leading-[0.9] text-[88px]" style={{ color: accent }}>{price || "CALL FOR PRICE"}</span>
       </div>
 

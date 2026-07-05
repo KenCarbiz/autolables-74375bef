@@ -224,3 +224,77 @@ export function getPriceDisplayMode(settings: unknown): PriceDisplayMode {
   const m = (settings as { price_display_mode?: unknown } | null | undefined)?.price_display_mode;
   return isPriceDisplayMode(m) ? m : DEFAULT_PRICE_DISPLAY_MODE;
 }
+
+// ──────────────────────────────────────────────────────────────────────
+// Price LABEL — what the dealer CALLS their price on customer surfaces.
+// This is display text only; it never changes the price VALUE or the doc-fee
+// inclusion decided by price_display_mode. Stored on dealer_profiles.settings
+// as { preset, custom? }. The "dealer" preset substitutes the dealership name
+// ("Harte Price"); "custom" uses free text.
+// ──────────────────────────────────────────────────────────────────────
+
+export type PriceLabelPreset =
+  | "our_price"
+  | "advertised"
+  | "best"
+  | "one_price"
+  | "sale"
+  | "dealer"
+  | "custom";
+
+export interface PriceLabelSetting {
+  preset: PriceLabelPreset;
+  custom?: string;
+}
+
+export const DEFAULT_PRICE_LABEL: PriceLabelSetting = { preset: "our_price" };
+
+// Admin dropdown options. `sample` is the copy shown in the live preview for the
+// fixed presets; "dealer" and "custom" resolve from live inputs so they carry no
+// static sample.
+export const PRICE_LABEL_PRESETS: { value: PriceLabelPreset; label: string; sample?: string }[] = [
+  { value: "our_price", label: "Our Price (default)", sample: "Our Price" },
+  { value: "advertised", label: "Advertised Price", sample: "Advertised Price" },
+  { value: "best", label: "Best Price", sample: "Best Price" },
+  { value: "one_price", label: "One Price", sample: "One Price" },
+  { value: "sale", label: "Sale Price", sample: "Sale Price" },
+  { value: "dealer", label: "{Dealer} Price (uses your dealership name)" },
+  { value: "custom", label: "Custom…" },
+];
+
+const PRICE_LABEL_FIXED: Partial<Record<PriceLabelPreset, string>> = {
+  our_price: "Our Price",
+  advertised: "Advertised Price",
+  best: "Best Price",
+  one_price: "One Price",
+  sale: "Sale Price",
+};
+
+// Resolve the display string a shopper sees for the price header. Falls back to
+// "Our Price" for an unset setting, an empty custom string, or a "dealer" preset
+// with no dealership name available.
+export function resolvePriceLabel(
+  setting: PriceLabelSetting | null | undefined,
+  dealerName?: string | null,
+): string {
+  const preset = setting?.preset;
+  if (preset === "dealer") {
+    const name = (dealerName || "").trim();
+    return name ? `${name} Price` : "Our Price";
+  }
+  if (preset === "custom") {
+    return (setting?.custom || "").trim() || "Our Price";
+  }
+  return (preset && PRICE_LABEL_FIXED[preset]) || "Our Price";
+}
+
+// Read a tenant's price_label setting out of dealer_profiles.settings, tolerating
+// legacy/absent shapes.
+export function getPriceLabelSetting(settings: unknown): PriceLabelSetting {
+  const raw = (settings as { price_label?: unknown } | null | undefined)?.price_label;
+  if (raw && typeof raw === "object" && typeof (raw as { preset?: unknown }).preset === "string") {
+    const r = raw as { preset: string; custom?: unknown };
+    return { preset: r.preset as PriceLabelPreset, custom: typeof r.custom === "string" ? r.custom : undefined };
+  }
+  return { ...DEFAULT_PRICE_LABEL };
+}

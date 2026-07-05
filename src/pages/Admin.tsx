@@ -25,6 +25,7 @@ import PacketDefaultsPanel from "@/components/admin/PacketDefaultsPanel";
 import { useInstantSave } from "@/hooks/useInstantSave";
 import { TODAYS_PRICE_MODE_OPTIONS, DEFAULT_TODAYS_PRICE_CUSTOM, resolveTodaysPrice } from "@/lib/todaysPrice";
 import { COMP_STRATEGY_OPTIONS, type CompStrategy } from "@/lib/compStrategy";
+import { PRICE_LABEL_PRESETS, DEFAULT_PRICE_LABEL, resolvePriceLabel } from "@/lib/priceModel";
 import OemWarrantyPanel from "@/components/admin/OemWarrantyPanel";
 import StickyButtonsPanel from "@/components/admin/StickyButtonsPanel";
 import DealershipTrustPanel from "@/components/admin/DealershipTrustPanel";
@@ -2360,6 +2361,36 @@ const Admin = () => {
               <p className="text-[11px] text-muted-foreground mt-1">
                 Controls the price shown on the customer Passport. The advertised price is always compared to market before the doc fee.
               </p>
+
+              {(() => {
+                const label = settings.price_label || DEFAULT_PRICE_LABEL;
+                const setLabel = (patch: Partial<typeof label>) => updateSettings({ price_label: { ...label, ...patch } });
+                const preview = resolvePriceLabel(label, settings.dealer_name);
+                return (
+                  <div className="mt-3 pt-3 border-t border-border">
+                    <label className="text-xs font-semibold text-muted-foreground">Price label</label>
+                    <select
+                      value={label.preset}
+                      onChange={(e) => setLabel({ preset: e.target.value as typeof label.preset })}
+                      className="w-full px-3 py-2 border border-border-custom rounded text-sm mt-1"
+                    >
+                      {PRICE_LABEL_PRESETS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+                    </select>
+                    {label.preset === "custom" && (
+                      <input
+                        value={label.custom || ""}
+                        onChange={(e) => setLabel({ custom: e.target.value })}
+                        placeholder="Our Price"
+                        className="w-full px-3 py-2 border border-border-custom rounded text-sm mt-2"
+                      />
+                    )}
+                    <p className="text-[11px] text-muted-foreground mt-1">
+                      Wording only — never changes the price. Customers will see:{" "}
+                      <span className="font-semibold text-foreground">{preview}</span>
+                    </p>
+                  </div>
+                );
+              })()}
             </div>
 
             <div id="comp-strategy" className="bg-card rounded-lg p-4 shadow-sm">

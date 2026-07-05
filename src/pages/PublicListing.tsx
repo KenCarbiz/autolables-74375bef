@@ -324,7 +324,8 @@ const PublicListingBody = () => {
   const marketAvg = listing.market_value ?? 0;
   const belowMarket = mp.belowMarket ?? (marketAvg > 0 && price < marketAvg ? marketAvg - price : 0);
   const marketHigh = mp.high ?? 0;
-  const priceLabel = (dealer.price_label as string) || "Our Price";
+  const priceLabel = ((listing as unknown as { price_label?: string }).price_label)
+    || (dealer.price_label as string) || "Our Price";
 
   const serviceCount = listing.service_records?.length ?? 0;
   const recallCount = listing.open_recall_count ?? 0;

@@ -118,6 +118,10 @@ serve(async (req) => {
     }
     if (!row) return json(404, { error: "not_found" });
 
+    // Dealer's price_label setting ({ preset, custom? }), captured here and
+    // resolved to a display string after the dealer name is known below.
+    let priceLabelSetting: Record<string, unknown> | null = null;
+
     // ── Attach the dealer's passport sticky-button config (service role reads
     // dealer_profiles past RLS) so the anonymous passport can render it.
     try {
@@ -131,6 +135,7 @@ serve(async (req) => {
         // Customer-facing price display mode (advertised_before_doc default vs
         // website_sale_price). Lets the passport show the dealer's chosen price.
         if (s.price_display_mode) row.price_display_mode = s.price_display_mode;
+        if (s.price_label && typeof s.price_label === "object") priceLabelSetting = s.price_label as Record<string, unknown>;
         // Today's Price page wording mode + custom copy (compliance-safe
         // defaults resolve client-side when absent).
         if (s.todays_price_mode) row.todays_price_mode = s.todays_price_mode;
@@ -362,6 +367,25 @@ serve(async (req) => {
         }
       }
     } catch { /* dealer identity optional */ }
+
+    // ── Resolve the dealer's customer-facing price LABEL to a display string.
+    // Display text only — it never changes the price value or the doc-fee mode.
+    // Mirrors resolvePriceLabel in src/lib/priceModel.ts (edge functions can't
+    // import from src). "dealer" substitutes the dealership name.
+    try {
+      const preset = String((priceLabelSetting?.preset ?? "our_price") as string);
+      const dealerName = String(((row.dealer_snapshot as Record<string, unknown> | null)?.name as string) || "").trim();
+      const custom = String((priceLabelSetting?.custom ?? "") as string).trim();
+      const resolved =
+        preset === "advertised" ? "Advertised Price"
+        : preset === "best" ? "Best Price"
+        : preset === "one_price" ? "One Price"
+        : preset === "sale" ? "Sale Price"
+        : preset === "dealer" ? (dealerName ? `${dealerName} Price` : "Our Price")
+        : preset === "custom" ? (custom || "Our Price")
+        : "Our Price";
+      row.price_label = resolved;
+    } catch { /* label optional — passport defaults to "Our Price" */ }
 
     // ── Attach real captured price/market history for this VIN (Passport V2
     // Price History). Read-only, service role; the MOST RECENT 60 snapshots
