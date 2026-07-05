@@ -427,6 +427,25 @@ const VehiclePassportV3 = () => {
     sold.velocity && d.marketMeta.soldCount != null ? `${d.marketMeta.soldCount} sold in 90 days` : null,
   ].filter(Boolean) as string[];
   const warrantyIncl = d.dealerCoverage.find((c) => c.mode === "included");
+  const warrantyAvail = d.dealerCoverage.find((c) => c.mode === "available");
+  // Warranty card precedence: dealer-included coverage (the dealer's headline)
+  // -> CPO certification -> a live factory term (always for new cars) -> the
+  // optional plans the dealer offers to add. No coverage of any kind -> no card.
+  const warrantyTile: MiTile | null = (() => {
+    const base = { icon: ShieldCheck, title: "Warranty", section: "factory-warranty", cta: "View coverage" };
+    const cond = String(listing.condition || "").toLowerCase();
+    const w = d.warranty;
+    const fmtMY = (dt: Date) => dt.toLocaleDateString(undefined, { month: "short", year: "numeric" });
+    const endOf = (m?: number | null) => { if (!w?.in_service_date || !m) return null; const e = new Date(w.in_service_date); e.setMonth(e.getMonth() + m); return e.getTime() > Date.now() ? fmtMY(e) : null; };
+    const inSvc = w?.in_service_date ? fmtMY(new Date(w.in_service_date)) : null;
+    const coverEnd = endOf(w?.powertrain_months) || endOf(w?.factory_months);
+    const coverWindow = inSvc && coverEnd ? `In service ${inSvc} · covered to ${coverEnd}` : coverEnd ? `Covered through ${coverEnd}` : null;
+    if (warrantyIncl) return { ...base, strong: warrantyIncl.lifetime ? `Lifetime ${warrantyIncl.coverage || "Powertrain"}` : (warrantyIncl.title || "Dealer Coverage"), sub: "Included with this vehicle" };
+    if (cond === "cpo") return { ...base, strong: "Certified Pre-Owned", sub: coverWindow || (d.warrantyStr ? `${d.warrantyStr} coverage` : "Manufacturer-backed coverage") };
+    if (cond === "new" || (d.warrantyStr && !d.warrantyExpired)) return { ...base, strong: "Factory Warranty", sub: coverWindow || (cond === "new" ? (d.warrantyStr || "Full factory coverage") : (d.warrantyStr ? `${d.warrantyStr} remaining` : "Factory coverage remaining")) };
+    if (warrantyAvail) return { ...base, strong: "Coverage Available", sub: "Optional protection plans — see terms" };
+    return null;
+  })();
   const mi = ([
     d.belowMarket && d.belowMarket > 0
       ? { icon: DollarSign, title: "Market Price", strong: "Great Price", sub: `${fmt$(d.belowMarket)} below market average`, chart: <Spark points={marketSeries} />, section: "market-price", cta: "View report" }
@@ -439,16 +458,7 @@ const VehiclePassportV3 = () => {
     d.marketAvg != null && rating?.overall != null
       ? { icon: GaugeIcon, title: "Price Confidence", strong: ratingTier(rating.overall).label, sub: "overall vehicle score", donut: rating.overall, section: "price-confidence", cta: "View report" }
       : null,
-    warrantyIncl || (d.warrantyStr && !d.warrantyExpired)
-      ? {
-          icon: ShieldCheck, title: "Warranty",
-          strong: warrantyIncl
-            ? (warrantyIncl.lifetime ? `Lifetime ${warrantyIncl.coverage || "Powertrain"}` : (warrantyIncl.title || "Dealer Coverage"))
-            : "Factory Warranty",
-          sub: warrantyIncl ? "Included with this vehicle" : (listing.condition === "new" ? (d.warrantyStr as string) : `${d.warrantyStr} remaining`),
-          section: "factory-warranty", cta: "View coverage",
-        }
-      : null,
+    warrantyTile,
     priceChange7d != null && priceChange7d < 0
       ? { icon: Clock, title: "Price History", strong: `-${fmt$(Math.abs(priceChange7d))}`, sub: "price decreased", chart: <Spark points={priceSeries} color="#7C3AED" />, section: "price-history", cta: "View history" }
       : null,
