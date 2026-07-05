@@ -44,13 +44,15 @@ const LABELS: Record<Language, Record<string, string>> = {
     title: "BUYERS GUIDE",
     important: "IMPORTANT: Spoken promises are difficult to enforce. Ask the dealer to put all promises in writing. Keep this form.",
     warranties_heading: "WARRANTIES FOR THIS VEHICLE:",
-    as_is_title: "AS IS — NO DEALER WARRANTY",
-    as_is_body: "The dealer does not provide a warranty for any repairs after sale. The dealer doesn't make any promises to fix things that need repair when you buy the vehicle or afterward. But implied warranties under your state's laws may give you some rights to have the dealer take care of serious problems that were not apparent when you bought the vehicle.",
+    as_is_title: "AS IS - NO DEALER WARRANTY",
+    as_is_body: "THE DEALER DOES NOT PROVIDE A WARRANTY FOR ANY REPAIRS AFTER SALE.",
     implied_title: "IMPLIED WARRANTIES ONLY",
-    implied_body: "The dealer makes no warranties, express or implied, on this vehicle, except for implied warranties of merchantability. Implied warranty of merchantability means that the dealer warrants that the vehicle will pass without objection in the trade and is fit for the ordinary purpose for which it is used. The entire risk as to quality and performance is with the buyer. However, the buyer may have other rights under applicable state law.",
+    implied_body: "The dealer doesn't make any promises to fix things that need repair when you buy the vehicle or afterward. But implied warranties under your state's laws may give you some rights to have the dealer take care of serious problems that were not apparent when you bought the vehicle.",
     warranty_title: "DEALER WARRANTY",
+    warranty_full: "FULL WARRANTY.",
+    warranty_limited: "LIMITED WARRANTY. The dealer will pay ___% of the labor and ___% of the parts for the covered systems that fail during the warranty period. Ask the dealer for a copy of the warranty, and for any documents that explain warranty coverage, exclusions, and the dealer's repair obligations. Implied warranties under your state's laws may give you additional rights.",
     warranty_body: "The dealer will pay a percentage of the labor and parts for the covered systems that fail during the warranty period. Ask the dealer for a copy of the warranty, and for any documents that explain warranty coverage, exclusions, and the dealer's repair obligations. Implied warranties under your state's laws may give you additional rights.",
-    warranty_duration: "WARRANTY DURATION:",
+    warranty_duration: "DURATION:",
     warranty_percentage: "PERCENTAGE OF COSTS COVERED:",
     covered_systems: "SYSTEMS COVERED:",
     system_engine: "Engine — All lubricated internal engine parts, water pump, fuel pump, manifolds, engine block, cylinder heads, rotary engine housings and flywheel.",
@@ -58,30 +60,45 @@ const LABELS: Record<Language, Record<string, string>> = {
     system_steering: "Steering — The steering gear housing and all internal parts, power steering pump, valve body, piston and rack.",
     system_brakes: "Brakes — Master cylinder, vacuum assist booster, wheel cylinders, hydraulic lines and fittings, and disc brake calipers.",
     system_electrical: "Electrical — Alternator, voltage regulator, starter, ignition switch, and electronic ignition.",
-    service_contact: "SERVICE CONTRACT",
-    service_body: "A service contract is available at an extra charge on this vehicle. Ask for details as to coverage, deductible, price, and exclusions. If you buy a service contract within 90 days of the time of sale, state law \"implied warranties\" may give you additional rights.",
-    pre_purchase: "Ask the dealer if your mechanic can inspect the vehicle on or off the lot.",
+    nondealer_heading: "NON-DEALER WARRANTIES FOR THIS VEHICLE:",
+    nondealer_mfg_still: "MANUFACTURER'S WARRANTY STILL APPLIES. The manufacturer's original warranty has not expired on some components of the vehicle.",
+    nondealer_mfg_used: "MANUFACTURER'S USED VEHICLE WARRANTY APPLIES.",
+    nondealer_other: "OTHER USED VEHICLE WARRANTY APPLIES.",
+    nondealer_ask: "Ask the dealer for a copy of the warranty document and an explanation of warranty coverage, exclusions, and repair obligations.",
+    service_contact: "SERVICE CONTRACT.",
+    service_body: "A service contract is available at an extra charge on this vehicle. Ask for details about coverage, deductible, price, and exclusions. If you buy a service contract within 90 days of your purchase of this vehicle, implied warranties under your state's laws may give you additional rights.",
+    pre_purchase: "ASK THE DEALER IF YOUR MECHANIC CAN INSPECT THE VEHICLE ON OR OFF THE LOT.",
+    history_statement: "OBTAIN A VEHICLE HISTORY REPORT AND CHECK FOR OPEN SAFETY RECALLS. For information on how to obtain a vehicle history report, visit ftc.gov/usedcars. To check for open safety recalls, visit safercar.gov. You will need the vehicle identification number (VIN) shown above to make the best use of the resources on these sites.",
+    see_other_side: "SEE OTHER SIDE for important additional information, including a list of major defects that may occur in used motor vehicles.",
+    spanish_notice: "Si el concesionario gestiona la venta en español, pídale una copia de la Guía del Comprador en español.",
+    back_intro: "Here is a list of some major defects that may occur in used vehicles.",
+    telephone: "Telephone",
+    email: "Email",
+    complaints: "For complaints after sale, contact:",
+    removal_footer: "IMPORTANT: The information on this form is part of any contract to buy this vehicle. Removing this label before consumer purchase (except for purpose of test-driving) violates federal law (16 C.F.R. 455).",
     vehicle_make: "Vehicle Make",
     vehicle_model: "Model",
     vehicle_year: "Year",
-    vehicle_vin: "VIN Number",
+    vehicle_vin: "Vehicle Identification Number (VIN)",
     mileage: "Mileage",
     price: "Price",
-    stock_no: "Stock No.",
+    stock_no: "Dealer Stock Number (Optional)",
     dealer_name: "Dealer Name",
     dealer_address: "Address",
   },
   es: {
     title: "GUÍA DEL COMPRADOR",
-    important: "IMPORTANTE: Las promesas verbales son difíciles de hacer cumplir. Pida al concesionario que ponga todas las promesas por escrito. Conserve este formulario.",
+    important: "IMPORTANTE: Las promesas verbales son difíciles de hacer cumplir. Solicite al concesionario que ponga todas las promesas por escrito. Conserve este formulario.",
     warranties_heading: "GARANTÍAS PARA ESTE VEHÍCULO:",
-    as_is_title: "TAL COMO ESTÁ — SIN GARANTÍA DEL CONCESIONARIO",
-    as_is_body: "El concesionario no ofrece una garantía para ninguna reparación después de la venta. El concesionario no hace ninguna promesa de arreglar las cosas que necesiten reparación cuando usted compra el vehículo o después. Pero las garantías implícitas bajo las leyes de su estado le pueden dar algunos derechos para hacer que el concesionario se ocupe de problemas graves que no eran evidentes cuando usted compró el vehículo.",
+    as_is_title: "COMO ESTÁ - SIN GARANTÍA DEL CONCESIONARIO",
+    as_is_body: "EL CONCESIONARIO NO PAGARÁ NINGUNA REPARACIÓN. El concesionario no provee una garantía para reparaciones hechas después del momento de la venta.",
     implied_title: "SOLO GARANTÍAS IMPLÍCITAS",
-    implied_body: "El concesionario no hace ninguna garantía, expresa o implícita, sobre este vehículo, excepto las garantías implícitas de comerciabilidad. La garantía implícita de comerciabilidad significa que el concesionario garantiza que el vehículo pasará sin objeción en el comercio y es apto para el propósito ordinario para el cual se usa. Todo el riesgo en cuanto a calidad y rendimiento es del comprador. Sin embargo, el comprador puede tener otros derechos según la ley estatal aplicable.",
+    implied_body: "El concesionario no hace ninguna promesa de reparar lo que sea necesario cuando compre el vehículo o posteriormente. Sin embargo, las garantías implícitas según las leyes estatales podrían darle algunos derechos para hacer que el concesionario se encargue de ciertos problemas que no fueran evidentes cuando compró el vehículo.",
     warranty_title: "GARANTÍA DEL CONCESIONARIO",
-    warranty_body: "El concesionario pagará un porcentaje de la mano de obra y de las piezas de los sistemas cubiertos que fallen durante el período de garantía. Pídale al concesionario una copia de la garantía y cualquier documento que explique la cobertura de la garantía, las exclusiones y las obligaciones de reparación del concesionario. Las garantías implícitas bajo las leyes de su estado le pueden dar derechos adicionales.",
-    warranty_duration: "DURACIÓN DE LA GARANTÍA:",
+    warranty_full: "GARANTÍA COMPLETA.",
+    warranty_limited: "GARANTÍA LIMITADA. El concesionario pagará el ___% de la mano de obra y el ___% de las partes de los sistemas cubiertos que fallen durante el período de garantía. Pídale al concesionario una copia de la garantía y de cualquier documento que le explique la cobertura, las exclusiones y las obligaciones de reparación del concesionario. Las garantías implícitas, según las leyes de su estado, podrían darle derechos adicionales.",
+    warranty_body: "El concesionario pagará el porcentaje indicado de la mano de obra y de las partes de los sistemas cubiertos que fallen durante el período de garantía. Pídale al concesionario una copia de la garantía y de cualquier documento que le explique la cobertura, las exclusiones y las obligaciones de reparación del concesionario. Las garantías implícitas, según las leyes de su estado, podrían darle derechos adicionales.",
+    warranty_duration: "DURACIÓN:",
     warranty_percentage: "PORCENTAJE DE COSTOS CUBIERTOS:",
     covered_systems: "SISTEMAS CUBIERTOS:",
     system_engine: "Motor — Todas las partes internas lubricadas del motor, bomba de agua, bomba de combustible, múltiples, bloque del motor, cabezas de cilindros, carcasas del motor rotativo y volante.",
@@ -89,18 +106,31 @@ const LABELS: Record<Language, Record<string, string>> = {
     system_steering: "Dirección — La carcasa del engranaje de dirección y todas las partes internas, bomba de dirección asistida, cuerpo de válvula, pistón y cremallera.",
     system_brakes: "Frenos — Cilindro maestro, refuerzo de vacío, cilindros de rueda, líneas hidráulicas y accesorios, y calibradores de frenos de disco.",
     system_electrical: "Eléctrico — Alternador, regulador de voltaje, motor de arranque, interruptor de encendido y encendido electrónico.",
-    service_contact: "CONTRATO DE SERVICIO",
-    service_body: "Un contrato de servicio está disponible con un cargo extra en este vehículo. Pregunte por los detalles sobre la cobertura, deducible, precio y exclusiones. Si compra un contrato de servicio dentro de los 90 días posteriores a la venta, las \"garantías implícitas\" de la ley estatal pueden darle derechos adicionales.",
-    pre_purchase: "Pregúntele al concesionario si su mecánico puede inspeccionar el vehículo en el lote o fuera del lote.",
+    nondealer_heading: "GARANTÍAS QUE NO PERTENECEN AL CONCESIONARIO:",
+    nondealer_mfg_still: "LA GARANTÍA DEL FABRICANTE TODAVÍA APLICA. La garantía original del fabricante no ha expirado para algunos de los componentes del vehículo.",
+    nondealer_mfg_used: "SE APLICA LA GARANTÍA DEL FABRICANTE PARA VEHÍCULOS USADOS.",
+    nondealer_other: "SE APLICA OTRA GARANTÍA PARA VEHÍCULOS USADOS.",
+    nondealer_ask: "Pídale al concesionario una copia del documento de garantía y una explicación de la cobertura, las exclusiones y las obligaciones de reparación.",
+    service_contact: "CONTRATO DE MANTENIMIENTO.",
+    service_body: "Con un cargo adicional, puede obtener un contrato de mantenimiento para este vehículo. Pregunte acerca de los detalles de la cobertura, los deducibles, el precio y las exclusiones. Si compra un contrato de mantenimiento dentro de los 90 días desde el momento en que compró el vehículo, las garantías implícitas según las leyes de su estado podrían darle derechos adicionales.",
+    pre_purchase: "PREGÚNTELE AL CONCESIONARIO SI SU MECÁNICO PUEDE INSPECCIONAR EL VEHÍCULO DENTRO O FUERA DEL CONCESIONARIO.",
+    history_statement: "OBTENGA UN INFORME DEL HISTORIAL DEL VEHÍCULO Y VERIFIQUE SI EXISTEN RETIROS POR DEFECTOS DE SEGURIDAD PENDIENTES. Para información sobre cómo obtener un Informe del Historial del Vehículo, visite el sitio ftc.gov/carrosusados. Para verificar si existen retiros por defectos de seguridad pendientes, visite safercar.gov. Para aprovechar al máximo los recursos de estos sitios necesitará el número de identificación de vehículo (VIN) mostrado anteriormente.",
+    see_other_side: "CONSULTE EL DORSO para obtener más información, incluyendo una lista de defectos importantes que pueden ocurrir en vehículos de motor usados.",
+    spanish_notice: "",
+    back_intro: "A continuación podrá encontrar una lista de los defectos principales que podrían ocurrir en vehículos usados.",
+    telephone: "Teléfono",
+    email: "Correo Electrónico",
+    complaints: "Para quejas después de la venta comuníquese con:",
+    removal_footer: "IMPORTANTE: La información de este formulario es parte de cualquier contrato para comprar este vehículo. Quitar esta etiqueta antes de la compra del consumidor (excepto a los fines de realizar una prueba de conducción) es una infracción a la ley federal (16 C.F.R. 455).",
     vehicle_make: "Marca del Vehículo",
     vehicle_model: "Modelo",
     vehicle_year: "Año",
-    vehicle_vin: "Número VIN",
+    vehicle_vin: "Número de Identificación del Vehículo (VIN)",
     mileage: "Millaje",
     price: "Precio",
-    stock_no: "No. de Stock",
+    stock_no: "Número de Stock del Concesionario (Opcional)",
     dealer_name: "Nombre del Concesionario",
-    dealer_address: "Dirección",
+    dealer_address: "Dirección del Concesionario",
   },
   vi: {
     title: "HƯỚNG DẪN NGƯỜI MUA",
@@ -199,6 +229,46 @@ const LABELS: Record<Language, Record<string, string>> = {
 
 const WARRANTY_SYSTEMS = ["system_engine", "system_transmission", "system_steering", "system_brakes", "system_electrical"];
 
+// The exact back-of-form defect list from the official FTC Buyers Guide
+// (16 CFR 455, revised form). Rendered verbatim in three columns. en + es are
+// the two official versions; courtesy languages fall back to en.
+const BACK_SYSTEMS: Record<"en" | "es", { name: string; items: string[] }[]> = {
+  en: [
+    { name: "Frame & Body", items: ["Frame-cracks, corrective welds, or rusted through", "Dog tracks—bent or twisted frame"] },
+    { name: "Engine", items: ["Oil leakage, excluding normal seepage", "Cracked block or head", "Belts missing or inoperable", "Knocks or misses related to camshaft lifters and push rods", "Abnormal exhaust discharge"] },
+    { name: "Transmission & Drive Shaft", items: ["Improper fluid level or leakage, excluding normal seepage", "Cracked or damaged case which is visible", "Abnormal noise or vibration caused by faulty transmission or drive shaft", "Improper shifting or functioning in any gear", "Manual clutch slips or chatters"] },
+    { name: "Differential", items: ["Improper fluid level or leakage, excluding normal seepage", "Cracked or damaged housing which is visible", "Abnormal noise or vibration caused by faulty differential"] },
+    { name: "Cooling System", items: ["Leakage including radiator", "Improperly functioning water pump"] },
+    { name: "Electrical System", items: ["Battery leakage", "Improperly functioning alternator, generator, battery, or starter"] },
+    { name: "Fuel System", items: ["Visible leakage"] },
+    { name: "Inoperable Accessories", items: ["Gauges or warning devices", "Air conditioner", "Heater & Defroster"] },
+    { name: "Brake System", items: ["Failure warning light broken", "Pedal not firm under pressure (DOT spec.)", "Not enough pedal reserve (DOT spec.)", "Does not stop vehicle in straight line (DOT spec.)", "Hoses damaged", "Drum or rotor too thin (Mfr. Specs)", "Lining or pad thickness less than 1/32 inch", "Power unit not operating or leaking", "Structural or mechanical parts damaged"] },
+    { name: "Air Bags", items: [] },
+    { name: "Steering System", items: ["Too much free play at steering wheel (DOT specs.)", "Free play in linkage more than 1/4 inch", "Steering gear binds or jams", "Front wheels aligned improperly (DOT specs.)", "Power unit belts cracked or slipping", "Power unit fluid level improper"] },
+    { name: "Suspension System", items: ["Ball joint seals damaged", "Structural parts bent or damaged", "Stabilizer bar disconnected", "Spring broken", "Shock absorber mounting loose", "Rubber bushings damaged or missing", "Radius rod damaged or missing", "Shock absorber leaking or functioning improperly"] },
+    { name: "Tires", items: ["Tread depth less than 2/32 inch", "Sizes mismatched", "Visible damage"] },
+    { name: "Wheels", items: ["Visible cracks, damage or repairs", "Mounting bolts loose or missing"] },
+    { name: "Exhaust System", items: ["Leakage", "Catalytic converter"] },
+  ],
+  es: [
+    { name: "Chasis y carrocería", items: ["Grietas en el chasis, soldaduras correctivas u oxidadas", "Descuadrado: chasis doblado o torcido"] },
+    { name: "Motor", items: ["Pérdidas de aceite, excepto las filtraciones normales", "Bloque o cárter con grietas", "Correas ausentes o fuera de servicio", "Golpes o fallas relacionados con levantadores de levas o bielas", "Descarga del escape fuera de lo normal"] },
+    { name: "Transmisión y eje motor", items: ["Nivel inadecuado de fluido o pérdidas, excepto filtraciones normales", "Grietas o daños visibles en la caja", "Ruidos o vibraciones fuera de lo normal ocasionadas por la transmisión o el eje motor", "Cambios o funcionamiento inadecuados en cualquier velocidad", "Patinados o vibraciones del embrague manual"] },
+    { name: "Diferencial", items: ["Nivel inadecuado de fluido o pérdidas excepto filtraciones normales", "Grietas o daños visibles en el cárter del diferencial", "Ruidos o vibraciones fuera de lo normal ocasionadas por fallas en el diferencial"] },
+    { name: "Sistema de enfriamiento", items: ["Pérdidas, incluidas las del radiador", "Funcionamiento inadecuado de la bomba de agua"] },
+    { name: "Sistema eléctrico", items: ["Pérdidas en la batería", "Funcionamiento inadecuado del alternador, generador, batería o arrancador"] },
+    { name: "Sistema de combustible", items: ["Pérdidas visibles"] },
+    { name: "Accesorios fuera de servicio", items: ["Indicadores o dispositivos de advertencia", "Aire acondicionado", "Calefacción y Desempañador"] },
+    { name: "Sistema de frenos", items: ["Luz de advertencia de fallas rota", "Falta de firmeza cuando se presiona el pedal (según especificaciones del Departamento de Transporte [DOT])", "Distancia insuficiente del pedal (según especificaciones del DOT)", "El vehículo no se detiene en línea recta (según especificaciones del DOT)", "Mangueras dañadas", "Tambor o rotor muy delgados (según especificaciones del fabricante)", "Grosor de la placa o del revestimiento inferior que 1/32 pulgadas", "Unidad de potencia fuera de servicio o con pérdidas", "Partes estructurales o mecánicas dañadas"] },
+    { name: "Bolsas de aire", items: [] },
+    { name: "Sistema de dirección", items: ["Demasiado juego en el volante (según especificaciones del DOT)", "Juego mayor a 1/4 de pulgada en el varillaje", "El mecanismo de dirección se traba", "Alineación inadecuada de las ruedas frontales (según especificaciones del DOT)", "Grietas o deslizamientos en las correas de la unidad de potencia", "Nivel inadecuado de fluidos de la unidad de potencia"] },
+    { name: "Sistema de suspensión", items: ["Juntas de rótula dañadas", "Partes estructurales dobladas o dañadas", "Barra estabilizadora desconectada", "Resorte roto", "Cojinete del amortiguador suelto", "Cojinetes de caucho dañados o ausentes", "Biela dañada o ausente", "Amortiguador con pérdidas o con funcionamiento inadecuado"] },
+    { name: "Neumáticos", items: ["Profundidad de las ranuras menor que 2/32 de pulgada", "Tamaños que no corresponden", "Daños visibles"] },
+    { name: "Ruedas", items: ["Grietas, daños o reparaciones visibles", "Tornillos de sujeción sueltos o ausentes"] },
+    { name: "Sistema de escape", items: ["Pérdidas", "Convertidor catalítico"] },
+  ],
+};
+
 const BuyersGuide = () => {
   const navigate = useNavigate();
   const { settings, loading: settingsLoading } = useDealerSettings();
@@ -286,7 +356,10 @@ const BuyersGuide = () => {
     if (t) setWarrantyDuration((cur) => (cur === "30 Days / 1,000 Miles" ? t.replace(/-/g, " ") : cur));
   }, [dealerWarrantyLock, dealerWarranties]);
 
-  const L = LABELS[lang];
+  // Courtesy languages (vi/ko/zh) don't define the newer official-form keys —
+  // fall back to English so no section renders blank. en/es are complete.
+  const L = { ...LABELS.en, ...LABELS[lang] };
+  const backSystems = BACK_SYSTEMS[lang === "es" ? "es" : "en"];
 
   const handleSave = () => {
     const record = {
@@ -579,72 +652,78 @@ const BuyersGuide = () => {
           )}
         </div>
 
+        {/* Non-dealer warranties */}
+        <div className="px-4 py-3 border-t-2 border-foreground">
+          <h3 className="text-xs font-extrabold text-foreground mb-2">{L.nondealer_heading}</h3>
+          <div className="space-y-1.5">
+            {[L.nondealer_mfg_still, L.nondealer_mfg_used, L.nondealer_other].map((t, i) => (
+              <div key={i} className="flex items-start gap-2">
+                <div className="w-3 h-3 border border-foreground mt-0.5 shrink-0" />
+                <span className="text-[9px] text-foreground leading-tight">{t}</span>
+              </div>
+            ))}
+          </div>
+          <p className="text-[9px] text-foreground leading-relaxed mt-2">{L.nondealer_ask}</p>
+        </div>
+
         {/* Service contract */}
-        <div className="px-4 py-3 border-t-2 border-foreground">
-          <h3 className="text-xs font-extrabold text-foreground mb-1">{L.service_contact}</h3>
-          <p className="text-[9px] text-foreground leading-relaxed">{L.service_body}</p>
-        </div>
-
-        {/* Pre-purchase */}
-        <div className="px-4 py-3 border-t-2 border-foreground bg-muted/30">
-          <p className="text-[9px] font-bold text-foreground">{L.pre_purchase}</p>
-        </div>
-
-        {/* Dealer info footer */}
-        <div className="px-4 py-3 border-t-2 border-foreground">
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <span className="text-[8px] font-bold text-muted-foreground uppercase">{L.dealer_name}</span>
-              <p className="text-xs font-semibold text-foreground">{settings.dealer_name}</p>
-            </div>
-            <div>
-              <span className="text-[8px] font-bold text-muted-foreground uppercase">{L.dealer_address}</span>
-              <p className="text-xs text-foreground">{settings.dealer_tagline}</p>
-            </div>
+        <div className="px-4 py-3 border-t border-foreground">
+          <div className="flex items-start gap-2">
+            <div className="w-3 h-3 border border-foreground mt-0.5 shrink-0" />
+            <p className="text-[9px] text-foreground leading-relaxed"><strong>{L.service_contact}</strong> {L.service_body}</p>
           </div>
         </div>
 
-        {/* BACK OF BUYERS GUIDE — FTC Required (16 CFR § 455) */}
+        {/* Inspection + history + see-other-side statements */}
+        <div className="px-4 py-3 border-t-2 border-foreground space-y-2">
+          <p className="text-[9px] font-bold text-foreground">{L.pre_purchase}</p>
+          <p className="text-[9px] text-foreground leading-relaxed"><strong>{L.history_statement}</strong></p>
+          <p className="text-[9px] font-bold text-foreground">{L.see_other_side}</p>
+          {L.spanish_notice ? <p className="text-[9px] text-foreground italic">{L.spanish_notice}</p> : null}
+        </div>
+
+        {/* BACK OF BUYERS GUIDE — official FTC defect list (16 CFR 455) */}
         <div className="border-t-4 border-foreground mt-1">
-          <div className="px-4 py-3 bg-muted/20">
-            <p className="text-[10px] font-extrabold text-foreground mb-2">IMPORTANT: Refer to this information when you visit the dealer!</p>
-
-            <p className="text-[8px] text-foreground leading-relaxed mb-2">
-              <strong>Contract Cancellation:</strong> Federal law does not provide a "cooling off" period for used car purchases. In some states, once you sign a contract, you may not be able to cancel it. Check with your state's Attorney General's office or consumer protection agency.
-            </p>
-
-            <p className="text-[8px] text-foreground leading-relaxed mb-2">
-              <strong>Vehicle History Reports:</strong> Before you buy a used vehicle, ask the dealer if the vehicle has a history report. This report may contain important information about the vehicle's title, odometer, and damage history.
-            </p>
-
-            <p className="text-[8px] text-foreground leading-relaxed mb-2">
-              <strong>Vehicle Return Policies:</strong> Some dealers may offer a return policy, money-back guarantee, or exchange privilege. Be sure to get any return policy in writing and understand its terms and conditions.
-            </p>
-
-            <p className="text-[8px] text-foreground leading-relaxed mb-2">
-              <strong>Below is a list of some of the major defects that may occur in used motor vehicles:</strong>
-            </p>
-
-            <div className="grid grid-cols-2 gap-x-4 gap-y-0.5 text-[7px] text-foreground mb-2">
-              <div><strong>Frame & Body:</strong> Frame cracks, damage, or repairs; water damage or flood damage</div>
-              <div><strong>Engine:</strong> Oil leaks, excessive oil consumption, unusual noises, poor compression</div>
-              <div><strong>Transmission:</strong> Slipping, rough shifting, unusual noises, fluid leaks</div>
-              <div><strong>Differential:</strong> Excessive noise, fluid leaks</div>
-              <div><strong>Cooling System:</strong> Leaks, overheating, water pump failure</div>
-              <div><strong>Electrical:</strong> Alternator, starter, wiring problems, battery failure</div>
-              <div><strong>Fuel System:</strong> Leaks, fuel pump failure, emission control issues</div>
-              <div><strong>Brakes:</strong> Worn pads/shoes, fluid leaks, brake failure, ABS malfunction</div>
-              <div><strong>Steering:</strong> Excessive play, hard steering, fluid leaks, alignment</div>
-              <div><strong>Suspension:</strong> Worn shocks/struts, broken springs, ball joint failure</div>
-              <div><strong>Tires:</strong> Uneven wear, damage, improper size</div>
-              <div><strong>Exhaust:</strong> Leaks, catalytic converter failure, excessive emissions</div>
-              <div><strong>Air Conditioning:</strong> Inoperative, refrigerant leaks, compressor failure</div>
-              <div><strong>Air Bags:</strong> Inoperative, previously deployed, warning light on</div>
+          <div className="px-4 py-3">
+            <p className="text-[9px] text-foreground mb-2">{L.back_intro}</p>
+            <div className="[column-count:3] [column-gap:0.75rem] text-[7px] text-foreground mb-3">
+              {backSystems.map((sys) => (
+                <div key={sys.name} className="mb-1.5 break-inside-avoid">
+                  <p className="font-bold leading-tight">{sys.name}</p>
+                  {sys.items.map((it, i) => (
+                    <p key={i} className="pl-1.5 leading-tight text-foreground/90">{it}</p>
+                  ))}
+                </div>
+              ))}
             </div>
 
-            <p className="text-[7px] text-muted-foreground leading-relaxed">
-              <strong>COMPLAINT PROCEDURE:</strong> If you have a complaint about the vehicle or the conduct of the dealer, contact: your state's Attorney General's office, your state's motor vehicle regulatory agency, the Better Business Bureau (BBB), or the Federal Trade Commission (FTC) at ftc.gov or 1-877-FTC-HELP.
-            </p>
+            {/* Dealer contact block */}
+            <div className="border-t-2 border-foreground pt-2 space-y-2">
+              <div>
+                <span className="text-[8px] font-bold text-muted-foreground uppercase">{L.dealer_name}</span>
+                <p className="text-[11px] font-semibold text-foreground border-b border-border-custom">{settings.dealer_name || " "}</p>
+              </div>
+              <div>
+                <span className="text-[8px] font-bold text-muted-foreground uppercase">{L.dealer_address}</span>
+                <p className="text-[11px] text-foreground border-b border-border-custom">{[settings.dealer_address, [settings.dealer_city, settings.dealer_state].filter(Boolean).join(", "), settings.dealer_zip].filter(Boolean).join(" ") || " "}</p>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <span className="text-[8px] font-bold text-muted-foreground uppercase">{L.telephone}</span>
+                  <p className="text-[11px] text-foreground border-b border-border-custom">{settings.dealer_phone || " "}</p>
+                </div>
+                <div>
+                  <span className="text-[8px] font-bold text-muted-foreground uppercase">{L.email}</span>
+                  <p className="text-[11px] text-foreground border-b border-border-custom">{" "}</p>
+                </div>
+              </div>
+              <div>
+                <span className="text-[8px] font-bold text-muted-foreground uppercase">{L.complaints}</span>
+                <p className="text-[11px] text-foreground border-b border-border-custom">&nbsp;</p>
+              </div>
+            </div>
+
+            <p className="text-[8px] text-foreground leading-relaxed mt-3 pt-2 border-t-2 border-foreground">{L.removal_footer}</p>
           </div>
         </div>
       </div>
