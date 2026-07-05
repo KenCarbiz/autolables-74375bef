@@ -117,6 +117,7 @@ const AppShell = ({ children }: AppShellProps) => {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [showMobileQr, setShowMobileQr] = useState(false);
   const { open: paletteOpen, setOpen: setPaletteOpen } = useCommandPalette();
+  const { productIds: platformProductIds, load: loadPlatformProducts } = usePlatformEntitlements();
   const [storeFilter, setStoreFilter] = useState("");
   const [marketCheckConnected, setMarketCheckConnected] = useState(false);
   const [marketCheckLabel, setMarketCheckLabel] = useState("MarketCheck Pending");
