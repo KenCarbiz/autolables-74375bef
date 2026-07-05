@@ -21,6 +21,8 @@ import { InstallProofList } from "@/components/admin/InstallProofList";
 import { useRecallTask, OUTCOME_LABELS, type RecallOutcome } from "@/hooks/useRecallTask";
 import { listingGallery, listingHero } from "@/lib/photos";
 import { PACKET_MODULES, packetVisible } from "@/lib/packetModules";
+import { assessListingDecodeHealth, HEALTH_TONE, type DataHealthReport } from "@/lib/vehicleData/dataContract";
+import type { VehicleListing } from "@/hooks/useVehicleListing";
 import { resolveOperatingState } from "@/lib/dealerState";
 import { QRCodeSVG } from "qrcode.react";
 import GeneratedDocumentsSection from "@/components/vehicle/GeneratedDocumentsSection";
@@ -703,6 +705,10 @@ const OverviewPanel = ({ vehicle, onTab, recall }: { vehicle: VehicleRow; onTab:
   const publicUrl = `${window.location.origin}/v/${(vehicle.vin || vehicle.slug || "").toUpperCase()}`;
   const published = vehicle.status === "published";
   const mc = (vehicle.mc_attributes || {}) as Record<string, unknown>;
+  // Decode health from the versioned vehicle-data contract — surfaces when a
+  // VIN's equipment/specs decode has degraded so a regression is visible here
+  // instead of silently blanking the customer passport panels.
+  const decodeHealth = assessListingDecodeHealth(vehicle as unknown as VehicleListing);
   const stockNo = (mc.stock_no as string) || ((vehicle.sticker_snapshot?.decoded as Record<string, unknown> | undefined)?.stock as string) || null;
   const sourceLabel = (() => { const v = mc.source ?? mc.seller_type ?? mc.inventory_type; return v ? String(v).toUpperCase() : null; })();
   const lastShopperView = events.find((e) => e.action === "listing_viewed")?.created_at || null;
@@ -820,6 +826,9 @@ const OverviewPanel = ({ vehicle, onTab, recall }: { vehicle: VehicleRow; onTab:
             <button onClick={copyVinLocal} className={snapBtn}><Copy className="w-3.5 h-3.5" /> Copy VIN</button>
           </div>
         </Card>
+
+        {/* 4b — Decode Health (equipment/specs data contract) */}
+        <DecodeHealthCard health={decodeHealth} />
 
         {/* 5 — Market Pricing */}
         <MarketPricingCard vehicle={vehicle} />
@@ -2393,6 +2402,52 @@ const Card = ({ title, children, action, className = "" }: { title: string; chil
     {children}
   </div>
 );
+
+// Decode Health — the admin-side readout of the versioned vehicle-data
+// contract. Grades the equipment/specs decode and names any degradation, so a
+// VIN whose decode has thinned is caught here instead of silently blanking the
+// customer passport panels.
+const DecodeHealthCard = ({ health }: { health: DataHealthReport }) => {
+  const overall = HEALTH_TONE[health.status];
+  const toneCls = (t: "good" | "warn" | "bad") =>
+    t === "good" ? "bg-emerald-100 text-emerald-700"
+      : t === "warn" ? "bg-amber-100 text-amber-700"
+      : "bg-rose-100 text-rose-700";
+  const dot = (s: DataHealthReport["sections"][number]["status"]) =>
+    s === "rich" ? "bg-emerald-500" : s === "partial" ? "bg-amber-500" : s === "thin" ? "bg-orange-500" : "bg-rose-500";
+  return (
+    <Card title="Decode Health" className="flex flex-col" action={
+      <span className={`text-[11px] font-bold px-2 py-0.5 rounded-full ${toneCls(overall.tone)}`}>{overall.label}</span>
+    }>
+      <div className="space-y-2 flex-1">
+        {health.sections.map((s) => (
+          <div key={s.key} className="flex items-center gap-2.5">
+            <span className={`w-2 h-2 rounded-full shrink-0 ${dot(s.status)}`} />
+            <div className="min-w-0 flex-1">
+              <p className="text-[12.5px] font-semibold text-foreground leading-tight">{s.label}</p>
+              <p className="text-[11px] text-muted-foreground truncate">{s.detail}</p>
+            </div>
+            <span className="text-[11px] font-bold tabular-nums text-muted-foreground shrink-0">{HEALTH_TONE[s.status].label}</span>
+          </div>
+        ))}
+      </div>
+      {health.flags.length > 0 ? (
+        <div className="mt-1 pt-3 border-t border-border/60 space-y-1.5">
+          {health.flags.map((f, i) => (
+            <div key={i} className="flex items-start gap-1.5 text-[11px] text-amber-700">
+              <AlertTriangle className="w-3 h-3 mt-0.5 shrink-0" />
+              <span>{f}</span>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <p className="mt-1 pt-3 border-t border-border/60 text-[11px] text-emerald-700 flex items-center gap-1.5">
+          <CheckCircle2 className="w-3.5 h-3.5" /> Equipment and specifications present{health.decodedAt ? ` · decoded ${new Date(health.decodedAt).toLocaleDateString()}` : ""}.
+        </p>
+      )}
+    </Card>
+  );
+};
 
 // Maps an audit action to a distinct icon + tone so the activity feed reads
 // as a real timeline (decode vs sticker vs sign vs upload) rather than a wall

@@ -17,6 +17,7 @@ import { resolveEffectiveWarranty } from "@/lib/warranty/passportWarranty";
 import { readBuildSheet, PACKAGE_KIND_ORDER } from "@/lib/buildSheet";
 import { getEquipmentIcon } from "@/lib/equipmentIcons";
 import { buildEquipmentPanelData, type EquipmentCategory } from "@/lib/equipmentPanel";
+import { buildVehiclePassportDataContract } from "@/lib/vehicleData/dataContract";
 import { readDealerAlternatives, type DealerAlternative } from "@/lib/dealerAlternatives";
 import { rememberPassportOrigin } from "@/lib/passportOrigin";
 import { recordPanelView } from "@/lib/shopperIntent";
@@ -1867,9 +1868,11 @@ function buildPanel(key: PassportPanelKey, d: PassportData, listing: VehicleList
       // Equipment Intelligence Panel — a wide premium drawer that turns the
       // decoded build into a value story: stat cards, benefit-driven
       // featured highlights, category rows, packages/options summary, and a
-      // collapsed full reference. Data via buildEquipmentPanelData; every
-      // section is real-data gated.
-      const eq = buildEquipmentPanelData(listing, d);
+      // collapsed full reference. Data flows through the versioned vehicle-data
+      // contract (buildVehiclePassportDataContract) so equipment and the build
+      // sheet come from one validated seam; every section is real-data gated.
+      const contract = buildVehiclePassportDataContract(listing, d);
+      const eq = contract.equipment;
       const hasContent = eq.factoryFeatureCount > 0 || eq.packageCount > 0 || eq.dealerAddonCount > 0 || eq.featuredHighlights.length > 0;
       const statCard = (label: string, value: string, sub: string, Icon: React.ElementType, tone: "blue" | "green" = "blue") => (
         <div className={`rounded-2xl border ${tone === "green" ? "border-emerald-200 bg-emerald-50/40" : "border-[#DDE5EE] bg-white"} p-3.5 flex flex-col gap-1.5`}>
@@ -1879,7 +1882,7 @@ function buildPanel(key: PassportPanelKey, d: PassportData, listing: VehicleList
           <p className="text-[10px] text-[#94A3B8]">{sub}</p>
         </div>
       );
-      const eqSheet = readBuildSheet(listing);
+      const eqSheet = contract.buildSheet;
       const eqPill = eqSheet && listing.vin ? `Build #${listing.vin.slice(-8)}` : undefined;
       const bestFeatures = eq.featuredHighlights.slice(0, 6);
       const catTotal = eq.categories.reduce((a, c) => a + c.items.length, 0);
