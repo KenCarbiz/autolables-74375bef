@@ -7,6 +7,7 @@ import { useTenant } from "@/contexts/TenantContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { resolveBuyersGuideWarranty } from "@/lib/stateCompliance";
 import { resolveOperatingState } from "@/lib/dealerState";
+import { resolveBuyersGuideForm } from "@/lib/buyersGuideForms";
 import { useVehiclePrefill, VehicleContextHeader } from "@/lib/vehiclePrefill";
 import { toast } from "sonner";
 
@@ -314,6 +315,9 @@ const BuyersGuide = () => {
   // mandatory used-vehicle warranty keyed to price/mileage. Driven by the
   // dealer's operating state + this vehicle's age/mileage/price.
   const operatingState = resolveOperatingState(settings, currentStore?.state);
+  // Maine and Wisconsin are exempt from the FTC rule and mandate their own
+  // forms — serve the official state PDF instead of the FTC generator.
+  const buyersGuideForm = resolveBuyersGuideForm(operatingState);
   const bgResolution = useMemo(
     () =>
       resolveBuyersGuideWarranty(operatingState, {
@@ -492,6 +496,19 @@ const BuyersGuide = () => {
         )}
       </div>
 
+      {buyersGuideForm.authority === "state" ? (
+        <div className="mx-auto max-w-[8.5in]">
+          <div className="rounded-lg border-2 border-amber-300 bg-amber-50 px-4 py-3 mb-4">
+            <p className="text-sm font-bold text-amber-900">{buyersGuideForm.formName} required</p>
+            <p className="text-[13px] text-amber-800 mt-1">{buyersGuideForm.note} Complete and print the official state form below — the FTC Buyers Guide does not apply in this state.</p>
+            <a href={buyersGuideForm.assetUrl ?? "#"} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 mt-2 font-semibold text-[13px] px-4 py-2 rounded-md bg-navy text-primary-foreground hover:opacity-85">
+              Open / print the official {buyersGuideForm.formName} (PDF)
+            </a>
+          </div>
+          <iframe title={buyersGuideForm.formName} src={buyersGuideForm.assetUrl ?? undefined} className="w-full rounded-lg border-2 border-foreground bg-white" style={{ height: "11in" }} />
+        </div>
+      ) : (
+      <>
       {/* Guide Card — FTC mandates minimum 11" high × 7.25" wide (16 CFR § 455) */}
       <div ref={cardRef} className="mx-auto bg-card shadow-lg rounded-lg overflow-hidden border-2 border-foreground" style={{ minWidth: "7.25in", minHeight: "11in", maxWidth: "8.5in" }}>
         {/* Header */}
@@ -580,7 +597,16 @@ const BuyersGuide = () => {
                 <div className="w-5 h-5 border-2 border-foreground flex items-center justify-center text-xs font-bold">✓</div>
                 <h3 className="text-sm font-extrabold text-foreground">{L.warranty_title}</h3>
               </div>
-              <p className="text-[10px] text-foreground">{L.warranty_body}</p>
+              <div className="space-y-1.5 pl-1">
+                <div className="flex items-start gap-2">
+                  <div className="w-3 h-3 border border-foreground mt-0.5 shrink-0" />
+                  <span className="text-[10px] font-bold text-foreground">{L.warranty_full}</span>
+                </div>
+                <div className="flex items-start gap-2">
+                  <div className="w-3 h-3 border border-foreground mt-0.5 shrink-0" />
+                  <span className="text-[10px] text-foreground leading-relaxed">{L.warranty_limited}</span>
+                </div>
+              </div>
 
               <div className="grid grid-cols-2 gap-3 pt-2">
                 <div>
@@ -727,6 +753,8 @@ const BuyersGuide = () => {
           </div>
         </div>
       </div>
+      </>
+      )}
     </div>
   );
 };

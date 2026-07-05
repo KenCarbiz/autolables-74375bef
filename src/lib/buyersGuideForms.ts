@@ -34,6 +34,9 @@ export interface BuyersGuideForm {
   spanishAvailable: boolean;
   // Human note for the admin surface — why this form, and any action needed.
   note: string;
+  // For state forms: the official state PDF served from /public, shown and
+  // printed as-is (filled by hand). null for the FTC form, which we render.
+  assetUrl: string | null;
 }
 
 const FTC: BuyersGuideForm = {
@@ -43,6 +46,7 @@ const FTC: BuyersGuideForm = {
   citation: "16 CFR Part 455",
   spanishAvailable: true,
   note: "Federal FTC Buyers Guide applies. Choose the As-Is or Implied Warranties Only front per this state's warranty rules.",
+  assetUrl: null,
 };
 
 const WISCONSIN: BuyersGuideForm = {
@@ -52,6 +56,7 @@ const WISCONSIN: BuyersGuideForm = {
   citation: "Wis. Admin. Code TRANS 139",
   spanishAvailable: false,
   note: "Wisconsin is exempt from the federal rule and mandates its own Form MV2872 — use the Wisconsin form, not the FTC Buyers Guide.",
+  assetUrl: "/buyers-guides/wi-mv2872.pdf",
 };
 
 const MAINE: BuyersGuideForm = {
@@ -61,6 +66,7 @@ const MAINE: BuyersGuideForm = {
   citation: "Maine Used Car Information Act, 10 MRSA §§1471-1477",
   spanishAvailable: false,
   note: "Maine is exempt from the federal rule and mandates its own Used Vehicle Buyer's Guide — use the Maine form, not the FTC Buyers Guide.",
+  assetUrl: "/buyers-guides/me-250c104.pdf",
 };
 
 // The two exempt states → their own forms; everyone else → the FTC form.
