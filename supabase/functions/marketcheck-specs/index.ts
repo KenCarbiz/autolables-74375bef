@@ -179,16 +179,26 @@ Deno.serve(async (req) => {
   // deno-lint-ignore no-explicit-any
   let payload: any = null;
   let endpoint = "";
-  for (const url of specEndpoints(vin)) {
+  // NeoVIN (endpoint 0) carries the equipment breakout but is the slow, heavy
+  // call — a tight timeout makes it fall through to the basic decoder that
+  // returns core specs with ZERO equipment, which then writes options=null and
+  // finalizes the car with no features. Give NeoVIN 30s; keep the basic
+  // fallbacks short. And never let an equipment-less payload win while a later
+  // endpoint might still carry equipment: only break early when the payload
+  // actually has options/features; otherwise keep it as a fallback and try the
+  // next endpoint, settling for the specs-only payload only if nothing better answers.
+  const endpoints = specEndpoints(vin);
+  for (let i = 0; i < endpoints.length; i++) {
+    const url = endpoints[i];
     try {
-      const res = await fetch(url, { signal: AbortSignal.timeout(12000) });
+      const res = await fetch(url, { signal: AbortSignal.timeout(i === 0 ? 30000 : 12000) });
       tried.push({ url: redact(url), status: res.status });
       if (!res.ok) continue;
       const data = await res.json().catch(() => null);
       if (data == null) continue;
-      payload = data;
-      endpoint = redact(url);
-      break;
+      const probe = extractLists(data);
+      if (probe.options.length || probe.features.length) { payload = data; endpoint = redact(url); break; }
+      if (!payload) { payload = data; endpoint = redact(url); } // keep specs-only as a fallback, keep looking
     } catch (_e) {
       tried.push({ url: redact(url), status: "timeout_or_network" });
     }
@@ -230,11 +240,18 @@ Deno.serve(async (req) => {
         // NeoVIN exposes seating_capacity at the top level (basic decoder uses std_seating).
         setIf("std_seating", build.std_seating ?? build.seating_capacity);
         setIf("seating_capacity", build.seating_capacity);
+        // When the equipment-capable NeoVIN endpoint actually answered, an empty
+        // result means this vehicle genuinely has no decoded equipment — record
+        // it as [] (decoded-empty) so it is distinguishable from null (never
+        // decoded) and the backfill/sweep stop retrying it. If only the basic
+        // decoder answered (NeoVIN timed out / 4xx'd), keep null so NeoVIN is
+        // retried later rather than finalizing the car with no equipment.
+        const neovinAnswered = endpoint.includes("neovin");
         const merged = {
           ...prev,
           ...fill,
-          options: options.length ? options : prev.options ?? null,
-          features: features.length ? features : prev.features ?? null,
+          options: options.length ? options : (neovinAnswered ? (prev.options ?? []) : (prev.options ?? null)),
+          features: features.length ? features : (neovinAnswered ? (prev.features ?? []) : (prev.features ?? null)),
           build_sheet: sheet ?? prev.build_sheet ?? null,
           specs_decoded_at: new Date().toISOString(),
         };
