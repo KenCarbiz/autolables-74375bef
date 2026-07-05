@@ -24,6 +24,7 @@ import { readPassportOrigin, clearPassportOrigin, type PassportOrigin } from "@/
 import { trackPassportOpened, trackWindowStickerScanned, trackCustomerCtaClicked, trackCustomerEngagement } from "@/lib/engagement/customerEngagement";
 import { packetVisible } from "@/lib/packetModules";
 import type { DiscountBreakdown } from "@/lib/priceModel";
+import { scorePassportCard, selectCards, type CardSignals } from "@/lib/passportCards";
 import PassportPanel, { isPassportPanelKey, type PassportPanelKey } from "@/components/passport/PassportPanel";
 import { useNhtsaSafety } from "@/hooks/useNhtsaSafety";
 import PassportCtaDock from "@/components/passport/PassportCtaDock";
@@ -597,7 +598,7 @@ const VehiclePassportV3 = () => {
     if (warrantyAvail) return { ...base, strong: "Coverage Available", sub: "Optional protection plans — see terms" };
     return null;
   })();
-  const mi = ([
+  const miRaw = ([
     d.belowMarket && d.belowMarket > 0
       ? { icon: DollarSign, title: "Market Price", strong: "Great Price", sub: `${fmt$(d.belowMarket)} below market average`, chart: <Spark points={marketSeries} />, section: "market-price", cta: "View report" }
       : d.marketAvg != null && d.price != null && d.price <= d.marketAvg
@@ -617,6 +618,29 @@ const VehiclePassportV3 = () => {
       ? { icon: Car, title: "Comparable Vehicles", strong: compStory.strong, sub: compStory.sub, comps: false, section: "comparable-vehicles", cta: "View comp set" }
       : null,
   ] as (MiTile | null)[]).filter((t): t is MiTile => t != null);
+
+  // Card arsenal selection: the tiles above already passed their own data gates,
+  // so every one is worth showing. The registry RANKS them by buy-signal
+  // strength (strongest value message first) and caps the strip — floor present
+  // tiles at 1 so ranking never drops a tile the gates already approved.
+  const cond = String(listing.condition || "").toLowerCase();
+  const cardSignals: CardSignals = {
+    belowMarket: d.belowMarket, marketAvg: d.marketAvg, price: d.price,
+    similarCount: d.marketMeta.similarCount, soldCount: d.marketMeta.soldCount,
+    viewCount: d.viewCount, domFavorable,
+    priceDrop: priceChange7d != null && priceChange7d < 0 ? Math.abs(priceChange7d) : null,
+    ratingOverall: rating?.overall ?? null,
+    demandPartsCount: demandParts.length,
+    warrantyStrength: warrantyIncl ? 4 : cond === "cpo" ? 3 : cond === "new" || (!!d.warrantyStr && !d.warrantyExpired) ? 2 : warrantyAvail ? 1 : 0,
+  };
+  const miChosen = selectCards(
+    miRaw.map((t) => ({ key: t.section, score: Math.max(1, scorePassportCard(t.section, cardSignals)) })),
+    { max: 7 },
+  );
+  const miOrder = new Map(miChosen.map((c, i) => [c.key, i] as const));
+  const mi = miRaw
+    .filter((t) => miOrder.has(t.section))
+    .sort((a, b) => (miOrder.get(a.section) ?? 0) - (miOrder.get(b.section) ?? 0));
 
   const highlights: { icon: React.ElementType; t: string; s: string }[] = [];
   // Specs are written into mc_attributes by the pull; key_specs is usually
