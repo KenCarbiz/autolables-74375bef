@@ -1,9 +1,8 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 
-// One-off entitlement probe: answers whether the account's MarketCheck plan
-// includes sold/off-market data (sales stats + recents) before we build the
-// sold-comps feature on it. Hits each candidate endpoint once and returns the
-// raw status + a trimmed body. Auth: shared cron secret only.
+// One-off diagnostic: does NeoVIN return the enhanced installed-options
+// breakout for a VIN that currently has options=null in our DB? Confirms the
+// decode source works before we back-fill the fleet. Auth: shared cron secret.
 
 const MC_KEY = Deno.env.get("MARKETCHECK_API_KEY_1") || Deno.env.get("MARKETCHECK_API_KEY") || "";
 const MC_BASE = "https://api.marketcheck.com/v2";
@@ -22,24 +21,35 @@ serve(async (req) => {
     return new Response(JSON.stringify({ error: "unauthorized" }), { status: 401, headers: corsHeaders });
   }
 
-  const probes: { name: string; url: string }[] = [
-    { name: "sales_make_only", url: `${MC_BASE}/sales/car?api_key=${MC_KEY}&make=infiniti` },
-    { name: "sales_model_year", url: `${MC_BASE}/sales/car?api_key=${MC_KEY}&make=infiniti&model=q50&year=2021` },
-    { name: "sales_state", url: `${MC_BASE}/sales/car?api_key=${MC_KEY}&make=infiniti&model=q50&year=2021&state=CT` },
-    { name: "sales_city_state", url: `${MC_BASE}/sales/car?api_key=${MC_KEY}&make=infiniti&model=q50&year=2021&city_state=hartford|CT` },
-    { name: "sales_trim", url: `${MC_BASE}/sales/car?api_key=${MC_KEY}&make=infiniti&model=q50&year=2021&trim=luxe&state=CT` },
-    { name: "recents_geo", url: `${MC_BASE}/search/car/recents?api_key=${MC_KEY}&make=infiniti&model=q50&year=2021&state=CT&rows=2` },
+  const vin = "JN1FV7AR5KM800521"; // a published 2019 Q50 with options=null in our DB
+  const urls = [
+    { name: "neovin_specs", url: `${MC_BASE}/decode/car/neovin/${vin}/specs?api_key=${MC_KEY}&include_generic=true` },
+    { name: "decode_specs", url: `${MC_BASE}/decode/car/${vin}/specs?api_key=${MC_KEY}` },
   ];
 
   const results: Record<string, unknown>[] = [];
-  for (const p of probes) {
+  for (const u of urls) {
     try {
-      const res = await fetch(p.url, { signal: AbortSignal.timeout(15000) });
-      const body = await res.text();
-      results.push({ name: p.name, status: res.status, body: body.slice(0, 600) });
+      const res = await fetch(u.url, { signal: AbortSignal.timeout(20000) });
+      const text = await res.text();
+      let keys: string[] = [];
+      let counts: Record<string, number> = {};
+      try {
+        const j = JSON.parse(text);
+        keys = Object.keys(j);
+        const arr = (k: string) => (Array.isArray(j[k]) ? j[k].length : (j[k] && typeof j[k] === "object" ? Object.keys(j[k]).length : 0));
+        counts = {
+          installed_options_details: arr("installed_options_details"),
+          options_packages: arr("options_packages"),
+          high_value_features: arr("high_value_features"),
+          features: arr("features"),
+          installed_equipment: arr("installed_equipment"),
+        };
+      } catch { /* not json */ }
+      results.push({ name: u.name, status: res.status, top_keys: keys.slice(0, 40), counts, sample: text.slice(0, 400) });
     } catch (e) {
-      results.push({ name: p.name, status: 0, body: String(e).slice(0, 200) });
+      results.push({ name: u.name, status: 0, error: String(e).slice(0, 200) });
     }
   }
-  return new Response(JSON.stringify({ results }), { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+  return new Response(JSON.stringify({ vin, results }), { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });
 });
