@@ -172,11 +172,25 @@ export interface DisplayPriceFields {
 //     computed website_sale_price is deliberately ignored here: it derives from
 //     the additive assumption, and adding the fee to a fee-inclusive listed
 //     price would overstate what the customer pays.
+// The website-scraped advertised price and the inventory feed price are two
+// reads of the same "our price". They usually agree; when they disagree the
+// customer must NEVER see a number above the dealer's own inventory price — a
+// scrape that lands above the feed is a mis-parse (it grabbed the sticker/MSRP
+// or a lease figure, not the sale price), while a scrape BELOW the feed is a
+// real website price drop we want to honor. So the advertised price is the
+// lower of the two whenever both are present.
+const lowerAdvertised = (f: DisplayPriceFields): number | null => {
+  const a = f.advertised_price_before_doc;
+  const p = f.price;
+  if (a != null && p != null) return Math.min(a, p);
+  return a ?? p ?? null;
+};
+
 export function resolveDisplayPrice(
   f: DisplayPriceFields,
   mode: PriceDisplayMode = DEFAULT_PRICE_DISPLAY_MODE,
 ): number | null {
-  const advertised = f.advertised_price_before_doc ?? f.price ?? null;
+  const advertised = lowerAdvertised(f);
   if (mode === "website_sale_price") {
     return advertised ?? f.website_sale_price ?? null;
   }
@@ -191,7 +205,7 @@ export function resolveComparePrice(
   f: DisplayPriceFields,
   mode: PriceDisplayMode = DEFAULT_PRICE_DISPLAY_MODE,
 ): number | null {
-  const advertised = f.advertised_price_before_doc ?? f.price ?? null;
+  const advertised = lowerAdvertised(f);
   if (mode === "website_sale_price") {
     // Compare the number the customer actually sees (fee-inclusive listed
     // price) so market position math matches the displayed price.
