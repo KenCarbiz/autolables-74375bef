@@ -180,34 +180,37 @@ serve(async (req) => {
         .eq("vin", v.vin)
         .maybeSingle();
 
-      const patch = {
-        tenant_id: tenant.id,
-        vin: v.vin,
-        ymm: v.ymm || null,
-        trim: v.trim || null,
-        mileage: typeof v.mileage === "number" ? v.mileage : null,
-        condition: v.condition || null,
-        price: typeof v.price === "number" ? v.price : null,
-        dealer_snapshot: dealerSnapshot,
-        documents: v.source_url
-          ? [{ name: "Autocurb record", url: v.source_url, type: "external" }]
-          : [],
-        videos: [],
-        value_props: [],
-      } as Record<string, unknown>;
-
       if (existing) {
-        // Never demote a published listing — leave status alone on update.
+        // Update ONLY the inventory fields the feed actually carries. The feed
+        // is not the source of truth for the customer packet, so it must never
+        // zero the dealer-curated documents / videos / value_props (or null a
+        // good ymm/trim/mileage/price). Never demote a published listing either.
+        const updatePatch: Record<string, unknown> = { tenant_id: tenant.id, vin: v.vin, dealer_snapshot: dealerSnapshot };
+        if (v.ymm) updatePatch.ymm = v.ymm;
+        if (v.trim) updatePatch.trim = v.trim;
+        if (typeof v.mileage === "number") updatePatch.mileage = v.mileage;
+        if (v.condition) updatePatch.condition = v.condition;
+        if (typeof v.price === "number") updatePatch.price = v.price;
         const { error } = await admin
           .from("vehicle_listings")
-          .update(patch)
+          .update(updatePatch)
           .eq("id", existing.id);
         if (error) errors.push({ vin: v.vin, error: error.message });
         else upserted++;
       } else {
         const slug = makeSlug(v.vin, v.ymm);
         const { error } = await admin.from("vehicle_listings").insert({
-          ...patch,
+          tenant_id: tenant.id,
+          vin: v.vin,
+          ymm: v.ymm || null,
+          trim: v.trim || null,
+          mileage: typeof v.mileage === "number" ? v.mileage : null,
+          condition: v.condition || null,
+          price: typeof v.price === "number" ? v.price : null,
+          dealer_snapshot: dealerSnapshot,
+          documents: v.source_url ? [{ name: "Autocurb record", url: v.source_url, type: "external" }] : [],
+          videos: [],
+          value_props: [],
           slug,
           status: "draft",
           sticker_snapshot: {},

@@ -665,17 +665,25 @@ serve(async (req) => {
             const { data: vl } = await admin.from("vehicle_listings")
               .select("id").eq("tenant_id", cfg.tenant_id).eq("vin", vin).maybeSingle();
             const patch: Record<string, unknown> = {
-              tenant_id: cfg.tenant_id, vin, ymm, trim: b.trim || null,
-              mileage: miles || null, condition, price, feed_source: "marketcheck",
+              tenant_id: cfg.tenant_id, vin, condition, feed_source: "marketcheck",
               // Keep the VDP url even when the feed carried no price, so the
               // advertised-price crawler can seed a first price off the dealer's
               // own page (Your Price / <Dealer> Deal).
               source_url: l.vdp_url || null,
             };
+            // Only set inventory fields the feed actually carried. A feed row
+            // that reappears WITHOUT a price/mileage/ymm must never null out a
+            // good value on an existing listing — and a nulled price would also
+            // disable the FTC advertised-price guard, which reads
+            // vehicle_listings.price as the feed baseline.
+            if (ymm) patch.ymm = ymm;
+            if (b.trim) patch.trim = b.trim;
+            if (miles) patch.mileage = miles;
             // Price/doc-fee breakdown: the feed price is advertised-before-doc;
             // website sale price = advertised + the tenant doc fee (added once).
             // The nightly advertised-price crawl refines these from the live VDP.
             if (price != null) {
+              patch.price = price;
               patch.advertised_price_before_doc = price;
               patch.doc_fee = tenantDocFee;
               patch.website_sale_price = price + tenantDocFee;

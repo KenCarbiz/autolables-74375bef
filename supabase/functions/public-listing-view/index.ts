@@ -730,6 +730,12 @@ serve(async (req) => {
       delete row.blackbook; delete row.history_payload;
     }
 
+    // The raw MarketCheck listing object (verbatim, incl. the competitor-facing
+    // `dealer` block, full comp/history data, and market valuation) must never
+    // reach a shopper. The passport reads the curated `mc_attributes`, never
+    // `mc_raw`, so dropping the raw dump is safe.
+    delete (row as Record<string, unknown>).mc_raw;
+
     return json(200, { listing: row });
   } catch (err) {
     return json(500, { error: err instanceof Error ? err.message : "unknown error" });
