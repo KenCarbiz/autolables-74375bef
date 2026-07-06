@@ -328,6 +328,9 @@ export interface DealerSettings {
   // rotation memory is written by lead-alert into passport_rotation_state.
   passport_contact_routing: CustomerPassportContactSettings;
   passport_agents: PassportAgent[];
+  // Which pieces of the passport payment estimate the shopper sees
+  // (payment / down / term / APR). Absent = all shown. See lib/affordability.
+  passport_payment_display?: { payment?: boolean; downPayment?: boolean; term?: boolean; interestRate?: boolean };
   passport_rotation_state: Record<string, string>;
   // Per-vehicle agent assignment (VIN → agent id) for Assigned Agent mode.
   vehicle_agent_assignments: Record<string, string>;

@@ -1,6 +1,6 @@
 import type { VehicleListing } from "@/hooks/useVehicleListing";
 import { resolveDisplayPrice, getPriceDisplayMode, buildDiscountBreakdown, type PriceDisplayMode, type DiscountBreakdown } from "@/lib/priceModel";
-import { DEFAULT_APR_PERCENT } from "@/lib/affordability";
+import { DEFAULT_APR_PERCENT, getPaymentDisplay, buildPaymentAssumptions } from "@/lib/affordability";
 import type { OemFactoryWarranty } from "@/lib/oemWarranty";
 
 // The OEM coverage breakdown public-listing-view attaches to a new/CPO listing.
@@ -437,7 +437,7 @@ export const derivePassport = (listing: VehicleListing): PassportData => {
   // doc fee is disclosed separately by the surface; market math compares on the
   // same value the dealer displays.
   const lp = listing as unknown as {
-    advertised_price_before_doc?: number | null; doc_fee?: number | null; website_sale_price?: number | null; price_display_mode?: unknown; price_label?: string | null; website_price_term?: string | null; dealer_discount?: number | null; retail_cash?: number | null;
+    advertised_price_before_doc?: number | null; doc_fee?: number | null; website_sale_price?: number | null; price_display_mode?: unknown; price_label?: string | null; website_price_term?: string | null; dealer_discount?: number | null; retail_cash?: number | null; payment_display?: unknown;
   };
   const priceMode: PriceDisplayMode = getPriceDisplayMode({ price_display_mode: lp.price_display_mode });
   const advBeforeDoc = lp.advertised_price_before_doc ?? listing.price ?? null;
@@ -485,13 +485,20 @@ export const derivePassport = (listing: VehicleListing): PassportData => {
   // original sticker is depreciation, exposed separately as belowOriginalMsrp.
   const saveVsMsrp = isNew && msrp != null && price != null && msrp > price ? msrp - price : null;
   const belowOriginalMsrp = !isNew && msrp != null && price != null && msrp > price ? msrp - price : null;
+  // Dealer-controlled payment display: `payment` off hides the whole estimate;
+  // the term / down / APR chips toggle independently. Attached by
+  // public-listing-view from dealer_profiles.settings.passport_payment_display.
+  const paymentDisplay = getPaymentDisplay({ passport_payment_display: lp.payment_display });
+  const PAYMENT_TERM = 72, PAYMENT_DOWN_PCT = 10;
   const estMonthly = (() => {
-    if (price == null) return null;
-    const r = DEFAULT_APR_PERCENT / 100 / 12, n = 72, principal = price * 0.9;
+    if (price == null || !paymentDisplay.payment) return null;
+    const r = DEFAULT_APR_PERCENT / 100 / 12, n = PAYMENT_TERM, principal = price * (1 - PAYMENT_DOWN_PCT / 100);
     const m = Math.round((principal * r) / (1 - Math.pow(1 + r, -n)));
     return isFinite(m) ? m : null;
   })();
-  const paymentAssumptions = `72 mo · 10% down · ${DEFAULT_APR_PERCENT}% APR example`;
+  const paymentAssumptions = buildPaymentAssumptions(paymentDisplay, {
+    termMonths: PAYMENT_TERM, downPercent: PAYMENT_DOWN_PCT, aprPercent: DEFAULT_APR_PERCENT,
+  });
 
   // A brand-new car has had no prior owners. For everything else, only trust a
   // real owner signal (MarketCheck owner_count or a CARFAX one-owner flag) —

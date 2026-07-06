@@ -900,7 +900,7 @@ const VehiclePassportV3 = () => {
                         : `+ ${fmt$(d.docFee)} doc fee · Sale ${fmt$(d.websiteSalePrice ?? price + d.docFee)}`}</p>
                     ) : null}
                     {buildSheet?.estValue ? <p className="font-semibold text-[#16A34A]">Incl. {fmt$(buildSheet.estValue)} in factory options</p> : null}
-                    {pv("payment") && d.estMonthly != null && <p>Est. {fmt$(d.estMonthly)}/mo <span className="text-[11px] text-[#94A3B8]">{d.paymentAssumptions}</span></p>}
+                    {pv("payment") && d.estMonthly != null && <p>Est. {fmt$(d.estMonthly)}/mo{d.paymentAssumptions ? <span className="text-[11px] text-[#94A3B8]"> {d.paymentAssumptions}</span> : null}</p>}
                     {!d.priceBreakdown && d.msrp != null && <p>MSRP {fmt$(d.msrp)}</p>}
                   </div>
                   {d.priceBreakdown && <PriceLadder b={d.priceBreakdown} priceLabel={d.priceLabel} />}

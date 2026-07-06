@@ -3,6 +3,9 @@ import {
   estimateAffordability,
   formatCurrency,
   formatCurrencyCents,
+  getPaymentDisplay,
+  buildPaymentAssumptions,
+  DEFAULT_PAYMENT_DISPLAY,
   DEFAULT_APR_PERCENT,
   DEFAULT_TERMS_MONTHS,
 } from "./affordability";
@@ -72,5 +75,25 @@ describe("currency formatters", () => {
 
   it("formats currency with cents", () => {
     expect(formatCurrencyCents(1000)).toContain("1,000.00");
+  });
+});
+
+describe("passport payment display toggles", () => {
+  it("defaults to all shown when unset or malformed", () => {
+    expect(getPaymentDisplay(null)).toEqual(DEFAULT_PAYMENT_DISPLAY);
+    expect(getPaymentDisplay({})).toEqual(DEFAULT_PAYMENT_DISPLAY);
+    expect(getPaymentDisplay({ passport_payment_display: "nope" })).toEqual(DEFAULT_PAYMENT_DISPLAY);
+  });
+
+  it("reads individual toggles and fills missing keys with the default (shown)", () => {
+    const pd = getPaymentDisplay({ passport_payment_display: { downPayment: false, interestRate: false } });
+    expect(pd).toEqual({ payment: true, downPayment: false, term: true, interestRate: false });
+  });
+
+  it("composes the assumptions line from only the enabled chips", () => {
+    const opts = { termMonths: 72, downPercent: 10, aprPercent: 7.25 };
+    expect(buildPaymentAssumptions(DEFAULT_PAYMENT_DISPLAY, opts)).toBe("72 mo · 10% down · 7.25% APR example");
+    expect(buildPaymentAssumptions({ payment: true, downPayment: false, term: true, interestRate: false }, opts)).toBe("72 mo example");
+    expect(buildPaymentAssumptions({ payment: true, downPayment: false, term: false, interestRate: false }, opts)).toBe("");
   });
 });

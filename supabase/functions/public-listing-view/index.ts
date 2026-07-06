@@ -135,6 +135,8 @@ serve(async (req) => {
         // Customer-facing price display mode (advertised_before_doc default vs
         // website_sale_price). Lets the passport show the dealer's chosen price.
         if (s.price_display_mode) row.price_display_mode = s.price_display_mode;
+        // Dealer payment-estimate display toggles (payment / down / term / APR).
+        if (s.passport_payment_display && typeof s.passport_payment_display === "object") row.payment_display = s.passport_payment_display;
         if (s.price_label && typeof s.price_label === "object") priceLabelSetting = s.price_label as Record<string, unknown>;
         // Today's Price page wording mode + custom copy (compliance-safe
         // defaults resolve client-side when absent).

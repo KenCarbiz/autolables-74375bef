@@ -33,6 +33,46 @@ export interface AffordabilityRow {
 export const DEFAULT_APR_PERCENT = 7.25;
 export const DEFAULT_TERMS_MONTHS = [60, 72, 84] as const;
 
+// ── Passport payment-estimate display toggles ──────────────────────────
+// The dealer controls which pieces of the passport payment estimate the shopper
+// sees. `payment` off hides the whole "Est. $X/mo" line; the other three toggle
+// each assumption chip (term / down payment / APR) independently. Default: all
+// shown. Stored on dealer_profiles.settings.passport_payment_display.
+export interface PaymentDisplay {
+  payment: boolean;      // the "Est. $X/mo" figure itself
+  downPayment: boolean;  // the "10% down" assumption chip
+  term: boolean;         // the "72 mo" assumption chip
+  interestRate: boolean; // the "7.25% APR" assumption chip
+}
+
+export const DEFAULT_PAYMENT_DISPLAY: PaymentDisplay = {
+  payment: true, downPayment: true, term: true, interestRate: true,
+};
+
+export function getPaymentDisplay(settings: unknown): PaymentDisplay {
+  const raw = (settings as { passport_payment_display?: unknown } | null | undefined)?.passport_payment_display;
+  if (raw && typeof raw === "object" && !Array.isArray(raw)) {
+    const r = raw as Record<string, unknown>;
+    const b = (k: keyof PaymentDisplay) => (typeof r[k] === "boolean" ? (r[k] as boolean) : DEFAULT_PAYMENT_DISPLAY[k]);
+    return { payment: b("payment"), downPayment: b("downPayment"), term: b("term"), interestRate: b("interestRate") };
+  }
+  return { ...DEFAULT_PAYMENT_DISPLAY };
+}
+
+// Compose the "72 mo · 10% down · 7.25% APR example" assumption line from only
+// the chips the dealer left enabled. Returns "" when none are enabled.
+export function buildPaymentAssumptions(
+  display: PaymentDisplay,
+  opts: { termMonths: number; downPercent: number; aprPercent: number },
+): string {
+  const parts = [
+    display.term ? `${opts.termMonths} mo` : null,
+    display.downPayment ? `${opts.downPercent}% down` : null,
+    display.interestRate ? `${opts.aprPercent}% APR` : null,
+  ].filter(Boolean) as string[];
+  return parts.length ? `${parts.join(" · ")} example` : "";
+}
+
 export const estimateAffordability = (
   input: AffordabilityInput,
   terms: readonly number[] = DEFAULT_TERMS_MONTHS

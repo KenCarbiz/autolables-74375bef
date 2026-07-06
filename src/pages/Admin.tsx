@@ -3,6 +3,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/contexts/AuthContext";
 import { uploadPhoto } from "@/lib/storage";
 import { Switch } from "@/components/ui/switch";
+import { getPaymentDisplay, type PaymentDisplay } from "@/lib/affordability";
 import { PRICE_BUCKETS } from "@/types/product";
 import { useDealerSettings, DealerSettings, DEFAULT_SETTINGS, type GetReadyService } from "@/contexts/DealerSettingsContext";
 import { formatPhone } from "@/components/addendum/CustomerInfoSection";
@@ -1951,6 +1952,32 @@ const Admin = () => {
                       <option value="as_is">As-Is — No Warranty</option><option value="implied">Implied Warranties Only</option><option value="dealer">Dealer Warranty</option>
                     </select>
                   </div>
+                </div>
+
+                {/* Passport payment estimate — dealer controls which pieces of
+                    the "Est. $X/mo" line the shopper sees. */}
+                <div className="mt-5 pt-4 border-t border-border-custom">
+                  <label className="text-xs font-semibold text-muted-foreground">Passport payment estimate</label>
+                  <p className="text-[11px] text-muted-foreground mt-0.5 mb-2">Choose what shows in the "Est. $X/mo" line on the vehicle passport. Turning off the payment hides the whole line.</p>
+                  {(() => {
+                    const pd = getPaymentDisplay(settings);
+                    const rows: { key: keyof PaymentDisplay; label: string }[] = [
+                      { key: "payment", label: "Estimated monthly payment" },
+                      { key: "downPayment", label: "Down payment assumption" },
+                      { key: "term", label: "Loan term" },
+                      { key: "interestRate", label: "Interest rate (APR)" },
+                    ];
+                    return (
+                      <div className="space-y-1">
+                        {rows.map((r) => (
+                          <div key={r.key} className="flex items-center justify-between py-1.5">
+                            <span className="text-sm text-foreground">{r.label}</span>
+                            <Switch checked={pd[r.key]} onCheckedChange={(v) => updateSettings({ passport_payment_display: { ...pd, [r.key]: v } })} className="data-[state=checked]:bg-teal" />
+                          </div>
+                        ))}
+                      </div>
+                    );
+                  })()}
                 </div>
               </div>
 
