@@ -580,8 +580,8 @@ export const resolveBuyersGuideWarranty = (
   switch (code) {
     case "CT": {
       if (price < 3000) return asIs("Connecticut: As-Is allowed under $3,000.");
-      if (price >= 5000) return warranty(60, 3000, 50, "Conn. Gen. Stat. §42-221", "Connecticut used-car warranty: price $5,000+.");
-      return warranty(30, 1500, 50, "Conn. Gen. Stat. §42-221", "Connecticut used-car warranty: price $3,000–$4,999.");
+      if (price >= 5000) return warranty(60, 3000, 100, "Conn. Gen. Stat. §42-221", "Connecticut used-car warranty: price $5,000+.");
+      return warranty(30, 1500, 100, "Conn. Gen. Stat. §42-221", "Connecticut used-car warranty: price $3,000–$4,999.");
     }
     case "MA": {
       if (miles >= 125000) return asIs("Massachusetts: As-Is allowed at 125,000+ miles.");
@@ -620,6 +620,7 @@ export const resolveBuyersGuideWarranty = (
     case "MN": return impliedForced("Minn. Stat. §325G.18 (used-vehicle warranty)");
     case "MS": return impliedForced("Miss. Code Ann. §11-7-18");
     case "OR": return impliedForced("Or. Rev. Stat. §72.3160");
+    case "WA": return impliedForced("Wash. Rev. Code §62A.2-316 / §46.70 (implied-warranty limits)");
     case "RI": return impliedForced("R.I. Gen. Laws §31-5.4 (used-vehicle warranty)");
     case "VT": return impliedForced("Vt. Stat. Ann. tit. 9 §4173");
     case "WV": return impliedForced("W. Va. Code §46A-6-107");

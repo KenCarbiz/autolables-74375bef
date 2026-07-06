@@ -188,7 +188,7 @@ describe("resolveBuyersGuideWarranty — per-state Buyers Guide front", () => {
   });
 
   it("forces the Implied Warranties Only front in as-is-prohibited states", () => {
-    for (const st of ["CA", "DC", "KS", "LA", "MD", "MN", "MS", "OR", "RI", "VT", "WV"]) {
+    for (const st of ["CA", "DC", "KS", "LA", "MD", "MN", "MS", "OR", "WA", "RI", "VT", "WV"]) {
       const r = resolveBuyersGuideWarranty(st, {});
       expect(r.box, st).toBe("implied");
       expect(r.forced, st).toBe(true);

@@ -1681,7 +1681,11 @@ function buildPanel(key: PassportPanelKey, d: PassportData, listing: VehicleList
         ["Battery", A(["battery"])], ["Hybrid System", A(["hybrid_system"])], ["EV Battery", A(["ev_battery", "battery_capacity"])], ["Charging", A(["charging", "charge_time"])],
       ];
       const safety = groups.Safety || [];
-      const hasAny = [engineV, transV, driveV, hp, mpg, fuelV, ...dimRows.map(([, v]) => v)].some(Boolean);
+      // Identity (VIN / year-make-model) is always known for a real listing, so
+      // the Specs panel must never fall to a bare empty state — it renders the
+      // identity row plus whatever specs decoded. This honors the data
+      // contract's guarantee that identity always shows (dataContract.ts).
+      const hasAny = Boolean(listing.vin || listing.ymm) || [engineV, transV, driveV, hp, mpg, fuelV, ...dimRows.map(([, v]) => v)].some(Boolean);
       const counts = (rows: [string, string | null][]) => ({ ok: rows.filter(([, v]) => v).length, pending: rows.filter(([, v]) => !v).length });
 
       const specStat = (label: string, value: string | null, helper: string, iconName: string) => {

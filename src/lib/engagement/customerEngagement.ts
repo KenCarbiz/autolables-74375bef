@@ -120,8 +120,13 @@ export const trackCustomerEngagement = async (payload: CustomerEngagementPayload
     const bodyText = JSON.stringify({ event });
 
     if (typeof navigator !== "undefined" && typeof navigator.sendBeacon === "function") {
-      const ok = navigator.sendBeacon(ENGAGEMENT_ENDPOINT, new Blob([bodyText], { type: "application/json" }));
-      if (ok) return;
+      try {
+        // Some browsers THROW on an oversized beacon rather than returning
+        // false; catch it here so we fall through to the keepalive fetch
+        // instead of losing the event to the outer catch.
+        const ok = navigator.sendBeacon(ENGAGEMENT_ENDPOINT, new Blob([bodyText], { type: "application/json" }));
+        if (ok) return;
+      } catch { /* fall through to fetch */ }
     }
     // sendBeacon unavailable or queue full — fall back to keepalive fetch so
     // the request still completes if the page is unloading.

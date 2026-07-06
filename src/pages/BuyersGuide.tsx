@@ -281,13 +281,6 @@ const BuyersGuide = () => {
   const [guideType, setGuideType] = useState<GuideType>("as-is");
   // Admin's "FTC used-car warranty" default seeds the guide type once the
   // dealer's settings arrive (the provider renders before they load).
-  const guideTypeSeeded = useRef(false);
-  useEffect(() => {
-    if (settingsLoading || guideTypeSeeded.current) return;
-    guideTypeSeeded.current = true;
-    if (settings.default_ftc_warranty === "implied") setGuideType("implied");
-    else if (settings.default_ftc_warranty === "dealer") setGuideType("warranty");
-  }, [settingsLoading, settings.default_ftc_warranty]);
   const [lang, setLang] = useState<Language>("en");
   const [vehicle, setVehicle] = useState<VehicleInfo>({
     year: "", make: "", model: "", vin: "", stock: "", mileage: "", price: "",
@@ -343,19 +336,29 @@ const BuyersGuide = () => {
     ? `This store advertises "${dealerWarranties[0].title}" as included on used vehicles — the Buyers Guide must reflect it, so As-Is can't be selected. Turn the program off in Included with Sale if it doesn't apply.`
     : "";
 
-  // Auto-populate the box + statutory floor whenever the inputs change.
-  // Forced states lock As-Is; dealers may still RAISE warranty terms.
+  // SINGLE source of truth for the warranty box — folds every input into one
+  // effect so re-computing bgResolution (e.g. the dealer edits price/mileage)
+  // can never reset the box back to As-Is on a vehicle the dealer warrants.
+  // Precedence: statutory-warranty state -> dealer-advertised included warranty
+  // (As-Is is then unlawful) -> a forced state box (implied / state form) ->
+  // the dealer's configured default -> the resolver's default (As-Is).
   useEffect(() => {
-    setGuideType(bgResolution.box);
-    if (bgResolution.box === "warranty" && bgResolution.minDurationDays > 0) {
+    let box: GuideType = bgResolution.box;
+    if (bgResolution.box === "warranty") box = "warranty";
+    else if (dealerWarrantyLock) box = "warranty";
+    else if (bgResolution.forced) box = bgResolution.box;
+    else if (settings.default_ftc_warranty === "implied") box = "implied";
+    else if (settings.default_ftc_warranty === "dealer") box = "warranty";
+    setGuideType(box);
+    if (box === "warranty" && bgResolution.minDurationDays > 0) {
       setWarrantyDuration(`${bgResolution.minDurationDays} Days / ${bgResolution.minMiles.toLocaleString()} Miles`);
       setWarrantyPct(`${bgResolution.minPct}%`);
     }
-  }, [bgResolution]);
+  }, [bgResolution, dealerWarrantyLock, settings.default_ftc_warranty]);
 
+  // Seed the warranty duration from the dealer's advertised program term.
   useEffect(() => {
     if (!dealerWarrantyLock) return;
-    setGuideType((cur) => (cur === "as-is" ? "warranty" : cur));
     const t = termLabel(dealerWarranties[0]);
     if (t) setWarrantyDuration((cur) => (cur === "30 Days / 1,000 Miles" ? t.replace(/-/g, " ") : cur));
   }, [dealerWarrantyLock, dealerWarranties]);

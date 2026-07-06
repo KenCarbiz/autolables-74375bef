@@ -57,7 +57,12 @@ const SUBSCRIPTION_KEY = "platform_subscriptions";
 export function getSubscribedProducts(): string[] {
   try {
     const subs = localStorage.getItem(SUBSCRIPTION_KEY);
-    if (subs) return JSON.parse(subs);
+    if (subs) {
+      const parsed = JSON.parse(subs);
+      // Guard against a legacy/corrupt non-array value — `.includes` on a
+      // non-array would throw and take down the app-switcher on every page.
+      if (Array.isArray(parsed)) return parsed.filter((x): x is string => typeof x === "string");
+    }
   } catch { /* */ }
   // Default: AutoLabels always available (they're on it)
   return ["autolabels"];

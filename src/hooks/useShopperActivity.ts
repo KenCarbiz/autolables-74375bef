@@ -92,7 +92,9 @@ export function useShopperActivity({ vin, tenantId, vehicleId, viewCount, enable
 
         const leadsQ = db
           .from("leads")
-          .select("vehicle_vin, name, source, sub_source, status, captured_at, first_response_at")
+          // Only the count is used downstream — don't pull shopper PII (name)
+          // into the browser for an internal analytics aggregate.
+          .select("vehicle_vin, captured_at")
           .eq("tenant_id", tenantId)
           .eq("vehicle_vin", upper)
           .order("captured_at", { ascending: false })

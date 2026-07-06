@@ -608,7 +608,10 @@ export function buildShopperActivity(input: ShopperActivityInput): ShopperActivi
   const ctaClicks = events.filter((e) => CTA_EVENTS.has(e.event_type)).length;
   const leadFormOpens = events.filter((e) => e.event_type === "lead_form_opened").length;
   const leadSubmitEvents = events.filter((e) => e.event_type === "lead_submitted").length;
-  const leadSubmits = leadSubmitEvents + leads.length;
+  // A submitted lead usually writes BOTH a leads row and a lead_submitted event
+  // (the passport inserts the lead and fires the beacon), so summing them
+  // double-counts one conversion. Take the larger of the two as the real count.
+  const leadSubmits = Math.max(leadSubmitEvents, leads.length);
   const scrollEvents = events.filter((e) => e.event_type === "scroll_depth");
   const maxScrollDepth = scrollEvents.length
     ? Math.max(...scrollEvents.map((e) => scrollDepthOf(e) ?? 0))

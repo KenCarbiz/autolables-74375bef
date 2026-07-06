@@ -1268,10 +1268,10 @@ const VehiclePassportV3 = () => {
           )}
           {/* Overview — text plus a compact photo story strip instead of one
               oversized secondary image. */}
-          {pv("description") && (
+          {pv("description") && (d.overview.trim().length > 0 || gallery.length > 1) && (
           <div data-module="overview" className={`${CARD} p-5 flex flex-col`}>
             <H3>Vehicle Overview</H3>
-            <p className="text-[13px] leading-relaxed text-[#64748B] mt-3 line-clamp-4">{d.overview}</p>
+            {d.overview.trim().length > 0 && <p className="text-[13px] leading-relaxed text-[#64748B] mt-3 line-clamp-4">{d.overview}</p>}
             {gallery.length > 1 && (
               <div className="mt-3">
                 <p className="text-[11px] font-semibold text-[#94A3B8] mb-1.5">Vehicle photo story</p>
