@@ -116,9 +116,9 @@ interface FamilyApp {
   entitlementKey: string;
 }
 const FAMILY_APPS: FamilyApp[] = [
-  { id: "autolabels", name: "AutoLabels", icon: Tag,   url: "",                          entitlementKey: "autolabels" },
-  { id: "autocurb",   name: "AutoCurb",   icon: Car,   url: "https://autocurb.io/admin", entitlementKey: "autocurb"   },
-  { id: "autofilm",   name: "AutoFilm",   icon: Video, url: "https://autofilm.io/admin", entitlementKey: "autofilm"   },
+  { id: "autolabels", name: "AutoLabels", icon: Tag,   url: "",                        entitlementKey: "autolabels" },
+  { id: "autocurb",   name: "AutoCurb",   icon: Car,   url: "https://autocurb.io/sso", entitlementKey: "autocurb"   },
+  { id: "autofilm",   name: "AutoFilm",   icon: Video, url: "https://autofilm.io/sso", entitlementKey: "autofilm"   },
 ];
 
 const AppShell = ({ children }: AppShellProps) => {
