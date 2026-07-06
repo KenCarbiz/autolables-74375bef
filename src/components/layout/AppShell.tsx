@@ -858,8 +858,27 @@ const AppShell = ({ children }: AppShellProps) => {
                         disabled={!unlocked || isCurrent}
                         onSelect={(event) => {
                           if (isCurrent || !unlocked) { event.preventDefault(); return; }
-                          if (app.url.startsWith("http")) window.location.href = app.url;
-                          else navigate(app.url);
+                          if (app.url.startsWith("http")) {
+                            // Mint a short-lived handoff token so the sibling
+                            // app can SSO the user in without a re-login.
+                            void (async () => {
+                              try {
+                                const { data, error } = await supabase.functions.invoke("mint-handoff-token", {
+                                  body: { targetApp: app.id },
+                                });
+                                const token = (data as { token?: string } | null)?.token;
+                                if (error || !token) {
+                                  window.location.href = app.url;
+                                  return;
+                                }
+                                window.location.href = `${app.url}?t=${encodeURIComponent(token)}`;
+                              } catch {
+                                window.location.href = app.url;
+                              }
+                            })();
+                          } else {
+                            navigate(app.url);
+                          }
                         }}
                         className={`py-2 rounded-lg ${unlocked && !isCurrent ? "cursor-pointer" : "cursor-default"} ${!unlocked ? "opacity-60" : ""}`}
                       >
