@@ -393,8 +393,8 @@ const VehicleFile = () => {
                     <img src={gallery[safeImg]} alt={vehicle.ymm || "vehicle"} className="w-full h-full object-cover" />
                     {gallery.length > 1 && (
                       <>
-                        <button onClick={(e) => { e.stopPropagation(); setImgIdx((safeImg - 1 + gallery.length) % gallery.length); }} aria-label="Previous photo" className="absolute left-1.5 top-1/2 -translate-y-1/2 w-7 h-7 rounded-full bg-black/45 text-white flex items-center justify-center hover:bg-black/65 transition-colors"><ArrowLeft className="w-4 h-4" /></button>
-                        <button onClick={(e) => { e.stopPropagation(); setImgIdx((safeImg + 1) % gallery.length); }} aria-label="Next photo" className="absolute right-1.5 top-1/2 -translate-y-1/2 w-7 h-7 rounded-full bg-black/45 text-white flex items-center justify-center hover:bg-black/65 transition-colors"><ChevronRight className="w-4 h-4" /></button>
+                        <button type="button" onClick={(e) => { e.stopPropagation(); setImgIdx((i) => (i - 1 + gallery.length) % gallery.length); }} aria-label="Previous photo" className="absolute left-1.5 top-1/2 -translate-y-1/2 z-10 w-7 h-7 rounded-full bg-black/45 text-white flex items-center justify-center hover:bg-black/65 transition-colors"><ArrowLeft className="w-4 h-4" /></button>
+                        <button type="button" onClick={(e) => { e.stopPropagation(); setImgIdx((i) => (i + 1) % gallery.length); }} aria-label="Next photo" className="absolute right-1.5 top-1/2 -translate-y-1/2 z-10 w-7 h-7 rounded-full bg-black/45 text-white flex items-center justify-center hover:bg-black/65 transition-colors"><ChevronRight className="w-4 h-4" /></button>
                         <span className="absolute bottom-1.5 left-1.5 text-[10px] font-semibold px-1.5 py-0.5 rounded bg-black/55 text-white tabular-nums">{safeImg + 1} / {gallery.length}</span>
                       </>
                     )}
