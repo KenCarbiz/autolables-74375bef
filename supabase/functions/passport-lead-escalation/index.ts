@@ -11,7 +11,7 @@
 // escalated_at, and writes an audit_log row. Idempotent per level.
 // ──────────────────────────────────────────────────────────────────────
 import { json, preflight } from "../_shared/http.ts";
-import { adminClient, SERVICE_KEY } from "../_shared/supabase.ts";
+import { adminClient, SERVICE_KEY, isServiceOrCron } from "../_shared/supabase.ts";
 import { normalizeContactRouting } from "../_shared/passport-routing.ts";
 
 const supabaseUrl = Deno.env.get("SUPABASE_URL") || "";
@@ -22,6 +22,9 @@ const esc = (s: unknown) =>
 
 Deno.serve(async (req) => {
   const pf = preflight(req); if (pf) return pf;
+  // Cross-tenant SLA sweep sends escalation emails — gate to service role / cron secret
+  // so an anon caller can't force premature escalations or drain the email budget.
+  if (!isServiceOrCron(req)) return json(401, { error: "unauthorized" });
   try {
     const admin = adminClient();
     // Tenants that have any routing config saved.
