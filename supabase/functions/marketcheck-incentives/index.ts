@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
+import { isServiceOrCron } from "../_shared/supabase.ts";
 
 // marketcheck-incentives — OEM incentive lookup via MarketCheck's
 // /v2/search/car/incentive/oem endpoint (the only incentive route enabled
@@ -107,6 +108,10 @@ serve(async (req) => {
   // ── On-demand customer-ZIP lookup ───────────────────────────────
   if (body.vin && body.zip && body.tenant_id) {
     const { data: v } = await admin.from("vehicle_listings").select("ymm").eq("tenant_id", body.tenant_id).eq("vin", body.vin).maybeSingle();
+    // Ownership gate: only proceed for a (tenant_id, vin) that actually exists.
+    // Without this, a client-supplied tenant_id/vin would burn a metered
+    // MarketCheck call and poison an arbitrary marketcheck_vehicle_cache row.
+    if (!v) return json({ error: "not_found", incentives: [] }, 404);
     const ymm = parseYmm(v?.ymm);
     const { offers, error } = await fetchOffers({ zip: body.zip, make: ymm.make, model: ymm.model, year: ymm.year });
     if (error === "not_configured") return json({ error: "not_configured", incentives: [] });
@@ -131,6 +136,10 @@ serve(async (req) => {
 
   // ── Nightly dealer-ZIP batch ─────────────────────────────────────
   if (body.batch) {
+    // Service-role / cron only — the batch iterates every incentives-enabled
+    // tenant and fires a metered MarketCheck call per tenant. Never let an
+    // anon caller trigger a fleet-wide paid pull.
+    if (!isServiceOrCron(req)) return json({ error: "unauthorized" }, 401);
     if (!KEY) return json({ error: "not_configured" }, 200);
     const { data: enabled } = await admin
       .from("tenant_incentive_settings")
