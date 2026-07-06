@@ -121,18 +121,25 @@ export const trackCustomerEngagement = async (payload: CustomerEngagementPayload
 
     if (typeof navigator !== "undefined" && typeof navigator.sendBeacon === "function") {
       try {
-        // Some browsers THROW on an oversized beacon rather than returning
-        // false; catch it here so we fall through to the keepalive fetch
-        // instead of losing the event to the outer catch.
-        const ok = navigator.sendBeacon(ENGAGEMENT_ENDPOINT, new Blob([bodyText], { type: "application/json" }));
+        // CRITICAL: the Blob type MUST be a CORS-safelisted content type
+        // ("text/plain"). An "application/json" beacon is a non-simple
+        // cross-origin request that requires a preflight, which sendBeacon
+        // cannot perform — the browser silently drops it while sendBeacon still
+        // returns true, so the fallback never fires and the event is lost.
+        // record-engagement parses the body with req.json() regardless of the
+        // Content-Type, so a text/plain JSON string is read correctly.
+        // (This was the cause of clickstream events not reaching the DB while
+        // per-module dwell — sent via the Supabase client — flowed normally.)
+        const ok = navigator.sendBeacon(ENGAGEMENT_ENDPOINT, new Blob([bodyText], { type: "text/plain" }));
         if (ok) return;
       } catch { /* fall through to fetch */ }
     }
-    // sendBeacon unavailable or queue full — fall back to keepalive fetch so
-    // the request still completes if the page is unloading.
+    // sendBeacon unavailable or queue full — fall back to keepalive fetch. Use a
+    // safelisted content type here too so the request stays simple (no preflight
+    // needed during page unload); record-engagement reads the body as JSON.
     void fetch(ENGAGEMENT_ENDPOINT, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "text/plain" },
       body: bodyText,
       keepalive: true,
     }).catch(() => {});
