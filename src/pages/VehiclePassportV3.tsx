@@ -464,7 +464,7 @@ const VehiclePassportV3 = () => {
   // the first gallery photo that differs from whatever the hero is showing; if
   // there is no distinct second photo, render none rather than repeat.
   const secondaryImage = gallery.find((g) => g && g !== hero) || "";
-  const { priceChange7d } = computePriceHistory(listing);
+  const { priceChangeLatest } = computePriceHistory(listing);
   const priceSeries = d.valueHistory.filter((h) => h.listing_price != null).map((h) => h.listing_price as number);
   const marketSeries = d.valueHistory.filter((h) => h.market_value != null).map((h) => h.market_value as number);
 
@@ -611,8 +611,8 @@ const VehiclePassportV3 = () => {
       ? { icon: GaugeIcon, title: "Price Confidence", strong: ratingTier(rating.overall).label, sub: "overall vehicle score", donut: rating.overall, section: "price-confidence", cta: "View report" }
       : null,
     warrantyTile,
-    priceChange7d != null && priceChange7d < 0
-      ? { icon: Clock, title: "Price History", strong: `-${fmt$(Math.abs(priceChange7d))}`, sub: "price decreased", chart: <Spark points={priceSeries} color="#7C3AED" />, section: "price-history", cta: "View history" }
+    priceChangeLatest != null && priceChangeLatest < 0
+      ? { icon: Clock, title: "Price History", strong: `-${fmt$(Math.abs(priceChangeLatest))}`, sub: "latest price reduction", chart: <Spark points={priceSeries} color="#7C3AED" />, section: "price-history", cta: "View history" }
       : null,
     compStory
       ? { icon: Car, title: "Comparable Vehicles", strong: compStory.strong, sub: compStory.sub, comps: false, section: "comparable-vehicles", cta: "View comp set" }
@@ -628,7 +628,7 @@ const VehiclePassportV3 = () => {
     belowMarket: d.belowMarket, marketAvg: d.marketAvg, price: d.price,
     similarCount: d.marketMeta.similarCount, soldCount: d.marketMeta.soldCount,
     viewCount: d.viewCount, domFavorable,
-    priceDrop: priceChange7d != null && priceChange7d < 0 ? Math.abs(priceChange7d) : null,
+    priceDrop: priceChangeLatest != null && priceChangeLatest < 0 ? Math.abs(priceChangeLatest) : null,
     ratingOverall: rating?.overall ?? null,
     demandPartsCount: demandParts.length,
     warrantyStrength: warrantyIncl ? 4 : cond === "cpo" ? 3 : cond === "new" || (!!d.warrantyStr && !d.warrantyExpired) ? 2 : warrantyAvail ? 1 : 0,

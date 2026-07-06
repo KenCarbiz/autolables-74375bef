@@ -289,6 +289,7 @@ export interface PassportData {
   valueHistory: { captured_at: string; market_value: number | null; listing_price: number | null; below_market: number | null; position: string | null }[];
   priceChange7d: number | null;   // listing_price delta vs ~7 days ago (negative = drop)
   priceChangeTotal: number | null; // delta since first capture
+  priceChangeLatest: number | null; // most recent real price movement (negative = drop)
   // Dealer-entered trust content (from public-listing-view → dealer_trust)
   dealerTrust: {
     yearsInBusiness: string;
@@ -340,15 +341,31 @@ export interface PricePoint { captured_at: string; market_value: number | null; 
 // Real captured price history (attached to the listing by public-listing-view
 // from the vehicle_value_history table). Returns the series plus 7-day and
 // total listing-price deltas (negative = price drop).
-export const computePriceHistory = (listing: VehicleListing): { valueHistory: PricePoint[]; priceChange7d: number | null; priceChangeTotal: number | null } => {
+export const computePriceHistory = (listing: VehicleListing): { valueHistory: PricePoint[]; priceChange7d: number | null; priceChangeTotal: number | null; priceChangeLatest: number | null } => {
   const rawHist = (listing as unknown as { value_history?: unknown }).value_history;
-  const valueHistory: PricePoint[] = (Array.isArray(rawHist) ? rawHist : []).map((h) => h as Record<string, unknown>).map((h) => ({
+  const rawHistory: PricePoint[] = (Array.isArray(rawHist) ? rawHist : []).map((h) => h as Record<string, unknown>).map((h) => ({
     captured_at: String(h.captured_at ?? ""),
     market_value: h.market_value != null ? Number(h.market_value) : null,
     listing_price: h.listing_price != null ? Number(h.listing_price) : null,
     below_market: h.below_market != null ? Number(h.below_market) : null,
     position: (h.position as string) ?? null,
   })).filter((h) => h.captured_at);
+
+  // Data-integrity guard: drop transient single-capture UP-spikes in the
+  // dealer-price series. A dealer's price steps down or holds — it does not
+  // blip up for one capture and immediately fall back. Such a point (strictly
+  // above BOTH neighbors by a meaningful amount) is a scrape artifact
+  // (MSRP/market-value contaminating listing_price) that otherwise inflates the
+  // chart, the "highest price", and manufactures a phantom reduction event.
+  const SPIKE = 250;
+  const rawPriced = rawHistory.filter((h) => h.listing_price != null);
+  const spikeAts = new Set<string>();
+  for (let i = 1; i < rawPriced.length - 1; i++) {
+    const p = rawPriced[i].listing_price!, prev = rawPriced[i - 1].listing_price!, next = rawPriced[i + 1].listing_price!;
+    if (p - prev > SPIKE && p - next > SPIKE) spikeAts.add(rawPriced[i].captured_at);
+  }
+  const valueHistory = rawHistory.filter((h) => !spikeAts.has(h.captured_at));
+
   const priced = valueHistory.filter((h) => h.listing_price != null);
   const latestPrice = priced.length ? priced[priced.length - 1].listing_price! : null;
   const priceChangeTotal = priced.length >= 2 && latestPrice != null ? latestPrice - priced[0].listing_price! : null;
@@ -367,7 +384,17 @@ export const computePriceHistory = (listing: VehicleListing): { valueHistory: Pr
     if (!prior) return null;
     return latestPrice - prior.listing_price!;
   })();
-  return { valueHistory, priceChange7d, priceChangeTotal };
+  // The most RECENT real price movement (last transition between two different
+  // consecutive captures), regardless of how long ago — the freshest, most
+  // compelling signal for the Price History card ("just reduced $X").
+  const priceChangeLatest = (() => {
+    for (let i = priced.length - 1; i >= 1; i--) {
+      const d = priced[i].listing_price! - priced[i - 1].listing_price!;
+      if (Math.abs(d) >= 1) return d;
+    }
+    return null;
+  })();
+  return { valueHistory, priceChange7d, priceChangeTotal, priceChangeLatest };
 };
 
 export const derivePassport = (listing: VehicleListing): PassportData => {
@@ -660,7 +687,7 @@ export const derivePassport = (listing: VehicleListing): PassportData => {
     exp: o.valid_through ? `Expires ${new Date(o.valid_through as string).toLocaleDateString()}` : "",
   })).filter((o) => o.body).slice(0, 6);
 
-  const { valueHistory, priceChange7d, priceChangeTotal } = computePriceHistory(listing);
+  const { valueHistory, priceChange7d, priceChangeTotal, priceChangeLatest } = computePriceHistory(listing);
 
   const t = (listing as unknown as { dealer_trust?: Record<string, string> }).dealer_trust ?? {};
   const dealerTrust = {
@@ -710,7 +737,7 @@ export const derivePassport = (listing: VehicleListing): PassportData => {
     dealerPhone: (dealer.phone as string) || "",
     dealerAddress: [dealer.address, dealer.city, dealer.state, dealer.zip].filter(Boolean).join(", "),
     offers,
-    valueHistory, priceChange7d, priceChangeTotal,
+    valueHistory, priceChange7d, priceChangeTotal, priceChangeLatest,
     dealerTrust,
     dealerCoverage: (Array.isArray((listing as { dealer_coverage?: unknown[] }).dealer_coverage) ? (listing as unknown as { dealer_coverage: Record<string, unknown>[] }).dealer_coverage : []).map((c) => ({
       title: String(c.title || ""),

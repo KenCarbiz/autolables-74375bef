@@ -1,5 +1,54 @@
 import { describe, it, expect } from "vitest";
-import { cleanEquipmentList } from "./passportV2Data";
+import { cleanEquipmentList, computePriceHistory } from "./passportV2Data";
+import type { VehicleListing } from "@/hooks/useVehicleListing";
+
+const listingWithHistory = (points: { at: string; price: number | null }[]): VehicleListing =>
+  ({ value_history: points.map((p) => ({ captured_at: p.at, listing_price: p.price, market_value: null })) } as unknown as VehicleListing);
+
+describe("computePriceHistory", () => {
+  it("drops a transient single-capture up-spike from the series", () => {
+    // Flat at 55598, a one-capture spike up to 60598, back to 55598 — the spike
+    // is a scrape artifact and must be removed from the chart/highest/events.
+    const r = computePriceHistory(listingWithHistory([
+      { at: "2026-06-01", price: 56895 },
+      { at: "2026-06-28", price: 55598 },
+      { at: "2026-07-03", price: 60598 }, // artifact
+      { at: "2026-07-05", price: 55598 },
+    ]));
+    const prices = r.valueHistory.map((h) => h.listing_price);
+    expect(prices).not.toContain(60598);
+    expect(Math.max(...(prices.filter((p): p is number => p != null)))).toBe(56895);
+  });
+
+  it("reports the latest REAL reduction, not the phantom created by the spike", () => {
+    const r = computePriceHistory(listingWithHistory([
+      { at: "2026-06-01", price: 56895 },
+      { at: "2026-06-28", price: 55598 },
+      { at: "2026-07-03", price: 60598 }, // artifact — would fake a -5000 "latest change"
+      { at: "2026-07-05", price: 55598 },
+    ]));
+    // After removing the spike the last real movement is 56895 -> 55598 = -1297.
+    expect(r.priceChangeLatest).toBe(-1297);
+  });
+
+  it("returns null latest-change when the price never moved", () => {
+    const r = computePriceHistory(listingWithHistory([
+      { at: "2026-06-01", price: 55598 },
+      { at: "2026-06-15", price: 55598 },
+    ]));
+    expect(r.priceChangeLatest).toBeNull();
+  });
+
+  it("keeps a genuine sustained higher earlier price (not a lone spike)", () => {
+    const r = computePriceHistory(listingWithHistory([
+      { at: "2026-05-01", price: 61895 },
+      { at: "2026-06-01", price: 61895 },
+      { at: "2026-07-01", price: 55598 },
+    ]));
+    expect(r.valueHistory.map((h) => h.listing_price)).toContain(61895);
+    expect(r.priceChangeLatest).toBe(-6297);
+  });
+});
 
 describe("cleanEquipmentList", () => {
   it("drops raw option codes", () => {
