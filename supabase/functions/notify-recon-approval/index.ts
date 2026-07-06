@@ -41,8 +41,8 @@ Deno.serve(async (req) => {
   const settings = (prof?.settings || {}) as Record<string, string>;
   let recipients = splitEmails(settings.recon_approval_email || "");
   if (!recipients.length) {
-    const { data: ob } = await admin.from("onboarding_profiles").select("email").eq("tenant_id", est.tenant_id).maybeSingle();
-    if (ob?.email) recipients = splitEmails(ob.email as string);
+    const { data: ten } = await admin.from("tenants").select("primary_email").eq("id", est.tenant_id).maybeSingle();
+    if (ten?.primary_email) recipients = splitEmails(ten.primary_email as string);
   }
   if (!recipients.length) return json(200, { ok: false, error: "no_recipient" });
 

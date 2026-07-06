@@ -67,9 +67,10 @@ Deno.serve(async (req) => {
   const { data: prof } = await admin.from("dealer_profiles").select("settings").eq("tenant_id", tenantId).maybeSingle();
   const settings = (prof?.settings || {}) as Record<string, string>;
   let recipients = body.to ? splitEmails(body.to) : splitEmails(settings.title_clerk_email || "");
-  const { data: ob } = await admin.from("onboarding_profiles").select("display_name, email").eq("tenant_id", tenantId).maybeSingle();
+  const { data: ob } = await admin.from("onboarding_profiles").select("display_name").eq("tenant_id", tenantId).maybeSingle();
   const dealerName = (ob?.display_name as string) || "";
-  if (recipients.length === 0 && ob?.email) recipients = splitEmails(ob.email as string);
+  const { data: ten } = await admin.from("tenants").select("primary_email").eq("id", tenantId).maybeSingle();
+  if (recipients.length === 0 && ten?.primary_email) recipients = splitEmails(ten.primary_email as string);
   if (recipients.length === 0) return json(400, { error: "no recipient — set a title clerk email in Settings" });
 
   // Round-robin: when enabled, email a single clerk and rotate to the next on

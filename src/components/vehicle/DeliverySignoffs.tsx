@@ -39,7 +39,7 @@ export const DeliverySignoffs = ({ vin, tenantId, condition }: Props) => {
     const sb = supabase as unknown as { from: (t: string) => any };
     const [insp, prep, detail, installs, recall] = await Promise.all([
       sb.from("safety_inspections").select("status, form_type, result, signed_at, documents").eq("vin", v).eq("tenant_id", tenantId),
-      sb.from("prep_sign_offs").select("listing_unlocked, foreman_name, install_photos, signed_at, status").eq("vehicle_vin", v).eq("tenant_id", tenantId),
+      sb.from("prep_sign_offs").select("listing_unlocked, foreman_name, install_photos, signed_at, status").eq("vin", v).eq("tenant_id", tenantId),
       sb.from("detail_signoffs").select("status, detail_types, installs, is_third_party, provider_company, performer_role, performer_name, photos, signed_at").eq("vin", v).eq("tenant_id", tenantId),
       sb.from("install_proofs").select("product_name, installer_company, photo_path, is_verified").eq("vehicle_vin", v),
       sb.from("recall_service_tasks").select("status").eq("vin", v).eq("tenant_id", tenantId),

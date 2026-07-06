@@ -33,8 +33,8 @@ Deno.serve(async (req) => {
   const { data: prof } = await admin.from("dealer_profiles").select("settings").eq("tenant_id", tenantId).maybeSingle();
   const settings = (prof?.settings || {}) as Record<string, string>;
   let recipients = splitEmails(settings.detail_email || "");
-  const { data: ob } = await admin.from("onboarding_profiles").select("email").eq("tenant_id", tenantId).maybeSingle();
-  if (recipients.length === 0 && ob?.email) recipients = splitEmails(ob.email as string);
+  const { data: ten } = await admin.from("tenants").select("primary_email").eq("id", tenantId).maybeSingle();
+  if (recipients.length === 0 && ten?.primary_email) recipients = splitEmails(ten.primary_email as string);
   if (recipients.length === 0) return json(200, { ok: false, error: "no_recipient" });
   recipients = recipients.slice(0, 3);
 

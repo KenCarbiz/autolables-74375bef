@@ -422,7 +422,7 @@ serve(async (req) => {
         };
         const [insp, prep, detail, installs] = await Promise.all([
           admin.from("safety_inspections").select("form_type, result, signed_at").eq("vin", vinU).eq("tenant_id", row.tenant_id).eq("status", "signed").order("signed_at", { ascending: false }).limit(1),
-          admin.from("prep_sign_offs").select("install_photos, accessories_installed, signed_at, inspection_passed").eq("vehicle_vin", vinU).eq("tenant_id", row.tenant_id).eq("listing_unlocked", true).order("signed_at", { ascending: false }).limit(1),
+          admin.from("prep_sign_offs").select("install_photos, accessories_installed, signed_at, inspection_passed").eq("vin", vinU).eq("tenant_id", row.tenant_id).eq("listing_unlocked", true).order("signed_at", { ascending: false }).limit(1),
           // Every signed detail/install sign-off — many parties (detail, parts,
           // service, outside vendors) can each sign off their own work.
           admin.from("detail_signoffs").select("detail_types, installs, photos, is_third_party, provider_company, signed_at").eq("vin", vinU).eq("tenant_id", row.tenant_id).eq("status", "signed").order("signed_at", { ascending: false }).limit(50),
