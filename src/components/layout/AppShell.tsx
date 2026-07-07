@@ -328,6 +328,28 @@ const AppShell = ({ children }: AppShellProps) => {
     const nu = typeof d.new_vehicles === "number" ? d.new_vehicles : null;
     return { ok: true, text: seen != null ? `${seen} vehicles${nu ? ` · ${nu} new` : ""}` : "Completed" };
   };
+  // Pull the most identifying label for an activity row so the feed names
+  // WHICH vehicle — stock #, VIN, year/make/model, or the public slug —
+  // instead of a bare "vehicle_listing".
+  const activitySubject = (e: { entity_type?: string; entity_id?: string; user_email?: string | null; details?: Record<string, unknown> }): string => {
+    const d = (e.details || {}) as Record<string, unknown>;
+    const str = (v: unknown) => (typeof v === "string" && v.trim() ? v.trim() : "");
+    const stock = str(d.stock);
+    const vin = str(d.vin) || (e.entity_type === "advertised_price" ? str(e.entity_id) : "");
+    let subject = str(d.ymm) || [d.year, d.make, d.model].map(str).filter(Boolean).join(" ") || str(d.product);
+    let idTag = stock ? `Stock #${stock}` : "";
+    const slug = str(d.slug);
+    if (!subject && slug) {
+      const toks = slug.split("-");
+      const last = toks[toks.length - 1];
+      if (/^\d+$/.test(last)) { idTag = idTag || `#${last}`; toks.pop(); }
+      subject = toks.map((t) => (/\d/.test(t) ? t.toUpperCase() : t.charAt(0).toUpperCase() + t.slice(1))).join(" ");
+    }
+    if (!idTag && vin) idTag = `VIN …${vin.slice(-8)}`;
+    const label = [subject, idTag].filter(Boolean).join(" · ");
+    const who = str(e.user_email);
+    return label ? (who ? `${label} · ${who}` : label) : "";
+  };
   const renderNotificationsList = () => (
     recentActivity.length === 0 ? (
       <div className="px-4 py-8 text-center text-xs text-muted-foreground">
@@ -354,7 +376,7 @@ const AppShell = ({ children }: AppShellProps) => {
                 )}
               </span>
               <span className="block text-[11px] text-muted-foreground truncate">
-                {outcome ? outcome.text : `${e.entity_type}${e.user_email ? ` · ${e.user_email}` : ""}`}
+                {outcome ? outcome.text : (activitySubject(e) || `${e.entity_type}${e.user_email ? ` · ${e.user_email}` : ""}`)}
               </span>
             </span>
             <span className="text-[10px] text-muted-foreground tabular-nums shrink-0 mt-0.5">
