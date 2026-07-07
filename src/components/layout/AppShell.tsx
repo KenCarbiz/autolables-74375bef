@@ -376,7 +376,7 @@ const AppShell = ({ children }: AppShellProps) => {
                 )}
               </span>
               <span className="block text-[11px] text-muted-foreground truncate">
-                {outcome ? outcome.text : `${e.entity_type}${e.user_email ? ` · ${e.user_email}` : ""}`}
+                {outcome ? outcome.text : (activitySubject(e) || `${e.entity_type}${e.user_email ? ` · ${e.user_email}` : ""}`)}
               </span>
             </span>
             <span className="text-[10px] text-muted-foreground tabular-nums shrink-0 mt-0.5">
