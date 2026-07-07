@@ -345,10 +345,10 @@ const AppShell = ({ children }: AppShellProps) => {
       if (/^\d+$/.test(last)) { idTag = idTag || `#${last}`; toks.pop(); }
       subject = toks.map((t) => (/\d/.test(t) ? t.toUpperCase() : t.charAt(0).toUpperCase() + t.slice(1))).join(" ");
     }
-    if (!idTag && vin) idTag = `VIN …${vin.slice(-8)}`;
-    const label = [subject, idTag].filter(Boolean).join(" · ");
-    const who = str(e.user_email);
-    return label ? (who ? `${label} · ${who}` : label) : "";
+    // No full VIN — too long. Fall back to a short stock-style id (last 6),
+    // which for these dealers matches the stock number.
+    if (!idTag && vin) idTag = `#${vin.slice(-6)}`;
+    return [subject, idTag].filter(Boolean).join(" · ");
   };
   const renderNotificationsList = () => (
     recentActivity.length === 0 ? (
