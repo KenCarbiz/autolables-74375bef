@@ -4,3 +4,8 @@ project_id = "onnbmmdbrsgytfozfozn"
 # which cannot attach the anon apikey header, so JWT verification must be off.
 [functions.record-engagement]
 verify_jwt = false
+
+# vehicle-lookup is authenticated via a shared secret header (x-lookup-secret)
+# so sister apps (AutoFilm) can query without minting a Supabase JWT.
+[functions.vehicle-lookup]
+verify_jwt = false
