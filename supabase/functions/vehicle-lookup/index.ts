@@ -122,59 +122,63 @@ Deno.serve(async (req) => {
 
     const isFullVin = q.length === 17;
 
+    const safe = async <T,>(fn: () => Promise<T>): Promise<T | null> => {
+      try { return await fn(); } catch { return null; }
+    };
+
     // 1) Full VIN exact match
     if (isFullVin) {
-      const { data } = await (supabase as any)
+      const res = await safe(() => (supabase as any)
         .from("vehicle_listings")
         .select(cols)
         .or(tenantFilter)
         .eq("vin", q)
-        .limit(5);
-      addRows(data);
+        .limit(5));
+      addRows(res?.data);
     }
 
     // 2) Partial VIN or slug match
     if (rowsById.size < 5) {
       const like = `%${q}%`;
-      const { data } = await (supabase as any)
+      const res = await safe(() => (supabase as any)
         .from("vehicle_listings")
         .select(cols)
         .or(tenantFilter)
         .or(`vin.ilike.${like},slug.ilike.${like}`)
         .order("published_at", { ascending: false, nullsFirst: false })
-        .limit(10);
-      addRows(data);
+        .limit(10));
+      addRows(res?.data);
     }
 
     // 3) Stock number in mc_attributes / key_specs (JSON contains)
     if (rowsById.size < 5) {
       for (const key of ["stock", "stock_number"]) {
-        const { data: mcRows } = await (supabase as any)
+        const mc = await safe(() => (supabase as any)
           .from("vehicle_listings")
           .select(cols)
           .or(tenantFilter)
           .contains("mc_attributes", { [key]: q })
-          .limit(5);
-        addRows(mcRows);
-        const { data: ksRows } = await (supabase as any)
+          .limit(5));
+        addRows(mc?.data);
+        const ks = await safe(() => (supabase as any)
           .from("vehicle_listings")
           .select(cols)
           .or(tenantFilter)
           .contains("key_specs", { [key]: q })
-          .limit(5);
-        addRows(ksRows);
+          .limit(5));
+        addRows(ks?.data);
       }
     }
 
     // 4) Stock lookup via vehicle_files → resolve to vin, then re-query listings
     if (rowsById.size < 5) {
-      const { data: files } = await (supabase as any)
+      const filesRes = await safe(() => (supabase as any)
         .from("vehicle_files")
         .select("vin, stock_number, tenant_id, store_id")
         .or(tenantFilter)
         .ilike("stock_number", `%${q}%`)
-        .limit(5);
-      const vins = (files || []).map((f: any) => f.vin).filter(Boolean);
+        .limit(5));
+      const vins = ((filesRes?.data as any[]) || []).map((f: any) => f.vin).filter(Boolean);
       if (vins.length) {
         const { data } = await (supabase as any)
           .from("vehicle_listings")
