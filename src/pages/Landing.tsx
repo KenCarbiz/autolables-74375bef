@@ -1265,15 +1265,37 @@ const TIERS: { name: string; price: string; best: string; tagline: string; featu
   },
 ];
 
+const PRICING_ADDONS: { title: string; body: string }[] = [
+  { title: "Additional rooftops", body: "Per-rooftop pricing with group discounts across a dealer group." },
+  { title: "DMS webhooks & API", body: "Push signed addendums and deal evidence into your DMS where supported." },
+  { title: "Guided onboarding & import", body: "Hands-on setup, branding kit, and inventory/price-feed connection." },
+  { title: "Custom state disclosure rules", body: "Tailor the 50-state disclosure engine to your group's legal playbook." },
+];
+
 const PricingTeaser = ({ waitTo }: { waitTo: string }) => (
-  <section id="pricing" className="scroll-mt-20 border-b border-slate-100 bg-white">
-    <div className="mx-auto max-w-7xl px-6 py-20 lg:px-8">
+  <section id="pricing" className="al-pricing scroll-mt-20 relative overflow-hidden bg-[#07090D] text-white">
+    <style>{`
+      .al-pricing::before{content:"";position:absolute;top:-160px;right:-120px;width:560px;height:560px;background:radial-gradient(circle,rgba(37,99,235,.28),transparent 62%);opacity:.5;pointer-events:none}
+      .al-pricing::after{content:"";position:absolute;bottom:-180px;left:-140px;width:520px;height:520px;background:radial-gradient(circle,rgba(37,99,235,.18),transparent 65%);opacity:.5;pointer-events:none}
+      .al-plan{position:relative;background:radial-gradient(120% 80% at 50% 0%,rgba(37,99,235,.16),transparent 60%),linear-gradient(180deg,#141821,#0C1017);border-radius:22px;padding:30px 26px 26px;display:flex;flex-direction:column;box-shadow:0 0 0 1px rgba(37,99,235,.28) inset,0 22px 60px -18px rgba(37,99,235,.32),0 40px 90px -30px rgba(0,0,0,.7);transition:transform .2s ease,box-shadow .2s ease}
+      .al-plan::before{content:"";position:absolute;inset:-24px;border-radius:34px;z-index:-1;pointer-events:none;background:radial-gradient(50% 45% at 50% 20%,rgba(37,99,235,.30),transparent 70%);filter:blur(18px);opacity:.8}
+      .al-plan::after{content:"";position:absolute;inset:0;border-radius:22px;padding:1.5px;pointer-events:none;background:linear-gradient(180deg,rgba(37,99,235,.75),rgba(37,99,235,.15) 55%,rgba(37,99,235,.35));-webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);-webkit-mask-composite:xor;mask-composite:exclude}
+      .al-plan:hover{transform:translateY(-3px)}
+      .al-plan.pop{background:radial-gradient(130% 90% at 50% 0%,rgba(37,99,235,.30),transparent 62%),linear-gradient(180deg,#181C26,#0C1017);box-shadow:0 0 0 1.5px rgba(37,99,235,.6) inset,0 30px 80px -18px rgba(37,99,235,.5),0 50px 110px -30px rgba(0,0,0,.8);transform:translateY(-6px)}
+      .al-plan.pop::before{background:radial-gradient(55% 50% at 50% 15%,rgba(37,99,235,.50),transparent 70%);opacity:1;filter:blur(22px)}
+      .al-plan.pop::after{background:linear-gradient(180deg,rgba(96,165,250,1),rgba(37,99,235,.35) 55%,rgba(37,99,235,.6))}
+      @media (max-width:900px){.al-plan.pop{transform:none}.al-plan:hover{transform:none}}
+      .al-feats li:not(.hdr){position:relative;padding-left:26px}
+      .al-feats li:not(.hdr)::before{content:"";position:absolute;left:0;top:2px;width:16px;height:16px;border-radius:50%;background:rgba(37,99,235,.15);box-shadow:0 0 0 1px rgba(37,99,235,.45) inset}
+      .al-feats li:not(.hdr)::after{content:"";position:absolute;left:5px;top:6px;width:6px;height:3px;border-left:1.8px solid #60A5FA;border-bottom:1.8px solid #60A5FA;transform:rotate(-45deg)}
+    `}</style>
+    <div className="relative mx-auto max-w-7xl px-6 py-24 lg:px-8">
       <div className="mx-auto max-w-3xl text-center">
-        <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-blue-600">Pricing</p>
-        <h2 className="mt-3 font-barlow-condensed text-4xl font-extrabold tracking-normal text-slate-900 sm:text-5xl">
+        <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-blue-400">Pricing</p>
+        <h2 className="mt-3 font-barlow-condensed text-4xl font-extrabold tracking-normal text-white sm:text-5xl">
           Simple pricing. Three tiers.
         </h2>
-        <p className="mt-5 text-base leading-relaxed text-slate-600">
+        <p className="mt-5 text-base leading-relaxed text-slate-300">
           Per rooftop, per month. Essential is free with any Autocurb.io subscription.
         </p>
         <p className="mt-2 text-sm font-medium text-slate-500">
@@ -1281,67 +1303,91 @@ const PricingTeaser = ({ waitTo }: { waitTo: string }) => (
         </p>
       </div>
 
-      <div className="mx-auto mt-12 grid max-w-6xl gap-5 md:grid-cols-3">
+      <div className="mx-auto mt-16 grid max-w-6xl items-stretch gap-8 md:grid-cols-3">
         {TIERS.map((t) => (
-          <div
-            key={t.name}
-            className={`relative flex flex-col rounded-2xl border bg-white p-6 shadow-sm ${
-              t.featured ? "border-[#2563EB] ring-1 ring-[#2563EB]" : "border-slate-200"
-            }`}
-          >
+          <div key={t.name} className={`al-plan ${t.featured ? "pop" : ""}`}>
             {t.featured && (
-              <span className="absolute -top-3 left-6 rounded-full bg-[#2563EB] px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-white">
-                Most popular
+              <span className="absolute -top-3 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-lg bg-gradient-to-b from-[#3B82F6] to-[#2563EB] px-3.5 py-1.5 text-[10.5px] font-extrabold uppercase tracking-[0.1em] text-white shadow-[0_10px_22px_rgba(37,99,235,.5)]">
+                Most Popular
               </span>
             )}
-            <h3 className="font-barlow-condensed text-xl font-bold tracking-normal text-slate-900">{t.name}</h3>
-            <p className="mt-1 text-[11px] font-bold uppercase tracking-wider text-blue-600">{t.best}</p>
-            <div className="mt-3 flex items-baseline gap-1">
-              <span className="font-barlow-condensed text-4xl font-extrabold tracking-normal text-slate-900 tabular-nums">{t.price}</span>
-              <span className="text-sm font-medium text-slate-500">/mo</span>
+            <h3 className="font-barlow-condensed text-2xl font-bold tracking-normal text-white">{t.name}</h3>
+            <p className="mt-1 text-[11px] font-bold uppercase tracking-wider text-blue-400">{t.best}</p>
+            <div className="mt-4 flex items-baseline gap-1.5">
+              <span className="font-barlow-condensed text-5xl font-extrabold leading-none tracking-normal text-white tabular-nums">{t.price}</span>
+              <span className="text-sm font-semibold text-slate-500">/mo</span>
             </div>
-            <p className="mt-3 text-sm leading-relaxed text-slate-600">{t.tagline}</p>
-            <ul className="mt-4 flex-1 space-y-2 border-t border-slate-100 pt-4">
+            <p className="mt-4 text-sm leading-relaxed text-slate-400">{t.tagline}</p>
+            <ul className="al-feats mt-5 flex-1 space-y-2.5 border-t border-white/10 pt-5">
               {t.features.map((feat) => {
                 const isHeader = feat.endsWith("plus:");
                 return (
-                  <li key={feat} className={`flex items-start gap-2 text-[13px] leading-snug ${isHeader ? "font-semibold text-slate-900" : "text-slate-700"}`}>
-                    {!isHeader && <CheckCircle2 className="mt-0.5 h-4 w-4 flex-shrink-0 text-emerald-500" />}
-                    <span className={isHeader ? "pt-0.5" : ""}>{feat}</span>
+                  <li key={feat} className={`${isHeader ? "hdr font-semibold text-white" : "text-[13px] leading-snug text-slate-200"}`}>
+                    {feat}
                   </li>
                 );
               })}
             </ul>
-            <div className="mt-6 pt-2">
-              {t.featured ? (
-                <Link
-                  to={waitTo}
-                  className="inline-flex h-10 w-full items-center justify-center gap-1.5 rounded-full bg-[#2563EB] px-4 text-sm font-semibold text-white hover:bg-[#1D4ED8]"
-                >
-                  Request Early Access
-                  <ArrowRight className="h-3.5 w-3.5" />
-                </Link>
-              ) : (
-                <Link
-                  to={waitTo}
-                  className="inline-flex h-10 w-full items-center justify-center gap-1.5 rounded-full border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 hover:bg-slate-50"
-                >
-                  Request Early Access
-                </Link>
-              )}
-            </div>
+            <Link
+              to={waitTo}
+              className={`mt-6 inline-flex h-11 w-full items-center justify-center gap-1.5 rounded-[11px] text-sm font-bold transition ${
+                t.featured
+                  ? "bg-gradient-to-b from-[#3B82F6] to-[#2563EB] text-white shadow-[0_14px_30px_-10px_rgba(37,99,235,.6)] hover:brightness-110"
+                  : "border border-white/15 text-slate-200 hover:bg-white/5"
+              }`}
+            >
+              Request Early Access
+              {t.featured && <ArrowRight className="h-3.5 w-3.5" />}
+            </Link>
           </div>
         ))}
       </div>
 
-      <div className="mt-10 flex flex-wrap items-center justify-center gap-5">
+      <div className="mx-auto mt-10 flex max-w-6xl flex-col gap-6 rounded-2xl border border-white/10 bg-gradient-to-b from-white/[0.06] to-white/[0.02] p-7 sm:flex-row sm:items-center sm:justify-between">
+        <div className="max-w-2xl">
+          <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-violet-400">Full Auto platform</p>
+          <h3 className="mt-1.5 font-barlow-condensed text-2xl font-bold tracking-normal text-white">Bundle AutoLabels with the Auto suite</h3>
+          <p className="mt-2 text-sm leading-relaxed text-slate-400">
+            Run AutoLabels alongside AutoCurb (trade &amp; retention) and AutoFilm (video sales &amp; service) on one shared
+            dealer profile. Essential is included free with any Autocurb.io subscription.
+          </p>
+          <p className="mt-3 text-sm font-semibold text-slate-300">One login · shared inventory · group pricing available</p>
+        </div>
+        <div className="shrink-0 text-center sm:text-right">
+          <Link
+            to={waitTo}
+            className="inline-flex h-11 items-center justify-center gap-1.5 rounded-full bg-white px-6 text-sm font-bold text-slate-900 hover:bg-slate-100"
+          >
+            Talk to us <ArrowRight className="h-4 w-4" />
+          </Link>
+          <p className="mt-2 text-[11px] text-slate-500">Full AutoCurb &amp; AutoFilm features require those products active.</p>
+        </div>
+      </div>
+
+      <div className="mx-auto mt-14 max-w-6xl">
+        <h3 className="font-barlow-condensed text-xl font-bold tracking-normal text-white">Add-ons</h3>
+        <div className="mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          {PRICING_ADDONS.map((a) => (
+            <div key={a.title} className="rounded-2xl border border-white/10 bg-white/[0.03] p-5">
+              <h4 className="text-sm font-bold text-white">{a.title}</h4>
+              <p className="mt-1.5 text-[13px] leading-relaxed text-slate-400">{a.body}</p>
+            </div>
+          ))}
+        </div>
+        <p className="mt-6 text-[12px] leading-relaxed text-slate-500">
+          All plans per rooftop, month-to-month. Advertised-price monitoring, DMS/OEM integrations, and high-volume usage
+          may have setup or usage fees. No per-seat charges for standard dealership users.
+        </p>
+      </div>
+
+      <div className="mt-12 flex flex-wrap items-center justify-center gap-5">
         <Link
           to={DEMO_TO}
-          className="inline-flex h-11 items-center gap-2 rounded-full border border-slate-200 bg-white px-6 text-sm font-semibold text-slate-700 hover:border-slate-300 hover:bg-slate-50"
+          className="inline-flex h-11 items-center gap-2 rounded-full border border-white/15 bg-white/5 px-6 text-sm font-semibold text-white hover:bg-white/10"
         >
           See a live Vehicle Passport
         </Link>
-        <Link to={waitTo} className="inline-flex items-center gap-1.5 py-2 text-sm font-semibold text-[#2563EB] hover:underline">
+        <Link to={waitTo} className="inline-flex items-center gap-1.5 py-2 text-sm font-semibold text-blue-400 hover:underline">
           Request early access <ArrowRight className="h-4 w-4" />
         </Link>
       </div>
