@@ -215,14 +215,15 @@ const Hero = ({ waitTo }: { waitTo: string }) => (
           FTC warned 97 dealer groups &mdash; March 2026
         </div>
         <h1 className="font-barlow-condensed text-[44px] font-extrabold uppercase leading-[0.98] tracking-[0.01em] text-slate-900 sm:text-7xl">
-          The FTC doesn&rsquo;t care if it was an{" "}
-          <span className="text-blue-600">accident.</span>
+          The field is level.{" "}
+          <span className="text-blue-600">Now you win on trust.</span>
         </h1>
         <p className="mt-6 max-w-xl text-base leading-relaxed text-slate-600 sm:text-lg">
-          One website pricing mistake can trigger an investigation, customer complaints, chargebacks,
-          and a class action. AutoLabels turns your live inventory into print-ready window stickers,
-          FTC-aligned addendums, QR Vehicle Passports, and signed disclosures &mdash; so every VIN
-          gets one clean record, from website price to lot sticker to customer signature.
+          The FTC ended the pricing games &mdash; every store has to advertise straight now. That is
+          your opening. AutoLabels gives every vehicle a branded QR Vehicle Passport that answers a
+          shopper&rsquo;s questions before they ask, keeps them in your ecosystem, and turns every scan
+          into insight your team can act on &mdash; while one tamper-evident record per VIN, from
+          website price to signature, keeps you covered.
         </p>
         <div className="mt-8 flex flex-col items-start gap-3 sm:flex-row">
           <Link
@@ -241,12 +242,12 @@ const Hero = ({ waitTo }: { waitTo: string }) => (
         </div>
         <p className="mt-3 text-xs text-slate-500">Free to join · no card required · locks early-access pricing.</p>
         <div className="mt-8 grid grid-cols-1 gap-x-6 gap-y-3 sm:grid-cols-2">
-          <HeroCheck iconSrc={landingIcons.websitePriceMonitoring} label="Website price monitoring" />
-          <HeroCheck iconSrc={landingIcons.ftcAlignedAddendums} label="FTC-aligned addendums" />
-          <HeroCheck iconSrc={landingIcons.windowStickersVehiclePassports} label="Window stickers + Vehicle Passports" />
+          <HeroCheck iconSrc={landingIcons.windowStickersVehiclePassports} label="QR Vehicle Passport per VIN" />
+          <HeroCheck iconSrc={landingIcons.close} label="Every scan becomes a routed lead" />
           <HeroCheck iconSrc={landingIcons.customerDigitalSignatures} label="Customer digital signatures" />
-          <HeroCheck iconSrc={landingIcons.tamperEvidentAuditTrail} label="Tamper-evident audit trail" />
-          <HeroCheck iconSrc={landingIcons.fiftyStateDisclosureEngine} label="50-state disclosure engine" />
+          <HeroCheck iconSrc={landingIcons.websitePriceMonitoring} label="Advertised-price reconciliation" />
+          <HeroCheck iconSrc={landingIcons.ftcAlignedAddendums} label="FTC-aligned addendums" />
+          <HeroCheck iconSrc={landingIcons.tamperEvidentAuditTrail} label="Tamper-evident record per VIN" />
         </div>
       </div>
 
