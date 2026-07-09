@@ -219,10 +219,11 @@ const Hero = ({ waitTo }: { waitTo: string }) => (
           <span className="text-blue-600">Now you win on trust.</span>
         </h1>
         <p className="mt-6 max-w-xl text-base leading-relaxed text-slate-600 sm:text-lg">
-          One website pricing mistake can trigger an investigation, customer complaints, chargebacks,
-          and a class action. AutoLabels turns your live inventory into print-ready window stickers,
-          FTC-aligned addendums, QR Vehicle Passports, and signed disclosures &mdash; so every VIN
-          gets one clean record, from website price to lot sticker to customer signature.
+          The FTC ended the pricing games &mdash; every store has to advertise straight now. That is
+          your opening. AutoLabels gives every vehicle a branded QR Vehicle Passport that answers a
+          shopper&rsquo;s questions before they ask, keeps them in your ecosystem, and turns every scan
+          into insight your team can act on &mdash; while one tamper-evident record per VIN, from
+          website price to signature, keeps you covered.
         </p>
         <div className="mt-8 flex flex-col items-start gap-3 sm:flex-row">
           <Link
