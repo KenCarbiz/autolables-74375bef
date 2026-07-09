@@ -215,8 +215,8 @@ const Hero = ({ waitTo }: { waitTo: string }) => (
           FTC warned 97 dealer groups &mdash; March 2026
         </div>
         <h1 className="font-barlow-condensed text-[44px] font-extrabold uppercase leading-[0.98] tracking-[0.01em] text-slate-900 sm:text-7xl">
-          The FTC doesn&rsquo;t care if it was an{" "}
-          <span className="text-blue-600">accident.</span>
+          The field is level.{" "}
+          <span className="text-blue-600">Now you win on trust.</span>
         </h1>
         <p className="mt-6 max-w-xl text-base leading-relaxed text-slate-600 sm:text-lg">
           One website pricing mistake can trigger an investigation, customer complaints, chargebacks,
