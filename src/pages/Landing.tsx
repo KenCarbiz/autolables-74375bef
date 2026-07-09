@@ -242,12 +242,12 @@ const Hero = ({ waitTo }: { waitTo: string }) => (
         </div>
         <p className="mt-3 text-xs text-slate-500">Free to join · no card required · locks early-access pricing.</p>
         <div className="mt-8 grid grid-cols-1 gap-x-6 gap-y-3 sm:grid-cols-2">
-          <HeroCheck iconSrc={landingIcons.websitePriceMonitoring} label="Website price monitoring" />
-          <HeroCheck iconSrc={landingIcons.ftcAlignedAddendums} label="FTC-aligned addendums" />
-          <HeroCheck iconSrc={landingIcons.windowStickersVehiclePassports} label="Window stickers + Vehicle Passports" />
+          <HeroCheck iconSrc={landingIcons.windowStickersVehiclePassports} label="QR Vehicle Passport per VIN" />
+          <HeroCheck iconSrc={landingIcons.close} label="Every scan becomes a routed lead" />
           <HeroCheck iconSrc={landingIcons.customerDigitalSignatures} label="Customer digital signatures" />
-          <HeroCheck iconSrc={landingIcons.tamperEvidentAuditTrail} label="Tamper-evident audit trail" />
-          <HeroCheck iconSrc={landingIcons.fiftyStateDisclosureEngine} label="50-state disclosure engine" />
+          <HeroCheck iconSrc={landingIcons.websitePriceMonitoring} label="Advertised-price reconciliation" />
+          <HeroCheck iconSrc={landingIcons.ftcAlignedAddendums} label="FTC-aligned addendums" />
+          <HeroCheck iconSrc={landingIcons.tamperEvidentAuditTrail} label="Tamper-evident record per VIN" />
         </div>
       </div>
 
