@@ -258,6 +258,43 @@ const Hero = ({ waitTo }: { waitTo: string }) => (
   </section>
 );
 
+const CINEMATIC_LOOP = "https://d8j0ntlcm91z4.cloudfront.net/user_3GLKFn1j1KOsqeocvS6eF2PS9bx/hf_20260711_190320_30ba287a-3966-4575-9504-aec19150e512.mp4";
+
+const CinematicManifesto = ({ waitTo }: { waitTo: string }) => (
+  <section className="relative isolate overflow-hidden bg-[#07090D] text-white">
+    <video
+      className="absolute inset-0 h-full w-full object-cover opacity-45"
+      src={CINEMATIC_LOOP}
+      autoPlay
+      muted
+      loop
+      playsInline
+      preload="metadata"
+      aria-hidden
+    />
+    <div className="absolute inset-0 bg-gradient-to-b from-[#07090D]/85 via-[#07090D]/55 to-[#07090D]/90" aria-hidden />
+    <div className="relative mx-auto max-w-5xl px-6 py-28 text-center lg:py-36">
+      <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-blue-400">The field just leveled &mdash; 2026</p>
+      <h2 className="mt-4 font-barlow-condensed text-4xl font-extrabold uppercase leading-[0.98] tracking-tight text-white sm:text-6xl">
+        When everyone plays fair,<br className="hidden sm:block" /> the <span className="text-blue-400">experience</span> wins.
+      </h2>
+      <p className="mx-auto mt-6 max-w-2xl text-base leading-relaxed text-slate-300 sm:text-lg">
+        The FTC ended the pricing games &mdash; every store has to advertise straight now. The dealers who win from here earn
+        trust: a Vehicle Passport on every car that answers the shopper&rsquo;s questions before they ask, keeps them in your
+        ecosystem, and turns every scan into insight your team can act on.
+      </p>
+      <div className="mt-9 flex flex-wrap items-center justify-center gap-4">
+        <Link to={waitTo} className="inline-flex h-12 items-center gap-2 rounded-full bg-[#2563EB] px-6 text-sm font-semibold text-white hover:bg-[#1D4ED8]">
+          Request Early Access <ArrowRight className="h-4 w-4" />
+        </Link>
+        <a href="#how" className="inline-flex h-12 items-center rounded-full border border-white/20 bg-white/5 px-6 text-sm font-semibold text-white hover:bg-white/10">
+          See how it works
+        </a>
+      </div>
+    </div>
+  </section>
+);
+
 const HeroCheck = ({ iconSrc, label }: { iconSrc: string; label: string }) => (
   <div className="flex items-center gap-3 text-sm text-slate-700">
     <LandingIcon src={iconSrc} alt={label} className="h-14 w-14" />
