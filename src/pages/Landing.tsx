@@ -91,6 +91,7 @@ const Landing = () => {
       <Nav user={user} waitTo={waitTo} />
       <main>
         <Hero waitTo={waitTo} />
+        <CinematicManifesto waitTo={waitTo} />
         <WhyNow />
         <TrustBand />
         <Risk />
