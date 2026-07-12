@@ -199,11 +199,23 @@ const Nav = ({ user, waitTo }: { user: unknown; waitTo: string }) => {
 
 const Hero = ({ waitTo }: { waitTo: string }) => (
   <section className="relative isolate overflow-hidden border-b border-slate-100 bg-white">
+    {/* Ambient looping video behind the copy column — masked to a soft glow so
+        it never fights the type. Reduced-motion users see the static poster. */}
     <div
       aria-hidden
-      className="pointer-events-none absolute inset-x-0 -top-32 -z-10 h-[620px] [mask-image:radial-gradient(60%_60%_at_55%_30%,#000_40%,transparent_85%)]"
+      className="pointer-events-none absolute inset-x-0 -top-32 -z-10 h-[720px] [mask-image:radial-gradient(60%_60%_at_45%_35%,#000_35%,transparent_82%)]"
     >
-      <div className="absolute inset-0 bg-[radial-gradient(55%_50%_at_60%_25%,rgba(37,99,235,0.12),transparent_70%)]" />
+      <video
+        className="absolute inset-0 h-full w-full object-cover opacity-[0.15] motion-reduce:hidden"
+        src="/hero-loop.mp4"
+        poster="/passport-scan-poster.png"
+        autoPlay
+        muted
+        loop
+        playsInline
+        preload="metadata"
+      />
+      <div className="absolute inset-0 bg-[radial-gradient(55%_50%_at_60%_25%,rgba(37,99,235,0.10),transparent_70%)]" />
     </div>
 
     <div className="mx-auto grid max-w-7xl items-center gap-12 px-6 pb-20 pt-16 lg:grid-cols-2 lg:gap-12 lg:px-8 lg:pb-24 lg:pt-20">
@@ -216,15 +228,13 @@ const Hero = ({ waitTo }: { waitTo: string }) => (
           FTC warned 97 dealer groups &mdash; March 2026
         </div>
         <h1 className="font-barlow-condensed text-[44px] font-extrabold uppercase leading-[0.98] tracking-[0.01em] text-slate-900 sm:text-7xl">
-          The field is level.{" "}
+          The playing field just got leveled.{" "}
           <span className="text-blue-600">Now you win on trust.</span>
         </h1>
         <p className="mt-6 max-w-xl text-base leading-relaxed text-slate-600 sm:text-lg">
-          The FTC ended the pricing games &mdash; every store has to advertise straight now. That is
-          your opening. AutoLabels gives every vehicle a branded QR Vehicle Passport that answers a
-          shopper&rsquo;s questions before they ask, keeps them in your ecosystem, and turns every scan
-          into insight your team can act on &mdash; while one tamper-evident record per VIN, from
-          website price to signature, keeps you covered.
+          The FTC&rsquo;s crackdown wiped out the pricing games your competitors hid behind &mdash; so
+          the dealer with the cleanest, most transparent story on every VIN takes the deal.
+          AutoLabels makes that dealer you.
         </p>
         <div className="mt-8 flex flex-col items-start gap-3 sm:flex-row">
           <Link
