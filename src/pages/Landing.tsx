@@ -91,6 +91,7 @@ const Landing = () => {
       <Nav user={user} waitTo={waitTo} />
       <main>
         <Hero waitTo={waitTo} />
+        <PassportShowcase waitTo={waitTo} />
         <CinematicManifesto waitTo={waitTo} />
         <WhyNow />
         <TrustBand />
@@ -102,6 +103,7 @@ const Landing = () => {
         <WhereWeFit />
         <SocialProof />
         <FAQ />
+        <AutoSuite waitTo={waitTo} />
         <PricingTeaser waitTo={waitTo} />
         <FinalCTA waitTo={waitTo} />
       </main>
