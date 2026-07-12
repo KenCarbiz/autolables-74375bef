@@ -1242,7 +1242,7 @@ const WhyNow = () => (
           </span>
           <div>
             <p className="font-display text-lg font-bold leading-snug text-white sm:text-xl">
-              In March 2026, the FTC warned 97 dealer groups about deceptive pricing.
+              The FTC crackdown didn&rsquo;t just add rules &mdash; it erased the edge your competitors sold on.
               <a
                 href="https://www.ftc.gov/news-events/news/press-releases/2026/03/ftc-warns-97-auto-dealership-groups-about-deceptive-pricing"
                 target="_blank"
@@ -1253,8 +1253,7 @@ const WhyNow = () => (
               </a>
             </p>
             <p className="mt-1.5 text-sm leading-relaxed text-white/70">
-              Enforcement reviews often start with a website crawl, not a customer complaint &mdash; comparing
-              your advertised price to the deal. AutoLabels reconciles the two before that gap becomes a problem.
+              In March 2026 the FTC warned 97 dealer groups about deceptive pricing &mdash; and those reviews start with a website crawl, not a customer complaint. Hidden add-ons and site-vs-lot price games are done. The dealers who win now win on trust, and leave a record to prove it.
             </p>
           </div>
         </div>
