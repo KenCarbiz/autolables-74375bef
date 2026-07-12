@@ -472,16 +472,17 @@ const FileStat = ({ label, value, tone }: { label: string; value: string; tone?:
   </div>
 );
 
-// Two-pillar hero visual: the compliance defense file and the auto-built
-// vehicle file, on a slow auto-advance that pauses on hover or manual select.
+// Three-pillar hero visual: the shopper-facing Vehicle Passport (the win),
+// the per-VIN defense file (the coverage), and the auto-built vehicle file
+// (the ops story). Auto-advances slowly, pauses on hover/focus/manual select.
 const HERO_VIEWS = [
-  { id: "compliance", label: "Compliance file" },
+  { id: "passport", label: "Vehicle Passport" },
+  { id: "compliance", label: "VIN defense file" },
   { id: "vehicle", label: "Vehicle file" },
 ];
+
 const HeroVisual = () => {
   const [view, setView] = useState(0);
-  // Auto-advance stops permanently after a manual selection, pauses on
-  // hover/focus, and never runs for reduced-motion users.
   const [auto, setAuto] = useState(true);
   const [paused, setPaused] = useState(false);
   useEffect(() => {
@@ -509,15 +510,49 @@ const HeroVisual = () => {
           </button>
         ))}
       </div>
-      {/* Both cards stay mounted in one grid cell so the container sizes to
-          the tallest card — the 7s swap can never shift the page (CLS 0). */}
       <div className="grid">
-        <div className={`col-start-1 row-start-1 ${view === 0 ? "" : "invisible"}`} aria-hidden={view !== 0}><ComplianceStatusCard /></div>
-        <div className={`col-start-1 row-start-1 ${view === 1 ? "" : "invisible"}`} aria-hidden={view !== 1}><VehicleFileCard /></div>
+        <div className={`col-start-1 row-start-1 ${view === 0 ? "" : "invisible"}`} aria-hidden={view !== 0}><PassportPhoneCard /></div>
+        <div className={`col-start-1 row-start-1 ${view === 1 ? "" : "invisible"}`} aria-hidden={view !== 1}><ComplianceStatusCard /></div>
+        <div className={`col-start-1 row-start-1 ${view === 2 ? "" : "invisible"}`} aria-hidden={view !== 2}><VehicleFileCard /></div>
       </div>
     </div>
   );
 };
+
+// Compact phone-frame preview of the live sample Passport. Uses the real
+// /v/demo?preview=1 route so what the shopper sees is what shows here.
+const PassportPhoneCard = () => (
+  <div className="relative overflow-hidden rounded-2xl border border-slate-200 bg-gradient-to-b from-slate-50 to-white p-6 ring-1 ring-slate-900/[0.04] shadow-[0_2px_4px_-1px_rgba(15,23,42,0.06),0_20px_40px_-12px_rgba(15,23,42,0.16),0_40px_90px_-30px_rgba(11,32,65,0.28)]">
+    <div className="flex items-center justify-between">
+      <div className="flex items-center gap-2.5">
+        <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-[#2563EB] text-white shadow-sm">
+          <QrCode className="h-4 w-4" />
+        </span>
+        <div className="leading-none">
+          <p className="font-display text-[13px] font-black tracking-tight text-slate-900">Vehicle Passport</p>
+          <p className="mt-1 font-mono text-[10px] tracking-tight text-slate-500">Live sample &middot; /v/demo</p>
+        </div>
+      </div>
+      <span className="inline-flex items-center gap-1.5 rounded-full border border-blue-200 bg-blue-50 px-2 py-0.5 text-[10px] font-semibold tracking-wide text-[#1d4ed8]">
+        <BadgeCheck className="h-3 w-3" /> Great Buy
+      </span>
+    </div>
+    <div className="mt-5 flex justify-center">
+      <div className="relative w-[240px] rounded-[36px] border border-slate-900/10 bg-slate-900 p-2 shadow-xl">
+        <div className="h-[380px] w-full overflow-hidden rounded-[28px] bg-white">
+          <iframe
+            src={DEMO_TO}
+            title="Live sample Vehicle Passport"
+            loading="lazy"
+            className="h-full w-full origin-top-left scale-[0.62] border-0"
+            style={{ width: "161%", height: "161%" }}
+          />
+        </div>
+      </div>
+    </div>
+    <p className="mt-4 text-center text-[11px] text-slate-500">Scan the sticker &rarr; the whole story opens in their hand.</p>
+  </div>
+);
 
 const StatusRow = ({
   label, sub, mono, chip = "Verified", tone = "emerald",
