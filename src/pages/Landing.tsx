@@ -308,6 +308,257 @@ const CinematicManifesto = ({ waitTo }: { waitTo: string }) => (
   </section>
 );
 
+// ──────────────────────────────────────────────────────────────
+// Passport Showcase — the centerpiece. Left: cinematic slot for a
+// customer-scanning-the-sticker video (poster placeholder for now).
+// Right: the LIVE sample Passport in a phone frame via iframe, slow
+// auto-scroll (paused for reduced-motion). Concrete mechanisms,
+// FTC-aligned language, no fabricated ROI.
+// ──────────────────────────────────────────────────────────────
+
+const PASSPORT_CHIPS = [
+  "Great Price",
+  "Reconditioning Proof",
+  "Recall Checked (live NHTSA)",
+  "Warranty & History",
+  "Verified Documents",
+  "Price Confidence",
+];
+
+const PassportShowcase = ({ waitTo }: { waitTo: string }) => {
+  const iframeRef = React.useRef<HTMLIFrameElement>(null);
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    const iframe = iframeRef.current;
+    if (!iframe) return;
+    let raf = 0;
+    let dir = 1;
+    const tick = () => {
+      try {
+        const win = iframe.contentWindow;
+        const doc = iframe.contentDocument;
+        if (win && doc && doc.body) {
+          const max = doc.body.scrollHeight - win.innerHeight;
+          if (max > 0) {
+            const next = win.scrollY + 0.6 * dir;
+            if (next >= max) dir = -1;
+            else if (next <= 0) dir = 1;
+            win.scrollTo(0, next);
+          }
+        }
+      } catch { /* cross-origin — no-op */ }
+      raf = window.requestAnimationFrame(tick);
+    };
+    const start = window.setTimeout(() => { raf = window.requestAnimationFrame(tick); }, 2500);
+    return () => { window.clearTimeout(start); if (raf) window.cancelAnimationFrame(raf); };
+  }, []);
+
+  return (
+    <section id="passport-showcase" className="scroll-mt-20 border-b border-slate-100 bg-white">
+      <div className="mx-auto max-w-7xl px-6 py-20 lg:px-8 lg:py-24">
+        <div className="mx-auto max-w-3xl text-center">
+          <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-blue-600">The Vehicle Passport</p>
+          <h2 className="mt-3 font-barlow-condensed text-4xl font-extrabold uppercase leading-[0.98] tracking-tight text-slate-900 sm:text-6xl">
+            One QR turns every windshield <span className="text-blue-600">into your best salesperson.</span>
+          </h2>
+          <p className="mt-5 text-base leading-relaxed text-slate-600 sm:text-lg">
+            Scan the sticker and the shopper gets a full digital showroom for that exact VIN &mdash; market pricing,
+            verified warranty, crash-test stars, the factory build sheet, recall status, service history, and every
+            signed document. Not a PDF. A living, per-VIN trust file that keeps selling after the lot goes dark.
+          </p>
+        </div>
+
+        <div className="mx-auto mt-14 grid max-w-6xl items-center gap-8 lg:grid-cols-2 lg:gap-10">
+          {/* LEFT — cinematic video slot (poster placeholder until final MP4 lands). */}
+          <div className="relative overflow-hidden rounded-2xl border border-slate-200 bg-slate-900 shadow-[0_2px_4px_-1px_rgba(15,23,42,0.06),0_20px_40px_-12px_rgba(15,23,42,0.16),0_40px_90px_-30px_rgba(11,32,65,0.28)]">
+            {/* TODO: swap poster for the final cinematic MP4 (customer scanning
+                the window sticker, Passport blooming on their phone). Wire the
+                <video> element below — src, autoPlay, muted, loop, playsInline. */}
+            <video
+              className="block h-auto w-full motion-reduce:hidden"
+              poster="/passport-scan-poster.png"
+              muted
+              loop
+              playsInline
+              preload="none"
+              aria-label="A customer scanning the window sticker and opening the Vehicle Passport"
+            />
+            <img
+              src="/passport-scan-poster.png"
+              alt="A customer scanning the window sticker and opening the Vehicle Passport"
+              className="hidden h-auto w-full motion-reduce:block"
+              loading="lazy"
+            />
+            {/* Subtle play affordance until the video is wired up. */}
+            <div className="pointer-events-none absolute inset-0 flex items-end justify-between p-5">
+              <span className="inline-flex items-center gap-2 rounded-full bg-black/55 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-white backdrop-blur">
+                <span className="flex h-1.5 w-1.5 items-center justify-center">
+                  <span className="absolute h-1.5 w-1.5 animate-ping rounded-full bg-white/70" />
+                  <span className="h-1.5 w-1.5 rounded-full bg-white" />
+                </span>
+                Live scan
+              </span>
+              <span className="inline-flex h-11 w-11 items-center justify-center rounded-full bg-white/90 text-slate-900 shadow-lg">
+                <svg viewBox="0 0 24 24" className="h-4 w-4 fill-current" aria-hidden><path d="M8 5v14l11-7z" /></svg>
+              </span>
+            </div>
+          </div>
+
+          {/* RIGHT — the LIVE product, in a phone-frame mock. */}
+          <div className="flex flex-col items-center">
+            <div className="relative w-full max-w-[320px] rounded-[44px] border border-slate-900/10 bg-slate-900 p-2.5 shadow-[0_2px_4px_-1px_rgba(15,23,42,0.08),0_30px_60px_-18px_rgba(15,23,42,0.28),0_60px_120px_-40px_rgba(11,32,65,0.35)]">
+              <div className="absolute left-1/2 top-3 z-10 h-5 w-24 -translate-x-1/2 rounded-full bg-slate-900" aria-hidden />
+              <div className="h-[560px] w-full overflow-hidden rounded-[34px] bg-white">
+                {/* TODO: if /v/demo?preview=1 stops rendering sample data, fall
+                    back to a tall static screenshot placeholder here. */}
+                <iframe
+                  ref={iframeRef}
+                  src={DEMO_TO}
+                  title="Live sample Vehicle Passport"
+                  loading="lazy"
+                  className="h-full w-full border-0"
+                />
+              </div>
+            </div>
+            <p className="mt-4 text-center text-sm text-slate-500">
+              Scan on the lot. The whole story opens in their hand.
+            </p>
+          </div>
+        </div>
+
+        {/* Inside every Passport — chip row */}
+        <div className="mx-auto mt-14 max-w-5xl">
+          <p className="text-center text-[11px] font-bold uppercase tracking-[0.18em] text-slate-500">
+            Inside every Passport
+          </p>
+          <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
+            {PASSPORT_CHIPS.map((chip) => (
+              <span
+                key={chip}
+                className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-3 py-1.5 text-[12.5px] font-semibold text-slate-700 shadow-sm"
+              >
+                <CheckCircle2 className="h-3.5 w-3.5 text-blue-600" /> {chip}
+              </span>
+            ))}
+          </div>
+          <p className="mt-6 text-center text-sm leading-relaxed text-slate-600">
+            Every scan becomes a routed lead &mdash; to the right salesperson, with timed escalation.
+          </p>
+          <div className="mt-6 flex flex-col items-center justify-center gap-3 sm:flex-row">
+            <Link to={waitTo} className="inline-flex h-11 items-center gap-2 rounded-full bg-[#2563EB] px-5 text-sm font-semibold text-white hover:bg-[#1D4ED8]">
+              Request Early Access <ArrowRight className="h-4 w-4" />
+            </Link>
+            <Link to={DEMO_TO} className="inline-flex items-center gap-1.5 text-sm font-semibold text-[#2563EB] hover:underline">
+              Open the live sample Passport <ArrowRight className="h-3.5 w-3.5" />
+            </Link>
+          </div>
+          <p className="mt-4 text-center text-[12px] text-slate-500">
+            50-state disclosure engine &middot; every claim sourced &middot; FTC-aligned.
+          </p>
+        </div>
+      </div>
+    </section>
+  );
+};
+
+// ──────────────────────────────────────────────────────────────
+// Auto Suite — one dealer profile, three ways to win the customer.
+// Full-bleed navy band with a looping bg video and three color-
+// coded cards. Bundle hook: Essential is free with any Autocurb.io.
+// ──────────────────────────────────────────────────────────────
+
+const AUTO_SUITE_CARDS = [
+  {
+    name: "AutoLabels",
+    accent: "#2563EB",
+    tag: "Trust, priced and disclosed",
+    body: "Window stickers + the QR Vehicle Passport. Trust, priced and disclosed.",
+  },
+  {
+    name: "AutoCurb",
+    accent: "#8B5CF6",
+    tag: "The appraisal starts with you",
+    body: "Instant trade / cash offer on your lot. The appraisal starts with you.",
+  },
+  {
+    name: "AutoFilm",
+    accent: "#F97316",
+    tag: "Trust into the close",
+    body: "Personal video sales & service. The trust carries into the close.",
+  },
+];
+
+const AutoSuite = ({ waitTo }: { waitTo: string }) => (
+  <section id="auto-suite" className="relative isolate scroll-mt-20 overflow-hidden bg-[#07090D] text-white">
+    <video
+      className="absolute inset-0 h-full w-full object-cover opacity-[0.25] motion-reduce:hidden"
+      src="/auto-suite-loop.mp4"
+      poster="/passport-scan-poster.png"
+      autoPlay
+      muted
+      loop
+      playsInline
+      preload="metadata"
+      aria-hidden
+    />
+    <div className="absolute inset-0 bg-gradient-to-b from-[#07090D]/85 via-[#0B2041]/70 to-[#07090D]/95" aria-hidden />
+    <div className="relative mx-auto max-w-7xl px-6 py-24 lg:px-8 lg:py-28">
+      <div className="mx-auto max-w-3xl text-center">
+        <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-blue-400">The Auto suite</p>
+        <h2 className="mt-3 font-barlow-condensed text-4xl font-extrabold uppercase leading-[0.98] tracking-tight text-white sm:text-6xl">
+          One dealer profile. <span className="text-blue-400">Three ways to win the customer.</span>
+        </h2>
+        <p className="mx-auto mt-5 max-w-2xl text-base leading-relaxed text-slate-300 sm:text-lg">
+          AutoLabels earns the trust on every VIN. AutoCurb pulls the trade and the cash-offer lead. AutoFilm closes with
+          personal video. Shared login, shared inventory, one bill.
+        </p>
+      </div>
+
+      <div className="mx-auto mt-14 grid max-w-6xl gap-5 md:grid-cols-3">
+        {AUTO_SUITE_CARDS.map((c) => (
+          <div
+            key={c.name}
+            className="group relative overflow-hidden rounded-2xl border border-white/10 bg-white/[0.04] p-7 backdrop-blur-sm transition-transform duration-200 hover:-translate-y-1"
+            style={{ boxShadow: `0 0 0 1px ${c.accent}22 inset, 0 30px 60px -30px ${c.accent}66` }}
+          >
+            <span
+              aria-hidden
+              className="absolute inset-x-0 top-0 h-0.5"
+              style={{ background: c.accent }}
+            />
+            <p
+              className="text-[11px] font-bold uppercase tracking-[0.18em]"
+              style={{ color: c.accent }}
+            >
+              {c.tag}
+            </p>
+            <h3 className="mt-2 font-barlow-condensed text-3xl font-extrabold uppercase tracking-tight text-white">
+              {c.name}
+            </h3>
+            <p className="mt-3 text-sm leading-relaxed text-slate-300">{c.body}</p>
+          </div>
+        ))}
+      </div>
+
+      <div className="mx-auto mt-12 flex max-w-4xl flex-col items-center justify-center gap-4 rounded-2xl border border-white/10 bg-white/[0.04] px-6 py-6 text-center sm:flex-row sm:justify-between sm:text-left">
+        <p className="text-sm leading-relaxed text-slate-200">
+          <span className="font-bold text-white">Essential is free with any Autocurb.io subscription.</span>{" "}
+          One login &middot; shared inventory &middot; one bill.
+        </p>
+        <Link
+          to={waitTo}
+          className="inline-flex h-11 shrink-0 items-center gap-2 rounded-full bg-white px-5 text-sm font-bold text-slate-900 hover:bg-slate-100"
+        >
+          Talk to us <ArrowRight className="h-4 w-4" />
+        </Link>
+      </div>
+    </div>
+  </section>
+);
+
+
+
 const HeroCheck = ({ iconSrc, label }: { iconSrc: string; label: string }) => (
   <div className="flex items-center gap-3 text-sm text-slate-700">
     <LandingIcon src={iconSrc} alt={label} className="h-14 w-14" />
