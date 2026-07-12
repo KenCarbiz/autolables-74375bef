@@ -117,7 +117,7 @@ const Landing = () => {
 // ──────────────────────────────────────────────────────────────
 
 const NAV_LINKS = [
-  { label: "The risk", href: "#risk" },
+  { label: "The shift", href: "#risk" },
   { label: "Take the power back", href: "#power" },
   { label: "How it works", href: "#how" },
   { label: "Compare", href: "#compare" },
