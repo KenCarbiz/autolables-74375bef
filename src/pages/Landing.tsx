@@ -98,7 +98,7 @@ const Landing = () => {
         <Risk />
         <TakeThePowerBack waitTo={waitTo} />
         <HowItWorks />
-        <StickerStudioGallery />
+        
         <VehiclePassportSection waitTo={waitTo} />
         <WhereWeFit />
         <SocialProof />
