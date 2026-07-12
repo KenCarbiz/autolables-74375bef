@@ -1680,26 +1680,8 @@ const PricingTeaser = ({ waitTo }: { waitTo: string }) => (
         ))}
       </div>
 
-      <div className="mx-auto mt-10 flex max-w-6xl flex-col gap-6 rounded-2xl border border-white/10 bg-gradient-to-b from-white/[0.06] to-white/[0.02] p-7 sm:flex-row sm:items-center sm:justify-between">
-        <div className="max-w-2xl">
-          <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-violet-400">Full Auto platform</p>
-          <h3 className="mt-1.5 font-barlow-condensed text-2xl font-bold tracking-normal text-white">Bundle AutoLabels with the Auto suite</h3>
-          <p className="mt-2 text-sm leading-relaxed text-slate-400">
-            Run AutoLabels alongside AutoCurb (trade &amp; retention) and AutoFilm (video sales &amp; service) on one shared
-            dealer profile. Essential is included free with any Autocurb.io subscription.
-          </p>
-          <p className="mt-3 text-sm font-semibold text-slate-300">One login · shared inventory · group pricing available</p>
-        </div>
-        <div className="shrink-0 text-center sm:text-right">
-          <Link
-            to={waitTo}
-            className="inline-flex h-11 items-center justify-center gap-1.5 rounded-full bg-white px-6 text-sm font-bold text-slate-900 hover:bg-slate-100"
-          >
-            Talk to us <ArrowRight className="h-4 w-4" />
-          </Link>
-          <p className="mt-2 text-[11px] text-slate-500">Full AutoCurb &amp; AutoFilm features require those products active.</p>
-        </div>
-      </div>
+
+
 
       <div className="mx-auto mt-14 max-w-6xl">
         <h3 className="font-barlow-condensed text-xl font-bold tracking-normal text-white">Add-ons</h3>
