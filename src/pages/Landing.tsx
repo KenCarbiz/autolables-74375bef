@@ -928,12 +928,12 @@ const HowItWorks = () => (
   <section id="how" className="scroll-mt-20 border-b border-slate-100 bg-white">
     <div className="mx-auto max-w-7xl px-6 py-20 lg:px-8">
       <div className="mx-auto max-w-3xl text-center">
-        <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-blue-600">How it works</p>
+        <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-blue-600">What it does</p>
         <h2 className="mt-3 font-barlow-condensed text-4xl font-extrabold tracking-normal text-slate-900 sm:text-5xl">
-          Four verbs. One platform.
+          Everything a clean deal needs &mdash; from the lot to the lawsuit that never happens.
         </h2>
         <p className="mt-5 text-base leading-relaxed text-slate-600">
-          The product is built around four actions. That&rsquo;s it.
+          Four verbs run the whole platform: Decode the VIN, Stick the right sticker, get it Signed, and Close with the data. Nothing prints until the car is truly ready.
         </p>
       </div>
 
@@ -942,35 +942,57 @@ const HowItWorks = () => (
           num="01"
           iconSrc={landingIcons.decode}
           title="Decode"
-          body="VIN to a decoded spec sheet in under a second via NHTSA — year, make, model, trim, and standard equipment, auto-filled."
+          body="VIN to vehicle file &mdash; year, make, model, trim, and standard equipment auto-filled from NHTSA in under a second."
         />
         <NumberedCard
           num="02"
           iconSrc={landingIcons.stick}
           title="Stick"
-          body="Build an FTC-aligned dealer addendum — products, pricing, disclosures, and your state's doc fee — audit-ready in under a minute."
+          body="The right sticker and addendum for the car &mdash; products, pricing, disclosures, and your state&rsquo;s doc fee, audit-ready in under a minute."
         />
         <NumberedCard
           num="03"
           iconSrc={landingIcons.sign}
           title="Sign"
-          body="Customer scans a QR, signs on their phone, and every action lands in your audit log. No paper, no chasing signatures."
+          body="Advertised-price reconciliation and e-signature on the customer&rsquo;s phone. Every action lands in the audit log."
         />
         <NumberedCard
           num="04"
           iconSrc={landingIcons.close}
           title="Close"
-          body="Every scan becomes a lead. Every addendum becomes data. See what's selling, what's stuck, and what's closing — live."
+          body="The buying case, the routed lead, and live data on what&rsquo;s selling, what&rsquo;s stuck, and what&rsquo;s closing."
         />
       </div>
 
-      {/* From arrival to windshield — the self-aware get-ready pipeline,
-          folded in here so the how-it-works story is told exactly once. */}
-      <div className="mx-auto mt-16 max-w-6xl">
+      {/* Sticker Studio — tangible artifact + template gallery, folded in
+          so the &quot;we print a real product&quot; proof lives inside the spine. */}
+      <div id="studio" className="mx-auto mt-20 max-w-6xl scroll-mt-20">
+        <p className="text-center text-[11px] font-bold uppercase tracking-[0.18em] text-blue-600">Sticker Studio</p>
+        <p className="mx-auto mt-2 max-w-2xl text-center text-sm leading-relaxed text-slate-600">
+          A growing library of 8.5&times;11 window stickers and 4.5&times;11 addendums. Each carries your branding, QR, pricing, disclosures, and the Vehicle Passport link &mdash; and locks the moment it&rsquo;s signed.
+        </p>
+        <div className="mt-8 grid items-center gap-10 lg:grid-cols-[340px_minmax(0,1fr)]">
+          <StickerMock />
+          <div className="grid gap-5 sm:grid-cols-2">
+            {TEMPLATES.map((t) => (
+              <Card key={t.title} icon={t.icon} title={t.title}>{t.body}</Card>
+            ))}
+          </div>
+        </div>
+        <div className="mt-10 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          {PRINT_SPECS.map((s) => (
+            <div key={s} className="flex items-center gap-2.5 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-700">
+              <Check className="h-4 w-4 flex-shrink-0 text-blue-600" /> {s}
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* From arrival to windshield — operational-credibility beat. */}
+      <div className="mx-auto mt-20 max-w-6xl">
         <p className="text-center text-[11px] font-bold uppercase tracking-[0.18em] text-blue-600">From arrival to windshield</p>
         <p className="mx-auto mt-2 max-w-2xl text-center text-sm leading-relaxed text-slate-600">
-          Point AutoLabels at your inventory &mdash; a VDP URL, a VIN, or your nightly feed &mdash; and
-          nothing prints until the work is signed off.
+          Point AutoLabels at your inventory &mdash; a VDP URL, a VIN, or your nightly feed &mdash; and nothing prints until the work is signed off.
         </p>
         <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
           {PIPELINE.map((s) => (
