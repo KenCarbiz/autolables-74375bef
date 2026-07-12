@@ -208,7 +208,7 @@ const Hero = ({ waitTo }: { waitTo: string }) => (
       className="pointer-events-none absolute inset-x-0 -top-32 -z-10 h-[720px] [mask-image:radial-gradient(60%_60%_at_45%_35%,#000_35%,transparent_82%)]"
     >
       <video
-        className="absolute inset-0 h-full w-full object-cover opacity-[0.15] motion-reduce:hidden"
+        className="absolute inset-0 h-full w-full object-cover opacity-[0.3] motion-reduce:hidden"
         src="/hero-loop.mp4"
         poster="/passport-scan-poster.png"
         autoPlay
@@ -217,7 +217,7 @@ const Hero = ({ waitTo }: { waitTo: string }) => (
         playsInline
         preload="metadata"
       />
-      <div className="absolute inset-0 bg-[radial-gradient(55%_50%_at_60%_25%,rgba(37,99,235,0.10),transparent_70%)]" />
+      <div className="absolute inset-0 bg-[radial-gradient(55%_50%_at_60%_25%,rgba(37,99,235,0.20),transparent_70%)]" />
     </div>
 
     <div className="mx-auto grid max-w-7xl items-center gap-12 px-6 pb-20 pt-16 lg:grid-cols-2 lg:gap-12 lg:px-8 lg:pb-24 lg:pt-20">
@@ -492,7 +492,7 @@ const AUTO_SUITE_CARDS = [
 const AutoSuite = ({ waitTo }: { waitTo: string }) => (
   <section id="auto-suite" className="relative isolate scroll-mt-20 overflow-hidden bg-[#07090D] text-white">
     <video
-      className="absolute inset-0 h-full w-full object-cover opacity-[0.25] motion-reduce:hidden"
+      className="absolute inset-0 h-full w-full object-cover opacity-[0.5] motion-reduce:hidden"
       src="/auto-suite-loop.mp4"
       poster="/passport-scan-poster.png"
       autoPlay
@@ -502,7 +502,7 @@ const AutoSuite = ({ waitTo }: { waitTo: string }) => (
       preload="metadata"
       aria-hidden
     />
-    <div className="absolute inset-0 bg-gradient-to-b from-[#07090D]/85 via-[#0B2041]/70 to-[#07090D]/95" aria-hidden />
+    <div className="absolute inset-0 bg-gradient-to-b from-[#07090D]/75 via-[#0B2041]/60 to-[#07090D]/85" aria-hidden />
     <div className="relative mx-auto max-w-7xl px-6 py-24 lg:px-8 lg:py-28">
       <div className="mx-auto max-w-3xl text-center">
         <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-blue-400">The Auto suite</p>
@@ -533,8 +533,12 @@ const AutoSuite = ({ waitTo }: { waitTo: string }) => (
             >
               {c.tag}
             </p>
-            <h3 className="mt-2 font-barlow-condensed text-3xl font-extrabold uppercase tracking-tight text-white">
-              {c.name}
+            <h3
+              className="mt-2 text-[30px] font-extrabold leading-none tracking-[-0.02em] text-white"
+              style={{ fontFamily: "'Inter', system-ui, sans-serif" }}
+            >
+              <span style={{ color: c.accent }}>auto</span>
+              <span>({c.name.replace("Auto", "").toUpperCase()})</span>
             </h3>
             <p className="mt-3 text-sm leading-relaxed text-slate-300">{c.body}</p>
           </div>
@@ -1660,9 +1664,9 @@ const PricingTeaser = ({ waitTo }: { waitTo: string }) => (
 
       <div className="mx-auto mt-16 grid max-w-6xl items-stretch gap-8 md:grid-cols-3">
         {TIERS.map((t) => (
-          <div key={t.name} className={`al-plan ${t.featured ? "pop" : ""}`}>
+          <div key={t.name} className={`al-plan ${t.featured ? "pop overflow-visible" : ""}`}>
             {t.featured && (
-              <span className="absolute -top-3 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-lg bg-gradient-to-b from-[#3B82F6] to-[#2563EB] px-3.5 py-1.5 text-[10.5px] font-extrabold uppercase tracking-[0.1em] text-white shadow-[0_10px_22px_rgba(37,99,235,.5)]">
+              <span className="absolute -top-3 left-1/2 z-20 -translate-x-1/2 whitespace-nowrap rounded-lg bg-gradient-to-b from-[#3B82F6] to-[#2563EB] px-3.5 py-1.5 text-[10.5px] font-extrabold uppercase tracking-[0.1em] text-white shadow-[0_10px_22px_rgba(37,99,235,.5)]">
                 Most Popular
               </span>
             )}
