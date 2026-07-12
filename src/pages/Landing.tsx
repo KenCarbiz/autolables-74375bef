@@ -869,56 +869,53 @@ const TrustBand = () => (
 );
 
 // ──────────────────────────────────────────────────────────────
-// Risk — the cost of getting labels wrong. No fabricated dollars.
+// The Shift — old game vs new game. The crackdown erased the
+// edges competitors sold on. That's the dealer's opening.
 // ──────────────────────────────────────────────────────────────
+
+const SHIFT_ROWS: { old: string; now: string }[] = [
+  { old: "Hidden add-ons", now: "Signed, optional election" },
+  { old: "Site-vs-lot price gaps", now: "Reconciled at signing" },
+  { old: "&ldquo;Trust me&rdquo;", now: "A record you can hand a regulator" },
+];
 
 const Risk = () => (
   <section id="risk" className="scroll-mt-20 border-b border-slate-100 bg-white">
     <div className="mx-auto max-w-7xl px-6 py-20 lg:px-8">
       <div className="mx-auto max-w-3xl text-center">
-        <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-blue-600">The risk</p>
+        <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-blue-600">The shift</p>
         <h2 className="mt-3 font-barlow-condensed text-4xl font-extrabold tracking-normal text-slate-900 sm:text-5xl">
-          One bad label can cost you the lot.
+          The field just leveled. Now the trust wins.
         </h2>
         <p className="mt-5 text-lg leading-relaxed text-slate-600">
-          Regulators, state AGs, and plaintiffs&rsquo; attorneys are actively comparing your
-          advertised price to your deal jacket — and the consequences land on the dealership, not
-          the ad agency that built the site.
+          The FTC crackdown didn&rsquo;t just add rules &mdash; it erased the edges your competitors were selling on.
+          Hidden add-ons, site-vs-lot price gaps, and &ldquo;trust me&rdquo; closes are done. What&rsquo;s left is
+          experience, service, and a clean paper trail &mdash; the things good dealers were doing anyway.
         </p>
       </div>
 
-      <div className="mx-auto mt-12 grid max-w-6xl gap-5 sm:grid-cols-2 lg:grid-cols-4">
-        <Card iconSrc={landingIcons.ftcEnforcement} title="FTC enforcement">
-          FTC Act §5 and 16 CFR Part 455 target undisclosed add-ons, bait pricing, and missing consent.
-          Investigations begin with a website crawl, not a customer complaint.
-        </Card>
-        <Card iconSrc={landingIcons.advertisedPriceLiability} title="Advertised-price liability">
-          Selling a vehicle for more than the advertised price exposes the dealer to refunds,
-          rescission, and state UDAP penalties — even when the mismatch was a typo.
-        </Card>
-        <Card iconSrc={landingIcons.stateAgAudits} title="State AG audits">
-          California (SB 766, eff. Oct 2026), Massachusetts, New York, and Maryland have active
-          dealer enforcement units that pull records on demand.
-        </Card>
-        <Card iconSrc={landingIcons.recallExposure} title="Recall exposure">
-          Selling a new vehicle under an open recall is federally prohibited, and used-car recall
-          disclosure is a growing FTC and state-AG target. AutoLabels checks NHTSA campaigns at
-          listing, re-checks at signing, and hard-stops on do-not-drive orders.
-        </Card>
+      <div className="mx-auto mt-12 max-w-4xl overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-[0_20px_50px_-30px_rgba(11,32,65,0.25)]">
+        <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3 border-b border-slate-100 bg-slate-50/60 px-5 py-3">
+          <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-slate-500">Old game</p>
+          <span className="text-slate-300">&rarr;</span>
+          <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-blue-600">New game</p>
+        </div>
+        {SHIFT_ROWS.map((r, i) => (
+          <div
+            key={r.old}
+            className={`grid grid-cols-[1fr_auto_1fr] items-center gap-3 px-5 py-4 ${i < SHIFT_ROWS.length - 1 ? "border-b border-slate-100" : ""}`}
+          >
+            <p className="font-mono text-sm text-slate-500 line-through decoration-slate-300" dangerouslySetInnerHTML={{ __html: r.old }} />
+            <ArrowRight className="h-4 w-4 text-blue-600" />
+            <p className="font-display text-sm font-semibold text-slate-900" dangerouslySetInnerHTML={{ __html: r.now }} />
+          </div>
+        ))}
       </div>
 
-      <div className="mx-auto mt-10 max-w-3xl rounded-2xl border border-slate-200 bg-slate-50 p-6 text-center">
-        <p className="text-sm text-slate-700">
-          <strong className="text-slate-900">AutoLabels is the shield.</strong> Continuous price
-          reconciliation, 50-state disclosure engine, signed customer acknowledgements, and a
-          tamper-evident audit log — so the regulator sees a clean record, not a missing one.
-        </p>
-        <p className="mt-3 text-sm text-slate-700">
-          Every addendum is <strong className="text-slate-900">red-teamed before it prints</strong> —
-          banned phrases hard-fail, doc fees are checked against all 50 state caps, and a used car
-          can&rsquo;t go out without its Buyers Guide.
-        </p>
-      </div>
+      <p className="mx-auto mt-8 max-w-2xl text-center text-sm leading-relaxed text-slate-600">
+        The exposure is real &mdash; enforcement reviews open with a website crawl, not a complaint &mdash; but the
+        answer isn&rsquo;t fear. It&rsquo;s a defensible record per VIN, generated automatically as you sell.
+      </p>
     </div>
   </section>
 );
