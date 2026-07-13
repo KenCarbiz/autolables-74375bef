@@ -976,7 +976,7 @@ const HowItWorks = () => (
           A growing library of 8.5&times;11 window stickers and 4.5&times;11 addendums. Each carries your branding, QR, pricing, disclosures, and the Vehicle Passport link &mdash; and locks the moment it&rsquo;s signed.
         </p>
         <div className="mt-8 grid items-center gap-10 lg:grid-cols-[340px_minmax(0,1fr)]">
-          <StickerMock />
+          <AddendumMock />
           <div className="grid gap-5 sm:grid-cols-2">
             {TEMPLATES.map((t) => (
               <Card key={t.title} icon={t.icon} title={t.title}>{t.body}</Card>
@@ -1085,6 +1085,180 @@ const StickerMock = () => (
     </p>
   </div>
 );
+
+// A realistic 4.25x11 addendum artifact — mirrors the printed AutoLabels
+// addendum layout (header, passport eyebrow, info grid, QR block,
+// installed equipment, adjusted total, disclaimer, dark footer). All
+// data is fictional sample content for landing-page display only.
+const AddendumMock = () => {
+  const NAVY = "#0B2041";
+  const BLUE = "#2563EB";
+  const GREEN = "#1F7A4D";
+  const GOLD = "#B45309";
+  const infoCell = (Icon: typeof Tag, label: string, value: string, mono = false) => (
+    <div className="flex items-center gap-1.5 px-2 py-[7px]">
+      <span className="flex h-[20px] w-[20px] items-center justify-center rounded-[5px] bg-blue-50 shrink-0">
+        <Icon className="h-3 w-3" style={{ color: NAVY }} />
+      </span>
+      <span className="min-w-0">
+        <span className="block text-[6px] font-black uppercase tracking-[0.13em] text-slate-500">{label}</span>
+        <span className={`block font-extrabold leading-tight text-slate-900 ${mono ? "text-[8px] break-all" : "text-[9px]"}`}>{value}</span>
+      </span>
+    </div>
+  );
+  const qrBullets = ["Photos", "Ownership Information", "Documents", "Service History", "Benefits", "Protection Products"];
+  const installed = [
+    { name: "Ceramic Protection Package", price: "$1,495", Icon: Sparkles },
+    { name: "Door Edge Guard & Handle Cup", price: "$500", Icon: ShieldCheck },
+    { name: "Street Smart VIN Etch", price: "$349", Icon: Lock },
+  ];
+  const footerBadges = [
+    { Icon: Zap, t: "AI Powered" },
+    { Icon: ShieldCheck, t: "FTC Aligned" },
+    { Icon: BarChart3, t: "Real-Time Updates" },
+    { Icon: FileText, t: "Print Ready" },
+  ];
+  return (
+    <div
+      className="mx-auto w-full max-w-[340px] rounded-2xl bg-white shadow-[0_30px_60px_-20px_rgba(11,32,65,0.35)] ring-1 ring-slate-200"
+      style={{ fontFamily: "Inter, system-ui, sans-serif", color: "#10202B" }}
+    >
+      <div className="flex flex-col p-4">
+        {/* Header */}
+        <header className="flex items-stretch justify-between gap-2 pb-1.5">
+          <div className="flex items-center gap-1.5 min-w-0">
+            <span className="flex h-4 w-4 items-center justify-center rounded-[4px]" style={{ background: BLUE }}>
+              <span className="text-white text-[10px] font-black leading-none">a</span>
+            </span>
+            <span>
+              <span className="block text-[12px] font-black tracking-tight leading-none">
+                <span style={{ color: BLUE }}>auto</span>
+                <span style={{ color: NAVY }}>labels.io</span>
+              </span>
+              <span className="block mt-[3px] text-[5px] font-bold uppercase tracking-[0.16em] text-slate-500">AI-Powered Vehicle Transparency</span>
+            </span>
+          </div>
+          <div className="pl-2 text-right text-[6px] font-semibold leading-[1.4] text-slate-500 border-l border-slate-200">
+            <div className="text-[7.5px] font-black uppercase tracking-wide" style={{ color: NAVY }}>RIVERSIDE MOTORS</div>
+            <div>412 Harbor Way, Riverside</div>
+            <div>(555) 214-0199</div>
+            <div>riversidemotors.example</div>
+          </div>
+        </header>
+        <div className="border-t border-slate-200" />
+
+        {/* Passport eyebrow */}
+        <div className="mt-2 inline-flex items-center gap-1.5">
+          <span className="flex h-4 w-4 items-center justify-center rounded-full bg-blue-50">
+            <ShieldCheck className="h-2.5 w-2.5" style={{ color: NAVY }} />
+          </span>
+          <span className="text-[7px] font-black uppercase tracking-[0.2em]" style={{ color: BLUE }}>Vehicle Passport</span>
+        </div>
+        <h3 className="mt-1 text-[26px] font-black leading-[0.95] tracking-[-0.02em]" style={{ color: NAVY }}>ADDENDUM</h3>
+        <div className="mt-1 text-[11px] font-black uppercase leading-[1.12] tracking-[-0.01em] text-slate-900">
+          2027 INFINITI QX60<br />LUXE AWD
+        </div>
+
+        {/* Info grid */}
+        <section className="mt-2 grid grid-cols-2 rounded-[8px] border border-slate-200">
+          <div className="border-b border-r border-slate-200">{infoCell(Tag, "Stock Number", "RM-24815")}</div>
+          <div className="border-b border-slate-200">{infoCell(FileText, "VIN", "5N1DL1FS8SC331335", true)}</div>
+          <div className="border-r border-slate-200">{infoCell(CheckCircle2, "Date", "07/13/2026")}</div>
+          {infoCell(Tag, "MSRP (Base Price)", "$30,876")}
+        </section>
+
+        {/* QR block */}
+        <section className="mt-2 grid grid-cols-[68px_1fr] items-center gap-2 rounded-[8px] border p-2" style={{ borderColor: "#B9D4F8", background: "#F7FAFF" }}>
+          <div className="rounded-[6px] bg-white p-1 border border-slate-200">
+            <QRCodeSVG value="https://autolabels.io/v/demo" size={60} bgColor="#ffffff" fgColor={NAVY} level="M" style={{ width: "100%", height: "auto" }} />
+          </div>
+          <div className="min-w-0">
+            <div className="text-[9px] font-black uppercase leading-[1.15] tracking-wide" style={{ color: BLUE }}>Scan to View<br />Vehicle Passport</div>
+            <div className="mt-1.5 grid grid-cols-2 gap-x-1.5 gap-y-[3px]">
+              {qrBullets.map((b) => (
+                <span key={b} className="inline-flex items-center gap-1 text-[6px] font-bold leading-tight text-slate-900">
+                  <Check className="h-2 w-2" style={{ color: BLUE }} /> {b}
+                </span>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        {/* Installed equipment */}
+        <section className="mt-2 rounded-[8px] border overflow-hidden" style={{ borderColor: "#BFE3CD" }}>
+          <div className="flex items-center justify-between px-2 py-[6px]" style={{ background: "#EAF6EF" }}>
+            <span className="inline-flex items-center gap-1.5 text-[7.5px] font-black uppercase tracking-[0.12em]" style={{ color: GREEN }}>
+              <span className="flex h-[14px] w-[14px] items-center justify-center rounded-full bg-white" style={{ border: `1px solid ${GREEN}2e` }}>
+                <CheckCircle2 className="h-2 w-2" style={{ color: GREEN }} />
+              </span>
+              Installed Equipment
+              <span className="text-[5.5px] font-black uppercase tracking-[0.1em] rounded-full px-1.5 py-[1px] bg-white" style={{ color: GREEN, border: `1px solid ${GREEN}33` }}>Included</span>
+            </span>
+            <span className="text-[7px] font-black uppercase tracking-wide" style={{ color: GREEN }}>
+              <span className="text-[5.5px] tracking-[0.12em] mr-1">Total</span>$2,344
+            </span>
+          </div>
+          {installed.map((l) => (
+            <div key={l.name} className="flex items-center gap-1.5 px-2 py-[5px] border-b last:border-b-0 border-slate-100">
+              <span className="flex h-[16px] w-[16px] items-center justify-center rounded-[4px] shrink-0" style={{ background: "#EAF6EF" }}>
+                <l.Icon className="h-2.5 w-2.5" style={{ color: GREEN }} />
+              </span>
+              <span className="min-w-0 flex-1 text-[8px] font-extrabold leading-tight text-slate-900">{l.name}</span>
+              <span className="shrink-0 text-[8px] font-black" style={{ color: GREEN }}>{l.price}</span>
+            </div>
+          ))}
+        </section>
+
+        {/* Adjusted total */}
+        <section className="mt-2 grid grid-cols-[1fr_1.3fr] rounded-[8px] border-2 overflow-hidden" style={{ borderColor: NAVY }}>
+          <div className="px-2 py-2 border-r border-slate-200 flex flex-col justify-center">
+            <div className="text-[6px] font-black uppercase tracking-[0.14em]" style={{ color: GOLD }}>Adjusted Total</div>
+            <div className="mt-0.5 text-[18px] font-black leading-none tracking-tight" style={{ color: GOLD }}>$33,220</div>
+            <div className="mt-1 text-[5.5px] font-bold text-slate-500">Base Price + Installed Equipment</div>
+          </div>
+          <div className="px-2 py-1.5 flex flex-col justify-center">
+            <div className="flex justify-between text-[7px] font-bold text-slate-900">
+              <span>Base Vehicle Price</span><span>$30,876</span>
+            </div>
+            <div className="flex justify-between text-[7px] font-bold mt-[2px] text-slate-900">
+              <span>Installed Equipment Value</span><span style={{ color: GREEN }}>+ $2,344</span>
+            </div>
+            <div className="flex justify-between text-[7.5px] font-black mt-[2px] pt-[2px] border-t border-slate-200 text-slate-900">
+              <span>Adjusted Total</span>
+              <span style={{ color: GOLD }}>$33,220</span>
+            </div>
+          </div>
+        </section>
+
+        <p className="mt-2 text-[5.5px] leading-snug text-slate-500">
+          Prices exclude tax, title, registration, and dealer documentary fees. See dealer for complete details.
+        </p>
+
+        {/* Dark footer */}
+        <footer className="mt-2 flex items-center justify-between gap-2 rounded-[7px] px-2.5 py-2" style={{ background: NAVY }}>
+          <span className="flex items-center gap-1.5 min-w-0">
+            <span className="flex h-4 w-4 items-center justify-center rounded-[4px] bg-white/10">
+              <span className="text-white text-[9px] font-black leading-none">a</span>
+            </span>
+            <span className="min-w-0">
+              <span className="block text-[4.5px] font-bold uppercase tracking-[0.18em] text-white/70">Powered by</span>
+              <span className="block text-[8px] font-black leading-tight text-white">autolabels.io</span>
+            </span>
+          </span>
+          <span className="flex items-center gap-2">
+            {footerBadges.map((b) => (
+              <span key={b.t} className="flex flex-col items-center gap-[1px]">
+                <b.Icon className="h-2.5 w-2.5 text-white" />
+                <span className="text-[4.5px] font-bold text-white/85 whitespace-nowrap">{b.t}</span>
+              </span>
+            ))}
+          </span>
+        </footer>
+      </div>
+    </div>
+  );
+};
+
 
 const StickerStudioGallery = () => (
   <section id="studio" className="scroll-mt-20 border-b border-slate-100 bg-slate-50/40">
