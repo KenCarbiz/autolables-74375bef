@@ -513,6 +513,7 @@ serve(async (req) => {
     let tenantSeen = 0, tenantNew = 0, tenantPrices = 0;
     let firstWriteErr: string | null = null;
     const liveVins = new Set<string>();
+    const runStartedAt = new Date().toISOString();
     try {
       // Latest website price per VIN — only append a snapshot when it moved.
       const { data: priceRows } = await admin.from("advertised_prices")
