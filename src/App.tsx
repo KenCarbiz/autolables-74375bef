@@ -253,6 +253,7 @@ const App = () => (
                         <Route path="/admin/design-system/addendum-icons" element={<AddendumIconLibrary />} />
                         <Route path="/addendum-label/:id" element={<AddendumLabelPrint />} />
                         <Route path="/admin/certification-history" element={<AdminCertificationHistory />} />
+                        <Route path="/admin/inventory-sync" element={<InventorySyncCenter />} />
                         <Route path="/saved" element={<SavedAddendums />} />
                         <Route path="/signed" element={<SavedAddendums stage="signed" />} />
                         <Route path="/delivered" element={<SavedAddendums stage="delivered" />} />
