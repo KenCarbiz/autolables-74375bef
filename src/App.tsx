@@ -52,6 +52,7 @@ const AdminSmokeTest = lazy(() => import("./pages/AdminSmokeTest"));
 const AddendumIconLibrary = lazy(() => import("./pages/AddendumIconLibrary"));
 const AddendumLabelPrint = lazy(() => import("./pages/AddendumLabelPrint"));
 const AdminCertificationHistory = lazy(() => import("./pages/AdminCertificationHistory"));
+const InventorySyncCenter = lazy(() => import("./pages/InventorySyncCenter"));
 const PlatformAdmin = lazy(() => import("./pages/PlatformAdmin"));
 const Inventory = lazy(() => import("./pages/Inventory"));
 const InventoryCommandCenterV2 = lazy(() => import("./pages/InventoryCommandCenterV2"));
