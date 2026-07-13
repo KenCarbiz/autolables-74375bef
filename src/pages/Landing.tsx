@@ -1764,7 +1764,7 @@ const TIERS: { name: string; price: string; best: string; tagline: string; featu
   },
   {
     name: "Unlimited",
-    price: "$599",
+    price: "$399",
     featured: true,
     best: "Higher-volume stores",
     tagline: "Everything in Essential, with no VIN cap and the workflow tools a busy store runs on.",
@@ -1781,7 +1781,7 @@ const TIERS: { name: string; price: string; best: string; tagline: string; featu
   },
   {
     name: "Compliance Pro",
-    price: "$1,499",
+    price: "$899",
     best: "Groups that want every deal audit-ready",
     tagline: "Everything in Unlimited, plus the price-integrity and evidence layer that makes every deal defensible.",
     features: [
@@ -1876,8 +1876,35 @@ const PricingTeaser = ({ waitTo }: { waitTo: string }) => (
         ))}
       </div>
 
-
-
+      <div className="mx-auto mt-8 max-w-6xl">
+        <div className="relative overflow-hidden rounded-[22px] border border-blue-400/25 bg-gradient-to-r from-[#0E1524] via-[#0C1017] to-[#0E1524] p-6 sm:p-7">
+          <div className="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-blue-400">All-Apps Unlimited</p>
+              <h3 className="mt-2 font-barlow-condensed text-2xl font-bold tracking-normal text-white sm:text-3xl">
+                Run the whole lot on one bill
+              </h3>
+              <p className="mt-2 max-w-xl text-sm leading-relaxed text-slate-300">
+                AutoLabels comes bundled in the Autocurb.io platform suite — AutoCurb acquisition, AutoLabels stickers &amp;
+                compliance, AutoFilm video, and AutoFrame photography, every app at its top tier, unlimited usage, one rooftop price.
+              </p>
+            </div>
+            <div className="shrink-0 text-left sm:text-right">
+              <div className="flex items-baseline gap-1.5 sm:justify-end">
+                <span className="font-barlow-condensed text-4xl font-extrabold leading-none tracking-normal text-white tabular-nums">$3,999</span>
+                <span className="text-sm font-semibold text-slate-500">/mo</span>
+              </div>
+              <p className="mt-1 text-[12px] text-slate-500">per rooftop · vs buying each app separately</p>
+              <a
+                href="https://autocurb.io/#pricing"
+                className="mt-4 inline-flex h-11 items-center justify-center gap-1.5 rounded-[11px] bg-gradient-to-b from-[#3B82F6] to-[#2563EB] px-6 text-sm font-bold text-white shadow-[0_14px_30px_-10px_rgba(37,99,235,.6)] hover:brightness-110"
+              >
+                See the full suite <ArrowRight className="h-3.5 w-3.5" />
+              </a>
+            </div>
+          </div>
+        </div>
+      </div>
 
       <div className="mx-auto mt-14 max-w-6xl">
         <h3 className="font-barlow-condensed text-xl font-bold tracking-normal text-white">Add-ons</h3>

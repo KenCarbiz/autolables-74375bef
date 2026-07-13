@@ -7,8 +7,12 @@
 //
 // Pricing (per rooftop/month):
 //   - essential      $299 — window stickers + addendums, up to 75 VINs/mo
-//   - unlimited      $599 — unlimited VINs, product rules, analytics
-//   - compliance_pro $1,499 — full scan-to-signed FTC compliance flow
+//   - unlimited      $399 — unlimited VINs, product rules, analytics
+//   - compliance_pro $899 — full scan-to-signed FTC compliance flow
+//
+// Prices anchor to the shared platform catalog (AutoCurb `fallbackCatalog`):
+// AutoLabels Basic $399 (unlimited) / Premium $899 (full compliance). The
+// $299 essential tier is a standalone capped entry below the catalog Basic.
 // ──────────────────────────────────────────────────────────────
 
 import type { DealerSettings } from "@/contexts/DealerSettingsContext";
@@ -90,7 +94,7 @@ export const PLAN_DEFINITIONS: PlanDefinition[] = [
     tier: "unlimited",
     name: "Unlimited",
     tagline: "Unlimited vehicles for high-volume dealers.",
-    price: "$599",
+    price: "$399",
     priceNote: "per rooftop / month",
     features: [
       "Everything in Essential, plus:",
@@ -121,7 +125,7 @@ export const PLAN_DEFINITIONS: PlanDefinition[] = [
     tier: "compliance_pro",
     name: "Compliance Pro",
     tagline: "Full scan-to-signed FTC flow for airtight deals.",
-    price: "$1,499",
+    price: "$899",
     priceNote: "per rooftop / month",
     features: [
       "Everything in Unlimited, plus:",
