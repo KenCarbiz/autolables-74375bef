@@ -4233,6 +4233,48 @@ export type Database = {
           },
         ]
       }
+      source_authority_rules: {
+        Row: {
+          auto_replace_override: boolean
+          conflict_behavior: string
+          created_at: string
+          field_key: string
+          id: string
+          override_expires_days: number | null
+          primary_source: string
+          secondary_source: string | null
+          tenant_id: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          auto_replace_override?: boolean
+          conflict_behavior?: string
+          created_at?: string
+          field_key: string
+          id?: string
+          override_expires_days?: number | null
+          primary_source: string
+          secondary_source?: string | null
+          tenant_id: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          auto_replace_override?: boolean
+          conflict_behavior?: string
+          created_at?: string
+          field_key?: string
+          id?: string
+          override_expires_days?: number | null
+          primary_source?: string
+          secondary_source?: string | null
+          tenant_id?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: []
+      }
       stale_document_flags: {
         Row: {
           changed_field: string | null
