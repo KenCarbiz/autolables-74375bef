@@ -276,6 +276,10 @@ const CommandPalette = ({ open, onOpenChange }: CommandPaletteProps) => {
                 <ShieldCheck className="w-4 h-4 mr-2" />
                 Platform Audit
               </CommandItem>
+              <CommandItem onSelect={() => go("/admin/inventory-sync")}>
+                <ShieldCheck className="w-4 h-4 mr-2" />
+                Inventory Sync Center
+              </CommandItem>
             </CommandGroup>
           </>
         )}

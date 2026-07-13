@@ -52,6 +52,7 @@ const AdminSmokeTest = lazy(() => import("./pages/AdminSmokeTest"));
 const AddendumIconLibrary = lazy(() => import("./pages/AddendumIconLibrary"));
 const AddendumLabelPrint = lazy(() => import("./pages/AddendumLabelPrint"));
 const AdminCertificationHistory = lazy(() => import("./pages/AdminCertificationHistory"));
+const InventorySyncCenter = lazy(() => import("./pages/InventorySyncCenter"));
 const PlatformAdmin = lazy(() => import("./pages/PlatformAdmin"));
 const Inventory = lazy(() => import("./pages/Inventory"));
 const InventoryCommandCenterV2 = lazy(() => import("./pages/InventoryCommandCenterV2"));
@@ -253,6 +254,7 @@ const App = () => (
                         <Route path="/admin/design-system/addendum-icons" element={<AddendumIconLibrary />} />
                         <Route path="/addendum-label/:id" element={<AddendumLabelPrint />} />
                         <Route path="/admin/certification-history" element={<AdminCertificationHistory />} />
+                        <Route path="/admin/inventory-sync" element={<InventorySyncCenter />} />
                         <Route path="/saved" element={<SavedAddendums />} />
                         <Route path="/signed" element={<SavedAddendums stage="signed" />} />
                         <Route path="/delivered" element={<SavedAddendums stage="delivered" />} />

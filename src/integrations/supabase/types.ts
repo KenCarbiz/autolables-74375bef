@@ -2345,6 +2345,104 @@ export type Database = {
         }
         Relationships: []
       }
+      inventory_sync_errors: {
+        Row: {
+          code: string | null
+          created_at: string
+          id: string
+          message: string | null
+          sync_run_id: string
+          tenant_id: string
+          vin: string | null
+        }
+        Insert: {
+          code?: string | null
+          created_at?: string
+          id?: string
+          message?: string | null
+          sync_run_id: string
+          tenant_id: string
+          vin?: string | null
+        }
+        Update: {
+          code?: string | null
+          created_at?: string
+          id?: string
+          message?: string | null
+          sync_run_id?: string
+          tenant_id?: string
+          vin?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "inventory_sync_errors_sync_run_id_fkey"
+            columns: ["sync_run_id"]
+            isOneToOne: false
+            referencedRelation: "inventory_sync_runs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      inventory_sync_runs: {
+        Row: {
+          created_at: string
+          error_summary: string | null
+          finished_at: string | null
+          http_status: number | null
+          id: string
+          matched_dealer: string | null
+          new_vehicles: number
+          num_found: number
+          prices_recorded: number
+          raw: Json | null
+          removed: number
+          seen: number
+          source: string
+          started_at: string
+          status: string
+          tenant_id: string
+          updated_vehicles: number
+        }
+        Insert: {
+          created_at?: string
+          error_summary?: string | null
+          finished_at?: string | null
+          http_status?: number | null
+          id?: string
+          matched_dealer?: string | null
+          new_vehicles?: number
+          num_found?: number
+          prices_recorded?: number
+          raw?: Json | null
+          removed?: number
+          seen?: number
+          source?: string
+          started_at?: string
+          status: string
+          tenant_id: string
+          updated_vehicles?: number
+        }
+        Update: {
+          created_at?: string
+          error_summary?: string | null
+          finished_at?: string | null
+          http_status?: number | null
+          id?: string
+          matched_dealer?: string | null
+          new_vehicles?: number
+          num_found?: number
+          prices_recorded?: number
+          raw?: Json | null
+          removed?: number
+          seen?: number
+          source?: string
+          started_at?: string
+          status?: string
+          tenant_id?: string
+          updated_vehicles?: number
+        }
+        Relationships: []
+      }
       leads: {
         Row: {
           captured_at: string

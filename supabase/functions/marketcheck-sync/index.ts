@@ -346,6 +346,43 @@ serve(async (req) => {
 
   const admin = createClient(supabaseUrl, serviceKey, { auth: { persistSession: false, autoRefreshToken: false } });
 
+  // ── Inventory sync instrumentation ────────────────────────────────
+  // Persist one inventory_sync_runs row per tenant-run (with error rows)
+  // wrapped so a logging failure never breaks the sync itself. Status
+  // semantics: 'failed' (source error / no feed / exception) MUST stay
+  // distinct from 'empty_valid' (source ok, legitimately zero cars).
+  // deno-lint-ignore no-explicit-any
+  const logSyncRun = async (row: {
+    tenant_id: string; started_at: string; status: "success" | "partial" | "failed" | "empty_valid" | "skipped";
+    num_found?: number; seen?: number; new_vehicles?: number; updated_vehicles?: number;
+    prices_recorded?: number; removed?: number; http_status?: number | null;
+    matched_dealer?: string | null; error_summary?: string | null; raw: any;
+    errors?: Array<{ vin?: string | null; code?: string; message?: string }>;
+  }) => {
+    try {
+      const { data: run, error } = await admin.from("inventory_sync_runs").insert({
+        tenant_id: row.tenant_id, source: "marketcheck",
+        started_at: row.started_at, finished_at: new Date().toISOString(),
+        status: row.status,
+        num_found: row.num_found ?? 0, seen: row.seen ?? 0,
+        new_vehicles: row.new_vehicles ?? 0, updated_vehicles: row.updated_vehicles ?? 0,
+        prices_recorded: row.prices_recorded ?? 0, removed: row.removed ?? 0,
+        http_status: row.http_status ?? null,
+        matched_dealer: row.matched_dealer ?? null,
+        error_summary: row.error_summary ?? null,
+        raw: row.raw ?? null,
+      }).select("id").maybeSingle();
+      if (error || !run?.id) return;
+      const errs = (row.errors || []).filter((e) => (e.message || e.code));
+      if (errs.length) {
+        await admin.from("inventory_sync_errors").insert(errs.map((e) => ({
+          sync_run_id: run.id, tenant_id: row.tenant_id,
+          vin: e.vin ?? null, code: e.code ?? null, message: e.message ?? null,
+        }))).then(() => undefined, () => undefined);
+      }
+    } catch { /* logging is best-effort */ }
+  };
+
   let body: { tenant_id?: string; force?: boolean; lookup?: boolean; zip?: string; state?: string; enrich?: boolean } = {};
   try { body = await req.json(); } catch { /* empty body OK */ }
 
@@ -476,6 +513,7 @@ serve(async (req) => {
     let tenantSeen = 0, tenantNew = 0, tenantPrices = 0;
     let firstWriteErr: string | null = null;
     const liveVins = new Set<string>();
+    const runStartedAt = new Date().toISOString();
     try {
       // Latest website price per VIN — only append a snapshot when it moved.
       const { data: priceRows } = await admin.from("advertised_prices")
@@ -602,6 +640,12 @@ serve(async (req) => {
           last_run_at: now.toISOString(),
           last_status: { ran_at: now.toISOString(), seen: 0, new_vehicles: 0, prices_recorded: 0, error: contaminated ? "no_owned_match" : "no_listings", note, matched_dealer: verifiedName, attempts: attempts.slice(0, 8) },
         }).eq("tenant_id", cfg.tenant_id);
+        await logSyncRun({
+          tenant_id: cfg.tenant_id, started_at: runStartedAt, status: "failed",
+          http_status: (attempts[0]?.http as number) ?? 0, matched_dealer: verifiedName || null,
+          error_summary: note, raw: { error: contaminated ? "no_owned_match" : (sample.listings.length > 0 ? "search_sample_only" : "no_listings"), attempts, source, dealer_record: verifiedName, note },
+          errors: [{ code: contaminated ? "no_owned_match" : "no_listings", message: note }],
+        });
         continue;
       }
 
@@ -853,8 +897,36 @@ serve(async (req) => {
         action: "marketcheck_sync", entity_type: "tenant", entity_id: cfg.tenant_id,
         store_id: cfg.tenant_id, details: { source, ...status },
       }).then(() => undefined, () => undefined);
+
+      // Distinct status classification:
+      //   'failed'      → a write error surfaced this run (firstWriteErr set)
+      //   'empty_valid' → chosen feed responded fine, but returned zero cars
+      //   'partial'     → capped by max_vehicles / didn't reach num_found (no prune)
+      //   'success'     → covered the full inventory (prune guard would have run)
+      const runStatus: "success" | "partial" | "failed" | "empty_valid" =
+        firstWriteErr ? "failed"
+          : (numFound === 0 && tenantSeen === 0) ? "empty_valid"
+          : (tenantSeen < numFound || tenantSeen >= cfg.max_vehicles) ? "partial"
+          : "success";
+      await logSyncRun({
+        tenant_id: cfg.tenant_id, started_at: runStartedAt, status: runStatus,
+        num_found: numFound, seen: tenantSeen, new_vehicles: tenantNew,
+        updated_vehicles: Math.max(0, listingsUpserted - tenantNew),
+        prices_recorded: tenantPrices, removed: pruned?.listings_deleted ?? 0,
+        http_status: httpStatus, matched_dealer: verifiedName || null,
+        error_summary: firstWriteErr,
+        raw: { source, dealer_id: manualId, mc_param: chosen.param, mc_value: chosen.value, ...probe, pruned },
+        errors: firstWriteErr ? [{ code: "write_error", message: firstWriteErr }] : [],
+      });
     } catch (err) {
-      errors.push({ tenant_id: cfg.tenant_id, error: err instanceof Error ? err.message : String(err) });
+      const msg = err instanceof Error ? err.message : String(err);
+      errors.push({ tenant_id: cfg.tenant_id, error: msg });
+      await logSyncRun({
+        tenant_id: cfg.tenant_id, started_at: runStartedAt, status: "failed",
+        seen: tenantSeen, new_vehicles: tenantNew, prices_recorded: tenantPrices,
+        error_summary: msg, raw: { exception: msg },
+        errors: [{ code: "exception", message: msg }],
+      });
     }
   }
 
