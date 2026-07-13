@@ -252,6 +252,16 @@ const CommandPalette = ({ open, onOpenChange }: CommandPaletteProps) => {
                   {entry.label}
                 </CommandItem>
               ))}
+              {hasDealerCapability(role, "manage_source_authority", isAdmin) || hasAnyDealerCapability(role, ["can_view_compliance"], isAdmin) ? (
+                <CommandItem
+                  value="Source Authority high risk data integrity"
+                  keywords={["source authority", "authoritative source", "data integrity", "conflict rules", "primary source"]}
+                  onSelect={() => go("/admin/source-authority")}
+                >
+                  <Settings className="w-4 h-4 mr-2" />
+                  Source Authority
+                </CommandItem>
+              ) : null}
             </CommandGroup>
           );
         })()}
