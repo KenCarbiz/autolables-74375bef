@@ -976,7 +976,7 @@ const HowItWorks = () => (
           A growing library of 8.5&times;11 window stickers and 4.5&times;11 addendums. Each carries your branding, QR, pricing, disclosures, and the Vehicle Passport link &mdash; and locks the moment it&rsquo;s signed.
         </p>
         <div className="mt-8 grid items-center gap-10 lg:grid-cols-[340px_minmax(0,1fr)]">
-          <StickerMock />
+          <AddendumMock />
           <div className="grid gap-5 sm:grid-cols-2">
             {TEMPLATES.map((t) => (
               <Card key={t.title} icon={t.icon} title={t.title}>{t.body}</Card>
