@@ -346,6 +346,43 @@ serve(async (req) => {
 
   const admin = createClient(supabaseUrl, serviceKey, { auth: { persistSession: false, autoRefreshToken: false } });
 
+  // ── Inventory sync instrumentation ────────────────────────────────
+  // Persist one inventory_sync_runs row per tenant-run (with error rows)
+  // wrapped so a logging failure never breaks the sync itself. Status
+  // semantics: 'failed' (source error / no feed / exception) MUST stay
+  // distinct from 'empty_valid' (source ok, legitimately zero cars).
+  // deno-lint-ignore no-explicit-any
+  const logSyncRun = async (row: {
+    tenant_id: string; started_at: string; status: "success" | "partial" | "failed" | "empty_valid" | "skipped";
+    num_found?: number; seen?: number; new_vehicles?: number; updated_vehicles?: number;
+    prices_recorded?: number; removed?: number; http_status?: number | null;
+    matched_dealer?: string | null; error_summary?: string | null; raw: any;
+    errors?: Array<{ vin?: string | null; code?: string; message?: string }>;
+  }) => {
+    try {
+      const { data: run, error } = await admin.from("inventory_sync_runs").insert({
+        tenant_id: row.tenant_id, source: "marketcheck",
+        started_at: row.started_at, finished_at: new Date().toISOString(),
+        status: row.status,
+        num_found: row.num_found ?? 0, seen: row.seen ?? 0,
+        new_vehicles: row.new_vehicles ?? 0, updated_vehicles: row.updated_vehicles ?? 0,
+        prices_recorded: row.prices_recorded ?? 0, removed: row.removed ?? 0,
+        http_status: row.http_status ?? null,
+        matched_dealer: row.matched_dealer ?? null,
+        error_summary: row.error_summary ?? null,
+        raw: row.raw ?? null,
+      }).select("id").maybeSingle();
+      if (error || !run?.id) return;
+      const errs = (row.errors || []).filter((e) => (e.message || e.code));
+      if (errs.length) {
+        await admin.from("inventory_sync_errors").insert(errs.map((e) => ({
+          sync_run_id: run.id, tenant_id: row.tenant_id,
+          vin: e.vin ?? null, code: e.code ?? null, message: e.message ?? null,
+        }))).then(() => undefined, () => undefined);
+      }
+    } catch { /* logging is best-effort */ }
+  };
+
   let body: { tenant_id?: string; force?: boolean; lookup?: boolean; zip?: string; state?: string; enrich?: boolean } = {};
   try { body = await req.json(); } catch { /* empty body OK */ }
 
