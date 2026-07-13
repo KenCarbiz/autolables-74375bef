@@ -897,8 +897,36 @@ serve(async (req) => {
         action: "marketcheck_sync", entity_type: "tenant", entity_id: cfg.tenant_id,
         store_id: cfg.tenant_id, details: { source, ...status },
       }).then(() => undefined, () => undefined);
+
+      // Distinct status classification:
+      //   'failed'      → a write error surfaced this run (firstWriteErr set)
+      //   'empty_valid' → chosen feed responded fine, but returned zero cars
+      //   'partial'     → capped by max_vehicles / didn't reach num_found (no prune)
+      //   'success'     → covered the full inventory (prune guard would have run)
+      const runStatus: "success" | "partial" | "failed" | "empty_valid" =
+        firstWriteErr ? "failed"
+          : (numFound === 0 && tenantSeen === 0) ? "empty_valid"
+          : (tenantSeen < numFound || tenantSeen >= cfg.max_vehicles) ? "partial"
+          : "success";
+      await logSyncRun({
+        tenant_id: cfg.tenant_id, started_at: runStartedAt, status: runStatus,
+        num_found: numFound, seen: tenantSeen, new_vehicles: tenantNew,
+        updated_vehicles: Math.max(0, listingsUpserted - tenantNew),
+        prices_recorded: tenantPrices, removed: pruned?.listings_deleted ?? 0,
+        http_status: httpStatus, matched_dealer: verifiedName || null,
+        error_summary: firstWriteErr,
+        raw: { source, dealer_id: manualId, mc_param: chosen.param, mc_value: chosen.value, ...probe, pruned },
+        errors: firstWriteErr ? [{ code: "write_error", message: firstWriteErr }] : [],
+      });
     } catch (err) {
-      errors.push({ tenant_id: cfg.tenant_id, error: err instanceof Error ? err.message : String(err) });
+      const msg = err instanceof Error ? err.message : String(err);
+      errors.push({ tenant_id: cfg.tenant_id, error: msg });
+      await logSyncRun({
+        tenant_id: cfg.tenant_id, started_at: runStartedAt, status: "failed",
+        seen: tenantSeen, new_vehicles: tenantNew, prices_recorded: tenantPrices,
+        error_summary: msg, raw: { exception: msg },
+        errors: [{ code: "exception", message: msg }],
+      });
     }
   }
 
