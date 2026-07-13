@@ -640,6 +640,12 @@ serve(async (req) => {
           last_run_at: now.toISOString(),
           last_status: { ran_at: now.toISOString(), seen: 0, new_vehicles: 0, prices_recorded: 0, error: contaminated ? "no_owned_match" : "no_listings", note, matched_dealer: verifiedName, attempts: attempts.slice(0, 8) },
         }).eq("tenant_id", cfg.tenant_id);
+        await logSyncRun({
+          tenant_id: cfg.tenant_id, started_at: runStartedAt, status: "failed",
+          http_status: (attempts[0]?.http as number) ?? 0, matched_dealer: verifiedName || null,
+          error_summary: note, raw: { error: contaminated ? "no_owned_match" : (sample.listings.length > 0 ? "search_sample_only" : "no_listings"), attempts, source, dealer_record: verifiedName, note },
+          errors: [{ code: contaminated ? "no_owned_match" : "no_listings", message: note }],
+        });
         continue;
       }
 
