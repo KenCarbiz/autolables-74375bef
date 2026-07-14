@@ -51,7 +51,8 @@ export type DealerCapability =
   | "can_manage_invoices"
   | "can_view_platform_admin"
   | "can_manage_automation"
-  | "manage_source_authority";
+  | "manage_source_authority"
+  | "resolve_exceptions";
 
 const allDealerCapabilities: DealerCapability[] = [
   "can_view_dashboard",
