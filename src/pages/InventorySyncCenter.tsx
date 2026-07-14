@@ -116,6 +116,7 @@ export default function InventorySyncCenter() {
   const [selected, setSelected] = useState<Run | null>(null);
   const [selectedErrs, setSelectedErrs] = useState<SyncErr[]>([]);
   const [errsLoading, setErrsLoading] = useState(false);
+  const [unresolvedCount, setUnresolvedCount] = useState<number>(0);
 
   const load = useCallback(async () => {
     if (!tenantId) return;
