@@ -45,6 +45,12 @@ const SectionBar = ({ icon, title, tag, total, bg, fg }: { icon: AddendumIconKey
 
 export const SaturdayPremiumAddendum: React.FC<Props> = ({ data }) => {
   const { dealer, vehicle, installed = [], upgrades = [], benefits, qrUrl, disclaimer } = data;
+  // Accent follows the dealer theme (populated by toSaturdaySticker from
+  // branding.accentColor). Neutrals (navy, slate) stay fixed; installed
+  // green and upgrades purple keep their semantic meaning.
+  const accent = dealer.theme?.accentColor || "#0B6FEA";
+  const accentSoft = `${accent}14`;
+  const accentBorder = `${accent}40`;
   const safeUrl = qrUrl && qrUrl.startsWith("http") ? qrUrl : qrUrl ? `https://${qrUrl}` : "https://autolabels.io";
   const num = (v: string | number) => Number(String(v).replace(/[^\d.]/g, "") || 0);
   const installedTotal = installed.reduce((s, l) => s + num(l.price), 0);
