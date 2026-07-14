@@ -280,6 +280,26 @@ export default function InventorySyncCenter() {
         </div>
       )}
 
+      {/* ── Unresolved exceptions tie-in (Phase 2.3) ─────────── */}
+      {unresolvedCount > 0 && (
+        <a href="/admin/exceptions"
+          className="flex items-center justify-between gap-3 rounded-xl border border-amber-500/30 bg-amber-500/5 px-4 py-3 hover:bg-amber-500/10">
+          <div className="flex items-center gap-3">
+            <AlertTriangle className="w-4 h-4 text-amber-700" />
+            <div>
+              <div className="text-sm font-semibold text-amber-800">
+                {unresolvedCount} unresolved exception{unresolvedCount === 1 ? "" : "s"}
+              </div>
+              <div className="text-[11px] text-amber-800/80">
+                Reconciliation flagged data anomalies for this rooftop — review and resolve.
+              </div>
+            </div>
+          </div>
+          <span className="text-xs font-semibold text-amber-800 uppercase tracking-wider">Open →</span>
+        </a>
+      )}
+
+
       {/* ── Latest run stats ─────────────────────────────────── */}
       {latest && (
         <div className="rounded-2xl border border-border bg-card p-5">
