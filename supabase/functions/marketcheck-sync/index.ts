@@ -514,6 +514,76 @@ serve(async (req) => {
     let firstWriteErr: string | null = null;
     const liveVins = new Set<string>();
     const runStartedAt = new Date().toISOString();
+
+    // ── Phase 2.3 reconciliation / change-detection state ─────────────────
+    // All change/exception writes go through emitException + emitChange helpers
+    // wrapped in try/catch so a logging failure NEVER breaks the ingest loop.
+    // Capped per invocation so the first deploy can't flood the table for the
+    // whole existing lot.
+    const EXC_CAP = 300;
+    let excInserts = 0;
+    const stockMap = new Map<string, string[]>();     // live stock_number -> vins seen
+    const priorExistingVins = new Set<string>();       // vehicle_listings VINs before this pull
+    const previouslyRemovedVins = new Set<string>();   // VINs with a prior 'removed_from_feed' change
+    const authorityRules = new Map<string, { conflict_behavior?: string | null }>();
+    // deno-lint-ignore no-explicit-any
+    const emitException = async (row: any) => {
+      if (excInserts >= EXC_CAP) return null;
+      try {
+        // Upsert-like: if an open/in_progress exception of this (vin, type) exists,
+        // refresh it (partial-unique index enforces the invariant).
+        const { data: existing } = await admin.from("vehicle_exceptions")
+          .select("id").eq("tenant_id", row.tenant_id).eq("vin", row.vin)
+          .eq("exception_type", row.exception_type).in("status", ["open", "in_progress"])
+          .maybeSingle();
+        if (existing?.id) {
+          await admin.from("vehicle_exceptions").update({
+            severity: row.severity, title: row.title, explanation: row.explanation ?? null,
+            source_values: row.source_values ?? null, recommended_action: row.recommended_action ?? null,
+            requires_new_document: !!row.requires_new_document,
+            stock_number: row.stock_number ?? null, vehicle_listing_id: row.vehicle_listing_id ?? null,
+          }).eq("id", existing.id);
+          return existing.id as string;
+        }
+        const { data: ins } = await admin.from("vehicle_exceptions").insert(row).select("id").maybeSingle();
+        if (ins?.id) excInserts++;
+        return (ins?.id as string) || null;
+      } catch { return null; }
+    };
+    // deno-lint-ignore no-explicit-any
+    const emitChange = async (row: any) => {
+      try { await admin.from("vehicle_change_history").insert(row); } catch { /* best-effort */ }
+    };
+    const applyAuthority = (fieldKey: string, base: { severity: string; requires_new_document?: boolean }):
+      { skip: boolean; severity: string; requires_new_document: boolean } => {
+      const rule = authorityRules.get(fieldKey);
+      const beh = String(rule?.conflict_behavior || "").trim().toLowerCase();
+      if (beh === "ignore") return { skip: true, severity: base.severity, requires_new_document: !!base.requires_new_document };
+      if (beh === "block_generation") return { skip: false, severity: "high", requires_new_document: true };
+      return { skip: false, severity: base.severity, requires_new_document: !!base.requires_new_document };
+    };
+    try {
+      const { data: rules } = await admin.from("source_authority_rules")
+        .select("field_key, conflict_behavior").eq("tenant_id", cfg.tenant_id);
+      for (const r of (rules || []) as Array<{ field_key: string; conflict_behavior?: string | null }>) {
+        if (r?.field_key) authorityRules.set(r.field_key, { conflict_behavior: r.conflict_behavior ?? null });
+      }
+    } catch { /* rules table optional */ }
+    try {
+      const { data: existingRows } = await admin.from("vehicle_listings")
+        .select("vin").eq("tenant_id", cfg.tenant_id).limit(20000);
+      for (const r of (existingRows || []) as Array<{ vin: string }>) {
+        if (r.vin) priorExistingVins.add(normVin(r.vin));
+      }
+    } catch { /* diff best-effort */ }
+    try {
+      const { data: removedRows } = await admin.from("vehicle_change_history")
+        .select("vin").eq("tenant_id", cfg.tenant_id).eq("field_key", "_lifecycle")
+        .eq("new_value", "removed_from_feed").limit(5000);
+      for (const r of (removedRows || []) as Array<{ vin: string }>) {
+        if (r.vin) previouslyRemovedVins.add(normVin(r.vin));
+      }
+    } catch { /* first run — no history yet */ }
     try {
       // Latest website price per VIN — only append a snapshot when it moved.
       const { data: priceRows } = await admin.from("advertised_prices")
@@ -668,7 +738,25 @@ serve(async (req) => {
 
           for (const l of listings) {
             if (tenantSeen >= cfg.max_vehicles) break pages;
+            const rawVin = String(l.vin || "").toUpperCase().trim();
             const vin = normVin(l.vin);
+            // Invalid VIN (fails 17-char/format check): log an exception then skip.
+            const validVin = /^[A-HJ-NPR-Z0-9]{17}$/.test(rawVin);
+            if (!validVin) {
+              try {
+                if (rawVin) {
+                  await emitException({
+                    tenant_id: cfg.tenant_id, vin: rawVin, exception_type: "invalid_vin",
+                    severity: "high", title: `Invalid VIN "${rawVin}"`,
+                    explanation: "VIN failed 17-character format check. The feed row was skipped.",
+                    source_values: { vin: rawVin, source: "marketcheck" },
+                    recommended_action: "Confirm the VIN with the source system; the listing was not ingested.",
+                    status: "open",
+                  });
+                }
+              } catch { /* best-effort */ }
+              if (!vin || vin.length < 11) continue;
+            }
             if (!vin || vin.length < 11) continue;
             // Drop any car that positively belongs to a different domain/state —
             // never ingest another dealer's vehicle into this tenant.
@@ -681,6 +769,28 @@ serve(async (req) => {
             const ymm = [b.year, b.make, b.model].filter(Boolean).join(" ") || null;
             const condition = l.is_certified ? "cpo" : (l.inventory_type === "new" ? "new" : "used");
             const miles = typeof l.miles === "number" ? Math.round(l.miles) : 0;
+            if (stockNo) {
+              const arr = stockMap.get(stockNo) || [];
+              if (!arr.includes(vin)) arr.push(vin);
+              stockMap.set(stockNo, arr);
+            }
+
+            // ── Change detection — capture prior state before any write ──
+            // deno-lint-ignore no-explicit-any
+            let priorListing: any = null;
+            // deno-lint-ignore no-explicit-any
+            let priorFile: any = null;
+            try {
+              const { data: pl } = await admin.from("vehicle_listings")
+                .select("id, price, mileage, condition, ymm")
+                .eq("tenant_id", cfg.tenant_id).eq("vin", vin).maybeSingle();
+              priorListing = pl || null;
+              const { data: pf } = await admin.from("vehicle_files")
+                .select("id, stock_number, condition, mileage")
+                .eq("tenant_id", cfg.tenant_id).eq("vin", vin).maybeSingle();
+              priorFile = pf || null;
+            } catch { /* diff best-effort */ }
+
 
             // 1) vehicle_files — the inventory-of-record / addendum hub. NEW
             // VINs create a fresh file; existing files only refresh inventory
@@ -853,11 +963,235 @@ serve(async (req) => {
                 if (enrichQueue.length < ENRICH_CAP) enrichQueue.push({ tenant_id: cfg.tenant_id, vin, zip: tenantZip || undefined });
               }
             }
+
+            // ── Emit change_history + exceptions ──────────────────────
+            // Wrapped so a logging failure never breaks the ingest loop.
+            try {
+              // Resolve the current listing id (for the FK on change_history).
+              const listingId = priorListing?.id
+                || (await admin.from("vehicle_listings").select("id")
+                  .eq("tenant_id", cfg.tenant_id).eq("vin", vin).maybeSingle()).data?.id
+                || null;
+
+              if (!priorListing) {
+                // Brand-new VIN — or a reappearance of a previously-removed one.
+                if (previouslyRemovedVins.has(vin)) {
+                  await emitChange({
+                    tenant_id: cfg.tenant_id, vehicle_listing_id: listingId, vin,
+                    field_key: "_lifecycle", previous_value: "removed_from_feed",
+                    new_value: "relisted", source: "marketcheck", change_origin: "automatic",
+                  });
+                  await emitException({
+                    tenant_id: cfg.tenant_id, vehicle_listing_id: listingId, vin, stock_number: stockNo || null,
+                    exception_type: "relisted", severity: "low",
+                    title: `${ymm || vin} is back on the feed`,
+                    explanation: "This VIN was previously removed from the feed and is now live again.",
+                    source_values: { price, miles, condition }, recommended_action: "Confirm status and refresh price/label if needed.",
+                    status: "open",
+                  });
+                } else {
+                  await emitChange({
+                    tenant_id: cfg.tenant_id, vehicle_listing_id: listingId, vin,
+                    field_key: "_lifecycle", previous_value: null,
+                    new_value: "new_vehicle", source: "marketcheck", change_origin: "automatic",
+                  });
+                  await emitException({
+                    tenant_id: cfg.tenant_id, vehicle_listing_id: listingId, vin, stock_number: stockNo || null,
+                    exception_type: "new_vehicle", severity: "info",
+                    title: `${ymm || vin} added to inventory`,
+                    explanation: "First time this VIN has been seen from the feed.",
+                    source_values: { price, miles, condition },
+                    recommended_action: "Generate required documents (window sticker, addendum, buyers guide).",
+                    status: "open",
+                  });
+                }
+              } else {
+                // Field-level diff on an existing listing.
+                const prevPriceRaw = priorListing.price;
+                const prevPrice = prevPriceRaw == null ? null : Number(prevPriceRaw);
+                if (price != null && prevPrice != null && Math.abs(prevPrice - price) >= 1) {
+                  const a = applyAuthority("price", { severity: "medium", requires_new_document: true });
+                  if (!a.skip) {
+                    const ex = await emitException({
+                      tenant_id: cfg.tenant_id, vehicle_listing_id: listingId, vin, stock_number: stockNo || null,
+                      exception_type: "price_change", severity: a.severity,
+                      title: `Price ${price > prevPrice ? "raised" : "lowered"}: $${prevPrice.toLocaleString()} → $${price.toLocaleString()}`,
+                      explanation: `The advertised price for ${ymm || vin} moved.`,
+                      source_values: { previous: prevPrice, next: price, source: "marketcheck" },
+                      recommended_action: "Regenerate & reprint the price label / addendum.",
+                      requires_new_document: a.requires_new_document, status: "open",
+                    });
+                    await emitChange({
+                      tenant_id: cfg.tenant_id, vehicle_listing_id: listingId, vin,
+                      field_key: "price", previous_value: String(prevPrice), new_value: String(price),
+                      source: "marketcheck", change_origin: "automatic",
+                      requires_new_document: a.requires_new_document, created_exception_id: ex,
+                    });
+                  }
+                }
+
+                const prevMilesRaw = priorListing.mileage;
+                const prevMiles = prevMilesRaw == null ? null : Number(prevMilesRaw);
+                if (miles > 0 && prevMiles != null && prevMiles !== miles) {
+                  const rolledBack = miles < prevMiles - 50;
+                  const type = rolledBack ? "mileage_rollback" : "mileage_change";
+                  const base = { severity: rolledBack ? "high" : "low", requires_new_document: rolledBack };
+                  const a = applyAuthority("mileage", base);
+                  if (!a.skip) {
+                    const ex = await emitException({
+                      tenant_id: cfg.tenant_id, vehicle_listing_id: listingId, vin, stock_number: stockNo || null,
+                      exception_type: type, severity: a.severity,
+                      title: rolledBack
+                        ? `Mileage decreased: ${prevMiles.toLocaleString()} → ${miles.toLocaleString()}`
+                        : `Mileage updated: ${prevMiles.toLocaleString()} → ${miles.toLocaleString()}`,
+                      explanation: rolledBack
+                        ? "Odometer reading dropped from the last sync. Verify the source before publishing."
+                        : "Odometer reading changed on the feed.",
+                      source_values: { previous: prevMiles, next: miles, source: "marketcheck" },
+                      recommended_action: rolledBack ? "Verify the odometer with the source system and update the disclosure if needed."
+                        : "Confirm the update and refresh printed materials on next print.",
+                      requires_new_document: a.requires_new_document, status: "open",
+                    });
+                    await emitChange({
+                      tenant_id: cfg.tenant_id, vehicle_listing_id: listingId, vin,
+                      field_key: "mileage", previous_value: String(prevMiles), new_value: String(miles),
+                      source: "marketcheck", change_origin: "automatic",
+                      requires_new_document: a.requires_new_document, created_exception_id: ex,
+                    });
+                  }
+                }
+
+                const prevCondition = priorListing.condition || null;
+                if (prevCondition && prevCondition !== condition) {
+                  const a = applyAuthority("condition", { severity: "medium", requires_new_document: true });
+                  if (!a.skip) {
+                    const ex = await emitException({
+                      tenant_id: cfg.tenant_id, vehicle_listing_id: listingId, vin, stock_number: stockNo || null,
+                      exception_type: condition === "cpo" || prevCondition === "cpo" ? "certification_change" : "vehicle_type_change",
+                      severity: a.severity,
+                      title: `Vehicle type changed: ${prevCondition} → ${condition}`,
+                      explanation: "The feed reports a different new/used/CPO classification than the last run.",
+                      source_values: { previous: prevCondition, next: condition, source: "marketcheck" },
+                      recommended_action: "Confirm the correct classification; regenerate documents that vary by type.",
+                      requires_new_document: a.requires_new_document, status: "open",
+                    });
+                    await emitChange({
+                      tenant_id: cfg.tenant_id, vehicle_listing_id: listingId, vin,
+                      field_key: "condition", previous_value: prevCondition, new_value: condition,
+                      source: "marketcheck", change_origin: "automatic",
+                      requires_new_document: a.requires_new_document, created_exception_id: ex,
+                    });
+                  }
+                }
+
+                const prevStock = String(priorFile?.stock_number ?? "").trim();
+                if (stockNo && prevStock && prevStock !== stockNo) {
+                  const a = applyAuthority("stock_number", { severity: "low" });
+                  if (!a.skip) {
+                    const ex = await emitException({
+                      tenant_id: cfg.tenant_id, vehicle_listing_id: listingId, vin, stock_number: stockNo,
+                      exception_type: "stock_number_change", severity: a.severity,
+                      title: `Stock # changed: ${prevStock} → ${stockNo}`,
+                      explanation: "The DMS stock number on the feed changed for this VIN.",
+                      source_values: { previous: prevStock, next: stockNo }, recommended_action: "Confirm the stock number in the DMS.",
+                      requires_new_document: a.requires_new_document, status: "open",
+                    });
+                    await emitChange({
+                      tenant_id: cfg.tenant_id, vehicle_listing_id: listingId, vin,
+                      field_key: "stock_number", previous_value: prevStock, new_value: stockNo,
+                      source: "marketcheck", change_origin: "automatic",
+                      requires_new_document: a.requires_new_document, created_exception_id: ex,
+                    });
+                  }
+                }
+              }
+
+              // Missing required fields (used vehicles need price + mileage).
+              if (condition === "used") {
+                if (price == null) {
+                  const a = applyAuthority("price", { severity: "medium" });
+                  if (!a.skip) {
+                    await emitException({
+                      tenant_id: cfg.tenant_id, vehicle_listing_id: listingId, vin, stock_number: stockNo || null,
+                      exception_type: "missing_required_field", severity: a.severity,
+                      title: `Missing price on used vehicle ${ymm || vin}`,
+                      explanation: "The feed row has no advertised price. A used vehicle must be published with a price.",
+                      source_values: { field: "price", source: "marketcheck" },
+                      recommended_action: "Set the advertised price at the source (DMS / website).",
+                      requires_new_document: a.requires_new_document, status: "open",
+                    });
+                  }
+                }
+                if (!miles) {
+                  const a = applyAuthority("mileage", { severity: "medium" });
+                  if (!a.skip) {
+                    await emitException({
+                      tenant_id: cfg.tenant_id, vehicle_listing_id: listingId, vin, stock_number: stockNo || null,
+                      exception_type: "missing_required_field", severity: a.severity,
+                      title: `Missing mileage on used vehicle ${ymm || vin}`,
+                      explanation: "The feed row has no odometer reading for a used vehicle.",
+                      source_values: { field: "mileage", source: "marketcheck" },
+                      recommended_action: "Enter the odometer reading at the source system.",
+                      requires_new_document: a.requires_new_document, status: "open",
+                    });
+                  }
+                }
+              }
+            } catch { /* change detection is best-effort */ }
           }
+
           start += listings.length;
           if (start >= numFound) break;
         }
       }
+
+      // ── Duplicate stock_number across live VINs ────────────────────
+      try {
+        for (const [stock, vins] of stockMap.entries()) {
+          if (vins.length < 2) continue;
+          for (const v of vins) {
+            const a = applyAuthority("stock_number", { severity: "medium" });
+            if (a.skip) continue;
+            await emitException({
+              tenant_id: cfg.tenant_id, vin: v, stock_number: stock,
+              exception_type: "duplicate_stock", severity: a.severity,
+              title: `Stock # ${stock} used on ${vins.length} live VINs`,
+              explanation: `Multiple live vehicles share stock number ${stock}: ${vins.join(", ")}. Stock numbers should be unique.`,
+              source_values: { stock, vins }, recommended_action: "Reassign one of the vehicles a unique stock number at the source.",
+              status: "open",
+            });
+          }
+        }
+      } catch { /* dupe scan best-effort */ }
+
+      // ── Removed-from-feed detection (before the prune deletes the rows) ──
+      // Only run when we pulled a FULL inventory successfully. Failed/partial
+      // pulls never mark cars as removed — the prune guard already blocks that.
+      try {
+        const fullSuccess = !firstWriteErr && liveVins.size > 0 && numFound > 0 && tenantSeen >= numFound;
+        if (fullSuccess && priorExistingVins.size > 0) {
+          for (const v of priorExistingVins) {
+            if (liveVins.has(v)) continue;
+            if (excInserts >= EXC_CAP) break;
+            const a = applyAuthority("_lifecycle", { severity: "low" });
+            if (a.skip) continue;
+            const ex = await emitException({
+              tenant_id: cfg.tenant_id, vin: v, exception_type: "removed_from_feed",
+              severity: a.severity, title: `${v} left the inventory feed`,
+              explanation: "The VIN was present on the previous pull but is absent from a successful full pull. This does NOT mark the car as sold.",
+              source_values: { source: "marketcheck" },
+              recommended_action: "Confirm whether the vehicle was sold, moved, or is a source glitch.",
+              status: "open",
+            });
+            await emitChange({
+              tenant_id: cfg.tenant_id, vin: v,
+              field_key: "_lifecycle", previous_value: "live", new_value: "removed_from_feed",
+              source: "marketcheck", change_origin: "automatic", created_exception_id: ex,
+            });
+          }
+        }
+      } catch { /* removed detection best-effort */ }
+
 
       // Replace-on-sync: prune MarketCheck cars that left the feed. Only when we
       // pulled the FULL inventory (not capped) and got a real result, so a

@@ -290,6 +290,10 @@ const CommandPalette = ({ open, onOpenChange }: CommandPaletteProps) => {
                 <ShieldCheck className="w-4 h-4 mr-2" />
                 Inventory Sync Center
               </CommandItem>
+              <CommandItem onSelect={() => go("/admin/exceptions")}>
+                <ShieldCheck className="w-4 h-4 mr-2" />
+                Exceptions
+              </CommandItem>
             </CommandGroup>
           </>
         )}

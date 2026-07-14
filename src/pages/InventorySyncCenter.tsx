@@ -116,20 +116,25 @@ export default function InventorySyncCenter() {
   const [selected, setSelected] = useState<Run | null>(null);
   const [selectedErrs, setSelectedErrs] = useState<SyncErr[]>([]);
   const [errsLoading, setErrsLoading] = useState(false);
+  const [unresolvedCount, setUnresolvedCount] = useState<number>(0);
 
   const load = useCallback(async () => {
     if (!tenantId) return;
     setLoading(true);
-    const [{ data: c }, { data: r }] = await Promise.all([
+    const [{ data: c }, { data: r }, { count: excCount }] = await Promise.all([
       (supabase as any).from("marketcheck_sync_config")
         .select("source, enabled, frequency, run_hour, day_of_week, last_run_at")
         .eq("tenant_id", tenantId).maybeSingle(),
       (supabase as any).from("inventory_sync_runs")
         .select("*").eq("tenant_id", tenantId)
         .order("started_at", { ascending: false }).limit(50),
+      (supabase as any).from("vehicle_exceptions")
+        .select("id", { count: "exact", head: true })
+        .eq("tenant_id", tenantId).in("status", ["open", "in_progress"]),
     ]);
     setCfg((c as Cfg) || null);
     setRuns((r as Run[]) || []);
+    setUnresolvedCount(typeof excCount === "number" ? excCount : 0);
     setLoading(false);
   }, [tenantId]);
 
@@ -274,6 +279,26 @@ export default function InventorySyncCenter() {
           ))}
         </div>
       )}
+
+      {/* ── Unresolved exceptions tie-in (Phase 2.3) ─────────── */}
+      {unresolvedCount > 0 && (
+        <a href="/admin/exceptions"
+          className="flex items-center justify-between gap-3 rounded-xl border border-amber-500/30 bg-amber-500/5 px-4 py-3 hover:bg-amber-500/10">
+          <div className="flex items-center gap-3">
+            <AlertTriangle className="w-4 h-4 text-amber-700" />
+            <div>
+              <div className="text-sm font-semibold text-amber-800">
+                {unresolvedCount} unresolved exception{unresolvedCount === 1 ? "" : "s"}
+              </div>
+              <div className="text-[11px] text-amber-800/80">
+                Reconciliation flagged data anomalies for this rooftop — review and resolve.
+              </div>
+            </div>
+          </div>
+          <span className="text-xs font-semibold text-amber-800 uppercase tracking-wider">Open →</span>
+        </a>
+      )}
+
 
       {/* ── Latest run stats ─────────────────────────────────── */}
       {latest && (

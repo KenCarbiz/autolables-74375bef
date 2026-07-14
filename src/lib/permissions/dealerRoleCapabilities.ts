@@ -51,7 +51,8 @@ export type DealerCapability =
   | "can_manage_invoices"
   | "can_view_platform_admin"
   | "can_manage_automation"
-  | "manage_source_authority";
+  | "manage_source_authority"
+  | "resolve_exceptions";
 
 const allDealerCapabilities: DealerCapability[] = [
   "can_view_dashboard",
@@ -83,6 +84,7 @@ const allDealerCapabilities: DealerCapability[] = [
   "can_manage_invoices",
   "can_manage_automation",
   "manage_source_authority",
+  "resolve_exceptions",
 ];
 
 const salesBase: DealerCapability[] = [
@@ -128,6 +130,7 @@ const complianceBase: DealerCapability[] = [
   "can_manage_compliance",
   "can_view_reports",
   "manage_source_authority",
+  "resolve_exceptions",
 ];
 
 // Used-Car Director / GSM: full operating visibility, short of owner-only

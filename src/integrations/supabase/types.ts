@@ -1879,6 +1879,41 @@ export type Database = {
         }
         Relationships: []
       }
+      exception_comments: {
+        Row: {
+          author: string | null
+          body: string
+          created_at: string
+          exception_id: string
+          id: string
+          tenant_id: string
+        }
+        Insert: {
+          author?: string | null
+          body: string
+          created_at?: string
+          exception_id: string
+          id?: string
+          tenant_id: string
+        }
+        Update: {
+          author?: string | null
+          body?: string
+          created_at?: string
+          exception_id?: string
+          id?: string
+          tenant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "exception_comments_exception_id_fkey"
+            columns: ["exception_id"]
+            isOneToOne: false
+            referencedRelation: "vehicle_exceptions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       generated_documents: {
         Row: {
           approved_at: string | null
@@ -5004,6 +5039,54 @@ export type Database = {
         }
         Relationships: []
       }
+      vehicle_change_history: {
+        Row: {
+          change_origin: string
+          changed_at: string
+          changed_by: string | null
+          created_exception_id: string | null
+          field_key: string
+          id: string
+          new_value: string | null
+          previous_value: string | null
+          requires_new_document: boolean
+          source: string
+          tenant_id: string
+          vehicle_listing_id: string | null
+          vin: string
+        }
+        Insert: {
+          change_origin?: string
+          changed_at?: string
+          changed_by?: string | null
+          created_exception_id?: string | null
+          field_key: string
+          id?: string
+          new_value?: string | null
+          previous_value?: string | null
+          requires_new_document?: boolean
+          source?: string
+          tenant_id: string
+          vehicle_listing_id?: string | null
+          vin: string
+        }
+        Update: {
+          change_origin?: string
+          changed_at?: string
+          changed_by?: string | null
+          created_exception_id?: string | null
+          field_key?: string
+          id?: string
+          new_value?: string | null
+          previous_value?: string | null
+          requires_new_document?: boolean
+          source?: string
+          tenant_id?: string
+          vehicle_listing_id?: string | null
+          vin?: string
+        }
+        Relationships: []
+      }
       vehicle_documents: {
         Row: {
           caption: string | null
@@ -5070,6 +5153,72 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      vehicle_exceptions: {
+        Row: {
+          assigned_to: string | null
+          created_at: string
+          due_at: string | null
+          exception_type: string
+          explanation: string | null
+          id: string
+          recommended_action: string | null
+          requires_new_document: boolean
+          resolved_at: string | null
+          resolved_by: string | null
+          severity: string
+          source_values: Json | null
+          status: string
+          stock_number: string | null
+          tenant_id: string
+          title: string
+          updated_at: string
+          vehicle_listing_id: string | null
+          vin: string
+        }
+        Insert: {
+          assigned_to?: string | null
+          created_at?: string
+          due_at?: string | null
+          exception_type: string
+          explanation?: string | null
+          id?: string
+          recommended_action?: string | null
+          requires_new_document?: boolean
+          resolved_at?: string | null
+          resolved_by?: string | null
+          severity: string
+          source_values?: Json | null
+          status?: string
+          stock_number?: string | null
+          tenant_id: string
+          title: string
+          updated_at?: string
+          vehicle_listing_id?: string | null
+          vin: string
+        }
+        Update: {
+          assigned_to?: string | null
+          created_at?: string
+          due_at?: string | null
+          exception_type?: string
+          explanation?: string | null
+          id?: string
+          recommended_action?: string | null
+          requires_new_document?: boolean
+          resolved_at?: string | null
+          resolved_by?: string | null
+          severity?: string
+          source_values?: Json | null
+          status?: string
+          stock_number?: string | null
+          tenant_id?: string
+          title?: string
+          updated_at?: string
+          vehicle_listing_id?: string | null
+          vin?: string
+        }
+        Relationships: []
       }
       vehicle_files: {
         Row: {
