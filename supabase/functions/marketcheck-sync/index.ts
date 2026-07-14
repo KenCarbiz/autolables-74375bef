@@ -514,6 +514,76 @@ serve(async (req) => {
     let firstWriteErr: string | null = null;
     const liveVins = new Set<string>();
     const runStartedAt = new Date().toISOString();
+
+    // ── Phase 2.3 reconciliation / change-detection state ─────────────────
+    // All change/exception writes go through emitException + emitChange helpers
+    // wrapped in try/catch so a logging failure NEVER breaks the ingest loop.
+    // Capped per invocation so the first deploy can't flood the table for the
+    // whole existing lot.
+    const EXC_CAP = 300;
+    let excInserts = 0;
+    const stockMap = new Map<string, string[]>();     // live stock_number -> vins seen
+    const priorExistingVins = new Set<string>();       // vehicle_listings VINs before this pull
+    const previouslyRemovedVins = new Set<string>();   // VINs with a prior 'removed_from_feed' change
+    const authorityRules = new Map<string, { conflict_behavior?: string | null }>();
+    // deno-lint-ignore no-explicit-any
+    const emitException = async (row: any) => {
+      if (excInserts >= EXC_CAP) return null;
+      try {
+        // Upsert-like: if an open/in_progress exception of this (vin, type) exists,
+        // refresh it (partial-unique index enforces the invariant).
+        const { data: existing } = await admin.from("vehicle_exceptions")
+          .select("id").eq("tenant_id", row.tenant_id).eq("vin", row.vin)
+          .eq("exception_type", row.exception_type).in("status", ["open", "in_progress"])
+          .maybeSingle();
+        if (existing?.id) {
+          await admin.from("vehicle_exceptions").update({
+            severity: row.severity, title: row.title, explanation: row.explanation ?? null,
+            source_values: row.source_values ?? null, recommended_action: row.recommended_action ?? null,
+            requires_new_document: !!row.requires_new_document,
+            stock_number: row.stock_number ?? null, vehicle_listing_id: row.vehicle_listing_id ?? null,
+          }).eq("id", existing.id);
+          return existing.id as string;
+        }
+        const { data: ins } = await admin.from("vehicle_exceptions").insert(row).select("id").maybeSingle();
+        if (ins?.id) excInserts++;
+        return (ins?.id as string) || null;
+      } catch { return null; }
+    };
+    // deno-lint-ignore no-explicit-any
+    const emitChange = async (row: any) => {
+      try { await admin.from("vehicle_change_history").insert(row); } catch { /* best-effort */ }
+    };
+    const applyAuthority = (fieldKey: string, base: { severity: string; requires_new_document?: boolean }):
+      { skip: boolean; severity: string; requires_new_document: boolean } => {
+      const rule = authorityRules.get(fieldKey);
+      const beh = String(rule?.conflict_behavior || "").trim().toLowerCase();
+      if (beh === "ignore") return { skip: true, severity: base.severity, requires_new_document: !!base.requires_new_document };
+      if (beh === "block_generation") return { skip: false, severity: "high", requires_new_document: true };
+      return { skip: false, severity: base.severity, requires_new_document: !!base.requires_new_document };
+    };
+    try {
+      const { data: rules } = await admin.from("source_authority_rules")
+        .select("field_key, conflict_behavior").eq("tenant_id", cfg.tenant_id);
+      for (const r of (rules || []) as Array<{ field_key: string; conflict_behavior?: string | null }>) {
+        if (r?.field_key) authorityRules.set(r.field_key, { conflict_behavior: r.conflict_behavior ?? null });
+      }
+    } catch { /* rules table optional */ }
+    try {
+      const { data: existingRows } = await admin.from("vehicle_listings")
+        .select("vin").eq("tenant_id", cfg.tenant_id).limit(20000);
+      for (const r of (existingRows || []) as Array<{ vin: string }>) {
+        if (r.vin) priorExistingVins.add(normVin(r.vin));
+      }
+    } catch { /* diff best-effort */ }
+    try {
+      const { data: removedRows } = await admin.from("vehicle_change_history")
+        .select("vin").eq("tenant_id", cfg.tenant_id).eq("field_key", "_lifecycle")
+        .eq("new_value", "removed_from_feed").limit(5000);
+      for (const r of (removedRows || []) as Array<{ vin: string }>) {
+        if (r.vin) previouslyRemovedVins.add(normVin(r.vin));
+      }
+    } catch { /* first run — no history yet */ }
     try {
       // Latest website price per VIN — only append a snapshot when it moved.
       const { data: priceRows } = await admin.from("advertised_prices")
