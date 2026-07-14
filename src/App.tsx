@@ -258,6 +258,7 @@ const App = () => (
                         <Route path="/addendum-label/:id" element={<AddendumLabelPrint />} />
                         <Route path="/admin/certification-history" element={<AdminCertificationHistory />} />
                         <Route path="/admin/inventory-sync" element={<InventorySyncCenter />} />
+                        <Route path="/admin/command-center" element={<CommandCenter />} />
                         <Route path="/admin/exceptions" element={<InventoryExceptions />} />
                         <Route path="/admin/source-authority" element={<SourceAuthoritySettings />} />
                         <Route path="/saved" element={<SavedAddendums />} />
