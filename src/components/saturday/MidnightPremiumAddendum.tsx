@@ -43,7 +43,7 @@ const SectionBar = ({ icon, title, tag, total, bg, fg }: { icon: AddendumIconKey
   </div>
 );
 
-export const SaturdayPremiumAddendum: React.FC<Props> = ({ data }) => {
+export const MidnightPremiumAddendum: React.FC<Props> = ({ data }) => {
   const { dealer, vehicle, installed = [], upgrades = [], benefits, qrUrl, disclaimer } = data;
   // Accent follows the dealer theme (populated by toSaturdaySticker from
   // branding.accentColor). Neutrals (navy, slate) stay fixed; installed
@@ -267,4 +267,4 @@ export const SaturdayPremiumAddendum: React.FC<Props> = ({ data }) => {
   );
 };
 
-export default SaturdayPremiumAddendum;
+export default MidnightPremiumAddendum;

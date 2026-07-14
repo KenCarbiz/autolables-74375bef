@@ -1,6 +1,9 @@
 import SaturdayHeroWindow from "@/components/saturday/SaturdayHeroWindow";
 import SaturdayClassicWindow from "@/components/saturday/SaturdayClassicWindow";
 import SaturdayPremiumAddendum from "@/components/saturday/SaturdayPremiumAddendum";
+import MidnightPremiumAddendum from "@/components/saturday/MidnightPremiumAddendum";
+import EclipsePremiumAddendum from "@/components/saturday/EclipsePremiumAddendum";
+import OnyxPremiumAddendum from "@/components/saturday/OnyxPremiumAddendum";
 import type { SaturdaySticker } from "@/components/saturday/types";
 import type {
   StickerBranding,
@@ -200,17 +203,27 @@ function SaturdayClassicRenderer(props: TemplateRenderProps) {
   return <SaturdayClassicWindow data={toSaturdaySticker(props.data, props.branding)} />;
 }
 
-function SaturdayPremiumAddendumRenderer(props: TemplateRenderProps) {
-  const sticker = toSaturdaySticker(props.data, props.branding) as SaturdayAddendumData;
-  sticker.installed = priced(props.data.installed);
-  sticker.upgrades = priced(props.data.upgrades);
-  return <SaturdayPremiumAddendum data={sticker} />;
+function makeAddendumRenderer(Component: React.ComponentType<{ data: SaturdayAddendumData }>) {
+  return function AddendumRenderer(props: TemplateRenderProps) {
+    const sticker = toSaturdaySticker(props.data, props.branding) as SaturdayAddendumData;
+    sticker.installed = priced(props.data.installed);
+    sticker.upgrades = priced(props.data.upgrades);
+    return <Component data={sticker} />;
+  };
 }
+
+const SaturdayPremiumAddendumRenderer = makeAddendumRenderer(SaturdayPremiumAddendum);
+const MidnightPremiumAddendumRenderer = makeAddendumRenderer(MidnightPremiumAddendum);
+const EclipsePremiumAddendumRenderer = makeAddendumRenderer(EclipsePremiumAddendum);
+const OnyxPremiumAddendumRenderer = makeAddendumRenderer(OnyxPremiumAddendum);
 
 const SATURDAY_RENDERERS: Record<string, (props: TemplateRenderProps) => JSX.Element> = {
   "window-saturday-hero": SaturdayHeroRenderer,
   "window-saturday-classic": SaturdayClassicRenderer,
   "addendum-saturday-premium": SaturdayPremiumAddendumRenderer,
+  "addendum-saturday-midnight": MidnightPremiumAddendumRenderer,
+  "addendum-saturday-eclipse": EclipsePremiumAddendumRenderer,
+  "addendum-saturday-onyx": OnyxPremiumAddendumRenderer,
 };
 
 const SATURDAY_CONFIGS: Record<string, StickerTemplateConfig> = {
@@ -232,6 +245,27 @@ const SATURDAY_CONFIGS: Record<string, StickerTemplateConfig> = {
     name: "Saturday Premium Addendum",
     styleTags: ["Modern", "Readability", "Compliance"],
     useCase: "4.25x11 premium branded addendum with passport QR, equipment, benefits, and upgrades",
+    complianceNote: "Summarizes dealer-installed equipment and optional upgrades; full disclosure packet remains in the QR passport.",
+  }),
+  "addendum-saturday-midnight": saturdayAddendumConfig({
+    id: "addendum-saturday-midnight",
+    name: "Midnight Premium Addendum",
+    styleTags: ["Modern", "Readability", "Compliance"],
+    useCase: "4.25x11 premium branded addendum variant — independently editable Midnight layout.",
+    complianceNote: "Summarizes dealer-installed equipment and optional upgrades; full disclosure packet remains in the QR passport.",
+  }),
+  "addendum-saturday-eclipse": saturdayAddendumConfig({
+    id: "addendum-saturday-eclipse",
+    name: "Eclipse Premium Addendum",
+    styleTags: ["Modern", "Readability", "Compliance"],
+    useCase: "4.25x11 premium branded addendum variant — independently editable Eclipse layout.",
+    complianceNote: "Summarizes dealer-installed equipment and optional upgrades; full disclosure packet remains in the QR passport.",
+  }),
+  "addendum-saturday-onyx": saturdayAddendumConfig({
+    id: "addendum-saturday-onyx",
+    name: "Onyx Premium Addendum",
+    styleTags: ["Modern", "Readability", "Compliance"],
+    useCase: "4.25x11 premium branded addendum variant — independently editable Onyx layout.",
     complianceNote: "Summarizes dealer-installed equipment and optional upgrades; full disclosure packet remains in the QR passport.",
   }),
 };
