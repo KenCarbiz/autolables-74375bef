@@ -1145,6 +1145,54 @@ serve(async (req) => {
         }
       }
 
+      // ── Duplicate stock_number across live VINs ────────────────────
+      try {
+        for (const [stock, vins] of stockMap.entries()) {
+          if (vins.length < 2) continue;
+          for (const v of vins) {
+            const a = applyAuthority("stock_number", { severity: "medium" });
+            if (a.skip) continue;
+            await emitException({
+              tenant_id: cfg.tenant_id, vin: v, stock_number: stock,
+              exception_type: "duplicate_stock", severity: a.severity,
+              title: `Stock # ${stock} used on ${vins.length} live VINs`,
+              explanation: `Multiple live vehicles share stock number ${stock}: ${vins.join(", ")}. Stock numbers should be unique.`,
+              source_values: { stock, vins }, recommended_action: "Reassign one of the vehicles a unique stock number at the source.",
+              status: "open",
+            });
+          }
+        }
+      } catch { /* dupe scan best-effort */ }
+
+      // ── Removed-from-feed detection (before the prune deletes the rows) ──
+      // Only run when we pulled a FULL inventory successfully. Failed/partial
+      // pulls never mark cars as removed — the prune guard already blocks that.
+      try {
+        const fullSuccess = !firstWriteErr && liveVins.size > 0 && numFound > 0 && tenantSeen >= numFound;
+        if (fullSuccess && priorExistingVins.size > 0) {
+          for (const v of priorExistingVins) {
+            if (liveVins.has(v)) continue;
+            if (excInserts >= EXC_CAP) break;
+            const a = applyAuthority("_lifecycle", { severity: "low" });
+            if (a.skip) continue;
+            const ex = await emitException({
+              tenant_id: cfg.tenant_id, vin: v, exception_type: "removed_from_feed",
+              severity: a.severity, title: `${v} left the inventory feed`,
+              explanation: "The VIN was present on the previous pull but is absent from a successful full pull. This does NOT mark the car as sold.",
+              source_values: { source: "marketcheck" },
+              recommended_action: "Confirm whether the vehicle was sold, moved, or is a source glitch.",
+              status: "open",
+            });
+            await emitChange({
+              tenant_id: cfg.tenant_id, vin: v,
+              field_key: "_lifecycle", previous_value: "live", new_value: "removed_from_feed",
+              source: "marketcheck", change_origin: "automatic", created_exception_id: ex,
+            });
+          }
+        }
+      } catch { /* removed detection best-effort */ }
+
+
       // Replace-on-sync: prune MarketCheck cars that left the feed. Only when we
       // pulled the FULL inventory (not capped) and got a real result, so a
       // partial/failed pull never deletes good cars.
