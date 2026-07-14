@@ -78,7 +78,8 @@ interface PrepRow {
 }
 
 export function useVehicleCompliance() {
-  const { currentTenantId } = useTenant();
+  const { tenant } = useTenant();
+  const currentTenantId = tenant?.id ?? null;
   const [rows, setRows] = useState<VehicleComplianceRow[]>([]);
   const [latestSync, setLatestSync] = useState<{
     status: string | null; finished_at: string | null; error_summary: string | null;
