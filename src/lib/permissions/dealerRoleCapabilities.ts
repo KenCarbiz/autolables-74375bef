@@ -84,6 +84,7 @@ const allDealerCapabilities: DealerCapability[] = [
   "can_manage_invoices",
   "can_manage_automation",
   "manage_source_authority",
+  "resolve_exceptions",
 ];
 
 const salesBase: DealerCapability[] = [
