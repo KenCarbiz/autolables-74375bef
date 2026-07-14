@@ -109,9 +109,10 @@ const StatusBadge = ({ s }: { s: Status }) => (
 
 export default function InventoryExceptions() {
   const { tenant } = useTenant();
-  const { role, isAdmin } = useAuth();
+  const { isAdmin } = useAuth();
+  const { member } = useEntitlements();
   const tenantId = tenant?.id || null;
-  const canResolve = hasDealerCapability(role, "resolve_exceptions", isAdmin);
+  const canResolve = hasDealerCapability(member?.role, "resolve_exceptions", isAdmin);
 
   const [rows, setRows] = useState<Exception[]>([]);
   const [loading, setLoading] = useState(true);
