@@ -963,7 +963,183 @@ serve(async (req) => {
                 if (enrichQueue.length < ENRICH_CAP) enrichQueue.push({ tenant_id: cfg.tenant_id, vin, zip: tenantZip || undefined });
               }
             }
+
+            // ── Emit change_history + exceptions ──────────────────────
+            // Wrapped so a logging failure never breaks the ingest loop.
+            try {
+              // Resolve the current listing id (for the FK on change_history).
+              const listingId = priorListing?.id
+                || (await admin.from("vehicle_listings").select("id")
+                  .eq("tenant_id", cfg.tenant_id).eq("vin", vin).maybeSingle()).data?.id
+                || null;
+
+              if (!priorListing) {
+                // Brand-new VIN — or a reappearance of a previously-removed one.
+                if (previouslyRemovedVins.has(vin)) {
+                  await emitChange({
+                    tenant_id: cfg.tenant_id, vehicle_listing_id: listingId, vin,
+                    field_key: "_lifecycle", previous_value: "removed_from_feed",
+                    new_value: "relisted", source: "marketcheck", change_origin: "automatic",
+                  });
+                  await emitException({
+                    tenant_id: cfg.tenant_id, vehicle_listing_id: listingId, vin, stock_number: stockNo || null,
+                    exception_type: "relisted", severity: "low",
+                    title: `${ymm || vin} is back on the feed`,
+                    explanation: "This VIN was previously removed from the feed and is now live again.",
+                    source_values: { price, miles, condition }, recommended_action: "Confirm status and refresh price/label if needed.",
+                    status: "open",
+                  });
+                } else {
+                  await emitChange({
+                    tenant_id: cfg.tenant_id, vehicle_listing_id: listingId, vin,
+                    field_key: "_lifecycle", previous_value: null,
+                    new_value: "new_vehicle", source: "marketcheck", change_origin: "automatic",
+                  });
+                  await emitException({
+                    tenant_id: cfg.tenant_id, vehicle_listing_id: listingId, vin, stock_number: stockNo || null,
+                    exception_type: "new_vehicle", severity: "info",
+                    title: `${ymm || vin} added to inventory`,
+                    explanation: "First time this VIN has been seen from the feed.",
+                    source_values: { price, miles, condition },
+                    recommended_action: "Generate required documents (window sticker, addendum, buyers guide).",
+                    status: "open",
+                  });
+                }
+              } else {
+                // Field-level diff on an existing listing.
+                const prevPriceRaw = priorListing.price;
+                const prevPrice = prevPriceRaw == null ? null : Number(prevPriceRaw);
+                if (price != null && prevPrice != null && Math.abs(prevPrice - price) >= 1) {
+                  const a = applyAuthority("price", { severity: "medium", requires_new_document: true });
+                  if (!a.skip) {
+                    const ex = await emitException({
+                      tenant_id: cfg.tenant_id, vehicle_listing_id: listingId, vin, stock_number: stockNo || null,
+                      exception_type: "price_change", severity: a.severity,
+                      title: `Price ${price > prevPrice ? "raised" : "lowered"}: $${prevPrice.toLocaleString()} → $${price.toLocaleString()}`,
+                      explanation: `The advertised price for ${ymm || vin} moved.`,
+                      source_values: { previous: prevPrice, next: price, source: "marketcheck" },
+                      recommended_action: "Regenerate & reprint the price label / addendum.",
+                      requires_new_document: a.requires_new_document, status: "open",
+                    });
+                    await emitChange({
+                      tenant_id: cfg.tenant_id, vehicle_listing_id: listingId, vin,
+                      field_key: "price", previous_value: String(prevPrice), new_value: String(price),
+                      source: "marketcheck", change_origin: "automatic",
+                      requires_new_document: a.requires_new_document, created_exception_id: ex,
+                    });
+                  }
+                }
+
+                const prevMilesRaw = priorListing.mileage;
+                const prevMiles = prevMilesRaw == null ? null : Number(prevMilesRaw);
+                if (miles > 0 && prevMiles != null && prevMiles !== miles) {
+                  const rolledBack = miles < prevMiles - 50;
+                  const type = rolledBack ? "mileage_rollback" : "mileage_change";
+                  const base = { severity: rolledBack ? "high" : "low", requires_new_document: rolledBack };
+                  const a = applyAuthority("mileage", base);
+                  if (!a.skip) {
+                    const ex = await emitException({
+                      tenant_id: cfg.tenant_id, vehicle_listing_id: listingId, vin, stock_number: stockNo || null,
+                      exception_type: type, severity: a.severity,
+                      title: rolledBack
+                        ? `Mileage decreased: ${prevMiles.toLocaleString()} → ${miles.toLocaleString()}`
+                        : `Mileage updated: ${prevMiles.toLocaleString()} → ${miles.toLocaleString()}`,
+                      explanation: rolledBack
+                        ? "Odometer reading dropped from the last sync. Verify the source before publishing."
+                        : "Odometer reading changed on the feed.",
+                      source_values: { previous: prevMiles, next: miles, source: "marketcheck" },
+                      recommended_action: rolledBack ? "Verify the odometer with the source system and update the disclosure if needed."
+                        : "Confirm the update and refresh printed materials on next print.",
+                      requires_new_document: a.requires_new_document, status: "open",
+                    });
+                    await emitChange({
+                      tenant_id: cfg.tenant_id, vehicle_listing_id: listingId, vin,
+                      field_key: "mileage", previous_value: String(prevMiles), new_value: String(miles),
+                      source: "marketcheck", change_origin: "automatic",
+                      requires_new_document: a.requires_new_document, created_exception_id: ex,
+                    });
+                  }
+                }
+
+                const prevCondition = priorListing.condition || null;
+                if (prevCondition && prevCondition !== condition) {
+                  const a = applyAuthority("condition", { severity: "medium", requires_new_document: true });
+                  if (!a.skip) {
+                    const ex = await emitException({
+                      tenant_id: cfg.tenant_id, vehicle_listing_id: listingId, vin, stock_number: stockNo || null,
+                      exception_type: condition === "cpo" || prevCondition === "cpo" ? "certification_change" : "vehicle_type_change",
+                      severity: a.severity,
+                      title: `Vehicle type changed: ${prevCondition} → ${condition}`,
+                      explanation: "The feed reports a different new/used/CPO classification than the last run.",
+                      source_values: { previous: prevCondition, next: condition, source: "marketcheck" },
+                      recommended_action: "Confirm the correct classification; regenerate documents that vary by type.",
+                      requires_new_document: a.requires_new_document, status: "open",
+                    });
+                    await emitChange({
+                      tenant_id: cfg.tenant_id, vehicle_listing_id: listingId, vin,
+                      field_key: "condition", previous_value: prevCondition, new_value: condition,
+                      source: "marketcheck", change_origin: "automatic",
+                      requires_new_document: a.requires_new_document, created_exception_id: ex,
+                    });
+                  }
+                }
+
+                const prevStock = String(priorFile?.stock_number ?? "").trim();
+                if (stockNo && prevStock && prevStock !== stockNo) {
+                  const a = applyAuthority("stock_number", { severity: "low" });
+                  if (!a.skip) {
+                    const ex = await emitException({
+                      tenant_id: cfg.tenant_id, vehicle_listing_id: listingId, vin, stock_number: stockNo,
+                      exception_type: "stock_number_change", severity: a.severity,
+                      title: `Stock # changed: ${prevStock} → ${stockNo}`,
+                      explanation: "The DMS stock number on the feed changed for this VIN.",
+                      source_values: { previous: prevStock, next: stockNo }, recommended_action: "Confirm the stock number in the DMS.",
+                      requires_new_document: a.requires_new_document, status: "open",
+                    });
+                    await emitChange({
+                      tenant_id: cfg.tenant_id, vehicle_listing_id: listingId, vin,
+                      field_key: "stock_number", previous_value: prevStock, new_value: stockNo,
+                      source: "marketcheck", change_origin: "automatic",
+                      requires_new_document: a.requires_new_document, created_exception_id: ex,
+                    });
+                  }
+                }
+              }
+
+              // Missing required fields (used vehicles need price + mileage).
+              if (condition === "used") {
+                if (price == null) {
+                  const a = applyAuthority("price", { severity: "medium" });
+                  if (!a.skip) {
+                    await emitException({
+                      tenant_id: cfg.tenant_id, vehicle_listing_id: listingId, vin, stock_number: stockNo || null,
+                      exception_type: "missing_required_field", severity: a.severity,
+                      title: `Missing price on used vehicle ${ymm || vin}`,
+                      explanation: "The feed row has no advertised price. A used vehicle must be published with a price.",
+                      source_values: { field: "price", source: "marketcheck" },
+                      recommended_action: "Set the advertised price at the source (DMS / website).",
+                      requires_new_document: a.requires_new_document, status: "open",
+                    });
+                  }
+                }
+                if (!miles) {
+                  const a = applyAuthority("mileage", { severity: "medium" });
+                  if (!a.skip) {
+                    await emitException({
+                      tenant_id: cfg.tenant_id, vehicle_listing_id: listingId, vin, stock_number: stockNo || null,
+                      exception_type: "missing_required_field", severity: a.severity,
+                      title: `Missing mileage on used vehicle ${ymm || vin}`,
+                      explanation: "The feed row has no odometer reading for a used vehicle.",
+                      source_values: { field: "mileage", source: "marketcheck" },
+                      recommended_action: "Enter the odometer reading at the source system.",
+                      requires_new_document: a.requires_new_document, status: "open",
+                    });
+                  }
+                }
+              }
+            } catch { /* change detection is best-effort */ }
           }
+
           start += listings.length;
           if (start >= numFound) break;
         }
