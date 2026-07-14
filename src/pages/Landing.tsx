@@ -575,148 +575,148 @@ const HeroCheck = ({ iconSrc, label }: { iconSrc: string; label: string }) => (
 // a single "caught before a customer did" beat, and seals with a real
 // content-hash footer so the card reads as a legal evidence record, not a
 // generic status board.
+// Per-VIN tamper-evident "defense file" — presented as a real in-app
+// evidence screen: quiet product header, calm status rows, a compact
+// exceptions list, and a subtle content-hash footer. No marketing chrome.
 const ComplianceStatusCard = () => (
-  <div className="relative overflow-hidden rounded-2xl border border-slate-200 bg-white ring-1 ring-slate-900/[0.04] shadow-[0_2px_4px_-1px_rgba(15,23,42,0.06),0_20px_40px_-12px_rgba(15,23,42,0.16),0_40px_90px_-30px_rgba(11,32,65,0.28)]">
-    {/* Faint ledger grid so the card reads as an evidence document, not chrome. */}
-    <div
-      aria-hidden
-      className="pointer-events-none absolute inset-0 z-0 bg-[linear-gradient(to_right,rgba(15,23,42,0.03)_1px,transparent_1px),linear-gradient(to_bottom,rgba(15,23,42,0.03)_1px,transparent_1px)] bg-[size:22px_22px] [mask-image:linear-gradient(to_bottom,#000,transparent_88%)]"
-    />
-    <div className="relative z-10">
-      <div className="border-b border-slate-100 bg-gradient-to-b from-slate-50 to-white px-5 pb-3.5 pt-4">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2.5">
-            <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-[#0B2041] text-white shadow-sm ring-1 ring-white/10">
-              <ShieldCheck className="h-4 w-4" />
-            </span>
-            <div className="leading-none">
-              <p className="font-display text-[13px] font-black tracking-tight text-slate-900">VIN defense file</p>
-              <p className="mt-1 font-mono text-[10px] tracking-tight text-slate-500">REC-2026-0617 · 142 VINs sealed</p>
+  <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-[0_1px_2px_rgba(15,23,42,0.04),0_12px_32px_-16px_rgba(15,23,42,0.18)]">
+    {/* Product-style header row */}
+    <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3">
+      <div className="flex items-center gap-2.5 min-w-0">
+        <span className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-lg bg-slate-900 text-white">
+          <ShieldCheck className="h-3.5 w-3.5" />
+        </span>
+        <div className="min-w-0 leading-tight">
+          <p className="text-[13px] font-semibold tracking-tight text-slate-900">VIN defense file</p>
+          <p className="mt-0.5 font-mono text-[10px] text-slate-500 truncate">REC-2026-0617 · 142 VINs sealed</p>
+        </div>
+      </div>
+      <span className="inline-flex flex-shrink-0 items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[10px] font-medium text-emerald-700">
+        <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+        Live
+      </span>
+    </div>
+
+    {/* Status list — the four evidence rows */}
+    <ul className="divide-y divide-slate-100">
+      {[
+        { label: "Advertised price locked to all-in", sub: "Signing blocked until price matches", chip: "Enforced" },
+        { label: "Disclosures signed & hash-sealed", sub: "E-sign consent · IP · UTC time", chip: "Sealed" },
+        { label: "Installer proof on file", sub: "Sign-off + photo per pre-installed item", chip: "Verified" },
+        { label: "Website price screenshot", sub: "Captured at pre-signature re-check", chip: "Captured" },
+      ].map((r) => (
+        <li key={r.label} className="flex items-center justify-between gap-3 px-4 py-2.5">
+          <div className="flex min-w-0 items-start gap-2.5">
+            <CheckCircle2 className="mt-0.5 h-3.5 w-3.5 flex-shrink-0 text-emerald-600" />
+            <div className="min-w-0">
+              <p className="text-[12.5px] font-medium leading-tight text-slate-900">{r.label}</p>
+              <p className="mt-0.5 truncate text-[10.5px] leading-tight text-slate-500">{r.sub}</p>
             </div>
           </div>
-          <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-200/70 bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold tracking-wide text-emerald-700">
-            <span className="relative flex h-1.5 w-1.5">
-              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-60" />
-              <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-emerald-500" />
-            </span>
-            Live
+          <span className="inline-flex flex-shrink-0 items-center rounded-md border border-slate-200 bg-slate-50 px-1.5 py-0.5 text-[10px] font-medium text-slate-600">
+            {r.chip}
           </span>
+        </li>
+      ))}
+    </ul>
+
+    {/* Website scan exceptions */}
+    <div className="border-t border-slate-100 bg-slate-50/50 px-4 py-3">
+      <div className="mb-2 flex items-center justify-between">
+        <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">Website scan · exceptions</span>
+        <span className="text-[10px] font-medium text-slate-500">02:14 UTC</span>
+      </div>
+      <div className="space-y-1.5">
+        <div className="flex items-start gap-2 rounded-lg border border-red-100 bg-white px-2.5 py-2">
+          <span className="mt-1 h-1.5 w-1.5 flex-shrink-0 rounded-full bg-red-500" />
+          <div className="min-w-0 flex-1">
+            <p className="text-[11.5px] font-medium leading-tight text-slate-900">Advertised price mismatch — held</p>
+            <p className="mt-0.5 truncate font-mono text-[10px] text-slate-500">VIN 1HGCM826… · Lot $34,991 vs Site $32,995</p>
+          </div>
+          <span className="inline-flex flex-shrink-0 items-center rounded border border-red-200 bg-red-50 px-1.5 py-0.5 text-[9.5px] font-medium text-red-700">Held</span>
+        </div>
+        <div className="flex items-start gap-2 rounded-lg border border-amber-100 bg-white px-2.5 py-2">
+          <span className="mt-1 h-1.5 w-1.5 flex-shrink-0 rounded-full bg-amber-500" />
+          <div className="min-w-0 flex-1">
+            <p className="text-[11.5px] font-medium leading-tight text-slate-900">Missing disclosure — flagged</p>
+            <p className="mt-0.5 truncate font-mono text-[10px] text-slate-500">2019 F-150 · Buyers Guide not attached</p>
+          </div>
+          <span className="inline-flex flex-shrink-0 items-center rounded border border-amber-200 bg-amber-50 px-1.5 py-0.5 text-[9.5px] font-medium text-amber-700">Flag</span>
         </div>
       </div>
 
-      <div className="divide-y divide-slate-100/80">
-        <StatusRow label="Advertised price locked to all-in" sub="Signing blocked until the price matches" chip="Enforced" tone="navy" />
-        <StatusRow label="Disclosures signed &amp; hash-sealed" sub="E-sign consent · IP · UTC time" mono="sha-256" chip="Sealed" />
-        <StatusRow label="Installer proof, per pre-installed item" sub="Sign-off + install photo on file" chip="Verified" />
-        <StatusRow label="Website price screenshot on file" sub="Timestamped at the pre-signature re-check" chip="Captured" />
-      </div>
-
-      <div className="border-t border-slate-100 bg-slate-50/40 px-5 pb-5 pt-4">
-        <div className="mb-3 flex items-center justify-between">
-          <span className="font-mono text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-500">Website scan · exceptions</span>
-          <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-semibold text-amber-700 ring-1 ring-amber-200/70">
-            <AlertTriangle className="h-3 w-3" /> Caught &amp; held
-          </span>
-        </div>
-        <AlertRow tone="red" title="Advertised price mismatch — held" detail="VIN 1HGCM826… · Lot $34,991 vs Site $32,995" />
-        <AlertRow tone="amber" title="Missing disclosure — flagged" detail="2019 F-150 · Buyers Guide not attached" />
-        <p className="mt-3 flex items-center gap-1.5 text-[11px] text-slate-500">
-          <Scan className="h-3.5 w-3.5 text-[#2563EB]" /> Nightly price sync flagged this 02:14 AM &mdash; before a customer did.
+      {/* Content hash footer */}
+      <div className="mt-3 flex items-center gap-2 border-t border-slate-200/70 pt-2.5">
+        <Lock className="h-3 w-3 flex-shrink-0 text-slate-500" />
+        <p className="min-w-0 flex-1 truncate font-mono text-[10px] text-slate-500">
+          Record sealed · sha256:9f2a1c4e…7b30
         </p>
-
-        {/* Tamper-evident seal — the trust payload. Mirrors the stored content hash. */}
-        <div className="mt-4 flex items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white px-3.5 py-3 shadow-sm">
-          <div className="flex min-w-0 items-center gap-2.5">
-            <span className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-lg bg-slate-50 text-[#0B2041] ring-1 ring-slate-200">
-              <Lock className="h-3.5 w-3.5" />
-            </span>
-            <div className="min-w-0 leading-tight">
-              <p className="flex items-center gap-1.5 text-[11px] font-semibold text-slate-700">
-                Record sealed
-                <span className="inline-flex items-center rounded border border-emerald-200 bg-emerald-50 px-1 py-px font-mono text-[9px] font-semibold uppercase tracking-wide text-emerald-700">tamper-evident</span>
-              </p>
-              <p className="mt-0.5 truncate font-mono text-[10px] text-slate-500">sha256:9f2a1c4e…7b30 · 02:14 UTC</p>
-            </div>
-          </div>
-        </div>
-        <p className="mt-2 text-center text-[10.5px] text-slate-500">Any change to any document changes this hash.</p>
       </div>
     </div>
   </div>
 );
 
-// The second hero pillar: the complete, auto-built vehicle file the scraper
-// produces from the dealer's inventory feed — factory options, fuel economy,
-// one-owner / clean-title flags, days-on-market, and live market position,
-// all sticker-ready with zero data entry.
+// The vehicle file — modeled after the real /vehicle-file/:id screen.
+// Reads as a scaled screenshot of the in-app page: quiet header, price row,
+// verification chips, stat grid, decoded factory options.
 const VehicleFileCard = () => (
-  <div className="relative overflow-hidden rounded-2xl border border-slate-200 bg-white ring-1 ring-slate-900/[0.04] shadow-[0_2px_4px_-1px_rgba(15,23,42,0.06),0_20px_40px_-12px_rgba(15,23,42,0.16),0_40px_90px_-30px_rgba(11,32,65,0.28)]">
-    <div
-      aria-hidden
-      className="pointer-events-none absolute inset-0 z-0 bg-[linear-gradient(to_right,rgba(15,23,42,0.03)_1px,transparent_1px),linear-gradient(to_bottom,rgba(15,23,42,0.03)_1px,transparent_1px)] bg-[size:22px_22px] [mask-image:linear-gradient(to_bottom,#000,transparent_88%)]"
-    />
-    <div className="relative z-10">
-      <div className="border-b border-slate-100 bg-gradient-to-b from-slate-50 to-white px-5 pb-3.5 pt-4">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2.5">
-            <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-[#0B2041] text-white shadow-sm ring-1 ring-white/10">
-              <BadgeCheck className="h-4 w-4" />
-            </span>
-            <div className="leading-none">
-              <p className="font-display text-[13px] font-black tracking-tight text-slate-900">Vehicle file</p>
-              <p className="mt-1 font-mono text-[10px] tracking-tight text-slate-500">VIN &hellip;331335 &middot; auto-built from your feed</p>
-            </div>
-          </div>
-          <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-200/70 bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold tracking-wide text-emerald-700">
-            <span className="relative flex h-1.5 w-1.5">
-              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-60" />
-              <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-emerald-500" />
-            </span>
-            Synced
-          </span>
+  <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-[0_1px_2px_rgba(15,23,42,0.04),0_12px_32px_-16px_rgba(15,23,42,0.18)]">
+    {/* Product header — matches VehicleFile page style */}
+    <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3">
+      <div className="flex items-center gap-2.5 min-w-0">
+        <span className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-lg bg-slate-900 text-white">
+          <BadgeCheck className="h-3.5 w-3.5" />
+        </span>
+        <div className="min-w-0 leading-tight">
+          <p className="text-[13px] font-semibold tracking-tight text-slate-900">Vehicle file</p>
+          <p className="mt-0.5 font-mono text-[10px] text-slate-500 truncate">VIN …331335 · auto-built from your feed</p>
+        </div>
+      </div>
+      <span className="inline-flex flex-shrink-0 items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[10px] font-medium text-emerald-700">
+        <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+        Synced
+      </span>
+    </div>
+
+    <div className="px-4 py-3.5">
+      {/* Title + price row — mirrors the VehicleFile hero */}
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className="text-[14px] font-semibold tracking-tight text-slate-900">2027 INFINITI QX60 LUXE</p>
+          <p className="mt-0.5 text-[11px] text-slate-500">Deep Emerald · Graphite leather</p>
+        </div>
+        <div className="flex-shrink-0 text-right">
+          <p className="text-[14px] font-semibold tabular-nums text-slate-900">$58,835</p>
+          <p className="text-[10px] font-medium text-emerald-700">$2,444 below market</p>
         </div>
       </div>
 
-      <div className="px-5 pb-5 pt-4">
-        <div className="flex items-start justify-between gap-3">
-          <div className="min-w-0">
-            <p className="font-mono text-[15px] font-semibold tracking-tight text-slate-900">2027 INFINITI QX60 LUXE</p>
-            <p className="mt-0.5 text-[11px] text-slate-500">Deep Emerald &middot; Graphite leather</p>
-          </div>
-          <div className="flex-shrink-0 text-right">
-            <p className="font-mono text-[15px] font-semibold tracking-tight text-slate-900 tabular-nums">$58,835</p>
-            <p className="text-[10px] font-semibold text-emerald-700">$2,444 below market</p>
-          </div>
-        </div>
+      {/* Verification chips */}
+      <div className="mt-3 flex flex-wrap gap-1.5">
+        {["One owner", "Clean title", "No open recalls"].map((b) => (
+          <span key={b} className="inline-flex items-center gap-1 rounded-md border border-slate-200 bg-white px-1.5 py-0.5 text-[10.5px] font-medium text-slate-700">
+            <CheckCircle2 className="h-3 w-3 text-emerald-600" /> {b}
+          </span>
+        ))}
+      </div>
 
-        <div className="mt-3 flex flex-wrap gap-1.5">
-          {["One owner", "Clean title", "No open recalls"].map((b) => (
-            <span key={b} className="inline-flex items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50/70 px-2 py-0.5 text-[10.5px] font-semibold text-emerald-700">
-              <CheckCircle2 className="h-3 w-3" /> {b}
-            </span>
+      {/* Stat grid — like VehicleFile page */}
+      <div className="mt-3 grid grid-cols-2 gap-1.5">
+        <FileStat label="Market position" value="Good Deal" tone="emerald" />
+        <FileStat label="Days on market" value="12 days" />
+        <FileStat label="Fuel economy" value="20 / 26 mpg" />
+        <FileStat label="MSRP" value="$62,335" />
+      </div>
+
+      {/* Factory options — decoded */}
+      <div className="mt-3">
+        <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-wider text-slate-500">Factory options · decoded</p>
+        <div className="flex flex-wrap gap-1">
+          {["Premium Pkg", "Heated Seats", "Bose Audio", "360 Camera", "ProPILOT Assist"].map((o) => (
+            <span key={o} className="inline-flex items-center rounded border border-slate-200 bg-slate-50 px-1.5 py-0.5 text-[10px] font-medium text-slate-700">{o}</span>
           ))}
+          <span className="inline-flex items-center rounded border border-slate-200 bg-white px-1.5 py-0.5 text-[10px] font-medium text-slate-500">+17 more</span>
         </div>
-
-        <div className="mt-3 grid grid-cols-2 gap-2">
-          <FileStat label="Market position" value="Good Deal" tone="emerald" />
-          <FileStat label="Days on market" value="12 days" />
-          <FileStat label="Fuel economy" value="20 / 26 mpg" />
-          <FileStat label="MSRP" value="$62,335" />
-        </div>
-
-        <div className="mt-3 rounded-xl border border-slate-200 bg-slate-50/40 px-3.5 py-3">
-          <p className="mb-2 font-mono text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-500">Factory options &middot; decoded</p>
-          <div className="flex flex-wrap gap-1.5">
-            {["Premium Pkg", "Heated Seats", "Bose Audio", "360 Camera", "ProPILOT Assist"].map((o) => (
-              <span key={o} className="inline-flex items-center rounded-md border border-slate-200 bg-white px-1.5 py-0.5 text-[10.5px] font-medium text-slate-700">{o}</span>
-            ))}
-            <span className="inline-flex items-center rounded-md border border-slate-200 bg-white px-1.5 py-0.5 text-[10.5px] font-semibold text-[#2563EB]">+17 more</span>
-          </div>
-        </div>
-
-        <p className="mt-3 flex items-center gap-1.5 text-[11px] text-slate-500">
-          <Sparkles className="h-3.5 w-3.5 text-[#2563EB]" /> Sticker-ready in seconds &mdash; every field pulled from your inventory feed.
-        </p>
       </div>
     </div>
   </div>
