@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useTenant } from "@/contexts/TenantContext";
 import { useAuth } from "@/contexts/AuthContext";
+import { useEntitlements } from "@/hooks/useEntitlements";
 import { hasDealerCapability } from "@/lib/permissions/dealerRoleCapabilities";
 import { toast } from "sonner";
 import {
