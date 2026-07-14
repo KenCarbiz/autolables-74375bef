@@ -130,6 +130,7 @@ const complianceBase: DealerCapability[] = [
   "can_manage_compliance",
   "can_view_reports",
   "manage_source_authority",
+  "resolve_exceptions",
 ];
 
 // Used-Car Director / GSM: full operating visibility, short of owner-only
