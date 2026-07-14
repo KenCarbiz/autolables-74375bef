@@ -53,6 +53,7 @@ const AddendumIconLibrary = lazy(() => import("./pages/AddendumIconLibrary"));
 const AddendumLabelPrint = lazy(() => import("./pages/AddendumLabelPrint"));
 const AdminCertificationHistory = lazy(() => import("./pages/AdminCertificationHistory"));
 const InventorySyncCenter = lazy(() => import("./pages/InventorySyncCenter"));
+const InventoryExceptions = lazy(() => import("./pages/InventoryExceptions"));
 const SourceAuthoritySettings = lazy(() => import("./pages/SourceAuthoritySettings"));
 const PlatformAdmin = lazy(() => import("./pages/PlatformAdmin"));
 const Inventory = lazy(() => import("./pages/Inventory"));
