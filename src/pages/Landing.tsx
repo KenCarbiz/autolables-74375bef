@@ -1891,7 +1891,7 @@ const PricingTeaser = ({ waitTo }: { waitTo: string }) => (
             </div>
             <div className="shrink-0 text-left sm:text-right">
               <div className="flex items-baseline gap-1.5 sm:justify-end">
-                <span className="font-barlow-condensed text-4xl font-extrabold leading-none tracking-normal text-white tabular-nums">$3,999</span>
+                <span className="font-barlow-condensed text-4xl font-extrabold leading-none tracking-normal text-white tabular-nums">$3,497</span>
                 <span className="text-sm font-semibold text-slate-500">/mo</span>
               </div>
               <p className="mt-1 text-[12px] text-slate-500">per rooftop · vs buying each app separately</p>
