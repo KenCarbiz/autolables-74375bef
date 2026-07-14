@@ -203,12 +203,19 @@ function SaturdayClassicRenderer(props: TemplateRenderProps) {
   return <SaturdayClassicWindow data={toSaturdaySticker(props.data, props.branding)} />;
 }
 
-function SaturdayPremiumAddendumRenderer(props: TemplateRenderProps) {
-  const sticker = toSaturdaySticker(props.data, props.branding) as SaturdayAddendumData;
-  sticker.installed = priced(props.data.installed);
-  sticker.upgrades = priced(props.data.upgrades);
-  return <SaturdayPremiumAddendum data={sticker} />;
+function makeAddendumRenderer(Component: React.ComponentType<{ data: SaturdayAddendumData }>) {
+  return function AddendumRenderer(props: TemplateRenderProps) {
+    const sticker = toSaturdaySticker(props.data, props.branding) as SaturdayAddendumData;
+    sticker.installed = priced(props.data.installed);
+    sticker.upgrades = priced(props.data.upgrades);
+    return <Component data={sticker} />;
+  };
 }
+
+const SaturdayPremiumAddendumRenderer = makeAddendumRenderer(SaturdayPremiumAddendum);
+const MidnightPremiumAddendumRenderer = makeAddendumRenderer(MidnightPremiumAddendum);
+const EclipsePremiumAddendumRenderer = makeAddendumRenderer(EclipsePremiumAddendum);
+const OnyxPremiumAddendumRenderer = makeAddendumRenderer(OnyxPremiumAddendum);
 
 const SATURDAY_RENDERERS: Record<string, (props: TemplateRenderProps) => JSX.Element> = {
   "window-saturday-hero": SaturdayHeroRenderer,
