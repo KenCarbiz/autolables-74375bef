@@ -221,6 +221,9 @@ const SATURDAY_RENDERERS: Record<string, (props: TemplateRenderProps) => JSX.Ele
   "window-saturday-hero": SaturdayHeroRenderer,
   "window-saturday-classic": SaturdayClassicRenderer,
   "addendum-saturday-premium": SaturdayPremiumAddendumRenderer,
+  "addendum-saturday-midnight": MidnightPremiumAddendumRenderer,
+  "addendum-saturday-eclipse": EclipsePremiumAddendumRenderer,
+  "addendum-saturday-onyx": OnyxPremiumAddendumRenderer,
 };
 
 const SATURDAY_CONFIGS: Record<string, StickerTemplateConfig> = {
