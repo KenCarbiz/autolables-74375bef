@@ -71,7 +71,7 @@ export const SaturdayPremiumAddendum: React.FC<Props> = ({ data }) => {
 
   const infoCell = (icon: AddendumIconKey, label: string, value: string | null, mono = false) => (
     <div className="flex items-center gap-2 px-2.5 py-[9px]">
-      <span className="flex h-[24px] w-[24px] items-center justify-center rounded-[7px] shrink-0" style={{ background: T.blueSoft }}>
+      <span className="flex h-[24px] w-[24px] items-center justify-center rounded-[7px] shrink-0" style={{ background: accentSoft }}>
         <AutoLabelsAddendumIcon iconKey={icon} size={15} color={T.navy} />
       </span>
       <span className="min-w-0">
@@ -118,9 +118,9 @@ export const SaturdayPremiumAddendum: React.FC<Props> = ({ data }) => {
         {/* Header — anchored AutoLabels lockup left, dealer block right of a vertical divider */}
         <header className="flex items-stretch justify-between gap-2.5 pb-1">
           <div className="flex items-center gap-1.5 min-w-0">
-            <AutoLabelsAddendumIcon iconKey="autolabels-powered" size={20} color={T.blue} />
+            <AutoLabelsAddendumIcon iconKey="autolabels-powered" size={20} color={accent} />
             <span>
-              <span className="block text-[15px] font-black tracking-tight leading-none"><span style={{ color: T.blue }}>auto</span><span style={{ color: T.navy }}>labels.io</span></span>
+              <span className="block text-[15px] font-black tracking-tight leading-none"><span style={{ color: accent }}>auto</span><span style={{ color: T.navy }}>labels.io</span></span>
               <span className="block mt-[3px] text-[6px] font-bold uppercase tracking-[0.16em]" style={{ color: T.muted }}>AI-Powered Vehicle Transparency</span>
             </span>
           </div>
@@ -134,10 +134,10 @@ export const SaturdayPremiumAddendum: React.FC<Props> = ({ data }) => {
 
         {/* Passport badge + hero title stack */}
         <div className="mt-2.5 inline-flex items-center gap-1.5">
-          <span className="flex h-[18px] w-[18px] items-center justify-center rounded-full shrink-0" style={{ background: T.blueSoft }}>
+          <span className="flex h-[18px] w-[18px] items-center justify-center rounded-full shrink-0" style={{ background: accentSoft }}>
             <AutoLabelsAddendumIcon iconKey="vehicle-passport" size={12} color={T.navy} />
           </span>
-          <span className="text-[8.5px] font-black uppercase tracking-[0.2em]" style={{ color: T.blue }}>Vehicle Passport™</span>
+          <span className="text-[8.5px] font-black uppercase tracking-[0.2em]" style={{ color: accent }}>Vehicle Passport™</span>
         </div>
         <h1 className="mt-1 text-[34px] font-black leading-[0.95] tracking-[-0.02em]" style={{ color: T.navy }}>ADDENDUM</h1>
         <div className="mt-1.5 text-[15px] font-black uppercase leading-[1.12] tracking-[-0.01em]" style={{ color: T.text }}>
@@ -153,16 +153,16 @@ export const SaturdayPremiumAddendum: React.FC<Props> = ({ data }) => {
         </section>
 
         {/* QR block — a major engagement point in the upper third */}
-        <section className="mt-2.5 grid grid-cols-[1in_1fr] items-center gap-3 rounded-[10px] border p-2.5" style={{ borderColor: "#B9D4F8", background: "#F7FAFF" }}>
+        <section className="mt-2.5 grid grid-cols-[1in_1fr] items-center gap-3 rounded-[10px] border p-2.5" style={{ borderColor: accentBorder, background: accentSoft }}>
           <div className="rounded-[7px] bg-white p-1.5 border" style={{ borderColor: T.border }}>
             <QRCodeSVG value={safeUrl} size={84} bgColor="#ffffff" fgColor={T.navy} level="M" style={{ width: "100%", height: "auto" }} />
           </div>
           <div className="min-w-0">
-            <div className="text-[12px] font-black uppercase leading-[1.15] tracking-wide" style={{ color: T.blue }}>Scan to View<br />Vehicle Passport</div>
+            <div className="text-[12px] font-black uppercase leading-[1.15] tracking-wide" style={{ color: accent }}>Scan to View<br />Vehicle Passport</div>
             <div className="mt-2 grid grid-cols-2 gap-x-2.5 gap-y-[5px]">
               {QR_BULLETS.map((b) => (
                 <span key={b} className="inline-flex items-center gap-1.5 text-[7.4px] font-bold leading-tight" style={{ color: T.text }}>
-                  <AutoLabelsAddendumIcon iconKey="ftc-aligned" size={10} color={T.blue} /> {b}
+                  <AutoLabelsAddendumIcon iconKey="ftc-aligned" size={10} color={accent} /> {b}
                 </span>
               ))}
             </div>
@@ -179,12 +179,12 @@ export const SaturdayPremiumAddendum: React.FC<Props> = ({ data }) => {
 
         {/* Included Benefits — blue */}
         <section className="mt-2.5 rounded-[10px] border overflow-hidden" style={{ borderColor: "#BBD8F5" }}>
-          <SectionBar icon="benefits" title="Included Benefits" bg={T.blueSoft} fg={T.blue} />
+          <SectionBar icon="benefits" title="Included Benefits" bg={accentSoft} fg={accent} />
           {benefits.length ? (
             <div className="px-2.5 py-2 grid grid-cols-1 gap-[5px]">
               {benefits.slice(0, 6).map((b) => (
                 <span key={b} className="inline-flex items-center gap-2 text-[8.6px] font-bold leading-tight" style={{ color: T.text }}>
-                  <AutoLabelsAddendumIcon iconKey="ftc-aligned" size={11} color={T.blue} /> {b}
+                  <AutoLabelsAddendumIcon iconKey="ftc-aligned" size={11} color={accent} /> {b}
                 </span>
               ))}
             </div>
