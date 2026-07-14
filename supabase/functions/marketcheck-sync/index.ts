@@ -738,7 +738,25 @@ serve(async (req) => {
 
           for (const l of listings) {
             if (tenantSeen >= cfg.max_vehicles) break pages;
+            const rawVin = String(l.vin || "").toUpperCase().trim();
             const vin = normVin(l.vin);
+            // Invalid VIN (fails 17-char/format check): log an exception then skip.
+            const validVin = /^[A-HJ-NPR-Z0-9]{17}$/.test(rawVin);
+            if (!validVin) {
+              try {
+                if (rawVin) {
+                  await emitException({
+                    tenant_id: cfg.tenant_id, vin: rawVin, exception_type: "invalid_vin",
+                    severity: "high", title: `Invalid VIN "${rawVin}"`,
+                    explanation: "VIN failed 17-character format check. The feed row was skipped.",
+                    source_values: { vin: rawVin, source: "marketcheck" },
+                    recommended_action: "Confirm the VIN with the source system; the listing was not ingested.",
+                    status: "open",
+                  });
+                }
+              } catch { /* best-effort */ }
+              if (!vin || vin.length < 11) continue;
+            }
             if (!vin || vin.length < 11) continue;
             // Drop any car that positively belongs to a different domain/state —
             // never ingest another dealer's vehicle into this tenant.
@@ -751,6 +769,28 @@ serve(async (req) => {
             const ymm = [b.year, b.make, b.model].filter(Boolean).join(" ") || null;
             const condition = l.is_certified ? "cpo" : (l.inventory_type === "new" ? "new" : "used");
             const miles = typeof l.miles === "number" ? Math.round(l.miles) : 0;
+            if (stockNo) {
+              const arr = stockMap.get(stockNo) || [];
+              if (!arr.includes(vin)) arr.push(vin);
+              stockMap.set(stockNo, arr);
+            }
+
+            // ── Change detection — capture prior state before any write ──
+            // deno-lint-ignore no-explicit-any
+            let priorListing: any = null;
+            // deno-lint-ignore no-explicit-any
+            let priorFile: any = null;
+            try {
+              const { data: pl } = await admin.from("vehicle_listings")
+                .select("id, price, mileage, condition, ymm")
+                .eq("tenant_id", cfg.tenant_id).eq("vin", vin).maybeSingle();
+              priorListing = pl || null;
+              const { data: pf } = await admin.from("vehicle_files")
+                .select("id, stock_number, condition, mileage")
+                .eq("tenant_id", cfg.tenant_id).eq("vin", vin).maybeSingle();
+              priorFile = pf || null;
+            } catch { /* diff best-effort */ }
+
 
             // 1) vehicle_files — the inventory-of-record / addendum hub. NEW
             // VINs create a fresh file; existing files only refresh inventory
