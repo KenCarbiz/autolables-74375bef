@@ -1,6 +1,9 @@
 import SaturdayHeroWindow from "@/components/saturday/SaturdayHeroWindow";
 import SaturdayClassicWindow from "@/components/saturday/SaturdayClassicWindow";
 import SaturdayPremiumAddendum from "@/components/saturday/SaturdayPremiumAddendum";
+import MidnightPremiumAddendum from "@/components/saturday/MidnightPremiumAddendum";
+import EclipsePremiumAddendum from "@/components/saturday/EclipsePremiumAddendum";
+import OnyxPremiumAddendum from "@/components/saturday/OnyxPremiumAddendum";
 import type { SaturdaySticker } from "@/components/saturday/types";
 import type {
   StickerBranding,
