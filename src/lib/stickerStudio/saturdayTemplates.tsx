@@ -247,6 +247,27 @@ const SATURDAY_CONFIGS: Record<string, StickerTemplateConfig> = {
     useCase: "4.25x11 premium branded addendum with passport QR, equipment, benefits, and upgrades",
     complianceNote: "Summarizes dealer-installed equipment and optional upgrades; full disclosure packet remains in the QR passport.",
   }),
+  "addendum-saturday-midnight": saturdayAddendumConfig({
+    id: "addendum-saturday-midnight",
+    name: "Midnight Premium Addendum",
+    styleTags: ["Modern", "Readability", "Compliance"],
+    useCase: "4.25x11 premium branded addendum variant — independently editable Midnight layout.",
+    complianceNote: "Summarizes dealer-installed equipment and optional upgrades; full disclosure packet remains in the QR passport.",
+  }),
+  "addendum-saturday-eclipse": saturdayAddendumConfig({
+    id: "addendum-saturday-eclipse",
+    name: "Eclipse Premium Addendum",
+    styleTags: ["Modern", "Readability", "Compliance"],
+    useCase: "4.25x11 premium branded addendum variant — independently editable Eclipse layout.",
+    complianceNote: "Summarizes dealer-installed equipment and optional upgrades; full disclosure packet remains in the QR passport.",
+  }),
+  "addendum-saturday-onyx": saturdayAddendumConfig({
+    id: "addendum-saturday-onyx",
+    name: "Onyx Premium Addendum",
+    styleTags: ["Modern", "Readability", "Compliance"],
+    useCase: "4.25x11 premium branded addendum variant — independently editable Onyx layout.",
+    complianceNote: "Summarizes dealer-installed equipment and optional upgrades; full disclosure packet remains in the QR passport.",
+  }),
 };
 
 export const STUDIO_SATURDAY_TEMPLATES: StudioTemplate[] = Object.keys(SATURDAY_CONFIGS).map((id) => ({
