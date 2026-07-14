@@ -1750,7 +1750,7 @@ const TIERS: { name: string; price: string; best: string; tagline: string; featu
   {
     name: "Essential",
     price: "$299",
-    best: "Single-store dealers",
+    best: "Single-store dealers · Free with any auto(CURB) subscription",
     tagline: "Everything one rooftop needs to print audit-ready window stickers and close clean, signed deals.",
     features: [
       "New + used car window stickers & dealer addendums",
@@ -1829,7 +1829,7 @@ const PricingTeaser = ({ waitTo }: { waitTo: string }) => (
           Simple pricing. Three tiers.
         </h2>
         <p className="mt-5 text-base leading-relaxed text-slate-300">
-          Per rooftop, per month. Essential is free with any Autocurb.io subscription.
+          Per rooftop, per month. Essential is free with any auto(CURB) subscription.
         </p>
         <p className="mt-2 text-sm font-medium text-slate-500">
           Free to join the early-access list · no card required · month-to-month · locks early-access pricing.
