@@ -121,16 +121,20 @@ export default function InventorySyncCenter() {
   const load = useCallback(async () => {
     if (!tenantId) return;
     setLoading(true);
-    const [{ data: c }, { data: r }] = await Promise.all([
+    const [{ data: c }, { data: r }, { count: excCount }] = await Promise.all([
       (supabase as any).from("marketcheck_sync_config")
         .select("source, enabled, frequency, run_hour, day_of_week, last_run_at")
         .eq("tenant_id", tenantId).maybeSingle(),
       (supabase as any).from("inventory_sync_runs")
         .select("*").eq("tenant_id", tenantId)
         .order("started_at", { ascending: false }).limit(50),
+      (supabase as any).from("vehicle_exceptions")
+        .select("id", { count: "exact", head: true })
+        .eq("tenant_id", tenantId).in("status", ["open", "in_progress"]),
     ]);
     setCfg((c as Cfg) || null);
     setRuns((r as Run[]) || []);
+    setUnresolvedCount(typeof excCount === "number" ? excCount : 0);
     setLoading(false);
   }, [tenantId]);
 
