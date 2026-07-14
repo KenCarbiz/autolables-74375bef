@@ -33,8 +33,8 @@ const STATUS_ORDER: ComplianceStatus[] = ["critical", "action_required", "verifi
 
 const CommandCenter = () => {
   const { user, isAdmin } = useAuth();
-  const { role } = useEntitlements();
-  const canResolve = hasDealerCapability(role, "resolve_exceptions", isAdmin);
+  const { member } = useEntitlements();
+  const canResolve = hasDealerCapability(member?.role as any, "resolve_exceptions", isAdmin);
 
   const { rows, summary, latestSync, loading, error } = useVehicleCompliance();
 
