@@ -56,6 +56,7 @@ const InventorySyncCenter = lazy(() => import("./pages/InventorySyncCenter"));
 const CommandCenter = lazy(() => import("./pages/CommandCenter"));
 const InventoryExceptions = lazy(() => import("./pages/InventoryExceptions"));
 const SourceAuthoritySettings = lazy(() => import("./pages/SourceAuthoritySettings"));
+const WebsiteEmbed = lazy(() => import("./pages/WebsiteEmbed"));
 const PlatformAdmin = lazy(() => import("./pages/PlatformAdmin"));
 const Inventory = lazy(() => import("./pages/Inventory"));
 const InventoryCommandCenterV2 = lazy(() => import("./pages/InventoryCommandCenterV2"));
