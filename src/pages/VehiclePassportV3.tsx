@@ -827,7 +827,7 @@ const VehiclePassportV3 = () => {
         <button onClick={handleShare} className="inline-flex items-center gap-1.5 hover:text-[#0F172A]"><Upload className="w-3.5 h-3.5" /> Share</button>
         <button onClick={() => setWatchOpen((v) => !v)} aria-expanded={watchOpen} className={`inline-flex items-center gap-1.5 hover:text-[#0F172A] ${watchOpen ? "text-[#2563EB]" : ""}`}><Eye className="w-3.5 h-3.5" /> Watch Price</button>
       </div>
-      {watchOpen && price != null && <div className="mt-3"><PriceDropWatch slug={listing.slug || vehicleSlug || listing.vin} enabled={(listing as unknown as { price_drop_watch?: boolean }).price_drop_watch !== false} /></div>}
+      {watchOpen && price != null && <div className="mt-3"><Suspense fallback={null}><PriceDropWatch slug={listing.slug || vehicleSlug || listing.vin} enabled={(listing as unknown as { price_drop_watch?: boolean }).price_drop_watch !== false} /></Suspense></div>}
     </div>
   );
 
