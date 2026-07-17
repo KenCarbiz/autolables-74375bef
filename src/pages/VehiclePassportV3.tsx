@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import {
   ChevronLeft, ChevronRight, Upload, Bookmark, Printer, FileText, MessageSquare,
@@ -15,7 +15,6 @@ import { formatPhone } from "@/components/addendum/CustomerInfoSection";
 import Logo from "@/components/brand/Logo";
 import { derivePassport, deriveRating, ratingTier, computePriceHistory, fmt$, listingEquipment, historyReportName, deriveSoldClaims } from "@/lib/passportV2Data";
 import { resolveStickyButtons, type StickyBottomButtons } from "@/lib/stickyButtons";
-import PriceDropWatch from "@/components/listing/PriceDropWatch";
 import { listingGallery } from "@/lib/photos";
 import { usePassportEngagement } from "@/lib/passportEngagement";
 import { isVehicleSaved, toggleSavedVehicle } from "@/lib/savedVehicles";
@@ -25,12 +24,19 @@ import { trackPassportOpened, trackWindowStickerScanned, trackCustomerCtaClicked
 import { packetVisible } from "@/lib/packetModules";
 import type { DiscountBreakdown } from "@/lib/priceModel";
 import { scorePassportCard, selectCards, type CardSignals } from "@/lib/passportCards";
-import PassportPanel, { isPassportPanelKey, type PassportPanelKey } from "@/components/passport/PassportPanel";
+import { isPassportPanelKey, type PassportPanelKey } from "@/components/passport/passportPanelKeys";
 import { useNhtsaSafety } from "@/hooks/useNhtsaSafety";
-import PassportCtaDock from "@/components/passport/PassportCtaDock";
-import PassportInfoModal, { type InfoModalKey } from "@/components/passport/PassportInfoModal";
+import type { InfoModalKey } from "@/components/passport/PassportInfoModal";
 import { Info } from "lucide-react";
 import { BLUE, GREEN, CARD } from "@/lib/passportTokens";
+
+// Heavy, below-the-fold surfaces are code-split so the initial passport chunk
+// stays small — first paint doesn't wait for the 3200-line PassportPanel
+// dispatcher, the CTA dock, the info modal, or the price-drop watch form.
+const PassportPanel = lazy(() => import("@/components/passport/PassportPanel"));
+const PassportInfoModal = lazy(() => import("@/components/passport/PassportInfoModal"));
+const PassportCtaDock = lazy(() => import("@/components/passport/PassportCtaDock"));
+const PriceDropWatch = lazy(() => import("@/components/listing/PriceDropWatch"));
 
 // ──────────────────────────────────────────────────────────────
 // VehiclePassportV3 — /passport-v3/:vehicleSlug
