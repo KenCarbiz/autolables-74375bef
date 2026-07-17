@@ -326,6 +326,16 @@ const VehiclePassportV3 = () => {
   }, [activePanel]);
 
   const isPreview = typeof window !== "undefined" && new URLSearchParams(window.location.search).has("preview");
+  // Embed mode (?embed=1): rendered inside a dealer-site iframe via /embed.js.
+  // Strip the top header and any sticky return bar so the iframe body is chrome-
+  // light. Post an autolabels:close message when the shopper taps a close-like
+  // control from inside the passport.
+  const isEmbed = typeof window !== "undefined" && new URLSearchParams(window.location.search).has("embed");
+  useEffect(() => {
+    if (!isEmbed) return;
+    const send = () => { try { window.parent?.postMessage({ type: "autolabels:ready" }, "*"); } catch { /* cross-origin */ } };
+    send();
+  }, [isEmbed]);
   // QR attribution: window-sticker QRs land with ?src=qr. Persist for the whole
   // session so leads are stamped qr_scan even after in-app navigation.
   useEffect(() => {
@@ -728,13 +738,14 @@ const VehiclePassportV3 = () => {
   return (
     <div className="min-h-screen bg-[#F6F7F9] text-[#0F172A]" style={{ fontFamily: "Inter, -apple-system, BlinkMacSystemFont, sans-serif" }}>
       <style>{V3_PRINT}</style>
-      <Helmet><title>{`${listing.ymm}${listing.trim ? ` ${listing.trim}` : ""} — ${d.dealerName}`}</title><meta name="description" content={`${listing.ymm}${price != null ? ` · ${fmt$(price)}` : ""} · ${d.dealerName}`} />{isPreview && <meta name="robots" content="noindex" />}</Helmet>
+      <Helmet><title>{`${listing.ymm}${listing.trim ? ` ${listing.trim}` : ""} — ${d.dealerName}`}</title><meta name="description" content={`${listing.ymm}${price != null ? ` · ${fmt$(price)}` : ""} · ${d.dealerName}`} /><meta httpEquiv="Content-Security-Policy" content="frame-ancestors *" />{isPreview && <meta name="robots" content="noindex" />}</Helmet>
 
       {isPreview && (
         <div className="bg-amber-500 text-white text-center text-[12px] font-bold py-1.5 px-4 print:hidden">SAMPLE PREVIEW — design layout with placeholder data. Not a real listing.</div>
       )}
 
-      {/* Top bar */}
+      {/* Top bar (hidden in embed mode — the dealer-site drawer supplies its own chrome) */}
+      {!isEmbed && (
       <header className="border-b border-[#E6E8EC] bg-white print:hidden">
         <div className="mx-auto max-w-[1320px] px-4 sm:px-5 h-16 flex items-center justify-between">
           {listing.dealer_snapshot?.logo_url ? <img src={listing.dealer_snapshot.logo_url as string} alt="" className="h-7" /> : <Logo variant="full" size={22} />}
@@ -746,6 +757,7 @@ const VehiclePassportV3 = () => {
           </div>
         </div>
       </header>
+      )}
 
       {/* Return path after browsing a sibling listing — sticky so the shopper
           can always get back to the vehicle they started on. */}

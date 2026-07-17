@@ -56,6 +56,7 @@ const InventorySyncCenter = lazy(() => import("./pages/InventorySyncCenter"));
 const CommandCenter = lazy(() => import("./pages/CommandCenter"));
 const InventoryExceptions = lazy(() => import("./pages/InventoryExceptions"));
 const SourceAuthoritySettings = lazy(() => import("./pages/SourceAuthoritySettings"));
+const WebsiteEmbed = lazy(() => import("./pages/WebsiteEmbed"));
 const PlatformAdmin = lazy(() => import("./pages/PlatformAdmin"));
 const Inventory = lazy(() => import("./pages/Inventory"));
 const InventoryCommandCenterV2 = lazy(() => import("./pages/InventoryCommandCenterV2"));
@@ -261,6 +262,7 @@ const App = () => (
                         <Route path="/admin/command-center" element={<CommandCenter />} />
                         <Route path="/admin/exceptions" element={<InventoryExceptions />} />
                         <Route path="/admin/source-authority" element={<SourceAuthoritySettings />} />
+                        <Route path="/admin/website-embed" element={<WebsiteEmbed />} />
                         <Route path="/saved" element={<SavedAddendums />} />
                         <Route path="/signed" element={<SavedAddendums stage="signed" />} />
                         <Route path="/delivered" element={<SavedAddendums stage="delivered" />} />
