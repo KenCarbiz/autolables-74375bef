@@ -1391,6 +1391,11 @@ const VehiclePassportV3 = () => {
             <Link onClick={() => go("dealer")} className="mt-auto pt-4 self-start">Learn more about our dealership</Link>
           </div>
         </section>
+        </div>
+        <aside className="hidden lg:block lg:sticky lg:top-6 self-start print:hidden"><ActionPanel /></aside>
+        </div>
+
+
 
         {/* FINAL CTA — the strongest conversion moment on the page; the
             floating dock hides while this block is in view. Hidden on small
