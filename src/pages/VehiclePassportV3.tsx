@@ -957,6 +957,8 @@ const VehiclePassportV3 = () => {
                   <Link onClick={() => go("verification")} className="mt-4">View full verification report</Link>
                 </div>
               )}
+              {/* Mobile/tablet inline buy-box — below the verification card. Hidden on desktop where the sticky right rail owns this. */}
+              <div className="lg:hidden print:hidden"><ActionPanel /></div>
             </div>
           </div>
 
