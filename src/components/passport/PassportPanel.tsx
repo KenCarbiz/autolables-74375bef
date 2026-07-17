@@ -36,15 +36,9 @@ import {
 // missing data shows a clean empty state instead of a fabricated one.
 // ──────────────────────────────────────────────────────────────
 
-export const PASSPORT_PANEL_KEYS = [
-  "market-price", "market-demand", "price-confidence", "price-history",
-  "comparable-vehicles", "inventory-trend", "factory-warranty",
-  "owner-reviews", "highlights", "overview", "key-specs", "equipment", "ownership-timeline",
-  "visit-dealer",
-] as const;
-export type PassportPanelKey = (typeof PASSPORT_PANEL_KEYS)[number];
-export const isPassportPanelKey = (v: string | null | undefined): v is PassportPanelKey =>
-  !!v && (PASSPORT_PANEL_KEYS as readonly string[]).includes(v);
+export { PASSPORT_PANEL_KEYS, isPassportPanelKey } from "./passportPanelKeys";
+export type { PassportPanelKey } from "./passportPanelKeys";
+import type { PassportPanelKey } from "./passportPanelKeys";
 
 interface PanelDef { title: string; subtitle: string; body: React.ReactNode; primary?: { label: string; onClick: () => void }; secondary?: { label: string; onClick: () => void }; footerQuestion?: string; specialistLabel?: string; footerNote?: string; wide?: boolean; xl?: boolean }
 
