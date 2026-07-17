@@ -262,6 +262,16 @@ const CommandPalette = ({ open, onOpenChange }: CommandPaletteProps) => {
                   Source Authority
                 </CommandItem>
               ) : null}
+              {hasDealerCapability(role, "can_manage_settings", isAdmin) ? (
+                <CommandItem
+                  value="Website Integration embed widget passport"
+                  keywords={["website", "embed", "widget", "vdp", "passport button", "integration"]}
+                  onSelect={() => go("/admin/website-embed")}
+                >
+                  <Code className="w-4 h-4 mr-2" />
+                  Website Integration
+                </CommandItem>
+              ) : null}
             </CommandGroup>
           );
         })()}
