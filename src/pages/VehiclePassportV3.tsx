@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import {
   ChevronLeft, ChevronRight, Upload, Bookmark, Printer, FileText, MessageSquare,
@@ -15,7 +15,6 @@ import { formatPhone } from "@/components/addendum/CustomerInfoSection";
 import Logo from "@/components/brand/Logo";
 import { derivePassport, deriveRating, ratingTier, computePriceHistory, fmt$, listingEquipment, historyReportName, deriveSoldClaims } from "@/lib/passportV2Data";
 import { resolveStickyButtons, type StickyBottomButtons } from "@/lib/stickyButtons";
-import PriceDropWatch from "@/components/listing/PriceDropWatch";
 import { listingGallery } from "@/lib/photos";
 import { usePassportEngagement } from "@/lib/passportEngagement";
 import { isVehicleSaved, toggleSavedVehicle } from "@/lib/savedVehicles";
@@ -25,12 +24,51 @@ import { trackPassportOpened, trackWindowStickerScanned, trackCustomerCtaClicked
 import { packetVisible } from "@/lib/packetModules";
 import type { DiscountBreakdown } from "@/lib/priceModel";
 import { scorePassportCard, selectCards, type CardSignals } from "@/lib/passportCards";
-import PassportPanel, { isPassportPanelKey, type PassportPanelKey } from "@/components/passport/PassportPanel";
+import { isPassportPanelKey, type PassportPanelKey } from "@/components/passport/passportPanelKeys";
 import { useNhtsaSafety } from "@/hooks/useNhtsaSafety";
-import PassportCtaDock from "@/components/passport/PassportCtaDock";
-import PassportInfoModal, { type InfoModalKey } from "@/components/passport/PassportInfoModal";
+import type { InfoModalKey } from "@/components/passport/PassportInfoModal";
 import { Info } from "lucide-react";
 import { BLUE, GREEN, CARD } from "@/lib/passportTokens";
+
+// Heavy, below-the-fold surfaces are code-split so the initial passport chunk
+// stays small — first paint doesn't wait for the 3200-line PassportPanel
+// dispatcher, the CTA dock, the info modal, or the price-drop watch form.
+const PassportPanel = lazy(() => import("@/components/passport/PassportPanel"));
+const PassportInfoModal = lazy(() => import("@/components/passport/PassportInfoModal"));
+const PassportCtaDock = lazy(() => import("@/components/passport/PassportCtaDock"));
+const PriceDropWatch = lazy(() => import("@/components/listing/PriceDropWatch"));
+
+// Instant skeleton: passport-shaped placeholder painted immediately on route
+// mount so shoppers never see a blank white screen or app-level spinner while
+// the public-listing-view query resolves. Matches the real layout so the
+// swap-in feels seamless — hero band, gallery block, identity column,
+// module rails.
+function PassportSkeleton() {
+  return (
+    <div className="min-h-screen bg-[#F6F7F9]">
+      <div className="h-14 border-b border-[#E6E8EC] bg-white" />
+      <div className="max-w-[1320px] mx-auto px-4 lg:px-6 py-5 space-y-6 animate-pulse">
+        <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,400px)_minmax(0,1fr)] gap-5">
+          <div className="aspect-[4/3] rounded-2xl bg-slate-200" />
+          <div className="space-y-3">
+            <div className="h-5 w-40 rounded bg-slate-200" />
+            <div className="h-7 w-3/4 rounded bg-slate-200" />
+            <div className="h-4 w-1/2 rounded bg-slate-200" />
+            <div className="h-24 w-full rounded-xl bg-slate-200 mt-3" />
+            <div className="h-10 w-full rounded-xl bg-slate-200" />
+            <div className="h-10 w-full rounded-xl bg-slate-200" />
+          </div>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="h-32 rounded-2xl bg-slate-200" />
+          <div className="h-32 rounded-2xl bg-slate-200" />
+          <div className="h-32 rounded-2xl bg-slate-200" />
+        </div>
+        <div className="h-56 rounded-2xl bg-slate-200" />
+      </div>
+    </div>
+  );
+}
 
 // ──────────────────────────────────────────────────────────────
 // VehiclePassportV3 — /passport-v3/:vehicleSlug
@@ -450,7 +488,7 @@ const VehiclePassportV3 = () => {
   // Watch-price form collapses behind a toggle inside the action panel.
   const [watchOpen, setWatchOpen] = useState(false);
 
-  if (loading) return <div className="min-h-screen flex items-center justify-center bg-[#F6F7F9]"><div className="w-8 h-8 border-2 border-[#2563EB] border-t-transparent rounded-full animate-spin" /></div>;
+  if (loading) return <PassportSkeleton />;
   if (notFound || !listing || !d) return (
     <div className="min-h-screen flex items-center justify-center px-6 bg-[#F6F7F9]"><div className="text-center"><Package className="w-12 h-12 text-slate-300 mx-auto mb-4" /><h1 className="text-xl font-bold">Vehicle unavailable</h1><p className="text-sm text-slate-500 mt-2">This listing may have been sold or unpublished.</p></div></div>
   );
@@ -789,7 +827,7 @@ const VehiclePassportV3 = () => {
         <button onClick={handleShare} className="inline-flex items-center gap-1.5 hover:text-[#0F172A]"><Upload className="w-3.5 h-3.5" /> Share</button>
         <button onClick={() => setWatchOpen((v) => !v)} aria-expanded={watchOpen} className={`inline-flex items-center gap-1.5 hover:text-[#0F172A] ${watchOpen ? "text-[#2563EB]" : ""}`}><Eye className="w-3.5 h-3.5" /> Watch Price</button>
       </div>
-      {watchOpen && price != null && <div className="mt-3"><PriceDropWatch slug={listing.slug || vehicleSlug || listing.vin} enabled={(listing as unknown as { price_drop_watch?: boolean }).price_drop_watch !== false} /></div>}
+      {watchOpen && price != null && <div className="mt-3"><Suspense fallback={null}><PriceDropWatch slug={listing.slug || vehicleSlug || listing.vin} enabled={(listing as unknown as { price_drop_watch?: boolean }).price_drop_watch !== false} /></Suspense></div>}
     </div>
   );
 
@@ -856,14 +894,14 @@ const VehiclePassportV3 = () => {
           {/* Gallery */}
           <div>
             <div className="relative overflow-hidden rounded-2xl bg-[#1f2227] aspect-[4/3] max-[767px]:aspect-[5/4]">
-              {hero ? <img src={hero} alt={listing.ymm || ""} onClick={() => go("gallery")} className="absolute inset-0 w-full h-full object-cover cursor-zoom-in" /> : <div className="absolute inset-0 flex items-center justify-center text-slate-500"><Car className="w-14 h-14" strokeWidth={1.25} /></div>}
+              {hero ? <img src={hero} alt={listing.ymm || ""} onClick={() => go("gallery")} fetchPriority="high" decoding="async" className="absolute inset-0 w-full h-full object-cover cursor-zoom-in" /> : <div className="absolute inset-0 flex items-center justify-center text-slate-500"><Car className="w-14 h-14" strokeWidth={1.25} /></div>}
               {photoCount > 0 && <span className="print:hidden absolute right-3 top-3 text-white text-xs font-semibold px-2.5 py-1 rounded bg-black/60">{idx + 1} / {photoCount}</span>}
               {photoCount > 1 && <>
                 <button onClick={() => setIdx((i) => (i - 1 + photoCount) % photoCount)} className="print:hidden absolute left-3 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full bg-white/95 hover:bg-white flex items-center justify-center shadow"><ChevronLeft className="w-5 h-5" /></button>
                 <button onClick={() => setIdx((i) => (i + 1) % photoCount)} className="print:hidden absolute right-3 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full bg-white/95 hover:bg-white flex items-center justify-center shadow"><ChevronRight className="w-5 h-5" /></button>
               </>}
             </div>
-            {photoCount > 1 && <div className="flex gap-2 mt-2 print:hidden">{gallery.slice(0, 6).map((s, i) => <button key={i} onClick={() => setIdx(i)} className="w-[60px] h-11 rounded-lg overflow-hidden bg-[#e9ecef]" style={{ outline: i === idx ? `2px solid ${BLUE}` : "2px solid transparent", outlineOffset: -2 }}><img src={s} alt="" className="w-full h-full object-cover" /></button>)}{photoCount > 6 && <button onClick={() => go("gallery")} className="w-[60px] h-11 rounded-lg bg-black/70 text-white text-[11px] font-bold">+{photoCount - 6}</button>}</div>}
+            {photoCount > 1 && <div className="flex gap-2 mt-2 print:hidden">{gallery.slice(0, 6).map((s, i) => <button key={i} onClick={() => setIdx(i)} className="w-[60px] h-11 rounded-lg overflow-hidden bg-[#e9ecef]" style={{ outline: i === idx ? `2px solid ${BLUE}` : "2px solid transparent", outlineOffset: -2 }}><img src={s} alt="" loading="lazy" decoding="async" className="w-full h-full object-cover" /></button>)}{photoCount > 6 && <button onClick={() => go("gallery")} className="w-[60px] h-11 rounded-lg bg-black/70 text-white text-[11px] font-bold">+{photoCount - 6}</button>}</div>}
             <div className="flex gap-2 mt-2 print:hidden">
               {pv("photos") && photoCount > 1 && <button onClick={() => go("gallery")} className={`flex-1 h-10 rounded-xl border border-[#E6E8EC] bg-white text-[13px] font-semibold inline-flex items-center justify-center gap-1.5 hover:border-[#2563EB]`}><Eye className="w-4 h-4 text-[#2563EB]" /> All Photos ({photoCount})</button>}
               {pv("videos") && listing.videos?.length ? <a href={listing.videos[0].url} target="_blank" rel="noreferrer" className="flex-1 h-10 rounded-xl border border-[#E6E8EC] bg-white text-[13px] font-semibold inline-flex items-center justify-center gap-1.5 hover:border-[#2563EB]"><Play className="w-4 h-4 text-[#2563EB]" /> Walkaround Video</a> : null}
@@ -1333,7 +1371,7 @@ const VehiclePassportV3 = () => {
             })()}
             {(badges.length > 0 || d.dealerTrust.certifications.length > 0 || d.dealerTrust.storefrontUrl) && (
               <div className="mt-5 pt-5 border-t border-[#E6E8EC] flex flex-wrap items-center gap-x-6 gap-y-4">
-                {d.dealerTrust.storefrontUrl && <img src={d.dealerTrust.storefrontUrl} alt={d.dealerName} className="w-28 h-20 rounded-xl object-cover border border-[#E6E8EC]" />}
+                {d.dealerTrust.storefrontUrl && <img src={d.dealerTrust.storefrontUrl} alt={d.dealerName} loading="lazy" decoding="async" className="w-28 h-20 rounded-xl object-cover border border-[#E6E8EC]" />}
                 {badges.map((b, i) => <div key={i} className="text-center"><p className="text-[22px] font-bold text-[#2563EB] leading-none inline-flex items-center gap-1">{b.v}{b.star && <Star className="w-3.5 h-3.5 text-amber-400" fill="#F59E0B" />}</p><p className="text-[10px] text-[#64748B] mt-1">{b.l}</p></div>)}
                 {d.dealerTrust.certifications.map((c, i) => <span key={`c${i}`} className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-[#0F172A] bg-slate-100 rounded-full px-2.5 py-1"><Award className="w-3 h-3 text-[#2563EB]" />{c}</span>)}
               </div>
@@ -1435,20 +1473,30 @@ const VehiclePassportV3 = () => {
         </div>
       )}
 
-      {!finalCtaInView && <div className="print:hidden"><PassportCtaDock go={go} dealerPhone={d.dealerPhone || undefined} reviewRating={d.reviewRating} advisor={adv} routing={d.contactRouting} vehicle={{ storeId: listing.store_id, vehicleId: listing.id, vin: listing.vin }} /></div>}
+      {!finalCtaInView && !isEmbed && (
+        <Suspense fallback={null}>
+          <div className="print:hidden"><PassportCtaDock go={go} dealerPhone={d.dealerPhone || undefined} reviewRating={d.reviewRating} advisor={adv} routing={d.contactRouting} vehicle={{ storeId: listing.store_id, vehicleId: listing.id, vin: listing.vin }} /></div>
+        </Suspense>
+      )}
 
       <div className="print:hidden">
-        <PassportInfoModal info={activeInfo} onClose={closeInfo} go={go} openPanel={(k) => setActivePanel(k as PassportPanelKey)} />
+        <Suspense fallback={null}>
+          {activeInfo && <PassportInfoModal info={activeInfo} onClose={closeInfo} go={go} openPanel={(k) => setActivePanel(k as PassportPanelKey)} />}
+        </Suspense>
 
-        <PassportPanel
-          panel={activePanel}
-          onClose={closePanel}
-          openPanel={(key) => setActivePanel(key)}
-          d={d}
-          listing={listing}
-          isPreview={isPreview}
-          go={go}
-        />
+        <Suspense fallback={null}>
+          {activePanel && (
+            <PassportPanel
+              panel={activePanel}
+              onClose={closePanel}
+              openPanel={(key) => setActivePanel(key)}
+              d={d}
+              listing={listing}
+              isPreview={isPreview}
+              go={go}
+            />
+          )}
+        </Suspense>
       </div>
     </div>
   );
