@@ -27,6 +27,7 @@ import {
   Users,
   Store,
   CreditCard,
+  Code,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useEntitlements } from "@/hooks/useEntitlements";
