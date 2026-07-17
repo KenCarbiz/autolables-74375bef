@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import { useTenant } from "@/contexts/TenantContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { hasDealerCapability } from "@/lib/permissions/dealerRoleCapabilities";
-import { supabase } from "@/integrations/supabase/client";
+
 import { Copy, Check, Code, ShieldX } from "lucide-react";
 import { toast } from "sonner";
 
