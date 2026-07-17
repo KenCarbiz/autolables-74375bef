@@ -847,8 +847,12 @@ const VehiclePassportV3 = () => {
           </div>
         </div>
 
-        {/* 1–2. TOP ZONE — three-zone hero: gallery · identity · action panel */}
-        <section data-module="vehicle-details" className="grid grid-cols-1 lg:grid-cols-[minmax(0,400px)_minmax(0,1fr)_310px] gap-5 items-start print:block print:space-y-4">
+        {/* Desktop two-column shell: left = hero + all module sections; right = pinned buy-box that rides the whole scroll. */}
+        <div className="lg:grid lg:grid-cols-[minmax(0,1fr)_340px] lg:gap-7 lg:items-start space-y-6 lg:space-y-0 print:block">
+        <div className="min-w-0 space-y-6 lg:space-y-7">
+
+        {/* 1–2. TOP ZONE — two-zone hero: gallery · identity (buy-box moved to right rail on desktop) */}
+        <section data-module="vehicle-details" className="grid grid-cols-1 lg:grid-cols-[minmax(0,400px)_minmax(0,1fr)] gap-5 items-start print:block print:space-y-4">
           {/* Gallery */}
           <div>
             <div className="relative overflow-hidden rounded-2xl bg-[#1f2227] aspect-[4/3] max-[767px]:aspect-[5/4]">
