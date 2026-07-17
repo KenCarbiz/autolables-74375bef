@@ -262,6 +262,7 @@ const App = () => (
                         <Route path="/admin/command-center" element={<CommandCenter />} />
                         <Route path="/admin/exceptions" element={<InventoryExceptions />} />
                         <Route path="/admin/source-authority" element={<SourceAuthoritySettings />} />
+                        <Route path="/admin/website-embed" element={<WebsiteEmbed />} />
                         <Route path="/saved" element={<SavedAddendums />} />
                         <Route path="/signed" element={<SavedAddendums stage="signed" />} />
                         <Route path="/delivered" element={<SavedAddendums stage="delivered" />} />
