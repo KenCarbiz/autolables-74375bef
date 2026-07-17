@@ -326,6 +326,16 @@ const VehiclePassportV3 = () => {
   }, [activePanel]);
 
   const isPreview = typeof window !== "undefined" && new URLSearchParams(window.location.search).has("preview");
+  // Embed mode (?embed=1): rendered inside a dealer-site iframe via /embed.js.
+  // Strip the top header and any sticky return bar so the iframe body is chrome-
+  // light. Post an autolabels:close message when the shopper taps a close-like
+  // control from inside the passport.
+  const isEmbed = typeof window !== "undefined" && new URLSearchParams(window.location.search).has("embed");
+  useEffect(() => {
+    if (!isEmbed) return;
+    const send = () => { try { window.parent?.postMessage({ type: "autolabels:ready" }, "*"); } catch { /* cross-origin */ } };
+    send();
+  }, [isEmbed]);
   // QR attribution: window-sticker QRs land with ?src=qr. Persist for the whole
   // session so leads are stamped qr_scan even after in-app navigation.
   useEffect(() => {
