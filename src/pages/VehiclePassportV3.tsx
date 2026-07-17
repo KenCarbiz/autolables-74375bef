@@ -1473,20 +1473,30 @@ const VehiclePassportV3 = () => {
         </div>
       )}
 
-      {!finalCtaInView && <div className="print:hidden"><PassportCtaDock go={go} dealerPhone={d.dealerPhone || undefined} reviewRating={d.reviewRating} advisor={adv} routing={d.contactRouting} vehicle={{ storeId: listing.store_id, vehicleId: listing.id, vin: listing.vin }} /></div>}
+      {!finalCtaInView && !isEmbed && (
+        <Suspense fallback={null}>
+          <div className="print:hidden"><PassportCtaDock go={go} dealerPhone={d.dealerPhone || undefined} reviewRating={d.reviewRating} advisor={adv} routing={d.contactRouting} vehicle={{ storeId: listing.store_id, vehicleId: listing.id, vin: listing.vin }} /></div>
+        </Suspense>
+      )}
 
       <div className="print:hidden">
-        <PassportInfoModal info={activeInfo} onClose={closeInfo} go={go} openPanel={(k) => setActivePanel(k as PassportPanelKey)} />
+        <Suspense fallback={null}>
+          {activeInfo && <PassportInfoModal info={activeInfo} onClose={closeInfo} go={go} openPanel={(k) => setActivePanel(k as PassportPanelKey)} />}
+        </Suspense>
 
-        <PassportPanel
-          panel={activePanel}
-          onClose={closePanel}
-          openPanel={(key) => setActivePanel(key)}
-          d={d}
-          listing={listing}
-          isPreview={isPreview}
-          go={go}
-        />
+        <Suspense fallback={null}>
+          {activePanel && (
+            <PassportPanel
+              panel={activePanel}
+              onClose={closePanel}
+              openPanel={(key) => setActivePanel(key)}
+              d={d}
+              listing={listing}
+              isPreview={isPreview}
+              go={go}
+            />
+          )}
+        </Suspense>
       </div>
     </div>
   );
