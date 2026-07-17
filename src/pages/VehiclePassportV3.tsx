@@ -738,7 +738,7 @@ const VehiclePassportV3 = () => {
   return (
     <div className="min-h-screen bg-[#F6F7F9] text-[#0F172A]" style={{ fontFamily: "Inter, -apple-system, BlinkMacSystemFont, sans-serif" }}>
       <style>{V3_PRINT}</style>
-      <Helmet><title>{`${listing.ymm}${listing.trim ? ` ${listing.trim}` : ""} — ${d.dealerName}`}</title><meta name="description" content={`${listing.ymm}${price != null ? ` · ${fmt$(price)}` : ""} · ${d.dealerName}`} />{isPreview && <meta name="robots" content="noindex" />}</Helmet>
+      <Helmet><title>{`${listing.ymm}${listing.trim ? ` ${listing.trim}` : ""} — ${d.dealerName}`}</title><meta name="description" content={`${listing.ymm}${price != null ? ` · ${fmt$(price)}` : ""} · ${d.dealerName}`} /><meta httpEquiv="Content-Security-Policy" content="frame-ancestors *" />{isPreview && <meta name="robots" content="noindex" />}</Helmet>
 
       {isPreview && (
         <div className="bg-amber-500 text-white text-center text-[12px] font-bold py-1.5 px-4 print:hidden">SAMPLE PREVIEW — design layout with placeholder data. Not a real listing.</div>
