@@ -38,6 +38,38 @@ const PassportInfoModal = lazy(() => import("@/components/passport/PassportInfoM
 const PassportCtaDock = lazy(() => import("@/components/passport/PassportCtaDock"));
 const PriceDropWatch = lazy(() => import("@/components/listing/PriceDropWatch"));
 
+// Instant skeleton: passport-shaped placeholder painted immediately on route
+// mount so shoppers never see a blank white screen or app-level spinner while
+// the public-listing-view query resolves. Matches the real layout so the
+// swap-in feels seamless — hero band, gallery block, identity column,
+// module rails.
+function PassportSkeleton() {
+  return (
+    <div className="min-h-screen bg-[#F6F7F9]">
+      <div className="h-14 border-b border-[#E6E8EC] bg-white" />
+      <div className="max-w-[1320px] mx-auto px-4 lg:px-6 py-5 space-y-6 animate-pulse">
+        <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,400px)_minmax(0,1fr)] gap-5">
+          <div className="aspect-[4/3] rounded-2xl bg-slate-200" />
+          <div className="space-y-3">
+            <div className="h-5 w-40 rounded bg-slate-200" />
+            <div className="h-7 w-3/4 rounded bg-slate-200" />
+            <div className="h-4 w-1/2 rounded bg-slate-200" />
+            <div className="h-24 w-full rounded-xl bg-slate-200 mt-3" />
+            <div className="h-10 w-full rounded-xl bg-slate-200" />
+            <div className="h-10 w-full rounded-xl bg-slate-200" />
+          </div>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="h-32 rounded-2xl bg-slate-200" />
+          <div className="h-32 rounded-2xl bg-slate-200" />
+          <div className="h-32 rounded-2xl bg-slate-200" />
+        </div>
+        <div className="h-56 rounded-2xl bg-slate-200" />
+      </div>
+    </div>
+  );
+}
+
 // ──────────────────────────────────────────────────────────────
 // VehiclePassportV3 — /passport-v3/:vehicleSlug
 //
