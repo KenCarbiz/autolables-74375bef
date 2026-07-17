@@ -735,6 +735,64 @@ const VehiclePassportV3 = () => {
   const price = d.price;
   const adv = d.dealerTrust;
 
+  // Extracted so the same buy-box renders both inline on mobile (below the
+  // verification card) and pinned to the right rail on desktop, without
+  // duplicating any of its price/CTA logic.
+  const ActionPanel = () => (
+    <div className={`${CARD} p-5`}>
+      {price != null && (
+        <div className="hidden lg:block">
+          <div className="text-[12px] font-semibold text-[#64748B]">{d.priceLabel}</div>
+          <div className="text-[30px] font-extrabold leading-9 tracking-tight">{fmt$(price)}</div>
+          <div className="mt-1 space-y-0.5 text-[12px] text-[#64748B]">
+            {!d.priceBreakdown && d.docFee ? (
+              <p>{d.priceIncludesDoc
+                ? `Incl. ${fmt$(d.docFee)} doc fee · ${fmt$(Math.max(0, price - d.docFee))} before doc fee`
+                : `+ ${fmt$(d.docFee)} doc fee · Sale ${fmt$(d.websiteSalePrice ?? price + d.docFee)}`}</p>
+            ) : null}
+            {buildSheet?.estValue ? <p className="font-semibold text-[#16A34A]">Incl. {fmt$(buildSheet.estValue)} in factory options</p> : null}
+            {pv("payment") && d.estMonthly != null && <p>Est. {fmt$(d.estMonthly)}/mo{d.paymentAssumptions ? <span className="text-[11px] text-[#94A3B8]"> {d.paymentAssumptions}</span> : null}</p>}
+            {!d.priceBreakdown && d.msrp != null && <p>MSRP {fmt$(d.msrp)}</p>}
+          </div>
+          {d.priceBreakdown && <PriceLadder b={d.priceBreakdown} priceLabel={d.priceLabel} />}
+        </div>
+      )}
+      {(() => {
+        const msrpChip = !d.priceBreakdown && d.saveVsMsrp ? d.saveVsMsrp : null;
+        const mktChip = d.belowMarket && d.belowMarket > 0 ? d.belowMarket : null;
+        const amt = msrpChip ?? mktChip;
+        if (amt == null) return null;
+        return (
+        <div className="mt-3 lg:mt-3 rounded-xl border border-emerald-200 bg-emerald-50/70 px-3 py-2">
+          <div className="flex items-center gap-2">
+            <BadgeCheck className="w-4 h-4 text-[#16A34A] shrink-0" />
+            <p className="text-[12px] font-bold text-emerald-800">{fmt$(amt)} {msrpChip ? "below MSRP" : "below market"}</p>
+          </div>
+          {d.belowMarket != null && d.belowMarket > 0 && d.marketMeta.similarCount != null && d.marketMeta.similarCount >= 5 && (
+            <p className="text-[11px] text-emerald-800/80 mt-1">Compared against {d.marketMeta.similarCount.toLocaleString()} similar listings {d.marketMeta.radius != null ? `within ${d.marketMeta.radius} miles` : "in the region"} · live market data</p>
+          )}
+        </div>
+        );
+      })()}
+      <button onClick={() => go("todays-price")} className="mt-4 w-full h-12 rounded-xl bg-[#2563EB] hover:bg-[#1d4fd7] text-white text-[14px] font-bold inline-flex items-center justify-center gap-2"><DollarSign className="w-4 h-4" /> See My Price</button>
+      <button onClick={() => go("reserve")} className="mt-2 w-full h-11 rounded-xl border border-[#2563EB] text-[#2563EB] text-[13.5px] font-bold inline-flex items-center justify-center gap-2 hover:bg-blue-50 transition-colors"><BadgeCheck className="w-4 h-4" /> Reserve This Vehicle</button>
+      <div className="grid grid-cols-2 gap-2 mt-3">
+        {[
+          { icon: RefreshCw, label: "Value My Trade", onClick: () => go("trade") },
+          { icon: Clock, label: "Test Drive", onClick: () => go("test-drive") },
+          { icon: MessageSquare, label: "Contact Dealer", onClick: () => go("contact") },
+          ...(pv("documents") ? [{ icon: FileText, label: "Documents", onClick: () => go("documents") }] : []),
+        ].map((a) => <button key={a.label} onClick={a.onClick} className="h-10 rounded-xl border border-[#E6E8EC] bg-white text-[12px] font-semibold inline-flex items-center justify-center gap-1.5 hover:border-[#2563EB] transition-colors px-1"><a.icon className="w-4 h-4 text-[#2563EB] shrink-0" /><span className="truncate">{a.label}</span></button>)}
+      </div>
+      <div className="flex items-center justify-center gap-4 mt-3 pt-3 border-t border-[#F1F5F9] text-[12px] font-semibold text-[#64748B]">
+        <button onClick={handleSave} className={`inline-flex items-center gap-1.5 hover:text-[#0F172A] ${isSaved ? "text-[#2563EB]" : ""}`}><Bookmark className="w-3.5 h-3.5" fill={isSaved ? "currentColor" : "none"} /> {isSaved ? "Saved" : "Save"}</button>
+        <button onClick={handleShare} className="inline-flex items-center gap-1.5 hover:text-[#0F172A]"><Upload className="w-3.5 h-3.5" /> Share</button>
+        <button onClick={() => setWatchOpen((v) => !v)} aria-expanded={watchOpen} className={`inline-flex items-center gap-1.5 hover:text-[#0F172A] ${watchOpen ? "text-[#2563EB]" : ""}`}><Eye className="w-3.5 h-3.5" /> Watch Price</button>
+      </div>
+      {watchOpen && price != null && <div className="mt-3"><PriceDropWatch slug={listing.slug || vehicleSlug || listing.vin} enabled={(listing as unknown as { price_drop_watch?: boolean }).price_drop_watch !== false} /></div>}
+    </div>
+  );
+
   return (
     <div className="min-h-screen bg-[#F6F7F9] text-[#0F172A]" style={{ fontFamily: "Inter, -apple-system, BlinkMacSystemFont, sans-serif" }}>
       <style>{V3_PRINT}</style>
