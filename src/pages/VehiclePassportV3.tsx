@@ -456,7 +456,7 @@ const VehiclePassportV3 = () => {
   // Watch-price form collapses behind a toggle inside the action panel.
   const [watchOpen, setWatchOpen] = useState(false);
 
-  if (loading) return <div className="min-h-screen flex items-center justify-center bg-[#F6F7F9]"><div className="w-8 h-8 border-2 border-[#2563EB] border-t-transparent rounded-full animate-spin" /></div>;
+  if (loading) return <PassportSkeleton />;
   if (notFound || !listing || !d) return (
     <div className="min-h-screen flex items-center justify-center px-6 bg-[#F6F7F9]"><div className="text-center"><Package className="w-12 h-12 text-slate-300 mx-auto mb-4" /><h1 className="text-xl font-bold">Vehicle unavailable</h1><p className="text-sm text-slate-500 mt-2">This listing may have been sold or unpublished.</p></div></div>
   );
