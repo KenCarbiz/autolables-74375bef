@@ -238,11 +238,13 @@ const TodaysPriceExperience = ({ listing, d }: { listing: VehicleListing; d: Pas
   const row = estimateAffordability({ price, downPayment: safeDown, aprPercent: Math.max(0, apr) }, [term])[0];
   const monthly = Math.round(row.monthly_payment);
   const financed = Math.max(0, price - safeDown);
+  const aprPresentation = useMemo(() => presentApr(apr), [apr]);
+  const dueAtSigning = useMemo(() => estimateDueAtSigning({ downPayment: safeDown, firstMonthPayment: monthly }), [safeDown, monthly]);
 
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
-  const [method, setMethod] = useState<string | null>("text");
+  const [method, setMethod] = useState<"call" | "text" | "email">("text");
   const [message, setMessage] = useState("");
   const [sending, setSending] = useState(false);
   const [sent, setSent] = useState(false);
