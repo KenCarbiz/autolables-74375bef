@@ -2329,41 +2329,64 @@ const CoverageCard = ({ title, subtitle, pct, tone, years, miles, expiresDate, e
 // ── Goal-layout warranty primitives (wide modal) ─────────────────────────────
 // Top status card. New cars show only the delivery-based start; used/CPO show
 // the in-service start and the calculated end (date + mileage).
-const WarrantyStatusCard = ({ active, startLabel, startSub, endDate, endMiles }: {
+const WarrantyStatusCard = ({ active, startLabel, startSub, endDate, endMiles, governedState }: {
   active: boolean; startLabel: string; startSub?: string | null; endDate?: string | null; endMiles?: number | null;
-}) => active ? (
-  <div className="rounded-2xl border border-emerald-200 bg-emerald-50/60 p-5">
-    <div className="flex flex-col sm:flex-row sm:items-center gap-5">
-      <div className="flex items-start gap-3.5 min-w-0 flex-1">
-        <span className="w-14 h-14 rounded-2xl bg-emerald-100 flex items-center justify-center shrink-0"><ShieldCheck className="w-7 h-7 text-[#16A34A]" /></span>
-        <div className="min-w-0">
-          <p className="text-[13px] font-bold text-[#0F172A]">Factory Warranty</p>
-          <p className="text-[26px] font-extrabold leading-none tracking-wide mt-0.5 text-[#16A34A]">ACTIVE</p>
-          <p className="text-[12px] text-[#64748B] mt-1.5 leading-snug">Your factory warranty is in effect. You're covered.</p>
+  governedState?: WarrantyStateView;
+}) => {
+  // Governed truth-model: render the status chip + copy based on the resolver.
+  // Only VERIFIED_ACTIVE renders the affirmative green "in effect" panel with
+  // exact start/end dates. All other states render a neutral/blue/amber card
+  // that never implies covered status without a verified start date.
+  const gs = governedState;
+  const tone = gs?.tone ?? (active ? "green" : "slate");
+  const showAffirm = gs ? gs.showCovered : active;
+  const label = gs?.statusLabel ?? (active ? "ACTIVE" : "COVERAGE ENDED");
+  const copy = gs?.statusCopy ?? (active ? "Vehicle-specific factory coverage is currently in effect." : "Factory coverage ended — ask our team about extended coverage options.");
+  const headline = gs?.headline ?? "Factory Warranty";
+  const toneCls =
+    tone === "green" ? { wrap: "border-emerald-200 bg-emerald-50/60", chip: "bg-emerald-100", icon: "text-[#16A34A]", label: "text-[#16A34A]", border: "sm:border-emerald-200/70" } :
+    tone === "blue" ? { wrap: "border-blue-200 bg-blue-50/60", chip: "bg-blue-100", icon: "text-[#2563EB]", label: "text-[#2563EB]", border: "sm:border-blue-200/70" } :
+    tone === "amber" ? { wrap: "border-amber-200 bg-amber-50/60", chip: "bg-amber-100", icon: "text-[#B45309]", label: "text-[#B45309]", border: "sm:border-amber-200/70" } :
+    { wrap: "border-slate-200 bg-slate-50/60", chip: "bg-slate-100", icon: "text-[#475569]", label: "text-[#475569]", border: "sm:border-slate-200/70" };
+  return (
+    <div className={`rounded-2xl border ${toneCls.wrap} p-5`}>
+      <div className="flex flex-col sm:flex-row sm:items-center gap-5">
+        <div className="flex items-start gap-3.5 min-w-0 flex-1">
+          <span className={`w-14 h-14 rounded-2xl ${toneCls.chip} flex items-center justify-center shrink-0`}><ShieldCheck className={`w-7 h-7 ${toneCls.icon}`} /></span>
+          <div className="min-w-0">
+            <p className="text-[13px] font-bold text-[#0F172A]">{headline}</p>
+            <p className={`text-[22px] font-extrabold leading-none tracking-wide mt-0.5 ${toneCls.label}`}>{label}</p>
+            <p className="text-[12px] text-[#64748B] mt-1.5 leading-snug">{copy}</p>
+            {gs && (
+              <p className="text-[11px] text-[#94A3B8] mt-1 leading-snug">
+                Source: <span className="font-semibold text-[#475569]">{gs.sourceLabel}</span> · {gs.verificationLabel}
+              </p>
+            )}
+          </div>
         </div>
-      </div>
-      <div className="flex items-stretch gap-6 sm:border-l sm:border-emerald-200/70 sm:pl-6">
-        <div>
-          <p className="text-[11px] font-semibold text-[#64748B]">Warranty Start</p>
-          <p className="text-[15px] font-extrabold text-[#0F172A] mt-1 leading-tight">{startLabel}</p>
-          {startSub && <p className="text-[11px] text-[#94A3B8] leading-tight">{startSub}</p>}
-        </div>
-        {(endDate || endMiles) && (
-          <div>
-            <p className="text-[11px] font-semibold text-[#64748B]">Warranty End</p>
-            {endDate && <p className="text-[15px] font-extrabold text-[#0F172A] mt-1 leading-tight">{endDate}</p>}
-            {endMiles && <p className="text-[11px] text-[#94A3B8] leading-tight">or {endMiles.toLocaleString()} miles</p>}
+        {gs?.showExactDates && (
+          <div className={`flex items-stretch gap-6 sm:border-l ${toneCls.border} sm:pl-6`}>
+            <div>
+              <p className="text-[11px] font-semibold text-[#64748B]">Warranty Start</p>
+              <p className="text-[15px] font-extrabold text-[#0F172A] mt-1 leading-tight">{startLabel}</p>
+              {startSub && <p className="text-[11px] text-[#94A3B8] leading-tight">{startSub}</p>}
+            </div>
+            {(endDate || endMiles) && (
+              <div>
+                <p className="text-[11px] font-semibold text-[#64748B]">Warranty End</p>
+                {endDate && <p className="text-[15px] font-extrabold text-[#0F172A] mt-1 leading-tight">{endDate}</p>}
+                {endMiles && <p className="text-[11px] text-[#94A3B8] leading-tight">or {endMiles.toLocaleString()} miles</p>}
+              </div>
+            )}
           </div>
         )}
       </div>
+      {showAffirm && gs && (
+        <p className="sr-only">Factory coverage is currently in effect for this vehicle.</p>
+      )}
     </div>
-  </div>
-) : (
-  <div className={`${CARD} px-4 py-3 flex items-center gap-2.5`}>
-    <ShieldCheck className="w-4 h-4 text-[#94A3B8] shrink-0" />
-    <p className="text-[13px] text-[#64748B]">Factory coverage ended — ask our team about the extended coverage options for this vehicle.</p>
-  </div>
-);
+  );
+};
 
 // New-car coverage card: term + mileage only — no percentages, progress, or
 // remaining figures (coverage hasn't started counting down until delivery).
