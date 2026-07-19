@@ -146,9 +146,9 @@ const VehiclePassportVerification = () => {
     issue: rows.filter((r) => r.status === "issue").length,
   }), [rows]);
 
-  if (loading) return <div className="min-h-screen flex items-center justify-center bg-[#F6F7F9]"><div className="w-8 h-8 border-2 border-[#2563EB] border-t-transparent rounded-full animate-spin" /></div>;
+  if (loading) return <div className="min-h-[100svh] flex items-center justify-center bg-[#F6F7F9]"><div className="w-8 h-8 border-2 border-[#2563EB] border-t-transparent rounded-full animate-spin" /></div>;
   if (notFound || !listing || !d) return (
-    <div className="min-h-screen flex items-center justify-center px-6 bg-[#F6F7F9]"><div className="text-center"><ShieldCheck className="w-12 h-12 text-slate-300 mx-auto mb-4" /><h1 className="text-xl font-bold">Report unavailable</h1><p className="text-sm text-slate-500 mt-2">This vehicle's verification report could not be found.</p></div></div>
+    <div className="min-h-[100svh] flex items-center justify-center px-6 bg-[#F6F7F9]"><div className="text-center"><ShieldCheck className="w-12 h-12 text-slate-300 mx-auto mb-4" /><h1 className="text-xl font-bold">Report unavailable</h1><p className="text-sm text-slate-500 mt-2">This vehicle's verification report could not be found.</p></div></div>
   );
 
   // The header meter is data COVERAGE — how many rating factor groups have
@@ -186,11 +186,11 @@ const VehiclePassportVerification = () => {
     : { label: "Pending", cls: "text-[#94A3B8]" };
 
   return (
-    <div className="min-h-screen bg-[#F6F7F9] text-[#0F172A]" style={{ fontFamily: "Inter, -apple-system, BlinkMacSystemFont, sans-serif" }}>
+    <div className="min-h-[100svh] bg-[#F6F7F9] text-[#0F172A]" style={{ fontFamily: "Inter, -apple-system, BlinkMacSystemFont, sans-serif" }}>
       <Helmet><title>{`Verification Report — ${listing.ymm} · AutoLabels`}</title><meta name="robots" content="noindex" /></Helmet>
 
       {/* ── Mobile (<768px) — premium iOS verification experience ── */}
-      <div className="md:hidden bg-[#F6F7F9] pb-[calc(96px+env(safe-area-inset-bottom))]">
+      <div className="md:hidden bg-[#F6F7F9]">
         <div className="bg-white px-5 pt-[calc(12px+env(safe-area-inset-top))] pb-7">
           <button onClick={back} className="text-[14px] font-semibold text-[#2563EB] inline-flex items-center gap-1.5 -ml-1"><ChevronLeft className="w-[18px] h-[18px]" /> Back to Vehicle Passport</button>
           <div className="text-center mt-6">
@@ -287,13 +287,14 @@ const VehiclePassportVerification = () => {
             ))}
           </div>
         </div>
+
+        {/* Mobile sticky-in-flow bottom bar — primary Reserve action + back link. Placed as the last child of the mobile column so it follows content on short pages (no blank gap) and pins to the viewport bottom on long/scrolling pages. */}
+        <div className="sticky bottom-0 z-40 bg-white/85 backdrop-blur border-t border-[#E6E8EC] px-4 pt-3 pb-[calc(12px+env(safe-area-inset-bottom))] -mx-px">
+          <button onClick={() => go("reserve")} className="w-full h-[52px] rounded-2xl bg-[#2563EB] active:bg-[#1d4fd7] text-white text-[15px] font-bold inline-flex items-center justify-center gap-2 transition-transform active:scale-[0.99]"><ShieldCheck className="w-5 h-5" /> Reserve This Vehicle</button>
+          <button onClick={back} className="w-full mt-2 h-9 text-[13px] font-semibold text-[#64748B] inline-flex items-center justify-center gap-1"><ChevronLeft className="w-4 h-4" /> Back to Vehicle Passport</button>
+        </div>
       </div>
 
-      {/* Mobile sticky bottom — primary Reserve action + back link */}
-      <div className="md:hidden fixed bottom-0 inset-x-0 z-40 bg-white/85 backdrop-blur border-t border-[#E6E8EC] px-4 pt-3 pb-[calc(12px+env(safe-area-inset-bottom))]">
-        <button onClick={() => go("reserve")} className="w-full h-[52px] rounded-2xl bg-[#2563EB] active:bg-[#1d4fd7] text-white text-[15px] font-bold inline-flex items-center justify-center gap-2 transition-transform active:scale-[0.99]"><ShieldCheck className="w-5 h-5" /> Reserve This Vehicle</button>
-        <button onClick={back} className="w-full mt-2 h-9 text-[13px] font-semibold text-[#64748B] inline-flex items-center justify-center gap-1"><ChevronLeft className="w-4 h-4" /> Back to Vehicle Passport</button>
-      </div>
 
       {/* Desktop + tablet (≥768px) — unchanged three-column report. */}
       <div className="hidden md:block lg:grid lg:grid-cols-[260px_1fr]">

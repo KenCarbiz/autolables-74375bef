@@ -77,9 +77,9 @@ const VehiclePassportHistory = () => {
 
   const d = useMemo(() => (listing ? derivePassport(listing) : null), [listing]);
 
-  if (loading) return <div className="min-h-screen flex items-center justify-center bg-[#F6F7F9]"><div className="w-8 h-8 border-2 border-[#2563EB] border-t-transparent rounded-full animate-spin" /></div>;
+  if (loading) return <div className="min-h-[100svh] flex items-center justify-center bg-[#F6F7F9]"><div className="w-8 h-8 border-2 border-[#2563EB] border-t-transparent rounded-full animate-spin" /></div>;
   if (notFound || !listing || !d) return (
-    <div className="min-h-screen flex items-center justify-center px-6 bg-[#F6F7F9]"><div className="text-center"><FileText className="w-12 h-12 text-slate-300 mx-auto mb-4" /><h1 className="text-xl font-bold">History report unavailable</h1><p className="text-sm text-slate-500 mt-2">This listing may have been sold or unpublished.</p></div></div>
+    <div className="min-h-[100svh] flex items-center justify-center px-6 bg-[#F6F7F9]"><div className="text-center"><FileText className="w-12 h-12 text-slate-300 mx-auto mb-4" /><h1 className="text-xl font-bold">History report unavailable</h1><p className="text-sm text-slate-500 mt-2">This listing may have been sold or unpublished.</p></div></div>
   );
 
   const slug = listing.slug || vehicleSlug;
@@ -280,12 +280,12 @@ const VehiclePassportHistory = () => {
   );
 
   return (
-    <div className="min-h-screen bg-[#F6F7F9] text-[#0F172A]" style={{ fontFamily: "Inter, -apple-system, BlinkMacSystemFont, sans-serif" }}>
+    <div className="min-h-[100svh] bg-[#F6F7F9] text-[#0F172A]" style={{ fontFamily: "Inter, -apple-system, BlinkMacSystemFont, sans-serif" }}>
       <Helmet><title>{`Vehicle History Summary — ${listing.ymm}`}</title>{isPreview && <meta name="robots" content="noindex" />}</Helmet>
       {isPreview && <div className="bg-amber-500 text-white text-center text-[12px] font-bold py-1.5 px-4">SAMPLE PREVIEW — design layout with placeholder data. Not a real listing.</div>}
 
       {/* ── Mobile (<768px) ── */}
-      <div className="md:hidden pb-[calc(96px+env(safe-area-inset-bottom))]">
+      <div className="md:hidden">
         {/* Hero */}
         <div className="bg-white px-5 pt-[calc(12px+env(safe-area-inset-top))] pb-7">
           <button onClick={back} className="text-[14px] font-semibold text-[#2563EB] inline-flex items-center gap-1.5 -ml-1"><ChevronLeft className="w-[18px] h-[18px]" /> Back to Vehicle Passport</button>
@@ -442,13 +442,14 @@ const VehiclePassportHistory = () => {
             </button>
           </div>
         </div>
+
+        {/* Mobile sticky-in-flow bottom CTA — follows content on short pages, pins to viewport on long ones */}
+        <div className="sticky bottom-0 z-40 bg-white/85 backdrop-blur border-t border-[#E6E8EC] px-4 pt-3 pb-[calc(10px+env(safe-area-inset-bottom))] text-center">
+          <button onClick={() => go("verification")} className="w-full h-[52px] rounded-2xl bg-[#16A34A] active:bg-[#15803d] text-white text-[15px] font-bold inline-flex items-center justify-center gap-2 transition-transform active:scale-[0.99]"><ShieldCheck className="w-5 h-5" /> Continue to Verification</button>
+          <button onClick={() => go("contact")} className="text-[13px] font-semibold text-[#2563EB] mt-2">Contact Dealer</button>
+        </div>
       </div>
 
-      {/* Mobile sticky bottom CTA */}
-      <div className="md:hidden fixed bottom-0 inset-x-0 z-40 bg-white/85 backdrop-blur border-t border-[#E6E8EC] px-4 pt-3 pb-[calc(10px+env(safe-area-inset-bottom))] text-center">
-        <button onClick={() => go("verification")} className="w-full h-[52px] rounded-2xl bg-[#16A34A] active:bg-[#15803d] text-white text-[15px] font-bold inline-flex items-center justify-center gap-2 transition-transform active:scale-[0.99]"><ShieldCheck className="w-5 h-5" /> Continue to Verification</button>
-        <button onClick={() => go("contact")} className="text-[13px] font-semibold text-[#2563EB] mt-2">Contact Dealer</button>
-      </div>
 
       <header className="hidden md:block border-b border-[#E6E8EC] bg-white sticky top-0 z-20">
         <div className="mx-auto max-w-[1100px] px-4 sm:px-5 h-16 flex items-center justify-between gap-3">

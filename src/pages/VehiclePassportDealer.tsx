@@ -112,9 +112,9 @@ const VehiclePassportDealer = () => {
 
   const d = useMemo(() => (listing ? derivePassport(listing) : null), [listing]);
 
-  if (loading) return <div className="min-h-screen flex items-center justify-center bg-[#F6F7F9]"><div className="w-8 h-8 border-2 border-[#2563EB] border-t-transparent rounded-full animate-spin" /></div>;
+  if (loading) return <div className="min-h-[100svh] flex items-center justify-center bg-[#F6F7F9]"><div className="w-8 h-8 border-2 border-[#2563EB] border-t-transparent rounded-full animate-spin" /></div>;
   if (notFound || !listing || !d) return (
-    <div className="min-h-screen flex items-center justify-center px-6 bg-[#F6F7F9]"><div className="text-center"><Building2 className="w-12 h-12 text-slate-300 mx-auto mb-4" /><h1 className="text-xl font-bold">Dealer profile unavailable</h1><p className="text-sm text-slate-500 mt-2">This listing may have been sold or unpublished.</p></div></div>
+    <div className="min-h-[100svh] flex items-center justify-center px-6 bg-[#F6F7F9]"><div className="text-center"><Building2 className="w-12 h-12 text-slate-300 mx-auto mb-4" /><h1 className="text-xl font-bold">Dealer profile unavailable</h1><p className="text-sm text-slate-500 mt-2">This listing may have been sold or unpublished.</p></div></div>
   );
 
   const slug = listing.slug || vehicleSlug;
@@ -231,7 +231,7 @@ const VehiclePassportDealer = () => {
   const heroBtn = "h-12 rounded-[10px] text-[13.5px] font-extrabold inline-flex items-center gap-2 transition-transform hover:-translate-y-0.5";
 
   return (
-    <div className="min-h-screen bg-[#F6F7F9] text-[#0F172A]" style={{ fontFamily: "Inter, -apple-system, BlinkMacSystemFont, sans-serif" }}>
+    <div className="min-h-[100svh] bg-[#F6F7F9] text-[#0F172A]" style={{ fontFamily: "Inter, -apple-system, BlinkMacSystemFont, sans-serif" }}>
       <Helmet><title>{`Why Buy From ${d.dealerName}`}</title>{isPreview && <meta name="robots" content="noindex" />}</Helmet>
       {isPreview && <div className="bg-amber-500 text-white text-center text-[12px] font-bold py-1.5 px-4">SAMPLE PREVIEW — design layout with placeholder data. Not a real listing.</div>}
 
