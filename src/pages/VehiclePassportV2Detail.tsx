@@ -1301,7 +1301,13 @@ const SECTIONS: Record<string, { title: string; render: SectionRender; wide?: bo
       const all = listingGallery(listing);
       return (
         <>
-          <SectionHeading icon={Car} title="Photo Gallery" subtitle={all.length ? `${all.length} photo${all.length === 1 ? "" : "s"} of this vehicle.` : "Photos of this vehicle."} />
+          {/* Iconless, compact header — "Photo Gallery" + the count already say
+              enough; the car icon and the sticky-header thumbnail were a third
+              redundant signal. */}
+          <div className="mb-3">
+            <h1 className="text-[20px] font-extrabold tracking-tight leading-tight">Photo Gallery</h1>
+            <p className="text-[13px] text-slate-500 mt-0.5">{all.length ? `${all.length} photo${all.length === 1 ? "" : "s"} of this vehicle` : "Photos of this vehicle"}</p>
+          </div>
           {all.length ? (
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
               {all.map((src, i) => (
