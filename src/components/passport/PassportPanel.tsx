@@ -1007,6 +1007,30 @@ function buildPanel(key: PassportPanelKey, d: PassportData, listing: VehicleList
       const active = basicTimeRemains == null && basicMilesRemain == null
         ? false
         : basicTimeRemains !== false && basicMilesRemain !== false;
+      // ── Governed warranty truth-model (safety/compliance) ─────────────────
+      // "ACTIVE" + "You're covered" may render ONLY when a vehicle-specific
+      // start date is verified. Otherwise we show STARTS_AT_DELIVERY /
+      // ESTIMATED_COVERAGE / CONFIRMATION_REQUIRED and drop exact dates.
+      const hasVerifiedStartDate = !!w.in_service_date && !isNew;
+      const authority: "dealer_verified" | "vehicle_specific" | "cpo_program" | "oem_reference" | "unknown" =
+        d.oemWarranty ? "dealer_verified"
+        : isFactoryCpo ? "cpo_program"
+        : w.in_service_date ? "vehicle_specific"
+        : eff.usedLibrary || lookupOemReference(listing.ymm) ? "oem_reference"
+        : "unknown";
+      const hasProgram = !!(w.factory_months || w.powertrain_months || eff.usedLibrary || isFactoryCpo || d.oemWarranty);
+      const makeLabel = (listing.ymm || "").replace(/^\d{4}\s+/, "").split(/\s+/)[0] || null;
+      const governedState: WarrantyStateView = resolveWarrantyState({
+        isNew,
+        hasProgram,
+        authority,
+        hasVerifiedStartDate,
+        startDateCertainty: hasVerifiedStartDate ? "verified" : (hasProgram ? "estimated" : "unknown"),
+        computedActive: hasVerifiedStartDate ? active : null,
+        computedExpired: hasVerifiedStartDate && active === false,
+        conflict: false,
+      }, makeLabel);
+      const statusActiveGoverned = governedState.state === "VERIFIED_ACTIVE";
       const protections = isPreview ? [
         { t: "Extended Vehicle Service Contract", s: "Bumper-to-bumper protection beyond the factory term.", len: "Up to 7 yr / 100K mi" },
         { t: "Prepaid Maintenance Plan", s: "Lock in scheduled service at today's pricing.", len: "3 yr / 36K mi" },
