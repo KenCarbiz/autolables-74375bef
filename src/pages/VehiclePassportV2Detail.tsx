@@ -1316,12 +1316,12 @@ const SECTIONS: Record<string, { title: string; render: SectionRender; wide?: bo
     },
   },
   "protect": {
-    title: "Protect This Vehicle",
+    title: "Optional Protection",
     render: ({ listing }) => (
       <>
-        <SectionHeading icon={ShieldCheck} title="Protect This Vehicle" subtitle="Coverage options to consider with your purchase." />
+        <SectionHeading icon={ShieldCheck} title="Optional Protection" subtitle="Explore coverage that may continue beyond the factory warranty." />
         <Card className="p-5 mb-4">
-          <p className="text-[13px] text-slate-600 mb-3">Ask the dealership about protection products that can extend or add to your coverage:</p>
+          <p className="text-[13px] text-slate-600 mb-3">Optional protection products are separate from the vehicle's included factory coverage. Ask the dealership about:</p>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
             {[
               ["Extended Service Contract", "Coverage beyond the factory warranty term."],
