@@ -287,13 +287,14 @@ const VehiclePassportVerification = () => {
             ))}
           </div>
         </div>
+
+        {/* Mobile sticky-in-flow bottom bar — primary Reserve action + back link. Placed as the last child of the mobile column so it follows content on short pages (no blank gap) and pins to the viewport bottom on long/scrolling pages. */}
+        <div className="sticky bottom-0 z-40 bg-white/85 backdrop-blur border-t border-[#E6E8EC] px-4 pt-3 pb-[calc(12px+env(safe-area-inset-bottom))] -mx-px">
+          <button onClick={() => go("reserve")} className="w-full h-[52px] rounded-2xl bg-[#2563EB] active:bg-[#1d4fd7] text-white text-[15px] font-bold inline-flex items-center justify-center gap-2 transition-transform active:scale-[0.99]"><ShieldCheck className="w-5 h-5" /> Reserve This Vehicle</button>
+          <button onClick={back} className="w-full mt-2 h-9 text-[13px] font-semibold text-[#64748B] inline-flex items-center justify-center gap-1"><ChevronLeft className="w-4 h-4" /> Back to Vehicle Passport</button>
+        </div>
       </div>
 
-      {/* Mobile sticky bottom — primary Reserve action + back link */}
-      <div className="md:hidden fixed bottom-0 inset-x-0 z-40 bg-white/85 backdrop-blur border-t border-[#E6E8EC] px-4 pt-3 pb-[calc(12px+env(safe-area-inset-bottom))]">
-        <button onClick={() => go("reserve")} className="w-full h-[52px] rounded-2xl bg-[#2563EB] active:bg-[#1d4fd7] text-white text-[15px] font-bold inline-flex items-center justify-center gap-2 transition-transform active:scale-[0.99]"><ShieldCheck className="w-5 h-5" /> Reserve This Vehicle</button>
-        <button onClick={back} className="w-full mt-2 h-9 text-[13px] font-semibold text-[#64748B] inline-flex items-center justify-center gap-1"><ChevronLeft className="w-4 h-4" /> Back to Vehicle Passport</button>
-      </div>
 
       {/* Desktop + tablet (≥768px) — unchanged three-column report. */}
       <div className="hidden md:block lg:grid lg:grid-cols-[260px_1fr]">
