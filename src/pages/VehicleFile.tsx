@@ -103,6 +103,7 @@ interface VehicleRow {
   market_payload: { listingPrice?: number | null; low?: number | null; high?: number | null; belowMarket?: number } | null;
   enriched_at: string | null;
   market_checked_at: string | null;
+  passport_version: "current" | "v3" | "experiment" | null;
   created_at: string;
   updated_at: string;
 }
