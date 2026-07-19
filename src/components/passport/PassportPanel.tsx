@@ -1091,9 +1091,10 @@ function buildPanel(key: PassportPanelKey, d: PassportData, listing: VehicleList
       const cpoTerm = (mo: unknown, mi: unknown) => [Number(mo) ? `${Math.round(Number(mo) / 12)} yr` : null, Number(mi) ? `${(Number(mi) / 1000).toFixed(0)}K mi` : null].filter(Boolean).join(" / ");
       const hasData = !!(d.warrantyStr || d.oemWarranty || eff.usedLibrary || isFactoryCpo || d.dealerCoverage.length);
       // ── Goal-layout derived values ──────────────────────────────────────
-      // A new car's factory warranty is active by definition (starts at
-      // delivery); used/CPO rely on the calculated remaining coverage.
-      const statusActive = isNew ? true : active;
+      // Only render the green ACTIVE / "You're covered" state when the governed
+      // resolver says VERIFIED_ACTIVE. Otherwise the status card uses the
+      // governedState copy (STARTS AT DELIVERY, MAY APPLY, EXPIRED, etc.).
+      const statusActive = statusActiveGoverned;
       const statusStart = isNew ? "At Delivery Date" : (startDate ?? "See dealer");
       const statusStartSub = isNew ? null : (startDate ? "(In-Service Date)" : null);
       const yTerm = (mo?: number | null) => (mo ? `${Math.round(mo / 12)} ${Math.round(mo / 12) === 1 ? "Year" : "Years"}` : null);
