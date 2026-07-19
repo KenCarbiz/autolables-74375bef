@@ -146,9 +146,9 @@ const VehiclePassportVerification = () => {
     issue: rows.filter((r) => r.status === "issue").length,
   }), [rows]);
 
-  if (loading) return <div className="min-h-screen flex items-center justify-center bg-[#F6F7F9]"><div className="w-8 h-8 border-2 border-[#2563EB] border-t-transparent rounded-full animate-spin" /></div>;
+  if (loading) return <div className="min-h-[100svh] flex items-center justify-center bg-[#F6F7F9]"><div className="w-8 h-8 border-2 border-[#2563EB] border-t-transparent rounded-full animate-spin" /></div>;
   if (notFound || !listing || !d) return (
-    <div className="min-h-screen flex items-center justify-center px-6 bg-[#F6F7F9]"><div className="text-center"><ShieldCheck className="w-12 h-12 text-slate-300 mx-auto mb-4" /><h1 className="text-xl font-bold">Report unavailable</h1><p className="text-sm text-slate-500 mt-2">This vehicle's verification report could not be found.</p></div></div>
+    <div className="min-h-[100svh] flex items-center justify-center px-6 bg-[#F6F7F9]"><div className="text-center"><ShieldCheck className="w-12 h-12 text-slate-300 mx-auto mb-4" /><h1 className="text-xl font-bold">Report unavailable</h1><p className="text-sm text-slate-500 mt-2">This vehicle's verification report could not be found.</p></div></div>
   );
 
   // The header meter is data COVERAGE — how many rating factor groups have
