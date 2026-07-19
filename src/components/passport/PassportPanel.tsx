@@ -2727,7 +2727,7 @@ const MHero = ({ tone = "green", icon: Icon, eyebrow, title, note, ringPct, stat
 
 // ── Mobile slide-out footer CTA — dealer-configurable variant ──
 interface CtaSignals { greatPrice: boolean; highDemand: boolean; highConf: boolean; highlyRated: boolean; hasWarranty: boolean }
-interface CtaDef { badge: string; btn: string; sub: string; action: "reserve" | "protect"; tone: "green" | "orange" | "blue" }
+interface CtaDef { badge: string; btn: string; sub: string; action: "reserve" | "protect" | "warranty_question"; tone: "green" | "orange" | "blue" }
 const ctaFor = (panelKey: string, s: CtaSignals): CtaDef => {
   switch (panelKey) {
     case "market-price": return { badge: s.greatPrice ? "Great Price Available Today" : "Vehicle Available Today", btn: s.greatPrice ? "Reserve at This Price" : "Reserve This Vehicle", sub: s.greatPrice ? "The dealership confirms availability." : "Secure this vehicle while it's still available.", action: "reserve", tone: s.greatPrice ? "green" : "blue" };
