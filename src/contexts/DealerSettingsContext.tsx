@@ -274,6 +274,9 @@ export interface DealerSettings {
   // require photo proof (comma-separated task labels).
   prep_require_ro: boolean;
   packet_module_defaults: Record<string, boolean>; // store-wide passport module template
+  // Tenant-wide default passport experience version served on /v/:slug.
+  // Per-vehicle `passport_version` overrides this when non-"current".
+  passport_version?: "current" | "v3" | "experiment";
   prep_detail_photos_required: boolean;
   prep_service_photo_tasks: string;
   // Compliance
