@@ -456,6 +456,7 @@ export const DEFAULT_SETTINGS: DealerSettings = {
   ],
   prep_require_ro: false,
   packet_module_defaults: {},
+  passport_version: "current",
   prep_detail_photos_required: false,
   prep_service_photo_tasks: "Mud flaps installed, Running boards installed",
   cars_act_mode: false,
