@@ -363,13 +363,24 @@ const TodaysPriceExperience = ({ listing, d }: { listing: VehicleListing; d: Pas
               <div className="flex items-start justify-between gap-4 flex-wrap">
                 <div>
                   <p className="text-[16px] font-bold text-[#0D1B2A]">Build Your Payment</p>
-                  <p className="text-[12px] text-[#64748B] mt-0.5">Customize your estimate. This does not affect your credit score.</p>
+                  <p className="text-[12px] text-[#64748B] mt-0.5">Customize your estimate. {creditImpactCopy(performsCreditInquiry)}</p>
                 </div>
                 <div className="text-right">
                   <p className="text-[10px] font-bold uppercase tracking-wide text-[#94A3B8]">Estimated Payment</p>
                   <p className="text-[28px] font-extrabold tracking-tight text-[#0B6FEA] leading-none mt-0.5">{fmt$(monthly)}<span className="text-[14px] font-semibold text-[#64748B]">/mo</span></p>
-                  <p className="text-[11px] text-[#64748B] mt-1">For {term} months at {apr.toFixed(2)}% APR</p>
+                  <p className="text-[11px] text-[#64748B] mt-1">For {term} months at {aprPresentation.label} {aprPresentation.value}</p>
                 </div>
+              </div>
+
+              {/* Excluded charges shown BEFORE interaction — the estimate is
+                  materially incomplete without this context (16 CFR 226, TILA
+                  Reg Z illustrative advertising guidance). */}
+              <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50/70 p-3.5">
+                <p className="text-[12px] font-bold text-[#7C2D12] inline-flex items-center gap-1.5"><Info className="w-3.5 h-3.5" /> Estimate excludes these charges</p>
+                <p className="text-[11.5px] text-[#7C2D12] mt-1 leading-snug">{EXCLUDED_CHARGES_SUMMARY}</p>
+                <ul className="text-[11px] text-[#92400E] mt-1.5 grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-0.5 list-disc pl-4">
+                  {EXCLUDED_CHARGES.map((c) => <li key={c}>{c}</li>)}
+                </ul>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-[minmax(0,1fr)_220px] gap-6 mt-5">
@@ -377,32 +388,33 @@ const TodaysPriceExperience = ({ listing, d }: { listing: VehicleListing; d: Pas
                   {copy.showDown && (
                     <div>
                       <div className="flex justify-between text-[12px] text-[#64748B] mb-1"><span>Down Payment</span><span className="font-bold text-[#0D1B2A]">{fmt$(safeDown)}</span></div>
-                      <input type="range" min={0} max={Math.max(500, Math.round((price * 0.5) / 500) * 500)} step={500} value={safeDown} onChange={(e) => { setDown(Math.min(Number(e.target.value), price)); markStarted(); }} onPointerUp={() => emit("payment_slider_changed", { down: safeDown })} className="w-full accent-[#0B6FEA]" />
+                      <input type="range" min={0} max={Math.max(500, Math.round((price * 0.5) / 500) * 500)} step={500} value={safeDown} onChange={(e) => { const prev = safeDown; const next = Math.min(Number(e.target.value), price); setDown(next); markStarted(); emit("payment_recalculated", { field: "down_payment", from: prev, to: next, calc_version: PAYMENT_CALC_VERSION }); }} onPointerUp={() => emit("payment_slider_changed", { down: safeDown })} className="w-full accent-[#0B6FEA]" />
                     </div>
                   )}
                   {copy.showTerm && (
                     <div>
                       <p className="text-[12px] text-[#64748B] mb-1.5">Term</p>
                       <div className="grid grid-cols-4 gap-2">{TERMS.map((t) => (
-                        <button key={t} onClick={() => { setTerm(t); markStarted(); emit("term_selected", { term: t }); }} className={`h-10 rounded-xl text-[13px] font-semibold border transition-colors ${term === t ? "border-[#0B6FEA] bg-[#EAF4FF] text-[#0B6FEA]" : "border-[#DDE5EE] text-[#64748B] hover:border-slate-300"}`}>{t} mo</button>
+                        <button key={t} onClick={() => { const prev = term; setTerm(t); markStarted(); emit("payment_term_selected", { term: t }); emit("payment_recalculated", { field: "term", from: prev, to: t, calc_version: PAYMENT_CALC_VERSION }); }} className={`h-10 rounded-xl text-[13px] font-semibold border transition-colors ${term === t ? "border-[#0B6FEA] bg-[#EAF4FF] text-[#0B6FEA]" : "border-[#DDE5EE] text-[#64748B] hover:border-slate-300"}`}>{t} mo</button>
                       ))}</div>
                     </div>
                   )}
                   {copy.showApr && (
                     <div>
-                      <div className="flex justify-between text-[12px] text-[#64748B] mb-1"><span>Est. APR</span><span className="font-bold text-[#0D1B2A]">{apr.toFixed(2)}%</span></div>
-                      <input type="range" min={0} max={16} step={0.25} value={apr} onChange={(e) => { setApr(Math.max(0, Number(e.target.value))); markStarted(); }} onPointerUp={() => emit("apr_changed", { apr })} className="w-full accent-[#0B6FEA]" />
+                      <div className="flex justify-between text-[12px] text-[#64748B] mb-1"><span>{aprPresentation.label}</span><span className="font-bold text-[#0D1B2A]">{aprPresentation.value}</span></div>
+                      <input type="range" min={0} max={16} step={0.25} value={apr} onChange={(e) => { const prev = apr; const next = Math.max(0, Number(e.target.value)); setApr(next); markStarted(); emit("payment_recalculated", { field: "example_apr", from: prev, to: next, calc_version: PAYMENT_CALC_VERSION }); }} onPointerUp={() => emit("example_apr_changed", { apr })} className="w-full accent-[#0B6FEA]" />
+                      <p className="text-[10.5px] text-[#94A3B8] mt-1 leading-snug">{aprPresentation.disclosure} <span className="text-[#64748B]">Source: {aprPresentation.source}.</span></p>
                     </div>
                   )}
                   <div>
                     <p className="text-[12px] text-[#64748B] mb-1.5 inline-flex items-center gap-1.5">Credit Profile (Optional) <Info className="w-3 h-3" /></p>
                     <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">{CREDIT_PROFILES.map((p) => (
-                      <button key={p.key} onClick={() => { setProfile(p.label); setApr(p.apr); markStarted(); emit("apr_changed", { apr: p.apr, profile: p.key }); }} className={`h-12 rounded-xl border text-center transition-colors ${profile === p.label ? "border-[#0B6FEA] bg-[#EAF4FF]" : "border-[#DDE5EE] hover:border-slate-300"}`}>
+                      <button key={p.key} onClick={() => { const prev = apr; setProfile(p.label); setApr(p.apr); markStarted(); emit("credit_profile_selected", { profile: p.key }); emit("payment_recalculated", { field: "credit_profile", from: prev, to: p.apr, calc_version: PAYMENT_CALC_VERSION }); }} className={`h-12 rounded-xl border text-center transition-colors ${profile === p.label ? "border-[#0B6FEA] bg-[#EAF4FF]" : "border-[#DDE5EE] hover:border-slate-300"}`}>
                         <span className={`block text-[12px] font-bold leading-tight ${profile === p.label ? "text-[#0B6FEA]" : "text-[#10202B]"}`}>{p.label}</span>
                         <span className="block text-[10px] text-[#94A3B8]">{p.range}</span>
                       </button>
                     ))}</div>
-                    <p className="text-[10.5px] text-[#94A3B8] mt-1.5">This does not affect your credit score.</p>
+                    <p className="text-[10.5px] text-[#94A3B8] mt-1.5">{CREDIT_TIER_DISCLOSURE} {creditImpactCopy(performsCreditInquiry)}</p>
                   </div>
                 </div>
 
@@ -413,7 +425,7 @@ const TodaysPriceExperience = ({ listing, d }: { listing: VehicleListing; d: Pas
                     ["Down Payment", `-${fmt$(safeDown)}`],
                     ["Est. Amount Financed", fmt$(financed)],
                     ["Term", `${term} months`],
-                    ["Est. APR", `${apr.toFixed(2)}%`],
+                    [aprPresentation.label, aprPresentation.value],
                   ] as [string, string][]).map(([k, v]) => (
                     <div key={k} className="flex items-center justify-between gap-3 py-1.5 text-[12.5px]">
                       <span className="text-[#64748B]">{k}</span><span className="font-semibold text-[#10202B] tabular-nums">{v}</span>
@@ -423,12 +435,36 @@ const TodaysPriceExperience = ({ listing, d }: { listing: VehicleListing; d: Pas
                     <span className="text-[12.5px] font-bold text-[#0D1B2A]">Est. Monthly Payment</span>
                     <span className="text-[16px] font-extrabold text-[#0B6FEA] tabular-nums">{fmt$(monthly)}<span className="text-[11px] font-semibold text-[#64748B]">/mo</span></span>
                   </div>
+                  <div className="mt-3 pt-3 border-t border-[#DDE5EE]">
+                    <p className="text-[11px] font-bold text-[#0D1B2A]">Estimated cash due at signing</p>
+                    {dueAtSigning.components.map((c) => (
+                      <div key={c.label} className="flex items-center justify-between gap-2 py-0.5 text-[11.5px]">
+                        <span className="text-[#64748B]">{c.label}</span><span className="font-semibold text-[#10202B] tabular-nums">{fmt$(c.amount)}</span>
+                      </div>
+                    ))}
+                    <div className="flex items-center justify-between gap-2 pt-1.5 mt-1 border-t border-dashed border-[#DDE5EE]">
+                      <span className="text-[11.5px] font-bold text-[#0D1B2A]">Known subtotal</span>
+                      <span className="text-[12.5px] font-extrabold text-[#0D1B2A] tabular-nums">{fmt$(dueAtSigning.known)}</span>
+                    </div>
+                    <p className="text-[10.5px] text-[#94A3B8] mt-1.5 leading-snug">{dueAtSigning.note}</p>
+                  </div>
                 </div>
+              </div>
+
+              {/* Continue-to-dealer-review transition splits calculation from
+                  lead submission so abandonment between the two is measurable. */}
+              <div className="mt-5 flex flex-col sm:flex-row sm:items-center gap-3 pt-4 border-t border-[#F1F5F9]">
+                <div className="flex-1 min-w-0">
+                  <p className="text-[11px] font-bold uppercase tracking-wide text-[#94A3B8]">Your estimate</p>
+                  <p className="text-[13px] font-bold text-[#0D1B2A] mt-0.5 truncate">{fmt$(monthly)}/mo · {term} mo · {aprPresentation.label} {aprPresentation.value} · {fmt$(safeDown)} down</p>
+                </div>
+                <a href="#tp-form" onClick={() => emit("continue_to_dealer_review_clicked")} className="h-11 px-5 rounded-xl bg-[#0B6FEA] hover:bg-[#0958bd] text-white text-sm font-bold inline-flex items-center justify-center gap-2">Continue to dealer review</a>
               </div>
 
               <p className="text-[11px] text-[#94A3B8] mt-4">{copy.disclaimer}</p>
             </div>
           )}
+
 
           <div id="tp-form" className={`${CARD} p-5 sm:p-6 scroll-mt-24`}>
             <p className="text-[16px] font-bold text-[#0D1B2A]">Get Dealer-Reviewed Payment Details</p>
