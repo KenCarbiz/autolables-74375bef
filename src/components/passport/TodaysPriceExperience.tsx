@@ -15,6 +15,16 @@ import { fmt$, type PassportData } from "@/lib/passportV2Data";
 import { readBuildSheet } from "@/lib/buildSheet";
 import { listingGallery, listingHero } from "@/lib/photos";
 import { resolveTodaysPrice } from "@/lib/todaysPrice";
+import {
+  presentApr, creditImpactCopy, estimateDueAtSigning, contactConsentCopy,
+  CREDIT_TIER_DISCLOSURE, EXCLUDED_CHARGES, EXCLUDED_CHARGES_SUMMARY,
+  PAYMENT_CALC_VERSION, type CreditTier, type PaymentCalculationSnapshot,
+} from "@/lib/payment/disclosure";
+
+// This calculator performs NO credit-bureau inquiry. The "no credit impact"
+// assertion is gated on this flag so the copy stays truthful if a soft pull
+// is ever added.
+const performsCreditInquiry = false;
 
 // ──────────────────────────────────────────────────────────────
 // Today's Price & Payment Options — the premium payment experience on the
