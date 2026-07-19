@@ -213,7 +213,6 @@ const App = () => (
                       <Route path="/v/:slug" element={<VehiclePassportV3 />} />
                       {/* Parallel governed passport experience (mobile-first). */}
                       <Route path="/v3/:vehicleSlug" element={<VehiclePassportGoverned />} />
-                      <Route path="/v3/:vin" element={<VehiclePassportGoverned />} />
                       <Route path="/v/:slug/verification" element={<VehiclePassportVerification />} />
                       <Route path="/v/:slug/documents" element={<VehiclePassportDocuments />} />
                       <Route path="/v/:slug/great-buy" element={<VehiclePassportGreatBuy />} />
