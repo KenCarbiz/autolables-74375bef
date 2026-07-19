@@ -63,9 +63,9 @@ function Skeleton() {
 
 export default function VehiclePassportGoverned() {
   const { vehicleSlug, slug } = useParams<{ vehicleSlug?: string; slug?: string }>();
-  const key = ((vehicleSlug || slug || "").trim()).toUpperCase();
+  const rawSlug = (vehicleSlug || slug || "").trim();
   const navigate = useNavigate();
-  const { listing, loading, notFound } = usePublicListing(key);
+  const { listing, loading, notFound } = usePublicListing(rawSlug);
 
   const d = useMemo(() => (listing ? derivePassport(listing) : null), [listing]);
   const gallery = useMemo(() => (listing ? listingGallery(listing) : []), [listing]);
@@ -88,7 +88,7 @@ export default function VehiclePassportGoverned() {
     (viaQr ? trackWindowStickerScanned(base) : trackPassportOpened(base));
   }, [listing?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  usePassportEngagement(listing?.slug || key, activePanel, true);
+  usePassportEngagement(listing?.slug || rawSlug, activePanel, true);
 
   // Sticky header context: reveal once the hero scrolls out of view.
   useEffect(() => {
@@ -113,7 +113,7 @@ export default function VehiclePassportGoverned() {
   }
 
   const pv = (id: string) => packetVisible(listing, id);
-  const go = (section: string) => navigate(`/v/${listing.slug || key}/${section}`);
+  const go = (section: string) => navigate(`/v/${listing.slug || rawSlug}/${section}`);
   const openPanel = (k: PassportPanelKey) => { setActivePanel(k); };
   const isSaved = saved ?? isVehicleSaved(listing.slug);
   const handleSave = () => {
