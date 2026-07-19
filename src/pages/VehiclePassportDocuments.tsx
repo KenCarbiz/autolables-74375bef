@@ -167,9 +167,9 @@ const VehiclePassportDocuments = () => {
 
   const grouped = useMemo(() => CATEGORIES.map((c) => ({ c, docs: filtered.filter((x) => categoryOf(x) === c.key) })).filter((g) => g.docs.length > 0), [filtered]);
 
-  if (loading) return <div className="min-h-screen flex items-center justify-center bg-[#F6F7F9]"><div className="w-8 h-8 border-2 border-[#2563EB] border-t-transparent rounded-full animate-spin" /></div>;
+  if (loading) return <div className="min-h-[100svh] flex items-center justify-center bg-[#F6F7F9]"><div className="w-8 h-8 border-2 border-[#2563EB] border-t-transparent rounded-full animate-spin" /></div>;
   if (notFound || !listing || !d) return (
-    <div className="min-h-screen flex items-center justify-center px-6 bg-[#F6F7F9]"><div className="text-center"><FileText className="w-12 h-12 text-slate-300 mx-auto mb-4" /><h1 className="text-xl font-bold">Documents unavailable</h1></div></div>
+    <div className="min-h-[100svh] flex items-center justify-center px-6 bg-[#F6F7F9]"><div className="text-center"><FileText className="w-12 h-12 text-slate-300 mx-auto mb-4" /><h1 className="text-xl font-bold">Documents unavailable</h1></div></div>
   );
 
   const slug = listing.slug || vehicleSlug;
@@ -203,7 +203,7 @@ const VehiclePassportDocuments = () => {
   );
 
   return (
-    <div className="min-h-screen bg-[#F6F7F9] text-[#0F172A]" style={{ fontFamily: "Inter, -apple-system, BlinkMacSystemFont, sans-serif" }}>
+    <div className="min-h-[100svh] bg-[#F6F7F9] text-[#0F172A]" style={{ fontFamily: "Inter, -apple-system, BlinkMacSystemFont, sans-serif" }}>
       <Helmet><title>{`Documents — ${listing.ymm} · AutoLabels`}</title><meta name="robots" content="noindex" /></Helmet>
 
       {/* Top bar */}
