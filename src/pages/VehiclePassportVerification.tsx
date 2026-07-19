@@ -16,6 +16,7 @@ import { MOCK_LISTING } from "./VehiclePassportV3";
 import { usePublicListing } from "@/hooks/usePublicListing";
 import PassportCtaDock from "@/components/passport/PassportCtaDock";
 import { CARD } from "@/lib/passportTokens";
+import { rollupVerification, type VerificationClaim, type ClaimStatus, type EvidenceType } from "@/lib/claims/provenance";
 
 // ──────────────────────────────────────────────────────────────
 // VehiclePassportVerification — /passport-v3/:vehicleSlug/verification
@@ -41,17 +42,19 @@ interface Row {
   status: Status; source: string; lines: string[]; note?: string;
 }
 
-// Data-coverage meter — how many rating factor groups have real, measured
-// data. A coverage figure, never a quality score.
-const CoverageRing = ({ measured, total }: { measured: number; total: number }) => {
+// Verification-completeness meter — how many checks returned a terminal
+// result. Ring color is governed: green only when every check is complete,
+// amber while material checks are still pending, red when one needs review.
+// This is a COMPLETENESS figure, never all-green while a material check is open.
+const CoverageRing = ({ measured, total, color, caption }: { measured: number; total: number; color: string; caption: string }) => {
   const r = 54, c = 2 * Math.PI * r, off = c * (1 - (total > 0 ? measured / total : 0));
   return (
     <div className="relative w-[140px] h-[140px] shrink-0">
       <svg viewBox="0 0 128 128" className="w-full h-full -rotate-90">
         <circle cx="64" cy="64" r={r} fill="none" stroke="#E6E8EC" strokeWidth="10" />
-        <circle cx="64" cy="64" r={r} fill="none" stroke="#16A34A" strokeWidth="10" strokeLinecap="round" strokeDasharray={c} strokeDashoffset={off} />
+        <circle cx="64" cy="64" r={r} fill="none" stroke={color} strokeWidth="10" strokeLinecap="round" strokeDasharray={c} strokeDashoffset={off} />
       </svg>
-      <div className="absolute inset-0 flex flex-col items-center justify-center"><span className="text-[30px] font-extrabold text-[#0F172A] leading-none">{measured}<span className="text-[16px] text-[#94A3B8]">/{total}</span></span><span className="text-[11px] font-bold text-[#94A3B8] mt-1">Data Coverage</span></div>
+      <div className="absolute inset-0 flex flex-col items-center justify-center"><span className="text-[30px] font-extrabold text-[#0F172A] leading-none">{measured}<span className="text-[16px] text-[#94A3B8]">/{total}</span></span><span className="text-[11px] font-bold text-[#94A3B8] mt-1">{caption}</span></div>
     </div>
   );
 };
@@ -172,6 +175,35 @@ const VehiclePassportVerification = () => {
   const isToday = reportTime.toDateString() === new Date().toDateString();
   // Real report date everywhere — never a hardcoded "today".
   const reportDateLbl = isToday ? "today" : reportTime.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+
+  // Governed rollup — the checks map into the shared claim-provenance model so a
+  // pending/conflicting MATERIAL check (title, recall, odometer) can never roll
+  // up into an all-green "verified" vehicle state. Data coverage != verification.
+  const claims: VerificationClaim[] = rows.map((r) => {
+    const status: ClaimStatus =
+      r.status === "verified" ? "VERIFIED"
+      : r.status === "issue" || r.status === "attention" ? "CONFLICT_DETECTED"
+      : "PENDING";
+    const evidence: EvidenceType =
+      r.key === "recall" ? "government"
+      : r.key === "vin" || r.key === "warranty" ? "oem"
+      : r.key === "history" || r.key === "title" || r.key === "odometer" ? "commercial_history"
+      : r.key === "market" ? "autolabels_calculated"
+      : "dealer_reported";
+    return {
+      key: r.key,
+      label: r.title,
+      status,
+      outcome: r.lines[0] ?? "",
+      evidence,
+      sourceLabel: r.source,
+      material: r.key === "recall" || r.key === "title" || r.key === "odometer",
+      checkedAt: reportTime.toISOString(),
+    };
+  });
+  const roll = rollupVerification(claims);
+  const ringColor = roll.overall === "verified" ? "#16A34A" : roll.overall === "attention" ? "#EF4444" : "#F59E0B";
+  const checksLine = `${roll.completedChecks} of ${roll.applicableChecks} checks complete · ${roll.verified} verified${roll.pending ? ` · ${roll.pending} pending` : ""} · ${roll.sourcesConsulted} data source${roll.sourcesConsulted === 1 ? "" : "s"}`;
   const toGlance = [
     { icon: CheckCircle2, cls: "text-[#16A34A]", label: "Verified checks", value: `${counts.verified}` },
     counts.attention > 0 ? { icon: AlertTriangle, cls: "text-[#F59E0B]", label: "Attention items", value: `${counts.attention}` } : null,
@@ -194,18 +226,20 @@ const VehiclePassportVerification = () => {
         <div className="bg-white px-5 pt-[calc(12px+env(safe-area-inset-top))] pb-7">
           <button onClick={back} className="text-[14px] font-semibold text-[#2563EB] inline-flex items-center gap-1.5 -ml-1"><ChevronLeft className="w-[18px] h-[18px]" /> Back to Vehicle Passport</button>
           <div className="text-center mt-6">
-            <p className="text-[13px] font-semibold text-[#64748B]">AutoLabels Verified Report</p>
-            <p className="text-[12px] text-[#94A3B8] mt-0.5">Verified {isToday ? "Today" : reportTime.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}</p>
-            {cov.total > 0 && (
+            <p className="text-[13px] font-semibold text-[#64748B]">AutoLabels Data-Verified Report</p>
+            <p className="text-[12px] text-[#94A3B8] mt-0.5">Updated {isToday ? "Today" : reportTime.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}</p>
+            {roll.applicableChecks > 0 && (
               <>
                 <div className="relative w-[200px] h-[200px] mx-auto mt-5">
                   <svg viewBox="0 0 160 160" className="w-full h-full -rotate-90">
                     <circle cx="80" cy="80" r="70" fill="none" stroke="#E6E8EC" strokeWidth="12" />
-                    <circle cx="80" cy="80" r="70" fill="none" stroke="#16A34A" strokeWidth="12" strokeLinecap="round" strokeDasharray={2 * Math.PI * 70} strokeDashoffset={ringFill ? (2 * Math.PI * 70) * (1 - cov.measured / cov.total) : 2 * Math.PI * 70} style={{ transition: "stroke-dashoffset 1s ease-out" }} />
+                    <circle cx="80" cy="80" r="70" fill="none" stroke={ringColor} strokeWidth="12" strokeLinecap="round" strokeDasharray={2 * Math.PI * 70} strokeDashoffset={ringFill ? (2 * Math.PI * 70) * (1 - roll.completedChecks / roll.applicableChecks) : 2 * Math.PI * 70} style={{ transition: "stroke-dashoffset 1s ease-out" }} />
                   </svg>
-                  <div className="absolute inset-0 flex flex-col items-center justify-center"><span className="text-[44px] font-extrabold leading-none text-[#0F172A]">{cov.measured}<span className="text-[22px] text-[#94A3B8]">/{cov.total}</span></span><span className="text-[13px] font-bold text-[#94A3B8] mt-1">Data Coverage</span></div>
+                  <div className="absolute inset-0 flex flex-col items-center justify-center"><span className="text-[44px] font-extrabold leading-none text-[#0F172A]">{roll.completedChecks}<span className="text-[22px] text-[#94A3B8]">/{roll.applicableChecks}</span></span><span className="text-[13px] font-bold text-[#94A3B8] mt-1">Checks Complete</span></div>
                 </div>
-                <span className="inline-flex items-center gap-1.5 mt-4 px-4 py-1.5 rounded-full bg-emerald-50 text-[#16A34A] text-[13px] font-bold"><CheckCircle2 className="w-[18px] h-[18px]" /> {covLine}</span>
+                <p className="text-[15px] font-bold text-[#0F172A] mt-4">{roll.statusHeadline}</p>
+                <span className={`inline-flex items-center gap-1.5 mt-2 px-4 py-1.5 rounded-full text-[12px] font-bold ${roll.overall === "verified" ? "bg-emerald-50 text-[#16A34A]" : roll.overall === "attention" ? "bg-red-50 text-[#EF4444]" : "bg-amber-50 text-[#D97706]"}`}>{roll.overall === "verified" ? <CheckCircle2 className="w-[16px] h-[16px]" /> : <MinusCircle className="w-[16px] h-[16px]" />} {checksLine}</span>
+                <p className="text-[12px] text-[#94A3B8] mt-2 px-2 leading-snug">{roll.subcopy}</p>
               </>
             )}
           </div>
@@ -258,7 +292,7 @@ const VehiclePassportVerification = () => {
           <h2 className="text-[18px] font-bold mb-3">Why You Can Trust This Report</h2>
           <div className={`${CARD} p-5`}>
             <ul className="space-y-3">{[
-              `Verified using ${liveSources.length} independent data source${liveSources.length === 1 ? "" : "s"}`,
+              `Checked across ${liveSources.length} data source${liveSources.length === 1 ? "" : "s"}`,
               "OEM VIN validation",
               "Recall database checked",
               "Market pricing verified",
@@ -288,10 +322,10 @@ const VehiclePassportVerification = () => {
           </div>
         </div>
 
-        {/* Mobile sticky-in-flow bottom bar — primary Reserve action + back link. Placed as the last child of the mobile column so it follows content on short pages (no blank gap) and pins to the viewport bottom on long/scrolling pages. */}
+        {/* Mobile sticky-in-flow bottom bar — this is a trust report, not a checkout: the primary action returns to the passport, with "Ask About This Vehicle" secondary. Reserve is deliberately NOT the primary CTA here. Placed as the last child of the mobile column so it follows content on short pages (no blank gap) and pins to the viewport bottom on long/scrolling pages. */}
         <div className="sticky bottom-0 z-40 bg-white/85 backdrop-blur border-t border-[#E6E8EC] px-4 pt-3 pb-[calc(12px+env(safe-area-inset-bottom))] -mx-px">
-          <button onClick={() => go("reserve")} className="w-full h-[52px] rounded-2xl bg-[#2563EB] active:bg-[#1d4fd7] text-white text-[15px] font-bold inline-flex items-center justify-center gap-2 transition-transform active:scale-[0.99]"><ShieldCheck className="w-5 h-5" /> Reserve This Vehicle</button>
-          <button onClick={back} className="w-full mt-2 h-9 text-[13px] font-semibold text-[#64748B] inline-flex items-center justify-center gap-1"><ChevronLeft className="w-4 h-4" /> Back to Vehicle Passport</button>
+          <button onClick={back} className="w-full h-[52px] rounded-2xl bg-[#2563EB] active:bg-[#1d4fd7] text-white text-[15px] font-bold inline-flex items-center justify-center gap-2 transition-transform active:scale-[0.99]"><ChevronLeft className="w-5 h-5" /> Back to Vehicle Passport</button>
+          <button onClick={() => go("contact")} className="w-full mt-2 h-11 rounded-2xl border border-[#E6E8EC] bg-white text-[14px] font-semibold text-[#0F172A] inline-flex items-center justify-center gap-1.5 active:bg-slate-50"><MessageSquare className="w-4 h-4 text-[#2563EB]" /> Ask About This Vehicle</button>
         </div>
       </div>
 
@@ -335,7 +369,7 @@ const VehiclePassportVerification = () => {
               <div id="v-overview" className="flex items-start justify-between gap-4">
                 <div className="flex items-start gap-3">
                   <span className="w-12 h-12 rounded-2xl bg-emerald-50 flex items-center justify-center shrink-0"><ShieldCheck className="w-7 h-7 text-[#16A34A]" /></span>
-                  <div><h1 className="text-[24px] font-bold leading-tight">AutoLabels Verified Report</h1><p className="text-[14px] text-[#64748B] mt-0.5">Independently verified data to help you buy with confidence.</p></div>
+                  <div><h1 className="text-[24px] font-bold leading-tight">AutoLabels Data-Verified Report</h1><p className="text-[14px] text-[#64748B] mt-0.5">Records checked across multiple data sources to help you buy with confidence.</p></div>
                 </div>
                 <div className="text-right shrink-0 hidden sm:block"><p className="text-[12px] text-[#94A3B8]">Report Generated</p><p className="text-[13px] font-semibold">{reportTime.toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })} · {reportTime.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}</p></div>
               </div>
@@ -343,10 +377,11 @@ const VehiclePassportVerification = () => {
               {/* Hero card */}
               <div className={`${CARD} p-6`}>
                 <div className="flex flex-col lg:flex-row lg:items-center gap-6">
-                  {cov.total > 0 && <CoverageRing measured={cov.measured} total={cov.total} />}
+                  {roll.applicableChecks > 0 && <CoverageRing measured={roll.completedChecks} total={roll.applicableChecks} color={ringColor} caption="Checks Complete" />}
                   <div className="flex-1 min-w-0">
-                    <h2 className="text-[20px] font-bold">{counts.issue > 0 ? "Verified — review the flagged items with the dealership." : counts.attention > 0 ? "Verified with a few items to review." : counts.verified > 0 ? "Verified. The records on this vehicle check out." : "Verification in progress."}</h2>
-                    <p className="text-[14px] text-[#64748B] mt-1">{covLine}. Our verification process confirms this vehicle's information against independent data sources.</p>
+                    <h2 className="text-[20px] font-bold">{roll.statusHeadline}</h2>
+                    <p className="text-[14px] text-[#64748B] mt-1">{roll.subcopy}</p>
+                    <p className="text-[12px] text-[#94A3B8] mt-1.5">{checksLine}. Data coverage across rating factors: {covLine}.</p>
                     <div className="flex flex-wrap gap-x-8 gap-y-2 mt-4">
                       {([{ icon: CheckCircle2, cls: "text-[#16A34A]", v: counts.verified, l: "Verified" }, counts.attention > 0 ? { icon: AlertTriangle, cls: "text-[#F59E0B]", v: counts.attention, l: "Attention" } : null, counts.issue > 0 ? { icon: MinusCircle, cls: "text-[#94A3B8]", v: counts.issue, l: "Issues Found" } : null].filter(Boolean) as { icon: React.ElementType; cls: string; v: number; l: string }[]).map((m, i) => (
                         <div key={i} className="flex items-center gap-2"><m.icon className={`w-5 h-5 ${m.cls}`} /><span className="text-[18px] font-extrabold">{m.v}</span><span className="text-[13px] text-[#64748B]">{m.l}</span></div>
@@ -396,7 +431,7 @@ const VehiclePassportVerification = () => {
               {/* Promise banner */}
               <div id="v-summary" className="rounded-2xl border border-emerald-200 bg-emerald-50/60 p-6 flex flex-col sm:flex-row sm:items-center gap-4">
                 <span className="w-11 h-11 rounded-xl bg-emerald-100 flex items-center justify-center shrink-0"><ShieldCheck className="w-6 h-6 text-[#16A34A]" /></span>
-                <div className="flex-1"><p className="text-[16px] font-bold text-[#0F172A]">Every vehicle. Every time. Every detail.</p><p className="text-[13px] text-[#64748B] mt-0.5">AutoLabels checks every vehicle against independent data sources — VIN decode, NHTSA recalls, market pricing, title and history records.</p></div>
+                <div className="flex-1"><p className="text-[16px] font-bold text-[#0F172A]">Every vehicle. Every time. Every detail.</p><p className="text-[13px] text-[#64748B] mt-0.5">AutoLabels checks every vehicle against multiple data sources — VIN decode, NHTSA recalls, market pricing, title and history records.</p></div>
                 <button onClick={() => setModal("promise")} className="h-10 px-4 rounded-xl bg-[#16A34A] hover:bg-[#15803d] text-white text-[13px] font-bold shrink-0">Our Verification Promise</button>
               </div>
             </div>
