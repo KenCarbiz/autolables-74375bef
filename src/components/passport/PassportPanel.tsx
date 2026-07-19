@@ -1262,25 +1262,110 @@ function buildPanel(key: PassportPanelKey, d: PassportData, listing: VehicleList
                 <ChevronDown className="w-4 h-4 text-[#94A3B8] group-open:rotate-180 transition-transform shrink-0" />
               </summary>
               <div className="px-4 pb-4 space-y-4">
-                {cov.map((r) => {
-                  const comps = COVERAGE_COMPONENTS[r.key] ?? [];
-                  const accent = r.key === "basic" ? "text-[#2563EB]" : r.key === "powertrain" ? "text-[#16A34A]" : "text-[#0F172A]";
+                {(() => {
+                  // Coverage color key (accessibility: color is never the sole
+                  // signal — every group is labeled and every item stays
+                  // readable without color):
+                  //   BLUE  #2563EB → Bumper-to-Bumper (basic)
+                  //   GREEN #16A34A → Powertrain
+                  //   SLATE           → shared "covered by both"
+                  // Extra benefit rows (corrosion, roadside, ev_battery,
+                  // maintenance) keep their own semantics and never adopt
+                  // powertrain green for basic-coverage items.
+                  const basicRow = cov.find((r) => r.key === "basic") ?? null;
+                  const ptRow = cov.find((r) => r.key === "powertrain") ?? null;
+                  const otherRows = cov.filter((r) => r.key !== "basic" && r.key !== "powertrain");
+                  const basicComps = COVERAGE_COMPONENTS.basic ?? [];
+                  const ptComps = COVERAGE_COMPONENTS.powertrain ?? [];
+                  const bothSet = new Set(basicComps.filter((c) => ptComps.includes(c)));
+                  const basicOnly = basicComps.filter((c) => !bothSet.has(c));
+                  const ptOnly = ptComps.filter((c) => !bothSet.has(c));
+                  const bothItems = Array.from(bothSet);
+                  const otherAccent = (key: string) =>
+                    key === "corrosion" ? "text-[#0F172A]"
+                      : key === "roadside" ? "text-[#0F172A]"
+                        : key === "ev_battery" ? "text-[#16A34A]"
+                          : key === "maintenance" ? "text-[#16A34A]"
+                            : "text-[#0F172A]";
+                  const otherCheck = (key: string) =>
+                    key === "ev_battery" || key === "maintenance" ? "text-[#16A34A]" : "text-[#64748B]";
                   return (
-                    <div key={r.key}>
-                      <div className="flex items-baseline justify-between gap-3 mb-1.5">
-                        <p className={`text-[13px] font-bold ${accent}`}>{r.label}</p>
-                        <p className="text-[12px] font-semibold text-[#64748B] shrink-0">{r.term}</p>
-                      </div>
-                      {comps.length > 0 ? (
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1.5">
-                          {comps.map((c) => <div key={c} className="flex items-start gap-2 text-[12px] text-[#334155]"><CheckCircle2 className="w-3.5 h-3.5 text-[#16A34A] shrink-0 mt-0.5" />{c}</div>)}
+                    <>
+                      {basicRow && (
+                        <div className="border-l-2 border-[#2563EB] pl-3">
+                          <div className="flex items-baseline justify-between gap-3 mb-1.5">
+                            <p className="text-[13px] font-bold text-[#2563EB]">Bumper-to-Bumper</p>
+                            <p className="text-[12px] font-semibold text-[#64748B] shrink-0">{basicRow.term}</p>
+                          </div>
+                          {basicOnly.length > 0 ? (
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1.5">
+                              {basicOnly.map((c) => (
+                                <div key={c} className="flex items-start gap-2 text-[12px] text-[#334155]">
+                                  <CheckCircle2 className="w-3.5 h-3.5 text-[#2563EB] shrink-0 mt-0.5" aria-label="Bumper-to-Bumper" />{c}
+                                </div>
+                              ))}
+                            </div>
+                          ) : <p className="text-[12px] text-[#64748B]">{basicRow.sub}</p>}
                         </div>
-                      ) : <p className="text-[12px] text-[#64748B]">{r.sub}</p>}
-                    </div>
+                      )}
+                      {ptRow && (
+                        <div className="border-l-2 border-[#16A34A] pl-3">
+                          <div className="flex items-baseline justify-between gap-3 mb-1.5">
+                            <p className="text-[13px] font-bold text-[#16A34A]">Powertrain</p>
+                            <p className="text-[12px] font-semibold text-[#64748B] shrink-0">{ptRow.term}</p>
+                          </div>
+                          {ptOnly.length > 0 ? (
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1.5">
+                              {ptOnly.map((c) => (
+                                <div key={c} className="flex items-start gap-2 text-[12px] text-[#334155]">
+                                  <CheckCircle2 className="w-3.5 h-3.5 text-[#16A34A] shrink-0 mt-0.5" aria-label="Powertrain" />{c}
+                                </div>
+                              ))}
+                            </div>
+                          ) : <p className="text-[12px] text-[#64748B]">{ptRow.sub}</p>}
+                        </div>
+                      )}
+                      {basicRow && ptRow && bothItems.length > 0 && (
+                        <div className="border-l-2 border-slate-300 pl-3">
+                          <p className="text-[13px] font-bold text-[#334155] mb-1.5">Covered by both</p>
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1.5">
+                            {bothItems.map((c) => (
+                              <div key={c} className="flex items-start gap-2 text-[12px] text-[#334155]">
+                                <span className="inline-flex gap-0.5 shrink-0 mt-0.5">
+                                  <CheckCircle2 className="w-3.5 h-3.5 text-[#2563EB]" aria-label="Bumper-to-Bumper" />
+                                  <CheckCircle2 className="w-3.5 h-3.5 text-[#16A34A]" aria-label="Powertrain" />
+                                </span>{c}
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                      {otherRows.map((r) => {
+                        const comps = COVERAGE_COMPONENTS[r.key] ?? [];
+                        return (
+                          <div key={r.key}>
+                            <div className="flex items-baseline justify-between gap-3 mb-1.5">
+                              <p className={`text-[13px] font-bold ${otherAccent(r.key)}`}>{r.label}</p>
+                              <p className="text-[12px] font-semibold text-[#64748B] shrink-0">{r.term}</p>
+                            </div>
+                            {comps.length > 0 ? (
+                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1.5">
+                                {comps.map((c) => (
+                                  <div key={c} className="flex items-start gap-2 text-[12px] text-[#334155]">
+                                    <CheckCircle2 className={`w-3.5 h-3.5 shrink-0 mt-0.5 ${otherCheck(r.key)}`} />{c}
+                                  </div>
+                                ))}
+                              </div>
+                            ) : <p className="text-[12px] text-[#64748B]">{r.sub}</p>}
+                          </div>
+                        );
+                      })}
+                    </>
                   );
-                })}
+                })()}
                 <p className="text-[11px] text-[#94A3B8] pt-1 border-t border-slate-100">Typical coverage groupings for this manufacturer's terms. The OEM warranty booklet governs exact components and exclusions — confirm specifics with the dealer.</p>
               </div>
+
             </details>
 
             {/* Additional factory benefits */}
