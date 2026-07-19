@@ -2540,6 +2540,23 @@ const Admin = () => {
               })()}
             </div>
 
+            <div id="passport-version" className="bg-card rounded-lg p-4 shadow-sm">
+              <h4 className="text-sm font-bold text-foreground mb-2">Passport experience version</h4>
+              <select
+                value={settings.passport_version || "current"}
+                onChange={(e) => updateSettings({ passport_version: e.target.value as "current" | "v3" | "experiment" })}
+                className="w-full px-3 py-2 border border-border-custom rounded text-sm"
+              >
+                <option value="current">Current — existing /v/ passport (recommended)</option>
+                <option value="v3">V3 governed — new mobile-first /v3/ experience</option>
+                <option value="experiment">Experiment — internal preview</option>
+              </select>
+              <p className="text-[11px] text-muted-foreground mt-1">
+                Store-wide default. A vehicle's own "Passport version" setting overrides this when set to something other than "Current".
+              </p>
+            </div>
+
+
             <div id="incentive-programs">
               <IncentivesSettingsPanel />
             </div>
