@@ -255,14 +255,26 @@ const TodaysPriceExperience = ({ listing, d }: { listing: VehicleListing; d: Pas
   const emit = (event: string, extra: Record<string, unknown> = {}) => { if (!isPreview) track(listing, event, extra); };
 
   const submit = async () => {
+    // Duplicate-submit guard: any in-flight or already-sent request is ignored
+    // so repeated taps can't produce a second lead row.
+    if (sending || sent) return;
     const errs: typeof errors = {};
     if (!name.trim()) errs.name = "Enter your full name.";
     if (!email.trim() && !phone.trim()) errs.contact = "Add a phone number or email so the dealership can reach you.";
     if (email.trim() && !/^\S+@\S+\.\S+$/.test(email.trim())) errs.email = "That email doesn't look right.";
     setErrors(errs);
-    if (Object.keys(errs).length) return;
+    if (Object.keys(errs).length) { emit("lead_validation_failed", { fields: Object.keys(errs) }); return; }
+    emit("payment_request_submitted", { mode: copy.mode, term, apr_bucket: Math.round(apr), monthly_bucket: Math.round(monthly / 25) * 25 });
     if (isPreview) { setSent(true); return; }
     setSending(true);
+    // Preserve the exact calculation the shopper modeled so the dealer sees it.
+    const paymentSnapshot: PaymentCalculationSnapshot = {
+      vin: listing.vin, vehiclePrice: price, downPayment: safeDown, termMonths: term,
+      exampleAprPercent: apr, aprIsVerifiedOffer: false, estMonthlyPayment: monthly,
+      amountFinanced: financed, creditTier: (profile?.toLowerCase() as CreditTier | undefined) ?? null,
+      dueAtSigningKnown: dueAtSigning.known, excludedCharges: [...EXCLUDED_CHARGES],
+      preferredContact: method, calcVersion: PAYMENT_CALC_VERSION, calculatedAt: new Date().toISOString(),
+    };
     try {
       let src = "website";
       let zip = "";
@@ -270,14 +282,14 @@ const TodaysPriceExperience = ({ listing, d }: { listing: VehicleListing; d: Pas
         if (sessionStorage.getItem("al_visit_src") === "qr") src = "qr_scan";
         zip = sessionStorage.getItem("al_zip") || "";
       } catch { /* storage unavailable */ }
-      const terms = copy.showCalculator ? `Payment goal ${fmt$(monthly)}/mo · ${term} mo · ${apr.toFixed(2)}% APR · ${fmt$(safeDown)} down${profile ? ` · Credit profile ${profile}` : ""}` : "";
-      const extras = [`Mode ${copy.mode}`, terms, method ? `Prefers ${method}` : "", zip ? `ZIP ${zip}` : "", "via vehicle_passport_todays_price_page"].filter(Boolean).join(" · ");
+      const terms = copy.showCalculator ? `Payment goal ${fmt$(monthly)}/mo · ${term} mo · Example APR ${apr.toFixed(2)}% · ${fmt$(safeDown)} down${profile ? ` · Credit profile ${profile}` : ""}` : "";
+      const extras = [`Mode ${copy.mode}`, terms, method ? `Prefers ${method}` : "", zip ? `ZIP ${zip}` : "", `Due at signing (est.) ${fmt$(dueAtSigning.known)} (excl. tax/title/reg)`, "via vehicle_passport_todays_price_page"].filter(Boolean).join(" · ");
       const routing = (listing as unknown as { contact_routing?: Record<string, unknown> }).contact_routing || null;
       const basePayload = {
         store_id: listing.store_id, name: name.trim(), email: email.trim() || "", phone: phone.trim() || "",
         vehicle_interest: `${listing.ymm || "Vehicle"} (Today's Price)`,
         vehicle_vin: listing.vin, source: src, status: "new",
-        notes: `[intent=todays_price] Passport V2 — Today's Price · ${extras}${message.trim() ? `: ${message.trim()}` : ""}`,
+        notes: `[intent=todays_price] Passport V2 — Today's Price · ${extras}${message.trim() ? `: ${message.trim()}` : ""}\n[payment_calculation]${JSON.stringify(paymentSnapshot)}`,
       };
       const routedPayload = {
         ...basePayload, sub_source: "contact",
@@ -287,15 +299,15 @@ const TodaysPriceExperience = ({ listing, d }: { listing: VehicleListing; d: Pas
       let insErr = (await (supabase as unknown as LeadsTable).from("leads").insert(routedPayload)).error;
       if (insErr) insErr = (await (supabase as unknown as LeadsTable).from("leads").insert(basePayload)).error;
       if (insErr) throw insErr;
-      trackLeadSubmitted({ storeId: listing.store_id, vehicleId: listing.id, vin: listing.vin, source: src === "qr_scan" ? "window_sticker_qr" : "passport", metadata: { intent: "todays_price", event: "todays_price_form_submitted", mode: copy.mode, monthly, term, apr, down: safeDown } });
+      trackLeadSubmitted({ storeId: listing.store_id, vehicleId: listing.id, vin: listing.vin, source: src === "qr_scan" ? "window_sticker_qr" : "passport", metadata: { intent: "todays_price", event: "todays_price_form_submitted", mode: copy.mode, monthly, term, apr, down: safeDown, calc_version: PAYMENT_CALC_VERSION } });
       supabase.functions.invoke("lead-alert", {
         body: { slug: listing.slug, vin: listing.vin, intent: "todays_price", name: name.trim(), phone: phone.trim() || null, email: email.trim() || null, source: src, sub_source: "contact" },
       }).catch(() => { /* alert failure never blocks the shopper */ });
-      emit("todays_price_form_success");
+      emit("payment_request_succeeded", { mode: copy.mode });
       setSent(true);
       window.scrollTo({ top: 0, behavior: "smooth" });
     } catch {
-      emit("todays_price_form_error");
+      emit("payment_request_failed");
       toast.error("Couldn't send — please call the dealer directly");
     } finally { setSending(false); }
   };
