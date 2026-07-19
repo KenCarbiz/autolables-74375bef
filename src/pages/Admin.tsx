@@ -2543,16 +2543,15 @@ const Admin = () => {
             <div id="passport-version" className="bg-card rounded-lg p-4 shadow-sm">
               <h4 className="text-sm font-bold text-foreground mb-2">Passport experience version</h4>
               <select
-                value={settings.passport_version || "current"}
-                onChange={(e) => updateSettings({ passport_version: e.target.value as "current" | "v3" | "experiment" })}
+                value={settings.passport_version === "v3" ? "v3" : "current"}
+                onChange={(e) => updateSettings({ passport_version: e.target.value as "current" | "v3" })}
                 className="w-full px-3 py-2 border border-border-custom rounded text-sm"
               >
-                <option value="current">Current — existing /v/ passport (recommended)</option>
-                <option value="v3">V3 governed — new mobile-first /v3/ experience</option>
-                <option value="experiment">Experiment — internal preview</option>
+                <option value="current">Current Passport</option>
+                <option value="v3">Passport V3</option>
               </select>
               <p className="text-[11px] text-muted-foreground mt-1">
-                Store-wide default. A vehicle's own "Passport version" setting overrides this when set to something other than "Current".
+                Store-wide default. A vehicle can override this per-VIN — leave a vehicle on "Inherit store default" to follow this setting.
               </p>
             </div>
 
