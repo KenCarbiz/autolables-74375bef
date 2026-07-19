@@ -103,7 +103,7 @@ interface VehicleRow {
   market_payload: { listingPrice?: number | null; low?: number | null; high?: number | null; belowMarket?: number } | null;
   enriched_at: string | null;
   market_checked_at: string | null;
-  passport_version: "current" | "v3" | "experiment" | null;
+  passport_version: "inherit" | "current" | "v3" | "experiment" | null;
   created_at: string;
   updated_at: string;
 }
@@ -1363,7 +1363,7 @@ const ScanInfoPanel = ({ vehicle, onReload }: { vehicle: VehicleRow; onReload: (
   const [accessories, setAccessories] = useState<AvailableAccessory[]>(vehicle.available_accessories || []);
   const [packetModules, setPacketModules] = useState<Record<string, boolean>>(vehicle.packet_modules || {});
   const [suppressedPrograms, setSuppressedPrograms] = useState<string[]>(vehicle.suppressed_programs || []);
-  const [passportVersion, setPassportVersion] = useState<"current" | "v3" | "experiment">((vehicle.passport_version as "current" | "v3" | "experiment") || "current");
+  const [passportVersion, setPassportVersion] = useState<"inherit" | "current" | "v3" | "experiment">((vehicle.passport_version as "inherit" | "current" | "v3" | "experiment") || "inherit");
   const [saving, setSaving] = useState(false);
   const { settings: dealerSettings } = useDealerSettings();
   const storeDefaults = dealerSettings.packet_module_defaults || {};
@@ -1442,16 +1442,17 @@ const ScanInfoPanel = ({ vehicle, onReload }: { vehicle: VehicleRow; onReload: (
         <div className="flex items-start justify-between gap-4">
           <div>
             <h3 className="text-[15px] font-bold text-foreground">Passport version</h3>
-            <p className="text-[13px] text-slate-500 mt-0.5">Which shopper experience this vehicle serves. Leave on “Current” unless you're piloting the new governed passport.</p>
+            <p className="text-[13px] text-slate-500 mt-0.5">Which shopper experience this vehicle serves. Leave on “Inherit store default” unless this specific vehicle should be pinned.</p>
           </div>
           <select
             value={passportVersion}
-            onChange={(e) => setPassportVersion(e.target.value as "current" | "v3" | "experiment")}
+            onChange={(e) => setPassportVersion(e.target.value as "inherit" | "current" | "v3" | "experiment")}
             className="h-9 px-3 rounded-lg border border-border bg-background text-sm text-foreground"
           >
-            <option value="current">Current (/v/…)</option>
-            <option value="v3">V3 governed (/v3/…)</option>
-            <option value="experiment">Experiment</option>
+            <option value="inherit">Inherit store default</option>
+            <option value="current">Current Passport</option>
+            <option value="v3">Passport V3</option>
+            <option value="experiment">Controlled Experiment</option>
           </select>
         </div>
       </div>

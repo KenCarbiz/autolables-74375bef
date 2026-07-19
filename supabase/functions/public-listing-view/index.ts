@@ -2,6 +2,7 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 import { resolveCustomerPassportRouting, type PassportAgent } from "../_shared/passport-routing.ts";
 import { matchIihsAward, type IihsAward } from "../_shared/iihs-awards.ts";
+import { resolvePassportVersion } from "../_shared/passport-version.ts";
 
 // ──────────────────────────────────────────────────────────────
 // public-listing-view
@@ -147,18 +148,21 @@ serve(async (req) => {
         if (s.packet_module_defaults && typeof s.packet_module_defaults === "object") {
           row.packet_defaults = s.packet_module_defaults;
         }
-        // Passport experience version: the per-vehicle override wins when
-        // it's not 'current'; otherwise fall back to the tenant default in
-        // dealer_profiles.settings.passport_version; otherwise 'current'.
-        // Resolved once, server-side, so the client just reads one field.
+        // Passport experience version — resolved once, server-side, through
+        // the shared pure resolver (supabase/functions/_shared/passport-version.ts)
+        // so the client just reads effective_passport_version +
+        // passport_resolution_reason. Also expose the tenant's governed-routing
+        // gate so the /v/:slug wrapper can decide in-place without a second
+        // request. The kill switch always forces the existing passport.
         {
-          const perVehicle = String((row as { passport_version?: unknown }).passport_version || "current");
-          const tenantDefault = String((s.passport_version as string) || "current");
-          const allowed = new Set(["current", "v3", "experiment"]);
-          const effective = perVehicle !== "current" && allowed.has(perVehicle)
-            ? perVehicle
-            : (allowed.has(tenantDefault) ? tenantDefault : "current");
-          (row as Record<string, unknown>).effective_passport_version = effective;
+          const resolved = resolvePassportVersion({
+            vehicleOverride: (row as { passport_version?: unknown }).passport_version,
+            tenantDefault: s.passport_version,
+            tenantKillSwitch: s.passport_kill_switch,
+          });
+          (row as Record<string, unknown>).effective_passport_version = resolved.effective;
+          (row as Record<string, unknown>).passport_resolution_reason = resolved.reason;
+          (row as Record<string, unknown>).governed_routing_enabled = s.governed_routing_enabled === true;
         }
         // Dealer-branded warranty programs (lifetime powertrain, dealer CPO)
         // flagged for the passport warranty panel, filtered to this vehicle's
