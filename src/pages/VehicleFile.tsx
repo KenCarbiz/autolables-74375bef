@@ -1363,6 +1363,7 @@ const ScanInfoPanel = ({ vehicle, onReload }: { vehicle: VehicleRow; onReload: (
   const [accessories, setAccessories] = useState<AvailableAccessory[]>(vehicle.available_accessories || []);
   const [packetModules, setPacketModules] = useState<Record<string, boolean>>(vehicle.packet_modules || {});
   const [suppressedPrograms, setSuppressedPrograms] = useState<string[]>(vehicle.suppressed_programs || []);
+  const [passportVersion, setPassportVersion] = useState<"current" | "v3" | "experiment">((vehicle.passport_version as "current" | "v3" | "experiment") || "current");
   const [saving, setSaving] = useState(false);
   const { settings: dealerSettings } = useDealerSettings();
   const storeDefaults = dealerSettings.packet_module_defaults || {};
