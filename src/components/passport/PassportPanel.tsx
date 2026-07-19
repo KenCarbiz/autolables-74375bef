@@ -14,6 +14,7 @@ import { trackCustomerCtaClicked } from "@/lib/engagement/customerEngagement";
 import { oemCoverageRows, type CoverageKey } from "@/lib/oemWarranty";
 import { lookupOemReference } from "@/data/oemWarrantyReference";
 import { resolveEffectiveWarranty } from "@/lib/warranty/passportWarranty";
+import { resolveWarrantyState, type WarrantyStateView } from "@/lib/warranty/state";
 import { readBuildSheet, PACKAGE_KIND_ORDER } from "@/lib/buildSheet";
 import { getEquipmentIcon } from "@/lib/equipmentIcons";
 import { buildEquipmentPanelData, type EquipmentCategory } from "@/lib/equipmentPanel";
@@ -1006,6 +1007,30 @@ function buildPanel(key: PassportPanelKey, d: PassportData, listing: VehicleList
       const active = basicTimeRemains == null && basicMilesRemain == null
         ? false
         : basicTimeRemains !== false && basicMilesRemain !== false;
+      // ── Governed warranty truth-model (safety/compliance) ─────────────────
+      // "ACTIVE" + "You're covered" may render ONLY when a vehicle-specific
+      // start date is verified. Otherwise we show STARTS_AT_DELIVERY /
+      // ESTIMATED_COVERAGE / CONFIRMATION_REQUIRED and drop exact dates.
+      const hasVerifiedStartDate = !!w.in_service_date && !isNew;
+      const authority: "dealer_verified" | "vehicle_specific" | "cpo_program" | "oem_reference" | "unknown" =
+        d.oemWarranty ? "dealer_verified"
+        : isFactoryCpo ? "cpo_program"
+        : w.in_service_date ? "vehicle_specific"
+        : eff.usedLibrary || lookupOemReference(listing.ymm) ? "oem_reference"
+        : "unknown";
+      const hasProgram = !!(w.factory_months || w.powertrain_months || eff.usedLibrary || isFactoryCpo || d.oemWarranty);
+      const makeLabel = (listing.ymm || "").replace(/^\d{4}\s+/, "").split(/\s+/)[0] || null;
+      const governedState: WarrantyStateView = resolveWarrantyState({
+        isNew,
+        hasProgram,
+        authority,
+        hasVerifiedStartDate,
+        startDateCertainty: hasVerifiedStartDate ? "verified" : (hasProgram ? "estimated" : "unknown"),
+        computedActive: hasVerifiedStartDate ? active : null,
+        computedExpired: hasVerifiedStartDate && active === false,
+        conflict: false,
+      }, makeLabel);
+      const statusActiveGoverned = governedState.state === "VERIFIED_ACTIVE";
       const protections = isPreview ? [
         { t: "Extended Vehicle Service Contract", s: "Bumper-to-bumper protection beyond the factory term.", len: "Up to 7 yr / 100K mi" },
         { t: "Prepaid Maintenance Plan", s: "Lock in scheduled service at today's pricing.", len: "3 yr / 36K mi" },
@@ -1028,22 +1053,31 @@ function buildPanel(key: PassportPanelKey, d: PassportData, listing: VehicleList
       const startDate = w.in_service_date ? new Date(w.in_service_date).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" }) : null;
       const endDate = pt.date ?? basic.date ?? null;
       const endMiles = w.powertrain_miles ?? w.factory_miles ?? null;
-      // New cars: coverage starts at delivery (today), so the timeline opens on
-      // "Today · Warranty Start" — no separate manufactured/current points.
-      // New cars: coverage starts at delivery (today), so the timeline opens on
-      // "Today · Warranty Start" — no separate manufactured/current points.
-      const tlRaw = (listing.condition === "new"
+      // Timeline: exact dates only when the governed state confirms a verified
+      // start ("exact"). Otherwise show RELATIVE milestones ("Delivery Date /
+      // Delivery + N Years") — never label "Today" as Warranty Start when no
+      // verified in-service date exists.
+      const bYrs = w.factory_months ? Math.max(1, Math.round(w.factory_months / 12)) : null;
+      const pYrs = w.powertrain_months ? Math.max(1, Math.round(w.powertrain_months / 12)) : null;
+      const useRelativeTimeline = governedState.timelineMode === "relative";
+      const tlRaw = useRelativeTimeline
         ? [
-            { date: "Today", label: "Warranty Start", color: "bg-emerald-500" },
-            basic.date ? { date: basic.date, label: "B-to-B Ends", color: "bg-[#2563EB]" } : null,
-            pt.date ? { date: pt.date, label: "Powertrain Ends", color: "bg-[#16A34A]" } : null,
+            { date: "Delivery Date", label: "Coverage Begins", color: "bg-emerald-500" },
+            bYrs ? { date: `Delivery + ${bYrs} ${bYrs === 1 ? "Year" : "Years"}`, label: "Basic Coverage Ends", color: "bg-[#2563EB]" } : null,
+            pYrs ? { date: `Delivery + ${pYrs} ${pYrs === 1 ? "Year" : "Years"}`, label: "Powertrain Coverage Ends", color: "bg-[#16A34A]" } : null,
           ]
-        : [
-            startDate ? { date: startDate, label: "In service", color: "bg-slate-300" } : null,
-            { date: "Today", label: "Current", color: "bg-emerald-500" },
-            basic.date ? { date: basic.date, label: "B-to-B Ends", color: "bg-[#2563EB]" } : null,
-            pt.date ? { date: pt.date, label: "Powertrain Ends", color: "bg-[#16A34A]" } : null,
-          ]) as (TLPoint | null)[];
+        : (listing.condition === "new"
+          ? [
+              { date: "Today", label: "Warranty Start", color: "bg-emerald-500" },
+              basic.date ? { date: basic.date, label: "B-to-B Ends", color: "bg-[#2563EB]" } : null,
+              pt.date ? { date: pt.date, label: "Powertrain Ends", color: "bg-[#16A34A]" } : null,
+            ]
+          : [
+              startDate ? { date: startDate, label: "In service", color: "bg-slate-300" } : null,
+              { date: "Today", label: "Current", color: "bg-emerald-500" },
+              basic.date ? { date: basic.date, label: "B-to-B Ends", color: "bg-[#2563EB]" } : null,
+              pt.date ? { date: pt.date, label: "Powertrain Ends", color: "bg-[#16A34A]" } : null,
+            ]) as (TLPoint | null)[];
       const tlPoints = tlRaw.filter((p): p is TLPoint => p != null);
       const todayIdx = tlPoints.findIndex((p) => p.date === "Today");
       const isCpo = listing.condition === "cpo";
@@ -1057,9 +1091,10 @@ function buildPanel(key: PassportPanelKey, d: PassportData, listing: VehicleList
       const cpoTerm = (mo: unknown, mi: unknown) => [Number(mo) ? `${Math.round(Number(mo) / 12)} yr` : null, Number(mi) ? `${(Number(mi) / 1000).toFixed(0)}K mi` : null].filter(Boolean).join(" / ");
       const hasData = !!(d.warrantyStr || d.oemWarranty || eff.usedLibrary || isFactoryCpo || d.dealerCoverage.length);
       // ── Goal-layout derived values ──────────────────────────────────────
-      // A new car's factory warranty is active by definition (starts at
-      // delivery); used/CPO rely on the calculated remaining coverage.
-      const statusActive = isNew ? true : active;
+      // Only render the green ACTIVE / "You're covered" state when the governed
+      // resolver says VERIFIED_ACTIVE. Otherwise the status card uses the
+      // governedState copy (STARTS AT DELIVERY, MAY APPLY, EXPIRED, etc.).
+      const statusActive = statusActiveGoverned;
       const statusStart = isNew ? "At Delivery Date" : (startDate ?? "See dealer");
       const statusStartSub = isNew ? null : (startDate ? "(In-Service Date)" : null);
       const yTerm = (mo?: number | null) => (mo ? `${Math.round(mo / 12)} ${Math.round(mo / 12) === 1 ? "Year" : "Years"}` : null);
@@ -1141,10 +1176,11 @@ function buildPanel(key: PassportPanelKey, d: PassportData, listing: VehicleList
               active={statusActive}
               startLabel={statusStart}
               startSub={statusStartSub}
-              endDate={isNew ? null : endDate}
-              endMiles={isNew ? null : endMiles}
+              endDate={governedState.showExactDates && !isNew ? endDate : null}
+              endMiles={governedState.showExactDates && !isNew ? endMiles : null}
+              governedState={governedState}
             />
-            {(statusActive || eff.cpoWrap) && (
+            {(statusActive || eff.cpoWrap || (isNew && hasProgram)) && (
               <div className="rounded-2xl border border-[#E6E8EC] bg-white p-4 sm:p-5">
                 <p className="text-[15px] font-bold text-[#0F172A] mb-3">Coverage at a Glance</p>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -2293,41 +2329,64 @@ const CoverageCard = ({ title, subtitle, pct, tone, years, miles, expiresDate, e
 // ── Goal-layout warranty primitives (wide modal) ─────────────────────────────
 // Top status card. New cars show only the delivery-based start; used/CPO show
 // the in-service start and the calculated end (date + mileage).
-const WarrantyStatusCard = ({ active, startLabel, startSub, endDate, endMiles }: {
+const WarrantyStatusCard = ({ active, startLabel, startSub, endDate, endMiles, governedState }: {
   active: boolean; startLabel: string; startSub?: string | null; endDate?: string | null; endMiles?: number | null;
-}) => active ? (
-  <div className="rounded-2xl border border-emerald-200 bg-emerald-50/60 p-5">
-    <div className="flex flex-col sm:flex-row sm:items-center gap-5">
-      <div className="flex items-start gap-3.5 min-w-0 flex-1">
-        <span className="w-14 h-14 rounded-2xl bg-emerald-100 flex items-center justify-center shrink-0"><ShieldCheck className="w-7 h-7 text-[#16A34A]" /></span>
-        <div className="min-w-0">
-          <p className="text-[13px] font-bold text-[#0F172A]">Factory Warranty</p>
-          <p className="text-[26px] font-extrabold leading-none tracking-wide mt-0.5 text-[#16A34A]">ACTIVE</p>
-          <p className="text-[12px] text-[#64748B] mt-1.5 leading-snug">Your factory warranty is in effect. You're covered.</p>
+  governedState?: WarrantyStateView;
+}) => {
+  // Governed truth-model: render the status chip + copy based on the resolver.
+  // Only VERIFIED_ACTIVE renders the affirmative green "in effect" panel with
+  // exact start/end dates. All other states render a neutral/blue/amber card
+  // that never implies covered status without a verified start date.
+  const gs = governedState;
+  const tone = gs?.tone ?? (active ? "green" : "slate");
+  const showAffirm = gs ? gs.showCovered : active;
+  const label = gs?.statusLabel ?? (active ? "ACTIVE" : "COVERAGE ENDED");
+  const copy = gs?.statusCopy ?? (active ? "Vehicle-specific factory coverage is currently in effect." : "Factory coverage ended — ask our team about extended coverage options.");
+  const headline = gs?.headline ?? "Factory Warranty";
+  const toneCls =
+    tone === "green" ? { wrap: "border-emerald-200 bg-emerald-50/60", chip: "bg-emerald-100", icon: "text-[#16A34A]", label: "text-[#16A34A]", border: "sm:border-emerald-200/70" } :
+    tone === "blue" ? { wrap: "border-blue-200 bg-blue-50/60", chip: "bg-blue-100", icon: "text-[#2563EB]", label: "text-[#2563EB]", border: "sm:border-blue-200/70" } :
+    tone === "amber" ? { wrap: "border-amber-200 bg-amber-50/60", chip: "bg-amber-100", icon: "text-[#B45309]", label: "text-[#B45309]", border: "sm:border-amber-200/70" } :
+    { wrap: "border-slate-200 bg-slate-50/60", chip: "bg-slate-100", icon: "text-[#475569]", label: "text-[#475569]", border: "sm:border-slate-200/70" };
+  return (
+    <div className={`rounded-2xl border ${toneCls.wrap} p-5`}>
+      <div className="flex flex-col sm:flex-row sm:items-center gap-5">
+        <div className="flex items-start gap-3.5 min-w-0 flex-1">
+          <span className={`w-14 h-14 rounded-2xl ${toneCls.chip} flex items-center justify-center shrink-0`}><ShieldCheck className={`w-7 h-7 ${toneCls.icon}`} /></span>
+          <div className="min-w-0">
+            <p className="text-[13px] font-bold text-[#0F172A]">{headline}</p>
+            <p className={`text-[22px] font-extrabold leading-none tracking-wide mt-0.5 ${toneCls.label}`}>{label}</p>
+            <p className="text-[12px] text-[#64748B] mt-1.5 leading-snug">{copy}</p>
+            {gs && (
+              <p className="text-[11px] text-[#94A3B8] mt-1 leading-snug">
+                Source: <span className="font-semibold text-[#475569]">{gs.sourceLabel}</span> · {gs.verificationLabel}
+              </p>
+            )}
+          </div>
         </div>
-      </div>
-      <div className="flex items-stretch gap-6 sm:border-l sm:border-emerald-200/70 sm:pl-6">
-        <div>
-          <p className="text-[11px] font-semibold text-[#64748B]">Warranty Start</p>
-          <p className="text-[15px] font-extrabold text-[#0F172A] mt-1 leading-tight">{startLabel}</p>
-          {startSub && <p className="text-[11px] text-[#94A3B8] leading-tight">{startSub}</p>}
-        </div>
-        {(endDate || endMiles) && (
-          <div>
-            <p className="text-[11px] font-semibold text-[#64748B]">Warranty End</p>
-            {endDate && <p className="text-[15px] font-extrabold text-[#0F172A] mt-1 leading-tight">{endDate}</p>}
-            {endMiles && <p className="text-[11px] text-[#94A3B8] leading-tight">or {endMiles.toLocaleString()} miles</p>}
+        {gs?.showExactDates && (
+          <div className={`flex items-stretch gap-6 sm:border-l ${toneCls.border} sm:pl-6`}>
+            <div>
+              <p className="text-[11px] font-semibold text-[#64748B]">Warranty Start</p>
+              <p className="text-[15px] font-extrabold text-[#0F172A] mt-1 leading-tight">{startLabel}</p>
+              {startSub && <p className="text-[11px] text-[#94A3B8] leading-tight">{startSub}</p>}
+            </div>
+            {(endDate || endMiles) && (
+              <div>
+                <p className="text-[11px] font-semibold text-[#64748B]">Warranty End</p>
+                {endDate && <p className="text-[15px] font-extrabold text-[#0F172A] mt-1 leading-tight">{endDate}</p>}
+                {endMiles && <p className="text-[11px] text-[#94A3B8] leading-tight">or {endMiles.toLocaleString()} miles</p>}
+              </div>
+            )}
           </div>
         )}
       </div>
+      {showAffirm && gs && (
+        <p className="sr-only">Factory coverage is currently in effect for this vehicle.</p>
+      )}
     </div>
-  </div>
-) : (
-  <div className={`${CARD} px-4 py-3 flex items-center gap-2.5`}>
-    <ShieldCheck className="w-4 h-4 text-[#94A3B8] shrink-0" />
-    <p className="text-[13px] text-[#64748B]">Factory coverage ended — ask our team about the extended coverage options for this vehicle.</p>
-  </div>
-);
+  );
+};
 
 // New-car coverage card: term + mileage only — no percentages, progress, or
 // remaining figures (coverage hasn't started counting down until delivery).
@@ -2668,7 +2727,7 @@ const MHero = ({ tone = "green", icon: Icon, eyebrow, title, note, ringPct, stat
 
 // ── Mobile slide-out footer CTA — dealer-configurable variant ──
 interface CtaSignals { greatPrice: boolean; highDemand: boolean; highConf: boolean; highlyRated: boolean; hasWarranty: boolean }
-interface CtaDef { badge: string; btn: string; sub: string; action: "reserve" | "protect"; tone: "green" | "orange" | "blue" }
+interface CtaDef { badge: string; btn: string; sub: string; action: "reserve" | "protect" | "warranty_question"; tone: "green" | "orange" | "blue" }
 const ctaFor = (panelKey: string, s: CtaSignals): CtaDef => {
   switch (panelKey) {
     case "market-price": return { badge: s.greatPrice ? "Great Price Available Today" : "Vehicle Available Today", btn: s.greatPrice ? "Reserve at This Price" : "Reserve This Vehicle", sub: s.greatPrice ? "The dealership confirms availability." : "Secure this vehicle while it's still available.", action: "reserve", tone: s.greatPrice ? "green" : "blue" };
@@ -2682,7 +2741,9 @@ const ctaFor = (panelKey: string, s: CtaSignals): CtaDef => {
       ? { badge: "Strong Local Interest", btn: "Reserve This Vehicle", sub: "Shopper activity on this vehicle is above average.", action: "reserve", tone: "orange" }
       : { badge: "Vehicle Available Today", btn: "Reserve This Vehicle", sub: "Secure this vehicle while it's still available.", action: "reserve", tone: "blue" };
     case "price-confidence": return { badge: "Supported by Market Data", btn: s.highConf ? "Reserve With Confidence" : "Reserve This Vehicle", sub: "This price is supported by live market data.", action: "reserve", tone: "green" };
-    case "factory-warranty": return { badge: s.hasWarranty ? "Warranty Coverage Available" : "Vehicle Available Today", btn: s.hasWarranty ? "Protect This Vehicle" : "Reserve This Vehicle", sub: s.hasWarranty ? "Secure remaining factory protection." : "Secure this vehicle while it's still available.", action: s.hasWarranty ? "protect" : "reserve", tone: "green" };
+    // Factory coverage is INCLUDED with the vehicle — never sold. CTA is a
+    // request to confirm coverage, not a purchase (16 CFR 239).
+    case "factory-warranty": return { badge: s.hasWarranty ? "Warranty Coverage Included" : "Vehicle Available Today", btn: s.hasWarranty ? "Confirm Warranty Coverage" : "Reserve This Vehicle", sub: s.hasWarranty ? "Ask the dealer to confirm the exact start date and included coverage." : "Secure this vehicle while it's still available.", action: s.hasWarranty ? "warranty_question" : "reserve", tone: "blue" };
     case "owner-reviews": return { badge: s.highlyRated ? "Highly Rated By Owners" : "Trusted Dealer Reviews", btn: "Reserve This Vehicle", sub: "Shoppers rate this dealership highly.", action: "reserve", tone: "green" };
     default: return { badge: "Vehicle Available Today", btn: "Reserve This Vehicle", sub: "Secure this vehicle while it's still available.", action: "reserve", tone: "blue" };
   }
@@ -2699,7 +2760,7 @@ const TRUST_PROGRESSIVE = [{ icon: ShieldCheck, t: "No Payment Now" }, { icon: B
 
 function MobileCtaFooter({ variant, panelKey, go, signals }: { variant: string; panelKey: string; go: (s: string) => void; signals: CtaSignals }) {
   const cta = ctaFor(panelKey, signals);
-  const primary = () => go(cta.action === "protect" ? "protect" : "reserve");
+  const primary = () => go(cta.action === "protect" ? "protect" : cta.action === "warranty_question" ? "warranty_question" : "reserve");
   const toneBadge = cta.tone === "orange" ? "bg-orange-50 border-orange-200 text-[#EA580C]" : cta.tone === "green" ? "bg-emerald-50 border-emerald-200 text-[#16A34A]" : "bg-blue-50 border-blue-200 text-[#2563EB]";
   const BadgeIcon = cta.tone === "orange" ? Flame : cta.tone === "green" ? CheckCircle2 : ShieldCheck;
   const BlueBtn = ({ label, sub }: { label: string; sub?: string }) => (
