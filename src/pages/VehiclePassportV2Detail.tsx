@@ -1475,7 +1475,7 @@ const VehiclePassportV2Detail = () => {
 
   const back = () => navigate(`/${base}/${vehicleSlug}${isPreview ? "?preview=1" : ""}`);
 
-  if (loading || shimPanel) return <div className="min-h-screen flex items-center justify-center bg-[#F6F7F9]"><div className="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" /></div>;
+  if (loading || shimPanel) return <div className="min-h-[100svh] flex items-center justify-center bg-[#F6F7F9]"><div className="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" /></div>;
 
   if (notFound || !listing || !d) return (
     <div className="min-h-screen flex items-center justify-center px-6 bg-[#F6F7F9]">
