@@ -1478,7 +1478,7 @@ const VehiclePassportV2Detail = () => {
   if (loading || shimPanel) return <div className="min-h-[100svh] flex items-center justify-center bg-[#F6F7F9]"><div className="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" /></div>;
 
   if (notFound || !listing || !d) return (
-    <div className="min-h-screen flex items-center justify-center px-6 bg-[#F6F7F9]">
+    <div className="min-h-[100svh] flex items-center justify-center px-6 bg-[#F6F7F9]">
       <div className="text-center">
         <Package className="w-12 h-12 text-slate-300 mx-auto mb-4" />
         <h1 className="text-xl font-bold">This vehicle may have just sold</h1>
