@@ -541,7 +541,7 @@ export default function VehiclePassportGoverned() {
       {activePanel && isPassportPanelKey(activePanel) && (
         <Suspense fallback={null}>
           <PassportPanel
-            active={activePanel}
+            panel={activePanel}
             onClose={() => setActivePanel(null)}
             listing={listing}
             d={d}
