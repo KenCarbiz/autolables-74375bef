@@ -2741,7 +2741,9 @@ const ctaFor = (panelKey: string, s: CtaSignals): CtaDef => {
       ? { badge: "Strong Local Interest", btn: "Reserve This Vehicle", sub: "Shopper activity on this vehicle is above average.", action: "reserve", tone: "orange" }
       : { badge: "Vehicle Available Today", btn: "Reserve This Vehicle", sub: "Secure this vehicle while it's still available.", action: "reserve", tone: "blue" };
     case "price-confidence": return { badge: "Supported by Market Data", btn: s.highConf ? "Reserve With Confidence" : "Reserve This Vehicle", sub: "This price is supported by live market data.", action: "reserve", tone: "green" };
-    case "factory-warranty": return { badge: s.hasWarranty ? "Warranty Coverage Available" : "Vehicle Available Today", btn: s.hasWarranty ? "Protect This Vehicle" : "Reserve This Vehicle", sub: s.hasWarranty ? "Secure remaining factory protection." : "Secure this vehicle while it's still available.", action: s.hasWarranty ? "protect" : "reserve", tone: "green" };
+    // Factory coverage is INCLUDED with the vehicle — never sold. CTA is a
+    // request to confirm coverage, not a purchase (16 CFR 239).
+    case "factory-warranty": return { badge: s.hasWarranty ? "Warranty Coverage Included" : "Vehicle Available Today", btn: s.hasWarranty ? "Confirm Warranty Coverage" : "Reserve This Vehicle", sub: s.hasWarranty ? "Ask the dealer to confirm the exact start date and included coverage." : "Secure this vehicle while it's still available.", action: s.hasWarranty ? "warranty_question" : "reserve", tone: "blue" };
     case "owner-reviews": return { badge: s.highlyRated ? "Highly Rated By Owners" : "Trusted Dealer Reviews", btn: "Reserve This Vehicle", sub: "Shoppers rate this dealership highly.", action: "reserve", tone: "green" };
     default: return { badge: "Vehicle Available Today", btn: "Reserve This Vehicle", sub: "Secure this vehicle while it's still available.", action: "reserve", tone: "blue" };
   }
