@@ -1053,22 +1053,31 @@ function buildPanel(key: PassportPanelKey, d: PassportData, listing: VehicleList
       const startDate = w.in_service_date ? new Date(w.in_service_date).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" }) : null;
       const endDate = pt.date ?? basic.date ?? null;
       const endMiles = w.powertrain_miles ?? w.factory_miles ?? null;
-      // New cars: coverage starts at delivery (today), so the timeline opens on
-      // "Today · Warranty Start" — no separate manufactured/current points.
-      // New cars: coverage starts at delivery (today), so the timeline opens on
-      // "Today · Warranty Start" — no separate manufactured/current points.
-      const tlRaw = (listing.condition === "new"
+      // Timeline: exact dates only when the governed state confirms a verified
+      // start ("exact"). Otherwise show RELATIVE milestones ("Delivery Date /
+      // Delivery + N Years") — never label "Today" as Warranty Start when no
+      // verified in-service date exists.
+      const bYrs = w.factory_months ? Math.max(1, Math.round(w.factory_months / 12)) : null;
+      const pYrs = w.powertrain_months ? Math.max(1, Math.round(w.powertrain_months / 12)) : null;
+      const useRelativeTimeline = governedState.timelineMode === "relative";
+      const tlRaw = useRelativeTimeline
         ? [
-            { date: "Today", label: "Warranty Start", color: "bg-emerald-500" },
-            basic.date ? { date: basic.date, label: "B-to-B Ends", color: "bg-[#2563EB]" } : null,
-            pt.date ? { date: pt.date, label: "Powertrain Ends", color: "bg-[#16A34A]" } : null,
+            { date: "Delivery Date", label: "Coverage Begins", color: "bg-emerald-500" },
+            bYrs ? { date: `Delivery + ${bYrs} ${bYrs === 1 ? "Year" : "Years"}`, label: "Basic Coverage Ends", color: "bg-[#2563EB]" } : null,
+            pYrs ? { date: `Delivery + ${pYrs} ${pYrs === 1 ? "Year" : "Years"}`, label: "Powertrain Coverage Ends", color: "bg-[#16A34A]" } : null,
           ]
-        : [
-            startDate ? { date: startDate, label: "In service", color: "bg-slate-300" } : null,
-            { date: "Today", label: "Current", color: "bg-emerald-500" },
-            basic.date ? { date: basic.date, label: "B-to-B Ends", color: "bg-[#2563EB]" } : null,
-            pt.date ? { date: pt.date, label: "Powertrain Ends", color: "bg-[#16A34A]" } : null,
-          ]) as (TLPoint | null)[];
+        : (listing.condition === "new"
+          ? [
+              { date: "Today", label: "Warranty Start", color: "bg-emerald-500" },
+              basic.date ? { date: basic.date, label: "B-to-B Ends", color: "bg-[#2563EB]" } : null,
+              pt.date ? { date: pt.date, label: "Powertrain Ends", color: "bg-[#16A34A]" } : null,
+            ]
+          : [
+              startDate ? { date: startDate, label: "In service", color: "bg-slate-300" } : null,
+              { date: "Today", label: "Current", color: "bg-emerald-500" },
+              basic.date ? { date: basic.date, label: "B-to-B Ends", color: "bg-[#2563EB]" } : null,
+              pt.date ? { date: pt.date, label: "Powertrain Ends", color: "bg-[#16A34A]" } : null,
+            ]) as (TLPoint | null)[];
       const tlPoints = tlRaw.filter((p): p is TLPoint => p != null);
       const todayIdx = tlPoints.findIndex((p) => p.date === "Today");
       const isCpo = listing.condition === "cpo";
