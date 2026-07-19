@@ -442,13 +442,14 @@ const VehiclePassportHistory = () => {
             </button>
           </div>
         </div>
+
+        {/* Mobile sticky-in-flow bottom CTA — follows content on short pages, pins to viewport on long ones */}
+        <div className="sticky bottom-0 z-40 bg-white/85 backdrop-blur border-t border-[#E6E8EC] px-4 pt-3 pb-[calc(10px+env(safe-area-inset-bottom))] text-center">
+          <button onClick={() => go("verification")} className="w-full h-[52px] rounded-2xl bg-[#16A34A] active:bg-[#15803d] text-white text-[15px] font-bold inline-flex items-center justify-center gap-2 transition-transform active:scale-[0.99]"><ShieldCheck className="w-5 h-5" /> Continue to Verification</button>
+          <button onClick={() => go("contact")} className="text-[13px] font-semibold text-[#2563EB] mt-2">Contact Dealer</button>
+        </div>
       </div>
 
-      {/* Mobile sticky bottom CTA */}
-      <div className="md:hidden fixed bottom-0 inset-x-0 z-40 bg-white/85 backdrop-blur border-t border-[#E6E8EC] px-4 pt-3 pb-[calc(10px+env(safe-area-inset-bottom))] text-center">
-        <button onClick={() => go("verification")} className="w-full h-[52px] rounded-2xl bg-[#16A34A] active:bg-[#15803d] text-white text-[15px] font-bold inline-flex items-center justify-center gap-2 transition-transform active:scale-[0.99]"><ShieldCheck className="w-5 h-5" /> Continue to Verification</button>
-        <button onClick={() => go("contact")} className="text-[13px] font-semibold text-[#2563EB] mt-2">Contact Dealer</button>
-      </div>
 
       <header className="hidden md:block border-b border-[#E6E8EC] bg-white sticky top-0 z-20">
         <div className="mx-auto max-w-[1100px] px-4 sm:px-5 h-16 flex items-center justify-between gap-3">
