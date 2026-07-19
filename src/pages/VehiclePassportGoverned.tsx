@@ -63,9 +63,9 @@ function Skeleton() {
 
 export default function VehiclePassportGoverned() {
   const { vehicleSlug, slug } = useParams<{ vehicleSlug?: string; slug?: string }>();
-  const key = ((vehicleSlug || slug || "").trim()).toUpperCase();
+  const rawSlug = (vehicleSlug || slug || "").trim();
   const navigate = useNavigate();
-  const { listing, loading, notFound } = usePublicListing(key);
+  const { listing, loading, notFound } = usePublicListing(rawSlug);
 
   const d = useMemo(() => (listing ? derivePassport(listing) : null), [listing]);
   const gallery = useMemo(() => (listing ? listingGallery(listing) : []), [listing]);
