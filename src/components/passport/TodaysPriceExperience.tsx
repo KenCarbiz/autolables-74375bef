@@ -443,12 +443,13 @@ const TodaysPriceExperience = ({ listing, d }: { listing: VehicleListing; d: Pas
               <div>
                 <p className="text-[12px] font-semibold text-[#64748B] mb-1.5">Preferred Contact Method</p>
                 <div className="grid grid-cols-3 gap-2">
-                  {([["call", "Call", Phone], ["text", "Text", MessageSquare], ["email", "Email", Mail]] as [string, string, React.ElementType][]).map(([key, label, Icon]) => (
-                    <button key={key} type="button" aria-pressed={method === key} onClick={() => { setMethod(key); markStarted(); }} className={`h-11 rounded-xl text-[13px] inline-flex items-center justify-center gap-1.5 border transition-colors ${method === key ? "bg-[#0B6FEA] border-[#0B6FEA] text-white font-bold" : "border-[#DDE5EE] text-[#64748B] font-semibold hover:border-slate-300"}`}>
+                  {([["call", "Call", Phone], ["text", "Text", MessageSquare], ["email", "Email", Mail]] as ["call" | "text" | "email", string, React.ElementType][]).map(([key, label, Icon]) => (
+                    <button key={key} type="button" aria-pressed={method === key} onClick={() => { setMethod(key); markStarted(); emit("contact_method_selected", { method: key }); }} className={`h-11 rounded-xl text-[13px] inline-flex items-center justify-center gap-1.5 border transition-colors ${method === key ? "bg-[#0B6FEA] border-[#0B6FEA] text-white font-bold" : "border-[#DDE5EE] text-[#64748B] font-semibold hover:border-slate-300"}`}>
                       <Icon className="w-4 h-4" /> {label}
                     </button>
                   ))}
                 </div>
+                <p className="text-[11px] text-[#64748B] mt-2 leading-snug">{contactConsentCopy(d.dealerName || "", method)}</p>
               </div>
               <div>
                 <label htmlFor="tp-msg" className="block text-[12px] font-semibold text-[#64748B] mb-1">Anything you'd like the dealer to know? <span className="font-normal text-[#94A3B8]">(Optional)</span></label>
