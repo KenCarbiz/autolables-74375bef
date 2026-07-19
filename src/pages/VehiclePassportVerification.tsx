@@ -186,11 +186,11 @@ const VehiclePassportVerification = () => {
     : { label: "Pending", cls: "text-[#94A3B8]" };
 
   return (
-    <div className="min-h-screen bg-[#F6F7F9] text-[#0F172A]" style={{ fontFamily: "Inter, -apple-system, BlinkMacSystemFont, sans-serif" }}>
+    <div className="min-h-[100svh] bg-[#F6F7F9] text-[#0F172A]" style={{ fontFamily: "Inter, -apple-system, BlinkMacSystemFont, sans-serif" }}>
       <Helmet><title>{`Verification Report — ${listing.ymm} · AutoLabels`}</title><meta name="robots" content="noindex" /></Helmet>
 
       {/* ── Mobile (<768px) — premium iOS verification experience ── */}
-      <div className="md:hidden bg-[#F6F7F9] pb-[calc(96px+env(safe-area-inset-bottom))]">
+      <div className="md:hidden bg-[#F6F7F9]">
         <div className="bg-white px-5 pt-[calc(12px+env(safe-area-inset-top))] pb-7">
           <button onClick={back} className="text-[14px] font-semibold text-[#2563EB] inline-flex items-center gap-1.5 -ml-1"><ChevronLeft className="w-[18px] h-[18px]" /> Back to Vehicle Passport</button>
           <div className="text-center mt-6">
