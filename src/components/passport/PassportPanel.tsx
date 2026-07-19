@@ -8,7 +8,7 @@ import {
 import { toast } from "sonner";
 import { listingHero } from "@/lib/photos";
 import type { PassportData, PricePoint, OemWarrantyView } from "@/lib/passportV2Data";
-import { fmt$, listingEquipment, historyReportName, deriveSoldClaims, deriveRating, ratingTier } from "@/lib/passportV2Data";
+import { fmt$, listingEquipment, historyReportName, deriveSoldClaims, deriveRating, ratingTier, CREDIBLE_AVG_DOM_MAX } from "@/lib/passportV2Data";
 import { packetVisible } from "@/lib/packetModules";
 import { trackCustomerCtaClicked } from "@/lib/engagement/customerEngagement";
 import { oemCoverageRows, type CoverageKey } from "@/lib/oemWarranty";
@@ -176,10 +176,14 @@ function buildPanel(key: PassportPanelKey, d: PassportData, listing: VehicleList
     case "market-demand": {
       const views = d.viewCount, dom = d.dom;
       const avgDom = (mc.avg_dom as number) ?? null;
+      // Active-listing mean age is right-skewed by stale inventory; a 150+ day
+      // "market average" is not a benchmark we show a shopper. Gate to a
+      // credible band before it appears in any customer-facing line.
+      const avgDomCredible = avgDom != null && avgDom <= CREDIBLE_AVG_DOM_MAX ? avgDom : null;
       // Customer-visible gates: view counts only once they're meaningful, and
       // days-on-market only when it's a favorable signal.
       const viewsShown = views != null && views >= 5 ? views : null;
-      const domFav = dom != null && (avgDom != null ? dom <= avgDom : dom <= 30) ? dom : null;
+      const domFav = dom != null && (avgDomCredible != null ? dom <= avgDomCredible : dom <= 30) ? dom : null;
       const has = viewsShown != null || domFav != null;
       const radius = d.marketMeta.radius;
       // Demand score from real inputs only — no synthetic baseline. Fewer than
@@ -198,7 +202,7 @@ function buildPanel(key: PassportPanelKey, d: PassportData, listing: VehicleList
       // never be labeled "N nearby".
       const invCount = (mc.inventory_count as number) ?? (mc.similar_count as number) ?? (mc.comparable_count as number) ?? null;
       const scarce = supply != null ? supply < 30 : invCount != null ? invCount <= 10 : false;
-      const sellsFaster = dom != null && avgDom != null && avgDom > dom;
+      const sellsFaster = dom != null && avgDomCredible != null && avgDomCredible > dom;
       const priceDrop = d.priceChangeTotal != null && d.priceChangeTotal < 0 ? Math.abs(d.priceChangeTotal) : null;
       const sold45 = (mc.sold_45d_estimate as number) ?? null;
       const cutCount = (mc.comp_price_cut_count as number) ?? null;
@@ -217,11 +221,11 @@ function buildPanel(key: PassportPanelKey, d: PassportData, listing: VehicleList
       const insights: string[] = [];
       if (viewsShown != null) insights.push(`${viewsShown.toLocaleString()} shoppers have viewed this vehicle`);
       if (isGreat) insights.push(d.belowMarket && d.belowMarket > 0 ? `Priced ${fmt$(d.belowMarket)} below the local market average` : "Priced below market average — strong value");
-      if (sellsFaster) insights.push(`Similar vehicles average ${avgDom} days on the market — this one is drawing interest faster`);
+      if (sellsFaster) insights.push(`Similar vehicles average ${avgDomCredible} days on the market — this one is drawing interest faster`);
       // avg_dom is active-listing days on market, not time-to-sell — only real
       // sold data supports a "sell within N days" claim.
       if (sold.sellTime) insights.push(sold.sellTime);
-      else if (!sellsFaster && avgDom != null && avgDom <= 60) insights.push(`Similar listings average ~${avgDom} days on market`);
+      else if (!sellsFaster && avgDomCredible != null && avgDomCredible <= 60) insights.push(`Similar listings average ~${avgDomCredible} days on market`);
       if (sold.velocity) insights.push(sold.velocity);
       else if (sold45 != null && sold45 > 0) insights.push(`~${sold45.toLocaleString()} sold ${nearWord} in the last 45 days (estimated)`);
       if (cutCount != null && cutCount > 0 && cutTotal != null && cutTotal >= 5 && priceDrop == null) insights.push(`${cutCount} of ${cutTotal} comparable listings have cut their price — this one ${trackedFromListing ? "was priced right from day one" : "has not needed a price cut"}`);
@@ -244,14 +248,14 @@ function buildPanel(key: PassportPanelKey, d: PassportData, listing: VehicleList
         { icon: Car, label: "Similar Vehicles", value: supplyLevel },
         soldDom != null
           ? { icon: Clock, label: "Avg Days to Sell", value: `${soldDom} Days` }
-          : { icon: Clock, label: "Avg Days on Market", value: avgDom != null ? `${avgDom} Days` : isPreview ? "12 Days" : "—" },
+          : { icon: Clock, label: "Avg Days on Market", value: avgDomCredible != null ? `${avgDomCredible} Days` : isPreview ? "12 Days" : "—" },
         { icon: TrendingUp, label: "Weekly Searches", value: isPreview ? "120" : "—" },
         { icon: Heart, label: "Saved by Shoppers", value: isPreview ? "38" : "—" },
         { icon: MapPin, label: "Local Availability", value: supplyLevel },
       ];
       const snapshot = [
         { l: "Inventory Level", v: supplyLevel },
-        { l: "Average Days on Market", v: avgDom != null ? `${avgDom} Days` : domFav != null ? `${domFav} Days` : isPreview ? "12 Days" : "—" },
+        { l: "Average Days on Market", v: avgDomCredible != null ? `${avgDomCredible} Days` : domFav != null ? `${domFav} Days` : isPreview ? "12 Days" : "—" },
         { l: "Search Activity", v: isPreview ? "Above Average" : level ?? "—" },
         { l: "Local Availability", v: supplyLevel },
         { l: "Average Price", v: avg != null && price != null && price <= avg ? fmt$(avg) : isPreview ? fmt$(61300) : "—" },
@@ -374,7 +378,7 @@ function buildPanel(key: PassportPanelKey, d: PassportData, listing: VehicleList
             </Section>
             <Section title="Similar vehicles">
               <div className={`${CARD} p-4`}>
-                {(avgDom != null || isPreview) && <StatRow label="Avg days on market" value={avgDom != null ? `${avgDom} days` : "38 days"} />}
+                {(avgDomCredible != null || isPreview) && <StatRow label="Avg days on market" value={avgDomCredible != null ? `${avgDomCredible} days` : "38 days"} />}
                 {invCount != null && invCount < 50 ? <StatRow label="Similar vehicles nearby" value={invCount.toLocaleString()} /> : supplyLevel !== "—" && <StatRow label="Local availability" value={supplyLevel} />}
                 {domFav != null && <StatRow label="This vehicle" value={`${domFav} days listed`} />}
                 {sellsFaster && (
@@ -397,7 +401,7 @@ function buildPanel(key: PassportPanelKey, d: PassportData, listing: VehicleList
                 {isGreat && <Check>{(d.belowMarket ?? 0) > 0 ? `Priced ${fmt$(d.belowMarket as number)} below market average` : "Priced below market average"}</Check>}
                 {score != null && score >= 66 && <Check>Strong shopper interest right now</Check>}
                 {scarce && <Check>Limited similar inventory {nearWord}</Check>}
-                {sold.sellTime ? <Check>{sold.sellTime}</Check> : sellsFaster && <Check>Similar vehicles average {avgDom} days on market</Check>}
+                {sold.sellTime ? <Check>{sold.sellTime}</Check> : sellsFaster && <Check>Similar vehicles average {avgDomCredible} days on market</Check>}
                 {priceDrop != null && <Check>Price already reduced {fmt$(priceDrop)}</Check>}
                 {d.warrantyStr && !d.warrantyExpired && <Check>Factory warranty still active</Check>}
                 {dom != null && dom <= 30 && <Check>Fresh listing — best selection</Check>}
@@ -834,7 +838,10 @@ function buildPanel(key: PassportPanelKey, d: PassportData, listing: VehicleList
     case "inventory-trend": {
       const supply = (mc.market_days_supply as number) ?? (mc.inventory_count as number) ?? (isPreview ? 42 : null);
       const changePct = (mc.inventory_change_pct as number) ?? (isPreview ? -12 : null);
-      const avgDom = (mc.avg_dom as number) ?? (isPreview ? 38 : null);
+      const avgDomRaw = (mc.avg_dom as number) ?? (isPreview ? 38 : null);
+      // Same credibility gate as the demand panel: a stale-skewed 150+ day
+      // active-listing average is never shown as a market benchmark.
+      const avgDom = avgDomRaw != null && avgDomRaw <= CREDIBLE_AVG_DOM_MAX ? avgDomRaw : null;
       const hasData = supply != null;
       // Rising inventory never renders — it collapses into "Stable Inventory".
       const trendLabel = changePct != null && changePct < 0 ? `Inventory Down ${Math.abs(changePct)}%` : "Stable Inventory";

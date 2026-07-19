@@ -1,6 +1,12 @@
 import { describe, it, expect } from "vitest";
-import { cleanEquipmentList, computePriceHistory } from "./passportV2Data";
+import { cleanEquipmentList, computePriceHistory, derivePassport, deriveRating, CREDIBLE_AVG_DOM_MAX } from "./passportV2Data";
 import type { VehicleListing } from "@/hooks/useVehicleListing";
+
+// dom is read from mc_attributes; avg_dom from market_meta.
+const demandEvidence = ({ dom, avg_dom }: { dom: number; avg_dom: number }): string[] => {
+  const l = { mc_attributes: { dom }, market_meta: { avg_dom } } as unknown as VehicleListing;
+  return deriveRating(l, derivePassport(l)).factors.find((f) => f.key === "demand")?.evidence ?? [];
+};
 
 const listingWithHistory = (points: { at: string; price: number | null }[]): VehicleListing =>
   ({ value_history: points.map((p) => ({ captured_at: p.at, listing_price: p.price, market_value: null })) } as unknown as VehicleListing);
@@ -47,6 +53,32 @@ describe("computePriceHistory", () => {
     ]));
     expect(r.valueHistory.map((h) => h.listing_price)).toContain(61895);
     expect(r.priceChangeLatest).toBe(-6297);
+  });
+});
+
+describe("Demand & Velocity — skewed avg_dom governance", () => {
+  it("never cites a stale-skewed active-listing average as the market benchmark", () => {
+    const lines = demandEvidence({ dom: 17, avg_dom: 154 });
+    expect(lines.some((l) => l.includes("154"))).toBe(false);
+    expect(lines.some((l) => /market average/.test(l))).toBe(false);
+    // A fresh listing still gets an honest, benchmark-free freshness line.
+    expect(lines.some((l) => /Listed 17 days — fresh to market/.test(l))).toBe(true);
+  });
+
+  it("still cites the average when it sits in a credible band", () => {
+    const lines = demandEvidence({ dom: 17, avg_dom: 40 });
+    expect(lines.some((l) => l.includes("17 days listed vs a 40-day market average"))).toBe(true);
+  });
+
+  it("boundary: an average exactly at the credibility ceiling is usable", () => {
+    const lines = demandEvidence({ dom: 20, avg_dom: CREDIBLE_AVG_DOM_MAX });
+    expect(lines.some((l) => l.includes(`${CREDIBLE_AVG_DOM_MAX}-day market average`))).toBe(true);
+  });
+
+  it("skewed average with a not-fresh listing yields no fabricated benchmark line", () => {
+    const lines = demandEvidence({ dom: 95, avg_dom: 154 });
+    expect(lines.some((l) => l.includes("154") || /market average/.test(l))).toBe(false);
+    expect(lines.some((l) => /fresh to market/.test(l))).toBe(false);
   });
 });
 

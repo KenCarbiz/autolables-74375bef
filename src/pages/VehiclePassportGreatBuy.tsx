@@ -10,7 +10,7 @@ import { toast } from "sonner";
 import { Helmet } from "react-helmet-async";
 import { type VehicleListing } from "@/hooks/useVehicleListing";
 import Logo from "@/components/brand/Logo";
-import { derivePassport, deriveRating, ratingTier, fmt$, listingEquipment, deriveSoldClaims } from "@/lib/passportV2Data";
+import { derivePassport, deriveRating, ratingTier, fmt$, listingEquipment, deriveSoldClaims, CREDIBLE_AVG_DOM_MAX } from "@/lib/passportV2Data";
 import { readDealerAlternatives } from "@/lib/dealerAlternatives";
 import { readBuildSheet } from "@/lib/buildSheet";
 import { MOCK_LISTING } from "./VehiclePassportV3";
@@ -382,7 +382,7 @@ const VehiclePassportGreatBuy = () => {
     sold.milesAdv && listing.mileage != null && d.marketMeta.soldMilesMedian != null
       ? { k: "Miles vs Sold", v: `${listing.mileage.toLocaleString()} mi`, m: `${Math.round(d.marketMeta.soldMilesMedian).toLocaleString()} mi (sold median)`, a: { text: "Under sold median", good: true } }
       : null,
-    d.dom != null && d.marketMeta.avgDom != null && d.dom <= d.marketMeta.avgDom
+    d.dom != null && d.marketMeta.avgDom != null && d.marketMeta.avgDom <= CREDIBLE_AVG_DOM_MAX && d.dom <= d.marketMeta.avgDom
       ? { k: "Market Days", v: `${d.dom} days`, m: `${d.marketMeta.avgDom} days`, a: d.dom < d.marketMeta.avgDom ? { text: "Shorter time", good: true } : null }
       : null,
     sold.velocity && d.dom != null && d.marketMeta.soldDomMedian != null && d.dom < d.marketMeta.soldDomMedian
@@ -452,7 +452,7 @@ const VehiclePassportGreatBuy = () => {
   if (sold.velocity) buyNow.push(`${sold.velocity}.`);
   if (d.saveVsMsrp) buyNow.push(`Priced ${fmt$(d.saveVsMsrp)} below MSRP.`);
   if (d.verifyRows.length > 0) buyNow.push("Dealer verified and ready for the next step.");
-  if (d.dom != null && d.marketMeta.avgDom != null && d.dom < d.marketMeta.avgDom) buyNow.push("Market days are favorable compared with similar listings.");
+  if (d.dom != null && d.marketMeta.avgDom != null && d.marketMeta.avgDom <= CREDIBLE_AVG_DOM_MAX && d.dom < d.marketMeta.avgDom) buyNow.push("Market days are favorable compared with similar listings.");
   else if (isPreview && buyNow.length < 4) buyNow.push("Market days are favorable compared with similar listings.");
   if ((d.viewCount ?? 0) > 20 && buyNow.length < 5) buyNow.push("High shopper interest in your area.");
   if (listing.trim && d.comparables.length >= 5 && sameTrimComps.length <= 2 && buyNow.length < 5) buyNow.push(sameTrimComps.length === 0

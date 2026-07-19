@@ -13,7 +13,7 @@ import { useVehicleListing, type VehicleListing } from "@/hooks/useVehicleListin
 import { usePublicListing } from "@/hooks/usePublicListing";
 import { formatPhone } from "@/components/addendum/CustomerInfoSection";
 import Logo from "@/components/brand/Logo";
-import { derivePassport, deriveRating, ratingTier, computePriceHistory, fmt$, listingEquipment, historyReportName, deriveSoldClaims } from "@/lib/passportV2Data";
+import { derivePassport, deriveRating, ratingTier, computePriceHistory, fmt$, listingEquipment, historyReportName, deriveSoldClaims, CREDIBLE_AVG_DOM_MAX } from "@/lib/passportV2Data";
 import { resolveStickyButtons, type StickyBottomButtons } from "@/lib/stickyButtons";
 import { listingGallery } from "@/lib/photos";
 import { usePassportEngagement } from "@/lib/passportEngagement";
@@ -620,7 +620,7 @@ const VehiclePassportV3 = () => {
     return null;
   })();
   type MiTile = { icon: React.ElementType; title: string; strong: string; sub: string; chart?: React.ReactNode; donut?: number | null; comps?: boolean; section: string; cta: string };
-  const domFavorable = d.dom != null && (d.marketMeta.avgDom != null ? d.dom <= d.marketMeta.avgDom : d.dom <= 30);
+  const domFavorable = d.dom != null && (d.marketMeta.avgDom != null && d.marketMeta.avgDom <= CREDIBLE_AVG_DOM_MAX ? d.dom <= d.marketMeta.avgDom : d.dom <= 30);
   const demandParts = [
     d.viewCount != null && d.viewCount >= 5 ? `${d.viewCount.toLocaleString()} views` : null,
     domFavorable ? `${d.dom} days on market` : null,

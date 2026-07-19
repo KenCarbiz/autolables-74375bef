@@ -30,6 +30,10 @@ const UK_US: [RegExp, string][] = [
   [/\bmetre\b/gi, "Meter"], [/\bkerb\b/gi, "Curb"],
 ];
 const normSpelling = (s: string) => UK_US.reduce((a, [re, t]) => a.replace(re, t), s);
+// Ceiling above which an active-listing "average days on market" is treated as
+// skewed by stale inventory and not shown to shoppers as a market benchmark.
+export const CREDIBLE_AVG_DOM_MAX = 75;
+
 const CODE_RE = /^[A-Z]{1,3}\d{1,4}$/;                                                   // B10, E10, B93
 const META_RE = /\b(msrp|warranty|currency|invoice|jato|segment|dimensions?|emission|plant of assembly|country|weights?|charges?|model generation|model year|ramp angle|secondary|delivery charge)\b/i;
 const RATING_RE = /\b(iihs|nhtsa)\b|-(good|acceptable|marginal|poor|tsp|updated|[1-5])$|overlap|rollover|frontal crash|side impact-/i;
@@ -861,9 +865,19 @@ export const deriveRating = (listing: VehicleListing, d: PassportData): VehicleR
     const sd = Math.round(m.soldDomMedian);
     demandInputs.push({ score: sd <= 30 ? 90 : sd <= 45 ? 80 : sd <= 60 ? 68 : 55, line: `Similar vehicles typically sell in ~${sd} days here` });
   }
+  // avg_dom is the mean age of ACTIVE listings — a right-skewed figure that a
+  // handful of stale listings can drag to 150+ days. Anchoring "vs a 154-day
+  // market average" reads as fake precision, so we only cite the average when
+  // it sits in a credible band (CREDIBLE_AVG_DOM_MAX). Above that we keep the
+  // signal but frame it on the vehicle's own freshness, never the skewed mean.
   if (d.dom != null && m.avgDom != null && m.avgDom > 0) {
-    const r = d.dom / m.avgDom;
-    demandInputs.push({ score: r <= 0.5 ? 90 : r <= 1 ? 78 : r <= 1.5 ? 60 : 48, line: `${d.dom} days listed vs a ${m.avgDom}-day market average` });
+    const credibleAvg = m.avgDom <= CREDIBLE_AVG_DOM_MAX ? m.avgDom : null;
+    if (credibleAvg != null) {
+      const r = d.dom / credibleAvg;
+      demandInputs.push({ score: r <= 0.5 ? 90 : r <= 1 ? 78 : r <= 1.5 ? 60 : 48, line: `${d.dom} days listed vs a ${credibleAvg}-day market average` });
+    } else if (d.dom <= 30) {
+      demandInputs.push({ score: d.dom <= 14 ? 82 : 70, line: `Listed ${d.dom} days — fresh to market` });
+    }
   }
   if (m.daysSupply != null) {
     demandInputs.push({ score: m.daysSupply < 30 ? 88 : m.daysSupply < 60 ? 72 : 55, line: `${Math.round(m.daysSupply)}-day local supply of similar vehicles` });
