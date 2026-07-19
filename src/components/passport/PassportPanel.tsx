@@ -1176,10 +1176,11 @@ function buildPanel(key: PassportPanelKey, d: PassportData, listing: VehicleList
               active={statusActive}
               startLabel={statusStart}
               startSub={statusStartSub}
-              endDate={isNew ? null : endDate}
-              endMiles={isNew ? null : endMiles}
+              endDate={governedState.showExactDates && !isNew ? endDate : null}
+              endMiles={governedState.showExactDates && !isNew ? endMiles : null}
+              governedState={governedState}
             />
-            {(statusActive || eff.cpoWrap) && (
+            {(statusActive || eff.cpoWrap || (isNew && hasProgram)) && (
               <div className="rounded-2xl border border-[#E6E8EC] bg-white p-4 sm:p-5">
                 <p className="text-[15px] font-bold text-[#0F172A] mb-3">Coverage at a Glance</p>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
