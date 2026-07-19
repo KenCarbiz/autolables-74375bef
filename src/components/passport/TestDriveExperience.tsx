@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Phone, MessageSquare, ChevronLeft, CheckCircle2, Car } from "lucide-react";
+import { Phone, ChevronLeft, CheckCircle2, Car, MapPin } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { type VehicleListing } from "@/hooks/useVehicleListing";
@@ -10,6 +10,7 @@ import { fmt$, type PassportData } from "@/lib/passportV2Data";
 import { readBuildSheet } from "@/lib/buildSheet";
 import { listingGallery, listingHero } from "@/lib/photos";
 import { AutoLabelsSpecIcon, SpecIconBadge, type AutoLabelsSpecIconKey } from "@/components/icons/AutoLabelsSpecIcons";
+import { smsConsentCopy } from "@/lib/payment/disclosure";
 
 // ──────────────────────────────────────────────────────────────
 // Schedule a Test Drive — premium action page on the passport system, a
@@ -165,7 +166,7 @@ const TestDriveSupportCard = () => (
     <p className="text-[16px] font-bold text-[#0D1B2A]">A better way to test drive</p>
     <div className="mt-4 space-y-4">
       {([
-        ["calendar-check", "Convenient Scheduling", "Choose the date and time that works best for you."],
+        ["calendar-check", "Flexible Timing", "Tell us the date and time you'd prefer — the dealership confirms availability."],
         ["paper-plane", "Fast Confirmation", "We'll confirm your test drive quickly."],
         ["people", "No Pressure, Just Answers", "Our team is here to help — no hassle, no obligations."],
       ] as [AutoLabelsSpecIconKey, string, string][]).map(([icon, title, sub]) => (
@@ -182,7 +183,7 @@ const TestDriveSupportCard = () => (
       <AutoLabelsSpecIcon name="shield-check" className="w-5 h-5 text-[#0B6FEA] shrink-0 mt-0.5" />
       <div>
         <p className="text-[12.5px] font-bold text-[#0B6FEA]">Your Information is Secure</p>
-        <p className="text-[12px] text-[#3D5876] leading-relaxed mt-0.5">We use industry-standard encryption and never sell your data.</p>
+        <p className="text-[12px] text-[#3D5876] leading-relaxed mt-0.5">Your details are encrypted in transit and shared only with this dealership to respond to your request.</p>
       </div>
     </div>
   </div>
@@ -200,6 +201,11 @@ const TestDriveExperience = ({ listing, d, navigate }: { listing: VehicleListing
   const [sent, setSent] = useState(false);
   const [errors, setErrors] = useState<{ name?: string; contact?: string; email?: string }>({});
   const [started, setStarted] = useState(false);
+  // Text contact requires explicit SMS consent (TCPA). Idempotency key guards
+  // against duplicate leads from repeated taps / retries.
+  const [smsConsent, setSmsConsent] = useState(false);
+  const [idempotencyKey] = useState(() =>
+    typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : `td-${listing.vin || "x"}-${Math.round(performance.now())}`);
 
   const isPreview = typeof window !== "undefined" && new URLSearchParams(window.location.search).has("preview");
   useEffect(() => { if (!isPreview) track(listing, "test_drive_page_viewed"); }, [listing, isPreview]);
@@ -216,12 +222,26 @@ const TestDriveExperience = ({ listing, d, navigate }: { listing: VehicleListing
   const windowDef = TIME_WINDOWS.find((w) => w.key === window_);
 
   const submit = async () => {
+    if (sent) return; // idempotent: never resubmit after a successful send
     const errs: typeof errors = {};
     if (!name.trim()) errs.name = "Enter your full name.";
-    if (!email.trim() && !phone.trim()) errs.contact = "Add a phone number or email so the dealership can reach you.";
+    // Contact requirement follows the selected method — Text can't proceed on an
+    // email alone, Call needs a phone, Email needs an email.
+    if (method === "email") {
+      if (!email.trim()) errs.contact = "Add your email so the dealership can reply.";
+    } else if (!phone.trim()) {
+      errs.contact = method === "text"
+        ? "Add a mobile number to receive text updates."
+        : "Add a phone number so the dealership can call you.";
+    }
     if (email.trim() && !/^\S+@\S+\.\S+$/.test(email.trim())) errs.email = "That email doesn't look right.";
     setErrors(errs);
-    if (Object.keys(errs).length) return;
+    const needsConsent = method === "text";
+    if (Object.keys(errs).length || (needsConsent && !smsConsent)) {
+      if (needsConsent && !smsConsent && !Object.keys(errs).length) toast.error("Please agree to receive text messages, or choose Call or Email.");
+      if (!isPreview) track(listing, "test_drive_validation_failed");
+      return;
+    }
     if (isPreview) { setSent(true); window.scrollTo({ top: 0, behavior: "smooth" }); return; }
     setSending(true);
     try {
@@ -262,7 +282,7 @@ const TestDriveExperience = ({ listing, d, navigate }: { listing: VehicleListing
       let insErr = (await (supabase as unknown as LeadsTable).from("leads").insert(routedPayload)).error;
       if (insErr) insErr = (await (supabase as unknown as LeadsTable).from("leads").insert(basePayload)).error;
       if (insErr) throw insErr;
-      trackLeadSubmitted({ storeId: listing.store_id, vehicleId: listing.id, vin: listing.vin, source: src === "qr_scan" ? "window_sticker_qr" : "passport", metadata: { intent: "test_drive", event: "test_drive_form_submitted", requested_date: date || null, requested_window: window_ || null, routing_target_type: (routing?.routingTargetType as string) ?? null } });
+      trackLeadSubmitted({ storeId: listing.store_id, vehicleId: listing.id, vin: listing.vin, source: src === "qr_scan" ? "window_sticker_qr" : "passport", metadata: { intent: "test_drive", event: "test_drive_form_submitted", requested_date: date || null, requested_window: window_ || null, contact_method: method, idempotency_key: idempotencyKey, routing_target_type: (routing?.routingTargetType as string) ?? null } });
       supabase.functions.invoke("lead-alert", {
         body: { slug: listing.slug, vin: listing.vin, intent: "test_drive", name: name.trim(), phone: phone.trim() || null, email: email.trim() || null, source: src, sub_source: "contact" },
       }).catch(() => { /* alert failure never blocks the shopper */ });
@@ -303,15 +323,21 @@ const TestDriveExperience = ({ listing, d, navigate }: { listing: VehicleListing
       <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_340px] gap-6 items-start">
         <div className={`${CARD} p-8 text-center`}>
           <CheckCircle2 className="w-14 h-14 text-emerald-500 mx-auto mb-3" />
-          <h2 className="text-[20px] font-extrabold text-[#0D1B2A]">Test drive request sent</h2>
-          <p className="text-[13.5px] text-[#64748B] mt-1.5 max-w-md mx-auto">
-            {date || windowDef
-              ? <>We sent your request{date ? <> for <span className="font-semibold text-[#10202B]">{date}</span></> : null}{windowDef ? <> ({windowDef.label.toLowerCase()}, {windowDef.range})</> : null} to the dealership. They'll confirm availability quickly.</>
-              : <>We sent your request to the dealership. They'll confirm availability quickly.</>}
+          <h2 className="text-[20px] font-extrabold text-[#0D1B2A]">Test-drive request sent</h2>
+          <p className="text-[14px] font-semibold text-[#10202B] mt-1">{listing.ymm}{listing.trim ? ` ${listing.trim}` : ""}</p>
+          <div className="mt-3 inline-block text-left text-[13px] text-[#64748B] space-y-0.5">
+            {date && <div>Preferred date: <span className="font-semibold text-[#10202B]">{date}</span></div>}
+            {windowDef && <div>Preferred time: <span className="font-semibold text-[#10202B]">{windowDef.label} · {windowDef.range}</span></div>}
+            <div>Preferred contact: <span className="font-semibold text-[#10202B] capitalize">{method}</span></div>
+          </div>
+          <p className="text-[13px] text-[#64748B] mt-3 max-w-md mx-auto">
+            {d.dealerName || "The dealership"} will confirm the exact time. <span className="font-semibold text-[#0D1B2A]">This is not yet a confirmed appointment.</span>
           </p>
-          <div className="flex flex-col sm:flex-row gap-2.5 justify-center mt-5">
-            {dealerTel && <a href={`tel:${dealerTel}`} className="h-11 px-5 rounded-xl bg-[#0B6FEA] text-white text-sm font-bold inline-flex items-center justify-center gap-2"><Phone className="w-4 h-4" /> Call {formatPhone(d.dealerPhone!)}</a>}
-            {dealerTel && <a href={`sms:${dealerTel}`} className="h-11 px-5 rounded-xl border border-[#DDE5EE] text-sm font-bold text-[#10202B] inline-flex items-center justify-center gap-2"><MessageSquare className="w-4 h-4 text-[#0B6FEA]" /> Text the Dealer</a>}
+          <div className="flex flex-wrap gap-2.5 justify-center mt-5">
+            <button onClick={() => { setSent(false); if (!isPreview) track(listing, "test_drive_request_edited"); }} className="h-11 px-4 rounded-xl border border-[#DDE5EE] text-sm font-bold text-[#10202B] inline-flex items-center gap-2">Edit request</button>
+            {dealerTel && <a href={`tel:${dealerTel}`} className="h-11 px-4 rounded-xl bg-[#0B6FEA] text-white text-sm font-bold inline-flex items-center gap-2"><Phone className="w-4 h-4" /> Call dealership</a>}
+            {d.dealerAddress && <a href={`https://maps.google.com/?q=${encodeURIComponent(d.dealerAddress)}`} target="_blank" rel="noreferrer" className="h-11 px-4 rounded-xl border border-[#DDE5EE] text-sm font-bold text-[#10202B] inline-flex items-center gap-2"><MapPin className="w-4 h-4 text-[#0B6FEA]" /> Get directions</a>}
+            <button onClick={goBack} className="h-11 px-4 rounded-xl border border-[#DDE5EE] text-sm font-bold text-[#10202B] inline-flex items-center gap-2"><ChevronLeft className="w-4 h-4" /> Return to Passport</button>
           </div>
         </div>
         <TestDriveSupportCard />
@@ -329,8 +355,8 @@ const TestDriveExperience = ({ listing, d, navigate }: { listing: VehicleListing
             <div className="flex items-start gap-3.5">
               <SpecIconBadge name="calendar" size={48} />
               <div>
-                <h1 className="text-[21px] font-extrabold tracking-tight leading-tight text-[#0D1B2A]">Schedule a Test Drive</h1>
-                <p className="text-[13px] text-[#64748B] mt-0.5">Pick a time that works and we'll confirm quickly.</p>
+                <h1 className="text-[21px] font-extrabold tracking-tight leading-tight text-[#0D1B2A]">Request a Test Drive</h1>
+                <p className="text-[13px] text-[#64748B] mt-0.5">Choose your preferred date and time. The dealership will confirm availability.</p>
               </div>
             </div>
 
@@ -424,6 +450,13 @@ const TestDriveExperience = ({ listing, d, navigate }: { listing: VehicleListing
                 </div>
               </div>
 
+              {method === "text" && (
+                <label className="flex items-start gap-2.5 mt-4 cursor-pointer">
+                  <input type="checkbox" checked={smsConsent} onChange={(e) => setSmsConsent(e.target.checked)} className="mt-0.5 h-4 w-4 accent-[#0B6FEA] shrink-0" aria-label="Agree to receive text messages" />
+                  <span className="text-[11.5px] text-[#64748B] leading-snug">{smsConsentCopy(d.dealerName || "the dealership")}</span>
+                </label>
+              )}
+
               <button
                 onClick={submit} disabled={sending}
                 className="w-full h-[52px] mt-4 rounded-xl bg-[#0B6FEA] hover:bg-[#095CC4] disabled:opacity-60 text-white text-[15px] font-bold flex items-center justify-center gap-2 transition-colors"
@@ -434,7 +467,7 @@ const TestDriveExperience = ({ listing, d, navigate }: { listing: VehicleListing
               </button>
               <p className="text-[11.5px] text-[#8CA3BC] text-center mt-3 inline-flex items-center gap-1.5 w-full justify-center">
                 <AutoLabelsSpecIcon name="lock" className="w-3.5 h-3.5 shrink-0" accent="currentColor" />
-                Your information goes only to the dealership. By submitting, you agree to be contacted by the dealership about this vehicle.
+                Your information is shared with this dealership to respond to your request.
               </p>
           </div>
         </div>
