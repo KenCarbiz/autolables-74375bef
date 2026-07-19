@@ -131,6 +131,28 @@ export default function VehiclePassportGoverned() {
   const dealer = (listing.dealer_snapshot || {}) as Record<string, unknown>;
   const dealerLogo = (dealer.logo_url as string) || (dealer.logo as string) || "";
   const dealerName = d.dealerName || "";
+
+  // ── Dealer trust (rich "Why Buy From" section) ──────────────────────────
+  const dt = d.dealerTrust;
+  const dealerYears = (() => {
+    const n = parseInt(String(dt.yearsInBusiness || "").replace(/[^\d]/g, ""), 10);
+    return Number.isFinite(n) && n > 0 ? n : null;
+  })();
+  // Founded year is derived from the years count; without a founding month we
+  // show "Since <year>" rather than an exact-day claim (still concrete).
+  const dealerFoundedYear = dealerYears != null ? new Date().getFullYear() - dealerYears : null;
+  const makeName = (listing.ymm || "").replace(/^\d{4}\s+/, "").split(/\s+/)[0] || "";
+  const authorizedByMake = !!makeName && (
+    dt.certifications.some((c) => c.toLowerCase().includes(makeName.toLowerCase())) ||
+    dealerName.toLowerCase().includes(makeName.toLowerCase())
+  );
+  const dealerBenefits = ([
+    dt.familyOwned ? "Family owned" : null,
+    authorizedByMake ? `Authorized ${makeName} retailer` : null,
+    dt.serviceLocation === "onsite" ? "On-site service center" : null,
+    dt.financing ? "Financing available" : null,
+    dt.delivery && dt.delivery !== "none" ? `${dt.delivery.charAt(0).toUpperCase()}${dt.delivery.slice(1)} delivery available` : null,
+  ].filter(Boolean)) as string[];
   const condition = String((listing.condition as string) || "").toLowerCase();
   const isNew = condition === "new";
 
@@ -491,23 +513,66 @@ export default function VehiclePassportGoverned() {
           </button>
         </section>
 
-        {/* ── Dealer footer summary ────────────────────────────────── */}
+        {/* ── Why Buy From {dealer} ────────────────────────────────── */}
         {dealerName && (
-          <section className="px-4 pt-5 pb-6" data-module="dealer">
-            <button onClick={() => openPanel("visit-dealer")} className={`${CARD} w-full text-left px-4 py-4`}>
-              <div className="flex items-center gap-3">
-                {dealerLogo ? (
-                  <img src={dealerLogo} alt="" className="h-9 max-w-[120px] object-contain" loading="lazy" decoding="async" />
-                ) : (
-                  <span className="h-9 w-9 grid place-items-center rounded-lg" style={{ background: "#F1F5F9" }}><MapPin className="w-4 h-4" style={{ color: SUB }} /></span>
-                )}
-                <div className="min-w-0 flex-1">
-                  <div className="text-[13px] font-bold truncate" style={{ color: NAVY }}>{dealerName}</div>
-                  <div className="text-[12px] truncate" style={{ color: SUB }}>{d.dealerAddress || d.dealerPhone || "Visit dealer"}</div>
+          <section className="px-4 pt-6 pb-6" data-module="dealer">
+            <h2 className="text-[18px] font-extrabold leading-tight" style={{ color: NAVY }}>Why Buy From {dealerName}</h2>
+            <p className="mt-0.5 text-[13px]" style={{ color: SUB }}>What makes buying here different.</p>
+
+            <div className={`${CARD} mt-3 overflow-hidden`}>
+              {/* Full-width dealership photo anchor with dark bottom gradient. */}
+              {dt.storefrontUrl ? (
+                <div className="relative aspect-[2/1] w-full bg-slate-100">
+                  <img src={dt.storefrontUrl} alt={dealerName} className="w-full h-full object-cover" loading="lazy" decoding="async" />
+                  <div className="absolute inset-0" style={{ background: "linear-gradient(to top, rgba(13,27,42,0.85) 0%, rgba(13,27,42,0.15) 45%, transparent 70%)" }} />
+                  {dealerFoundedYear != null && (
+                    <div className="absolute bottom-3 left-4 text-white">
+                      <div className="text-[16px] font-extrabold leading-tight">Serving drivers since {dealerFoundedYear}</div>
+                      {dealerYears != null && <div className="text-[12px] opacity-90">{dealerYears} years in business</div>}
+                    </div>
+                  )}
                 </div>
-                <ChevronRight className="w-4 h-4 shrink-0" style={{ color: SUB }} />
-              </div>
-            </button>
+              ) : dealerFoundedYear != null ? (
+                <div className="px-4 pt-4">
+                  <div className="text-[15px] font-extrabold leading-tight" style={{ color: NAVY }}>Serving drivers since {dealerFoundedYear}</div>
+                  {dealerYears != null && <div className="text-[12px]" style={{ color: SUB }}>{dealerYears} years in business</div>}
+                </div>
+              ) : null}
+
+              {/* Verified benefits — two-column, only what the dealer confirms. */}
+              {dealerBenefits.length > 0 && (
+                <div className="px-4 pt-4 grid grid-cols-2 gap-x-4 gap-y-2.5">
+                  {dealerBenefits.map((b) => (
+                    <div key={b} className="flex items-start gap-2 text-[13px] font-medium" style={{ color: NAVY }}>
+                      <CheckCircle2 className="w-4 h-4 shrink-0 mt-0.5" style={{ color: GREEN }} /> {b}
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Recognition — awards as evidence, dealer-attested. */}
+              {dt.certifications.length > 0 && (
+                <div className="px-4 pt-4 mt-4 border-t" style={{ borderColor: BORDER }}>
+                  <div className="pt-3 text-[13px] font-bold" style={{ color: NAVY }}>Recognition</div>
+                  <div className="mt-2 space-y-2.5">
+                    {dt.certifications.slice(0, 4).map((c) => (
+                      <div key={c} className="flex items-start gap-2.5">
+                        <span className="h-7 w-7 grid place-items-center rounded-full shrink-0" style={{ background: "#EFF6FF" }}><Award className="w-4 h-4" style={{ color: BLUE }} /></span>
+                        <div className="min-w-0">
+                          <div className="text-[13px] font-semibold leading-tight" style={{ color: NAVY }}>{c}</div>
+                          <div className="text-[11px]" style={{ color: SUB }}>Verified by the dealership</div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* One purposeful link to the full dealership page. */}
+              <button onClick={() => go("dealer")} className="px-4 py-3.5 inline-flex items-center gap-1.5 text-[13px] font-bold" style={{ color: BLUE }}>
+                Meet {dealerName} <ChevronRight className="w-4 h-4" />
+              </button>
+            </div>
           </section>
         )}
       </div>
