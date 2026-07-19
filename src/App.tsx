@@ -129,6 +129,7 @@ const DealSigning = lazy(() => import("./pages/DealSigning"));
 const PublicListing = lazy(() => import("./pages/PublicListing"));
 const VehiclePassportV2Detail = lazy(() => import("./pages/VehiclePassportV2Detail"));
 const VehiclePassportV3 = lazy(() => import("./pages/VehiclePassportV3"));
+const VehiclePassportGoverned = lazy(() => import("./pages/VehiclePassportGoverned"));
 const VehiclePassportVerification = lazy(() => import("./pages/VehiclePassportVerification"));
 const VehiclePassportDocuments = lazy(() => import("./pages/VehiclePassportDocuments"));
 const VehiclePassportGreatBuy = lazy(() => import("./pages/VehiclePassportGreatBuy"));
