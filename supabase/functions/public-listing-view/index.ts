@@ -147,6 +147,19 @@ serve(async (req) => {
         if (s.packet_module_defaults && typeof s.packet_module_defaults === "object") {
           row.packet_defaults = s.packet_module_defaults;
         }
+        // Passport experience version: the per-vehicle override wins when
+        // it's not 'current'; otherwise fall back to the tenant default in
+        // dealer_profiles.settings.passport_version; otherwise 'current'.
+        // Resolved once, server-side, so the client just reads one field.
+        {
+          const perVehicle = String((row as { passport_version?: unknown }).passport_version || "current");
+          const tenantDefault = String((s.passport_version as string) || "current");
+          const allowed = new Set(["current", "v3", "experiment"]);
+          const effective = perVehicle !== "current" && allowed.has(perVehicle)
+            ? perVehicle
+            : (allowed.has(tenantDefault) ? tenantDefault : "current");
+          (row as Record<string, unknown>).effective_passport_version = effective;
+        }
         // Dealer-branded warranty programs (lifetime powertrain, dealer CPO)
         // flagged for the passport warranty panel, filtered to this vehicle's
         // condition. Included vs available mode rides along for the badge.
