@@ -14,6 +14,7 @@ import { trackCustomerCtaClicked } from "@/lib/engagement/customerEngagement";
 import { oemCoverageRows, type CoverageKey } from "@/lib/oemWarranty";
 import { lookupOemReference } from "@/data/oemWarrantyReference";
 import { resolveEffectiveWarranty } from "@/lib/warranty/passportWarranty";
+import { resolveWarrantyState, type WarrantyStateView } from "@/lib/warranty/state";
 import { readBuildSheet, PACKAGE_KIND_ORDER } from "@/lib/buildSheet";
 import { getEquipmentIcon } from "@/lib/equipmentIcons";
 import { buildEquipmentPanelData, type EquipmentCategory } from "@/lib/equipmentPanel";
