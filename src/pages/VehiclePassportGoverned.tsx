@@ -88,7 +88,7 @@ export default function VehiclePassportGoverned() {
     (viaQr ? trackWindowStickerScanned(base) : trackPassportOpened(base));
   }, [listing?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  usePassportEngagement(listing?.slug || key, activePanel, true);
+  usePassportEngagement(listing?.slug || rawSlug, activePanel, true);
 
   // Sticky header context: reveal once the hero scrolls out of view.
   useEffect(() => {
@@ -113,7 +113,7 @@ export default function VehiclePassportGoverned() {
   }
 
   const pv = (id: string) => packetVisible(listing, id);
-  const go = (section: string) => navigate(`/v/${listing.slug || key}/${section}`);
+  const go = (section: string) => navigate(`/v/${listing.slug || rawSlug}/${section}`);
   const openPanel = (k: PassportPanelKey) => { setActivePanel(k); };
   const isSaved = saved ?? isVehicleSaved(listing.slug);
   const handleSave = () => {
