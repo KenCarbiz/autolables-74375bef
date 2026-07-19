@@ -83,7 +83,7 @@ const PrintRing = ({ score, color, size = 110 }: { score: number; color: string;
         <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke={color} strokeWidth="9" strokeLinecap="round" strokeDasharray={c} strokeDashoffset={c * (1 - score / 100)} />
       </svg>
       <div className="absolute inset-0 flex flex-col items-center justify-center">
-        <span className={`${size >= 100 ? "text-[24px]" : "text-[18px]"} font-extrabold leading-none`}>{score}<span className={size >= 100 ? "text-[13px]" : "text-[10px]"}>%</span></span>
+        <span className={`${size >= 100 ? "text-[24px]" : "text-[18px]"} font-extrabold leading-none`}>{score}<span className={size >= 100 ? "text-[13px]" : "text-[10px]"}>/100</span></span>
         {size >= 100 && <span className="text-[6.5px] font-bold tracking-[0.12em] text-[#94A3B8] mt-0.5">VEHICLE SCORE</span>}
       </div>
     </div>
@@ -142,8 +142,8 @@ const ScoreRing = ({ score, color, size = 156 }: { score: number; color: string;
         <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke={color} strokeWidth="11" strokeLinecap="round" strokeDasharray={c} strokeDashoffset={off} style={{ transition: "stroke-dashoffset 1.2s cubic-bezier(.22,1,.36,1)" }} />
       </svg>
       <div className="absolute inset-0 flex flex-col items-center justify-center">
-        <span className="text-[36px] font-extrabold text-[#0F172A] leading-none">{score}<span className="text-[20px]">%</span></span>
-        <span className="text-[8.5px] font-bold tracking-[0.12em] text-[#94A3B8] mt-1">VEHICLE SCORE</span>
+        <span className="text-[36px] font-extrabold text-[#0F172A] leading-none">{score}<span className="text-[18px] text-[#94A3B8]">/100</span></span>
+        <span className="text-[8.5px] font-bold tracking-[0.12em] text-[#94A3B8] mt-1">BUYING CONFIDENCE</span>
       </div>
     </div>
   );
@@ -251,6 +251,20 @@ const VehiclePassportGreatBuy = () => {
   const rating = deriveRating(listing, d);
   const score = rating.overall;
   const tier = scoreTier(score);
+  // Governance: the conclusion can never be more certain than its checks. A
+  // pending MATERIAL factor (title & history) caps an "Exceptional" verdict.
+  const materialPending = score != null && rating.factors.some((f) => f.key === "history" && f.score == null);
+  const governedHeadline = materialPending ? "Strong Candidate — One Check Pending" : tier.headline;
+  // "What could change this result?" — a credible report shows its limits too.
+  const whatCouldChange: string[] = [
+    "Final taxes, fees, and out-the-door price",
+    "Current vehicle availability",
+    "Financing terms and approval",
+    ...(materialPending ? ["Completion of the title & history verification"] : []),
+    "Warranty in-service (start) date",
+    "Market-data freshness",
+    "Equipment confirmation",
+  ];
   const priceFactor = rating.factors.find((f) => f.key === "price") ?? null;
   // price_percentile = % of comps priced BELOW this car, so a low percentile
   // means well priced. Surface it only when favorable; never praise the
@@ -513,7 +527,8 @@ const VehiclePassportGreatBuy = () => {
                 <p className="text-[11px] text-[#94A3B8] mt-1 leading-snug">Built only from measured factors — price vs market, history & title, demand, equipment, and coverage.</p>
               </div>
               <div className="text-center sm:text-left min-w-0">
-                <h1 className="text-[28px] sm:text-[32px] font-extrabold tracking-tight leading-tight">{tier.headline}</h1>
+                <h1 className="text-[28px] sm:text-[32px] font-extrabold tracking-tight leading-tight">{governedHeadline}</h1>
+                {materialPending && <p className="text-[13px] font-semibold text-[#B45309] mt-1.5 max-w-[480px] mx-auto sm:mx-0">Title &amp; history verification is still being confirmed — pricing and equipment already compare favorably.</p>}
                 {heroEndorsement && <p className={`text-[14px] ${TEXT2} mt-2 max-w-[480px] mx-auto sm:mx-0`}>{heroEndorsement}</p>}
                 {trustBadges.length > 0 && (
                   <div className="flex flex-wrap gap-2 mt-4 justify-center sm:justify-start">
@@ -524,6 +539,12 @@ const VehiclePassportGreatBuy = () => {
                   <button onClick={() => go("reserve")} className="h-11 px-5 rounded-xl bg-[#2563EB] text-white text-[13.5px] font-bold inline-flex items-center justify-center gap-2 hover:bg-[#1e50c8] transition-colors"><ShieldCheck className="w-4 h-4" /> Reserve This Vehicle</button>
                   <button onClick={() => go("test-drive")} className="h-11 px-5 rounded-xl border border-[#2563EB] text-[#2563EB] text-[13.5px] font-bold inline-flex items-center justify-center gap-2 hover:bg-blue-50 transition-colors"><Clock className="w-4 h-4" /> Schedule Test Drive</button>
                 </div>
+                <details className="mt-4 text-left">
+                  <summary className="text-[12.5px] font-semibold text-[#64748B] cursor-pointer select-none list-none inline-flex items-center gap-1.5">What could change this result?</summary>
+                  <ul className="mt-2 grid sm:grid-cols-2 gap-x-5 gap-y-1">
+                    {whatCouldChange.map((w) => <li key={w} className="text-[12px] text-[#64748B] flex items-start gap-1.5"><span className="mt-[7px] w-1 h-1 rounded-full bg-[#CBD5E1] shrink-0" />{w}</li>)}
+                  </ul>
+                </details>
               </div>
             </div>
           </section>
