@@ -1500,7 +1500,7 @@ const VehiclePassportV2Detail = () => {
   const widthCls = def.wide ? "max-w-[1180px]" : "max-w-[760px]";
 
   return (
-    <div className="min-h-screen bg-[#F6F7F9] text-[#0F172A]" style={{ fontFamily: "Inter, -apple-system, BlinkMacSystemFont, sans-serif" }}>
+    <div className="min-h-[100svh] bg-[#F6F7F9] text-[#0F172A]" style={{ fontFamily: "Inter, -apple-system, BlinkMacSystemFont, sans-serif" }}>
       <Helmet><title>{`${def.title} — ${listing.ymm} · Passport`}</title><meta name="robots" content="noindex" /></Helmet>
 
       {/* Sticky top header — back + vehicle context */}
@@ -1517,7 +1517,10 @@ const VehiclePassportV2Detail = () => {
         </div>
       </header>
 
-      <div className={`mx-auto ${widthCls} px-4 sm:px-6 py-5 pb-[calc(96px+env(safe-area-inset-bottom))] space-y-4`}>
+      {/* Content column. The action bar below is placed IN FLOW as the last
+          child so `sticky bottom-0` follows content on short pages (no blank
+          gap) and pins to the viewport bottom on long/scrolling pages. */}
+      <div className={`mx-auto ${widthCls} px-4 sm:px-6 py-5 space-y-4`}>
         {def.render({ d, listing, slug: vehicleSlug || "", navigate })}
 
         {/* Cross-CTA + back to passport (suppressed on pages that carry
@@ -1536,43 +1539,44 @@ const VehiclePassportV2Detail = () => {
         <footer className="pt-2 pb-4">
           <div className="flex items-center justify-center gap-2 text-[12px] text-slate-500"><Lock className="w-3.5 h-3.5 text-emerald-600" /> Secure &amp; Private · Powered by <Logo variant="full" size={16} /></div>
         </footer>
-      </div>
 
-      {/* Sticky bottom action bar — a floating centered card. Compact icon
-          grid on phones; two-line label + microcopy segments on desktop, with
-          the primary as a strong blue block (Today's Price shows the amount). */}
-      <div className="fixed bottom-0 inset-x-0 z-40 px-3 pb-[calc(10px+env(safe-area-inset-bottom))] pt-2 pointer-events-none">
-        <div className={`mx-auto ${widthCls} pointer-events-auto rounded-2xl border border-[#E6E8EC] bg-white/95 backdrop-blur shadow-[0_10px_36px_-12px_rgba(16,24,40,0.28)] p-2 grid grid-cols-4 gap-1.5 sm:flex sm:justify-center sm:gap-2`}>
-          {[
-            { key: "call", icon: Phone, label: "Call Us", sub: d.dealerPhone ? formatPhone(d.dealerPhone) : "Reach the dealership", onClick: () => { if (d.dealerPhone) window.location.href = `tel:${d.dealerPhone}`; else navigate(`/${base}/${vehicleSlug}/contact`); } },
-            { key: "text", icon: MessageSquare, label: "Text Us", sub: "We reply fast", onClick: () => navigate(`/${base}/${vehicleSlug}/text`) },
-            section === "test-drive"
-              ? { key: "td", icon: Clock, label: "Test Drive", sub: "Pick a time that works", onClick: () => { const el = document.getElementById("td-form"); el?.scrollIntoView({ behavior: "smooth" }); window.setTimeout(() => document.getElementById("td-name")?.focus({ preventScroll: true }), 450); } }
-              : { key: "td", icon: Clock, label: "Test Drive", sub: "Pick a time that works", onClick: () => navigate(`/${base}/${vehicleSlug}/test-drive`) },
-            // On the action pages (reserve / contact) the primary bar action IS
-            // the page goal — Today's Price would compete with it.
-            section === "reserve"
-              ? { key: "hold", icon: ShieldCheck, label: "Request Hold", primary: true, onClick: () => { const el = document.getElementById("reserve-form"); el?.scrollIntoView({ behavior: "smooth" }); window.setTimeout(() => document.getElementById("rsv-name")?.focus({ preventScroll: true }), 450); } }
-              : section === "contact"
-              ? { key: "contact", icon: Mail, label: "Contact Dealer", primary: true, onClick: () => { const el = document.getElementById("contact-form"); el?.scrollIntoView({ behavior: "smooth" }); window.setTimeout(() => document.getElementById("ct-name")?.focus({ preventScroll: true }), 450); } }
-              : section === "todays-price"
-              ? { key: "price", icon: DollarSign, label: resolveTodaysPrice(listing as unknown as { todays_price_mode?: unknown }).barLabel, primary: true, onClick: () => { const el = document.getElementById("tp-form"); el?.scrollIntoView({ behavior: "smooth" }); window.setTimeout(() => document.getElementById("tp-name")?.focus({ preventScroll: true }), 450); } }
-              : { key: "price", icon: DollarSign, label: "Today's Price", sub: d.price != null ? fmt$(d.price) : undefined, primary: true, onClick: () => navigate(`/${base}/${vehicleSlug}/todays-price`) },
-          ].map((b) => {
-            const sub = (b as { sub?: string }).sub;
-            return (
-              <button key={b.key} onClick={b.onClick} className={`h-12 rounded-xl text-[10px] leading-[1.05] font-bold inline-flex flex-col items-center justify-center gap-0.5 text-center px-0.5 sm:h-[52px] sm:flex-row sm:gap-2.5 sm:px-6 sm:text-[13px] sm:text-left ${b.primary ? "bg-[#2563EB] text-white hover:bg-[#1d4fd7]" : "bg-white text-[#0F172A] sm:border sm:border-transparent sm:hover:border-[#d8dce0]"}`}>
-                <b.icon className={`w-4 h-4 shrink-0 ${b.primary ? "" : "text-[#2563EB]"}`} />
-                <span className="sm:flex sm:flex-col sm:leading-tight">
-                  <span>{b.label}</span>
-                  {sub && <span className={`hidden sm:block font-semibold ${b.primary ? "text-[15px] font-extrabold" : "text-[11px] text-[#64748B]"}`}>{sub}</span>}
-                </span>
-              </button>
-            );
-          })}
+        {/* Sticky-in-flow action bar — floating centered card. Compact icon
+            grid on phones; two-line label + microcopy segments on desktop, with
+            the primary as a strong blue block (Today's Price shows the amount). */}
+        <div className="sticky bottom-0 z-40 -mx-4 sm:-mx-6 px-3 pt-2 pb-[calc(10px+env(safe-area-inset-bottom))]">
+          <div className="rounded-2xl border border-[#E6E8EC] bg-white/95 backdrop-blur shadow-[0_10px_36px_-12px_rgba(16,24,40,0.28)] p-2 grid grid-cols-4 gap-1.5 sm:flex sm:justify-center sm:gap-2">
+            {[
+              { key: "call", icon: Phone, label: "Call Us", sub: d.dealerPhone ? formatPhone(d.dealerPhone) : "Reach the dealership", onClick: () => { if (d.dealerPhone) window.location.href = `tel:${d.dealerPhone}`; else navigate(`/${base}/${vehicleSlug}/contact`); } },
+              { key: "text", icon: MessageSquare, label: "Text Us", sub: "We reply fast", onClick: () => navigate(`/${base}/${vehicleSlug}/text`) },
+              section === "test-drive"
+                ? { key: "td", icon: Clock, label: "Test Drive", sub: "Pick a time that works", onClick: () => { const el = document.getElementById("td-form"); el?.scrollIntoView({ behavior: "smooth" }); window.setTimeout(() => document.getElementById("td-name")?.focus({ preventScroll: true }), 450); } }
+                : { key: "td", icon: Clock, label: "Test Drive", sub: "Pick a time that works", onClick: () => navigate(`/${base}/${vehicleSlug}/test-drive`) },
+              // On the action pages (reserve / contact) the primary bar action IS
+              // the page goal — Today's Price would compete with it.
+              section === "reserve"
+                ? { key: "hold", icon: ShieldCheck, label: "Request Hold", primary: true, onClick: () => { const el = document.getElementById("reserve-form"); el?.scrollIntoView({ behavior: "smooth" }); window.setTimeout(() => document.getElementById("rsv-name")?.focus({ preventScroll: true }), 450); } }
+                : section === "contact"
+                ? { key: "contact", icon: Mail, label: "Contact Dealer", primary: true, onClick: () => { const el = document.getElementById("contact-form"); el?.scrollIntoView({ behavior: "smooth" }); window.setTimeout(() => document.getElementById("ct-name")?.focus({ preventScroll: true }), 450); } }
+                : section === "todays-price"
+                ? { key: "price", icon: DollarSign, label: resolveTodaysPrice(listing as unknown as { todays_price_mode?: unknown }).barLabel, primary: true, onClick: () => { const el = document.getElementById("tp-form"); el?.scrollIntoView({ behavior: "smooth" }); window.setTimeout(() => document.getElementById("tp-name")?.focus({ preventScroll: true }), 450); } }
+                : { key: "price", icon: DollarSign, label: "Today's Price", sub: d.price != null ? fmt$(d.price) : undefined, primary: true, onClick: () => navigate(`/${base}/${vehicleSlug}/todays-price`) },
+            ].map((b) => {
+              const sub = (b as { sub?: string }).sub;
+              return (
+                <button key={b.key} onClick={b.onClick} className={`h-12 rounded-xl text-[10px] leading-[1.05] font-bold inline-flex flex-col items-center justify-center gap-0.5 text-center px-0.5 sm:h-[52px] sm:flex-row sm:gap-2.5 sm:px-6 sm:text-[13px] sm:text-left ${b.primary ? "bg-[#2563EB] text-white hover:bg-[#1d4fd7]" : "bg-white text-[#0F172A] sm:border sm:border-transparent sm:hover:border-[#d8dce0]"}`}>
+                  <b.icon className={`w-4 h-4 shrink-0 ${b.primary ? "" : "text-[#2563EB]"}`} />
+                  <span className="sm:flex sm:flex-col sm:leading-tight">
+                    <span>{b.label}</span>
+                    {sub && <span className={`hidden sm:block font-semibold ${b.primary ? "text-[15px] font-extrabold" : "text-[11px] text-[#64748B]"}`}>{sub}</span>}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
         </div>
       </div>
     </div>
+
   );
 };
 
