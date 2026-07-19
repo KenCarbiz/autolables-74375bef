@@ -5393,6 +5393,7 @@ export type Database = {
           open_recall_count: number | null
           orchestrated_at: string | null
           packet_modules: Json
+          passport_version: string
           payment_estimate: Json | null
           photo_count: number | null
           photos: Json
@@ -5476,6 +5477,7 @@ export type Database = {
           open_recall_count?: number | null
           orchestrated_at?: string | null
           packet_modules?: Json
+          passport_version?: string
           payment_estimate?: Json | null
           photo_count?: number | null
           photos?: Json
@@ -5559,6 +5561,7 @@ export type Database = {
           open_recall_count?: number | null
           orchestrated_at?: string | null
           packet_modules?: Json
+          passport_version?: string
           payment_estimate?: Json | null
           photo_count?: number | null
           photos?: Json
@@ -6577,6 +6580,7 @@ export type Database = {
           open_recall_count: number | null
           orchestrated_at: string | null
           packet_modules: Json
+          passport_version: string
           payment_estimate: Json | null
           photo_count: number | null
           photos: Json
