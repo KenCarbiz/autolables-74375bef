@@ -2,6 +2,7 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 import { resolveCustomerPassportRouting, type PassportAgent } from "../_shared/passport-routing.ts";
 import { matchIihsAward, type IihsAward } from "../_shared/iihs-awards.ts";
+import { resolvePassportVersion } from "../_shared/passport-version.ts";
 
 // ──────────────────────────────────────────────────────────────
 // public-listing-view
