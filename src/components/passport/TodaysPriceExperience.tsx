@@ -95,7 +95,8 @@ const TrustStrip = ({ dealerPhone }: { dealerPhone: string | null }) => (
   <div className={`${CARD} px-4 py-2.5 flex items-center justify-between gap-3 flex-wrap`}>
     <div className="flex items-center gap-x-5 gap-y-1.5 flex-wrap text-[12px] font-semibold text-[#10202B]">
       <span className="inline-flex items-center gap-1.5"><Lock className="w-3.5 h-3.5 text-[#0B6FEA]" /> Secure &amp; Private</span>
-      <span className="inline-flex items-center gap-1.5"><ShieldCheck className="w-3.5 h-3.5 text-[#0B6FEA]" /> Dealer Reviewed</span>
+      <span className="inline-flex items-center gap-1.5"><Lock className="w-3.5 h-3.5 text-[#0B6FEA]" /> Secure &amp; Private</span>
+      <span className="inline-flex items-center gap-1.5" title="A dealership representative will review your request and follow up with confirmed details."><ShieldCheck className="w-3.5 h-3.5 text-[#0B6FEA]" /> Dealer will review</span>
       <span className="inline-flex items-center gap-1.5"><CheckCircle2 className="w-3.5 h-3.5 text-[#0B6FEA]" /> No Obligation</span>
     </div>
     {dealerPhone && <a href={`tel:${dealerPhone.replace(/[^\d+]/g, "")}`} className="text-[12px] font-semibold text-[#0B6FEA] inline-flex items-center gap-1.5"><Phone className="w-3.5 h-3.5" /> Questions? Call {formatPhone(dealerPhone)}</a>}
