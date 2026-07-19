@@ -1435,6 +1435,27 @@ const ScanInfoPanel = ({ vehicle, onReload }: { vehicle: VehicleRow; onReload: (
         }
       />
 
+      {/* Passport experience version — per-vehicle override. Defaults to
+          "current" (existing /v/:slug). "V3 (governed)" opts this vehicle
+          into the new /v3/:slug mobile-first surface. */}
+      <div className="rounded-2xl border border-border bg-card p-5">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <h3 className="text-[15px] font-bold text-foreground">Passport version</h3>
+            <p className="text-[13px] text-slate-500 mt-0.5">Which shopper experience this vehicle serves. Leave on “Current” unless you're piloting the new governed passport.</p>
+          </div>
+          <select
+            value={passportVersion}
+            onChange={(e) => setPassportVersion(e.target.value as "current" | "v3" | "experiment")}
+            className="h-9 px-3 rounded-lg border border-border bg-background text-sm text-foreground"
+          >
+            <option value="current">Current (/v/…)</option>
+            <option value="v3">V3 governed (/v3/…)</option>
+            <option value="experiment">Experiment</option>
+          </select>
+        </div>
+      </div>
+
       {/* Passport modules — module cards, same language as Documents */}
       <div>
         <h3 className="text-[15px] font-bold text-foreground">Passport Modules</h3>
