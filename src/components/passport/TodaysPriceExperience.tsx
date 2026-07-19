@@ -347,15 +347,17 @@ const TodaysPriceExperience = ({ listing, d }: { listing: VehicleListing; d: Pas
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)] gap-6 items-start">
-        {/* Left column */}
-        <div className="space-y-5 min-w-0 order-2 lg:order-1">
+        {/* Left column — VEHICLE FIRST: shopper confirms exact VIN/price/vehicle
+            before entering contact details. Order-1 on mobile so the vehicle
+            card and price-transparency block sit ABOVE the calculator/form. */}
+        <div className="space-y-5 min-w-0 order-1 lg:order-1">
           <VehicleSummaryCard listing={listing} d={d} />
           <PriceTransparencyCard listing={listing} d={d} />
           <div className="hidden lg:block"><WhatHappensNextCard /></div>
         </div>
 
         {/* Right column */}
-        <div className="space-y-5 min-w-0 order-1 lg:order-2">
+        <div className="space-y-5 min-w-0 order-2 lg:order-2">
           {copy.showCalculator && (
             <div className={`${CARD} p-5 sm:p-6`}>
               <div className="flex items-start justify-between gap-4 flex-wrap">
