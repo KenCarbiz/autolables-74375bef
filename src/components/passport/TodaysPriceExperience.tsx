@@ -186,7 +186,7 @@ const PriceTransparencyCard = ({ listing, d }: { listing: VehicleListing; d: Pas
         </div>
       )}
       <div className="grid grid-cols-2 gap-2 mt-4 pt-4 border-t border-[#F1F5F9]">
-        {[["Up-Front Pricing", CheckCircle2], ["Secure & Private", Lock], ["Dealer Reviewed", ShieldCheck], ["Vehicle-Specific", Car]].map(([label, Icon]) => (
+        {[["Up-Front Pricing", CheckCircle2], ["Secure & Private", Lock], ["Dealer will review", ShieldCheck], ["Vehicle-Specific", Car]].map(([label, Icon]) => (
           <span key={label as string} className="inline-flex items-center gap-1.5 text-[11.5px] font-semibold text-[#334155]">
             {(() => { const I = Icon as React.ElementType; return <I className="w-3.5 h-3.5 text-[#0B6FEA] shrink-0" />; })()} {label as string}
           </span>
