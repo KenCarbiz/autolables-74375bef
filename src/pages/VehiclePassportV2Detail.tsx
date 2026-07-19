@@ -1491,7 +1491,7 @@ const VehiclePassportV2Detail = () => {
   );
 
   if (!def) return (
-    <div className="min-h-screen flex items-center justify-center px-6 bg-[#F6F7F9]">
+    <div className="min-h-[100svh] flex items-center justify-center px-6 bg-[#F6F7F9]">
       <div className="text-center"><Package className="w-12 h-12 text-slate-300 mx-auto mb-4" /><h1 className="text-xl font-bold">Page not found</h1><button onClick={back} className="mt-4 text-[#2563EB] font-semibold">Back to Passport</button></div>
     </div>
   );
