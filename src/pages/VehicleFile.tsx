@@ -1390,8 +1390,11 @@ const ScanInfoPanel = ({ vehicle, onReload }: { vehicle: VehicleRow; onReload: (
     };
     let { error } = await (supabase as any)
       .from("vehicle_listings")
-      .update({ ...base, packet_modules: packetModules, suppressed_programs: suppressedPrograms })
+      .update({ ...base, packet_modules: packetModules, suppressed_programs: suppressedPrograms, passport_version: passportVersion })
       .eq("id", vehicle.id);
+    if (error && /passport_version/i.test(error.message || "")) {
+      ({ error } = await (supabase as any).from("vehicle_listings").update({ ...base, packet_modules: packetModules, suppressed_programs: suppressedPrograms }).eq("id", vehicle.id));
+    }
     if (error && /suppressed_programs/i.test(error.message || "")) {
       ({ error } = await (supabase as any).from("vehicle_listings").update({ ...base, packet_modules: packetModules }).eq("id", vehicle.id));
     }
