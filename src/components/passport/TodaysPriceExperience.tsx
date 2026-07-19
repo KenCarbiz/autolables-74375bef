@@ -318,10 +318,16 @@ const TodaysPriceExperience = ({ listing, d }: { listing: VehicleListing; d: Pas
     <div className="max-w-[640px] mx-auto">
       <div className={`${CARD} p-8 text-center`}>
         <CheckCircle2 className="w-14 h-14 text-emerald-500 mx-auto mb-3" />
-        <h2 className="text-[24px] font-extrabold tracking-tight text-[#0D1B2A]">Request Sent</h2>
+        <h2 className="text-[24px] font-extrabold tracking-tight text-[#0D1B2A]">Sent for dealer review</h2>
         <p className="text-[14px] text-[#64748B] mt-2">{d.dealerName || "The dealership"} received your request and will follow up with available payment details.</p>
         <div className="mt-4 mx-auto max-w-sm rounded-xl border border-[#DDE5EE] bg-[#F5F7FA] p-4 text-left text-[13px] text-[#334155]">
-          {copy.showCalculator && <p className="font-bold text-[#0D1B2A]">{fmt$(monthly)}/mo · {term} months · {apr.toFixed(2)}% APR · {fmt$(safeDown)} down</p>}
+          {copy.showCalculator && (
+            <>
+              <p className="font-bold text-[#0D1B2A]">{fmt$(monthly)}/mo · {term} months</p>
+              <p className="mt-1 text-[12px]">Example APR {apr.toFixed(2)}% · {fmt$(safeDown)} down · Est. due at signing {fmt$(dueAtSigning.known)}</p>
+              <p className="mt-1 text-[11px] text-[#94A3B8]">Excludes tax, title, registration, dealer fees, add-ons, and trade equity.</p>
+            </>
+          )}
           <p className="mt-1">{name}{phone ? ` · ${phone}` : ""}{email ? ` · ${email}` : ""}</p>
         </div>
         <div className="flex flex-wrap gap-2 justify-center mt-6">
