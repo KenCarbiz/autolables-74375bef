@@ -1,6 +1,7 @@
 import { ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
+import { consumeSessionExpired } from "@/lib/auth/sessionExpiry";
 import { Loader2, ShieldX } from "lucide-react";
 
 // ──────────────────────────────────────────────────────────────
@@ -40,7 +41,9 @@ const AdminGate = ({ children }: Props) => {
 
   if (!user) {
     const nextPath = encodeURIComponent(window.location.pathname + window.location.search);
-    setTimeout(() => navigate(`/login?next=${nextPath}`), 0);
+    // A lapsed (vs never-signed-in) session surfaces the "session expired" banner.
+    const expired = consumeSessionExpired() ? "&expired=1" : "";
+    setTimeout(() => navigate(`/login?next=${nextPath}${expired}`), 0);
     return null;
   }
 

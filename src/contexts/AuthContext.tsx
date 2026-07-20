@@ -1,5 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, ReactNode } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { markSessionActive, clearSessionActive } from "@/lib/auth/sessionExpiry";
 import type { AuthChangeEvent, Session, User } from "@supabase/supabase-js";
 
 interface AuthContextType {
@@ -128,6 +129,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       setLoading(false);
       return;
     }
+    // Remember a session was active this tab so a later gate can tell a real
+    // expiry from a first visit. Cleared only on an intentional sign-out.
+    markSessionActive();
     const cached = readAdminCache(nextUser.id);
     if (cached !== null) {
       setIsAdmin(cached);
@@ -186,6 +190,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   }, []);
 
   const signOut = useCallback(async () => {
+    // Clear the session-active flag first so the gate redirect reads as a
+    // normal logout, not an expiry banner.
+    clearSessionActive();
     await supabase.auth.signOut();
     clearAdminCache();
     setUser(null);

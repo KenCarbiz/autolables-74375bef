@@ -1,6 +1,7 @@
 import { ReactNode, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
+import { consumeSessionExpired } from "@/lib/auth/sessionExpiry";
 import { useEntitlements, type AppSlug } from "@/hooks/useEntitlements";
 import ActivatePaywall from "@/components/layout/ActivatePaywall";
 import NoTenantScreen from "@/components/layout/NoTenantScreen";
@@ -165,7 +166,9 @@ const EntitlementGate = ({ app, children }: Props) => {
   }
 
   if (!user) {
-    setTimeout(() => navigate("/login"), 0);
+    // A lapsed (vs never-signed-in) session surfaces the "session expired" banner.
+    const expired = consumeSessionExpired() ? "?expired=1" : "";
+    setTimeout(() => navigate(`/login${expired}`), 0);
     return null;
   }
 
