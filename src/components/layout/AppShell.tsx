@@ -67,7 +67,15 @@ import Logo from "@/components/brand/Logo";
 import CommandPalette, { useCommandPalette } from "@/components/layout/CommandPalette";
 import { usePlatformEntitlements } from "@/hooks/usePlatformEntitlements";
 import { VinScanContext, prefersLiveScanner } from "@/contexts/VinScanContext";
-import { toolIcon } from "@/components/icons/AutoLabelsToolIcons";
+import {
+  buildAdminNavSections,
+  filterNavSections,
+  findActiveNavItem,
+  isNavItemActive,
+  formatBadgeCount,
+  badgeAriaLabel,
+} from "@/components/layout/adminNav";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -79,23 +87,6 @@ import {
 
 interface AppShellProps {
   children: ReactNode;
-}
-
-interface NavItem {
-  label: string;
-  path: string;
-  icon: React.ElementType;
-  badge?: string | number;
-  featureKey?: string;
-  requireManager?: boolean;
-  requireAdmin?: boolean;
-  capability?: DealerCapability;
-}
-
-interface NavSection {
-  title: string;
-  items: NavItem[];
-  defaultOpen?: boolean;
 }
 
 const productIcon = (id: string) => {
@@ -179,101 +170,21 @@ const AppShell = ({ children }: AppShellProps) => {
 
   // Worklist counts on the nav rows that represent queues; 0 renders no badge.
   const badges = useNavBadges();
-  const badge = (n: number) => (n > 0 ? n : undefined);
 
-  // Consolidated, capability-gated nav. The ~19 `?tab=` rows now live behind the
-  // single "Settings" door (the Admin page is already tabbed); the 9 document
-  // creators behind one "Create" hub; recon/prep/service/ready under "Get Ready".
-  const sections: Record<string, NavSection> = {
-    main: {
-      title: "",
-      defaultOpen: true,
-      items: [
-        { label: "Home", path: "/dashboard", icon: toolIcon("home"), capability: "can_view_dashboard" },
-        { label: "Inventory", path: "/inventory", icon: toolIcon("inventory"), capability: "can_view_inventory" },
-        { label: "Deals", path: "/saved", icon: toolIcon("deals"), capability: "can_view_deals", badge: badge(badges.returns) },
-      ],
-    },
-    create: {
-      title: "CREATE",
-      defaultOpen: true,
-      items: [
-        { label: "Create", path: "/create", icon: toolIcon("create"), capability: "can_create_documents" },
-      ],
-    },
-    work: {
-      title: "WORK",
-      defaultOpen: true,
-      items: [
-        { label: "Work Queue", path: "/queue", icon: ClipboardList, capability: "can_view_work_queue", badge: badge(badges.workQueue) },
-        { label: "Leads", path: "/leads", icon: Users, capability: "can_view_leads", featureKey: "feature_lead_capture", badge: badge(badges.leads) },
-      ],
-    },
-    getready: {
-      title: "GET READY",
-      defaultOpen: true,
-      items: [
-        { label: "Recon Approvals", path: "/recon", icon: toolIcon("recon-approvals"), capability: "can_view_get_ready", badge: badge(badges.reconApprovals) },
-        { label: "Prep & Install", path: "/prep", icon: toolIcon("prep-install"), capability: "can_view_get_ready" },
-        { label: "Service Desk", path: "/service", icon: toolIcon("service-desk"), capability: "can_view_get_ready" },
-        { label: "Ready Board", path: "/ready-board", icon: toolIcon("ready-board"), capability: "can_view_get_ready" },
-      ],
-    },
-    compliance: {
-      title: "COMPLIANCE",
-      defaultOpen: false,
-      items: [
-        { label: "Compliance Center", path: "/compliance", icon: toolIcon("compliance-center"), capability: "can_view_compliance" },
-        { label: "Compliance Tasks", path: "/compliance-center", icon: ShieldCheck, capability: "can_manage_compliance", badge: badge(badges.complianceTasks) },
-        { label: "Price Change Review", path: "/dashboard/document-review", icon: toolIcon("document-review"), capability: "can_view_compliance", badge: badge(badges.priceChangeReview) },
-        { label: "Audit Log", path: "/admin?tab=audit", icon: toolIcon("audit-log"), capability: "can_view_compliance" },
-      ],
-    },
-    office: {
-      title: "OFFICE",
-      defaultOpen: false,
-      items: [
-        { label: "Titles", path: "/titles", icon: FileText, capability: "can_view_compliance" },
-        { label: "Invoices", path: "/admin?tab=invoices", icon: ScrollText, capability: "can_manage_invoices" },
-      ],
-    },
-    settings: {
-      title: "SETTINGS",
-      defaultOpen: false,
-      items: [
-        ...(anyAdminTab ? [{ label: "Settings", path: "/admin", icon: toolIcon("settings") }] : []),
-        { label: "Reports", path: "/dashboard/reports", icon: BarChart3, capability: "can_view_reports" },
-      ],
-    },
-    platform: {
-      title: "PLATFORM",
-      defaultOpen: false,
-      items: [
-        { label: "Platform Admin", path: "/platform-admin", icon: Store, requireAdmin: true },
-      ],
-    },
-  };
+  // Consolidated, capability-gated nav built from the shared model in
+  // ./adminNav — the ~19 `?tab=` rows live behind the single "Settings" door,
+  // the document creators behind one "Create" hub, recon/prep/service/ready
+  // under "Get Ready". Expanded, collapsed, and mobile drawer all read this.
+  const navSections = buildAdminNavSections({ badges, anyAdminTab });
+  const visibleSections = filterNavSections(navSections, {
+    isAdmin,
+    isManager,
+    can,
+    hasFeature: (key) => Boolean((settings as unknown as Record<string, unknown>)[key]),
+  });
 
-  const filterItems = (items: NavItem[]) =>
-    items.filter((item) =>
-      (!item.featureKey || (settings as unknown as Record<string, unknown>)[item.featureKey]) &&
-      (isAdmin || !item.capability || can(item.capability)) &&
-      (!item.requireManager || isManager) &&
-      (!item.requireAdmin || isAdmin)
-    );
-
-  const visibleSections = Object.entries(sections)
-    .map(([key, section]) => [key, { ...section, items: filterItems(section.items) }] as const)
-    .filter(([, section]) => section.items.length > 0);
-
-  const isActive = (path: string) => {
-    const [pathname, search = ""] = path.split("?");
-    if (location.pathname !== pathname) return false;
-    if (!search) return true;
-    return location.search === `?${search}`;
-  };
-
-  const activeItem = visibleSections.flatMap(([, section]) => section.items).find((item) => isActive(item.path));
+  const activeItem = findActiveNavItem(visibleSections, location.pathname, location.search);
+  const isActive_ = (item: (typeof visibleSections)[number]["items"][number]) => item === activeItem;
 
   const pageTitles: Record<string, { title: string; subtitle: string }> = {
     "/dashboard": { title: "Home", subtitle: "Your dealership command center." },
@@ -423,10 +334,10 @@ const AppShell = ({ children }: AppShellProps) => {
     setOpenSections((prev) => {
       const next = { ...prev };
       let changed = false;
-      Object.entries(sections).forEach(([key, section]) => {
-        const hasActive = section.items.some((item) => isActive(item.path));
-        if (hasActive && !next[key]) {
-          next[key] = true;
+      navSections.forEach((section) => {
+        const hasActive = section.items.some((item) => isNavItemActive(item, location.pathname, location.search));
+        if (hasActive && !next[section.key]) {
+          next[section.key] = true;
           changed = true;
         }
       });
@@ -572,46 +483,81 @@ const AppShell = ({ children }: AppShellProps) => {
               className="h-10 w-full inline-flex items-center justify-center gap-2 rounded-full bg-blue-600 text-white text-sm font-semibold shadow-sm hover:bg-blue-700 transition-colors"
               title="Add a vehicle"
             >
-              <Plus className="h-4 w-4 stroke-[2.5]" />
+              <Plus size={18} strokeWidth={2.25} aria-hidden="true" />
               {!collapsed && <span>Add Vehicle</span>}
             </button>
           </div>
 
-          <nav className="flex-1 overflow-y-auto p-3 space-y-1">
-            {visibleSections.map(([key, section]) => {
-              const open = section.defaultOpen || openSections[key];
-              return (
-                <div key={key} className="mb-2">
-                  {section.title && !collapsed && (
-                    <button onClick={() => toggleSection(key)} className="w-full flex items-center justify-between px-3 py-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground hover:text-foreground">
-                      {section.title}
-                      <ChevronDown className={`h-3 w-3 transition-transform ${open ? "rotate-180" : ""}`} />
-                    </button>
-                  )}
-                  {(open || collapsed || !section.title) && (
-                    <div className="space-y-1">
-                      {section.items.map((item) => {
-                        const active = isActive(item.path);
-                        const Icon = item.icon;
-                        return (
-                          <button
-                            key={item.path}
-                            onClick={() => { navigate(item.path); setMobileOpen(false); }}
-                            title={collapsed ? item.label : undefined}
-                            className={`relative w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${active ? "bg-blue-50 text-blue-700 before:absolute before:left-0 before:top-1.5 before:bottom-1.5 before:w-[3px] before:rounded-r-full before:bg-blue-600" : "text-muted-foreground hover:text-foreground hover:bg-muted"} ${collapsed ? "lg:justify-center" : ""}`}
-                          >
-                            <Icon className="h-4 w-4 flex-shrink-0" />
-                            {!collapsed && <span className="truncate">{item.label}</span>}
-                            {!collapsed && item.badge && <span className="ml-auto text-[10px] px-1.5 py-0.5 rounded-full bg-primary-foreground/20">{item.badge}</span>}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-          </nav>
+          <TooltipProvider delayDuration={200}>
+            <nav className="flex-1 overflow-y-auto p-3 space-y-1" aria-label="Primary">
+              {visibleSections.map((section) => {
+                const open = section.defaultOpen || openSections[section.key];
+                const panelId = `nav-section-${section.key}`;
+                const showItems = open || collapsed || !section.title;
+                return (
+                  <div key={section.key} className="mb-2">
+                    {section.title && !collapsed && (
+                      <button
+                        onClick={() => toggleSection(section.key)}
+                        aria-expanded={open}
+                        aria-controls={panelId}
+                        className="w-full flex items-center justify-between rounded-md px-2.5 py-2 text-[10px] font-bold uppercase tracking-[0.08em] text-[#64748b] transition-colors hover:text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#1267e8]"
+                      >
+                        {section.title}
+                        <ChevronDown size={14} strokeWidth={2} aria-hidden="true" className={`transition-transform motion-reduce:transition-none ${open ? "" : "-rotate-90"}`} />
+                      </button>
+                    )}
+                    {showItems && (
+                      <div id={panelId} className="space-y-0.5">
+                        {section.items.map((item) => {
+                          const active = isActive_(item);
+                          const Icon = item.icon;
+                          const badgeText = formatBadgeCount(item.badge);
+                          const row = (
+                            <Link
+                              to={item.path}
+                              onClick={() => setMobileOpen(false)}
+                              aria-current={active ? "page" : undefined}
+                              aria-label={collapsed ? item.label : undefined}
+                              className={`group relative flex min-h-[42px] items-center gap-2 rounded-[9px] px-2.5 py-1.5 text-sm transition-colors duration-[120ms] motion-reduce:transition-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#1267e8] ${active ? "bg-[#eaf2ff] font-semibold text-[#0f2b5c]" : "text-[#475569] hover:bg-[#f1f5f9] hover:text-[#0f172a]"} ${collapsed ? "lg:min-h-[44px] lg:justify-center lg:px-0" : ""}`}
+                            >
+                              <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-lg ${active ? "bg-[#dbeafe]" : ""}`}>
+                                <Icon size={19} strokeWidth={2} aria-hidden="true" className={active ? "text-[#1267e8]" : "text-[#64748b] group-hover:text-[#1267e8]"} />
+                              </span>
+                              {!collapsed && <span className="truncate">{item.label}</span>}
+                              {!collapsed && badgeText && (
+                                <span
+                                  aria-label={badgeAriaLabel(item.label, item.badge ?? 0)}
+                                  className={`ml-auto inline-flex h-5 min-w-6 items-center justify-center rounded-full px-1.5 text-[11px] font-bold tabular-nums ${active ? "bg-[#1267e8] text-white" : "bg-[#eef2f7] text-[#475569]"}`}
+                                >
+                                  {badgeText}
+                                </span>
+                              )}
+                              {collapsed && badgeText && (
+                                <span
+                                  aria-label={badgeAriaLabel(item.label, item.badge ?? 0)}
+                                  className={`absolute right-1 top-1 inline-flex h-4 min-w-4 items-center justify-center rounded-full px-1 text-[10px] font-bold tabular-nums ${active ? "bg-[#1267e8] text-white" : "bg-[#eef2f7] text-[#475569]"}`}
+                                >
+                                  {badgeText}
+                                </span>
+                              )}
+                            </Link>
+                          );
+                          if (!collapsed) return <div key={item.path}>{row}</div>;
+                          return (
+                            <Tooltip key={item.path}>
+                              <TooltipTrigger asChild>{row}</TooltipTrigger>
+                              <TooltipContent side="right">{item.label}</TooltipContent>
+                            </Tooltip>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </nav>
+          </TooltipProvider>
 
           <div className="p-3 border-t border-border flex-shrink-0 space-y-2">
             <button onClick={() => setPaletteOpen(true)} className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-muted-foreground hover:text-foreground hover:bg-muted ${collapsed ? "lg:justify-center" : ""}`} title={collapsed ? "Search" : undefined}>
