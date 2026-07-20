@@ -12,6 +12,7 @@ import { derivePassport, fmt$, historyReportName } from "@/lib/passportV2Data";
 import { listingGallery } from "@/lib/photos";
 import { packetVisible } from "@/lib/packetModules";
 import { buildPassportActionPath } from "@/lib/passportReturn";
+import PriceDropWatch from "@/components/listing/PriceDropWatch";
 import { resolveStickyButtons, type StickyBottomButtons } from "@/lib/stickyButtons";
 import { MOCK_LISTING } from "./VehiclePassportV3";
 import type { VehicleListing } from "@/hooks/useVehicleListing";
@@ -162,6 +163,7 @@ export default function VehiclePassportGoverned() {
   const [activePanel, setActivePanel] = useState<PassportPanelKey | null>(null);
   const [actionDrawer, setActionDrawer] = useState<PassportActionKey | null>(null);
   const [galleryOpen, setGalleryOpen] = useState(false);
+  const [watchOpen, setWatchOpen] = useState(false);
   const [heroInView, setHeroInView] = useState(true);
   const heroRef = useRef<HTMLDivElement | null>(null);
   const isDesktop = useIsDesktop();
@@ -775,7 +777,9 @@ export default function VehiclePassportGoverned() {
         const actUtility = [
           { label: "Save", icon: Bookmark, onClick: handleSave },
           { label: "Share", icon: Upload, onClick: handleShare },
-          { label: "Watch Price", icon: Eye, onClick: handleSave },
+          // Watch Price opens an inline email capture so the shopper gets price &
+          // availability alerts — it does not just save to this device.
+          { label: "Watch Price", icon: Eye, onClick: () => setWatchOpen((v) => !v) },
         ];
         const label3 = "text-[11px] font-semibold uppercase tracking-wider";
         // Dollar amount the price sits ABOVE normalized market value (past a $250
@@ -1157,8 +1161,18 @@ export default function VehiclePassportGoverned() {
                     {actGrid2.map((s) => <button key={s.label} onClick={s.onClick} className="h-10 rounded-xl border inline-flex items-center justify-center gap-1.5 text-[13px] font-bold hover:bg-slate-50" style={{ borderColor: BORDER, color: NAVY }}><s.icon className="w-4 h-4" style={{ color: BLUE }} /> {s.label}</button>)}
                   </div>
                   <div className="mt-3 pt-3 border-t grid grid-cols-3 gap-2" style={{ borderColor: BORDER }}>
-                    {actUtility.map((c) => <button key={c.label} onClick={c.onClick} className="h-9 rounded-lg inline-flex items-center justify-center gap-1.5 text-[12px] font-bold hover:bg-slate-50" style={{ color: NAVY }}><c.icon className="w-4 h-4" style={{ color: c.label === "Save" && isSaved ? BLUE : SUB, fill: c.label === "Save" && isSaved ? BLUE : "none" }} /> {c.label}</button>)}
+                    {actUtility.map((c) => {
+                      const on = (c.label === "Save" && isSaved) || (c.label === "Watch Price" && watchOpen);
+                      return <button key={c.label} onClick={c.onClick} aria-expanded={c.label === "Watch Price" ? watchOpen : undefined} className="h-9 rounded-lg inline-flex items-center justify-center gap-1.5 text-[12px] font-bold hover:bg-slate-50" style={{ color: on ? BLUE : NAVY }}><c.icon className="w-4 h-4" style={{ color: on ? BLUE : SUB, fill: c.label === "Save" && isSaved ? BLUE : "none" }} /> {c.label}</button>;
+                    })}
                   </div>
+                  {/* Inline price & availability alert capture (reuses the governed
+                      watch_price RPC). Honors the dealer's price_drop_watch toggle. */}
+                  {watchOpen && (listing as unknown as { price_drop_watch?: boolean }).price_drop_watch !== false && (
+                    <div className="mt-3">
+                      <PriceDropWatch slug={listing.slug || rawSlug} />
+                    </div>
+                  )}
 
                   {dealerName && (
                     <div className="mt-4 pt-4 border-t" style={{ borderColor: BORDER }}>
