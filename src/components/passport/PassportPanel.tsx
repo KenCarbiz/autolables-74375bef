@@ -2823,7 +2823,7 @@ interface CtaDef { badge: string; btn: string; sub: string; action: "reserve" | 
 const ctaFor = (panelKey: string, s: CtaSignals): CtaDef => {
   switch (panelKey) {
     case "market-price": return { badge: s.greatPrice ? "Great Price Available Today" : "Vehicle Available Today", btn: s.greatPrice ? "Reserve at This Price" : "Reserve This Vehicle", sub: s.greatPrice ? "The dealership confirms availability." : "Secure this vehicle while it's still available.", action: "reserve", tone: s.greatPrice ? "green" : "blue" };
-    case "market-demand": return { badge: s.highDemand ? "High Demand In Your Market" : "Vehicle Available Today", btn: s.highDemand ? "Claim This Vehicle" : "Reserve This Vehicle", sub: s.highDemand ? "High-demand vehicles go fast." : "Secure this vehicle while it's still available.", action: "reserve", tone: "green" };
+    case "market-demand": return { badge: s.highDemand ? "High Demand In Your Market" : "Vehicle Available Today", btn: "Reserve This Vehicle", sub: s.highDemand ? "High-demand vehicles go fast." : "Secure this vehicle while it's still available.", action: "reserve", tone: "green" };
     // Urgency copy only when the data supports it — a fabricated scarcity badge
     // above an honest empty state poisons the page's verification premise.
     case "comparable-vehicles": return s.highDemand
