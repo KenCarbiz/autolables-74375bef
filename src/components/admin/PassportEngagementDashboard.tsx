@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { Activity, Car, FileText, Flame, HeartHandshake, Mail, MousePointerClick, Phone, RefreshCw, TrendingUp } from "lucide-react";
+import { Activity, Car, FileText, Flame, FlaskConical, HeartHandshake, Mail, MousePointerClick, Phone, RefreshCw, TrendingUp } from "lucide-react";
+import { summarizePassportExperiment } from "@/lib/experiments/passportExperiment";
 
 type EngagementEvent = {
   id?: string;
@@ -132,6 +133,11 @@ export default function PassportEngagementDashboard() {
   const hotLeads = vehicles.filter((vehicle) => scoreFor(vehicle) >= 20).slice(0, 5);
   const recent = events.slice(0, 20);
 
+  // Passport A/B readout — only meaningful once vehicles are running the
+  // experiment and events carry the variant tag. Hidden entirely otherwise.
+  const experiment = useMemo(() => summarizePassportExperiment(events), [events]);
+  const pctFmt = (n: number) => `${(n * 100).toFixed(1)}%`;
+
   if (loading) return <p className="p-4 text-sm text-muted-foreground">Loading Passport engagement…</p>;
 
   return (
@@ -213,6 +219,44 @@ export default function PassportEngagementDashboard() {
           </div>
         </section>
       </div>
+
+      {experiment.totalExposures > 0 && (() => {
+        const { current, v3 } = experiment.variants;
+        const leader = experiment.lift == null ? null : experiment.lift > 0 ? "v3" : experiment.lift < 0 ? "current" : "tie";
+        const liftPts = experiment.lift == null ? null : Math.abs(experiment.lift) * 100;
+        const Arm = ({ name, label, f }: { name: string; label: string; f: typeof current }) => (
+          <div className={`rounded-2xl border p-4 ${leader === name ? "border-violet-300 bg-violet-50" : "border-border bg-background"}`}>
+            <div className="flex items-center justify-between">
+              <p className="text-sm font-black text-foreground">{label}</p>
+              {leader === name && <span className="rounded-full bg-violet-100 px-2 py-0.5 text-[10px] font-black uppercase text-violet-700">Leading</span>}
+            </div>
+            <p className="mt-2 text-3xl font-black text-foreground">{pctFmt(f.conversionRate)}</p>
+            <p className="text-xs text-muted-foreground">{f.conversions} of {f.exposures} visitors converted</p>
+          </div>
+        );
+        return (
+          <section className="rounded-3xl border border-violet-200 bg-card p-5 shadow-sm">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <div className="inline-flex items-center gap-2 rounded-full bg-violet-50 px-3 py-1 text-[10px] font-black uppercase tracking-wider text-violet-700"><FlaskConical className="h-3.5 w-3.5" /> Passport A/B</div>
+                <h3 className="mt-3 text-lg font-black text-foreground">Current vs V3 conversion</h3>
+                <p className="text-sm text-muted-foreground">High-intent conversions (reserve, contact, lead) by the experience each visitor saw. Counted per unique visitor.</p>
+              </div>
+            </div>
+            <div className="mt-4 grid gap-3 sm:grid-cols-2">
+              <Arm name="current" label="Current passport" f={current} />
+              <Arm name="v3" label="Governed V3" f={v3} />
+            </div>
+            <p className="mt-3 text-xs font-semibold text-muted-foreground">
+              {liftPts == null
+                ? "Both arms need traffic before a comparison is meaningful."
+                : leader === "tie"
+                  ? `Even so far — ${experiment.totalExposures} visitors in the experiment.`
+                  : `${leader === "v3" ? "Governed V3" : "Current passport"} leads by ${liftPts.toFixed(1)} points across ${experiment.totalExposures} visitors. Directional until each arm has enough traffic.`}
+            </p>
+          </section>
+        );
+      })()}
 
       <section className="rounded-3xl border border-orange-200 bg-orange-50 p-5 text-orange-950">
         <div className="flex items-start gap-3">

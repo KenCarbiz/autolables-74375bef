@@ -1,8 +1,9 @@
 import { lazy, Suspense } from "react";
 import { useParams, useSearchParams } from "react-router-dom";
 import { usePublicListing } from "@/hooks/usePublicListing";
-import { trackCustomerEngagement } from "@/lib/engagement/customerEngagement";
-import { useEffect, useRef } from "react";
+import { trackCustomerEngagement, getEngagementVisitorId } from "@/lib/engagement/customerEngagement";
+import { enrollPassportVariant, clearPassportExperiment } from "@/lib/experiments/passportExperiment";
+import { useEffect, useMemo, useRef } from "react";
 
 // ──────────────────────────────────────────────────────────────
 // VehiclePassportRoute — thin selection wrapper for /v/:slug.
@@ -45,10 +46,29 @@ export default function VehiclePassportRoute() {
   const reason = (listing as { passport_resolution_reason?: string } | null)?.passport_resolution_reason;
   const governedEnabled = (listing as { governed_routing_enabled?: boolean } | null)?.governed_routing_enabled === true;
 
+  // Controlled experiment: when the resolver says this vehicle is in the A/B
+  // ('experiment_assignment') and governed routing is enabled, split the visitor
+  // deterministically between v3 and current. Enrollment is stamped on all
+  // downstream events (ambiently, in trackCustomerEngagement) so conversions
+  // attribute to the variant. Outside the experiment nothing is enrolled and the
+  // clean per-vehicle/tenant resolution below applies.
+  const inExperiment = reason === "experiment_assignment" && governedEnabled;
+  const experiment = useMemo(
+    () => (inExperiment ? enrollPassportVariant(getEngagementVisitorId()) : null),
+    [inExperiment],
+  );
+  // Leaving the experiment (vehicle switched to a fixed version) clears the
+  // stale enrollment so its variant no longer tags unrelated events.
+  useEffect(() => {
+    if (listing && !inExperiment) clearPassportExperiment();
+  }, [listing, inExperiment]);
+
   // Route selection: default (flag absent or false) always renders the
   // existing passport, unchanged. Kill switch is already applied in the
   // resolver, so `effective === 'v3'` here always means "safe to switch".
-  const renderGoverned = governedEnabled && effective === "v3";
+  const renderGoverned = inExperiment
+    ? experiment?.variant === "v3"
+    : governedEnabled && effective === "v3";
   const chosen: "governed" | "existing" = renderGoverned ? "governed" : "existing";
 
   // Lightweight signal: which version actually rendered and why. Reuses
@@ -72,9 +92,12 @@ export default function VehiclePassportRoute() {
       metadata: {
         rendered_route: "/v/:slug",
         rendered_experience: chosen,
-        passport_version: effective || "current",
+        // Under the experiment the actual rendered variant is the assigned arm,
+        // not the tenant default the resolver returned.
+        passport_version: inExperiment ? (experiment?.variant ?? "current") : (effective || "current"),
         passport_resolution_reason: reason || "safety_fallback",
         governed_routing_enabled: governedEnabled,
+        ...(inExperiment && experiment ? { experiment_id: experiment.experimentId, experiment_variant: experiment.variant } : {}),
       },
     });
   }, [listing, chosen, effective, reason, governedEnabled]);

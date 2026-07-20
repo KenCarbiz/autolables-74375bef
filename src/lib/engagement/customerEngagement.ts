@@ -1,3 +1,5 @@
+import { getActivePassportExperiment } from "@/lib/experiments/passportExperiment";
+
 export type CustomerEngagementSource = "passport" | "window_sticker_qr" | "website" | "email" | "sms" | "direct" | "unknown";
 export type CustomerEngagementSurface = "vehicle_passport" | "window_sticker" | "public_listing" | "document_packet" | "document_viewer" | "lead_form" | "unknown";
 export type CustomerEngagementEventType =
@@ -96,6 +98,14 @@ const ENGAGEMENT_ENDPOINT = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/r
 
 export const trackCustomerEngagement = async (payload: CustomerEngagementPayload) => {
   try {
+    // Ambient experiment tag — if this visitor is enrolled in the passport A/B,
+    // stamp the variant on EVERY event (exposures and conversions alike) so the
+    // funnel readout can attribute outcomes to the experience they saw. Explicit
+    // metadata always wins over the ambient tag.
+    const enrollment = getActivePassportExperiment();
+    const ambient = enrollment
+      ? { experiment_id: enrollment.experimentId, experiment_variant: enrollment.variant }
+      : null;
     const event = {
       tenant_id: payload.tenantId || null,
       store_id: payload.storeId || null,
@@ -115,7 +125,7 @@ export const trackCustomerEngagement = async (payload: CustomerEngagementPayload
       referrer: typeof document !== "undefined" ? document.referrer || null : null,
       landing_url: typeof window !== "undefined" ? window.location.href : null,
       device_type: detectDeviceType(),
-      metadata: payload.metadata || {},
+      metadata: { ...(ambient || {}), ...(payload.metadata || {}) },
     };
     const bodyText = JSON.stringify({ event });
 
