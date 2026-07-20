@@ -4,6 +4,8 @@ import {
   ChevronLeft, Download, Printer, Share2, CircleCheck, TriangleAlert, CircleAlert,
   Clock, CircleMinus, LayoutDashboard, Database, ListChecks, ExternalLink, Loader2,
   X, ShieldCheck, ChevronDown, ArrowRight, SearchCheck, BadgeCheck, FileWarning,
+  ShieldAlert, MoreVertical, ChevronRight, ScanBarcode, Gauge, UserRound, BarChart3,
+  MessageCircle, CalendarCheck, FileMinus, FileText,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Helmet } from "react-helmet-async";
@@ -11,7 +13,7 @@ import { type VehicleListing } from "@/hooks/useVehicleListing";
 import Logo from "@/components/brand/Logo";
 import { derivePassport, type PassportData } from "@/lib/passportV2Data";
 import {
-  deriveVerificationReport, PROVENANCE_LABEL,
+  deriveVerificationReport, PROVENANCE_LABEL, VERIFICATION_STATUS_LABEL,
   type VerificationReport, type ReportCheck, type VerificationStatus, type EvidenceProvenance,
 } from "@/lib/passport/verificationSummary";
 import { resolvePassportBack } from "@/lib/passportReturn";
@@ -248,6 +250,411 @@ const NeutralState = ({ title, body, onRetry, onBack }: { title: string; body: s
   </div>
 );
 
+// ── Mobile (compact) presentation ───────────────────────────────────────────
+// A phone-first layout for the SAME canonical VerificationReport. It re-lays out
+// the frozen model into a long scroll (verdict → problem → proof summary →
+// evidence sheets) and reuses every handler the desktop report already owns. It
+// derives NO status or count of its own — pending stays pending, unavailable
+// stays unavailable, a conflict stays "needs confirmation". Rendered only at
+// ≤767px; ≥768px keeps the untouched desktop report.
+
+const useCompactViewport = (): boolean => {
+  const query = "(max-width: 767px)";
+  const read = () => typeof window !== "undefined" && !!window.matchMedia?.(query).matches;
+  const [compact, setCompact] = useState<boolean>(read);
+  useEffect(() => {
+    if (typeof window === "undefined" || !window.matchMedia) return;
+    const mq = window.matchMedia(query);
+    const on = () => setCompact(mq.matches);
+    on();
+    mq.addEventListener?.("change", on);
+    return () => mq.removeEventListener?.("change", on);
+  }, []);
+  return compact;
+};
+
+// Per-check outcome word for the completed rows — precise evidence language, not
+// a blanket "Verified". Non-verified checks fall back to the canonical status
+// label so a pending/unavailable row can never read as a pass.
+const OUTCOME_LABEL: Record<string, string> = {
+  vin: "Matched", ownership: "Found", odometer: "No conflict",
+  market: "Available", warranty: "Info found", title: "Clean",
+  history: "No accidents", recall: "No recalls",
+};
+const outcomeLabel = (c: ReportCheck): string =>
+  c.status === "verified" ? (OUTCOME_LABEL[c.key] ?? "Verified") : VERIFICATION_STATUS_LABEL[c.status];
+
+// One recognizable Lucide glyph per check — one family, substantial at 22–24px.
+const CHECK_ICON: Record<string, React.ElementType> = {
+  vin: ScanBarcode, history: FileText, ownership: UserRound, odometer: Gauge,
+  title: FileText, recall: ShieldCheck, market: BarChart3, warranty: BadgeCheck,
+};
+
+const supportingLine = (c: ReportCheck): string =>
+  c.status === "pending" ? "Still processing · No result yet"
+  : c.status === "unavailable" ? "Source data unavailable · Not verified"
+  : c.status === "needs_confirmation" ? "Sources disagree · Confirm with dealer"
+  : c.status === "needs_attention" ? "Needs your attention"
+  : "Checked";
+
+// A calm, phone-sized bottom sheet: slides up, drag handle, focus trapped, closes
+// on Escape / backdrop, restores focus to the row that opened it. Honors
+// prefers-reduced-motion by dropping the slide transition.
+const BottomSheet = ({
+  open, title, onClose, children,
+}: { open: boolean; title: string; onClose: () => void; children: React.ReactNode }) => {
+  const panelRef = useRef<HTMLDivElement>(null);
+  const returnFocusRef = useRef<Element | null>(null);
+  const [shown, setShown] = useState(false);
+  const reduced = typeof window !== "undefined" && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+
+  useEffect(() => {
+    if (!open) return;
+    returnFocusRef.current = typeof document !== "undefined" ? document.activeElement : null;
+    setShown(false);
+    const raf = requestAnimationFrame(() => { setShown(true); panelRef.current?.focus(); });
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+    document.addEventListener("keydown", onKey);
+    return () => {
+      cancelAnimationFrame(raf);
+      document.removeEventListener("keydown", onKey);
+      document.body.style.overflow = prevOverflow;
+      if (returnFocusRef.current instanceof HTMLElement) returnFocusRef.current.focus();
+    };
+  }, [open, onClose]);
+
+  if (!open) return null;
+  return (
+    <div className="fixed inset-0 z-[80] flex items-end justify-center" role="dialog" aria-modal="true" aria-label={title}>
+      <div className="absolute inset-0 bg-black/45" onClick={onClose} />
+      <div
+        ref={panelRef}
+        tabIndex={-1}
+        className={`relative w-full max-w-[520px] bg-white rounded-t-[22px] max-h-[88svh] flex flex-col outline-none shadow-[0_-8px_40px_rgba(15,23,42,0.18)] ${reduced ? "" : "transition-transform duration-200 ease-out"} ${shown || reduced ? "translate-y-0" : "translate-y-full"}`}
+      >
+        <div className="pt-2.5 pb-1 flex justify-center shrink-0"><span className="h-1.5 w-10 rounded-full bg-slate-300" /></div>
+        <div className="px-5 pb-2 flex items-center justify-between gap-3 shrink-0">
+          <h2 className="text-[17px] font-bold text-[#0F172A] leading-snug">{title}</h2>
+          <button onClick={onClose} aria-label="Close" className="w-11 h-11 -mr-2 rounded-full flex items-center justify-center text-[#64748B] hover:bg-slate-100 shrink-0"><X className="w-5 h-5" /></button>
+        </div>
+        <div className="px-5 pb-[max(20px,env(safe-area-inset-bottom))] overflow-y-auto">{children}</div>
+      </div>
+    </div>
+  );
+};
+
+// Evidence sheet body for a single check — reuses the canonical evidence fields;
+// a null value reads "Not available from current sources", never a fabricated one.
+const CheckSheetBody = ({ check, onAskDealer }: { check: ReportCheck; onAskDealer?: () => void }) => {
+  const ui = STATUS_UI[check.status];
+  const meaning = check.finding
+    ?? (check.status === "pending"
+      ? "This check has not returned a result yet. Pending does not mean a problem was found — it simply has no result yet."
+      : check.status === "unavailable"
+        ? "The records this check needs are not available for this vehicle. This is not a problem found — there is simply no data to verify."
+        : "");
+  return (
+    <div className="space-y-4 pb-1">
+      <span className={`inline-flex items-center gap-1.5 rounded-full border ${ui.ring} ${ui.bg} px-2.5 py-1 text-[12.5px] font-bold ${ui.fg}`}>
+        <ui.icon className="w-4 h-4" aria-hidden="true" /> {ui.label}
+      </span>
+      {meaning && <p className="text-[14px] text-[#334155] leading-relaxed">{meaning}</p>}
+      {check.key === "market" && (
+        <p className="text-[12.5px] text-[#64748B] leading-relaxed">Market values are estimates based on comparable listings, not an appraisal.</p>
+      )}
+      {check.key === "warranty" && (
+        <p className="text-[12.5px] text-[#64748B] leading-relaxed">Shows factory coverage on record. Any remaining-coverage figure is an estimate — confirm exact terms with the dealer.</p>
+      )}
+      <div className="rounded-xl border border-[#E6EAF0] bg-[#FAFBFC] divide-y divide-[#F1F5F9] px-4">
+        {check.evidence.map((e) => (
+          <div key={e.label} className="flex items-start justify-between gap-4 py-2.5 text-[13px]">
+            <span className="text-[#64748B] shrink-0">{e.label}</span>
+            <span className={`text-right ${e.value ? "text-[#0F172A] font-medium" : "text-[#94A3B8] italic"}`}>{e.value ?? "Not available from current sources"}</span>
+          </div>
+        ))}
+      </div>
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[12px] text-[#94A3B8]">
+        <span>Source: {sourceLabelFor(check)}</span>
+        <span>{PROVENANCE_LABEL[check.provenance]}</span>
+        {check.checkedAt && <span>Checked <time dateTime={check.checkedAt}>{dateLabel(check.checkedAt)}</time></span>}
+      </div>
+      {onAskDealer && (
+        <button onClick={onAskDealer} className="w-full min-h-[50px] rounded-xl bg-[#2563EB] hover:bg-[#1d4fd7] text-white text-[15px] font-bold inline-flex items-center justify-center gap-2">
+          <MessageCircle className="w-5 h-5" /> Ask the dealer
+        </button>
+      )}
+    </div>
+  );
+};
+
+interface MobileProps {
+  report: VerificationReport;
+  listing: VehicleListing;
+  pdfState: "idle" | "working" | "done" | "error";
+  reportGenerated: string;
+  onBack: () => void;
+  onShare: () => void;
+  onPrint: () => void;
+  onDownloadPdf: () => void;
+  onAskRecall: () => void;
+  askDealerFor: (check: ReportCheck) => () => void;
+  onContact: () => void;
+  track: (eventType: CustomerEngagementEventType, meta?: Record<string, unknown>) => void;
+}
+
+const MobileVerification = ({
+  report, listing, pdfState, reportGenerated,
+  onBack, onShare, onPrint, onDownloadPdf, onAskRecall, askDealerFor, onContact, track,
+}: MobileProps) => {
+  const [sheetKey, setSheetKey] = useState<string | null>(null);
+  const [sourcesOpen, setSourcesOpen] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
+
+  const recallCheck = report.checks.find((c) => c.key === "recall");
+  const recallIsException = !!recallCheck && recallCheck.status !== "verified";
+  const attentionCount = report.needsAttentionChecks + report.needsConfirmationChecks;
+  const incompleteRows = report.checks.filter((c) => (c.status === "pending" || c.status === "unavailable") && c.key !== "recall");
+  const completedRows = report.checks.filter((c) => c.status === "verified");
+  const incompleteTotal = report.totalChecks - report.verifiedChecks;
+
+  const vinTail = listing.vin ? listing.vin.slice(-6) : null;
+  const lastChecked = report.lastCheckedAt ? dateLabel(report.lastCheckedAt) : null;
+  const recallCheckedLabel = recallCheck?.checkedAt ? dateLabel(recallCheck.checkedAt) : lastChecked;
+
+  const bannerHeading = attentionCount > 0
+    ? `${attentionCount} item${attentionCount === 1 ? "" : "s"} need${attentionCount === 1 ? "s" : ""} your attention`
+    : report.pendingChecks > 0
+      ? `${report.pendingChecks} check${report.pendingChecks === 1 ? "" : "s"} still processing`
+      : "All checks verified";
+  const bannerCalm = attentionCount === 0 && report.pendingChecks === 0;
+  const bannerSupport = `${report.verifiedChecks} completed · ${incompleteTotal} incomplete`;
+
+  const openCheck = (c: ReportCheck) => { setSheetKey(c.key); track("verification_evidence_opened", { check_id: c.key, status: c.status }); };
+  const openRecallDetails = () => { if (recallCheck) { setSheetKey("recall"); track("verification_evidence_opened", { check_id: "recall", status: recallCheck.status }); } };
+  const openSources = () => { setSourcesOpen(true); track("verification_methodology_opened", {}); };
+  const activeSheetCheck = sheetKey ? report.checks.find((c) => c.key === sheetKey) : undefined;
+
+  const STATUS_TILES: { label: string; count: number; icon: React.ElementType; fg: string; bg: string }[] = [
+    { label: "Completed", count: report.verifiedChecks, icon: CircleCheck, fg: "text-[#16A34A]", bg: "bg-emerald-50" },
+    { label: "Attention", count: attentionCount, icon: CircleAlert, fg: "text-[#D97706]", bg: "bg-amber-50" },
+    { label: "Pending", count: report.pendingChecks, icon: Clock, fg: "text-[#2563EB]", bg: "bg-blue-50" },
+    { label: "Unavailable", count: report.unavailableChecks, icon: CircleMinus, fg: "text-[#94A3B8]", bg: "bg-slate-100" },
+  ];
+
+  return (
+    <div className="min-h-[100svh] bg-[#F4F6FA] text-[#0D1B2A]" style={{ fontFamily: "Inter, -apple-system, BlinkMacSystemFont, sans-serif" }}>
+      {/* Header */}
+      <header className="sticky top-0 z-40 bg-white/95 backdrop-blur border-b border-[#E6EAF0] h-[56px] flex items-center justify-between px-1.5">
+        <button onClick={onBack} className="h-11 pl-1 pr-2 rounded-lg inline-flex items-center gap-1 text-[#0D1B2A] active:bg-slate-100">
+          <ChevronLeft className="w-[22px] h-[22px]" strokeWidth={2} />
+          <span className="text-[14px] font-semibold">Back to Passport</span>
+        </button>
+        <div className="shrink-0"><Logo variant="full" size={18} /></div>
+        <div className="flex items-center">
+          <button onClick={onShare} aria-label="Share report" className="w-11 h-11 rounded-lg inline-flex items-center justify-center text-[#0D1B2A] active:bg-slate-100"><Share2 className="w-[21px] h-[21px]" strokeWidth={1.9} /></button>
+          <button onClick={() => setMenuOpen((v) => !v)} aria-label="More actions" aria-expanded={menuOpen} className="w-11 h-11 rounded-lg inline-flex items-center justify-center text-[#0D1B2A] active:bg-slate-100"><MoreVertical className="w-[21px] h-[21px]" strokeWidth={1.9} /></button>
+        </div>
+        {menuOpen && (
+          <>
+            <div className="fixed inset-0 z-40" onClick={() => setMenuOpen(false)} />
+            <div className="absolute right-2 top-[52px] z-50 w-52 rounded-xl border border-[#E6EAF0] bg-white shadow-xl py-1.5">
+              {[
+                { label: "Share report", icon: Share2, fn: onShare },
+                { label: "Print report", icon: Printer, fn: onPrint },
+                { label: "Download PDF", icon: Download, fn: onDownloadPdf },
+              ].map((it) => (
+                <button key={it.label} onClick={() => { setMenuOpen(false); it.fn(); }} className="w-full min-h-[44px] px-4 flex items-center gap-3 text-[14px] font-semibold text-[#0D1B2A] hover:bg-slate-50">
+                  <it.icon className="w-[18px] h-[18px] text-[#2563EB]" /> {it.label}
+                </button>
+              ))}
+            </div>
+          </>
+        )}
+      </header>
+
+      <main className="px-4 pt-5 pb-32 space-y-5">
+        {/* Vehicle identity */}
+        <section>
+          <p className="text-[11px] font-bold uppercase tracking-[0.08em] text-[#2563EB]">Vehicle verification</p>
+          <h1 className="text-[23px] font-bold leading-tight tracking-[-0.01em] mt-1">{listing.ymm}{listing.trim ? ` ${listing.trim}` : ""}</h1>
+          <p className="text-[14px] text-[#64748B] mt-1">
+            {vinTail ? `VIN ending ${vinTail}` : "VIN unavailable"}{listing.mileage != null ? ` · ${listing.mileage.toLocaleString()} mi` : ""}
+          </p>
+          <p className="text-[13px] text-[#64748B] mt-1.5 inline-flex items-center gap-1.5"><CalendarCheck className="w-[18px] h-[18px] text-[#94A3B8]" /> Checked {reportGenerated}</p>
+        </section>
+
+        {/* Overall-result banner */}
+        <section className={`rounded-2xl bg-white border border-[#E6EAF0] ${bannerCalm ? "border-l-4 border-l-[#16A34A]" : "border-l-4 border-l-[#D97706]"} p-4 flex items-center gap-3.5`} aria-live="polite">
+          <span className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${bannerCalm ? "bg-emerald-50" : "bg-amber-50"}`}>
+            {bannerCalm ? <ShieldCheck className="w-6 h-6 text-[#16A34A]" strokeWidth={1.9} /> : <ShieldAlert className="w-6 h-6 text-[#D97706]" strokeWidth={1.9} />}
+          </span>
+          <div className="min-w-0">
+            <p className="text-[18px] font-bold leading-snug">{bannerHeading}</p>
+            <p className="text-[13.5px] text-[#64748B] mt-0.5">{bannerSupport}</p>
+          </div>
+        </section>
+
+        {/* 2×2 status summary */}
+        <section className="rounded-2xl bg-white border border-[#E6EAF0] grid grid-cols-2">
+          {STATUS_TILES.map((t, i) => (
+            <div key={t.label} className={`flex items-center gap-3 px-4 py-3.5 min-h-[48px] ${i % 2 === 0 ? "border-r" : ""} ${i < 2 ? "border-b" : ""} border-[#EEF1F4]`}>
+              <span className={`w-9 h-9 rounded-full ${t.bg} flex items-center justify-center shrink-0`}><t.icon className={`w-[19px] h-[19px] ${t.fg}`} strokeWidth={2} aria-hidden="true" /></span>
+              <div className="leading-tight">
+                <p className="text-[18px] font-bold tabular-nums">{t.count}</p>
+                <p className="text-[13px] text-[#64748B]">{t.label}</p>
+              </div>
+            </div>
+          ))}
+        </section>
+
+        {/* Open-recall card — the only large attention card on the page */}
+        {recallIsException && recallCheck && (
+          <section className="rounded-2xl bg-[#FFF9EF] border border-amber-200/80 p-4">
+            <div className="flex items-start gap-3">
+              <span className="w-10 h-10 rounded-xl bg-white border border-amber-200 flex items-center justify-center shrink-0"><ShieldAlert className="w-7 h-7 text-[#D97706]" strokeWidth={2} aria-hidden="true" /></span>
+              <div className="min-w-0">
+                <p className="text-[11px] font-bold uppercase tracking-[0.07em] text-[#B45309]">{recallCheck.status === "needs_confirmation" ? "Needs confirmation" : "Needs attention"}</p>
+                <h2 className="text-[19px] font-bold text-[#0F172A] leading-snug mt-0.5">{exceptionHeadline(recallCheck)}</h2>
+                {recallCheck.finding && <p className="text-[14px] text-[#475569] mt-1.5 leading-relaxed">{recallCheck.finding}</p>}
+                <p className="text-[12px] text-[#94A3B8] mt-2 inline-flex items-center gap-1.5">NHTSA{recallCheckedLabel ? ` · Checked ${recallCheckedLabel}` : ""}</p>
+              </div>
+            </div>
+            <div className="mt-4 space-y-2.5">
+              <button onClick={onAskRecall} className="w-full min-h-[52px] rounded-xl bg-[#2563EB] hover:bg-[#1d4fd7] text-white text-[15px] font-semibold inline-flex items-center justify-center gap-2">
+                <MessageCircle className="w-[21px] h-[21px]" /> Ask About This Recall
+              </button>
+              <button onClick={openRecallDetails} className="w-full min-h-[50px] rounded-xl border border-[#2563EB] bg-white text-[#2563EB] text-[15px] font-semibold inline-flex items-center justify-center gap-2">View Recall Details</button>
+            </div>
+          </section>
+        )}
+
+        {/* Incomplete checks */}
+        {incompleteRows.length > 0 && (
+          <section>
+            <h2 className="text-[17px] font-semibold px-1 mb-2">Incomplete checks</h2>
+            <div className="rounded-2xl bg-white border border-[#E6EAF0] divide-y divide-[#EEF1F4] overflow-hidden">
+              {incompleteRows.map((c) => {
+                const Icon = c.status === "pending" ? Clock : FileMinus;
+                const iconTint = c.status === "pending" ? "bg-blue-50 text-[#2563EB]" : "bg-slate-100 text-[#64748B]";
+                const statusFg = c.status === "pending" ? "text-[#2563EB]" : "text-[#64748B]";
+                return (
+                  <button key={c.key} onClick={() => openCheck(c)} className="w-full min-h-[60px] px-4 py-3 flex items-center gap-3 text-left active:bg-slate-50">
+                    <span className={`w-9 h-9 rounded-xl ${iconTint} flex items-center justify-center shrink-0`}><Icon className="w-[22px] h-[22px]" strokeWidth={1.9} aria-hidden="true" /></span>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-[15px] font-semibold text-[#0F172A] leading-snug">{c.name}</p>
+                      <p className="text-[13px] text-[#64748B] mt-0.5">{supportingLine(c)}</p>
+                    </div>
+                    <span className={`text-[13.5px] font-semibold ${statusFg} shrink-0`}>{VERIFICATION_STATUS_LABEL[c.status]}</span>
+                    <ChevronRight className="w-[19px] h-[19px] text-[#94A3B8] shrink-0" aria-hidden="true" />
+                  </button>
+                );
+              })}
+            </div>
+          </section>
+        )}
+
+        {/* Checks completed */}
+        {completedRows.length > 0 && (
+          <section>
+            <h2 className="text-[17px] font-semibold px-1 mb-2">Checks completed</h2>
+            <div className="rounded-2xl bg-white border border-[#E6EAF0] divide-y divide-[#EEF1F4] overflow-hidden">
+              {completedRows.map((c) => {
+                const Icon = CHECK_ICON[c.key] ?? BadgeCheck;
+                return (
+                  <button key={c.key} onClick={() => openCheck(c)} className="w-full min-h-[58px] px-4 py-3 flex items-center gap-3 text-left active:bg-slate-50">
+                    <span className="w-9 h-9 rounded-xl bg-emerald-50/70 flex items-center justify-center shrink-0"><Icon className="w-[22px] h-[22px] text-[#334155]" strokeWidth={1.9} aria-hidden="true" /></span>
+                    <p className="text-[15px] font-semibold text-[#0F172A] leading-snug min-w-0 flex-1">{c.name}</p>
+                    <span className="inline-flex items-center gap-1.5 text-[13.5px] font-semibold text-[#16A34A] shrink-0"><CircleCheck className="w-[18px] h-[18px]" aria-hidden="true" />{outcomeLabel(c)}</span>
+                    <ChevronRight className="w-[19px] h-[19px] text-[#94A3B8] shrink-0" aria-hidden="true" />
+                  </button>
+                );
+              })}
+            </div>
+          </section>
+        )}
+
+        {/* Sources and methodology */}
+        <button onClick={openSources} className="w-full rounded-2xl bg-white border border-[#E6EAF0] min-h-[64px] px-4 py-3 flex items-center gap-3 text-left active:bg-slate-50">
+          <span className="w-9 h-9 rounded-xl bg-blue-50 flex items-center justify-center shrink-0"><Database className="w-[22px] h-[22px] text-[#2563EB]" strokeWidth={1.9} aria-hidden="true" /></span>
+          <div className="min-w-0 flex-1">
+            <p className="text-[15px] font-semibold text-[#0F172A]">Sources and methodology</p>
+            <p className="text-[13px] text-[#64748B] mt-0.5">{report.sourceCount} automotive data source{report.sourceCount === 1 ? "" : "s"}</p>
+          </div>
+          <ChevronRight className="w-[19px] h-[19px] text-[#94A3B8] shrink-0" aria-hidden="true" />
+        </button>
+
+        {/* Report actions */}
+        <div className="space-y-2.5 pt-1">
+          <button onClick={onDownloadPdf} className="w-full min-h-[50px] rounded-xl border border-[#2563EB] bg-white text-[#2563EB] text-[15px] font-semibold inline-flex items-center justify-center gap-2">
+            {pdfState === "working" ? <Loader2 className="w-[21px] h-[21px] animate-spin" /> : pdfState === "done" ? <CircleCheck className="w-[21px] h-[21px]" /> : <Download className="w-[21px] h-[21px]" strokeWidth={2} />}
+            {pdfState === "working" ? "Preparing PDF…" : pdfState === "done" ? "PDF ready" : "Download PDF"}
+          </button>
+          <button onClick={() => setMenuOpen(true)} className="w-full text-center text-[14px] font-semibold text-[#2563EB]">Share or print report</button>
+          {pdfState === "error" && <p className="text-[12.5px] text-[#DC2626] text-center">We could not generate the PDF. Please try Print instead.</p>}
+        </div>
+
+        {/* Disclosure */}
+        <p className="text-[12.5px] text-[#64748B] text-center leading-relaxed px-2">
+          AutoLabels verification does not replace a physical inspection, title search or dealer confirmation.
+        </p>
+      </main>
+
+      {/* Sticky action bar */}
+      <div className="fixed bottom-0 inset-x-0 z-40 bg-white border-t border-[#E6EAF0] px-4 pt-3 pb-[max(12px,env(safe-area-inset-bottom))] flex items-center gap-3">
+        <button onClick={onBack} className="basis-2/5 min-h-[50px] rounded-xl border border-[#CBD5E1] bg-white text-[#0F172A] text-[14.5px] font-semibold inline-flex items-center justify-center gap-1.5">
+          <ChevronLeft className="w-[21px] h-[21px]" /> Back to Passport
+        </button>
+        <button onClick={recallIsException ? onAskRecall : onContact} className="basis-3/5 min-h-[50px] rounded-xl bg-[#2563EB] hover:bg-[#1d4fd7] text-white text-[14.5px] font-semibold inline-flex items-center justify-center gap-2">
+          <MessageCircle className="w-[21px] h-[21px]" /> {recallIsException ? "Ask About Recall" : "Ask the Dealer"}
+        </button>
+      </div>
+
+      {/* Evidence + sources sheets */}
+      <BottomSheet open={!!activeSheetCheck} title={activeSheetCheck?.name ?? ""} onClose={() => setSheetKey(null)}>
+        {activeSheetCheck && (
+          <CheckSheetBody
+            check={activeSheetCheck}
+            onAskDealer={activeSheetCheck.status !== "verified" ? () => { setSheetKey(null); askDealerFor(activeSheetCheck)(); } : undefined}
+          />
+        )}
+      </BottomSheet>
+
+      <BottomSheet open={sourcesOpen} title="Sources and methodology" onClose={() => setSourcesOpen(false)}>
+        <div className="space-y-4 pb-1">
+          <p className="text-[14px] text-[#334155] leading-relaxed">
+            AutoLabels aggregates records from manufacturer, government, independent history, live market and dealer sources, then compares them for each check. When sources agree, the check is verified with its evidence shown. When they disagree it reads "needs confirmation"; a check with no result stays "pending" — never verified.
+          </p>
+          <div className="rounded-xl border border-[#E6EAF0] bg-[#FAFBFC] divide-y divide-[#F1F5F9] px-4">
+            {report.sources.map((s) => (
+              <div key={s.family} className="py-3">
+                <div className="flex items-center justify-between gap-3">
+                  <span className="text-[14px] font-semibold text-[#0F172A]">{s.label}</span>
+                  <span className="text-[10.5px] font-semibold text-[#64748B] bg-slate-100 rounded-md px-2 py-0.5 shrink-0">{PROVENANCE_LABEL[s.provenance]}</span>
+                </div>
+                <p className="text-[12.5px] text-[#64748B] mt-0.5">{s.type}{s.checkedAt ? ` · Checked ${dateLabel(s.checkedAt)}` : ""}</p>
+              </div>
+            ))}
+          </div>
+          <div>
+            <h3 className="text-[12px] font-bold uppercase tracking-[0.06em] text-[#64748B] mb-2">What each status means</h3>
+            <div className="grid grid-cols-1 gap-1.5">
+              {(Object.keys(STATUS_UI) as VerificationStatus[]).map((s) => {
+                const ui = STATUS_UI[s];
+                return <span key={s} className="inline-flex items-center gap-2 text-[13px] text-[#475569]"><ui.icon className={`w-[18px] h-[18px] ${ui.fg}`} aria-hidden="true" />{ui.label}</span>;
+              })}
+            </div>
+          </div>
+          <p className="text-[12px] text-[#94A3B8] leading-relaxed">
+            This is a data-verification report. It aggregates records and does not replace a physical inspection, title search or dealer confirmation.
+          </p>
+        </div>
+      </BottomSheet>
+    </div>
+  );
+};
+
 const VehiclePassportVerification = () => {
   const params = useParams<{ vehicleSlug?: string; slug?: string }>();
   const vehicleSlug = params.vehicleSlug ?? params.slug;
@@ -268,6 +675,7 @@ const VehiclePassportVerification = () => {
   const [methodologyOpen, setMethodologyOpen] = useState(false);
   const [pdfState, setPdfState] = useState<"idle" | "working" | "done" | "error">("idle");
   const viewedRef = useRef(false);
+  const isCompact = useCompactViewport();
 
   const prefersReducedMotion = typeof window !== "undefined" && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
   const passportVersion = /\/v3\//.test(qp.get("returnTo") || "") ? "v3" : "v2";
@@ -411,6 +819,30 @@ const VehiclePassportVerification = () => {
     return () => goContact({ topic: "other", checkId: check.key, about: `the ${check.name.toLowerCase()} on this ${listing.ymm}` });
   };
   const askRecall = () => goContact({ topic: "warranty", checkId: "recall", about: `the recall status on this ${listing.ymm} (VIN ${listing.vin})` });
+
+  // Compact phones (≤767px) get the dedicated mobile presentation of the SAME
+  // canonical report; ≥768px keeps the untouched desktop report below.
+  if (isCompact) {
+    return (
+      <>
+        <Helmet><title>{`Data-Verified Report — ${listing.ymm} · AutoLabels`}</title><meta name="robots" content="noindex" /></Helmet>
+        <MobileVerification
+          report={report}
+          listing={listing}
+          pdfState={pdfState}
+          reportGenerated={reportGenerated}
+          onBack={back}
+          onShare={share}
+          onPrint={printReport}
+          onDownloadPdf={downloadPdf}
+          onAskRecall={askRecall}
+          askDealerFor={askDealerFor}
+          onContact={() => goContact({ topic: "other", checkId: "report" })}
+          track={track}
+        />
+      </>
+    );
+  }
 
   // Next-step checklist, derived purely from which exceptions exist — never a
   // fabricated recommendation.
