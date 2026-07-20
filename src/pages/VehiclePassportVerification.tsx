@@ -2,8 +2,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import {
   ChevronLeft, Download, Printer, Share2, CircleCheck, TriangleAlert, CircleAlert,
-  Clock, CircleMinus, LayoutDashboard, Database, List, ExternalLink, Car, Loader2,
-  X, ShieldCheck, ChevronDown,
+  Clock, CircleMinus, LayoutDashboard, Database, ListChecks, ExternalLink, Loader2,
+  X, ShieldCheck, ChevronDown, ArrowRight, SearchCheck, BadgeCheck, FileWarning,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Helmet } from "react-helmet-async";
@@ -31,6 +31,9 @@ import { trackCustomerEngagement, type CustomerEngagementEventType } from "@/lib
 // what needs review, then what checked out. Governance is absolute — a pending
 // check is never shown as verified, a source conflict is "needs confirmation"
 // (not "issue found"), and no reassuring line renders without supporting data.
+//
+// This file is a PRESENTATION layer over the frozen canonical model. It never
+// re-derives a status, count, or finding — it only lays them out.
 // ──────────────────────────────────────────────────────────────
 
 // Preview-only review-state fixture (noindex). Lets the amber "review" layout
@@ -64,27 +67,48 @@ const NAV = [
   { key: "attention", label: "Needs attention", icon: TriangleAlert },
   { key: "verified", label: "Verified checks", icon: CircleCheck },
   { key: "sources", label: "Data sources", icon: Database },
-  { key: "actions", label: "Report actions", icon: List },
+  { key: "next", label: "What's next", icon: ListChecks },
 ] as const;
 
-const BANNER_TONE: Record<string, { bg: string; border: string; icon: React.ElementType; iconCls: string; head: string }> = {
-  green:   { bg: "bg-emerald-50/70", border: "border-emerald-200", icon: CircleCheck,   iconCls: "text-[#16A34A]", head: "text-[#0F172A]" },
-  amber:   { bg: "bg-amber-50/70",   border: "border-amber-200",   icon: TriangleAlert, iconCls: "text-[#D97706]", head: "text-[#0F172A]" },
-  red:     { bg: "bg-red-50/70",     border: "border-red-200",     icon: CircleAlert,   iconCls: "text-[#DC2626]", head: "text-[#0F172A]" },
-  neutral: { bg: "bg-slate-50",      border: "border-slate-200",   icon: ShieldCheck,   iconCls: "text-[#64748B]", head: "text-[#0F172A]" },
-};
-
-const StatusPill = ({ status }: { status: VerificationStatus }) => {
-  const ui = STATUS_UI[status];
-  return (
-    <span className={`inline-flex items-center gap-1.5 text-[12px] font-bold ${ui.fg}`}>
-      <ui.icon className="w-4 h-4" aria-hidden="true" /> {ui.label}
-    </span>
-  );
+// Hero tone comes straight from the canonical banner.tone — never re-derived.
+const HERO_TONE: Record<string, { bg: string; border: string; icon: React.ElementType; iconCls: string; chip: string; eyebrow: string }> = {
+  green:   { bg: "bg-emerald-50", border: "border-emerald-200", icon: CircleCheck,   iconCls: "text-[#16A34A]", chip: "bg-emerald-100 text-[#15803D]", eyebrow: "Verification complete" },
+  amber:   { bg: "bg-amber-50",   border: "border-amber-200",   icon: TriangleAlert, iconCls: "text-[#D97706]", chip: "bg-amber-100 text-[#B45309]", eyebrow: "Review before purchase" },
+  red:     { bg: "bg-red-50",     border: "border-red-200",     icon: CircleAlert,   iconCls: "text-[#DC2626]", chip: "bg-red-100 text-[#B91C1C]", eyebrow: "Review before purchase" },
+  neutral: { bg: "bg-slate-50",   border: "border-slate-200",   icon: ShieldCheck,   iconCls: "text-[#64748B]", chip: "bg-slate-200 text-[#475569]", eyebrow: "Verification in progress" },
 };
 
 const dateLabel = (iso: string | null | undefined): string | null =>
   iso ? new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : null;
+
+const ORDER: VerificationStatus[] = ["verified", "needs_attention", "needs_confirmation", "pending", "unavailable"];
+
+// The full status arithmetic, EVERY non-zero status included (unavailable too).
+// Presentation-only — reads the canonical counts, derives nothing.
+const statusSegments = (report: VerificationReport): { status: VerificationStatus; count: number }[] => {
+  const counts: Record<VerificationStatus, number> = {
+    verified: report.verifiedChecks,
+    needs_attention: report.needsAttentionChecks,
+    needs_confirmation: report.needsConfirmationChecks,
+    pending: report.pendingChecks,
+    unavailable: report.unavailableChecks,
+  };
+  return ORDER.map((status) => ({ status, count: counts[status] })).filter((s) => s.count > 0);
+};
+
+const StatusPills = ({ report }: { report: VerificationReport }) => (
+  <div className="flex flex-wrap items-center gap-2">
+    {statusSegments(report).map(({ status, count }) => {
+      const ui = STATUS_UI[status];
+      return (
+        <span key={status} className={`inline-flex items-center gap-1.5 rounded-full border ${ui.ring} bg-white px-2.5 py-1 text-[12.5px] font-semibold text-[#0F172A]`}>
+          <ui.icon className={`w-3.5 h-3.5 ${ui.fg}`} aria-hidden="true" />
+          <span className={ui.fg}>{count}</span> {ui.label}
+        </span>
+      );
+    })}
+  </div>
+);
 
 // One evidence row; a null value is shown as an honest "not available" line,
 // never a fabricated value.
@@ -102,65 +126,69 @@ interface CheckCardProps {
   onAskDealer?: () => void;
 }
 
+// Secondary exception (e.g. pending Title & Brand). Deliberately lighter than the
+// decision hero so the visual weight steps down: hero → this card → unavailable row.
 const ExceptionCard = ({ check, expanded, onToggleEvidence, onAskDealer }: CheckCardProps) => {
   const ui = STATUS_UI[check.status];
-  const isRecall = check.key === "recall";
   return (
-    <div className={`rounded-2xl border ${ui.ring} ${ui.bg} p-5 print:break-inside-avoid`}>
+    <div className={`rounded-2xl border ${ui.ring} ${ui.bg} p-4 sm:p-5 print:break-inside-avoid`}>
       <div className="flex items-start gap-3">
         <span className="w-9 h-9 rounded-xl bg-white flex items-center justify-center shrink-0 border border-black/5"><ui.icon className={`w-5 h-5 ${ui.fg}`} aria-hidden="true" /></span>
         <div className="min-w-0 flex-1">
           <p className={`text-[11px] font-bold uppercase tracking-wide ${ui.fg}`}>{ui.label}</p>
-          <h3 className="text-[16px] font-bold text-[#0F172A] leading-snug mt-0.5">{exceptionHeadline(check)}</h3>
-          {check.finding && <p className="text-[13.5px] text-[#475569] mt-1.5 leading-relaxed">{check.finding}</p>}
+          <h3 className="text-[15.5px] font-bold text-[#0F172A] leading-snug mt-0.5">{exceptionHeadline(check)}</h3>
+          {check.finding && <p className="text-[13px] text-[#475569] mt-1.5 leading-relaxed">{check.finding}</p>}
           {!check.finding && check.status === "pending" && (
-            <p className="text-[13.5px] text-[#475569] mt-1.5 leading-relaxed">This check has not completed. Pending does not mean a problem was found — it has simply not returned a result yet.</p>
+            <p className="text-[13px] text-[#475569] mt-1.5 leading-relaxed">This check has not completed. Pending does not mean a problem was found — it has simply not returned a result yet.</p>
+          )}
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-3 text-[11.5px] text-[#94A3B8]">
+            <span>Source: {sourceLabelFor(check)}</span>
+            {check.checkedAt && <span>Last checked <time dateTime={check.checkedAt}>{dateLabel(check.checkedAt)}</time></span>}
+          </div>
+          <div className="flex flex-wrap gap-2 mt-3 print:hidden">
+            <button onClick={onToggleEvidence} aria-expanded={expanded} className="h-9 px-3.5 rounded-lg border border-[#E6E8EC] bg-white text-[12.5px] font-semibold text-[#0F172A] inline-flex items-center gap-1.5 hover:border-[#2563EB]">
+              View evidence <ChevronDown className={`w-3.5 h-3.5 transition-transform ${expanded ? "rotate-180" : ""}`} />
+            </button>
+            {onAskDealer && (
+              <button onClick={onAskDealer} className="h-9 px-3.5 rounded-lg bg-[#2563EB] hover:bg-[#1d4fd7] text-white text-[12.5px] font-bold inline-flex items-center gap-1.5">Ask the dealer</button>
+            )}
+          </div>
+          {expanded && (
+            <div className="mt-3 rounded-xl border border-black/5 bg-white p-4 divide-y divide-[#F1F5F9]">
+              {check.evidence.map((e) => <EvidenceRow key={e.label} label={e.label} value={e.value} />)}
+            </div>
           )}
         </div>
       </div>
-      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-3 text-[11.5px] text-[#94A3B8] pl-12">
-        <span>Source: {sourceLabelFor(check)}</span>
-        {check.checkedAt && <span>Last checked <time dateTime={check.checkedAt}>{dateLabel(check.checkedAt)}</time></span>}
+    </div>
+  );
+};
+
+const VerifiedCard = ({ check, expanded, onToggleEvidence }: CheckCardProps) => {
+  const ui = STATUS_UI.verified;
+  return (
+    <div className={`${CARD} p-5 flex flex-col`}>
+      <div className="flex items-center justify-between gap-3">
+        <span className="w-11 h-11 rounded-2xl bg-emerald-50 flex items-center justify-center shrink-0 border border-emerald-100"><ui.icon className={`w-6 h-6 ${ui.fg}`} aria-hidden="true" /></span>
+        <ProvenanceTag provenance={check.provenance} />
       </div>
-      <div className="flex flex-wrap gap-2 mt-3 pl-12 print:hidden">
-        <button onClick={onToggleEvidence} aria-expanded={expanded} className="h-9 px-3.5 rounded-lg border border-[#E6E8EC] bg-white text-[12.5px] font-semibold text-[#0F172A] inline-flex items-center gap-1.5 hover:border-[#2563EB]">
-          {isRecall ? "View recall details" : "View evidence"} <ChevronDown className={`w-3.5 h-3.5 transition-transform ${expanded ? "rotate-180" : ""}`} />
-        </button>
-        {onAskDealer && (
-          <button onClick={onAskDealer} className="h-9 px-3.5 rounded-lg bg-[#2563EB] hover:bg-[#1d4fd7] text-white text-[12.5px] font-bold inline-flex items-center gap-1.5">Ask the dealer</button>
-        )}
+      <h3 className="text-[16.5px] font-bold text-[#0F172A] mt-3 leading-snug">{check.name}</h3>
+      {check.finding && <p className="text-[13px] text-[#475569] mt-1.5 leading-relaxed">{check.finding}</p>}
+      <div className="mt-auto pt-4 border-t border-[#EEF1F4] mt-4 flex items-center justify-between gap-2 text-[11.5px] text-[#94A3B8]">
+        <span>{sourceLabelFor(check)}</span>
+        {check.checkedAt && <span>Checked <time dateTime={check.checkedAt}>{dateLabel(check.checkedAt)}</time></span>}
       </div>
+      <button onClick={onToggleEvidence} aria-expanded={expanded} className="mt-3 text-[12.5px] font-semibold text-[#2563EB] inline-flex items-center gap-1 hover:underline print:hidden">
+        View evidence <ArrowRight className="w-3.5 h-3.5" />
+      </button>
       {expanded && (
-        <div className="mt-3 ml-12 rounded-xl border border-black/5 bg-white p-4 divide-y divide-[#F1F5F9]">
+        <div className="mt-3 rounded-xl border border-[#EEF1F4] bg-[#fafbfc] p-4 divide-y divide-[#F1F5F9]">
           {check.evidence.map((e) => <EvidenceRow key={e.label} label={e.label} value={e.value} />)}
         </div>
       )}
     </div>
   );
 };
-
-const VerifiedCard = ({ check, expanded, onToggleEvidence }: CheckCardProps) => (
-  <div className={`${CARD} p-5`}>
-    <div className="flex items-center justify-between gap-3">
-      <StatusPill status="verified" />
-      <ProvenanceTag provenance={check.provenance} />
-    </div>
-    <h3 className="text-[15px] font-bold text-[#0F172A] mt-2.5">{check.name}</h3>
-    {check.finding && <p className="text-[13px] text-[#475569] mt-1 leading-relaxed">{check.finding}</p>}
-    <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-3 text-[11.5px] text-[#94A3B8]">
-      <span>{sourceLabelFor(check)}</span>
-      {check.checkedAt && <span>Checked <time dateTime={check.checkedAt}>{dateLabel(check.checkedAt)}</time></span>}
-    </div>
-    <button onClick={onToggleEvidence} aria-expanded={expanded} className="mt-3 text-[12.5px] font-semibold text-[#2563EB] inline-flex items-center gap-1 hover:underline print:hidden">
-      View evidence <ChevronDown className={`w-3.5 h-3.5 transition-transform ${expanded ? "rotate-180" : ""}`} />
-    </button>
-    {expanded && (
-      <div className="mt-3 rounded-xl border border-[#EEF1F4] bg-[#fafbfc] p-4 divide-y divide-[#F1F5F9]">
-        {check.evidence.map((e) => <EvidenceRow key={e.label} label={e.label} value={e.value} />)}
-      </div>
-    )}
-  </div>
-);
 
 const ProvenanceTag = ({ provenance }: { provenance: EvidenceProvenance }) => (
   <span className="text-[10.5px] font-semibold text-[#64748B] bg-slate-100 rounded-md px-2 py-0.5">{PROVENANCE_LABEL[provenance]}</span>
@@ -185,6 +213,15 @@ const FAMILY_SHORT: Record<string, string> = {
   live_market: "Live market data", oem_warranty: "OEM warranty", dealer: "Dealer-provided",
 };
 const sourceLabelFor = (check: ReportCheck): string => FAMILY_SHORT[check.family] ?? check.family;
+
+const conditionBadge = (listing: VehicleListing): string | null => {
+  const c = String((listing as unknown as { condition?: string }).condition || "").toLowerCase();
+  if (!c) return null;
+  if (c === "new") return "New";
+  if (c.includes("certified") || c === "cpo") return "Certified Pre-Owned";
+  if (c === "used") return "Used";
+  return c.charAt(0).toUpperCase() + c.slice(1);
+};
 
 // ── Loading / error shells ──────────────────────────────────────────────────
 const Skeleton = () => (
@@ -352,41 +389,65 @@ const VehiclePassportVerification = () => {
 
   const recallCheck = report.checks.find((c) => c.key === "recall");
   const recallNeedsConfirmation = recallCheck?.status === "needs_confirmation";
+  const recallIsException = !!recallCheck && recallCheck.status !== "verified";
   const exceptions = report.checks
     .filter((c) => c.status !== "verified")
     .sort((a, b) => exceptionRank(a.status) - exceptionRank(b.status));
-  const actionable = exceptions.filter((c) => c.status !== "unavailable");
+  // Recall lives in the decision hero; the remaining actionable exceptions render
+  // as lighter secondary cards so nothing is stated twice.
+  const secondary = exceptions.filter((c) => c.status !== "unavailable" && c.key !== "recall");
   const unavailable = exceptions.filter((c) => c.status === "unavailable");
   const verified = report.checks.filter((c) => c.status === "verified");
   const hero = listingHero(listing);
-  const banner = BANNER_TONE[report.banner.tone];
+  const tone = HERO_TONE[report.banner.tone];
   const lastChecked = report.lastCheckedAt ? dateLabel(report.lastCheckedAt) : null;
+  const dealerName = ((listing as unknown as { dealer_snapshot?: { name?: string } }).dealer_snapshot?.name) || null;
+  const condition = conditionBadge(listing);
+  const reportGenerated = new Date().toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" });
 
   const askDealerFor = (check: ReportCheck) => {
     if (check.key === "recall") return () => goContact({ topic: "warranty", checkId: "recall", about: `the recall status on this ${listing.ymm} (VIN ${listing.vin})` });
     if (check.key === "title") return () => goContact({ topic: "history", checkId: "title", about: `the title and brand status on this ${listing.ymm}` });
     return () => goContact({ topic: "other", checkId: check.key, about: `the ${check.name.toLowerCase()} on this ${listing.ymm}` });
   };
+  const askRecall = () => goContact({ topic: "warranty", checkId: "recall", about: `the recall status on this ${listing.ymm} (VIN ${listing.vin})` });
+
+  // Next-step checklist, derived purely from which exceptions exist — never a
+  // fabricated recommendation.
+  const nextSteps: string[] = [];
+  if (recallIsException) {
+    nextSteps.push("Ask the dealer about the open recall and whether the remedy is available.");
+    nextSteps.push("Confirm the recall remedy has been completed before you take delivery.");
+  }
+  secondary.forEach((c) => {
+    if (c.key === "title") nextSteps.push("Review the title and brand details with the dealer once that check completes.");
+    else nextSteps.push(`Ask the dealer about ${c.name.toLowerCase()}.`);
+  });
+  if (unavailable.length) nextSteps.push("Ask the dealer for the records behind any checks marked unavailable.");
+  if (nextSteps.length === 0) nextSteps.push("Review the verified checks above — every completed check returned a clear result.");
+  nextSteps.push("Keep this report for your records. It reflects the source data as of the date shown.");
 
   const CountRow = ({ label, value, status }: { label: string; value: number; status: VerificationStatus }) => {
     const ui = STATUS_UI[status];
     return (
       <div className="flex items-center justify-between">
-        <span className="inline-flex items-center gap-2 text-[13px] text-[#64748B]"><ui.icon className={`w-4 h-4 ${ui.fg}`} aria-hidden="true" />{label}</span>
-        <span className="text-[14px] font-bold text-[#0F172A]">{value}</span>
+        <span className="inline-flex items-center gap-2 text-[13.5px] text-[#475569]"><ui.icon className={`w-[18px] h-[18px] ${ui.fg}`} aria-hidden="true" />{label}</span>
+        <span className="text-[18px] font-extrabold tabular-nums text-[#0F172A]">{value}</span>
       </div>
     );
   };
 
-  const ActionButtons = ({ compact }: { compact?: boolean }) => (
-    <div className={compact ? "space-y-2" : "flex flex-wrap gap-2.5"}>
-      <button onClick={downloadPdf} className={`${compact ? "w-full" : ""} min-h-[44px] px-4 rounded-xl bg-[#2563EB] hover:bg-[#1d4fd7] text-white text-[13px] font-bold inline-flex items-center justify-center gap-2`}>
+  const RailActions = () => (
+    <div className="space-y-2">
+      <button onClick={downloadPdf} className="w-full min-h-[44px] px-4 rounded-xl bg-[#2563EB] hover:bg-[#1d4fd7] text-white text-[13px] font-bold inline-flex items-center justify-center gap-2">
         {pdfState === "working" ? <Loader2 className="w-4 h-4 animate-spin" /> : pdfState === "done" ? <CircleCheck className="w-4 h-4" /> : <Download className="w-4 h-4" />}
         {pdfState === "working" ? "Preparing PDF…" : pdfState === "done" ? "PDF ready" : "Download PDF"}
       </button>
-      <button onClick={share} className={`${compact ? "w-full" : ""} min-h-[44px] px-4 rounded-xl border border-[#E6E8EC] bg-white text-[13px] font-bold text-[#0F172A] inline-flex items-center justify-center gap-2 hover:border-[#2563EB]`}><Share2 className="w-4 h-4 text-[#2563EB]" /> Share report</button>
-      <button onClick={printReport} className={`${compact ? "w-full" : ""} min-h-[44px] px-4 rounded-xl border border-[#E6E8EC] bg-white text-[13px] font-bold text-[#0F172A] inline-flex items-center justify-center gap-2 hover:border-[#2563EB]`}><Printer className="w-4 h-4 text-[#2563EB]" /> Print</button>
-      <button onClick={back} className={`${compact ? "w-full" : ""} min-h-[44px] px-4 rounded-xl border border-transparent hover:bg-slate-50 text-[13px] font-bold text-[#64748B] inline-flex items-center justify-center gap-2`}><ChevronLeft className="w-4 h-4" /> Back to Vehicle Passport</button>
+      <div className="grid grid-cols-2 gap-2">
+        <button onClick={share} className="min-h-[44px] px-3 rounded-xl border border-[#E6E8EC] bg-white text-[13px] font-bold text-[#0F172A] inline-flex items-center justify-center gap-1.5 hover:border-[#2563EB]"><Share2 className="w-4 h-4 text-[#2563EB]" /> Share</button>
+        <button onClick={printReport} className="min-h-[44px] px-3 rounded-xl border border-[#E6E8EC] bg-white text-[13px] font-bold text-[#0F172A] inline-flex items-center justify-center gap-1.5 hover:border-[#2563EB]"><Printer className="w-4 h-4 text-[#2563EB]" /> Print</button>
+      </div>
+      <button onClick={back} className="w-full min-h-[44px] px-4 rounded-xl border border-transparent hover:bg-slate-50 text-[13px] font-bold text-[#64748B] inline-flex items-center justify-center gap-2"><ChevronLeft className="w-4 h-4" /> Back to Vehicle Passport</button>
     </div>
   );
 
@@ -405,7 +466,7 @@ const VehiclePassportVerification = () => {
         </div>
       </div>
 
-      <div className="mx-auto max-w-[1200px] px-4 lg:px-8 py-6 lg:grid lg:grid-cols-[176px_minmax(0,1fr)_320px] lg:gap-5 lg:items-start">
+      <div className="mx-auto max-w-[1240px] px-4 lg:px-8 py-6 lg:grid lg:grid-cols-[160px_minmax(0,1fr)_300px] lg:gap-6 lg:items-start">
         {/* Left report nav (desktop) */}
         <nav aria-label="Report sections" className="hidden lg:block sticky top-6 self-start print:hidden">
           <ul className="space-y-1">
@@ -434,93 +495,146 @@ const VehiclePassportVerification = () => {
             </div>
           </div>
 
-          {/* Header + identity */}
+          {/* Title + vehicle identity strip */}
           <header id="v-overview" className="scroll-mt-6">
-            <h1 className="text-[24px] font-bold leading-tight">AutoLabels Data-Verified Report</h1>
-            <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-2 text-[13px] text-[#64748B]">
-              <span className="font-semibold text-[#0F172A]">{listing.ymm}{listing.trim ? ` · ${listing.trim}` : ""}</span>
-              <span>VIN {listing.vin}</span>
-              {listing.mileage != null && <span>{listing.mileage.toLocaleString()} mi</span>}
+            <h1 className="text-[24px] sm:text-[26px] font-bold leading-tight tracking-[-0.01em]">AutoLabels Data-Verified Report</h1>
+            <div className={`${CARD} mt-3 p-3 sm:p-4 flex flex-wrap items-center gap-x-5 gap-y-3`}>
+              {hero && <img src={hero} alt="" className="w-16 h-16 sm:w-20 sm:h-20 rounded-xl object-cover shrink-0 border border-black/5" />}
+              <div className="min-w-0 flex-1">
+                <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1">
+                  <span className="text-[16px] font-bold text-[#0F172A]">{listing.ymm}{listing.trim ? ` ${listing.trim}` : ""}</span>
+                  {condition && <span className="inline-flex items-center rounded-full bg-blue-50 text-[#1e3a8a] text-[11px] font-bold px-2 py-0.5 uppercase tracking-wide">{condition}</span>}
+                </div>
+                <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 mt-1 text-[12.5px] text-[#64748B]">
+                  <span>VIN {listing.vin}</span>
+                  {listing.mileage != null && <span>{listing.mileage.toLocaleString()} mi</span>}
+                  {dealerName && <span>{dealerName}</span>}
+                </div>
+                <p className="text-[11.5px] text-[#94A3B8] mt-1">Report generated {reportGenerated}{lastChecked ? ` · Source data last checked ${lastChecked}` : ""}</p>
+              </div>
+              <button onClick={back} className="print:hidden text-[12.5px] font-semibold text-[#2563EB] hover:underline inline-flex items-center gap-1 shrink-0"><ChevronLeft className="w-4 h-4" /> Back to Passport</button>
             </div>
-            <p className="text-[12px] text-[#94A3B8] mt-1">Report generated {new Date().toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}{lastChecked ? ` · Source data last checked ${lastChecked}` : ""}</p>
           </header>
 
-          {/* Exception-first status banner */}
-          <section aria-label="Verification status" className={`rounded-2xl border ${banner.border} ${banner.bg} p-5 flex items-start gap-3.5 print:break-inside-avoid`}>
-            <span className="w-10 h-10 rounded-xl bg-white flex items-center justify-center shrink-0 border border-black/5"><banner.icon className={`w-6 h-6 ${banner.iconCls}`} aria-hidden="true" /></span>
-            <div className="min-w-0">
-              <h2 className={`text-[18px] font-extrabold ${banner.head}`}>{report.banner.heading}</h2>
-              <p className="text-[13.5px] text-[#475569] mt-1 leading-relaxed">{report.banner.body}</p>
-            </div>
-          </section>
-
-          {/* Needs attention — exceptions */}
-          <section id="v-attention" className="scroll-mt-6 space-y-3">
-            <h2 className="text-[16px] font-bold">Needs attention</h2>
-            {actionable.length === 0 && (
-              <div className={`${CARD} p-5 flex items-center gap-3`}><CircleCheck className="w-5 h-5 text-[#16A34A]" /><p className="text-[13.5px] text-[#475569]">Nothing needs your attention. Every completed check returned a clear result.</p></div>
-            )}
-            {actionable.map((check) => (
-              <ExceptionCard key={check.key} check={check} expanded={!!evidenceOpen[check.key]}
-                onToggleEvidence={() => toggleEvidence(check)}
-                onAskDealer={check.status === "unavailable" ? undefined : askDealerFor(check)} />
-            ))}
-            {unavailable.length > 0 && (
-              <div className={`${CARD} p-5`}>
-                <div className="flex items-center gap-2"><CircleMinus className="w-4 h-4 text-[#94A3B8]" /><h3 className="text-[13.5px] font-bold text-[#0F172A]">Checks awaiting source data</h3></div>
-                <p className="text-[12.5px] text-[#64748B] mt-1">These checks could not run because the underlying source data is not available for this vehicle. Source data required.</p>
-                <ul className="mt-2 flex flex-wrap gap-2">{unavailable.map((c) => <li key={c.key} className="text-[12px] font-medium text-[#64748B] bg-slate-100 rounded-lg px-2.5 py-1">{c.name}</li>)}</ul>
+          {/* Decision hero + exceptions */}
+          <section id="v-attention" aria-labelledby="v-hero-heading" className="scroll-mt-6 space-y-4">
+            <div className={`rounded-2xl border ${tone.border} ${tone.bg} p-5 sm:p-7 print:break-inside-avoid`}>
+              <div className="flex items-start gap-4">
+                <span className="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl bg-white flex items-center justify-center shrink-0 border border-black/5"><tone.icon className={`w-7 h-7 sm:w-8 sm:h-8 ${tone.iconCls}`} aria-hidden="true" /></span>
+                <div className="min-w-0 flex-1">
+                  <p className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-wide ${tone.chip}`}>{tone.eyebrow}</p>
+                  <h2 id="v-hero-heading" className="text-[22px] sm:text-[28px] font-extrabold text-[#0F172A] leading-tight mt-2">{report.banner.heading}</h2>
+                  {report.banner.body && <p className="text-[14px] sm:text-[15px] text-[#475569] mt-2 leading-relaxed max-w-2xl">{report.banner.body}</p>}
+                  <div className="mt-4"><StatusPills report={report} /></div>
+                </div>
               </div>
+
+              {/* Recall decision — the ONLY place the recall is stated in full */}
+              {recallIsException && recallCheck && (
+                <div className="mt-5 rounded-2xl border border-black/5 bg-white/80 p-4 sm:p-5">
+                  <div className="flex items-start gap-3">
+                    <span className="w-9 h-9 rounded-xl bg-white flex items-center justify-center shrink-0 border border-black/5"><TriangleAlert className={`w-5 h-5 ${STATUS_UI[recallCheck.status].fg}`} aria-hidden="true" /></span>
+                    <div className="min-w-0">
+                      <h3 className="text-[15.5px] font-bold text-[#0F172A] leading-snug">{exceptionHeadline(recallCheck)}</h3>
+                      {recallCheck.finding && <p className="text-[13px] text-[#475569] mt-1 leading-relaxed">{recallCheck.finding}</p>}
+                    </div>
+                  </div>
+                  <div className="flex flex-wrap gap-2 mt-3 print:hidden">
+                    <button onClick={() => toggleEvidence(recallCheck)} aria-expanded={!!evidenceOpen.recall} className="h-10 px-4 rounded-lg border border-[#E6E8EC] bg-white text-[13px] font-semibold text-[#0F172A] inline-flex items-center gap-1.5 hover:border-[#2563EB]">
+                      View recall details <ChevronDown className={`w-4 h-4 transition-transform ${evidenceOpen.recall ? "rotate-180" : ""}`} />
+                    </button>
+                    <button onClick={askDealerFor(recallCheck)} className="h-10 px-4 rounded-lg bg-[#2563EB] hover:bg-[#1d4fd7] text-white text-[13px] font-bold inline-flex items-center gap-1.5">Ask the dealer</button>
+                  </div>
+                  {evidenceOpen.recall && (
+                    <div className="mt-3 rounded-xl border border-black/5 bg-white p-4 divide-y divide-[#F1F5F9]">
+                      {recallCheck.evidence.map((e) => <EvidenceRow key={e.label} label={e.label} value={e.value} />)}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* Secondary exceptions — lighter than the hero */}
+            {secondary.map((check) => (
+              <ExceptionCard key={check.key} check={check} expanded={!!evidenceOpen[check.key]}
+                onToggleEvidence={() => toggleEvidence(check)} onAskDealer={askDealerFor(check)} />
+            ))}
+
+            {/* Unavailable — the most compact, neutral row */}
+            {unavailable.length > 0 && (
+              <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3.5 print:break-inside-avoid">
+                <div className="flex items-start gap-2.5">
+                  <CircleMinus className="w-[18px] h-[18px] text-[#94A3B8] shrink-0 mt-0.5" aria-hidden="true" />
+                  <div className="min-w-0">
+                    <p className="text-[13px] font-bold text-[#475569]">Awaiting source data <span className="font-medium text-[#94A3B8]">— no result, not a problem found</span></p>
+                    <p className="text-[12px] text-[#64748B] mt-0.5">{unavailable.map((c) => c.name).join(", ")} could not run because the underlying records are not available for this vehicle.</p>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {secondary.length === 0 && unavailable.length === 0 && !recallIsException && (
+              <div className={`${CARD} p-5 flex items-center gap-3`}><CircleCheck className="w-5 h-5 text-[#16A34A]" /><p className="text-[13.5px] text-[#475569]">Nothing needs your attention. Every completed check returned a clear result.</p></div>
             )}
           </section>
 
           {/* What checked out — verified */}
           <section id="v-verified" className="scroll-mt-6">
-            <h2 className="text-[16px] font-bold mb-3">What checked out</h2>
+            <div className="flex items-baseline justify-between gap-3">
+              <h2 className="text-[17px] font-bold">What checked out</h2>
+              <span className="text-[12.5px] text-[#94A3B8]">{verified.length} verified {verified.length === 1 ? "check" : "checks"}</span>
+            </div>
             {verified.length === 0 ? (
-              <div className={`${CARD} p-5`}><p className="text-[13.5px] text-[#64748B]">No checks have returned a verified result yet.</p></div>
+              <div className={`${CARD} p-5 mt-3`}><p className="text-[13.5px] text-[#64748B]">No checks have returned a verified result yet.</p></div>
             ) : (
-              <div className="grid sm:grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 mt-3">
                 {verified.map((check) => <VerifiedCard key={check.key} check={check} expanded={!!evidenceOpen[check.key]} onToggleEvidence={() => toggleEvidence(check)} />)}
               </div>
             )}
           </section>
 
-          {/* Evidence & methodology */}
-          <section className={`${CARD} p-6 print:break-inside-avoid`}>
-            <h2 className="text-[16px] font-bold">Evidence and methodology</h2>
-            <p className="text-[13.5px] text-[#475569] mt-2 leading-relaxed">
-              AutoLabels compares vehicle information across independent and dealer-provided sources, identifies conflicts, and never displays a pending check as verified. This report does not replace a physical inspection, title search, or dealer confirmation.
-            </p>
-            <button onClick={() => { setMethodologyOpen(true); track("verification_methodology_opened", {}); }} className="mt-3 text-[13px] font-semibold text-[#2563EB] hover:underline inline-flex items-center gap-1 print:hidden">How AutoLabels verification works <ExternalLink className="w-3.5 h-3.5" /></button>
-
-            <div className="mt-5 pt-5 border-t border-[#EEF1F4]">
-              <h3 className="text-[12.5px] font-bold text-[#0F172A] uppercase tracking-wide">Source provenance</h3>
-              <div className="mt-2.5 grid sm:grid-cols-2 gap-x-6 gap-y-1.5">
-                {PROVENANCE_ORDER.map((p) => (
-                  <div key={p} className="flex items-center gap-2 text-[12.5px] text-[#475569]"><span className="w-1.5 h-1.5 rounded-full bg-[#2563EB]" />{PROVENANCE_LABEL[p]}</div>
-                ))}
-              </div>
+          {/* Methodology — four plain-language cards */}
+          <section className="scroll-mt-6">
+            <div className="flex items-baseline justify-between gap-3">
+              <h2 className="text-[17px] font-bold">How to read this report</h2>
+              <button onClick={() => { setMethodologyOpen(true); track("verification_methodology_opened", {}); }} className="text-[13px] font-semibold text-[#2563EB] hover:underline inline-flex items-center gap-1 print:hidden">How AutoLabels verification works <ExternalLink className="w-3.5 h-3.5" /></button>
             </div>
-
-            {/* Status legend */}
-            <div className="mt-5 pt-5 border-t border-[#EEF1F4]">
-              <h3 className="text-[12.5px] font-bold text-[#0F172A] uppercase tracking-wide">What each status means</h3>
-              <div className="mt-2.5 grid sm:grid-cols-2 gap-x-6 gap-y-2">
-                {(Object.keys(STATUS_UI) as VerificationStatus[]).map((s) => {
-                  const ui = STATUS_UI[s];
-                  return <div key={s} className="flex items-center gap-2 text-[12.5px] text-[#475569]"><ui.icon className={`w-4 h-4 ${ui.fg}`} aria-hidden="true" />{ui.label}{s === "needs_confirmation" ? " — sources disagree" : s === "pending" ? " — not yet complete" : ""}</div>;
-                })}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-3">
+              <div className={`${CARD} p-5`}>
+                <SearchCheck className="w-6 h-6 text-[#2563EB]" aria-hidden="true" />
+                <h3 className="text-[15px] font-bold text-[#0F172A] mt-2.5">What AutoLabels checked</h3>
+                <p className="text-[13px] text-[#475569] mt-1.5 leading-relaxed">{report.totalChecks} distinct checks — identity, history, title, safety recalls, market, and warranty — evaluated against real records for this VIN.</p>
+              </div>
+              <div className={`${CARD} p-5`}>
+                <Database className="w-6 h-6 text-[#2563EB]" aria-hidden="true" />
+                <h3 className="text-[15px] font-bold text-[#0F172A] mt-2.5">Where the data came from</h3>
+                <p className="text-[13px] text-[#475569] mt-1.5 leading-relaxed">{report.sourceCount} independent source {report.sourceCount === 1 ? "family" : "families"} — manufacturer, government, independent history, live market, and dealer records — compared for agreement.</p>
+              </div>
+              <div className={`${CARD} p-5`}>
+                <BadgeCheck className="w-6 h-6 text-[#16A34A]" aria-hidden="true" />
+                <h3 className="text-[15px] font-bold text-[#0F172A] mt-2.5">What "verified" means</h3>
+                <p className="text-[13px] text-[#475569] mt-1.5 leading-relaxed">Sources agreed and the supporting evidence is shown. When they disagree the check reads "needs confirmation"; a check with no result stays "pending" — never verified.</p>
+                <div className="mt-3 pt-3 border-t border-[#EEF1F4] flex flex-wrap gap-x-4 gap-y-1.5">
+                  {(Object.keys(STATUS_UI) as VerificationStatus[]).map((s) => {
+                    const ui = STATUS_UI[s];
+                    return <span key={s} className="inline-flex items-center gap-1.5 text-[11.5px] text-[#475569]"><ui.icon className={`w-3.5 h-3.5 ${ui.fg}`} aria-hidden="true" />{ui.label}</span>;
+                  })}
+                </div>
+              </div>
+              <div className={`${CARD} p-5`}>
+                <FileWarning className="w-6 h-6 text-[#D97706]" aria-hidden="true" />
+                <h3 className="text-[15px] font-bold text-[#0F172A] mt-2.5">What this report does not replace</h3>
+                <p className="text-[13px] text-[#475569] mt-1.5 leading-relaxed">This is a data-verification report. It does not replace a physical inspection, an independent title search, or written confirmation from the dealer.</p>
               </div>
             </div>
           </section>
 
-          {/* Data sources */}
+          {/* Data sources — the detailed cards live here only */}
           <section id="v-sources" className="scroll-mt-6">
-            <h2 className="text-[16px] font-bold mb-3">Data sources ({report.sourceCount})</h2>
-            <div className="grid sm:grid-cols-2 gap-3">
+            <h2 className="text-[17px] font-bold mb-3">Data sources ({report.sourceCount})</h2>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               {report.sources.map((s) => (
-                <div key={s.family} className={`${CARD} p-4`}>
+                <div key={s.family} onClick={() => track("verification_source_viewed", { source_id: s.family })} className={`${CARD} p-4`}>
                   <div className="flex items-center justify-between gap-2">
                     <span className="inline-flex items-center gap-2 text-[13.5px] font-bold text-[#0F172A]"><Database className="w-4 h-4 text-[#2563EB]" />{s.label}</span>
                     <ProvenanceTag provenance={s.provenance} />
@@ -532,44 +646,49 @@ const VehiclePassportVerification = () => {
             </div>
           </section>
 
-          {/* Report actions */}
-          <section id="v-actions" className={`${CARD} p-6 scroll-mt-6 print:hidden`}>
-            <h2 className="text-[16px] font-bold mb-3">Report actions</h2>
-            <ActionButtons />
-            {pdfState === "error" && <p className="text-[12.5px] text-[#DC2626] mt-2">We could not generate the PDF. Please try Print instead.</p>}
-            <p className="text-[11.5px] text-[#94A3B8] mt-3">The PDF matches this report exactly — same checks, statuses, sources, and dates.</p>
+          {/* Customer conclusion — what should I do next? */}
+          <section id="v-next" className={`${CARD} p-6 scroll-mt-6 print:break-inside-avoid`}>
+            <div className="flex items-center gap-2.5">
+              <span className="w-9 h-9 rounded-xl bg-blue-50 flex items-center justify-center shrink-0"><ListChecks className="w-5 h-5 text-[#2563EB]" aria-hidden="true" /></span>
+              <h2 className="text-[17px] font-bold">What should I do next?</h2>
+            </div>
+            <ol className="mt-4 space-y-3">
+              {nextSteps.map((step, i) => (
+                <li key={i} className="flex items-start gap-3">
+                  <span className="w-6 h-6 rounded-full bg-blue-50 text-[#1e3a8a] text-[12px] font-bold inline-flex items-center justify-center shrink-0 mt-0.5">{i + 1}</span>
+                  <span className="text-[13.5px] text-[#334155] leading-relaxed">{step}</span>
+                </li>
+              ))}
+            </ol>
+            <div className="flex flex-wrap gap-2.5 mt-5 print:hidden">
+              <button onClick={askRecall} className="min-h-[44px] px-4 rounded-xl bg-[#2563EB] hover:bg-[#1d4fd7] text-white text-[13px] font-bold inline-flex items-center justify-center gap-2">{recallIsException ? "Ask about the recall" : "Ask the dealer"}</button>
+              <button onClick={back} className="min-h-[44px] px-4 rounded-xl border border-[#E6E8EC] bg-white text-[13px] font-bold text-[#0F172A] inline-flex items-center justify-center gap-2 hover:border-[#2563EB]"><ChevronLeft className="w-4 h-4" /> Back to Vehicle Passport</button>
+            </div>
           </section>
         </main>
 
         {/* Right summary rail */}
         <aside className="mt-6 lg:mt-0 lg:sticky lg:top-6 self-start space-y-4">
           <div className={`${CARD} p-5`}>
-            <h2 className="text-[15px] font-bold">Report summary</h2>
-            <div className="mt-3 space-y-2.5">
+            <h2 className="text-[12px] font-bold uppercase tracking-[0.08em] text-[#64748B]">Report summary</h2>
+            <p className="text-[15px] font-bold text-[#0F172A] mt-1.5 leading-snug">{report.banner.heading}</p>
+            <div className="mt-4 space-y-3">
               <CountRow label="Verified" value={report.verifiedChecks} status="verified" />
               {report.needsAttentionChecks > 0 && <CountRow label="Needs attention" value={report.needsAttentionChecks} status="needs_attention" />}
               {report.needsConfirmationChecks > 0 && <CountRow label="Needs confirmation" value={report.needsConfirmationChecks} status="needs_confirmation" />}
               {report.pendingChecks > 0 && <CountRow label="Pending" value={report.pendingChecks} status="pending" />}
               {report.unavailableChecks > 0 && <CountRow label="Unavailable" value={report.unavailableChecks} status="unavailable" />}
-              <div className="flex items-center justify-between pt-2.5 border-t border-[#EEF1F4]">
-                <span className="inline-flex items-center gap-2 text-[13px] text-[#64748B]"><Database className="w-4 h-4 text-[#2563EB]" />Data sources</span>
-                <span className="text-[14px] font-bold text-[#0F172A]">{report.sourceCount}</span>
+            </div>
+            <div className="mt-4 pt-4 border-t border-[#EEF1F4]">
+              <div className="flex items-center justify-between">
+                <span className="inline-flex items-center gap-2 text-[13.5px] text-[#475569]"><Database className="w-[18px] h-[18px] text-[#2563EB]" />Data sources</span>
+                <span className="text-[18px] font-extrabold tabular-nums text-[#0F172A]">{report.sourceCount}</span>
               </div>
+              <button onClick={() => scrollTo("sources")} className="mt-1.5 text-[12.5px] font-semibold text-[#2563EB] hover:underline inline-flex items-center gap-1 print:hidden">View sources <ArrowRight className="w-3.5 h-3.5" /></button>
             </div>
             {lastChecked && <p className="text-[11.5px] text-[#94A3B8] mt-3">Source data last checked {lastChecked}</p>}
-            <div className="mt-4 print:hidden"><ActionButtons compact /></div>
-          </div>
-
-          <div className={`${CARD} p-5 print:hidden`}>
-            <h3 className="text-[13.5px] font-bold">Data sources ({report.sourceCount})</h3>
-            <ul className="mt-2.5 space-y-2.5">
-              {report.sources.map((s) => (
-                <li key={s.family} onClick={() => track("verification_source_viewed", { source_id: s.family })} className="text-[12.5px]">
-                  <p className="font-semibold text-[#0F172A]">{s.label}</p>
-                  <p className="text-[#94A3B8]">{s.type}{s.checkedAt ? ` · checked ${dateLabel(s.checkedAt)}` : ""}</p>
-                </li>
-              ))}
-            </ul>
+            <div className="mt-4 print:hidden"><RailActions /></div>
+            {pdfState === "error" && <p className="text-[12px] text-[#DC2626] mt-2 print:hidden">We could not generate the PDF. Please try Print instead.</p>}
           </div>
         </aside>
       </div>
@@ -580,13 +699,21 @@ const VehiclePassportVerification = () => {
           <div className="relative bg-white rounded-2xl w-full max-w-lg p-6 shadow-2xl">
             <div className="flex items-center justify-between mb-3"><h2 className="text-lg font-bold">How AutoLabels verification works</h2><button onClick={() => setMethodologyOpen(false)} aria-label="Close" className="w-8 h-8 rounded-full hover:bg-slate-100 flex items-center justify-center"><X className="w-4 h-4" /></button></div>
             <p className="text-[14px] leading-relaxed text-[#475569]">AutoLabels aggregates records from manufacturer, government, independent history, and dealer sources, then compares them for each check. When sources agree, the check is marked verified with the supporting evidence shown. When they disagree, the check is marked "needs confirmation" so you can resolve it with the dealer. Checks that have not returned a result are shown as pending — never as verified. This is a data-verification report; it aggregates records and does not replace a physical inspection, title search, or dealer confirmation.</p>
+            <div className="mt-4 pt-4 border-t border-[#EEF1F4]">
+              <h3 className="text-[12.5px] font-bold text-[#0F172A] uppercase tracking-wide">Source provenance</h3>
+              <div className="mt-2.5 grid sm:grid-cols-2 gap-x-6 gap-y-1.5">
+                {PROVENANCE_ORDER.map((p) => (
+                  <div key={p} className="flex items-center gap-2 text-[12.5px] text-[#475569]"><span className="w-1.5 h-1.5 rounded-full bg-[#2563EB]" />{PROVENANCE_LABEL[p]}</div>
+                ))}
+              </div>
+            </div>
           </div>
         </div>
       )}
 
       <VerificationReportDock
         recallNeedsConfirmation={!!recallNeedsConfirmation}
-        onAskRecall={() => goContact({ topic: "warranty", checkId: "recall", about: `the recall status on this ${listing.ymm} (VIN ${listing.vin})` })}
+        onAskRecall={askRecall}
         onContact={() => goContact({ topic: "other", checkId: "report" })}
         onBack={back}
         onOpenChange={(o) => { if (o) track("verification_bubble_opened", {}); }}
