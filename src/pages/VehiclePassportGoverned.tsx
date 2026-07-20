@@ -2,9 +2,9 @@ import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams, useSearchParams, useLocation } from "react-router-dom";
 import {
   Bookmark, MoreHorizontal, Upload, Phone, MessageSquare, Clock, DollarSign,
-  ChevronDown, ChevronRight, ChevronLeft, Star, Sparkles, ShieldCheck, CheckCircle2, MapPin,
+  ChevronRight, ChevronLeft, Star, Sparkles, ShieldCheck, CheckCircle2, MapPin,
   RefreshCw, Send, BadgeCheck, Play, Package, Award, TrendingUp, X, Info, Lock, Wrench, FileText, Eye,
-  CircleCheck, CircleAlert, TriangleAlert, CircleMinus,
+  CircleCheck, CircleAlert, TriangleAlert, CircleMinus, Printer, ExternalLink,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Helmet } from "react-helmet-async";
@@ -419,15 +419,15 @@ export default function VehiclePassportGoverned() {
               </div>
             )}
           </div>
-          <div className="flex items-center gap-1">
-            <button onClick={handleSave} aria-label="Save" className="h-9 w-9 grid place-items-center rounded-full hover:bg-slate-50" data-module="save">
-              <Bookmark className="w-[18px] h-[18px]" style={{ color: isSaved ? BLUE : NAVY, fill: isSaved ? BLUE : "none" }} />
+          <div className="flex items-center gap-0.5">
+            <button onClick={handleSave} aria-label={isSaved ? "Saved" : "Save this vehicle"} aria-pressed={isSaved} className="h-11 w-11 grid place-items-center rounded-full hover:bg-slate-50" data-module="save">
+              <Bookmark className="w-[21px] h-[21px]" style={{ color: isSaved ? BLUE : NAVY, fill: isSaved ? BLUE : "none" }} />
             </button>
-            <button onClick={handleShare} aria-label="Share" className="h-9 w-9 grid place-items-center rounded-full hover:bg-slate-50" data-module="share">
-              <Upload className="w-[18px] h-[18px]" style={{ color: NAVY }} />
+            <button onClick={handleShare} aria-label="Share this vehicle" className="h-11 w-11 grid place-items-center rounded-full hover:bg-slate-50" data-module="share">
+              <Upload className="w-[21px] h-[21px]" style={{ color: NAVY }} />
             </button>
-            <button aria-label="More" onClick={() => openAction("contact")} className="h-9 w-9 grid place-items-center rounded-full hover:bg-slate-50">
-              <MoreHorizontal className="w-[18px] h-[18px]" style={{ color: NAVY }} />
+            <button aria-label="Contact dealer" onClick={() => openAction("contact")} className="h-11 w-11 grid place-items-center rounded-full hover:bg-slate-50">
+              <MoreHorizontal className="w-[21px] h-[21px]" style={{ color: NAVY }} />
             </button>
           </div>
         </div>
@@ -435,338 +435,510 @@ export default function VehiclePassportGoverned() {
       )}
 
       {/* ── Mobile / tablet column (< xl) — the approved mobile V3, only mounts below xl ── */}
-      {!isDesktop && (
-      <div className="max-w-lg mx-auto">
+      {!isDesktop && (() => {
+        const conditionLabel = isNew ? "New" : condition === "cpo" ? "Certified Pre-Owned" : "Used";
+        const trustBadges = [
+          d.ownerCount === 1 ? "One Owner" : null,
+          (d.dealerVerified || (d.verifiedBy && d.verifiedBy.length > 0)) ? "Dealer Verified" : null,
+          d.marketAvg != null ? "Market Data Verified" : null,
+        ].filter(Boolean) as string[];
 
-        {/* ── Hero gallery ─────────────────────────────────────────── */}
-        <div ref={heroRef} className="relative bg-white" data-module="gallery">
-          <div
-            className="relative aspect-[4/3] w-full overflow-hidden"
-            onClick={() => setGalleryOpen(true)}
-            onTouchStart={(e) => { (e.currentTarget as HTMLDivElement).dataset.tsx = String(e.touches[0].clientX); }}
-            onTouchEnd={(e) => {
-              const start = Number((e.currentTarget as HTMLDivElement).dataset.tsx || 0);
-              const dx = (e.changedTouches[0].clientX - start);
-              if (Math.abs(dx) > 40) { e.stopPropagation(); swipeHero(dx < 0 ? 1 : -1); }
-            }}
-          >
-            {heroImg ? (
-              <img src={heroImg} alt={listing.ymm || "Vehicle"} className="w-full h-full object-cover" decoding="async" fetchPriority="high" />
-            ) : (
-              <div className="w-full h-full grid place-items-center text-slate-400 bg-slate-100"><Package className="w-10 h-10" /></div>
-            )}
-            {gallery.length > 1 && (
-              <span className="absolute top-3 right-3 h-7 px-2.5 rounded-full bg-black/60 text-white text-[11px] font-semibold inline-flex items-center">
-                {idx + 1} / {gallery.length}
-              </span>
-            )}
-            {hasVideo && (
-              <span className="absolute top-3 left-3 h-7 px-2.5 rounded-full bg-white/95 text-[11px] font-bold inline-flex items-center gap-1" style={{ color: NAVY }}>
-                <Play className="w-3 h-3" /> Video
-              </span>
-            )}
-            {gallery.length > 1 && (
-              <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex gap-1">
-                {gallery.slice(0, 8).map((_, i) => (
-                  <span key={i} className="w-1.5 h-1.5 rounded-full" style={{ background: i === (idx % 8) ? "#fff" : "rgba(255,255,255,0.5)" }} />
-                ))}
-              </div>
-            )}
-          </div>
-        </div>
+        // Recall stays governed — amber "Needs confirmation" when sources conflict,
+        // never a green "no open recalls", by reading the canonical report.
+        const recallStatus = report.checks.find((c) => c.key === "recall")?.status;
+        const recallNeedsReview = recallStatus === "needs_confirmation" || recallStatus === "needs_attention";
+        const confirmRows = [
+          recallNeedsReview ? {
+            t: recallStatus === "needs_confirmation" ? "Recall status needs confirmation" : "Open safety recall reported",
+            s: recallStatus === "needs_confirmation" ? "Sources disagree on this vehicle — confirm the recall status with the dealer before purchase." : "Ask the dealer about the recall remedy before purchase.",
+          } : null,
+          d.accidentCount != null && d.accidentCount > 0 ? { t: `${d.accidentCount} reported accident${d.accidentCount === 1 ? "" : "s"}`, s: "Review the full history report and reconditioning work with the dealer." } : null,
+          d.titleStatus === "branded" ? { t: "Title brand reported", s: "Review the title history with the dealer before purchase." } : null,
+        ].filter(Boolean) as { t: string; s: string }[];
 
-        {/* ── Identity + one price story ───────────────────────────── */}
-        <section className="px-4 pt-5" data-module="identity">
-          <div className="inline-flex items-center h-6 px-2.5 rounded-full text-[11px] font-bold uppercase tracking-wide" style={{ background: isNew ? "#EFF6FF" : "#F1F5F9", color: isNew ? BLUE : NAVY }}>
-            {isNew ? "New" : (condition === "cpo" ? "Certified" : "Used")}
-          </div>
-          <h1 className="mt-2 text-[22px] leading-tight font-extrabold" style={{ color: NAVY }}>
-            {listing.ymm}{listing.trim ? ` ${listing.trim}` : ""}
-          </h1>
-          <p className="mt-1 text-[13px]" style={{ color: SUB }}>
-            {listing.vin ? <>VIN <span className="font-mono">{listing.vin}</span></> : null}
-            {listing.mileage != null ? <> · {listing.mileage.toLocaleString()} mi</> : null}
-          </p>
+        const strengths = ([
+          (d.dealerVerified || d.verifiedBy.length > 0) ? "Dealer-verified listing" : null,
+          d.ownerCount === 1 ? `One owner reported${d.historyReport ? ` (${historyReportName(d.historyReport.provider)})` : ""}` : d.ownerCount != null && d.ownerCount > 1 ? `${d.ownerCount} owners reported` : null,
+          listing.mileage != null ? `${listing.mileage.toLocaleString()} reported miles` : null,
+          listing.trim ? `${listing.trim} trim` : null,
+          recallVerified ? "No open recalls (NHTSA)" : null,
+          d.warrantyStr ? "Factory warranty terms found — remaining coverage requires confirmation" : null,
+        ].filter(Boolean) as string[]);
 
-          {/* Trusted price row */}
-          <button
-            onClick={() => setPriceOpen((v) => !v)}
-            className={`${CARD} mt-4 w-full text-left px-4 py-4`}
-            data-module="price"
-          >
-            <div className="flex items-center justify-between gap-3">
-              <div>
-                <div className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: SUB }}>{d.priceLabel || "Total price"}</div>
-                <div className="mt-0.5 text-[28px] font-extrabold tabular-nums" style={{ color: NAVY }}>
-                  {price != null ? fmt$(price) : "—"}
-                </div>
-              </div>
-              <div className="text-right">
-                {saveVs ? (
-                  <>
-                    <div className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: SUB }}>Total savings</div>
-                    <div className="mt-0.5 text-[18px] font-extrabold tabular-nums inline-flex items-center gap-1" style={{ color: GREEN }}>
-                      {fmt$(saveVs)} <ChevronDown className={`w-4 h-4 transition ${priceOpen ? "rotate-180" : ""}`} />
-                    </div>
-                  </>
+        const timeline = ([
+          /^\d{4}$/.test((listing.ymm || "").split(" ")[0]) ? { d: (listing.ymm || "").split(" ")[0], t: "Manufactured", s: "Factory production" } : null,
+          d.warranty.in_service_date ? { d: new Date(d.warranty.in_service_date).toLocaleDateString(), t: "Placed in service", s: "Factory warranty begins" } : null,
+          d.ownerCount != null ? { d: d.ownerCount === 0 ? "New" : d.ownerCount === 1 ? "Single owner" : `${d.ownerCount} owners`, t: d.ownerCount === 0 ? "You'd be the first owner" : "Ownership", s: d.ownerCount === 0 ? "No prior owners" : "Reported ownership on record" } : null,
+          d.serviceCount > 0 ? { d: `${d.serviceCount} records`, t: "Regular service", s: "Maintenance on record" } : null,
+          { d: "Today", t: "Ready for you", s: "Available at the dealership" },
+        ].filter(Boolean) as { d: string; t: string; s: string }[]);
+
+        // Warranty coverage bars — reuse the exact remaining-coverage math the V3
+        // passport uses; new cars show the full forward term, used cars remaining.
+        const w = d.warranty;
+        const showWarranty = pv("warranty") && !!d.warrantyStr && (!d.warrantyExpired || d.dealerCoverage.length > 0);
+        const wCalc = (months?: number | null, miles?: number | null) => {
+          let timePct: number | null = null, monthsLeft: number | null = null;
+          if (w.in_service_date && months) {
+            const end = new Date(w.in_service_date); end.setMonth(end.getMonth() + months);
+            const msLeft = end.getTime() - Date.now();
+            monthsLeft = msLeft > 0 ? Math.round(msLeft / (1000 * 60 * 60 * 24 * 30.4)) : 0;
+            timePct = Math.max(3, Math.min(100, (monthsLeft / months) * 100));
+          }
+          const milesLeft = miles != null && miles > 0 && listing.mileage != null ? Math.max(0, miles - listing.mileage) : null;
+          const milesPct = miles != null && miles > 0 && listing.mileage != null ? Math.max(3, 100 - Math.min(100, (listing.mileage / miles) * 100)) : null;
+          const vals = [timePct, milesPct].filter((x): x is number => x != null);
+          const remainPct = vals.length ? Math.round(Math.min(...vals)) : null;
+          const yrs = monthsLeft == null ? null : monthsLeft >= 12 ? `${Math.round(monthsLeft / 12)} yr` : `${monthsLeft} mo`;
+          const milesLbl = milesLeft == null ? null : `${(milesLeft / 1000).toFixed(0)}K mi`;
+          const fullTerm = [months ? `${Math.round(months / 12)} yr` : null, miles === -1 ? "Unlimited" : miles ? `${(miles / 1000).toFixed(0)}K mi` : null].filter(Boolean).join(" / ");
+          const remainLbl = [yrs, milesLbl].filter(Boolean).join(" / ");
+          return { pct: isNew ? 100 : remainPct, label: isNew ? (fullTerm || null) : (remainLbl ? `${remainLbl} left` : null) };
+        };
+        const b2b = showWarranty ? wCalc(w.factory_months, w.factory_miles) : null;
+        const ptw = showWarranty && (w.powertrain_months != null || w.powertrain_miles != null) ? wCalc(w.powertrain_months, w.powertrain_miles) : null;
+
+        const watchEnabled = (listing as unknown as { price_drop_watch?: boolean }).price_drop_watch !== false;
+        const actionTiles: { label: string; icon: React.ElementType; onClick: () => void; active?: boolean }[] = [
+          { label: "Value My Trade", icon: RefreshCw, onClick: () => go("trade") },
+          { label: "Test Drive", icon: Clock, onClick: () => go("test-drive") },
+          { label: "Contact Dealer", icon: MessageSquare, onClick: () => go("contact") },
+          { label: "Documents", icon: FileText, onClick: () => go("documents") },
+          { label: "Save", icon: Bookmark, onClick: handleSave, active: isSaved },
+          { label: "Share", icon: Upload, onClick: handleShare },
+        ];
+        if (watchEnabled) actionTiles.push({ label: "Watch Price", icon: Eye, active: watchOpen, onClick: () => { if (!watchOpen) trackCustomerCtaClicked({ storeId: listing.store_id, vehicleId: listing.id, vin: listing.vin, source: "passport", surface: "vehicle_passport", metadata: { cta: "watch_price" } }); setWatchOpen(true); } });
+
+        const overviewText = d.overview && d.overview.length > 320 ? `${d.overview.slice(0, 320).trimEnd()}…` : d.overview;
+        const H = ({ children }: { children: React.ReactNode }) => <h2 className="text-[19px] font-extrabold leading-tight" style={{ color: NAVY }}>{children}</h2>;
+
+        return (
+        <div className="max-w-lg mx-auto pb-2">
+
+          {/* 2 — Hero gallery (heroRef drives the sticky-header reveal) */}
+          <div ref={heroRef} className="px-4 pt-3" data-module="gallery">
+            <div className="relative rounded-2xl overflow-hidden bg-white border" style={{ borderColor: BORDER }}>
+              <div
+                className="relative aspect-[4/3] w-full overflow-hidden"
+                onClick={() => setGalleryOpen(true)}
+                onTouchStart={(e) => { (e.currentTarget as HTMLDivElement).dataset.tsx = String(e.touches[0].clientX); }}
+                onTouchEnd={(e) => {
+                  const start = Number((e.currentTarget as HTMLDivElement).dataset.tsx || 0);
+                  const dx = (e.changedTouches[0].clientX - start);
+                  if (Math.abs(dx) > 40) { e.stopPropagation(); swipeHero(dx < 0 ? 1 : -1); }
+                }}
+              >
+                {heroImg ? (
+                  <img src={heroImg} alt={listing.ymm || "Vehicle"} className="w-full h-full object-cover" decoding="async" fetchPriority="high" />
                 ) : (
-                  <ChevronDown className={`w-5 h-5 transition ${priceOpen ? "rotate-180" : ""}`} style={{ color: SUB }} />
+                  <div className="w-full h-full grid place-items-center text-slate-400 bg-slate-100"><Package className="w-10 h-10" /></div>
                 )}
+                {gallery.length > 1 && (
+                  <span className="absolute top-3 right-3 h-7 px-2.5 rounded-full bg-black/60 text-white text-[11px] font-semibold inline-flex items-center">{idx + 1} / {gallery.length}</span>
+                )}
+                {hasVideo && (
+                  <span className="absolute top-3 left-3 h-7 px-2.5 rounded-full bg-white/95 text-[11px] font-bold inline-flex items-center gap-1" style={{ color: NAVY }}><Play className="w-3.5 h-3.5" /> Video</span>
+                )}
+                {gallery.length > 1 && <>
+                  <button aria-label="Previous photo" onClick={(e) => { e.stopPropagation(); swipeHero(-1); }} className="absolute left-2.5 top-1/2 -translate-y-1/2 h-11 w-11 grid place-items-center rounded-full bg-white/90 shadow"><ChevronLeft className="w-[23px] h-[23px]" style={{ color: NAVY }} /></button>
+                  <button aria-label="Next photo" onClick={(e) => { e.stopPropagation(); swipeHero(1); }} className="absolute right-2.5 top-1/2 -translate-y-1/2 h-11 w-11 grid place-items-center rounded-full bg-white/90 shadow"><ChevronRight className="w-[23px] h-[23px]" style={{ color: NAVY }} /></button>
+                </>}
+                <button aria-label={isSaved ? "Saved" : "Save this vehicle"} aria-pressed={isSaved} onClick={(e) => { e.stopPropagation(); handleSave(); }} className="absolute bottom-3 right-3 h-11 w-11 grid place-items-center rounded-full bg-white/90 shadow">
+                  <Bookmark className="w-[22px] h-[22px]" style={{ color: isSaved ? BLUE : NAVY, fill: isSaved ? BLUE : "none" }} />
+                </button>
+                <button aria-label={`View all ${gallery.length} photos`} onClick={(e) => { e.stopPropagation(); setGalleryOpen(true); }} className="absolute bottom-3 left-3 h-9 px-3 rounded-full bg-black/60 text-white text-[12px] font-bold inline-flex items-center gap-1.5"><Eye className="w-4 h-4" /> All Photos</button>
               </div>
             </div>
-            {priceOpen && d.priceBreakdown && (
-              <div className="mt-3 rounded-xl border px-3 py-2.5 text-[12px]" style={{ borderColor: BORDER, background: "#F8FAFC", color: SUB }}>
-                <div className="flex items-baseline justify-between"><span>MSRP</span><span className="font-semibold tabular-nums" style={{ color: NAVY }}>{fmt$(d.priceBreakdown.msrp)}</span></div>
-                {d.priceBreakdown.lines.map((l) => (
-                  <div key={l.key} className="flex items-baseline justify-between mt-1"><span>{l.label}</span><span className="font-semibold tabular-nums" style={{ color: GREEN }}>−{fmt$(l.amount)}</span></div>
+            {/* 3 — thumbnail strip */}
+            {gallery.length > 1 && (
+              <div className="mt-2.5 flex gap-2 overflow-x-auto pb-1 -mx-1 px-1">
+                {gallery.slice(0, 12).map((src, i) => (
+                  <button key={i} onClick={() => setIdx(i)} aria-label={`View photo ${i + 1}`} className="h-16 w-16 rounded-xl overflow-hidden shrink-0" style={{ border: `2px solid ${i === idx ? BLUE : "transparent"}` }}>
+                    <img src={src} alt={`${listing.ymm || "Vehicle"} photo ${i + 1}`} loading="lazy" className={`w-full h-full object-cover ${i === idx ? "" : "opacity-70"}`} />
+                  </button>
                 ))}
-                <div className="mt-2 pt-2 border-t flex items-baseline justify-between" style={{ borderColor: BORDER }}><span className="font-bold" style={{ color: NAVY }}>{d.priceLabel || "Your price"}</span><span className="font-extrabold tabular-nums" style={{ color: NAVY }}>{fmt$(d.priceBreakdown.ourPrice)}</span></div>
-                {d.priceBreakdown.docFee ? (
-                  <>
-                    <div className="mt-1 flex items-baseline justify-between"><span>+ Conveyance / doc fee</span><span className="font-semibold tabular-nums" style={{ color: NAVY }}>{fmt$(d.priceBreakdown.docFee)}</span></div>
-                    <div className="mt-2 pt-2 border-t flex items-baseline justify-between" style={{ borderColor: BORDER }}><span className="font-bold" style={{ color: NAVY }}>Sale price</span><span className="font-extrabold tabular-nums" style={{ color: NAVY }}>{fmt$(d.priceBreakdown.salePrice ?? d.priceBreakdown.ourPrice)}</span></div>
-                  </>
-                ) : null}
               </div>
             )}
-            {priceOpen && !d.priceBreakdown && d.belowOriginalMsrp && d.belowOriginalMsrp > 0 && (
-              <div className="mt-3 rounded-xl border px-3 py-2.5 text-[12px]" style={{ borderColor: BORDER, background: "#F8FAFC", color: SUB }}>
-                <div className="flex items-baseline justify-between"><span>Original MSRP</span><span className="font-semibold tabular-nums" style={{ color: NAVY }}>{fmt$(d.msrp)}</span></div>
-                <div className="mt-1 flex items-baseline justify-between"><span>Depreciation since new</span><span className="font-semibold tabular-nums" style={{ color: NAVY }}>−{fmt$(d.belowOriginalMsrp)}</span></div>
-                <div className="mt-2 pt-2 border-t flex items-baseline justify-between" style={{ borderColor: BORDER }}><span className="font-bold" style={{ color: NAVY }}>{d.priceLabel || "Your price"}</span><span className="font-extrabold tabular-nums" style={{ color: NAVY }}>{fmt$(price)}</span></div>
-              </div>
-            )}
-          </button>
-        </section>
+          </div>
 
-        {/* ── Price & availability alerts (same governed watch_price capture as desktop) ── */}
-        {(listing as unknown as { price_drop_watch?: boolean }).price_drop_watch !== false && (
-          <section className="px-4 pt-4" data-module="watch-price">
-            {watchOpen ? (
-              <PriceDropWatch slug={listing.slug || rawSlug} />
-            ) : (
-              <button onClick={() => { trackCustomerCtaClicked({ storeId: listing.store_id, vehicleId: listing.id, vin: listing.vin, source: "passport", surface: "vehicle_passport", metadata: { cta: "watch_price" } }); setWatchOpen(true); }} className={`${CARD} w-full flex items-center justify-between gap-3 px-4 py-3.5`}>
-                <span className="inline-flex items-center gap-2 text-[13px] font-bold" style={{ color: NAVY }}><Eye className="w-4 h-4" style={{ color: BLUE }} /> Watch price &amp; availability</span>
-                <ChevronRight className="w-4 h-4" style={{ color: SUB }} />
-              </button>
+          {/* 4 — Vehicle identity */}
+          <section className="px-4 pt-5" data-module="identity">
+            <div className="inline-flex items-center h-6 px-2.5 rounded-full text-[11px] font-bold uppercase tracking-wide" style={{ background: isNew ? "#EFF6FF" : condition === "cpo" ? "#ECFDF5" : "#F1F5F9", color: isNew ? BLUE : condition === "cpo" ? GREEN : NAVY }}>{conditionLabel}</div>
+            <h1 className="mt-2 text-[26px] leading-tight font-extrabold" style={{ color: NAVY }}>{listing.ymm}{listing.trim ? ` ${listing.trim}` : ""}</h1>
+            {(listing.vin || listing.mileage != null) && (
+              <p className="mt-1 text-[13px]" style={{ color: SUB }}>
+                {listing.vin ? <>VIN <span className="font-mono">{listing.vin}</span></> : null}
+                {listing.vin && listing.mileage != null ? " · " : null}
+                {listing.mileage != null ? <span className="tabular-nums">{listing.mileage.toLocaleString()} mi</span> : null}
+              </p>
+            )}
+            {trustBadges.length > 0 && (
+              <div className="mt-3 flex flex-wrap gap-2">
+                {trustBadges.map((b) => (
+                  <span key={b} className="inline-flex items-center gap-1.5 h-7 px-2.5 rounded-full text-[12px] font-semibold border" style={{ background: "#F0FDF4", color: GREEN, borderColor: "#BBF7D0" }}><CheckCircle2 className="w-3.5 h-3.5" /> {b}</span>
+                ))}
+              </div>
+            )}
+            {d.viewCount != null && d.viewCount > 0 && (
+              <div className="mt-2 inline-flex items-center gap-1.5 text-[12px] font-medium" style={{ color: SUB }}><Eye className="w-4 h-4" style={{ color: BLUE }} /> {d.viewCount.toLocaleString()} recent shopper views</div>
             )}
           </section>
-        )}
 
-        {/* ── AutoLabels Intelligence ──────────────────────────────── */}
-        {chips.length > 0 && (
-          <section className="px-4 pt-4" data-module="intelligence">
-            <div className={CARD}>
-              <button onClick={() => setIntelOpen((v) => !v)} className="w-full flex items-center justify-between gap-3 px-4 py-3">
-                <div className="inline-flex items-center gap-2">
-                  <span className="h-7 w-7 grid place-items-center rounded-full" style={{ background: "#EFF6FF" }}>
-                    <Sparkles className="w-4 h-4" style={{ color: BLUE }} />
-                  </span>
-                  <span className="text-[13px] font-bold" style={{ color: NAVY }}>AutoLabels Intelligence</span>
+          {/* 5 — Advertised price */}
+          <section className="px-4 pt-4" data-module="price">
+            <div className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: SUB }}>{d.priceLabel || "Our Price"}</div>
+            <div className="mt-0.5 text-[32px] font-extrabold tabular-nums leading-none" style={{ color: NAVY }}>{price != null ? fmt$(price) : "—"}</div>
+            {d.priceIncludesDoc && d.docFee && price != null && (
+              <div className="mt-1.5 text-[12px] leading-snug tabular-nums" style={{ color: SUB }}>Includes {fmt$(d.docFee)} doc fee · {fmt$(price - d.docFee)} before doc fee</div>
+            )}
+            {d.msrp != null && saveVs && (
+              <div className="mt-1 text-[12px] tabular-nums" style={{ color: SUB }}>MSRP {fmt$(d.msrp)} <span className="ml-1 font-bold" style={{ color: GREEN }}>{fmt$(saveVs)} below MSRP</span></div>
+            )}
+
+            {/* 6 — Payment module: ONLY when d.estMonthly is present. This is the same
+                dealer setting (passport_payment_display.payment → getPaymentDisplay)
+                that gates the desktop estimate; when off, estMonthly is null and this
+                renders nothing (no empty card, no gap). Never an offer or approval. */}
+            {d.estMonthly != null && (
+              <div className={`${CARD} mt-3 px-4 py-3.5`} data-module="payment">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: SUB }}>Estimated payment (Example)</span>
+                  <button onClick={() => openAction("payment")} aria-label="How this payment is estimated" className="h-8 w-8 -mr-1.5 grid place-items-center rounded-full hover:bg-slate-50"><Info className="w-[18px] h-[18px]" style={{ color: SUB }} /></button>
                 </div>
-                <ChevronDown className={`w-4 h-4 transition ${intelOpen ? "rotate-180" : ""}`} style={{ color: SUB }} />
-              </button>
-              {intelOpen && (
-                <div className="px-4 pb-4 flex flex-wrap gap-2">
-                  {chips.map((c) => {
-                    const bg = c.tone === "green" ? "#ECFDF5" : c.tone === "amber" ? "#FEF3C7" : "#EFF6FF";
-                    const fg = c.tone === "green" ? GREEN : c.tone === "amber" ? AMBER : BLUE;
-                    const border = c.tone === "green" ? "#A7F3D0" : c.tone === "amber" ? "#FCD34D" : "#BFDBFE";
-                    const Icon = c.icon;
-                    return (
-                      <span key={c.label} className="inline-flex items-center gap-1.5 h-8 px-3 rounded-full text-[12px] font-semibold border" style={{ background: bg, color: fg, borderColor: border }}>
-                        <Icon className="w-3.5 h-3.5" /> {c.label}
-                      </span>
-                    );
-                  })}
+                <div className="mt-1 flex items-baseline gap-1">
+                  <span className="text-[30px] font-extrabold tabular-nums leading-none" style={{ color: NAVY }}>{fmt$(d.estMonthly)}</span>
+                  <span className="text-[15px] font-bold" style={{ color: SUB }}>/mo</span>
                 </div>
-              )}
+                {d.paymentAssumptions && <div className="mt-1 text-[12px]" style={{ color: SUB }}>{d.paymentAssumptions}</div>}
+                <button onClick={() => go("todays-price")} className="mt-2.5 inline-flex items-center gap-1 text-[13px] font-bold" style={{ color: BLUE }}>Customize Payment <ChevronRight className="w-4 h-4" /></button>
+                <p className="mt-2.5 pt-2.5 border-t text-[11px] leading-snug" style={{ borderColor: BORDER, color: SUB }}>Estimated payment for illustration only. Terms, rates, taxes, fees and approval may vary. This is not a financing offer.</p>
+              </div>
+            )}
+          </section>
+
+          {/* 7 — Primary + secondary actions (open the complete V2 destination pages) */}
+          <section className="px-4 pt-4" data-module="primary-actions">
+            <button onClick={() => go("todays-price")} className="w-full h-14 rounded-2xl inline-flex items-center justify-center gap-2 text-[15px] font-bold text-white" style={{ background: BLUE }}><DollarSign className="w-[22px] h-[22px]" /> See My Price</button>
+            <button onClick={() => go("reserve")} className="mt-2.5 w-full h-14 rounded-2xl border inline-flex items-center justify-center gap-2 text-[15px] font-bold" style={{ borderColor: BLUE, color: BLUE }}><BadgeCheck className="w-[22px] h-[22px]" /> Reserve This Vehicle</button>
+          </section>
+
+          {/* 8 — Supporting action tiles */}
+          <section className="px-4 pt-3" data-module="action-tiles">
+            <div className="grid grid-cols-4 gap-2.5">
+              {actionTiles.map((t) => (
+                <button key={t.label} onClick={t.onClick} aria-pressed={t.active} className={`${CARD} h-[74px] flex flex-col items-center justify-center gap-1.5`}>
+                  <t.icon className="w-[24px] h-[24px]" style={{ color: BLUE, fill: t.label === "Save" && t.active ? BLUE : "none" }} />
+                  <span className="text-[10.5px] font-bold leading-none text-center px-0.5" style={{ color: t.active ? BLUE : NAVY }}>{t.label}</span>
+                </button>
+              ))}
             </div>
+            {watchOpen && watchEnabled && (
+              <div className="mt-3" data-module="watch-price"><PriceDropWatch slug={listing.slug || rawSlug} /></div>
+            )}
           </section>
-        )}
 
-        {/* ── Verified Vehicle Data ────────────────────────────────── */}
-        {vShow && (
-          <section className="px-4 pt-4" data-module="verification">
-            <button onClick={() => openPanel("price-confidence")} className={`${CARD} w-full text-left px-4 py-4`}>
-              <div className="flex items-center justify-between gap-3">
-                <div className="min-w-0">
-                  <div className="text-[13px] font-bold" style={{ color: NAVY }}>Verified Vehicle Data</div>
-                  <div className="text-[12px] mt-0.5" style={{ color: SUB }}>
-                    {vAllVerified ? `All ${vTotal} checks verified` : `${vVerified} of ${vTotal} verified · ${vSummary}`}
-                  </div>
-                </div>
-                <ChevronRight className="w-4 h-4 shrink-0" style={{ color: SUB }} />
-              </div>
-              <div className="mt-3 h-2 rounded-full overflow-hidden" style={{ background: "#F1F5F9" }}>
-                <div className="h-full rounded-full" style={{ width: `${Math.round((vVerified / vTotal) * 100)}%`, background: GREEN }} />
-              </div>
-              <div className="mt-2 flex items-center gap-3 text-[11px]" style={{ color: SUB }}>
-                <span className="inline-flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full" style={{ background: GREEN }} />Verified</span>
-                <span className="inline-flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full" style={{ background: "#CBD5E1" }} />Not yet verified</span>
-              </div>
-            </button>
-          </section>
-        )}
-
-        {/* ── Market Intelligence ──────────────────────────────────── */}
-        {pv("marketValue") && marketPos && (
-          <section className="px-4 pt-4" data-module="market">
-            <button onClick={() => openPanel("market-price")} className={`${CARD} w-full text-left px-4 py-4`}>
-              <div className="flex items-center justify-between gap-3">
-                <div className="min-w-0">
-                  <div className="text-[13px] font-bold" style={{ color: NAVY }}>Market Intelligence</div>
-                  <div className="text-[12px] mt-0.5" style={{ color: SUB }}>
-                    {d.marketMeta.similarCount ? `${d.marketMeta.similarCount} similar vehicles nearby` : "Local comparable market"}
-                  </div>
-                </div>
-                <ChevronRight className="w-4 h-4 shrink-0" style={{ color: SUB }} />
-              </div>
-              <div className="mt-3">
-                <div className="relative h-2 rounded-full" style={{ background: "linear-gradient(90deg, #DCFCE7 0%, #DBEAFE 50%, #FEE2E2 100%)" }}>
-                  <span
-                    className="absolute -top-1 w-4 h-4 rounded-full border-2 border-white shadow"
-                    style={{ left: `calc(${Math.round(marketPos.t * 100)}% - 8px)`, background: NAVY }}
-                  />
-                </div>
-                <div className="mt-2 flex justify-between text-[11px]" style={{ color: SUB }}>
-                  <span>Best Value</span>
-                  <span className="font-bold" style={{ color: NAVY }}>{marketPos.label}</span>
-                  <span>Above Market</span>
-                </div>
-              </div>
-            </button>
-          </section>
-        )}
-
-        {/* ── Progressive rows ─────────────────────────────────────── */}
-        <section className="px-4 pt-4 space-y-3">
-          {pv("warranty") && (d.warrantyStr || d.oemWarranty) && (
-            <button onClick={() => openPanel("factory-warranty")} className={`${CARD} w-full flex items-center justify-between gap-3 px-4 py-3.5`} data-module="warranty">
-              <div className="min-w-0 flex items-center gap-3">
-                <span className="h-9 w-9 grid place-items-center rounded-xl" style={{ background: "#EFF6FF" }}><Award className="w-[18px] h-[18px]" style={{ color: BLUE }} /></span>
-                <div className="min-w-0 text-left">
-                  <div className="text-[13px] font-bold" style={{ color: NAVY }}>Warranty Intelligence</div>
-                  <div className="text-[12px]" style={{ color: SUB }}>{d.warrantyStr || "Factory coverage"}</div>
-                </div>
-              </div>
-              <ChevronRight className="w-4 h-4 shrink-0" style={{ color: SUB }} />
-            </button>
-          )}
-          {pv("factoryOptions") && (
-            <button onClick={() => openPanel("equipment")} className={`${CARD} w-full flex items-center justify-between gap-3 px-4 py-3.5`} data-module="equipment">
-              <div className="min-w-0 flex items-center gap-3">
-                <span className="h-9 w-9 grid place-items-center rounded-xl" style={{ background: "#F1F5F9" }}><Star className="w-[18px] h-[18px]" style={{ color: NAVY }} /></span>
-                <div className="min-w-0 text-left">
-                  <div className="text-[13px] font-bold" style={{ color: NAVY }}>Features &amp; Equipment</div>
-                  <div className="text-[12px]" style={{ color: SUB }}>See all highlights</div>
-                </div>
-              </div>
-              <ChevronRight className="w-4 h-4 shrink-0" style={{ color: SUB }} />
-            </button>
-          )}
-          {(pv("historyReport") || pv("insights")) && (d.ownerCount != null || d.cleanTitle || d.historyReport) && (
-            <button onClick={() => openPanel("ownership-timeline")} className={`${CARD} w-full flex items-center justify-between gap-3 px-4 py-3.5`} data-module="history">
-              <div className="min-w-0 flex items-center gap-3">
-                <span className="h-9 w-9 grid place-items-center rounded-xl" style={{ background: "#ECFDF5" }}><ShieldCheck className="w-[18px] h-[18px]" style={{ color: GREEN }} /></span>
-                <div className="min-w-0 text-left">
-                  <div className="text-[13px] font-bold" style={{ color: NAVY }}>History &amp; Ownership</div>
-                  <div className="text-[12px]" style={{ color: SUB }}>
-                    {d.cleanTitle ? "Clean title" : d.titleStatus === "branded" ? "Branded title" : "Title status"}
-                    {d.ownerCount != null ? ` · ${d.ownerCount}-Owner` : ""}
-                  </div>
-                </div>
-              </div>
-              <ChevronRight className="w-4 h-4 shrink-0" style={{ color: SUB }} />
-            </button>
-          )}
-        </section>
-
-        {/* ── Your next best step ──────────────────────────────────── */}
-        <section className="px-4 pt-5" data-module="next-step">
-          <button onClick={() => openAction("payment")} className="w-full rounded-2xl px-4 py-4 flex items-center gap-3 border" style={{ background: "#EFF6FF", borderColor: "#BFDBFE" }}>
-            <span className="h-10 w-10 grid place-items-center rounded-full bg-white" style={{ color: BLUE }}>
-              <Star className="w-5 h-5" />
-            </span>
-            <div className="min-w-0 text-left">
-              <div className="text-[13px] font-bold" style={{ color: NAVY }}>Your Next Best Step</div>
-              <div className="text-[12px]" style={{ color: SUB }}>Get your personalized price and payment options in 60 seconds</div>
-            </div>
-            <ChevronRight className="w-5 h-5 ml-auto" style={{ color: BLUE }} />
-          </button>
-        </section>
-
-        {/* ── Why Buy From {dealer} ────────────────────────────────── */}
-        {dealerName && (
-          <section className="px-4 pt-6 pb-6" data-module="dealer">
-            <h2 className="text-[18px] font-extrabold leading-tight" style={{ color: NAVY }}>Why Buy From {dealerName}</h2>
-            <p className="mt-0.5 text-[13px]" style={{ color: SUB }}>What makes buying here different.</p>
-
-            <div className={`${CARD} mt-3 overflow-hidden`}>
-              {/* Full-width dealership photo anchor with dark bottom gradient. */}
-              {dt.storefrontUrl ? (
-                <div className="relative aspect-[2/1] w-full bg-slate-100">
-                  <img src={dt.storefrontUrl} alt={dealerName} className="w-full h-full object-cover" loading="lazy" decoding="async" />
-                  <div className="absolute inset-0" style={{ background: "linear-gradient(to top, rgba(13,27,42,0.85) 0%, rgba(13,27,42,0.15) 45%, transparent 70%)" }} />
-                  {dealerFoundedYear != null && (
-                    <div className="absolute bottom-3 left-4 text-white">
-                      <div className="text-[16px] font-extrabold leading-tight">Serving drivers since {dealerFoundedYear}</div>
-                      {dealerYears != null && <div className="text-[12px] opacity-90">{dealerYears} years in business</div>}
+          {/* 9 — AutoLabels Verified */}
+          {vShow && (
+            <section className="px-4 pt-6" data-module="verification">
+              <H>AutoLabels Verified</H>
+              <div className={`${CARD} mt-3 p-4`}>
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <span className="h-10 w-10 grid place-items-center rounded-full shrink-0" style={{ background: "#EFF6FF" }}><ShieldCheck className="w-[22px] h-[22px]" style={{ color: BLUE }} /></span>
+                    <div className="min-w-0">
+                      <div className="text-[14px] font-extrabold" style={{ color: NAVY }}>{vAllVerified ? `All ${vTotal} checks verified` : `${vVerified} of ${vTotal} verified`}</div>
+                      <div className="text-[12px] leading-snug" style={{ color: SUB }}>Checked against trusted automotive data sources.</div>
                     </div>
-                  )}
+                  </div>
+                  <button onClick={() => openPanel("price-confidence")} className="text-[11px] font-bold shrink-0 text-right" style={{ color: vSummaryColor }}>{vSummary}</button>
                 </div>
-              ) : dealerFoundedYear != null ? (
-                <div className="px-4 pt-4">
-                  <div className="text-[15px] font-extrabold leading-tight" style={{ color: NAVY }}>Serving drivers since {dealerFoundedYear}</div>
-                  {dealerYears != null && <div className="text-[12px]" style={{ color: SUB }}>{dealerYears} years in business</div>}
-                </div>
-              ) : null}
-
-              {/* Verified benefits — two-column, only what the dealer confirms. */}
-              {dealerBenefits.length > 0 && (
-                <div className="px-4 pt-4 grid grid-cols-2 gap-x-4 gap-y-2.5">
-                  {dealerBenefits.map((b) => (
-                    <div key={b} className="flex items-start gap-2 text-[13px] font-medium" style={{ color: NAVY }}>
-                      <CheckCircle2 className="w-4 h-4 shrink-0 mt-0.5" style={{ color: GREEN }} /> {b}
+                <div className="mt-3 space-y-2">
+                  {vChecksUi.map((c) => (
+                    <div key={c.key} className="flex items-center gap-2.5 rounded-xl border px-3 py-2.5" style={{ borderColor: BORDER, background: c.bg }}>
+                      <c.Icon className="w-[20px] h-[20px] shrink-0" style={{ color: c.color }} />
+                      <div className="text-[13px] font-semibold leading-tight flex-1 min-w-0" style={{ color: NAVY }}>{c.name}</div>
+                      <div className="text-[11px] font-semibold shrink-0" style={{ color: c.color }}>{c.statusLabel}</div>
                     </div>
                   ))}
                 </div>
-              )}
+                <div className="mt-3 flex items-center justify-between gap-3">
+                  <button onClick={() => go("verification")} className="text-[13px] font-bold inline-flex items-center gap-1" style={{ color: BLUE }}>View full verification report <ChevronRight className="w-4 h-4" /></button>
+                  <button onClick={() => openPanel("price-confidence")} className="text-[12px] font-semibold" style={{ color: SUB }}>How verification works</button>
+                </div>
+              </div>
+            </section>
+          )}
 
-              {/* Recognition — the stored certifications are dealer-entered
-                  NAMES only (no issuer/year/verification record), so they are
-                  labeled "Dealer-reported" and deliberately do NOT get the green
-                  verified treatment used for confirmed benefits. When richer,
-                  verified award data lands, this can promote to a verified state. */}
-              {dt.certifications.length > 0 && (
-                <div className="px-4 pt-4 mt-4 border-t" style={{ borderColor: BORDER }}>
-                  <div className="pt-3 text-[13px] font-bold" style={{ color: NAVY }}>Recognition</div>
-                  <div className="mt-2 space-y-2.5">
-                    {dt.certifications.slice(0, 4).map((c) => (
-                      <div key={c} className="flex items-start gap-2.5">
-                        <span className="h-7 w-7 grid place-items-center rounded-full shrink-0" style={{ background: "#EFF6FF" }}><Award className="w-4 h-4" style={{ color: BLUE }} /></span>
-                        <div className="min-w-0">
-                          <div className="text-[13px] font-semibold leading-tight" style={{ color: NAVY }}>{c}</div>
-                          <div className="text-[11px]" style={{ color: SUB }}>Dealer-reported recognition</div>
-                        </div>
+          {/* 10 — Market Intelligence */}
+          {pv("marketValue") && marketPos && (
+            <section className="px-4 pt-6" data-module="market">
+              <H>Market Intelligence</H>
+              <div className={`${CARD} mt-3 p-4`}>
+                <div className="grid grid-cols-3 gap-3">
+                  <div><div className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: SUB }}>Analyzed</div><div className="mt-1 text-[20px] font-extrabold tabular-nums" style={{ color: NAVY }}>{d.marketMeta.similarCount ?? "—"}</div><div className="text-[11px]" style={{ color: SUB }}>{d.marketMeta.radius ? `within ${d.marketMeta.radius} mi` : "nearby"}</div></div>
+                  <div><div className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: SUB }}>vs market</div><div className="mt-1 text-[20px] font-extrabold tabular-nums" style={{ color: d.belowMarket && d.belowMarket > 0 ? GREEN : NAVY }}>{d.belowMarket && d.belowMarket > 0 ? fmt$(d.belowMarket) : d.marketAvg != null && price != null && price - d.marketAvg > 250 ? fmt$(price - d.marketAvg) : "—"}</div><div className="text-[11px]" style={{ color: SUB }}>{d.belowMarket && d.belowMarket > 0 ? "below value" : "vs value"}</div></div>
+                  <div><div className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: SUB }}>Days listed</div><div className="mt-1 text-[20px] font-extrabold tabular-nums" style={{ color: NAVY }}>{d.dom != null ? d.dom : d.marketMeta.avgDom != null ? d.marketMeta.avgDom : "—"}</div><div className="text-[11px]" style={{ color: SUB }}>{d.dom != null ? "this car" : "market avg"}</div></div>
+                </div>
+                <div className="mt-4">
+                  <div className="relative h-2.5 rounded-full" style={{ background: "linear-gradient(90deg, #DCFCE7 0%, #DBEAFE 50%, #FEE2E2 100%)" }}>
+                    <span className="absolute -top-1 w-4 h-4 rounded-full border-2 border-white shadow" style={{ left: `calc(${Math.round(marketPos.t * 100)}% - 8px)`, background: NAVY }} />
+                  </div>
+                  <div className="mt-2 flex justify-between text-[11px]" style={{ color: SUB }}><span>Best Value</span><span className="font-bold" style={{ color: NAVY }}>{marketPos.label}</span><span>Above Market</span></div>
+                </div>
+                <div className="mt-3 flex items-center justify-between gap-3">
+                  <button onClick={() => openPanel("market-price")} className="text-[13px] font-bold inline-flex items-center gap-1" style={{ color: BLUE }}>View market details <ChevronRight className="w-4 h-4" /></button>
+                  <button onClick={() => openPanel("comparable-vehicles")} className="text-[12px] font-semibold" style={{ color: SUB }}>Comparable vehicles</button>
+                </div>
+              </div>
+            </section>
+          )}
+
+          {/* 11 — Why This Vehicle Checks Out */}
+          <section className="px-4 pt-6" data-module="great-buy">
+            <H>Why This Vehicle Checks Out</H>
+            <div className={`${CARD} mt-3 p-4`}>
+              <ul className="space-y-2.5">
+                {(strengths.length ? strengths : ["Details confirmed at the dealership"]).map((b, i) => (
+                  <li key={i} className="flex items-start gap-2 text-[13px]" style={{ color: NAVY }}><CheckCircle2 className="w-[18px] h-[18px] shrink-0 mt-0.5" style={{ color: GREEN }} /> {b}</li>
+                ))}
+              </ul>
+              <button onClick={() => go("great-buy")} className="mt-3 text-[13px] font-bold inline-flex items-center gap-1" style={{ color: BLUE }}>View full buying report <ChevronRight className="w-4 h-4" /></button>
+            </div>
+          </section>
+
+          {/* 12 — Confirm Before Purchase (recall stays neutral amber; never green) */}
+          {(confirmRows.length > 0 || (d.historyReport && pv("historyReport"))) && (
+            <section className="px-4 pt-6" data-module="confirm">
+              <H>Confirm Before Purchase</H>
+              <div className={`${CARD} mt-3 p-4`}>
+                {confirmRows.length > 0 && (
+                  <div className="space-y-2.5">
+                    {confirmRows.map((r) => (
+                      <div key={r.t} className="rounded-xl border p-3 flex items-start gap-2" style={{ borderColor: "#FDE68A", background: "#FFFBEB" }}>
+                        <TriangleAlert className="w-[18px] h-[18px] shrink-0 mt-0.5" style={{ color: AMBER }} />
+                        <div className="min-w-0"><p className="text-[12.5px] font-semibold leading-tight" style={{ color: NAVY }}>{r.t}</p><p className="text-[11px] mt-0.5" style={{ color: SUB }}>{r.s}</p></div>
                       </div>
                     ))}
                   </div>
-                </div>
-              )}
+                )}
+                {d.historyReport && pv("historyReport") && (
+                  <div className={confirmRows.length > 0 ? "mt-3 pt-3 border-t" : ""} style={confirmRows.length > 0 ? { borderColor: BORDER } : undefined}>
+                    <a href={d.historyReport.url} target="_blank" rel="noopener noreferrer" onClick={() => trackCustomerCtaClicked({ storeId: listing.store_id, vehicleId: listing.id, vin: listing.vin, source: "passport", surface: "vehicle_passport", metadata: { cta: "history_report" } })} className="text-[13px] font-bold inline-flex items-center gap-1.5" style={{ color: BLUE }}>
+                      {d.historyReport.source === "vin" ? `View the ${historyReportName(d.historyReport.provider)} record` : `View the free ${historyReportName(d.historyReport.provider)} Report`} <ExternalLink className="w-4 h-4" />
+                    </a>
+                    {d.historyReport.source !== "vin" && dealerName && <p className="text-[11px] mt-0.5" style={{ color: SUB }}>Provided at no cost by {dealerName}</p>}
+                  </div>
+                )}
+                <button onClick={() => go("verification")} className="mt-3 text-[13px] font-bold inline-flex items-center gap-1" style={{ color: BLUE }}>View full verification report <ChevronRight className="w-4 h-4" /></button>
+              </div>
+            </section>
+          )}
 
-              {/* One purposeful link to the full dealership page — reuses the
-                  existing working /dealer route; no second reserve CTA here. The
-                  tap ties dealership-story engagement to profile opens through
-                  the existing CTA event pipeline. */}
-              <button onClick={() => { trackCustomerCtaClicked({ storeId: listing.store_id, vehicleId: listing.id, vin: listing.vin, source: "passport", surface: "vehicle_passport", metadata: { cta: "dealer_profile" } }); go("dealer"); }} className="px-4 py-3.5 inline-flex items-center gap-1.5 text-[13px] font-bold" style={{ color: BLUE }}>
-                Meet {dealerName} <ChevronRight className="w-4 h-4" />
+          {/* 13 — Ownership Timeline */}
+          {(pv("historyReport") || pv("insights")) && timeline.length > 1 && (
+            <section className="px-4 pt-6" data-module="history">
+              <H>Ownership Timeline</H>
+              <div className={`${CARD} mt-3 p-4`}>
+                <ol className="space-y-4 relative border-l-2 ml-1.5 pl-4" style={{ borderColor: "#E2E8F0" }}>
+                  {timeline.map((e, i) => (
+                    <li key={i} className="relative">
+                      <span className="absolute -left-[22px] top-1 w-3 h-3 rounded-full ring-2 ring-white" style={{ background: i === timeline.length - 1 ? BLUE : GREEN }} />
+                      <p className="text-[12.5px] font-bold" style={{ color: NAVY }}>{e.d} · {e.t}</p>
+                      <p className="text-[11px]" style={{ color: SUB }}>{e.s}</p>
+                    </li>
+                  ))}
+                </ol>
+                <button onClick={() => openPanel("ownership-timeline")} className="mt-3 text-[13px] font-bold inline-flex items-center gap-1" style={{ color: BLUE }}>View full timeline <ChevronRight className="w-4 h-4" /></button>
+              </div>
+            </section>
+          )}
+
+          {/* 14 — Factory Warranty */}
+          {showWarranty && (
+            <section className="px-4 pt-6" data-module="warranty">
+              <H>{!d.warrantyExpired ? "Factory Warranty" : "Warranty Coverage"}</H>
+              <div className={`${CARD} mt-3 p-4`}>
+                {!d.warrantyExpired ? (
+                  <div className="space-y-3.5">
+                    {b2b && b2b.pct != null && (
+                      <div>
+                        <div className="flex items-center gap-1.5"><ShieldCheck className="w-[18px] h-[18px]" style={{ color: BLUE }} /><span className="text-[13px] font-semibold" style={{ color: NAVY }}>Bumper-to-Bumper</span></div>
+                        <div className="flex items-center gap-2 mt-1.5">
+                          <span className="text-[15px] font-extrabold tabular-nums w-10" style={{ color: BLUE }}>{b2b.pct}%</span>
+                          <div className="flex-1 h-2.5 rounded-full overflow-hidden" style={{ background: "#F1F5F9" }}><div className="h-full rounded-full" style={{ width: `${b2b.pct}%`, background: BLUE }} /></div>
+                        </div>
+                        {b2b.label && <p className="text-[11px] mt-1" style={{ color: SUB }}>{b2b.label}</p>}
+                      </div>
+                    )}
+                    {ptw && ptw.pct != null && (
+                      <div>
+                        <div className="flex items-center gap-1.5"><ShieldCheck className="w-[18px] h-[18px]" style={{ color: GREEN }} /><span className="text-[13px] font-semibold" style={{ color: NAVY }}>Powertrain</span></div>
+                        <div className="flex items-center gap-2 mt-1.5">
+                          <span className="text-[15px] font-extrabold tabular-nums w-10" style={{ color: GREEN }}>{ptw.pct}%</span>
+                          <div className="flex-1 h-2.5 rounded-full overflow-hidden" style={{ background: "#F1F5F9" }}><div className="h-full rounded-full" style={{ width: `${ptw.pct}%`, background: GREEN }} /></div>
+                        </div>
+                        {ptw.label && <p className="text-[11px] mt-1" style={{ color: SUB }}>{ptw.label}</p>}
+                      </div>
+                    )}
+                    {!b2b?.pct && !ptw?.pct && <p className="text-[13px]" style={{ color: SUB }}>{d.warrantyStr}</p>}
+                  </div>
+                ) : (
+                  <p className="text-[13px]" style={{ color: SUB }}>{d.warrantyStr || "Factory coverage on record."}</p>
+                )}
+                <button onClick={() => openPanel("factory-warranty")} className="mt-3 text-[13px] font-bold inline-flex items-center gap-1" style={{ color: BLUE }}>View warranty coverage <ChevronRight className="w-4 h-4" /></button>
+              </div>
+            </section>
+          )}
+
+          {/* 15 — About This Vehicle: highlights + features + specs */}
+          <section className="px-4 pt-6" data-module="about">
+            <H>About This Vehicle</H>
+            {d.highlights.length > 0 && (
+              <div className="mt-3 grid grid-cols-2 gap-2.5">
+                {d.highlights.slice(0, 6).map((h) => (
+                  <div key={h.key} className={`${CARD} p-3`}>
+                    <div className="text-[13px] font-bold leading-tight" style={{ color: NAVY }}>{h.label}</div>
+                    {h.sub && <div className="text-[11px] mt-0.5 leading-snug" style={{ color: SUB }}>{h.sub}</div>}
+                  </div>
+                ))}
+              </div>
+            )}
+            <div className="mt-3 space-y-3">
+              <button onClick={() => openPanel("equipment")} className={`${CARD} w-full flex items-center justify-between gap-3 px-4 py-3.5`} data-module="equipment">
+                <div className="min-w-0 flex items-center gap-3">
+                  <span className="h-10 w-10 grid place-items-center rounded-xl" style={{ background: "#F1F5F9" }}><Star className="w-[22px] h-[22px]" style={{ color: NAVY }} /></span>
+                  <div className="min-w-0 text-left"><div className="text-[13px] font-bold" style={{ color: NAVY }}>All features &amp; equipment</div><div className="text-[12px]" style={{ color: SUB }}>Premium, safety, tech &amp; more</div></div>
+                </div>
+                <ChevronRight className="w-[18px] h-[18px] shrink-0" style={{ color: SUB }} />
+              </button>
+              <button onClick={() => openPanel("key-specs")} className={`${CARD} w-full flex items-center justify-between gap-3 px-4 py-3.5`} data-module="specs">
+                <div className="min-w-0 flex items-center gap-3">
+                  <span className="h-10 w-10 grid place-items-center rounded-xl" style={{ background: "#EFF6FF" }}><Wrench className="w-[22px] h-[22px]" style={{ color: BLUE }} /></span>
+                  <div className="min-w-0 text-left"><div className="text-[13px] font-bold" style={{ color: NAVY }}>Full specifications</div><div className="text-[12px]" style={{ color: SUB }}>Engine, dimensions, capacity</div></div>
+                </div>
+                <ChevronRight className="w-[18px] h-[18px] shrink-0" style={{ color: SUB }} />
               </button>
             </div>
           </section>
-        )}
-      </div>
-      )}
+
+          {/* 16 — Vehicle Overview */}
+          {overviewText && (
+            <section className="px-4 pt-6" data-module="overview">
+              <H>Vehicle Overview</H>
+              <div className={`${CARD} mt-3 p-4`}>
+                <p className="text-[13px] leading-relaxed" style={{ color: NAVY }}>{overviewText}</p>
+                <button onClick={() => openPanel("overview")} className="mt-3 text-[13px] font-bold inline-flex items-center gap-1" style={{ color: BLUE }}>Read full overview <ChevronRight className="w-4 h-4" /></button>
+              </div>
+            </section>
+          )}
+
+          {/* 17 — Vehicle photo story */}
+          {gallery.length > 1 && (
+            <section className="px-4 pt-6" data-module="photo-story">
+              <H>Photos</H>
+              <div className="mt-3 grid grid-cols-3 gap-2">
+                {gallery.slice(0, 6).map((src, i) => (
+                  <button key={i} onClick={() => { setIdx(i); setGalleryOpen(true); }} aria-label={`View photo ${i + 1}`} className="aspect-square rounded-xl overflow-hidden bg-slate-100">
+                    <img src={src} alt={`${listing.ymm || "Vehicle"} photo ${i + 1}`} loading="lazy" className="w-full h-full object-cover" />
+                  </button>
+                ))}
+              </div>
+              <button onClick={() => setGalleryOpen(true)} className="mt-3 text-[13px] font-bold inline-flex items-center gap-1" style={{ color: BLUE }}>View all {gallery.length} photos <ChevronRight className="w-4 h-4" /></button>
+            </section>
+          )}
+
+          {/* 18 — Why Buy From {dealer} */}
+          {dealerName && (
+            <section className="px-4 pt-6" data-module="dealer">
+              <H>Why Buy From {dealerName}</H>
+              <p className="mt-0.5 text-[13px]" style={{ color: SUB }}>What makes buying here different.</p>
+              <div className={`${CARD} mt-3 overflow-hidden`}>
+                {dt.storefrontUrl ? (
+                  <div className="relative aspect-[2/1] w-full bg-slate-100">
+                    <img src={dt.storefrontUrl} alt={dealerName} className="w-full h-full object-cover" loading="lazy" decoding="async" />
+                    <div className="absolute inset-0" style={{ background: "linear-gradient(to top, rgba(13,27,42,0.85) 0%, rgba(13,27,42,0.15) 45%, transparent 70%)" }} />
+                    {dealerFoundedYear != null && (
+                      <div className="absolute bottom-3 left-4 text-white">
+                        <div className="text-[16px] font-extrabold leading-tight">Serving drivers since {dealerFoundedYear}</div>
+                        {dealerYears != null && <div className="text-[12px] opacity-90">{dealerYears} years in business</div>}
+                      </div>
+                    )}
+                  </div>
+                ) : dealerFoundedYear != null ? (
+                  <div className="px-4 pt-4">
+                    <div className="text-[15px] font-extrabold leading-tight" style={{ color: NAVY }}>Serving drivers since {dealerFoundedYear}</div>
+                    {dealerYears != null && <div className="text-[12px]" style={{ color: SUB }}>{dealerYears} years in business</div>}
+                  </div>
+                ) : null}
+                {dealerBenefits.length > 0 && (
+                  <div className="px-4 pt-4 grid grid-cols-2 gap-x-4 gap-y-2.5">
+                    {dealerBenefits.map((b) => (
+                      <div key={b} className="flex items-start gap-2 text-[13px] font-medium" style={{ color: NAVY }}>
+                        <CheckCircle2 className="w-4 h-4 shrink-0 mt-0.5" style={{ color: GREEN }} /> {b}
+                      </div>
+                    ))}
+                  </div>
+                )}
+                {(d.reviewRating != null || dt.certifications.length > 0) && (
+                  <div className="px-4 pt-4 mt-4 border-t" style={{ borderColor: BORDER }}>
+                    {d.reviewRating != null && (
+                      <div className="pt-3 flex items-center gap-2">
+                        <div className="inline-flex items-center gap-1">
+                          {[0, 1, 2, 3, 4].map((s) => <Star key={s} className="w-4 h-4" style={{ color: AMBER, fill: s < Math.round(d.reviewRating as number) ? AMBER : "none" }} />)}
+                        </div>
+                        <span className="text-[13px] font-bold" style={{ color: NAVY }}>{(d.reviewRating as number).toFixed(1)}</span>
+                        {d.reviewCount != null && <span className="text-[12px]" style={{ color: SUB }}>({d.reviewCount.toLocaleString()} reviews)</span>}
+                      </div>
+                    )}
+                    {dt.certifications.length > 0 && (
+                      <div className="mt-3 space-y-2.5 pb-1">
+                        {dt.certifications.slice(0, 4).map((c) => (
+                          <div key={c} className="flex items-start gap-2.5">
+                            <span className="h-7 w-7 grid place-items-center rounded-full shrink-0" style={{ background: "#EFF6FF" }}><Award className="w-4 h-4" style={{ color: BLUE }} /></span>
+                            <div className="min-w-0">
+                              <div className="text-[13px] font-semibold leading-tight" style={{ color: NAVY }}>{c}</div>
+                              <div className="text-[11px]" style={{ color: SUB }}>Dealer-reported recognition</div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+                <button onClick={() => { trackCustomerCtaClicked({ storeId: listing.store_id, vehicleId: listing.id, vin: listing.vin, source: "passport", surface: "vehicle_passport", metadata: { cta: "dealer_profile" } }); go("dealer"); }} className="px-4 py-3.5 inline-flex items-center gap-1.5 text-[13px] font-bold" style={{ color: BLUE }}>
+                  Learn more about {dealerName} <ChevronRight className="w-4 h-4" />
+                </button>
+              </div>
+            </section>
+          )}
+
+          {/* 19 — Next Steps */}
+          <section className="px-4 pt-6" data-module="next-steps">
+            <H>Next Steps</H>
+            <div className="mt-3 grid grid-cols-2 gap-2.5">
+              <button onClick={() => go("reserve")} className="h-12 rounded-2xl inline-flex items-center justify-center gap-2 text-[13px] font-bold text-white" style={{ background: BLUE }}><BadgeCheck className="w-[20px] h-[20px]" /> Reserve</button>
+              <button onClick={() => go("test-drive")} className={`${CARD} h-12 inline-flex items-center justify-center gap-2 text-[13px] font-bold`} style={{ color: NAVY }}><Clock className="w-[20px] h-[20px]" style={{ color: BLUE }} /> Schedule Test Drive</button>
+              <button onClick={() => go("contact")} className={`${CARD} h-12 inline-flex items-center justify-center gap-2 text-[13px] font-bold`} style={{ color: NAVY }}><MessageSquare className="w-[20px] h-[20px]" style={{ color: BLUE }} /> Contact Dealer</button>
+              <button onClick={() => window.print()} className={`${CARD} h-12 inline-flex items-center justify-center gap-2 text-[13px] font-bold`} style={{ color: NAVY }}><Printer className="w-[20px] h-[20px]" style={{ color: BLUE }} /> Print Passport</button>
+            </div>
+          </section>
+
+          {/* 20 — Footer */}
+          <footer className="px-4 pt-8 pb-4 text-center">
+            {d.dealerPhone && (
+              <a href={`tel:${d.dealerPhone}`} className="inline-flex items-center gap-1.5 text-[13px] font-bold" style={{ color: BLUE }}><Phone className="w-4 h-4" /> Need help? Call {d.dealerPhone}</a>
+            )}
+            <div className="mt-3 flex items-center justify-center gap-4 text-[12px] font-semibold" style={{ color: SUB }}>
+              <a href="/privacy" className="hover:underline">Privacy</a>
+              <span style={{ color: "#CBD5E1" }}>·</span>
+              <a href="/terms" className="hover:underline">Terms</a>
+            </div>
+            {dealerName && <p className="mt-3 text-[11px]" style={{ color: SUB }}>Vehicle offered by {dealerName}. Confirm current availability, price and details with the dealership.</p>}
+          </footer>
+
+        </div>
+        );
+      })()}
 
       {/* ══ Intelligence-first desktop (≥ xl / 1280px) ═══════════════════════
           Two-column outer shell: a wide intelligence WORKSPACE + a sticky
