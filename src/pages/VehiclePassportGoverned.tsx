@@ -13,6 +13,7 @@ import { listingGallery } from "@/lib/photos";
 import { packetVisible } from "@/lib/packetModules";
 import { buildPassportActionPath } from "@/lib/passportReturn";
 import PriceDropWatch from "@/components/listing/PriceDropWatch";
+import PassportCtaDock from "@/components/passport/PassportCtaDock";
 import { resolveStickyButtons, type StickyBottomButtons } from "@/lib/stickyButtons";
 import { MOCK_LISTING } from "./VehiclePassportV3";
 import type { VehicleListing } from "@/hooks/useVehicleListing";
@@ -778,8 +779,9 @@ export default function VehiclePassportGoverned() {
           { label: "Save", icon: Bookmark, onClick: handleSave },
           { label: "Share", icon: Upload, onClick: handleShare },
           // Watch Price opens an inline email capture so the shopper gets price &
-          // availability alerts — it does not just save to this device.
-          { label: "Watch Price", icon: Eye, onClick: () => setWatchOpen((v) => !v) },
+          // availability alerts — it does not just save to this device. Track the
+          // open once (not the close), never a conversion until the RPC succeeds.
+          { label: "Watch Price", icon: Eye, onClick: () => { if (!watchOpen) trackCustomerCtaClicked({ storeId: listing.store_id, vehicleId: listing.id, vin: listing.vin, source: "passport", surface: "vehicle_passport", metadata: { cta: "watch_price" } }); setWatchOpen((v) => !v); } },
         ];
         const label3 = "text-[11px] font-semibold uppercase tracking-wider";
         // Dollar amount the price sits ABOVE normalized market value (past a $250
@@ -1189,6 +1191,19 @@ export default function VehiclePassportGoverned() {
                 </div>
               </aside>
             </div>
+
+            {/* Floating "Ready to take the next step?" launcher — a persistent,
+                low-friction next-step dock distinct from the sticky action rail.
+                Desktop-only (hidden lg:block); routes Reserve/Trade/Contact into
+                the complete V2 pages via go() and dials the dealer's real number. */}
+            <PassportCtaDock
+              go={go}
+              dealerPhone={d.dealerPhone || undefined}
+              reviewRating={d.reviewRating}
+              advisor={d.dealerTrust}
+              routing={d.contactRouting}
+              vehicle={{ storeId: listing.store_id, vehicleId: listing.id, vin: listing.vin }}
+            />
           </div>
         );
       })()}
