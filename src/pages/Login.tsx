@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { Link, useLocation, useNavigate, useSearchParams } from "react-router-dom";
+import { supabase } from "@/integrations/supabase/client";
 import { useTenant } from "@/contexts/TenantContext";
 import Logo from "@/components/brand/Logo";
 import Seo from "@/components/Seo";
@@ -95,6 +96,7 @@ const Login = () => {
   const [failCount, setFailCount] = useState(0);
   const [cooldownUntil, setCooldownUntil] = useState<number | null>(null);
   const [now, setNow] = useState(() => Date.now());
+  const [resetState, setResetState] = useState<"idle" | "sending" | "sent" | "error">("idle");
 
   const emailRef = useRef<HTMLInputElement>(null);
   const passwordRef = useRef<HTMLInputElement>(null);
@@ -163,6 +165,27 @@ const Login = () => {
     // useEffect above waits for both user + isAdmin to resolve, then
     // routes admins to /admin and dealers to /dashboard.
     setFailCount(0);
+  };
+
+  // Self-serve reset. We reuse whatever is already typed in the Email
+  // field; an empty/invalid address surfaces the inline validation and
+  // never sends. The confirmation is deliberately non-enumerating — a
+  // missing account resolves without error and shows identical copy, so
+  // the page never reveals whether an address is registered.
+  const handleForgotPassword = async () => {
+    if (resetState === "sending") return;
+    const eErr = validateEmail(email);
+    if (eErr) {
+      setEmailError(eErr);
+      emailRef.current?.focus();
+      return;
+    }
+    setEmailError(null);
+    setResetState("sending");
+    const { error: err } = await supabase.auth.resetPasswordForEmail(email.trim(), {
+      redirectTo: `${window.location.origin}/reset-password`,
+    });
+    setResetState(err ? "error" : "sent");
   };
 
   const banner = inCooldown
@@ -293,6 +316,7 @@ const Login = () => {
                     setEmail(e.target.value);
                     if (emailError) setEmailError(null);
                     if (formError) setFormError(null);
+                    if (resetState !== "idle") setResetState("idle");
                   }}
                   onBlur={() => setEmailError(validateEmail(email))}
                   placeholder="you@dealership.com"
@@ -313,13 +337,14 @@ const Login = () => {
                   <label htmlFor="password" className="text-sm font-medium text-foreground">
                     Password
                   </label>
-                  {/* No self-serve reset exists yet; support handles it. */}
-                  <a
-                    href={`mailto:${SUPPORT_EMAIL}?subject=${encodeURIComponent("Password reset request")}`}
-                    className="text-xs font-medium text-[#1E90FF] hover:underline rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  <button
+                    type="button"
+                    onClick={handleForgotPassword}
+                    disabled={resetState === "sending"}
+                    className="text-xs font-medium text-[#1E90FF] hover:underline rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    Forgot password?
-                  </a>
+                    {resetState === "sending" ? "Sending…" : "Forgot password?"}
+                  </button>
                 </div>
                 <div className="relative">
                   <input
@@ -377,6 +402,28 @@ const Login = () => {
                   </p>
                 )}
               </div>
+
+              {resetState === "sent" && (
+                <div
+                  role="status"
+                  className="flex items-start gap-2 text-sm text-emerald-800 bg-emerald-50 border border-emerald-200 rounded-md px-3 py-2"
+                >
+                  <CheckCircle2 className="w-4 h-4 shrink-0 mt-0.5" />
+                  <span>
+                    If an account exists for that email, we&apos;ve sent a password reset link.
+                    Check your inbox and spam folder.
+                  </span>
+                </div>
+              )}
+              {resetState === "error" && (
+                <div
+                  role="alert"
+                  className="flex items-start gap-2 text-sm text-destructive bg-destructive/5 border border-destructive/20 rounded-md px-3 py-2"
+                >
+                  <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
+                  <span>Couldn&apos;t send the reset email. Please try again.</span>
+                </div>
+              )}
 
               {banner && (
                 <div

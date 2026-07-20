@@ -47,6 +47,7 @@ const Waitlist = lazy(() => import("./pages/Waitlist"));
 const Privacy = lazy(() => import("./pages/Privacy"));
 const Terms = lazy(() => import("./pages/Terms"));
 const Login = lazy(() => import("./pages/Login"));
+const ResetPassword = lazy(() => import("./pages/ResetPassword"));
 const Admin = lazy(() => import("./pages/Admin"));
 const AdminSmokeTest = lazy(() => import("./pages/AdminSmokeTest"));
 const AddendumIconLibrary = lazy(() => import("./pages/AddendumIconLibrary"));
@@ -199,6 +200,7 @@ const App = () => (
                       <Route path="/privacy" element={<Privacy />} />
                       <Route path="/terms" element={<Terms />} />
                       <Route path="/login" element={<Login />} />
+                      <Route path="/reset-password" element={<ResetPassword />} />
                       <Route path="/sign/:token" element={<MobileSigning />} />
                       <Route path="/review/:token" element={<CustomerReview />} />
                       <Route path="/install/:token" element={<InstallerProof />} />
