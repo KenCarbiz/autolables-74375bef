@@ -43,6 +43,24 @@ export function buildPassportActionPath(
   return `/v/${slug}/${section}${q ? `?${q}` : ""}`;
 }
 
+// Build a FORWARD navigation between V2 destination pages (e.g. Reserve → Trade)
+// that PRESERVES the originating passport returnTo carried in the current URL, so
+// a multi-hop journey (V3 → Reserve → Trade → Back) still returns to the V3
+// origin instead of dropping to /v/:slug after the first hop.
+export function passportForwardPath(
+  slug: string,
+  section: string,
+  search: string,
+  preview: boolean,
+): string {
+  const rt = new URLSearchParams(search || "").get("returnTo");
+  const params = new URLSearchParams();
+  if (isSafePassportReturnPath(rt)) params.set("returnTo", rt);
+  if (preview) params.set("preview", "1");
+  const q = params.toString();
+  return `/v/${slug}/${section}${q ? `?${q}` : ""}`;
+}
+
 // Resolve where a destination page's "Back to Vehicle Passport" should go.
 // Honors a validated returnTo (so a V3-originated visit returns to V3); falls
 // back to the canonical /v/:slug. Preserves preview mode in the fallback and,

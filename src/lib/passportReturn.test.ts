@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { isSafePassportReturnPath, buildPassportActionPath, resolvePassportBack } from "./passportReturn";
+import { isSafePassportReturnPath, buildPassportActionPath, resolvePassportBack, passportForwardPath } from "./passportReturn";
 
 describe("isSafePassportReturnPath", () => {
   it("accepts internal passport paths", () => {
@@ -37,6 +37,24 @@ describe("buildPassportActionPath", () => {
   it("preserves preview mode", () => {
     expect(buildPassportActionPath("qx50", "test-drive", "/v3/qx50", true)).toBe(
       "/v/qx50/test-drive?returnTo=%2Fv3%2Fqx50&preview=1",
+    );
+  });
+});
+
+describe("passportForwardPath", () => {
+  it("preserves the originating returnTo across a forward hop", () => {
+    // On /v/qx50/reserve?returnTo=/v3/qx50, going forward to Trade keeps /v3.
+    expect(passportForwardPath("qx50", "trade", "?returnTo=%2Fv3%2Fqx50", false)).toBe(
+      "/v/qx50/trade?returnTo=%2Fv3%2Fqx50",
+    );
+  });
+  it("omits returnTo when none is present or it is unsafe", () => {
+    expect(passportForwardPath("qx50", "trade", "", false)).toBe("/v/qx50/trade");
+    expect(passportForwardPath("qx50", "trade", "?returnTo=https%3A%2F%2Fevil.com", false)).toBe("/v/qx50/trade");
+  });
+  it("preserves preview", () => {
+    expect(passportForwardPath("qx50", "reserve", "?returnTo=%2Fv3%2Fqx50", true)).toBe(
+      "/v/qx50/reserve?returnTo=%2Fv3%2Fqx50&preview=1",
     );
   });
 });

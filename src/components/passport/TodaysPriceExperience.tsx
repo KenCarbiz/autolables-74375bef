@@ -12,7 +12,7 @@ import { formatPhone } from "@/components/addendum/CustomerInfoSection";
 import { trackLeadSubmitted, trackCustomerEngagement } from "@/lib/engagement/customerEngagement";
 import { estimateAffordability, DEFAULT_APR_PERCENT } from "@/lib/affordability";
 import { fmt$, type PassportData } from "@/lib/passportV2Data";
-import { resolvePassportBack } from "@/lib/passportReturn";
+import { resolvePassportBack, passportForwardPath } from "@/lib/passportReturn";
 import { readBuildSheet } from "@/lib/buildSheet";
 import { listingGallery, listingHero } from "@/lib/photos";
 import { resolveTodaysPrice } from "@/lib/todaysPrice";
@@ -333,7 +333,7 @@ const TodaysPriceExperience = ({ listing, d }: { listing: VehicleListing; d: Pas
         </div>
         <div className="flex flex-wrap gap-2 justify-center mt-6">
           <button onClick={() => navigate(resolvePassportBack(window.location.search, listing.slug, isPreview))} className="h-11 px-5 rounded-xl bg-[#0B6FEA] text-white text-sm font-bold inline-flex items-center gap-2"><ChevronLeft className="w-4 h-4" /> Back to Vehicle Passport</button>
-          <button onClick={() => navigate(`/v/${listing.slug}/reserve${q}`)} className="h-11 px-5 rounded-xl border border-[#DDE5EE] text-sm font-bold text-[#334155]">Reserve This Vehicle</button>
+          <button onClick={() => navigate(passportForwardPath(listing.slug, "reserve", window.location.search, isPreview))} className="h-11 px-5 rounded-xl border border-[#DDE5EE] text-sm font-bold text-[#334155]">Reserve This Vehicle</button>
         </div>
       </div>
     </div>

@@ -15,7 +15,7 @@ import { formatPhone } from "@/components/addendum/CustomerInfoSection";
 import { trackLeadSubmitted, trackCustomerEngagement } from "@/lib/engagement/customerEngagement";
 import Logo from "@/components/brand/Logo";
 import { derivePassport, fmt$, type PassportData } from "@/lib/passportV2Data";
-import { resolvePassportBack } from "@/lib/passportReturn";
+import { resolvePassportBack, passportForwardPath } from "@/lib/passportReturn";
 import { readBuildSheet } from "@/lib/buildSheet";
 import { resolveTodaysPrice } from "@/lib/todaysPrice";
 import TodaysPriceExperience from "@/components/passport/TodaysPriceExperience";
@@ -183,7 +183,7 @@ const LeadForm = ({
       {/* The moment after a yes is the cheapest moment to get a second yes. */}
       <div className="flex flex-col sm:flex-row gap-2 justify-center mt-5">
         {dealerPhone && <a href={`tel:${dealerPhone.replace(/[^\d+]/g, "")}`} className="h-11 px-5 rounded-xl bg-[#2563EB] text-white text-sm font-bold inline-flex items-center justify-center gap-2"><Phone className="w-4 h-4" /> Call now instead</a>}
-        {intent !== "test_drive" && <button onClick={() => navigate(`/v/${listing.slug}/test-drive`)} className="h-11 px-5 rounded-xl border border-slate-200 text-sm font-bold text-slate-700 inline-flex items-center justify-center gap-2"><Car className="w-4 h-4" /> Schedule a test drive</button>}
+        {intent !== "test_drive" && <button onClick={() => navigate(passportForwardPath(listing.slug, "test-drive", window.location.search, new URLSearchParams(window.location.search).has("preview")))} className="h-11 px-5 rounded-xl border border-slate-200 text-sm font-bold text-slate-700 inline-flex items-center justify-center gap-2"><Car className="w-4 h-4" /> Schedule a test drive</button>}
       </div>
     </Card>
   );
@@ -282,7 +282,7 @@ const ReserveExperience = ({ listing, d, navigate }: { listing: VehicleListing; 
 
   const q = isPreview ? "?preview=1" : "";
   const goBack = () => { if (!isPreview) trackFlow(listing, "back_to_passport_clicked"); navigate(resolvePassportBack(window.location.search, listing.slug, isPreview)); };
-  const goTrade = () => { if (!isPreview) trackFlow(listing, "trade_value_clicked"); navigate(`/v/${listing.slug}/trade${q}`); };
+  const goTrade = () => { if (!isPreview) trackFlow(listing, "trade_value_clicked"); navigate(passportForwardPath(listing.slug, "trade", window.location.search, isPreview)); };
 
   const submit = async () => {
     const errs: typeof errors = {};
@@ -574,9 +574,9 @@ const ContactExperience = ({ listing, d, navigate }: { listing: VehicleListing; 
 
   const q = isPreview ? "?preview=1" : "";
   const goBack = () => { if (!isPreview) trackFlow(listing, "back_to_passport_clicked"); navigate(resolvePassportBack(window.location.search, listing.slug, isPreview)); };
-  const goTrade = () => { if (!isPreview) trackFlow(listing, "trade_value_clicked"); navigate(`/v/${listing.slug}/trade${q}`); };
-  const goReserve = () => { if (!isPreview) trackFlow(listing, "reserve_vehicle_clicked"); navigate(`/v/${listing.slug}/reserve${q}`); };
-  const goTestDrive = () => { if (!isPreview) trackFlow(listing, "test_drive_clicked"); navigate(`/v/${listing.slug}/test-drive${q}`); };
+  const goTrade = () => { if (!isPreview) trackFlow(listing, "trade_value_clicked"); navigate(passportForwardPath(listing.slug, "trade", window.location.search, isPreview)); };
+  const goReserve = () => { if (!isPreview) trackFlow(listing, "reserve_vehicle_clicked"); navigate(passportForwardPath(listing.slug, "reserve", window.location.search, isPreview)); };
+  const goTestDrive = () => { if (!isPreview) trackFlow(listing, "test_drive_clicked"); navigate(passportForwardPath(listing.slug, "test-drive", window.location.search, isPreview)); };
   const trackCall = () => { if (!isPreview) trackFlow(listing, "call_dealer_clicked"); };
   const trackText = () => { if (!isPreview) trackFlow(listing, "text_dealer_clicked"); };
 

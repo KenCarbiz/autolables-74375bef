@@ -711,7 +711,14 @@ export default function VehiclePassportGoverned() {
           no separate desktop data model. Hidden below xl so mobile V3 is
           byte-for-byte unchanged. */}
       {isDesktop && (() => {
-        const vcats = vsum.categories.map((c) => ({ label: c.label, done: c.state !== "pending" && c.state !== "unavailable", material: c.material }));
+        // Governed four-state tone (same machine as the hero verified card): a
+        // conflict must read "Review" and an unavailable check must read neutral,
+        // never a green "Checked" — a pending/unresolved check is never verified.
+        const vcats = vsum.categories.map((c) => {
+          const terminalPositive = c.state === "verified" || c.state === "dealer_confirmed" || c.state === "calculated" || c.state === "inferred";
+          const tone: "ok" | "review" | "na" | "pending" = terminalPositive ? "ok" : c.state === "conflict_detected" ? "review" : c.state === "unavailable" || c.state === "not_applicable" ? "na" : "pending";
+          return { label: c.label, tone, material: c.material };
+        });
         const vDone = vsum.completed;
         const vTotal = vsum.total;
         const vMaterialPending = vsum.materialPending > 0;
@@ -891,12 +898,19 @@ export default function VehiclePassportGoverned() {
                     <button onClick={() => go("verification")} className="text-[13px] font-bold inline-flex items-center gap-1 hover:underline" style={{ color: BLUE }}>View all categories <ChevronRight className="w-4 h-4" /></button>
                   </div>
                   <div className="mt-4 grid grid-cols-4 gap-2.5">
-                    {vcats.map((c) => (
-                      <div key={c.label} className="rounded-xl border px-3 py-2.5 flex items-center gap-2" style={{ borderColor: BORDER, background: c.done ? "#fff" : "#FFFBEB" }}>
-                        {c.done ? <CheckCircle2 className="w-4 h-4 shrink-0" style={{ color: GREEN }} /> : <Clock className="w-4 h-4 shrink-0" style={{ color: AMBER }} />}
-                        <div className="min-w-0"><div className="text-[12px] font-semibold leading-tight truncate" style={{ color: NAVY }}>{c.label}</div><div className="text-[10px]" style={{ color: c.done ? SUB : AMBER }}>{c.done ? "Checked" : "Pending"}</div></div>
-                      </div>
-                    ))}
+                    {vcats.map((c) => {
+                      const ok = c.tone === "ok";
+                      const na = c.tone === "na";
+                      const color = ok ? GREEN : na ? "#94A3B8" : AMBER;
+                      const Icon = ok ? CheckCircle2 : na ? Info : Clock;
+                      const status = ok ? "Checked" : c.tone === "review" ? "Review" : na ? "Not available" : "Pending";
+                      return (
+                        <div key={c.label} className="rounded-xl border px-3 py-2.5 flex items-center gap-2" style={{ borderColor: BORDER, background: ok ? "#fff" : na ? "#F8FAFC" : "#FFFBEB" }}>
+                          <Icon className="w-4 h-4 shrink-0" style={{ color }} />
+                          <div className="min-w-0"><div className="text-[12px] font-semibold leading-tight truncate" style={{ color: NAVY }}>{c.label}</div><div className="text-[10px]" style={{ color: ok ? SUB : color }}>{status}</div></div>
+                        </div>
+                      );
+                    })}
                   </div>
                   <p className="mt-3 text-[11px]" style={{ color: SUB }}>AutoLabels Data-Verified Report — records aggregated across data sources. A pending check is never shown as verified.</p>
                 </section>
