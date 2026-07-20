@@ -20,6 +20,10 @@ import { trackPassportOpened, trackWindowStickerScanned, trackCustomerCtaClicked
 import { isPassportPanelKey, type PassportPanelKey } from "@/components/passport/passportPanelKeys";
 import { derivePassportVerification } from "@/lib/passport/verificationSummary";
 import PassportActionDrawer, { type PassportActionKey } from "@/components/passport/PassportActionDrawer";
+import { resolveMarketComparison, type MarketSeriesPoint } from "@/lib/passport/marketComparison";
+import { normalizeComparables } from "@/lib/passport/comparables";
+import { resolveFuelEconomy, FUEL_MODULE_HEADING } from "@/lib/passport/fuelEconomy";
+import { trackCustomerEngagement } from "@/lib/engagement/customerEngagement";
 import Logo from "@/components/brand/Logo";
 
 // One shared sticky offset for the desktop header + action center so they can
@@ -44,6 +48,52 @@ function useIsDesktop(): boolean {
     return () => mql.removeEventListener?.("change", on);
   }, []);
   return is;
+}
+
+// Fires a governed "viewed" event ONCE when ≥40% of the module is on-screen —
+// never merely because it rendered offscreen. Desktop-only mount (foundation #1)
+// means no cross-layer duplication.
+function ModuleView({ onView, children, className, dataModule }: { onView: () => void; children: React.ReactNode; className?: string; dataModule?: string }) {
+  const ref = useRef<HTMLDivElement | null>(null);
+  const fired = useRef(false);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el || typeof IntersectionObserver === "undefined") { if (!fired.current) { fired.current = true; onView(); } return; }
+    const io = new IntersectionObserver((entries) => {
+      for (const e of entries) if (e.isIntersecting && e.intersectionRatio >= 0.4 && !fired.current) { fired.current = true; onView(); io.disconnect(); }
+    }, { threshold: [0, 0.4, 1] });
+    io.observe(el);
+    return () => io.disconnect();
+  }, [onView]);
+  return <div ref={ref} className={className} data-module={dataModule}>{children}</div>;
+}
+
+// Dependency-free two-series line chart with a direct legend and an accessible
+// text summary. Color is never the only differentiator (legend + labels).
+function MarketTrendChart({ listing, market, currency }: { listing: MarketSeriesPoint[]; market: MarketSeriesPoint[]; currency: (n: number) => string }) {
+  const all = [...listing, ...market].map((p) => p.value);
+  if (listing.length < 2) return null;
+  const w = 560, h = 150, pad = 10;
+  const min = Math.min(...all), max = Math.max(...all), span = Math.max(1, max - min);
+  const xs = (i: number, len: number) => pad + (len <= 1 ? 0 : (i / (len - 1)) * (w - pad * 2));
+  const ys = (v: number) => pad + (1 - (v - min) / span) * (h - pad * 2);
+  const path = (pts: MarketSeriesPoint[]) => pts.map((p, i) => `${xs(i, pts.length).toFixed(1)},${ys(p.value).toFixed(1)}`).join(" ");
+  const first = listing[0], last = listing[listing.length - 1];
+  const summary = `This vehicle's listed price moved from ${currency(first.value)} on ${first.at} to ${currency(last.value)} on ${last.at}${market.length >= 2 ? `; the normalized market value is also shown.` : "."}`;
+  return (
+    <div>
+      <svg viewBox={`0 0 ${w} ${h}`} className="w-full" style={{ height: 150 }} role="img" aria-label={summary}>
+        {market.length >= 2 && <polyline points={path(market)} fill="none" stroke="#94A3B8" strokeWidth="2" strokeDasharray="5 4" strokeLinecap="round" />}
+        <polyline points={path(listing)} fill="none" stroke="#2563EB" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+        {listing.map((p, i) => <circle key={i} cx={xs(i, listing.length)} cy={ys(p.value)} r="3" fill="#2563EB" />)}
+      </svg>
+      <div className="mt-1 flex items-center gap-4 text-[11px]" style={{ color: "#64748B" }}>
+        <span className="inline-flex items-center gap-1.5"><span className="w-4 h-0.5" style={{ background: "#2563EB" }} /> This vehicle</span>
+        {market.length >= 2 && <span className="inline-flex items-center gap-1.5"><span className="w-4 h-0.5" style={{ background: "#94A3B8" }} /> Normalized market value</span>}
+      </div>
+      <p className="sr-only">{summary}</p>
+    </div>
+  );
 }
 
 // The full slide-out dispatcher is heavy (~3200 lines). Lazy-load so the
@@ -158,6 +208,14 @@ export default function VehiclePassportGoverned() {
   // Shared verification source of truth — both mobile and desktop layers read
   // this so they can never diverge on totals / pending / material-pending.
   const vsum = derivePassportVerification(d, listing);
+  // Phase E analytics — the specific event name rides in metadata.event on the
+  // existing engagement pipeline (no new enum); ModuleView dedupes views. No PII.
+  const firePhaseE = (event: string, extra: Record<string, unknown> = {}) =>
+    trackCustomerEngagement({
+      tenantId: listing.tenant_id, storeId: listing.store_id, vehicleId: listing.id, vin: listing.vin,
+      source: "passport", surface: "vehicle_passport", eventType: "engagement_ping",
+      metadata: { event, passport_version: "v3", viewport_category: "desktop", layout_variant: "intelligence_first", analytics_schema_version: 1, ...extra },
+    });
   const isSaved = saved ?? isVehicleSaved(listing.slug);
   const handleSave = () => {
     const now = toggleSavedVehicle({ slug: listing.slug, ymm: listing.ymm, trim: listing.trim, price: listing.price, image: gallery[0] || listing.hero_image_url || null });
@@ -670,6 +728,17 @@ export default function VehiclePassportGoverned() {
           { label: "Share", icon: Upload, onClick: handleShare },
         ];
         const label3 = "text-[11px] font-semibold uppercase tracking-wider";
+        // ── Phase E view models (governed, presentation-only) ──
+        const mc = resolveMarketComparison({
+          valueHistory: d.valueHistory, advertisedPrice: price, normalizedMarketValue: d.marketAvg,
+          sampleSize: d.marketMeta.similarCount, radiusMiles: d.marketMeta.radius, checkedAt: d.marketCheckedAt,
+        });
+        const subjectYear = Number((listing.ymm || "").match(/\b(19|20)\d{2}\b/)?.[0]) || null;
+        const sims = normalizeComparables(
+          { vin: listing.vin, year: subjectYear, trim: listing.trim ?? null, advertisedPrice: price },
+          d.comparables,
+        );
+        const fuel = resolveFuelEconomy(d.epa);
         return (
           <div style={{ background: BG }}>
             {/* Desktop header */}
@@ -781,7 +850,7 @@ export default function VehiclePassportGoverned() {
                       </div>
                       <div><div className={label3} style={{ color: SUB }}>Comparables</div><div className="mt-1 text-[22px] font-extrabold tabular-nums" style={{ color: NAVY }}>{d.marketMeta.similarCount ?? "—"}</div><div className="text-[11px]" style={{ color: SUB }}>{d.marketMeta.radius ? `within ${d.marketMeta.radius} mi` : "in the region"}</div></div>
                       <div><div className={label3} style={{ color: SUB }}>Below market</div><div className="mt-1 text-[22px] font-extrabold tabular-nums" style={{ color: d.belowMarket && d.belowMarket > 0 ? GREEN : NAVY }}>{d.belowMarket && d.belowMarket > 0 ? fmt$(d.belowMarket) : "—"}</div><div className="text-[11px]" style={{ color: SUB }}>vs normalized value</div></div>
-                      <div><div className={label3} style={{ color: SUB }}>Market avg</div><div className="mt-1 text-[22px] font-extrabold tabular-nums" style={{ color: NAVY }}>{d.marketAvg != null ? fmt$(d.marketAvg) : "—"}</div><div className="text-[11px]" style={{ color: SUB }}>{d.marketCheckedAt ? "Live market data" : "—"}</div></div>
+                      <div><div className={label3} style={{ color: SUB }}>Normalized market value</div><div className="mt-1 text-[22px] font-extrabold tabular-nums" style={{ color: NAVY }}>{d.marketAvg != null ? fmt$(d.marketAvg) : "—"}</div><div className="text-[11px]" style={{ color: SUB }}>{d.marketCheckedAt ? "VIN-level predicted value" : "—"}</div></div>
                     </div>
                   ) : (
                     <p className="mt-3 text-[13px]" style={{ color: SUB }}>Market comparison temporarily unavailable. Vehicle information and dealer pricing remain available.</p>
@@ -805,7 +874,8 @@ export default function VehiclePassportGoverned() {
                   ))}
                 </section>
 
-                {/* Lower page — Why this vehicle checks out + dealer story. */}
+                {/* Lower page — Phase E intelligence band (governed, presentation-only). */}
+                {/* Row: Why this vehicle checks out | Market Comparison */}
                 <section className="grid grid-cols-2 gap-5 items-start">
                   <div className={`${CARD} p-5`}>
                     <div className="text-[14px] font-extrabold" style={{ color: NAVY }}>Why This Vehicle Checks Out</div>
@@ -816,6 +886,105 @@ export default function VehiclePassportGoverned() {
                     </ul>
                     <button onClick={() => go("great-buy")} className="mt-3 text-[13px] font-bold inline-flex items-center gap-1 hover:underline" style={{ color: BLUE }}>See full buying report <ChevronRight className="w-4 h-4" /></button>
                   </div>
+
+                  <ModuleView onView={() => firePhaseE("market_comparison_viewed", { module_id: "market-comparison", module_position: 2, mode: mc.mode })} dataModule="market-comparison" className={`${CARD} p-5`}>
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="text-[14px] font-extrabold" style={{ color: NAVY }}>Market Comparison</div>
+                      {mc.mode !== "unavailable" && <button onClick={() => { firePhaseE("market_methodology_opened"); openPanel("price-history"); }} className="text-[13px] font-bold inline-flex items-center gap-1 hover:underline" style={{ color: BLUE }}>View Market Details <ChevronRight className="w-4 h-4" /></button>}
+                    </div>
+                    {mc.mode === "unavailable" ? (
+                      <p className="mt-3 text-[13px]" style={{ color: SUB }}>Market comparison temporarily unavailable. Vehicle information and dealer pricing remain available.</p>
+                    ) : (
+                      <>
+                        <div className="mt-3 flex items-end justify-between gap-4">
+                          <div><div className={label3} style={{ color: SUB }}>This vehicle</div><div className="text-[20px] font-extrabold tabular-nums" style={{ color: NAVY }}>{mc.advertisedPrice != null ? fmt$(mc.advertisedPrice) : "—"}</div></div>
+                          <div className="text-right"><div className={label3} style={{ color: SUB }}>{mc.marketValueLabel}</div><div className="text-[20px] font-extrabold tabular-nums" style={{ color: NAVY }}>{mc.normalizedMarketValue != null ? fmt$(mc.normalizedMarketValue) : "—"}</div></div>
+                        </div>
+                        {mc.diff != null && (
+                          <div className="mt-2 text-[13px] font-bold" style={{ color: mc.diff < 0 ? GREEN : NAVY }}>
+                            {mc.diff < 0 ? `${fmt$(-mc.diff)} below ${mc.marketValueLabel.toLowerCase()}` : mc.diff > 0 ? `${fmt$(mc.diff)} above ${mc.marketValueLabel.toLowerCase()}` : `At ${mc.marketValueLabel.toLowerCase()}`}
+                            {mc.diffPct != null ? ` (${Math.abs(mc.diffPct)}%)` : ""}
+                          </div>
+                        )}
+                        {mc.mode === "trend" ? (
+                          <div className="mt-3">
+                            {mc.periodLabel && <div className="text-[11px] mb-1" style={{ color: SUB }}>{mc.periodLabel}</div>}
+                            <MarketTrendChart listing={mc.listingSeries} market={mc.marketSeries} currency={(n) => fmt$(n) || `$${n}`} />
+                          </div>
+                        ) : (
+                          <div className="mt-3">
+                            {marketPos && (
+                              <>
+                                <div className="relative h-2.5 rounded-full" style={{ background: "linear-gradient(90deg,#16A34A,#F59E0B,#EF4444)" }}>
+                                  <span className="absolute -top-1 w-1.5 rounded-full ring-2 ring-white" style={{ left: `calc(${Math.round(marketPos.t * 100)}% - 3px)`, height: 18, background: NAVY }} />
+                                </div>
+                                <div className="mt-1.5 flex justify-between text-[10px]" style={{ color: SUB }}><span>Best value</span><span className="font-bold" style={{ color: NAVY }}>{marketPos.label}</span><span>Above market</span></div>
+                              </>
+                            )}
+                          </div>
+                        )}
+                        <div className="mt-2 flex flex-wrap gap-x-4 gap-y-0.5 text-[11px]" style={{ color: SUB }}>
+                          {mc.sampleSize != null && <span>{mc.sampleSize} comparables{mc.radiusMiles ? ` · ${mc.radiusMiles} mi` : ""}</span>}
+                          {mc.checkedAt && <span>Checked {mc.checkedAt.slice(0, 10)}</span>}
+                        </div>
+                        {mc.limitations.length > 0 && <p className="mt-1.5 text-[11px]" style={{ color: SUB }}>{mc.limitations[0]}</p>}
+                      </>
+                    )}
+                  </ModuleView>
+                </section>
+
+                {/* Similar Vehicles — full width, horizontally scrollable, closest first. */}
+                <ModuleView onView={() => firePhaseE("similar_vehicles_viewed", { module_id: "similar-vehicles", module_position: 3, count: sims.length })} dataModule="similar-vehicles" className={`${CARD} p-5`}>
+                  <div className="flex items-center justify-between gap-3">
+                    <div><div className="text-[14px] font-extrabold" style={{ color: NAVY }}>Similar Vehicles</div><p className="text-[12px]" style={{ color: SUB }}>Closest comparable listings. Price shown is the raw advertised difference.</p></div>
+                    {sims.length > 0 && <button onClick={() => { firePhaseE("all_similar_vehicles_opened"); openPanel("comparable-vehicles"); }} className="text-[13px] font-bold inline-flex items-center gap-1 hover:underline shrink-0" style={{ color: BLUE }}>View All Similar Vehicles <ChevronRight className="w-4 h-4" /></button>}
+                  </div>
+                  {sims.length === 0 ? (
+                    <p className="mt-4 text-[13px]" style={{ color: SUB }}>No sufficiently similar vehicles were found within the current market radius.</p>
+                  ) : (
+                    <div className="mt-4 overflow-x-auto -mx-1 px-1 pb-1"><div className="flex gap-4" style={{ width: "max-content" }}>
+                      {sims.map((c) => (
+                        <button key={c.id} onClick={() => { firePhaseE("similar_vehicle_opened", { comparable_id: c.id, match_label: c.matchLabel }); openPanel("comparable-vehicles"); }} className="text-left rounded-xl border overflow-hidden hover:border-[#2563EB] transition-colors" style={{ borderColor: BORDER, width: 220 }}>
+                          <div className="aspect-[16/10] bg-slate-100">{c.image ? <img src={c.image} alt={c.ymm || "Comparable vehicle"} loading="lazy" className="w-full h-full object-cover" /> : <div className="w-full h-full grid place-items-center"><Package className="w-6 h-6 text-slate-300" /></div>}</div>
+                          <div className="p-3">
+                            <div className="text-[12.5px] font-bold leading-tight truncate" style={{ color: NAVY }}>{c.ymm || "Comparable listing"}</div>
+                            <div className="text-[11px] mt-0.5" style={{ color: SUB }}>{[c.trim, c.miles != null ? `${c.miles.toLocaleString()} mi` : null, c.dist != null ? `${Math.round(c.dist)} mi away` : null].filter(Boolean).join(" · ")}</div>
+                            <div className="text-[15px] font-extrabold tabular-nums mt-1.5" style={{ color: NAVY }}>{fmt$(c.price)}</div>
+                            <div className="text-[11px] font-semibold mt-0.5" style={{ color: c.priceDelta < 0 ? GREEN : c.priceDelta > 0 ? NAVY : SUB }}>{c.priceDeltaLabel}</div>
+                            <div className="mt-1.5 inline-flex items-center gap-1 text-[10px] font-semibold rounded-full px-2 py-0.5" style={{ background: "#F1F5F9", color: SUB }}>{c.matchLabel}</div>
+                          </div>
+                        </button>
+                      ))}
+                    </div></div>
+                  )}
+                </ModuleView>
+
+                {/* Fuel Economy & Running Cost — governed EPA fuel data only. */}
+                <ModuleView onView={() => firePhaseE("fuel_economy_viewed", { module_id: "fuel-economy", module_position: 4, available: fuel.available })} dataModule="fuel-economy" className={`${CARD} p-5`}>
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="text-[14px] font-extrabold" style={{ color: NAVY }}>{FUEL_MODULE_HEADING}</div>
+                    {fuel.available && fuel.source && <button onClick={() => firePhaseE("epa_methodology_opened")} className="text-[11px] font-semibold inline-flex items-center gap-1" style={{ color: SUB }}><Info className="w-3.5 h-3.5" /> {fuel.source}</button>}
+                  </div>
+                  {!fuel.available ? (
+                    <p className="mt-3 text-[13px]" style={{ color: SUB }}>{fuel.note}</p>
+                  ) : (
+                    <>
+                      <div className="mt-3 grid grid-cols-2 md:grid-cols-4 gap-4">
+                        {fuel.annualFuelCost != null && (
+                          <div><div className={label3} style={{ color: SUB }}>{fuel.annualFuelCostLabel}</div><div className="mt-1 text-[20px] font-extrabold tabular-nums" style={{ color: NAVY }}>{fmt$(fuel.annualFuelCost)}<span className="text-[12px] font-semibold" style={{ color: SUB }}>/yr</span></div></div>
+                        )}
+                        {fuel.combinedMpg != null && <div><div className={label3} style={{ color: SUB }}>Combined</div><div className="mt-1 text-[20px] font-extrabold tabular-nums" style={{ color: NAVY }}>{fuel.combinedMpg}<span className="text-[12px] font-semibold" style={{ color: SUB }}> MPG</span></div></div>}
+                        {(fuel.cityMpg != null || fuel.highwayMpg != null) && <div><div className={label3} style={{ color: SUB }}>City / Hwy</div><div className="mt-1 text-[20px] font-extrabold tabular-nums" style={{ color: NAVY }}>{fuel.cityMpg ?? "—"}/{fuel.highwayMpg ?? "—"}</div></div>}
+                        {fuel.rangeMiles != null && <div><div className={label3} style={{ color: SUB }}>EPA range</div><div className="mt-1 text-[20px] font-extrabold tabular-nums" style={{ color: NAVY }}>{fuel.rangeMiles}<span className="text-[12px] font-semibold" style={{ color: SUB }}> mi</span></div></div>}
+                        {fuel.fuelType && <div><div className={label3} style={{ color: SUB }}>Fuel</div><div className="mt-1 text-[15px] font-bold" style={{ color: NAVY }}>{fuel.fuelType}</div></div>}
+                      </div>
+                      <p className="mt-3 text-[11px]" style={{ color: SUB }}>{fuel.note}</p>
+                    </>
+                  )}
+                </ModuleView>
+
+                {/* Dealer story — full width. */}
+                <section className="grid grid-cols-1 gap-5 items-start">
                   {dealerName && (
                     <div className={`${CARD} overflow-hidden`} data-module="dealer">
                       {dt.storefrontUrl ? (
