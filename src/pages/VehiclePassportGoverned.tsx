@@ -2,8 +2,8 @@ import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import {
   Bookmark, MoreHorizontal, Upload, Phone, MessageSquare, Clock, DollarSign,
-  ChevronDown, ChevronRight, Star, Sparkles, ShieldCheck, CheckCircle2, MapPin,
-  RefreshCw, Send, BadgeCheck, Play, Package, Award, TrendingUp, X,
+  ChevronDown, ChevronRight, ChevronLeft, Star, Sparkles, ShieldCheck, CheckCircle2, MapPin,
+  RefreshCw, Send, BadgeCheck, Play, Package, Award, TrendingUp, X, Info, Lock, Wrench, FileText,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Helmet } from "react-helmet-async";
@@ -240,14 +240,14 @@ export default function VehiclePassportGoverned() {
   };
 
   return (
-    <div className="min-h-screen pb-28" style={{ background: BG, color: NAVY }}>
+    <div className="min-h-screen pb-28 xl:pb-0" style={{ background: BG, color: NAVY }}>
       <Helmet>
         <title>{listing.ymm ? `${listing.ymm} — Vehicle Passport` : "Vehicle Passport"}</title>
         <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
       </Helmet>
 
-      {/* ── Compact header ─────────────────────────────────────────── */}
-      <header className="sticky top-0 z-40 bg-white/95 backdrop-blur border-b" style={{ borderColor: BORDER }}>
+      {/* ── Compact header (mobile / tablet < xl) ──────────────────── */}
+      <header className="sticky top-0 z-40 bg-white/95 backdrop-blur border-b xl:hidden" style={{ borderColor: BORDER }}>
         <div className="max-w-lg mx-auto h-14 px-4 flex items-center justify-between gap-3">
           <div className="min-w-0 flex items-center gap-2">
             {dealerLogo ? (
@@ -276,7 +276,8 @@ export default function VehiclePassportGoverned() {
         </div>
       </header>
 
-      <div className="max-w-lg mx-auto">
+      {/* ── Mobile / tablet column (< xl) — the approved mobile V3, unchanged ── */}
+      <div className="max-w-lg mx-auto xl:hidden">
 
         {/* ── Hero gallery ─────────────────────────────────────────── */}
         <div ref={heroRef} className="relative bg-white" data-module="gallery">
@@ -591,9 +592,260 @@ export default function VehiclePassportGoverned() {
         )}
       </div>
 
-      {/* ── Sticky bottom CTA ──────────────────────────────────────── */}
+      {/* ══ Intelligence-first desktop (≥ xl / 1280px) ═══════════════════════
+          Two-column outer shell: a wide intelligence WORKSPACE + a sticky
+          customer ACTION CENTER. Gallery + identity split only the top hero.
+          Verification and market span the workspace. Detail modules open the
+          SAME V3 drawers (openPanel) the mobile passport uses — no V2 routes.
+          Reuses the identical governed data (d / listing) — no second fetch,
+          no separate desktop data model. Hidden below xl so mobile V3 is
+          byte-for-byte unchanged. */}
+      {(() => {
+        const vcats = [
+          { label: "VIN", done: !!listing.vin, material: true },
+          { label: "Title & Brand", done: d.cleanTitle, material: true },
+          { label: "Recall", done: !!listing.recall_status || d.recallClear, material: true },
+          { label: "Vehicle History", done: d.ownerCount != null || d.accidentCount != null || d.cleanTitle, material: false },
+          { label: "Market Data", done: d.marketAvg != null, material: false },
+          { label: "Warranty", done: !!d.warrantyStr, material: false },
+          { label: "Service History", done: d.serviceCount > 0, material: false },
+        ];
+        const vDone = vcats.filter((c) => c.done).length;
+        const vTotal = vcats.length;
+        const vMaterialPending = vcats.some((c) => c.material && !c.done);
+        const specChips = [
+          listing.mileage != null ? `${listing.mileage.toLocaleString()} mi` : null,
+          ...d.highlights.slice(0, 3).map((h) => h.label),
+        ].filter(Boolean) as string[];
+        // Primary CTA is governed by vehicle state — a material check pending
+        // downgrades "Reserve" to a confirmation request, never a hard sell.
+        const primary = vMaterialPending
+          ? { label: "Ask Dealer to Confirm", onClick: () => go("contact") }
+          : { label: "Reserve This Vehicle", onClick: () => go("reserve") };
+        const secondary = [
+          { label: "Value My Trade", icon: RefreshCw, onClick: () => go("trade") },
+          { label: "Schedule Test Drive", icon: Clock, onClick: () => go("test-drive") },
+        ];
+        const compact = [
+          { label: "Call", icon: Phone, onClick: stickyAction("call").onClick },
+          { label: "Text", icon: MessageSquare, onClick: stickyAction("text").onClick },
+          { label: "Watch Price", icon: Bookmark, onClick: handleSave },
+          { label: "Share", icon: Upload, onClick: handleShare },
+        ];
+        const label3 = "text-[11px] font-semibold uppercase tracking-wider";
+        return (
+          <div className="hidden xl:block" style={{ background: BG }}>
+            {/* Desktop header */}
+            <header className="sticky top-0 z-40 bg-white/95 backdrop-blur border-b" style={{ borderColor: BORDER }}>
+              <div className="max-w-[1520px] mx-auto h-16 px-6 flex items-center justify-between gap-4">
+                <div className="flex items-center gap-4 min-w-0">
+                  {dealerLogo ? <img src={dealerLogo} alt={dealerName} className="h-8 max-w-[150px] object-contain" /> : <Logo variant="full" className="h-7" />}
+                  {dealerName && <div className="pl-4 border-l min-w-0" style={{ borderColor: BORDER }}><div className="text-[13px] font-bold truncate" style={{ color: NAVY }}>{dealerName}</div>{d.dealerAddress && <div className="text-[11px] truncate" style={{ color: SUB }}>{d.dealerAddress}</div>}</div>}
+                  <div className="pl-4 border-l min-w-0 hidden 2xl:block" style={{ borderColor: BORDER }}><div className="text-[13px] font-extrabold truncate" style={{ color: NAVY }}>{listing.ymm}{listing.trim ? ` ${listing.trim}` : ""}</div>{listing.vin && <div className="text-[11px] font-mono" style={{ color: SUB }}>VIN {listing.vin}</div>}</div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button onClick={handleSave} className="h-9 px-3 rounded-lg border inline-flex items-center gap-1.5 text-[13px] font-bold hover:bg-slate-50" style={{ borderColor: BORDER, color: isSaved ? BLUE : NAVY }}><Bookmark className="w-4 h-4" style={{ fill: isSaved ? BLUE : "none" }} /> Save</button>
+                  <button onClick={handleShare} className="h-9 px-3 rounded-lg inline-flex items-center gap-1.5 text-[13px] font-bold text-white" style={{ background: BLUE }}><Upload className="w-4 h-4" /> Share</button>
+                </div>
+              </div>
+            </header>
+
+            <div className="max-w-[1520px] mx-auto px-6 py-6 grid grid-cols-[minmax(0,1fr)_360px] gap-6 items-start">
+              {/* ── MAIN INTELLIGENCE WORKSPACE ── */}
+              <main className="min-w-0 space-y-5">
+                {/* Hero: gallery | identity */}
+                <section className={`${CARD} p-5 grid grid-cols-[minmax(0,1.15fr)_minmax(300px,0.85fr)] gap-5`} aria-label="Vehicle overview">
+                  <div className="min-w-0">
+                    <div className="relative aspect-[4/3] rounded-xl overflow-hidden bg-slate-100 group cursor-pointer" onClick={() => setGalleryOpen(true)}>
+                      {heroImg ? <img src={heroImg} alt={listing.ymm || "Vehicle"} className="w-full h-full object-cover" /> : <div className="w-full h-full grid place-items-center text-slate-400"><Package className="w-10 h-10" /></div>}
+                      {gallery.length > 1 && <span className="absolute top-3 right-3 h-7 px-2.5 rounded-full bg-black/60 text-white text-[11px] font-semibold inline-flex items-center">{idx + 1} / {gallery.length}</span>}
+                      {gallery.length > 1 && <>
+                        <button aria-label="Previous photo" onClick={(e) => { e.stopPropagation(); swipeHero(-1); }} className="absolute left-2 top-1/2 -translate-y-1/2 h-9 w-9 grid place-items-center rounded-full bg-white/90 shadow opacity-0 group-hover:opacity-100 transition"><ChevronLeft className="w-5 h-5" style={{ color: NAVY }} /></button>
+                        <button aria-label="Next photo" onClick={(e) => { e.stopPropagation(); swipeHero(1); }} className="absolute right-2 top-1/2 -translate-y-1/2 h-9 w-9 grid place-items-center rounded-full bg-white/90 shadow opacity-0 group-hover:opacity-100 transition"><ChevronRight className="w-5 h-5" style={{ color: NAVY }} /></button>
+                      </>}
+                    </div>
+                    {gallery.length > 1 && (
+                      <div className="mt-2.5 flex gap-2">
+                        {gallery.slice(0, 6).map((src, i) => (
+                          <button key={i} onClick={() => setIdx(i)} className={`h-14 w-16 rounded-lg overflow-hidden border-2 shrink-0 ${i === idx ? "" : "opacity-70"}`} style={{ borderColor: i === idx ? BLUE : "transparent" }}>
+                            <img src={src} alt={`${listing.ymm || "Vehicle"} photo ${i + 1}`} loading="lazy" className="w-full h-full object-cover" />
+                          </button>
+                        ))}
+                        {gallery.length > 6 && <button onClick={() => setGalleryOpen(true)} className="h-14 w-16 rounded-lg grid place-items-center text-[12px] font-bold shrink-0" style={{ background: "#EEF2F7", color: NAVY }}>+{gallery.length - 6}</button>}
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="min-w-0">
+                    <div className="inline-flex items-center h-6 px-2.5 rounded-full text-[11px] font-bold uppercase tracking-wide" style={{ background: isNew ? "#EFF6FF" : "#F1F5F9", color: isNew ? BLUE : NAVY }}>{isNew ? "New" : condition === "cpo" ? "Certified" : "Used"}</div>
+                    <h1 className="mt-2 text-[26px] leading-tight font-extrabold" style={{ color: NAVY }}>{listing.ymm}{listing.trim ? ` ${listing.trim}` : ""}</h1>
+                    {specChips.length > 0 && <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-[13px]" style={{ color: SUB }}>{specChips.map((c, i) => <span key={i} className="inline-flex items-center gap-1.5">{i > 0 && <span className="w-1 h-1 rounded-full" style={{ background: "#CBD5E1" }} />}{c}</span>)}</div>}
+
+                    <div className="mt-4 flex items-end justify-between gap-4">
+                      <div><div className={label3} style={{ color: SUB }}>{d.priceLabel || "Our price"}</div><div className="text-[30px] font-extrabold tabular-nums leading-none mt-1" style={{ color: NAVY }}>{price != null ? fmt$(price) : "—"}</div></div>
+                      <div className="text-right space-y-0.5">
+                        {saveVs ? <div className="text-[13px] font-bold tabular-nums" style={{ color: GREEN }}>{fmt$(saveVs)} <span className="font-semibold" style={{ color: SUB }}>below MSRP</span></div> : null}
+                        {d.belowMarket != null && d.belowMarket > 0 ? <div className="text-[13px] font-bold tabular-nums" style={{ color: GREEN }}>{fmt$(d.belowMarket)} <span className="font-semibold" style={{ color: SUB }}>below market value</span></div> : null}
+                      </div>
+                    </div>
+
+                    {/* Buying-candidate strip — governed: pending material check is surfaced, never hidden. */}
+                    <div className="mt-4 rounded-xl border p-3 flex items-center justify-between gap-3" style={{ borderColor: BORDER, background: "#F8FAFC" }}>
+                      <div className="inline-flex items-center gap-2"><ShieldCheck className="w-4 h-4" style={{ color: GREEN }} /><span className="text-[13px] font-bold" style={{ color: NAVY }}>Strong Buying Candidate</span></div>
+                      {vMaterialPending && <span className="inline-flex items-center gap-1 text-[11px] font-bold" style={{ color: AMBER }}><Info className="w-3.5 h-3.5" /> 1 material check pending</span>}
+                    </div>
+                    {chips.length > 0 && (
+                      <div className="mt-3 grid grid-cols-3 gap-2">
+                        {chips.map((c, i) => (
+                          <div key={i} className="rounded-xl border p-2.5" style={{ borderColor: BORDER }}>
+                            <c.icon className="w-4 h-4" style={{ color: c.tone === "green" ? GREEN : BLUE }} />
+                            <div className="mt-1 text-[11px] font-semibold leading-tight" style={{ color: NAVY }}>{c.label}</div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </section>
+
+                {/* Verified Vehicle Data — spans the workspace; pending stays visible. */}
+                <section className={`${CARD} p-5`} data-module="verification" aria-label="Verified vehicle data">
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="inline-flex items-center gap-2">
+                      <span className="h-8 w-8 grid place-items-center rounded-full" style={{ background: vMaterialPending ? "#FEF3C7" : "#DCFCE7" }}><CheckCircle2 className="w-4 h-4" style={{ color: vMaterialPending ? AMBER : GREEN }} /></span>
+                      <div><div className="text-[14px] font-extrabold" style={{ color: NAVY }}>Verified Vehicle Data</div><div className="text-[12px]" style={{ color: SUB }}>{vDone} of {vTotal} checks complete{vMaterialPending ? " · a material check is still pending" : ""}</div></div>
+                    </div>
+                    <button onClick={() => go("verification")} className="text-[13px] font-bold inline-flex items-center gap-1 hover:underline" style={{ color: BLUE }}>View all categories <ChevronRight className="w-4 h-4" /></button>
+                  </div>
+                  <div className="mt-4 grid grid-cols-4 gap-2.5">
+                    {vcats.map((c) => (
+                      <div key={c.label} className="rounded-xl border px-3 py-2.5 flex items-center gap-2" style={{ borderColor: BORDER, background: c.done ? "#fff" : "#FFFBEB" }}>
+                        {c.done ? <CheckCircle2 className="w-4 h-4 shrink-0" style={{ color: GREEN }} /> : <Clock className="w-4 h-4 shrink-0" style={{ color: AMBER }} />}
+                        <div className="min-w-0"><div className="text-[12px] font-semibold leading-tight truncate" style={{ color: NAVY }}>{c.label}</div><div className="text-[10px]" style={{ color: c.done ? SUB : AMBER }}>{c.done ? "Checked" : "Pending"}</div></div>
+                      </div>
+                    ))}
+                  </div>
+                  <p className="mt-3 text-[11px]" style={{ color: SUB }}>AutoLabels Data-Verified Report — records aggregated across data sources. A pending check is never shown as verified.</p>
+                </section>
+
+                {/* Market Intelligence — one unified full-width module. */}
+                <section className={`${CARD} p-5`} data-module="market" aria-label="Market intelligence">
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="text-[14px] font-extrabold" style={{ color: NAVY }}>Market Intelligence</div>
+                    <button onClick={() => openPanel("comparable-vehicles")} className="text-[13px] font-bold inline-flex items-center gap-1 hover:underline" style={{ color: BLUE }}>Comparable vehicles <ChevronRight className="w-4 h-4" /></button>
+                  </div>
+                  {marketPos ? (
+                    <div className="mt-4 grid grid-cols-[minmax(0,1.4fr)_repeat(3,minmax(0,1fr))] gap-5 items-center">
+                      <div>
+                        <div className={label3} style={{ color: SUB }}>Price position</div>
+                        <div className="mt-2 relative h-2.5 rounded-full" style={{ background: "linear-gradient(90deg,#16A34A,#F59E0B,#EF4444)" }}>
+                          <span className="absolute -top-1 h-4.5 w-1.5 rounded-full ring-2 ring-white" style={{ left: `calc(${Math.round(marketPos.t * 100)}% - 3px)`, height: 18, background: NAVY }} />
+                        </div>
+                        <div className="mt-1.5 flex justify-between text-[10px]" style={{ color: SUB }}><span>Best value</span><span className="font-bold" style={{ color: NAVY }}>{marketPos.label}</span><span>Above market</span></div>
+                      </div>
+                      <div><div className={label3} style={{ color: SUB }}>Comparables</div><div className="mt-1 text-[22px] font-extrabold tabular-nums" style={{ color: NAVY }}>{d.marketMeta.similarCount ?? "—"}</div><div className="text-[11px]" style={{ color: SUB }}>{d.marketMeta.radius ? `within ${d.marketMeta.radius} mi` : "in the region"}</div></div>
+                      <div><div className={label3} style={{ color: SUB }}>Below market</div><div className="mt-1 text-[22px] font-extrabold tabular-nums" style={{ color: d.belowMarket && d.belowMarket > 0 ? GREEN : NAVY }}>{d.belowMarket && d.belowMarket > 0 ? fmt$(d.belowMarket) : "—"}</div><div className="text-[11px]" style={{ color: SUB }}>vs normalized value</div></div>
+                      <div><div className={label3} style={{ color: SUB }}>Market avg</div><div className="mt-1 text-[22px] font-extrabold tabular-nums" style={{ color: NAVY }}>{d.marketAvg != null ? fmt$(d.marketAvg) : "—"}</div><div className="text-[11px]" style={{ color: SUB }}>{d.marketCheckedAt ? "Live market data" : "—"}</div></div>
+                    </div>
+                  ) : (
+                    <p className="mt-3 text-[13px]" style={{ color: SUB }}>Market comparison temporarily unavailable. Vehicle information and dealer pricing remain available.</p>
+                  )}
+                </section>
+
+                {/* Progressive detail row — each opens a V3 drawer (not a V2 page). */}
+                <section className="grid grid-cols-4 gap-4" aria-label="Vehicle details">
+                  {[
+                    { key: "factory-warranty" as const, icon: ShieldCheck, title: "Warranty", head: d.warrantyStr ? (d.warrantyExpired ? "Coverage ended" : "Factory warranty") : "Confirm with dealer", sub: d.warrantyStr || "Terms confirmed at delivery" },
+                    { key: "equipment" as const, icon: Sparkles, title: "Features & Equipment", head: "Equipment analyzed", sub: "Premium, safety, tech & more" },
+                    { key: "ownership-timeline" as const, icon: FileText, title: "History & Ownership", head: d.cleanTitle ? "Clean title on record" : "History checked", sub: d.ownerCount != null ? `${d.ownerCount === 1 ? "One owner" : `${d.ownerCount} owners`} on record` : "View reported results" },
+                    { key: "key-specs" as const, icon: Wrench, title: "Specifications", head: "Detailed specs", sub: "Engine, dimensions, capacity" },
+                  ].map((m) => (
+                    <button key={m.key} onClick={() => openPanel(m.key)} className={`${CARD} p-4 text-left hover:border-[#2563EB] transition-colors`} data-module={m.key === "factory-warranty" ? "warranty" : m.key === "equipment" ? "equipment" : m.key === "ownership-timeline" ? "history" : "specs"}>
+                      <div className="flex items-center justify-between"><m.icon className="w-5 h-5" style={{ color: BLUE }} /><ChevronRight className="w-4 h-4" style={{ color: "#CBD5E1" }} /></div>
+                      <div className="mt-2 text-[13px] font-bold" style={{ color: NAVY }}>{m.title}</div>
+                      <div className="text-[12px] font-semibold mt-0.5" style={{ color: NAVY }}>{m.head}</div>
+                      <div className="text-[11px] mt-0.5 leading-snug" style={{ color: SUB }}>{m.sub}</div>
+                    </button>
+                  ))}
+                </section>
+
+                {/* Lower page — Why this vehicle checks out + dealer story. */}
+                <section className="grid grid-cols-2 gap-5 items-start">
+                  <div className={`${CARD} p-5`}>
+                    <div className="text-[14px] font-extrabold" style={{ color: NAVY }}>Why This Vehicle Checks Out</div>
+                    <ul className="mt-3 space-y-2">
+                      {(d.whyBuy.length ? d.whyBuy.slice(0, 5) : ["Details confirmed at the dealership"]).map((b, i) => (
+                        <li key={i} className="flex items-start gap-2 text-[13px]" style={{ color: NAVY }}><CheckCircle2 className="w-4 h-4 shrink-0 mt-0.5" style={{ color: GREEN }} /> {b}</li>
+                      ))}
+                    </ul>
+                    <button onClick={() => go("great-buy")} className="mt-3 text-[13px] font-bold inline-flex items-center gap-1 hover:underline" style={{ color: BLUE }}>See full buying report <ChevronRight className="w-4 h-4" /></button>
+                  </div>
+                  {dealerName && (
+                    <div className={`${CARD} overflow-hidden`} data-module="dealer">
+                      {dt.storefrontUrl ? (
+                        <div className="relative aspect-[2/1] w-full bg-slate-100">
+                          <img src={dt.storefrontUrl} alt={dealerName} className="w-full h-full object-cover" loading="lazy" />
+                          <div className="absolute inset-0" style={{ background: "linear-gradient(to top, rgba(13,27,42,0.85) 0%, rgba(13,27,42,0.1) 55%, transparent 75%)" }} />
+                          <div className="absolute bottom-3 left-4 text-white"><div className="text-[15px] font-extrabold">Why Buy From {dealerName}</div>{dealerFoundedYear != null && <div className="text-[12px] opacity-90">Serving drivers since {dealerFoundedYear}{dealerYears != null ? ` · ${dealerYears} years` : ""}</div>}</div>
+                        </div>
+                      ) : <div className="px-4 pt-4 text-[15px] font-extrabold" style={{ color: NAVY }}>Why Buy From {dealerName}</div>}
+                      {dealerBenefits.length > 0 && (
+                        <div className="px-4 pt-4 grid grid-cols-2 gap-x-4 gap-y-2">
+                          {dealerBenefits.slice(0, 4).map((b) => <div key={b} className="flex items-start gap-2 text-[12.5px] font-medium" style={{ color: NAVY }}><CheckCircle2 className="w-4 h-4 shrink-0 mt-0.5" style={{ color: GREEN }} /> {b}</div>)}
+                        </div>
+                      )}
+                      <button onClick={() => { trackCustomerCtaClicked({ storeId: listing.store_id, vehicleId: listing.id, vin: listing.vin, source: "passport", surface: "vehicle_passport", metadata: { cta: "dealer_profile" } }); go("dealer"); }} className="px-4 py-3.5 inline-flex items-center gap-1.5 text-[13px] font-bold" style={{ color: BLUE }}>Meet {dealerName} <ChevronRight className="w-4 h-4" /></button>
+                    </div>
+                  )}
+                </section>
+              </main>
+
+              {/* ── STICKY CUSTOMER ACTION CENTER ── */}
+              <aside className="sticky top-[88px] self-start" data-module="action-center">
+                <div className={`${CARD} p-5`}>
+                  <div className="text-[10px] font-black uppercase tracking-wider" style={{ color: SUB }}>Customer Action Center</div>
+                  <div className="mt-3 text-[11px] font-bold uppercase tracking-wider" style={{ color: SUB }}>One price truth</div>
+                  <div className="text-[30px] font-extrabold tabular-nums leading-none mt-1" style={{ color: NAVY }}>{price != null ? fmt$(price) : "—"}</div>
+                  {d.priceBreakdown && (
+                    <div className="mt-3 space-y-1 text-[12px]">
+                      <div className="flex items-baseline justify-between"><span style={{ color: SUB }}>MSRP</span><span className="font-semibold tabular-nums" style={{ color: NAVY }}>{fmt$(d.priceBreakdown.msrp)}</span></div>
+                      {d.priceBreakdown.lines.map((l) => <div key={l.key} className="flex items-baseline justify-between"><span style={{ color: SUB }}>{l.label}</span><span className="font-semibold tabular-nums" style={{ color: GREEN }}>−{fmt$(l.amount)}</span></div>)}
+                      {d.priceBreakdown.docFee ? <div className="flex items-baseline justify-between"><span style={{ color: SUB }}>Conveyance / doc fee</span><span className="font-semibold tabular-nums" style={{ color: NAVY }}>{fmt$(d.priceBreakdown.docFee)}</span></div> : null}
+                    </div>
+                  )}
+                  <p className="mt-3 text-[11px] leading-snug" style={{ color: SUB }}>Sales tax, title, registration and dealer-installed options are not included.</p>
+
+                  <button onClick={primary.onClick} className="mt-4 w-full h-11 rounded-xl text-[14px] font-bold text-white" style={{ background: BLUE }}>{primary.label}</button>
+                  {vMaterialPending && <div className="mt-2 rounded-lg border px-3 py-2 text-[11px] font-semibold inline-flex items-center gap-1.5 w-full" style={{ borderColor: "#FDE68A", background: "#FFFBEB", color: AMBER }}><Info className="w-3.5 h-3.5" /> 1 material check pending</div>}
+
+                  <div className="mt-3 grid grid-cols-1 gap-2">
+                    {secondary.map((s) => <button key={s.label} onClick={s.onClick} className="h-10 rounded-xl border inline-flex items-center justify-center gap-1.5 text-[13px] font-bold hover:bg-slate-50" style={{ borderColor: BORDER, color: BLUE }}><s.icon className="w-4 h-4" /> {s.label}</button>)}
+                  </div>
+                  <div className="mt-2 grid grid-cols-2 gap-2">
+                    {compact.map((c) => <button key={c.label} onClick={c.onClick} className="h-10 rounded-xl border inline-flex items-center justify-center gap-1.5 text-[12px] font-bold hover:bg-slate-50" style={{ borderColor: BORDER, color: NAVY }}><c.icon className="w-4 h-4" style={{ color: BLUE }} /> {c.label}</button>)}
+                  </div>
+
+                  {dealerName && (
+                    <div className="mt-4 pt-4 border-t" style={{ borderColor: BORDER }}>
+                      <div className="text-[13px] font-extrabold" style={{ color: NAVY }}>{dealerName}</div>
+                      {d.dealerAddress && <div className="text-[12px] mt-0.5" style={{ color: SUB }}>{d.dealerAddress}</div>}
+                      {d.dealerPhone && <a href={`tel:${d.dealerPhone}`} className="text-[12px] font-semibold" style={{ color: BLUE }}>{d.dealerPhone}</a>}
+                      <div className="mt-1 text-[11px]" style={{ color: SUB }}>Confirm current availability with the dealership.</div>
+                      <button onClick={() => go("dealer")} className="mt-2 text-[12px] font-bold inline-flex items-center gap-1 hover:underline" style={{ color: BLUE }}>Meet {dealerName} <ChevronRight className="w-3.5 h-3.5" /></button>
+                    </div>
+                  )}
+                  <div className="mt-3 pt-3 border-t inline-flex items-center gap-1.5 text-[10px]" style={{ borderColor: BORDER, color: SUB }}>
+                    <Lock className="w-3 h-3" /> Dealer intent intelligence is private to authorized dealer users.
+                  </div>
+                </div>
+              </aside>
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* ── Sticky bottom CTA (mobile / tablet only — desktop uses the action center) ── */}
       {stickyCfg.enabled && (
-        <div className="fixed inset-x-0 bottom-0 z-50 border-t bg-white/95 backdrop-blur" style={{ borderColor: BORDER, paddingBottom: "env(safe-area-inset-bottom)" }}>
+        <div className="fixed inset-x-0 bottom-0 z-50 border-t bg-white/95 backdrop-blur xl:hidden" style={{ borderColor: BORDER, paddingBottom: "env(safe-area-inset-bottom)" }}>
           <div className="max-w-lg mx-auto px-3 py-2.5 grid gap-2" style={{ gridTemplateColumns: `repeat(${stickyCfg.items.length}, minmax(0,1fr))` }}>
             {stickyCfg.items.map((b) => {
               const { icon: Icon, onClick } = stickyAction(b.key);
