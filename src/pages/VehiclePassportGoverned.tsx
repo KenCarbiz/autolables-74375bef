@@ -1070,6 +1070,13 @@ export default function VehiclePassportGoverned() {
                   <div className="text-[10px] font-black uppercase tracking-wider" style={{ color: SUB }}>Customer Action Center</div>
                   <div className="mt-3 text-[11px] font-bold uppercase tracking-wider" style={{ color: SUB }}>One price truth</div>
                   <div className="text-[30px] font-extrabold tabular-nums leading-none mt-1" style={{ color: NAVY }}>{price != null ? fmt$(price) : "—"}</div>
+                  {/* Doc-fee inclusion — the price already includes the fee; we NEVER add it again. */}
+                  {d.priceIncludesDoc && d.docFee && price != null && (
+                    <div className="mt-1.5 text-[12px] leading-snug" style={{ color: SUB }}>
+                      <div>Includes {fmt$(d.docFee)} documentation fee</div>
+                      <div className="tabular-nums">{fmt$(price - d.docFee)} before documentation fee</div>
+                    </div>
+                  )}
                   {d.priceBreakdown && (
                     <div className="mt-3 space-y-1 text-[12px]">
                       <div className="flex items-baseline justify-between"><span style={{ color: SUB }}>MSRP</span><span className="font-semibold tabular-nums" style={{ color: NAVY }}>{fmt$(d.priceBreakdown.msrp)}</span></div>

@@ -441,12 +441,30 @@ interface PriceBreakdown {
   price_parse_status: "ok" | "warning" | "pending";
   price_parse_notes: string;
 }
-const buildBreakdown = (extractedPrice: number | null, comp: PriceComponents, configuredDocFee: number): PriceBreakdown => {
+const buildBreakdown = (extractedPrice: number | null, comp: PriceComponents, configuredDocFee: number, includesDocFee = false): PriceBreakdown => {
   // The dealer's CONFIGURED doc fee (from admin) is authoritative for the
   // amount; the page's conveyance fee line is a parse CHECK against it. When
   // the dealer hasn't set a fee, fall back to whatever the page shows.
   const parsedFee = comp.docFee;
   const docFee = configuredDocFee > 0 ? configuredDocFee : (parsedFee ?? 0);
+  // Dealer's displayed price ALREADY includes the doc fee: the extracted price
+  // is the fee-inclusive website sale price, and before-doc is derived. Never
+  // add the fee on top.
+  if (includesDocFee && docFee > 0 && extractedPrice != null) {
+    const beforeDoc = extractedPrice - docFee;
+    const feeMatch = parsedFee == null || Math.abs(parsedFee - docFee) <= 1;
+    return {
+      advertised_price_before_doc: beforeDoc,
+      doc_fee: docFee,
+      website_sale_price: extractedPrice,
+      retail_cash: comp.retailCash,
+      dealer_discount: comp.dealerDiscount,
+      price_parse_status: feeMatch ? "ok" : "warning",
+      price_parse_notes: feeMatch
+        ? `Advertised price ${extractedPrice} includes the ${docFee} doc fee; before-doc ${beforeDoc}.`
+        : `Advertised price includes doc fee, but page conveyance fee ${parsedFee} != configured ${docFee}. Review source page.`,
+    };
+  }
   let advertised = extractedPrice;
   // If the extractor picked the final sale price (== displayed sale), strip the
   // fee to recover the advertised-before-doc price.
@@ -686,7 +704,7 @@ serve(async (req) => {
   // dealer_profiles.settings.vdp_price_labels (comma-separated, priority
   // order) and .vdp_strip_finance_params (default true) configure the
   // extractor. Cached in a Map so the per-row loop doesn't refetch.
-  const settingsCache = new Map<string, { labels: string[]; stripFinance: boolean; docFee: number }>();
+  const settingsCache = new Map<string, { labels: string[]; stripFinance: boolean; docFee: number; inclDocFee: boolean }>();
   const getTenantScrapeSettings = async (tenantId: string) => {
     const cached = settingsCache.get(tenantId);
     if (cached) return cached;
@@ -694,6 +712,8 @@ serve(async (req) => {
     // deno-lint-ignore no-explicit-any
     const s: any = data?.settings || {};
     const docFee = String(s.doc_fee_enabled) === "true" ? (Number(s.doc_fee_amount) || 0) : 0;
+    // Dealer's advertised/VDP price already includes the doc fee (Harte: yes).
+    const inclDocFee = String(s.advertised_includes_doc_fee) === "true";
     const custom = String(s.vdp_price_labels || "").split(",").map((x: string) => x.trim()).filter(Boolean);
     // Dealer's configured labels win priority; generic selling-price labels run
     // after so common sites still resolve. Dedupe case-insensitively.
@@ -705,7 +725,7 @@ serve(async (req) => {
       return true;
     });
     const stripFinance = s.vdp_strip_finance_params !== false;
-    const out = { labels, stripFinance, docFee };
+    const out = { labels, stripFinance, docFee, inclDocFee };
     settingsCache.set(tenantId, out);
     return out;
   };
@@ -1015,7 +1035,7 @@ serve(async (req) => {
       // when the displayed sale price disagrees with advertised + doc fee.
       try {
         const comp = extractPriceComponents(html);
-        const bd = buildBreakdown(newPrice, comp, cfg.docFee);
+        const bd = buildBreakdown(newPrice, comp, cfg.docFee, cfg.inclDocFee);
         // FTC-critical guard: the advertised price the platform stores and
         // protects must never land ABOVE the dealer's own inventory/feed price.
         // A scrape above the feed means the extractor grabbed the sticker/MSRP

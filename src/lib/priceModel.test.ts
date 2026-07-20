@@ -157,21 +157,52 @@ describe("resolveDisplayPrice / resolveComparePrice", () => {
     expect(resolveDisplayPrice(fields)).toBe(58140);
   });
 
-  it("website_sale_price mode shows the listed price unchanged (it already includes the fee)", () => {
-    // The mode means "my listed price is fee-inclusive" — the display never
-    // adds the fee on top of a price that already contains it.
-    expect(resolveDisplayPrice(fields, "website_sale_price")).toBe(58140);
+  it("website_sale_price mode shows the fee-INCLUSIVE website price", () => {
+    // With correctly parsed data, advertised_price_before_doc is the pre-fee
+    // amount (58140) and website_sale_price is the inclusive total (59035).
+    // The mode displays the inclusive total the customer pays.
+    expect(resolveDisplayPrice(fields, "website_sale_price")).toBe(59035);
     expect(resolveDisplayPrice({ website_sale_price: 59035 }, "website_sale_price")).toBe(59035);
   });
 
-  it("compares on the displayed number in both modes", () => {
+  it("compares on the displayed number in each mode (before-doc vs inclusive)", () => {
     expect(resolveComparePrice(fields)).toBe(58140);
-    expect(resolveComparePrice(fields, "website_sale_price")).toBe(58140);
+    expect(resolveComparePrice(fields, "website_sale_price")).toBe(59035);
   });
 
   it("falls back to the legacy price column when breakdown fields are absent", () => {
     expect(resolveDisplayPrice({ price: 42000 })).toBe(42000);
     expect(resolveDisplayPrice({ price: 42000 }, "website_sale_price")).toBe(42000);
+  });
+
+  // Real Harte QX50: the advertised `price` (30876) ALREADY includes the $895 doc
+  // fee, so the stored website_sale_price (31771) is a double-count. website_sale
+  // mode must show the all-in advertised price, never the inflated additive total.
+  it("doc-inclusive tenant: website_sale_price mode anchors on `price`, not the double-counted total", () => {
+    const inclusive = {
+      advertised_price_before_doc: 30876,
+      doc_fee: 895,
+      website_sale_price: 31771, // double-counted (price already includes the fee)
+      price: 30876,
+    };
+    expect(resolveDisplayPrice(inclusive, "website_sale_price")).toBe(30876);
+    expect(resolveComparePrice(inclusive, "website_sale_price")).toBe(30876);
+    // The customer never sees a number above the dealer's own inventory price.
+    expect(resolveDisplayPrice(inclusive, "website_sale_price")).toBeLessThanOrEqual(inclusive.price);
+  });
+
+  // A tenant whose advertised price EXCLUDES the fee is the only case where the
+  // additive website_sale_price is the correct fee-inclusive display.
+  it("fee-excluding tenant: website_sale_price mode shows the additive total", () => {
+    const additive = {
+      advertised_price_before_doc: 30876,
+      doc_fee: 895,
+      website_sale_price: 31771,
+      price: 30876,
+      advertised_excludes_doc_fee: true,
+    };
+    expect(resolveDisplayPrice(additive, "website_sale_price")).toBe(31771);
+    expect(resolveComparePrice(additive, "website_sale_price")).toBe(31771);
   });
 });
 

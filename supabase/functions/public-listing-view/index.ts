@@ -136,6 +136,10 @@ serve(async (req) => {
         // Customer-facing price display mode (advertised_before_doc default vs
         // website_sale_price). Lets the passport show the dealer's chosen price.
         if (s.price_display_mode) row.price_display_mode = s.price_display_mode;
+        // Whether the tenant's advertised price EXCLUDES the doc fee (additive).
+        // Default (inclusive) means website_sale_price mode shows the advertised
+        // price unchanged and never double-adds the fee.
+        if (s.advertised_includes_doc_fee != null) row.advertised_excludes_doc_fee = String(s.advertised_includes_doc_fee) !== "true";
         // Dealer payment-estimate display toggles (payment / down / term / APR).
         if (s.passport_payment_display && typeof s.passport_payment_display === "object") row.payment_display = s.passport_payment_display;
         if (s.price_label && typeof s.price_label === "object") priceLabelSetting = s.price_label as Record<string, unknown>;

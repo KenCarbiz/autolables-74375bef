@@ -468,14 +468,17 @@ export const derivePassport = (listing: VehicleListing): PassportData => {
   // doc fee is disclosed separately by the surface; market math compares on the
   // same value the dealer displays.
   const lp = listing as unknown as {
-    advertised_price_before_doc?: number | null; doc_fee?: number | null; website_sale_price?: number | null; price_display_mode?: unknown; price_label?: string | null; website_price_term?: string | null; dealer_discount?: number | null; retail_cash?: number | null; payment_display?: unknown;
+    advertised_price_before_doc?: number | null; doc_fee?: number | null; website_sale_price?: number | null; price_display_mode?: unknown; advertised_excludes_doc_fee?: boolean | null; price_label?: string | null; website_price_term?: string | null; dealer_discount?: number | null; retail_cash?: number | null; payment_display?: unknown;
   };
   const priceMode: PriceDisplayMode = getPriceDisplayMode({ price_display_mode: lp.price_display_mode });
   const advBeforeDoc = lp.advertised_price_before_doc ?? listing.price ?? null;
   const docFee = lp.doc_fee ?? null;
   const websiteSalePrice = lp.website_sale_price ?? (advBeforeDoc != null ? advBeforeDoc + (docFee ?? 0) : null);
+  // advertised_excludes_doc_fee: default false — every current tenant's advertised
+  // `price` already includes the doc fee, so website_sale_price mode shows `price`
+  // and never double-adds the fee (see resolveDisplayPrice).
   const price = resolveDisplayPrice(
-    { advertised_price_before_doc: advBeforeDoc, doc_fee: docFee, website_sale_price: websiteSalePrice, price: listing.price },
+    { advertised_price_before_doc: advBeforeDoc, doc_fee: docFee, website_sale_price: websiteSalePrice, price: listing.price, advertised_excludes_doc_fee: lp.advertised_excludes_doc_fee ?? null },
     priceMode,
   );
   const priceIncludesDoc = priceMode === "website_sale_price";

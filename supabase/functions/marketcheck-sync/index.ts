@@ -607,6 +607,10 @@ serve(async (req) => {
       const tenantDocFee = String(pset.doc_fee_enabled) === "true"
         ? (Number(pset.doc_fee_amount) || 0)
         : 0;
+      // Whether this dealer's advertised/feed price ALREADY includes the doc fee
+      // (Harte: yes). When true we must NOT add the fee again — the feed price is
+      // the fee-inclusive website price and the before-doc amount is derived.
+      const advertisedInclDocFee = String(pset.advertised_includes_doc_fee) === "true";
       // Tenant ZIP anchors every enrichment pull's comps + Market Days Supply to
       // this dealer's local market radius (not a national average).
       const tenantZip = (pset.dealer_zip || "").trim();
@@ -838,12 +842,20 @@ serve(async (req) => {
             // The nightly advertised-price crawl refines these from the live VDP.
             if (price != null) {
               patch.price = price;
-              patch.advertised_price_before_doc = price;
               patch.doc_fee = tenantDocFee;
-              patch.website_sale_price = price + tenantDocFee;
+              if (advertisedInclDocFee && tenantDocFee > 0) {
+                // Feed price is the fee-INCLUSIVE website price; derive before-doc.
+                patch.advertised_price_before_doc = price - tenantDocFee;
+                patch.website_sale_price = price;
+                patch.price_parse_notes = "From MarketCheck feed; advertised price includes the tenant doc fee (not added again).";
+              } else {
+                // Feed price is BEFORE doc; website sale price adds the fee once.
+                patch.advertised_price_before_doc = price;
+                patch.website_sale_price = price + tenantDocFee;
+                patch.price_parse_notes = "From MarketCheck feed; sale price = advertised + tenant doc fee.";
+              }
               patch.price_source_url = l.vdp_url || null;
               patch.price_parse_status = "ok";
-              patch.price_parse_notes = "From MarketCheck feed; sale price = advertised + tenant doc fee.";
               patch.price_last_verified_at = new Date().toISOString();
             }
             // First-pass photos from the feed; the crawler later upgrades the

@@ -161,6 +161,12 @@ export interface DisplayPriceFields {
   website_sale_price?: number | null;
   // Fallback to the legacy single price column when the breakdown is unpopulated.
   price?: number | null;
+  // TRUE only for a tenant whose advertised price EXCLUDES the doc fee, so the
+  // fee-inclusive display must be website_sale_price (= advertised + fee). Absent
+  // / false means the advertised `price` is already the all-in number (every Harte
+  // store), so website_sale_price mode shows `price` unchanged — adding the fee to
+  // an already-inclusive price double-counts it.
+  advertised_excludes_doc_fee?: boolean | null;
 }
 
 // The customer-facing "Our Price" value, chosen by tenant setting. The mode
@@ -192,7 +198,16 @@ export function resolveDisplayPrice(
 ): number | null {
   const advertised = lowerAdvertised(f);
   if (mode === "website_sale_price") {
-    return advertised ?? f.website_sale_price ?? null;
+    // Fee-INCLUSIVE display. Only a tenant whose advertised price EXCLUDES the
+    // fee needs the additive total (website_sale_price = advertised + fee). For
+    // every tenant whose advertised price already includes the fee, the advertised
+    // `price` IS the all-in number; surfacing website_sale_price there would
+    // double-count the fee (and violate the invariant that the customer never sees
+    // a number above the dealer's own inventory price). Anchor on `price`.
+    if (f.advertised_excludes_doc_fee) {
+      return f.website_sale_price ?? advertised ?? f.price ?? null;
+    }
+    return f.price ?? f.website_sale_price ?? advertised ?? null;
   }
   return advertised;
 }
@@ -207,9 +222,13 @@ export function resolveComparePrice(
 ): number | null {
   const advertised = lowerAdvertised(f);
   if (mode === "website_sale_price") {
-    // Compare the number the customer actually sees (fee-inclusive listed
-    // price) so market position math matches the displayed price.
-    return advertised ?? f.website_sale_price ?? null;
+    // Compare the number the customer actually sees. Mirror resolveDisplayPrice:
+    // an already-inclusive advertised price IS the displayed number (anchor on
+    // `price`), while a fee-excluding tenant compares on the additive total.
+    if (f.advertised_excludes_doc_fee) {
+      return f.website_sale_price ?? advertised ?? f.price ?? null;
+    }
+    return f.price ?? f.website_sale_price ?? advertised ?? null;
   }
   return advertised;
 }
