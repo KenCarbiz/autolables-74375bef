@@ -717,8 +717,27 @@ const OverviewPanel = ({ vehicle, onTab, recall }: { vehicle: VehicleRow; onTab:
   // "Vehicle created" is always true — noise in a task list.
   const taskChecks = checks.filter((c) => c.label !== "Vehicle created");
   const [showAllChecks, setShowAllChecks] = useState(false);
+  const [recallReviewOpen, setRecallReviewOpen] = useState(false);
   const shownChecks = showAllChecks ? taskChecks : taskChecks.slice(0, 6);
   const moreCount = taskChecks.length - Math.min(taskChecks.length, 6);
+
+  // A missing checklist item routes to where it gets resolved. The recall item
+  // opens the recall review (where service records completed / no fix / does not
+  // apply — e.g. when NHTSA shows no recall for this VIN).
+  const checkAction = (c: ReadyCheck): (() => void) | null => {
+    if (c.ok) return null;
+    switch (c.label) {
+      case "Open Recall Review Required":
+      case "Recall checked": return () => setRecallReviewOpen(true);
+      case "Documents attached": return () => onTab("documents");
+      case "Prep & install signed off": return () => onTab("prep");
+      case "Published to shopper portal": return () => onTab("labels");
+      case "Service history":
+      case "Remaining warranty":
+      case "Available accessories": return () => onTab("scan");
+      default: return null;
+    }
+  };
 
   const copyPortalLink = async () => {
     try { await navigator.clipboard.writeText(publicUrl); toast.success("Link copied"); }
@@ -780,12 +799,25 @@ const OverviewPanel = ({ vehicle, onTab, recall }: { vehicle: VehicleRow; onTab:
               <span className="text-[11px] font-semibold text-muted-foreground mt-2">{remaining.length} task{remaining.length === 1 ? "" : "s"} remaining</span>
             </div>
             <ul className="flex-1 space-y-2 min-w-0 pt-0.5">
-              {shownChecks.map((c) => (
-                <li key={c.label} className="flex items-center gap-2 text-xs min-w-0">
-                  {c.ok ? <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" /> : <CircleAlert className="w-4 h-4 text-amber-500 shrink-0" />}
-                  <span className={`truncate ${c.ok ? "text-foreground font-medium" : "text-amber-700 font-medium"}`}>{c.label}</span>
-                </li>
-              ))}
+              {shownChecks.map((c) => {
+                const act = checkAction(c);
+                const inner = (
+                  <>
+                    {c.ok ? <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" /> : <CircleAlert className="w-4 h-4 text-amber-500 shrink-0" />}
+                    <span className={`truncate ${c.ok ? "text-foreground font-medium" : "text-amber-700 font-medium"}`}>{c.label}</span>
+                    {act && <ChevronRight className="w-3.5 h-3.5 text-amber-500 shrink-0 ml-auto" />}
+                  </>
+                );
+                return (
+                  <li key={c.label} className="min-w-0">
+                    {act ? (
+                      <button onClick={act} className="flex items-center gap-2 text-xs min-w-0 w-full text-left rounded -mx-1 px-1 py-0.5 hover:bg-amber-50 transition-colors">{inner}</button>
+                    ) : (
+                      <div className="flex items-center gap-2 text-xs min-w-0">{inner}</div>
+                    )}
+                  </li>
+                );
+              })}
               {!showAllChecks && moreCount > 0 && <li className="text-[11px] font-semibold text-muted-foreground pl-6">+{moreCount} more</li>}
             </ul>
           </div>
@@ -817,7 +849,7 @@ const OverviewPanel = ({ vehicle, onTab, recall }: { vehicle: VehicleRow; onTab:
         </Card>
 
         {/* 3 — Recall Status */}
-        <RecallCard vehicle={vehicle} recall={recall} />
+        <RecallCard vehicle={vehicle} recall={recall} reviewOpen={recallReviewOpen} onReviewOpenChange={setRecallReviewOpen} />
 
         {/* 4 — Vehicle Information (reference only) */}
         <Card title="Vehicle Information" className="flex flex-col">
@@ -2591,13 +2623,17 @@ const RecallReviewActions = ({ recall, vehicle }: { recall: ReturnType<typeof us
 };
 
 // MarketCheck AutoRecalls — live 4-state card (clear / open / unknown / error).
-const RecallCard = ({ vehicle, recall }: { vehicle: VehicleRow; recall: ReturnType<typeof useRecallTask> }) => {
+const RecallCard = ({ vehicle, recall, reviewOpen, onReviewOpenChange }: { vehicle: VehicleRow; recall: ReturnType<typeof useRecallTask>; reviewOpen?: boolean; onReviewOpenChange?: (o: boolean) => void }) => {
   const [status, setStatus] = useState<string | null>(vehicle.recall_status);
   const [checkedAt, setCheckedAt] = useState<string | null>(vehicle.recall_checked_at);
   const [open, setOpen] = useState<number>(vehicle.open_recall_count ?? 0);
   const [recalls, setRecalls] = useState<RecallItem[]>(normalizeRecalls(vehicle.recall_payload));
   const [checking, setChecking] = useState(false);
-  const [detailsOpen, setDetailsOpen] = useState(false);
+  // The review Sheet can be opened from here OR from the Packet Completeness
+  // checklist item, so accept an optional controlled open state.
+  const [detailsOpenLocal, setDetailsOpenLocal] = useState(false);
+  const detailsOpen = reviewOpen ?? detailsOpenLocal;
+  const setDetailsOpen = onReviewOpenChange ?? setDetailsOpenLocal;
 
   const run = async () => {
     if (!vehicle.vin) { toast.error("No VIN to check"); return; }
