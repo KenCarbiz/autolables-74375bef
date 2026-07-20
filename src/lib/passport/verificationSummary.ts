@@ -598,3 +598,51 @@ function joinList(items: string[]): string {
   if (items.length === 2) return `${items[0]} and ${items[1]}`;
   return `${items.slice(0, -1).join(", ")}, and ${items[items.length - 1]}`;
 }
+
+// ── Canonical status wording shared by every customer surface ────────────────
+// The passport hero "AutoLabels Verified" card, the "Verified Vehicle Data"
+// module (mobile + desktop) and the full Data-Verified Report all render these
+// EXACT words for a given VerificationStatus so a status can never be phrased
+// differently (or upgraded to green) on one surface. "verified" is the only
+// status that ever reads as a positive pass.
+export const VERIFICATION_STATUS_LABEL: Record<VerificationStatus, string> = {
+  verified: "Verified",
+  needs_attention: "Needs attention",
+  needs_confirmation: "Needs confirmation",
+  pending: "Pending",
+  unavailable: "Not available",
+};
+
+// Short, two-word display names for the compact passport grids (the full report
+// keeps the longer ReportCheck.name). Keyed by ReportCheck.key so both come from
+// the same catalog.
+export const VERIFICATION_CHECK_SHORT_LABEL: Record<string, string> = {
+  vin: "VIN Identity",
+  history: "Accident History",
+  ownership: "Ownership",
+  odometer: "Odometer",
+  title: "Title & Brand",
+  recall: "Recall Status",
+  market: "Market Value",
+  warranty: "Warranty",
+};
+
+// Count-aware one-line summary for the hero card chip + module subtitle, derived
+// straight from the canonical counts: e.g. "1 needs confirmation · 2 pending".
+// Zero segments are omitted; a fully-verified vehicle reads "All checks verified".
+export function summarizeVerificationExceptions(r: {
+  totalChecks: number;
+  verifiedChecks: number;
+  needsAttentionChecks: number;
+  needsConfirmationChecks: number;
+  pendingChecks: number;
+  unavailableChecks: number;
+}): string {
+  if (r.totalChecks > 0 && r.verifiedChecks === r.totalChecks) return "All checks verified";
+  const seg: string[] = [];
+  if (r.needsAttentionChecks > 0) seg.push(`${r.needsAttentionChecks} needs attention`);
+  if (r.needsConfirmationChecks > 0) seg.push(`${r.needsConfirmationChecks} needs confirmation`);
+  if (r.pendingChecks > 0) seg.push(`${r.pendingChecks} pending`);
+  if (r.unavailableChecks > 0) seg.push(`${r.unavailableChecks} not available`);
+  return seg.length ? seg.join(" · ") : "All checks verified";
+}

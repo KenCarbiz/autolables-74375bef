@@ -4,6 +4,7 @@ import {
   Bookmark, MoreHorizontal, Upload, Phone, MessageSquare, Clock, DollarSign,
   ChevronDown, ChevronRight, ChevronLeft, Star, Sparkles, ShieldCheck, CheckCircle2, MapPin,
   RefreshCw, Send, BadgeCheck, Play, Package, Award, TrendingUp, X, Info, Lock, Wrench, FileText, Eye,
+  CircleCheck, CircleAlert, TriangleAlert, CircleMinus,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Helmet } from "react-helmet-async";
@@ -21,7 +22,12 @@ import { isVehicleSaved, toggleSavedVehicle } from "@/lib/savedVehicles";
 import { usePassportEngagement } from "@/lib/passportEngagement";
 import { trackPassportOpened, trackWindowStickerScanned, trackCustomerCtaClicked } from "@/lib/engagement/customerEngagement";
 import { isPassportPanelKey, type PassportPanelKey } from "@/components/passport/passportPanelKeys";
-import { derivePassportVerification } from "@/lib/passport/verificationSummary";
+import {
+  deriveVerificationReport, summarizeVerificationExceptions,
+  VERIFICATION_STATUS_LABEL, VERIFICATION_CHECK_SHORT_LABEL,
+  type VerificationStatus,
+} from "@/lib/passport/verificationSummary";
+import { MOCK_REVIEW_LISTING } from "./VehiclePassportVerification";
 import PassportActionDrawer, { type PassportActionKey } from "@/components/passport/PassportActionDrawer";
 import { resolveMarketComparison, type MarketSeriesPoint } from "@/lib/passport/marketComparison";
 import { normalizeComparables } from "@/lib/passport/comparables";
@@ -91,7 +97,7 @@ function MarketTrendChart({ listing, market, currency }: { listing: MarketSeries
         {listing.map((p, i) => <circle key={i} cx={xs(i, listing.length)} cy={ys(p.value)} r="3" fill="#2563EB" />)}
       </svg>
       <div className="mt-1 flex items-center gap-4 text-[11px]" style={{ color: "#64748B" }}>
-        <span className="inline-flex items-center gap-1.5"><span className="w-4 h-0.5" style={{ background: "#2563EB" }} /> This vehicle</span>
+        <span className="inline-flex items-center gap-1.5"><span className="w-4 h-0.5" style={{ background: "#2563EB" }} /> This vehicle&#39;s advertised price</span>
         {market.length >= 2 && <span className="inline-flex items-center gap-1.5"><span className="w-4 h-0.5" style={{ background: "#94A3B8" }} /> Normalized market value</span>}
       </div>
       <p className="sr-only">{summary}</p>
@@ -126,6 +132,20 @@ const AMBER = "#F59E0B";
 const BORDER = "#E6EAF0";
 const CARD = "bg-white border border-[#E6EAF0] rounded-2xl shadow-[0_1px_2px_rgba(15,23,42,0.04)]";
 
+// Governed 5-state verification status → presentation (icon + colors). The words
+// come from the canonical VERIFICATION_STATUS_LABEL, so the hero "AutoLabels
+// Verified" card, the "Verified Vehicle Data" module and the full report can
+// never show different wording — or a different colour — for the same status. A
+// green icon is used ONLY for "verified"; pending / needs-confirmation /
+// needs-attention / unavailable never render green.
+const V_STATUS_ICON: Record<VerificationStatus, { color: string; bg: string; Icon: React.ElementType }> = {
+  verified: { color: GREEN, bg: "#FFFFFF", Icon: CircleCheck },
+  needs_attention: { color: "#DC2626", bg: "#FEF2F2", Icon: CircleAlert },
+  needs_confirmation: { color: AMBER, bg: "#FFFBEB", Icon: TriangleAlert },
+  pending: { color: SUB, bg: "#F8FAFC", Icon: Clock },
+  unavailable: { color: "#94A3B8", bg: "#F8FAFC", Icon: CircleMinus },
+};
+
 function Skeleton() {
   return (
     <div className="min-h-screen" style={{ background: BG }}>
@@ -152,7 +172,11 @@ export default function VehiclePassportGoverned() {
   // live backend. No effect on real shopper traffic.
   const [search] = useSearchParams();
   const isPreview = search.get("preview") === "1";
-  const { listing, loading, notFound } = usePublicListing(rawSlug, { preview: isPreview, previewData: MOCK_LISTING as unknown as VehicleListing });
+  // Preview parity with the verification report: ?preview=1&scenario=review renders
+  // the shared review fixture (a real recall cross-source conflict + pending title)
+  // so the governed passport's exception states can be reviewed against the report.
+  const previewData = (search.get("scenario") === "review" ? MOCK_REVIEW_LISTING : MOCK_LISTING) as unknown as VehicleListing;
+  const { listing, loading, notFound } = usePublicListing(rawSlug, { preview: isPreview, previewData });
 
   const d = useMemo(() => (listing ? derivePassport(listing) : null), [listing]);
   const gallery = useMemo(() => (listing ? listingGallery(listing) : []), [listing]);
@@ -215,9 +239,38 @@ export default function VehiclePassportGoverned() {
   // detail pages. (Deep detail modules still use openPanel; call/text stay
   // native. verification / great-buy / dealer are governed V3-in-flow pages.)
   const openAction = (k: PassportActionKey) => { setActionDrawer(k); };
-  // Shared verification source of truth — both mobile and desktop layers read
-  // this so they can never diverge on totals / pending / material-pending.
-  const vsum = derivePassportVerification(d, listing);
+  // Canonical customer verification model — the SAME object the full Data-Verified
+  // Report renders. Every verification status/count the shopper sees on this
+  // passport (hero "AutoLabels Verified" card, "Verified Vehicle Data" module,
+  // mobile + desktop) is derived from this one report so they can never diverge.
+  const report = deriveVerificationReport(d, listing);
+  const vShow = report.valid && report.totalChecks > 0;
+  const vTotal = report.totalChecks;
+  const vVerified = report.verifiedChecks;
+  const vAllVerified = vTotal > 0 && vVerified === vTotal;
+  const vSummary = summarizeVerificationExceptions(report);
+  const vSummaryColor = report.needsAttentionChecks > 0
+    ? "#DC2626"
+    : report.needsConfirmationChecks > 0 || report.pendingChecks > 0 || report.unavailableChecks > 0
+      ? AMBER
+      : GREEN;
+  // One presentation projection of the canonical checks, reused byte-for-byte by
+  // the hero card AND the Verified Vehicle Data module (both desktop + mobile).
+  const vChecksUi = report.checks.map((c) => {
+    const ui = V_STATUS_ICON[c.status];
+    return {
+      key: c.key,
+      name: VERIFICATION_CHECK_SHORT_LABEL[c.key] || c.name,
+      statusLabel: VERIFICATION_STATUS_LABEL[c.status],
+      color: ui.color,
+      bg: ui.bg,
+      Icon: ui.Icon,
+    };
+  });
+  // Recall is only a positive claim ("no open recalls") when the CANONICAL report
+  // says it's verified — never on the lenient d.recallClear, which stays true even
+  // under a cross-source conflict and would contradict the verified card.
+  const recallVerified = report.checks.find((c) => c.key === "recall")?.status === "verified";
   // Phase E analytics — the specific event name rides in metadata.event on the
   // existing engagement pipeline (no new enum); ModuleView dedupes views. No PII.
   const firePhaseE = (event: string, extra: Record<string, unknown> = {}) =>
@@ -277,16 +330,10 @@ export default function VehiclePassportGoverned() {
   if (d.dealerVerified || (d.verifiedBy && d.verifiedBy.length > 0)) intelChips.push({ label: "Dealer Verified", tone: "blue", icon: ShieldCheck });
   if (d.warrantyStr && !d.warrantyExpired) intelChips.push({ label: `Factory Warranty · ${d.warrantyStr}`, tone: "blue", icon: Award });
   if (intelChips.length < 3 && d.ownerCount === 1) intelChips.push({ label: "1-Owner", tone: "blue", icon: BadgeCheck });
-  if (intelChips.length < 3 && d.recallClear) intelChips.push({ label: "No Open Recalls", tone: "green", icon: CheckCircle2 });
+  if (intelChips.length < 3 && recallVerified) intelChips.push({ label: "No Open Recalls", tone: "green", icon: CheckCircle2 });
   if (intelChips.length < 3 && d.cleanTitle) intelChips.push({ label: "Clean Title", tone: "green", icon: CheckCircle2 });
   if (intelChips.length < 3 && d.serviceCount > 0) intelChips.push({ label: `${d.serviceCount} Service Records`, tone: "blue", icon: Award });
   const chips = intelChips.slice(0, 3);
-
-  // ── Verification summary — derived from the shared governed source so the
-  // mobile count can never disagree with the desktop module.
-  const verified = vsum.completed;
-  const totalVerify = vsum.total;
-  const verifyPct = vsum.completedPct;
 
   // ── Market position
   const marketPos = (() => {
@@ -539,21 +586,23 @@ export default function VehiclePassportGoverned() {
         )}
 
         {/* ── Verified Vehicle Data ────────────────────────────────── */}
-        {totalVerify > 0 && (
+        {vShow && (
           <section className="px-4 pt-4" data-module="verification">
             <button onClick={() => openPanel("price-confidence")} className={`${CARD} w-full text-left px-4 py-4`}>
               <div className="flex items-center justify-between gap-3">
                 <div className="min-w-0">
                   <div className="text-[13px] font-bold" style={{ color: NAVY }}>Verified Vehicle Data</div>
-                  <div className="text-[12px] mt-0.5" style={{ color: SUB }}>{verified} of {totalVerify} categories verified</div>
+                  <div className="text-[12px] mt-0.5" style={{ color: SUB }}>
+                    {vAllVerified ? `All ${vTotal} checks verified` : `${vVerified} of ${vTotal} verified · ${vSummary}`}
+                  </div>
                 </div>
                 <ChevronRight className="w-4 h-4 shrink-0" style={{ color: SUB }} />
               </div>
               <div className="mt-3 h-2 rounded-full overflow-hidden" style={{ background: "#F1F5F9" }}>
-                <div className="h-full rounded-full" style={{ width: `${verifyPct}%`, background: GREEN }} />
+                <div className="h-full rounded-full" style={{ width: `${Math.round((vVerified / vTotal) * 100)}%`, background: GREEN }} />
               </div>
               <div className="mt-2 flex items-center gap-3 text-[11px]" style={{ color: SUB }}>
-                <span className="inline-flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full" style={{ background: GREEN }} />Factory / Dealer Verified</span>
+                <span className="inline-flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full" style={{ background: GREEN }} />Verified</span>
                 <span className="inline-flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full" style={{ background: "#CBD5E1" }} />Not yet verified</span>
               </div>
             </button>
@@ -728,17 +777,6 @@ export default function VehiclePassportGoverned() {
           no separate desktop data model. Hidden below xl so mobile V3 is
           byte-for-byte unchanged. */}
       {isDesktop && (() => {
-        // Governed four-state tone (same machine as the hero verified card): a
-        // conflict must read "Review" and an unavailable check must read neutral,
-        // never a green "Checked" — a pending/unresolved check is never verified.
-        const vcats = vsum.categories.map((c) => {
-          const terminalPositive = c.state === "verified" || c.state === "dealer_confirmed" || c.state === "calculated" || c.state === "inferred";
-          const tone: "ok" | "review" | "na" | "pending" = terminalPositive ? "ok" : c.state === "conflict_detected" ? "review" : c.state === "unavailable" || c.state === "not_applicable" ? "na" : "pending";
-          return { label: c.label, tone, material: c.material };
-        });
-        const vDone = vsum.completed;
-        const vTotal = vsum.total;
-        const vMaterialPending = vsum.materialPending > 0;
         // CPO: without a per-VIN manufacturer-enrollment signal we label the
         // neutral "Certified Pre-Owned", never a manufacturer-branded claim.
         const conditionLabel = isNew ? "New" : condition === "cpo" ? "Certified Pre-Owned" : "Used";
@@ -754,27 +792,6 @@ export default function VehiclePassportGoverned() {
           (d.dealerVerified || (d.verifiedBy && d.verifiedBy.length > 0)) ? "Dealer Verified" : null,
           d.marketAvg != null ? "Market Data Verified" : null,
         ].filter(Boolean) as string[];
-
-        // ── AutoLabels Verified card — governed per-category state, never a
-        // fabricated pass. Verified/terminal → green; pending → amber + "Pending";
-        // conflict → amber "Review"; unavailable → neutral "Not available".
-        const VERIFIED_LABEL: Record<string, string> = {
-          vin: "VIN Verified", title: "Title & Brand", recall: "Recall Verification",
-          history: "Vehicle History", market: "Market Data", warranty: "Warranty Checked", service: "Service History",
-        };
-        const PENDING_LABEL: Record<string, string> = {
-          vin: "VIN", title: "Title & Brand", recall: "Recall",
-          history: "Vehicle History", market: "Market Data", warranty: "Warranty", service: "Service History",
-        };
-        const verifiedChecks = vsum.categories.map((c) => {
-          const terminalPositive = c.state === "verified" || c.state === "dealer_confirmed" || c.state === "calculated" || c.state === "inferred";
-          const tone = terminalPositive ? "ok" : c.state === "conflict_detected" ? "review" : c.state === "unavailable" || c.state === "not_applicable" ? "na" : "pending";
-          const label = tone === "ok" ? (VERIFIED_LABEL[c.key] || c.label) : (PENDING_LABEL[c.key] || c.label);
-          const note = tone === "pending" ? "Pending" : tone === "review" ? "Review" : tone === "na" ? "Not available" : null;
-          const color = tone === "ok" ? GREEN : tone === "na" ? "#94A3B8" : AMBER;
-          const Icon = tone === "ok" ? CheckCircle2 : tone === "na" ? Info : Clock;
-          return { key: c.key, label, note, color, Icon };
-        });
 
         // ── Fixed conversion action hierarchy (goal-locked). Each opens the
         // existing, complete V2 destination page via go() — never a drawer — and
@@ -881,7 +898,7 @@ export default function VehiclePassportGoverned() {
 
                     {/* AutoLabels Verified — governed per-category state; never all-green
                         while a material check is pending. */}
-                    {vTotal > 0 && (
+                    {vShow && (
                       <div className="mt-4 rounded-xl border p-4" style={{ borderColor: BORDER, background: "#FBFDFF" }}>
                         <div className="flex items-start justify-between gap-3">
                           <div className="flex items-center gap-2.5 min-w-0">
@@ -891,14 +908,16 @@ export default function VehiclePassportGoverned() {
                               <div className="text-[12px] leading-snug" style={{ color: SUB }}>Checked against trusted automotive data sources.</div>
                             </div>
                           </div>
-                          {vMaterialPending && <span className="text-[11px] font-bold shrink-0" style={{ color: AMBER }}>Checks pending</span>}
+                          <button onClick={() => go("verification")} className="text-[11px] font-bold shrink-0 text-right hover:underline" style={{ color: vSummaryColor }}>{vSummary}</button>
                         </div>
-                        <div className="mt-3 grid grid-cols-2 gap-x-4 gap-y-2">
-                          {verifiedChecks.map((c) => (
-                            <div key={c.key} className="flex items-center gap-2 text-[12.5px] min-w-0" style={{ color: NAVY }}>
-                              <c.Icon className="w-4 h-4 shrink-0" style={{ color: c.color }} />
-                              <span className="font-medium truncate">{c.label}</span>
-                              {c.note && <span className="text-[11px] font-semibold shrink-0" style={{ color: c.color }}>· {c.note}</span>}
+                        <div className="mt-3 grid grid-cols-2 gap-x-4 gap-y-2.5">
+                          {vChecksUi.map((c) => (
+                            <div key={c.key} className="flex items-start gap-2 min-w-0">
+                              <c.Icon className="w-4 h-4 shrink-0 mt-0.5" style={{ color: c.color }} />
+                              <div className="min-w-0">
+                                <div className="text-[12.5px] font-semibold leading-tight truncate" style={{ color: NAVY }}>{c.name}</div>
+                                <div className="text-[11px] font-semibold leading-tight" style={{ color: c.color }}>{c.statusLabel}</div>
+                              </div>
                             </div>
                           ))}
                         </div>
@@ -912,25 +931,18 @@ export default function VehiclePassportGoverned() {
                 <section className={`${CARD} p-5`} data-module="verification" aria-label="Verified vehicle data">
                   <div className="flex items-center justify-between gap-3">
                     <div className="inline-flex items-center gap-2">
-                      <span className="h-8 w-8 grid place-items-center rounded-full" style={{ background: vMaterialPending ? "#FEF3C7" : "#DCFCE7" }}><CheckCircle2 className="w-4 h-4" style={{ color: vMaterialPending ? AMBER : GREEN }} /></span>
-                      <div><div className="text-[14px] font-extrabold" style={{ color: NAVY }}>Verified Vehicle Data</div><div className="text-[12px]" style={{ color: SUB }}>{vDone} of {vTotal} checks complete{vMaterialPending ? " · a material check is still pending" : ""}</div></div>
+                      <span className="h-8 w-8 grid place-items-center rounded-full" style={{ background: vAllVerified ? "#DCFCE7" : "#FEF3C7" }}><CheckCircle2 className="w-4 h-4" style={{ color: vAllVerified ? GREEN : AMBER }} /></span>
+                      <div><div className="text-[14px] font-extrabold" style={{ color: NAVY }}>Verified Vehicle Data</div><div className="text-[12px]" style={{ color: SUB }}>{vAllVerified ? `All ${vTotal} checks verified` : `${vVerified} of ${vTotal} checks verified · ${vSummary}`}</div></div>
                     </div>
                     <button onClick={() => go("verification")} className="text-[13px] font-bold inline-flex items-center gap-1 hover:underline" style={{ color: BLUE }}>View all categories <ChevronRight className="w-4 h-4" /></button>
                   </div>
                   <div className="mt-4 grid grid-cols-4 gap-2.5">
-                    {vcats.map((c) => {
-                      const ok = c.tone === "ok";
-                      const na = c.tone === "na";
-                      const color = ok ? GREEN : na ? "#94A3B8" : AMBER;
-                      const Icon = ok ? CheckCircle2 : na ? Info : Clock;
-                      const status = ok ? "Checked" : c.tone === "review" ? "Review" : na ? "Not available" : "Pending";
-                      return (
-                        <div key={c.label} className="rounded-xl border px-3 py-2.5 flex items-center gap-2" style={{ borderColor: BORDER, background: ok ? "#fff" : na ? "#F8FAFC" : "#FFFBEB" }}>
-                          <Icon className="w-4 h-4 shrink-0" style={{ color }} />
-                          <div className="min-w-0"><div className="text-[12px] font-semibold leading-tight truncate" style={{ color: NAVY }}>{c.label}</div><div className="text-[10px]" style={{ color: ok ? SUB : color }}>{status}</div></div>
-                        </div>
-                      );
-                    })}
+                    {vChecksUi.map((c) => (
+                      <div key={c.key} className="rounded-xl border px-3 py-2.5 flex items-center gap-2" style={{ borderColor: BORDER, background: c.bg }}>
+                        <c.Icon className="w-4 h-4 shrink-0" style={{ color: c.color }} />
+                        <div className="min-w-0"><div className="text-[12px] font-semibold leading-tight truncate" style={{ color: NAVY }}>{c.name}</div><div className="text-[10px]" style={{ color: c.color }}>{c.statusLabel}</div></div>
+                      </div>
+                    ))}
                   </div>
                   <p className="mt-3 text-[11px]" style={{ color: SUB }}>AutoLabels Data-Verified Report — records aggregated across data sources. A pending check is never shown as verified.</p>
                 </section>
@@ -990,7 +1002,7 @@ export default function VehiclePassportGoverned() {
                           d.ownerCount === 1 ? `One owner reported${d.historyReport ? ` (${historyReportName(d.historyReport.provider)})` : ""}` : d.ownerCount != null && d.ownerCount > 1 ? `${d.ownerCount} owners reported` : null,
                           listing.mileage != null ? `${listing.mileage.toLocaleString()} reported miles` : null,
                           listing.trim ? `${listing.trim} trim` : null,
-                          d.recallClear ? "No open recalls (NHTSA)" : null,
+                          recallVerified ? "No open recalls (NHTSA)" : null,
                           d.warrantyStr ? "Factory warranty terms found — remaining coverage requires confirmation" : null,
                         ].filter(Boolean) as string[];
                         return (strengths.length ? strengths : ["Details confirmed at the dealership"]).map((b, i) => (
@@ -1027,7 +1039,7 @@ export default function VehiclePassportGoverned() {
                             {/* Limited market history: pair the price line with the current static position bar. */}
                             {!mc.hasMarketSeries && marketPos && (
                               <div className="mt-2">
-                                <div className="text-[11px] mb-1.5" style={{ color: SUB }}>Historical market-value trend unavailable — showing current market position.</div>
+                                <div className="text-[11px] mb-1.5" style={{ color: SUB }}>The line above is this vehicle&#39;s advertised-price history. A normalized market-value trend line is not yet available, so the bar below shows its current market position.</div>
                                 <div className="relative h-2 rounded-full" style={{ background: "linear-gradient(90deg,#16A34A,#F59E0B,#EF4444)" }}>
                                   <span className="absolute -top-1 w-1.5 rounded-full ring-2 ring-white" style={{ left: `calc(${Math.round(marketPos.t * 100)}% - 3px)`, height: 16, background: NAVY }} />
                                 </div>

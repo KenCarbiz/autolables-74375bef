@@ -1,5 +1,9 @@
 import { describe, it, expect } from "vitest";
-import { deriveVerificationReport, type VerificationReport } from "./verificationSummary";
+import {
+  deriveVerificationReport, summarizeVerificationExceptions,
+  VERIFICATION_STATUS_LABEL, VERIFICATION_CHECK_SHORT_LABEL,
+  type VerificationReport,
+} from "./verificationSummary";
 import type { PassportData } from "@/lib/passportV2Data";
 import type { VehicleListing } from "@/hooks/useVehicleListing";
 
@@ -161,5 +165,66 @@ describe("deriveVerificationReport — canonical customer summary", () => {
     expect(r.checks.find((c) => c.key === "history")?.provenance).toBe("independent_history");
     expect(r.checks.find((c) => c.key === "recall")?.provenance).toBe("government");
     expect(r.checks.find((c) => c.key === "vin")?.provenance).toBe("oem");
+  });
+});
+
+// The count-aware summary the passport hero chip + Verified Vehicle Data subtitle
+// render. Zero segments are omitted; a fully-verified vehicle reads "All checks
+// verified".
+describe("summarizeVerificationExceptions — count-aware hero summary", () => {
+  const base = { totalChecks: 8, verifiedChecks: 8, needsAttentionChecks: 0, needsConfirmationChecks: 0, pendingChecks: 0, unavailableChecks: 0 };
+
+  it("all verified → 'All checks verified'", () => {
+    expect(summarizeVerificationExceptions(base)).toBe("All checks verified");
+  });
+
+  it("1 needs confirmation + 2 pending → omits zero segments, ordered", () => {
+    expect(summarizeVerificationExceptions({ ...base, verifiedChecks: 5, needsConfirmationChecks: 1, pendingChecks: 2 }))
+      .toBe("1 needs confirmation · 2 pending");
+  });
+
+  it("needs attention leads, unavailable trails", () => {
+    expect(summarizeVerificationExceptions({ ...base, verifiedChecks: 4, needsAttentionChecks: 1, needsConfirmationChecks: 1, pendingChecks: 1, unavailableChecks: 1 }))
+      .toBe("1 needs attention · 1 needs confirmation · 1 pending · 1 not available");
+  });
+});
+
+// Cross-surface consistency: the passport hero card + Verified Vehicle Data
+// module are driven off deriveVerificationReport + the shared label maps, so a
+// status can never be re-derived (or upgraded to green) on the passport.
+describe("passport surfaces consume the canonical report (cross-surface consistency)", () => {
+  const conflictReport = (): VerificationReport => deriveVerificationReport(
+    dOf({ accidentCount: 0, ownerCount: 1, titleStatus: "unknown", cleanTitle: false, marketAvg: 41000, belowMarket: 1500, warrantyStr: "4 yr / 60,000 mi", marketCheckedAt: "2026-07-15T00:00:00Z" }),
+    lOf({
+      vin: "5N1AL1F83VC332076", ymm: "2025 INFINITI QX50", trim: "LUXE AWD", mileage: 12000, condition: "used",
+      recall_status: "clear", open_recall_count: 1,
+      recall_check: { checked_at: "2026-07-10T00:00:00Z", has_open: true, campaigns: [{ campaignNumber: "25V123" }] },
+    }),
+  );
+
+  it("recall label is 'Needs confirmation', never 'Verified', when the conflict signature is present", () => {
+    const recall = conflictReport().checks.find((c) => c.key === "recall")!;
+    expect(recall.status).toBe("needs_confirmation");
+    expect(VERIFICATION_STATUS_LABEL[recall.status]).toBe("Needs confirmation");
+    expect(VERIFICATION_STATUS_LABEL[recall.status]).not.toBe("Verified");
+  });
+
+  it("the hero card renders all 8 canonical checks (same total as the report) with a short label each", () => {
+    const r = conflictReport();
+    expect(r.totalChecks).toBe(8);
+    expect(r.checks).toHaveLength(8);
+    r.checks.forEach((c) => expect(VERIFICATION_CHECK_SHORT_LABEL[c.key]).toBeTruthy());
+  });
+
+  it("pending and unavailable checks never map to the verified label", () => {
+    const r = conflictReport();
+    r.checks
+      .filter((c) => c.status === "pending" || c.status === "unavailable")
+      .forEach((c) => expect(VERIFICATION_STATUS_LABEL[c.status]).not.toBe("Verified"));
+    expect(r.checks.find((c) => c.key === "title")?.status).toBe("pending");
+  });
+
+  it("the hero summary string matches the canonical counts (1 needs confirmation · 1 pending)", () => {
+    expect(summarizeVerificationExceptions(conflictReport())).toBe("1 needs confirmation · 1 pending");
   });
 });

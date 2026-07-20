@@ -11,6 +11,7 @@ import { Helmet } from "react-helmet-async";
 import { type VehicleListing } from "@/hooks/useVehicleListing";
 import Logo from "@/components/brand/Logo";
 import { derivePassport, deriveRating, ratingTier, fmt$, listingEquipment, deriveSoldClaims, CREDIBLE_AVG_DOM_MAX } from "@/lib/passportV2Data";
+import { deriveVerificationReport } from "@/lib/passport/verificationSummary";
 import { readDealerAlternatives } from "@/lib/dealerAlternatives";
 import { readBuildSheet } from "@/lib/buildSheet";
 import { MOCK_LISTING } from "./VehiclePassportV3";
@@ -247,6 +248,15 @@ const VehiclePassportGreatBuy = () => {
   };
 
   const mc = (listing.mc_attributes || {}) as Record<string, unknown>;
+  // Recall status comes from the canonical Data-Verified Report — the SAME model
+  // the passport hero and the full report render — so this page can never claim
+  // "No Open Recalls" while the report flags a recall conflict. `d.recallClear`
+  // (recall_status === "clear") is too lenient: it stays true even when the NHTSA
+  // detail check reports an open campaign (a cross-source conflict).
+  const vReport = deriveVerificationReport(d, listing);
+  const recallStatus = vReport.checks.find((c) => c.key === "recall")?.status ?? "pending";
+  const recallVerified = recallStatus === "verified";
+  const recallNeedsReview = recallStatus === "needs_confirmation" || recallStatus === "needs_attention";
   const sold = deriveSoldClaims(d, listing.mileage ?? null, listing.condition);
   const rating = deriveRating(listing, d);
   const score = rating.overall;
@@ -313,7 +323,7 @@ const VehiclePassportGreatBuy = () => {
     d.ownerCount === 1 ? "One Owner" : null,
     d.verifyRows.length > 0 ? "Dealer Verified" : null,
     oemVerified ? "OEM Verified" : null,
-    d.recallClear ? "No Open Recalls" : null,
+    recallVerified ? "No Open Recalls" : null,
     d.marketAvg != null || d.comparables.length > 0 ? "Market Data Verified" : null,
     equipCount > 0 ? "Equipment Verified" : null,
   ].filter(Boolean) as string[];
@@ -347,13 +357,13 @@ const VehiclePassportGreatBuy = () => {
   if (d.warrantyStr && !d.warrantyExpired) why.push("Factory warranty remaining");
   if (d.reviewRating != null && d.reviewRating >= 4.5) why.push("Excellent owner reviews");
   if (lowMiles) why.push(`Low mileage — ${listing.mileage!.toLocaleString()} mi`);
-  if (d.recallClear) why.push("No open recalls");
+  if (recallVerified) why.push("No open recalls");
 
   // Confirm before purchase — dealer-confirmation items, framed as steps
   // rather than warnings. Data-gated: verified items don't appear.
   const confirmRows: string[] = [
     !d.warrantyStr ? "Confirm remaining warranty coverage with the dealer." : null,
-    !d.recallClear && !isNew ? "Review open recall status." : null,
+    recallNeedsReview ? (recallStatus === "needs_confirmation" ? "Confirm the recall status with the dealer — sources disagree." : "Review the open safety recall reported for this vehicle.") : null,
     !isNew && (d.accidentCount == null || d.ownerCount == null) ? "Confirm final vehicle history details." : null,
   ].filter(Boolean) as string[];
 
@@ -471,7 +481,7 @@ const VehiclePassportGreatBuy = () => {
   ].filter(Boolean) as string[];
   const confirmWords = [
     !d.warrantyStr ? "remaining warranty coverage" : null,
-    !d.recallClear && !isNew ? "open recall status" : null,
+    recallNeedsReview ? "open recall status" : null,
     !isNew && (d.accidentCount == null || d.ownerCount == null) ? "vehicle history" : null,
   ].filter(Boolean) as string[];
   const recCopy =

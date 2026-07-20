@@ -36,7 +36,7 @@ import { trackCustomerEngagement, type CustomerEngagementEventType } from "@/lib
 // Preview-only review-state fixture (noindex). Lets the amber "review" layout
 // be rendered locally at /v/:slug/verification?preview=1&scenario=review without
 // polluting the shared MOCK_LISTING (which is the all-verified happy path).
-const MOCK_REVIEW_LISTING = {
+export const MOCK_REVIEW_LISTING = {
   ...MOCK_LISTING,
   condition: "used",
   mileage: 12480,
