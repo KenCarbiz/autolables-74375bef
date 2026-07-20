@@ -18,7 +18,33 @@ import { isVehicleSaved, toggleSavedVehicle } from "@/lib/savedVehicles";
 import { usePassportEngagement } from "@/lib/passportEngagement";
 import { trackPassportOpened, trackWindowStickerScanned, trackCustomerCtaClicked } from "@/lib/engagement/customerEngagement";
 import { isPassportPanelKey, type PassportPanelKey } from "@/components/passport/passportPanelKeys";
+import { derivePassportVerification } from "@/lib/passport/verificationSummary";
+import PassportActionDrawer, { type PassportActionKey } from "@/components/passport/PassportActionDrawer";
 import Logo from "@/components/brand/Logo";
+
+// One shared sticky offset for the desktop header + action center so they can
+// never disagree (header height 64 + 24 gap).
+const DESKTOP_STICKY_OFFSET = 88;
+
+// Behaviour — not just appearance — differs between the mobile column and the
+// desktop shell, so the active layout gates which one RENDERS (only one mounts,
+// preventing duplicate observers/analytics/DOM). matchMedia is read
+// synchronously at init (client-only SPA — no SSR/hydration mismatch).
+function useIsDesktop(): boolean {
+  const query = "(min-width: 1280px)";
+  const [is, setIs] = useState<boolean>(() =>
+    typeof window !== "undefined" && typeof window.matchMedia === "function" ? window.matchMedia(query).matches : false,
+  );
+  useEffect(() => {
+    if (typeof window === "undefined" || typeof window.matchMedia !== "function") return;
+    const mql = window.matchMedia(query);
+    const on = () => setIs(mql.matches);
+    on();
+    mql.addEventListener?.("change", on);
+    return () => mql.removeEventListener?.("change", on);
+  }, []);
+  return is;
+}
 
 // The full slide-out dispatcher is heavy (~3200 lines). Lazy-load so the
 // governed passport's first paint stays lean — the sheets only mount when
@@ -82,9 +108,11 @@ export default function VehiclePassportGoverned() {
   const [priceOpen, setPriceOpen] = useState(false);
   const [intelOpen, setIntelOpen] = useState(true);
   const [activePanel, setActivePanel] = useState<PassportPanelKey | null>(null);
+  const [actionDrawer, setActionDrawer] = useState<PassportActionKey | null>(null);
   const [galleryOpen, setGalleryOpen] = useState(false);
   const [heroInView, setHeroInView] = useState(true);
   const heroRef = useRef<HTMLDivElement | null>(null);
+  const isDesktop = useIsDesktop();
 
   // Engagement tracking mirrors the current passport exactly.
   useEffect(() => {
@@ -122,6 +150,14 @@ export default function VehiclePassportGoverned() {
   const pv = (id: string) => packetVisible(listing, id);
   const go = (section: string) => navigate(`/v/${listing.slug || rawSlug}/${section}`);
   const openPanel = (k: PassportPanelKey) => { setActivePanel(k); };
+  // Governed V3 action surfaces — reserve / test-drive / trade / contact /
+  // payment / availability open a V3 drawer and NEVER navigate into the V2
+  // detail pages. (Deep detail modules still use openPanel; call/text stay
+  // native. verification / great-buy / dealer are governed V3-in-flow pages.)
+  const openAction = (k: PassportActionKey) => { setActionDrawer(k); };
+  // Shared verification source of truth — both mobile and desktop layers read
+  // this so they can never diverge on totals / pending / material-pending.
+  const vsum = derivePassportVerification(d, listing);
   const isSaved = saved ?? isVehicleSaved(listing.slug);
   const handleSave = () => {
     const now = toggleSavedVehicle({ slug: listing.slug, ymm: listing.ymm, trim: listing.trim, price: listing.price, image: gallery[0] || listing.hero_image_url || null });
@@ -178,10 +214,11 @@ export default function VehiclePassportGoverned() {
   if (intelChips.length < 3 && d.serviceCount > 0) intelChips.push({ label: `${d.serviceCount} Service Records`, tone: "blue", icon: Award });
   const chips = intelChips.slice(0, 3);
 
-  // ── Verification summary
-  const verified = d.verifyRows.filter((v) => v.done).length;
-  const totalVerify = d.verifyRows.length;
-  const verifyPct = totalVerify > 0 ? Math.round((verified / totalVerify) * 100) : 0;
+  // ── Verification summary — derived from the shared governed source so the
+  // mobile count can never disagree with the desktop module.
+  const verified = vsum.completed;
+  const totalVerify = vsum.total;
+  const verifyPct = vsum.completedPct;
 
   // ── Market position
   const marketPos = (() => {
@@ -198,37 +235,41 @@ export default function VehiclePassportGoverned() {
   const stickyCfg = resolveStickyButtons((listing as unknown as { sticky_bottom_buttons?: StickyBottomButtons }).sticky_bottom_buttons);
   const stickyAction = (k: string): { icon: React.ElementType; onClick: () => void } => {
     const tap = (cta: string) => trackCustomerCtaClicked({ storeId: listing.store_id, vehicleId: listing.id, vin: listing.vin, source: "passport", surface: "vehicle_passport", metadata: { cta } });
-    const call = () => { tap("call"); if (d.dealerPhone) window.location.href = `tel:${d.dealerPhone}`; else go("contact"); };
+    // Call / Text stay native; the no-phone fallback opens the governed V3
+    // Contact drawer (never the V2 contact page).
+    const call = () => { tap("call"); if (d.dealerPhone) window.location.href = `tel:${d.dealerPhone}`; else openAction("contact"); };
     const text = () => {
       tap("text");
       if (d.dealerPhone) {
         const body = encodeURIComponent(`Hi, I'm interested in the ${listing.ymm || "vehicle"}${listing.vin ? ` (VIN ...${listing.vin.slice(-8)})` : ""} — is it available?`);
         window.location.href = `sms:${d.dealerPhone.replace(/[^\d+]/g, "")}?&body=${body}`;
-      } else go("text");
+      } else openAction("contact");
     };
+    // Every primary/secondary action opens a governed V3 surface — no go() into
+    // the V2 detail pages.
     const map: Record<string, { icon: React.ElementType; onClick: () => void }> = {
       call: { icon: Phone, onClick: call },
       text: { icon: MessageSquare, onClick: text },
-      test_drive: { icon: Clock, onClick: () => go("test-drive") },
-      todays_price: { icon: DollarSign, onClick: () => go("todays-price") },
-      contact_dealer: { icon: MessageSquare, onClick: () => go("contact") },
-      trade_appraisal: { icon: RefreshCw, onClick: () => go("trade") },
-      value_trade: { icon: RefreshCw, onClick: () => go("trade") },
-      reserve: { icon: BadgeCheck, onClick: () => go("reserve") },
-      pre_qualified: { icon: DollarSign, onClick: () => go("todays-price") },
-      apply_financing: { icon: DollarSign, onClick: () => go("todays-price") },
-      check_availability: { icon: CheckCircle2, onClick: () => go("check-availability") },
+      test_drive: { icon: Clock, onClick: () => openAction("test-drive") },
+      todays_price: { icon: DollarSign, onClick: () => openAction("payment") },
+      contact_dealer: { icon: MessageSquare, onClick: () => openAction("contact") },
+      trade_appraisal: { icon: RefreshCw, onClick: () => openAction("trade") },
+      value_trade: { icon: RefreshCw, onClick: () => openAction("trade") },
+      reserve: { icon: BadgeCheck, onClick: () => openAction("reserve") },
+      pre_qualified: { icon: DollarSign, onClick: () => openAction("payment") },
+      apply_financing: { icon: DollarSign, onClick: () => openAction("payment") },
+      check_availability: { icon: CheckCircle2, onClick: () => openAction("availability") },
       send_to_phone: { icon: Send, onClick: handleShare },
       save_vehicle: { icon: Bookmark, onClick: handleSave },
       share_vehicle: { icon: Upload, onClick: handleShare },
       directions: { icon: MapPin, onClick: () => openPanel("visit-dealer") },
-      email_dealer: { icon: Send, onClick: () => go("contact") },
-      chat: { icon: MessageSquare, onClick: () => go("contact") },
-      schedule_service: { icon: Clock, onClick: () => go("contact") },
-      payment_options: { icon: DollarSign, onClick: () => go("todays-price") },
-      calculate_payment: { icon: DollarSign, onClick: () => go("todays-price") },
+      email_dealer: { icon: Send, onClick: () => openAction("contact") },
+      chat: { icon: MessageSquare, onClick: () => openAction("contact") },
+      schedule_service: { icon: Clock, onClick: () => openAction("contact") },
+      payment_options: { icon: DollarSign, onClick: () => openAction("payment") },
+      calculate_payment: { icon: DollarSign, onClick: () => openAction("payment") },
     };
-    return map[k] || { icon: CheckCircle2, onClick: () => go("check-availability") };
+    return map[k] || { icon: CheckCircle2, onClick: () => openAction("availability") };
   };
 
   const hasVideo = Array.isArray(listing.videos) && listing.videos.length > 0;
@@ -240,14 +281,15 @@ export default function VehiclePassportGoverned() {
   };
 
   return (
-    <div className="min-h-screen pb-28 xl:pb-0" style={{ background: BG, color: NAVY }}>
+    <div className={`min-h-screen ${isDesktop ? "" : "pb-28"}`} style={{ background: BG, color: NAVY }}>
       <Helmet>
         <title>{listing.ymm ? `${listing.ymm} — Vehicle Passport` : "Vehicle Passport"}</title>
         <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
       </Helmet>
 
-      {/* ── Compact header (mobile / tablet < xl) ──────────────────── */}
-      <header className="sticky top-0 z-40 bg-white/95 backdrop-blur border-b xl:hidden" style={{ borderColor: BORDER }}>
+      {/* ── Compact header (mobile / tablet < xl) — only mounts below xl ── */}
+      {!isDesktop && (
+      <header className="sticky top-0 z-40 bg-white/95 backdrop-blur border-b" style={{ borderColor: BORDER }}>
         <div className="max-w-lg mx-auto h-14 px-4 flex items-center justify-between gap-3">
           <div className="min-w-0 flex items-center gap-2">
             {dealerLogo ? (
@@ -269,15 +311,17 @@ export default function VehiclePassportGoverned() {
             <button onClick={handleShare} aria-label="Share" className="h-9 w-9 grid place-items-center rounded-full hover:bg-slate-50" data-module="share">
               <Upload className="w-[18px] h-[18px]" style={{ color: NAVY }} />
             </button>
-            <button aria-label="More" onClick={() => go("contact")} className="h-9 w-9 grid place-items-center rounded-full hover:bg-slate-50">
+            <button aria-label="More" onClick={() => openAction("contact")} className="h-9 w-9 grid place-items-center rounded-full hover:bg-slate-50">
               <MoreHorizontal className="w-[18px] h-[18px]" style={{ color: NAVY }} />
             </button>
           </div>
         </div>
       </header>
+      )}
 
-      {/* ── Mobile / tablet column (< xl) — the approved mobile V3, unchanged ── */}
-      <div className="max-w-lg mx-auto xl:hidden">
+      {/* ── Mobile / tablet column (< xl) — the approved mobile V3, only mounts below xl ── */}
+      {!isDesktop && (
+      <div className="max-w-lg mx-auto">
 
         {/* ── Hero gallery ─────────────────────────────────────────── */}
         <div ref={heroRef} className="relative bg-white" data-module="gallery">
@@ -509,7 +553,7 @@ export default function VehiclePassportGoverned() {
 
         {/* ── Your next best step ──────────────────────────────────── */}
         <section className="px-4 pt-5" data-module="next-step">
-          <button onClick={() => go("todays-price")} className="w-full rounded-2xl px-4 py-4 flex items-center gap-3 border" style={{ background: "#EFF6FF", borderColor: "#BFDBFE" }}>
+          <button onClick={() => openAction("payment")} className="w-full rounded-2xl px-4 py-4 flex items-center gap-3 border" style={{ background: "#EFF6FF", borderColor: "#BFDBFE" }}>
             <span className="h-10 w-10 grid place-items-center rounded-full bg-white" style={{ color: BLUE }}>
               <Star className="w-5 h-5" />
             </span>
@@ -591,6 +635,7 @@ export default function VehiclePassportGoverned() {
           </section>
         )}
       </div>
+      )}
 
       {/* ══ Intelligence-first desktop (≥ xl / 1280px) ═══════════════════════
           Two-column outer shell: a wide intelligence WORKSPACE + a sticky
@@ -600,19 +645,11 @@ export default function VehiclePassportGoverned() {
           Reuses the identical governed data (d / listing) — no second fetch,
           no separate desktop data model. Hidden below xl so mobile V3 is
           byte-for-byte unchanged. */}
-      {(() => {
-        const vcats = [
-          { label: "VIN", done: !!listing.vin, material: true },
-          { label: "Title & Brand", done: d.cleanTitle, material: true },
-          { label: "Recall", done: !!listing.recall_status || d.recallClear, material: true },
-          { label: "Vehicle History", done: d.ownerCount != null || d.accidentCount != null || d.cleanTitle, material: false },
-          { label: "Market Data", done: d.marketAvg != null, material: false },
-          { label: "Warranty", done: !!d.warrantyStr, material: false },
-          { label: "Service History", done: d.serviceCount > 0, material: false },
-        ];
-        const vDone = vcats.filter((c) => c.done).length;
-        const vTotal = vcats.length;
-        const vMaterialPending = vcats.some((c) => c.material && !c.done);
+      {isDesktop && (() => {
+        const vcats = vsum.categories.map((c) => ({ label: c.label, done: c.state !== "pending" && c.state !== "unavailable", material: c.material }));
+        const vDone = vsum.completed;
+        const vTotal = vsum.total;
+        const vMaterialPending = vsum.materialPending > 0;
         const specChips = [
           listing.mileage != null ? `${listing.mileage.toLocaleString()} mi` : null,
           ...d.highlights.slice(0, 3).map((h) => h.label),
@@ -620,11 +657,11 @@ export default function VehiclePassportGoverned() {
         // Primary CTA is governed by vehicle state — a material check pending
         // downgrades "Reserve" to a confirmation request, never a hard sell.
         const primary = vMaterialPending
-          ? { label: "Ask Dealer to Confirm", onClick: () => go("contact") }
-          : { label: "Reserve This Vehicle", onClick: () => go("reserve") };
+          ? { label: "Ask Dealer to Confirm", onClick: () => openAction("contact") }
+          : { label: "Reserve This Vehicle", onClick: () => openAction("reserve") };
         const secondary = [
-          { label: "Value My Trade", icon: RefreshCw, onClick: () => go("trade") },
-          { label: "Schedule Test Drive", icon: Clock, onClick: () => go("test-drive") },
+          { label: "Value My Trade", icon: RefreshCw, onClick: () => openAction("trade") },
+          { label: "Schedule Test Drive", icon: Clock, onClick: () => openAction("test-drive") },
         ];
         const compact = [
           { label: "Call", icon: Phone, onClick: stickyAction("call").onClick },
@@ -634,7 +671,7 @@ export default function VehiclePassportGoverned() {
         ];
         const label3 = "text-[11px] font-semibold uppercase tracking-wider";
         return (
-          <div className="hidden xl:block" style={{ background: BG }}>
+          <div style={{ background: BG }}>
             {/* Desktop header */}
             <header className="sticky top-0 z-40 bg-white/95 backdrop-blur border-b" style={{ borderColor: BORDER }}>
               <div className="max-w-[1520px] mx-auto h-16 px-6 flex items-center justify-between gap-4">
@@ -800,7 +837,7 @@ export default function VehiclePassportGoverned() {
               </main>
 
               {/* ── STICKY CUSTOMER ACTION CENTER ── */}
-              <aside className="sticky top-[88px] self-start" data-module="action-center">
+              <aside className="self-start" style={{ position: "sticky", top: DESKTOP_STICKY_OFFSET }} data-module="action-center">
                 <div className={`${CARD} p-5`}>
                   <div className="text-[10px] font-black uppercase tracking-wider" style={{ color: SUB }}>Customer Action Center</div>
                   <div className="mt-3 text-[11px] font-bold uppercase tracking-wider" style={{ color: SUB }}>One price truth</div>
@@ -844,8 +881,8 @@ export default function VehiclePassportGoverned() {
       })()}
 
       {/* ── Sticky bottom CTA (mobile / tablet only — desktop uses the action center) ── */}
-      {stickyCfg.enabled && (
-        <div className="fixed inset-x-0 bottom-0 z-50 border-t bg-white/95 backdrop-blur xl:hidden" style={{ borderColor: BORDER, paddingBottom: "env(safe-area-inset-bottom)" }}>
+      {!isDesktop && stickyCfg.enabled && (
+        <div className="fixed inset-x-0 bottom-0 z-50 border-t bg-white/95 backdrop-blur" style={{ borderColor: BORDER, paddingBottom: "env(safe-area-inset-bottom)" }}>
           <div className="max-w-lg mx-auto px-3 py-2.5 grid gap-2" style={{ gridTemplateColumns: `repeat(${stickyCfg.items.length}, minmax(0,1fr))` }}>
             {stickyCfg.items.map((b) => {
               const { icon: Icon, onClick } = stickyAction(b.key);
@@ -882,6 +919,11 @@ export default function VehiclePassportGoverned() {
           />
         </Suspense>
       )}
+
+      {/* ── Governed V3 action drawer (shared by mobile + desktop) — keeps
+          reserve / test-drive / trade / contact / payment / availability inside
+          the V3 experience instead of navigating into the V2 detail pages. ── */}
+      <PassportActionDrawer action={actionDrawer} listing={listing} d={d} onClose={() => setActionDrawer(null)} />
 
       {/* ── Full-screen gallery sheet ──────────────────────────────── */}
       {galleryOpen && gallery.length > 0 && (
