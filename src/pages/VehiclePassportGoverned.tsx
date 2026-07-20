@@ -8,7 +8,7 @@ import {
 import { toast } from "sonner";
 import { Helmet } from "react-helmet-async";
 import { usePublicListing } from "@/hooks/usePublicListing";
-import { derivePassport, fmt$ } from "@/lib/passportV2Data";
+import { derivePassport, fmt$, historyReportName } from "@/lib/passportV2Data";
 import { listingGallery } from "@/lib/photos";
 import { packetVisible } from "@/lib/packetModules";
 import { resolveStickyButtons, type StickyBottomButtons } from "@/lib/stickyButtons";
@@ -23,6 +23,7 @@ import PassportActionDrawer, { type PassportActionKey } from "@/components/passp
 import { resolveMarketComparison, type MarketSeriesPoint } from "@/lib/passport/marketComparison";
 import { normalizeComparables } from "@/lib/passport/comparables";
 import { resolveFuelEconomy, FUEL_MODULE_HEADING } from "@/lib/passport/fuelEconomy";
+import { resolveBuyingCandidate } from "@/lib/passport/buyingCandidate";
 import { trackCustomerEngagement } from "@/lib/engagement/customerEngagement";
 import Logo from "@/components/brand/Logo";
 
@@ -712,11 +713,28 @@ export default function VehiclePassportGoverned() {
           listing.mileage != null ? `${listing.mileage.toLocaleString()} mi` : null,
           ...d.highlights.slice(0, 3).map((h) => h.label),
         ].filter(Boolean) as string[];
-        // Primary CTA is governed by vehicle state — a material check pending
-        // downgrades "Reserve" to a confirmation request, never a hard sell.
-        const primary = vMaterialPending
-          ? { label: "Ask Dealer to Confirm", onClick: () => openAction("contact") }
-          : { label: "Reserve This Vehicle", onClick: () => openAction("reserve") };
+        // ── Governed recommendation — the conclusion is conditioned on BOTH the
+        // price position and any pending material check. Above normalized market
+        // value OR a pending material check => "Candidate With Questions", with
+        // the specific reasons stated (never a bare "Strong Buying Candidate").
+        const pendingMaterial = vsum.categories.filter((c) => c.material && c.state === "pending").map((c) => c.label);
+        const cand = resolveBuyingCandidate({ advertisedPrice: price, normalizedMarketValue: d.marketAvg, pendingMaterialLabels: pendingMaterial });
+        const aboveMarket = cand.aboveMarket;
+        const concerns = cand.concerns;
+        const hasQuestions = cand.hasQuestions;
+        const candidateHeadline = cand.headline;
+        const candidateSub = cand.subcopy;
+        // CPO: without a per-VIN manufacturer-enrollment signal we label the
+        // neutral "Certified Pre-Owned", never a manufacturer-branded claim.
+        const conditionLabel = isNew ? "New" : condition === "cpo" ? "Certified Pre-Owned" : "Used";
+        // Warranty: mileage alone can't prove remaining coverage — that needs the
+        // in-service date. State the terms as "found" and require confirmation.
+        const hasInService = !!(d.warranty && (d.warranty as { in_service_date?: string }).in_service_date);
+        const warrantyHead = d.warrantyStr ? "Factory warranty terms found" : "Confirm warranty with dealer";
+        const warrantySub = hasInService ? (d.warrantyStr || "Coverage on record") : "Remaining eligibility requires confirmation of the in-service date";
+        // Primary CTA follows the recommendation — questions route to the dealer,
+        // never a hard "Reserve".
+        const primary = { label: cand.primaryCtaLabel, onClick: () => openAction(hasQuestions ? "contact" : "reserve") };
         const secondary = [
           { label: "Value My Trade", icon: RefreshCw, onClick: () => openAction("trade") },
           { label: "Schedule Test Drive", icon: Clock, onClick: () => openAction("test-drive") },
@@ -783,7 +801,7 @@ export default function VehiclePassportGoverned() {
                   </div>
 
                   <div className="min-w-0">
-                    <div className="inline-flex items-center h-6 px-2.5 rounded-full text-[11px] font-bold uppercase tracking-wide" style={{ background: isNew ? "#EFF6FF" : "#F1F5F9", color: isNew ? BLUE : NAVY }}>{isNew ? "New" : condition === "cpo" ? "Certified" : "Used"}</div>
+                    <div className="inline-flex items-center h-6 px-2.5 rounded-full text-[11px] font-bold uppercase tracking-wide" style={{ background: isNew ? "#EFF6FF" : "#F1F5F9", color: isNew ? BLUE : NAVY }}>{conditionLabel}</div>
                     <h1 className="mt-2 text-[26px] leading-tight font-extrabold" style={{ color: NAVY }}>{listing.ymm}{listing.trim ? ` ${listing.trim}` : ""}</h1>
                     {specChips.length > 0 && <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-[13px]" style={{ color: SUB }}>{specChips.map((c, i) => <span key={i} className="inline-flex items-center gap-1.5">{i > 0 && <span className="w-1 h-1 rounded-full" style={{ background: "#CBD5E1" }} />}{c}</span>)}</div>}
 
@@ -795,10 +813,14 @@ export default function VehiclePassportGoverned() {
                       </div>
                     </div>
 
-                    {/* Buying-candidate strip — governed: pending material check is surfaced, never hidden. */}
-                    <div className="mt-4 rounded-xl border p-3 flex items-center justify-between gap-3" style={{ borderColor: BORDER, background: "#F8FAFC" }}>
-                      <div className="inline-flex items-center gap-2"><ShieldCheck className="w-4 h-4" style={{ color: GREEN }} /><span className="text-[13px] font-bold" style={{ color: NAVY }}>Strong Buying Candidate</span></div>
-                      {vMaterialPending && <span className="inline-flex items-center gap-1 text-[11px] font-bold" style={{ color: AMBER }}><Info className="w-3.5 h-3.5" /> 1 material check pending</span>}
+                    {/* Buying-candidate strip — governed: the conclusion is conditioned on
+                        price position AND pending material checks, with reasons stated. */}
+                    <div className="mt-4 rounded-xl border p-3" style={{ borderColor: hasQuestions ? "#FDE68A" : BORDER, background: hasQuestions ? "#FFFBEB" : "#F8FAFC" }}>
+                      <div className="flex items-center justify-between gap-3">
+                        <div className="inline-flex items-center gap-2">{hasQuestions ? <Info className="w-4 h-4" style={{ color: AMBER }} /> : <ShieldCheck className="w-4 h-4" style={{ color: GREEN }} />}<span className="text-[13px] font-bold" style={{ color: NAVY }}>{candidateHeadline}</span></div>
+                        {hasQuestions && <span className="text-[11px] font-bold" style={{ color: AMBER }}>{concerns.length} to confirm</span>}
+                      </div>
+                      <p className="mt-1 text-[11px] leading-snug" style={{ color: SUB }}>{candidateSub}</p>
                     </div>
                     {chips.length > 0 && (
                       <div className="mt-3 grid grid-cols-3 gap-2">
@@ -848,8 +870,8 @@ export default function VehiclePassportGoverned() {
                         </div>
                         <div className="mt-1.5 flex justify-between text-[10px]" style={{ color: SUB }}><span>Best value</span><span className="font-bold" style={{ color: NAVY }}>{marketPos.label}</span><span>Above market</span></div>
                       </div>
-                      <div><div className={label3} style={{ color: SUB }}>Comparables</div><div className="mt-1 text-[22px] font-extrabold tabular-nums" style={{ color: NAVY }}>{d.marketMeta.similarCount ?? "—"}</div><div className="text-[11px]" style={{ color: SUB }}>{d.marketMeta.radius ? `within ${d.marketMeta.radius} mi` : "in the region"}</div></div>
-                      <div><div className={label3} style={{ color: SUB }}>Below market</div><div className="mt-1 text-[22px] font-extrabold tabular-nums" style={{ color: d.belowMarket && d.belowMarket > 0 ? GREEN : NAVY }}>{d.belowMarket && d.belowMarket > 0 ? fmt$(d.belowMarket) : "—"}</div><div className="text-[11px]" style={{ color: SUB }}>vs normalized value</div></div>
+                      <div><div className={label3} style={{ color: SUB }}>Listings analyzed</div><div className="mt-1 text-[22px] font-extrabold tabular-nums" style={{ color: NAVY }}>{d.marketMeta.similarCount ?? "—"}</div><div className="text-[11px]" style={{ color: SUB }}>{d.marketMeta.radius ? `within ${d.marketMeta.radius} mi` : "in the region"}</div></div>
+                      <div><div className={label3} style={{ color: SUB }}>vs market</div><div className="mt-1 text-[22px] font-extrabold tabular-nums" style={{ color: d.belowMarket && d.belowMarket > 0 ? GREEN : aboveMarket != null ? AMBER : NAVY }}>{d.belowMarket && d.belowMarket > 0 ? fmt$(d.belowMarket) : aboveMarket != null ? fmt$(aboveMarket) : "—"}</div><div className="text-[11px]" style={{ color: SUB }}>{d.belowMarket && d.belowMarket > 0 ? "below normalized value" : aboveMarket != null ? "above normalized value" : "vs normalized value"}</div></div>
                       <div><div className={label3} style={{ color: SUB }}>Normalized market value</div><div className="mt-1 text-[22px] font-extrabold tabular-nums" style={{ color: NAVY }}>{d.marketAvg != null ? fmt$(d.marketAvg) : "—"}</div><div className="text-[11px]" style={{ color: SUB }}>{d.marketCheckedAt ? "VIN-level predicted value" : "—"}</div></div>
                     </div>
                   ) : (
@@ -860,7 +882,7 @@ export default function VehiclePassportGoverned() {
                 {/* Progressive detail row — each opens a V3 drawer (not a V2 page). */}
                 <section className="grid grid-cols-4 gap-4" aria-label="Vehicle details">
                   {[
-                    { key: "factory-warranty" as const, icon: ShieldCheck, title: "Warranty", head: d.warrantyStr ? (d.warrantyExpired ? "Coverage ended" : "Factory warranty") : "Confirm with dealer", sub: d.warrantyStr || "Terms confirmed at delivery" },
+                    { key: "factory-warranty" as const, icon: ShieldCheck, title: "Warranty", head: d.warrantyExpired ? "Coverage ended" : warrantyHead, sub: warrantySub },
                     { key: "equipment" as const, icon: Sparkles, title: "Features & Equipment", head: "Equipment analyzed", sub: "Premium, safety, tech & more" },
                     { key: "ownership-timeline" as const, icon: FileText, title: "History & Ownership", head: d.cleanTitle ? "Clean title on record" : "History checked", sub: d.ownerCount != null ? `${d.ownerCount === 1 ? "One owner" : `${d.ownerCount} owners`} on record` : "View reported results" },
                     { key: "key-specs" as const, icon: Wrench, title: "Specifications", head: "Detailed specs", sub: "Engine, dimensions, capacity" },
@@ -878,11 +900,23 @@ export default function VehiclePassportGoverned() {
                 {/* Row: Why this vehicle checks out | Market Comparison */}
                 <section className="grid grid-cols-2 gap-5 items-start">
                   <div className={`${CARD} p-5`}>
-                    <div className="text-[14px] font-extrabold" style={{ color: NAVY }}>Why This Vehicle Checks Out</div>
+                    <div className="text-[14px] font-extrabold" style={{ color: NAVY }}>Vehicle Strengths</div>
                     <ul className="mt-3 space-y-2">
-                      {(d.whyBuy.length ? d.whyBuy.slice(0, 5) : ["Details confirmed at the dealership"]).map((b, i) => (
-                        <li key={i} className="flex items-start gap-2 text-[13px]" style={{ color: NAVY }}><CheckCircle2 className="w-4 h-4 shrink-0 mt-0.5" style={{ color: GREEN }} /> {b}</li>
-                      ))}
+                      {(() => {
+                        // Governed, exact-outcome strengths — sourced where the record
+                        // names a provider; warranty/coverage stays "requires confirmation".
+                        const strengths = [
+                          (d.dealerVerified || d.verifiedBy.length > 0) ? "Dealer-verified listing" : null,
+                          d.ownerCount === 1 ? `One owner reported${d.historyReport ? ` (${historyReportName(d.historyReport.provider)})` : ""}` : d.ownerCount != null && d.ownerCount > 1 ? `${d.ownerCount} owners reported` : null,
+                          listing.mileage != null ? `${listing.mileage.toLocaleString()} reported miles` : null,
+                          listing.trim ? `${listing.trim} trim` : null,
+                          d.recallClear ? "No open recalls (NHTSA)" : null,
+                          d.warrantyStr ? "Factory warranty terms found — remaining coverage requires confirmation" : null,
+                        ].filter(Boolean) as string[];
+                        return (strengths.length ? strengths : ["Details confirmed at the dealership"]).map((b, i) => (
+                          <li key={i} className="flex items-start gap-2 text-[13px]" style={{ color: NAVY }}><CheckCircle2 className="w-4 h-4 shrink-0 mt-0.5" style={{ color: GREEN }} /> {b}</li>
+                        ));
+                      })()}
                     </ul>
                     <button onClick={() => go("great-buy")} className="mt-3 text-[13px] font-bold inline-flex items-center gap-1 hover:underline" style={{ color: BLUE }}>See full buying report <ChevronRight className="w-4 h-4" /></button>
                   </div>
@@ -910,6 +944,16 @@ export default function VehiclePassportGoverned() {
                           <div className="mt-3">
                             {mc.periodLabel && <div className="text-[11px] mb-1" style={{ color: SUB }}>{mc.periodLabel}</div>}
                             <MarketTrendChart listing={mc.listingSeries} market={mc.marketSeries} currency={(n) => fmt$(n) || `$${n}`} />
+                            {/* Limited market history: pair the price line with the current static position bar. */}
+                            {!mc.hasMarketSeries && marketPos && (
+                              <div className="mt-2">
+                                <div className="text-[11px] mb-1.5" style={{ color: SUB }}>Historical market-value trend unavailable — showing current market position.</div>
+                                <div className="relative h-2 rounded-full" style={{ background: "linear-gradient(90deg,#16A34A,#F59E0B,#EF4444)" }}>
+                                  <span className="absolute -top-1 w-1.5 rounded-full ring-2 ring-white" style={{ left: `calc(${Math.round(marketPos.t * 100)}% - 3px)`, height: 16, background: NAVY }} />
+                                </div>
+                                <div className="mt-1 flex justify-between text-[10px]" style={{ color: SUB }}><span>Best value</span><span className="font-bold" style={{ color: NAVY }}>{marketPos.label}</span><span>Above market</span></div>
+                              </div>
+                            )}
                           </div>
                         ) : (
                           <div className="mt-3">
@@ -934,14 +978,23 @@ export default function VehiclePassportGoverned() {
                 </section>
 
                 {/* Similar Vehicles — full width, horizontally scrollable, closest first. */}
-                <ModuleView onView={() => firePhaseE("similar_vehicles_viewed", { module_id: "similar-vehicles", module_position: 3, count: sims.length })} dataModule="similar-vehicles" className={`${CARD} p-5`}>
+                <ModuleView onView={() => firePhaseE("similar_vehicles_viewed", { module_id: "similar-vehicles", module_position: 3, count: sims.length })} dataModule="similar-vehicles" className={`${CARD} ${sims.length === 0 ? "p-4" : "p-5"}`}>
+                  {sims.length === 0 ? (
+                    // Compact empty state that also reconciles "N analyzed" vs "0 shown".
+                    <div className="flex items-center justify-between gap-4">
+                      <div>
+                        <div className="text-[13px] font-bold" style={{ color: NAVY }}>No close matches found</div>
+                        <p className="text-[12px] mt-0.5" style={{ color: SUB }}>{d.marketMeta.similarCount != null ? `We analyzed ${d.marketMeta.similarCount} listings, but none met the current year, trim, condition and mileage requirements.` : "None met the current year, trim, condition and mileage requirements."}</p>
+                      </div>
+                      <button onClick={() => { firePhaseE("all_similar_vehicles_opened"); openPanel("comparable-vehicles"); }} className="text-[13px] font-bold inline-flex items-center gap-1 hover:underline shrink-0" style={{ color: BLUE }}>View broader alternatives <ChevronRight className="w-4 h-4" /></button>
+                    </div>
+                  ) : (
+                    <>
                   <div className="flex items-center justify-between gap-3">
                     <div><div className="text-[14px] font-extrabold" style={{ color: NAVY }}>Similar Vehicles</div><p className="text-[12px]" style={{ color: SUB }}>Closest comparable listings. Price shown is the raw advertised difference.</p></div>
-                    {sims.length > 0 && <button onClick={() => { firePhaseE("all_similar_vehicles_opened"); openPanel("comparable-vehicles"); }} className="text-[13px] font-bold inline-flex items-center gap-1 hover:underline shrink-0" style={{ color: BLUE }}>View All Similar Vehicles <ChevronRight className="w-4 h-4" /></button>}
+                    <button onClick={() => { firePhaseE("all_similar_vehicles_opened"); openPanel("comparable-vehicles"); }} className="text-[13px] font-bold inline-flex items-center gap-1 hover:underline shrink-0" style={{ color: BLUE }}>View All Similar Vehicles <ChevronRight className="w-4 h-4" /></button>
                   </div>
-                  {sims.length === 0 ? (
-                    <p className="mt-4 text-[13px]" style={{ color: SUB }}>No sufficiently similar vehicles were found within the current market radius.</p>
-                  ) : (
+                  {(
                     <div className="mt-4 overflow-x-auto -mx-1 px-1 pb-1"><div className="flex gap-4" style={{ width: "max-content" }}>
                       {sims.map((c) => (
                         <button key={c.id} onClick={() => { firePhaseE("similar_vehicle_opened", { comparable_id: c.id, match_label: c.matchLabel }); openPanel("comparable-vehicles"); }} className="text-left rounded-xl border overflow-hidden hover:border-[#2563EB] transition-colors" style={{ borderColor: BORDER, width: 220 }}>
@@ -957,13 +1010,18 @@ export default function VehiclePassportGoverned() {
                       ))}
                     </div></div>
                   )}
+                    </>
+                  )}
                 </ModuleView>
 
                 {/* Fuel Economy & Running Cost — governed EPA fuel data only. */}
                 <ModuleView onView={() => firePhaseE("fuel_economy_viewed", { module_id: "fuel-economy", module_position: 4, available: fuel.available })} dataModule="fuel-economy" className={`${CARD} p-5`}>
                   <div className="flex items-center justify-between gap-3">
                     <div className="text-[14px] font-extrabold" style={{ color: NAVY }}>{FUEL_MODULE_HEADING}</div>
-                    {fuel.available && fuel.source && <button onClick={() => firePhaseE("epa_methodology_opened")} className="text-[11px] font-semibold inline-flex items-center gap-1" style={{ color: SUB }}><Info className="w-3.5 h-3.5" /> {fuel.source}</button>}
+                    {fuel.available && fuel.source && (() => {
+                      const epaChecked = (listing as unknown as { epa_checked_at?: string }).epa_checked_at;
+                      return <button onClick={() => firePhaseE("epa_methodology_opened")} className="text-[11px] font-semibold inline-flex items-center gap-1" style={{ color: SUB }}><Info className="w-3.5 h-3.5" /> {fuel.source}{epaChecked ? ` · checked ${epaChecked.slice(0, 10)}` : ""}</button>;
+                    })()}
                   </div>
                   {!fuel.available ? (
                     <p className="mt-3 text-[13px]" style={{ color: SUB }}>{fuel.note}</p>
@@ -988,7 +1046,8 @@ export default function VehiclePassportGoverned() {
                   {dealerName && (
                     <div className={`${CARD} overflow-hidden`} data-module="dealer">
                       {dt.storefrontUrl ? (
-                        <div className="relative aspect-[2/1] w-full bg-slate-100">
+                        // Cinematic crop — full-width story without dominating the page (~2.3:1, max 360px).
+                        <div className="relative w-full bg-slate-100 overflow-hidden" style={{ aspectRatio: "2.3 / 1", maxHeight: 360 }}>
                           <img src={dt.storefrontUrl} alt={dealerName} className="w-full h-full object-cover" loading="lazy" />
                           <div className="absolute inset-0" style={{ background: "linear-gradient(to top, rgba(13,27,42,0.85) 0%, rgba(13,27,42,0.1) 55%, transparent 75%)" }} />
                           <div className="absolute bottom-3 left-4 text-white"><div className="text-[15px] font-extrabold">Why Buy From {dealerName}</div>{dealerFoundedYear != null && <div className="text-[12px] opacity-90">Serving drivers since {dealerFoundedYear}{dealerYears != null ? ` · ${dealerYears} years` : ""}</div>}</div>
@@ -1021,7 +1080,12 @@ export default function VehiclePassportGoverned() {
                   <p className="mt-3 text-[11px] leading-snug" style={{ color: SUB }}>Sales tax, title, registration and dealer-installed options are not included.</p>
 
                   <button onClick={primary.onClick} className="mt-4 w-full h-11 rounded-xl text-[14px] font-bold text-white" style={{ background: BLUE }}>{primary.label}</button>
-                  {vMaterialPending && <div className="mt-2 rounded-lg border px-3 py-2 text-[11px] font-semibold inline-flex items-center gap-1.5 w-full" style={{ borderColor: "#FDE68A", background: "#FFFBEB", color: AMBER }}><Info className="w-3.5 h-3.5" /> 1 material check pending</div>}
+                  {hasQuestions && (
+                    <div className="mt-2 rounded-lg border px-3 py-2.5" style={{ borderColor: "#FDE68A", background: "#FFFBEB" }}>
+                      <div className="text-[11px] font-bold" style={{ color: AMBER }}>{concerns.length === 1 ? "One question to confirm" : `${concerns.length} questions to confirm`}</div>
+                      <ul className="mt-1 space-y-0.5">{concerns.map((c, i) => <li key={i} className="text-[11px] leading-snug flex items-start gap-1.5" style={{ color: NAVY }}><span style={{ color: AMBER }}>•</span> {c}</li>)}</ul>
+                    </div>
+                  )}
 
                   <div className="mt-3 grid grid-cols-1 gap-2">
                     {secondary.map((s) => <button key={s.label} onClick={s.onClick} className="h-10 rounded-xl border inline-flex items-center justify-center gap-1.5 text-[13px] font-bold hover:bg-slate-50" style={{ borderColor: BORDER, color: BLUE }}><s.icon className="w-4 h-4" /> {s.label}</button>)}
@@ -1040,7 +1104,7 @@ export default function VehiclePassportGoverned() {
                     </div>
                   )}
                   <div className="mt-3 pt-3 border-t inline-flex items-center gap-1.5 text-[10px]" style={{ borderColor: BORDER, color: SUB }}>
-                    <Lock className="w-3 h-3" /> Dealer intent intelligence is private to authorized dealer users.
+                    <Lock className="w-3 h-3" /> Your information is only shared when you choose to contact the dealership.
                   </div>
                 </div>
               </aside>

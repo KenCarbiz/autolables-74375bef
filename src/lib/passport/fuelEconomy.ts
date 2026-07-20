@@ -11,7 +11,7 @@
 import type { PassportData } from "@/lib/passportV2Data";
 
 export const FUEL_MODULE_HEADING = "Fuel Economy & Running Cost";
-export const FUEL_MODULE_DISCLAIMER = "EPA estimates based on standardized driving and fuel-cost assumptions. Your actual fuel cost will vary.";
+export const FUEL_MODULE_DISCLAIMER = "EPA model-level estimates based on standardized driving and fuel-cost assumptions. Figures apply to this model/trim; confirm the exact drivetrain. Your actual fuel cost will vary.";
 
 export interface FuelEconomyView {
   available: boolean;
