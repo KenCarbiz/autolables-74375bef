@@ -492,6 +492,20 @@ export default function VehiclePassportGoverned() {
           </button>
         </section>
 
+        {/* ── Price & availability alerts (same governed watch_price capture as desktop) ── */}
+        {(listing as unknown as { price_drop_watch?: boolean }).price_drop_watch !== false && (
+          <section className="px-4 pt-4" data-module="watch-price">
+            {watchOpen ? (
+              <PriceDropWatch slug={listing.slug || rawSlug} />
+            ) : (
+              <button onClick={() => { trackCustomerCtaClicked({ storeId: listing.store_id, vehicleId: listing.id, vin: listing.vin, source: "passport", surface: "vehicle_passport", metadata: { cta: "watch_price" } }); setWatchOpen(true); }} className={`${CARD} w-full flex items-center justify-between gap-3 px-4 py-3.5`}>
+                <span className="inline-flex items-center gap-2 text-[13px] font-bold" style={{ color: NAVY }}><Eye className="w-4 h-4" style={{ color: BLUE }} /> Watch price &amp; availability</span>
+                <ChevronRight className="w-4 h-4" style={{ color: SUB }} />
+              </button>
+            )}
+          </section>
+        )}
+
         {/* ── AutoLabels Intelligence ──────────────────────────────── */}
         {chips.length > 0 && (
           <section className="px-4 pt-4" data-module="intelligence">
