@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { Activity, Car, FileText, Flame, FlaskConical, HeartHandshake, Mail, MousePointerClick, Phone, RefreshCw, TrendingUp } from "lucide-react";
+import { Activity, BellRing, Car, Check, FileText, Flame, FlaskConical, HeartHandshake, Mail, MousePointerClick, Phone, RefreshCw, TrendingUp } from "lucide-react";
 import { summarizePassportExperiment } from "@/lib/experiments/passportExperiment";
+import { deriveManagerAlerts, filterAcknowledged, acknowledgeAlert } from "@/lib/alerts/managerAlerts";
 
 type EngagementEvent = {
   id?: string;
@@ -66,6 +67,7 @@ export default function PassportEngagementDashboard() {
   const [events, setEvents] = useState<EngagementEvent[]>([]);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState<string | null>(null);
+  const [ackNonce, setAckNonce] = useState(0); // bump to re-filter after a dismiss
 
   const load = async () => {
     setLoading(true);
@@ -138,6 +140,16 @@ export default function PassportEngagementDashboard() {
   const experiment = useMemo(() => summarizePassportExperiment(events), [events]);
   const pctFmt = (n: number) => `${(n * 100).toFixed(1)}%`;
 
+  // Manager alerts — shoppers who took a real intent action and crossed the
+  // follow-up threshold. Acknowledgement is session-local and re-surfaces on new
+  // activity. ackNonce forces a re-filter after a dismiss.
+  const alerts = useMemo(
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    () => filterAcknowledged(deriveManagerAlerts(events as Parameters<typeof deriveManagerAlerts>[0])).slice(0, 8),
+    [events, ackNonce],
+  );
+  const dismissAlert = (a: { key: string; lastActivityAt: string }) => { acknowledgeAlert(a); setAckNonce((n) => n + 1); };
+
   if (loading) return <p className="p-4 text-sm text-muted-foreground">Loading Passport engagement…</p>;
 
   return (
@@ -153,6 +165,40 @@ export default function PassportEngagementDashboard() {
           <button onClick={load} className="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-border px-4 text-sm font-black text-foreground hover:bg-muted"><RefreshCw className="h-4 w-4" /> Refresh</button>
         </div>
       </div>
+
+      {alerts.length > 0 && (
+        <section className="rounded-3xl border border-rose-200 bg-card p-5 shadow-sm">
+          <div className="flex items-center gap-2">
+            <span className="inline-flex items-center gap-2 rounded-full bg-rose-50 px-3 py-1 text-[10px] font-black uppercase tracking-wider text-rose-700"><BellRing className="h-3.5 w-3.5" /> Needs follow-up now</span>
+            <span className="text-xs font-semibold text-muted-foreground">{alerts.length} shopper{alerts.length === 1 ? "" : "s"} took a real intent action</span>
+          </div>
+          <div className="mt-4 space-y-3">
+            {alerts.map((a) => (
+              <div key={a.key} className={`rounded-2xl border p-4 ${a.severity === "hot" ? "border-rose-300 bg-rose-50/60" : "border-amber-200 bg-amber-50/50"}`}>
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span className={`rounded-full px-2 py-0.5 text-[10px] font-black uppercase ${a.severity === "hot" ? "bg-rose-600 text-white" : "bg-amber-500 text-white"}`}>{a.severity}</span>
+                      <p className="truncate font-black text-foreground">{a.vehicle.stock ? `Stock ${a.vehicle.stock}` : a.vehicle.vin || "Vehicle"}</p>
+                    </div>
+                    <p className="mt-1 text-sm font-bold text-foreground">{a.suggestedAction}</p>
+                    <div className="mt-2 flex flex-wrap gap-1.5">
+                      {a.signals.slice(0, 5).map((s) => (
+                        <span key={s.type} className="rounded-lg bg-background px-2 py-1 text-[11px] font-semibold text-foreground border border-border">{s.label}</span>
+                      ))}
+                    </div>
+                    <p className="mt-2 text-[11px] text-muted-foreground">
+                      {a.sessions > 1 ? `Returned across ${a.sessions} visits · ` : ""}Last active {formatTime(a.lastActivityAt)}
+                    </p>
+                  </div>
+                  <button onClick={() => dismissAlert(a)} title="Dismiss until new activity" className="inline-flex h-9 shrink-0 items-center gap-1.5 rounded-xl border border-border px-3 text-xs font-bold text-muted-foreground hover:bg-muted"><Check className="h-3.5 w-3.5" /> Done</button>
+                </div>
+              </div>
+            ))}
+          </div>
+          <p className="mt-3 text-[11px] text-muted-foreground">Alerts reflect what shoppers did on the passport — a reservation, a call/text tap, a financing or trade request. They are follow-up signals, not a purchase prediction. Dismissing hides an alert until the shopper takes a new action.</p>
+        </section>
+      )}
 
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-6">
         <div className={statClass}><Activity className="mb-3 h-5 w-5 text-blue-600" /><p className="text-2xl font-black text-foreground">{summary.opens}</p><p className="text-xs font-bold uppercase text-muted-foreground">Passport opens</p></div>
