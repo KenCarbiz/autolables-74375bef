@@ -11,6 +11,7 @@ import { Helmet } from "react-helmet-async";
 import { type VehicleListing } from "@/hooks/useVehicleListing";
 import Logo from "@/components/brand/Logo";
 import { derivePassport, deriveRating, fmt$, listingEquipment, type PassportData } from "@/lib/passportV2Data";
+import { resolvePassportBack } from "@/lib/passportReturn";
 import { listingHero } from "@/lib/photos";
 import { MOCK_LISTING } from "./VehiclePassportV3";
 import { usePublicListing } from "@/hooks/usePublicListing";
@@ -158,7 +159,7 @@ const VehiclePassportVerification = () => {
   // measured data — never a quality score dressed up as verification.
   const cov = rating?.coverage ?? { measured: 0, total: 0, sources: 0 };
   const covLine = `${cov.measured} of ${cov.total} factor groups measured · ${cov.sources} data source${cov.sources === 1 ? "" : "s"}`;
-  const back = () => navigate(`/v/${listing.slug || vehicleSlug}${isPreview ? "?preview=1" : ""}`);
+  const back = () => navigate(resolvePassportBack(window.location.search, listing.slug || vehicleSlug || "", isPreview));
   const go = (section: string) => navigate(`/v/${listing.slug || vehicleSlug}/${section}${isPreview ? "?preview=1" : ""}`);
   const sourcesUsed = [
     { on: !!listing.ymm, label: "OEM / VIN decode" },

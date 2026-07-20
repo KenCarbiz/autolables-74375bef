@@ -7,6 +7,7 @@ import { type VehicleListing } from "@/hooks/useVehicleListing";
 import { formatPhone } from "@/components/addendum/CustomerInfoSection";
 import { trackLeadSubmitted, trackCustomerEngagement } from "@/lib/engagement/customerEngagement";
 import { fmt$, type PassportData } from "@/lib/passportV2Data";
+import { resolvePassportBack } from "@/lib/passportReturn";
 import { readBuildSheet } from "@/lib/buildSheet";
 import { listingGallery, listingHero } from "@/lib/photos";
 import { AutoLabelsSpecIcon, SpecIconBadge, type AutoLabelsSpecIconKey } from "@/components/icons/AutoLabelsSpecIcons";
@@ -215,7 +216,7 @@ const TestDriveExperience = ({ listing, d, navigate }: { listing: VehicleListing
   const stockNo = mc.stock_no ? String(mc.stock_no) : null;
   const dealerTel = d.dealerPhone ? d.dealerPhone.replace(/[^\d+]/g, "") : null;
   const q = isPreview ? "?preview=1" : "";
-  const goBack = () => { if (!isPreview) track(listing, "back_to_passport_clicked"); navigate(`/v/${listing.slug}${q}`); };
+  const goBack = () => { if (!isPreview) track(listing, "back_to_passport_clicked"); navigate(resolvePassportBack(window.location.search, listing.slug, isPreview)); };
   const goReserve = () => { if (!isPreview) track(listing, "reserve_vehicle_clicked"); navigate(`/v/${listing.slug}/reserve${q}`); };
   const goTrade = () => { if (!isPreview) track(listing, "trade_value_clicked"); navigate(`/v/${listing.slug}/trade${q}`); };
 

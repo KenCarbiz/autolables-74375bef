@@ -12,6 +12,7 @@ import { type VehicleListing } from "@/hooks/useVehicleListing";
 import { formatPhone } from "@/components/addendum/CustomerInfoSection";
 import Logo from "@/components/brand/Logo";
 import { derivePassport, historyReportName } from "@/lib/passportV2Data";
+import { resolvePassportBack } from "@/lib/passportReturn";
 import { packetVisible } from "@/lib/packetModules";
 import { trackCustomerCtaClicked } from "@/lib/engagement/customerEngagement";
 import { listingHero } from "@/lib/photos";
@@ -173,7 +174,10 @@ const VehiclePassportDocuments = () => {
   );
 
   const slug = listing.slug || vehicleSlug;
-  const pp = (s: string) => `/v/${slug}${s ? `/${s}` : ""}${isPreview ? "?preview=1" : ""}`;
+  // Passport ROOT nav (empty section) honors a validated returnTo so a V3-launched
+  // Documents visit returns to /v3/:slug; deep-section links stay on /v/:slug.
+  const pp = (s: string) =>
+    s ? `/v/${slug}/${s}${isPreview ? "?preview=1" : ""}` : resolvePassportBack(window.location.search, slug || "", isPreview);
   const hero = listingHero(listing);
   const total = allDocs.length;
   const adv = d.dealerTrust;

@@ -15,6 +15,7 @@ import { formatPhone } from "@/components/addendum/CustomerInfoSection";
 import { trackLeadSubmitted, trackCustomerEngagement } from "@/lib/engagement/customerEngagement";
 import Logo from "@/components/brand/Logo";
 import { derivePassport, fmt$, type PassportData } from "@/lib/passportV2Data";
+import { resolvePassportBack } from "@/lib/passportReturn";
 import { readBuildSheet } from "@/lib/buildSheet";
 import { resolveTodaysPrice } from "@/lib/todaysPrice";
 import TodaysPriceExperience from "@/components/passport/TodaysPriceExperience";
@@ -280,7 +281,7 @@ const ReserveExperience = ({ listing, d, navigate }: { listing: VehicleListing; 
   const stockNo = (() => { const s = (listing.mc_attributes as Record<string, unknown> | null)?.stock_no; return s ? String(s) : null; })();
 
   const q = isPreview ? "?preview=1" : "";
-  const goBack = () => { if (!isPreview) trackFlow(listing, "back_to_passport_clicked"); navigate(`/v/${listing.slug}${q}`); };
+  const goBack = () => { if (!isPreview) trackFlow(listing, "back_to_passport_clicked"); navigate(resolvePassportBack(window.location.search, listing.slug, isPreview)); };
   const goTrade = () => { if (!isPreview) trackFlow(listing, "trade_value_clicked"); navigate(`/v/${listing.slug}/trade${q}`); };
 
   const submit = async () => {
@@ -572,7 +573,7 @@ const ContactExperience = ({ listing, d, navigate }: { listing: VehicleListing; 
   const dealerTel = d.dealerPhone ? d.dealerPhone.replace(/[^\d+]/g, "") : null;
 
   const q = isPreview ? "?preview=1" : "";
-  const goBack = () => { if (!isPreview) trackFlow(listing, "back_to_passport_clicked"); navigate(`/v/${listing.slug}${q}`); };
+  const goBack = () => { if (!isPreview) trackFlow(listing, "back_to_passport_clicked"); navigate(resolvePassportBack(window.location.search, listing.slug, isPreview)); };
   const goTrade = () => { if (!isPreview) trackFlow(listing, "trade_value_clicked"); navigate(`/v/${listing.slug}/trade${q}`); };
   const goReserve = () => { if (!isPreview) trackFlow(listing, "reserve_vehicle_clicked"); navigate(`/v/${listing.slug}/reserve${q}`); };
   const goTestDrive = () => { if (!isPreview) trackFlow(listing, "test_drive_clicked"); navigate(`/v/${listing.slug}/test-drive${q}`); };
@@ -1479,7 +1480,9 @@ const VehiclePassportV2Detail = () => {
   const d = useMemo(() => (listing ? derivePassport(listing) : null), [listing]);
   const def = section && !shimPanel ? SECTIONS[section] : undefined;
 
-  const back = () => navigate(`/${base}/${vehicleSlug}${isPreview ? "?preview=1" : ""}`);
+  // Honors a validated returnTo (a V3-originated visit returns to /v3/:slug);
+  // otherwise falls back to the canonical passport for this base.
+  const back = () => navigate(resolvePassportBack(location.search, vehicleSlug || "", isPreview) || `/${base}/${vehicleSlug}`);
 
   if (loading || shimPanel) return <div className="min-h-[100svh] flex items-center justify-center bg-[#F6F7F9]"><div className="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" /></div>;
 

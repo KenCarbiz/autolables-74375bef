@@ -1,9 +1,9 @@
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
-import { useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { useNavigate, useParams, useSearchParams, useLocation } from "react-router-dom";
 import {
   Bookmark, MoreHorizontal, Upload, Phone, MessageSquare, Clock, DollarSign,
   ChevronDown, ChevronRight, ChevronLeft, Star, Sparkles, ShieldCheck, CheckCircle2, MapPin,
-  RefreshCw, Send, BadgeCheck, Play, Package, Award, TrendingUp, X, Info, Lock, Wrench, FileText,
+  RefreshCw, Send, BadgeCheck, Play, Package, Award, TrendingUp, X, Info, Lock, Wrench, FileText, Eye,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Helmet } from "react-helmet-async";
@@ -11,6 +11,7 @@ import { usePublicListing } from "@/hooks/usePublicListing";
 import { derivePassport, fmt$, historyReportName } from "@/lib/passportV2Data";
 import { listingGallery } from "@/lib/photos";
 import { packetVisible } from "@/lib/packetModules";
+import { buildPassportActionPath } from "@/lib/passportReturn";
 import { resolveStickyButtons, type StickyBottomButtons } from "@/lib/stickyButtons";
 import { MOCK_LISTING } from "./VehiclePassportV3";
 import type { VehicleListing } from "@/hooks/useVehicleListing";
@@ -23,7 +24,6 @@ import PassportActionDrawer, { type PassportActionKey } from "@/components/passp
 import { resolveMarketComparison, type MarketSeriesPoint } from "@/lib/passport/marketComparison";
 import { normalizeComparables } from "@/lib/passport/comparables";
 import { resolveFuelEconomy, FUEL_MODULE_HEADING } from "@/lib/passport/fuelEconomy";
-import { resolveBuyingCandidate } from "@/lib/passport/buyingCandidate";
 import { trackCustomerEngagement } from "@/lib/engagement/customerEngagement";
 import Logo from "@/components/brand/Logo";
 
@@ -144,6 +144,7 @@ export default function VehiclePassportGoverned() {
   const { vehicleSlug, slug } = useParams<{ vehicleSlug?: string; slug?: string }>();
   const rawSlug = (vehicleSlug || slug || "").trim();
   const navigate = useNavigate();
+  const location = useLocation();
   // Preview parity with the other passport pages (?preview=1 renders the shared
   // MOCK_LISTING) so the governed experience can be visually reviewed without a
   // live backend. No effect on real shopper traffic.
@@ -199,7 +200,12 @@ export default function VehiclePassportGoverned() {
   }
 
   const pv = (id: string) => packetVisible(listing, id);
-  const go = (section: string) => navigate(`/v/${listing.slug || rawSlug}/${section}`);
+  // Open an existing V2 destination page (/v/:slug/:section) carrying the current
+  // passport URL as a validated returnTo, so the destination's "Back to Vehicle
+  // Passport" returns to THIS V3 experience. The full V2 pages/forms are reused
+  // unchanged — V3 CTAs never re-implement them as drawers.
+  const go = (section: string) =>
+    navigate(buildPassportActionPath(listing.slug || rawSlug, section, location.pathname, isPreview));
   const openPanel = (k: PassportPanelKey) => { setActivePanel(k); };
   // Governed V3 action surfaces — reserve / test-drive / trade / contact /
   // payment / availability open a V3 drawer and NEVER navigate into the V2
@@ -709,21 +715,6 @@ export default function VehiclePassportGoverned() {
         const vDone = vsum.completed;
         const vTotal = vsum.total;
         const vMaterialPending = vsum.materialPending > 0;
-        const specChips = [
-          listing.mileage != null ? `${listing.mileage.toLocaleString()} mi` : null,
-          ...d.highlights.slice(0, 3).map((h) => h.label),
-        ].filter(Boolean) as string[];
-        // ── Governed recommendation — the conclusion is conditioned on BOTH the
-        // price position and any pending material check. Above normalized market
-        // value OR a pending material check => "Candidate With Questions", with
-        // the specific reasons stated (never a bare "Strong Buying Candidate").
-        const pendingMaterial = vsum.categories.filter((c) => c.material && c.state === "pending").map((c) => c.label);
-        const cand = resolveBuyingCandidate({ advertisedPrice: price, normalizedMarketValue: d.marketAvg, pendingMaterialLabels: pendingMaterial });
-        const aboveMarket = cand.aboveMarket;
-        const concerns = cand.concerns;
-        const hasQuestions = cand.hasQuestions;
-        const candidateHeadline = cand.headline;
-        const candidateSub = cand.subcopy;
         // CPO: without a per-VIN manufacturer-enrollment signal we label the
         // neutral "Certified Pre-Owned", never a manufacturer-branded claim.
         const conditionLabel = isNew ? "New" : condition === "cpo" ? "Certified Pre-Owned" : "Used";
@@ -732,20 +723,58 @@ export default function VehiclePassportGoverned() {
         const hasInService = !!(d.warranty && (d.warranty as { in_service_date?: string }).in_service_date);
         const warrantyHead = d.warrantyStr ? "Factory warranty terms found" : "Confirm warranty with dealer";
         const warrantySub = hasInService ? (d.warrantyStr || "Coverage on record") : "Remaining eligibility requires confirmation of the in-service date";
-        // Primary CTA follows the recommendation — questions route to the dealer,
-        // never a hard "Reserve".
-        const primary = { label: cand.primaryCtaLabel, onClick: () => openAction(hasQuestions ? "contact" : "reserve") };
-        const secondary = [
-          { label: "Value My Trade", icon: RefreshCw, onClick: () => openAction("trade") },
-          { label: "Schedule Test Drive", icon: Clock, onClick: () => openAction("test-drive") },
+
+        // ── Hero trust badges — each shown only when its governed signal is real.
+        const trustBadges = [
+          d.ownerCount === 1 ? "One Owner" : null,
+          (d.dealerVerified || (d.verifiedBy && d.verifiedBy.length > 0)) ? "Dealer Verified" : null,
+          d.marketAvg != null ? "Market Data Verified" : null,
+        ].filter(Boolean) as string[];
+
+        // ── AutoLabels Verified card — governed per-category state, never a
+        // fabricated pass. Verified/terminal → green; pending → amber + "Pending";
+        // conflict → amber "Review"; unavailable → neutral "Not available".
+        const VERIFIED_LABEL: Record<string, string> = {
+          vin: "VIN Verified", title: "Title & Brand", recall: "Recall Verification",
+          history: "Vehicle History", market: "Market Data", warranty: "Warranty Checked", service: "Service History",
+        };
+        const PENDING_LABEL: Record<string, string> = {
+          vin: "VIN", title: "Title & Brand", recall: "Recall",
+          history: "Vehicle History", market: "Market Data", warranty: "Warranty", service: "Service History",
+        };
+        const verifiedChecks = vsum.categories.map((c) => {
+          const terminalPositive = c.state === "verified" || c.state === "dealer_confirmed" || c.state === "calculated" || c.state === "inferred";
+          const tone = terminalPositive ? "ok" : c.state === "conflict_detected" ? "review" : c.state === "unavailable" || c.state === "not_applicable" ? "na" : "pending";
+          const label = tone === "ok" ? (VERIFIED_LABEL[c.key] || c.label) : (PENDING_LABEL[c.key] || c.label);
+          const note = tone === "pending" ? "Pending" : tone === "review" ? "Review" : tone === "na" ? "Not available" : null;
+          const color = tone === "ok" ? GREEN : tone === "na" ? "#94A3B8" : AMBER;
+          const Icon = tone === "ok" ? CheckCircle2 : tone === "na" ? Info : Clock;
+          return { key: c.key, label, note, color, Icon };
+        });
+
+        // ── Fixed conversion action hierarchy (goal-locked). Each opens the
+        // existing, complete V2 destination page via go() — never a drawer — and
+        // carries returnTo so its "Back to Vehicle Passport" returns here.
+        const actPrimary = { label: "See My Price", onClick: () => go("todays-price") };
+        const actReserve = { label: "Reserve This Vehicle", onClick: () => go("reserve") };
+        const actGrid1 = [
+          { label: "Value My Trade", icon: RefreshCw, onClick: () => go("trade") },
+          { label: "Test Drive", icon: Clock, onClick: () => go("test-drive") },
         ];
-        const compact = [
-          { label: "Call", icon: Phone, onClick: stickyAction("call").onClick },
-          { label: "Text", icon: MessageSquare, onClick: stickyAction("text").onClick },
-          { label: "Watch Price", icon: Bookmark, onClick: handleSave },
+        const actGrid2 = [
+          { label: "Contact Dealer", icon: MessageSquare, onClick: () => go("contact") },
+          { label: "Documents", icon: FileText, onClick: () => go("documents") },
+        ];
+        const actUtility = [
+          { label: "Save", icon: Bookmark, onClick: handleSave },
           { label: "Share", icon: Upload, onClick: handleShare },
+          { label: "Watch Price", icon: Eye, onClick: handleSave },
         ];
         const label3 = "text-[11px] font-semibold uppercase tracking-wider";
+        // Dollar amount the price sits ABOVE normalized market value (past a $250
+        // rounding tolerance), used by the Market Comparison module. Null when at
+        // or below market.
+        const aboveMarket = price != null && d.marketAvg != null && price - d.marketAvg > 250 ? price - d.marketAvg : null;
         // ── Phase E view models (governed, presentation-only) ──
         const mc = resolveMarketComparison({
           valueHistory: d.valueHistory, advertisedPrice: price, normalizedMarketValue: d.marketAvg,
@@ -765,7 +794,6 @@ export default function VehiclePassportGoverned() {
                 <div className="flex items-center gap-4 min-w-0">
                   {dealerLogo ? <img src={dealerLogo} alt={dealerName} className="h-8 max-w-[150px] object-contain" /> : <Logo variant="full" className="h-7" />}
                   {dealerName && <div className="pl-4 border-l min-w-0" style={{ borderColor: BORDER }}><div className="text-[13px] font-bold truncate" style={{ color: NAVY }}>{dealerName}</div>{d.dealerAddress && <div className="text-[11px] truncate" style={{ color: SUB }}>{d.dealerAddress}</div>}</div>}
-                  <div className="pl-4 border-l min-w-0 hidden 2xl:block" style={{ borderColor: BORDER }}><div className="text-[13px] font-extrabold truncate" style={{ color: NAVY }}>{listing.ymm}{listing.trim ? ` ${listing.trim}` : ""}</div>{listing.vin && <div className="text-[11px] font-mono" style={{ color: SUB }}>VIN {listing.vin}</div>}</div>
                 </div>
                 <div className="flex items-center gap-2">
                   <button onClick={handleSave} className="h-9 px-3 rounded-lg border inline-flex items-center gap-1.5 text-[13px] font-bold hover:bg-slate-50" style={{ borderColor: BORDER, color: isSaved ? BLUE : NAVY }}><Bookmark className="w-4 h-4" style={{ fill: isSaved ? BLUE : "none" }} /> Save</button>
@@ -803,33 +831,51 @@ export default function VehiclePassportGoverned() {
                   <div className="min-w-0">
                     <div className="inline-flex items-center h-6 px-2.5 rounded-full text-[11px] font-bold uppercase tracking-wide" style={{ background: isNew ? "#EFF6FF" : "#F1F5F9", color: isNew ? BLUE : NAVY }}>{conditionLabel}</div>
                     <h1 className="mt-2 text-[26px] leading-tight font-extrabold" style={{ color: NAVY }}>{listing.ymm}{listing.trim ? ` ${listing.trim}` : ""}</h1>
-                    {specChips.length > 0 && <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-[13px]" style={{ color: SUB }}>{specChips.map((c, i) => <span key={i} className="inline-flex items-center gap-1.5">{i > 0 && <span className="w-1 h-1 rounded-full" style={{ background: "#CBD5E1" }} />}{c}</span>)}</div>}
-
-                    <div className="mt-4 flex items-end justify-between gap-4">
-                      <div><div className={label3} style={{ color: SUB }}>{d.priceLabel || "Our price"}</div><div className="text-[30px] font-extrabold tabular-nums leading-none mt-1" style={{ color: NAVY }}>{price != null ? fmt$(price) : "—"}</div></div>
-                      <div className="text-right space-y-0.5">
-                        {saveVs ? <div className="text-[13px] font-bold tabular-nums" style={{ color: GREEN }}>{fmt$(saveVs)} <span className="font-semibold" style={{ color: SUB }}>below MSRP</span></div> : null}
-                        {d.belowMarket != null && d.belowMarket > 0 ? <div className="text-[13px] font-bold tabular-nums" style={{ color: GREEN }}>{fmt$(d.belowMarket)} <span className="font-semibold" style={{ color: SUB }}>below market value</span></div> : null}
+                    {/* VIN + mileage on one secondary line — the price lives ONLY in the
+                        action center, never here. */}
+                    {(listing.vin || listing.mileage != null) && (
+                      <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-[13px]" style={{ color: SUB }}>
+                        {listing.vin && <span className="font-mono">VIN {listing.vin}</span>}
+                        {listing.vin && listing.mileage != null && <span className="w-1 h-1 rounded-full" style={{ background: "#CBD5E1" }} />}
+                        {listing.mileage != null && <span className="tabular-nums">{listing.mileage.toLocaleString()} mi</span>}
                       </div>
-                    </div>
+                    )}
 
-                    {/* Buying-candidate strip — governed: the conclusion is conditioned on
-                        price position AND pending material checks, with reasons stated. */}
-                    <div className="mt-4 rounded-xl border p-3" style={{ borderColor: hasQuestions ? "#FDE68A" : BORDER, background: hasQuestions ? "#FFFBEB" : "#F8FAFC" }}>
-                      <div className="flex items-center justify-between gap-3">
-                        <div className="inline-flex items-center gap-2">{hasQuestions ? <Info className="w-4 h-4" style={{ color: AMBER }} /> : <ShieldCheck className="w-4 h-4" style={{ color: GREEN }} />}<span className="text-[13px] font-bold" style={{ color: NAVY }}>{candidateHeadline}</span></div>
-                        {hasQuestions && <span className="text-[11px] font-bold" style={{ color: AMBER }}>{concerns.length} to confirm</span>}
-                      </div>
-                      <p className="mt-1 text-[11px] leading-snug" style={{ color: SUB }}>{candidateSub}</p>
-                    </div>
-                    {chips.length > 0 && (
-                      <div className="mt-3 grid grid-cols-3 gap-2">
-                        {chips.map((c, i) => (
-                          <div key={i} className="rounded-xl border p-2.5" style={{ borderColor: BORDER }}>
-                            <c.icon className="w-4 h-4" style={{ color: c.tone === "green" ? GREEN : BLUE }} />
-                            <div className="mt-1 text-[11px] font-semibold leading-tight" style={{ color: NAVY }}>{c.label}</div>
-                          </div>
+                    {/* Vehicle trust badges — each shown only when its governed signal is real. */}
+                    {trustBadges.length > 0 && (
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        {trustBadges.map((b) => (
+                          <span key={b} className="inline-flex items-center gap-1.5 h-7 px-2.5 rounded-full text-[12px] font-semibold border" style={{ background: "#F0FDF4", color: GREEN, borderColor: "#BBF7D0" }}>
+                            <CheckCircle2 className="w-3.5 h-3.5" /> {b}
+                          </span>
                         ))}
+                      </div>
+                    )}
+
+                    {/* AutoLabels Verified — governed per-category state; never all-green
+                        while a material check is pending. */}
+                    {vTotal > 0 && (
+                      <div className="mt-4 rounded-xl border p-4" style={{ borderColor: BORDER, background: "#FBFDFF" }}>
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="flex items-center gap-2.5 min-w-0">
+                            <span className="h-9 w-9 grid place-items-center rounded-full shrink-0" style={{ background: "#EFF6FF" }}><ShieldCheck className="w-5 h-5" style={{ color: BLUE }} /></span>
+                            <div className="min-w-0">
+                              <div className="text-[14px] font-extrabold" style={{ color: NAVY }}>AutoLabels Verified</div>
+                              <div className="text-[12px] leading-snug" style={{ color: SUB }}>Checked against trusted automotive data sources.</div>
+                            </div>
+                          </div>
+                          {vMaterialPending && <span className="text-[11px] font-bold shrink-0" style={{ color: AMBER }}>Checks pending</span>}
+                        </div>
+                        <div className="mt-3 grid grid-cols-2 gap-x-4 gap-y-2">
+                          {verifiedChecks.map((c) => (
+                            <div key={c.key} className="flex items-center gap-2 text-[12.5px] min-w-0" style={{ color: NAVY }}>
+                              <c.Icon className="w-4 h-4 shrink-0" style={{ color: c.color }} />
+                              <span className="font-medium truncate">{c.label}</span>
+                              {c.note && <span className="text-[11px] font-semibold shrink-0" style={{ color: c.color }}>· {c.note}</span>}
+                            </div>
+                          ))}
+                        </div>
+                        <button onClick={() => go("verification")} className="mt-3 text-[13px] font-bold inline-flex items-center gap-1 hover:underline" style={{ color: BLUE }}>View full verification report <ChevronRight className="w-4 h-4" /></button>
                       </div>
                     )}
                   </div>
@@ -1068,37 +1114,36 @@ export default function VehiclePassportGoverned() {
               <aside className="self-start" style={{ position: "sticky", top: DESKTOP_STICKY_OFFSET }} data-module="action-center">
                 <div className={`${CARD} p-5`}>
                   <div className="text-[10px] font-black uppercase tracking-wider" style={{ color: SUB }}>Customer Action Center</div>
-                  <div className="mt-3 text-[11px] font-bold uppercase tracking-wider" style={{ color: SUB }}>One price truth</div>
-                  <div className="text-[30px] font-extrabold tabular-nums leading-none mt-1" style={{ color: NAVY }}>{price != null ? fmt$(price) : "—"}</div>
-                  {/* Doc-fee inclusion — the price already includes the fee; we NEVER add it again. */}
+                  <div className="mt-3 text-[11px] font-bold uppercase tracking-wider" style={{ color: SUB }}>{d.priceLabel || "Our Price"}</div>
+                  {/* The ONE above-the-fold price. For a doc-inclusive tenant this already
+                      includes the doc fee — it is never added again (no $31,771). */}
+                  <div className="text-[32px] font-extrabold tabular-nums leading-none mt-1" style={{ color: NAVY }}>{price != null ? fmt$(price) : "—"}</div>
                   {d.priceIncludesDoc && d.docFee && price != null && (
-                    <div className="mt-1.5 text-[12px] leading-snug" style={{ color: SUB }}>
-                      <div>Includes {fmt$(d.docFee)} documentation fee</div>
-                      <div className="tabular-nums">{fmt$(price - d.docFee)} before documentation fee</div>
+                    <div className="mt-1.5 text-[12px] leading-snug tabular-nums" style={{ color: SUB }}>
+                      Includes {fmt$(d.docFee)} doc fee · {fmt$(price - d.docFee)} before doc fee
                     </div>
                   )}
-                  {d.priceBreakdown && (
-                    <div className="mt-3 space-y-1 text-[12px]">
-                      <div className="flex items-baseline justify-between"><span style={{ color: SUB }}>MSRP</span><span className="font-semibold tabular-nums" style={{ color: NAVY }}>{fmt$(d.priceBreakdown.msrp)}</span></div>
-                      {d.priceBreakdown.lines.map((l) => <div key={l.key} className="flex items-baseline justify-between"><span style={{ color: SUB }}>{l.label}</span><span className="font-semibold tabular-nums" style={{ color: GREEN }}>−{fmt$(l.amount)}</span></div>)}
-                      {d.priceBreakdown.docFee ? <div className="flex items-baseline justify-between"><span style={{ color: SUB }}>Conveyance / doc fee</span><span className="font-semibold tabular-nums" style={{ color: NAVY }}>{fmt$(d.priceBreakdown.docFee)}</span></div> : null}
-                    </div>
+                  {/* Example payment — an estimate only, never an offer or approval. */}
+                  {d.estMonthly != null && (
+                    <div className="mt-1.5 text-[12px]" style={{ color: SUB }}>Est. <span className="font-bold tabular-nums" style={{ color: NAVY }}>{fmt$(d.estMonthly)}/mo</span>{d.paymentAssumptions ? ` · ${d.paymentAssumptions}` : ""}</div>
+                  )}
+                  {/* MSRP — the real factory sticker only; never market value. */}
+                  {d.msrp != null && (
+                    <div className="mt-1 text-[12px] tabular-nums" style={{ color: SUB }}>MSRP {fmt$(d.msrp)}{saveVs ? <span className="ml-2 font-bold" style={{ color: GREEN }}>{fmt$(saveVs)} below MSRP</span> : null}</div>
                   )}
                   <p className="mt-3 text-[11px] leading-snug" style={{ color: SUB }}>Sales tax, title, registration and dealer-installed options are not included.</p>
 
-                  <button onClick={primary.onClick} className="mt-4 w-full h-11 rounded-xl text-[14px] font-bold text-white" style={{ background: BLUE }}>{primary.label}</button>
-                  {hasQuestions && (
-                    <div className="mt-2 rounded-lg border px-3 py-2.5" style={{ borderColor: "#FDE68A", background: "#FFFBEB" }}>
-                      <div className="text-[11px] font-bold" style={{ color: AMBER }}>{concerns.length === 1 ? "One question to confirm" : `${concerns.length} questions to confirm`}</div>
-                      <ul className="mt-1 space-y-0.5">{concerns.map((c, i) => <li key={i} className="text-[11px] leading-snug flex items-start gap-1.5" style={{ color: NAVY }}><span style={{ color: AMBER }}>•</span> {c}</li>)}</ul>
-                    </div>
-                  )}
-
-                  <div className="mt-3 grid grid-cols-1 gap-2">
-                    {secondary.map((s) => <button key={s.label} onClick={s.onClick} className="h-10 rounded-xl border inline-flex items-center justify-center gap-1.5 text-[13px] font-bold hover:bg-slate-50" style={{ borderColor: BORDER, color: BLUE }}><s.icon className="w-4 h-4" /> {s.label}</button>)}
+                  {/* Fixed conversion hierarchy — each opens the complete existing V2 page. */}
+                  <button onClick={actPrimary.onClick} className="mt-4 w-full h-11 rounded-xl inline-flex items-center justify-center gap-2 text-[14px] font-bold text-white" style={{ background: BLUE }}><DollarSign className="w-4 h-4" /> {actPrimary.label}</button>
+                  <button onClick={actReserve.onClick} className="mt-2 w-full h-11 rounded-xl border inline-flex items-center justify-center gap-2 text-[14px] font-bold hover:bg-slate-50" style={{ borderColor: BLUE, color: BLUE }}><BadgeCheck className="w-4 h-4" /> {actReserve.label}</button>
+                  <div className="mt-2 grid grid-cols-2 gap-2">
+                    {actGrid1.map((s) => <button key={s.label} onClick={s.onClick} className="h-10 rounded-xl border inline-flex items-center justify-center gap-1.5 text-[13px] font-bold hover:bg-slate-50" style={{ borderColor: BORDER, color: NAVY }}><s.icon className="w-4 h-4" style={{ color: BLUE }} /> {s.label}</button>)}
                   </div>
                   <div className="mt-2 grid grid-cols-2 gap-2">
-                    {compact.map((c) => <button key={c.label} onClick={c.onClick} className="h-10 rounded-xl border inline-flex items-center justify-center gap-1.5 text-[12px] font-bold hover:bg-slate-50" style={{ borderColor: BORDER, color: NAVY }}><c.icon className="w-4 h-4" style={{ color: BLUE }} /> {c.label}</button>)}
+                    {actGrid2.map((s) => <button key={s.label} onClick={s.onClick} className="h-10 rounded-xl border inline-flex items-center justify-center gap-1.5 text-[13px] font-bold hover:bg-slate-50" style={{ borderColor: BORDER, color: NAVY }}><s.icon className="w-4 h-4" style={{ color: BLUE }} /> {s.label}</button>)}
+                  </div>
+                  <div className="mt-3 pt-3 border-t grid grid-cols-3 gap-2" style={{ borderColor: BORDER }}>
+                    {actUtility.map((c) => <button key={c.label} onClick={c.onClick} className="h-9 rounded-lg inline-flex items-center justify-center gap-1.5 text-[12px] font-bold hover:bg-slate-50" style={{ color: NAVY }}><c.icon className="w-4 h-4" style={{ color: c.label === "Save" && isSaved ? BLUE : SUB, fill: c.label === "Save" && isSaved ? BLUE : "none" }} /> {c.label}</button>)}
                   </div>
 
                   {dealerName && (

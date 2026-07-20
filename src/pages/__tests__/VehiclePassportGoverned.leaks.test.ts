@@ -2,39 +2,45 @@ import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
-// ── Phase D non-regression guard ────────────────────────────────────────────
-// A shopper on the governed V3 passport must never be routed into the V2 detail
-// pages (/v/:slug/<action>). Primary/secondary actions open the governed V3
-// action drawer via openAction(...) instead. This test fails if any action
-// re-introduces a go("<v2-action>") leak.
+// ── Passport V3 desktop conversion-routing guard ────────────────────────────
+// The approved desktop architecture reuses the complete, existing V2 destination
+// pages for the high-intent conversion flows (See My Price, Reserve, Trade, Test
+// Drive, Contact, Documents) instead of re-implementing them as drawers. The V3
+// action center opens them via go("<section>"), which navigates to
+// /v/:slug/:section carrying a validated returnTo back to the originating V3 URL.
+// The mobile governed passport keeps its own action drawer unchanged.
 
 const SRC = readFileSync(resolve(__dirname, "../VehiclePassportGoverned.tsx"), "utf8");
 
-// Actions whose only governed destination is the V3 action drawer — they must
-// NEVER appear as go("...") (which navigates into VehiclePassportV2Detail).
-const FORBIDDEN_ACTION_ROUTES = [
-  "reserve",
-  "test-drive",
-  "trade",
-  "contact",
-  "todays-price",
-  "check-availability",
-  "text",
-];
+// Each conversion CTA must open its complete existing V2 destination page.
+const CONVERSION_ROUTES = ["todays-price", "reserve", "trade", "test-drive", "contact", "documents"];
 
-describe("VehiclePassportGoverned — no V3→V2 action route leaks", () => {
-  it.each(FORBIDDEN_ACTION_ROUTES)('never calls go("%s") — must use the governed V3 action drawer', (action) => {
-    expect(SRC).not.toContain(`go("${action}")`);
+describe("VehiclePassportGoverned — desktop conversion routing", () => {
+  it.each(CONVERSION_ROUTES)('opens the complete V2 %s page via go("%s")', (action) => {
+    expect(SRC).toContain(`go("${action}")`);
   });
 
-  it("routes actions through the governed openAction() drawer", () => {
+  it("routes every V2 destination through the returnTo contract (buildPassportActionPath)", () => {
+    // go() is implemented via buildPassportActionPath so the destination's
+    // "Back to Vehicle Passport" can return to the originating /v3/:slug URL.
+    expect(SRC).toContain("buildPassportActionPath");
+    expect(SRC).toContain("location.pathname");
+  });
+
+  it("still reaches the verification report in-flow via go(\"verification\")", () => {
+    expect(SRC).toMatch(/go\("(verification|dealer)"\)/);
+  });
+
+  it("keeps the mobile governed action drawer unchanged", () => {
+    // Mobile V3 must not be converted to route into V2 — it keeps openAction()
+    // + PassportActionDrawer.
     expect(SRC).toContain("openAction(");
     expect(SRC).toContain("PassportActionDrawer");
   });
 
-  it("still allows governed V3-in-flow destination pages (verification / great-buy / dealer)", () => {
-    // These render dedicated governed pages, not the V2 detail passport, so they
-    // remain acceptable in-flow routes.
-    expect(SRC).toMatch(/go\("(verification|great-buy|dealer)"\)/);
+  it("never surfaces the double-counted price — the fee is included, never re-added", () => {
+    // Governance: the action center shows the doc-inclusive price and discloses
+    // the fee; it must not construct price + docFee anywhere.
+    expect(SRC).not.toMatch(/price\s*\+\s*d\.docFee/);
   });
 });
