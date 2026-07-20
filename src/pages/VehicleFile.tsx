@@ -716,8 +716,9 @@ const OverviewPanel = ({ vehicle, onTab, recall }: { vehicle: VehicleRow; onTab:
 
   // "Vehicle created" is always true — noise in a task list.
   const taskChecks = checks.filter((c) => c.label !== "Vehicle created");
-  const shownChecks = taskChecks.slice(0, 6);
-  const moreCount = taskChecks.length - shownChecks.length;
+  const [showAllChecks, setShowAllChecks] = useState(false);
+  const shownChecks = showAllChecks ? taskChecks : taskChecks.slice(0, 6);
+  const moreCount = taskChecks.length - Math.min(taskChecks.length, 6);
 
   const copyPortalLink = async () => {
     try { await navigator.clipboard.writeText(publicUrl); toast.success("Link copied"); }
@@ -785,10 +786,16 @@ const OverviewPanel = ({ vehicle, onTab, recall }: { vehicle: VehicleRow; onTab:
                   <span className={`truncate ${c.ok ? "text-foreground font-medium" : "text-amber-700 font-medium"}`}>{c.label}</span>
                 </li>
               ))}
-              {moreCount > 0 && <li className="text-[11px] font-semibold text-muted-foreground pl-6">+{moreCount} more</li>}
+              {!showAllChecks && moreCount > 0 && <li className="text-[11px] font-semibold text-muted-foreground pl-6">+{moreCount} more</li>}
             </ul>
           </div>
-          <button onClick={() => onTab("labels")} className="mt-auto pt-1 text-[12px] font-semibold text-blue-600 hover:underline inline-flex items-center justify-center gap-1 w-full">View missing items <ChevronRight className="w-3.5 h-3.5" /></button>
+          {remaining.length > 0 ? (
+            <button onClick={() => setShowAllChecks((v) => !v)} aria-expanded={showAllChecks} className="mt-auto pt-1 text-[12px] font-semibold text-blue-600 hover:underline inline-flex items-center justify-center gap-1 w-full">
+              {showAllChecks ? "Show less" : "View missing items"} <ChevronRight className={`w-3.5 h-3.5 transition-transform ${showAllChecks ? "rotate-90" : ""}`} />
+            </button>
+          ) : (
+            <div className="mt-auto pt-1 text-[12px] font-semibold text-emerald-600 inline-flex items-center justify-center gap-1 w-full"><CheckCircle2 className="w-3.5 h-3.5" /> Packet complete</div>
+          )}
         </Card>
 
         {/* 2 — Shopper Portal status */}
