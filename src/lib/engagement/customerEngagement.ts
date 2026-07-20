@@ -29,7 +29,20 @@ export type CustomerEngagementEventType =
   | "trade_clicked"
   | "scroll_depth"
   | "time_on_page"
-  | "engagement_ping";
+  | "engagement_ping"
+  // Data-Verified Report surface. Payload detail (checkId / status / sourceId /
+  // action / passportVersion / reportId / viewport) rides in metadata.
+  | "verification_report_viewed"
+  | "verification_exception_viewed"
+  | "verification_evidence_opened"
+  | "verification_source_viewed"
+  | "verification_contact_clicked"
+  | "verification_pdf_downloaded"
+  | "verification_report_shared"
+  | "verification_report_printed"
+  | "verification_methodology_opened"
+  | "verification_bubble_opened"
+  | "verification_bubble_action_clicked";
 
 export type CustomerEngagementPayload = {
   tenantId?: string | null;
