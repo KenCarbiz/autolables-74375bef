@@ -1,5 +1,5 @@
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import {
   Bookmark, MoreHorizontal, Upload, Phone, MessageSquare, Clock, DollarSign,
   ChevronDown, ChevronRight, Star, Sparkles, ShieldCheck, CheckCircle2, MapPin,
@@ -12,6 +12,8 @@ import { derivePassport, fmt$ } from "@/lib/passportV2Data";
 import { listingGallery } from "@/lib/photos";
 import { packetVisible } from "@/lib/packetModules";
 import { resolveStickyButtons, type StickyBottomButtons } from "@/lib/stickyButtons";
+import { MOCK_LISTING } from "./VehiclePassportV3";
+import type { VehicleListing } from "@/hooks/useVehicleListing";
 import { isVehicleSaved, toggleSavedVehicle } from "@/lib/savedVehicles";
 import { usePassportEngagement } from "@/lib/passportEngagement";
 import { trackPassportOpened, trackWindowStickerScanned, trackCustomerCtaClicked } from "@/lib/engagement/customerEngagement";
@@ -65,7 +67,12 @@ export default function VehiclePassportGoverned() {
   const { vehicleSlug, slug } = useParams<{ vehicleSlug?: string; slug?: string }>();
   const rawSlug = (vehicleSlug || slug || "").trim();
   const navigate = useNavigate();
-  const { listing, loading, notFound } = usePublicListing(rawSlug);
+  // Preview parity with the other passport pages (?preview=1 renders the shared
+  // MOCK_LISTING) so the governed experience can be visually reviewed without a
+  // live backend. No effect on real shopper traffic.
+  const [search] = useSearchParams();
+  const isPreview = search.get("preview") === "1";
+  const { listing, loading, notFound } = usePublicListing(rawSlug, { preview: isPreview, previewData: MOCK_LISTING as unknown as VehicleListing });
 
   const d = useMemo(() => (listing ? derivePassport(listing) : null), [listing]);
   const gallery = useMemo(() => (listing ? listingGallery(listing) : []), [listing]);
@@ -550,7 +557,11 @@ export default function VehiclePassportGoverned() {
                 </div>
               )}
 
-              {/* Recognition — awards as evidence, dealer-attested. */}
+              {/* Recognition — the stored certifications are dealer-entered
+                  NAMES only (no issuer/year/verification record), so they are
+                  labeled "Dealer-reported" and deliberately do NOT get the green
+                  verified treatment used for confirmed benefits. When richer,
+                  verified award data lands, this can promote to a verified state. */}
               {dt.certifications.length > 0 && (
                 <div className="px-4 pt-4 mt-4 border-t" style={{ borderColor: BORDER }}>
                   <div className="pt-3 text-[13px] font-bold" style={{ color: NAVY }}>Recognition</div>
@@ -560,7 +571,7 @@ export default function VehiclePassportGoverned() {
                         <span className="h-7 w-7 grid place-items-center rounded-full shrink-0" style={{ background: "#EFF6FF" }}><Award className="w-4 h-4" style={{ color: BLUE }} /></span>
                         <div className="min-w-0">
                           <div className="text-[13px] font-semibold leading-tight" style={{ color: NAVY }}>{c}</div>
-                          <div className="text-[11px]" style={{ color: SUB }}>Verified by the dealership</div>
+                          <div className="text-[11px]" style={{ color: SUB }}>Dealer-reported recognition</div>
                         </div>
                       </div>
                     ))}
@@ -568,8 +579,11 @@ export default function VehiclePassportGoverned() {
                 </div>
               )}
 
-              {/* One purposeful link to the full dealership page. */}
-              <button onClick={() => go("dealer")} className="px-4 py-3.5 inline-flex items-center gap-1.5 text-[13px] font-bold" style={{ color: BLUE }}>
+              {/* One purposeful link to the full dealership page — reuses the
+                  existing working /dealer route; no second reserve CTA here. The
+                  tap ties dealership-story engagement to profile opens through
+                  the existing CTA event pipeline. */}
+              <button onClick={() => { trackCustomerCtaClicked({ storeId: listing.store_id, vehicleId: listing.id, vin: listing.vin, source: "passport", surface: "vehicle_passport", metadata: { cta: "dealer_profile" } }); go("dealer"); }} className="px-4 py-3.5 inline-flex items-center gap-1.5 text-[13px] font-bold" style={{ color: BLUE }}>
                 Meet {dealerName} <ChevronRight className="w-4 h-4" />
               </button>
             </div>
@@ -610,7 +624,7 @@ export default function VehiclePassportGoverned() {
             onClose={() => setActivePanel(null)}
             listing={listing}
             d={d}
-            isPreview={false}
+            isPreview={isPreview}
             go={go}
             openPanel={(k) => setActivePanel(k)}
           />
