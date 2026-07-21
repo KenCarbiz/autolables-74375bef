@@ -215,9 +215,11 @@ const App = () => (
                       {/* Canonical Passport at /v/:slug — always the V3 passport
                           for every vehicle (VehiclePassportRoute). */}
                       <Route path="/v/:slug" element={<VehiclePassportRoute />} />
-                      {/* /v3/:slug is a naming alias — it now redirects to the
-                          canonical /v/:slug (V3), not the older governed page. */}
-                      <Route path="/v3/:vehicleSlug" element={<PassportRootRedirect />} />
+                      {/* /v3/:slug renders the SAME VehiclePassportV3 in place (no
+                          redirect) so the address bar reads /v3/ for admin/dealer
+                          "view" links. /v/:slug stays the canonical customer URL the
+                          window-sticker QR encodes; both render V3. */}
+                      <Route path="/v3/:slug" element={<VehiclePassportRoute />} />
                       <Route path="/v/:slug/verification" element={<VehiclePassportVerification />} />
                       <Route path="/v/:slug/documents" element={<VehiclePassportDocuments />} />
                       <Route path="/v/:slug/great-buy" element={<VehiclePassportGreatBuy />} />

@@ -435,7 +435,7 @@ const InventoryModern = () => {
     { label: "Prep & Install", icon: ClipboardList, onClick: () => navigate(`/vehicle-file/${r.id}?tab=prep`) },
     { label: "Build Addendum", icon: FileText, onClick: () => navigate(`/vehicle-file/${r.id}?tab=addendum`) },
     { label: "Audit Defense", icon: ShieldCheck, onClick: () => navigate(`/compliance?vin=${encodeURIComponent(r.vin || "")}`) },
-    ...(r.status === "published" ? [{ label: "View Customer Packet", icon: Eye, onClick: () => window.open(`/v/${r.slug}`, "_blank", "noopener") }] : []),
+    ...(r.status === "published" ? [{ label: "View Customer Packet", icon: Eye, onClick: () => window.open(`/v3/${r.slug}`, "_blank", "noopener") }] : []),
     ...(r.source_url && /^https?:\/\//i.test(r.source_url) ? [{ label: "View ad on website", icon: ExternalLink, onClick: () => window.open(r.source_url!, "_blank", "noopener") }] : []),
     { label: "Delete", icon: Trash2, onClick: () => deleteVehicle(r), danger: true },
   ];
@@ -632,7 +632,7 @@ const InventoryModern = () => {
                             <div className="hidden md:flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
                               <HoverBtn title="Open vehicle" onClick={() => navigate(`/vehicle-file/${r.id}`)}><ExternalLink className="w-3.5 h-3.5" /></HoverBtn>
                               <HoverBtn title="Generate sticker" onClick={() => navigate(`${r.condition === "new" ? "/new-car-sticker" : "/used-car-sticker"}?vehicleId=${r.id}`)}><Printer className="w-3.5 h-3.5" /></HoverBtn>
-                              {r.status === "published" && <HoverBtn title="View customer packet" onClick={() => window.open(`/v/${r.slug}`, "_blank", "noopener")}><Eye className="w-3.5 h-3.5" /></HoverBtn>}
+                              {r.status === "published" && <HoverBtn title="View customer packet" onClick={() => window.open(`/v3/${r.slug}`, "_blank", "noopener")}><Eye className="w-3.5 h-3.5" /></HoverBtn>}
                               <HoverBtn title="Quick recall check" onClick={() => quickRecall(r.vin)}><ShieldCheck className="w-3.5 h-3.5" /></HoverBtn>
                             </div>
                             <KebabMenu items={rowActions(r)} />
@@ -654,7 +654,7 @@ const InventoryModern = () => {
                     readiness={rowReadiness(r)}
                     onOpen={() => navigate(`/vehicle-file/${r.id}`)}
                     onSticker={() => navigate(`${r.condition === "new" ? "/new-car-sticker" : "/used-car-sticker"}?vehicleId=${r.id}`)}
-                    onView={() => window.open(`/v/${r.slug}`, "_blank", "noopener")}
+                    onView={() => window.open(`/v3/${r.slug}`, "_blank", "noopener")}
                     items={rowActions(r)}
                   />
                 ))}

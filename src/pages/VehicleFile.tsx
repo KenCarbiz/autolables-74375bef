@@ -228,6 +228,13 @@ const VehicleFile = () => {
     () => vehicle ? `${window.location.origin}/v/${(vehicle.vin || vehicle.slug || "").toUpperCase()}` : "",
     [vehicle]
   );
+  // The "open/view" address bar reads /v3/ (same V3 page) so the dealer sees the
+  // version explicitly; copy-link + QR keep /v/ above so shared links match the
+  // printed sticker.
+  const viewUrl = useMemo(
+    () => vehicle ? `${window.location.origin}/v3/${(vehicle.vin || vehicle.slug || "").toUpperCase()}` : "",
+    [vehicle]
+  );
   // The dealer's actual ad/VDP page on their own website (captured from the
   // inventory feed); falls back to the AutoLabels shopper page.
   const adUrl = useMemo(
@@ -368,7 +375,7 @@ const VehicleFile = () => {
           {(adUrl || vehicle.status === "published") && (
             <div className="hidden lg:flex items-center gap-2">
               <a
-                href={adUrl || publicUrl}
+                href={adUrl || viewUrl}
                 target="_blank"
                 rel="noreferrer"
                 title={adUrl ? "Open this vehicle's ad on the dealership website" : "Open the shopper page"}
@@ -483,7 +490,7 @@ const VehicleFile = () => {
                 <div className="flex flex-col gap-2.5 w-full lg:w-[260px] shrink-0">
                   {vehicle.status === "published" ? (
                     <a
-                      href={publicUrl}
+                      href={viewUrl}
                       target="_blank"
                       rel="noreferrer"
                       className="h-12 px-4 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold inline-flex items-center justify-center gap-2 shadow-sm shadow-blue-600/30 transition-colors"
@@ -510,7 +517,7 @@ const VehicleFile = () => {
                       {vehicle.status === "published" ? (
                         <>
                           <button onClick={copyLink} className="w-full text-left text-sm px-3 h-9 rounded-lg hover:bg-muted inline-flex items-center gap-2"><Copy className="w-3.5 h-3.5" /> Copy link</button>
-                          <a href={publicUrl} target="_blank" rel="noreferrer" className="w-full text-left text-sm px-3 h-9 rounded-lg hover:bg-muted inline-flex items-center gap-2"><ExternalLink className="w-3.5 h-3.5" /> Open in new tab</a>
+                          <a href={viewUrl} target="_blank" rel="noreferrer" className="w-full text-left text-sm px-3 h-9 rounded-lg hover:bg-muted inline-flex items-center gap-2"><ExternalLink className="w-3.5 h-3.5" /> Open in new tab</a>
                           <button onClick={() => setTab("labels")} className="w-full text-left text-sm px-3 h-9 rounded-lg hover:bg-muted inline-flex items-center gap-2"><Printer className="w-3.5 h-3.5" /> Generate sticker</button>
                         </>
                       ) : (
@@ -587,7 +594,7 @@ const VehicleFile = () => {
         {vehicle.status === "published" ? (
           <div className="flex gap-2">
             <a
-              href={publicUrl}
+              href={viewUrl}
               target="_blank"
               rel="noreferrer"
               className="flex-1 h-11 rounded-xl bg-blue-600 text-white text-sm font-semibold inline-flex items-center justify-center gap-1.5 shadow-sm shadow-blue-600/30"
@@ -704,6 +711,7 @@ const OverviewPanel = ({ vehicle, onTab, recall }: { vehicle: VehicleRow; onTab:
   const notReady = pct < 100;
   const ringColor = notReady ? "#F59E0B" : "#10B981";
   const publicUrl = `${window.location.origin}/v/${(vehicle.vin || vehicle.slug || "").toUpperCase()}`;
+  const viewUrl = `${window.location.origin}/v3/${(vehicle.vin || vehicle.slug || "").toUpperCase()}`;
   const published = vehicle.status === "published";
   const mc = (vehicle.mc_attributes || {}) as Record<string, unknown>;
   // Decode health from the versioned vehicle-data contract — surfaces when a
@@ -757,7 +765,7 @@ const OverviewPanel = ({ vehicle, onTab, recall }: { vehicle: VehicleRow; onTab:
     // vehicle's /v/{vin} renders "Vehicle unavailable", so route drafts to the
     // publish flow instead of a blank page.
     published
-      ? { label: "Open Shopper Portal", icon: ExternalLink, tone: "bg-blue-50 text-blue-600", onClick: () => window.open(publicUrl, "_blank", "noopener") }
+      ? { label: "Open Shopper Portal", icon: ExternalLink, tone: "bg-blue-50 text-blue-600", onClick: () => window.open(viewUrl, "_blank", "noopener") }
       : { label: "Publish to Go Live", icon: Globe, tone: "bg-blue-50 text-blue-600", onClick: () => onTab("labels") },
   ];
 
@@ -842,7 +850,7 @@ const OverviewPanel = ({ vehicle, onTab, recall }: { vehicle: VehicleRow; onTab:
           </div>
           <div className="grid grid-cols-2 gap-2 mt-auto pt-1">
             {published
-              ? <a href={publicUrl} target="_blank" rel="noreferrer" className={snapBtn}><ExternalLink className="w-3.5 h-3.5" /> View shopper page</a>
+              ? <a href={viewUrl} target="_blank" rel="noreferrer" className={snapBtn}><ExternalLink className="w-3.5 h-3.5" /> View shopper page</a>
               : <button onClick={() => onTab("labels")} className={snapBtnPrimary}><Globe className="w-3.5 h-3.5" /> Publish vehicle</button>}
             <button onClick={copyPortalLink} className={snapBtn}><Copy className="w-3.5 h-3.5" /> Copy link</button>
           </div>
@@ -2805,7 +2813,7 @@ const MarketPricingCard = ({ vehicle }: { vehicle: VehicleRow }) => {
   // "$24,876 vs $19,495" once labeled itself "$4,486 above market").
   const below = market != null && vehicle.price != null ? Math.round(market - vehicle.price) : 0;
   const valueLabel = valueSource === "comps_median" ? "Comp median (mileage-blind)" : valueSource === "marketcheck_predict" ? "Market average (mileage-adj.)" : "Market average";
-  const publicUrl = `${window.location.origin}/v/${(vehicle.vin || vehicle.slug || "").toUpperCase()}`;
+  const viewUrl = `${window.location.origin}/v3/${(vehicle.vin || vehicle.slug || "").toUpperCase()}`;
   const comps = (vehicle as unknown as { comparables?: { miles?: number | null }[] }).comparables;
   const compCount = Array.isArray(comps) ? comps.length : 0;
   const compMiles = Array.isArray(comps) ? comps.map((c) => Number(c?.miles)).filter((n) => Number.isFinite(n) && n > 0) : [];
@@ -2846,7 +2854,7 @@ const MarketPricingCard = ({ vehicle }: { vehicle: VehicleRow }) => {
           </div>
           <div className="grid grid-cols-2 gap-2 mt-auto pt-1">
             {vehicle.status === "published"
-              ? <a href={`${publicUrl}?panel=market-price`} target="_blank" rel="noreferrer" className="h-9 rounded-lg border border-border bg-card hover:bg-muted text-foreground text-xs font-semibold inline-flex items-center justify-center gap-1.5 transition-colors"><ExternalLink className="w-3.5 h-3.5" /> View pricing report</a>
+              ? <a href={`${viewUrl}?panel=market-price`} target="_blank" rel="noreferrer" className="h-9 rounded-lg border border-border bg-card hover:bg-muted text-foreground text-xs font-semibold inline-flex items-center justify-center gap-1.5 transition-colors"><ExternalLink className="w-3.5 h-3.5" /> View pricing report</a>
               : <button disabled title="Publish the vehicle to open the shopper pricing report" className="h-9 rounded-lg border border-border bg-card text-muted-foreground text-xs font-semibold inline-flex items-center justify-center gap-1.5 opacity-50 cursor-not-allowed"><ExternalLink className="w-3.5 h-3.5" /> View pricing report</button>}
             <button onClick={run} disabled={checking} className="h-9 rounded-lg border border-border bg-card hover:bg-muted text-foreground text-xs font-semibold inline-flex items-center justify-center gap-1.5 transition-colors disabled:opacity-50">
               <RefreshCw className={`w-3.5 h-3.5 ${checking ? "animate-spin" : ""}`} /> {checking ? "Syncing…" : "Re-pull market data"}
