@@ -41,6 +41,9 @@ export type CustomerEngagementEventType =
   | "verification_report_shared"
   | "verification_report_printed"
   | "verification_methodology_opened"
+  | "verification_traceability_opened"
+  | "verification_report_verified"
+  | "verification_official_source_opened"
   | "verification_bubble_opened"
   | "verification_bubble_action_clicked";
 

@@ -4,8 +4,8 @@ import {
   ChevronLeft, Download, Printer, Share2, CircleCheck, TriangleAlert, CircleAlert,
   Clock, CircleMinus, LayoutDashboard, Database, ListChecks, ExternalLink, Loader2,
   X, ShieldCheck, ChevronDown, ArrowRight, SearchCheck, BadgeCheck, FileWarning,
-  ShieldAlert, MoreVertical, ChevronRight, ScanBarcode, Gauge, UserRound, BarChart3,
-  MessageCircle, CalendarCheck, FileMinus, FileText,
+  ShieldAlert, MoreVertical, ChevronRight, MessageCircle, CalendarCheck, FileMinus,
+  FileCheck2,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Helmet } from "react-helmet-async";
@@ -17,6 +17,7 @@ import {
   type VerificationReport, type ReportCheck, type VerificationStatus, type EvidenceProvenance,
 } from "@/lib/passport/verificationSummary";
 import { resolvePassportBack } from "@/lib/passportReturn";
+import { subjectIcon, incompleteIcon, rankActionable, resolveFinding } from "@/lib/passport/verificationFindings";
 import { listingHero } from "@/lib/photos";
 import { MOCK_LISTING } from "./VehiclePassportV3";
 import { usePublicListing } from "@/hooks/usePublicListing";
@@ -277,18 +278,12 @@ const useCompactViewport = (): boolean => {
 // a blanket "Verified". Non-verified checks fall back to the canonical status
 // label so a pending/unavailable row can never read as a pass.
 const OUTCOME_LABEL: Record<string, string> = {
-  vin: "Matched", ownership: "Found", odometer: "No conflict",
-  market: "Available", warranty: "Info found", title: "Clean",
+  vin: "Matched", ownership: "Record found", odometer: "No conflict",
+  market: "Estimate available", warranty: "Coverage info", title: "No brand found",
   history: "No accidents", recall: "No recalls",
 };
 const outcomeLabel = (c: ReportCheck): string =>
   c.status === "verified" ? (OUTCOME_LABEL[c.key] ?? "Verified") : VERIFICATION_STATUS_LABEL[c.status];
-
-// One recognizable Lucide glyph per check — one family, substantial at 22–24px.
-const CHECK_ICON: Record<string, React.ElementType> = {
-  vin: ScanBarcode, history: FileText, ownership: UserRound, odometer: Gauge,
-  title: FileText, recall: ShieldCheck, market: BarChart3, warranty: BadgeCheck,
-};
 
 const supportingLine = (c: ReportCheck): string =>
   c.status === "pending" ? "Still processing · No result yet"
@@ -394,6 +389,8 @@ interface MobileProps {
   listing: VehicleListing;
   pdfState: "idle" | "working" | "done" | "error";
   reportGenerated: string;
+  reportId: string;
+  liveUrl: string;
   onBack: () => void;
   onShare: () => void;
   onPrint: () => void;
@@ -405,11 +402,12 @@ interface MobileProps {
 }
 
 const MobileVerification = ({
-  report, listing, pdfState, reportGenerated,
+  report, listing, pdfState, reportGenerated, reportId, liveUrl,
   onBack, onShare, onPrint, onDownloadPdf, onAskRecall, askDealerFor, onContact, track,
 }: MobileProps) => {
   const [sheetKey, setSheetKey] = useState<string | null>(null);
   const [sourcesOpen, setSourcesOpen] = useState(false);
+  const [traceOpen, setTraceOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
 
   const recallCheck = report.checks.find((c) => c.key === "recall");
@@ -417,7 +415,12 @@ const MobileVerification = ({
   const attentionCount = report.needsAttentionChecks + report.needsConfirmationChecks;
   const incompleteRows = report.checks.filter((c) => (c.status === "pending" || c.status === "unavailable") && c.key !== "recall");
   const completedRows = report.checks.filter((c) => c.status === "verified");
-  const incompleteTotal = report.totalChecks - report.verifiedChecks;
+
+  // Highest-priority actionable finding drives the sticky CTA + finding order.
+  const rankedActionable = rankActionable(report.checks);
+  const topFinding = rankedActionable[0];
+  const ctaLabel = topFinding ? `Ask About ${resolveFinding(topFinding).contextLabel}` : "Ask the Dealer";
+  const onCtaClick = topFinding ? askDealerFor(topFinding) : onContact;
 
   const vinTail = listing.vin ? listing.vin.slice(-6) : null;
   const lastChecked = report.lastCheckedAt ? dateLabel(report.lastCheckedAt) : null;
@@ -427,20 +430,36 @@ const MobileVerification = ({
     ? `${attentionCount} item${attentionCount === 1 ? "" : "s"} need${attentionCount === 1 ? "s" : ""} your attention`
     : report.pendingChecks > 0
       ? `${report.pendingChecks} check${report.pendingChecks === 1 ? "" : "s"} still processing`
-      : "All checks verified";
+      : "Verification checks completed";
   const bannerCalm = attentionCount === 0 && report.pendingChecks === 0;
-  const bannerSupport = `${report.verifiedChecks} completed · ${incompleteTotal} incomplete`;
+  // Honest verdict breakdown — every non-zero state named, none minimized.
+  const verdictSegments: string[] = [`${report.verifiedChecks} check${report.verifiedChecks === 1 ? "" : "s"} completed`];
+  if (report.needsAttentionChecks > 0) verdictSegments.push(`${report.needsAttentionChecks} action item${report.needsAttentionChecks === 1 ? "" : "s"}`);
+  if (report.needsConfirmationChecks > 0) verdictSegments.push(`${report.needsConfirmationChecks} needs confirmation`);
+  const notVerified = report.pendingChecks + report.unavailableChecks;
+  if (report.pendingChecks > 0 && report.unavailableChecks === 0) verdictSegments.push(`${report.pendingChecks} pending`);
+  else if (report.unavailableChecks > 0 && report.pendingChecks === 0) verdictSegments.push(`${report.unavailableChecks} not verified`);
+  else if (notVerified > 0) verdictSegments.push(`${notVerified} not verified`);
+  const bannerSupport = verdictSegments.join(" · ");
+
+  const FAMILY_TAG: Record<string, string> = {
+    oem_vin: "OEM", nhtsa: "Government", vehicle_history: "History",
+    live_market: "Market", oem_warranty: "Warranty", dealer: "Dealer",
+  };
+  const sourceFamilies = Array.from(new Set(report.sources.map((s) => FAMILY_TAG[s.family] ?? s.label)));
 
   const openCheck = (c: ReportCheck) => { setSheetKey(c.key); track("verification_evidence_opened", { check_id: c.key, status: c.status }); };
-  const openRecallDetails = () => { if (recallCheck) { setSheetKey("recall"); track("verification_evidence_opened", { check_id: "recall", status: recallCheck.status }); } };
+  const openRecallDetails = () => { if (recallCheck) { setSheetKey("recall"); track("verification_official_source_opened", { check_id: "recall", source: "nhtsa" }); } };
   const openSources = () => { setSourcesOpen(true); track("verification_methodology_opened", {}); };
+  const openTrace = () => { setTraceOpen(true); track("verification_traceability_opened", { report_id: reportId }); };
+  const verifyLive = () => { track("verification_report_verified", { report_id: reportId }); if (typeof window !== "undefined") window.open(liveUrl, "_blank", "noopener,noreferrer"); };
   const activeSheetCheck = sheetKey ? report.checks.find((c) => c.key === sheetKey) : undefined;
 
   const STATUS_TILES: { label: string; count: number; icon: React.ElementType; fg: string; bg: string }[] = [
     { label: "Completed", count: report.verifiedChecks, icon: CircleCheck, fg: "text-[#16A34A]", bg: "bg-emerald-50" },
-    { label: "Attention", count: attentionCount, icon: CircleAlert, fg: "text-[#D97706]", bg: "bg-amber-50" },
+    { label: "Attention", count: attentionCount, icon: TriangleAlert, fg: "text-[#D97706]", bg: "bg-amber-50" },
     { label: "Pending", count: report.pendingChecks, icon: Clock, fg: "text-[#2563EB]", bg: "bg-blue-50" },
-    { label: "Unavailable", count: report.unavailableChecks, icon: CircleMinus, fg: "text-[#94A3B8]", bg: "bg-slate-100" },
+    { label: "Unavailable", count: report.unavailableChecks, icon: FileMinus, fg: "text-[#64748B]", bg: "bg-slate-100" },
   ];
 
   return (
@@ -477,12 +496,13 @@ const MobileVerification = ({
       <main className="px-4 pt-5 pb-32 space-y-5">
         {/* Vehicle identity */}
         <section>
-          <p className="text-[11px] font-bold uppercase tracking-[0.08em] text-[#2563EB]">Vehicle verification</p>
+          <p className="text-[11px] font-bold uppercase tracking-[0.08em] text-[#2563EB]">Vehicle data verification</p>
           <h1 className="text-[23px] font-bold leading-tight tracking-[-0.01em] mt-1">{listing.ymm}{listing.trim ? ` ${listing.trim}` : ""}</h1>
           <p className="text-[14px] text-[#64748B] mt-1">
             {vinTail ? `VIN ending ${vinTail}` : "VIN unavailable"}{listing.mileage != null ? ` · ${listing.mileage.toLocaleString()} mi` : ""}
           </p>
           <p className="text-[13px] text-[#64748B] mt-1.5 inline-flex items-center gap-1.5"><CalendarCheck className="w-[18px] h-[18px] text-[#94A3B8]" /> Checked {reportGenerated}</p>
+          <p className="text-[12.5px] text-[#94A3B8] mt-1">Report ID {reportId}</p>
         </section>
 
         {/* Overall-result banner */}
@@ -518,14 +538,15 @@ const MobileVerification = ({
                 <p className="text-[11px] font-bold uppercase tracking-[0.07em] text-[#B45309]">{recallCheck.status === "needs_confirmation" ? "Needs confirmation" : "Needs attention"}</p>
                 <h2 className="text-[19px] font-bold text-[#0F172A] leading-snug mt-0.5">{exceptionHeadline(recallCheck)}</h2>
                 {recallCheck.finding && <p className="text-[14px] text-[#475569] mt-1.5 leading-relaxed">{recallCheck.finding}</p>}
-                <p className="text-[12px] text-[#94A3B8] mt-2 inline-flex items-center gap-1.5">NHTSA{recallCheckedLabel ? ` · Checked ${recallCheckedLabel}` : ""}</p>
+                <p className="text-[12px] text-[#94A3B8] mt-2">NHTSA{recallCheckedLabel ? ` · Checked ${recallCheckedLabel}` : ""}</p>
+                <p className="text-[12px] text-[#94A3B8]">Official government source</p>
               </div>
             </div>
             <div className="mt-4 space-y-2.5">
               <button onClick={onAskRecall} className="w-full min-h-[52px] rounded-xl bg-[#2563EB] hover:bg-[#1d4fd7] text-white text-[15px] font-semibold inline-flex items-center justify-center gap-2">
                 <MessageCircle className="w-[21px] h-[21px]" /> Ask About This Recall
               </button>
-              <button onClick={openRecallDetails} className="w-full min-h-[50px] rounded-xl border border-[#2563EB] bg-white text-[#2563EB] text-[15px] font-semibold inline-flex items-center justify-center gap-2">View Recall Details</button>
+              <button onClick={openRecallDetails} className="w-full min-h-[50px] rounded-xl border border-[#2563EB] bg-white text-[#2563EB] text-[15px] font-semibold inline-flex items-center justify-center gap-2">View Official Recall Details</button>
             </div>
           </section>
         )}
@@ -536,7 +557,7 @@ const MobileVerification = ({
             <h2 className="text-[17px] font-semibold px-1 mb-2">Incomplete checks</h2>
             <div className="rounded-2xl bg-white border border-[#E6EAF0] divide-y divide-[#EEF1F4] overflow-hidden">
               {incompleteRows.map((c) => {
-                const Icon = c.status === "pending" ? Clock : FileMinus;
+                const Icon = incompleteIcon(c.status);
                 const iconTint = c.status === "pending" ? "bg-blue-50 text-[#2563EB]" : "bg-slate-100 text-[#64748B]";
                 const statusFg = c.status === "pending" ? "text-[#2563EB]" : "text-[#64748B]";
                 return (
@@ -561,10 +582,10 @@ const MobileVerification = ({
             <h2 className="text-[17px] font-semibold px-1 mb-2">Checks completed</h2>
             <div className="rounded-2xl bg-white border border-[#E6EAF0] divide-y divide-[#EEF1F4] overflow-hidden">
               {completedRows.map((c) => {
-                const Icon = CHECK_ICON[c.key] ?? BadgeCheck;
+                const Icon = subjectIcon(c);
                 return (
                   <button key={c.key} onClick={() => openCheck(c)} className="w-full min-h-[58px] px-4 py-3 flex items-center gap-3 text-left active:bg-slate-50">
-                    <span className="w-9 h-9 rounded-xl bg-emerald-50/70 flex items-center justify-center shrink-0"><Icon className="w-[22px] h-[22px] text-[#334155]" strokeWidth={1.9} aria-hidden="true" /></span>
+                    <span className="w-9 h-9 rounded-xl bg-emerald-50 flex items-center justify-center shrink-0"><Icon className="w-[22px] h-[22px] text-[#16A34A]" strokeWidth={1.9} aria-hidden="true" /></span>
                     <p className="text-[15px] font-semibold text-[#0F172A] leading-snug min-w-0 flex-1">{c.name}</p>
                     <span className="inline-flex items-center gap-1.5 text-[13.5px] font-semibold text-[#16A34A] shrink-0"><CircleCheck className="w-[18px] h-[18px]" aria-hidden="true" />{outcomeLabel(c)}</span>
                     <ChevronRight className="w-[19px] h-[19px] text-[#94A3B8] shrink-0" aria-hidden="true" />
@@ -576,13 +597,26 @@ const MobileVerification = ({
         )}
 
         {/* Sources and methodology */}
-        <button onClick={openSources} className="w-full rounded-2xl bg-white border border-[#E6EAF0] min-h-[64px] px-4 py-3 flex items-center gap-3 text-left active:bg-slate-50">
+        <button onClick={openSources} className="w-full rounded-2xl bg-white border border-[#E6EAF0] min-h-[64px] px-4 py-3.5 flex items-center gap-3 text-left active:bg-slate-50">
           <span className="w-9 h-9 rounded-xl bg-blue-50 flex items-center justify-center shrink-0"><Database className="w-[22px] h-[22px] text-[#2563EB]" strokeWidth={1.9} aria-hidden="true" /></span>
           <div className="min-w-0 flex-1">
             <p className="text-[15px] font-semibold text-[#0F172A]">Sources and methodology</p>
-            <p className="text-[13px] text-[#64748B] mt-0.5">{report.sourceCount} automotive data source{report.sourceCount === 1 ? "" : "s"}</p>
+            <p className="text-[13px] text-[#64748B] mt-0.5">Checked across {report.sourceCount} automotive data source{report.sourceCount === 1 ? "" : "s"}</p>
+            {sourceFamilies.length > 0 && <p className="text-[12.5px] text-[#94A3B8] mt-0.5">{sourceFamilies.join(" · ")}</p>}
           </div>
-          <ChevronRight className="w-[19px] h-[19px] text-[#94A3B8] shrink-0" aria-hidden="true" />
+          <ChevronRight className="w-[19px] h-[19px] text-[#94A3B8] shrink-0 self-center" aria-hidden="true" />
+        </button>
+
+        {/* Report traceability */}
+        <button onClick={openTrace} className="w-full rounded-2xl bg-white border border-[#E6EAF0] min-h-[64px] px-4 py-3.5 flex items-center gap-3 text-left active:bg-slate-50">
+          <span className="w-9 h-9 rounded-xl bg-blue-50 flex items-center justify-center shrink-0"><FileCheck2 className="w-[22px] h-[22px] text-[#2563EB]" strokeWidth={1.9} aria-hidden="true" /></span>
+          <div className="min-w-0 flex-1">
+            <p className="text-[15px] font-semibold text-[#0F172A]">Report traceability</p>
+            <p className="text-[13px] text-[#64748B] mt-0.5">Generated {reportGenerated}</p>
+            <p className="text-[12.5px] text-[#94A3B8] mt-0.5">Live report: autolabels.io · Report {reportId}</p>
+            <span className="text-[13px] font-semibold text-[#2563EB] mt-1 inline-block">Verify this report</span>
+          </div>
+          <ChevronRight className="w-[19px] h-[19px] text-[#94A3B8] shrink-0 self-center" aria-hidden="true" />
         </button>
 
         {/* Report actions */}
@@ -595,10 +629,19 @@ const MobileVerification = ({
           {pdfState === "error" && <p className="text-[12.5px] text-[#DC2626] text-center">We could not generate the PDF. Please try Print instead.</p>}
         </div>
 
-        {/* Disclosure */}
-        <p className="text-[12.5px] text-[#64748B] text-center leading-relaxed px-2">
-          AutoLabels verification does not replace a physical inspection, title search or dealer confirmation.
-        </p>
+        {/* Disclosure + footer */}
+        <div className="pt-1 space-y-3">
+          <p className="text-[12.5px] text-[#64748B] text-center leading-relaxed px-2">
+            AutoLabels compares available automotive data sources and never displays pending or unavailable checks as completed. This report does not replace a physical inspection, title search or dealer confirmation.
+          </p>
+          <div className="flex items-center justify-between pt-1 border-t border-[#EEF1F4]">
+            <Logo variant="full" size={16} />
+            <div className="flex items-center gap-4 text-[13px] font-semibold text-[#2563EB]">
+              <a href="/privacy" className="hover:underline">Privacy</a>
+              <a href="/terms" className="hover:underline">Terms</a>
+            </div>
+          </div>
+        </div>
       </main>
 
       {/* Sticky action bar */}
@@ -606,8 +649,8 @@ const MobileVerification = ({
         <button onClick={onBack} className="basis-2/5 min-h-[50px] rounded-xl border border-[#CBD5E1] bg-white text-[#0F172A] text-[14.5px] font-semibold inline-flex items-center justify-center gap-1.5">
           <ChevronLeft className="w-[21px] h-[21px]" /> Back to Passport
         </button>
-        <button onClick={recallIsException ? onAskRecall : onContact} className="basis-3/5 min-h-[50px] rounded-xl bg-[#2563EB] hover:bg-[#1d4fd7] text-white text-[14.5px] font-semibold inline-flex items-center justify-center gap-2">
-          <MessageCircle className="w-[21px] h-[21px]" /> {recallIsException ? "Ask About Recall" : "Ask the Dealer"}
+        <button onClick={recallIsException ? onAskRecall : onCtaClick} className="basis-3/5 min-h-[50px] rounded-xl bg-[#2563EB] hover:bg-[#1d4fd7] text-white text-[14.5px] font-semibold inline-flex items-center justify-center gap-2">
+          <MessageCircle className="w-[21px] h-[21px]" /> {recallIsException ? "Ask About Recall" : ctaLabel}
         </button>
       </div>
 
@@ -649,6 +692,31 @@ const MobileVerification = ({
           <p className="text-[12px] text-[#94A3B8] leading-relaxed">
             This is a data-verification report. It aggregates records and does not replace a physical inspection, title search or dealer confirmation.
           </p>
+        </div>
+      </BottomSheet>
+
+      <BottomSheet open={traceOpen} title="Report traceability" onClose={() => setTraceOpen(false)}>
+        <div className="space-y-4 pb-1">
+          <p className="text-[14px] text-[#334155] leading-relaxed">
+            This report is traceable to the live verification record. The saved PDF and this page reflect the same checks, statuses, sources and dates.
+          </p>
+          <div className="rounded-xl border border-[#E6EAF0] bg-[#FAFBFC] divide-y divide-[#F1F5F9] px-4">
+            {[
+              { label: "Report ID", value: reportId },
+              { label: "Generated", value: reportGenerated },
+              { label: "Source data through", value: lastChecked },
+              { label: "VIN", value: listing.vin || null },
+              { label: "Live report", value: "autolabels.io" },
+            ].map((r) => (
+              <div key={r.label} className="flex items-start justify-between gap-4 py-2.5 text-[13px]">
+                <span className="text-[#64748B] shrink-0">{r.label}</span>
+                <span className={`text-right ${r.value ? "text-[#0F172A] font-medium" : "text-[#94A3B8] italic"}`}>{r.value ?? "Not available"}</span>
+              </div>
+            ))}
+          </div>
+          <button onClick={verifyLive} className="w-full min-h-[50px] rounded-xl bg-[#2563EB] hover:bg-[#1d4fd7] text-white text-[15px] font-bold inline-flex items-center justify-center gap-2">
+            <ExternalLink className="w-5 h-5" /> Open live report
+          </button>
         </div>
       </BottomSheet>
     </div>
@@ -823,6 +891,8 @@ const VehiclePassportVerification = () => {
   // Compact phones (≤767px) get the dedicated mobile presentation of the SAME
   // canonical report; ≥768px keeps the untouched desktop report below.
   if (isCompact) {
+    const [yyyy, mm] = reportDateISO.split("-");
+    const reportId = `AL-${(listing.vin || "REPORT").slice(-6)}-${mm}${yyyy}`;
     return (
       <>
         <Helmet><title>{`Data-Verified Report — ${listing.ymm} · AutoLabels`}</title><meta name="robots" content="noindex" /></Helmet>
@@ -831,6 +901,8 @@ const VehiclePassportVerification = () => {
           listing={listing}
           pdfState={pdfState}
           reportGenerated={reportGenerated}
+          reportId={reportId}
+          liveUrl={canonicalReportUrl()}
           onBack={back}
           onShare={share}
           onPrint={printReport}
