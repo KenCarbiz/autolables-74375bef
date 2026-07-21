@@ -13,6 +13,38 @@ Stack: Vite + React 18 + TypeScript + Tailwind + shadcn/ui + TanStack
 Query + react-router v6 + Supabase (auth + Postgres + Storage + Edge
 Functions). Bun as package manager.
 
+## Customer Passport — LOCKED, version of truth (2026-07-21)
+
+The customer Vehicle Passport served at `/v/:slug` (and `/v3/:slug`)
+is **FINAL and approved by the owner** for BOTH desktop and mobile.
+Do NOT redesign it, restructure its modules, or swap the component.
+
+- **The served page is `src/pages/VehiclePassportGoverned.tsx`**,
+  routed through `VehiclePassportRoute` at `/v/:slug` and `/v3/:slug`.
+  This is the complete design. Preview it with
+  `/v/demo?preview=1&scenario=new2026`.
+- `src/pages/VehiclePassportV3.tsx` is the OLDER, stripped-down page
+  (missing the lower modules). It is NOT served to customers — do not
+  route `/v/` back to it. (It still backs the marketing landing
+  showcase image + shares the `MOCK_*` fixtures, so don't delete it.)
+- The locked module set, top to bottom: clean header (AutoLabels +
+  dealer, Save/Share) · V2-style hero (gallery + identity + AutoLabels
+  Verified card) · Customer Action Center (Today's Sale Price + price
+  breakdown, See My Price, Reserve, Value My Trade, Test Drive,
+  Contact, Documents, Save/Share/Watch) · Verified Vehicle Data (8
+  checks; pending is never shown as verified) · Market Intelligence ·
+  Warranty / Features & Equipment / History & Ownership /
+  Specifications cards · Vehicle Strengths · Market Comparison
+  (price-history chart) · Similar Vehicles · Fuel Economy & Running
+  Cost · Why Buy From {dealer} · sticky action rail.
+- Price truth is the fee-inclusive backward-derivation (`buildSalePriceCard`
+  → `buildPassportSaleCard`): MSRP/Market → discounts → Vehicle Selling
+  Price → + Doc Fee → Total Advertised Price → green You Save only when
+  positive. Do not change this arithmetic.
+- Changes are bugfix/data-wiring only (fix a broken module, wire real
+  data, responsive/a11y polish). Any visual restructure needs a fresh
+  explicit owner sign-off — treat this as a locked spec otherwise.
+
 ## Git Workflow — MANDATORY
 
 This repo (`KenCarbiz/autolables-74375bef`) is the **active,
