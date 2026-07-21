@@ -320,6 +320,7 @@ const UsedCarSticker = () => {
           make: vehicle.make,
           model: vehicle.model,
           year: vehicle.year,
+          tenantId: tenant?.id,
         });
         if (r) {
           recallCheck = {
@@ -498,6 +499,7 @@ const UsedCarSticker = () => {
             make={vehicle.make}
             model={vehicle.model}
             year={vehicle.year}
+            tenantId={tenant?.id}
             onStopSale={() => setStopSale(true)}
           />
         </div>

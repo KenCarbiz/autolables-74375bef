@@ -15,6 +15,7 @@ interface Props {
   make: string;
   model: string;
   year: string;
+  tenantId?: string | null;
   onStopSale?: () => void;
 }
 
@@ -23,6 +24,7 @@ export default function RecallBanner({
   make,
   model,
   year,
+  tenantId,
   onStopSale,
 }: Props) {
   const { lookup, loading } = useRecallLookup();
@@ -32,11 +34,11 @@ export default function RecallBanner({
 
   useEffect(() => {
     const fetch = async () => {
-      const res = await lookup({ vin, make, model, year });
+      const res = await lookup({ vin, make, model, year, tenantId });
       setResult(res);
     };
     fetch();
-  }, [year, make, model, vin, lookup]);
+  }, [year, make, model, vin, tenantId, lookup]);
 
   useEffect(() => {
     if (result?.hasStopSale && !stopSaleCalled) {

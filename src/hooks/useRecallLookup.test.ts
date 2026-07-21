@@ -66,4 +66,39 @@ describe("useRecallLookup.lookup", () => {
     expect(out).toBeNull();
     expect(result.current.error).toBe("network down");
   });
+
+  it("queries MarketCheck first when a tenant is known and maps its Normalized shape", async () => {
+    invoke.mockResolvedValueOnce({
+      data: {
+        recalls: [
+          { nhtsaCampaignNumber: "22V-500", status: "open", title: "Airbag inflator", description: "Takata inflator may rupture", component: "AIR BAGS", remedy: "Replace inflator", manufacturer: "Honda", reportDate: "2022-07-01" },
+          { nhtsaCampaignNumber: "18V-900", status: "closed", title: "Old campaign", component: "OTHER" },
+        ],
+        recallStatus: "open_recalls", openRecallCount: 1, checkedAt: "2026-07-21T00:00:00Z",
+      },
+      error: null,
+    });
+    const { result } = renderHook(() => useRecallLookup());
+    let out: RecallResult | null = null;
+    await act(async () => { out = await result.current.lookup({ ...INPUT, tenantId: "t-1" }); });
+    expect(invoke).toHaveBeenCalledWith("marketcheck-recalls", { body: { vin: INPUT.vin, tenant_id: "t-1" } });
+    // Closed campaign dropped; open one mapped with Takata flagged.
+    expect(out!.recalls).toHaveLength(1);
+    expect(out!.recalls[0].campaignNumber).toBe("22V-500");
+    expect(out!.recalls[0].summary).toBe("Airbag inflator");
+    expect(out!.hasOpenRecall).toBe(true);
+    expect(out!.hasTakata).toBe(true);
+  });
+
+  it("falls back to NHTSA when MarketCheck cannot answer (no recalls array)", async () => {
+    invoke
+      .mockResolvedValueOnce({ data: { recallStatus: "error", note: "no_authoritative_source" }, error: null })
+      .mockResolvedValueOnce({ data: RESULT, error: null });
+    const { result } = renderHook(() => useRecallLookup());
+    let out: RecallResult | null = null;
+    await act(async () => { out = await result.current.lookup({ ...INPUT, tenantId: "t-1" }); });
+    expect(invoke).toHaveBeenNthCalledWith(1, "marketcheck-recalls", { body: { vin: INPUT.vin, tenant_id: "t-1" } });
+    expect(invoke).toHaveBeenNthCalledWith(2, "nhtsa-recall", { body: { vin: INPUT.vin, make: INPUT.make, model: INPUT.model, year: INPUT.year } });
+    expect(out).toEqual(RESULT);
+  });
 });

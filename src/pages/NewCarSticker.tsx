@@ -231,6 +231,7 @@ const NewCarSticker = () => {
           make: vehicle.make,
           model: vehicle.model,
           year: vehicle.year,
+          tenantId: tenant?.id,
         });
         if (r) {
           recallCheck = {
