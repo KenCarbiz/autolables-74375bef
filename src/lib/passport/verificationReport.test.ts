@@ -156,6 +156,28 @@ describe("deriveVerificationReport — canonical customer summary", () => {
     expect(r.checks.find((c) => c.key === "warranty")?.status).toBe("unavailable");
   });
 
+  it("surfaces MarketCheck-shaped recall campaign fields (nhtsaCampaignNumber / description)", () => {
+    const r = deriveVerificationReport(
+      dOf({}),
+      lOf({
+        vin: "5N1AL1F83VC332076", ymm: "2022 Car", condition: "used",
+        recall_status: "open_recalls", open_recall_count: 1,
+        // marketcheck-recalls persists campaigns under these field names, not
+        // campaignNumber / summary — the passport must still read them.
+        recall_check: {
+          has_open: true,
+          campaigns: [{ nhtsaCampaignNumber: "22V-123", description: "Fuel pump may fail", component: "FUEL SYSTEM", remedy: "Replace pump" }],
+        },
+      }),
+    );
+    const recall = r.checks.find((c) => c.key === "recall");
+    expect(recall?.status).toBe("needs_attention");
+    const number = recall?.evidence.find((e) => e.label === "Campaign number")?.value;
+    const summary = recall?.evidence.find((e) => e.label === "Summary")?.value;
+    expect(number).toBe("22V-123");
+    expect(summary).toBe("Fuel pump may fail");
+  });
+
   it("never labels dealer-provided data as independent, and market as AutoLabels-derived", () => {
     const r = deriveVerificationReport(
       dOf({ marketAvg: 40000, warrantyStr: "3 yr", accidentCount: 0 }),

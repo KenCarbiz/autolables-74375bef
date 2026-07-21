@@ -100,9 +100,18 @@ export interface ListingRecallCheck {
   checked_at?: string;
   has_open?: boolean;
   do_not_drive?: boolean;
+  // Campaign records arrive under three writer schemes: nhtsa-recall/manual
+  // (campaignNumber + summary), marketcheck-recalls (nhtsaCampaignNumber /
+  // campaignId + title / description), and vehicle-enrich (campaign + summary).
+  // Readers must tolerate all three — see readRecall in verificationSummary.
   campaigns?: Array<{
     campaignNumber?: string;
+    nhtsaCampaignNumber?: string;
+    campaignId?: string;
+    campaign?: string;
     summary?: string;
+    title?: string;
+    description?: string;
     consequence?: string;
     remedy?: string;
     component?: string;

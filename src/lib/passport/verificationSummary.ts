@@ -268,10 +268,14 @@ function readRecall(listing: VehicleListing): RecallSignals {
     detailOpen: rc ? !!rc.has_open : null,
     doNotDrive: !!rc?.do_not_drive,
     checkedAt: rc?.checked_at || null,
+    // Tolerate every writer's field names so a MarketCheck-sourced recall
+    // (nhtsaCampaignNumber / title / description) renders the same detail as an
+    // NHTSA/manual one (campaignNumber / summary). Without this the passport
+    // showed a blank campaign number + summary for MarketCheck-first recalls.
     campaign: {
-      number: first?.campaignNumber || null,
+      number: first?.campaignNumber || first?.nhtsaCampaignNumber || first?.campaignId || first?.campaign || null,
       component: first?.component || null,
-      summary: first?.summary || null,
+      summary: first?.summary || first?.description || first?.title || null,
       remedy: first?.remedy || null,
     },
   };
