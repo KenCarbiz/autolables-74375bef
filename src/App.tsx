@@ -212,14 +212,12 @@ const App = () => (
                       <Route path="/onboarding" element={<Onboarding />} />
                       <Route path="/scan" element={<ScanPage />} />
                       <Route path="/vehicle/:vin" element={<VehicleVinRedirect />} />
-                      {/* Canonical Passport experience at /v/:slug.
-                          VehiclePassportRoute is a thin selection wrapper
-                          that renders the existing passport by default and
-                          swaps in the governed /v3 experience only when the
-                          tenant has flipped governed_routing_enabled. */}
+                      {/* Canonical Passport at /v/:slug — always the V3 passport
+                          for every vehicle (VehiclePassportRoute). */}
                       <Route path="/v/:slug" element={<VehiclePassportRoute />} />
-                      {/* Parallel governed passport experience (mobile-first). */}
-                      <Route path="/v3/:vehicleSlug" element={<VehiclePassportGoverned />} />
+                      {/* /v3/:slug is a naming alias — it now redirects to the
+                          canonical /v/:slug (V3), not the older governed page. */}
+                      <Route path="/v3/:vehicleSlug" element={<PassportRootRedirect />} />
                       <Route path="/v/:slug/verification" element={<VehiclePassportVerification />} />
                       <Route path="/v/:slug/documents" element={<VehiclePassportDocuments />} />
                       <Route path="/v/:slug/great-buy" element={<VehiclePassportGreatBuy />} />
