@@ -167,29 +167,78 @@ const ExceptionCard = ({ check, expanded, onToggleEvidence, onAskDealer }: Check
   );
 };
 
+// A verified check in the "What checked out" grid. Closed by default with a
+// consistent floor height and a bottom-pinned trigger. When expanded it spans
+// the full grid row (md:col-span-2 — the parent grid reorders it to the front)
+// and re-lays out as a wide record: the plain-language customer result first,
+// then a two-column key/value evidence table, then a provenance strip. Only one
+// card is ever expanded (single expandedKey in the parent), so the grid can
+// never collapse into a skinny vertical column.
 const VerifiedCard = ({ check, expanded, onToggleEvidence }: CheckCardProps) => {
   const ui = STATUS_UI.verified;
+  const panelId = `evidence-panel-${check.key}`;
+  const triggerId = `evidence-trigger-${check.key}`;
+  const checked = check.checkedAt ? dateLabel(check.checkedAt) : null;
+
+  if (expanded) {
+    return (
+      <article data-status={check.status} data-expanded="true" className={`${CARD} md:col-span-2 flex flex-col p-5`}>
+        <div className="flex items-start justify-between gap-3 flex-wrap">
+          <div className="flex items-center gap-2.5 min-w-0">
+            <span className="w-9 h-9 rounded-xl bg-emerald-50 flex items-center justify-center shrink-0 border border-emerald-100"><ui.icon className={`w-5 h-5 ${ui.fg}`} aria-hidden="true" /></span>
+            <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 border border-emerald-200 px-2 py-0.5 text-[11px] font-bold text-[#15803D]"><ui.icon className="w-3 h-3" aria-hidden="true" />Verified</span>
+            <h3 className="text-[16.5px] font-bold text-[#0F172A] truncate">{check.name}</h3>
+          </div>
+          <div className="flex items-center gap-3 shrink-0">
+            <ProvenanceTag provenance={check.provenance} />
+            {checked && <span className="text-[11.5px] text-[#94A3B8] whitespace-nowrap hidden sm:inline">Checked {checked}</span>}
+            <button id={triggerId} type="button" onClick={onToggleEvidence} aria-expanded aria-controls={panelId} className="text-[12.5px] font-semibold text-[#2563EB] inline-flex items-center gap-1 hover:underline print:hidden">
+              Hide evidence <ChevronDown className="w-3.5 h-3.5 rotate-180" />
+            </button>
+          </div>
+        </div>
+        <div id={panelId} role="region" aria-labelledby={triggerId} className="mt-4">
+          {check.finding && (
+            <>
+              <p className="text-[11px] font-bold uppercase tracking-wide text-[#94A3B8]">Customer result</p>
+              <p className="text-[13.5px] text-[#334155] mt-1 leading-relaxed max-w-[70ch]">{check.finding}</p>
+            </>
+          )}
+          {check.evidence.length > 0 && (
+            <dl className="mt-4 rounded-xl border border-[#EEF1F4] overflow-hidden divide-y divide-[#F1F5F9]">
+              {check.evidence.map((e) => (
+                <div key={e.label} className="grid grid-cols-1 sm:grid-cols-[200px_minmax(0,1fr)]">
+                  <dt className="bg-[#fafbfc] px-4 py-2.5 text-[12.5px] font-semibold text-[#64748B]">{e.label}</dt>
+                  <dd className="px-4 py-2.5 text-[13px] text-[#0F172A] tabular-nums break-words">{e.value ?? <span className="text-[#94A3B8]">Not available from current sources</span>}</dd>
+                </div>
+              ))}
+            </dl>
+          )}
+          <div className="mt-3 flex items-center gap-2 rounded-lg bg-emerald-50/60 border border-emerald-100 px-3 py-2 text-[12px] text-[#15803D]">
+            <ui.icon className="w-4 h-4 shrink-0" aria-hidden="true" />
+            <span>Verified against {sourceLabelFor(check)} data{checked ? ` · Checked ${checked}` : ""}.</span>
+          </div>
+        </div>
+      </article>
+    );
+  }
+
   return (
-    <div className={`${CARD} p-5 flex flex-col`}>
+    <article data-status={check.status} data-expanded="false" className={`${CARD} p-5 flex flex-col min-h-[196px]`}>
       <div className="flex items-center justify-between gap-3">
         <span className="w-11 h-11 rounded-2xl bg-emerald-50 flex items-center justify-center shrink-0 border border-emerald-100"><ui.icon className={`w-6 h-6 ${ui.fg}`} aria-hidden="true" /></span>
         <ProvenanceTag provenance={check.provenance} />
       </div>
       <h3 className="text-[16.5px] font-bold text-[#0F172A] mt-3 leading-snug">{check.name}</h3>
       {check.finding && <p className="text-[13px] text-[#475569] mt-1.5 leading-relaxed">{check.finding}</p>}
-      <div className="mt-auto pt-4 border-t border-[#EEF1F4] mt-4 flex items-center justify-between gap-2 text-[11.5px] text-[#94A3B8]">
+      <div className="mt-auto pt-4 border-t border-[#EEF1F4] flex items-center justify-between gap-2 text-[11.5px] text-[#94A3B8]">
         <span>{sourceLabelFor(check)}</span>
-        {check.checkedAt && <span>Checked <time dateTime={check.checkedAt}>{dateLabel(check.checkedAt)}</time></span>}
+        {checked && <span>Checked <time dateTime={check.checkedAt!}>{checked}</time></span>}
       </div>
-      <button onClick={onToggleEvidence} aria-expanded={expanded} className="mt-3 text-[12.5px] font-semibold text-[#2563EB] inline-flex items-center gap-1 hover:underline print:hidden">
-        View evidence <ArrowRight className="w-3.5 h-3.5" />
+      <button id={triggerId} type="button" onClick={onToggleEvidence} aria-expanded={false} aria-controls={panelId} className="mt-3 self-start text-[12.5px] font-semibold text-[#2563EB] inline-flex items-center gap-1 hover:underline print:hidden">
+        View evidence <ChevronDown className="w-3.5 h-3.5" />
       </button>
-      {expanded && (
-        <div className="mt-3 rounded-xl border border-[#EEF1F4] bg-[#fafbfc] p-4 divide-y divide-[#F1F5F9]">
-          {check.evidence.map((e) => <EvidenceRow key={e.label} label={e.label} value={e.value} />)}
-        </div>
-      )}
-    </div>
+    </article>
   );
 };
 
@@ -801,7 +850,7 @@ const VerificationPrintDoc = ({ report, listing, slug }: { report: VerificationR
   );
 
   return (
-    <div className="vp-verify-print hidden print:block bg-white text-black text-[12px] leading-normal" style={{ fontFamily: "Inter, -apple-system, BlinkMacSystemFont, sans-serif" }}>
+    <div data-print-doc aria-hidden="true" className="vp-verify-print hidden print:block bg-white text-black text-[12px] leading-normal" style={{ fontFamily: "Inter, -apple-system, BlinkMacSystemFont, sans-serif" }}>
       <style>{`
         .vp-verify-print { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
         .vp-verify-print .vp-card { break-inside: avoid; }
@@ -913,7 +962,9 @@ const VehiclePassportVerification = () => {
   const report: VerificationReport | null = useMemo(() => (d && listing ? deriveVerificationReport(d, listing) : null), [d, listing]);
 
   const [active, setActive] = useState<string>("overview");
-  const [evidenceOpen, setEvidenceOpen] = useState<Record<string, boolean>>({});
+  // Single expanded evidence card across the whole report (recall, exceptions,
+  // and verified grid) — opening one closes any other. Null = all closed.
+  const [expandedKey, setExpandedKey] = useState<string | null>(null);
   const [methodologyOpen, setMethodologyOpen] = useState(false);
   const [pdfState, setPdfState] = useState<"idle" | "working" | "done" | "error">("idle");
   const viewedRef = useRef(false);
@@ -972,10 +1023,10 @@ const VehiclePassportVerification = () => {
   };
 
   const toggleEvidence = (check: ReportCheck) => {
-    setEvidenceOpen((o) => {
-      const next = !o[check.key];
-      if (next) track("verification_evidence_opened", { check_id: check.key, status: check.status });
-      return { ...o, [check.key]: next };
+    setExpandedKey((cur) => {
+      const opening = cur !== check.key;
+      if (opening) track("verification_evidence_opened", { check_id: check.key, status: check.status });
+      return opening ? check.key : null;
     });
   };
 
@@ -1048,6 +1099,11 @@ const VehiclePassportVerification = () => {
   const secondary = exceptions.filter((c) => c.status !== "unavailable" && c.key !== "recall");
   const unavailable = exceptions.filter((c) => c.status === "unavailable");
   const verified = report.checks.filter((c) => c.status === "verified");
+  // The expanded verified card spans the full grid row (md:col-span-2); render it
+  // first so it leads the grid and never orphans an empty cell beside a 1-col card.
+  const orderedVerified = expandedKey && verified.some((c) => c.key === expandedKey)
+    ? [...verified.filter((c) => c.key === expandedKey), ...verified.filter((c) => c.key !== expandedKey)]
+    : verified;
   const hero = listingHero(listing);
   const tone = HERO_TONE[report.banner.tone];
   const lastChecked = report.lastCheckedAt ? dateLabel(report.lastCheckedAt) : null;
@@ -1218,12 +1274,12 @@ const VehiclePassportVerification = () => {
                     </div>
                   </div>
                   <div className="flex flex-wrap gap-2 mt-3 print:hidden">
-                    <button onClick={() => toggleEvidence(recallCheck)} aria-expanded={!!evidenceOpen.recall} className="h-10 px-4 rounded-lg border border-[#E6E8EC] bg-white text-[13px] font-semibold text-[#0F172A] inline-flex items-center gap-1.5 hover:border-[#2563EB]">
-                      View recall details <ChevronDown className={`w-4 h-4 transition-transform ${evidenceOpen.recall ? "rotate-180" : ""}`} />
+                    <button onClick={() => toggleEvidence(recallCheck)} aria-expanded={expandedKey === "recall"} className="h-10 px-4 rounded-lg border border-[#E6E8EC] bg-white text-[13px] font-semibold text-[#0F172A] inline-flex items-center gap-1.5 hover:border-[#2563EB]">
+                      View recall details <ChevronDown className={`w-4 h-4 transition-transform ${expandedKey === "recall" ? "rotate-180" : ""}`} />
                     </button>
                     <button onClick={askDealerFor(recallCheck)} className="h-10 px-4 rounded-lg bg-[#2563EB] hover:bg-[#1d4fd7] text-white text-[13px] font-bold inline-flex items-center gap-1.5">Ask the dealer</button>
                   </div>
-                  {evidenceOpen.recall && (
+                  {expandedKey === "recall" && (
                     <div className="mt-3 rounded-xl border border-black/5 bg-white p-4 divide-y divide-[#F1F5F9]">
                       {recallCheck.evidence.map((e) => <EvidenceRow key={e.label} label={e.label} value={e.value} />)}
                     </div>
@@ -1234,7 +1290,7 @@ const VehiclePassportVerification = () => {
 
             {/* Secondary exceptions — lighter than the hero */}
             {secondary.map((check) => (
-              <ExceptionCard key={check.key} check={check} expanded={!!evidenceOpen[check.key]}
+              <ExceptionCard key={check.key} check={check} expanded={expandedKey === check.key}
                 onToggleEvidence={() => toggleEvidence(check)} onAskDealer={askDealerFor(check)} />
             ))}
 
@@ -1265,8 +1321,8 @@ const VehiclePassportVerification = () => {
             {verified.length === 0 ? (
               <div className={`${CARD} p-5 mt-3`}><p className="text-[13.5px] text-[#64748B]">No checks have returned a verified result yet.</p></div>
             ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 mt-3">
-                {verified.map((check) => <VerifiedCard key={check.key} check={check} expanded={!!evidenceOpen[check.key]} onToggleEvidence={() => toggleEvidence(check)} />)}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-3 items-start">
+                {orderedVerified.map((check) => <VerifiedCard key={check.key} check={check} expanded={expandedKey === check.key} onToggleEvidence={() => toggleEvidence(check)} />)}
               </div>
             )}
           </section>
