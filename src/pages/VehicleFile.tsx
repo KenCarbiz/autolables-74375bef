@@ -22,7 +22,8 @@ import { useRecallTask, OUTCOME_LABELS, type RecallOutcome } from "@/hooks/useRe
 import { listingGallery, listingHero } from "@/lib/photos";
 import { PACKET_MODULES, packetVisible } from "@/lib/packetModules";
 import { assessListingDecodeHealth, HEALTH_TONE, type DataHealthReport } from "@/lib/vehicleData/dataContract";
-import type { VehicleListing } from "@/hooks/useVehicleListing";
+import type { VehicleListing, TitleVerification } from "@/hooks/useVehicleListing";
+import { useEntitlements } from "@/hooks/useEntitlements";
 import { resolveOperatingState } from "@/lib/dealerState";
 import { QRCodeSVG } from "qrcode.react";
 import GeneratedDocumentsSection from "@/components/vehicle/GeneratedDocumentsSection";
@@ -35,6 +36,7 @@ import {
 import UsedCarDocPack from "@/components/vehicle/UsedCarDocPack";
 import DeliverySignoffs from "@/components/vehicle/DeliverySignoffs";
 import TitleMcoPanel from "@/components/vehicle/TitleMcoPanel";
+import TitleVerificationPanel from "@/components/vehicle/TitleVerificationPanel";
 import VehicleEvidenceTimeline from "@/components/vehicle/VehicleEvidenceTimeline";
 import ShopperActivityDrawer from "@/components/vehicle/ShopperActivityDrawer";
 
@@ -85,6 +87,7 @@ interface VehicleRow {
   videos: Array<{ id: string; url: string; caption?: string }>;
   prep_status: { all_accessories_installed?: boolean; foreman_signed_at?: string } | null;
   recall_check: Record<string, unknown> | null;
+  title_verification: TitleVerification | null;
   vehicle_file_id: string | null;
   service_records: ServiceRecord[] | null;
   warranty_info: WarrantyInfo | null;
@@ -977,6 +980,8 @@ const TabHeader = ({ title, description, action }: { title: string; description:
 const DocumentsPanel = ({ vehicle, onReload }: { vehicle: VehicleRow; onReload: () => void }) => {
   const [uploading, setUploading] = useState<string | null>(null);
   const { settings } = useDealerSettings();
+  const { tier } = useEntitlements();
+  const titleVerifyEnabled = tier("autolabels") === "compliance_pro";
   const { currentStore } = useTenant();
   const opState = resolveOperatingState(settings, currentStore?.state);
   const safety = SAFETY_FORM[opState] || {
@@ -1196,6 +1201,7 @@ const DocumentsPanel = ({ vehicle, onReload }: { vehicle: VehicleRow; onReload: 
       </div>
       <UsedCarDocPack vehicleId={vehicle.id} vin={vehicle.vin} condition={vehicle.condition} />
       <TitleMcoPanel vin={vehicle.vin} tenantId={vehicle.tenant_id} condition={vehicle.condition} />
+      <TitleVerificationPanel listingId={vehicle.id} vin={vehicle.vin} tenantId={vehicle.tenant_id} condition={vehicle.condition} titleVerification={vehicle.title_verification} enabled={titleVerifyEnabled} onUpdated={onReload} />
       <div className="rounded-2xl border border-border bg-card shadow-[0_1px_3px_rgba(0,0,0,0.05)] p-5">
         <GeneratedDocumentsSection vehicleId={vehicle.id} />
       </div>

@@ -109,6 +109,16 @@ export interface ListingRecallCheck {
   }>;
 }
 
+export interface TitleVerification {
+  status: "clean" | "branded";
+  verified_at: string;
+  verified_by: string | null;
+  source: "nmvtis";
+  report_generated_at: string | null;
+  report_expires_at: string | null;
+  brand_note: string | null;
+}
+
 export interface VehicleListing {
   id: string;
   store_id: string;
@@ -170,6 +180,12 @@ export interface VehicleListing {
   // dealer's own VDP by the nightly crawl, or entered manually). The public
   // payload carries the gated `history_report` attachment derived from it.
   history_report_url?: string | null;
+
+  // Dealer NMVTIS title attestation (Compliance Pro). Written from the admin
+  // Title Verification panel after the dealer reviews the raw record; the raw
+  // NMVTIS report itself lives in title_reports, never here. Safe to expose on
+  // the passport — status + verified date only.
+  title_verification?: TitleVerification | null;
 
   // OEM Monroney window sticker pulled by VIN + cached in the oem-stickers bucket.
   oem_sticker_url?: string | null;

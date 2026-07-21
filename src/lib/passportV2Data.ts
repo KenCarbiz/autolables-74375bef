@@ -254,6 +254,9 @@ export interface PassportData {
   accidentCount: number | null;
   cleanTitle: boolean;
   titleStatus: "clean" | "branded" | "unknown";
+  // Present only when the dealer published an NMVTIS title attestation.
+  titleVerifiedAt: string | null;
+  titleVerifiedSource: "nmvtis" | null;
   serviceCount: number;
   recallClear: boolean;
   openRecalls: number | null;
@@ -546,11 +549,23 @@ export const derivePassport = (listing: VehicleListing): PassportData => {
   // listing spells (a car relisted by 12 dealers is NOT a 12-owner car).
   const ownerCount = isNew ? 0 : ((mc.owner_count as number) ?? (mc.carfax_1_owner === true ? 1 : null));
   const accidentCount = (mc.accident_count as number) ?? null;
-  const cleanTitle = mc.carfax_clean_title === true;
+  // Dealer NMVTIS attestation (title_verification) is authoritative: the dealer
+  // pulled the national title record and explicitly attested. It overrides the
+  // softer MarketCheck/CARFAX title signal when present.
+  const titleAttest = listing.title_verification || null;
+  const dealerTitleClean = titleAttest?.status === "clean";
+  const dealerTitleBranded = titleAttest?.status === "branded";
+  const cleanTitle = dealerTitleClean || mc.carfax_clean_title === true;
   const titleBrand = String((mc.title_brand ?? mc.title_status ?? "") as string).trim();
-  const titleStatus: PassportData["titleStatus"] = cleanTitle
+  const titleStatus: PassportData["titleStatus"] = dealerTitleClean
     ? "clean"
-    : mc.carfax_clean_title === false || (titleBrand !== "" && !/^clean/i.test(titleBrand)) ? "branded" : "unknown";
+    : dealerTitleBranded
+      ? "branded"
+      : cleanTitle
+        ? "clean"
+        : mc.carfax_clean_title === false || (titleBrand !== "" && !/^clean/i.test(titleBrand)) ? "branded" : "unknown";
+  const titleVerifiedAt = titleAttest?.verified_at || null;
+  const titleVerifiedSource: PassportData["titleVerifiedSource"] = titleAttest ? "nmvtis" : null;
   const serviceCount = listing.service_records?.length ?? 0;
   const recallClear = listing.recall_status === "clear";
   const openRecalls = listing.open_recall_count ?? null;
@@ -738,7 +753,7 @@ export const derivePassport = (listing: VehicleListing): PassportData => {
     marketAvg, marketLow, marketHigh, belowMarket,
     marketMeta, comparables, blackbook, marketCheckedAt, history,
     viewCount: listing.view_count ?? null, dom: (mc.dom as number) ?? null,
-    ownerCount, accidentCount, cleanTitle, titleStatus, serviceCount, recallClear, openRecalls, hasRecallCheck,
+    ownerCount, accidentCount, cleanTitle, titleStatus, titleVerifiedAt, titleVerifiedSource, serviceCount, recallClear, openRecalls, hasRecallCheck,
     warranty, warrantyStr, warrantyExpired,
     oemWarranty: ((listing as unknown as { oem_warranty?: OemWarrantyView }).oem_warranty) || null,
     confScore, confLabel, confDeductions, verifiedBy, dealerVerified, verifyRows,

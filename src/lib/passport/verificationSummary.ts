@@ -387,11 +387,17 @@ export function deriveVerificationReport(d: PassportData, listing: VehicleListin
     const s = src("vehicle_history");
     const status: VerificationStatus =
       d.titleStatus === "clean" ? "verified" : d.titleStatus === "branded" ? "needs_attention" : "pending";
+    // When the dealer pulled the national title record (NMVTIS) and attested,
+    // cite that authoritative source + the verification date explicitly.
+    const nmvtis = d.titleVerifiedSource === "nmvtis";
+    const verifiedOn = nmvtis ? dateFmt(d.titleVerifiedAt) : null;
     return {
       key: "title", name: "Title and brand", ...s, material: true, highSeverity: false,
       status,
       finding: status === "verified"
-        ? "Clean title on record — no salvage, flood, lemon, or rebuilt brands found."
+        ? nmvtis
+          ? `Clean title confirmed against the national title record (NMVTIS)${verifiedOn ? `, verified by the dealer on ${verifiedOn}` : ""} — no salvage, flood, lemon, or rebuilt brands found.`
+          : "Clean title on record — no salvage, flood, lemon, or rebuilt brands found."
         : status === "needs_attention"
           ? "A title brand is on record for this vehicle — review the brand details with the dealer."
           : null,
@@ -401,9 +407,10 @@ export function deriveVerificationReport(d: PassportData, listing: VehicleListin
       evidence: [
         { label: "Title status", value: d.titleStatus === "clean" ? "Clean" : d.titleStatus === "branded" ? "Brand on record" : null },
         { label: "Brands checked", value: status !== "pending" ? "Salvage, flood, lemon, rebuilt" : null },
-        { label: "Source", value: FAMILY_META.vehicle_history.label },
+        { label: "Verification", value: nmvtis ? `Dealer-verified via NMVTIS${verifiedOn ? ` on ${verifiedOn}` : ""}` : null },
+        { label: "Source", value: nmvtis ? "NMVTIS national title record" : FAMILY_META.vehicle_history.label },
       ],
-      checkedAt: status !== "pending" ? reportTime : null,
+      checkedAt: status !== "pending" ? (nmvtis ? (d.titleVerifiedAt || reportTime) : reportTime) : null,
     };
   })());
 
