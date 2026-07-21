@@ -53,12 +53,12 @@ export const PriceIntegrityPanel = () => {
     setSeeding(true);
     const { data: listings } = await (supabase as any)
       .from("vehicle_listings")
-      .select("vin, stock_number, price, condition")
+      .select("vin, sticker_snapshot, price, condition")
       .not("price", "is", null)
       .limit(1000);
     // Tokens: {CONDITION} → new/used, {VIN} → uppercase, {vin} → lowercase
     // (dealer VDP urls are usually lowercase), {STOCK} → stock number.
-    const rows = ((listings as { vin: string; stock_number: string | null; price: number; condition: string | null }[]) || [])
+    const rows = ((listings as { vin: string; sticker_snapshot: Record<string, unknown> | null; price: number; condition: string | null }[]) || [])
       .filter((l) => l.vin)
       .map((l) => ({
         vin: l.vin.toUpperCase(),
@@ -67,7 +67,7 @@ export const PriceIntegrityPanel = () => {
           .replace(/\{CONDITION\}/gi, l.condition === "new" ? "new" : "used")
           .replace(/\{VIN\}/g, l.vin.toUpperCase())
           .replace(/\{vin\}/g, l.vin.toLowerCase())
-          .replace(/\{STOCK\}/gi, l.stock_number || ""),
+          .replace(/\{STOCK\}/gi, (l.sticker_snapshot?.["stock_number"] as string) || ""),
         advertised_price: l.price,
         captured_by: "seed",
         notes: "Seeded website URL for nightly crawl",
