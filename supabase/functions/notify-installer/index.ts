@@ -1,5 +1,5 @@
 import { qrcode } from "https://deno.land/x/qrcode@v2.0.0/mod.ts";
-import { json, preflight } from "../_shared/http.ts";
+import { json, preflight, htmlEscape } from "../_shared/http.ts";
 import { SUPABASE_URL, SERVICE_KEY, adminClient, isServiceOrCron } from "../_shared/supabase.ts";
 
 // ──────────────────────────────────────────────────────────────────────
@@ -65,9 +65,9 @@ Deno.serve(async (req) => {
     const product = (inst.product || "").trim();
     const html = `
     <div style="font-family:Inter,Arial,sans-serif;max-width:480px;margin:0 auto;color:#0F172A">
-      <h2 style="margin:0 0 4px">${ymm} is ready for ${product || "your install"}</h2>
-      <p style="color:#64748B;margin:0 0 16px">VIN ${vin}</p>
-      <p style="margin:0 0 16px">A new vehicle is in inventory${product ? ` for <b>${product}</b>` : ""}. Record the install with a photo and your signature when complete.</p>
+      <h2 style="margin:0 0 4px">${htmlEscape(ymm)} is ready for ${htmlEscape(product || "your install")}</h2>
+      <p style="color:#64748B;margin:0 0 16px">VIN ${htmlEscape(vin)}</p>
+      <p style="margin:0 0 16px">A new vehicle is in inventory${product ? ` for <b>${htmlEscape(product)}</b>` : ""}. Record the install with a photo and your signature when complete.</p>
       <a href="${installUrl}" style="display:inline-block;background:#2563EB;color:#fff;font-weight:bold;text-decoration:none;padding:14px 24px;border-radius:12px">Record Install</a>
       ${qrImgUrl ? `<p style="color:#64748B;margin:20px 0 8px">Or scan with your phone:</p><img src="${qrImgUrl}" width="180" height="180" alt="Scan to record install" style="border:1px solid #E6E8EC;border-radius:12px"/>` : ""}
       <p style="color:#94A3B8;font-size:12px;margin-top:20px">A photo and signature are required to mark the install complete.</p>

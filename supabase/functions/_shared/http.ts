@@ -21,3 +21,15 @@ export const preflight = (req: Request): Response | null =>
 
 export const json = (status: number, body: unknown, extra: Record<string, string> = {}): Response =>
   new Response(JSON.stringify(body), { status, headers: { ...cors, "Content-Type": "application/json", ...extra } });
+
+// Escape a value for safe interpolation into an HTML email/body. Dealer- and
+// vehicle-supplied strings (names, YMM, free-text instructions, line items) must
+// pass through this before landing in a template literal, or markup in that data
+// is injected into the rendered email. Any value is accepted; null/undefined → "".
+export const htmlEscape = (value: unknown): string =>
+  String(value ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");

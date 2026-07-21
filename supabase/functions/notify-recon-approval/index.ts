@@ -1,4 +1,4 @@
-import { json, preflight } from "../_shared/http.ts";
+import { json, preflight, htmlEscape } from "../_shared/http.ts";
 import { SUPABASE_URL, SERVICE_KEY, adminClient } from "../_shared/supabase.ts";
 
 // ──────────────────────────────────────────────────────────────────────
@@ -50,13 +50,13 @@ Deno.serve(async (req) => {
   const ymm = est.ymm || "Vehicle";
   const approveUrl = `${APP_BASE}/approve/${approval_token}`;
   const rows = pendingLines.slice(0, 12).map((l) =>
-    `<tr><td style="padding:6px 0;font-size:14px;color:#0F172A">${l.description}</td><td style="padding:6px 0;font-size:14px;text-align:right;color:#0F172A;font-weight:600">${money(Number(l.line_total) || 0)}</td></tr>`).join("");
+    `<tr><td style="padding:6px 0;font-size:14px;color:#0F172A">${htmlEscape(l.description)}</td><td style="padding:6px 0;font-size:14px;text-align:right;color:#0F172A;font-weight:600">${money(Number(l.line_total) || 0)}</td></tr>`).join("");
 
   const html = `
     <div style="font-family:Inter,Arial,sans-serif;max-width:520px;margin:0 auto;color:#0F172A">
       <p style="font-size:15px;margin:0 0 4px">Recon work needs your approval:</p>
-      <h2 style="font-size:20px;margin:8px 0 2px">${ymm}</h2>
-      <p style="font-size:13px;color:#64748B;margin:0 0 14px">VIN ${est.vin} &middot; ${pendingLines.length} item${pendingLines.length === 1 ? "" : "s"} &middot; ${money(total)}</p>
+      <h2 style="font-size:20px;margin:8px 0 2px">${htmlEscape(ymm)}</h2>
+      <p style="font-size:13px;color:#64748B;margin:0 0 14px">VIN ${htmlEscape(est.vin)} &middot; ${pendingLines.length} item${pendingLines.length === 1 ? "" : "s"} &middot; ${money(total)}</p>
       <table style="width:100%;border-collapse:collapse;border-top:1px solid #E6E8EC;border-bottom:1px solid #E6E8EC;margin:0 0 16px">${rows}</table>
       <a href="${approveUrl}" style="display:inline-block;background:#2563EB;color:#fff;text-decoration:none;padding:12px 20px;border-radius:12px;font-weight:600;font-size:14px">Review &amp; approve</a>
       <p style="font-size:12px;color:#94A3B8;margin:18px 0 0">Approve or decline each item from your phone &mdash; no login needed. Items under your auto-approve amount already cleared.</p>

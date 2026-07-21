@@ -47,6 +47,25 @@ Deno.serve(async (req) => {
     }
     if (!row) return json(404, { error: "not_found" });
 
+    // ── Quota guard: serve a recent cached comp set instead of re-hitting the
+    // paid MarketCheck API. This is what stops unauthenticated repeat calls from
+    // draining quota — MarketCheck is spent at most once per vehicle per TTL.
+    const cacheSlug = String(row.slug || slug);
+    const CACHE_TTL_MS = 12 * 60 * 60 * 1000; // comps move slowly
+    const respond = async (payload: Record<string, unknown>) => {
+      await admin.from("marketcheck_comps_cache")
+        .upsert({ slug: cacheSlug, tenant_id: row.tenant_id ?? null, payload, cached_at: new Date().toISOString() }, { onConflict: "slug" })
+        .then(() => undefined, () => undefined);
+      return json(200, payload);
+    };
+    {
+      const { data: hit } = await admin.from("marketcheck_comps_cache")
+        .select("payload, cached_at").eq("slug", cacheSlug).maybeSingle();
+      if (hit?.payload && hit.cached_at && (Date.now() - new Date(hit.cached_at as string).getTime()) < CACHE_TTL_MS) {
+        return json(200, { ...(hit.payload as Record<string, unknown>), cached: true });
+      }
+    }
+
     const ymm = String(row.ymm || "").trim();
     const [year, make, ...model] = ymm.split(/\s+/);
     const dealer = (row.dealer_snapshot || {}) as Record<string, unknown>;
@@ -167,10 +186,10 @@ Deno.serve(async (req) => {
     const stats = b?.stats?.price || {};
     const median = num(stats.median) ?? num(stats.mean);
 
-    if (count === 0 && mapped.length === 0) return json(200, { available: false, reason: "no_comps" });
-    if (comparables.length === 0) return json(200, { available: false, reason: "no_value_comps" });
+    if (count === 0 && mapped.length === 0) return await respond({ available: false, reason: "no_comps" });
+    if (comparables.length === 0) return await respond({ available: false, reason: "no_value_comps" });
 
-    return json(200, { available: true, count, median, comparables, ourPrice, strategy: cs.compStrategy, checkedAt: new Date().toISOString() });
+    return await respond({ available: true, count, median, comparables, ourPrice, strategy: cs.compStrategy, checkedAt: new Date().toISOString() });
   } catch (err) {
     return json(200, { available: false, reason: err instanceof Error ? err.message : "unknown" });
   }

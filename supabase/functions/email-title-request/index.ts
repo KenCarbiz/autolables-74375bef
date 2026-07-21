@@ -1,5 +1,5 @@
 import { qrcode } from "https://deno.land/x/qrcode@v2.0.0/mod.ts";
-import { json, preflight } from "../_shared/http.ts";
+import { json, preflight, htmlEscape } from "../_shared/http.ts";
 import { SUPABASE_URL, SERVICE_KEY, adminClient, isServiceOrCron } from "../_shared/supabase.ts";
 
 // ──────────────────────────────────────────────────────────────────────
@@ -120,9 +120,9 @@ Deno.serve(async (req) => {
   const subject = `Upload the ${isNew ? "MCO" : "title"} — ${ymm}${stock ? ` (Stock ${stock})` : ""}`;
   const html = `
   <div style="font-family:Inter,Arial,sans-serif;max-width:480px;margin:0 auto;color:#0F172A">
-    <h2 style="margin:0 0 4px">${ymm} is in inventory</h2>
-    <p style="color:#64748B;margin:0 0 16px">${stock ? `Stock ${stock} · ` : ""}VIN ${vin}</p>
-    <p style="margin:0 0 16px">Please upload a copy of the <b>${docName}</b> (front and back) for this vehicle.</p>
+    <h2 style="margin:0 0 4px">${htmlEscape(ymm)} is in inventory</h2>
+    <p style="color:#64748B;margin:0 0 16px">${stock ? `Stock ${htmlEscape(stock)} · ` : ""}VIN ${htmlEscape(vin)}</p>
+    <p style="margin:0 0 16px">Please upload a copy of the <b>${htmlEscape(docName)}</b> (front and back) for this vehicle.</p>
     <a href="${uploadUrl}" style="display:inline-block;background:#2563EB;color:#fff;font-weight:bold;text-decoration:none;padding:14px 24px;border-radius:12px">Upload ${isNew ? "MCO" : "Title"}</a>
     ${qrImgUrl ? `<p style="color:#64748B;margin:20px 0 8px">Or scan with your phone:</p><img src="${qrImgUrl}" width="180" height="180" alt="Scan to upload" style="border:1px solid #E6E8EC;border-radius:12px"/>` : ""}
     <p style="color:#94A3B8;font-size:12px;margin-top:20px">Stored securely for dealership use only — never shown to shoppers.</p>
