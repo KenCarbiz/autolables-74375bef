@@ -753,10 +753,31 @@ const FileStat = ({ label, value, tone }: { label: string; value: string; tone?:
 // Three-pillar hero visual: the shopper-facing Vehicle Passport (the win),
 // the per-VIN defense file (the coverage), and the auto-built vehicle file
 // (the ops story). Auto-advances slowly, pauses on hover/focus/manual select.
+// Three approved customer-facing phone slides. Each asset is an identical
+// 578×908 iPhone mockup (phone + baked-in sticky action bar, white canvas), so
+// the frame never resizes between slides and there is zero layout shift. The
+// content inside every phone is a completely static screenshot; only a crossfade
+// plays as the carousel rotates. "FTC-Aligned" wording only — never approved/
+// certified/compliant.
 const HERO_VIEWS = [
-  { id: "passport", label: "Vehicle Passport" },
-  { id: "compliance", label: "VIN defense file" },
-  { id: "vehicle", label: "Vehicle file" },
+  {
+    id: "passport",
+    label: "Vehicle Passport",
+    src: "/static-slide-1-vehicle-passport-iphone.png",
+    alt: "Customer Vehicle Passport for a 2026 INFINITI QX60 LUXE — gallery, verified badges, today's sale price and full price breakdown.",
+  },
+  {
+    id: "signed-price",
+    label: "Signed Price Record",
+    src: "/static-slide-2-signed-price-record-iphone.png",
+    alt: "FTC-aligned signed price and disclosure record — MSRP, dealer discount, doc fee, total advertised price, installed equipment and the customer's signature.",
+  },
+  {
+    id: "verified-vin",
+    label: "Verified VIN Record",
+    src: "/static-slide-3-verified-vin-record-iphone.png",
+    alt: "Verified VIN record — eight AutoLabels data checks with evidence: VIN identity, title & brand, recall status, accident history, ownership, odometer, warranty and market value.",
+  },
 ];
 
 const HeroVisual = () => {
@@ -766,9 +787,17 @@ const HeroVisual = () => {
   useEffect(() => {
     if (!auto || paused) return;
     if (typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
-    const t = setInterval(() => setView((v) => (v + 1) % HERO_VIEWS.length), 7000);
+    if (typeof document !== "undefined" && document.hidden) return;
+    const t = setInterval(() => setView((v) => (v + 1) % HERO_VIEWS.length), 6000);
     return () => clearInterval(t);
-  }, [auto, paused]);
+  }, [auto, paused, view]);
+  // Pause rotation while the browser tab is hidden; resume when it returns.
+  useEffect(() => {
+    if (typeof document === "undefined") return;
+    const onVis = () => setPaused(document.hidden);
+    document.addEventListener("visibilitychange", onVis);
+    return () => document.removeEventListener("visibilitychange", onVis);
+  }, []);
   return (
     <div
       onMouseEnter={() => setPaused(true)}
@@ -776,11 +805,14 @@ const HeroVisual = () => {
       onFocus={() => setPaused(true)}
       onBlur={() => setPaused(false)}
     >
-      <div role="group" aria-label="Hero example toggle" className="mb-3 inline-flex items-center gap-0.5 rounded-full border border-slate-200 bg-white p-0.5 shadow-sm">
+      <div role="tablist" aria-label="Customer experiences" className="mb-3 inline-flex items-center gap-0.5 rounded-full border border-slate-200 bg-white p-0.5 shadow-sm">
         {HERO_VIEWS.map((hv, i) => (
           <button
             key={hv.id}
-            aria-pressed={i === view}
+            role="tab"
+            id={`hero-tab-${hv.id}`}
+            aria-selected={i === view}
+            aria-controls={`hero-panel-${hv.id}`}
             onClick={() => { setView(i); setAuto(false); }}
             className={`rounded-full px-3 py-1.5 text-[11px] font-semibold transition-colors ${i === view ? "bg-[#0B2041] text-white" : "text-slate-500 hover:text-slate-800"}`}
           >
@@ -788,10 +820,24 @@ const HeroVisual = () => {
           </button>
         ))}
       </div>
-      <div className="grid">
-        <div className={`col-start-1 row-start-1 ${view === 0 ? "" : "invisible"}`} aria-hidden={view !== 0}><PassportPhoneCard /></div>
-        <div className={`col-start-1 row-start-1 ${view === 1 ? "" : "invisible"}`} aria-hidden={view !== 1}><ComplianceStatusCard /></div>
-        <div className={`col-start-1 row-start-1 ${view === 2 ? "" : "invisible"}`} aria-hidden={view !== 2}><VehicleFileCard /></div>
+      {/* Fixed-ratio phone stage. All three 578×908 assets stack in the same box
+          and crossfade — the phone is anchored and never scales, moves, or
+          changes height. object-contain keeps the bezel + sticky bar uncropped. */}
+      <div className="relative mx-auto w-full max-w-[320px] aspect-[578/908]">
+        {HERO_VIEWS.map((hv, i) => (
+          <img
+            key={hv.id}
+            id={`hero-panel-${hv.id}`}
+            src={hv.src}
+            alt={hv.alt}
+            width={578}
+            height={908}
+            loading={i === 0 ? "eager" : "lazy"}
+            decoding="async"
+            aria-hidden={i !== view}
+            className={`absolute inset-0 h-full w-full object-contain transition-opacity duration-500 motion-reduce:transition-none ${i === view ? "opacity-100" : "opacity-0 pointer-events-none"}`}
+          />
+        ))}
       </div>
     </div>
   );
