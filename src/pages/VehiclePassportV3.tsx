@@ -316,6 +316,21 @@ export const MOCK_NEW_2026 = {
   market_payload: { high: 67100, low: 61900, belowMarket: 1205 },
 };
 
+// Preview-only fixture: a SPARSE used vehicle — no MSRP, no market value, no
+// configured doc fee, no documented discount (?preview=1&scenario=sparse). It
+// proves the pricing card degrades gracefully to the minimum truthful rows
+// (Vehicle Price -> Today's Sale Price) instead of disappearing when optional
+// pricing fields are absent.
+export const MOCK_SPARSE = {
+  ...MOCK_LISTING,
+  id: "mock-sparse", slug: "sample-sparse", vin: "5N1AL1F83VC900001",
+  ymm: "2021 INFINITI QX50", trim: "PURE", condition: "used",
+  mileage: 41200, price: 24981, market_value: null,
+  mc_attributes: { ...MOCK_LISTING.mc_attributes, msrp: null, owner_count: 2, accident_count: 0 },
+  warranty_info: undefined, recon: undefined,
+  market_payload: {}, value_history: [],
+};
+
 // ── Lead modal is intentionally absent — every action routes to a full page ──
 const VehiclePassportV3 = () => {
   // Canonical route is /v/:slug (param `slug`); legacy /passport-v3/:vehicleSlug

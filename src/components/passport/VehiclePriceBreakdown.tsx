@@ -33,7 +33,11 @@ const Row = ({ label, value, bold, color }: { label: string; value: string; bold
 );
 
 const VehiclePriceBreakdown = ({ card, heading = "Today's Sale Price", priceClassName = "text-[32px]" }: Props) => {
-  const showCard = !card.headlineOnly && card.reconciles;
+  // The card renders whenever there is a valid, reconciling final price. It never
+  // disappears because an OPTIONAL row (anchor, discount, or fee) is missing —
+  // each row renders individually; the minimum truthful card is Vehicle Price →
+  // Today's Sale Price. Only a non-reconciling / non-finite total suppresses it.
+  const showCard = card.reconciles && Number.isFinite(card.finalSalePrice);
   return (
     <div data-module="price-breakdown">
       <div className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: MUTED }}>{heading}</div>
@@ -41,18 +45,22 @@ const VehiclePriceBreakdown = ({ card, heading = "Today's Sale Price", priceClas
 
       {showCard && (
         <div className="mt-3 rounded-2xl bg-white p-4" style={{ border: `1px solid ${BORDER}` }}>
-          <div className="space-y-2.5">
-            {card.lines.map((l) => (
-              <Row
-                key={l.key}
-                label={l.label}
-                value={l.role === "discount" ? `−${fmt$(l.amount)}` : fmt$(l.amount)}
-                color={l.role === "discount" ? DISCOUNT : MUTED}
-              />
-            ))}
-          </div>
+          {card.lines.length > 0 && (
+            <>
+              <div className="space-y-2.5">
+                {card.lines.map((l) => (
+                  <Row
+                    key={l.key}
+                    label={l.label}
+                    value={l.role === "discount" ? `−${fmt$(l.amount)}` : fmt$(l.amount)}
+                    color={l.role === "discount" ? DISCOUNT : MUTED}
+                  />
+                ))}
+              </div>
+              <div className="my-3 border-t" style={{ borderColor: BORDER }} />
+            </>
+          )}
 
-          <div className="my-3 border-t" style={{ borderColor: BORDER }} />
           <Row label="Vehicle Price" value={fmt$(card.vehiclePrice)} bold color={PRIMARY} />
 
           {card.feeAmount != null && card.feeLabel && (

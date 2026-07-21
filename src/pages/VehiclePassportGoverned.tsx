@@ -21,7 +21,7 @@ import { buildSalePriceCard, type PricingVehicleType } from "@/lib/priceModel";
 import { estimateAffordability } from "@/lib/affordability";
 import { readPaymentPrefs, clearPaymentPrefs, type PaymentPrefs } from "@/lib/passport/paymentPrefs";
 import { resolveStickyButtons, type StickyBottomButtons } from "@/lib/stickyButtons";
-import { MOCK_LISTING, MOCK_NEW_2026 } from "./VehiclePassportV3";
+import { MOCK_LISTING, MOCK_NEW_2026, MOCK_SPARSE } from "./VehiclePassportV3";
 import type { VehicleListing } from "@/hooks/useVehicleListing";
 import { isVehicleSaved, toggleSavedVehicle } from "@/lib/savedVehicles";
 import { usePassportEngagement } from "@/lib/passportEngagement";
@@ -183,6 +183,7 @@ export default function VehiclePassportGoverned() {
   const previewScenario = search.get("scenario");
   const previewData = (previewScenario === "review" ? MOCK_REVIEW_LISTING
     : previewScenario === "new2026" ? MOCK_NEW_2026
+    : previewScenario === "sparse" ? MOCK_SPARSE
     : MOCK_LISTING) as unknown as VehicleListing;
   const { listing, loading, notFound } = usePublicListing(rawSlug, { preview: isPreview, previewData });
 
