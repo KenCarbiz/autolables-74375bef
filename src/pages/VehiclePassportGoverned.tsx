@@ -445,7 +445,7 @@ export default function VehiclePassportGoverned() {
             {dealerLogo ? (
               <img src={dealerLogo} alt={dealerName} className="h-7 max-w-[140px] object-contain" loading="eager" decoding="async" />
             ) : (
-              <Logo variant="mark" className="h-6" />
+              <Logo variant="full" className="h-7" />
             )}
             {!heroInView && (
               <div className="min-w-0 pl-2 border-l" style={{ borderColor: BORDER }}>

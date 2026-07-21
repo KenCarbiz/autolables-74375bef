@@ -902,7 +902,14 @@ const VehiclePassportV3 = () => {
       {!isEmbed && (
       <header className="border-b border-[#E6E8EC] bg-white print:hidden">
         <div className="mx-auto max-w-[1320px] px-4 sm:px-5 h-16 flex items-center justify-between">
-          {listing.dealer_snapshot?.logo_url ? <img src={listing.dealer_snapshot.logo_url as string} alt="" className="h-7" /> : <Logo variant="full" size={22} />}
+          {(() => {
+            // Tenant logo from the dealer branding snapshot (logo_url or logo).
+            // Falls back to the full AutoLabels wordmark — never the "a" mark.
+            const dealerLogo = (listing.dealer_snapshot?.logo_url as string) || (listing.dealer_snapshot?.logo as string) || "";
+            return dealerLogo
+              ? <img src={dealerLogo} alt={d.dealerName} className="h-7 max-w-[160px] object-contain" loading="eager" decoding="async" />
+              : <Logo variant="full" size={22} />;
+          })()}
           <div className="flex items-center gap-3 sm:gap-5">
             <button onClick={handleShare} className={`text-sm font-medium inline-flex items-center gap-1.5 ${TEXT2} hover:text-[#0F172A]`}><Upload className="w-4 h-4" /> <span className="hidden sm:inline">Share</span></button>
             <button onClick={handleSave} className={`hidden sm:inline-flex text-sm font-medium items-center gap-1.5 ${isSaved ? "text-[#2563EB]" : TEXT2} hover:text-[#0F172A]`}><Bookmark className="w-4 h-4" fill={isSaved ? "currentColor" : "none"} /> {isSaved ? "Saved" : "Save"}</button>
