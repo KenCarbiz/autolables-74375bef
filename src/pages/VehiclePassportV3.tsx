@@ -800,33 +800,11 @@ const VehiclePassportV3 = () => {
   });
   listingEquipment(listing).forEach((label) => { if (highlights.length < 10) highlights.push({ icon: Award, t: label, s: "Feature" }); });
 
-  // Dealer trust chips — only render what the dealer actually configured
-  // (onboarding / admin), so we never assert an unverified capability.
+  // Dealer trust facts — only what the dealer actually configured (onboarding /
+  // admin), so we never assert an unverified capability. Consumed by the compact
+  // "Why Buy From" card below.
   const dt = d.dealerTrust;
   const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
-  const dealerChips: { icon: React.ElementType; t: string; s: string }[] = [];
-  if (dt.familyOwned) dealerChips.push({ icon: Building2, t: "Family Owned", s: dt.yearsInBusiness ? `Since ${new Date().getFullYear() - Number(dt.yearsInBusiness)}` : "Locally owned" });
-  else if (dt.yearsInBusiness) dealerChips.push({ icon: Building2, t: "Established", s: `Since ${new Date().getFullYear() - Number(dt.yearsInBusiness)}` });
-  if (dt.googleRating) dealerChips.push({ icon: Star, t: "Top Rated", s: `${dt.googleRating} Google Rating` });
-  if (dt.certifications.length) {
-    // "Factory Certified" only when the cert text names this vehicle's make;
-    // otherwise the cert speaks for itself.
-    const make = (listing.ymm || "").replace(/^\d{4}\s+/, "").split(/\s+/)[0] || "";
-    const factoryCert = make ? dt.certifications.find((c) => c.toLowerCase().includes(make.toLowerCase())) : undefined;
-    dealerChips.push(factoryCert
-      ? { icon: Wrench, t: "Factory Certified", s: factoryCert }
-      : { icon: Wrench, t: dt.certifications[0], s: "Dealer certification" });
-  }
-  if (dt.serviceLocation === "onsite") dealerChips.push({ icon: Settings, t: "Service Center", s: "On-site" });
-  else if (dt.serviceLocation === "offsite") dealerChips.push({ icon: Settings, t: "Service Center", s: "Off-site" });
-  if (dt.delivery && dt.delivery !== "none") dealerChips.push({ icon: Truck, t: "Delivery Available", s: cap(dt.delivery) });
-  if (dt.financing) dealerChips.push({ icon: DollarSign, t: "Financing", s: "On-site" });
-  const badges = [
-    d.dealerTrust.yearsInBusiness ? { v: `${d.dealerTrust.yearsInBusiness}+`, l: "Years in Business" } : null,
-    d.dealerTrust.googleRating ? { v: d.dealerTrust.googleRating, l: d.dealerTrust.googleCount ? `Google (${Number(d.dealerTrust.googleCount).toLocaleString()})` : "Google Rating", star: true } : null,
-    d.dealerTrust.satisfaction ? { v: d.dealerTrust.satisfaction, l: "Customer Satisfaction" } : null,
-    d.dealerTrust.bbbRating ? { v: d.dealerTrust.bbbRating, l: "BBB Rating" } : null,
-  ].filter(Boolean) as { v: string; l: string; star?: boolean }[];
 
   const price = d.price;
   const adv = d.dealerTrust;
@@ -1404,37 +1382,75 @@ const VehiclePassportV3 = () => {
           </div>
         </section>
 
-        {/* 8. CHAPTER 4 — WHY BUY HERE */}
+        {/* 8. CHAPTER 4 — WHY BUY HERE — compact, tenant-driven trust card. */}
         <section>
-          <div className="mb-4"><H2>Why Buy From {d.dealerName}</H2><p className={`text-[13px] ${TEXT2} mt-0.5`}>What makes buying here different.</p></div>
-          <div data-module="dealer" className={`${CARD} p-6 flex flex-col`}>
+          <div data-module="dealer" className={`${CARD} p-4 flex flex-col gap-4`}>
+            <div>
+              <H2>Why Buy From {d.dealerName}</H2>
+              <p className={`text-[13px] ${TEXT2} mt-0.5`}>A dealership you can trust.</p>
+            </div>
             {(() => {
-              // When the dealer hasn't configured trust content, fall back to
-              // platform-true facts so this section never renders empty.
-              const city = (listing.dealer_snapshot?.city as string) || "";
-              const fallback: { icon: React.ElementType; t: string; s: string }[] = [
-                ...(d.dealerVerified && d.verifyRows.length > 0 ? [{ icon: ShieldCheck, t: "Dealer-Verified Vehicle", s: "Checked against trusted data sources" }] : []),
-                { icon: FileText, t: "Vehicle Passport Transparency", s: "One record for this exact VIN" },
-                ...((listing.documents?.length ?? 0) > 0 ? [{ icon: FileText, t: "Documents Available", s: "Source documents on file" }] : []),
-                { icon: BadgeCheck, t: "Secure Reservation Request", s: "No payment required · dealer-confirmed" },
-                ...(city ? [{ icon: MapPin, t: `Local ${city} Dealer`, s: "See it in person" }] : []),
-                { icon: MessageSquare, t: "Contact the Dealer Directly", s: "Call, text, or message" },
+              const yearsNum = Number(dt.yearsInBusiness) || 0;
+              const foundingYear = yearsNum > 0 ? new Date().getFullYear() - yearsNum : null;
+              const make = (listing.ymm || "").replace(/^\d{4}\s+/, "").split(/\s+/)[0] || "";
+              const factoryCert = make ? dt.certifications.find((c) => c.toLowerCase().includes(make.toLowerCase())) : undefined;
+              // One primary award for the badge — never repeated as the Factory
+              // Certified caption (which uses only the brand).
+              const primaryAward = dt.certifications[0] || "";
+              const snap = listing.dealer_snapshot as Record<string, unknown> | undefined;
+              const locationName = (snap?.state as string) || (snap?.city as string) || "";
+              // Exactly the four dealer capabilities, in order; each hidden when
+              // not configured. Financing and rating chips are intentionally out.
+              const benefits = ([
+                dt.familyOwned ? { t: "Family Owned", s: foundingYear ? `Since ${foundingYear}` : "Locally owned" } : null,
+                factoryCert ? { t: "Factory Certified", s: make } : null,
+                dt.serviceLocation === "onsite" ? { t: "Service Center", s: "On-site" } : dt.serviceLocation === "offsite" ? { t: "Service Center", s: "Off-site" } : null,
+                (dt.delivery && dt.delivery !== "none") ? { t: "Delivery Available", s: cap(dt.delivery) } : null,
+              ].filter(Boolean) as { t: string; s: string }[]).slice(0, 4);
+              // Never an empty card: fall back to platform-true, non-fabricated facts.
+              const shown = benefits.length > 0 ? benefits : [
+                ...(d.dealerVerified ? [{ t: "Dealer-Verified", s: "Checked against trusted sources" }] : []),
+                { t: "Vehicle Passport", s: "One record for this VIN" },
               ];
-              const chips = dealerChips.length > 0 ? dealerChips : fallback;
               return (
-                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-x-5 gap-y-4 mt-1">
-                  {chips.map((c, i) => <div key={i} className="flex items-start gap-2"><CheckCircle2 className="w-4 h-4 text-[#16A34A] shrink-0 mt-0.5" /><div className="min-w-0"><p className="text-[13px] font-semibold leading-tight text-[#0F172A]">{c.t}</p><p className="text-[11px] text-[#64748B] mt-0.5">{c.s}</p></div></div>)}
-                </div>
+                <>
+                  <div className="grid grid-cols-2 gap-x-4 gap-y-3.5">
+                    {shown.map((b, i) => (
+                      <div key={i} className="flex items-start gap-2">
+                        <CheckCircle2 className="w-[18px] h-[18px] text-[#16A34A] shrink-0 mt-0.5" aria-hidden="true" />
+                        <div className="min-w-0">
+                          <p className="text-[13px] font-semibold leading-tight text-[#0F172A]">{b.t}</p>
+                          <p className="text-[11px] text-[#64748B] mt-0.5">{b.s}</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  {yearsNum > 0 && (
+                    <div className="pt-4 border-t border-[#EEF1F4] flex items-center gap-4">
+                      {dt.storefrontUrl ? (
+                        <img src={dt.storefrontUrl} alt={d.dealerName} loading="lazy" decoding="async" className="w-32 h-[82px] rounded-xl object-cover border border-[#E6E8EC] shrink-0" />
+                      ) : (
+                        <div className="w-32 h-[82px] rounded-xl bg-slate-100 border border-[#E6E8EC] flex items-center justify-center shrink-0"><Building2 className="w-7 h-7 text-slate-400" aria-hidden="true" /></div>
+                      )}
+                      <div className="min-w-0">
+                        <p className="text-[30px] font-bold text-[#2563EB] leading-none">{yearsNum}+</p>
+                        <p className="text-[13px] font-semibold text-[#0F172A] mt-1">Years in Business</p>
+                        {foundingYear && <p className="text-[11.5px] text-[#64748B] mt-0.5">{locationName ? `Serving ${locationName} since ${foundingYear}` : `Established ${foundingYear}`}</p>}
+                      </div>
+                    </div>
+                  )}
+                  {primaryAward && (
+                    <div className="flex">
+                      <span className="inline-flex items-center gap-2 rounded-full bg-blue-50 border border-blue-100 px-3 py-1.5 text-[12.5px] font-semibold text-[#0F172A]"><Award className="w-[18px] h-[18px] text-[#2563EB] shrink-0" aria-hidden="true" />{primaryAward}</span>
+                    </div>
+                  )}
+                </>
               );
             })()}
-            {(badges.length > 0 || d.dealerTrust.certifications.length > 0 || d.dealerTrust.storefrontUrl) && (
-              <div className="mt-5 pt-5 border-t border-[#E6E8EC] flex flex-wrap items-center gap-x-6 gap-y-4">
-                {d.dealerTrust.storefrontUrl && <img src={d.dealerTrust.storefrontUrl} alt={d.dealerName} loading="lazy" decoding="async" className="w-28 h-20 rounded-xl object-cover border border-[#E6E8EC]" />}
-                {badges.map((b, i) => <div key={i} className="text-center"><p className="text-[22px] font-bold text-[#2563EB] leading-none inline-flex items-center gap-1">{b.v}{b.star && <Star className="w-3.5 h-3.5 text-amber-400" fill="#F59E0B" />}</p><p className="text-[10px] text-[#64748B] mt-1">{b.l}</p></div>)}
-                {d.dealerTrust.certifications.map((c, i) => <span key={`c${i}`} className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-[#0F172A] bg-slate-100 rounded-full px-2.5 py-1"><Award className="w-3 h-3 text-[#2563EB]" />{c}</span>)}
-              </div>
-            )}
-            <Link onClick={() => go("dealer")} className="mt-auto pt-4 self-start">Learn more about our dealership</Link>
+            <button onClick={() => go("dealer")} className="-mx-1 min-h-[44px] px-1 flex items-center justify-between gap-2 text-[13px] font-semibold text-[#2563EB] print:hidden">
+              <span>Learn more about {d.dealerName}</span>
+              <ArrowRight className="w-4 h-4 shrink-0" aria-hidden="true" />
+            </button>
           </div>
         </section>
         </div>
