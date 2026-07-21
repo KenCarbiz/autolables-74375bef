@@ -13,11 +13,15 @@
 
 import type { ReportCheck, VerificationStatus } from "./verificationSummary";
 import {
-  ScanBarcode, FileText, FileWarning, ShieldAlert, ShieldCheck, Gauge, CarFront,
-  UserRound, Layers, LineChart, Database, Landmark, Factory, Store, FileSearch,
-  GitCompareArrows, Clock, FileMinus, History, ClipboardCheck, FileQuestion,
-  BadgeCheck, CircleDollarSign, Wrench, ListChecks,
+  FileText, FileWarning, ShieldAlert, ShieldCheck, CarFront,
+  Landmark, Factory, Store, FileSearch,
+  GitCompareArrows, Clock, History, ClipboardCheck, FileQuestion,
+  CircleDollarSign, Wrench, ListChecks, Database,
 } from "lucide-react";
+import {
+  VinCardIcon, OwnerVehicleIcon, OdometerGaugeIcon, MarketVehicleIcon,
+  WarrantyShieldIcon, HistoryMinusIcon,
+} from "./verificationIcons";
 
 export type VerificationFindingType =
   | "vin_identity" | "vin_mismatch"
@@ -52,8 +56,8 @@ export interface FindingDescriptor {
 
 const REGISTRY: Record<VerificationFindingType, Omit<FindingDescriptor, "findingType">> = {
   // Identity
-  vin_identity:  { Icon: ScanBarcode, contextLabel: "This Vehicle", contactTopic: "other",   priority: 40 },
-  vin_mismatch:  { Icon: ScanBarcode, contextLabel: "the VIN",      contactTopic: "history", priority: 4 },
+  vin_identity:  { Icon: VinCardIcon, contextLabel: "This Vehicle", contactTopic: "other",   priority: 40 },
+  vin_mismatch:  { Icon: VinCardIcon, contextLabel: "the VIN",      contactTopic: "history", priority: 4 },
   // Title & brand
   title_brand:   { Icon: FileText,    contextLabel: "Title",   contactTopic: "history", priority: 9 },
   salvage_title: { Icon: FileWarning, contextLabel: "Title",   contactTopic: "history", priority: 3 },
@@ -64,16 +68,16 @@ const REGISTRY: Record<VerificationFindingType, Omit<FindingDescriptor, "finding
   theft_record:  { Icon: ShieldAlert, contextLabel: "Title",   contactTopic: "history", priority: 1 },
   lien_record:   { Icon: CircleDollarSign, contextLabel: "Title", contactTopic: "history", priority: 9 },
   // Ownership & use
-  ownership_history: { Icon: UserRound, contextLabel: "Ownership", contactTopic: "history", priority: 40 },
-  owner_count:       { Icon: UserRound, contextLabel: "Ownership", contactTopic: "history", priority: 40 },
-  commercial_use:    { Icon: UserRound, contextLabel: "Ownership", contactTopic: "history", priority: 30 },
-  rental_use:        { Icon: UserRound, contextLabel: "Ownership", contactTopic: "history", priority: 30 },
-  fleet_use:         { Icon: UserRound, contextLabel: "Ownership", contactTopic: "history", priority: 30 },
-  personal_use:      { Icon: UserRound, contextLabel: "Ownership", contactTopic: "history", priority: 40 },
+  ownership_history: { Icon: OwnerVehicleIcon, contextLabel: "Ownership", contactTopic: "history", priority: 40 },
+  owner_count:       { Icon: OwnerVehicleIcon, contextLabel: "Ownership", contactTopic: "history", priority: 40 },
+  commercial_use:    { Icon: OwnerVehicleIcon, contextLabel: "Ownership", contactTopic: "history", priority: 30 },
+  rental_use:        { Icon: OwnerVehicleIcon, contextLabel: "Ownership", contactTopic: "history", priority: 30 },
+  fleet_use:         { Icon: OwnerVehicleIcon, contextLabel: "Ownership", contactTopic: "history", priority: 30 },
+  personal_use:      { Icon: OwnerVehicleIcon, contextLabel: "Ownership", contactTopic: "history", priority: 40 },
   // Odometer
-  odometer:          { Icon: Gauge, contextLabel: "Mileage", contactTopic: "history", priority: 40 },
-  odometer_conflict: { Icon: Gauge, contextLabel: "Mileage", contactTopic: "history", priority: 5 },
-  odometer_rollback: { Icon: Gauge, contextLabel: "Mileage", contactTopic: "history", priority: 5 },
+  odometer:          { Icon: OdometerGaugeIcon, contextLabel: "Mileage", contactTopic: "history", priority: 40 },
+  odometer_conflict: { Icon: OdometerGaugeIcon, contextLabel: "Mileage", contactTopic: "history", priority: 5 },
+  odometer_rollback: { Icon: OdometerGaugeIcon, contextLabel: "Mileage", contactTopic: "history", priority: 5 },
   // Accident & damage
   accident_history:  { Icon: CarFront, contextLabel: "Damage", contactTopic: "history", priority: 10 },
   damage_history:    { Icon: CarFront, contextLabel: "Damage", contactTopic: "history", priority: 10 },
@@ -85,15 +89,15 @@ const REGISTRY: Record<VerificationFindingType, Omit<FindingDescriptor, "finding
   recall:        { Icon: ShieldAlert, contextLabel: "Recall", contactTopic: "warranty", priority: 8 },
   recall_remedy: { Icon: ShieldCheck, contextLabel: "Recall", contactTopic: "warranty", priority: 8 },
   // Market
-  market_comparison:  { Icon: LineChart, contextLabel: "Pricing", contactTopic: "other", priority: 40 },
-  market_outlier:     { Icon: LineChart, contextLabel: "Pricing", contactTopic: "other", priority: 13 },
-  price_above_market: { Icon: LineChart, contextLabel: "Pricing", contactTopic: "other", priority: 13 },
-  price_below_market: { Icon: LineChart, contextLabel: "Pricing", contactTopic: "other", priority: 40 },
+  market_comparison:  { Icon: MarketVehicleIcon, contextLabel: "Pricing", contactTopic: "other", priority: 40 },
+  market_outlier:     { Icon: MarketVehicleIcon, contextLabel: "Pricing", contactTopic: "other", priority: 13 },
+  price_above_market: { Icon: MarketVehicleIcon, contextLabel: "Pricing", contactTopic: "other", priority: 13 },
+  price_below_market: { Icon: MarketVehicleIcon, contextLabel: "Pricing", contactTopic: "other", priority: 40 },
   // Warranty
-  factory_warranty:  { Icon: Layers, contextLabel: "Warranty", contactTopic: "warranty", priority: 40 },
-  cpo_warranty:      { Icon: Layers, contextLabel: "Warranty", contactTopic: "warranty", priority: 40 },
-  warranty_expired:  { Icon: Layers, contextLabel: "Warranty", contactTopic: "warranty", priority: 30 },
-  warranty_conflict: { Icon: Layers, contextLabel: "Warranty", contactTopic: "warranty", priority: 12 },
+  factory_warranty:  { Icon: WarrantyShieldIcon, contextLabel: "Warranty", contactTopic: "warranty", priority: 40 },
+  cpo_warranty:      { Icon: WarrantyShieldIcon, contextLabel: "Warranty", contactTopic: "warranty", priority: 40 },
+  warranty_expired:  { Icon: WarrantyShieldIcon, contextLabel: "Warranty", contactTopic: "warranty", priority: 30 },
+  warranty_conflict: { Icon: WarrantyShieldIcon, contextLabel: "Warranty", contactTopic: "warranty", priority: 12 },
   // Service
   service_history: { Icon: ClipboardCheck, contextLabel: "Service", contactTopic: "history", priority: 40 },
   maintenance_gap: { Icon: Wrench,         contextLabel: "Service", contactTopic: "history", priority: 14 },
@@ -107,7 +111,7 @@ const REGISTRY: Record<VerificationFindingType, Omit<FindingDescriptor, "finding
   inspection: { Icon: FileSearch, contextLabel: "Inspection", contactTopic: "other", priority: 40 },
   // Source / system conditions
   source_pending:     { Icon: Clock,             contextLabel: "This Report", contactTopic: "other", priority: 50 },
-  source_unavailable: { Icon: FileMinus,         contextLabel: "This Report", contactTopic: "other", priority: 50 },
+  source_unavailable: { Icon: HistoryMinusIcon,  contextLabel: "This Report", contactTopic: "other", priority: 50 },
   source_conflict:    { Icon: GitCompareArrows,  contextLabel: "This Report", contactTopic: "other", priority: 5 },
   stale_data:         { Icon: History,           contextLabel: "This Report", contactTopic: "other", priority: 40 },
   // Source provenance
@@ -164,9 +168,9 @@ export function subjectIcon(check: ReportCheck): React.ElementType {
 }
 
 // Icon for an INCOMPLETE row, where the meaningful signal is the status, not the
-// subject: pending → clock, unavailable → source-unavailable glyph.
+// subject: pending → clock, unavailable → history-document-with-minus glyph.
 export function incompleteIcon(status: VerificationStatus): React.ElementType {
-  return status === "pending" ? Clock : FileMinus;
+  return status === "pending" ? Clock : HistoryMinusIcon;
 }
 
 // The single actionable finding that should drive the sticky CTA + its ordering.

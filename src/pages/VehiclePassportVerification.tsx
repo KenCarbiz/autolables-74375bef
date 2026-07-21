@@ -5,7 +5,6 @@ import {
   Clock, CircleMinus, LayoutDashboard, Database, ListChecks, ExternalLink, Loader2,
   X, ShieldCheck, ChevronDown, ArrowRight, SearchCheck, BadgeCheck, FileWarning,
   ShieldAlert, MoreVertical, ChevronRight, MessageCircle, CalendarCheck, FileMinus,
-  FileCheck2,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Helmet } from "react-helmet-async";
@@ -18,6 +17,7 @@ import {
 } from "@/lib/passport/verificationSummary";
 import { resolvePassportBack } from "@/lib/passportReturn";
 import { subjectIcon, incompleteIcon, rankActionable, resolveFinding } from "@/lib/passport/verificationFindings";
+import { SourcesShieldIcon, TraceabilityIcon } from "@/lib/passport/verificationIcons";
 import { listingHero } from "@/lib/photos";
 import { MOCK_LISTING } from "./VehiclePassportV3";
 import { usePublicListing } from "@/hooks/usePublicListing";
@@ -202,7 +202,7 @@ const exceptionHeadline = (check: ReportCheck): string => {
     case "recall":
       if (check.status === "needs_confirmation") return "Recall status needs confirmation";
       if (check.highSeverity) return "Do-not-drive recall reported";
-      if (check.status === "needs_attention") return "Open safety recall reported";
+      if (check.status === "needs_attention") return "Open safety recall found";
       return "Recall check pending";
     case "title":
       return check.status === "needs_attention" ? "Title brand on record" : "Title and brand check pending";
@@ -413,7 +413,11 @@ const MobileVerification = ({
   const recallCheck = report.checks.find((c) => c.key === "recall");
   const recallIsException = !!recallCheck && recallCheck.status !== "verified";
   const attentionCount = report.needsAttentionChecks + report.needsConfirmationChecks;
-  const incompleteRows = report.checks.filter((c) => (c.status === "pending" || c.status === "unavailable") && c.key !== "recall");
+  // Pending before Unavailable — matches the summary grid order; a potentially
+  // temporary state leads.
+  const incompleteRows = report.checks
+    .filter((c) => (c.status === "pending" || c.status === "unavailable") && c.key !== "recall")
+    .sort((a, b) => (a.status === "pending" ? 0 : 1) - (b.status === "pending" ? 0 : 1));
   const completedRows = report.checks.filter((c) => c.status === "verified");
 
   // Highest-priority actionable finding drives the sticky CTA + finding order.
@@ -432,14 +436,12 @@ const MobileVerification = ({
       ? `${report.pendingChecks} check${report.pendingChecks === 1 ? "" : "s"} still processing`
       : "Verification checks completed";
   const bannerCalm = attentionCount === 0 && report.pendingChecks === 0;
-  // Honest verdict breakdown — every non-zero state named, none minimized.
-  const verdictSegments: string[] = [`${report.verifiedChecks} check${report.verifiedChecks === 1 ? "" : "s"} completed`];
-  if (report.needsAttentionChecks > 0) verdictSegments.push(`${report.needsAttentionChecks} action item${report.needsAttentionChecks === 1 ? "" : "s"}`);
-  if (report.needsConfirmationChecks > 0) verdictSegments.push(`${report.needsConfirmationChecks} needs confirmation`);
-  const notVerified = report.pendingChecks + report.unavailableChecks;
-  if (report.pendingChecks > 0 && report.unavailableChecks === 0) verdictSegments.push(`${report.pendingChecks} pending`);
-  else if (report.unavailableChecks > 0 && report.pendingChecks === 0) verdictSegments.push(`${report.unavailableChecks} not verified`);
-  else if (notVerified > 0) verdictSegments.push(`${notVerified} not verified`);
+  // Verdict breakdown reads the SAME terms and counts as the status grid, so the
+  // two can never conflict — completed · attention · pending · unavailable.
+  const verdictSegments: string[] = [`${report.verifiedChecks} completed`];
+  if (attentionCount > 0) verdictSegments.push(`${attentionCount} attention`);
+  if (report.pendingChecks > 0) verdictSegments.push(`${report.pendingChecks} pending`);
+  if (report.unavailableChecks > 0) verdictSegments.push(`${report.unavailableChecks} unavailable`);
   const bannerSupport = verdictSegments.join(" · ");
 
   const FAMILY_TAG: Record<string, string> = {
@@ -520,7 +522,7 @@ const MobileVerification = ({
         <section className="rounded-2xl bg-white border border-[#E6EAF0] grid grid-cols-2">
           {STATUS_TILES.map((t, i) => (
             <div key={t.label} className={`flex items-center gap-3 px-4 py-3.5 min-h-[48px] ${i % 2 === 0 ? "border-r" : ""} ${i < 2 ? "border-b" : ""} border-[#EEF1F4]`}>
-              <span className={`w-9 h-9 rounded-full ${t.bg} flex items-center justify-center shrink-0`}><t.icon className={`w-[19px] h-[19px] ${t.fg}`} strokeWidth={2} aria-hidden="true" /></span>
+              <span className={`w-10 h-10 rounded-full ${t.bg} flex items-center justify-center shrink-0`}><t.icon className={`w-[22px] h-[22px] ${t.fg}`} strokeWidth={2} aria-hidden="true" /></span>
               <div className="leading-tight">
                 <p className="text-[18px] font-bold tabular-nums">{t.count}</p>
                 <p className="text-[13px] text-[#64748B]">{t.label}</p>
@@ -562,12 +564,12 @@ const MobileVerification = ({
                 const statusFg = c.status === "pending" ? "text-[#2563EB]" : "text-[#64748B]";
                 return (
                   <button key={c.key} onClick={() => openCheck(c)} className="w-full min-h-[60px] px-4 py-3 flex items-center gap-3 text-left active:bg-slate-50">
-                    <span className={`w-9 h-9 rounded-xl ${iconTint} flex items-center justify-center shrink-0`}><Icon className="w-[22px] h-[22px]" strokeWidth={1.9} aria-hidden="true" /></span>
+                    <span className={`w-[38px] h-[38px] rounded-xl ${iconTint} flex items-center justify-center shrink-0`}><Icon className="w-[23px] h-[23px]" strokeWidth={1.9} aria-hidden="true" /></span>
                     <div className="min-w-0 flex-1">
                       <p className="text-[15px] font-semibold text-[#0F172A] leading-snug">{c.name}</p>
                       <p className="text-[13px] text-[#64748B] mt-0.5">{supportingLine(c)}</p>
                     </div>
-                    <span className={`text-[13.5px] font-semibold ${statusFg} shrink-0`}>{VERIFICATION_STATUS_LABEL[c.status]}</span>
+                    <span className={`text-[13.5px] font-semibold ${statusFg} shrink-0`}>{c.status === "unavailable" ? "Unavailable" : VERIFICATION_STATUS_LABEL[c.status]}</span>
                     <ChevronRight className="w-[19px] h-[19px] text-[#94A3B8] shrink-0" aria-hidden="true" />
                   </button>
                 );
@@ -585,7 +587,7 @@ const MobileVerification = ({
                 const Icon = subjectIcon(c);
                 return (
                   <button key={c.key} onClick={() => openCheck(c)} className="w-full min-h-[58px] px-4 py-3 flex items-center gap-3 text-left active:bg-slate-50">
-                    <span className="w-9 h-9 rounded-xl bg-emerald-50 flex items-center justify-center shrink-0"><Icon className="w-[22px] h-[22px] text-[#16A34A]" strokeWidth={1.9} aria-hidden="true" /></span>
+                    <span className="w-[38px] h-[38px] rounded-xl bg-emerald-50 flex items-center justify-center shrink-0"><Icon className="w-[23px] h-[23px] text-[#16A34A]" strokeWidth={1.9} aria-hidden="true" /></span>
                     <p className="text-[15px] font-semibold text-[#0F172A] leading-snug min-w-0 flex-1">{c.name}</p>
                     <span className="inline-flex items-center gap-1.5 text-[13.5px] font-semibold text-[#16A34A] shrink-0"><CircleCheck className="w-[18px] h-[18px]" aria-hidden="true" />{outcomeLabel(c)}</span>
                     <ChevronRight className="w-[19px] h-[19px] text-[#94A3B8] shrink-0" aria-hidden="true" />
@@ -598,7 +600,7 @@ const MobileVerification = ({
 
         {/* Sources and methodology */}
         <button onClick={openSources} className="w-full rounded-2xl bg-white border border-[#E6EAF0] min-h-[64px] px-4 py-3.5 flex items-center gap-3 text-left active:bg-slate-50">
-          <span className="w-9 h-9 rounded-xl bg-blue-50 flex items-center justify-center shrink-0"><Database className="w-[22px] h-[22px] text-[#2563EB]" strokeWidth={1.9} aria-hidden="true" /></span>
+          <span className="w-[38px] h-[38px] rounded-xl bg-blue-50 flex items-center justify-center shrink-0"><SourcesShieldIcon className="w-[23px] h-[23px] text-[#2563EB]" strokeWidth={1.9} aria-hidden="true" /></span>
           <div className="min-w-0 flex-1">
             <p className="text-[15px] font-semibold text-[#0F172A]">Sources and methodology</p>
             <p className="text-[13px] text-[#64748B] mt-0.5">Checked across {report.sourceCount} automotive data source{report.sourceCount === 1 ? "" : "s"}</p>
@@ -607,35 +609,34 @@ const MobileVerification = ({
           <ChevronRight className="w-[19px] h-[19px] text-[#94A3B8] shrink-0 self-center" aria-hidden="true" />
         </button>
 
-        {/* Report traceability */}
+        {/* Report traceability — whole row tappable */}
         <button onClick={openTrace} className="w-full rounded-2xl bg-white border border-[#E6EAF0] min-h-[64px] px-4 py-3.5 flex items-center gap-3 text-left active:bg-slate-50">
-          <span className="w-9 h-9 rounded-xl bg-blue-50 flex items-center justify-center shrink-0"><FileCheck2 className="w-[22px] h-[22px] text-[#2563EB]" strokeWidth={1.9} aria-hidden="true" /></span>
+          <span className="w-[38px] h-[38px] rounded-xl bg-blue-50 flex items-center justify-center shrink-0"><TraceabilityIcon className="w-[23px] h-[23px] text-[#2563EB]" strokeWidth={1.9} aria-hidden="true" /></span>
           <div className="min-w-0 flex-1">
             <p className="text-[15px] font-semibold text-[#0F172A]">Report traceability</p>
-            <p className="text-[13px] text-[#64748B] mt-0.5">Generated {reportGenerated}</p>
-            <p className="text-[12.5px] text-[#94A3B8] mt-0.5">Live report: autolabels.io · Report {reportId}</p>
-            <span className="text-[13px] font-semibold text-[#2563EB] mt-1 inline-block">Verify this report</span>
+            <p className="text-[13px] text-[#64748B] mt-0.5">Report {reportId}</p>
+            <p className="text-[12.5px] text-[#94A3B8] mt-0.5">Generated {reportGenerated}</p>
+            <span className="text-[13px] font-semibold text-[#2563EB] mt-1 inline-block">Verify Live Report</span>
           </div>
           <ChevronRight className="w-[19px] h-[19px] text-[#94A3B8] shrink-0 self-center" aria-hidden="true" />
         </button>
 
-        {/* Report actions */}
-        <div className="space-y-2.5 pt-1">
+        {/* Report action — single Download PDF (Share in header, Print in overflow) */}
+        <div className="pt-1">
           <button onClick={onDownloadPdf} className="w-full min-h-[50px] rounded-xl border border-[#2563EB] bg-white text-[#2563EB] text-[15px] font-semibold inline-flex items-center justify-center gap-2">
             {pdfState === "working" ? <Loader2 className="w-[21px] h-[21px] animate-spin" /> : pdfState === "done" ? <CircleCheck className="w-[21px] h-[21px]" /> : <Download className="w-[21px] h-[21px]" strokeWidth={2} />}
             {pdfState === "working" ? "Preparing PDF…" : pdfState === "done" ? "PDF ready" : "Download PDF"}
           </button>
-          <button onClick={() => setMenuOpen(true)} className="w-full text-center text-[14px] font-semibold text-[#2563EB]">Share or print report</button>
-          {pdfState === "error" && <p className="text-[12.5px] text-[#DC2626] text-center">We could not generate the PDF. Please try Print instead.</p>}
+          {pdfState === "error" && <p className="text-[12.5px] text-[#DC2626] text-center mt-2">We could not generate the PDF. Please try Print instead.</p>}
         </div>
 
         {/* Disclosure + footer */}
-        <div className="pt-1 space-y-3">
+        <div className="space-y-2.5">
           <p className="text-[12.5px] text-[#64748B] text-center leading-relaxed px-2">
             AutoLabels compares available automotive data sources and never displays pending or unavailable checks as completed. This report does not replace a physical inspection, title search or dealer confirmation.
           </p>
-          <div className="flex items-center justify-between pt-1 border-t border-[#EEF1F4]">
-            <Logo variant="full" size={16} />
+          <div className="flex items-center justify-between pt-2.5 border-t border-[#EEF1F4]">
+            <Logo variant="full" size={18} />
             <div className="flex items-center gap-4 text-[13px] font-semibold text-[#2563EB]">
               <a href="/privacy" className="hover:underline">Privacy</a>
               <a href="/terms" className="hover:underline">Terms</a>

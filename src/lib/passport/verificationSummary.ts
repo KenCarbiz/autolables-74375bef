@@ -432,7 +432,7 @@ export function deriveVerificationReport(d: PassportData, listing: VehicleListin
         status === "verified" ? `No open safety recalls found in NHTSA campaigns${asOf ? ` as of ${asOf}` : ""}.`
         : status === "needs_confirmation" ? "AutoLabels found conflicting recall information across available sources."
         : status === "needs_attention" && highSeverity ? "This vehicle has a do-not-drive recall — do not drive it until the remedy is completed."
-        : status === "needs_attention" ? "An open safety recall is reported for this vehicle."
+        : status === "needs_attention" ? "NHTSA data shows an open recall associated with this VIN. Ask whether the remedy has been completed or is available."
         : null,
       reviewNote:
         status === "needs_confirmation" ? "confirm the recall status with the dealer"
