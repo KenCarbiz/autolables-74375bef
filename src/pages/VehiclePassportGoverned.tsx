@@ -17,7 +17,7 @@ import PriceDropWatch from "@/components/listing/PriceDropWatch";
 import PassportCtaDock from "@/components/passport/PassportCtaDock";
 import VehiclePriceBreakdown from "@/components/passport/VehiclePriceBreakdown";
 import AutoLabelsVerifiedCard from "@/components/passport/AutoLabelsVerifiedCard";
-import { buildSalePriceCard, type PricingVehicleType } from "@/lib/priceModel";
+import { buildPassportSaleCard } from "@/lib/passport/saleCard";
 import { estimateAffordability } from "@/lib/affordability";
 import { readPaymentPrefs, clearPaymentPrefs, type PaymentPrefs } from "@/lib/passport/paymentPrefs";
 import { resolveStickyButtons, type StickyBottomButtons } from "@/lib/stickyButtons";
@@ -334,33 +334,12 @@ export default function VehiclePassportGoverned() {
 
   const price = d.price;
 
-  // Itemized sale-price card. New → MSRP anchor; used/CPO → Market Value anchor.
-  // The headline stays the exact number the passport already resolved (d.price);
-  // vehiclePrice backs the configured fee out only when the displayed price
-  // includes it. Everything below the model reconciles or falls back to the
-  // headline alone — no invented discount, no doubled fee.
-  const pricingVehicleType: PricingVehicleType =
-    isNew ? "new" : (condition === "cpo" || condition.includes("certified")) ? "cpo" : "used";
-  // The nightly-scraped Total Advertised Price ALWAYS includes the doc fee. Work
-  // backward from it: Vehicle Selling Price = Total − Doc Fee. When the tenant
-  // advertises before-doc, the total is price + fee; when the price already
-  // includes the fee (Harte's website_sale_price mode), price IS the total.
-  const docFeeVal = d.docFee != null && d.docFee > 0 ? d.docFee : 0;
-  const vehicleSellingPrice = price != null ? (d.priceIncludesDoc ? price - docFeeVal : price) : null;
-  const totalAdvertised = vehicleSellingPrice != null ? vehicleSellingPrice + docFeeVal : null;
-  // NEW-vehicle factory rebates included in the advertised price (Retail Cash,
-  // etc.). Only real, captured rebate amounts — never fabricated.
-  const factoryRebates: { key: string; label: string; amount: number }[] = [];
-  if (isNew && d.retailCash != null && d.retailCash > 0) factoryRebates.push({ key: "retail_cash", label: "Retail Cash", amount: d.retailCash });
-  const saleCard = price != null && vehicleSellingPrice != null && totalAdvertised != null
-    ? buildSalePriceCard({
-        vehicleType: pricingVehicleType,
-        msrp: d.msrp, marketValue: d.marketAvg,
-        vehicleSellingPrice, totalAdvertisedPrice: totalAdvertised,
-        docFee: docFeeVal, factoryRebates,
-        documentedDealerDiscount: d.dealerDiscount,
-      })
-    : null;
+  // Itemized sale-price card — one shared mapper (buildPassportSaleCard) so the
+  // live V3 passport and this governed passport build identical numbers, labels
+  // and net savings from the same PassportData. New → MSRP anchor; used/CPO →
+  // Market Value anchor; the total is fee-inclusive and reconciles or the card
+  // degrades to the headline alone — no invented discount, no doubled fee.
+  const saleCard = buildPassportSaleCard(d, condition);
 
   // Reflect the shopper's own payment scenario when they set one on the Today's
   // Price ladder — recomputed with the SAME estimator so the number matches the

@@ -240,3 +240,68 @@ describe("buildSalePriceCard — backward derivation from the fee-inclusive tota
     expect(card.feeLabel).toBe("Documentation Fee");
   });
 });
+
+// Net customer savings ("You Save") = anchor − Total Advertised Price, AFTER the
+// doc fee. Never the dealer discount, never negative, hidden at $0.
+describe("net customer savings — You Save", () => {
+  it("USED — positive net savings after the doc fee (reference QX50: 34,500 − 30,876 = 3,624)", () => {
+    const card = buildSalePriceCard({ vehicleType: "used", marketValue: 34500, vehicleSellingPrice: 29981, totalAdvertisedPrice: 30876, docFee: 895 });
+    expect(card.customerSavings).toBe(3624);
+    expect(card.showSavings).toBe(true);
+  });
+
+  it("USED — discount ($2,000) exceeds the doc fee; net savings = Market Value − Total (1,105), not the discount", () => {
+    const card = buildSalePriceCard({ vehicleType: "used", marketValue: 31981, vehicleSellingPrice: 29981, totalAdvertisedPrice: 30876, docFee: 895 });
+    expect(card.lines.find((l) => l.key === "dealer_discount")?.amount).toBe(2000);
+    expect(card.customerSavings).toBe(1105);
+    expect(card.showSavings).toBe(true);
+  });
+
+  it("USED — discount equals the doc fee → $0 net savings, hidden", () => {
+    const card = buildSalePriceCard({ vehicleType: "used", marketValue: 30000, vehicleSellingPrice: 29105, totalAdvertisedPrice: 30000, docFee: 895 });
+    expect(card.customerSavings).toBe(0);
+    expect(card.showSavings).toBe(false);
+  });
+
+  it("USED — Total above Market Value → negative, hidden (never a negative You Save)", () => {
+    const card = buildSalePriceCard({ vehicleType: "used", marketValue: 29000, vehicleSellingPrice: 29981, totalAdvertisedPrice: 30876, docFee: 895 });
+    expect(card.customerSavings).toBeLessThan(0);
+    expect(card.showSavings).toBe(false);
+  });
+
+  it("USED — missing Market Value → no savings", () => {
+    const card = buildSalePriceCard({ vehicleType: "used", marketValue: null, vehicleSellingPrice: 24981, totalAdvertisedPrice: 25876, docFee: 895 });
+    expect(card.customerSavings).toBeNull();
+    expect(card.showSavings).toBe(false);
+  });
+
+  it("NEW — rebates + discount + fee → net savings vs MSRP (50,000 − 47,395 = 2,605)", () => {
+    const card = buildSalePriceCard({ vehicleType: "new", msrp: 50000, vehicleSellingPrice: 46500, totalAdvertisedPrice: 47395, docFee: 895, factoryRebates: [{ key: "retail_cash", label: "Retail Cash", amount: 2000 }] });
+    expect(card.customerSavings).toBe(2605);
+    expect(card.showSavings).toBe(true);
+  });
+
+  it("NEW — dealer discount only, positive net savings (50,000 − 49,395 = 605)", () => {
+    const card = buildSalePriceCard({ vehicleType: "new", msrp: 50000, vehicleSellingPrice: 48500, totalAdvertisedPrice: 49395, docFee: 895 });
+    expect(card.customerSavings).toBe(605);
+    expect(card.showSavings).toBe(true);
+  });
+
+  it("NEW — discount offsets the doc fee, Total equals MSRP → $0, hidden (never 'You Save $895')", () => {
+    const card = buildSalePriceCard({ vehicleType: "new", msrp: 50000, vehicleSellingPrice: 49105, totalAdvertisedPrice: 50000, docFee: 895 });
+    expect(card.msrpEqualsTotal).toBe(true);
+    expect(card.customerSavings).toBe(0);
+    expect(card.showSavings).toBe(false);
+  });
+
+  it("NEW — Total above MSRP → hidden", () => {
+    const card = buildSalePriceCard({ vehicleType: "new", msrp: 47000, vehicleSellingPrice: 48000, totalAdvertisedPrice: 48895, docFee: 895 });
+    expect(card.showSavings).toBe(false);
+  });
+
+  it("savings uses integer cents, not formatted strings", () => {
+    const card = buildSalePriceCard({ vehicleType: "used", marketValue: 31981.4, vehicleSellingPrice: 29981.4, totalAdvertisedPrice: 30876.4, docFee: 895 });
+    expect(card.customerSavings).toBeCloseTo(1105, 2);
+    expect(card.showSavings).toBe(true);
+  });
+});

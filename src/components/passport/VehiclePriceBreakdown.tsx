@@ -75,6 +75,13 @@ const VehiclePriceBreakdown = ({ card, heading = "Today's Sale Price", priceClas
 
           <div className="my-3 border-t" style={{ borderColor: BORDER }} />
           <Row label="Total Advertised Price" value={fmt$(card.totalAdvertisedPrice)} bold color={PRIMARY} />
+
+          {card.showSavings && card.customerSavings != null && (
+            <div className="mt-2.5 flex items-baseline justify-between gap-4">
+              <span className="text-[13.5px] font-bold" style={{ color: DISCOUNT }}>You Save</span>
+              <span className="text-[14px] tabular-nums font-extrabold" style={{ color: DISCOUNT }}>{fmt$(card.customerSavings)}</span>
+            </div>
+          )}
         </div>
       )}
     </div>

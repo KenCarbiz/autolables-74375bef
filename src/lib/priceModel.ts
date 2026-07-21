@@ -397,6 +397,11 @@ export interface SalePriceCard {
   reconciles: boolean;                // exact integer-cent reconciliation of the whole ladder
   conflict: boolean;                  // inputs disagree (negative derived discount, etc.)
   msrpEqualsTotal: boolean;           // new + MSRP === total (the "discount == doc fee" case)
+  // Customer's ACTUAL net savings = anchor (MSRP/Market Value) − Total Advertised
+  // Price, AFTER the doc fee is added back. Not the dealer discount (which ignores
+  // the fee). Null when there is no anchor.
+  customerSavings: number | null;
+  showSavings: boolean;               // true only when customerSavings is finite AND > 0
   // Internal audit: a scraped/fed dealer discount was supplied and disagrees with
   // the derived one. The display still uses the reconciling derived value.
   documentedDiscountMismatch: boolean;
@@ -473,6 +478,14 @@ export function buildSalePriceCard(input: SalePriceInput): SalePriceCard {
   const ladderReconciles = !showLadder || (anchorC != null && discC != null && anchorC - rebateTotalC - discC === sellC);
   const reconciles = feeReconciles && ladderReconciles && Number.isFinite(totalC);
 
+  // Net customer savings vs. the anchor, AFTER the doc fee: anchor − Total. For a
+  // used car that is Market Value − Total; for new, MSRP − Total (which nets the
+  // rebates + discount against the fee). Shown only when it is a real, positive
+  // number — a discount that merely offsets the fee (MSRP === total) yields $0.
+  const savingsC = anchorC != null ? anchorC - totalC : null;
+  const customerSavings = savingsC != null ? toDollars(savingsC) : null;
+  const showSavings = reconciles && savingsC != null && savingsC > 0;
+
   return {
     vehicleType: input.vehicleType,
     anchorLabel,
@@ -484,6 +497,8 @@ export function buildSalePriceCard(input: SalePriceInput): SalePriceCard {
     reconciles,
     conflict,
     msrpEqualsTotal: input.vehicleType === "new" && anchorC != null && anchorC === totalC,
+    customerSavings,
+    showSavings,
     documentedDiscountMismatch,
   };
 }

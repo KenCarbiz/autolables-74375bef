@@ -22,7 +22,8 @@ import { readBuildSheet } from "@/lib/buildSheet";
 import { readPassportOrigin, clearPassportOrigin, type PassportOrigin } from "@/lib/passportOrigin";
 import { trackPassportOpened, trackWindowStickerScanned, trackCustomerCtaClicked, trackCustomerEngagement } from "@/lib/engagement/customerEngagement";
 import { packetVisible } from "@/lib/packetModules";
-import type { DiscountBreakdown } from "@/lib/priceModel";
+import type { SalePriceCard } from "@/lib/priceModel";
+import { buildPassportSaleCard } from "@/lib/passport/saleCard";
 import { scorePassportCard, selectCards, type CardSignals } from "@/lib/passportCards";
 import { isPassportPanelKey, type PassportPanelKey } from "@/components/passport/passportPanelKeys";
 import { useNhtsaSafety } from "@/hooks/useNhtsaSafety";
@@ -83,10 +84,13 @@ function PassportSkeleton() {
 
 const TEXT2 = "text-[#64748B]";
 
-// The MSRP → discounts → your price → + doc fee → sale price ladder, mirroring
-// the dealer's own VDP. Every row is a real or reconciled number from
-// buildDiscountBreakdown; the discount lines always sum to MSRP − our price.
-function PriceLadder({ b, priceLabel }: { b: DiscountBreakdown; priceLabel: string }) {
+// The canonical price ladder over the shared SalePriceCard (buildSalePriceCard),
+// matching the approved diagram exactly:
+//   anchor (Market Value / MSRP) → factory rebates − → dealer discount − →
+//   + Dealer Doc Fee → Total Advertised Price → You Save (green, net savings).
+// Renders NO math of its own; every number and sign comes from the card. The
+// "You Save" row appears only when card.showSavings (anchor − Total > 0).
+function PriceLadder({ card }: { card: SalePriceCard }) {
   const row = (label: React.ReactNode, value: React.ReactNode, cls = "") => (
     <div className={`flex items-baseline justify-between gap-3 ${cls}`}>
       <span className="truncate">{label}</span>
@@ -95,27 +99,29 @@ function PriceLadder({ b, priceLabel }: { b: DiscountBreakdown; priceLabel: stri
   );
   return (
     <div className="mt-3 rounded-xl border border-slate-200 bg-slate-50/70 px-3 py-2.5 text-[12px] text-[#64748B]">
-      {row("MSRP", <span className="font-semibold text-[#0F172A]">{fmt$(b.msrp)}</span>)}
-      {b.lines.map((l) => (
-        <div key={l.key} className="mt-1">
-          {row(l.label, <span className="font-semibold text-[#16A34A]">−{fmt$(l.amount)}</span>, "text-[#16A34A]")}
+      {card.lines.map((l, i) => (
+        <div key={l.key} className={i === 0 ? "" : "mt-1"}>
+          {row(
+            l.label,
+            l.role === "discount"
+              ? <span className="font-semibold text-[#16A34A]">−{fmt$(l.amount)}</span>
+              : <span className="font-semibold text-[#0F172A]">{fmt$(l.amount)}</span>,
+          )}
         </div>
       ))}
+      {card.feeAmount != null && card.feeLabel && (
+        <div className={card.lines.length > 0 ? "mt-1" : ""}>{row(`+ ${card.feeLabel}`, <span className="font-semibold text-[#0F172A]">{fmt$(card.feeAmount)}</span>)}</div>
+      )}
       {row(
-        <span className="font-bold text-[#0F172A]">{priceLabel}</span>,
-        <span className="font-extrabold text-[#0F172A]">{fmt$(b.ourPrice)}</span>,
+        <span className="font-bold text-[#0F172A]">Total Advertised Price</span>,
+        <span className="font-extrabold text-[#0F172A]">{fmt$(card.totalAdvertisedPrice)}</span>,
         "mt-2 pt-2 border-t border-slate-200",
       )}
-      {b.docFee ? (
-        <>
-          <div className="mt-1">{row("+ Conveyance / doc fee", <span className="font-semibold text-[#0F172A]">{fmt$(b.docFee)}</span>)}</div>
-          {row(
-            <span className="font-bold text-[#0F172A]">Sale price</span>,
-            <span className="font-extrabold text-[#0F172A]">{fmt$(b.salePrice ?? b.ourPrice)}</span>,
-            "mt-2 pt-2 border-t border-slate-200",
-          )}
-        </>
-      ) : null}
+      {card.showSavings && card.customerSavings != null && row(
+        <span className="font-bold text-[#16A34A]">You Save</span>,
+        <span className="font-extrabold text-[#16A34A]">{fmt$(card.customerSavings)}</span>,
+        "mt-1.5",
+      )}
     </div>
   );
 }
@@ -807,6 +813,9 @@ const VehiclePassportV3 = () => {
   const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 
   const price = d.price;
+  // Canonical sale-price card — the shared model used by the governed passport
+  // too, so mobile and desktop here render identical numbers and net savings.
+  const saleCard = buildPassportSaleCard(d, listing.condition as string | null);
   const adv = d.dealerTrust;
 
   // Extracted so the same buy-box renders both inline on mobile (below the
@@ -816,19 +825,13 @@ const VehiclePassportV3 = () => {
     <div className={`${CARD} p-5`}>
       {price != null && (
         <div className="hidden lg:block">
-          <div className="text-[12px] font-semibold text-[#64748B]">{d.priceLabel}</div>
-          <div className="text-[30px] font-extrabold leading-9 tracking-tight">{fmt$(price)}</div>
-          <div className="mt-1 space-y-0.5 text-[12px] text-[#64748B]">
-            {!d.priceBreakdown && d.docFee ? (
-              <p>{d.priceIncludesDoc
-                ? `Incl. ${fmt$(d.docFee)} doc fee · ${fmt$(Math.max(0, price - d.docFee))} before doc fee`
-                : `+ ${fmt$(d.docFee)} doc fee · Sale ${fmt$(d.websiteSalePrice ?? price + d.docFee)}`}</p>
-            ) : null}
+          <div className="text-[11px] font-semibold uppercase tracking-wider text-[#64748B]">Today's Sale Price</div>
+          <div className="text-[30px] font-extrabold leading-9 tracking-tight">{fmt$(saleCard?.totalAdvertisedPrice ?? price)}</div>
+          {saleCard && <PriceLadder card={saleCard} />}
+          <div className="mt-2 space-y-0.5 text-[12px] text-[#64748B]">
             {buildSheet?.estValue ? <p className="font-semibold text-[#16A34A]">Incl. {fmt$(buildSheet.estValue)} in factory options</p> : null}
             {pv("payment") && d.estMonthly != null && <p>Est. {fmt$(d.estMonthly)}/mo{d.paymentAssumptions ? <span className="text-[11px] text-[#94A3B8]"> {d.paymentAssumptions}</span> : null}</p>}
-            {!d.priceBreakdown && d.msrp != null && <p>MSRP {fmt$(d.msrp)}</p>}
           </div>
-          {d.priceBreakdown && <PriceLadder b={d.priceBreakdown} priceLabel={d.priceLabel} />}
         </div>
       )}
       {(() => {
@@ -983,23 +986,9 @@ const VehiclePassportV3 = () => {
                 {/* Price stays visible early on small screens; the action panel carries it on desktop. */}
                 {price != null && (
                   <div className="lg:hidden mt-3">
-                    <div className="text-[13px] font-semibold text-[#64748B]">{d.priceLabel}</div>
-                    <div className="text-[26px] font-extrabold leading-8">{fmt$(price)}</div>
-                    {d.priceBreakdown ? (
-                      <PriceLadder b={d.priceBreakdown} priceLabel={d.priceLabel} />
-                    ) : (
-                      <>
-                        {d.docFee ? (
-                          <div className="text-[12px] text-[#64748B]">
-                            {d.priceIncludesDoc
-                              ? `Incl. ${fmt$(d.docFee)} doc fee · ${fmt$(Math.max(0, price - d.docFee))} before doc fee`
-                              : `+ ${fmt$(d.docFee)} doc fee · Sale ${fmt$(d.websiteSalePrice ?? price + d.docFee)}`}
-                          </div>
-                        ) : null}
-                        {d.saveVsMsrp != null && <div className="text-[13px] font-semibold text-[#16A34A]">You save {fmt$(d.saveVsMsrp)}</div>}
-                        {d.belowOriginalMsrp != null && <div className="text-[13px] font-semibold text-[#16A34A]">{fmt$(d.belowOriginalMsrp)} below original MSRP</div>}
-                      </>
-                    )}
+                    <div className="text-[11px] font-semibold uppercase tracking-wider text-[#64748B]">Today's Sale Price</div>
+                    <div className="text-[26px] font-extrabold leading-8">{fmt$(saleCard?.totalAdvertisedPrice ?? price)}</div>
+                    {saleCard && <PriceLadder card={saleCard} />}
                   </div>
                 )}
               </div>
