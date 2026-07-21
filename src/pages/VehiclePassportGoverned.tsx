@@ -21,7 +21,7 @@ import { buildSalePriceCard, type PricingVehicleType } from "@/lib/priceModel";
 import { estimateAffordability } from "@/lib/affordability";
 import { readPaymentPrefs, clearPaymentPrefs, type PaymentPrefs } from "@/lib/passport/paymentPrefs";
 import { resolveStickyButtons, type StickyBottomButtons } from "@/lib/stickyButtons";
-import { MOCK_LISTING, MOCK_NEW_2026, MOCK_SPARSE } from "./VehiclePassportV3";
+import { MOCK_LISTING, MOCK_NEW_2026, MOCK_SPARSE, MOCK_NEW_MSRP, MOCK_USED_FEE } from "./VehiclePassportV3";
 import type { VehicleListing } from "@/hooks/useVehicleListing";
 import { isVehicleSaved, toggleSavedVehicle } from "@/lib/savedVehicles";
 import { usePassportEngagement } from "@/lib/passportEngagement";
@@ -184,6 +184,8 @@ export default function VehiclePassportGoverned() {
   const previewData = (previewScenario === "review" ? MOCK_REVIEW_LISTING
     : previewScenario === "new2026" ? MOCK_NEW_2026
     : previewScenario === "sparse" ? MOCK_SPARSE
+    : previewScenario === "newmsrp" ? MOCK_NEW_MSRP
+    : previewScenario === "usedfee" ? MOCK_USED_FEE
     : MOCK_LISTING) as unknown as VehicleListing;
   const { listing, loading, notFound } = usePublicListing(rawSlug, { preview: isPreview, previewData });
 
@@ -339,22 +341,24 @@ export default function VehiclePassportGoverned() {
   // headline alone — no invented discount, no doubled fee.
   const pricingVehicleType: PricingVehicleType =
     isNew ? "new" : (condition === "cpo" || condition.includes("certified")) ? "cpo" : "used";
-  const feeIncluded = d.priceIncludesDoc && d.docFee != null && d.docFee > 0;
-  const vehiclePricePreDoc = price != null ? (feeIncluded ? price - (d.docFee as number) : price) : null;
-  // Only DOCUMENTED dealer-authored reductions feed the breakdown — a dealer
-  // discount (new + used/CPO) and, for new vehicles, included retail cash. Never
-  // the MSRP/market-value − price gap. When none are documented, the card shows
-  // the anchor and vehicle price with no discount row (the honest presentation).
-  const documentedDiscounts: { key: string; label: string; amount: number }[] = [];
-  if (d.dealerDiscount != null && d.dealerDiscount > 0) documentedDiscounts.push({ key: "dealer_discount", label: "Dealer Discount", amount: d.dealerDiscount });
-  if (isNew && d.retailCash != null && d.retailCash > 0) documentedDiscounts.push({ key: "retail_cash", label: "Retail Cash", amount: d.retailCash });
-  const saleCard = price != null && vehiclePricePreDoc != null
+  // The nightly-scraped Total Advertised Price ALWAYS includes the doc fee. Work
+  // backward from it: Vehicle Selling Price = Total − Doc Fee. When the tenant
+  // advertises before-doc, the total is price + fee; when the price already
+  // includes the fee (Harte's website_sale_price mode), price IS the total.
+  const docFeeVal = d.docFee != null && d.docFee > 0 ? d.docFee : 0;
+  const vehicleSellingPrice = price != null ? (d.priceIncludesDoc ? price - docFeeVal : price) : null;
+  const totalAdvertised = vehicleSellingPrice != null ? vehicleSellingPrice + docFeeVal : null;
+  // NEW-vehicle factory rebates included in the advertised price (Retail Cash,
+  // etc.). Only real, captured rebate amounts — never fabricated.
+  const factoryRebates: { key: string; label: string; amount: number }[] = [];
+  if (isNew && d.retailCash != null && d.retailCash > 0) factoryRebates.push({ key: "retail_cash", label: "Retail Cash", amount: d.retailCash });
+  const saleCard = price != null && vehicleSellingPrice != null && totalAdvertised != null
     ? buildSalePriceCard({
         vehicleType: pricingVehicleType,
         msrp: d.msrp, marketValue: d.marketAvg,
-        vehiclePrice: vehiclePricePreDoc, finalSalePrice: price,
-        docFee: d.docFee, feeIncluded,
-        discountLines: documentedDiscounts.length ? documentedDiscounts : undefined,
+        vehicleSellingPrice, totalAdvertisedPrice: totalAdvertised,
+        docFee: docFeeVal, factoryRebates,
+        documentedDealerDiscount: d.dealerDiscount,
       })
     : null;
 

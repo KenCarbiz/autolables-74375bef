@@ -331,6 +331,31 @@ export const MOCK_SPARSE = {
   market_payload: {}, value_history: [],
 };
 
+// Preview-only fixtures reproducing the approved pricing math (image 2), with a
+// configured $895 doc fee already inside the fee-inclusive advertised total.
+// ?preview=1&scenario=newmsrp — NEW, MSRP == Total, so Dealer Discount == Doc Fee.
+export const MOCK_NEW_MSRP = {
+  ...MOCK_LISTING,
+  id: "mock-new-msrp", slug: "sample-new-msrp", vin: "5N1AL1FR2HC580140",
+  ymm: "2027 INFINITI QX60", trim: "LUXE AWD", condition: "new", mileage: 12,
+  price: 58140, advertised_price_before_doc: 57245, doc_fee: 895,
+  website_sale_price: 58140, price_display_mode: "website_sale_price",
+  dealer_discount: null, retail_cash: null,
+  mc_attributes: { ...MOCK_LISTING.mc_attributes, msrp: 58140, owner_count: 0, accident_count: 0 },
+  market_value: 59900, market_payload: {}, value_history: [],
+};
+// ?preview=1&scenario=usedfee — USED, Market Value $31,981, Total $30,876, fee $895.
+export const MOCK_USED_FEE = {
+  ...MOCK_LISTING,
+  id: "mock-used-fee", slug: "sample-used-fee", vin: "3PCAJ5BB1PF113139",
+  ymm: "2023 INFINITI QX50", trim: "Luxe", condition: "used", mileage: 23443,
+  price: 30876, advertised_price_before_doc: 29981, doc_fee: 895,
+  website_sale_price: 30876, price_display_mode: "website_sale_price",
+  dealer_discount: null, retail_cash: null, market_value: 31981,
+  mc_attributes: { ...MOCK_LISTING.mc_attributes, msrp: null, owner_count: 1, accident_count: 0 },
+  market_payload: {}, value_history: [],
+};
+
 // ── Lead modal is intentionally absent — every action routes to a full page ──
 const VehiclePassportV3 = () => {
   // Canonical route is /v/:slug (param `slug`); legacy /passport-v3/:vehicleSlug

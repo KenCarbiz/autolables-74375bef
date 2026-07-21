@@ -3,19 +3,23 @@ import type { SalePriceCard } from "@/lib/priceModel";
 
 // ──────────────────────────────────────────────────────────────
 // VehiclePriceBreakdown — the customer-facing pricing area on the
-// Vehicle Passport: a "Today's Sale Price" headline over an itemized
-// card. Pure presentation over a pre-validated SalePriceCard (see
-// buildSalePriceCard). It renders NO price math of its own; it only
-// lays out rows the model already reconciled.
+// Vehicle Passport: a "Today's Sale Price" headline over the itemized
+// breakdown card. Pure presentation over a pre-validated SalePriceCard
+// (see buildSalePriceCard). It renders NO price math of its own.
 //
-// Starting row is MSRP (new) or Market Value (used/CPO), decided in
-// the model. When there is nothing truthful to itemize — no anchor
-// gap and no included fee — or the card fails to reconcile, only the
-// headline renders (the smallest truthful presentation).
+// The math ladder (image 2):
+//   NEW:      MSRP − rebates − Dealer Discount = Vehicle Selling Price
+//   USED/CPO: Market Value    − Dealer Discount = Vehicle Selling Price
+//   + Dealer Doc Fee = Total Advertised Price  (== the big headline)
+//
+// The card renders whenever the total reconciles; each row renders
+// individually and the minimum truthful card is Vehicle Selling Price →
+// Total Advertised Price. It never disappears because an optional row is
+// missing, and never repeats the total as three identical rows.
 // ──────────────────────────────────────────────────────────────
 
 const PRIMARY = "#0D1B2A";
-const MUTED = "#64748B";
+const MUTED = "#71819A";
 const DISCOUNT = "#16A34A";
 const BORDER = "#DDE4ED";
 
@@ -33,15 +37,15 @@ const Row = ({ label, value, bold, color }: { label: string; value: string; bold
 );
 
 const VehiclePriceBreakdown = ({ card, heading = "Today's Sale Price", priceClassName = "text-[32px]" }: Props) => {
-  // The card renders whenever there is a valid, reconciling final price. It never
-  // disappears because an OPTIONAL row (anchor, discount, or fee) is missing —
-  // each row renders individually; the minimum truthful card is Vehicle Price →
-  // Today's Sale Price. Only a non-reconciling / non-finite total suppresses it.
-  const showCard = card.reconciles && Number.isFinite(card.finalSalePrice);
+  // Renders whenever the total reconciles. Optional rows (anchor, rebates,
+  // discount, fee) render individually; the minimum truthful card is Vehicle
+  // Selling Price → Total Advertised Price. Only a non-reconciling/non-finite
+  // total suppresses it.
+  const showCard = card.reconciles && Number.isFinite(card.totalAdvertisedPrice);
   return (
     <div data-module="price-breakdown">
       <div className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: MUTED }}>{heading}</div>
-      <div className={`mt-0.5 ${priceClassName} font-extrabold tabular-nums leading-none`} style={{ color: PRIMARY }}>{fmt$(card.finalSalePrice)}</div>
+      <div className={`mt-0.5 ${priceClassName} font-extrabold tabular-nums leading-none`} style={{ color: PRIMARY }}>{fmt$(card.totalAdvertisedPrice)}</div>
 
       {showCard && (
         <div className="mt-3 rounded-2xl bg-white p-4" style={{ border: `1px solid ${BORDER}` }}>
@@ -61,7 +65,7 @@ const VehiclePriceBreakdown = ({ card, heading = "Today's Sale Price", priceClas
             </>
           )}
 
-          <Row label="Vehicle Price" value={fmt$(card.vehiclePrice)} bold color={PRIMARY} />
+          <Row label="Vehicle Selling Price" value={fmt$(card.vehicleSellingPrice)} bold color={PRIMARY} />
 
           {card.feeAmount != null && card.feeLabel && (
             <div className="mt-2.5">
@@ -70,7 +74,7 @@ const VehiclePriceBreakdown = ({ card, heading = "Today's Sale Price", priceClas
           )}
 
           <div className="my-3 border-t" style={{ borderColor: BORDER }} />
-          <Row label="Today's Sale Price" value={fmt$(card.finalSalePrice)} bold color={PRIMARY} />
+          <Row label="Total Advertised Price" value={fmt$(card.totalAdvertisedPrice)} bold color={PRIMARY} />
         </div>
       )}
     </div>

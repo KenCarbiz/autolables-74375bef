@@ -354,19 +354,27 @@ export function buildDiscountBreakdown(
 }
 
 // ──────────────────────────────────────────────────────────────────────
-// Sale-price BREAKDOWN card — the customer-facing itemized ladder shown under
-// the "Today's Sale Price" headline on the Vehicle Passport.
+// Sale-price BREAKDOWN card — the customer-facing pricing math on the Vehicle
+// Passport. The nightly dealer scrape gives ONE locked number: the Total
+// Advertised Price, which ALREADY INCLUDES the dealer doc fee. Everything is
+// derived backward from it, in integer cents, so the arithmetic always
+// reconciles to that scraped total.
 //
-// The starting row depends ONLY on the validated vehicle type, never on a label:
-//   • new         → MSRP
-//   • used / cpo  → Market Value (the platform's configured/verified value)
+//   Vehicle Selling Price = Total Advertised Price − Dealer Doc Fee
+//   NEW:      MSRP − factory rebates − Dealer Discount = Vehicle Selling Price
+//   USED/CPO: Market Value          − Dealer Discount = Vehicle Selling Price
+//   ⇒ Dealer Discount is DERIVED so the ladder reconciles. When the total
+//     equals MSRP with no rebates, that discount correctly equals the doc fee
+//     (the dealer cut the price by the fee, then added the fee back) — this is
+//     real reconciling arithmetic off the scraped total, not a fabricated
+//     discount. A negative derived discount means the inputs conflict and is
+//     never shown as a positive discount.
 //
-// Every row is a real captured number or pure arithmetic off real numbers.
-// Nothing is invented: a discount is shown ONLY when the anchor genuinely sits
-// above the vehicle price, the fee row appears ONLY when a configured fee is part
-// of the displayed price, and $0 / empty / negative rows are never rendered. The
-// card ALWAYS reconciles vehiclePrice + fee === finalSalePrice, and the headline
-// price the passport shows IS finalSalePrice — the two can never diverge.
+// The doc fee is itemized by SUBTRACTION and re-ADDITION — never added on top of
+// the already-inclusive scraped total (no double count). The card never repeats
+// the scraped total as MSRP/Selling/Total, never renders $0/null/negative rows,
+// and never disappears: the minimum truthful card is Vehicle Selling Price →
+// Total Advertised Price.
 // ──────────────────────────────────────────────────────────────────────
 
 export type PricingVehicleType = "new" | "used" | "cpo";
@@ -374,86 +382,109 @@ export type PricingVehicleType = "new" | "used" | "cpo";
 export interface SalePriceLine {
   key: string;
   label: string;
-  amount: number;                     // positive magnitude; the role decides the sign shown
-  role: "anchor" | "discount";
+  amount: number;                     // positive magnitude (dollars); role decides the sign shown
+  role: "anchor" | "discount";        // anchor = MSRP/Market Value (muted); discount = green "−"
 }
 
 export interface SalePriceCard {
   vehicleType: PricingVehicleType;
   anchorLabel: "MSRP" | "Market Value";
-  lines: SalePriceLine[];             // anchor + discount rows, rendered ABOVE "Vehicle Price"
-  vehiclePrice: number;
+  lines: SalePriceLine[];             // anchor + factory rebates + dealer discount, ABOVE the divider
+  vehicleSellingPrice: number;        // pre-doc-fee (Total − Doc Fee)
   feeLabel: string | null;
   feeAmount: number | null;           // > 0 → render "+ <feeLabel>"; null → no fee row
-  finalSalePrice: number;             // the headline; equals vehiclePrice + (feeAmount ?? 0)
-  reconciles: boolean;                // false → caller should show the smallest truthful view
-  // True when the card carries no anchor/discount ladder AND no fee — i.e. there
-  // is nothing to itemize and only the headline should render.
-  headlineOnly: boolean;
+  totalAdvertisedPrice: number;       // the headline; the locked, fee-inclusive scraped total
+  reconciles: boolean;                // exact integer-cent reconciliation of the whole ladder
+  conflict: boolean;                  // inputs disagree (negative derived discount, etc.)
+  msrpEqualsTotal: boolean;           // new + MSRP === total (the "discount == doc fee" case)
+  // Internal audit: a scraped/fed dealer discount was supplied and disagrees with
+  // the derived one. The display still uses the reconciling derived value.
+  documentedDiscountMismatch: boolean;
 }
 
 export interface SalePriceInput {
   vehicleType: PricingVehicleType;
-  msrp?: number | null;
-  marketValue?: number | null;
-  vehiclePrice: number;               // real pre-doc vehicle price
-  finalSalePrice: number;             // real headline the passport already resolved
-  docFee?: number | null;
+  msrp?: number | null;               // new anchor
+  marketValue?: number | null;        // used/CPO anchor
+  vehicleSellingPrice: number;        // Total Advertised Price − Dealer Doc Fee
+  totalAdvertisedPrice: number;       // the locked, fee-inclusive nightly scraped total
+  docFee?: number | null;             // tenant-configured doc fee (already inside the total)
   docFeeLabel?: string | null;
-  feeIncluded: boolean;               // the configured fee is part of finalSalePrice
-  // Optional itemized new-vehicle discount detail (dealer discount, retail cash,
-  // …). Used only when it reconciles exactly to the MSRP→price gap; otherwise a
-  // single honest "Dealer Discount" remainder is shown.
-  discountLines?: { key?: string; label: string; amount: number }[];
+  // NEW only: manufacturer rebates included in the advertised price (Retail Cash,
+  // Bonus Cash, …). Each is a real, unconditional, included rebate. Conditional
+  // incentives are excluded UPSTREAM (the caller only passes included rebates).
+  factoryRebates?: { key?: string; label: string; amount: number }[];
+  // Optional: a dealer discount captured directly from the scrape/feed. Used only
+  // to CROSS-CHECK the derived discount (never to alter the reconciling display).
+  // A disagreement sets documentedDiscountMismatch for internal audit.
+  documentedDealerDiscount?: number | null;
 }
 
-const SALE_TOLERANCE = 1; // dollars
+export const DEFAULT_DOC_FEE_LABEL = "Dealer Doc Fee";
 
-export const DEFAULT_DOC_FEE_LABEL = "Conveyance / Doc Fee";
+// All money math is done in integer cents; dollars only cross the boundary in/out.
+const toCents = (n: number): number => Math.round(n * 100);
+const toDollars = (c: number): number => c / 100;
+const validMoney = (n: number | null | undefined): n is number => n != null && Number.isFinite(n);
 
-// Build the itemized sale-price card. Pure + deterministic.
+// Build the pricing card. Pure + deterministic; all arithmetic in integer cents.
 export function buildSalePriceCard(input: SalePriceInput): SalePriceCard {
-  const vp = input.vehiclePrice;
+  const totalC = toCents(input.totalAdvertisedPrice);
+  const feeC = validMoney(input.docFee) && input.docFee > 0 ? toCents(input.docFee) : 0;
+  // Vehicle Selling Price is the total minus the doc fee — computed here from the
+  // locked total so selling + fee === total holds exactly in cents.
+  const sellC = totalC - feeC;
+
   const anchorLabel: "MSRP" | "Market Value" = input.vehicleType === "new" ? "MSRP" : "Market Value";
-  const anchor = input.vehicleType === "new" ? input.msrp : input.marketValue;
+  const anchorRaw = input.vehicleType === "new" ? input.msrp : input.marketValue;
+  const anchorC = validMoney(anchorRaw) ? toCents(anchorRaw) : null;
+
+  const rebates = (input.vehicleType === "new" ? (input.factoryRebates ?? []) : [])
+    .filter((r) => validMoney(r.amount) && r.amount > 0 && typeof r.label === "string" && r.label.trim().length > 0)
+    .map((r, i) => ({ key: r.key ?? `rebate-${i}`, label: r.label, amountC: toCents(r.amount) }));
+  const rebateTotalC = rebates.reduce((s, r) => s + r.amountC, 0);
+
+  // Derived dealer discount that reconciles the anchor to the selling price.
+  const discC = anchorC != null ? anchorC - rebateTotalC - sellC : null;
+  const conflict = discC != null && discC < 0; // anchor below selling / rebates exceed the gap
+  // Cross-check a documented discount against the derived one (audit only).
+  const documentedDiscountMismatch = validMoney(input.documentedDealerDiscount) && discC != null
+    && toCents(input.documentedDealerDiscount) !== discC;
+
+  // Show the anchor ladder only when it holds up: a valid anchor and a
+  // non-negative derived discount, with something real to show (a positive
+  // discount or at least one rebate). Otherwise the card degrades cleanly to
+  // Vehicle Selling Price → Doc Fee → Total.
+  const showLadder = anchorC != null && discC != null && discC >= 0 && (discC > 0 || rebateTotalC > 0);
 
   const lines: SalePriceLine[] = [];
-  // Anchor row only when the anchor is a real number genuinely ABOVE the vehicle
-  // price (MSRP for new; verified/market value for used-CPO).
-  if (anchor != null && Number.isFinite(anchor) && anchor - vp > SALE_TOLERANCE) {
-    const gap = anchor - vp;
-    lines.push({ key: "anchor", label: anchorLabel, amount: anchor, role: "anchor" });
-    // Show discount rows ONLY from DOCUMENTED dealer-authored reductions (a
-    // scraped dealer discount / included unconditional incentive) that reconcile
-    // to the anchor→price gap. Never derive a discount by subtracting the price
-    // from the anchor: for used/CPO that gap is a market comparison, not a dealer
-    // discount, and for new it would invent an undocumented rebate. When nothing
-    // documented reconciles, the anchor stands as context and the vehicle price
-    // is shown with no fabricated discount row.
-    const provided = (input.discountLines ?? []).filter((l) => l.amount > SALE_TOLERANCE);
-    const providedSum = provided.reduce((s, l) => s + l.amount, 0);
-    if (provided.length && Math.abs(providedSum - gap) <= SALE_TOLERANCE) {
-      provided.forEach((l, i) => lines.push({ key: l.key ?? `disc-${i}`, label: l.label, amount: l.amount, role: "discount" }));
-    }
+  if (showLadder && anchorC != null && discC != null) {
+    lines.push({ key: "anchor", label: anchorLabel, amount: toDollars(anchorC), role: "anchor" });
+    rebates.forEach((r) => lines.push({ key: r.key, label: r.label, amount: toDollars(r.amountC), role: "discount" }));
+    if (discC > 0) lines.push({ key: "dealer_discount", label: "Dealer Discount", amount: toDollars(discC), role: "discount" });
   }
 
-  const feeAmount = input.feeIncluded && input.docFee != null && Number.isFinite(input.docFee) && input.docFee > SALE_TOLERANCE
-    ? input.docFee : null;
+  const feeAmount = feeC > 0 ? toDollars(feeC) : null;
   const feeLabel = feeAmount != null ? ((input.docFeeLabel && input.docFeeLabel.trim()) || DEFAULT_DOC_FEE_LABEL) : null;
 
-  const reconciles = Math.abs(vp + (feeAmount ?? 0) - input.finalSalePrice) <= SALE_TOLERANCE;
-  const headlineOnly = lines.length === 0 && feeAmount == null;
+  // Exact integer-cent reconciliation: selling + fee === total, and (when a ladder
+  // is shown) anchor − rebates − discount === selling. No rounding tolerance.
+  const feeReconciles = sellC + feeC === totalC;
+  const ladderReconciles = !showLadder || (anchorC != null && discC != null && anchorC - rebateTotalC - discC === sellC);
+  const reconciles = feeReconciles && ladderReconciles && Number.isFinite(totalC);
 
   return {
     vehicleType: input.vehicleType,
     anchorLabel,
     lines,
-    vehiclePrice: vp,
+    vehicleSellingPrice: toDollars(sellC),
     feeLabel,
     feeAmount,
-    finalSalePrice: input.finalSalePrice,
+    totalAdvertisedPrice: toDollars(totalC),
     reconciles,
-    headlineOnly,
+    conflict,
+    msrpEqualsTotal: input.vehicleType === "new" && anchorC != null && anchorC === totalC,
+    documentedDiscountMismatch,
   };
 }
 
