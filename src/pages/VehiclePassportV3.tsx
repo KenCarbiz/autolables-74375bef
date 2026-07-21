@@ -110,17 +110,18 @@ function PriceLadder({ card }: { card: SalePriceCard }) {
         </div>
       ))}
       {card.feeAmount != null && card.feeLabel && (
-        <div className={card.lines.length > 0 ? "mt-1" : ""}>{row(`+ ${card.feeLabel}`, <span className="font-semibold text-[#0F172A]">{fmt$(card.feeAmount)}</span>)}</div>
+        <div className={card.lines.length > 0 ? "mt-1" : ""}>{row(card.feeLabel, <span className="font-semibold text-[#0F172A]">+{fmt$(card.feeAmount)}</span>)}</div>
       )}
       {row(
         <span className="font-bold text-[#0F172A]">Total Advertised Price</span>,
         <span className="font-extrabold text-[#0F172A]">{fmt$(card.totalAdvertisedPrice)}</span>,
         "mt-2 pt-2 border-t border-slate-200",
       )}
-      {card.showSavings && card.customerSavings != null && row(
-        <span className="font-bold text-[#16A34A]">You Save</span>,
-        <span className="font-extrabold text-[#16A34A]">{fmt$(card.customerSavings)}</span>,
-        "mt-1.5",
+      {card.showSavings && card.customerSavings != null && (
+        <div className="mt-2 rounded-lg border border-emerald-300 bg-emerald-50/50 px-2.5 py-1.5 flex items-baseline justify-between gap-3">
+          <span className="font-bold text-[#16A34A]">You Save</span>
+          <span className="font-extrabold text-[#16A34A] tabular-nums">{fmt$(card.customerSavings)}</span>
+        </div>
       )}
     </div>
   );
@@ -840,7 +841,8 @@ const VehiclePassportV3 = () => {
           {saleCard && <PriceLadder card={saleCard} />}
           <div className="mt-2 space-y-0.5 text-[12px] text-[#64748B]">
             {buildSheet?.estValue ? <p className="font-semibold text-[#16A34A]">Incl. {fmt$(buildSheet.estValue)} in factory options</p> : null}
-            {pv("payment") && d.estMonthly != null && <p>Est. {fmt$(d.estMonthly)}/mo{d.paymentAssumptions ? <span className="text-[11px] text-[#94A3B8]"> {d.paymentAssumptions}</span> : null}</p>}
+            {pv("payment") && d.estMonthly != null && <p>Est. {fmt$(d.estMonthly)}/mo{d.paymentAssumptions ? ` · ${d.paymentAssumptions}` : ""}</p>}
+            <p className="text-[11px] text-[#94A3B8]">Sales tax, title and registration are not included.</p>
           </div>
         </div>
       )}
@@ -999,6 +1001,12 @@ const VehiclePassportV3 = () => {
                     <div className="text-[11px] font-semibold uppercase tracking-wider text-[#64748B]">Today's Sale Price</div>
                     <div className="text-[26px] font-extrabold leading-8">{fmt$(saleCard?.totalAdvertisedPrice ?? price)}</div>
                     {saleCard && <PriceLadder card={saleCard} />}
+                    {saleCard && (
+                      <div className="mt-2 space-y-0.5 text-[12px] text-[#64748B]">
+                        {pv("payment") && d.estMonthly != null && <p>Est. {fmt$(d.estMonthly)}/mo{d.paymentAssumptions ? ` · ${d.paymentAssumptions}` : ""}</p>}
+                        <p className="text-[11px] text-[#94A3B8]">Sales tax, title and registration are not included.</p>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
