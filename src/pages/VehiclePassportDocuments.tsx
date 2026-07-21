@@ -5,6 +5,7 @@ import {
   Upload, MoreVertical, ShieldCheck, CheckCircle2, FileText, ClipboardList, BadgeCheck,
   Package, DollarSign, Car, MessageSquare, Phone, ExternalLink, X, Star, Wrench,
   TrendingUp, Clock, Settings, Building2, PenLine, Plus, Info, Globe,
+  ChevronRight, FileCheck2, ClipboardX, FilePlus2,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Helmet } from "react-helmet-async";
@@ -201,14 +202,14 @@ const StatusBadge = ({ status }: { status: DocStatus }) => {
 // Records a shopper may ASK the dealership for. These are request options, never
 // presented as currently-available documents (data boundary).
 const REQUEST_OPTIONS: { key: string; label: string; icon: typeof FileText; tint: string }[] = [
-  { key: "buyers_guide", label: "Buyer's Guide", icon: ClipboardList, tint: "bg-blue-50 text-[#2563EB]" },
+  { key: "buyers_guide", label: "Buyer's Guide", icon: FileText, tint: "bg-blue-50 text-[#2563EB]" },
   { key: "window_sticker", label: "Window Sticker / Build Sheet", icon: Car, tint: "bg-blue-50 text-[#2563EB]" },
   { key: "warranty", label: "Warranty Information", icon: ShieldCheck, tint: "bg-emerald-50 text-[#059669]" },
   { key: "verification", label: "Verification Report", icon: BadgeCheck, tint: "bg-teal-50 text-[#0D9488]" },
-  { key: "inspection", label: "Inspection Report", icon: ClipboardList, tint: "bg-amber-50 text-[#D97706]" },
+  { key: "inspection", label: "Inspection Report", icon: ClipboardX, tint: "bg-amber-50 text-[#D97706]" },
   { key: "signed_price", label: "Signed Price Record", icon: PenLine, tint: "bg-purple-50 text-[#7C3AED]" },
   { key: "service", label: "Service Records", icon: Wrench, tint: "bg-orange-50 text-[#EA580C]" },
-  { key: "other", label: "Other Document", icon: Package, tint: "bg-slate-100 text-[#64748B]" },
+  { key: "other", label: "Other Document", icon: FilePlus2, tint: "bg-slate-100 text-[#64748B]" },
 ];
 
 // Documents-page loading skeleton — mirrors the two-column Document Center so the
@@ -253,7 +254,7 @@ const RecordCard = ({ cover, title, source, status, explanation, meta, action, w
       <div className="mt-3.5">{action}</div>
       {why && (
         <details className="mt-2 group">
-          <summary className="text-[13px] font-semibold text-[#2563EB] cursor-pointer list-none inline-flex items-center gap-1">Why this matters <ChevronDown className="w-3.5 h-3.5 transition-transform group-open:rotate-180" /></summary>
+          <summary className="text-[13px] font-semibold text-[#2563EB] cursor-pointer list-none inline-flex items-center gap-1">Why this matters <ChevronRight className="w-3.5 h-3.5 transition-transform group-open:rotate-90" /></summary>
           <p className="text-[12.5px] text-[#64748B] mt-1.5 leading-snug">{why}</p>
         </details>
       )}
@@ -264,13 +265,9 @@ const RecordCard = ({ cover, title, source, status, explanation, meta, action, w
 // thumbnail — the vehicle photo with a dark wash, so the card reads as a real
 // document tile rather than a generic icon.
 const RecordCover = ({ hero, label }: { hero?: string | null; label: string }) => (
-  <div className="relative h-40 sm:h-full min-h-[150px] w-full overflow-hidden bg-gradient-to-br from-slate-800 to-slate-950">
-    {hero && <img src={hero} alt="" className="absolute inset-0 h-full w-full object-cover opacity-55" />}
-    <div className="absolute inset-0 bg-gradient-to-t from-black/55 to-transparent" />
-    <div className="absolute inset-x-0 bottom-0 p-3">
-      <span className="inline-flex items-center gap-1.5 text-[11px] font-bold text-white/95"><FileText className="w-3.5 h-3.5" /> {label}</span>
-    </div>
-  </div>
+  hero
+    ? <div className="h-44 sm:h-full sm:min-h-[150px] w-full overflow-hidden"><img src={hero} alt="" className="h-full w-full object-cover" /></div>
+    : <div className="h-44 sm:h-full sm:min-h-[150px] w-full bg-gradient-to-br from-slate-800 to-slate-950 flex items-center justify-center"><span className="text-[11px] font-bold uppercase tracking-[0.16em] text-white/85">{label}</span></div>
 );
 
 const VehiclePassportDocuments = () => {
@@ -362,7 +359,7 @@ const VehiclePassportDocuments = () => {
   // External/manufacturer links — accessible now, but on an outside site.
   const histLink = d.historyReport && packetVisible(listing, "historyReport") ? d.historyReport : null;
   const brochureLink = oemBrochure?.url && packetVisible(listing, "brochure") ? oemBrochure : null;
-  const brochureHost = brochureLink?.url ? (() => { try { return new URL(brochureLink.url).hostname.replace(/^www\./, ""); } catch { return "the manufacturer's site"; } })() : "";
+  const brochureBrand = (() => { const mk = (listing.ymm || "").trim().split(/\s+/)[1]; return mk ? `${mk}.com` : "the manufacturer's site"; })();
   const manualStored = allDocs.some((x) => x.type === "owners_manual");
   const manualLink = oemManual?.url && packetVisible(listing, "ownersManual") && !manualStored ? oemManual : null;
   const stickerLink = listing.oem_sticker_url && packetVisible(listing, "oemSticker") && !allDocs.some((x) => x.type === "window_sticker") ? listing.oem_sticker_url : null;
@@ -385,10 +382,7 @@ const VehiclePassportDocuments = () => {
     </div>
   );
   const externalAction = (url: string, label: string, cta: string, meta: Record<string, unknown> = {}) => (
-    <div>
-      <a href={url} target="_blank" rel="noopener noreferrer" onClick={() => trackDoc(cta, meta)} className="w-full h-9 rounded-lg bg-[#2563EB] text-white text-[13px] font-semibold inline-flex items-center justify-center gap-1.5 hover:bg-[#1d4fd7]">{label} <ExternalLink className="w-4 h-4" /></a>
-      <p className="text-[11px] text-[#94A3B8] mt-1.5 text-center">Opens in a new tab</p>
-    </div>
+    <a href={url} target="_blank" rel="noopener noreferrer" onClick={() => trackDoc(cta, meta)} className="h-10 w-fit px-4 rounded-lg bg-[#2563EB] text-white text-[13px] font-semibold inline-flex items-center justify-center gap-1.5 hover:bg-[#1d4fd7]">{label} <ExternalLink className="w-4 h-4" /></a>
   );
 
   return (
@@ -534,11 +528,11 @@ const VehiclePassportDocuments = () => {
                     {brochureLink && (
                       <RecordCard
                         cover={<RecordCover hero={hero} label="Brochure" />}
-                        title={`${(listing.ymm || "").trim()} Official Brochure${brochureLink.year ? ` (${brochureLink.year})` : ""}`}
+                        title={`${(listing.ymm || "").trim()} Official Brochure`}
                         source={`${((listing.ymm || "").trim().split(/\s+/)[1] || "Manufacturer").toUpperCase()} USA · Manufacturer source`}
                         status="external"
                         explanation={`Features, specifications and model information published by ${((listing.ymm || "").trim().split(/\s+/)[1] || "the manufacturer").toUpperCase()}.`}
-                        meta={<><span className="inline-flex items-center gap-1"><Globe className="w-3.5 h-3.5" /> Official brochure</span><span className="inline-flex items-center gap-1"><ExternalLink className="w-3.5 h-3.5" /> Opens on {brochureHost}</span></>}
+                        meta={<><span className="inline-flex items-center gap-1"><Globe className="w-3.5 h-3.5" /> Official brochure</span><span aria-hidden className="text-[#CBD5E1]">·</span><span className="inline-flex items-center gap-1"><ExternalLink className="w-3.5 h-3.5" /> Opens on {brochureBrand}</span></>}
                         action={externalAction(brochureLink.url, "Open Official Brochure", "oem_brochure")}
                         why="The manufacturer's brochure confirms the factory features and specifications for this year and model." />
                     )}
@@ -566,20 +560,20 @@ const VehiclePassportDocuments = () => {
               <div className={`${CARD} p-5`}>
                 <div className="flex items-start justify-between">
                   <p className="text-[16px] font-bold text-[#0F172A]">Document Status</p>
-                  <span className="w-10 h-10 rounded-xl bg-blue-50 flex items-center justify-center shrink-0"><BadgeCheck className="w-5 h-5 text-[#2563EB]" /></span>
+                  <span className="w-11 h-11 rounded-full bg-blue-50 flex items-center justify-center shrink-0"><FileCheck2 className="w-5 h-5 text-[#2563EB]" /></span>
                 </div>
                 <div className="mt-4 space-y-3">
                   <div className="flex items-center justify-between">
                     <span className="inline-flex items-center gap-2 text-[13px] text-[#475569]"><span className={`w-2.5 h-2.5 rounded-full ${availableCount > 0 ? "bg-[#16A34A]" : "border border-[#CBD5E1]"}`} /> Available now</span>
-                    <span className="text-[15px] font-extrabold tabular-nums text-[#0F172A]">{availableCount}</span>
+                    <span className={`text-[15px] font-bold tabular-nums ${availableCount > 0 ? "text-[#0F172A]" : "text-[#94A3B8]"}`}>{availableCount}</span>
                   </div>
                   <div className="flex items-center justify-between">
                     <span className="inline-flex items-center gap-2 text-[13px] text-[#475569]"><span className={`w-2.5 h-2.5 rounded-full ${signedCount > 0 ? "bg-[#16A34A]" : "border border-[#CBD5E1]"}`} /> Signed customer records</span>
-                    <span className="text-[15px] font-extrabold tabular-nums text-[#0F172A]">{signedCount}</span>
+                    <span className={`text-[15px] font-bold tabular-nums ${signedCount > 0 ? "text-[#0F172A]" : "text-[#94A3B8]"}`}>{signedCount}</span>
                   </div>
                   <div className="flex items-center justify-between">
                     <span className="inline-flex items-center gap-2 text-[13px] text-[#475569]"><span className={`w-2.5 h-2.5 rounded-full ${verifiedCount > 0 ? "bg-[#16A34A]" : "border border-[#CBD5E1]"}`} /> Verified records</span>
-                    <span className="text-[15px] font-extrabold tabular-nums text-[#0F172A]">{verifiedCount}</span>
+                    <span className={`text-[15px] font-bold tabular-nums ${verifiedCount > 0 ? "text-[#0F172A]" : "text-[#94A3B8]"}`}>{verifiedCount}</span>
                   </div>
                   <div className="flex items-center justify-between pt-3 border-t border-[#EEF1F4]">
                     <span className="text-[13px] text-[#475569]">Last checked</span>
@@ -589,7 +583,7 @@ const VehiclePassportDocuments = () => {
                 <div className="mt-4 rounded-lg bg-blue-50 p-3 flex items-start gap-2 text-[12.5px] text-[#334155] leading-snug">
                   <Info className="w-4 h-4 text-[#2563EB] shrink-0 mt-0.5" /> Records shown here are associated with this exact VIN when available.
                 </div>
-                <button onClick={() => navigate(pp("check-availability"))} className="mt-4 w-full h-11 rounded-xl bg-[#2563EB] hover:bg-[#1d4fd7] text-white text-[13px] font-bold inline-flex items-center justify-center gap-1.5"><FileText className="w-4 h-4" /> Request a Document</button>
+                <button onClick={() => navigate(pp("check-availability"))} className="mt-4 w-full h-11 rounded-xl bg-[#2563EB] hover:bg-[#1d4fd7] text-white text-[13px] font-bold inline-flex items-center justify-center">Request a Document</button>
                 <p className="text-[12px] text-[#64748B] text-center mt-2">{dealerName} will confirm availability.</p>
                 {availableCount > 0 && !isPreview && (
                   <button onClick={() => setEmailOpen((v) => !v)} className="mt-3 w-full text-[12.5px] font-semibold text-[#2563EB] inline-flex items-center justify-center gap-1.5 hover:underline"><Upload className="w-3.5 h-3.5" /> Email me this packet</button>
