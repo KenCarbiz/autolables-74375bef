@@ -1,10 +1,10 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import {
   ChevronLeft, ChevronDown, Search, LayoutGrid, List, Eye, Download, Printer,
   Upload, MoreVertical, ShieldCheck, CheckCircle2, FileText, ClipboardList, BadgeCheck,
   Package, DollarSign, Car, MessageSquare, Phone, ExternalLink, X, Star, Wrench,
-  TrendingUp, Clock, Settings, Building2,
+  TrendingUp, Clock, Settings, Building2, PenLine, Plus,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Helmet } from "react-helmet-async";
@@ -151,28 +151,105 @@ const OwnersManualCard = ({
       setSaving(false);
     }
   };
-  return (
-    <div className={`${CARD} p-4 flex items-center gap-3`}>
-      <span className="w-11 h-11 rounded-xl bg-blue-50 flex items-center justify-center shrink-0"><FileText className="w-5 h-5 text-[#2563EB]" /></span>
-      <div className="min-w-0 flex-1">
-        <p className="text-[14px] font-bold leading-tight">Official {mk.toUpperCase()} Owner's Manual{m.year ? ` (${m.year})` : ""}</p>
-        <p className="text-[12px] text-[#64748B] leading-tight mt-0.5">Manufacturer's official manual · open it or save a copy to this passport</p>
-      </div>
-      <div className="shrink-0 flex items-center gap-2">
-        <a href={savedUrl || m.url} target="_blank" rel="noopener noreferrer" onClick={() => track("owners_manual_open")}
-          className="text-[13px] font-semibold text-[#2563EB] inline-flex items-center gap-1.5">
-          {savedUrl ? "Download" : "Open"} <Download className="w-4 h-4" />
-        </a>
-        {!savedUrl && (
-          <button onClick={save} disabled={saving}
-            className="text-[13px] font-semibold text-white bg-[#2563EB] hover:bg-[#1D4ED8] disabled:opacity-60 rounded-lg px-3 h-9 inline-flex items-center gap-1.5">
-            {saving ? "Saving…" : "Save to passport"}
-          </button>
-        )}
-      </div>
+  const action = (
+    <div className="flex items-center gap-2">
+      <a href={savedUrl || m.url} target="_blank" rel="noopener noreferrer" onClick={() => track("owners_manual_open")}
+        className="flex-1 h-9 rounded-lg border border-[#E6E8EC] text-[13px] font-semibold text-[#2563EB] inline-flex items-center justify-center gap-1.5 hover:border-[#2563EB]">
+        {savedUrl ? "Download" : "Open Manual"} <ExternalLink className="w-4 h-4" />
+      </a>
+      {!savedUrl && (
+        <button onClick={save} disabled={saving}
+          className="flex-1 h-9 rounded-lg bg-[#2563EB] text-white text-[13px] font-semibold inline-flex items-center justify-center gap-1.5 hover:bg-[#1D4ED8] disabled:opacity-60">
+          {saving ? "Saving…" : "Save to passport"}
+        </button>
+      )}
     </div>
   );
+  return (
+    <RecordCard
+      icon={FileText}
+      title={`Official ${mk.toUpperCase()} Owner's Manual${m.year ? ` (${m.year})` : ""}`}
+      source={`${mk.toUpperCase()} · Manufacturer source`}
+      status={savedUrl ? "available" : "external"}
+      explanation="The manufacturer's official owner's manual. Open it on the manufacturer site, or save a copy to this vehicle's passport."
+      action={action}
+    />
+  );
 };
+
+// Status system for the Document Center. Green is reserved for records that are
+// actually available or verified — never for a manufacturer link that merely
+// exists (those are the neutral "External Source").
+type DocStatus = "available" | "verified" | "signed" | "external" | "request" | "pending" | "unavailable";
+const STATUS_STYLE: Record<DocStatus, { label: string; cls: string; icon: typeof CheckCircle2 }> = {
+  available: { label: "Available Now", cls: "text-[#15803D] bg-emerald-50 ring-emerald-100", icon: CheckCircle2 },
+  verified: { label: "Verified Copy", cls: "text-[#15803D] bg-emerald-50 ring-emerald-100", icon: BadgeCheck },
+  signed: { label: "Signed Copy", cls: "text-[#15803D] bg-emerald-50 ring-emerald-100", icon: PenLine },
+  external: { label: "External Source", cls: "text-[#475569] bg-slate-100 ring-slate-200", icon: ExternalLink },
+  request: { label: "Available by Request", cls: "text-[#1d4ed8] bg-blue-50 ring-blue-100", icon: MessageSquare },
+  pending: { label: "Pending", cls: "text-[#B45309] bg-amber-50 ring-amber-100", icon: Clock },
+  unavailable: { label: "Not Available", cls: "text-[#64748B] bg-slate-50 ring-slate-200", icon: X },
+};
+const StatusBadge = ({ status }: { status: DocStatus }) => {
+  const s = STATUS_STYLE[status];
+  return <span className={`inline-flex items-center gap-1 text-[11px] font-bold rounded-full px-2 py-0.5 ring-1 ${s.cls}`}><s.icon className="w-3 h-3" /> {s.label}</span>;
+};
+
+// Records a shopper may ASK the dealership for. These are request options, never
+// presented as currently-available documents (data boundary).
+const REQUEST_OPTIONS: { key: string; label: string; icon: typeof FileText }[] = [
+  { key: "buyers_guide", label: "Buyer's Guide", icon: ClipboardList },
+  { key: "window_sticker", label: "Window Sticker or Build Sheet", icon: FileText },
+  { key: "warranty", label: "Warranty Information", icon: ShieldCheck },
+  { key: "verification", label: "AutoLabels Verification Report", icon: BadgeCheck },
+  { key: "inspection", label: "Inspection Report", icon: CheckCircle2 },
+  { key: "signed_price", label: "Signed Price and Disclosure Record", icon: DollarSign },
+  { key: "service", label: "Service or Reconditioning Records", icon: Wrench },
+  { key: "other", label: "Other Document", icon: Package },
+];
+
+// Documents-page loading skeleton — mirrors the two-column Document Center so the
+// layout doesn't jump when data arrives. Scoped to this page only.
+const DocSkeleton = () => (
+  <div className="min-h-[100svh] bg-[#F6F7F9]" style={{ fontFamily: "Inter, -apple-system, sans-serif" }}>
+    <div className="bg-white border-b border-[#E6E8EC] h-16" />
+    <div className="lg:grid lg:grid-cols-[280px_1fr]">
+      <div className="hidden lg:block border-r border-[#E6E8EC] bg-white h-screen p-5">
+        <div className="rounded-xl border border-[#E6E8EC] p-3 animate-pulse"><div className="w-full aspect-[16/10] rounded-lg bg-slate-100" /><div className="h-4 bg-slate-100 rounded mt-3 w-3/4" /><div className="h-3 bg-slate-100 rounded mt-2 w-1/2" /></div>
+      </div>
+      <div className="px-5 lg:px-8 py-6 max-w-[1200px] w-full">
+        <div className="animate-pulse">
+          <div className="h-7 bg-slate-200 rounded w-72" />
+          <div className="h-4 bg-slate-100 rounded w-96 mt-3" />
+          <div className="flex gap-2 mt-4">{[0, 1, 2].map((i) => <div key={i} className="h-7 bg-slate-100 rounded-full w-40" />)}</div>
+          <div className="grid lg:grid-cols-[1fr_320px] gap-6 mt-6">
+            <div className="grid sm:grid-cols-2 gap-4">{[0, 1, 2, 3].map((i) => <div key={i} className="h-40 bg-white rounded-2xl ring-1 ring-slate-100" />)}</div>
+            <div className="h-64 bg-white rounded-2xl ring-1 ring-slate-100" />
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+);
+
+// A real, visual document card for the "Available Now" grid. Constrained width,
+// tinted icon, source line, one clear status, short explanation, and one action.
+const RecordCard = ({ icon: Icon, title, source, status, explanation, action }: {
+  icon: typeof FileText; title: string; source: string; status: DocStatus; explanation?: string; action: ReactNode;
+}) => (
+  <div className="rounded-2xl bg-white ring-1 ring-slate-100 shadow-[0_1px_2px_rgba(15,23,42,.04),0_10px_24px_-16px_rgba(15,23,42,.18)] p-4 flex flex-col">
+    <div className="flex items-start gap-3">
+      <span className="w-11 h-11 rounded-xl bg-blue-50 flex items-center justify-center shrink-0"><Icon className="w-5 h-5 text-[#2563EB]" /></span>
+      <div className="min-w-0 flex-1">
+        <p className="text-[14px] font-bold leading-tight text-[#0F172A]">{title}</p>
+        <p className="text-[12px] text-[#64748B] mt-0.5">{source}</p>
+      </div>
+      <StatusBadge status={status} />
+    </div>
+    {explanation && <p className="text-[12.5px] text-[#475569] mt-3 leading-snug">{explanation}</p>}
+    <div className="mt-auto pt-3.5">{action}</div>
+  </div>
+);
 
 const VehiclePassportDocuments = () => {
   const params = useParams<{ vehicleSlug?: string; slug?: string }>();
@@ -185,6 +262,7 @@ const VehiclePassportDocuments = () => {
   const [preview, setPreview] = useState<Doc | null>(null);
   const [emailOpen, setEmailOpen] = useState(false);
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
+  const [reqSel, setReqSel] = useState<Set<string>>(() => new Set());
 
   const isPreview = typeof window !== "undefined" && new URLSearchParams(window.location.search).has("preview");
   const { listing, loading, notFound } = usePublicListing(vehicleSlug, { preview: isPreview, previewData: MOCK_LISTING as unknown as VehicleListing });
@@ -220,7 +298,7 @@ const VehiclePassportDocuments = () => {
 
   const grouped = useMemo(() => CATEGORIES.map((c) => ({ c, docs: filtered.filter((x) => categoryOf(x) === c.key) })).filter((g) => g.docs.length > 0), [filtered]);
 
-  if (loading) return <div className="min-h-[100svh] flex items-center justify-center bg-[#F6F7F9]"><div className="w-8 h-8 border-2 border-[#2563EB] border-t-transparent rounded-full animate-spin" /></div>;
+  if (loading) return <DocSkeleton />;
   if (notFound || !listing || !d) return (
     <div className="min-h-[100svh] flex items-center justify-center px-6 bg-[#F6F7F9]"><div className="text-center"><FileText className="w-12 h-12 text-slate-300 mx-auto mb-4" /><h1 className="text-xl font-bold">Documents unavailable</h1></div></div>
   );
@@ -253,25 +331,40 @@ const VehiclePassportDocuments = () => {
   if (listing.oem_sticker_url && packetVisible(listing, "oemSticker") && !allDocs.some((x) => x.type === "window_sticker"))
     printLinks.push({ title: "Original Window Sticker", note: "Factory Monroney label", url: listing.oem_sticker_url });
 
-  const DocCard = ({ doc }: { doc: Doc }) => (
-    <div className={`${CARD} p-3 flex flex-col transition-transform hover:-translate-y-0.5`}>
-      <button onClick={() => setPreview(doc)} className="rounded-xl border border-[#EEF1F4] overflow-hidden h-[120px] bg-slate-50"><DocThumb url={doc.url} /></button>
-      <div className="flex items-start justify-between gap-2 mt-3">
-        <p className="text-[13px] font-bold leading-tight">{doc.name}</p>
-        <button className="text-[#94A3B8] hover:text-[#0F172A] shrink-0"><MoreVertical className="w-4 h-4" /></button>
-      </div>
-      {doc.description && <p className="text-[11px] text-[#64748B] mt-0.5 leading-snug">{doc.description}</p>}
-      {doc.uploaded_at && <p className="text-[11px] text-[#94A3B8] mt-1">{fmtDate(doc.uploaded_at)}</p>}
-      <div className="flex items-center gap-2 mt-2">
-        <span className="inline-flex items-center gap-1 text-[10px] font-bold text-[#16A34A] bg-emerald-50 rounded px-1.5 py-0.5"><CheckCircle2 className="w-3 h-3" /> Dealer Provided</span>
-        <span className="inline-flex items-center gap-1 text-[10px] font-bold text-[#EF4444] bg-red-50 rounded px-1.5 py-0.5">{fileType(doc.url)}</span>
-      </div>
-      <div className="flex items-center gap-1 mt-2.5 pt-2.5 border-t border-[#EEF1F4]">
-        <button onClick={() => setPreview(doc)} title="Preview" className="flex-1 h-8 rounded-lg hover:bg-blue-50 inline-flex items-center justify-center text-[#2563EB]"><Eye className="w-4 h-4" /></button>
-        <a href={doc.url} download target="_blank" rel="noreferrer" title="Download" className="flex-1 h-8 rounded-lg hover:bg-blue-50 inline-flex items-center justify-center text-[#2563EB]"><Download className="w-4 h-4" /></a>
-        <button onClick={() => window.open(doc.url, "_blank")} title="Print" className="flex-1 h-8 rounded-lg hover:bg-blue-50 inline-flex items-center justify-center text-[#2563EB]"><Printer className="w-4 h-4" /></button>
-        <button onClick={() => share(doc.url)} title="Share" className="flex-1 h-8 rounded-lg hover:bg-blue-50 inline-flex items-center justify-center text-[#2563EB]"><Upload className="w-4 h-4" /></button>
-      </div>
+  // ── Document Center data (real records only — never fabricated) ──
+  const dealerName = d.dealerName || "the dealership";
+  const vinLast = (listing.vin || "").slice(-6);
+  const uploaded = allDocs.map((doc) => ({ doc, status: (/sign|addendum|disclosure/i.test(doc.type) ? "signed" : "available") as DocStatus }));
+  const signedCount = uploaded.filter((u) => u.status === "signed").length;
+  const verifiedCount = allDocs.filter((x) => (x as { verified?: boolean }).verified === true).length;
+  // External/manufacturer links — accessible now, but on an outside site.
+  const histLink = d.historyReport && packetVisible(listing, "historyReport") ? d.historyReport : null;
+  const brochureLink = oemBrochure?.url && packetVisible(listing, "brochure") ? oemBrochure : null;
+  const manualStored = allDocs.some((x) => x.type === "owners_manual");
+  const manualLink = oemManual?.url && packetVisible(listing, "ownersManual") && !manualStored ? oemManual : null;
+  const stickerLink = listing.oem_sticker_url && packetVisible(listing, "oemSticker") && !allDocs.some((x) => x.type === "window_sticker") ? listing.oem_sticker_url : null;
+  const externalCount = (histLink ? 1 : 0) + (brochureLink ? 1 : 0) + (manualLink ? 1 : 0) + (stickerLink ? 1 : 0);
+  const availableCount = uploaded.length + externalCount;
+  const lastChecked = lastUpdated || "Today";
+  const trackDoc = (cta: string, meta: Record<string, unknown> = {}) => { if (!isPreview) trackCustomerCtaClicked({ storeId: listing.store_id, vehicleId: listing.id, vin: listing.vin, source: "passport", surface: "vehicle_passport", metadata: { cta, placement: "documents_page", ...meta } }); };
+  const toggleReq = (k: string) => setReqSel((s) => { const n = new Set(s); if (n.has(k)) n.delete(k); else n.add(k); return n; });
+  const requestSelected = () => {
+    trackDoc("request_documents", { selected: [...reqSel] });
+    const keys = [...reqSel];
+    const qs = keys.length ? `?req=${encodeURIComponent(keys.join(","))}${isPreview ? "&preview=1" : ""}` : (isPreview ? "?preview=1" : "");
+    navigate(`/v/${slug}/check-availability${qs}`);
+  };
+
+  const uploadedAction = (doc: Doc) => (
+    <div className="flex items-center gap-2">
+      <button onClick={() => setPreview(doc)} className="flex-1 h-9 rounded-lg border border-[#E6E8EC] text-[13px] font-semibold text-[#2563EB] inline-flex items-center justify-center gap-1.5 hover:border-[#2563EB]"><Eye className="w-4 h-4" /> Preview</button>
+      <a href={doc.url} download target="_blank" rel="noreferrer" className="flex-1 h-9 rounded-lg bg-[#2563EB] text-white text-[13px] font-semibold inline-flex items-center justify-center gap-1.5 hover:bg-[#1d4fd7]"><Download className="w-4 h-4" /> Download</a>
+    </div>
+  );
+  const externalAction = (url: string, label: string, cta: string, meta: Record<string, unknown> = {}) => (
+    <div>
+      <a href={url} target="_blank" rel="noopener noreferrer" onClick={() => trackDoc(cta, meta)} className="w-full h-9 rounded-lg bg-[#2563EB] text-white text-[13px] font-semibold inline-flex items-center justify-center gap-1.5 hover:bg-[#1d4fd7]">{label} <ExternalLink className="w-4 h-4" /></a>
+      <p className="text-[11px] text-[#94A3B8] mt-1.5 text-center">Opens in a new tab</p>
     </div>
   );
 
@@ -372,170 +465,120 @@ const VehiclePassportDocuments = () => {
           </div>
         </aside>
 
-        {/* Main workspace */}
+        {/* Main workspace — Vehicle Document Center (redesign scope: this page only) */}
         <main className="px-5 lg:px-8 py-6 min-w-0">
-          <div className="flex flex-wrap items-start justify-between gap-4">
+          <div className="mx-auto max-w-[1200px]">
+            {/* Header */}
             <div>
-              <h1 className="text-[26px] font-bold tracking-tight">Vehicle Documents</h1>
-              <p className="text-[14px] text-[#64748B] mt-0.5">Everything provided by the dealership for this vehicle.</p>
-              {lastUpdated && <p className="text-[12px] text-[#94A3B8] mt-2 inline-flex items-center gap-1.5"><Clock className="w-3.5 h-3.5" /> Last updated: {lastUpdated}</p>}
-            </div>
-            <div className="flex items-center gap-3 flex-wrap">
-              {total > 0 && <span className="inline-flex items-center gap-1.5 text-[13px] font-semibold text-[#0F172A]"><span className="w-6 h-6 rounded-full bg-emerald-50 flex items-center justify-center"><CheckCircle2 className="w-3.5 h-3.5 text-[#16A34A]" /></span>{total} Documents Available</span>}
-              {total > 0 && <span className="inline-flex items-center gap-1.5 text-[13px] font-semibold text-[#16A34A] bg-emerald-50 rounded-full px-3 py-1.5"><ShieldCheck className="w-4 h-4" /> Dealer Provided</span>}
-              {total > 0 && !isPreview && (
-                <button onClick={() => setEmailOpen((v) => !v)} className="inline-flex items-center gap-1.5 h-10 px-4 rounded-xl bg-[#2563EB] hover:bg-[#1d4fd7] text-white text-[13px] font-bold transition-colors"><Upload className="w-4 h-4" /> Email me this packet</button>
-              )}
-            </div>
-          </div>
-
-          {emailOpen && <div className="mt-5"><EmailPacketCard listing={listing} docs={allDocs} onClose={() => setEmailOpen(false)} /></div>}
-
-          {/* Hero card */}
-          {total > 0 ? (
-            <div className={`${CARD} p-6 mt-5 flex flex-col lg:flex-row lg:items-center gap-6`}>
-              <span className="w-14 h-14 rounded-2xl bg-emerald-50 flex items-center justify-center shrink-0"><ShieldCheck className="w-7 h-7 text-[#16A34A]" /></span>
-              <div className="flex-1">
-                <h2 className="text-[18px] font-bold">Vehicle Documentation</h2>
-                <p className="text-[14px] text-[#64748B]">Everything you need in one place.</p>
-                <p className="text-[12px] text-[#94A3B8] mt-1">All available documents have been verified and uploaded by the dealership.</p>
-              </div>
-              <div className="lg:w-[360px] shrink-0">
-                <p className="text-[15px] font-bold mb-1.5"><span className="text-[20px] font-extrabold">{total}</span> of {total} Documents Available</p>
-                <div className="h-2.5 rounded-full bg-slate-100 overflow-hidden"><div className="h-full rounded-full bg-[#16A34A]" style={{ width: "100%" }} /></div>
-              </div>
-            </div>
-          ) : (
-            <div className={`${CARD} p-6 mt-5 flex flex-col lg:flex-row lg:items-center gap-6`}>
-              <span className="w-14 h-14 rounded-2xl bg-blue-50 flex items-center justify-center shrink-0"><FileText className="w-7 h-7 text-[#2563EB]" /></span>
-              <div className="flex-1">
-                <h2 className="text-[18px] font-bold">Request documents</h2>
-                <p className="text-[14px] text-[#64748B]">{d.dealerName || "The dealership"} will send them to you.</p>
-              </div>
-              <button onClick={() => navigate(pp("contact"))} className="h-11 px-5 rounded-xl bg-[#2563EB] hover:bg-[#1d4fd7] text-white text-[13px] font-bold inline-flex items-center justify-center gap-1.5 shrink-0"><MessageSquare className="w-4 h-4" /> Request Documents</button>
-            </div>
-          )}
-
-          {/* Toolbar */}
-          <div className="flex flex-wrap items-center gap-3 mt-5">
-            <div className="flex items-center gap-1.5 overflow-x-auto flex-1 min-w-0">
-              {CAT_TABS.map((t) => (
-                <button key={t.key} onClick={() => setCat(t.key)} className={`whitespace-nowrap h-9 px-3.5 rounded-xl text-[13px] font-semibold transition-colors ${cat === t.key ? "bg-[#2563EB] text-white" : "bg-white border border-[#E6E8EC] text-[#64748B] hover:border-[#2563EB]"}`}>{t.label}</button>
-              ))}
-            </div>
-            <div className="relative">
-              <Search className="w-4 h-4 text-[#94A3B8] absolute left-3 top-1/2 -translate-y-1/2" />
-              <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search documents..." className="h-9 w-[220px] pl-9 pr-3 rounded-xl border border-[#E6E8EC] text-[13px] outline-none focus:border-[#2563EB]" />
-            </div>
-            <select value={sort} onChange={(e) => setSort(e.target.value)} className="h-9 px-3 rounded-xl border border-[#E6E8EC] text-[13px] bg-white cursor-pointer">
-              <option value="newest">Sort: Newest First</option><option value="oldest">Oldest First</option><option value="alpha">Alphabetical</option><option value="category">Category</option>
-            </select>
-            <div className="flex items-center rounded-xl border border-[#E6E8EC] overflow-hidden">
-              <button onClick={() => setView("grid")} className={`w-9 h-9 flex items-center justify-center ${view === "grid" ? "bg-blue-50 text-[#2563EB]" : "text-[#94A3B8]"}`}><LayoutGrid className="w-4 h-4" /></button>
-              <button onClick={() => setView("list")} className={`w-9 h-9 flex items-center justify-center ${view === "list" ? "bg-blue-50 text-[#2563EB]" : "text-[#94A3B8]"}`}><List className="w-4 h-4" /></button>
-            </div>
-          </div>
-
-          {/* Workspace: categories + grid */}
-          <div className="grid grid-cols-1 lg:grid-cols-[220px_1fr] gap-6 mt-5">
-            <div className={`${CARD} p-4 h-max`}>
-              <p className="text-[13px] font-bold mb-2">Document Categories</p>
-              <div className="space-y-0.5">
-                {CATEGORIES.filter((c) => (counts[c.key] || 0) > 0).map((c) => (
-                  <button key={c.key} onClick={() => setCat(c.key)} className={`w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-[13px] font-medium transition-colors ${cat === c.key ? "bg-blue-50 text-[#2563EB]" : "text-[#64748B] hover:bg-slate-50"}`}>
-                    <c.icon className={`w-4 h-4 shrink-0 ${cat === c.key ? "text-[#2563EB]" : "text-[#94A3B8]"}`} /><span className="flex-1 text-left truncate">{c.label}</span><span className="text-[12px] text-[#94A3B8]">{counts[c.key]}</span>
-                  </button>
-                ))}
+              <h1 className="text-[26px] font-bold tracking-tight">Vehicle Document Center</h1>
+              <p className="text-[14px] text-[#64748B] mt-1">Review available records for this vehicle or request a copy from {dealerName}.</p>
+              <p className="text-[13px] text-[#0F172A] mt-2.5 inline-flex items-center gap-1.5"><ShieldCheck className="w-4 h-4 text-[#2563EB]" /> Every document is clearly labeled by its source and availability.</p>
+              <p className="text-[13px] text-[#475569] mt-3">
+                <span className="font-bold text-[#0F172A]">{listing.ymm}{listing.trim ? ` ${listing.trim}` : ""}</span>
+                {vinLast ? ` · VIN ending ${vinLast}` : ""}
+                {vinLast ? ` · Stock #${vinLast}` : ""}
+                {listing.mileage != null ? ` · ${listing.mileage.toLocaleString()} miles` : ""}
+              </p>
+              <div className="flex flex-wrap items-center gap-2 mt-4">
+                {availableCount > 0 && <span className="inline-flex items-center gap-1.5 text-[12.5px] font-bold text-[#15803D] bg-emerald-50 ring-1 ring-emerald-100 rounded-full px-3 py-1.5"><CheckCircle2 className="w-4 h-4" /> {availableCount} Available Now</span>}
+                {vinLast && <span className="inline-flex items-center gap-1.5 text-[12.5px] font-semibold text-[#334155] bg-white ring-1 ring-slate-200 rounded-full px-3 py-1.5"><BadgeCheck className="w-4 h-4 text-[#2563EB]" /> Connected to VIN {vinLast}</span>}
+                <span className="inline-flex items-center gap-1.5 text-[12.5px] font-semibold text-[#334155] bg-white ring-1 ring-slate-200 rounded-full px-3 py-1.5"><MessageSquare className="w-4 h-4 text-[#64748B]" /> Additional records available by request</span>
               </div>
             </div>
 
-            <div className="space-y-8">
-              {/* Dealer-paid history report — an external link, not an uploaded
-                  document, so it's pinned above the groups and excluded from
-                  the document counts. */}
-              {d.historyReport && packetVisible(listing, "historyReport") && (
-                <a
-                  href={d.historyReport.url} target="_blank" rel="noopener noreferrer"
-                  onClick={() => { if (!isPreview) trackCustomerCtaClicked({ storeId: listing.store_id, vehicleId: listing.id, vin: listing.vin, source: "passport", surface: "vehicle_passport", metadata: { cta: "history_report", provider: d.historyReport?.provider ?? null, placement: "documents_page" } }); }}
-                  className={`${CARD} p-4 flex items-center gap-3 hover:border-[#2563EB] transition-colors`}
-                >
-                  <span className="w-11 h-11 rounded-xl bg-blue-50 flex items-center justify-center shrink-0"><ClipboardList className="w-5 h-5 text-[#2563EB]" /></span>
-                  <div className="min-w-0 flex-1">
-                    <p className="text-[14px] font-bold leading-tight">{historyReportName(d.historyReport.provider)} Vehicle History Report</p>
-                    <p className="text-[12px] text-[#64748B] leading-tight mt-0.5">{d.historyReport.source === "vin" ? `Official ${historyReportName(d.historyReport.provider)} record for this VIN` : `Opens on ${d.historyReport.provider === "autocheck" ? "autocheck.com" : "carfax.com"} · provided at no cost by ${d.dealerName}`}</p>
-                  </div>
-                  <span className="shrink-0 text-[13px] font-semibold text-[#2563EB] inline-flex items-center gap-1.5">View Report <ExternalLink className="w-4 h-4" /></span>
-                </a>
-              )}
-              {(() => {
-                const b = (listing as { oem_brochure?: { url: string; title?: string | null; year?: number | null } }).oem_brochure;
-                if (!b?.url || !packetVisible(listing, "brochure")) return null;
-                const mk = (listing.ymm || "").trim().split(/\s+/)[1] || "manufacturer";
-                return (
-                  <a
-                    href={b.url} target="_blank" rel="noopener noreferrer"
-                    onClick={() => { if (!isPreview) trackCustomerCtaClicked({ storeId: listing.store_id, vehicleId: listing.id, vin: listing.vin, source: "passport", surface: "vehicle_passport", metadata: { cta: "oem_brochure", placement: "documents_page" } }); }}
-                    className={`${CARD} p-4 flex items-center gap-3 hover:border-[#2563EB] transition-colors`}
-                  >
-                    <span className="w-11 h-11 rounded-xl bg-blue-50 flex items-center justify-center shrink-0"><FileText className="w-5 h-5 text-[#2563EB]" /></span>
-                    <div className="min-w-0 flex-1">
-                      <p className="text-[14px] font-bold leading-tight">Official {mk.toUpperCase()} Brochure{b.year ? ` (${b.year})` : ""}</p>
-                      <p className="text-[12px] text-[#64748B] leading-tight mt-0.5">Opens on the manufacturer's website</p>
+            <div className="grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-6 mt-6 items-start">
+              <div className="space-y-8 min-w-0">
+                {availableCount > 0 && (
+                  <section>
+                    <h2 className="text-[16px] font-bold text-[#0F172A] mb-3">Available Now</h2>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      {uploaded.map(({ doc, status }, i) => (
+                        <RecordCard key={`u-${i}`} icon={status === "signed" ? PenLine : FileText}
+                          title={doc.name}
+                          source={`Provided by ${dealerName}`}
+                          status={status}
+                          explanation={doc.description || (doc.type === "window_sticker" ? "Original factory window sticker — MSRP and equipment as built." : "Uploaded by the dealership for this vehicle.")}
+                          action={uploadedAction(doc)} />
+                      ))}
+                      {histLink && (
+                        <RecordCard icon={ClipboardList}
+                          title={`${historyReportName(histLink.provider)} Vehicle History Report`}
+                          source={histLink.source === "vin" ? `Official ${historyReportName(histLink.provider)} record` : `${histLink.provider === "autocheck" ? "AutoCheck" : "CARFAX"} · provided by ${dealerName}`}
+                          status="external"
+                          explanation={`Ownership, title and accident history for this VIN, provided at no cost by ${dealerName}.`}
+                          action={externalAction(histLink.url, "View Report", "history_report", { provider: histLink.provider })} />
+                      )}
+                      {brochureLink && (
+                        <RecordCard icon={FileText}
+                          title={`${(listing.ymm || "").trim()} Official Brochure${brochureLink.year ? ` (${brochureLink.year})` : ""}`}
+                          source={`${((listing.ymm || "").trim().split(/\s+/)[1] || "Manufacturer").toUpperCase()} · Manufacturer source`}
+                          status="external"
+                          explanation="Features, specifications and model information published by the manufacturer."
+                          action={externalAction(brochureLink.url, "Open Official Brochure", "oem_brochure")} />
+                      )}
+                      <OwnersManualCard listing={listing} isPreview={isPreview} hasStoredCopy={manualStored} />
+                      {stickerLink && (
+                        <RecordCard icon={FileText}
+                          title="Original Window Sticker"
+                          source="Manufacturer source"
+                          status="external"
+                          explanation="Original factory window sticker — MSRP and factory equipment as built."
+                          action={externalAction(stickerLink, "View Sticker", "oem_window_sticker")} />
+                      )}
                     </div>
-                    <span className="shrink-0 text-[13px] font-semibold text-[#2563EB] inline-flex items-center gap-1.5">View Brochure <ExternalLink className="w-4 h-4" /></span>
-                  </a>
-                );
-              })()}
-              <OwnersManualCard listing={listing} isPreview={isPreview} hasStoredCopy={allDocs.some((x) => x.type === "owners_manual")} />
-              {listing.oem_sticker_url && packetVisible(listing, "oemSticker") && !allDocs.some((x) => x.type === "window_sticker") && (
-                <a
-                  href={listing.oem_sticker_url} target="_blank" rel="noopener noreferrer"
-                  onClick={() => { if (!isPreview) trackCustomerCtaClicked({ storeId: listing.store_id, vehicleId: listing.id, vin: listing.vin, source: "passport", surface: "vehicle_passport", metadata: { cta: "oem_window_sticker", placement: "documents_page" } }); }}
-                  className={`${CARD} p-4 flex items-center gap-3 hover:border-[#2563EB] transition-colors`}
-                >
-                  <span className="w-11 h-11 rounded-xl bg-blue-50 flex items-center justify-center shrink-0"><FileText className="w-5 h-5 text-[#2563EB]" /></span>
-                  <div className="min-w-0 flex-1">
-                    <p className="text-[14px] font-bold leading-tight">Original Window Sticker</p>
-                    <p className="text-[12px] text-[#64748B] leading-tight mt-0.5">Original factory window sticker — MSRP and factory equipment as built.</p>
+                  </section>
+                )}
+
+                <section>
+                  <h2 className="text-[16px] font-bold text-[#0F172A]">Available by Request</h2>
+                  <p className="text-[13px] text-[#64748B] mt-1 mb-3.5">Need a document you don&rsquo;t see? Choose the records you need and {dealerName} will confirm what is available.</p>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                    {REQUEST_OPTIONS.map((o) => {
+                      const on = reqSel.has(o.key);
+                      return (
+                        <button key={o.key} onClick={() => toggleReq(o.key)} aria-pressed={on}
+                          className={`flex items-center gap-3 rounded-xl border p-3 text-left transition-colors ${on ? "border-[#2563EB] bg-blue-50/60 ring-1 ring-[#2563EB]" : "border-[#E6E8EC] bg-white hover:border-[#C7D2FE]"}`}>
+                          <span className={`w-10 h-10 rounded-lg flex items-center justify-center shrink-0 ${on ? "bg-[#2563EB] text-white" : "bg-slate-50 text-[#64748B]"}`}><o.icon className="w-5 h-5" /></span>
+                          <span className="text-[13px] font-semibold text-[#0F172A] flex-1 leading-snug">{o.label}</span>
+                          <span className={`w-5 h-5 rounded-full border flex items-center justify-center shrink-0 ${on ? "bg-[#2563EB] border-[#2563EB] text-white" : "border-[#CBD5E1]"}`}>{on ? <CheckCircle2 className="w-4 h-4" /> : <Plus className="w-3.5 h-3.5 text-[#94A3B8]" />}</span>
+                        </button>
+                      );
+                    })}
                   </div>
-                  <span className="shrink-0 text-[13px] font-semibold text-[#2563EB] inline-flex items-center gap-1.5">View Sticker <ExternalLink className="w-4 h-4" /></span>
-                </a>
-              )}
-              {grouped.length === 0 ? (
-                total === 0 ? (
-                  <div className={`${CARD} p-12 text-center`}>
-                    <span className="w-14 h-14 rounded-2xl bg-blue-50 text-[#2563EB] flex items-center justify-center mx-auto mb-3"><FileText className="w-7 h-7" /></span>
-                    <p className="text-[15px] font-bold text-[#475569]">Request documents — {d.dealerName || "the dealership"} will send them.</p>
-                    <button onClick={() => navigate(pp("contact"))} className="mt-4 h-11 px-5 rounded-xl bg-[#2563EB] hover:bg-[#1d4fd7] text-white text-[13px] font-bold inline-flex items-center justify-center gap-1.5"><MessageSquare className="w-4 h-4" /> Request Documents</button>
-                  </div>
-                ) : (
-                  <div className={`${CARD} p-12 text-center`}>
-                    <span className="w-14 h-14 rounded-2xl bg-slate-100 text-slate-400 flex items-center justify-center mx-auto mb-3"><FileText className="w-7 h-7" /></span>
-                    <p className="text-[15px] font-bold text-[#475569]">No documents available{cat !== "all" ? " in this category" : ""}{q ? " for your search" : ""}.</p>
-                    <p className="text-[13px] text-[#64748B] mt-1.5">Documents the dealership uploads will appear here automatically.</p>
-                  </div>
-                )
-              ) : grouped.map(({ c, docs }) => (
-                <div key={c.key}>
-                  <button onClick={() => setCollapsed((s) => ({ ...s, [c.key]: !s[c.key] }))} className="w-full flex items-center justify-between mb-3">
-                    <h3 className="text-[16px] font-bold">{c.label}</h3>
-                    <span className="text-[13px] font-semibold text-[#2563EB] inline-flex items-center gap-1">{docs.length} Documents <ChevronDown className={`w-4 h-4 transition-transform ${collapsed[c.key] ? "-rotate-90" : ""}`} /></span>
+                  <button onClick={requestSelected} disabled={reqSel.size === 0}
+                    className="mt-4 h-11 px-5 rounded-xl bg-[#2563EB] hover:bg-[#1d4fd7] text-white text-[13px] font-bold inline-flex items-center justify-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed">
+                    <MessageSquare className="w-4 h-4" /> Request Selected Documents{reqSel.size > 0 ? ` (${reqSel.size})` : ""}
                   </button>
-                  {!collapsed[c.key] && (
-                    view === "grid"
-                      ? <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">{docs.map((doc, i) => <DocCard key={i} doc={doc} />)}</div>
-                      : <div className={`${CARD} divide-y divide-[#EEF1F4]`}>{docs.map((doc, i) => (
-                          <div key={i} className="flex items-center gap-3 p-3">
-                            <span className="w-10 h-12 rounded border border-[#EEF1F4] overflow-hidden shrink-0"><DocThumb url={doc.url} /></span>
-                            <div className="min-w-0 flex-1"><p className="text-[13px] font-bold truncate">{doc.name}</p><p className="text-[11px] text-[#94A3B8]">{fmtDate(doc.uploaded_at)} · {fileType(doc.url)}</p></div>
-                            <span className="inline-flex items-center gap-1 text-[10px] font-bold text-[#16A34A] bg-emerald-50 rounded px-1.5 py-0.5 shrink-0"><CheckCircle2 className="w-3 h-3" /> Verified</span>
-                            <button onClick={() => setPreview(doc)} className="h-8 px-2 rounded-lg hover:bg-blue-50 text-[#2563EB] shrink-0"><Eye className="w-4 h-4" /></button>
-                            <a href={doc.url} download target="_blank" rel="noreferrer" className="h-8 px-2 rounded-lg hover:bg-blue-50 text-[#2563EB] shrink-0 inline-flex items-center"><Download className="w-4 h-4" /></a>
-                          </div>
-                        ))}</div>
+                </section>
+              </div>
+
+              <aside className="space-y-4 lg:sticky lg:top-6">
+                <div className={`${CARD} p-5`}>
+                  <p className="text-[13px] font-bold uppercase tracking-wide text-[#475569]">Document Status</p>
+                  <div className="mt-3 space-y-2.5">
+                    <div className="flex items-center justify-between"><span className="text-[13px] text-[#64748B]">Available now</span><span className={`text-[16px] font-extrabold tabular-nums ${availableCount > 0 ? "text-[#15803D]" : "text-[#0F172A]"}`}>{availableCount}</span></div>
+                    <div className="flex items-center justify-between"><span className="text-[13px] text-[#64748B]">Signed customer records</span><span className="text-[16px] font-extrabold tabular-nums text-[#0F172A]">{signedCount}</span></div>
+                    <div className="flex items-center justify-between"><span className="text-[13px] text-[#64748B]">Verified records</span><span className="text-[16px] font-extrabold tabular-nums text-[#0F172A]">{verifiedCount}</span></div>
+                    <div className="flex items-center justify-between pt-2.5 border-t border-[#EEF1F4]"><span className="text-[13px] text-[#64748B]">Last checked</span><span className="text-[13px] font-semibold text-[#0F172A]">{lastChecked}</span></div>
+                  </div>
+                  <button onClick={() => navigate(pp("check-availability"))} className="mt-4 w-full h-10 rounded-xl bg-[#2563EB] hover:bg-[#1d4fd7] text-white text-[13px] font-bold inline-flex items-center justify-center gap-1.5"><FileText className="w-4 h-4" /> Request a Document</button>
+                  {availableCount > 0 && !isPreview && (
+                    <button onClick={() => setEmailOpen((v) => !v)} className="mt-2 w-full h-10 rounded-xl border border-[#E6E8EC] text-[#0F172A] text-[13px] font-semibold inline-flex items-center justify-center gap-1.5 hover:border-[#2563EB]"><Upload className="w-4 h-4 text-[#2563EB]" /> Email me this packet</button>
                   )}
+                  {emailOpen && <div className="mt-3"><EmailPacketCard listing={listing} docs={allDocs} onClose={() => setEmailOpen(false)} /></div>}
                 </div>
-              ))}
+
+                <div className={`${CARD} p-5`}>
+                  <p className="text-[14px] font-bold text-[#0F172A]">Questions about a document?</p>
+                  <p className="text-[13px] text-[#64748B] mt-1">A {dealerName} representative can explain what applies to this vehicle.</p>
+                  <div className="mt-3 grid grid-cols-1 gap-2">
+                    <button onClick={() => navigate(pp("contact"))} className="h-10 rounded-xl bg-[#2563EB] hover:bg-[#1d4fd7] text-white text-[13px] font-bold inline-flex items-center justify-center gap-1.5"><MessageSquare className="w-4 h-4" /> Ask a Question</button>
+                    {d.dealerPhone
+                      ? <a href={`tel:${d.dealerPhone}`} className="h-10 rounded-xl border border-[#E6E8EC] text-[#0F172A] text-[13px] font-semibold inline-flex items-center justify-center gap-1.5 hover:border-[#2563EB]"><Phone className="w-4 h-4 text-[#2563EB]" /> Call Dealership</a>
+                      : <button onClick={() => navigate(pp("contact"))} className="h-10 rounded-xl border border-[#E6E8EC] text-[#0F172A] text-[13px] font-semibold inline-flex items-center justify-center gap-1.5 hover:border-[#2563EB]"><Phone className="w-4 h-4 text-[#2563EB]" /> Call Dealership</button>}
+                  </div>
+                </div>
+              </aside>
             </div>
           </div>
         </main>
