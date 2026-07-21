@@ -1106,6 +1106,8 @@ const DocumentsPanel = ({ vehicle, onReload }: { vehicle: VehicleRow; onReload: 
       />
       {/* OEM brochure link — auto-harvested from the manufacturer's own site */}
       <BrochureFinderRow vehicle={vehicle} />
+      {/* OEM owner's manual — link on the packet + one-click save into documents */}
+      <OwnersManualFinderRow vehicle={vehicle} onReload={onReload} />
 
       <div>
         <h3 className="text-[15px] font-bold text-foreground">Uploads &amp; Links</h3>
@@ -1400,6 +1402,72 @@ const BrochureFinderRow = ({ vehicle }: { vehicle: VehicleRow }) => {
       <button onClick={find} disabled={busy} className="shrink-0 inline-flex items-center gap-1.5 h-9 px-3.5 rounded-lg border border-border text-[13px] font-semibold hover:bg-muted disabled:opacity-60">
         {busy ? "Searching…" : found ? "Search again" : "Find OEM brochure"}
       </button>
+    </section>
+  );
+};
+
+// Owner's manual: harvest the OEM link (shows on the packet, no bytes stored),
+// then optionally pull a copy into the vehicle's documents with one click.
+const OwnersManualFinderRow = ({ vehicle, onReload }: { vehicle: VehicleRow; onReload: () => void }) => {
+  const [busy, setBusy] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [found, setFound] = useState<{ url: string; year?: number | null } | null>(null);
+  const savedInDocs = (vehicle.documents || []).some((d) => d?.type === "owners_manual");
+  const parts = (vehicle.ymm || "").trim().split(/\s+/);
+  const year = Number.parseInt(parts[0] || "", 10) || null;
+  const make = parts[1] || "";
+  const model = parts.slice(2).join(" ");
+  const find = async () => {
+    if (!make || !model) { toast.error("Vehicle year/make/model is incomplete"); return; }
+    setBusy(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("oem-owners-manual", { body: { make, model, year } });
+      if (error || !data?.ok) {
+        const code = (data as { error?: string } | null)?.error;
+        toast.error(code === "make_not_supported" ? `No official manual source configured for ${make}.` : `No official ${make} owner's manual found for this model.`);
+        return;
+      }
+      setFound({ url: data.url, year: data.year });
+      toast.success(`Owner's manual linked${data.cached ? "" : " (newly harvested)"} — it now shows in the shopper packet.`);
+    } finally { setBusy(false); }
+  };
+  const saveToDocs = async () => {
+    setSaving(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("save-owners-manual", { body: { vehicle_id: vehicle.id } });
+      if (error || !data?.ok) {
+        const code = (data as { error?: string } | null)?.error;
+        toast.error(code === "manual_link_not_harvested" ? "Find the manual first, then save it." : "Couldn't save the manual to documents.");
+        return;
+      }
+      toast.success(data.cached ? "Owner's manual is already in this vehicle's documents." : "Owner's manual saved to documents.");
+      onReload();
+    } finally { setSaving(false); }
+  };
+  return (
+    <section className="rounded-2xl border border-border bg-card shadow-[0_1px_3px_rgba(0,0,0,0.06)] p-5 flex items-center justify-between gap-4 flex-wrap">
+      <div className="min-w-0">
+        <h3 className="text-[15px] font-bold text-foreground">Owner's Manual</h3>
+        <p className="text-[13px] text-slate-500 mt-0.5">
+          {savedInDocs
+            ? <>Saved to this vehicle's documents.</>
+            : found
+            ? <>Linked to the manufacturer's official manual{found.year ? ` (${found.year})` : ""}. <a href={found.url} target="_blank" rel="noreferrer" className="text-blue-600 font-semibold">Open</a> — the link shows on the packet; save a copy to store it with the car.</>
+            : <>Search the manufacturer's own site for the official {make || "model"} owner's manual and link it on the shopper packet.</>}
+        </p>
+      </div>
+      <div className="shrink-0 flex items-center gap-2">
+        {!savedInDocs && (
+          <button onClick={find} disabled={busy} className="inline-flex items-center gap-1.5 h-9 px-3.5 rounded-lg border border-border text-[13px] font-semibold hover:bg-muted disabled:opacity-60">
+            {busy ? "Searching…" : found ? "Search again" : "Find owner's manual"}
+          </button>
+        )}
+        {found && !savedInDocs && (
+          <button onClick={saveToDocs} disabled={saving} className="inline-flex items-center gap-1.5 h-9 px-3.5 rounded-lg bg-blue-600 text-white text-[13px] font-semibold hover:bg-blue-700 disabled:opacity-60">
+            {saving ? "Saving…" : "Save to documents"}
+          </button>
+        )}
+      </div>
     </section>
   );
 };

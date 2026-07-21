@@ -9,3 +9,10 @@ verify_jwt = false
 # so sister apps (AutoFilm) can query without minting a Supabase JWT.
 [functions.vehicle-lookup]
 verify_jwt = false
+
+# save-owners-manual caches the OEM owner's manual into a car's passport docs.
+# Customers on the public /v/:slug passport are anonymous, so JWT verification
+# is off; the function guards itself (published cars only, manual URL resolved
+# server-side from the harvested cache, never from the caller).
+[functions.save-owners-manual]
+verify_jwt = false

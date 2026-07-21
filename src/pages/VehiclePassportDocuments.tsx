@@ -122,6 +122,58 @@ const EmailPacketCard = ({ listing, docs, onClose }: { listing: VehicleListing; 
   );
 };
 
+// Owner's-manual card. By default we only hold the OEM link (no bytes stored),
+// so the shopper can open it on the manufacturer site OR pull a copy into this
+// vehicle's passport with one click. Once a copy is saved it shows as a normal
+// document instead, so this card hides (hasStoredCopy).
+const OwnersManualCard = ({
+  listing, isPreview, hasStoredCopy,
+}: { listing: VehicleListing; isPreview: boolean; hasStoredCopy: boolean }) => {
+  const [saving, setSaving] = useState(false);
+  const [savedUrl, setSavedUrl] = useState<string | null>(null);
+  const m = (listing as { oem_owners_manual?: { url: string; title?: string | null; year?: number | null } }).oem_owners_manual;
+  if (hasStoredCopy || !m?.url || !packetVisible(listing, "ownersManual")) return null;
+  const mk = (listing.ymm || "").trim().split(/\s+/)[1] || "manufacturer";
+  const track = (cta: string) => { if (!isPreview) trackCustomerCtaClicked({ storeId: listing.store_id, vehicleId: listing.id, vin: listing.vin, source: "passport", surface: "vehicle_passport", metadata: { cta, placement: "documents_page" } }); };
+  const save = async () => {
+    if (isPreview) { toast.message("Sample preview — saving is disabled here."); return; }
+    setSaving(true);
+    track("owners_manual_save");
+    try {
+      const { data, error } = await supabase.functions.invoke("save-owners-manual", { body: { slug: listing.slug || listing.vin } });
+      if (error || !data?.url) throw new Error(error?.message || "save_failed");
+      setSavedUrl(data.url as string);
+      toast.success("Owner's manual saved to this vehicle.");
+      window.open(data.url as string, "_blank", "noopener");
+    } catch {
+      toast.error("Couldn't save the manual right now. The manufacturer link still opens below.");
+    } finally {
+      setSaving(false);
+    }
+  };
+  return (
+    <div className={`${CARD} p-4 flex items-center gap-3`}>
+      <span className="w-11 h-11 rounded-xl bg-blue-50 flex items-center justify-center shrink-0"><FileText className="w-5 h-5 text-[#2563EB]" /></span>
+      <div className="min-w-0 flex-1">
+        <p className="text-[14px] font-bold leading-tight">Official {mk.toUpperCase()} Owner's Manual{m.year ? ` (${m.year})` : ""}</p>
+        <p className="text-[12px] text-[#64748B] leading-tight mt-0.5">Manufacturer's official manual · open it or save a copy to this passport</p>
+      </div>
+      <div className="shrink-0 flex items-center gap-2">
+        <a href={savedUrl || m.url} target="_blank" rel="noopener noreferrer" onClick={() => track("owners_manual_open")}
+          className="text-[13px] font-semibold text-[#2563EB] inline-flex items-center gap-1.5">
+          {savedUrl ? "Download" : "Open"} <Download className="w-4 h-4" />
+        </a>
+        {!savedUrl && (
+          <button onClick={save} disabled={saving}
+            className="text-[13px] font-semibold text-white bg-[#2563EB] hover:bg-[#1D4ED8] disabled:opacity-60 rounded-lg px-3 h-9 inline-flex items-center gap-1.5">
+            {saving ? "Saving…" : "Save to passport"}
+          </button>
+        )}
+      </div>
+    </div>
+  );
+};
+
 const VehiclePassportDocuments = () => {
   const params = useParams<{ vehicleSlug?: string; slug?: string }>();
   const vehicleSlug = params.vehicleSlug ?? params.slug;
@@ -195,6 +247,9 @@ const VehiclePassportDocuments = () => {
     printLinks.push({ title: `${historyReportName(d.historyReport.provider)} Vehicle History Report`, note: d.historyReport.source === "vin" ? "Official record for this VIN" : "External report link", url: d.historyReport.url });
   if (oemBrochure?.url && packetVisible(listing, "brochure"))
     printLinks.push({ title: `Official ${brochureMk.toUpperCase()} Brochure${oemBrochure.year ? ` (${oemBrochure.year})` : ""}`, note: "Manufacturer website", url: oemBrochure.url });
+  const oemManual = (listing as { oem_owners_manual?: { url: string; title?: string | null; year?: number | null } }).oem_owners_manual;
+  if (oemManual?.url && packetVisible(listing, "ownersManual") && !allDocs.some((x) => x.type === "owners_manual"))
+    printLinks.push({ title: `Official ${brochureMk.toUpperCase()} Owner's Manual${oemManual.year ? ` (${oemManual.year})` : ""}`, note: "Manufacturer website", url: oemManual.url });
   if (listing.oem_sticker_url && packetVisible(listing, "oemSticker") && !allDocs.some((x) => x.type === "window_sticker"))
     printLinks.push({ title: "Original Window Sticker", note: "Factory Monroney label", url: listing.oem_sticker_url });
 
@@ -431,6 +486,7 @@ const VehiclePassportDocuments = () => {
                   </a>
                 );
               })()}
+              <OwnersManualCard listing={listing} isPreview={isPreview} hasStoredCopy={allDocs.some((x) => x.type === "owners_manual")} />
               {listing.oem_sticker_url && packetVisible(listing, "oemSticker") && !allDocs.some((x) => x.type === "window_sticker") && (
                 <a
                   href={listing.oem_sticker_url} target="_blank" rel="noopener noreferrer"

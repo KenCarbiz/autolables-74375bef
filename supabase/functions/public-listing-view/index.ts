@@ -655,6 +655,29 @@ serve(async (req) => {
       }
     } catch { /* brochure link optional */ }
 
+    // ── Official OEM owner's-manual link from its harvest cache (same
+    // nearest-year rule). Link only; a stored copy, when one exists, comes
+    // through row.documents (attached on demand by save-owners-manual).
+    try {
+      const parts = String((row.ymm as string) || "").trim().split(/\s+/);
+      const yr = Number.parseInt(parts[0] || "", 10) || null;
+      const mk = parts[1] || "";
+      const md = parts.slice(2).join(" ");
+      if (mk && md) {
+        const { data: ml } = await admin
+          .from("oem_owners_manual_links")
+          .select("url, title, year")
+          .ilike("make", mk).ilike("model", md)
+          .order("year", { ascending: false, nullsFirst: false })
+          .limit(6);
+        const rows = (ml || []) as { url: string; title: string | null; year: number | null }[];
+        const pick = (yr ? rows.find((r) => r.year === yr) : rows[0]) ||
+          rows.find((r) => r.year != null && yr != null && Math.abs(r.year - yr) <= 2) ||
+          (!yr ? rows[0] : undefined);
+        if (pick) row.oem_owners_manual = { url: pick.url, title: pick.title, year: pick.year };
+      }
+    } catch { /* owner's-manual link optional */ }
+
     // ── Packet curation enforcement. A module the dealer excluded must not
     // ship in the public payload at all — client gating alone would still
     // leak the data to anyone reading the response. Per-vehicle override
@@ -671,6 +694,7 @@ serve(async (req) => {
       };
       if (!vis("historyReport")) { delete row.history_report; delete row.history_report_url; }
       if (!vis("brochure")) delete row.oem_brochure;
+      if (!vis("ownersManual")) delete row.oem_owners_manual;
       if (!vis("recon")) delete row.recon;
       if (!vis("videos")) delete row.videos;
       if (!vis("description")) delete row.description;
