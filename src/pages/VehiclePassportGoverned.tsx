@@ -16,6 +16,7 @@ import { buildPassportActionPath } from "@/lib/passportReturn";
 import PriceDropWatch from "@/components/listing/PriceDropWatch";
 import PassportCtaDock from "@/components/passport/PassportCtaDock";
 import VehiclePriceBreakdown from "@/components/passport/VehiclePriceBreakdown";
+import AutoLabelsVerifiedCard from "@/components/passport/AutoLabelsVerifiedCard";
 import { buildSalePriceCard, type PricingVehicleType } from "@/lib/priceModel";
 import { estimateAffordability } from "@/lib/affordability";
 import { readPaymentPrefs, clearPaymentPrefs, type PaymentPrefs } from "@/lib/passport/paymentPrefs";
@@ -262,11 +263,6 @@ export default function VehiclePassportGoverned() {
   const vVerified = report.verifiedChecks;
   const vAllVerified = vTotal > 0 && vVerified === vTotal;
   const vSummary = summarizeVerificationExceptions(report);
-  const vSummaryColor = report.needsAttentionChecks > 0
-    ? "#DC2626"
-    : report.needsConfirmationChecks > 0 || report.pendingChecks > 0 || report.unavailableChecks > 0
-      ? AMBER
-      : GREEN;
   // One presentation projection of the canonical checks, reused byte-for-byte by
   // the hero card AND the Verified Vehicle Data module (both desktop + mobile).
   const vChecksUi = report.checks.map((c) => {
@@ -689,35 +685,10 @@ export default function VehiclePassportGoverned() {
             )}
           </section>
 
-          {/* 9 — AutoLabels Verified */}
+          {/* 9 — AutoLabels Verified (Option B: Balanced Status Dashboard) */}
           {vShow && (
             <section className="px-4 pt-6" data-module="verification">
-              <H>AutoLabels Verified</H>
-              <div className={`${CARD} mt-3 p-4`}>
-                <div className="flex items-start justify-between gap-3">
-                  <div className="flex items-center gap-2.5 min-w-0">
-                    <span className="h-10 w-10 grid place-items-center rounded-full shrink-0" style={{ background: "#EFF6FF" }}><ShieldCheck className="w-[22px] h-[22px]" style={{ color: BLUE }} /></span>
-                    <div className="min-w-0">
-                      <div className="text-[14px] font-extrabold" style={{ color: NAVY }}>{vAllVerified ? `All ${vTotal} checks verified` : `${vVerified} of ${vTotal} verified`}</div>
-                      <div className="text-[12px] leading-snug" style={{ color: SUB }}>Checked against trusted automotive data sources.</div>
-                    </div>
-                  </div>
-                  <button onClick={() => openPanel("price-confidence")} className="text-[11px] font-bold shrink-0 text-right" style={{ color: vSummaryColor }}>{vSummary}</button>
-                </div>
-                <div className="mt-3 space-y-2">
-                  {vChecksUi.map((c) => (
-                    <div key={c.key} className="flex items-center gap-2.5 rounded-xl border px-3 py-2.5" style={{ borderColor: BORDER, background: c.bg }}>
-                      <c.Icon className="w-[20px] h-[20px] shrink-0" style={{ color: c.color }} />
-                      <div className="text-[13px] font-semibold leading-tight flex-1 min-w-0" style={{ color: NAVY }}>{c.name}</div>
-                      <div className="text-[11px] font-semibold shrink-0" style={{ color: c.color }}>{c.statusLabel}</div>
-                    </div>
-                  ))}
-                </div>
-                <div className="mt-3 flex items-center justify-between gap-3">
-                  <button onClick={() => go("verification")} className="text-[13px] font-bold inline-flex items-center gap-1" style={{ color: BLUE }}>View full verification report <ChevronRight className="w-4 h-4" /></button>
-                  <button onClick={() => openPanel("price-confidence")} className="text-[12px] font-semibold" style={{ color: SUB }}>How verification works</button>
-                </div>
-              </div>
+              <AutoLabelsVerifiedCard report={report} onOpenReport={() => go("verification")} onReview={() => go("verification")} />
             </section>
           )}
 
@@ -1120,33 +1091,9 @@ export default function VehiclePassportGoverned() {
                       </div>
                     )}
 
-                    {/* AutoLabels Verified — governed per-category state; never all-green
-                        while a material check is pending. */}
+                    {/* AutoLabels Verified (Option B: Balanced Status Dashboard) */}
                     {vShow && (
-                      <div className="mt-4 rounded-xl border p-4" style={{ borderColor: BORDER, background: "#FBFDFF" }}>
-                        <div className="flex items-start justify-between gap-3">
-                          <div className="flex items-center gap-2.5 min-w-0">
-                            <span className="h-9 w-9 grid place-items-center rounded-full shrink-0" style={{ background: "#EFF6FF" }}><ShieldCheck className="w-5 h-5" style={{ color: BLUE }} /></span>
-                            <div className="min-w-0">
-                              <div className="text-[14px] font-extrabold" style={{ color: NAVY }}>AutoLabels Verified</div>
-                              <div className="text-[12px] leading-snug" style={{ color: SUB }}>Checked against trusted automotive data sources.</div>
-                            </div>
-                          </div>
-                          <button onClick={() => go("verification")} className="text-[11px] font-bold shrink-0 text-right hover:underline" style={{ color: vSummaryColor }}>{vSummary}</button>
-                        </div>
-                        <div className="mt-3 grid grid-cols-2 gap-x-4 gap-y-2.5">
-                          {vChecksUi.map((c) => (
-                            <div key={c.key} className="flex items-start gap-2 min-w-0">
-                              <c.Icon className="w-4 h-4 shrink-0 mt-0.5" style={{ color: c.color }} />
-                              <div className="min-w-0">
-                                <div className="text-[12.5px] font-semibold leading-tight truncate" style={{ color: NAVY }}>{c.name}</div>
-                                <div className="text-[11px] font-semibold leading-tight" style={{ color: c.color }}>{c.statusLabel}</div>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                        <button onClick={() => go("verification")} className="mt-3 text-[13px] font-bold inline-flex items-center gap-1 hover:underline" style={{ color: BLUE }}>View full verification report <ChevronRight className="w-4 h-4" /></button>
-                      </div>
+                      <AutoLabelsVerifiedCard className="mt-4" report={report} onOpenReport={() => go("verification")} onReview={() => go("verification")} />
                     )}
                   </div>
                 </section>
