@@ -184,6 +184,20 @@ const VehiclePassportDocuments = () => {
   const share = async (url: string) => { try { if (navigator.share) { await navigator.share({ url }); return; } } catch { return; } await navigator.clipboard.writeText(url); toast.success("Link copied"); };
   const CAT_TABS = [{ key: "all", label: "All Documents" }, ...CATEGORIES.filter((c) => (counts[c.key] || 0) > 0).map((c) => ({ key: c.key, label: c.label.replace("Vehicle ", "").replace(" & Compliance", "") }))];
 
+  // Print packet manifest — grouped over ALL included docs (never the
+  // active search/category filter) so Print always emits the full packet.
+  const printGroups = CATEGORIES.map((c) => ({ c, docs: allDocs.filter((x) => categoryOf(x) === c.key) })).filter((g) => g.docs.length > 0);
+  const printedOn = new Date().toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" });
+  const oemBrochure = (listing as { oem_brochure?: { url: string; title?: string | null; year?: number | null } }).oem_brochure;
+  const brochureMk = (listing.ymm || "").trim().split(/\s+/)[1] || "";
+  const printLinks: { title: string; note: string; url: string }[] = [];
+  if (d.historyReport && packetVisible(listing, "historyReport"))
+    printLinks.push({ title: `${historyReportName(d.historyReport.provider)} Vehicle History Report`, note: d.historyReport.source === "vin" ? "Official record for this VIN" : "External report link", url: d.historyReport.url });
+  if (oemBrochure?.url && packetVisible(listing, "brochure"))
+    printLinks.push({ title: `Official ${brochureMk.toUpperCase()} Brochure${oemBrochure.year ? ` (${oemBrochure.year})` : ""}`, note: "Manufacturer website", url: oemBrochure.url });
+  if (listing.oem_sticker_url && packetVisible(listing, "oemSticker") && !allDocs.some((x) => x.type === "window_sticker"))
+    printLinks.push({ title: "Original Window Sticker", note: "Factory Monroney label", url: listing.oem_sticker_url });
+
   const DocCard = ({ doc }: { doc: Doc }) => (
     <div className={`${CARD} p-3 flex flex-col transition-transform hover:-translate-y-0.5`}>
       <button onClick={() => setPreview(doc)} className="rounded-xl border border-[#EEF1F4] overflow-hidden h-[120px] bg-slate-50"><DocThumb url={doc.url} /></button>
@@ -207,8 +221,60 @@ const VehiclePassportDocuments = () => {
   );
 
   return (
-    <div className="min-h-[100svh] bg-[#F6F7F9] text-[#0F172A]" style={{ fontFamily: "Inter, -apple-system, BlinkMacSystemFont, sans-serif" }}>
+    <div className="vpd-doc-root min-h-[100svh] bg-[#F6F7F9] text-[#0F172A]" style={{ fontFamily: "Inter, -apple-system, BlinkMacSystemFont, sans-serif" }}>
       <Helmet><title>{`Documents — ${listing.ymm} · AutoLabels`}</title><meta name="robots" content="noindex" /></Helmet>
+
+      {/* Print/save-to-PDF manifest: a clean US-Letter document packet index,
+          not a screenshot of the interactive grid. Screen chrome is hidden by
+          the scoped rule below; this block is the only thing that prints. */}
+      <style>{`@media print { .vpd-doc-root > :not(.vpd-print) { display: none !important; } .vpd-print { display: block !important; } }`}</style>
+      <div className="vpd-print hidden print:block bg-white text-[#0F172A] px-1">
+        <div className="flex items-center justify-between border-b-2 border-[#0F172A] pb-3 mb-4">
+          <Logo variant="full" size={20} />
+          <div className="text-right">
+            <p className="text-[15px] font-bold">Vehicle Document Packet</p>
+            <p className="text-[11px] text-[#475569]">Generated {printedOn}</p>
+          </div>
+        </div>
+        <div className="mb-5">
+          <p className="text-[20px] font-bold leading-tight">{listing.ymm}{listing.trim ? ` ${listing.trim}` : ""}</p>
+          <p className="text-[12px] text-[#334155] mt-1">
+            VIN {listing.vin}
+            {listing.mileage != null ? ` · ${listing.mileage.toLocaleString()} mi` : ""}
+            {d.dealerName ? ` · ${d.dealerName}` : ""}
+          </p>
+        </div>
+        {printLinks.length > 0 && (
+          <div className="mb-5 break-inside-avoid">
+            <h2 className="text-[13px] font-bold uppercase tracking-wide text-[#475569] border-b border-[#CBD5E1] pb-1 mb-2">Linked Reports</h2>
+            {printLinks.map((l, i) => (
+              <div key={i} className="break-inside-avoid py-2 border-b border-[#EEF1F4]">
+                <p className="text-[13px] font-semibold">{l.title}</p>
+                <p className="text-[11px] text-[#475569]">{l.note}</p>
+                <p className="text-[10px] text-[#2563EB] break-all">{l.url}</p>
+              </div>
+            ))}
+          </div>
+        )}
+        {printGroups.map(({ c, docs }) => (
+          <div key={c.key} className="mb-5 break-inside-avoid">
+            <h2 className="text-[13px] font-bold uppercase tracking-wide text-[#475569] border-b border-[#CBD5E1] pb-1 mb-2">{c.label} <span className="font-normal">({docs.length})</span></h2>
+            {docs.map((doc, i) => (
+              <div key={i} className="break-inside-avoid flex items-baseline justify-between gap-4 py-1.5 border-b border-[#EEF1F4]">
+                <div className="min-w-0">
+                  <p className="text-[13px] font-semibold">{doc.name}</p>
+                  {doc.description && <p className="text-[11px] text-[#475569]">{doc.description}</p>}
+                </div>
+                <span className="text-[10px] text-[#475569] shrink-0 whitespace-nowrap">Dealer Provided · {fileType(doc.url)}{doc.uploaded_at ? ` · ${fmtDate(doc.uploaded_at)}` : ""}</span>
+              </div>
+            ))}
+          </div>
+        ))}
+        {printLinks.length === 0 && printGroups.length === 0 && (
+          <p className="text-[13px] text-[#475569]">No documents are currently included in this packet. Contact {d.dealerName || "the dealership"} to request documents.</p>
+        )}
+        <div className="mt-6 pt-3 border-t border-[#CBD5E1] text-[11px] text-[#475569]">View the full digital packet at autolabels.io/v/{slug} · Generated {printedOn}</div>
+      </div>
 
       {/* Top bar */}
       <header className="bg-white border-b border-[#E6E8EC] px-5 lg:px-8 h-16 flex items-center justify-between">

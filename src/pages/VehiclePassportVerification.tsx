@@ -392,7 +392,6 @@ interface MobileProps {
   reportId: string;
   liveUrl: string;
   onBack: () => void;
-  onShare: () => void;
   onPrint: () => void;
   onDownloadPdf: () => void;
   onAskRecall: () => void;
@@ -403,7 +402,7 @@ interface MobileProps {
 
 const MobileVerification = ({
   report, listing, pdfState, reportGenerated, reportId, liveUrl,
-  onBack, onShare, onPrint, onDownloadPdf, onAskRecall, askDealerFor, onContact, track,
+  onBack, onPrint, onDownloadPdf, onAskRecall, askDealerFor, onContact, track,
 }: MobileProps) => {
   const [sheetKey, setSheetKey] = useState<string | null>(null);
   const [sourcesOpen, setSourcesOpen] = useState(false);
@@ -465,7 +464,7 @@ const MobileVerification = ({
   ];
 
   return (
-    <div className="min-h-[100svh] bg-[#F4F6FA] text-[#0D1B2A]" style={{ fontFamily: "Inter, -apple-system, BlinkMacSystemFont, sans-serif" }}>
+    <div className="min-h-[100svh] bg-[#F4F6FA] text-[#0D1B2A] print:hidden" style={{ fontFamily: "Inter, -apple-system, BlinkMacSystemFont, sans-serif" }}>
       {/* Header */}
       <header className="sticky top-0 z-40 bg-white/95 backdrop-blur border-b border-[#E6EAF0] h-[56px] flex items-center justify-between px-1.5">
         <button onClick={onBack} className="h-11 pl-1 pr-2 rounded-lg inline-flex items-center gap-1 text-[#0D1B2A] active:bg-slate-100">
@@ -474,7 +473,6 @@ const MobileVerification = ({
         </button>
         <div className="shrink-0"><Logo variant="full" size={18} /></div>
         <div className="flex items-center">
-          <button onClick={onShare} aria-label="Share report" className="w-11 h-11 rounded-lg inline-flex items-center justify-center text-[#0D1B2A] active:bg-slate-100"><Share2 className="w-[21px] h-[21px]" strokeWidth={1.9} /></button>
           <button onClick={() => setMenuOpen((v) => !v)} aria-label="More actions" aria-expanded={menuOpen} className="w-11 h-11 rounded-lg inline-flex items-center justify-center text-[#0D1B2A] active:bg-slate-100"><MoreVertical className="w-[21px] h-[21px]" strokeWidth={1.9} /></button>
         </div>
         {menuOpen && (
@@ -482,7 +480,6 @@ const MobileVerification = ({
             <div className="fixed inset-0 z-40" onClick={() => setMenuOpen(false)} />
             <div className="absolute right-2 top-[52px] z-50 w-52 rounded-xl border border-[#E6EAF0] bg-white shadow-xl py-1.5">
               {[
-                { label: "Share report", icon: Share2, fn: onShare },
                 { label: "Print report", icon: Printer, fn: onPrint },
                 { label: "Download PDF", icon: Download, fn: onDownloadPdf },
               ].map((it) => (
@@ -621,7 +618,7 @@ const MobileVerification = ({
           <ChevronRight className="w-[19px] h-[19px] text-[#94A3B8] shrink-0 self-center" aria-hidden="true" />
         </button>
 
-        {/* Report action — single Download PDF (Share in header, Print in overflow) */}
+        {/* Report action — single Download PDF (Print in overflow menu) */}
         <div className="pt-1">
           <button onClick={onDownloadPdf} className="w-full min-h-[50px] rounded-xl border border-[#2563EB] bg-white text-[#2563EB] text-[15px] font-semibold inline-flex items-center justify-center gap-2">
             {pdfState === "working" ? <Loader2 className="w-[21px] h-[21px] animate-spin" /> : pdfState === "done" ? <CircleCheck className="w-[21px] h-[21px]" /> : <Download className="w-[21px] h-[21px]" strokeWidth={2} />}
@@ -720,6 +717,182 @@ const MobileVerification = ({
           </button>
         </div>
       </BottomSheet>
+    </div>
+  );
+};
+
+// ── Print / Save-to-PDF document ────────────────────────────────────────────
+// A single-column, US-Letter document rendered hidden on screen (`hidden
+// print:block`) inside BOTH the desktop and mobile trees, so window.print() /
+// Save-as-PDF always yields ONE clean letterhead document regardless of the
+// viewport that triggered it. It reads the SAME canonical VerificationReport as
+// the screen — it re-lays out, it never re-derives: a pending check stays
+// Pending, a do-not-drive recall keeps its red status and wording, a null
+// evidence value reads "Not available", nothing is fabricated. All screen chrome
+// (nav, sticky bars, action buttons, dock, sheets) is hidden via the sibling
+// screen root's `print:hidden`, so only this document reaches the page.
+
+const PrintCheckCard = ({ check }: { check: ReportCheck }) => {
+  const ui = STATUS_UI[check.status];
+  const explanation = check.finding
+    ?? (check.status === "pending"
+      ? "This check has not returned a result yet. Pending does not mean a problem was found."
+      : check.status === "unavailable"
+        ? "The records this check needs are not available for this vehicle. This is not a problem found — there is simply no data to verify."
+        : "");
+  const title = check.status === "verified" ? check.name : exceptionHeadline(check);
+  return (
+    <article className="vp-card border border-neutral-300 rounded-lg p-3 mb-2">
+      <div className="flex items-center justify-between gap-3">
+        <span className={`inline-flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wide ${ui.fg}`}><ui.icon className="w-3.5 h-3.5" aria-hidden="true" />{ui.label}</span>
+        <span className="text-[10px] text-neutral-500">{PROVENANCE_LABEL[check.provenance]}</span>
+      </div>
+      <p className="text-[13px] font-bold text-black mt-1 leading-snug">{title}</p>
+      {explanation && <p className="text-[11px] text-neutral-700 mt-0.5 leading-snug">{explanation}</p>}
+      {check.evidence.length > 0 && (
+        <div className="mt-2 border-t border-neutral-200 pt-1.5">
+          {check.evidence.map((e) => (
+            <div key={e.label} className="flex items-start justify-between gap-4 text-[11px] py-0.5">
+              <span className="text-neutral-500 shrink-0">{e.label}</span>
+              <span className={`text-right ${e.value ? "text-black font-medium" : "text-neutral-400 italic"}`}>{e.value ?? "Not available from current sources"}</span>
+            </div>
+          ))}
+        </div>
+      )}
+      <p className="text-[10px] text-neutral-500 mt-2">Source: {sourceLabelFor(check)}{check.checkedAt ? ` · Checked ${dateLabel(check.checkedAt)}` : ""}</p>
+    </article>
+  );
+};
+
+const VerificationPrintDoc = ({ report, listing, slug }: { report: VerificationReport; listing: VehicleListing; slug: string }) => {
+  const now = new Date();
+  const reportGenerated = now.toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" });
+  const [yyyy, mm] = now.toISOString().slice(0, 10).split("-");
+  const reportId = `AL-${(listing.vin || "REPORT").slice(-6)}-${mm}${yyyy}`;
+  const lastChecked = report.lastCheckedAt ? dateLabel(report.lastCheckedAt) : null;
+  const dealerName = ((listing as unknown as { dealer_snapshot?: { name?: string } }).dealer_snapshot?.name) || null;
+  const condition = conditionBadge(listing);
+
+  const exceptions = report.checks
+    .filter((c) => c.status !== "verified")
+    .sort((a, b) => exceptionRank(a.status) - exceptionRank(b.status));
+  const verified = report.checks.filter((c) => c.status === "verified");
+  const recallIsException = report.checks.some((c) => c.key === "recall" && c.status !== "verified");
+  const unavailable = exceptions.filter((c) => c.status === "unavailable");
+  const secondary = exceptions.filter((c) => c.status !== "unavailable" && c.key !== "recall");
+
+  // Same derivation rules as the on-screen "What should I do next?" list —
+  // presentational copy driven purely by which exceptions exist.
+  const nextSteps: string[] = [];
+  if (recallIsException) {
+    nextSteps.push("Ask the dealer about the open recall and whether the remedy is available.");
+    nextSteps.push("Confirm the recall remedy has been completed before you take delivery.");
+  }
+  secondary.forEach((c) => {
+    if (c.key === "title") nextSteps.push("Review the title and brand details with the dealer once that check completes.");
+    else nextSteps.push(`Ask the dealer about ${c.name.toLowerCase()}.`);
+  });
+  if (unavailable.length) nextSteps.push("Ask the dealer for the records behind any checks marked unavailable.");
+  if (nextSteps.length === 0) nextSteps.push("Review the verified checks above — every completed check returned a clear result.");
+  nextSteps.push("Keep this report for your records. It reflects the source data as of the date shown.");
+
+  const H2 = ({ children }: { children: React.ReactNode }) => (
+    <h2 className="text-[12px] font-bold uppercase tracking-wide text-black border-b border-neutral-300 pb-1 mb-2.5">{children}</h2>
+  );
+
+  return (
+    <div className="vp-verify-print hidden print:block bg-white text-black text-[12px] leading-normal" style={{ fontFamily: "Inter, -apple-system, BlinkMacSystemFont, sans-serif" }}>
+      <style>{`
+        .vp-verify-print { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+        .vp-verify-print .vp-card { break-inside: avoid; }
+      `}</style>
+
+      {/* Masthead / letterhead */}
+      <div className="vp-card flex items-start justify-between gap-6 border-b-2 border-black pb-3 mb-4">
+        <div>
+          <Logo variant="full" size={22} />
+          <p className="text-[14px] font-bold mt-2">AutoLabels Data-Verified Report</p>
+          <p className="text-[10.5px] text-neutral-600 mt-0.5">Report generated {reportGenerated}{lastChecked ? ` · Source data last checked ${lastChecked}` : ""}</p>
+          <p className="text-[10.5px] text-neutral-500">Report {reportId}</p>
+        </div>
+        <div className="text-right shrink-0">
+          <p className="text-[14px] font-bold">{listing.ymm}{listing.trim ? ` ${listing.trim}` : ""}{condition ? ` · ${condition}` : ""}</p>
+          <p className="text-[11px] text-neutral-700 mt-0.5">VIN {listing.vin || "Not available"}</p>
+          {listing.mileage != null && <p className="text-[11px] text-neutral-700">{listing.mileage.toLocaleString()} mi</p>}
+          {dealerName && <p className="text-[11px] text-neutral-700">{dealerName}</p>}
+        </div>
+      </div>
+
+      {/* Verdict + status counts */}
+      <div className="vp-card border border-neutral-300 rounded-lg p-3 mb-4">
+        <p className="text-[13px] font-bold">{report.banner.heading}</p>
+        {report.banner.body && <p className="text-[11px] text-neutral-700 mt-1 leading-snug">{report.banner.body}</p>}
+        <div className="flex flex-wrap gap-2 mt-2">
+          {statusSegments(report).map(({ status, count }) => {
+            const ui = STATUS_UI[status];
+            return (
+              <span key={status} className="inline-flex items-center gap-1.5 border border-neutral-300 rounded-full px-2 py-0.5 text-[10.5px] font-semibold">
+                <ui.icon className={`w-3 h-3 ${ui.fg}`} aria-hidden="true" /><span className={ui.fg}>{count}</span> {ui.label}
+              </span>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Findings to review */}
+      {exceptions.length > 0 && (
+        <section className="mb-4">
+          <H2>Findings to review</H2>
+          {exceptions.map((c) => <PrintCheckCard key={c.key} check={c} />)}
+        </section>
+      )}
+
+      {/* Verified checks */}
+      {verified.length > 0 && (
+        <section className="mb-4">
+          <H2>Verified checks ({verified.length})</H2>
+          {verified.map((c) => <PrintCheckCard key={c.key} check={c} />)}
+        </section>
+      )}
+
+      {/* Data sources — a fresh page keeps the reference block and next steps together */}
+      <section className="mb-4 print:break-before-page">
+        <H2>Data sources ({report.sourceCount})</H2>
+        <div className="grid grid-cols-2 gap-2">
+          {report.sources.map((s) => (
+            <div key={s.family} className="vp-card border border-neutral-300 rounded-lg p-2.5">
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-[12px] font-bold text-black">{s.label}</span>
+                <span className="text-[10px] text-neutral-500 shrink-0">{PROVENANCE_LABEL[s.provenance]}</span>
+              </div>
+              <p className="text-[11px] text-neutral-700 mt-0.5">{s.type}</p>
+              <p className="text-[10px] text-neutral-500 mt-0.5">{s.checkedAt ? `Last checked ${dateLabel(s.checkedAt)}` : "Available"}</p>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* What's next */}
+      <section className="vp-card mb-4">
+        <H2>What's next</H2>
+        <ol className="space-y-1.5">
+          {nextSteps.map((step, i) => (
+            <li key={i} className="flex items-start gap-2.5 text-[11.5px] text-neutral-800 leading-snug">
+              <span className="text-black font-bold shrink-0">{i + 1}.</span>
+              <span>{step}</span>
+            </li>
+          ))}
+        </ol>
+        <p className="text-[10px] text-neutral-500 mt-3 leading-snug">
+          AutoLabels compares available automotive data sources and never displays pending or unavailable checks as completed. This report does not replace a physical inspection, title search, or written confirmation from the dealer.
+        </p>
+      </section>
+
+      {/* Footer */}
+      <div className="vp-card border-t border-neutral-300 pt-2 mt-4 flex items-center justify-between gap-4 text-[10px] text-neutral-500">
+        <span>Verify this report at autolabels.io/v/{slug}/verification</span>
+        <span>{lastChecked ? `Source data checked ${lastChecked}` : `Report ${reportId}`}</span>
+      </div>
     </div>
   );
 };
@@ -905,7 +1078,6 @@ const VehiclePassportVerification = () => {
           reportId={reportId}
           liveUrl={canonicalReportUrl()}
           onBack={back}
-          onShare={share}
           onPrint={printReport}
           onDownloadPdf={downloadPdf}
           onAskRecall={askRecall}
@@ -913,6 +1085,7 @@ const VehiclePassportVerification = () => {
           onContact={() => goContact({ topic: "other", checkId: "report" })}
           track={track}
         />
+        <VerificationPrintDoc report={report} listing={listing} slug={listing.slug || vehicleSlug || ""} />
       </>
     );
   }
@@ -957,7 +1130,8 @@ const VehiclePassportVerification = () => {
   );
 
   return (
-    <div className="min-h-[100svh] bg-[#F6F7F9] text-[#0F172A]" style={{ fontFamily: "Inter, -apple-system, BlinkMacSystemFont, sans-serif" }}>
+    <>
+    <div className="min-h-[100svh] bg-[#F6F7F9] text-[#0F172A] print:hidden" style={{ fontFamily: "Inter, -apple-system, BlinkMacSystemFont, sans-serif" }}>
       <Helmet><title>{`Data-Verified Report — ${listing.ymm} · AutoLabels`}</title><meta name="robots" content="noindex" /></Helmet>
 
       {/* Top bar — back + report actions */}
@@ -965,7 +1139,6 @@ const VehiclePassportVerification = () => {
         <button onClick={back} className="text-[14px] font-semibold text-[#64748B] hover:text-[#0F172A] inline-flex items-center gap-1.5 min-h-[44px]"><ChevronLeft className="w-4 h-4" /> Back to Vehicle Passport</button>
         <div className="hidden sm:block"><Logo variant="full" size={20} /></div>
         <div className="flex items-center gap-2">
-          <button onClick={share} aria-label="Share report" className="h-10 px-3 rounded-lg text-[13px] font-semibold text-[#64748B] hover:text-[#0F172A] inline-flex items-center gap-1.5"><Share2 className="w-4 h-4" /><span className="hidden md:inline">Share</span></button>
           <button onClick={downloadPdf} aria-label="Download report as PDF" className="h-10 px-3 rounded-lg text-[13px] font-semibold text-[#64748B] hover:text-[#0F172A] inline-flex items-center gap-1.5">{pdfState === "working" ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}<span className="hidden md:inline">Download PDF</span></button>
           <button onClick={printReport} aria-label="Print report" className="h-10 px-3 rounded-lg text-[13px] font-semibold text-[#64748B] hover:text-[#0F172A] inline-flex items-center gap-1.5"><Printer className="w-4 h-4" /><span className="hidden md:inline">Print</span></button>
         </div>
@@ -1225,6 +1398,8 @@ const VehiclePassportVerification = () => {
         onAction={(a) => track("verification_bubble_action_clicked", { action: a })}
       />
     </div>
+    <VerificationPrintDoc report={report} listing={listing} slug={listing.slug || vehicleSlug || ""} />
+    </>
   );
 };
 

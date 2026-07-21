@@ -687,13 +687,75 @@ const PublicDocuments = () => {
 
   const openSend = (mode: "email" | "text" | "notify", title: string, url?: string | null) => setSend({ mode, title, url });
 
+  // Print packet manifest — only documents actually in the packet
+  // (on_file or action_required), never the "coming soon" placeholders,
+  // grouped by category, plus dealer-uploaded custom docs.
+  const printDocs = docs.filter((x) => x.resolved.status !== "coming_soon");
+  const printGroups = CATEGORIES.filter((c) => c.key !== "all")
+    .map((c) => ({ c, items: printDocs.filter((x) => x.doc.category === c.key) }))
+    .filter((g) => g.items.length > 0);
+  const printedOn = fmtDate(new Date().toISOString());
+
   return (
-    <div className="min-h-screen bg-white text-slate-900 pb-24 sm:pb-0">
+    <div className="pubdoc-root min-h-screen bg-white text-slate-900 pb-24 sm:pb-0">
       <Helmet>
         <title>{`Documents — ${ymm}${listing.trim ? ` ${listing.trim}` : ""}`}</title>
         <meta name="robots" content="noindex" />
         <link rel="canonical" href={`${publicUrl(listing.slug)}/documents`} />
       </Helmet>
+
+      {/* Print/save-to-PDF manifest: a clean US-Letter document packet index,
+          not a screenshot of the interactive grid. Screen chrome (and any open
+          viewer/send modal) is hidden by the scoped rule below; this block is
+          the only thing that prints. */}
+      <style>{`@media print { .pubdoc-root > :not(.pubdoc-print) { display: none !important; } .pubdoc-print { display: block !important; } }`}</style>
+      <div className="pubdoc-print hidden print:block bg-white text-slate-900 px-1">
+        <div className="flex items-center justify-between border-b-2 border-slate-900 pb-3 mb-4">
+          <Logo variant="full" size={20} />
+          <div className="text-right">
+            <p className="text-[15px] font-bold">Vehicle Document Packet</p>
+            <p className="text-[11px] text-slate-600">Generated {printedOn}</p>
+          </div>
+        </div>
+        <div className="mb-5">
+          <p className="text-[20px] font-bold leading-tight">{ymm}{listing.trim ? ` ${listing.trim}` : ""}</p>
+          <p className="text-[12px] text-slate-700 mt-1">
+            VIN {listing.vin}
+            {listing.mileage != null ? ` · ${listing.mileage.toLocaleString()} mi` : ""}
+            {ks.exterior_color ? ` · ${ks.exterior_color}` : ""}
+            {` · ${dealerName}`}
+          </p>
+        </div>
+        {printGroups.map(({ c, items }) => (
+          <div key={c.key} className="mb-5 break-inside-avoid">
+            <h2 className="text-[13px] font-bold uppercase tracking-wide text-slate-600 border-b border-slate-300 pb-1 mb-2">{c.label} <span className="font-normal">({items.length})</span></h2>
+            {items.map(({ doc, resolved }) => (
+              <div key={doc.key} className="break-inside-avoid py-1.5 border-b border-slate-100">
+                <div className="flex items-baseline justify-between gap-4">
+                  <p className="text-[13px] font-semibold">{doc.title}</p>
+                  <span className="text-[10px] text-slate-600 shrink-0 whitespace-nowrap">{resolved.status === "action_required" ? (resolved.statusText || "Action required") : (resolved.date ? `On file · ${fmtDate(resolved.date)}` : "On file")}</span>
+                </div>
+                {resolved.url && <p className="text-[10px] text-blue-700 break-all">{resolved.url}</p>}
+              </div>
+            ))}
+          </div>
+        ))}
+        {customDocs.length > 0 && (
+          <div className="mb-5 break-inside-avoid">
+            <h2 className="text-[13px] font-bold uppercase tracking-wide text-slate-600 border-b border-slate-300 pb-1 mb-2">Dealer-Provided Documents <span className="font-normal">({customDocs.length})</span></h2>
+            {customDocs.map((doc) => (
+              <div key={doc.url} className="break-inside-avoid py-1.5 border-b border-slate-100">
+                <p className="text-[13px] font-semibold">{doc.name || "Document"}</p>
+                <p className="text-[10px] text-blue-700 break-all">{doc.url}</p>
+              </div>
+            ))}
+          </div>
+        )}
+        {printGroups.length === 0 && customDocs.length === 0 && (
+          <p className="text-[13px] text-slate-600">No documents are currently on file for this vehicle. Contact {dealerName} to request documents.</p>
+        )}
+        <div className="mt-6 pt-3 border-t border-slate-300 text-[11px] text-slate-600">View the full digital packet at autolabels.io/v/{listing.slug} · Generated {printedOn}</div>
+      </div>
 
       {/* ══ HEADER ══════════════════════════════════════════════ */}
       <header className="sticky top-0 z-30 bg-white border-b border-slate-200 px-4 py-3 flex items-center justify-between">

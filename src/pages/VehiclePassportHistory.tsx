@@ -106,6 +106,13 @@ const VehiclePassportHistory = () => {
   const updatedRaw = d.marketCheckedAt || (listing as unknown as { updated_at?: string }).updated_at || null;
   const updatedLbl = updatedRaw ? `Updated ${new Date(updatedRaw).toLocaleDateString()}` : null;
   const dealerName = d.dealerName || "the dealer";
+  // Print/PDF header + footer dates. Generated is the moment of printing;
+  // "sources checked" is the real latest-data timestamp, never today's date.
+  const printGenerated = new Date().toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" });
+  const sourceCheckedLbl = updatedRaw
+    ? `Sources checked ${new Date(updatedRaw).toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })}`
+    : "Sources checked: date not available";
+  const verifyUrl = `autolabels.io/v/${slug}/history`;
 
   type CpoView = { name?: string; inspection_points?: string };
   const cpoProgram = isCpo ? (listing as unknown as { cpo_programs?: CpoView[] }).cpo_programs?.[0] ?? null : null;
@@ -279,13 +286,221 @@ const VehiclePassportHistory = () => {
     </div>
   );
 
+  // ── Print / save-to-PDF document ──────────────────────────────
+  // A dedicated US-Letter document, not a screenshot of the app. Screen
+  // chrome is hidden (print:hidden) and this block is shown only under
+  // @media print (.vphp-doc). It renders the SAME derived data the screen
+  // shows — an open recall stays flagged, "not reported"/"not available"
+  // stay as-is; nothing is fabricated.
+  const PrintDoc = () => (
+    <div className="vphp-doc" aria-hidden>
+      <div className="vphp-masthead">
+        <div>
+          <div className="vphp-logo"><Logo variant="full" size={22} /></div>
+          <div className="vphp-title">Vehicle History Report</div>
+          <div className="vphp-sub">{isNewCar ? "Born-new provenance record" : "The verified records on file for this vehicle"}</div>
+        </div>
+        <div className="vphp-idcol">
+          <strong>{listing.ymm}{listing.trim ? ` ${listing.trim}` : ""}</strong>
+          <span>VIN {listing.vin}</span>
+          <span>{listing.mileage != null ? `${listing.mileage.toLocaleString()} mi` : "Mileage not reported"}</span>
+          <span>{dealerName}</span>
+          <span className="vphp-muted">Generated {printGenerated}</span>
+          <span className="vphp-muted">{sourceCheckedLbl}</span>
+        </div>
+      </div>
+
+      {glance.length > 0 && (
+        <div className="vphp-glance">
+          {glance.map((g) => (
+            <div key={g.label} className="vphp-tile"><div className="l">{g.label}</div><div className="v">{g.value}</div></div>
+          ))}
+        </div>
+      )}
+
+      {!isNewCar && score != null && (
+        <div className="vphp-section">
+          <div className="vphp-h2">History &amp; Title Score — {score}/100{strongTier ? ` · ${tier}` : ""}</div>
+          {deductions.length > 0 ? (
+            <>
+              <p className="vphp-note">What lowered the score:</p>
+              <ul className="vphp-list">{deductions.map((dd) => <li key={dd.label}>{dd.label} (−{dd.points} pts)</li>)}</ul>
+            </>
+          ) : <p className="vphp-ok">No deductions — every known signal on this vehicle is clean.</p>}
+        </div>
+      )}
+
+      {isNewCar ? (
+        <>
+          <div className="vphp-section">
+            <div className="vphp-h2">From the Factory to You</div>
+            <ol className="vphp-timeline">
+              {provenance.map((e) => (
+                <li key={e.t}><div className="vphp-tl-t">{e.t}</div><div className="vphp-tl-s">{e.s}</div><div className="vphp-tl-n">{e.n}</div></li>
+              ))}
+            </ol>
+          </div>
+          {d.hasRecallCheck && (
+            <div className="vphp-section">
+              <div className="vphp-h2">Recall Status</div>
+              {d.recallClear ? (
+                <p className="vphp-ok">No open safety recalls found with NHTSA.</p>
+              ) : (
+                <>
+                  <p className="vphp-warn">Open recall on record — ask the dealer to confirm completion before delivery.</p>
+                  {recallCampaigns.length > 0 && (
+                    <ul className="vphp-list">{recallCampaigns.map((c, i) => (
+                      <li key={c.campaignNumber || i}><span className="vphp-tl-t">{c.component || `NHTSA campaign${c.campaignNumber ? ` ${c.campaignNumber}` : ""}`}</span>{c.summary ? ` — ${c.summary}` : ""}{c.remedy ? " Remedy: free repair at any authorized dealer." : ""}</li>
+                    ))}</ul>
+                  )}
+                </>
+              )}
+            </div>
+          )}
+        </>
+      ) : (
+        <>
+          <div className="vphp-section">
+            <div className="vphp-h2">Title &amp; Brand Status</div>
+            {d.titleStatus === "clean" ? (
+              <p className="vphp-ok">Clean title — no salvage, flood, lemon, or rebuilt brands reported by vehicle history providers.</p>
+            ) : d.titleStatus === "branded" ? (
+              <p className="vphp-warn">Title brand on record — review the title record with {dealerName}.</p>
+            ) : (
+              <p className="vphp-muted">Title record available from the dealership.</p>
+            )}
+          </div>
+
+          {d.accidentCount != null && (
+            <div className="vphp-section">
+              <div className="vphp-h2">Accident &amp; Damage</div>
+              {d.accidentCount === 0 ? (
+                <p className="vphp-ok">No accidents reported in the available history sources.</p>
+              ) : (
+                <p className="vphp-warn">{d.accidentCount} incident{d.accidentCount === 1 ? "" : "s"} reported — incident details (date, severity, repair status) are in the full report; review with the dealer.</p>
+              )}
+            </div>
+          )}
+
+          {d.ownerCount != null && d.ownerCount > 0 && (
+            <div className="vphp-section">
+              <div className="vphp-h2">Ownership</div>
+              <p>{d.ownerCount === 1 ? "One owner on record" : `${d.ownerCount} owners on record`}</p>
+              <p className="vphp-note">Source: vehicle history providers. Owner-by-owner dates and locations appear when reported.</p>
+            </div>
+          )}
+
+          {listing.mileage != null && (
+            <div className="vphp-section">
+              <div className="vphp-h2">Odometer</div>
+              <p>Current {listing.mileage.toLocaleString()} mi{avgYearly != null ? ` · ${avgYearly.toLocaleString()} mi/yr average` : ""}{age != null ? ` · ${age} yr on the road` : ""}</p>
+              {mileageTrail && (
+                <p className="vphp-note">Mileage record: {mileageTrail.map((p) => p.miles.toLocaleString()).join(" → ")} miles ({mileageTrail.map((p) => monthYear(p.date)).join(" → ")}) — consistent, non-decreasing odometer readings.</p>
+              )}
+            </div>
+          )}
+
+          {services.length > 0 ? (
+            <div className={`vphp-section ${services.length > 6 ? "vphp-break" : ""}`}>
+              <div className="vphp-h2">Service &amp; Maintenance Records ({services.length})</div>
+              <table className="vphp-table">
+                <thead><tr><th>Date</th><th>Mileage</th><th>Service performed</th></tr></thead>
+                <tbody>
+                  {services.map((s, i) => (
+                    <tr key={i}>
+                      <td>{s.date ? new Date(s.date).toLocaleDateString() : "—"}</td>
+                      <td>{s.mileage ? `${s.mileage} mi` : "—"}</td>
+                      <td>{[s.type, s.notes].filter(Boolean).join(" — ") || "Maintenance performed"}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <div className="vphp-section">
+              <div className="vphp-h2">Service &amp; Maintenance Records</div>
+              <p className="vphp-muted">No service records on file.</p>
+            </div>
+          )}
+
+          {d.hasRecallCheck && (
+            <div className="vphp-section">
+              <div className="vphp-h2">Recall Status</div>
+              {d.recallClear ? (
+                <p className="vphp-ok">No open safety recalls were found for this vehicle with NHTSA.</p>
+              ) : (
+                <>
+                  <p className="vphp-warn">{d.openRecalls != null ? `${d.openRecalls} open recall${d.openRecalls === 1 ? "" : "s"} on record` : "Open recall on record"} — ask the dealer to confirm these are completed before delivery.</p>
+                  {recallCampaigns.length > 0 && (
+                    <ul className="vphp-list">{recallCampaigns.map((c, i) => (
+                      <li key={c.campaignNumber || i}><span className="vphp-tl-t">{c.component || `NHTSA campaign${c.campaignNumber ? ` ${c.campaignNumber}` : ""}`}</span>{c.summary ? ` — ${c.summary}` : ""}{c.remedy ? " Remedy: free repair at any authorized dealer." : ""}</li>
+                    ))}</ul>
+                  )}
+                </>
+              )}
+            </div>
+          )}
+        </>
+      )}
+
+      {meansItems.length > 0 && (
+        <div className="vphp-section">
+          <div className="vphp-h2">What This Means To You</div>
+          <ul className="vphp-list">{meansItems.map((m) => <li key={m}>{m}</li>)}</ul>
+        </div>
+      )}
+
+      <div className="vphp-footer">
+        <span>Verify at {verifyUrl}</span>
+        <span>{sourceCheckedLbl}</span>
+      </div>
+    </div>
+  );
+
   return (
-    <div className="min-h-[100svh] bg-[#F6F7F9] text-[#0F172A]" style={{ fontFamily: "Inter, -apple-system, BlinkMacSystemFont, sans-serif" }}>
+    <div className="vph-print min-h-[100svh] bg-[#F6F7F9] text-[#0F172A] print:bg-white print:min-h-0" style={{ fontFamily: "Inter, -apple-system, BlinkMacSystemFont, sans-serif" }}>
       <Helmet><title>{`Vehicle History Summary — ${listing.ymm}`}</title>{isPreview && <meta name="robots" content="noindex" />}</Helmet>
-      {isPreview && <div className="bg-amber-500 text-white text-center text-[12px] font-bold py-1.5 px-4">SAMPLE PREVIEW — design layout with placeholder data. Not a real listing.</div>}
+      <style>{`
+        .vph-print .vphp-doc { display: none; }
+        @media print {
+          .vph-print .vphp-doc { display: block; color: #0f172a; background: #fff; font-size: 10.5px; line-height: 1.4; }
+          .vph-print .vphp-logo { margin-bottom: 6px; }
+          .vph-print .vphp-masthead { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; border-bottom: 2px solid #0f172a; padding-bottom: 10px; margin-bottom: 14px; }
+          .vph-print .vphp-title { font-size: 18px; font-weight: 800; letter-spacing: -0.01em; }
+          .vph-print .vphp-sub { font-size: 10px; color: #475569; margin-top: 2px; }
+          .vph-print .vphp-idcol { text-align: right; font-size: 10px; color: #334155; display: flex; flex-direction: column; gap: 1px; }
+          .vph-print .vphp-idcol strong { font-size: 12px; color: #0f172a; }
+          .vph-print .vphp-muted { color: #64748b; }
+          .vph-print .vphp-glance { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
+          .vph-print .vphp-tile { flex: 1 1 90px; min-width: 90px; border: 1px solid #d9dde3; border-radius: 6px; padding: 7px 9px; break-inside: avoid; }
+          .vph-print .vphp-tile .l { font-size: 8px; text-transform: uppercase; letter-spacing: 0.05em; color: #64748b; }
+          .vph-print .vphp-tile .v { font-size: 12px; font-weight: 700; margin-top: 1px; }
+          .vph-print .vphp-section { break-inside: avoid; border: 1px solid #d9dde3; border-radius: 6px; padding: 10px 12px; margin-bottom: 10px; }
+          .vph-print .vphp-h2 { font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.05em; color: #334155; margin: 0 0 6px; }
+          .vph-print .vphp-doc p { margin: 0 0 2px; }
+          .vph-print .vphp-ok { color: #15803d; font-weight: 700; }
+          .vph-print .vphp-warn { color: #b45309; font-weight: 700; }
+          .vph-print .vphp-note { font-size: 9.5px; color: #64748b; }
+          .vph-print .vphp-list { margin: 4px 0 0; padding-left: 16px; }
+          .vph-print .vphp-list li { font-size: 10px; margin-bottom: 2px; }
+          .vph-print .vphp-table { width: 100%; border-collapse: collapse; margin-top: 4px; }
+          .vph-print .vphp-table th { text-align: left; font-size: 8px; text-transform: uppercase; letter-spacing: 0.04em; color: #64748b; border-bottom: 1px solid #cbd5e1; padding: 3px 6px; }
+          .vph-print .vphp-table td { font-size: 10px; border-bottom: 1px solid #eceff3; padding: 4px 6px; vertical-align: top; }
+          .vph-print .vphp-table tr { break-inside: avoid; }
+          .vph-print .vphp-timeline { list-style: none; margin: 0; padding: 0; }
+          .vph-print .vphp-timeline li { padding: 0 0 6px 12px; border-left: 2px solid #cbd5e1; margin-left: 3px; break-inside: avoid; }
+          .vph-print .vphp-tl-t { font-weight: 700; font-size: 10.5px; }
+          .vph-print .vphp-tl-s { font-size: 8.5px; color: #94a3b8; }
+          .vph-print .vphp-tl-n { font-size: 9.5px; color: #64748b; }
+          .vph-print .vphp-break { break-before: page; }
+          .vph-print .vphp-footer { margin-top: 16px; border-top: 1px solid #d9dde3; padding-top: 8px; display: flex; justify-content: space-between; gap: 12px; font-size: 9px; color: #475569; }
+        }
+      `}</style>
+      <PrintDoc />
+      {isPreview && <div className="print:hidden bg-amber-500 text-white text-center text-[12px] font-bold py-1.5 px-4">SAMPLE PREVIEW — design layout with placeholder data. Not a real listing.</div>}
 
       {/* ── Mobile (<768px) ── */}
-      <div className="md:hidden">
+      <div className="md:hidden print:hidden">
         {/* Hero */}
         <div className="bg-white px-5 pt-[calc(12px+env(safe-area-inset-top))] pb-7">
           <button onClick={back} className="text-[14px] font-semibold text-[#2563EB] inline-flex items-center gap-1.5 -ml-1"><ChevronLeft className="w-[18px] h-[18px]" /> Back to Vehicle Passport</button>
@@ -451,7 +666,7 @@ const VehiclePassportHistory = () => {
       </div>
 
 
-      <header className="hidden md:block border-b border-[#E6E8EC] bg-white sticky top-0 z-20">
+      <header className="hidden md:block print:hidden border-b border-[#E6E8EC] bg-white sticky top-0 z-20">
         <div className="mx-auto max-w-[1100px] px-4 sm:px-5 h-16 flex items-center justify-between gap-3">
           <button onClick={back} className="text-[13px] font-semibold text-[#2563EB] inline-flex items-center gap-1.5"><ChevronLeft className="w-4 h-4" /> <span className="hidden sm:inline">Back to Vehicle Passport</span><span className="sm:hidden">Back</span></button>
           <div className="flex items-center gap-2 sm:gap-3">
@@ -462,7 +677,7 @@ const VehiclePassportHistory = () => {
         </div>
       </header>
 
-      <main className="hidden md:block mx-auto max-w-[1100px] px-4 sm:px-5 py-6 space-y-5">
+      <main className="hidden md:block print:hidden mx-auto max-w-[1100px] px-4 sm:px-5 py-6 space-y-5">
         <div>
           <h1 className="text-[28px] sm:text-[34px] font-bold tracking-tight leading-tight">{isNewCar ? "Vehicle Provenance" : "Vehicle History Summary"}</h1>
           <p className={`text-[14px] ${TEXT2} mt-1`}>{isNewCar ? "The born-new record of this vehicle, from the factory to the showroom." : "The records on file — everything we've verified for this vehicle."}</p>
@@ -647,7 +862,9 @@ const VehiclePassportHistory = () => {
         </footer>
       </main>
 
-      <PassportCtaDock go={go} dealerPhone={d.dealerPhone || undefined} reviewRating={d.reviewRating} advisor={d.dealerTrust} routing={d.contactRouting} vehicle={{ storeId: listing.store_id, vehicleId: listing.id, vin: listing.vin }} />
+      <div className="print:hidden">
+        <PassportCtaDock go={go} dealerPhone={d.dealerPhone || undefined} reviewRating={d.reviewRating} advisor={d.dealerTrust} routing={d.contactRouting} vehicle={{ storeId: listing.store_id, vehicleId: listing.id, vin: listing.vin }} />
+      </div>
     </div>
   );
 };

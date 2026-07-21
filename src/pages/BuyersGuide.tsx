@@ -421,9 +421,27 @@ const BuyersGuide = () => {
   };
 
   return (
-    <div className="min-h-screen bg-background py-4 px-2 md:px-4">
+    <div className="min-h-screen bg-background py-4 px-2 md:px-4 bg-print-root">
+      {/* Print path only (window.print(); html2canvas ignores @media print).
+          The Buyers Guide is a legal FTC form — on paper it must fill the
+          letter page with no shadow, rounded corners, or overflow clip that
+          would truncate the back-of-form defect list across pages. */}
+      <style>{`
+        @media print {
+          .bg-print-root { padding: 0 !important; }
+          .bg-print-card {
+            box-shadow: none !important;
+            border-radius: 0 !important;
+            overflow: visible !important;
+            width: 100% !important;
+            min-width: 0 !important;
+            max-width: 100% !important;
+            margin: 0 auto !important;
+          }
+        }
+      `}</style>
       {prefill.active && (
-        <div className="max-w-[8.5in] mx-auto mb-3">
+        <div className="max-w-[8.5in] mx-auto mb-3 no-print">
           <VehicleContextHeader state={prefill} />
         </div>
       )}
@@ -513,7 +531,7 @@ const BuyersGuide = () => {
       ) : (
       <>
       {/* Guide Card — FTC mandates minimum 11" high × 7.25" wide (16 CFR § 455) */}
-      <div ref={cardRef} className="mx-auto bg-card shadow-lg rounded-lg overflow-hidden border-2 border-foreground" style={{ minWidth: "7.25in", minHeight: "11in", maxWidth: "8.5in" }}>
+      <div ref={cardRef} className="mx-auto bg-card shadow-lg rounded-lg overflow-hidden border-2 border-foreground bg-print-card" style={{ minWidth: "7.25in", minHeight: "11in", maxWidth: "8.5in" }}>
         {/* Header */}
         <div className="bg-foreground text-card text-center py-3 px-4">
           <h1 className="text-2xl font-extrabold tracking-wide font-barlow-condensed uppercase">{L.title}</h1>
@@ -575,7 +593,7 @@ const BuyersGuide = () => {
         {/* Guide type content */}
         <div className="px-4 py-3 space-y-3">
           {guideType === "as-is" && (
-            <div className="border-2 border-foreground rounded p-3">
+            <div className="border-2 border-foreground rounded p-3 print:break-inside-avoid">
               <div className="flex items-center gap-2 mb-2">
                 <div className="w-5 h-5 border-2 border-foreground flex items-center justify-center text-xs font-bold">✓</div>
                 <h3 className="text-sm font-extrabold text-foreground">{L.as_is_title}</h3>
@@ -585,7 +603,7 @@ const BuyersGuide = () => {
           )}
 
           {guideType === "implied" && (
-            <div className="border-2 border-foreground rounded p-3">
+            <div className="border-2 border-foreground rounded p-3 print:break-inside-avoid">
               <div className="flex items-center gap-2 mb-2">
                 <div className="w-5 h-5 border-2 border-foreground flex items-center justify-center text-xs font-bold">✓</div>
                 <h3 className="text-sm font-extrabold text-foreground">{L.implied_title}</h3>
@@ -595,7 +613,7 @@ const BuyersGuide = () => {
           )}
 
           {guideType === "warranty" && (
-            <div className="border-2 border-foreground rounded p-3 space-y-2">
+            <div className="border-2 border-foreground rounded p-3 space-y-2 print:break-inside-avoid">
               <div className="flex items-center gap-2 mb-2">
                 <div className="w-5 h-5 border-2 border-foreground flex items-center justify-center text-xs font-bold">✓</div>
                 <h3 className="text-sm font-extrabold text-foreground">{L.warranty_title}</h3>
@@ -682,7 +700,7 @@ const BuyersGuide = () => {
         </div>
 
         {/* Non-dealer warranties */}
-        <div className="px-4 py-3 border-t-2 border-foreground">
+        <div className="px-4 py-3 border-t-2 border-foreground print:break-inside-avoid">
           <h3 className="text-xs font-extrabold text-foreground mb-2">{L.nondealer_heading}</h3>
           <div className="space-y-1.5">
             {[L.nondealer_mfg_still, L.nondealer_mfg_used, L.nondealer_other].map((t, i) => (
@@ -696,7 +714,7 @@ const BuyersGuide = () => {
         </div>
 
         {/* Service contract */}
-        <div className="px-4 py-3 border-t border-foreground">
+        <div className="px-4 py-3 border-t border-foreground print:break-inside-avoid">
           <div className="flex items-start gap-2">
             <div className="w-3 h-3 border border-foreground mt-0.5 shrink-0" />
             <p className="text-[9px] text-foreground leading-relaxed"><strong>{L.service_contact}</strong> {L.service_body}</p>
@@ -704,7 +722,7 @@ const BuyersGuide = () => {
         </div>
 
         {/* Inspection + history + see-other-side statements */}
-        <div className="px-4 py-3 border-t-2 border-foreground space-y-2">
+        <div className="px-4 py-3 border-t-2 border-foreground space-y-2 print:break-inside-avoid">
           <p className="text-[9px] font-bold text-foreground">{L.pre_purchase}</p>
           <p className="text-[9px] text-foreground leading-relaxed"><strong>{L.history_statement}</strong></p>
           <p className="text-[9px] font-bold text-foreground">{L.see_other_side}</p>
@@ -727,7 +745,7 @@ const BuyersGuide = () => {
             </div>
 
             {/* Dealer contact block */}
-            <div className="border-t-2 border-foreground pt-2 space-y-2">
+            <div className="border-t-2 border-foreground pt-2 space-y-2 print:break-inside-avoid">
               <div>
                 <span className="text-[8px] font-bold text-muted-foreground uppercase">{L.dealer_name}</span>
                 <p className="text-[11px] font-semibold text-foreground border-b border-border-custom">{settings.dealer_name || " "}</p>

@@ -231,9 +231,69 @@ const VehiclePassportDealer = () => {
   const heroBtn = "h-12 rounded-[10px] text-[13.5px] font-extrabold inline-flex items-center gap-2 transition-transform hover:-translate-y-0.5";
 
   return (
-    <div className="min-h-[100svh] bg-[#F6F7F9] text-[#0F172A]" style={{ fontFamily: "Inter, -apple-system, BlinkMacSystemFont, sans-serif" }}>
+    <div className="min-h-[100svh] bg-[#F6F7F9] text-[#0F172A] dealer-print-root" style={{ fontFamily: "Inter, -apple-system, BlinkMacSystemFont, sans-serif" }}>
       <Helmet><title>{`Why Buy From ${d.dealerName}`}</title>{isPreview && <meta name="robots" content="noindex" />}</Helmet>
       {isPreview && <div className="bg-amber-500 text-white text-center text-[12px] font-bold py-1.5 px-4">SAMPLE PREVIEW — design layout with placeholder data. Not a real listing.</div>}
+
+      {/* Print / Save-to-PDF: a clean "Dealer Information" one-pager. On paper
+          the marketing layout, sticky chrome, and CTA dock print poorly, so
+          the scoped @media print rule below hides every screen sibling and
+          renders this document instead. An embedded map prints badly, so the
+          location is a plain text address block. */}
+      <style>{`
+        @media print {
+          .dealer-print-root { background: #ffffff !important; }
+          .dealer-print-root > *:not(.dealer-print-doc) { display: none !important; }
+          .dealer-print-doc { display: block !important; }
+        }
+      `}</style>
+      <div className="dealer-print-doc hidden">
+        <div className="mx-auto max-w-[7.6in] text-[#0F172A]">
+          <div className="flex items-start justify-between border-b-2 border-[#0F172A] pb-3 mb-5 break-inside-avoid">
+            <div>
+              <Logo variant="full" size={22} />
+              <p className="text-[10.5px] font-semibold uppercase tracking-[0.16em] text-[#475569] mt-1.5">Dealer Information</p>
+            </div>
+            <div className="text-right">
+              <p className="text-[15px] font-extrabold leading-tight">{d.dealerName}</p>
+              {listing.ymm && <p className="text-[11px] text-[#475569] mt-0.5">{listing.ymm}</p>}
+              {listing.vin && <p className="text-[10px] font-mono text-[#475569] mt-0.5">VIN {listing.vin}</p>}
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-8">
+            <div className="break-inside-avoid">
+              <h2 className="text-[11px] font-extrabold uppercase tracking-[0.1em] border-b border-[#CBD5E1] pb-1 mb-2">Dealership</h2>
+              <p className="text-[14px] font-bold leading-snug">{d.dealerName}</p>
+              {d.dealerAddress && <p className="text-[12px] leading-snug mt-1">{d.dealerAddress}</p>}
+              {d.dealerPhone && <p className="text-[12px] mt-2"><span className="font-semibold">Phone:</span> {d.dealerPhone}</p>}
+              {(t.advisorName || t.advisorTitle) && <p className="text-[12px] mt-1"><span className="font-semibold">Contact:</span> {[t.advisorName, t.advisorTitle].filter(Boolean).join(" — ")}</p>}
+              {hasRating && <p className="text-[12px] mt-1"><span className="font-semibold">Rating:</span> {rating.toFixed(1)} / 5{hasCount ? ` (${count.toLocaleString()} reviews)` : ""}</p>}
+            </div>
+            <div className="break-inside-avoid">
+              <h2 className="text-[11px] font-extrabold uppercase tracking-[0.1em] border-b border-[#CBD5E1] pb-1 mb-2">Hours</h2>
+              {t.hours
+                ? <p className="text-[12px] whitespace-pre-line leading-relaxed">{t.hours}</p>
+                : <p className="text-[12px] text-[#64748B]">Please contact the dealership for current hours.</p>}
+            </div>
+          </div>
+
+          <div className="mt-6 break-inside-avoid">
+            <h2 className="text-[11px] font-extrabold uppercase tracking-[0.1em] border-b border-[#CBD5E1] pb-1 mb-2">This Vehicle</h2>
+            <div className="grid grid-cols-2 gap-x-8 gap-y-1 text-[12px] mt-2">
+              {listing.ymm && <p><span className="font-semibold">Vehicle:</span> {listing.ymm}</p>}
+              {listing.vin && <p><span className="font-semibold">VIN:</span> <span className="font-mono">{listing.vin}</span></p>}
+              {typeof listing.mileage === "number" && <p><span className="font-semibold">Mileage:</span> {listing.mileage.toLocaleString()} mi</p>}
+              {typeof listing.price === "number" && listing.price > 0 && <p><span className="font-semibold">Price:</span> ${listing.price.toLocaleString()}</p>}
+            </div>
+          </div>
+
+          <div className="mt-8 pt-3 border-t border-[#CBD5E1] flex items-center justify-between text-[10px] text-[#64748B] break-inside-avoid">
+            <span>Dealer Verified · AutoLabels.io Vehicle Passport</span>
+            <span className="font-semibold text-[#0F172A]">autolabels.io/v/{slug}</span>
+          </div>
+        </div>
+      </div>
 
       <header className="border-b border-[#E6E8EC] bg-white sticky top-0 z-20">
         <div className="mx-auto max-w-[1100px] px-4 sm:px-5 h-14 flex items-center justify-between gap-3">
