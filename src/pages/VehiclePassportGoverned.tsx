@@ -340,13 +340,20 @@ export default function VehiclePassportGoverned() {
     isNew ? "new" : (condition === "cpo" || condition.includes("certified")) ? "cpo" : "used";
   const feeIncluded = d.priceIncludesDoc && d.docFee != null && d.docFee > 0;
   const vehiclePricePreDoc = price != null ? (feeIncluded ? price - (d.docFee as number) : price) : null;
+  // Only DOCUMENTED dealer-authored reductions feed the breakdown — a dealer
+  // discount (new + used/CPO) and, for new vehicles, included retail cash. Never
+  // the MSRP/market-value − price gap. When none are documented, the card shows
+  // the anchor and vehicle price with no discount row (the honest presentation).
+  const documentedDiscounts: { key: string; label: string; amount: number }[] = [];
+  if (d.dealerDiscount != null && d.dealerDiscount > 0) documentedDiscounts.push({ key: "dealer_discount", label: "Dealer Discount", amount: d.dealerDiscount });
+  if (isNew && d.retailCash != null && d.retailCash > 0) documentedDiscounts.push({ key: "retail_cash", label: "Retail Cash", amount: d.retailCash });
   const saleCard = price != null && vehiclePricePreDoc != null
     ? buildSalePriceCard({
         vehicleType: pricingVehicleType,
         msrp: d.msrp, marketValue: d.marketAvg,
         vehiclePrice: vehiclePricePreDoc, finalSalePrice: price,
         docFee: d.docFee, feeIncluded,
-        discountLines: d.priceBreakdown ? d.priceBreakdown.lines.map((l) => ({ key: l.key, label: l.label, amount: l.amount })) : undefined,
+        discountLines: documentedDiscounts.length ? documentedDiscounts : undefined,
       })
     : null;
 

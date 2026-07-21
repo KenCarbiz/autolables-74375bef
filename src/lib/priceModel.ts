@@ -418,17 +418,22 @@ export function buildSalePriceCard(input: SalePriceInput): SalePriceCard {
   const anchor = input.vehicleType === "new" ? input.msrp : input.marketValue;
 
   const lines: SalePriceLine[] = [];
-  // Anchor + discount ladder only when the anchor is a real number genuinely
-  // ABOVE the vehicle price (a positive, truthful savings story).
+  // Anchor row only when the anchor is a real number genuinely ABOVE the vehicle
+  // price (MSRP for new; verified/market value for used-CPO).
   if (anchor != null && Number.isFinite(anchor) && anchor - vp > SALE_TOLERANCE) {
     const gap = anchor - vp;
     lines.push({ key: "anchor", label: anchorLabel, amount: anchor, role: "anchor" });
+    // Show discount rows ONLY from DOCUMENTED dealer-authored reductions (a
+    // scraped dealer discount / included unconditional incentive) that reconcile
+    // to the anchor→price gap. Never derive a discount by subtracting the price
+    // from the anchor: for used/CPO that gap is a market comparison, not a dealer
+    // discount, and for new it would invent an undocumented rebate. When nothing
+    // documented reconciles, the anchor stands as context and the vehicle price
+    // is shown with no fabricated discount row.
     const provided = (input.discountLines ?? []).filter((l) => l.amount > SALE_TOLERANCE);
     const providedSum = provided.reduce((s, l) => s + l.amount, 0);
-    if (input.vehicleType === "new" && provided.length && Math.abs(providedSum - gap) <= SALE_TOLERANCE) {
+    if (provided.length && Math.abs(providedSum - gap) <= SALE_TOLERANCE) {
       provided.forEach((l, i) => lines.push({ key: l.key ?? `disc-${i}`, label: l.label, amount: l.amount, role: "discount" }));
-    } else {
-      lines.push({ key: "dealer_discount", label: "Dealer Discount", amount: gap, role: "discount" });
     }
   }
 

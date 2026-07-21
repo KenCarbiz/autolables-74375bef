@@ -2,10 +2,11 @@ import { describe, it, expect } from "vitest";
 import { buildSalePriceCard } from "./priceModel";
 
 describe("buildSalePriceCard", () => {
-  it("used vehicle: Market Value anchor with a real derived discount (reference QX50)", () => {
+  it("used vehicle WITH a documented dealer discount that reconciles (reference QX50)", () => {
     const card = buildSalePriceCard({
       vehicleType: "used", marketValue: 31981, vehiclePrice: 29981, finalSalePrice: 30876,
       docFee: 895, feeIncluded: true,
+      discountLines: [{ key: "dealer_discount", label: "Dealer Discount", amount: 2000 }],
     });
     expect(card.anchorLabel).toBe("Market Value");
     expect(card.lines).toEqual([
@@ -14,16 +15,27 @@ describe("buildSalePriceCard", () => {
     ]);
     expect(card.vehiclePrice).toBe(29981);
     expect(card.feeAmount).toBe(895);
-    expect(card.feeLabel).toBe("Conveyance / Doc Fee");
     expect(card.finalSalePrice).toBe(30876);
     expect(card.reconciles).toBe(true);
-    expect(card.headlineOnly).toBe(false);
   });
 
-  it("cpo vehicle behaves like used (Market Value anchor)", () => {
+  it("used vehicle with a market value ABOVE price but NO documented discount: shows Market Value, no fabricated discount", () => {
+    const card = buildSalePriceCard({
+      vehicleType: "used", marketValue: 31981, vehiclePrice: 29981, finalSalePrice: 30876,
+      docFee: 895, feeIncluded: true,
+    });
+    expect(card.lines).toEqual([{ key: "anchor", label: "Market Value", amount: 31981, role: "anchor" }]);
+    expect(card.lines.some((l) => l.role === "discount")).toBe(false);
+    expect(card.vehiclePrice).toBe(29981);
+    expect(card.feeAmount).toBe(895);
+    expect(card.finalSalePrice).toBe(30876);
+    expect(card.reconciles).toBe(true);
+  });
+
+  it("cpo vehicle without a documented discount shows Market Value only (no derived discount)", () => {
     const card = buildSalePriceCard({ vehicleType: "cpo", marketValue: 40000, vehiclePrice: 38000, finalSalePrice: 38000, feeIncluded: false });
     expect(card.anchorLabel).toBe("Market Value");
-    expect(card.lines.map((l) => l.label)).toEqual(["Market Value", "Dealer Discount"]);
+    expect(card.lines.map((l) => l.label)).toEqual(["Market Value"]);
     expect(card.feeAmount).toBeNull();
     expect(card.reconciles).toBe(true);
   });
@@ -45,15 +57,21 @@ describe("buildSalePriceCard", () => {
     expect(card.reconciles).toBe(true);
   });
 
-  it("new vehicle: itemized discounts that do NOT reconcile collapse to one derived Dealer Discount", () => {
+  it("new vehicle: documented discounts that do NOT reconcile are dropped (MSRP + Vehicle Price only, no invented rows)", () => {
     const card = buildSalePriceCard({
       vehicleType: "new", msrp: 61895, vehiclePrice: 55598, finalSalePrice: 55598, feeIncluded: false,
       discountLines: [{ label: "Dealer Discount", amount: 1000 }], // 1000 != 6297 gap
     });
-    expect(card.lines).toEqual([
-      { key: "anchor", label: "MSRP", amount: 61895, role: "anchor" },
-      { key: "dealer_discount", label: "Dealer Discount", amount: 6297, role: "discount" },
-    ]);
+    expect(card.lines).toEqual([{ key: "anchor", label: "MSRP", amount: 61895, role: "anchor" }]);
+    expect(card.lines.some((l) => l.role === "discount")).toBe(false);
+  });
+
+  it("new vehicle with MSRP + advertised price but unknown components: MSRP anchor, no discount rows", () => {
+    const card = buildSalePriceCard({ vehicleType: "new", msrp: 61895, vehiclePrice: 55598, finalSalePrice: 56493, docFee: 895, feeIncluded: true });
+    expect(card.lines).toEqual([{ key: "anchor", label: "MSRP", amount: 61895, role: "anchor" }]);
+    expect(card.feeAmount).toBe(895);
+    expect(card.finalSalePrice).toBe(56493);
+    expect(card.reconciles).toBe(true);
   });
 
   it("new vehicle with no discount (MSRP == vehicle price): no anchor ladder", () => {

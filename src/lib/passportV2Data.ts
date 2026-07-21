@@ -204,6 +204,12 @@ export interface PassportData {
   // story (no MSRP, or MSRP at/below the price). Every line reconciles to the
   // real MSRP−price gap; see buildDiscountBreakdown.
   priceBreakdown: DiscountBreakdown | null;
+  // DOCUMENTED dealer-authored reductions captured from the dealer's advertised
+  // page (never derived by subtracting the sale price from MSRP / market value).
+  // Null when the dealer does not advertise the amount — the pricing card then
+  // shows the anchor and vehicle price with NO fabricated discount row.
+  dealerDiscount: number | null;
+  retailCash: number | null;
   // Customer-safe reconditioning & inspection summary (injected by
   // public-listing-view from the dealer's prep/detail/install/inspection
   // sign-offs). Null until the dealership records reconditioning work.
@@ -727,6 +733,7 @@ export const derivePassport = (listing: VehicleListing): PassportData => {
   return {
     price, msrp, priceLabel, websitePriceTerm, estMonthly, paymentAssumptions, saveVsMsrp, belowOriginalMsrp,
     docFee, websiteSalePrice, priceMode, priceIncludesDoc, priceBreakdown,
+    dealerDiscount: lp.dealer_discount ?? null, retailCash: lp.retail_cash ?? null,
     recon: (listing as unknown as { recon?: PassportData["recon"] }).recon ?? null,
     marketAvg, marketLow, marketHigh, belowMarket,
     marketMeta, comparables, blackbook, marketCheckedAt, history,
