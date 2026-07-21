@@ -5,8 +5,11 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 // marketcheck-sync
 //
 // Per-tenant, super-admin-governed inventory pull from MarketCheck's
-// Inventory Search API (https://api.marketcheck.com/v2/search/car/active),
-// scoped to each dealer's OWN website domain. Config lives in
+// Dealership Inventory Syndication API
+// (https://api.marketcheck.com/v2/dealerships/inventory, owned=true), scoped
+// to each dealer's OWN website domain. The Inventory Search API
+// (/v2/search/car/active) is used only to resolve a domain to its dealer_id
+// and to grab a diagnostic sample. Config lives in
 // public.marketcheck_sync_config (allowed | enabled | source | schedule |
 // max_vehicles). Runs HOURLY via cron; each tenant fires at its run_hour on
 // its cadence (nightly | weekly | biweekly | monthly).
