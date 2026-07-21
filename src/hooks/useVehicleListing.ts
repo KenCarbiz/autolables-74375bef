@@ -191,9 +191,10 @@ export interface VehicleListing {
   history_report_url?: string | null;
 
   // Dealer NMVTIS title attestation (Compliance Pro). Written from the admin
-  // Title Verification panel after the dealer reviews the raw record; the raw
-  // NMVTIS report itself lives in title_reports, never here. Safe to expose on
-  // the passport — status + verified date only.
+  // Title Verification panel after the dealer reviews the live record. Per the
+  // VINData terms the raw report is never persisted anywhere — only this
+  // dealer conclusion (status + verified date) is stored. Safe to expose on
+  // the passport.
   title_verification?: TitleVerification | null;
 
   // OEM Monroney window sticker pulled by VIN + cached in the oem-stickers bucket.

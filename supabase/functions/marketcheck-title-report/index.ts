@@ -1,28 +1,35 @@
 // ──────────────────────────────────────────────────────────────────────
 // marketcheck-title-report — dealer-initiated NMVTIS / AAMVA title report via
-// MarketCheck's VINData (NMVTIS) API. DEALER-FACING ONLY: the raw title record
-// is cached in public.title_reports (never on the listing row, never shipped to
-// a shopper). The customer passport only ever sees the dealer's later
-// attestation (vehicle_listings.title_verification), written by the client.
+// MarketCheck's VINData API. Compliance-Pro only.
 //
-// This is a PAID, manual tool — a generate call costs ~$0.49 and reports live
-// 90 days, so:
-//   action "load"     → return the cached report if present (no API cost).
-//   action "generate" → paid generate-report/aamva (fresh pull). Charged.
-//   action "refresh"  → access-report/aamva (cheap; reuses the 90-day report).
+// VINData terms compliance (accepted third-party data agreement):
+//   • "I will not cache or persist VINData responses beyond a single user
+//     session." → We NEVER write the report or summary to our database. It is
+//     returned to the open admin panel for the session and nowhere else.
+//   • Re-viewing within 90 days uses VINData's own access-report (provider-side
+//     retrieval of the already-generated report) — that is their cache, allowed.
+//   • The dealer's later attestation (vehicle_listings.title_verification) is
+//     the dealership's own conclusion (clean/branded + date), not a VINData
+//     response, so it is a business record we may keep.
+//   • title_report_pulls is our billing meter (tenant/vin/cost) — no VINData
+//     data — so we may keep it.
 //
-// Gated to the Compliance-Pro AutoLabels entitlement so the cost can't be
-// triggered from a lower tier. Auth: tenant member or platform admin.
+// A generate is charged (~$0.49); access is cost-effective. Manual only.
 //
-// Body: { vin, tenant_id, action? }
+// Body: { vin, tenant_id, action? }  action = load | generate | view
+//   load     → no API call; returns the spend meter + whether a live report is
+//              retrievable via access (a generate happened in the last 90 days).
+//   generate → paid generate-report/aamva (fresh pull). Charged. Session-only.
+//   view     → access-report/aamva (cheap; retrieves the 90-day report). If none
+//              exists yet (422) the panel is told to generate. Session-only.
 // ──────────────────────────────────────────────────────────────────────
 import { json, preflight } from "../_shared/http.ts";
 import { adminClient, SERVICE_KEY } from "../_shared/supabase.ts";
 
 const MC_KEY = Deno.env.get("MARKETCHECK_API_KEY_1") || Deno.env.get("MARKETCHECK_API_KEY") || "";
 const MC_BASE = "https://api.marketcheck.com/v2";
-const REPORT_TTL_DAYS = 90;
-const GENERATE_UNIT_COST = 0.49;   // USD per paid generate (provider list price)
+const REPORT_TTL_DAYS = 90;            // VINData keeps a generated report this long
+const GENERATE_UNIT_COST = 0.49;       // USD per paid generate (provider list price)
 
 // VIN: 17 chars, letters/digits, excluding I, O, Q.
 const validVin = (vin: string) => /^[A-HJ-NPR-Z0-9]{17}$/i.test(vin);
@@ -37,16 +44,16 @@ interface TitleSummary {
   brandCount: number;
   junkCount: number;
   brands: { brand: string; description: string; state: string; date: string; severity: string }[];
-  junkSalvage: { disposition: string; entity: string; date: string; state?: string }[];
+  junkSalvage: { disposition: string; entity: string; date: string }[];
   latestTitle: { state: string; date: string; odometer: string; type: string } | null;
   highestOdometer: number | null;
   message: string;
   messageColor: string;
 }
 
-// Normalize the AAMVA VINData payload into a compact, dealer-facing summary.
-// "clean" ONLY when there are zero brand records AND zero junk/salvage/total-
-// loss records — anything else is "branded" so the dealer never over-attests.
+// Normalize the AAMVA VINData payload into a compact, dealer-facing summary,
+// returned for the session only. "clean" ONLY when there are zero brand records
+// AND zero junk/salvage/total-loss records, so the dealer never over-attests.
 // deno-lint-ignore no-explicit-any
 function summarize(raw: any): TitleSummary {
   const brandsRaw = arr(raw?.titleBrandReported);
@@ -65,10 +72,8 @@ function summarize(raw: any): TitleSummary {
     disposition: str(j?.disposition) || "Junk / salvage / total loss",
     entity: str(j?.reportedEntity),
     date: str(j?.date),
-    state: undefined as string | undefined,
   }));
 
-  // Latest title record by ISO date, when present.
   const sortedTitles = [...titles].sort((a, b) => str(b?.date).localeCompare(str(a?.date)));
   const t0 = sortedTitles[0];
   const latestTitle = t0
@@ -129,44 +134,46 @@ Deno.serve(async (req) => {
     }
   }
 
-  // Running spend meter for this tenant: charged pulls this calendar month +
-  // all-time, so the admin panel can always show the metered cost.
+  // Running spend meter (our billing metadata — no VINData data): charged pulls
+  // this calendar month + all-time, plus the most recent generate so the panel
+  // can pick access vs generate and show "last checked".
   const pullStats = async () => {
     const now = new Date();
     const monthStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1)).toISOString();
-    const [monthRes, totalRes] = await Promise.all([
-      admin.from("title_report_pulls").select("charged, unit_cost, created_at")
+    const [monthRes, totalRes, lastGenRes] = await Promise.all([
+      admin.from("title_report_pulls").select("unit_cost")
         .eq("tenant_id", tenantId).eq("charged", true).gte("created_at", monthStart),
       admin.from("title_report_pulls").select("id", { count: "exact", head: true })
         .eq("tenant_id", tenantId).eq("charged", true),
+      admin.from("title_report_pulls").select("created_at")
+        .eq("tenant_id", tenantId).eq("vin", vin).eq("action", "generate")
+        .order("created_at", { ascending: false }).limit(1).maybeSingle(),
     ]);
     const monthRows = (monthRes.data || []) as { unit_cost: number | null }[];
-    const monthCount = monthRows.length;
     const monthCost = monthRows.reduce((s, r) => s + Number(r.unit_cost || 0), 0);
-    return { monthCount, monthCost: Math.round(monthCost * 100) / 100, totalCount: totalRes.count ?? 0, unitCost: GENERATE_UNIT_COST };
+    const lastGeneratedAt = (lastGenRes.data as { created_at?: string } | null)?.created_at || null;
+    const withinWindow = !!lastGeneratedAt && (Date.now() - new Date(lastGeneratedAt).getTime()) < REPORT_TTL_DAYS * 864e5;
+    return {
+      monthCount: monthRows.length,
+      monthCost: Math.round(monthCost * 100) / 100,
+      totalCount: totalRes.count ?? 0,
+      unitCost: GENERATE_UNIT_COST,
+      lastGeneratedAt,
+      withinWindow,
+    };
   };
 
-  // ── Load the cached report (no external cost). Default action.
-  const loadCached = async () => {
-    const { data } = await admin.from("title_reports")
-      .select("summary, generated_at, expires_at, provider")
-      .eq("tenant_id", tenantId).eq("vin", vin).maybeSingle();
-    return data as { summary: TitleSummary | null; generated_at: string; expires_at: string | null; provider: string } | null;
-  };
-
+  // ── load: no external call, no VINData data. Just the meter + retrievability.
   if (action === "load") {
-    const [cached, stats] = await Promise.all([loadCached(), pullStats()]);
-    if (!cached) return json(200, { available: false, reason: "no_report", stats });
-    const expired = !!cached.expires_at && new Date(cached.expires_at).getTime() < Date.now();
-    return json(200, { available: true, summary: cached.summary, generatedAt: cached.generated_at, expiresAt: cached.expires_at, expired, provider: cached.provider, stats });
+    const stats = await pullStats();
+    return json(200, { stats });
   }
 
-  if (action !== "generate" && action !== "refresh") {
-    return json(400, { error: "invalid_action", note: "action must be load, generate, or refresh" });
+  if (action !== "generate" && action !== "view") {
+    return json(400, { error: "invalid_action", note: "action must be load, generate, or view" });
   }
 
-  // ── Paid path (generate/refresh) is Compliance-Pro only. A service-role
-  // caller (cron/back-office) is exempt from the tier gate.
+  // ── Paid path is Compliance-Pro only. Service-role callers are exempt.
   if (authHeader !== SERVICE_KEY) {
     const { data: ent } = await admin.from("app_entitlements")
       .select("plan_tier, status").eq("tenant_id", tenantId).eq("app_slug", "autolabels").maybeSingle();
@@ -178,8 +185,6 @@ Deno.serve(async (req) => {
     }
   }
 
-  // refresh reuses the existing 90-day report (cheap access-report); generate
-  // always mints a fresh one (charged).
   const kind: "generate" | "access" = action === "generate" ? "generate" : "access";
   let res: Response;
   try {
@@ -190,40 +195,36 @@ Deno.serve(async (req) => {
 
   // 422 on access = no report generated yet for this VIN → tell the dealer to generate.
   if (kind === "access" && res.status === 422) {
-    return json(200, { available: false, reason: "no_report", note: "No report on file yet — generate one." });
+    return json(200, { available: false, reason: "no_report", note: "No report on file yet — generate one.", stats: await pullStats() });
   }
   if (!res.ok) {
     const detail = await res.text().catch(() => "");
-    return json(200, { available: false, reason: `provider_${res.status}`, detail: detail.slice(0, 300) });
+    return json(200, { available: false, reason: `provider_${res.status}`, detail: detail.slice(0, 300), stats: await pullStats() });
   }
 
   // deno-lint-ignore no-explicit-any
   const raw: any = await res.json().catch(() => null);
-  if (!raw || typeof raw !== "object") return json(200, { available: false, reason: "empty_response" });
+  if (!raw || typeof raw !== "object") return json(200, { available: false, reason: "empty_response", stats: await pullStats() });
 
   const summary = summarize(raw);
-  const nowIso = new Date().toISOString();
-  const expiresIso = new Date(Date.now() + REPORT_TTL_DAYS * 24 * 60 * 60 * 1000).toISOString();
-
   const charged = kind === "generate";
-  await admin.from("title_reports").upsert({
-    tenant_id: tenantId,
-    vin,
-    provider: "vindata_nmvtis",
-    report: raw,
-    summary,
-    generated_at: nowIso,
-    expires_at: expiresIso,
-    generated_by: userId,
-    updated_at: nowIso,
-  }, { onConflict: "tenant_id,vin" });
 
-  // Meter the pull (append-only), then read back the running total.
+  // Meter the pull ONLY (append-only, no VINData data), then read the total.
   await admin.from("title_report_pulls").insert({
     tenant_id: tenantId, vin, action, charged,
     unit_cost: charged ? GENERATE_UNIT_COST : 0, pulled_by: userId,
   }).then(() => undefined, () => undefined);
   const stats = await pullStats();
 
-  return json(200, { available: true, summary, generatedAt: nowIso, expiresAt: expiresIso, charged, provider: "vindata_nmvtis", stats });
+  // Session-only response. Nothing here is written to our database.
+  return json(200, {
+    available: true,
+    summary,
+    charged,
+    checkedAt: new Date().toISOString(),
+    provider: "vindata_nmvtis",
+    attribution: "Title data provided by VINData, LLC via MarketCheck (NMVTIS).",
+    disclaimer: "Title-history data is provided “as is” and is not a substitute for a full title search.",
+    stats,
+  });
 });

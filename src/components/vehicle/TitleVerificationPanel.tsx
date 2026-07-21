@@ -3,21 +3,21 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import {
   ShieldCheck, ShieldAlert, Loader2, FileSearch, RefreshCw, CheckCircle2,
-  AlertTriangle, Lock, Eye, XCircle, Gauge, Receipt,
+  AlertTriangle, Lock, Eye, XCircle, Gauge, Receipt, Info,
 } from "lucide-react";
 import type { TitleVerification } from "@/hooks/useVehicleListing";
 
 // ──────────────────────────────────────────────────────────────────────
-// TitleVerificationPanel — dealer-facing NMVTIS (National Motor Vehicle Title
-// Information System) title check via MarketCheck VINData. Compliance-Pro only.
+// TitleVerificationPanel — dealer-facing NMVTIS title check via MarketCheck
+// VINData. Compliance-Pro only.
 //
-// The raw title record shown here is DEALER-INTERNAL. The customer passport
-// never sees it — it only sees the dealer's attestation (Clean Title, verified
-// date) that the dealer publishes from this panel after reviewing the record.
-//
-// A "Generate" is a paid pull (~$0.49) and the report is reusable for 90 days,
-// so the panel loads any cached report for free first and only charges on an
-// explicit Generate / Regenerate click.
+// VINData terms compliance: VINData responses are NEVER persisted. The title
+// record is fetched live and held only in this open panel for the session
+// (state below) — nothing is written to our database. Re-viewing within 90 days
+// uses the cheap provider-side access-report. What DOES persist is the dealer's
+// own attestation (clean/branded + verified date), which is a dealership
+// business record, not a VINData response. A required "as is" disclaimer and
+// VINData attribution show whenever the record is displayed.
 // ──────────────────────────────────────────────────────────────────────
 
 interface TitleSummary {
@@ -37,6 +37,8 @@ interface PullStats {
   monthCost: number;
   totalCount: number;
   unitCost: number;
+  lastGeneratedAt: string | null;
+  withinWindow: boolean;
 }
 
 interface Props {
@@ -54,12 +56,10 @@ const fmtDate = (iso?: string | null) =>
 
 export const TitleVerificationPanel = ({ listingId, vin, tenantId, condition, titleVerification, enabled, onUpdated }: Props) => {
   const isNew = String(condition || "").toLowerCase() === "new";
-  const [summary, setSummary] = useState<TitleSummary | null>(null);
-  const [generatedAt, setGeneratedAt] = useState<string | null>(null);
-  const [expiresAt, setExpiresAt] = useState<string | null>(null);
-  const [expired, setExpired] = useState(false);
+  const [summary, setSummary] = useState<TitleSummary | null>(null);   // session-only, never persisted
+  const [checkedAt, setCheckedAt] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
-  const [busy, setBusy] = useState<"generate" | "refresh" | "attest" | null>(null);
+  const [busy, setBusy] = useState<"view" | "generate" | "attest" | null>(null);
   const [showRaw, setShowRaw] = useState(false);
   const [stats, setStats] = useState<PullStats | null>(null);
 
@@ -67,46 +67,47 @@ export const TitleVerificationPanel = ({ listingId, vin, tenantId, condition, ti
     if (!vin || !tenantId || isNew) { setLoading(false); return; }
     setLoading(true);
     const { data } = await supabase.functions.invoke("marketcheck-title-report", { body: { vin, tenant_id: tenantId, action: "load" } });
-    const d = data as { available?: boolean; summary?: TitleSummary; generatedAt?: string; expiresAt?: string; expired?: boolean; stats?: PullStats } | null;
+    const d = data as { stats?: PullStats } | null;
     if (d?.stats) setStats(d.stats);
-    if (d?.available && d.summary) {
-      setSummary(d.summary); setGeneratedAt(d.generatedAt || null); setExpiresAt(d.expiresAt || null); setExpired(!!d.expired);
-    } else { setSummary(null); }
     setLoading(false);
   }, [vin, tenantId, isNew]);
 
   useEffect(() => { load(); }, [load]);
 
-  const pull = async (action: "generate" | "refresh") => {
+  // Fetch the record live for this session. Prefer the cheap access-report when
+  // a report was generated in the last 90 days; otherwise a paid generate.
+  const fetchRecord = async (forceGenerate = false) => {
     if (!vin || !tenantId) return;
-    setBusy(action);
+    const action = forceGenerate || !stats?.withinWindow ? "generate" : "view";
+    setBusy(action === "generate" ? "generate" : "view");
     const { data, error } = await supabase.functions.invoke("marketcheck-title-report", { body: { vin, tenant_id: tenantId, action } });
     setBusy(null);
-    const d = data as { available?: boolean; summary?: TitleSummary; generatedAt?: string; expiresAt?: string; reason?: string; error?: string; note?: string; stats?: PullStats } | null;
+    const d = data as { available?: boolean; summary?: TitleSummary; checkedAt?: string; reason?: string; error?: string; note?: string; stats?: PullStats } | null;
     if (d?.stats) setStats(d.stats);
     if (error || d?.error === "plan_required") { toast.error("Title verification is a Compliance Pro feature."); return; }
     if (!d?.available) {
       if (d?.reason === "no_report") { toast.error(d?.note || "No report on file yet — generate one."); }
       else if (d?.error === "not_configured") { toast.error("VINData (NMVTIS) access is not configured on the API key."); }
-      else { toast.error("Title report unavailable — try again shortly."); }
+      else { toast.error("Title record unavailable — try again shortly."); }
       return;
     }
-    setSummary(d.summary || null); setGeneratedAt(d.generatedAt || null); setExpiresAt(d.expiresAt || null); setExpired(false);
-    toast.success(action === "generate" ? "NMVTIS title report generated" : "Title report refreshed");
+    setSummary(d.summary || null); setCheckedAt(d.checkedAt || null);
+    if (action === "generate") toast.success("NMVTIS title record retrieved");
   };
 
   const attest = async (status: "clean" | "branded") => {
     if (!vin || !tenantId) return;
     setBusy("attest");
     const { data: ures } = await supabase.auth.getUser();
+    // Store the dealer's own conclusion only — NOT VINData response data.
     const payload: TitleVerification = {
       status,
       verified_at: new Date().toISOString(),
       verified_by: ures?.user?.id ?? null,
       source: "nmvtis",
-      report_generated_at: generatedAt,
-      report_expires_at: expiresAt,
-      brand_note: status === "branded" ? (summary?.brands.map((b) => b.brand).join(", ") || "Title brand on record") : null,
+      report_generated_at: checkedAt,
+      report_expires_at: null,
+      brand_note: status === "branded" ? "Title brand on record (reviewed in the NMVTIS title record)" : null,
     };
     // deno-lint-ignore no-explicit-any
     const { error } = await (supabase as unknown as { from: (t: string) => any })
@@ -168,7 +169,7 @@ export const TitleVerificationPanel = ({ listingId, vin, tenantId, condition, ti
           </p>
         </div>
       ) : loading ? (
-        <div className="flex items-center gap-2 text-[13px] text-muted-foreground py-3"><Loader2 className="w-4 h-4 animate-spin" /> Checking for a title record…</div>
+        <div className="flex items-center gap-2 text-[13px] text-muted-foreground py-3"><Loader2 className="w-4 h-4 animate-spin" /> Loading title status…</div>
       ) : (
         <div className="space-y-3">
           {/* Attestation banner — what the shopper currently sees */}
@@ -189,7 +190,7 @@ export const TitleVerificationPanel = ({ listingId, vin, tenantId, condition, ti
             </div>
           )}
 
-          {/* Report result */}
+          {/* Live record — session only, never stored */}
           {summary ? (
             <>
               <div className={`rounded-xl border p-3.5 ${summary.status === "clean" ? "border-emerald-200 bg-emerald-50/40" : "border-amber-200 bg-amber-50/40"}`}>
@@ -201,9 +202,7 @@ export const TitleVerificationPanel = ({ listingId, vin, tenantId, condition, ti
                     <p className="text-[13.5px] font-bold text-foreground">
                       {summary.status === "clean" ? "No title brands on record" : `${summary.brandCount + summary.junkCount} title record${summary.brandCount + summary.junkCount === 1 ? "" : "s"} found`}
                     </p>
-                    <p className="text-[11.5px] text-muted-foreground">
-                      NMVTIS · pulled {fmtDate(generatedAt)}{expiresAt ? ` · valid to ${fmtDate(expiresAt)}` : ""}{expired ? " · expired" : ""}
-                    </p>
+                    <p className="text-[11.5px] text-muted-foreground">NMVTIS · retrieved {fmtDate(checkedAt)} · shown for this session only</p>
                   </div>
                 </div>
 
@@ -240,6 +239,12 @@ export const TitleVerificationPanel = ({ listingId, vin, tenantId, condition, ti
                 </button>
               </div>
 
+              {/* Required VINData disclaimer + attribution (shown with the record) */}
+              <p className="text-[11px] text-muted-foreground flex items-start gap-1.5">
+                <Info className="w-3.5 h-3.5 mt-0.5 shrink-0" />
+                <span>Title-history data is provided &ldquo;as is&rdquo; and is not a substitute for a full title search. Title data provided by VINData, LLC via MarketCheck (NMVTIS).</span>
+              </p>
+
               {/* Dealer actions */}
               <div className="flex flex-wrap items-center gap-2">
                 {!published && summary.status === "clean" && (
@@ -252,8 +257,8 @@ export const TitleVerificationPanel = ({ listingId, vin, tenantId, condition, ti
                     {busy === "attest" ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <AlertTriangle className="w-3.5 h-3.5" />} Record Title Brand
                   </button>
                 )}
-                <button onClick={() => pull(expired ? "generate" : "refresh")} disabled={!!busy} className="h-9 px-3 rounded-lg border border-border text-foreground text-xs font-semibold inline-flex items-center gap-1.5 hover:border-blue-400 disabled:opacity-60">
-                  {busy === "refresh" ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />} {expired ? "Regenerate ($0.49)" : "Refresh"}
+                <button onClick={() => fetchRecord(true)} disabled={!!busy} className="h-9 px-3 rounded-lg border border-border text-foreground text-xs font-semibold inline-flex items-center gap-1.5 hover:border-blue-400 disabled:opacity-60">
+                  {busy === "generate" ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />} Regenerate ($0.49)
                 </button>
               </div>
             </>
@@ -262,12 +267,19 @@ export const TitleVerificationPanel = ({ listingId, vin, tenantId, condition, ti
               <div className="flex items-start gap-2.5">
                 <FileSearch className="w-4 h-4 text-muted-foreground mt-0.5 shrink-0" />
                 <div>
-                  <p className="text-[12.5px] text-foreground font-medium">No title report on file for this VIN.</p>
-                  <p className="text-[11.5px] text-muted-foreground mt-0.5">Pull the NMVTIS record to check for salvage, flood, lemon, and other brands. A new report costs about $0.49 and stays valid for 90 days.</p>
+                  <p className="text-[12.5px] text-foreground font-medium">
+                    {stats?.withinWindow ? "A title record is on file for this VIN." : "No title record pulled yet for this VIN."}
+                  </p>
+                  <p className="text-[11.5px] text-muted-foreground mt-0.5">
+                    {stats?.withinWindow
+                      ? `Retrieve it to check for salvage, flood, lemon, and other brands. Re-viewing within 90 days is free${stats.lastGeneratedAt ? ` (last generated ${fmtDate(stats.lastGeneratedAt)})` : ""}.`
+                      : "Pull the NMVTIS record to check for salvage, flood, lemon, and other brands. A new report costs about $0.49 and stays retrievable for 90 days."}
+                  </p>
                 </div>
               </div>
-              <button onClick={() => pull("generate")} disabled={busy === "generate"} className="mt-3 h-9 px-3.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold inline-flex items-center gap-1.5 disabled:opacity-60">
-                {busy === "generate" ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <ShieldCheck className="w-3.5 h-3.5" />} Generate Title Report ($0.49)
+              <button onClick={() => fetchRecord(false)} disabled={busy === "view" || busy === "generate"} className="mt-3 h-9 px-3.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold inline-flex items-center gap-1.5 disabled:opacity-60">
+                {(busy === "view" || busy === "generate") ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <ShieldCheck className="w-3.5 h-3.5" />}
+                {stats?.withinWindow ? "View Title Record" : "Generate Title Report ($0.49)"}
               </button>
             </div>
           )}

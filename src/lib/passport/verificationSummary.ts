@@ -413,6 +413,8 @@ export function deriveVerificationReport(d: PassportData, listing: VehicleListin
         { label: "Brands checked", value: status !== "pending" ? "Salvage, flood, lemon, rebuilt" : null },
         { label: "Verification", value: nmvtis ? `Dealer-verified via NMVTIS${verifiedOn ? ` on ${verifiedOn}` : ""}` : null },
         { label: "Source", value: nmvtis ? "NMVTIS national title record" : FAMILY_META.vehicle_history.label },
+        // VINData "as is" caveat — disclosed wherever the NMVTIS-derived result appears.
+        { label: "Note", value: nmvtis ? "Provided as is; not a substitute for a full title search." : null },
       ],
       checkedAt: status !== "pending" ? (nmvtis ? (d.titleVerifiedAt || reportTime) : reportTime) : null,
     };
