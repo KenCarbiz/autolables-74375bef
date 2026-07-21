@@ -57,7 +57,7 @@ export function useAutoLabelsReports(days = 30): AutoLabelsReport & { reload: ()
     const [docsRes, qrRes, addRes] = await Promise.all([
       sb.from("generated_documents").select("document_type, document_status, created_at, printed_at, published_at").eq("tenant_id", tenantId).gte("created_at", since).then((r: any) => r).catch(() => ({ data: null })),
       sb.from("qr_scan_events").select("scanned_at").eq("tenant_id", tenantId).gte("scanned_at", since).then((r: any) => r).catch(() => ({ data: null })),
-      sb.from("addendums").select("status, signed_at, products_snapshot, optional_selections, created_at").gte("created_at", since).then((r: any) => r).catch(() => ({ data: null })),
+      sb.from("addendums").select("status, customer_signed_at, products_snapshot, optional_selections, created_at").gte("created_at", since).then((r: any) => r).catch(() => ({ data: null })),
     ]);
 
     // Documents
