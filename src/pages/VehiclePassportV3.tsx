@@ -446,7 +446,17 @@ const VehiclePassportV3 = () => {
       if (src) sessionStorage.setItem("al_visit_src", src);
     } catch { /* storage unavailable */ }
   }, []);
-  const { listing, loading, notFound } = usePublicListing(vehicleSlug, { preview: isPreview, previewData: MOCK_LISTING as unknown as VehicleListing });
+  // Preview-only fixtures so ?preview=1&scenario=<name> can exercise every pricing
+  // path (used doc-fee, new MSRP==Total, sparse) without a live listing.
+  const previewScenario = isPreview ? new URLSearchParams(window.location.search).get("scenario") : null;
+  const previewFixture = (
+    previewScenario === "usedfee" ? MOCK_USED_FEE :
+    previewScenario === "newmsrp" ? MOCK_NEW_MSRP :
+    previewScenario === "sparse" ? MOCK_SPARSE :
+    previewScenario === "new2026" ? MOCK_NEW_2026 :
+    MOCK_LISTING
+  ) as unknown as VehicleListing;
+  const { listing, loading, notFound } = usePublicListing(vehicleSlug, { preview: isPreview, previewData: previewFixture });
   const [savedState, setSavedState] = useState<boolean | null>(null);
 
   const d = useMemo(() => (listing ? derivePassport(listing) : null), [listing]);
