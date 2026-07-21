@@ -565,15 +565,15 @@ const VehiclePassportDocuments = () => {
                 <div className="mt-4 space-y-3">
                   <div className="flex items-center justify-between">
                     <span className="inline-flex items-center gap-2 text-[13px] text-[#475569]"><span className={`w-2.5 h-2.5 rounded-full ${availableCount > 0 ? "bg-[#16A34A]" : "border border-[#CBD5E1]"}`} /> Available now</span>
-                    <span className={`text-[15px] font-bold tabular-nums ${availableCount > 0 ? "text-[#0F172A]" : "text-[#94A3B8]"}`}>{availableCount}</span>
+                    <span className={`text-[15px] font-medium tabular-nums ${availableCount > 0 ? "text-[#0F172A]" : "text-[#94A3B8]"}`}>{availableCount}</span>
                   </div>
                   <div className="flex items-center justify-between">
                     <span className="inline-flex items-center gap-2 text-[13px] text-[#475569]"><span className={`w-2.5 h-2.5 rounded-full ${signedCount > 0 ? "bg-[#16A34A]" : "border border-[#CBD5E1]"}`} /> Signed customer records</span>
-                    <span className={`text-[15px] font-bold tabular-nums ${signedCount > 0 ? "text-[#0F172A]" : "text-[#94A3B8]"}`}>{signedCount}</span>
+                    <span className={`text-[15px] font-medium tabular-nums ${signedCount > 0 ? "text-[#0F172A]" : "text-[#94A3B8]"}`}>{signedCount}</span>
                   </div>
                   <div className="flex items-center justify-between">
                     <span className="inline-flex items-center gap-2 text-[13px] text-[#475569]"><span className={`w-2.5 h-2.5 rounded-full ${verifiedCount > 0 ? "bg-[#16A34A]" : "border border-[#CBD5E1]"}`} /> Verified records</span>
-                    <span className={`text-[15px] font-bold tabular-nums ${verifiedCount > 0 ? "text-[#0F172A]" : "text-[#94A3B8]"}`}>{verifiedCount}</span>
+                    <span className={`text-[15px] font-medium tabular-nums ${verifiedCount > 0 ? "text-[#0F172A]" : "text-[#94A3B8]"}`}>{verifiedCount}</span>
                   </div>
                   <div className="flex items-center justify-between pt-3 border-t border-[#EEF1F4]">
                     <span className="text-[13px] text-[#475569]">Last checked</span>
