@@ -354,6 +354,105 @@ export function buildDiscountBreakdown(
 }
 
 // ──────────────────────────────────────────────────────────────────────
+// Sale-price BREAKDOWN card — the customer-facing itemized ladder shown under
+// the "Today's Sale Price" headline on the Vehicle Passport.
+//
+// The starting row depends ONLY on the validated vehicle type, never on a label:
+//   • new         → MSRP
+//   • used / cpo  → Market Value (the platform's configured/verified value)
+//
+// Every row is a real captured number or pure arithmetic off real numbers.
+// Nothing is invented: a discount is shown ONLY when the anchor genuinely sits
+// above the vehicle price, the fee row appears ONLY when a configured fee is part
+// of the displayed price, and $0 / empty / negative rows are never rendered. The
+// card ALWAYS reconciles vehiclePrice + fee === finalSalePrice, and the headline
+// price the passport shows IS finalSalePrice — the two can never diverge.
+// ──────────────────────────────────────────────────────────────────────
+
+export type PricingVehicleType = "new" | "used" | "cpo";
+
+export interface SalePriceLine {
+  key: string;
+  label: string;
+  amount: number;                     // positive magnitude; the role decides the sign shown
+  role: "anchor" | "discount";
+}
+
+export interface SalePriceCard {
+  vehicleType: PricingVehicleType;
+  anchorLabel: "MSRP" | "Market Value";
+  lines: SalePriceLine[];             // anchor + discount rows, rendered ABOVE "Vehicle Price"
+  vehiclePrice: number;
+  feeLabel: string | null;
+  feeAmount: number | null;           // > 0 → render "+ <feeLabel>"; null → no fee row
+  finalSalePrice: number;             // the headline; equals vehiclePrice + (feeAmount ?? 0)
+  reconciles: boolean;                // false → caller should show the smallest truthful view
+  // True when the card carries no anchor/discount ladder AND no fee — i.e. there
+  // is nothing to itemize and only the headline should render.
+  headlineOnly: boolean;
+}
+
+export interface SalePriceInput {
+  vehicleType: PricingVehicleType;
+  msrp?: number | null;
+  marketValue?: number | null;
+  vehiclePrice: number;               // real pre-doc vehicle price
+  finalSalePrice: number;             // real headline the passport already resolved
+  docFee?: number | null;
+  docFeeLabel?: string | null;
+  feeIncluded: boolean;               // the configured fee is part of finalSalePrice
+  // Optional itemized new-vehicle discount detail (dealer discount, retail cash,
+  // …). Used only when it reconciles exactly to the MSRP→price gap; otherwise a
+  // single honest "Dealer Discount" remainder is shown.
+  discountLines?: { key?: string; label: string; amount: number }[];
+}
+
+const SALE_TOLERANCE = 1; // dollars
+
+export const DEFAULT_DOC_FEE_LABEL = "Conveyance / Doc Fee";
+
+// Build the itemized sale-price card. Pure + deterministic.
+export function buildSalePriceCard(input: SalePriceInput): SalePriceCard {
+  const vp = input.vehiclePrice;
+  const anchorLabel: "MSRP" | "Market Value" = input.vehicleType === "new" ? "MSRP" : "Market Value";
+  const anchor = input.vehicleType === "new" ? input.msrp : input.marketValue;
+
+  const lines: SalePriceLine[] = [];
+  // Anchor + discount ladder only when the anchor is a real number genuinely
+  // ABOVE the vehicle price (a positive, truthful savings story).
+  if (anchor != null && Number.isFinite(anchor) && anchor - vp > SALE_TOLERANCE) {
+    const gap = anchor - vp;
+    lines.push({ key: "anchor", label: anchorLabel, amount: anchor, role: "anchor" });
+    const provided = (input.discountLines ?? []).filter((l) => l.amount > SALE_TOLERANCE);
+    const providedSum = provided.reduce((s, l) => s + l.amount, 0);
+    if (input.vehicleType === "new" && provided.length && Math.abs(providedSum - gap) <= SALE_TOLERANCE) {
+      provided.forEach((l, i) => lines.push({ key: l.key ?? `disc-${i}`, label: l.label, amount: l.amount, role: "discount" }));
+    } else {
+      lines.push({ key: "dealer_discount", label: "Dealer Discount", amount: gap, role: "discount" });
+    }
+  }
+
+  const feeAmount = input.feeIncluded && input.docFee != null && Number.isFinite(input.docFee) && input.docFee > SALE_TOLERANCE
+    ? input.docFee : null;
+  const feeLabel = feeAmount != null ? ((input.docFeeLabel && input.docFeeLabel.trim()) || DEFAULT_DOC_FEE_LABEL) : null;
+
+  const reconciles = Math.abs(vp + (feeAmount ?? 0) - input.finalSalePrice) <= SALE_TOLERANCE;
+  const headlineOnly = lines.length === 0 && feeAmount == null;
+
+  return {
+    vehicleType: input.vehicleType,
+    anchorLabel,
+    lines,
+    vehiclePrice: vp,
+    feeLabel,
+    feeAmount,
+    finalSalePrice: input.finalSalePrice,
+    reconciles,
+    headlineOnly,
+  };
+}
+
+// ──────────────────────────────────────────────────────────────────────
 // Price LABEL — what the dealer CALLS their price on customer surfaces.
 // This is display text only; it never changes the price VALUE or the doc-fee
 // inclusion decided by price_display_mode. Stored on dealer_profiles.settings

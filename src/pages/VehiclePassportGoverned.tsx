@@ -15,6 +15,8 @@ import { packetVisible } from "@/lib/packetModules";
 import { buildPassportActionPath } from "@/lib/passportReturn";
 import PriceDropWatch from "@/components/listing/PriceDropWatch";
 import PassportCtaDock from "@/components/passport/PassportCtaDock";
+import VehiclePriceBreakdown from "@/components/passport/VehiclePriceBreakdown";
+import { buildSalePriceCard, type PricingVehicleType } from "@/lib/priceModel";
 import { resolveStickyButtons, type StickyBottomButtons } from "@/lib/stickyButtons";
 import { MOCK_LISTING, MOCK_NEW_2026 } from "./VehiclePassportV3";
 import type { VehicleListing } from "@/hooks/useVehicleListing";
@@ -324,7 +326,25 @@ export default function VehiclePassportGoverned() {
   const isNew = condition === "new";
 
   const price = d.price;
-  const saveVs = d.saveVsMsrp && d.saveVsMsrp > 0 ? d.saveVsMsrp : null;
+
+  // Itemized sale-price card. New → MSRP anchor; used/CPO → Market Value anchor.
+  // The headline stays the exact number the passport already resolved (d.price);
+  // vehiclePrice backs the configured fee out only when the displayed price
+  // includes it. Everything below the model reconciles or falls back to the
+  // headline alone — no invented discount, no doubled fee.
+  const pricingVehicleType: PricingVehicleType =
+    isNew ? "new" : (condition === "cpo" || condition.includes("certified")) ? "cpo" : "used";
+  const feeIncluded = d.priceIncludesDoc && d.docFee != null && d.docFee > 0;
+  const vehiclePricePreDoc = price != null ? (feeIncluded ? price - (d.docFee as number) : price) : null;
+  const saleCard = price != null && vehiclePricePreDoc != null
+    ? buildSalePriceCard({
+        vehicleType: pricingVehicleType,
+        msrp: d.msrp, marketValue: d.marketAvg,
+        vehiclePrice: vehiclePricePreDoc, finalSalePrice: price,
+        docFee: d.docFee, feeIncluded,
+        discountLines: d.priceBreakdown ? d.priceBreakdown.lines.map((l) => ({ key: l.key, label: l.label, amount: l.amount })) : undefined,
+      })
+    : null;
 
   // ── Intelligence chips: derive the 3 strongest vehicle-specific reasons.
   type Chip = { label: string; tone: "green" | "blue" | "amber"; icon: React.ElementType };
@@ -587,16 +607,14 @@ export default function VehiclePassportGoverned() {
             )}
           </section>
 
-          {/* 5 — Advertised price */}
+          {/* 5 — Today's Sale Price + itemized breakdown (new → MSRP, used/CPO → Market Value) */}
           <section className="px-4 pt-4" data-module="price">
-            <div className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: SUB }}>{d.priceLabel || "Our Price"}</div>
-            <div className="mt-0.5 text-[32px] font-extrabold tabular-nums leading-none" style={{ color: NAVY }}>{price != null ? fmt$(price) : "—"}</div>
-            {d.priceIncludesDoc && d.docFee && price != null && (
-              <div className="mt-1.5 text-[12px] leading-snug tabular-nums" style={{ color: SUB }}>Includes {fmt$(d.docFee)} doc fee · {fmt$(price - d.docFee)} before doc fee</div>
-            )}
-            {d.msrp != null && saveVs && (
-              <div className="mt-1 text-[12px] tabular-nums" style={{ color: SUB }}>MSRP {fmt$(d.msrp)} <span className="ml-1 font-bold" style={{ color: GREEN }}>{fmt$(saveVs)} below MSRP</span></div>
-            )}
+            {saleCard
+              ? <VehiclePriceBreakdown card={saleCard} />
+              : <>
+                  <div className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: SUB }}>Today's Sale Price</div>
+                  <div className="mt-0.5 text-[32px] font-extrabold tabular-nums leading-none" style={{ color: NAVY }}>{price != null ? fmt$(price) : "—"}</div>
+                </>}
 
             {/* 6 — Payment module: ONLY when d.estMonthly is present. This is the same
                 dealer setting (passport_payment_display.payment → getPaymentDisplay)
@@ -1335,22 +1353,20 @@ export default function VehiclePassportGoverned() {
               <aside className="self-start" style={{ position: "sticky", top: DESKTOP_STICKY_OFFSET }} data-module="action-center">
                 <div className={`${CARD} p-5`}>
                   <div className="text-[10px] font-black uppercase tracking-wider" style={{ color: SUB }}>Customer Action Center</div>
-                  <div className="mt-3 text-[11px] font-bold uppercase tracking-wider" style={{ color: SUB }}>{d.priceLabel || "Our Price"}</div>
-                  {/* The ONE above-the-fold price. For a doc-inclusive tenant this already
-                      includes the doc fee — it is never added again (no $31,771). */}
-                  <div className="text-[32px] font-extrabold tabular-nums leading-none mt-1" style={{ color: NAVY }}>{price != null ? fmt$(price) : "—"}</div>
-                  {d.priceIncludesDoc && d.docFee && price != null && (
-                    <div className="mt-1.5 text-[12px] leading-snug tabular-nums" style={{ color: SUB }}>
-                      Includes {fmt$(d.docFee)} doc fee · {fmt$(price - d.docFee)} before doc fee
-                    </div>
-                  )}
+                  {/* Today's Sale Price + itemized breakdown. The ONE above-the-fold
+                      price; the model reconciles vehiclePrice + fee to it exactly, so
+                      the fee is never double-added (no $31,771). */}
+                  <div className="mt-3">
+                    {saleCard
+                      ? <VehiclePriceBreakdown card={saleCard} />
+                      : <>
+                          <div className="text-[11px] font-bold uppercase tracking-wider" style={{ color: SUB }}>Today's Sale Price</div>
+                          <div className="text-[32px] font-extrabold tabular-nums leading-none mt-1" style={{ color: NAVY }}>{price != null ? fmt$(price) : "—"}</div>
+                        </>}
+                  </div>
                   {/* Example payment — an estimate only, never an offer or approval. */}
                   {d.estMonthly != null && (
                     <div className="mt-1.5 text-[12px]" style={{ color: SUB }}>Est. <span className="font-bold tabular-nums" style={{ color: NAVY }}>{fmt$(d.estMonthly)}/mo</span>{d.paymentAssumptions ? ` · ${d.paymentAssumptions}` : ""}</div>
-                  )}
-                  {/* MSRP — the real factory sticker only; never market value. */}
-                  {d.msrp != null && (
-                    <div className="mt-1 text-[12px] tabular-nums" style={{ color: SUB }}>MSRP {fmt$(d.msrp)}{saveVs ? <span className="ml-2 font-bold" style={{ color: GREEN }}>{fmt$(saveVs)} below MSRP</span> : null}</div>
                   )}
                   <p className="mt-3 text-[11px] leading-snug" style={{ color: SUB }}>Sales tax, title, registration and dealer-installed options are not included.</p>
 
