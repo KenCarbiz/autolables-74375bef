@@ -73,7 +73,7 @@ export function useVehicleEvidence(vehicleId?: string | null, vin?: string | nul
     // Addendums / signing.
     for (const a of (Array.isArray(addRes?.data) ? addRes.data : [])) {
       if (a.created_at) ev.push({ id: `add-${a.id}`, at: a.created_at, category: "signing", title: "Addendum packet created", detail: a.total_price ? `$${Number(a.total_price).toLocaleString()}` : undefined, raw: a });
-      if (a.signed_at) ev.push({ id: `add-${a.id}-signed`, at: a.signed_at, category: "signing", title: `Customer signed${a.customer_name ? ` — ${a.customer_name}` : ""}`, contentHash: a.content_hash, raw: a });
+      if (a.customer_signed_at) ev.push({ id: `add-${a.id}-signed`, at: a.customer_signed_at, category: "signing", title: `Customer signed${a.customer_name ? ` — ${a.customer_name}` : ""}`, contentHash: a.content_hash, raw: a });
     }
 
     // Vehicle import.
