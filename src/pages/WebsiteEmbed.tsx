@@ -23,7 +23,8 @@ const SAMPLE_VIN = "1N4BL4BV1RN360195"; // any real VIN in the demo tenant works
 const WebsiteEmbed = () => {
   const { tenant } = useTenant();
   const { isAdmin } = useAuth();
-  const [role] = useState<string | null>(null);
+  const { member } = useEntitlements();
+  const role = member?.role ?? null;
   const canManage = isAdmin || hasDealerCapability(role, "can_manage_settings", isAdmin);
 
   const [mode, setMode] = useState<DetectMode>("template");
