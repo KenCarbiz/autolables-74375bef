@@ -1425,8 +1425,35 @@ const VehiclePassportV3 = () => {
                       </div>
                     ))}
                   </div>
+                  {/* MOBILE (<md): shallow full-width dealership banner with the
+                      years stat overlaid on a navy gradient — replaces the
+                      side-by-side thumbnail. */}
+                  {(yearsNum > 0 || dt.storefrontUrl) && (
+                    <div className="md:hidden pt-4 border-t border-[#EEF1F4]">
+                      <div className="relative w-full h-[118px] rounded-[13px] overflow-hidden border border-[#E6E8EC]">
+                        {dt.storefrontUrl ? (
+                          <img src={dt.storefrontUrl} alt={`${d.dealerName} dealership exterior`} loading="lazy" decoding="async" className="absolute inset-0 w-full h-full object-cover" />
+                        ) : (
+                          <div className="absolute inset-0 bg-gradient-to-br from-[#1E3A5F] to-[#0D1B2A] flex items-center justify-center"><Building2 className="w-8 h-8 text-white/30" aria-hidden="true" /></div>
+                        )}
+                        <div className="absolute inset-0" aria-hidden="true" style={{ background: "linear-gradient(to top, rgba(13,27,42,0.9) 0%, rgba(13,27,42,0.5) 36%, rgba(13,27,42,0) 66%)" }} />
+                        <div className="absolute left-4 bottom-3 right-4 text-white">
+                          {yearsNum > 0 ? (
+                            <>
+                              <p className="text-[28px] font-bold leading-none" style={{ textShadow: "0 1px 4px rgba(0,0,0,0.45)" }}>{yearsNum}+</p>
+                              <p className="text-[13px] font-semibold leading-tight mt-1">Years in Business</p>
+                              {foundingYear && <p className="text-[11.5px] text-white/85 leading-tight mt-0.5">{dt.familyOwned ? `Family owned since ${foundingYear}` : `Serving the community since ${foundingYear}`}</p>}
+                            </>
+                          ) : (
+                            <p className="text-[17px] font-bold leading-tight" style={{ textShadow: "0 1px 4px rgba(0,0,0,0.45)" }}>{d.dealerName}</p>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                  {/* DESKTOP / TABLET (md+): unchanged side-by-side thumbnail + years. */}
                   {yearsNum > 0 && (
-                    <div className="pt-4 border-t border-[#EEF1F4] flex items-center gap-4">
+                    <div className="hidden md:flex pt-4 border-t border-[#EEF1F4] items-center gap-4">
                       {dt.storefrontUrl ? (
                         <img src={dt.storefrontUrl} alt={d.dealerName} loading="lazy" decoding="async" className="w-32 h-[82px] rounded-xl object-cover border border-[#E6E8EC] shrink-0" />
                       ) : (
