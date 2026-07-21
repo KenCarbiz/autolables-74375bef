@@ -3,7 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import {
   ShieldCheck, ShieldAlert, Loader2, FileSearch, RefreshCw, CheckCircle2,
-  AlertTriangle, Lock, Eye, XCircle, Gauge,
+  AlertTriangle, Lock, Eye, XCircle, Gauge, Receipt,
 } from "lucide-react";
 import type { TitleVerification } from "@/hooks/useVehicleListing";
 
@@ -32,6 +32,13 @@ interface TitleSummary {
   messageColor: string;
 }
 
+interface PullStats {
+  monthCount: number;
+  monthCost: number;
+  totalCount: number;
+  unitCost: number;
+}
+
 interface Props {
   listingId: string;
   vin: string | null;
@@ -54,12 +61,14 @@ export const TitleVerificationPanel = ({ listingId, vin, tenantId, condition, ti
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState<"generate" | "refresh" | "attest" | null>(null);
   const [showRaw, setShowRaw] = useState(false);
+  const [stats, setStats] = useState<PullStats | null>(null);
 
   const load = useCallback(async () => {
     if (!vin || !tenantId || isNew) { setLoading(false); return; }
     setLoading(true);
     const { data } = await supabase.functions.invoke("marketcheck-title-report", { body: { vin, tenant_id: tenantId, action: "load" } });
-    const d = data as { available?: boolean; summary?: TitleSummary; generatedAt?: string; expiresAt?: string; expired?: boolean } | null;
+    const d = data as { available?: boolean; summary?: TitleSummary; generatedAt?: string; expiresAt?: string; expired?: boolean; stats?: PullStats } | null;
+    if (d?.stats) setStats(d.stats);
     if (d?.available && d.summary) {
       setSummary(d.summary); setGeneratedAt(d.generatedAt || null); setExpiresAt(d.expiresAt || null); setExpired(!!d.expired);
     } else { setSummary(null); }
@@ -73,7 +82,8 @@ export const TitleVerificationPanel = ({ listingId, vin, tenantId, condition, ti
     setBusy(action);
     const { data, error } = await supabase.functions.invoke("marketcheck-title-report", { body: { vin, tenant_id: tenantId, action } });
     setBusy(null);
-    const d = data as { available?: boolean; summary?: TitleSummary; generatedAt?: string; expiresAt?: string; reason?: string; error?: string; note?: string } | null;
+    const d = data as { available?: boolean; summary?: TitleSummary; generatedAt?: string; expiresAt?: string; reason?: string; error?: string; note?: string; stats?: PullStats } | null;
+    if (d?.stats) setStats(d.stats);
     if (error || d?.error === "plan_required") { toast.error("Title verification is a Compliance Pro feature."); return; }
     if (!d?.available) {
       if (d?.reason === "no_report") { toast.error(d?.note || "No report on file yet — generate one."); }
@@ -138,6 +148,17 @@ export const TitleVerificationPanel = ({ listingId, vin, tenantId, condition, ti
           <span className="text-[10px] font-bold uppercase tracking-wide text-blue-700 bg-blue-50 ring-1 ring-blue-100 rounded-full px-2 py-1 shrink-0">Compliance Pro</span>
         )}
       </div>
+
+      {enabled && stats && (
+        <div className="mb-3 -mt-1 flex items-center gap-1.5 text-[11.5px] text-muted-foreground">
+          <Receipt className="w-3.5 h-3.5 shrink-0" />
+          <span>
+            <span className="font-semibold text-foreground tabular-nums">{stats.monthCount}</span> report{stats.monthCount === 1 ? "" : "s"} generated this month
+            {stats.monthCost > 0 ? ` · ~$${stats.monthCost.toFixed(2)}` : ""}
+            {" · "}<span className="tabular-nums">{stats.totalCount}</span> all-time
+          </span>
+        </div>
+      )}
 
       {!enabled ? (
         <div className="rounded-xl border border-dashed border-border bg-muted/30 p-4 flex items-start gap-2.5">

@@ -22,6 +22,7 @@ import { adminClient, SERVICE_KEY } from "../_shared/supabase.ts";
 const MC_KEY = Deno.env.get("MARKETCHECK_API_KEY_1") || Deno.env.get("MARKETCHECK_API_KEY") || "";
 const MC_BASE = "https://api.marketcheck.com/v2";
 const REPORT_TTL_DAYS = 90;
+const GENERATE_UNIT_COST = 0.49;   // USD per paid generate (provider list price)
 
 // VIN: 17 chars, letters/digits, excluding I, O, Q.
 const validVin = (vin: string) => /^[A-HJ-NPR-Z0-9]{17}$/i.test(vin);
@@ -128,6 +129,23 @@ Deno.serve(async (req) => {
     }
   }
 
+  // Running spend meter for this tenant: charged pulls this calendar month +
+  // all-time, so the admin panel can always show the metered cost.
+  const pullStats = async () => {
+    const now = new Date();
+    const monthStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1)).toISOString();
+    const [monthRes, totalRes] = await Promise.all([
+      admin.from("title_report_pulls").select("charged, unit_cost, created_at")
+        .eq("tenant_id", tenantId).eq("charged", true).gte("created_at", monthStart),
+      admin.from("title_report_pulls").select("id", { count: "exact", head: true })
+        .eq("tenant_id", tenantId).eq("charged", true),
+    ]);
+    const monthRows = (monthRes.data || []) as { unit_cost: number | null }[];
+    const monthCount = monthRows.length;
+    const monthCost = monthRows.reduce((s, r) => s + Number(r.unit_cost || 0), 0);
+    return { monthCount, monthCost: Math.round(monthCost * 100) / 100, totalCount: totalRes.count ?? 0, unitCost: GENERATE_UNIT_COST };
+  };
+
   // ── Load the cached report (no external cost). Default action.
   const loadCached = async () => {
     const { data } = await admin.from("title_reports")
@@ -137,10 +155,10 @@ Deno.serve(async (req) => {
   };
 
   if (action === "load") {
-    const cached = await loadCached();
-    if (!cached) return json(200, { available: false, reason: "no_report" });
+    const [cached, stats] = await Promise.all([loadCached(), pullStats()]);
+    if (!cached) return json(200, { available: false, reason: "no_report", stats });
     const expired = !!cached.expires_at && new Date(cached.expires_at).getTime() < Date.now();
-    return json(200, { available: true, summary: cached.summary, generatedAt: cached.generated_at, expiresAt: cached.expires_at, expired, provider: cached.provider });
+    return json(200, { available: true, summary: cached.summary, generatedAt: cached.generated_at, expiresAt: cached.expires_at, expired, provider: cached.provider, stats });
   }
 
   if (action !== "generate" && action !== "refresh") {
@@ -187,6 +205,7 @@ Deno.serve(async (req) => {
   const nowIso = new Date().toISOString();
   const expiresIso = new Date(Date.now() + REPORT_TTL_DAYS * 24 * 60 * 60 * 1000).toISOString();
 
+  const charged = kind === "generate";
   await admin.from("title_reports").upsert({
     tenant_id: tenantId,
     vin,
@@ -199,5 +218,12 @@ Deno.serve(async (req) => {
     updated_at: nowIso,
   }, { onConflict: "tenant_id,vin" });
 
-  return json(200, { available: true, summary, generatedAt: nowIso, expiresAt: expiresIso, charged: kind === "generate", provider: "vindata_nmvtis" });
+  // Meter the pull (append-only), then read back the running total.
+  await admin.from("title_report_pulls").insert({
+    tenant_id: tenantId, vin, action, charged,
+    unit_cost: charged ? GENERATE_UNIT_COST : 0, pulled_by: userId,
+  }).then(() => undefined, () => undefined);
+  const stats = await pullStats();
+
+  return json(200, { available: true, summary, generatedAt: nowIso, expiresAt: expiresIso, charged, provider: "vindata_nmvtis", stats });
 });
