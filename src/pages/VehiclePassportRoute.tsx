@@ -5,20 +5,19 @@ import { trackCustomerEngagement } from "@/lib/engagement/customerEngagement";
 import { clearPassportExperiment } from "@/lib/experiments/passportExperiment";
 
 // ──────────────────────────────────────────────────────────────
-// VehiclePassportRoute — /v/:slug ALWAYS renders VehiclePassportV3.
+// VehiclePassportRoute — /v/:slug renders the full passport for every vehicle.
 //
-// V3 is the passport for every vehicle. The legacy governed/V2 experiences are
-// no longer routed to customer traffic here: the `governed_routing_enabled`
-// flag and the A/B split are intentionally ignored so no tenant configuration
-// can ever land a customer on the old passport. (VehiclePassportGoverned still
-// exists for /v3/:vehicleSlug and shared modules — it is simply never chosen
-// for /v/:slug.)
+// This is the complete, approved design (Customer Action Center, Verified
+// Vehicle Data, Market Intelligence, module cards, Market Comparison, Vehicle
+// Strengths, Fuel Economy, Why-Buy). The stripped-down earlier passport is no
+// longer served. The A/B split and `governed_routing_enabled` flag are ignored
+// so every vehicle gets the same complete experience.
 //
 // Rendering is IN-PLACE. No redirect, so query params + attribution
 // (?src=qr, utm_*, etc.) are never stripped.
 // ──────────────────────────────────────────────────────────────
 
-const VehiclePassportV3 = lazy(() => import("./VehiclePassportV3"));
+const VehiclePassport = lazy(() => import("./VehiclePassportGoverned"));
 
 function Loader() {
   return (
@@ -64,7 +63,7 @@ export default function VehiclePassportRoute() {
 
   return (
     <Suspense fallback={<Loader />}>
-      <VehiclePassportV3 />
+      <VehiclePassport />
     </Suspense>
   );
 }
