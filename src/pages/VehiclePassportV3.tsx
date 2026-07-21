@@ -298,6 +298,24 @@ export const MOCK_LISTING = {
   ],
 };
 
+// Preview-only fixture: a brand-new 2026 model (noindex-only, via
+// ?preview=1&scenario=new2026). A new car has delivery-mileage, zero prior
+// owners/accidents, full unelapsed factory warranty, and no reconditioning —
+// so the governed passport's new-vehicle treatment can be reviewed without a
+// live listing. Reuses the rich MOCK_LISTING spec/options payload.
+export const MOCK_NEW_2026 = {
+  ...MOCK_LISTING,
+  id: "mock-new-2026", slug: "sample-new-2026", vin: "5N1DL1GS4RC300126",
+  ymm: "2026 INFINITI QX60", trim: "AUTOGRAPH AWD", condition: "new",
+  mileage: 8, price: 63995, market_value: 65200,
+  description: "The 2026 INFINITI QX60 AUTOGRAPH AWD is the flagship of the QX60 line — quilted semi-aniline leather, open-pore ash wood, a 17-speaker Bose Performance Series audio system, and ProPILOT Assist, delivered brand-new with the full factory warranty.",
+  mc_attributes: { ...MOCK_LISTING.mc_attributes, msrp: 65200, owner_count: 0, accident_count: 0, dom: 6 },
+  warranty_info: { factory_months: 48, factory_miles: 60000, in_service_date: "2026-07-01" },
+  recon: undefined,
+  recall_status: "clear", open_recall_count: 0, view_count: 14, service_records: [],
+  market_payload: { high: 67100, low: 61900, belowMarket: 1205 },
+};
+
 // ── Lead modal is intentionally absent — every action routes to a full page ──
 const VehiclePassportV3 = () => {
   // Canonical route is /v/:slug (param `slug`); legacy /passport-v3/:vehicleSlug

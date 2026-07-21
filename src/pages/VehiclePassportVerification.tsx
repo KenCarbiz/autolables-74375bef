@@ -522,7 +522,7 @@ const MobileVerification = ({
         <section className="rounded-2xl bg-white border border-[#E6EAF0] grid grid-cols-2">
           {STATUS_TILES.map((t, i) => (
             <div key={t.label} className={`flex items-center gap-3 px-4 py-3.5 min-h-[48px] ${i % 2 === 0 ? "border-r" : ""} ${i < 2 ? "border-b" : ""} border-[#EEF1F4]`}>
-              <span className={`w-10 h-10 rounded-full ${t.bg} flex items-center justify-center shrink-0`}><t.icon className={`w-[22px] h-[22px] ${t.fg}`} strokeWidth={2} aria-hidden="true" /></span>
+              <span className={`w-10 h-10 rounded-full ${t.bg} flex items-center justify-center shrink-0`}><t.icon className={`w-[24px] h-[24px] ${t.fg}`} strokeWidth={2} aria-hidden="true" /></span>
               <div className="leading-tight">
                 <p className="text-[18px] font-bold tabular-nums">{t.count}</p>
                 <p className="text-[13px] text-[#64748B]">{t.label}</p>
@@ -564,7 +564,7 @@ const MobileVerification = ({
                 const statusFg = c.status === "pending" ? "text-[#2563EB]" : "text-[#64748B]";
                 return (
                   <button key={c.key} onClick={() => openCheck(c)} className="w-full min-h-[60px] px-4 py-3 flex items-center gap-3 text-left active:bg-slate-50">
-                    <span className={`w-[38px] h-[38px] rounded-xl ${iconTint} flex items-center justify-center shrink-0`}><Icon className="w-[23px] h-[23px]" strokeWidth={1.9} aria-hidden="true" /></span>
+                    <span className={`w-10 h-10 rounded-xl ${iconTint} flex items-center justify-center shrink-0`}><Icon className="w-[25px] h-[25px]" strokeWidth={1.9} aria-hidden="true" /></span>
                     <div className="min-w-0 flex-1">
                       <p className="text-[15px] font-semibold text-[#0F172A] leading-snug">{c.name}</p>
                       <p className="text-[13px] text-[#64748B] mt-0.5">{supportingLine(c)}</p>
@@ -587,7 +587,7 @@ const MobileVerification = ({
                 const Icon = subjectIcon(c);
                 return (
                   <button key={c.key} onClick={() => openCheck(c)} className="w-full min-h-[58px] px-4 py-3 flex items-center gap-3 text-left active:bg-slate-50">
-                    <span className="w-[38px] h-[38px] rounded-xl bg-emerald-50 flex items-center justify-center shrink-0"><Icon className="w-[23px] h-[23px] text-[#16A34A]" strokeWidth={1.9} aria-hidden="true" /></span>
+                    <span className="w-10 h-10 rounded-xl bg-emerald-50 flex items-center justify-center shrink-0"><Icon className="w-[25px] h-[25px] text-[#16A34A]" strokeWidth={1.9} aria-hidden="true" /></span>
                     <p className="text-[15px] font-semibold text-[#0F172A] leading-snug min-w-0 flex-1">{c.name}</p>
                     <span className="inline-flex items-center gap-1.5 text-[13.5px] font-semibold text-[#16A34A] shrink-0"><CircleCheck className="w-[18px] h-[18px]" aria-hidden="true" />{outcomeLabel(c)}</span>
                     <ChevronRight className="w-[19px] h-[19px] text-[#94A3B8] shrink-0" aria-hidden="true" />
@@ -600,7 +600,7 @@ const MobileVerification = ({
 
         {/* Sources and methodology */}
         <button onClick={openSources} className="w-full rounded-2xl bg-white border border-[#E6EAF0] min-h-[64px] px-4 py-3.5 flex items-center gap-3 text-left active:bg-slate-50">
-          <span className="w-[38px] h-[38px] rounded-xl bg-blue-50 flex items-center justify-center shrink-0"><SourcesShieldIcon className="w-[23px] h-[23px] text-[#2563EB]" strokeWidth={1.9} aria-hidden="true" /></span>
+          <span className="w-10 h-10 rounded-xl bg-blue-50 flex items-center justify-center shrink-0"><SourcesShieldIcon className="w-[25px] h-[25px] text-[#2563EB]" strokeWidth={1.9} aria-hidden="true" /></span>
           <div className="min-w-0 flex-1">
             <p className="text-[15px] font-semibold text-[#0F172A]">Sources and methodology</p>
             <p className="text-[13px] text-[#64748B] mt-0.5">Checked across {report.sourceCount} automotive data source{report.sourceCount === 1 ? "" : "s"}</p>
@@ -611,7 +611,7 @@ const MobileVerification = ({
 
         {/* Report traceability — whole row tappable */}
         <button onClick={openTrace} className="w-full rounded-2xl bg-white border border-[#E6EAF0] min-h-[64px] px-4 py-3.5 flex items-center gap-3 text-left active:bg-slate-50">
-          <span className="w-[38px] h-[38px] rounded-xl bg-blue-50 flex items-center justify-center shrink-0"><TraceabilityIcon className="w-[23px] h-[23px] text-[#2563EB]" strokeWidth={1.9} aria-hidden="true" /></span>
+          <span className="w-10 h-10 rounded-xl bg-blue-50 flex items-center justify-center shrink-0"><TraceabilityIcon className="w-[25px] h-[25px] text-[#2563EB]" strokeWidth={1.9} aria-hidden="true" /></span>
           <div className="min-w-0 flex-1">
             <p className="text-[15px] font-semibold text-[#0F172A]">Report traceability</p>
             <p className="text-[13px] text-[#64748B] mt-0.5">Report {reportId}</p>

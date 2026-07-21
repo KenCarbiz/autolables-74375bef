@@ -16,7 +16,7 @@ import { buildPassportActionPath } from "@/lib/passportReturn";
 import PriceDropWatch from "@/components/listing/PriceDropWatch";
 import PassportCtaDock from "@/components/passport/PassportCtaDock";
 import { resolveStickyButtons, type StickyBottomButtons } from "@/lib/stickyButtons";
-import { MOCK_LISTING } from "./VehiclePassportV3";
+import { MOCK_LISTING, MOCK_NEW_2026 } from "./VehiclePassportV3";
 import type { VehicleListing } from "@/hooks/useVehicleListing";
 import { isVehicleSaved, toggleSavedVehicle } from "@/lib/savedVehicles";
 import { usePassportEngagement } from "@/lib/passportEngagement";
@@ -175,7 +175,10 @@ export default function VehiclePassportGoverned() {
   // Preview parity with the verification report: ?preview=1&scenario=review renders
   // the shared review fixture (a real recall cross-source conflict + pending title)
   // so the governed passport's exception states can be reviewed against the report.
-  const previewData = (search.get("scenario") === "review" ? MOCK_REVIEW_LISTING : MOCK_LISTING) as unknown as VehicleListing;
+  const previewScenario = search.get("scenario");
+  const previewData = (previewScenario === "review" ? MOCK_REVIEW_LISTING
+    : previewScenario === "new2026" ? MOCK_NEW_2026
+    : MOCK_LISTING) as unknown as VehicleListing;
   const { listing, loading, notFound } = usePublicListing(rawSlug, { preview: isPreview, previewData });
 
   const d = useMemo(() => (listing ? derivePassport(listing) : null), [listing]);
