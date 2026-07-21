@@ -11,6 +11,7 @@ import { type VehicleListing } from "@/hooks/useVehicleListing";
 import { formatPhone } from "@/components/addendum/CustomerInfoSection";
 import { trackLeadSubmitted, trackCustomerEngagement } from "@/lib/engagement/customerEngagement";
 import { estimateAffordability, DEFAULT_APR_PERCENT } from "@/lib/affordability";
+import { savePaymentPrefs } from "@/lib/passport/paymentPrefs";
 import { fmt$, type PassportData } from "@/lib/passportV2Data";
 import { resolvePassportBack, passportForwardPath } from "@/lib/passportReturn";
 import { readBuildSheet } from "@/lib/buildSheet";
@@ -252,6 +253,14 @@ const TodaysPriceExperience = ({ listing, d }: { listing: VehicleListing; d: Pas
   const [errors, setErrors] = useState<{ name?: string; contact?: string; email?: string }>({});
   const [started, setStarted] = useState(false);
   const markStarted = () => { if (!started) { setStarted(true); if (!isPreview) track(listing, "todays_price_form_started"); } };
+
+  // Once the shopper has actually adjusted the payment (down / term / APR),
+  // remember their scenario for this vehicle so the passport estimate reflects
+  // it on return. Session-scoped, illustrative only — never an offer.
+  useEffect(() => {
+    if (!started || !copy.showCalculator) return;
+    savePaymentPrefs(listing, { down: safeDown, term, apr });
+  }, [started, copy.showCalculator, listing, safeDown, term, apr]);
 
   const emit = (event: string, extra: Record<string, unknown> = {}) => { if (!isPreview) track(listing, event, extra); };
 

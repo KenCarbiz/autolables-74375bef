@@ -17,6 +17,8 @@ import PriceDropWatch from "@/components/listing/PriceDropWatch";
 import PassportCtaDock from "@/components/passport/PassportCtaDock";
 import VehiclePriceBreakdown from "@/components/passport/VehiclePriceBreakdown";
 import { buildSalePriceCard, type PricingVehicleType } from "@/lib/priceModel";
+import { estimateAffordability } from "@/lib/affordability";
+import { readPaymentPrefs, clearPaymentPrefs, type PaymentPrefs } from "@/lib/passport/paymentPrefs";
 import { resolveStickyButtons, type StickyBottomButtons } from "@/lib/stickyButtons";
 import { MOCK_LISTING, MOCK_NEW_2026 } from "./VehiclePassportV3";
 import type { VehicleListing } from "@/hooks/useVehicleListing";
@@ -198,6 +200,12 @@ export default function VehiclePassportGoverned() {
   const heroRef = useRef<HTMLDivElement | null>(null);
   const isDesktop = useIsDesktop();
 
+  // Customer's own payment scenario (set on the Today's Price ladder). Read on
+  // mount so returning to the passport reflects what they just entered; a Reset
+  // clears it back to the dealer default.
+  const [payPrefs, setPayPrefs] = useState<PaymentPrefs | null>(null);
+  useEffect(() => { setPayPrefs(readPaymentPrefs(listing)); }, [listing]);
+
   // Engagement tracking mirrors the current passport exactly.
   useEffect(() => {
     if (!listing) return;
@@ -345,6 +353,23 @@ export default function VehiclePassportGoverned() {
         discountLines: d.priceBreakdown ? d.priceBreakdown.lines.map((l) => ({ key: l.key, label: l.label, amount: l.amount })) : undefined,
       })
     : null;
+
+  // Reflect the shopper's own payment scenario when they set one on the Today's
+  // Price ladder — recomputed with the SAME estimator so the number matches the
+  // ladder exactly. Only when the dealer enables payment display (d.estMonthly).
+  // Still an illustration, never an offer; Reset returns to the dealer default.
+  const customPayment = (payPrefs && price != null && d.estMonthly != null)
+    ? (() => {
+        const dp = Math.min(Math.max(0, payPrefs.down), price);
+        const m = estimateAffordability({ price, downPayment: dp, aprPercent: Math.max(0, payPrefs.apr) }, [payPrefs.term])[0]?.monthly_payment;
+        return m != null && Number.isFinite(m) ? { monthly: Math.round(m), down: dp, term: payPrefs.term, apr: payPrefs.apr } : null;
+      })()
+    : null;
+  const payMonthly = customPayment ? customPayment.monthly : d.estMonthly;
+  const payAssumptions = customPayment
+    ? `${customPayment.term} mo · ${fmt$(customPayment.down)} down · ${customPayment.apr.toFixed(2)}% APR (example)`
+    : d.paymentAssumptions;
+  const resetPayment = () => { clearPaymentPrefs(listing); setPayPrefs(null); };
 
   // ── Intelligence chips: derive the 3 strongest vehicle-specific reasons.
   type Chip = { label: string; tone: "green" | "blue" | "amber"; icon: React.ElementType };
@@ -620,18 +645,24 @@ export default function VehiclePassportGoverned() {
                 dealer setting (passport_payment_display.payment → getPaymentDisplay)
                 that gates the desktop estimate; when off, estMonthly is null and this
                 renders nothing (no empty card, no gap). Never an offer or approval. */}
-            {d.estMonthly != null && (
+            {payMonthly != null && (
               <div className={`${CARD} mt-3 px-4 py-3.5`} data-module="payment">
                 <div className="flex items-center justify-between gap-2">
-                  <span className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: SUB }}>Estimated payment (Example)</span>
+                  <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider" style={{ color: SUB }}>
+                    {customPayment ? "Your estimate" : "Estimated payment (Example)"}
+                    {customPayment && <span className="inline-flex items-center rounded-full px-1.5 py-0.5 text-[9.5px] font-bold" style={{ background: "#EFF6FF", color: BLUE }}>EDITED</span>}
+                  </span>
                   <button onClick={() => openAction("payment")} aria-label="How this payment is estimated" className="h-8 w-8 -mr-1.5 grid place-items-center rounded-full hover:bg-slate-50"><Info className="w-[18px] h-[18px]" style={{ color: SUB }} /></button>
                 </div>
                 <div className="mt-1 flex items-baseline gap-1">
-                  <span className="text-[30px] font-extrabold tabular-nums leading-none" style={{ color: NAVY }}>{fmt$(d.estMonthly)}</span>
+                  <span className="text-[30px] font-extrabold tabular-nums leading-none" style={{ color: NAVY }}>{fmt$(payMonthly)}</span>
                   <span className="text-[15px] font-bold" style={{ color: SUB }}>/mo</span>
                 </div>
-                {d.paymentAssumptions && <div className="mt-1 text-[12px]" style={{ color: SUB }}>{d.paymentAssumptions}</div>}
-                <button onClick={() => go("todays-price")} className="mt-2.5 inline-flex items-center gap-1 text-[13px] font-bold" style={{ color: BLUE }}>Customize Payment <ChevronRight className="w-4 h-4" /></button>
+                {payAssumptions && <div className="mt-1 text-[12px]" style={{ color: SUB }}>{payAssumptions}</div>}
+                <div className="mt-2.5 flex items-center gap-4">
+                  <button onClick={() => go("todays-price")} className="inline-flex items-center gap-1 text-[13px] font-bold" style={{ color: BLUE }}>Customize Payment <ChevronRight className="w-4 h-4" /></button>
+                  {customPayment && <button onClick={resetPayment} className="text-[13px] font-semibold" style={{ color: SUB }}>Reset to default</button>}
+                </div>
                 <p className="mt-2.5 pt-2.5 border-t text-[11px] leading-snug" style={{ borderColor: BORDER, color: SUB }}>Estimated payment for illustration only. Terms, rates, taxes, fees and approval may vary. This is not a financing offer.</p>
               </div>
             )}
@@ -1364,9 +1395,13 @@ export default function VehiclePassportGoverned() {
                           <div className="text-[32px] font-extrabold tabular-nums leading-none mt-1" style={{ color: NAVY }}>{price != null ? fmt$(price) : "—"}</div>
                         </>}
                   </div>
-                  {/* Example payment — an estimate only, never an offer or approval. */}
-                  {d.estMonthly != null && (
-                    <div className="mt-1.5 text-[12px]" style={{ color: SUB }}>Est. <span className="font-bold tabular-nums" style={{ color: NAVY }}>{fmt$(d.estMonthly)}/mo</span>{d.paymentAssumptions ? ` · ${d.paymentAssumptions}` : ""}</div>
+                  {/* Example payment — an estimate only, never an offer or approval.
+                      Reflects the shopper's own scenario when they set one on the ladder. */}
+                  {payMonthly != null && (
+                    <div className="mt-1.5 text-[12px]" style={{ color: SUB }}>
+                      {customPayment ? "Your est. " : "Est. "}<span className="font-bold tabular-nums" style={{ color: NAVY }}>{fmt$(payMonthly)}/mo</span>{payAssumptions ? ` · ${payAssumptions}` : ""}
+                      {customPayment && <button onClick={resetPayment} className="ml-2 font-semibold underline" style={{ color: BLUE }}>Reset</button>}
+                    </div>
                   )}
                   <p className="mt-3 text-[11px] leading-snug" style={{ color: SUB }}>Sales tax, title, registration and dealer-installed options are not included.</p>
 

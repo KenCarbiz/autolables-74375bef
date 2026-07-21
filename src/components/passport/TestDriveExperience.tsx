@@ -384,10 +384,10 @@ const TestDriveExperience = ({ listing, d, navigate }: { listing: VehicleListing
                         key={w.key} type="button"
                         onClick={() => { setWindow(on ? "" : w.key); markStarted(); }}
                         aria-pressed={on}
-                        className={`rounded-xl border px-2 py-2.5 text-center transition-colors ${on ? "border-[#0B6FEA] bg-[#EAF4FF]" : "border-[#DDE5EE] bg-white hover:border-[#B9CBE0]"}`}
+                        className={`rounded-xl border px-2 py-3 text-center transition-colors ${on ? "border-[#0B6FEA] bg-[#EAF4FF]" : "border-[#DDE5EE] bg-white hover:border-[#B9CBE0]"}`}
                       >
-                        <AutoLabelsSpecIcon name={w.icon} className={`w-5 h-5 mx-auto ${on ? "text-[#0B6FEA]" : "text-[#8CA3BC]"}`} accent={on ? "#0B6FEA" : "currentColor"} />
-                        <p className={`text-[12.5px] font-bold mt-1 ${on ? "text-[#0B6FEA]" : "text-[#10202B]"}`}>{w.label}</p>
+                        <AutoLabelsSpecIcon name={w.icon} className={`w-7 h-7 mx-auto ${on ? "text-[#0B6FEA]" : "text-[#8CA3BC]"}`} accent={on ? "#0B6FEA" : "currentColor"} style={{ width: 28, height: 28 }} />
+                        <p className={`text-[12.5px] font-bold mt-1.5 ${on ? "text-[#0B6FEA]" : "text-[#10202B]"}`}>{w.label}</p>
                         <p className={`text-[10.5px] font-medium ${on ? "text-[#3D5876]" : "text-[#8CA3BC]"}`}>{w.range}</p>
                       </button>
                     );
