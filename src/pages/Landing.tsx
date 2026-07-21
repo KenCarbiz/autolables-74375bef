@@ -39,7 +39,64 @@ import {
 
 // The most convincing demo is the real customer artifact — the sample
 // Vehicle Passport rendered with placeholder data (no signup required).
-const DEMO_TO = "/v/demo?preview=1";
+// Showcase mode drops the amber preview banner and pins the clean 2026
+// sample so the "open the live sample" links match the on-page demo image.
+const DEMO_TO = "/v/demo?showcase=1&scenario=new2026";
+
+// Static, reliable landing demo: a tall screenshot of the real 2026 QX60
+// Passport that slowly slides inside a phone window, with the sticky action
+// bar pinned to the bottom so it reads like a live app. Replaces the heavy
+// /v/demo iframe (flaky to warm up, expensive to mount twice on the page).
+// Reduced-motion users see the top of the passport, held still.
+const PassportDemoPhone = ({ sticky = true }: { sticky?: boolean }) => {
+  const wrapRef = React.useRef<HTMLDivElement>(null);
+  const imgRef = React.useRef<HTMLImageElement>(null);
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    let raf = 0;
+    let dir = 1;
+    let y = 0;
+    const tick = () => {
+      const wrap = wrapRef.current;
+      const img = imgRef.current;
+      if (wrap && img) {
+        const max = img.offsetHeight - wrap.clientHeight;
+        if (max > 0) {
+          y += 0.6 * dir;
+          if (y >= max) { y = max; dir = -1; }
+          else if (y <= 0) { y = 0; dir = 1; }
+          img.style.transform = `translateY(${-y}px)`;
+        }
+      }
+      raf = window.requestAnimationFrame(tick);
+    };
+    const start = window.setTimeout(() => { raf = window.requestAnimationFrame(tick); }, 2000);
+    return () => { window.clearTimeout(start); if (raf) window.cancelAnimationFrame(raf); };
+  }, []);
+  return (
+    <div className="relative h-full w-full overflow-hidden bg-white">
+      <div ref={wrapRef} className="h-full w-full overflow-hidden">
+        <img
+          ref={imgRef}
+          src="/image0.jpeg"
+          alt="Sample Vehicle Passport for a 2026 INFINITI QX60 — pricing breakdown, verification, and warranty"
+          className="w-full will-change-transform"
+          loading="lazy"
+          decoding="async"
+        />
+      </div>
+      {sticky && (
+        <img
+          src="/autolabels-sticky-action-bar-transparent.png"
+          alt=""
+          aria-hidden
+          className="pointer-events-none absolute inset-x-0 bottom-0 w-full"
+        />
+      )}
+    </div>
+  );
+};
 
 // Landing icon system — final locked SVGs committed in /public (blue gradient
 // tile, white glyph, transparent canvas). Rendered bare via LandingIcon: the
@@ -326,34 +383,6 @@ const PASSPORT_CHIPS = [
 ];
 
 const PassportShowcase = ({ waitTo }: { waitTo: string }) => {
-  const iframeRef = React.useRef<HTMLIFrameElement>(null);
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
-    const iframe = iframeRef.current;
-    if (!iframe) return;
-    let raf = 0;
-    let dir = 1;
-    const tick = () => {
-      try {
-        const win = iframe.contentWindow;
-        const doc = iframe.contentDocument;
-        if (win && doc && doc.body) {
-          const max = doc.body.scrollHeight - win.innerHeight;
-          if (max > 0) {
-            const next = win.scrollY + 0.6 * dir;
-            if (next >= max) dir = -1;
-            else if (next <= 0) dir = 1;
-            win.scrollTo(0, next);
-          }
-        }
-      } catch { /* cross-origin — no-op */ }
-      raf = window.requestAnimationFrame(tick);
-    };
-    const start = window.setTimeout(() => { raf = window.requestAnimationFrame(tick); }, 2500);
-    return () => { window.clearTimeout(start); if (raf) window.cancelAnimationFrame(raf); };
-  }, []);
-
   return (
     <section id="passport-showcase" className="scroll-mt-20 border-b border-slate-100 bg-white">
       <div className="mx-auto max-w-7xl px-6 py-20 lg:px-8 lg:py-24">
@@ -410,15 +439,7 @@ const PassportShowcase = ({ waitTo }: { waitTo: string }) => {
             <div className="relative w-full max-w-[320px] rounded-[44px] border border-slate-900/10 bg-slate-900 p-2.5 shadow-[0_2px_4px_-1px_rgba(15,23,42,0.08),0_30px_60px_-18px_rgba(15,23,42,0.28),0_60px_120px_-40px_rgba(11,32,65,0.35)]">
               <div className="absolute left-1/2 top-3 z-10 h-5 w-24 -translate-x-1/2 rounded-full bg-slate-900" aria-hidden />
               <div className="h-[560px] w-full overflow-hidden rounded-[34px] bg-white">
-                {/* TODO: if /v/demo?preview=1 stops rendering sample data, fall
-                    back to a tall static screenshot placeholder here. */}
-                <iframe
-                  ref={iframeRef}
-                  src={DEMO_TO}
-                  title="Live sample Vehicle Passport"
-                  loading="lazy"
-                  className="h-full w-full border-0"
-                />
+                <PassportDemoPhone />
               </div>
             </div>
             <p className="mt-4 text-center text-sm text-slate-500">
@@ -797,13 +818,7 @@ const PassportPhoneCard = () => (
     <div className="mt-5 flex justify-center">
       <div className="relative w-[240px] rounded-[36px] border border-slate-900/10 bg-slate-900 p-2 shadow-xl">
         <div className="h-[380px] w-full overflow-hidden rounded-[28px] bg-white">
-          <iframe
-            src={DEMO_TO}
-            title="Live sample Vehicle Passport"
-            loading="lazy"
-            className="h-full w-full origin-top-left scale-[0.62] border-0"
-            style={{ width: "161%", height: "161%" }}
-          />
+          <PassportDemoPhone />
         </div>
       </div>
     </div>

@@ -435,7 +435,11 @@ const VehiclePassportV3 = () => {
     window.history.replaceState({ alPanel: true }, "", url);
   }, [activePanel]);
 
-  const isPreview = typeof window !== "undefined" && new URLSearchParams(window.location.search).has("preview");
+  // Showcase mode (?showcase=1) loads the sample fixtures like preview but WITHOUT
+  // the amber "SAMPLE PREVIEW" banner — for a clean demo passport on the marketing
+  // site. Still noindex + no analytics (it inherits isPreview).
+  const isShowcase = typeof window !== "undefined" && new URLSearchParams(window.location.search).has("showcase");
+  const isPreview = isShowcase || (typeof window !== "undefined" && new URLSearchParams(window.location.search).has("preview"));
   // Embed mode (?embed=1): rendered inside a dealer-site iframe via /embed.js.
   // Strip the top header and any sticky return bar so the iframe body is chrome-
   // light. Post an autolabels:close message when the shopper taps a close-like
@@ -894,7 +898,7 @@ const VehiclePassportV3 = () => {
       <style>{V3_PRINT}</style>
       <Helmet><title>{`${listing.ymm}${listing.trim ? ` ${listing.trim}` : ""} — ${d.dealerName}`}</title><meta name="description" content={`${listing.ymm}${price != null ? ` · ${fmt$(price)}` : ""} · ${d.dealerName}`} /><meta httpEquiv="Content-Security-Policy" content="frame-ancestors *" />{isPreview && <meta name="robots" content="noindex" />}</Helmet>
 
-      {isPreview && (
+      {isPreview && !isShowcase && (
         <div className="bg-amber-500 text-white text-center text-[12px] font-bold py-1.5 px-4 print:hidden">SAMPLE PREVIEW — design layout with placeholder data. Not a real listing.</div>
       )}
 
