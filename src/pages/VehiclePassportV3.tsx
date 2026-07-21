@@ -905,7 +905,8 @@ const VehiclePassportV3 = () => {
           {(() => {
             // Tenant logo from the dealer branding snapshot (logo_url or logo).
             // Falls back to the full AutoLabels wordmark — never the "a" mark.
-            const dealerLogo = (listing.dealer_snapshot?.logo_url as string) || (listing.dealer_snapshot?.logo as string) || "";
+            const snap = listing.dealer_snapshot as Record<string, unknown> | undefined;
+            const dealerLogo = (snap?.logo_url as string) || (snap?.logo as string) || "";
             return dealerLogo
               ? <img src={dealerLogo} alt={d.dealerName} className="h-7 max-w-[160px] object-contain" loading="eager" decoding="async" />
               : <Logo variant="full" size={22} />;
