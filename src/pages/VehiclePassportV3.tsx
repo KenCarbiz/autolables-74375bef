@@ -109,8 +109,15 @@ function PriceLadder({ card }: { card: SalePriceCard }) {
           )}
         </div>
       ))}
+      {/* No anchor (no MSRP / Market Value in the data) → show the pre-fee
+          Vehicle Selling Price so the degraded card still reads Selling → Fee →
+          Total rather than a lone fee row. */}
+      {card.lines.length === 0 && card.feeAmount != null && row(
+        <span className="font-bold text-[#0F172A]">Vehicle Selling Price</span>,
+        <span className="font-extrabold text-[#0F172A]">{fmt$(card.vehicleSellingPrice)}</span>,
+      )}
       {card.feeAmount != null && card.feeLabel && (
-        <div className={card.lines.length > 0 ? "mt-1" : ""}>{row(card.feeLabel, <span className="font-semibold text-[#0F172A]">+{fmt$(card.feeAmount)}</span>)}</div>
+        <div className="mt-1">{row(card.feeLabel, <span className="font-semibold text-[#0F172A]">+{fmt$(card.feeAmount)}</span>)}</div>
       )}
       {row(
         <span className="font-bold text-[#0F172A]">Total Advertised Price</span>,
