@@ -36,6 +36,29 @@ const OEM_DOMAINS: Record<string, string[]> = {
   "alfa romeo": ["alfaromeousa.com"], maserati: ["maserati.com"],
 };
 
+// Fallback: the official owner/manuals portal per make. Many OEMs serve manuals
+// only through an interactive "Manuals & Guides" tool (no indexable static PDF),
+// so a site: search returns nothing. When it does, we link the official manuals
+// page — the shopper picks their exact year/model there. Probe-validated before
+// caching, and it must sit on the make's allowlisted domain.
+const MANUAL_PORTAL: Record<string, string> = {
+  infiniti: "https://owners.infinitiusa.com", nissan: "https://owners.nissanusa.com",
+  toyota: "https://www.toyota.com/owners/", lexus: "https://drivers.lexus.com",
+  honda: "https://owners.honda.com", acura: "https://owners.acura.com",
+  ford: "https://www.ford.com/support/category/owner-manuals/", lincoln: "https://www.lincoln.com/support/",
+  chevrolet: "https://www.chevrolet.com/support/vehicle/manuals-videos", gmc: "https://www.gmc.com/support/vehicle/manuals-videos",
+  buick: "https://www.buick.com/support/vehicle/manuals-videos", cadillac: "https://www.cadillac.com/support/vehicle/manuals-videos",
+  jeep: "https://www.mopar.com/en-us/my-vehicle/owners-manual.html", ram: "https://www.mopar.com/en-us/my-vehicle/owners-manual.html",
+  dodge: "https://www.mopar.com/en-us/my-vehicle/owners-manual.html", chrysler: "https://www.mopar.com/en-us/my-vehicle/owners-manual.html",
+  fiat: "https://www.mopar.com/en-us/my-vehicle/owners-manual.html",
+  mazda: "https://www.mazdausa.com/owners/resources/vehicle-resources", subaru: "https://www.subaru.com/owners/index.html",
+  hyundai: "https://www.hyundaiusa.com/us/en/owner-resources", kia: "https://www.kia.com/us/en/owners/resources/manuals-guides",
+  volkswagen: "https://www.vw.com/en/owners.html", vw: "https://www.vw.com/en/owners.html", audi: "https://www.audiusa.com/us/web/en/owners.html",
+  bmw: "https://www.bmwusa.com/owners.html", mini: "https://www.miniusa.com/owner.html",
+  "land rover": "https://www.landroverusa.com/ownership/index.html", jaguar: "https://www.jaguarusa.com/owners/index.html",
+  tesla: "https://www.tesla.com/ownersmanual", volvo: "https://www.volvocars.com/us/support/manuals",
+};
+
 const hostAllowed = (url: string, domains: string[]): boolean => {
   try {
     const host = new URL(url).hostname.toLowerCase();
@@ -127,15 +150,32 @@ Deno.serve(async (req) => {
   if (!FIRECRAWL_KEY) return json(200, { error: "not_configured" });
 
   const siteFilter = domains.map((d) => `site:${d}`).join(" OR ");
-  const query = `${year ? `${year} ` : ""}${make} ${model} owner's manual pdf (${siteFilter})`;
-  let hits = (await firecrawlSearch(query)).filter((h) => hostAllowed(h.url, domains));
-  if (!hits.length) {
-    hits = (await firecrawlSearch(`${make} ${model} owners manual (${siteFilter})`)).filter((h) => hostAllowed(h.url, domains));
+  // Several query shapes: manuals may be a static PDF, an "owner's manual" page,
+  // or the make's "Manuals & Guides" tool. First non-empty allowlisted set wins.
+  const queries = [
+    `${year ? `${year} ` : ""}${make} ${model} owner's manual pdf (${siteFilter})`,
+    `${year ? `${year} ` : ""}${make} ${model} owner's manual (${siteFilter})`,
+    `${make} ${model} owners manual (${siteFilter})`,
+    `${make} ${model} manuals and guides (${siteFilter})`,
+  ];
+  let hits: Hit[] = [];
+  for (const q of queries) {
+    hits = (await firecrawlSearch(q)).filter((h) => hostAllowed(h.url, domains));
+    if (hits.length) break;
   }
-  if (!hits.length) return json(404, { error: "manual_not_found", query });
 
-  hits.sort((a, b) => scoreHit(b, model, year) - scoreHit(a, model, year));
-  const best = hits[0];
+  let best: Hit;
+  let source = "oem_site";
+  if (hits.length) {
+    hits.sort((a, b) => scoreHit(b, model, year) - scoreHit(a, model, year));
+    best = hits[0];
+  } else {
+    // No indexable manual — fall back to the official manuals portal for the make.
+    const portal = MANUAL_PORTAL[make.toLowerCase()];
+    if (!portal || !hostAllowed(portal, domains)) return json(404, { error: "manual_not_found" });
+    best = { url: portal, title: `${make} Owner's Manuals & Guides` };
+    source = "oem_portal";
+  }
 
   // Confirm the link isn't dead before caching. OEM CDNs often 403 a
   // server-side probe that a real browser sails through — only a hard
@@ -163,8 +203,8 @@ Deno.serve(async (req) => {
   del = manualYear === null ? del.is("year", null) : del.eq("year", manualYear);
   await del;
   await admin.from("oem_owners_manual_links").insert(
-    { make, model, year: manualYear, url: best.url, title: best.title || null, source: "oem_site", verified_at: new Date().toISOString() },
+    { make, model, year: manualYear, url: best.url, title: best.title || null, source, verified_at: new Date().toISOString() },
   );
 
-  return json(200, { ok: true, cached: false, url: best.url, title: best.title || null, year: manualYear });
+  return json(200, { ok: true, cached: false, url: best.url, title: best.title || null, year: manualYear, source });
 });
