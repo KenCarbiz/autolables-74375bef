@@ -176,7 +176,9 @@ export default function VehiclePassportGoverned() {
   // MOCK_LISTING) so the governed experience can be visually reviewed without a
   // live backend. No effect on real shopper traffic.
   const [search] = useSearchParams();
-  const isPreview = search.get("preview") === "1";
+  // ?preview=1 and ?showcase=1 both render the shared MOCK fixtures (showcase is
+  // the marketing "open the live sample" entry point). No effect on real traffic.
+  const isPreview = search.get("preview") === "1" || search.has("showcase");
   // Preview parity with the verification report: ?preview=1&scenario=review renders
   // the shared review fixture (a real recall cross-source conflict + pending title)
   // so the governed passport's exception states can be reviewed against the report.
