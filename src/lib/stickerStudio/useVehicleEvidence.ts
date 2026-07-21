@@ -45,7 +45,7 @@ export function useVehicleEvidence(vehicleId?: string | null, vin?: string | nul
     const [docsRes, qrRes, addRes, listRes, auditRes] = await Promise.all([
       sb.from("generated_documents").select("id, document_type, document_status, version, created_at, approved_at, printed_at, published_at, rejected_at, reject_reason, label_mode, template_id").eq("vehicle_id", vehicleId).then((r: any) => r).catch(() => ({ data: null })),
       sb.from("qr_scan_events").select("id, sticker_type, device_type, browser, scanned_at").eq("vehicle_id", vehicleId).order("scanned_at", { ascending: false }).limit(25).then((r: any) => r).catch(() => ({ data: null })),
-      vin ? sb.from("addendums").select("id, status, signed_at, content_hash, customer_name, created_at, total_price").eq("vehicle_vin", vin).then((r: any) => r).catch(() => ({ data: null })) : Promise.resolve({ data: null }),
+      vin ? sb.from("addendums").select("id, status, customer_signed_at, content_hash, customer_name, created_at, total_price").eq("vehicle_vin", vin).then((r: any) => r).catch(() => ({ data: null })) : Promise.resolve({ data: null }),
       sb.from("vehicle_listings").select("created_at, ymm").eq("id", vehicleId).maybeSingle().then((r: any) => r).catch(() => ({ data: null })),
       tenantId ? sb.from("audit_log").select("id, action, entity_type, entity_id, content_hash, user_email, ip_address, details, created_at").eq("store_id", tenantId).order("created_at", { ascending: false }).limit(400).then((r: any) => r).catch(() => ({ data: null })) : Promise.resolve({ data: null }),
     ]);
