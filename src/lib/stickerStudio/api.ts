@@ -213,7 +213,7 @@ export async function publishToPassport(vehicleId?: string | null, tenantId?: st
       .from("vehicle_listings")
       .update({ status: "published", published_at: new Date().toISOString() })
       .eq("id", vehicleId)
-      .select("slug, vin, stock_number")
+      .select("slug, vin")
       .maybeSingle();
     if (error) return { ok: false, error: error.message };
     const origin = typeof window !== "undefined" ? window.location.origin : "";

@@ -2852,7 +2852,9 @@ const TRUST_PROGRESSIVE = [{ icon: ShieldCheck, t: "No Payment Now" }, { icon: B
 
 function MobileCtaFooter({ variant, panelKey, go, signals }: { variant: string; panelKey: string; go: (s: string) => void; signals: CtaSignals }) {
   const cta = ctaFor(panelKey, signals);
-  const primary = () => go(cta.action === "protect" ? "protect" : cta.action === "warranty_question" ? "warranty_question" : "reserve");
+  // "warranty_question" routes to the contact form (no dedicated section exists)
+  // so shoppers can send the dealer a warranty confirmation question.
+  const primary = () => go(cta.action === "protect" ? "protect" : cta.action === "warranty_question" ? "contact" : "reserve");
   const toneBadge = cta.tone === "orange" ? "bg-orange-50 border-orange-200 text-[#EA580C]" : cta.tone === "green" ? "bg-emerald-50 border-emerald-200 text-[#16A34A]" : "bg-blue-50 border-blue-200 text-[#2563EB]";
   const BadgeIcon = cta.tone === "orange" ? Flame : cta.tone === "green" ? CheckCircle2 : ShieldCheck;
   const BlueBtn = ({ label, sub }: { label: string; sub?: string }) => (

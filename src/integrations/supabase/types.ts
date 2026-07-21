@@ -72,6 +72,13 @@ export type Database = {
           ip_address: string | null
           prep_sign_off_id: string | null
           price_overrides: Json | null
+          return_completed_at: string | null
+          return_delivery_mileage: number | null
+          return_reason: string | null
+          return_requested_at: string | null
+          return_restocking_fee: number | null
+          return_status: string | null
+          return_window_closes_at: string | null
           signature_data: string | null
           signature_type: string | null
           signed_at: string
@@ -98,6 +105,13 @@ export type Database = {
           ip_address?: string | null
           prep_sign_off_id?: string | null
           price_overrides?: Json | null
+          return_completed_at?: string | null
+          return_delivery_mileage?: number | null
+          return_reason?: string | null
+          return_requested_at?: string | null
+          return_restocking_fee?: number | null
+          return_status?: string | null
+          return_window_closes_at?: string | null
           signature_data?: string | null
           signature_type?: string | null
           signed_at?: string
@@ -124,6 +138,13 @@ export type Database = {
           ip_address?: string | null
           prep_sign_off_id?: string | null
           price_overrides?: Json | null
+          return_completed_at?: string | null
+          return_delivery_mileage?: number | null
+          return_reason?: string | null
+          return_requested_at?: string | null
+          return_restocking_fee?: number | null
+          return_status?: string | null
+          return_window_closes_at?: string | null
           signature_data?: string | null
           signature_type?: string | null
           signed_at?: string
@@ -6477,6 +6498,22 @@ export type Database = {
           version: number
         }[]
       }
+      get_signing_return_status: {
+        Args: { _signing_token: string }
+        Returns: {
+          addendum_id: string
+          dealer_snapshot: Json
+          return_requested_at: string
+          return_status: string
+          return_window_closes_at: string
+          signed_at: string
+          signing_id: string
+          store_id: string
+          tenant_id: string
+          vehicle_vin: string
+          vehicle_ymm: string
+        }[]
+      }
       get_tenant_billing: {
         Args: { _tenant_id: string }
         Returns: {
@@ -6854,9 +6891,23 @@ export type Database = {
         Args: { _addendum_id: string; _channel?: string; _details?: Json }
         Returns: undefined
       }
+      request_return: {
+        Args: { _reason?: string; _signing_token: string }
+        Returns: Json
+      }
       request_signing_link_resend: {
         Args: { _contact: string; _origin?: string; _vin: string }
         Returns: Json
+      }
+      resolve_return: {
+        Args: {
+          _mileage?: number
+          _outcome: string
+          _reason?: string
+          _restocking?: number
+          _signing_id: string
+        }
+        Returns: undefined
       }
       save_marketcheck_config:
         | {
