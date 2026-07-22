@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { useParams } from "react-router-dom";
+import { useParams, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import SignaturePad from "@/components/addendum/SignaturePad";
@@ -90,8 +90,25 @@ const uploadViaToken = async (token: string, file: File): Promise<string | null>
   } catch { return null; }
 };
 
+// Department-scoped view. A dispatched link carries ?dept=<role> so each
+// department only sees its own stations — keeping SERVICE (K-208 / recon / PDI)
+// off what a detailer or outside vendor opens. No param = the full hub (a
+// manager's own QR). Presentation-scoped for now; server still serves the whole
+// context, so this hides rather than hard-blocks.
+const DEPT_STATIONS: Record<string, Set<View>> = {
+  detail: new Set<View>(["detail"]),
+  outside: new Set<View>(["detail"]),
+  parts: new Set<View>(["detail"]),
+  service: new Set<View>(["service", "recon", "pdi"]),
+  recon: new Set<View>(["recon"]),
+};
+
 export default function GetReady() {
   const { token = "" } = useParams();
+  const [searchParams] = useSearchParams();
+  const dept = (searchParams.get("dept") || "").toLowerCase();
+  const allowedStations = DEPT_STATIONS[dept] || null; // null = show all
+  const canStation = (v: View) => !allowedStations || allowedStations.has(v);
   const [ctx, setCtx] = useState<Ctx | null>(null);
   const [reconLines, setReconLines] = useState<ReconLine[]>([]);
   const [pdiDone, setPdiDone] = useState(false);
@@ -147,17 +164,23 @@ export default function GetReady() {
           const reconDoneCount = reconLines.filter((l) => l.completed_at).length;
           return (
           <div className="space-y-3">
-            <p className="text-sm text-muted-foreground">What are you here to do? Tap a step below. Each one locks once it's signed.</p>
-            <StationCard step={1} icon={<ShieldCheck className="w-5 h-5" />} title="Sign off the safety inspection (K-208)" sub={ctx.service_done ? "Completed" : "Mark each item Pass or Fail, then sign"} done={!!ctx.service_done} onClick={() => setView("service")} />
-            <StationCard step={2} icon={<Wrench className="w-5 h-5" />} title="Confirm reconditioning is done" sub={reconLines.length === 0 ? "No recon work assigned yet" : reconDone ? "All work confirmed" : `Check off each job — ${reconDoneCount} of ${reconLines.length} done`} done={reconDone} onClick={() => setView("recon")} disabled={reconLines.length === 0} />
-            <StationCard step={3} icon={<Sparkles className="w-5 h-5" />} title="Confirm detail & installed work" sub="Detail · service · parts · outside vendor" done={false} onClick={() => setView("detail")} addAction />
-            <StationCard step={4} icon={<ClipboardCheck className="w-5 h-5" />} title="Pre-delivery inspection (PDI)" sub={pdiDone ? "Completed" : "Final check before delivery — tech or service writer"} done={pdiDone} onClick={() => setView("pdi")} />
+            <p className="text-sm text-muted-foreground">{allowedStations ? "Your station for this vehicle. It locks once it's signed." : "What are you here to do? Tap a step below. Each one locks once it's signed."}</p>
+            {canStation("service") && <StationCard step={1} icon={<ShieldCheck className="w-5 h-5" />} title="Sign off the safety inspection (K-208)" sub={ctx.service_done ? "Completed" : "Mark each item Pass or Fail, then sign"} done={!!ctx.service_done} onClick={() => setView("service")} />}
+            {canStation("recon") && <StationCard step={2} icon={<Wrench className="w-5 h-5" />} title="Confirm reconditioning is done" sub={reconLines.length === 0 ? "No recon work assigned yet" : reconDone ? "All work confirmed" : `Check off each job — ${reconDoneCount} of ${reconLines.length} done`} done={reconDone} onClick={() => setView("recon")} disabled={reconLines.length === 0} />}
+            {canStation("detail") && <StationCard step={3} icon={<Sparkles className="w-5 h-5" />} title="Confirm detail & installed work" sub={dept === "outside" ? "Your installed work" : "Detail · parts · outside vendor"} done={false} onClick={() => setView("detail")} addAction />}
+            {canStation("pdi") && <StationCard step={4} icon={<ClipboardCheck className="w-5 h-5" />} title="Pre-delivery inspection (PDI)" sub={pdiDone ? "Completed" : "Final check before delivery — tech or service writer"} done={pdiDone} onClick={() => setView("pdi")} />}
 
-            {(ctx.signoffs?.length ?? 0) > 0 && (
+            {(() => {
+              const roster = allowedStations
+                ? (ctx.signoffs || []).filter((s) => (allowedStations.has("detail")
+                    ? (["detail", "parts", "outside"].includes(String(s.role)) || s.is_third_party)
+                    : ["service", "recon"].includes(String(s.role))))
+                : (ctx.signoffs || []);
+              return roster.length > 0 && (
               <div className="rounded-2xl border border-border bg-card p-4">
                 <div className="text-xs font-bold uppercase tracking-wider text-foreground mb-2">Sign-offs on this vehicle</div>
                 <div className="divide-y divide-border/60">
-                  {ctx.signoffs!.map((s) => {
+                  {roster.map((s) => {
                     const items = [
                       ...((s.detail_types || []).map((d) => d.label).filter(Boolean) as string[]),
                       ...((s.installs || []).map((i) => i.label).filter(Boolean) as string[]),
@@ -175,7 +198,8 @@ export default function GetReady() {
                   })}
                 </div>
               </div>
-            )}
+              );
+            })()}
           </div>
           );
         })()}

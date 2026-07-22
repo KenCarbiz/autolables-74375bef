@@ -76,7 +76,10 @@ Deno.serve(async (req) => {
     .gt("expires_at", new Date().toISOString()).order("created_at", { ascending: false }).limit(1).maybeSingle();
   if (!tok?.token) return json(200, { ok: false, error: "no_token" });
   const ymm = (tok.ymm as string) || "Vehicle";
-  const readyUrl = `${APP_BASE}/ready/${tok.token}`;
+  // Dispatched to the detail department — scope the link so the detailer's hub
+  // shows only their station (service K-208 / recon / PDI stay off the detail
+  // sheet). The token is shared; ?dept scopes the view.
+  const readyUrl = `${APP_BASE}/ready/${tok.token}?dept=detail`;
   const instructions = (settings.detail_default_instructions || "").trim();
 
   let qrImgUrl = "";
