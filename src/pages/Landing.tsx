@@ -98,10 +98,10 @@ const PassportDemoPhone = ({ sticky = true }: { sticky?: boolean }) => {
   );
 };
 
-// Landing icon system — one consistent stroke-glyph family on a light-blue
-// tile, rendered by LandingFeatureIcon. Each value is a glyph name in that
-// system (repeated concepts, e.g. sign / signed proof, deliberately share one
-// glyph). Replaced the earlier glossy generated blue-tile SVGs.
+// Landing icon system — the finished high-quality PNG icon pack, rendered by
+// LandingFeatureIcon. Each value is a glyph name that resolves to one PNG.
+// Signed proof (09) and Sign (13) are now distinct icons, no longer sharing the
+// digital-signature art.
 const landingIcons = {
   // hero feature list
   windowStickersVehiclePassports: "qrPassport",
@@ -114,13 +114,13 @@ const landingIcons = {
   // value pillars
   sellAddonsWithoutFear: "sellAddons",
   ownYourPrice: "ownYourPrice",
-  signedProof: "digitalSignature",
+  signedProof: "signedProof",
   auditDefenseFile: "auditDefense",
 
   // four verbs
   decode: "decode",
   stick: "stick",
-  sign: "digitalSignature",
+  sign: "sign",
   close: "close",
 
   // get-ready workflow
