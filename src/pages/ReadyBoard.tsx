@@ -24,7 +24,7 @@ const isUsed = (c: string | null) => ["used", "cpo", "certified"].includes(Strin
 
 // The active draft addendum for a VIN and where it stands in the manager's
 // acceptance flow: awaiting acceptance -> accepted (Get-Ready dispatched).
-interface Addn { id: string; accepted_at: string | null; getready_dispatched_at: string | null }
+interface Addn { id: string; accepted_at: string | null; getready_dispatched_at: string | null; updated_at: string | null }
 type Bucket = "acceptance" | "getready" | "ready" | "all";
 
 export default function ReadyBoard() {
@@ -73,15 +73,15 @@ export default function ReadyBoard() {
 
     // Active draft addendum per VIN (newest non-signed). Resilient to the
     // acceptance columns not yet being applied in a given environment.
-    type AddnRow = { id: string; vehicle_vin: string; status: string | null; signed_at: string | null; accepted_at: string | null; getready_dispatched_at: string | null };
-    const cols = "id, vehicle_vin, status, signed_at, accepted_at, getready_dispatched_at";
+    type AddnRow = { id: string; vehicle_vin: string; status: string | null; signed_at: string | null; accepted_at: string | null; getready_dispatched_at: string | null; updated_at: string | null };
+    const cols = "id, vehicle_vin, status, signed_at, accepted_at, getready_dispatched_at, updated_at";
     let add = await (supabase as any).from("addendums").select(cols).eq("tenant_id", tenantId).order("created_at", { ascending: false }).limit(1000);
-    if (add.error) add = await (supabase as any).from("addendums").select("id, vehicle_vin, status, signed_at").eq("tenant_id", tenantId).order("created_at", { ascending: false }).limit(1000);
+    if (add.error) add = await (supabase as any).from("addendums").select("id, vehicle_vin, status, signed_at, updated_at").eq("tenant_id", tenantId).order("created_at", { ascending: false }).limit(1000);
     const map = new Map<string, Addn>();
     for (const a of ((add.data as AddnRow[]) || [])) {
       if (a.status === "signed" || a.signed_at) continue;   // customer-signed -> out of the manager flow
       if (map.has(a.vehicle_vin)) continue;                  // keep the newest draft only
-      map.set(a.vehicle_vin, { id: a.id, accepted_at: a.accepted_at ?? null, getready_dispatched_at: a.getready_dispatched_at ?? null });
+      map.set(a.vehicle_vin, { id: a.id, accepted_at: a.accepted_at ?? null, getready_dispatched_at: a.getready_dispatched_at ?? null, updated_at: a.updated_at ?? null });
     }
     setAddMap(map);
 
@@ -99,7 +99,9 @@ export default function ReadyBoard() {
     const stale = new Set<string>();
     for (const [vin, a] of map) {
       const ts = proofMax.get(vin);
-      if (a.accepted_at && ts && ts > a.accepted_at) stale.add(vin);
+      // Anchor on updated_at (auto-bumped on any save) so an Update clears the
+      // flag; gate on accepted_at so only accepted addendums are flagged.
+      if (a.accepted_at && ts && new Date(ts) > new Date(a.updated_at || a.accepted_at)) stale.add(vin);
     }
     setStaleVins(stale);
     setLoading(false);

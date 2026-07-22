@@ -1360,6 +1360,7 @@ const LabelsPanel = ({ vehicle }: { vehicle: VehicleRow }) => {
 interface AddendumRow {
   id: string;
   created_at: string;
+  updated_at: string | null;
   status: string | null;
   customer_name: string | null;
   cobuyer_name: string | null;
@@ -1892,7 +1893,7 @@ const AddendumPanel = ({ vehicle }: { vehicle: VehicleRow }) => {
 
   const load = useCallback(async () => {
     setLoading(true);
-    const base = "id,created_at,status,customer_name,cobuyer_name,content_hash,signed_at,token,total_price";
+    const base = "id,created_at,updated_at,status,customer_name,cobuyer_name,content_hash,signed_at,token,total_price";
     // Resilient select: the acceptance columns may not be applied yet in a given
     // environment; fall back to the base column set rather than erroring to [].
     let data: AddendumRow[] | null = null;
@@ -2052,7 +2053,7 @@ const AddendumPanel = ({ vehicle }: { vehicle: VehicleRow }) => {
                   canAccept={canAccept}
                   accepting={accepting === r.id}
                   onAccept={() => acceptAndDispatch(r)}
-                  stale={!!r.accepted_at && !!proofMaxTs && new Date(proofMaxTs) > new Date(r.accepted_at)}
+                  stale={!!r.accepted_at && !!proofMaxTs && new Date(proofMaxTs) > new Date(r.updated_at || r.accepted_at)}
                   onUpdate={() => navigate(`/addendum?id=${r.id}&edit=1`)}
                 />
               ))}
