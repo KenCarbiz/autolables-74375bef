@@ -65,7 +65,17 @@ function selectRadio(form: any, name: string, option: string) {
 interface Vehicle { year: string; make: string; model: string; body: string; vin: string; mileage: string }
 interface Dealer { name: string; address: string; city: string; state: string; zip: string; phone: string; email: string; principal: string; license: string }
 
-async function fillFtc(box: string, pct: number, days: number, v: Vehicle, d: Dealer): Promise<Uint8Array> {
+// Standard covered-systems language (specific, per FTC guidance — never
+// shorthand like "powertrain"). Matches the dealer-approved default copy.
+const COVERED_SYSTEMS = [
+  "Engine — All lubricated internal engine parts, water pump, fuel pump, manifolds, engine block, cylinder heads, rotary engine housings and flywheel.",
+  "Transmission — All lubricated internal transmission parts, torque converter, drive shaft, universal joints, rear axle, and all internally lubricated parts.",
+  "Steering — The steering gear housing and all internal parts, power steering pump, valve body, piston and rack.",
+  "Brakes — Master cylinder, vacuum assist booster, wheel cylinders, hydraulic lines and fittings, and disc brake calipers.",
+  "Electrical — Alternator, voltage regulator, starter, ignition switch, and electronic ignition.",
+];
+
+async function fillFtc(box: string, pct: number, days: number, miles: number, v: Vehicle, d: Dealer): Promise<Uint8Array> {
   const pdf = await PDFDocument.load(await loadTemplate("ftc-buyers-guide-en.pdf"));
   const form = pdf.getForm();
   const implied = box === "implied";
@@ -75,13 +85,16 @@ async function fillFtc(box: string, pct: number, days: number, v: Vehicle, d: De
   setText(form, `${sub}.Year[0]`, v.year);
   setText(form, `${sub}.VIN[0]`, v.vin);
   if (box === "warranty") {
-    // Dealer warranty (CT/MA/NY/NJ statutory): check DEALER WARRANTY / Limited
-    // with the floor percentage + duration from the resolver.
+    // Dealer warranty (CT/MA/NY/NJ statutory): check DEALER WARRANTY / Limited,
+    // 100% parts + labor, the specific covered systems, and the term with both
+    // time and mileage ("whichever occurs first").
     selectRadio(form, `${sub}.Warranty[0]`, "Dealer");
     selectRadio(form, `${sub}.DealerWarranty[0]`, "Limited");
     setText(form, `${sub}.Labor[0]`, String(pct || 100));
     setText(form, `${sub}.Parts[0]`, String(pct || 100));
-    setText(form, `${sub}.Duration1[0]`, days ? `${days} days` : "");
+    const term = days ? `${days} days${miles ? ` or ${miles.toLocaleString("en-US")} miles` : ""}, whichever occurs first` : "";
+    setText(form, `${sub}.Duration1[0]`, term);
+    COVERED_SYSTEMS.forEach((sysLine, i) => setText(form, `${sub}.SystemsCovered${i + 1}[0]`, sysLine));
   } else {
     // As-Is or Implied Warranties Only: the top front box (same field, whose
     // export value is 'As Is' on both the As-Is and Implied fronts).
@@ -198,8 +211,8 @@ Deno.serve(async (req) => {
       const { data: bg } = await admin.from("generated_documents").select("data_snapshot")
         .eq("tenant_id", tenantId).eq("vehicle_id", listing.id).eq("document_type", "buyers_guide")
         .order("created_at", { ascending: false }).limit(1).maybeSingle();
-      const snap = (bg?.data_snapshot || {}) as { box?: string; min_pct?: number; min_duration_days?: number };
-      const bytes = await fillFtc(snap.box || "as-is", Number(snap.min_pct) || 0, Number(snap.min_duration_days) || 0, vehicle, dealer);
+      const snap = (bg?.data_snapshot || {}) as { box?: string; min_pct?: number; min_duration_days?: number; min_miles?: number };
+      const bytes = await fillFtc(snap.box || "as-is", Number(snap.min_pct) || 0, Number(snap.min_duration_days) || 0, Number(snap.min_miles) || 0, vehicle, dealer);
       out.buyers_guide = await fileForm(admin, tenantId, vin, listing.id as string, "buyers_guide", bytes, vehicle.year);
     }
     if (kinds.includes("k208") && ["used", "cpo", "certified"].includes(String(listing.condition || "used").toLowerCase())) {

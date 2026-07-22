@@ -218,6 +218,9 @@ describe("resolveBuyersGuideWarranty — per-state Buyers Guide front", () => {
   it("respects Connecticut / New York price + mileage thresholds", () => {
     expect(resolveBuyersGuideWarranty("CT", { price: 2000 }).box).toBe("as-is");
     expect(resolveBuyersGuideWarranty("CT", { price: 6000 }).box).toBe("warranty");
+    // 7+ model years old -> CT statutory exemption may apply -> As-Is (confirm).
+    expect(resolveBuyersGuideWarranty("CT", { price: 6000, ageYears: 8 }).box).toBe("as-is");
+    expect(resolveBuyersGuideWarranty("CT", { price: 6000, ageYears: 3 }).box).toBe("warranty");
     expect(resolveBuyersGuideWarranty("NY", { price: 1000 }).box).toBe("as-is");
     expect(resolveBuyersGuideWarranty("NY", { price: 20000, mileage: 20000 }).box).toBe("warranty");
   });

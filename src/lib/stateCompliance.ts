@@ -579,9 +579,19 @@ export const resolveBuyersGuideWarranty = (
 
   switch (code) {
     case "CT": {
+      const age = Number.isFinite(v.ageYears) ? (v.ageYears as number) : 0;
       if (price < 3000) return asIs("Connecticut: As-Is allowed under $3,000.");
-      if (price >= 5000) return warranty(60, 3000, 100, "Conn. Gen. Stat. §42-221", "Connecticut used-car warranty: price $5,000+.");
-      return warranty(30, 1500, 100, "Conn. Gen. Stat. §42-221", "Connecticut used-car warranty: price $3,000–$4,999.");
+      // 7+ model years old (CT measures age from Jan 1 of the model year): the
+      // statutory used-car warranty exemption may apply — default to As-Is and
+      // flag for confirmation rather than mandating a dealer warranty.
+      if (age >= 7) return {
+        box: "as-is", forced: false, minDurationDays: 0, minMiles: 0, minPct: 0,
+        citation: "Conn. Gen. Stat. §42-221",
+        reason: "Connecticut: 7+ model years — statutory used-car warranty exemption may apply; confirm before selling As-Is.",
+        needsVerification: true,
+      };
+      if (price >= 5000) return warranty(60, 3000, 100, "Conn. Gen. Stat. §42-221", "Connecticut used-car warranty: price $5,000+, under 7 model years.");
+      return warranty(30, 1500, 100, "Conn. Gen. Stat. §42-221", "Connecticut used-car warranty: price $3,000–$4,999, under 7 model years.");
     }
     case "MA": {
       if (miles >= 125000) return asIs("Massachusetts: As-Is allowed at 125,000+ miles.");
