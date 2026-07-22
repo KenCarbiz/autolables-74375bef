@@ -6961,6 +6961,10 @@ export type Database = {
         }
         Returns: Json
       }
+      set_current_tenant_id: {
+        Args: { _tenant_id: string }
+        Returns: undefined
+      }
       set_marketcheck_allowed: {
         Args: { _allowed: boolean; _tenant_id: string }
         Returns: undefined
