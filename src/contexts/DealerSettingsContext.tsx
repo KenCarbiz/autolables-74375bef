@@ -265,6 +265,7 @@ export interface DealerSettings {
   detail_email: string;                        // detail-dept recipient(s) for get-ready dispatch
   detail_default_instructions: string;        // instructions sent with detail get-ready
   thirdparty_auto_notify: boolean;             // auto-notify the installer on a preinstall
+  getready_drives_addendum: boolean;           // opt-in: a Get-Ready install (photo+signature) marks the product Installed on the addendum and moves the rest to Optional
   title_round_robin: boolean;                  // rotate title requests person-to-person vs all at once
   // Preprinted recon choices service can pick to document faster. Self-aware:
   // frequently-added items can be promoted into this list.
@@ -445,6 +446,7 @@ export const DEFAULT_SETTINGS: DealerSettings = {
   detail_email: "",
   detail_default_instructions: "",
   thirdparty_auto_notify: true,
+  getready_drives_addendum: false,
   title_round_robin: false,
   recon_canned_services: [
     { label: "Full safety inspection", category: "safety", severity: "required", labor_cost: 0, parts_cost: 0 },

@@ -390,7 +390,10 @@ const Index = () => {
   const [installProofs, setInstallProofs] = useState<{ product_name: string | null; is_verified?: boolean }[]>([]);
   useEffect(() => {
     const vin = vehicle.vin?.trim();
-    const tid = currentStore?.id;
+    // install_proofs.tenant_id is the tenant UUID, NOT the store id — filter by
+    // the tenant so the proof lookup actually returns rows (a store id here
+    // matched nothing, silently disabling the proof-driven defaulting).
+    const tid = tenant?.id || currentStore?.tenant_id;
     // Tenant-scope the lookup so a shared VIN across dealers can't leak
     // another tenant's proofs into this deal's defaulting.
     if (!vin || viewMode || !tid) { setInstallProofs([]); return; }
@@ -410,7 +413,7 @@ const Index = () => {
       if (!cancelled) setInstallProofs((res.data as { product_name: string | null; is_verified?: boolean }[]) || []);
     })();
     return () => { cancelled = true; };
-  }, [vehicle.vin, viewMode, currentStore?.id]);
+  }, [vehicle.vin, viewMode, tenant?.id, currentStore?.tenant_id]);
   // Only a VERIFIED proof (installer signature + photo) lets a line default to
   // Pre-Installed. A bare/photoless proof must not flip a product into the
   // advertised price — FTC substantiation. (When is_verified is absent because
