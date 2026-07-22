@@ -186,7 +186,7 @@ async function fillK208(v: Vehicle, d: Dealer): Promise<Uint8Array> {
 }
 
 // deno-lint-ignore no-explicit-any
-async function fileForm(admin: any, tenantId: string, vin: string, vehicleId: string | null, docType: string, bytes: Uint8Array, year: string): Promise<string> {
+async function fileForm(admin: any, tenantId: string, vin: string, vehicleId: string | null, docType: string, bytes: Uint8Array, year: string, snapExtra?: Record<string, unknown>): Promise<string> {
   const hash = await sha256Hex(bytes);
   const path = `${tenantId}/${docType}/${year || "na"}/${vin}-${hash.slice(0, 12)}.pdf`;
   await admin.storage.from(BUCKET).upload(path, bytes, { contentType: "application/pdf", upsert: true });
@@ -198,20 +198,38 @@ async function fileForm(admin: any, tenantId: string, vin: string, vehicleId: st
       storage_path: path, storage_bucket: BUCKET, content_hash: hash, byte_size: bytes.length,
     });
   } catch { /* archive best-effort */ }
-  // Upsert the generated_documents row so the form shows in the deal record +
-  // signing packet with a viewable URL.
+  // These are official compliance forms — never overwrite an existing version.
+  // If the fill is byte-identical to the current live version, just refresh its
+  // signed URL. If the content changed (warranty box, language, dealer data),
+  // mint a NEW immutable version and mark the prior version(s) superseded, so
+  // the full history is retained and auditable.
   if (vehicleId) {
-    const { data: existing } = await admin.from("generated_documents")
-      .select("id").eq("tenant_id", tenantId).eq("vehicle_id", vehicleId).eq("document_type", docType)
-      .order("created_at", { ascending: false }).limit(1).maybeSingle();
-    const snap = { source: "generate-vehicle-forms", storage_path: path, storage_bucket: BUCKET };
-    if (existing?.id) {
-      await admin.from("generated_documents").update({ online_url: url, pdf_url: url, data_snapshot: snap, updated_at: new Date().toISOString() }).eq("id", existing.id);
-    } else {
-      await admin.from("generated_documents").insert({
-        tenant_id: tenantId, vehicle_id: vehicleId, template_id: docType === "k208" ? "ct-k208" : "ftc-buyers-guide",
-        document_type: docType, document_status: "draft", version: 1, online_url: url, pdf_url: url, data_snapshot: snap,
-      });
+    const snap = { source: "generate-vehicle-forms", storage_path: path, storage_bucket: BUCKET, content_hash: hash, ...(snapExtra || {}) };
+    const { data: all } = await admin.from("generated_documents")
+      .select("id, version, document_status, data_snapshot")
+      .eq("tenant_id", tenantId).eq("vehicle_id", vehicleId).eq("document_type", docType)
+      .order("version", { ascending: false });
+    const rows = (all || []) as { id: string; version: number; document_status: string; data_snapshot: Record<string, unknown> | null }[];
+    const retired = new Set(["superseded", "archived", "rejected"]);
+    const liveRows = rows.filter((r) => !retired.has(r.document_status));
+    const current = liveRows[0];
+    if (current && (current.data_snapshot as { content_hash?: string } | null)?.content_hash === hash) {
+      await admin.from("generated_documents").update({ online_url: url, pdf_url: url, updated_at: new Date().toISOString() }).eq("id", current.id);
+      return url;
+    }
+    const nextVersion = rows.reduce((m, r) => Math.max(m, r.version || 0), 0) + 1;
+    const { data: inserted } = await admin.from("generated_documents").insert({
+      tenant_id: tenantId, vehicle_id: vehicleId, template_id: docType === "k208" ? "ct-k208" : "ftc-buyers-guide",
+      document_type: docType, document_status: "draft", version: nextVersion, template_version: 1,
+      online_url: url, pdf_url: url, data_snapshot: snap,
+    }).select("id").maybeSingle();
+    const newId = (inserted as { id?: string } | null)?.id;
+    if (newId && liveRows.length) {
+      // Retire the prior live version(s); superseded/archived transitions are
+      // permitted even on signature-locked rows, so history is never lost.
+      await admin.from("generated_documents")
+        .update({ document_status: "superseded", superseded_by: newId, updated_at: new Date().toISOString() })
+        .in("id", liveRows.map((r) => r.id));
     }
   }
   return url;
@@ -274,11 +292,11 @@ Deno.serve(async (req) => {
       const bytes = lang === "es"
         ? await fillFtcEs(effBox, pct, dd, mi, vehicle, dealer)
         : await fillFtc(effBox, pct, dd, mi, vehicle, dealer);
-      out.buyers_guide = await fileForm(admin, tenantId, vin, listing.id as string, "buyers_guide", bytes, vehicle.year);
+      out.buyers_guide = await fileForm(admin, tenantId, vin, listing.id as string, "buyers_guide", bytes, vehicle.year, { box: effBox, lang, template_version: "2026.07.1" });
     }
     if (kinds.includes("k208") && ["used", "cpo", "certified"].includes(String(listing.condition || "used").toLowerCase())) {
       const bytes = await fillK208(vehicle, dealer);
-      out.k208 = await fileForm(admin, tenantId, vin, listing.id as string, "k208", bytes, vehicle.year);
+      out.k208 = await fileForm(admin, tenantId, vin, listing.id as string, "k208", bytes, vehicle.year, { template_version: "2026.07.1" });
     }
   } catch (e) {
     return json(500, { ok: false, error: String((e as Error)?.message || e) });
