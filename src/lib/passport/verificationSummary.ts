@@ -399,8 +399,10 @@ export function deriveVerificationReport(d: PassportData, listing: VehicleListin
       key: "title", name: "Title and brand", ...s, material: true, highSeverity: false,
       status,
       finding: status === "verified"
+        // Describe the DATA RESULT, not a guarantee — "no brands reported" is
+        // accurate; "clean/guaranteed" over-claims (NMVTIS usage guidance).
         ? nmvtis
-          ? `Clean title confirmed against the national title record (NMVTIS)${verifiedOn ? `, verified by the dealer on ${verifiedOn}` : ""} — no salvage, flood, lemon, or rebuilt brands found.`
+          ? `No title brands were reported in the NMVTIS title data${verifiedOn ? ` returned on ${verifiedOn}` : ""} — no salvage, flood, lemon, or rebuilt records found. Reviewed by the dealer.`
           : "Clean title on record — no salvage, flood, lemon, or rebuilt brands found."
         : status === "needs_attention"
           ? "A title brand is on record for this vehicle — review the brand details with the dealer."
@@ -413,8 +415,8 @@ export function deriveVerificationReport(d: PassportData, listing: VehicleListin
         { label: "Brands checked", value: status !== "pending" ? "Salvage, flood, lemon, rebuilt" : null },
         { label: "Verification", value: nmvtis ? `Dealer-verified via NMVTIS${verifiedOn ? ` on ${verifiedOn}` : ""}` : null },
         { label: "Source", value: nmvtis ? "NMVTIS national title record" : FAMILY_META.vehicle_history.label },
-        // VINData "as is" caveat — disclosed wherever the NMVTIS-derived result appears.
-        { label: "Note", value: nmvtis ? "Provided as is; not a substitute for a full title search." : null },
+        // Required NMVTIS caveat — disclosed wherever the NMVTIS-derived result appears.
+        { label: "Note", value: nmvtis ? "NMVTIS title data may be incomplete; state participation and reporting timeframes vary. Not a substitute for an independent inspection." : null },
       ],
       checkedAt: status !== "pending" ? (nmvtis ? (d.titleVerifiedAt || reportTime) : reportTime) : null,
     };

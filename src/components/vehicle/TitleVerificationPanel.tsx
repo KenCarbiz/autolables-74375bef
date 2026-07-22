@@ -6,6 +6,10 @@ import {
   AlertTriangle, Lock, Eye, XCircle, Gauge, Receipt, Info,
 } from "lucide-react";
 import type { TitleVerification } from "@/hooks/useVehicleListing";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 // ──────────────────────────────────────────────────────────────────────
 // TitleVerificationPanel — dealer-facing NMVTIS title check via MarketCheck
@@ -62,6 +66,10 @@ export const TitleVerificationPanel = ({ listingId, vin, tenantId, condition, ti
   const [busy, setBusy] = useState<"view" | "generate" | "attest" | null>(null);
   const [showRaw, setShowRaw] = useState(false);
   const [stats, setStats] = useState<PullStats | null>(null);
+  // Null = closed; boolean = the fetchRecord(force) arg to run after the dealer
+  // confirms a charged ($0.49) generate. Required by the VINData usage rules:
+  // never charge without an explicit confirmation.
+  const [confirmForce, setConfirmForce] = useState<boolean | null>(null);
 
   const load = useCallback(async () => {
     if (!vin || !tenantId || isNew) { setLoading(false); return; }
@@ -239,11 +247,16 @@ export const TitleVerificationPanel = ({ listingId, vin, tenantId, condition, ti
                 </button>
               </div>
 
-              {/* Required VINData disclaimer + attribution (shown with the record) */}
-              <p className="text-[11px] text-muted-foreground flex items-start gap-1.5">
+              {/* Required NMVTIS / VINData disclaimer + attribution (shown with the record) */}
+              <div className="text-[11px] text-muted-foreground flex items-start gap-1.5">
                 <Info className="w-3.5 h-3.5 mt-0.5 shrink-0" />
-                <span>Title-history data is provided &ldquo;as is&rdquo; and is not a substitute for a full title search. Title data provided by VINData, LLC via MarketCheck (NMVTIS).</span>
-              </p>
+                <div className="space-y-1">
+                  <p>
+                    NMVTIS provides title and brand history but does not include detailed repair history. Data may be incomplete &mdash; reporting timeframes and state participation vary, and significant damage may not appear unless it resulted in a total-loss report or a state title brand. This is not a substitute for an independent inspection.
+                  </p>
+                  <p>Title data provided by VINData, LLC via MarketCheck (NMVTIS).</p>
+                </div>
+              </div>
 
               {/* Dealer actions */}
               <div className="flex flex-wrap items-center gap-2">
@@ -257,7 +270,7 @@ export const TitleVerificationPanel = ({ listingId, vin, tenantId, condition, ti
                     {busy === "attest" ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <AlertTriangle className="w-3.5 h-3.5" />} Record Title Brand
                   </button>
                 )}
-                <button onClick={() => fetchRecord(true)} disabled={!!busy} className="h-9 px-3 rounded-lg border border-border text-foreground text-xs font-semibold inline-flex items-center gap-1.5 hover:border-blue-400 disabled:opacity-60">
+                <button onClick={() => setConfirmForce(true)} disabled={!!busy} className="h-9 px-3 rounded-lg border border-border text-foreground text-xs font-semibold inline-flex items-center gap-1.5 hover:border-blue-400 disabled:opacity-60">
                   {busy === "generate" ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />} Regenerate ($0.49)
                 </button>
               </div>
@@ -277,7 +290,7 @@ export const TitleVerificationPanel = ({ listingId, vin, tenantId, condition, ti
                   </p>
                 </div>
               </div>
-              <button onClick={() => fetchRecord(false)} disabled={busy === "view" || busy === "generate"} className="mt-3 h-9 px-3.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold inline-flex items-center gap-1.5 disabled:opacity-60">
+              <button onClick={() => stats?.withinWindow ? fetchRecord(false) : setConfirmForce(false)} disabled={busy === "view" || busy === "generate"} className="mt-3 h-9 px-3.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold inline-flex items-center gap-1.5 disabled:opacity-60">
                 {(busy === "view" || busy === "generate") ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <ShieldCheck className="w-3.5 h-3.5" />}
                 {stats?.withinWindow ? "View Title Record" : "Generate Title Report ($0.49)"}
               </button>
@@ -285,6 +298,25 @@ export const TitleVerificationPanel = ({ listingId, vin, tenantId, condition, ti
           )}
         </div>
       )}
+
+      <AlertDialog open={confirmForce !== null} onOpenChange={(o) => { if (!o) setConfirmForce(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Generate a new NMVTIS title report?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This pulls a fresh report from VINData and costs about <span className="font-semibold text-foreground">$0.49</span>. The report then stays retrievable at no additional charge for 90 days. Only continue if you need a new report.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => { const f = confirmForce ?? false; setConfirmForce(null); fetchRecord(f); }}
+              className="bg-blue-600 hover:bg-blue-700">
+              Generate ($0.49)
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };
