@@ -171,11 +171,14 @@ Deno.serve(async (req) => {
   if (pf) return pf;
   if (req.method !== "POST") return json(405, { error: "method not allowed" });
 
-  const body = await req.json().catch(() => ({})) as { tenant_id?: string; vin?: string; kinds?: string[] };
+  const body = await req.json().catch(() => ({})) as { tenant_id?: string; vin?: string; kinds?: string[]; box?: string };
   const tenantId = body.tenant_id;
   const vin = (body.vin || "").toUpperCase().trim();
   if (!tenantId || !vin) return json(400, { error: "tenant_id and vin required" });
   const kinds = Array.isArray(body.kinds) && body.kinds.length ? body.kinds : ["buyers_guide", "k208"];
+  // Optional box override (as-is | implied | warranty) so a manual selection in
+  // the Buyers Guide UI fills the matching official form variant.
+  const boxOverride = ["as-is", "implied", "warranty"].includes(String(body.box)) ? String(body.box) : null;
 
   const admin = adminClient();
   if (!isServiceOrCron(req) && !(await isManagerMember(admin, req, tenantId))) {
@@ -212,7 +215,7 @@ Deno.serve(async (req) => {
         .eq("tenant_id", tenantId).eq("vehicle_id", listing.id).eq("document_type", "buyers_guide")
         .order("created_at", { ascending: false }).limit(1).maybeSingle();
       const snap = (bg?.data_snapshot || {}) as { box?: string; min_pct?: number; min_duration_days?: number; min_miles?: number };
-      const bytes = await fillFtc(snap.box || "as-is", Number(snap.min_pct) || 0, Number(snap.min_duration_days) || 0, Number(snap.min_miles) || 0, vehicle, dealer);
+      const bytes = await fillFtc(boxOverride || snap.box || "as-is", Number(snap.min_pct) || 0, Number(snap.min_duration_days) || 0, Number(snap.min_miles) || 0, vehicle, dealer);
       out.buyers_guide = await fileForm(admin, tenantId, vin, listing.id as string, "buyers_guide", bytes, vehicle.year);
     }
     if (kinds.includes("k208") && ["used", "cpo", "certified"].includes(String(listing.condition || "used").toLowerCase())) {
