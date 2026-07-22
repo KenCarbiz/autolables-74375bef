@@ -37,6 +37,28 @@ Deno.serve(async (req) => {
 
     const admin = adminClient();
 
+    // ── Rate limit per IP: caps unauthenticated MarketCheck quota burn.
+    // Public passport shoppers legitimately hit this on demand, so we cap at
+    // 20 comp-lookups / 5min and 80 / hour per source IP (mirrors the shape
+    // used by public-listing-view). The 12h per-slug cache below still absorbs
+    // repeat calls on the same vehicle for free.
+    const clientIp = (req.headers.get("cf-connecting-ip") ||
+      (req.headers.get("x-forwarded-for") || "").split(",")[0].trim() ||
+      req.headers.get("x-real-ip") || "unknown");
+    const fiveMinAgo = new Date(Date.now() - 5 * 60_000).toISOString();
+    const oneHrAgo = new Date(Date.now() - 60 * 60_000).toISOString();
+    const [rl5, rl60] = await Promise.all([
+      admin.from("audit_log").select("id", { head: true, count: "exact" })
+        .eq("action", "mc_comps_lookup").eq("ip_address", clientIp).gte("created_at", fiveMinAgo),
+      admin.from("audit_log").select("id", { head: true, count: "exact" })
+        .eq("action", "mc_comps_lookup").eq("ip_address", clientIp).gte("created_at", oneHrAgo),
+    ]);
+    if ((rl5.count ?? 0) >= 20 || (rl60.count ?? 0) >= 80) {
+      return json(429, { error: "rate_limited", retry_after: 300 }, { "Retry-After": "300" });
+    }
+    admin.from("audit_log").insert({ action: "mc_comps_lookup", entity_type: "listing", entity_id: slug.slice(0, 120), ip_address: clientIp })
+      .then(() => undefined, () => undefined);
+
     // Resolve the listing (slug, then VIN fallback) — mirror public-listing-view.
     let { data } = await admin.rpc("get_vehicle_listing_by_slug", { _slug: slug });
     let row = Array.isArray(data) ? data[0] : data;
