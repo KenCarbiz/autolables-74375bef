@@ -77,6 +77,8 @@ const DealershipTrustPanel = () => {
   const { tenant } = useTenant();
   const tenantId = tenant?.id && tenant.id !== "house" ? tenant.id : null;
   const [googleSyncing, setGoogleSyncing] = useState(false);
+  const persistedSyncAt = (settings as unknown as { google_rating_synced_at?: string }).google_rating_synced_at || null;
+  const [syncNote, setSyncNote] = useState<string | null>(null);
   const refreshGoogle = async () => {
     if (!tenantId) { toast.error("No dealership selected"); return; }
     setGoogleSyncing(true);
@@ -89,11 +91,14 @@ const DealershipTrustPanel = () => {
       }
       set("dealer_google_rating", String(data.rating));
       set("dealer_google_count", String(data.count));
+      setSyncNote(`Synced live from Google — matched ${data.matched}`);
       toast.success(`Google rating updated: ${data.rating} (${Number(data.count).toLocaleString()} reviews) — matched "${data.matched}"`);
     } finally {
       setGoogleSyncing(false);
     }
   };
+  const syncLabel = syncNote
+    || (persistedSyncAt ? `Last synced live from Google on ${new Date(persistedSyncAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}` : null);
 
   return (
     <div className="space-y-5 max-w-2xl">
@@ -112,7 +117,10 @@ const DealershipTrustPanel = () => {
           </div>
         ))}
         <div className="sm:col-span-2 flex items-center justify-between gap-3 border-t border-border pt-3">
-          <p className="text-[12px] text-slate-500">Pull your live Google rating and review count instead of typing them.</p>
+          <div>
+            <p className="text-[12px] text-slate-500">Pull your live Google rating and review count instead of typing them.</p>
+            {syncLabel && <p className="text-[11px] text-emerald-600 mt-0.5 inline-flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-emerald-500" /> {syncLabel}</p>}
+          </div>
           <button onClick={refreshGoogle} disabled={googleSyncing}
             className="inline-flex items-center gap-1.5 h-9 px-3.5 rounded-lg border border-border bg-background text-[13px] font-semibold hover:bg-muted disabled:opacity-60 shrink-0">
             <RefreshCw className={`w-3.5 h-3.5 ${googleSyncing ? "animate-spin" : ""}`} /> Refresh from Google
