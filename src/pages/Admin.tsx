@@ -1576,6 +1576,13 @@ const Admin = () => {
                   <span className="text-sm font-semibold text-foreground">Auto-notify third-party installers on preinstall</span>
                   <Switch checked={settings.thirdparty_auto_notify !== false} onCheckedChange={(v) => updateSettings({ thirdparty_auto_notify: v })} className="data-[state=checked]:bg-teal" />
                 </div>
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <span className="text-sm font-semibold text-foreground">Get-Ready drives the addendum</span>
+                    <p className="text-xs text-muted-foreground mt-0.5">When a Get-Ready install is signed off with a photo, mark that product Installed on the addendum and move the rest to optional. Leave off if your advertised price already includes every add-on.</p>
+                  </div>
+                  <Switch checked={settings.getready_drives_addendum === true} onCheckedChange={(v) => updateSettings({ getready_drives_addendum: v })} className="data-[state=checked]:bg-teal" />
+                </div>
                 <InstallerContactsCard />
               </div>
             </div>
