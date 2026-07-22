@@ -1885,6 +1885,10 @@ const AddendumPanel = ({ vehicle }: { vehicle: VehicleRow }) => {
   const [rows, setRows] = useState<AddendumRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [accepting, setAccepting] = useState<string | null>(null);
+  // Newest verified install proof for this VIN. If it lands AFTER an addendum
+  // was accepted, the Get-Ready changed since the manager approved it and the
+  // addendum needs a refresh (self-aware loop).
+  const [proofMaxTs, setProofMaxTs] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -1908,6 +1912,19 @@ const AddendumPanel = ({ vehicle }: { vehicle: VehicleRow }) => {
       data = (withAccept.data || []) as AddendumRow[];
     }
     setRows(data);
+
+    // Latest verified install proof (RLS scopes to this tenant). Falls back
+    // gracefully if verified_at/is_verified haven't propagated.
+    let pr = await (supabase as any)
+      .from("install_proofs").select("verified_at, is_verified")
+      .eq("vehicle_vin", vehicle.vin).order("verified_at", { ascending: false }).limit(50);
+    if (pr.error) pr = await (supabase as any)
+      .from("install_proofs").select("verified_at").eq("vehicle_vin", vehicle.vin).limit(50);
+    const proofs = (pr.data as { verified_at: string | null; is_verified?: boolean }[]) || [];
+    const maxTs = proofs
+      .filter((p) => p.is_verified !== false && p.verified_at)
+      .reduce<string | null>((m, p) => (!m || (p.verified_at as string) > m ? (p.verified_at as string) : m), null);
+    setProofMaxTs(maxTs);
     setLoading(false);
   }, [vehicle.vin]);
 
@@ -2035,6 +2052,8 @@ const AddendumPanel = ({ vehicle }: { vehicle: VehicleRow }) => {
                   canAccept={canAccept}
                   accepting={accepting === r.id}
                   onAccept={() => acceptAndDispatch(r)}
+                  stale={!!r.accepted_at && !!proofMaxTs && new Date(proofMaxTs) > new Date(r.accepted_at)}
+                  onUpdate={() => navigate(`/addendum?id=${r.id}&edit=1`)}
                 />
               ))}
             </Section>
@@ -2061,6 +2080,8 @@ const AddendumCard = ({
   canAccept,
   accepting,
   onAccept,
+  stale,
+  onUpdate,
 }: {
   row: AddendumRow;
   onOpen: () => void;
@@ -2068,11 +2089,13 @@ const AddendumCard = ({
   canAccept?: boolean;
   accepting?: boolean;
   onAccept?: () => void;
+  stale?: boolean;
+  onUpdate?: () => void;
 }) => {
   const signed = row.status === "signed" || !!row.signed_at;
   const accepted = !!row.accepted_at;
   return (
-    <div className="rounded-xl border border-border bg-card p-4 flex items-center gap-4 hover:bg-muted/40 transition-colors">
+    <div className={`rounded-xl border bg-card p-4 flex items-center gap-4 hover:bg-muted/40 transition-colors ${stale ? "border-amber-300" : "border-border"}`}>
       <div className={`w-9 h-9 rounded-md flex items-center justify-center flex-shrink-0 ${
         signed ? "bg-emerald-100 text-emerald-700" : accepted ? "bg-blue-100 text-blue-700" : "bg-amber-100 text-amber-700"
       }`}>
@@ -2098,12 +2121,27 @@ const AddendumCard = ({
               <Send className="w-3 h-3" /> Get-Ready sent
             </span>
           )}
+          {stale && (
+            <span className="inline-flex items-center gap-1 text-amber-700 font-semibold">
+              <AlertTriangle className="w-3 h-3" /> Get-Ready changed since acceptance
+            </span>
+          )}
           {row.content_hash && (
             <span className="font-mono text-[10px]">hash: {row.content_hash.slice(0, 10)}…</span>
           )}
         </div>
       </div>
       <div className="flex items-center gap-1.5">
+        {!signed && stale && onUpdate && (
+          <button
+            onClick={onUpdate}
+            className="h-8 px-2.5 rounded-md bg-amber-500 text-white text-caption font-semibold inline-flex items-center gap-1 hover:bg-amber-600"
+            title="Rebuild this addendum from the latest Get-Ready installs"
+          >
+            <RefreshCw className="w-3 h-3" />
+            Update
+          </button>
+        )}
         {!signed && !accepted && canAccept && onAccept && (
           <button
             onClick={onAccept}

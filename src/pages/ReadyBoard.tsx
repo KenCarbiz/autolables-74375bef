@@ -41,6 +41,7 @@ export default function ReadyBoard() {
   const [recallReview, setRecallReview] = useState<Set<string>>(new Set());
   const [reconNeeds, setReconNeeds] = useState<Set<string>>(new Set());
   const [addMap, setAddMap] = useState<Map<string, Addn>>(new Map());
+  const [staleVins, setStaleVins] = useState<Set<string>>(new Set());
   const [requireK208, setRequireK208] = useState(false);
   const [loading, setLoading] = useState(true);
   const [todayOnly, setTodayOnly] = useState(false);
@@ -83,6 +84,24 @@ export default function ReadyBoard() {
       map.set(a.vehicle_vin, { id: a.id, accepted_at: a.accepted_at ?? null, getready_dispatched_at: a.getready_dispatched_at ?? null });
     }
     setAddMap(map);
+
+    // Stale set: a VIN whose newest verified install proof lands after the
+    // addendum was accepted — the Get-Ready changed since the manager approved
+    // it, so the addendum needs a refresh.
+    let pf = await (supabase as any).from("install_proofs").select("vehicle_vin, verified_at, is_verified").eq("tenant_id", tenantId).limit(2000);
+    if (pf.error) pf = await (supabase as any).from("install_proofs").select("vehicle_vin, verified_at").eq("tenant_id", tenantId).limit(2000);
+    const proofMax = new Map<string, string>();
+    for (const p of ((pf.data as { vehicle_vin: string; verified_at: string | null; is_verified?: boolean }[]) || [])) {
+      if (p.is_verified === false || !p.verified_at) continue;
+      const prev = proofMax.get(p.vehicle_vin);
+      if (!prev || p.verified_at > prev) proofMax.set(p.vehicle_vin, p.verified_at);
+    }
+    const stale = new Set<string>();
+    for (const [vin, a] of map) {
+      const ts = proofMax.get(vin);
+      if (a.accepted_at && ts && ts > a.accepted_at) stale.add(vin);
+    }
+    setStaleVins(stale);
     setLoading(false);
   }, [tenantId]);
   useEffect(() => { load(); }, [load]);
@@ -266,7 +285,7 @@ export default function ReadyBoard() {
                 return (
                   <tr key={r.vin} className="border-b border-border/60 hover:bg-muted/30">
                     <td className="py-2 pr-3">
-                      <div className="font-semibold text-foreground truncate max-w-[220px] flex items-center gap-1.5">{r.ymm || "Vehicle"}{isToday(r) && <span className="text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-blue-100 text-blue-700">New</span>}</div>
+                      <div className="font-semibold text-foreground truncate max-w-[220px] flex items-center gap-1.5">{r.ymm || "Vehicle"}{isToday(r) && <span className="text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-blue-100 text-blue-700">New</span>}{staleVins.has(r.vin) && <span title="Get-Ready changed since acceptance" className="text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-amber-100 text-amber-700 inline-flex items-center gap-0.5"><AlertTriangle className="w-2.5 h-2.5" />Changed</span>}</div>
                       <div className="font-mono text-[10px] text-muted-foreground">{r.vin} · {r.status || "draft"}</div>
                     </td>
                     <td className="py-2 px-2 text-center"><Cell on={service.has(r.vin)} dim={!isUsed(r.condition)} /></td>
@@ -289,6 +308,11 @@ export default function ReadyBoard() {
                     </td>
                     <td className="py-2 pl-2">
                       <div className="flex items-center justify-end gap-1">
+                        {staleVins.has(r.vin) && addMap.get(r.vin) && (
+                          <button onClick={() => navigate(`/addendum?id=${addMap.get(r.vin)!.id}&edit=1`)} title="Get-Ready changed — rebuild the addendum from the latest installs" className="h-7 px-2 rounded-md bg-amber-500 text-white text-[11px] font-semibold inline-flex items-center gap-1 hover:bg-amber-600">
+                            <RefreshCw className="w-3.5 h-3.5" /> Update
+                          </button>
+                        )}
                         {canAccept && bucketOf(r) === "acceptance" && (
                           <button onClick={() => acceptAndDispatch(r)} disabled={accepting === r.vin} title="Accept addendum & send Get-Ready" className="h-7 px-2 rounded-md bg-emerald-600 text-white text-[11px] font-semibold inline-flex items-center gap-1 hover:bg-emerald-700 disabled:opacity-50">
                             {accepting === r.vin ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <CheckCircle2 className="w-3.5 h-3.5" />} Accept
