@@ -1555,6 +1555,23 @@ const Admin = () => {
                     className="w-full mt-2 px-3 py-2 border border-border-custom rounded text-sm resize-none"
                   />
                 </div>
+                <div className="border border-border-custom rounded-xl p-3">
+                  <span className="text-sm font-semibold text-foreground">Service work order (K-208)</span>
+                  <p className="text-xs text-muted-foreground mt-0.5">When set, accepting an addendum also sends the service department its own work order — scoped to the safety inspection, never the detail sheet.</p>
+                  <input
+                    value={settings.service_email || ""}
+                    onChange={(e) => updateSettings({ service_email: e.target.value })}
+                    placeholder="Service dept email(s) — comma separated (up to 3)"
+                    className="w-full mt-2 px-3 py-2 border border-border-custom rounded text-sm"
+                  />
+                  <textarea
+                    value={settings.service_default_instructions || ""}
+                    onChange={(e) => updateSettings({ service_default_instructions: e.target.value })}
+                    rows={2}
+                    placeholder="Standing instructions sent to the service department (optional)"
+                    className="w-full mt-2 px-3 py-2 border border-border-custom rounded text-sm resize-none"
+                  />
+                </div>
                 <div className="flex items-center justify-between">
                   <span className="text-sm font-semibold text-foreground">Auto-notify third-party installers on preinstall</span>
                   <Switch checked={settings.thirdparty_auto_notify !== false} onCheckedChange={(v) => updateSettings({ thirdparty_auto_notify: v })} className="data-[state=checked]:bg-teal" />

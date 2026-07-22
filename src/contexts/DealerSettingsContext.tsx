@@ -264,6 +264,8 @@ export interface DealerSettings {
   ingest_detail_dispatch: "manual" | "auto";  // get-ready → detail shop
   detail_email: string;                        // detail-dept recipient(s) for get-ready dispatch
   detail_default_instructions: string;        // instructions sent with detail get-ready
+  service_email: string;                       // service-dept recipient(s) for the K-208 work order
+  service_default_instructions: string;       // instructions sent with the service work order
   thirdparty_auto_notify: boolean;             // auto-notify the installer on a preinstall
   getready_drives_addendum: boolean;           // opt-in: a Get-Ready install (photo+signature) marks the product Installed on the addendum and moves the rest to Optional
   title_round_robin: boolean;                  // rotate title requests person-to-person vs all at once
@@ -445,6 +447,8 @@ export const DEFAULT_SETTINGS: DealerSettings = {
   ingest_detail_dispatch: "manual",
   detail_email: "",
   detail_default_instructions: "",
+  service_email: "",
+  service_default_instructions: "",
   thirdparty_auto_notify: true,
   getready_drives_addendum: false,
   title_round_robin: false,

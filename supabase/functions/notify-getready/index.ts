@@ -63,11 +63,6 @@ Deno.serve(async (req) => {
 
   const { data: prof } = await admin.from("dealer_profiles").select("settings").eq("tenant_id", tenantId).maybeSingle();
   const settings = (prof?.settings || {}) as Record<string, string>;
-  let recipients = splitEmails(settings.detail_email || "");
-  const { data: ten } = await admin.from("tenants").select("primary_email").eq("id", tenantId).maybeSingle();
-  if (recipients.length === 0 && ten?.primary_email) recipients = splitEmails(ten.primary_email as string);
-  if (recipients.length === 0) return json(200, { ok: false, error: "no_recipient" });
-  recipients = recipients.slice(0, 3);
 
   // The permanent Get-Ready hub token (minted at intake). Don't create one here
   // — if it isn't there yet, there's nothing to dispatch to.
@@ -76,45 +71,80 @@ Deno.serve(async (req) => {
     .gt("expires_at", new Date().toISOString()).order("created_at", { ascending: false }).limit(1).maybeSingle();
   if (!tok?.token) return json(200, { ok: false, error: "no_token" });
   const ymm = (tok.ymm as string) || "Vehicle";
-  // Dispatched to the detail department — scope the link so the detailer's hub
-  // shows only their station (service K-208 / recon / PDI stay off the detail
-  // sheet). The token is shared; ?dept scopes the view.
-  const readyUrl = `${APP_BASE}/ready/${tok.token}?dept=detail`;
-  const instructions = (settings.detail_default_instructions || "").trim();
 
-  let qrImgUrl = "";
-  try {
-    const dataUrl = await qrcode(readyUrl, { size: 240 }) as string;
-    const b64 = dataUrl.split(",")[1];
-    if (b64) {
-      const qrPath = `${tenantId}/qr/getready-${tok.token}.gif`;
-      await admin.storage.from("service-docs").upload(qrPath, b64ToBytes(b64), { contentType: "image/gif", upsert: true });
-      qrImgUrl = admin.storage.from("service-docs").getPublicUrl(qrPath).data?.publicUrl || "";
-    }
-  } catch { /* QR optional — the link button always works */ }
-
-  const html = `
-  <div style="font-family:Inter,Arial,sans-serif;max-width:480px;margin:0 auto;color:#0F172A">
-    <h2 style="margin:0 0 4px">${htmlEscape(ymm)} — ready for get-ready</h2>
-    <p style="color:#64748B;margin:0 0 16px">VIN ${htmlEscape(vin)}</p>
-    <p style="margin:0 0 16px">This vehicle is in inventory. Please complete the detail / get-ready and sign off from your phone.</p>
-    ${instructions ? `<p style="margin:0 0 16px;padding:12px 14px;background:#F1F5F9;border-radius:10px"><b>Instructions:</b> ${htmlEscape(instructions)}</p>` : ""}
-    <a href="${readyUrl}" style="display:inline-block;background:#2563EB;color:#fff;font-weight:bold;text-decoration:none;padding:14px 24px;border-radius:12px">Open Get-Ready</a>
-    ${qrImgUrl ? `<p style="color:#64748B;margin:20px 0 8px">Or scan with your phone:</p><img src="${qrImgUrl}" width="180" height="180" alt="Scan to open" style="border:1px solid #E6E8EC;border-radius:12px"/>` : ""}
-  </div>`;
-
-  const sent = await fetch(`${SUPABASE_URL}/functions/v1/send-email`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json", Authorization: `Bearer ${SERVICE_KEY}` },
-    body: JSON.stringify({ to: recipients, subject: `Get-ready: ${ymm}`, html }),
-  }).catch(() => null);
-
-  if (sent && sent.ok) {
-    try {
-      await admin.from("audit_log").insert({
-        action: "getready_dispatched", entity_type: "vehicle", entity_id: vin, store_id: tenantId, details: { recipients: recipients.length },
-      });
-    } catch { /* best-effort */ }
+  // Per-department fanout. Each department gets its OWN work order: a link
+  // scoped to only its stations (?dept=...), its own instructions, its own
+  // recipients. Service K-208 never lands on the detail sheet and vice versa.
+  // Detail is the default target; service is added when a service email is set.
+  const detailEmails = splitEmails(settings.detail_email || "");
+  const serviceEmails = splitEmails(settings.service_email || "");
+  type Target = { dept: string; subject: string; blurb: string; recipients: string[]; instructions: string };
+  const targets: Target[] = [];
+  if (detailEmails.length) targets.push({
+    dept: "detail", subject: `Get-ready: ${ymm}`,
+    blurb: "This vehicle is in inventory. Please complete the detail / get-ready and sign off from your phone.",
+    recipients: detailEmails.slice(0, 3), instructions: (settings.detail_default_instructions || "").trim(),
+  });
+  if (serviceEmails.length) targets.push({
+    dept: "service", subject: `Safety inspection: ${ymm}`,
+    blurb: "This vehicle needs its safety inspection (K-208) before it can be sold. Please complete and sign off from your phone.",
+    recipients: serviceEmails.slice(0, 3), instructions: (settings.service_default_instructions || "").trim(),
+  });
+  // Fallback: no department email configured — dispatch the detail work order
+  // to the dealership's primary email so nothing is silently dropped.
+  if (targets.length === 0) {
+    const { data: ten } = await admin.from("tenants").select("primary_email").eq("id", tenantId).maybeSingle();
+    const fb = splitEmails((ten?.primary_email as string) || "");
+    if (fb.length) targets.push({
+      dept: "detail", subject: `Get-ready: ${ymm}`,
+      blurb: "This vehicle is in inventory. Please complete the detail / get-ready and sign off from your phone.",
+      recipients: fb.slice(0, 3), instructions: (settings.detail_default_instructions || "").trim(),
+    });
   }
-  return json(sent && sent.ok ? 200 : 502, { ok: !!(sent && sent.ok), recipients: recipients.length });
+  if (targets.length === 0) return json(200, { ok: false, error: "no_recipient" });
+
+  let anySent = false;
+  const dispatched: { dept: string; ok: boolean; recipients: number }[] = [];
+  for (const t of targets) {
+    const readyUrl = `${APP_BASE}/ready/${tok.token}?dept=${t.dept}`;
+    let qrImgUrl = "";
+    try {
+      const dataUrl = await qrcode(readyUrl, { size: 240 }) as string;
+      const b64 = dataUrl.split(",")[1];
+      if (b64) {
+        const qrPath = `${tenantId}/qr/getready-${tok.token}-${t.dept}.gif`;
+        await admin.storage.from("service-docs").upload(qrPath, b64ToBytes(b64), { contentType: "image/gif", upsert: true });
+        qrImgUrl = admin.storage.from("service-docs").getPublicUrl(qrPath).data?.publicUrl || "";
+      }
+    } catch { /* QR optional — the link button always works */ }
+
+    const html = `
+    <div style="font-family:Inter,Arial,sans-serif;max-width:480px;margin:0 auto;color:#0F172A">
+      <h2 style="margin:0 0 4px">${htmlEscape(ymm)}</h2>
+      <p style="color:#64748B;margin:0 0 16px">VIN ${htmlEscape(vin)}</p>
+      <p style="margin:0 0 16px">${htmlEscape(t.blurb)}</p>
+      ${t.instructions ? `<p style="margin:0 0 16px;padding:12px 14px;background:#F1F5F9;border-radius:10px"><b>Instructions:</b> ${htmlEscape(t.instructions)}</p>` : ""}
+      <a href="${readyUrl}" style="display:inline-block;background:#2563EB;color:#fff;font-weight:bold;text-decoration:none;padding:14px 24px;border-radius:12px">Open work order</a>
+      ${qrImgUrl ? `<p style="color:#64748B;margin:20px 0 8px">Or scan with your phone:</p><img src="${qrImgUrl}" width="180" height="180" alt="Scan to open" style="border:1px solid #E6E8EC;border-radius:12px"/>` : ""}
+    </div>`;
+
+    const sent = await fetch(`${SUPABASE_URL}/functions/v1/send-email`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${SERVICE_KEY}` },
+      body: JSON.stringify({ to: t.recipients, subject: t.subject, html }),
+    }).catch(() => null);
+    const ok = !!(sent && sent.ok);
+    if (ok) {
+      anySent = true;
+      try {
+        await admin.from("audit_log").insert({
+          action: "getready_dispatched", entity_type: "vehicle", entity_id: vin, store_id: tenantId,
+          details: { dept: t.dept, recipients: t.recipients.length },
+        });
+      } catch { /* best-effort */ }
+    }
+    dispatched.push({ dept: t.dept, ok, recipients: t.recipients.length });
+  }
+
+  return json(anySent ? 200 : 502, { ok: anySent, dispatched });
 });
