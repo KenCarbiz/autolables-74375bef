@@ -44,6 +44,12 @@ Do NOT redesign it, restructure its modules, or swap the component.
 - Changes are bugfix/data-wiring only (fix a broken module, wire real
   data, responsive/a11y polish). Any visual restructure needs a fresh
   explicit owner sign-off — treat this as a locked spec otherwise.
+- **The load-in Skeleton is LOCKED too (owner-approved 2026-07-22).** The
+  `Skeleton()` in `VehiclePassportGoverned.tsx` mirrors the served layout
+  at each breakpoint (mobile `max-w-lg`; desktop `max-w-[1520px]` with the
+  `[minmax(0,1fr)_360px]` grid + `h-16` header) so the swap to real content
+  never shifts. Keep the skeleton's container width/grid in lockstep with
+  the served layout — do not revert it to a narrow mobile-only placeholder.
 
 ## Git Workflow — MANDATORY
 

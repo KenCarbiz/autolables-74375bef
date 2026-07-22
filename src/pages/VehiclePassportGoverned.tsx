@@ -158,9 +158,10 @@ const V_STATUS_ICON: Record<VerificationStatus, { color: string; bg: string; Ico
 function Skeleton() {
   return (
     <div className="min-h-screen" style={{ background: BG }}>
-      <div className="h-14 border-b bg-white" style={{ borderColor: BORDER }} />
-      {/* Mobile */}
-      <div className="lg:hidden max-w-md mx-auto p-4 space-y-4 animate-pulse">
+      {/* Header height matches the served bars (mobile h-14 / desktop h-16). */}
+      <div className="h-14 lg:h-16 border-b bg-white" style={{ borderColor: BORDER }} />
+      {/* Mobile — matches the served max-w-lg column. */}
+      <div className="lg:hidden max-w-lg mx-auto p-4 space-y-4 animate-pulse">
         <div className="aspect-[4/3] rounded-2xl bg-slate-200" />
         <div className="h-6 w-3/4 rounded bg-slate-200" />
         <div className="h-4 w-1/2 rounded bg-slate-200" />
@@ -168,28 +169,27 @@ function Skeleton() {
         <div className="h-32 rounded-2xl bg-slate-200" />
         <div className="h-24 rounded-2xl bg-slate-200" />
       </div>
-      {/* Desktop */}
-      <div className="hidden lg:block max-w-6xl mx-auto px-6 py-6 animate-pulse">
-        <div className="grid grid-cols-[1fr_360px] gap-6 items-start">
-          <div className="space-y-4">
-            <div className="aspect-[16/10] rounded-2xl bg-slate-200" />
-            <div className="h-7 w-2/3 rounded bg-slate-200" />
-            <div className="h-4 w-1/3 rounded bg-slate-200" />
-            <div className="grid grid-cols-2 gap-4">
-              <div className="h-40 rounded-2xl bg-slate-200" />
-              <div className="h-40 rounded-2xl bg-slate-200" />
-            </div>
-            <div className="h-56 rounded-2xl bg-slate-200" />
-          </div>
-          <div className="space-y-4">
+      {/* Desktop — matches the served max-w-[1520px] + [1fr_360px] grid so the
+          swap to real content causes no width/layout shift (no ghost pop). */}
+      <div className="hidden lg:block max-w-[1520px] mx-auto px-6 py-6 animate-pulse">
+        <div className="grid grid-cols-[minmax(0,1fr)_360px] gap-6 items-start">
+          <div className="space-y-6 min-w-0">
             <div className="h-72 rounded-2xl bg-slate-200" />
-            <div className="h-40 rounded-2xl bg-slate-200" />
+            <div className="grid grid-cols-2 gap-5">
+              <div className="h-44 rounded-2xl bg-slate-200" />
+              <div className="h-44 rounded-2xl bg-slate-200" />
+            </div>
+            <div className="h-60 rounded-2xl bg-slate-200" />
+            <div className="grid grid-cols-3 gap-5">
+              <div className="h-48 rounded-2xl bg-slate-200" />
+              <div className="h-48 rounded-2xl bg-slate-200" />
+              <div className="h-48 rounded-2xl bg-slate-200" />
+            </div>
           </div>
-        </div>
-        <div className="grid grid-cols-3 gap-4 mt-6">
-          <div className="h-48 rounded-2xl bg-slate-200" />
-          <div className="h-48 rounded-2xl bg-slate-200" />
-          <div className="h-48 rounded-2xl bg-slate-200" />
+          <div className="space-y-4">
+            <div className="h-80 rounded-2xl bg-slate-200" />
+            <div className="h-44 rounded-2xl bg-slate-200" />
+          </div>
         </div>
       </div>
     </div>
