@@ -1936,6 +1936,8 @@ const AddendumPanel = ({ vehicle }: { vehicle: VehicleRow }) => {
           toast.message("Accepted. Add a detail shop email in Settings to auto-send the Get-Ready.");
         } else if (res?.data?.error === "no_token") {
           toast.message("Accepted. Get-Ready link not ready yet — try Send from the Ready Board.");
+        } else if (res?.error) {
+          toast.message("Accepted. Couldn't reach the Get-Ready dispatcher — send it from the Ready Board.");
         }
       } catch { /* dispatch is best-effort; acceptance is already recorded */ }
       await load();

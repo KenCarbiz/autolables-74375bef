@@ -14,6 +14,31 @@ import { SUPABASE_URL, SERVICE_KEY, adminClient, isServiceOrCron } from "../_sha
 // ──────────────────────────────────────────────────────────────────────
 
 const APP_BASE = Deno.env.get("APP_BASE_URL") || "https://autolabels.io";
+
+// Roles that hold can_approve_print (mirrors dealerRoleCapabilities.ts). Keep in
+// sync with the accept_addendum SQL guard.
+const MANAGER_ROLES = new Set([
+  "owner", "general_manager", "gsm", "admin", "manager",
+  "sales_manager", "used_car_manager", "inventory_manager",
+]);
+
+// Member-scoped auth: validate the caller's user JWT, then confirm they are an
+// accepted manager member of the tenant (or a platform admin). Lets a manager
+// dispatch the Get-Ready on addendum acceptance from the app.
+// deno-lint-ignore no-explicit-any
+async function isManagerMember(admin: any, req: Request, tenantId: string): Promise<boolean> {
+  const jwt = (req.headers.get("Authorization") || "").replace(/^Bearer\s+/i, "");
+  if (!jwt) return false;
+  const { data: u } = await admin.auth.getUser(jwt);
+  const uid = u?.user?.id;
+  if (!uid) return false;
+  const { data: pa } = await admin.from("user_roles").select("role").eq("user_id", uid).eq("role", "admin").maybeSingle();
+  if (pa) return true;
+  const { data: m } = await admin.from("tenant_members")
+    .select("role").eq("tenant_id", tenantId).eq("user_id", uid).not("accepted_at", "is", null).maybeSingle();
+  return !!m && MANAGER_ROLES.has(String(m.role));
+}
+
 const splitEmails = (s: string) => s.split(/[\n,;]+/).map((e) => e.trim()).filter((e) => /.+@.+\..+/.test(e));
 const b64ToBytes = (b64: string) => { const bin = atob(b64); const out = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i); return out; };
 
@@ -21,7 +46,6 @@ Deno.serve(async (req) => {
   const pf = preflight(req);
   if (pf) return pf;
   if (req.method !== "POST") return json(405, { error: "method not allowed" });
-  if (!isServiceOrCron(req)) return json(401, { error: "unauthorized" });
 
   const body = await req.json().catch(() => ({})) as { tenant_id?: string; vin?: string };
   const tenantId = body.tenant_id;
@@ -29,6 +53,13 @@ Deno.serve(async (req) => {
   if (!tenantId || !vin) return json(400, { error: "tenant_id and vin required" });
 
   const admin = adminClient();
+
+  // Auth: server callers (ingest-orchestrate, cron) use the service/cron gate.
+  // A logged-in manager may also dispatch on addendum acceptance — accept a
+  // valid user JWT when the caller is an accepted manager member of the tenant.
+  if (!isServiceOrCron(req) && !(await isManagerMember(admin, req, tenantId))) {
+    return json(401, { error: "unauthorized" });
+  }
 
   const { data: prof } = await admin.from("dealer_profiles").select("settings").eq("tenant_id", tenantId).maybeSingle();
   const settings = (prof?.settings || {}) as Record<string, string>;

@@ -118,6 +118,10 @@ export default function ReadyBoard() {
           toast.success("Get-Ready sent to the shop");
         } else if (res?.data?.error === "no_recipient") {
           toast.message("Accepted. Set a detail shop email in Settings to auto-send the Get-Ready.");
+        } else if (res?.data?.error === "no_token") {
+          toast.message("Accepted. Get-Ready link not ready yet — try Send below.");
+        } else if (res?.error) {
+          toast.message("Accepted. Couldn't reach the Get-Ready dispatcher — try Send below.");
         }
       } catch { /* dispatch is best-effort; acceptance is already recorded */ }
       await load();
@@ -150,16 +154,18 @@ export default function ReadyBoard() {
     };
   }, [rows, service, isToday, reconNeeds, recallReview]);
 
-  // Which queue a vehicle sits in, from the manager's point of view:
-  //  ready       — every station done, clear to sell
-  //  getready    — addendum accepted, shop working the Get-Ready
+  // Which queue a vehicle sits in, from the manager's point of view. Acceptance
+  // is the first gate: an un-accepted draft belongs in the acceptance queue even
+  // if the stations happen to be done, because the disclosure isn't approved yet.
   //  acceptance  — a draft addendum is waiting for the manager to accept
+  //  ready       — accepted and every station done, clear to sell
+  //  getready    — accepted, shop still working the Get-Ready
   //  (rows with no draft addendum only appear under "All")
   const bucketOf = useCallback((r: Row): Bucket | null => {
-    if (isReady(r)) return "ready";
     const a = addMap.get(r.vin);
+    if (a && !a.accepted_at) return "acceptance";
+    if (isReady(r)) return "ready";
     if (a?.accepted_at) return "getready";
-    if (a) return "acceptance";
     return null;
   }, [isReady, addMap]);
 
