@@ -1504,6 +1504,20 @@ const Admin = () => {
                         })}
                       </div>
                     </div>
+                    <div className="pl-3 mt-3 flex items-center justify-between">
+                      <div className="pr-3">
+                        <span className="text-xs font-semibold text-foreground">Also require licensee certification</span>
+                        <p className="text-xs text-muted-foreground">Block signing until a manager (licensee) certifies the A/B/C result and signs — not just the technician's inspection.</p>
+                      </div>
+                      <Switch
+                        checked={settings.require_k208_licensee_certification === true}
+                        onCheckedChange={(v) => {
+                          if (v && !window.confirm("Require a manager to certify the K-208 (A/B/C result + signature) before customer disclosures can be signed?")) return;
+                          updateSettings({ require_k208_licensee_certification: v });
+                        }}
+                        className="data-[state=checked]:bg-teal"
+                      />
+                    </div>
                   </div>
                 )}
                 <div className="flex items-center justify-between">
