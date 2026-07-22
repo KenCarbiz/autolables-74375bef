@@ -145,6 +145,11 @@ async function autoPreload(admin: any, supabaseUrl: string, serviceKey: string, 
     await admin.rpc("create_draft_buyers_guide", { p_tenant_id: tenantId, p_vin: vin });
   } catch { /* buyers-guide preload best-effort */ }
   try {
+    // Pre-create the CT K-208 safety inspection for every used/CPO car (no
+    // year/mileage/value threshold), so service has it to complete + sign.
+    await admin.rpc("create_draft_safety_inspection", { p_tenant_id: tenantId, p_vin: vin });
+  } catch { /* k208 preload best-effort */ }
+  try {
     // Fire-and-forget; no-op if no window-sticker API key is configured.
     fetch(`${supabaseUrl}/functions/v1/oem-window-sticker`, {
       method: "POST",
