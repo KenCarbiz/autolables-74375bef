@@ -4062,6 +4062,10 @@ export type Database = {
           id: string
           inspector_name: string | null
           inspector_role: string | null
+          licensee_certified_at: string | null
+          licensee_certified_by: string | null
+          licensee_name: string | null
+          licensee_signature_data: string | null
           notes: string | null
           result: string | null
           result_initial: string | null
@@ -4094,6 +4098,10 @@ export type Database = {
           id?: string
           inspector_name?: string | null
           inspector_role?: string | null
+          licensee_certified_at?: string | null
+          licensee_certified_by?: string | null
+          licensee_name?: string | null
+          licensee_signature_data?: string | null
           notes?: string | null
           result?: string | null
           result_initial?: string | null
@@ -4126,6 +4134,10 @@ export type Database = {
           id?: string
           inspector_name?: string | null
           inspector_role?: string | null
+          licensee_certified_at?: string | null
+          licensee_certified_by?: string | null
+          licensee_name?: string | null
+          licensee_signature_data?: string | null
           notes?: string | null
           result?: string | null
           result_initial?: string | null
@@ -6317,6 +6329,15 @@ export type Database = {
           _plan_tier?: string
           _slug: string
           _source?: string
+        }
+        Returns: string
+      }
+      certify_safety_inspection: {
+        Args: {
+          p_inspection_id: string
+          p_licensee_name: string
+          p_result_initial: string
+          p_signature_data: string
         }
         Returns: string
       }
