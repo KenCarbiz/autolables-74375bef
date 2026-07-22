@@ -86,6 +86,7 @@ const CustomerReview = () => {
   const [cobuyerName, setCobuyerName] = useState("");
   const [cobuyerSig, setCobuyerSig] = useState({ data: "", type: "draw" as "draw" | "type" });
   const [warrantyAck, setWarrantyAck] = useState(false);
+  const [k208Ack, setK208Ack] = useState(false);
   const [deliveryMileage, setDeliveryMileage] = useState("");
   const [stickerMatchAck, setStickerMatchAck] = useState(false);
   const [paymentConfirmed, setPaymentConfirmed] = useState(false);
@@ -223,9 +224,13 @@ const CustomerReview = () => {
   // FTC Used Car Rule warranty + mileage only applies to used/CPO units; new
   // and demo cars skip it (and it must not gate their Continue).
   const isUsedCar = needsUsedCarWarranty(addendum?.vehicle_condition);
+  // A CT K-208 safety-inspection form is in the delivery packet — the buyer
+  // must acknowledge receipt and sign it as part of the bundle.
+  const hasK208 = signingDocs.some((d) => d.document_type === "k208");
   const disclosuresDone =
     esignConsent && stickerMatchAck &&
     (!isUsedCar || (warrantyAck && deliveryMileage.trim().length > 0)) &&
+    (!hasK208 || k208Ack) &&
     (!sb766Applies || sb766ThreeDayAck);
 
   const canAdvance = (() => {
@@ -274,6 +279,7 @@ const CustomerReview = () => {
     if (missingInitials.length > 0) { toast.error(`Please initial all ${missingInitials.length} item(s).`); return; }
     if (electable.some((p) => !optionalSelections[p.id])) { toast.error("Please accept or decline every option."); return; }
     if (!warrantyAck) { toast.error("Please acknowledge the warranty status."); return; }
+    if (hasK208 && !k208Ack) { toast.error("Please acknowledge receipt of the safety inspection (K-208)."); return; }
     if (!deliveryMileage.trim()) { toast.error("Please confirm mileage at delivery."); return; }
     if (!stickerMatchAck) { toast.error("Please acknowledge the window sticker matches this addendum."); return; }
     if (!paymentConfirmed) { toast.error("Please confirm your price breakdown."); return; }
@@ -392,6 +398,8 @@ const CustomerReview = () => {
       },
       customer_name: customerName,
       warranty_ack: warrantyAck,
+      buyers_guide_ack: warrantyAck,
+      k208_ack: hasK208 ? k208Ack : null,
       sticker_match_ack: stickerMatchAck,
       generated_documents: signingDocumentRefs(signingDocs),
       payment_confirmed: paymentConfirmed,
@@ -413,6 +421,8 @@ const CustomerReview = () => {
 
     const acknowledgments = {
       warranty_ack: warrantyAck,
+      buyers_guide_ack: warrantyAck,
+      k208_ack: hasK208 ? k208Ack : null,
       sticker_match_ack: stickerMatchAck,
       sb766_three_day_return_ack: sb766ThreeDayAck || false,
       sb766_financing_disclosure: sb766Disclosure || null,
@@ -469,6 +479,14 @@ const CustomerReview = () => {
         } as any)
         .eq("signing_token", token!);
       if (legacyErr) { toast.error("Failed to submit. Please try again."); return; }
+    }
+    // Stamp the buyer's signature onto the certified CT K-208 in the packet.
+    // Best-effort + idempotent server-side; the addendum signing is the record
+    // of authority, this ties the buyer's acknowledgment to the K-208 itself.
+    if (hasK208 && customerSig.data) {
+      await (supabase as any)
+        .rpc("k208_record_buyer_signature", { _signing_token: token!, _buyer_name: customerName || null, _buyer_signature_data: customerSig.data })
+        .then(() => {}, () => { /* K-208 buyer stamp is best-effort */ });
     }
     // Co-buyer signature, recorded as a second signer on the same deal.
     if (hasCobuyer && cobuyerSig.data) {
@@ -668,6 +686,7 @@ const CustomerReview = () => {
               esignConsent={esignConsent} setEsignConsent={setEsignConsent}
               showFullConsent={showFullConsent} setShowFullConsent={setShowFullConsent}
               warrantyAck={warrantyAck} setWarrantyAck={setWarrantyAck}
+              hasK208={hasK208} k208Ack={k208Ack} setK208Ack={setK208Ack}
               deliveryMileage={deliveryMileage} setDeliveryMileage={setDeliveryMileage}
               stickerMatchAck={stickerMatchAck} setStickerMatchAck={setStickerMatchAck}
               addendum={addendum} signingDocs={signingDocs}
@@ -1075,7 +1094,7 @@ const PricingStep = ({
 const DisclosuresStep = ({
   isUsedCar,
   esignConsent, setEsignConsent, showFullConsent, setShowFullConsent,
-  warrantyAck, setWarrantyAck, deliveryMileage, setDeliveryMileage,
+  warrantyAck, setWarrantyAck, hasK208, k208Ack, setK208Ack, deliveryMileage, setDeliveryMileage,
   stickerMatchAck, setStickerMatchAck, addendum, signingDocs,
   sb766ThreeDayAck, setSb766ThreeDayAck, setSb766Disclosure,
 }: {
@@ -1083,6 +1102,7 @@ const DisclosuresStep = ({
   esignConsent: boolean; setEsignConsent: (v: boolean) => void;
   showFullConsent: boolean; setShowFullConsent: (v: boolean) => void;
   warrantyAck: boolean; setWarrantyAck: (v: boolean) => void;
+  hasK208: boolean; k208Ack: boolean; setK208Ack: (v: boolean) => void;
   deliveryMileage: string; setDeliveryMileage: (v: string) => void;
   stickerMatchAck: boolean; setStickerMatchAck: (v: boolean) => void;
   addendum: any;
@@ -1111,7 +1131,13 @@ const DisclosuresStep = ({
 
         <BigCheck checked={warrantyAck} onClick={() => setWarrantyAck(!warrantyAck)}
           title="I acknowledge the warranty status"
-          body="I reviewed the FTC Buyers Guide on this vehicle and understand the warranty status (As-Is, Implied, or Warranty) as disclosed. The mileage above is accurate at delivery." />
+          body="I reviewed the FTC Buyers Guide on this vehicle and understand the warranty status (As-Is, Implied, or Warranty) as disclosed. I hereby acknowledge receipt of the Buyers Guide at the closing of this sale. The mileage above is accurate at delivery." />
+
+        {hasK208 && (
+          <BigCheck checked={k208Ack} onClick={() => setK208Ack(!k208Ack)}
+            title="I acknowledge the safety inspection (K-208)"
+            body="I received and reviewed the completed Connecticut used-vehicle safety inspection (Form K-208) for this vehicle, including its inspection result." />
+        )}
       </>
     )}
 

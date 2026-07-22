@@ -103,6 +103,9 @@ const MobileSigning = () => {
   // Generated sticker/addendum documents the customer reviews; a reference to
   // them is frozen into the canonical signed payload (proves what was shown).
   const { documents: signingDocs } = useSigningDocuments(token);
+  // A CT K-208 in the packet is acknowledged by the buyer's signature stamped
+  // onto the inspection (k208_record_buyer_signature below).
+  const hasK208 = signingDocs.some((d) => d.document_type === "k208");
   // Payment walk — single confirmation that the customer saw the base
   // vehicle price, the add-ons they elected, and the resulting total.
   const [paymentConfirmed, setPaymentConfirmed] = useState(false);
@@ -479,6 +482,8 @@ const MobileSigning = () => {
       },
       customer_name: customerName,
       warranty_ack: warrantyAck,
+      buyers_guide_ack: warrantyAck,
+      k208_ack: hasK208 ? !!customerSig.data : null,
       sticker_match_ack: stickerMatchAck,
       generated_documents: signingDocumentRefs(signingDocs),
       payment_confirmed: paymentConfirmed,
@@ -504,6 +509,8 @@ const MobileSigning = () => {
     // audit_log event in one transaction. See migration 20260418110000.
     const acknowledgments = {
       warranty_ack: warrantyAck,
+      buyers_guide_ack: warrantyAck,
+      k208_ack: hasK208 ? !!customerSig.data : null,
       sticker_match_ack: stickerMatchAck,
       sb766_three_day_return_ack: sb766ThreeDayAck || false,
       sb766_financing_disclosure: sb766Disclosure || null,
