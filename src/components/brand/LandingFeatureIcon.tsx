@@ -8,8 +8,8 @@
 // Sizes are explicit (never inherited) so an icon never shrinks when its
 // adjoining label wraps:
 //   hero      → 56×56 desktop · 50×50 mobile
-//   card      → 52×52 desktop · 48×48 mobile
-//   workflow  → 52×52 desktop · 48×48 mobile
+//   card      → 75×75 desktop · 70×70 mobile  (+45% over the 52/48 base)
+//   workflow  → 75×75 desktop · 70×70 mobile  (+45% over the 52/48 base)
 //
 // To swap art, change only the SRC path — the feature wiring lives in the
 // landingIcons map in Landing.tsx.
@@ -50,8 +50,8 @@ const SRC: Record<LandingGlyphName, string> = {
 // Explicit rendered box per variant. Mobile floor first, desktop at lg.
 const SIZE: Record<Variant, string> = {
   hero: "h-[50px] w-[50px] min-h-[50px] min-w-[50px] lg:h-[56px] lg:w-[56px] lg:min-h-[56px] lg:min-w-[56px]",
-  card: "h-12 w-12 min-h-[48px] min-w-[48px] lg:h-[52px] lg:w-[52px] lg:min-h-[52px] lg:min-w-[52px]",
-  workflow: "h-12 w-12 min-h-[48px] min-w-[48px] lg:h-[52px] lg:w-[52px] lg:min-h-[52px] lg:min-w-[52px]",
+  card: "h-[70px] w-[70px] min-h-[70px] min-w-[70px] lg:h-[75px] lg:w-[75px] lg:min-h-[75px] lg:min-w-[75px]",
+  workflow: "h-[70px] w-[70px] min-h-[70px] min-w-[70px] lg:h-[75px] lg:w-[75px] lg:min-h-[75px] lg:min-w-[75px]",
 };
 
 interface Props {
