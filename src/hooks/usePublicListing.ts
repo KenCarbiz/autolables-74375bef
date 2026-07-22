@@ -34,9 +34,15 @@ export function usePublicListing(
     queryFn: async () => {
       const session = (() => { try { return passportSessionId(); } catch { return undefined; } })();
       const { data, error } = await supabase.functions.invoke("public-listing-view", { body: { slug: key, session } });
-      if (error) throw error;
+      // A 404 from the edge function means the slug isn't a real listing — surface
+      // that as a clean not-found sentinel instead of throwing (throwing bubbles up
+      // as an unhandled runtime error in project monitoring / blank-screen alerts).
+      if (error) {
+        const ctx = (error as { context?: { status?: number } }).context;
+        if (ctx?.status === 404) return null;
+        throw error;
+      }
       const row = (data as { listing?: VehicleListing } | null)?.listing ?? null;
-      if (!row) throw new Error("not_found");
       return row;
     },
   });
