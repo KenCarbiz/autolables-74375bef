@@ -1,4 +1,5 @@
 import { useAuth } from "@/contexts/AuthContext";
+import { useNavigate } from "react-router-dom";
 import { useDealerDocumentRules } from "@/lib/documentRules";
 import { useEffect } from "react";
 import { useVehicleDocuments } from "@/lib/stickerStudio/useVehicleDocuments";
@@ -30,7 +31,7 @@ const toneClass: Record<string, string> = {
   rose: "bg-rose-50 text-rose-700",
 };
 
-const TYPE_LABEL: Record<string, string> = { window: "Window Sticker", addendum: "Addendum", passport: "Vehicle Passport", cpo_sheet: "CPO Sheet" };
+const TYPE_LABEL: Record<string, string> = { window: "Window Sticker", addendum: "Addendum", passport: "Vehicle Passport", cpo_sheet: "CPO Sheet", buyers_guide: "FTC Buyers Guide" };
 const fmtDate = (d?: string | null) => (d ? new Date(d).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" }) : "—");
 
 const ACTION_META: Record<DocumentAction, { label: string; icon: typeof Check }> = {
@@ -46,6 +47,7 @@ const ACTION_META: Record<DocumentAction, { label: string; icon: typeof Check }>
 
 export default function GeneratedDocumentsSection({ vehicleId }: { vehicleId: string }) {
   const { user, isAdmin } = useAuth();
+  const navigate = useNavigate();
   const { member } = useEntitlements();
   // Managers/admins approve, publish, override; sales generate + submit + print.
   // Gate on the dealer capability, not the platform-admin flag, so a tenant
@@ -98,7 +100,13 @@ export default function GeneratedDocumentsSection({ vehicleId }: { vehicleId: st
 
   const openDoc = (doc: GeneratedDocument) => {
     const url = doc.online_url || doc.pdf_url || doc.png_url;
-    if (!url) { toast.error("No file URL on this document"); return; }
+    if (!url) {
+      // The auto-drafted Buyers Guide has no rendered file — open the Buyers
+      // Guide editor for this vehicle, where the manager confirms the warranty
+      // box and prints/publishes the FTC form.
+      if (doc.document_type === "buyers_guide") { navigate(`/buyers-guide?vehicleId=${vehicleId}`); return; }
+      toast.error("No file URL on this document"); return;
+    }
     window.open(url, "_blank", "noopener");
   };
   // Reprint from the frozen snapshot via the vector print route.

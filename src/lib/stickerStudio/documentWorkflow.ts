@@ -26,7 +26,7 @@ export interface GeneratedDocument {
   vehicle_id: string | null;
   template_id: string;
   template_version?: number | null;
-  document_type: "window" | "addendum" | "passport";
+  document_type: "window" | "addendum" | "passport" | "cpo_sheet" | "buyers_guide";
   document_status: DocumentStatus;
   version: number;
   label_mode?: "white" | "black";

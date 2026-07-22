@@ -140,6 +140,11 @@ async function autoPreload(admin: any, supabaseUrl: string, serviceKey: string, 
     await admin.rpc("create_draft_addendum", { p_tenant_id: tenantId, p_vin: vin });
   } catch { /* addendum preload best-effort */ }
   try {
+    // Draft the FTC Buyers Guide for used/CPO cars (skips new cars + is
+    // idempotent). Lands as a draft for the manager to confirm and publish.
+    await admin.rpc("create_draft_buyers_guide", { p_tenant_id: tenantId, p_vin: vin });
+  } catch { /* buyers-guide preload best-effort */ }
+  try {
     // Fire-and-forget; no-op if no window-sticker API key is configured.
     fetch(`${supabaseUrl}/functions/v1/oem-window-sticker`, {
       method: "POST",
