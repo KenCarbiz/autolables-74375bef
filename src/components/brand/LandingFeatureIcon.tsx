@@ -66,15 +66,15 @@ const GLYPHS: Record<LandingGlyphName, ReactNode> = {
   // 02 — Routed lead: QR in scan brackets → dotted route with nodes → person + check.
   routedLead: (
     <>
-      <path d="M3.2 5V4a.8.8 0 0 1 .8-.8h1M8.4 3.2h1a.8.8 0 0 1 .8.8v1M10.2 8.2v1a.8.8 0 0 1-.8.8h-1M4.2 10.8h-1a.8.8 0 0 1-.8-.8v-1" />
-      <M x={4.6} y={4.8} s={1.4} /><M x={7} y={4.8} s={1.4} /><M x={4.6} y={7.2} s={1.4} />
-      <path strokeDasharray="0.1 2" d="M7.2 12.6 11.6 15" />
-      <path strokeDasharray="0.1 2" d="M12.6 14.6 15.2 11.8" />
-      <circle cx="7" cy="12.5" r=".95" />
-      <circle cx="12" cy="15.2" r=".95" />
-      <circle cx="17.2" cy="6" r="2.15" />
-      <path d="M13.7 11.7a3.55 3.55 0 0 1 7 0" />
-      <Check />
+      <path d="M2.8 5V3.9a1.1 1.1 0 0 1 1.1-1.1h1.1M8.2 2.8h1.1a1.1 1.1 0 0 1 1.1 1.1V5M10.4 8v1.1a1.1 1.1 0 0 1-1.1 1.1H8.2M5 10.2H3.9a1.1 1.1 0 0 1-1.1-1.1V8" />
+      <M x={4.4} y={4.4} s={1.7} /><M x={7.1} y={4.4} s={1.7} /><M x={4.4} y={7.1} s={1.7} />
+      <rect x="7.1" y="7.1" width="1.5" height="1.5" />
+      <path strokeDasharray="0.1 2.3" d="M8.2 12.2 12.2 15.6" />
+      <path strokeDasharray="0.1 2.3" d="M13.2 15 15.4 12.2" />
+      <circle cx="8" cy="12" r=".95" /><circle cx="13" cy="16" r=".95" />
+      <circle cx="17.4" cy="6" r="2.1" />
+      <path d="M13.9 11.3a3.5 3.5 0 0 1 7 0" />
+      <Check cx={18.6} cy={18.4} r={3} />
     </>
   ),
   // 03/09/13 — Digital signature / signed proof / sign: doc + signature + pen + check.
@@ -95,9 +95,10 @@ const GLYPHS: Record<LandingGlyphName, ReactNode> = {
       <rect x="3.2" y="4" width="17.6" height="13.2" rx="1.8" />
       <path d="M3.2 7.4h17.6" />
       <M x={5.1} y={5.3} s={0.5} /><M x={6.7} y={5.3} s={0.5} /><M x={8.3} y={5.3} s={0.5} />
-      <path d="M5.4 9.6h2.5l2.4 2.4a1 1 0 0 1 0 1.4l-1.4 1.4a1 1 0 0 1-1.4 0L5.1 12.4V10a.4.4 0 0 1 .3-.4z" />
-      <path d="M6.4 10.7h.02" />
-      <path d="M12.4 11h5.4m0 0-1.6-1.6m1.6 1.6-1.6 1.6M17.8 14.2h-5.4m0 0 1.6 1.6m-1.6-1.6 1.6-1.6" />
+      <path d="M5.2 9.4h2.7l2.5 2.5a1 1 0 0 1 0 1.4l-1.5 1.5a1 1 0 0 1-1.4 0L5 12.3V9.8a.4.4 0 0 1 .2-.4z" />
+      <path d="M6.3 10.6h.02" />
+      <path d="M12.8 11.2h4.8m0 0-1.5-1.4m1.5 1.4-1.5 1.4" />
+      <path d="M17.6 14h-4.8m0 0 1.5-1.4m-1.5 1.4 1.5 1.4" />
     </>
   ),
   // 05 — FTC-aligned addendum: doc + lines + shield-check overlapping right.
@@ -140,9 +141,10 @@ const GLYPHS: Record<LandingGlyphName, ReactNode> = {
       <rect x="3.2" y="4" width="17.6" height="13.2" rx="1.8" />
       <path d="M3.2 7.4h17.6" />
       <M x={5.1} y={5.3} s={0.5} /><M x={6.7} y={5.3} s={0.5} /><M x={8.3} y={5.3} s={0.5} />
-      <path d="M5.4 9.6h2.5l2.4 2.4a1 1 0 0 1 0 1.4l-1.4 1.4a1 1 0 0 1-1.4 0L5.1 12.4V10a.4.4 0 0 1 .3-.4z" />
-      <path d="M6.4 10.7h.02" />
-      <path d="M12.4 11h5.4m0 0-1.6-1.6m1.6 1.6-1.6 1.6M17.8 14.2h-5.4m0 0 1.6 1.6m-1.6-1.6 1.6-1.6" />
+      <path d="M5.2 9.4h2.7l2.5 2.5a1 1 0 0 1 0 1.4l-1.5 1.5a1 1 0 0 1-1.4 0L5 12.3V9.8a.4.4 0 0 1 .2-.4z" />
+      <path d="M6.3 10.6h.02" />
+      <path d="M12.8 11.2h4.8m0 0-1.5-1.4m1.5 1.4-1.5 1.4" />
+      <path d="M17.6 14h-4.8m0 0 1.5-1.4m-1.5 1.4 1.5 1.4" />
     </>
   ),
   // 10 — Audit defense file: folder + checklist checkmarks + shield-check.
@@ -166,59 +168,60 @@ const GLYPHS: Record<LandingGlyphName, ReactNode> = {
       <Check cx={18.4} cy={18} r={3.3} />
     </>
   ),
-  // 12 — Apply sticker: car + windshield with a dashed sticker + placement arrow.
+  // 12 — Apply sticker: front car + windshield with a dashed sticker + placement arrow.
   stick: (
     <>
-      <path d="M3 16.2v-2.4l1.8-4a1.4 1.4 0 0 1 1.3-.8h9.8a1.4 1.4 0 0 1 1.3.8l1.8 4v2.4" />
-      <path d="M3 16.2a1 1 0 0 0 1 1h.6a1 1 0 0 0 1-1M18.8 16.2a1 1 0 0 1-1 1h-.6a1 1 0 0 1-1-1" />
-      <path d="M5.2 9.4 6.6 6.2a1.4 1.4 0 0 1 1.3-.8h6a1.4 1.4 0 0 1 1.3.8l1.4 3.2" />
-      <path strokeDasharray="1.6 1.2" d="M9.4 7.6h3.6v2.4l-1.8-.9-1.8.9z" />
-      <path d="M20.6 8.4h-2.9m0 0 1.3-1.3m-1.3 1.3 1.3 1.3" />
-      <path d="M5.5 12.9h1.4M15.9 12.9h1.4" />
+      <path d="M3.4 16.5v-3l1.2-2.4a1.2 1.2 0 0 1 1.1-.7h6.6a1.2 1.2 0 0 1 1.1.7l1.2 2.4v3" />
+      <path d="M3.4 16.5a.9.9 0 0 0 .9.9h.6a.9.9 0 0 0 .9-.9M13.6 16.5a.9.9 0 0 0 .9.9h.6a.9.9 0 0 0 .9-.9" />
+      <path d="M5.3 10.8 6 9h5l.7 1.8" />
+      <path strokeDasharray="1.4 1.1" d="M7.2 12h3.4v3H7.2z" />
+      <path d="M20.4 13.5H17m0 0 1.4-1.3m-1.4 1.3 1.4 1.3" />
     </>
   ),
-  // 14 — Close: rising bar chart + up trend arrow + handshake + check.
+  // 14 — Close: handshake + rising bars + sweeping trend arrow + check.
   close: (
     <>
-      <path d="M13.4 13.4v4.4M16.2 10.8v7M19 8.2v9.6" />
-      <path d="M13 6.6l2.6 2.4 2.2-2.6 2 1.8M18.4 5.9l1.4.3-.3 1.4" />
-      <path d="M3 14.6l1.9-1.3a1 1 0 0 1 1.1 0l1.4 1 1.5-1.1a1 1 0 0 1 1.2 0l1.3 1.1" />
-      <path d="M3 17.4l2.1 1.5a1 1 0 0 0 1.1 0l1.2-.8 1.2.8a1 1 0 0 0 1.2 0l2-1.5" />
-      <path d="M6.2 15.6l1.1.8M8 15.4l1 .7" />
+      <path d="M2.6 15.4l1.8-1.1a.9.9 0 0 1 1 0l1.2.9 1.3-.9a.9.9 0 0 1 1 0l1.1.9" />
+      <path d="M4 14.9l1.5 1.1a.9.9 0 0 0 1 0l.5-.4" />
+      <rect x="11.5" y="13.4" width="1.9" height="5.1" rx=".3" />
+      <rect x="14.7" y="10.9" width="1.9" height="7.6" rx=".3" />
+      <rect x="17.9" y="8.4" width="1.9" height="10.1" rx=".3" />
+      <path d="M10.8 12.4 14 9.6l2 1.4 3.6-4" />
+      <path d="M18 6.4h2.2v2.2" />
+      <Check cx={18.9} cy={18.4} r={2.8} />
     </>
   ),
-  // 15 — Vehicle arrival: car passing through a gate/archway + right arrow.
+  // 15 — Vehicle arrival: car passing through an open gate/gantry + exit arrow.
   vehicleArrives: (
     <>
-      <path d="M3.4 18V6.4a1 1 0 0 1 1-1h5.6a1 1 0 0 1 1 1V18" />
-      <path d="M3.4 5.4 7.2 3l3.8 2.4" />
-      <path d="M12.5 14.2l.7-1.7a1.1 1.1 0 0 1 1-.66h4.4a1.1 1.1 0 0 1 1 .66l.7 1.7" />
-      <path d="M12.1 14.2h8.2a.85.85 0 0 1 .85.85v1.7a.85.85 0 0 1-.85.85h-8.2a.85.85 0 0 1-.85-.85v-1.7a.85.85 0 0 1 .85-.85z" />
-      <path d="M13.1 16.2h.02M19.4 16.2h.02" />
-      <path d="M5.6 20.2h4.4m0 0-1.4-1.4m1.4 1.4-1.4 1.4" />
+      <path d="M3.2 18.5V5.6H14.8V18.5" />
+      <path d="M5.6 16.8v-2.6l.9-1.9a1 1 0 0 1 .9-.6h4.6a1 1 0 0 1 .9.6l.9 1.9v2.6" />
+      <path d="M5.6 16.8a.8.8 0 0 0 .8.8h.5a.8.8 0 0 0 .8-.8M12.2 16.8a.8.8 0 0 0 .8.8h.5a.8.8 0 0 0 .8-.8" />
+      <path d="M6.9 12.3 7.4 11h3.6l.5 1.3" />
+      <path d="M6.8 15h.02M12 15h.02" />
+      <path d="M16.4 12h4m0 0-1.5-1.5m1.5 1.5-1.5 1.5" />
     </>
   ),
-  // 16 — Get-Ready queues itself: stacked task cards + checks + arrow + clock.
+  // 16 — Get-Ready queues itself: offset card + checklist rows + arrow + clock.
   getReadyQueue: (
     <>
-      <rect x="3.6" y="3.4" width="11.4" height="3.6" rx="1" />
-      <path d="M5.6 5.2l.8.8 1.5-1.6" />
-      <rect x="3.6" y="8.6" width="11.4" height="3.6" rx="1" />
-      <path d="M5.6 10.4l.8.8 1.5-1.6" />
-      <rect x="3.6" y="13.8" width="11.4" height="3.6" rx="1" />
-      <path d="M5.6 15.6l.8.8 1.5-1.6" />
-      <path d="M10.4 10.4h5m0 0-1.5-1.5m1.5 1.5-1.5 1.5" />
-      <circle cx="18.2" cy="17.4" r="3.4" />
-      <path d="M18.2 15.6v1.8l1.2.8" />
+      <rect x="6.2" y="3.4" width="9.6" height="11.6" rx="1.2" />
+      <rect x="3.6" y="5.4" width="9.6" height="11.6" rx="1.2" fill="#EFF6FF" />
+      <circle cx="6" cy="8.4" r="1" /><path d="M5.5 8.4l.4.4.85-.95" /><path d="M8.4 8.4h3.4" />
+      <circle cx="6" cy="11.2" r="1" /><path d="M5.5 11.2l.4.4.85-.95" /><path d="M8.4 11.2h3.4" />
+      <circle cx="6" cy="14" r="1" /><path d="M5.5 14l.4.4.85-.95" /><path d="M8.4 14h2.4" />
+      <path d="M16.4 8.8h3.4m0 0-1.4-1.4m1.4 1.4-1.4 1.4" />
+      <circle cx="18" cy="16.4" r="3" />
+      <path d="M18 14.8v1.6l1.1.7" />
     </>
   ),
-  // 17 — Installer proof: camera with wrench in the lens + check.
+  // 17 — Installer proof: camera with a wrench in the lens + check.
   installProof: (
     <>
       <path d="M3.4 8.8a1.6 1.6 0 0 1 1.6-1.6h1.6l1.1-1.7h4.8l1.1 1.7h1.6A1.6 1.6 0 0 1 18.4 8.8v6.8a1.6 1.6 0 0 1-1.6 1.6H5A1.6 1.6 0 0 1 3.4 15.6z" />
-      <path d="M13.2 11.6a2.6 2.6 0 1 1-4.3-2" />
-      <path d="M13.7 9.2a2.6 2.6 0 0 0-1.2-.7l1.2-1.2 1.5 1.5-1.2 1.2a2.6 2.6 0 0 0-.3-.8z" />
-      <Check cx={18.4} cy={18} r={3.3} />
+      <circle cx="10.9" cy="11.8" r="3" />
+      <path d="M12.3 9.9a1.7 1.7 0 0 0-2.1 2.1l-1.5 1.5a.7.7 0 0 0 0 1l.4.4a.7.7 0 0 0 1 0l1.5-1.5a1.7 1.7 0 0 0 2.1-2.1l-1 1-.9-.2-.2-.9z" />
+      <Check cx={18.4} cy={18} r={3.1} />
     </>
   ),
   // 18 — Foreman approval: clipboard + person + checklist/signature + check.
@@ -232,16 +235,16 @@ const GLYPHS: Record<LandingGlyphName, ReactNode> = {
       <Check cx={17.7} cy={17.7} r={3.5} />
     </>
   ),
-  // 19 — Publish sticker: car + windshield with a verified sticker + outbound arrow + check.
+  // 19 — Publish sticker: front car + verified sticker + outbound arrow + check.
   rightStickerOut: (
     <>
-      <path d="M3 15.4v-2.2l1.7-3.7a1.3 1.3 0 0 1 1.2-.8h8.4a1.3 1.3 0 0 1 1.2.8l1.1 2.4" />
-      <path d="M3 15.4a.95.95 0 0 0 .95.95h.5a.95.95 0 0 0 .95-.95" />
-      <path d="M5 8.8 6.3 5.9a1.3 1.3 0 0 1 1.2-.8h5.2a1.3 1.3 0 0 1 1.2.8l1.2 2.9" />
-      <rect x="8.4" y="6.7" width="3.4" height="3.4" rx=".5" />
-      <path d="M9.2 8.4l.7.7 1.3-1.4" />
-      <path d="M18.4 13.4h2.8m0 0-1.3-1.3m1.3 1.3-1.3 1.3" />
-      <Check cx={18} cy={18.2} r={3.3} />
+      <path d="M3 16.5v-3l1.2-2.4a1.2 1.2 0 0 1 1.1-.7h6a1.2 1.2 0 0 1 1.1.7l1.2 2.4v3" />
+      <path d="M3 16.5a.9.9 0 0 0 .9.9h.6a.9.9 0 0 0 .9-.9M12.6 16.5a.9.9 0 0 0 .9.9h.6a.9.9 0 0 0 .9-.9" />
+      <path d="M4.9 10.8 5.6 9h4.8l.7 1.8" />
+      <rect x="6.4" y="12" width="3" height="3" rx=".4" />
+      <path d="M7 13.5l.6.6 1.1-1.2" />
+      <path d="M15.5 8h4m0 0-1.4-1.4m1.4 1.4-1.4 1.4" />
+      <Check cx={17.8} cy={17.8} r={3} />
     </>
   ),
 };
