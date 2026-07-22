@@ -410,6 +410,25 @@ export const useGetReady = (storeId: string) => {
       .from("get_ready_records")
       .update({ accessories_to_install: nextAccessories, items })
       .eq("id", recordId);
+
+    // Self-aware addendum: when the install carries both a photo and an
+    // installer signature (a verifiable proof), record it into install_proofs
+    // so the addendum's install-proof regime marks THIS product Installed and
+    // every other product Optional. No-op without both (never over-claims).
+    const merged = nextAccessories.find(a => a.productId === productId);
+    const photoPath = merged?.install_photos?.[0] || null;
+    const sigData = merged?.installer_signature_data || null;
+    if (photoPath && sigData) {
+      await (supabase as any).rpc("record_getready_install_proof", {
+        _record_id: recordId,
+        _product_id: productId,
+        _product_name: acc.productName,
+        _photo_path: photoPath,
+        _signature_data: sigData,
+        _signature_type: merged?.installer_signature_type || "draw",
+        _installer_name: installedBy,
+      }).then(() => undefined, () => undefined);
+    }
     await load();
   };
 
