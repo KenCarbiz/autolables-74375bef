@@ -7,7 +7,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useEntitlements } from "@/hooks/useEntitlements";
 import { hasDealerCapability } from "@/lib/permissions/dealerRoleCapabilities";
 import { toast } from "sonner";
-import { CheckCircle2, MinusCircle, Loader2, RefreshCw, QrCode, AlertTriangle, ShieldCheck, X, Printer, Send, Wrench } from "lucide-react";
+import { CheckCircle2, MinusCircle, Loader2, RefreshCw, QrCode, AlertTriangle, ShieldCheck, X, Printer, Send, Wrench, FolderCheck } from "lucide-react";
 import NextStepBanner from "@/components/workflow/NextStepBanner";
 
 // /ready-board — the used-car manager's daily cockpit. Every car and where it
@@ -19,6 +19,7 @@ import NextStepBanner from "@/components/workflow/NextStepBanner";
 interface Row {
   id: string; vin: string; ymm: string | null; condition: string | null; status: string | null;
   recall_check: { do_not_drive?: boolean; checked_at?: string } | null; orchestrated_at: string | null;
+  deal_processed_at: string | null;
 }
 const isUsed = (c: string | null) => ["used", "cpo", "certified"].includes(String(c || "used").toLowerCase());
 
@@ -55,7 +56,7 @@ export default function ReadyBoard() {
     if (!tenantId) return;
     setLoading(true);
     const [list, si, ds, ps, rr, re, prof] = await Promise.all([
-      (supabase as any).from("vehicle_listings").select("id, vin, ymm, condition, status, recall_check, orchestrated_at").eq("tenant_id", tenantId).limit(500),
+      (supabase as any).from("vehicle_listings").select("id, vin, ymm, condition, status, recall_check, orchestrated_at, deal_processed_at").eq("tenant_id", tenantId).limit(500),
       (supabase as any).from("safety_inspections").select("vin").eq("tenant_id", tenantId).eq("status", "signed"),
       (supabase as any).from("detail_signoffs").select("vin").eq("tenant_id", tenantId).eq("status", "signed"),
       (supabase as any).from("prep_sign_offs").select("vin").eq("tenant_id", tenantId).eq("listing_unlocked", true),
@@ -319,6 +320,11 @@ export default function ReadyBoard() {
                           <button onClick={() => acceptAndDispatch(r)} disabled={accepting === r.vin} title="Accept addendum & send Get-Ready" className="h-7 px-2 rounded-md bg-emerald-600 text-white text-[11px] font-semibold inline-flex items-center gap-1 hover:bg-emerald-700 disabled:opacity-50">
                             {accepting === r.vin ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <CheckCircle2 className="w-3.5 h-3.5" />} Accept
                           </button>
+                        )}
+                        {bucketOf(r) === "ready" && (
+                          r.deal_processed_at
+                            ? <span title={`Deal filed ${new Date(r.deal_processed_at).toLocaleDateString()}`} className="inline-flex items-center gap-1 text-emerald-700 text-[11px] font-semibold px-1.5"><CheckCircle2 className="w-3.5 h-3.5" /> Filed</span>
+                            : <button onClick={() => navigate(`/vehicle-file/${r.id}?tab=deal`)} title="Open the deal record to process this deal" className="h-7 px-2 rounded-md bg-primary text-primary-foreground text-[11px] font-semibold inline-flex items-center gap-1 hover:opacity-90"><FolderCheck className="w-3.5 h-3.5" /> Deal</button>
                         )}
                         {service.has(r.vin) && <button onClick={() => navigate(`/k208/${r.vin}`)} title="Print K-208" className="h-7 px-2 rounded-md border border-border text-[11px] font-semibold inline-flex items-center gap-1 hover:bg-muted"><ShieldCheck className="w-3.5 h-3.5" /></button>}
                         <button onClick={() => printSticker(r)} title="Print window sticker" className="h-7 px-2 rounded-md border border-border text-[11px] font-semibold inline-flex items-center gap-1 hover:bg-muted"><Printer className="w-3.5 h-3.5" /></button>

@@ -12,7 +12,7 @@ import {
   FileUp, Upload, Printer, Sparkles, Plus, ArrowUpRight,
   AlertTriangle, ShieldCheck, Lock, Unlock, Send, MessageSquare,
   Link as LinkIcon, X, QrCode, Trash2, Save, ShieldAlert, UserRound, Users,
-  ChevronRight, CircleAlert, Activity, RefreshCw, Loader2,
+  ChevronRight, CircleAlert, Activity, RefreshCw, Loader2, FolderCheck,
 } from "lucide-react";
 import { formatPhone, composeName } from "@/components/addendum/CustomerInfoSection";
 import EmptyState from "@/components/ui/empty-state";
@@ -28,6 +28,7 @@ import { hasDealerCapability } from "@/lib/permissions/dealerRoleCapabilities";
 import { resolveOperatingState } from "@/lib/dealerState";
 import { QRCodeSVG } from "qrcode.react";
 import GeneratedDocumentsSection from "@/components/vehicle/GeneratedDocumentsSection";
+import DealRecordPanel from "@/components/vehicle/DealRecordPanel";
 import { useStickerCatalog } from "@/lib/stickerStudio/useStickerCatalog";
 import { useStickerPrefs } from "@/lib/stickerStudio/useStickerPrefs";
 import {
@@ -51,7 +52,7 @@ import ShopperActivityDrawer from "@/components/vehicle/ShopperActivityDrawer";
 // child artifact refers to it by id.
 // ──────────────────────────────────────────────────────────────
 
-type TabId = "overview" | "documents" | "scan" | "customer" | "addendum" | "prep" | "labels" | "sign" | "evidence";
+type TabId = "overview" | "deal" | "documents" | "scan" | "customer" | "addendum" | "prep" | "labels" | "sign" | "evidence";
 
 interface PersonInfo {
   first_name?: string; middle_initial?: string; last_name?: string; suffix?: string;
@@ -132,7 +133,7 @@ const normalizeRecalls = (p: { recalls?: RecallItem[]; campaigns?: Record<string
   return [];
 };
 
-const VALID_TABS: TabId[] = ["overview", "documents", "scan", "customer", "addendum", "prep", "labels", "sign", "evidence"];
+const VALID_TABS: TabId[] = ["overview", "deal", "documents", "scan", "customer", "addendum", "prep", "labels", "sign", "evidence"];
 
 interface ReadyCheck { ok: boolean; label: string; when: string | null; blocks?: boolean }
 
@@ -349,6 +350,7 @@ const VehicleFile = () => {
 
   const tabs: { id: TabId; label: string; icon: typeof Car; count?: number }[] = [
     { id: "overview",  label: "Overview",  icon: Car },
+    { id: "deal",      label: "Deal Record", icon: FolderCheck },
     { id: "documents", label: "Documents", icon: FileUp, count: vehicle.documents?.length || undefined },
     { id: "scan",      label: "Scan Info", icon: QrCode },
     { id: "customer",  label: "Customer",  icon: UserRound },
@@ -576,6 +578,7 @@ const VehicleFile = () => {
       {/* Panels */}
       <div className="pt-2">
         {tab === "overview"  && <OverviewPanel vehicle={vehicle} onTab={setTab} recall={recall} />}
+        {tab === "deal"      && <DealRecordPanel vehicle={vehicle} />}
         {tab === "documents" && <DocumentsPanel vehicle={vehicle} onReload={load} />}
         {tab === "scan"      && <ScanInfoPanel vehicle={vehicle} onReload={load} />}
         {tab === "customer"  && <CustomerPanel vehicle={vehicle} />}
