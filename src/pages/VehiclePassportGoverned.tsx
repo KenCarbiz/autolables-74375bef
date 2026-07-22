@@ -151,17 +151,46 @@ const V_STATUS_ICON: Record<VerificationStatus, { color: string; bg: string; Ico
   unavailable: { color: "#94A3B8", bg: "#F8FAFC", Icon: CircleMinus },
 };
 
+// Loading placeholder (NOT the locked passport design) — mirrors the served
+// layout at each breakpoint so the load-in doesn't flash a narrow mobile strip
+// on desktop: single column on mobile, hero + sticky action rail + module row
+// on desktop.
 function Skeleton() {
   return (
     <div className="min-h-screen" style={{ background: BG }}>
       <div className="h-14 border-b bg-white" style={{ borderColor: BORDER }} />
-      <div className="max-w-md mx-auto p-4 space-y-4 animate-pulse">
+      {/* Mobile */}
+      <div className="lg:hidden max-w-md mx-auto p-4 space-y-4 animate-pulse">
         <div className="aspect-[4/3] rounded-2xl bg-slate-200" />
         <div className="h-6 w-3/4 rounded bg-slate-200" />
         <div className="h-4 w-1/2 rounded bg-slate-200" />
         <div className="h-24 rounded-2xl bg-slate-200" />
         <div className="h-32 rounded-2xl bg-slate-200" />
         <div className="h-24 rounded-2xl bg-slate-200" />
+      </div>
+      {/* Desktop */}
+      <div className="hidden lg:block max-w-6xl mx-auto px-6 py-6 animate-pulse">
+        <div className="grid grid-cols-[1fr_360px] gap-6 items-start">
+          <div className="space-y-4">
+            <div className="aspect-[16/10] rounded-2xl bg-slate-200" />
+            <div className="h-7 w-2/3 rounded bg-slate-200" />
+            <div className="h-4 w-1/3 rounded bg-slate-200" />
+            <div className="grid grid-cols-2 gap-4">
+              <div className="h-40 rounded-2xl bg-slate-200" />
+              <div className="h-40 rounded-2xl bg-slate-200" />
+            </div>
+            <div className="h-56 rounded-2xl bg-slate-200" />
+          </div>
+          <div className="space-y-4">
+            <div className="h-72 rounded-2xl bg-slate-200" />
+            <div className="h-40 rounded-2xl bg-slate-200" />
+          </div>
+        </div>
+        <div className="grid grid-cols-3 gap-4 mt-6">
+          <div className="h-48 rounded-2xl bg-slate-200" />
+          <div className="h-48 rounded-2xl bg-slate-200" />
+          <div className="h-48 rounded-2xl bg-slate-200" />
+        </div>
       </div>
     </div>
   );

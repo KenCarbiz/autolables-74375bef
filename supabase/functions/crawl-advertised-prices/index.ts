@@ -14,10 +14,15 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 //
 // Best-effort: extraction is heuristic (schema.org JSON-LD →
 // regex fallback for $X,XXX patterns). A failed crawl writes
-// nothing — the dealer still sees the prior snapshot. Errors
-// land on the audit_log via action='advertised_price_crawl_error'
-// so an admin can debug a dealer's specific source URL without
-// blocking the rest of the batch.
+// nothing — the dealer still sees the prior snapshot. Two audit
+// actions keep real problems separate from benign outcomes:
+//   • action='advertised_price_crawl_error'   — a genuine failure
+//     (URL blocked, no price extracted, insert failed, exception).
+//   • action='advertised_price_crawl_skipped' — an expected, benign
+//     skip where the prior good snapshot is preserved (bot wall,
+//     VIN mismatch, "call for price" gate, above-feed mis-parse).
+// This mirrors the `failed` vs `skipped` counters so an admin isn't
+// alarmed by skips that aren't errors.
 //
 // Contract:
 //   POST /functions/v1/crawl-advertised-prices
@@ -987,7 +992,7 @@ serve(async (req) => {
       if (result.reason === "bot_challenge" && result.price == null) {
         skipped++;
         await admin.from("audit_log").insert({
-          action: "advertised_price_crawl_error", entity_type: "advertised_price",
+          action: "advertised_price_crawl_skipped", entity_type: "advertised_price",
           entity_id: row.vin, store_id: row.tenant_id,
           details: { vin: row.vin, url: row.source_url, fetch_url: fetchUrl, http_status: cheapStatus, reason: "bot_challenge", rendered: !!renderSource, render_status: renderStatus, render_error: renderError },
         }).then(() => undefined, () => undefined);
@@ -998,7 +1003,7 @@ serve(async (req) => {
       if (result.reason === "vin_mismatch" || result.gated) {
         skipped++;
         await admin.from("audit_log").insert({
-          action: "advertised_price_crawl_error",
+          action: "advertised_price_crawl_skipped",
           entity_type: "advertised_price",
           entity_id: row.vin,
           store_id: row.tenant_id,
@@ -1056,7 +1061,7 @@ serve(async (req) => {
             price_last_verified_at: new Date().toISOString(),
           }).eq("tenant_id", row.tenant_id).eq("vin", row.vin);
           await admin.from("audit_log").insert({
-            action: "advertised_price_crawl_error", entity_type: "advertised_price",
+            action: "advertised_price_crawl_skipped", entity_type: "advertised_price",
             entity_id: row.vin, store_id: row.tenant_id,
             details: { vin: row.vin, reason: "advertised_above_feed", scraped: bd.advertised_price_before_doc, feed: feedPrice, url: fetchUrl },
           }).then(() => undefined, () => undefined);
