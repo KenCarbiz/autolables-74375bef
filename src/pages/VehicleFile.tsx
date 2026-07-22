@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useNavigate, useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -12,7 +12,7 @@ import {
   FileUp, Upload, Printer, Sparkles, Plus, ArrowUpRight,
   AlertTriangle, ShieldCheck, Lock, Unlock, Send, MessageSquare,
   Link as LinkIcon, X, QrCode, Trash2, Save, ShieldAlert, UserRound, Users,
-  ChevronRight, CircleAlert, Activity, RefreshCw,
+  ChevronRight, CircleAlert, Activity, RefreshCw, Loader2,
 } from "lucide-react";
 import { formatPhone, composeName } from "@/components/addendum/CustomerInfoSection";
 import EmptyState from "@/components/ui/empty-state";
@@ -24,6 +24,7 @@ import { PACKET_MODULES, packetVisible } from "@/lib/packetModules";
 import { assessListingDecodeHealth, HEALTH_TONE, type DataHealthReport } from "@/lib/vehicleData/dataContract";
 import type { VehicleListing, TitleVerification } from "@/hooks/useVehicleListing";
 import { useEntitlements } from "@/hooks/useEntitlements";
+import { hasDealerCapability } from "@/lib/permissions/dealerRoleCapabilities";
 import { resolveOperatingState } from "@/lib/dealerState";
 import { QRCodeSVG } from "qrcode.react";
 import GeneratedDocumentsSection from "@/components/vehicle/GeneratedDocumentsSection";
@@ -1366,6 +1367,8 @@ interface AddendumRow {
   signed_at: string | null;
   token: string | null;
   total_price: number | null;
+  accepted_at: string | null;
+  getready_dispatched_at: string | null;
 }
 
 // Scan Info — staff edit the three customer-facing fields shown on the public
@@ -1874,31 +1877,72 @@ const CustomerPanel = ({ vehicle }: { vehicle: VehicleRow }) => {
 
 const AddendumPanel = ({ vehicle }: { vehicle: VehicleRow }) => {
   const navigate = useNavigate();
+  const { isAdmin } = useAuth();
+  const { member } = useEntitlements();
+  // A used_car_manager / sales_manager (who holds can_approve_print) accepts the
+  // draft; sales staff only build and copy the link. Platform admins pass too.
+  const canAccept = hasDealerCapability(member?.role, "can_approve_print", isAdmin);
   const [rows, setRows] = useState<AddendumRow[]>([]);
   const [loading, setLoading] = useState(true);
+  const [accepting, setAccepting] = useState<string | null>(null);
 
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      setLoading(true);
-      const { data } = await (supabase as any)
-        .from("addendums")
-        .select(
-          "id,created_at,status,customer_name,cobuyer_name,content_hash,signed_at,token,total_price"
-        )
+  const load = useCallback(async () => {
+    setLoading(true);
+    const base = "id,created_at,status,customer_name,cobuyer_name,content_hash,signed_at,token,total_price";
+    // Resilient select: the acceptance columns may not be applied yet in a given
+    // environment; fall back to the base column set rather than erroring to [].
+    let data: AddendumRow[] | null = null;
+    const withAccept = await (supabase as any)
+      .from("addendums")
+      .select(`${base},accepted_at,getready_dispatched_at`)
+      .eq("vehicle_vin", vehicle.vin)
+      .order("created_at", { ascending: false })
+      .limit(50);
+    if (withAccept.error) {
+      const basic = await (supabase as any)
+        .from("addendums").select(base)
         .eq("vehicle_vin", vehicle.vin)
-        .order("created_at", { ascending: false })
-        .limit(50);
-      if (!cancelled) {
-        setRows((data || []) as AddendumRow[]);
-        setLoading(false);
-      }
-    })();
-    return () => { cancelled = true; };
+        .order("created_at", { ascending: false }).limit(50);
+      data = (basic.data || []) as AddendumRow[];
+    } else {
+      data = (withAccept.data || []) as AddendumRow[];
+    }
+    setRows(data);
+    setLoading(false);
   }, [vehicle.vin]);
+
+  useEffect(() => { load(); }, [load]);
 
   const signed = rows.filter((r) => r.status === "signed" || !!r.signed_at);
   const drafts = rows.filter((r) => !(r.status === "signed" || !!r.signed_at));
+
+  // Accept the draft, then dispatch the Get-Ready to the shop in the same click.
+  // Acceptance is recorded even if the shop email is not configured; the
+  // dispatch is best-effort and never blocks the acceptance.
+  const acceptAndDispatch = async (row: AddendumRow) => {
+    setAccepting(row.id);
+    try {
+      const { data, error } = await (supabase as any).rpc("accept_addendum", { _addendum_id: row.id });
+      if (error || !data?.ok) { toast.error("Couldn't accept the addendum"); return; }
+      toast.success("Addendum accepted");
+      try {
+        const res = await (supabase as any).functions.invoke("notify-getready", {
+          body: { tenant_id: data.tenant_id, vin: data.vin },
+        });
+        if (res?.data?.ok) {
+          await (supabase as any).rpc("mark_addendum_getready_dispatched", { _addendum_id: row.id });
+          toast.success("Get-Ready sent to the shop");
+        } else if (res?.data?.error === "no_recipient") {
+          toast.message("Accepted. Add a detail shop email in Settings to auto-send the Get-Ready.");
+        } else if (res?.data?.error === "no_token") {
+          toast.message("Accepted. Get-Ready link not ready yet — try Send from the Ready Board.");
+        }
+      } catch { /* dispatch is best-effort; acceptance is already recorded */ }
+      await load();
+    } finally {
+      setAccepting(null);
+    }
+  };
 
   const copyLink = async (token: string | null) => {
     if (!token) return;
@@ -1981,7 +2025,15 @@ const AddendumPanel = ({ vehicle }: { vehicle: VehicleRow }) => {
           {drafts.length > 0 && (
             <Section title={`Drafts (${drafts.length})`}>
               {drafts.map((r) => (
-                <AddendumCard key={r.id} row={r} onOpen={() => navigate(`/addendum?id=${r.id}`)} onCopyLink={copyLink} />
+                <AddendumCard
+                  key={r.id}
+                  row={r}
+                  onOpen={() => navigate(`/addendum?id=${r.id}`)}
+                  onCopyLink={copyLink}
+                  canAccept={canAccept}
+                  accepting={accepting === r.id}
+                  onAccept={() => acceptAndDispatch(r)}
+                />
               ))}
             </Section>
           )}
@@ -2004,18 +2056,25 @@ const AddendumCard = ({
   row,
   onOpen,
   onCopyLink,
+  canAccept,
+  accepting,
+  onAccept,
 }: {
   row: AddendumRow;
   onOpen: () => void;
   onCopyLink: (token: string | null) => void;
+  canAccept?: boolean;
+  accepting?: boolean;
+  onAccept?: () => void;
 }) => {
   const signed = row.status === "signed" || !!row.signed_at;
+  const accepted = !!row.accepted_at;
   return (
     <div className="rounded-xl border border-border bg-card p-4 flex items-center gap-4 hover:bg-muted/40 transition-colors">
       <div className={`w-9 h-9 rounded-md flex items-center justify-center flex-shrink-0 ${
-        signed ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"
+        signed ? "bg-emerald-100 text-emerald-700" : accepted ? "bg-blue-100 text-blue-700" : "bg-amber-100 text-amber-700"
       }`}>
-        {signed ? <CheckCircle2 className="w-4 h-4" /> : <Clock className="w-4 h-4" />}
+        {signed ? <CheckCircle2 className="w-4 h-4" /> : accepted ? <CheckCircle2 className="w-4 h-4" /> : <Clock className="w-4 h-4" />}
       </div>
       <div className="flex-1 min-w-0">
         <p className="text-body-sm font-semibold text-foreground truncate">
@@ -2027,12 +2086,33 @@ const AddendumCard = ({
           {typeof row.total_price === "number" && (
             <span className="tabular-nums">${row.total_price.toLocaleString()}</span>
           )}
+          {!signed && accepted && (
+            <span className="inline-flex items-center gap-1 text-blue-700 font-semibold">
+              <CheckCircle2 className="w-3 h-3" /> Accepted {new Date(row.accepted_at as string).toLocaleDateString()}
+            </span>
+          )}
+          {row.getready_dispatched_at && (
+            <span className="inline-flex items-center gap-1 text-emerald-700 font-semibold">
+              <Send className="w-3 h-3" /> Get-Ready sent
+            </span>
+          )}
           {row.content_hash && (
             <span className="font-mono text-[10px]">hash: {row.content_hash.slice(0, 10)}…</span>
           )}
         </div>
       </div>
       <div className="flex items-center gap-1.5">
+        {!signed && !accepted && canAccept && onAccept && (
+          <button
+            onClick={onAccept}
+            disabled={accepting}
+            className="h-8 px-2.5 rounded-md bg-emerald-600 text-white text-caption font-semibold inline-flex items-center gap-1 hover:bg-emerald-700 disabled:opacity-50"
+            title="Accept this addendum and send the Get-Ready to the shop"
+          >
+            {accepting ? <Loader2 className="w-3 h-3 animate-spin" /> : <CheckCircle2 className="w-3 h-3" />}
+            Accept &amp; send
+          </button>
+        )}
         {!signed && row.token && (
           <button
             onClick={() => onCopyLink(row.token)}
