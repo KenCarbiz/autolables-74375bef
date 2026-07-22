@@ -6329,6 +6329,10 @@ export type Database = {
         Args: { p_tenant_id: string; p_vin: string }
         Returns: string
       }
+      create_draft_safety_inspection: {
+        Args: { p_tenant_id: string; p_vin: string }
+        Returns: string
+      }
       current_tenant_id: { Args: never; Returns: string }
       decide_recon_estimate: {
         Args: {
