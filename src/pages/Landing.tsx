@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import Seo from "@/components/Seo";
 import Logo from "@/components/brand/Logo";
-import LandingIcon from "@/components/brand/LandingIcon";
+import { LandingFeatureIcon, type LandingGlyphName } from "@/components/brand/LandingFeatureIcon";
 import { QRCodeSVG } from "qrcode.react";
 import {
   ArrowRight,
@@ -98,38 +98,38 @@ const PassportDemoPhone = ({ sticky = true }: { sticky?: boolean }) => {
   );
 };
 
-// Landing icon system — final locked SVGs committed in /public (blue gradient
-// tile, white glyph, transparent canvas). Rendered bare via LandingIcon: the
-// tile is baked into the SVG, so no wrapper box or background is ever added.
+// Landing icon system — one consistent stroke-glyph family on a light-blue
+// tile, rendered by LandingFeatureIcon. Each value is a glyph name in that
+// system (repeated concepts, e.g. sign / signed proof, deliberately share one
+// glyph). Replaced the earlier glossy generated blue-tile SVGs.
 const landingIcons = {
-  ftcEnforcement: "/ftc_enforcement_gavel_shield_icon_transparent.svg",
-  advertisedPriceLiability: "/advertised_price_liability_icon_transparent.svg",
-  stateAgAudits: "/state_ag_audit_icon_transparent.svg",
-  recallExposure: "/recall_exposure_alert_icon_transparent.svg",
+  // hero feature list
+  windowStickersVehiclePassports: "qrPassport",
+  routedLead: "routedLead",
+  customerDigitalSignatures: "digitalSignature",
+  websitePriceMonitoring: "priceReconciliation",
+  ftcAlignedAddendums: "ftcAddendum",
+  tamperEvidentAuditTrail: "tamperEvident",
 
-  sellAddonsWithoutFear: "/sell_addons_without_fear_icon_transparent.svg",
-  ownYourPrice: "/own_your_price_icon_transparent.svg",
-  signedProof: "/sign_signature_icon_transparent.svg",
-  auditDefenseFile: "/audit_defense_file_icon_transparent.svg",
+  // value pillars
+  sellAddonsWithoutFear: "sellAddons",
+  ownYourPrice: "ownYourPrice",
+  signedProof: "digitalSignature",
+  auditDefenseFile: "auditDefense",
 
-  decode: "/decode_vin_scan_icon_transparent.svg",
-  stick: "/stick_label_icon_transparent.svg",
-  sign: "/sign_signature_icon_transparent.svg",
-  close: "/close_sales_intelligence_icon_transparent.svg",
+  // four verbs
+  decode: "decode",
+  stick: "stick",
+  sign: "digitalSignature",
+  close: "close",
 
-  vehicleArrives: "/vehicle_arrives_scan_icon_transparent.svg",
-  getReadyQueues: "/get_ready_queue_icon_transparent.svg",
-  installersProveWork: "/verified_camera_icon_transparent.svg",
-  foremanSignsOff: "/foreman_signoff_icon_transparent.svg",
-  rightStickerGoesOut: "/right_sticker_goes_out_icon_transparent.svg",
-
-  websitePriceMonitoring: "/website_price_monitoring_icon_transparent.svg",
-  windowStickersVehiclePassports: "/window_stickers_vehicle_passports_icon_transparent.svg",
-  tamperEvidentAuditTrail: "/tamper_evident_audit_trail_icon_transparent.svg",
-  ftcAlignedAddendums: "/ftc_aligned_addendums_icon_transparent.svg",
-  customerDigitalSignatures: "/customer_digital_signatures_icon_transparent.svg",
-  fiftyStateDisclosureEngine: "/fifty_state_disclosure_engine_icon_transparent.svg",
-};
+  // get-ready workflow
+  vehicleArrives: "vehicleArrives",
+  getReadyQueues: "getReadyQueue",
+  installersProveWork: "installProof",
+  foremanSignsOff: "foremanSignoff",
+  rightStickerGoesOut: "rightStickerOut",
+} satisfies Record<string, LandingGlyphName>;
 
 
 const Landing = () => {
@@ -313,7 +313,7 @@ const Hero = ({ waitTo }: { waitTo: string }) => (
         <p className="mt-3 text-xs text-slate-500">Free to join · no card required · locks early-access pricing.</p>
         <div className="mt-8 grid grid-cols-1 gap-x-6 gap-y-3 sm:grid-cols-2">
           <HeroCheck iconSrc={landingIcons.windowStickersVehiclePassports} label="QR Vehicle Passport per VIN" />
-          <HeroCheck iconSrc={landingIcons.close} label="Every scan becomes a routed lead" />
+          <HeroCheck iconSrc={landingIcons.routedLead} label="Every scan becomes a routed lead" />
           <HeroCheck iconSrc={landingIcons.customerDigitalSignatures} label="Customer digital signatures" />
           <HeroCheck iconSrc={landingIcons.websitePriceMonitoring} label="Advertised-price reconciliation" />
           <HeroCheck iconSrc={landingIcons.ftcAlignedAddendums} label="FTC-aligned addendums" />
@@ -584,9 +584,9 @@ const AutoSuite = ({ waitTo }: { waitTo: string }) => (
 
 
 
-const HeroCheck = ({ iconSrc, label }: { iconSrc: string; label: string }) => (
+const HeroCheck = ({ iconSrc, label }: { iconSrc: LandingGlyphName; label: string }) => (
   <div className="flex items-center gap-3 text-sm text-slate-700">
-    <LandingIcon src={iconSrc} alt={label} className="h-14 w-14" />
+    <LandingFeatureIcon name={iconSrc} variant="hero" />
     <span className="font-medium">{label}</span>
   </div>
 );
@@ -1695,7 +1695,7 @@ const TakeThePowerBack = ({ waitTo }: { waitTo: string }) => (
 
       <div className="mx-auto mt-5 grid max-w-5xl gap-5 sm:grid-cols-2">
         <div className="flex items-center gap-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-          <LandingIcon src={landingIcons.signedProof} alt="Signed proof" className="h-10 w-10" />
+          <LandingFeatureIcon name={landingIcons.signedProof} variant="card" />
           <div>
             <p className="font-barlow-condensed text-lg font-bold text-slate-900">Signed proof</p>
             <p className="mt-0.5 text-sm leading-relaxed text-slate-600">
@@ -1704,7 +1704,7 @@ const TakeThePowerBack = ({ waitTo }: { waitTo: string }) => (
           </div>
         </div>
         <div className="flex items-center gap-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-          <LandingIcon src={landingIcons.auditDefenseFile} alt="Audit defense file" className="h-10 w-10" />
+          <LandingFeatureIcon name={landingIcons.auditDefenseFile} variant="card" />
           <div>
             <p className="font-barlow-condensed text-lg font-bold text-slate-900">Audit defense file</p>
             <p className="mt-0.5 text-sm leading-relaxed text-slate-600">
@@ -1739,7 +1739,7 @@ const PowerPillar = ({
   chips,
   punch,
 }: {
-  iconSrc: string;
+  iconSrc: LandingGlyphName;
   eyebrow: string;
   title: string;
   body: React.ReactNode;
@@ -1747,7 +1747,7 @@ const PowerPillar = ({
   punch: string;
 }) => (
   <div className="flex flex-col rounded-2xl border border-slate-200 bg-white p-8 shadow-sm">
-    <LandingIcon src={iconSrc} alt={title} />
+    <LandingFeatureIcon name={iconSrc} variant="card" />
     <p className="mt-5 text-[11px] font-bold uppercase tracking-[0.16em] text-blue-600">{eyebrow}</p>
     <h3 className="mt-1.5 font-barlow-condensed text-2xl font-extrabold tracking-normal text-slate-900">{title}</h3>
     <div className="mt-3 text-sm leading-relaxed text-slate-600">{body}</div>
@@ -2200,13 +2200,13 @@ const Card = ({
   children,
 }: {
   icon?: IconType;
-  iconSrc?: string;
+  iconSrc?: LandingGlyphName;
   title: string;
   children: React.ReactNode;
 }) => (
   <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm transition-shadow hover:shadow-md">
     {iconSrc ? (
-      <LandingIcon src={iconSrc} alt={title} />
+      <LandingFeatureIcon name={iconSrc} variant="card" />
     ) : Icon ? (
       <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-blue-50 text-[#2563EB]">
         <Icon className="h-5 w-5" />
@@ -2224,13 +2224,13 @@ const NumberedCard = ({
   body,
 }: {
   num: string;
-  iconSrc: string;
+  iconSrc: LandingGlyphName;
   title: string;
   body: string;
 }) => (
   <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm transition-shadow hover:shadow-md">
     <div className="flex items-start justify-between">
-      <LandingIcon src={iconSrc} alt={title} />
+      <LandingFeatureIcon name={iconSrc} variant="workflow" />
       <span className="font-display text-xs font-bold tabular-nums text-[#2563EB]">{num}</span>
     </div>
     <h3 className="mt-4 font-barlow-condensed text-xl font-bold tracking-normal text-slate-900">{title}</h3>
