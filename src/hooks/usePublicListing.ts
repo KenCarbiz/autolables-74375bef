@@ -50,5 +50,5 @@ export function usePublicListing(
   if (opts?.preview) {
     return { listing: opts.previewData ?? null, loading: false, notFound: !opts.previewData };
   }
-  return { listing: query.data ?? null, loading: query.isLoading, notFound: query.isError };
+  return { listing: query.data ?? null, loading: query.isLoading, notFound: !query.isLoading && (query.isError || query.data === null) };
 }
