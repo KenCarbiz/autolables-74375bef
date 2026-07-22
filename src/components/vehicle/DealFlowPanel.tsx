@@ -9,9 +9,11 @@ import { useDealRecord, dealDocStatus, type DealRecord } from "@/hooks/useDealRe
 import {
   CheckCircle2, Circle, Loader2, FileText, ShieldCheck, Wrench, BookOpen,
   Send, ArrowUpRight, Sparkles, ClipboardCheck, FolderCheck, Signature,
-  AlertTriangle, ChevronRight,
+  AlertTriangle, ChevronRight, X, BadgeCheck,
 } from "lucide-react";
 import { toast } from "sonner";
+import SignaturePad from "@/components/addendum/SignaturePad";
+import { K208_INSPECTION_RESULTS, K208_CERTIFICATION_TEXT } from "@/data/ctK208Form";
 
 // ──────────────────────────────────────────────────────────────
 // DealFlowPanel — the ONE guided deal + documents workspace.
@@ -118,6 +120,34 @@ export default function DealFlowPanel({ vehicle }: { vehicle: { id: string; vin:
   // Buyers Guide language — 16 CFR 455.5 requires the Spanish Guide when the
   // sale is conducted in Spanish. Both fill the exact official form.
   const [lang, setLang] = useState<"en" | "es">("en");
+  // K-208 licensee certification (a manager step, distinct from the technician
+  // inspection). Any manager may certify per the store's authority model.
+  const [certifyOpen, setCertifyOpen] = useState(false);
+  const [certResult, setCertResult] = useState<"A" | "B" | "C" | "">("");
+  const [certName, setCertName] = useState("");
+  const [certSig, setCertSig] = useState({ data: "", type: "draw" as "draw" | "type" });
+  const [certifying, setCertifying] = useState(false);
+
+  const certifyK208 = async () => {
+    if (!record?.k208?.id || !certResult || !certSig.data) { toast.error("Choose the A/B/C result and sign to certify."); return; }
+    setCertifying(true);
+    try {
+      const { error } = await (supabase as any).rpc("certify_safety_inspection", {
+        p_inspection_id: record.k208.id, p_result_initial: certResult,
+        p_licensee_name: certName || null, p_signature_data: certSig.data,
+      });
+      if (error) {
+        const m = String(error.message || "");
+        toast.error(/not_authorized/.test(m) ? "You aren't authorized to certify the K-208." : /not_completed/.test(m) ? "The technician must complete the inspection first." : "Couldn't certify the K-208");
+        return;
+      }
+      toast.success("K-208 certified by licensee");
+      setCertifyOpen(false); setCertResult(""); setCertName(""); setCertSig({ data: "", type: "draw" });
+      await reload();
+    } finally {
+      setCertifying(false);
+    }
+  };
 
   const generateForms = async (kinds?: string[]) => {
     if (!tenant?.id) return;
@@ -196,6 +226,14 @@ export default function DealFlowPanel({ vehicle }: { vehicle: { id: string; vin:
         cta: { label: "Open K-208", onClick: () => navigate(`/k208/${vehicle.vin}`), primary: true },
       };
     }
+    if (record.isUsed && record.k208 && !record.k208.certifiedAt) {
+      return {
+        title: "Certify the K-208 as the licensee.",
+        owner: "Manager (licensee)",
+        why: "The technician completed the inspection; an authorized manager must confirm the A/B/C result and sign the certification.",
+        cta: canProcess ? { label: "Certify K-208", onClick: () => setCertifyOpen(true), primary: true } : undefined,
+      };
+    }
     if (!s.getReady) {
       return {
         title: "Get-Ready work is not complete.",
@@ -240,6 +278,8 @@ export default function DealFlowPanel({ vehicle }: { vehicle: { id: string; vin:
 
   const s = dealDocStatus(record);
 
+  const k208Certified = !!record.k208?.certifiedAt;
+  const k208AwaitingCert = !!record.k208 && !k208Certified;
   const docCards: {
     key: string;
     label: string;
@@ -249,6 +289,7 @@ export default function DealFlowPanel({ vehicle }: { vehicle: { id: string; vin:
     official: boolean;
     meta: string;
     open?: () => void;
+    onCertify?: () => void;
     show: boolean;
   }[] = [
     {
@@ -261,10 +302,15 @@ export default function DealFlowPanel({ vehicle }: { vehicle: { id: string; vin:
     },
     {
       key: "k208", label: "CT K-208 safety inspection", icon: ShieldCheck, official: true,
-      status: record.k208 ? (record.k208.result || "Signed") : "Draft",
+      status: k208Certified ? `Certified ${record.k208!.resultInitial || ""}`.trim() : k208AwaitingCert ? "Awaiting licensee" : "Draft",
       done: s.k208,
-      meta: record.k208 ? `Signed ${fmt(record.k208.signedAt)}` : "Auto-generated at ingest · awaiting service sign-off",
+      meta: k208Certified
+        ? `Licensee certified ${fmt(record.k208!.certifiedAt)}`
+        : k208AwaitingCert
+          ? `Technician signed ${fmt(record.k208!.signedAt)} · licensee must certify`
+          : "Auto-generated at ingest · awaiting service sign-off",
       open: () => navigate(`/k208/${vehicle.vin}`),
+      onCertify: canProcess && k208AwaitingCert ? () => setCertifyOpen(true) : undefined,
       show: record.isUsed,
     },
     {
@@ -460,6 +506,15 @@ export default function DealFlowPanel({ vehicle }: { vehicle: { id: string; vin:
                 <div className="flex items-center justify-between gap-2 mt-auto">
                   <span className={`text-caption font-semibold ${c.done ? "text-emerald-700" : "text-muted-foreground"}`}>{c.status}</span>
                   <div className="flex items-center gap-1.5">
+                    {c.onCertify && (
+                      <button
+                        onClick={c.onCertify}
+                        className="h-8 px-2.5 rounded-md bg-slate-800 text-white text-caption font-semibold inline-flex items-center gap-1 hover:bg-slate-700"
+                        title="Licensee certification — review the inspection and sign the A/B/C result"
+                      >
+                        <BadgeCheck className="w-3 h-3" /> Certify
+                      </button>
+                    )}
                     {c.official && record.isUsed && (
                       <button
                         onClick={() => viewFilledForm(c.key === "k208" ? "k208" : "buyers_guide")}
@@ -482,6 +537,50 @@ export default function DealFlowPanel({ vehicle }: { vehicle: { id: string; vin:
           })}
         </div>
       </div>
+
+      {/* Licensee certification modal — the manager confirms the A/B/C result
+          and signs, distinct from the technician's inspection. */}
+      {certifyOpen && (
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/40 p-0 sm:p-4" onClick={() => !certifying && setCertifyOpen(false)}>
+          <div className="w-full sm:max-w-lg bg-card rounded-t-2xl sm:rounded-2xl border border-border shadow-xl max-h-[92vh] overflow-auto" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between p-4 border-b border-border sticky top-0 bg-card">
+              <h3 className="text-body font-semibold text-foreground inline-flex items-center gap-1.5"><BadgeCheck className="w-4 h-4 text-slate-700" /> Certify K-208 (licensee)</h3>
+              <button onClick={() => setCertifyOpen(false)} disabled={certifying} className="text-muted-foreground hover:text-foreground"><X className="w-4 h-4" /></button>
+            </div>
+            <div className="p-4 space-y-4">
+              <p className="text-caption text-muted-foreground">Review the completed inspection, then confirm the inspection result and sign as the authorized licensee.</p>
+              <div className="space-y-2">
+                {K208_INSPECTION_RESULTS.map((r) => (
+                  <button
+                    key={r.code}
+                    onClick={() => setCertResult(r.code)}
+                    className={`w-full text-left rounded-xl border p-3 flex gap-3 transition-colors ${certResult === r.code ? "border-slate-800 bg-slate-50" : "border-border hover:bg-muted"}`}
+                  >
+                    <span className={`w-7 h-7 rounded-md flex items-center justify-center font-bold shrink-0 ${certResult === r.code ? "bg-slate-800 text-white" : "bg-slate-100 text-slate-700"}`}>{r.code}</span>
+                    <span className="text-caption text-foreground leading-snug">{r.label}</span>
+                  </button>
+                ))}
+              </div>
+              <input
+                value={certName}
+                onChange={(e) => setCertName(e.target.value)}
+                placeholder="Licensee printed name"
+                className="w-full h-10 rounded-md border border-border bg-background px-3 text-sm"
+              />
+              <p className="text-[11px] text-muted-foreground leading-snug">{K208_CERTIFICATION_TEXT}</p>
+              <SignaturePad label="Licensee signature" subtitle="Sign to certify" value={certSig.data} type={certSig.type} onChange={(data, type) => setCertSig({ data, type })} />
+              <button
+                onClick={certifyK208}
+                disabled={certifying || !certResult || !certSig.data}
+                className="w-full h-11 rounded-md bg-slate-800 text-white text-sm font-semibold inline-flex items-center justify-center gap-1.5 disabled:opacity-50"
+              >
+                {certifying ? <Loader2 className="w-4 h-4 animate-spin" /> : <BadgeCheck className="w-4 h-4" />}
+                Certify inspection
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
