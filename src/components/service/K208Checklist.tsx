@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { K208_INSPECTION_CATEGORIES } from "@/data/ctK208Form";
 
 // Shared CT K-208 inspection checklist UI + helpers, used by both the no-login
@@ -36,13 +36,31 @@ interface Props {
 export default function K208Checklist({ marks, onMark, onPassAll, failureNotes, onFailureNotes, notes, onNotes, itemNotes = {}, onItemNote }: Props) {
   const answered = useMemo(() => k208Answered(marks), [marks]);
   const anyFail = Object.values(marks).some((m) => m === "fail");
+  // "Mark all passed" is a safety-inspection-wide action — a single accidental
+  // tap must never pass the whole K-208. Require an explicit second confirmation
+  // (CT DMV K-208, Section 4 Method A).
+  const [confirmingPassAll, setConfirmingPassAll] = useState(false);
 
   return (
     <div className="space-y-5">
       <div className="flex items-center justify-between gap-3">
         <p className="text-sm text-muted-foreground">{answered} of {K208_ITEMS.length} items marked</p>
-        <button onClick={onPassAll} className="h-9 px-3 rounded-md bg-emerald-600 text-white text-xs font-semibold">Pass all</button>
+        <button onClick={() => setConfirmingPassAll(true)} className="h-9 px-3 rounded-md bg-emerald-600 text-white text-xs font-semibold">Mark all passed</button>
       </div>
+
+      {confirmingPassAll && (
+        <div className="rounded-2xl border border-amber-300 bg-amber-50 p-4 space-y-3">
+          <p className="text-sm font-bold text-amber-900">Confirm full-pass inspection</p>
+          <p className="text-[13px] text-amber-800">
+            You are confirming that all {K208_ITEMS.length} K-208 inspection items were physically inspected and passed.
+            This does not certify the form until an authorized licensee reviews and signs it.
+          </p>
+          <div className="flex gap-2">
+            <button onClick={() => setConfirmingPassAll(false)} className="h-11 px-4 rounded-md border border-border bg-background text-sm font-semibold text-foreground">Cancel</button>
+            <button onClick={() => { setConfirmingPassAll(false); onPassAll(); }} className="h-11 px-4 rounded-md bg-emerald-600 text-white text-sm font-semibold">Yes — all {K208_ITEMS.length} inspected &amp; passed</button>
+          </div>
+        </div>
+      )}
 
       {K208_INSPECTION_CATEGORIES.map((cat) => (
         <div key={cat.category} className="rounded-2xl border border-border bg-card overflow-hidden">
