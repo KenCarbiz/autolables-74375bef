@@ -133,7 +133,7 @@ export default function ReadyBoard() {
       if (error || !data?.ok) { toast.error("Couldn't accept the addendum"); return; }
       toast.success("Addendum accepted");
       try {
-        const res = await (supabase as any).functions.invoke("notify-getready", { body: { tenant_id: data.tenant_id, vin: data.vin } });
+        const res = await (supabase as any).functions.invoke("notify-getready", { body: { tenant_id: data.tenant_id, vin: data.vin, depts: ["detail", "service"] } });
         if (res?.data?.ok) {
           await (supabase as any).rpc("mark_addendum_getready_dispatched", { _addendum_id: a.id });
           toast.success("Get-Ready sent to the shop");

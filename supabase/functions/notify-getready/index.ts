@@ -47,9 +47,15 @@ Deno.serve(async (req) => {
   if (pf) return pf;
   if (req.method !== "POST") return json(405, { error: "method not allowed" });
 
-  const body = await req.json().catch(() => ({})) as { tenant_id?: string; vin?: string };
+  const body = await req.json().catch(() => ({})) as { tenant_id?: string; vin?: string; depts?: string[] };
   const tenantId = body.tenant_id;
   const vin = (body.vin || "").toUpperCase().trim();
+  // Which departments to dispatch. Manager acceptance requests both
+  // (["detail","service"]); the auto-ingest path passes nothing and stays
+  // detail-only, so a scrape never pings service before a car is accepted.
+  const requestedDepts = (Array.isArray(body.depts) && body.depts.length
+    ? body.depts.map((d) => String(d).toLowerCase())
+    : ["detail"]);
   if (!tenantId || !vin) return json(400, { error: "tenant_id and vin required" });
 
   const admin = adminClient();
@@ -80,19 +86,20 @@ Deno.serve(async (req) => {
   const serviceEmails = splitEmails(settings.service_email || "");
   type Target = { dept: string; subject: string; blurb: string; recipients: string[]; instructions: string };
   const targets: Target[] = [];
-  if (detailEmails.length) targets.push({
+  if (requestedDepts.includes("detail") && detailEmails.length) targets.push({
     dept: "detail", subject: `Get-ready: ${ymm}`,
     blurb: "This vehicle is in inventory. Please complete the detail / get-ready and sign off from your phone.",
     recipients: detailEmails.slice(0, 3), instructions: (settings.detail_default_instructions || "").trim(),
   });
-  if (serviceEmails.length) targets.push({
+  if (requestedDepts.includes("service") && serviceEmails.length) targets.push({
     dept: "service", subject: `Safety inspection: ${ymm}`,
     blurb: "This vehicle needs its safety inspection (K-208) before it can be sold. Please complete and sign off from your phone.",
     recipients: serviceEmails.slice(0, 3), instructions: (settings.service_default_instructions || "").trim(),
   });
-  // Fallback: no department email configured — dispatch the detail work order
-  // to the dealership's primary email so nothing is silently dropped.
-  if (targets.length === 0) {
+  // Fallback: detail was requested but no detail email is configured — dispatch
+  // the detail work order to the dealership's primary email so nothing is
+  // silently dropped. (Only when detail is in scope.)
+  if (targets.length === 0 && requestedDepts.includes("detail")) {
     const { data: ten } = await admin.from("tenants").select("primary_email").eq("id", tenantId).maybeSingle();
     const fb = splitEmails((ten?.primary_email as string) || "");
     if (fb.length) targets.push({
