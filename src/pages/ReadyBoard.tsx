@@ -3,6 +3,9 @@ import { useNavigate } from "react-router-dom";
 import { QRCodeSVG } from "qrcode.react";
 import { supabase } from "@/integrations/supabase/client";
 import { useTenant } from "@/contexts/TenantContext";
+import { useAuth } from "@/contexts/AuthContext";
+import { useEntitlements } from "@/hooks/useEntitlements";
+import { hasDealerCapability } from "@/lib/permissions/dealerRoleCapabilities";
 import { toast } from "sonner";
 import { CheckCircle2, MinusCircle, Loader2, RefreshCw, QrCode, AlertTriangle, ShieldCheck, X, Printer, Send, Wrench } from "lucide-react";
 import NextStepBanner from "@/components/workflow/NextStepBanner";
@@ -19,8 +22,16 @@ interface Row {
 }
 const isUsed = (c: string | null) => ["used", "cpo", "certified"].includes(String(c || "used").toLowerCase());
 
+// The active draft addendum for a VIN and where it stands in the manager's
+// acceptance flow: awaiting acceptance -> accepted (Get-Ready dispatched).
+interface Addn { id: string; accepted_at: string | null; getready_dispatched_at: string | null }
+type Bucket = "acceptance" | "getready" | "ready" | "all";
+
 export default function ReadyBoard() {
   const { tenant } = useTenant();
+  const { isAdmin } = useAuth();
+  const { member } = useEntitlements();
+  const canAccept = hasDealerCapability(member?.role, "can_approve_print", isAdmin);
   const navigate = useNavigate();
   const tenantId = tenant?.id || null;
   const [rows, setRows] = useState<Row[] | null>(null);
@@ -29,10 +40,13 @@ export default function ReadyBoard() {
   const [prep, setPrep] = useState<Set<string>>(new Set());
   const [recallReview, setRecallReview] = useState<Set<string>>(new Set());
   const [reconNeeds, setReconNeeds] = useState<Set<string>>(new Set());
+  const [addMap, setAddMap] = useState<Map<string, Addn>>(new Map());
   const [requireK208, setRequireK208] = useState(false);
   const [loading, setLoading] = useState(true);
   const [todayOnly, setTodayOnly] = useState(false);
   const [sending, setSending] = useState<string | null>(null);
+  const [accepting, setAccepting] = useState<string | null>(null);
+  const [bucket, setBucket] = useState<Bucket>("acceptance");
   const [qrVin, setQrVin] = useState<string | null>(null);
   const [qrToken, setQrToken] = useState<string | null>(null);
 
@@ -55,6 +69,20 @@ export default function ReadyBoard() {
     setRecallReview(new Set(((rr.data as { vin: string }[]) || []).map((r) => r.vin)));
     setReconNeeds(new Set(((re.data as { vin: string }[]) || []).map((r) => r.vin)));
     setRequireK208(!!(prof.data?.settings as { require_safety_inspection?: boolean } | null)?.require_safety_inspection);
+
+    // Active draft addendum per VIN (newest non-signed). Resilient to the
+    // acceptance columns not yet being applied in a given environment.
+    type AddnRow = { id: string; vehicle_vin: string; status: string | null; signed_at: string | null; accepted_at: string | null; getready_dispatched_at: string | null };
+    const cols = "id, vehicle_vin, status, signed_at, accepted_at, getready_dispatched_at";
+    let add = await (supabase as any).from("addendums").select(cols).eq("tenant_id", tenantId).order("created_at", { ascending: false }).limit(1000);
+    if (add.error) add = await (supabase as any).from("addendums").select("id, vehicle_vin, status, signed_at").eq("tenant_id", tenantId).order("created_at", { ascending: false }).limit(1000);
+    const map = new Map<string, Addn>();
+    for (const a of ((add.data as AddnRow[]) || [])) {
+      if (a.status === "signed" || a.signed_at) continue;   // customer-signed -> out of the manager flow
+      if (map.has(a.vehicle_vin)) continue;                  // keep the newest draft only
+      map.set(a.vehicle_vin, { id: a.id, accepted_at: a.accepted_at ?? null, getready_dispatched_at: a.getready_dispatched_at ?? null });
+    }
+    setAddMap(map);
     setLoading(false);
   }, [tenantId]);
   useEffect(() => { load(); }, [load]);
@@ -71,6 +99,32 @@ export default function ReadyBoard() {
     else toast.error(data?.error === "no_recipient" ? "Set a detail shop email in Settings first." : "Couldn't send the get-ready.");
   };
   const printSticker = (r: Row) => navigate(`${isUsed(r.condition) ? "/used-car-sticker" : "/new-car-sticker"}?vehicleId=${r.id}`);
+
+  // Accept the vehicle's draft addendum, then dispatch the Get-Ready. Mirrors
+  // the Vehicle File action so the manager can clear the acceptance queue from
+  // either surface. Acceptance is recorded even if the shop email is unset.
+  const acceptAndDispatch = async (r: Row) => {
+    const a = addMap.get(r.vin);
+    if (!a) return;
+    setAccepting(r.vin);
+    try {
+      const { data, error } = await (supabase as any).rpc("accept_addendum", { _addendum_id: a.id });
+      if (error || !data?.ok) { toast.error("Couldn't accept the addendum"); return; }
+      toast.success("Addendum accepted");
+      try {
+        const res = await (supabase as any).functions.invoke("notify-getready", { body: { tenant_id: data.tenant_id, vin: data.vin } });
+        if (res?.data?.ok) {
+          await (supabase as any).rpc("mark_addendum_getready_dispatched", { _addendum_id: a.id });
+          toast.success("Get-Ready sent to the shop");
+        } else if (res?.data?.error === "no_recipient") {
+          toast.message("Accepted. Set a detail shop email in Settings to auto-send the Get-Ready.");
+        }
+      } catch { /* dispatch is best-effort; acceptance is already recorded */ }
+      await load();
+    } finally {
+      setAccepting(null);
+    }
+  };
 
   const recallState = (r: Row): "ok" | "dnd" | "stale" => {
     const rc = r.recall_check || {};
@@ -96,10 +150,34 @@ export default function ReadyBoard() {
     };
   }, [rows, service, isToday, reconNeeds, recallReview]);
 
+  // Which queue a vehicle sits in, from the manager's point of view:
+  //  ready       — every station done, clear to sell
+  //  getready    — addendum accepted, shop working the Get-Ready
+  //  acceptance  — a draft addendum is waiting for the manager to accept
+  //  (rows with no draft addendum only appear under "All")
+  const bucketOf = useCallback((r: Row): Bucket | null => {
+    if (isReady(r)) return "ready";
+    const a = addMap.get(r.vin);
+    if (a?.accepted_at) return "getready";
+    if (a) return "acceptance";
+    return null;
+  }, [isReady, addMap]);
+
+  const bucketCounts = useMemo(() => {
+    const c = { acceptance: 0, getready: 0, ready: 0 };
+    for (const r of rows || []) {
+      const b = bucketOf(r);
+      if (b && b !== "all") c[b] += 1;
+    }
+    return c;
+  }, [rows, bucketOf]);
+
   const visibleRows = useMemo(() => {
     if (!rows) return [];
-    return todayOnly ? rows.filter(isToday) : rows;
-  }, [rows, todayOnly, isToday]);
+    let out = todayOnly ? rows.filter(isToday) : rows;
+    if (bucket !== "all") out = out.filter((r) => bucketOf(r) === bucket);
+    return out;
+  }, [rows, todayOnly, isToday, bucket, bucketOf]);
 
   const showQr = async (vin: string) => {
     if (!tenantId) return;
@@ -130,6 +208,15 @@ export default function ReadyBoard() {
       </div>
 
       <NextStepBanner stage="ready-board" />
+
+      {/* The manager's two work queues, plus Ready and All. Waiting for
+          acceptance is the default landing view — the day's decisions first. */}
+      <div className="flex items-center gap-1.5 flex-wrap">
+        <BucketTab active={bucket === "acceptance"} onClick={() => setBucket("acceptance")} label="Waiting for acceptance" count={bucketCounts.acceptance} tone="amber" />
+        <BucketTab active={bucket === "getready"} onClick={() => setBucket("getready")} label="Waiting for Get-Ready" count={bucketCounts.getready} tone="blue" />
+        <BucketTab active={bucket === "ready"} onClick={() => setBucket("ready")} label="Ready" count={bucketCounts.ready} tone="green" />
+        <BucketTab active={bucket === "all"} onClick={() => setBucket("all")} label="All" count={rows?.length ?? 0} tone="neutral" />
+      </div>
 
       {stats && (
         <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
@@ -196,6 +283,11 @@ export default function ReadyBoard() {
                     </td>
                     <td className="py-2 pl-2">
                       <div className="flex items-center justify-end gap-1">
+                        {canAccept && bucketOf(r) === "acceptance" && (
+                          <button onClick={() => acceptAndDispatch(r)} disabled={accepting === r.vin} title="Accept addendum & send Get-Ready" className="h-7 px-2 rounded-md bg-emerald-600 text-white text-[11px] font-semibold inline-flex items-center gap-1 hover:bg-emerald-700 disabled:opacity-50">
+                            {accepting === r.vin ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <CheckCircle2 className="w-3.5 h-3.5" />} Accept
+                          </button>
+                        )}
                         {service.has(r.vin) && <button onClick={() => navigate(`/k208/${r.vin}`)} title="Print K-208" className="h-7 px-2 rounded-md border border-border text-[11px] font-semibold inline-flex items-center gap-1 hover:bg-muted"><ShieldCheck className="w-3.5 h-3.5" /></button>}
                         <button onClick={() => printSticker(r)} title="Print window sticker" className="h-7 px-2 rounded-md border border-border text-[11px] font-semibold inline-flex items-center gap-1 hover:bg-muted"><Printer className="w-3.5 h-3.5" /></button>
                         <button onClick={() => sendGetReady(r)} disabled={sending === r.vin} title="Send get-ready to detail" className="h-7 px-2 rounded-md border border-border text-[11px] font-semibold inline-flex items-center gap-1 hover:bg-muted disabled:opacity-50">{sending === r.vin ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}</button>
@@ -205,7 +297,12 @@ export default function ReadyBoard() {
                   </tr>
                 );
               })}
-              {visibleRows.length === 0 && <tr><td colSpan={8} className="py-6 text-center text-muted-foreground">{todayOnly ? "No vehicles ingested today." : "No vehicles."}</td></tr>}
+              {visibleRows.length === 0 && <tr><td colSpan={8} className="py-6 text-center text-muted-foreground">{
+                bucket === "acceptance" ? "Nothing waiting for acceptance — all caught up."
+                : bucket === "getready" ? "No vehicles are in Get-Ready right now."
+                : bucket === "ready" ? "No vehicles are fully ready yet."
+                : todayOnly ? "No vehicles ingested today." : "No vehicles."
+              }</td></tr>}
             </tbody>
           </table>
         </div>
@@ -235,6 +332,18 @@ function Cell({ on, dim }: { on: boolean; dim?: boolean }) {
   if (on) return <CheckCircle2 className="w-4 h-4 text-[#16A34A] inline" />;
   if (dim) return <span className="text-[10px] text-muted-foreground">n/a</span>;
   return <MinusCircle className="w-4 h-4 text-slate-300 inline" />;
+}
+function BucketTab({ active, onClick, label, count, tone }: { active: boolean; onClick: () => void; label: string; count: number; tone: "amber" | "blue" | "green" | "neutral" }) {
+  const activeTone = tone === "amber" ? "border-amber-500 bg-amber-50 text-amber-800"
+    : tone === "blue" ? "border-blue-500 bg-blue-50 text-blue-800"
+    : tone === "green" ? "border-emerald-500 bg-emerald-50 text-emerald-800"
+    : "border-primary bg-primary/10 text-primary";
+  return (
+    <button onClick={onClick} className={`h-9 px-3 rounded-md border text-xs font-semibold inline-flex items-center gap-1.5 ${active ? activeTone : "border-border text-foreground hover:bg-muted"}`}>
+      {label}
+      <span className={`min-w-[18px] px-1 rounded text-[10px] tabular-nums ${active ? "bg-white/70" : "bg-muted text-muted-foreground"}`}>{count}</span>
+    </button>
+  );
 }
 function Stat({ label, value, tone = "neutral" }: { label: string; value: number; tone?: "neutral" | "green" | "amber" | "red" }) {
   const color = tone === "green" ? "text-[#16A34A]" : tone === "amber" ? "text-[#EA580C]" : tone === "red" ? "text-red-600" : "text-foreground";
