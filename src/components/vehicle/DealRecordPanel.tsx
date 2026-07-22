@@ -36,8 +36,12 @@ export default function DealRecordPanel({ vehicle }: { vehicle: { id: string; vi
     setProcessing(true);
     try {
       const { data, error } = await (supabase as any).functions.invoke("process-deal", { body: { tenant_id: tenant.id, vin: vehicle.vin } });
-      if (error || !data?.ok) { toast.error("Couldn't process the deal"); return; }
-      if (data.emailed) toast.success("Deal filed and emailed to the office");
+      if (error || !data?.ok) {
+        toast.error(data?.error === "not_ready" ? "Finish the required documents before filing." : "Couldn't process the deal");
+        return;
+      }
+      if (data.already_processed) toast.message("This deal was already filed.");
+      else if (data.emailed) toast.success("Deal filed and emailed to the office");
       else if (data.error === "no_recipient") toast.message("Deal filed. Add a deal-desk or office email in Settings to auto-send it.");
       else toast.success("Deal filed");
       await reload();

@@ -25,17 +25,15 @@ const MANAGER_ROLES = new Set([
 ]);
 
 // deno-lint-ignore no-explicit-any
-async function isManagerMember(admin: any, req: Request, tenantId: string): Promise<boolean> {
-  const jwt = (req.headers.get("Authorization") || "").replace(/^Bearer\s+/i, "");
-  if (!jwt) return false;
-  const { data: u } = await admin.auth.getUser(jwt);
-  const uid = u?.user?.id;
+async function isManagerMember(admin: any, uid: string, tenantId: string): Promise<boolean> {
   if (!uid) return false;
   const { data: pa } = await admin.from("user_roles").select("role").eq("user_id", uid).eq("role", "admin").maybeSingle();
   if (pa) return true;
   const { data: m } = await admin.from("tenant_members")
     .select("role").eq("tenant_id", tenantId).eq("user_id", uid).not("accepted_at", "is", null).maybeSingle();
-  return !!m && MANAGER_ROLES.has(String(m.role));
+  // Lowercase to match the client's normalized capability check — a legacy
+  // "Owner"/"Manager" row must not show an enabled button that 401s here.
+  return !!m && MANAGER_ROLES.has(String(m.role).trim().toLowerCase());
 }
 
 const yes = (b: boolean) => (b ? "&#10003;" : "&mdash;");
@@ -51,16 +49,28 @@ Deno.serve(async (req) => {
   if (!tenantId || !vin) return json(400, { error: "tenant_id and vin required" });
 
   const admin = adminClient();
-  if (!isServiceOrCron(req) && !(await isManagerMember(admin, req, tenantId))) {
-    return json(401, { error: "unauthorized" });
+  // Resolve the acting user (null for service/cron callers) so we can record
+  // who filed the deal, then gate on manager membership.
+  let actorId: string | null = null;
+  if (!isServiceOrCron(req)) {
+    const jwt = (req.headers.get("Authorization") || "").replace(/^Bearer\s+/i, "");
+    if (!jwt) return json(401, { error: "unauthorized" });
+    const { data: u } = await admin.auth.getUser(jwt);
+    actorId = u?.user?.id ?? null;
+    if (!actorId || !(await isManagerMember(admin, actorId, tenantId))) {
+      return json(401, { error: "unauthorized" });
+    }
   }
 
   // Vehicle + the four source documents, assembled by tenant_id + vin.
   const { data: listing } = await admin.from("vehicle_listings")
-    .select("id, ymm, condition, price").eq("tenant_id", tenantId).eq("vin", vin).maybeSingle();
+    .select("id, ymm, condition, price, deal_processed_at").eq("tenant_id", tenantId).eq("vin", vin).maybeSingle();
   if (!listing?.id) return json(404, { error: "vehicle not found" });
   const listingId = listing.id as string;
   const ymm = (listing.ymm as string) || "Vehicle";
+
+  // Idempotent: already filed → no re-stamp, no duplicate email.
+  if (listing.deal_processed_at) return json(200, { ok: true, emailed: false, already_processed: true });
 
   const [add, k208, gr, detail, bg] = await Promise.all([
     admin.from("addendums").select("id, accepted_at, selling_price, status, signed_at")
@@ -84,6 +94,11 @@ Deno.serve(async (req) => {
   const hasBuyersGuide = !!bg.data?.id && ["approved", "printed", "published"].includes(bgStatus);
   const isUsed = ["used", "cpo", "certified"].includes(String(listing.condition || "used").toLowerCase());
 
+  // Server floor: a deal can't be filed without the accepted addendum (the
+  // document the customer signs). The panel enforces full completeness; this
+  // guards any direct/stale call.
+  if (!hasAddendum) return json(200, { ok: false, error: "not_ready" });
+
   // Recipients: deal desk → office/title clerk → dealership primary email.
   const { data: prof } = await admin.from("dealer_profiles").select("settings").eq("tenant_id", tenantId).maybeSingle();
   const settings = (prof?.settings || {}) as Record<string, string>;
@@ -97,11 +112,11 @@ Deno.serve(async (req) => {
   // Always stamp the deal as processed (the office may pick it up in-app even if
   // no email is configured); the email is best-effort.
   await admin.from("vehicle_listings")
-    .update({ deal_processed_at: new Date().toISOString() })
+    .update({ deal_processed_at: new Date().toISOString(), deal_processed_by: actorId })
     .eq("tenant_id", tenantId).eq("id", listingId);
   try {
     await admin.from("audit_log").insert({
-      action: "deal_processed", entity_type: "vehicle", entity_id: vin, store_id: tenantId,
+      action: "deal_processed", entity_type: "vehicle", entity_id: vin, store_id: tenantId, user_id: actorId,
       details: { addendum: hasAddendum, k208: hasK208, get_ready: hasGetReady, buyers_guide: hasBuyersGuide, recipients: recipients.length },
     });
   } catch { /* best-effort */ }
