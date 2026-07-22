@@ -6,6 +6,8 @@ import { useVehicleQrScans } from "@/lib/stickerStudio/useQrAnalytics";
 import { useVehicleStaleFlags } from "@/lib/stickerStudio/useStaleFlags";
 import { reconcileVehicleStale } from "@/lib/stickerStudio/staleDetection";
 import { useTenant } from "@/contexts/TenantContext";
+import { useEntitlements } from "@/hooks/useEntitlements";
+import { hasDealerCapability } from "@/lib/permissions/dealerRoleCapabilities";
 import { AlertTriangle } from "lucide-react";
 import {
   transitionDocument, STATUS_META, allowedActions,
@@ -44,7 +46,11 @@ const ACTION_META: Record<DocumentAction, { label: string; icon: typeof Check }>
 
 export default function GeneratedDocumentsSection({ vehicleId }: { vehicleId: string }) {
   const { user, isAdmin } = useAuth();
-  const manager = isAdmin; // managers/admins approve, publish, override; sales generate + submit + print
+  const { member } = useEntitlements();
+  // Managers/admins approve, publish, override; sales generate + submit + print.
+  // Gate on the dealer capability, not the platform-admin flag, so a tenant
+  // used_car_manager / sales_manager (who holds can_approve_print) can verify.
+  const manager = hasDealerCapability(member?.role, "can_approve_print", isAdmin);
   const rules = useDealerDocumentRules();
   const { documents, loading, available, reload } = useVehicleDocuments(vehicleId);
   const scans = useVehicleQrScans(vehicleId);
