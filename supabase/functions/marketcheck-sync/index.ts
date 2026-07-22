@@ -150,6 +150,16 @@ async function autoPreload(admin: any, supabaseUrl: string, serviceKey: string, 
     await admin.rpc("create_draft_safety_inspection", { p_tenant_id: tenantId, p_vin: vin });
   } catch { /* k208 preload best-effort */ }
   try {
+    // Fill the official FTC Buyers Guide + K-208 PDFs from the drafted data.
+    // Fire-and-forget; runs after the drafts above so the warranty box is set.
+    fetch(`${supabaseUrl}/functions/v1/generate-vehicle-forms`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${serviceKey}` },
+      body: JSON.stringify({ tenant_id: tenantId, vin }),
+      signal: AbortSignal.timeout(25000),
+    }).catch(() => { /* best-effort */ });
+  } catch { /* forms preload best-effort */ }
+  try {
     // Fire-and-forget; no-op if no window-sticker API key is configured.
     fetch(`${supabaseUrl}/functions/v1/oem-window-sticker`, {
       method: "POST",

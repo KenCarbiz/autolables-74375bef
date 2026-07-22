@@ -24,6 +24,20 @@ export default function DealRecordPanel({ vehicle }: { vehicle: { id: string; vi
   const canProcess = hasDealerCapability(member?.role, "can_approve_print", isAdmin);
   const { record, loading, reload } = useDealRecord(vehicle.vin, vehicle.id, tenant?.id);
   const [processing, setProcessing] = useState(false);
+  const [genForms, setGenForms] = useState(false);
+
+  const generateForms = async () => {
+    if (!tenant?.id) return;
+    setGenForms(true);
+    try {
+      const { data, error } = await (supabase as any).functions.invoke("generate-vehicle-forms", { body: { tenant_id: tenant.id, vin: vehicle.vin } });
+      if (error || !data?.ok) { toast.error("Couldn't generate the official forms"); return; }
+      toast.success("Official FTC Buyers Guide + K-208 filled");
+      await reload();
+    } finally {
+      setGenForms(false);
+    }
+  };
 
   if (loading) return <p className="text-body-sm text-muted-foreground">Loading deal record…</p>;
   if (!record) return <p className="text-body-sm text-muted-foreground">No deal record yet for this vehicle.</p>;
@@ -64,21 +78,34 @@ export default function DealRecordPanel({ vehicle }: { vehicle: { id: string; vi
           <h2 className="text-title font-display font-semibold text-foreground">Deal record</h2>
           <p className="text-body-sm text-muted-foreground">Every document for this sale, assembled by VIN<span className="font-mono ml-1">{vehicle.vin}</span>.</p>
         </div>
-        {processed ? (
-          <span className="inline-flex items-center gap-1.5 h-10 px-4 rounded-md bg-emerald-50 text-emerald-700 text-sm font-semibold border border-emerald-200">
-            <CheckCircle2 className="w-4 h-4" /> Filed {fmt(record.processedAt)}
-          </span>
-        ) : canProcess ? (
-          <button
-            onClick={process}
-            disabled={processing || !s.complete}
-            title={s.complete ? "Email the office the deal record and file it" : "All required documents must be complete first"}
-            className="h-10 px-4 rounded-md bg-primary text-primary-foreground text-sm font-semibold inline-flex items-center gap-1.5 disabled:opacity-50"
-          >
-            {processing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
-            Process this deal
-          </button>
-        ) : null}
+        <div className="flex items-center gap-2 flex-wrap">
+          {canProcess && (
+            <button
+              onClick={generateForms}
+              disabled={genForms}
+              title="Fill the official FTC Buyers Guide + CT K-208 PDFs from this vehicle's data"
+              className="h-10 px-4 rounded-md border border-border text-sm font-semibold inline-flex items-center gap-1.5 hover:bg-muted disabled:opacity-50"
+            >
+              {genForms ? <Loader2 className="w-4 h-4 animate-spin" /> : <FileText className="w-4 h-4" />}
+              Generate official forms
+            </button>
+          )}
+          {processed ? (
+            <span className="inline-flex items-center gap-1.5 h-10 px-4 rounded-md bg-emerald-50 text-emerald-700 text-sm font-semibold border border-emerald-200">
+              <CheckCircle2 className="w-4 h-4" /> Filed {fmt(record.processedAt)}
+            </span>
+          ) : canProcess ? (
+            <button
+              onClick={process}
+              disabled={processing || !s.complete}
+              title={s.complete ? "Email the office the deal record and file it" : "All required documents must be complete first"}
+              className="h-10 px-4 rounded-md bg-primary text-primary-foreground text-sm font-semibold inline-flex items-center gap-1.5 disabled:opacity-50"
+            >
+              {processing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+              Process this deal
+            </button>
+          ) : null}
+        </div>
       </div>
 
       {!processed && !s.complete && (
