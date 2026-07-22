@@ -1,4 +1,4 @@
-import { PDFDocument } from "https://esm.sh/pdf-lib@1.17.1";
+import { PDFDocument, StandardFonts, rgb } from "https://esm.sh/pdf-lib@1.17.1";
 import { json, preflight } from "../_shared/http.ts";
 import { adminClient, isServiceOrCron } from "../_shared/supabase.ts";
 
@@ -7,10 +7,12 @@ import { adminClient, isServiceOrCron } from "../_shared/supabase.ts";
 // vehicle from real data, using pdf-lib against the AcroForm templates in
 // /public/forms, and files the results.
 //
-//   FTC Buyers Guide (16 CFR 455): fills the English AcroForm and keeps the
+//   FTC Buyers Guide (16 CFR 455): fills the EXACT official form and keeps the
 //     correct 2 pages — As-Is front [p1]+back [p3], or Implied front [p2]+back
 //     [p3] — driven by the warranty box already resolved by
-//     create_draft_buyers_guide. (Spanish overlay = follow-up.)
+//     create_draft_buyers_guide. English fills the AcroForm; Spanish (16 CFR
+//     455.5, sale conducted in Spanish) overlays the flat government artwork at
+//     measured coordinates. Four exact variants: EN/ES × As-Is/Implied.
 //   CT K-208: fills the header AcroForm (year/make/model/body/VIN×17/mileage +
 //     dealer name/phone/address/town/state/zip/principal/license). The pass/fail
 //     grid + signatures are overlaid in a later pass once the inspection signs.
@@ -112,6 +114,55 @@ async function fillFtc(box: string, pct: number, days: number, miles: number, v:
   return await pdf.save();
 }
 
+// The official Spanish Buyers Guide (16 CFR 455 App. B) is a FLAT PDF — no
+// AcroForm — so it is filled by overlaying text onto the exact government
+// artwork at measured coordinates (validated against the rendered form). Only
+// the blanks are drawn; the form itself is never altered. Pages: 0 As-Is front,
+// 1 Implied front, 2 back. Coordinates are PDF points, origin bottom-left.
+async function fillFtcEs(box: string, pct: number, days: number, miles: number, v: Vehicle, d: Dealer): Promise<Uint8Array> {
+  const pdf = await PDFDocument.load(await loadTemplate("ftc-buyers-guide-es.pdf"));
+  const font = await pdf.embedFont(StandardFonts.Helvetica);
+  const bold = await pdf.embedFont(StandardFonts.HelveticaBold);
+  const black = rgb(0, 0, 0);
+  const implied = box === "implied";
+  const pages = pdf.getPages();
+  const front = pages[implied ? 1 : 0];
+  const back = pages[2];
+  // deno-lint-ignore no-explicit-any
+  const draw = (pg: any, s: string, x: number, y: number, size = 10, f = font) => {
+    if (s) pg.drawText(String(s), { x, y, size, font: f, color: black });
+  };
+  // Header — value sits on the blank line above each label.
+  draw(front, v.make, 84, 643);
+  draw(front, v.model, 206, 643);
+  draw(front, v.year, 296, 643);
+  draw(front, v.vin, 386, 643);
+  if (box === "warranty") {
+    // Dealer warranty (statutory states, Spanish sale): mark GARANTÍA DEL
+    // CONCESIONARIO + GARANTÍA LIMITADA, the labor/parts % inline blanks, the
+    // covered systems, and the term.
+    draw(front, "X", 93, 491, 15, bold);
+    draw(front, "X", 97, 456, 10, bold);
+    draw(front, String(pct || 100), 315, 458);
+    draw(front, String(pct || 100), 449, 458);
+    const term = days ? `${days} días${miles ? ` o ${miles.toLocaleString("en-US")} millas` : ""}, lo que ocurra primero` : "";
+    draw(front, term, 315, 384, 8);
+    ["Motor", "Transmisión", "Dirección", "Frenos", "Sistema eléctrico"].forEach((sys, i) => draw(front, sys, 83, 384 - i * 11, 8));
+  } else {
+    // As-Is ("COMO ESTÁ") or Implied ("SOLO GARANTÍAS IMPLÍCITAS") top box.
+    draw(front, "X", 93, 577, 15, bold);
+  }
+  // Back — dealer identity + complaint contact, on the blanks above each label.
+  draw(back, d.name, 86, 218);
+  draw(back, [d.address, [d.city, d.state, d.zip].filter(Boolean).join(", ")].filter(Boolean).join(" · "), 86, 193);
+  draw(back, d.phone, 86, 168);
+  draw(back, d.email, 312, 168);
+  draw(back, [d.principal || d.name, d.phone].filter(Boolean).join(", "), 86, 143);
+  // Keep only the correct front + the back.
+  pdf.removePage(implied ? 0 : 1);
+  return await pdf.save();
+}
+
 async function fillK208(v: Vehicle, d: Dealer): Promise<Uint8Array> {
   const pdf = await PDFDocument.load(await loadTemplate("k208-inspection.pdf"));
   const form = pdf.getForm();
@@ -171,7 +222,7 @@ Deno.serve(async (req) => {
   if (pf) return pf;
   if (req.method !== "POST") return json(405, { error: "method not allowed" });
 
-  const body = await req.json().catch(() => ({})) as { tenant_id?: string; vin?: string; kinds?: string[]; box?: string };
+  const body = await req.json().catch(() => ({})) as { tenant_id?: string; vin?: string; kinds?: string[]; box?: string; lang?: string };
   const tenantId = body.tenant_id;
   const vin = (body.vin || "").toUpperCase().trim();
   if (!tenantId || !vin) return json(400, { error: "tenant_id and vin required" });
@@ -179,6 +230,9 @@ Deno.serve(async (req) => {
   // Optional box override (as-is | implied | warranty) so a manual selection in
   // the Buyers Guide UI fills the matching official form variant.
   const boxOverride = ["as-is", "implied", "warranty"].includes(String(body.box)) ? String(body.box) : null;
+  // Language of the Buyers Guide — English AcroForm or the Spanish overlay.
+  // 16 CFR 455.5 requires the Spanish Guide when the sale is conducted in Spanish.
+  const lang = String(body.lang) === "es" ? "es" : "en";
 
   const admin = adminClient();
   if (!isServiceOrCron(req) && !(await isManagerMember(admin, req, tenantId))) {
@@ -215,7 +269,11 @@ Deno.serve(async (req) => {
         .eq("tenant_id", tenantId).eq("vehicle_id", listing.id).eq("document_type", "buyers_guide")
         .order("created_at", { ascending: false }).limit(1).maybeSingle();
       const snap = (bg?.data_snapshot || {}) as { box?: string; min_pct?: number; min_duration_days?: number; min_miles?: number };
-      const bytes = await fillFtc(boxOverride || snap.box || "as-is", Number(snap.min_pct) || 0, Number(snap.min_duration_days) || 0, Number(snap.min_miles) || 0, vehicle, dealer);
+      const effBox = boxOverride || snap.box || "as-is";
+      const pct = Number(snap.min_pct) || 0, dd = Number(snap.min_duration_days) || 0, mi = Number(snap.min_miles) || 0;
+      const bytes = lang === "es"
+        ? await fillFtcEs(effBox, pct, dd, mi, vehicle, dealer)
+        : await fillFtc(effBox, pct, dd, mi, vehicle, dealer);
       out.buyers_guide = await fileForm(admin, tenantId, vin, listing.id as string, "buyers_guide", bytes, vehicle.year);
     }
     if (kinds.includes("k208") && ["used", "cpo", "certified"].includes(String(listing.condition || "used").toLowerCase())) {

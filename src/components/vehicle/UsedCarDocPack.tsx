@@ -5,14 +5,14 @@ import { FileText, ScrollText, ShieldCheck, FileCheck, CheckCircle2, Circle, Che
 
 // ──────────────────────────────────────────────────────────────────────
 // UsedCarDocPack — the four compliance documents every used car needs before
-// delivery, auto-tracked for each used/cpo vehicle. Generation itself is
-// client-rendered (each "Generate" opens the right generator pre-filled with
-// THIS vehicle), but the pack is surfaced and status-tracked automatically so
-// the four docs never get missed on intake:
+// delivery, auto-tracked for each used/cpo vehicle. The two official forms
+// (FTC Buyers Guide + CT K-208) are filled and signed in ONE canonical place —
+// the Deal Flow tab — so their rows route there; the sticker + addendum open
+// their own builders:
 //   1. Used-car window sticker (Monroney)   → /used-car-sticker
 //   2. Used-car addendum / accessory sticker → /addendum
-//   3. FTC warranty window sticker (Buyers Guide) → /used-vehicle-documents
-//   4. Connecticut K-208 warranty worksheet  → /used-vehicle-documents
+//   3. FTC Buyers Guide (official form)      → Deal Flow
+//   4. CT K-208 safety inspection (official) → Deal Flow
 // ──────────────────────────────────────────────────────────────────────
 
 type DocState = "generated" | "draft" | "missing";
@@ -48,13 +48,11 @@ export const UsedCarDocPack = ({ vehicleId, vin, condition }: Props) => {
     const v = (vin || "").toUpperCase();
     // deno-lint-ignore no-explicit-any
     const sb = supabase as unknown as { from: (t: string) => any };
-    const [gen, archive, addenda] = await Promise.all([
+    const [gen, addenda] = await Promise.all([
       sb.from("generated_documents").select("document_type, document_status").eq("vehicle_id", vehicleId),
-      v ? sb.from("signed_document_archive").select("kind").eq("vin", v) : Promise.resolve({ data: [] }),
       v ? sb.from("addendums").select("status").eq("vehicle_vin", v) : Promise.resolve({ data: [] }),
     ]);
     const gd = (gen.data || []) as { document_type: string; document_status: string }[];
-    const arc = (archive.data || []) as { kind: string }[];
     const add = (addenda.data || []) as { status: string }[];
 
     const genOf = (t: string): DocState => {
@@ -63,17 +61,25 @@ export const UsedCarDocPack = ({ vehicleId, vin, condition }: Props) => {
       if (rows.length) return "draft";
       return "missing";
     };
-    const archived = (k: string) => arc.some((r) => r.kind === k);
+    // FTC + K-208 track the canonical generated_documents rows written by the
+    // Deal Flow generator (a filled draft = draft, published = generated).
+    const officialState = (t: string): DocState => {
+      const rows = gd.filter((r) => r.document_type === t);
+      if (rows.some((r) => ["published", "approved", "printed"].includes(r.document_status))) return "generated";
+      if (rows.length) return "draft";
+      return "missing";
+    };
     const addendumState: DocState = genOf("addendum") !== "missing"
       ? genOf("addendum")
       : add.length ? "draft" : "missing";
 
     const qs = `vehicleId=${encodeURIComponent(vehicleId)}${v ? `&vin=${encodeURIComponent(v)}` : ""}`;
+    const deal = `/vehicle-file/${vehicleId}?tab=deal`;
     setRows([
       { key: "window", title: "Used-car window sticker (Monroney)", icon: FileText, state: genOf("window"), href: `/used-car-sticker?${qs}` },
       { key: "addendum", title: "Addendum / accessory sticker", icon: FileCheck, state: addendumState, href: `/addendum?${qs}` },
-      { key: "ftc", title: "FTC warranty window sticker", icon: ShieldCheck, state: archived("ftc_buyers_guide") ? "generated" : "missing", href: `/used-vehicle-documents?${qs}` },
-      { key: "k208", title: "Connecticut K-208 worksheet", icon: ScrollText, state: archived("k208_warranty") ? "generated" : "missing", href: `/used-vehicle-documents?${qs}` },
+      { key: "ftc", title: "FTC Buyers Guide (official form)", icon: ShieldCheck, state: officialState("buyers_guide"), href: deal },
+      { key: "k208", title: "CT K-208 safety inspection (official form)", icon: ScrollText, state: officialState("k208"), href: deal },
     ]);
   }, [vehicleId, vin, isUsedLike]);
 

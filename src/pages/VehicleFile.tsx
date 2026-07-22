@@ -28,7 +28,7 @@ import { hasDealerCapability } from "@/lib/permissions/dealerRoleCapabilities";
 import { resolveOperatingState } from "@/lib/dealerState";
 import { QRCodeSVG } from "qrcode.react";
 import GeneratedDocumentsSection from "@/components/vehicle/GeneratedDocumentsSection";
-import DealRecordPanel from "@/components/vehicle/DealRecordPanel";
+import DealFlowPanel from "@/components/vehicle/DealFlowPanel";
 import { useStickerCatalog } from "@/lib/stickerStudio/useStickerCatalog";
 import { useStickerPrefs } from "@/lib/stickerStudio/useStickerPrefs";
 import {
@@ -350,7 +350,7 @@ const VehicleFile = () => {
 
   const tabs: { id: TabId; label: string; icon: typeof Car; count?: number }[] = [
     { id: "overview",  label: "Overview",  icon: Car },
-    { id: "deal",      label: "Deal Record", icon: FolderCheck },
+    { id: "deal",      label: "Deal Flow", icon: FolderCheck },
     { id: "documents", label: "Documents", icon: FileUp, count: vehicle.documents?.length || undefined },
     { id: "scan",      label: "Scan Info", icon: QrCode },
     { id: "customer",  label: "Customer",  icon: UserRound },
@@ -578,7 +578,7 @@ const VehicleFile = () => {
       {/* Panels */}
       <div className="pt-2">
         {tab === "overview"  && <OverviewPanel vehicle={vehicle} onTab={setTab} recall={recall} />}
-        {tab === "deal"      && <DealRecordPanel vehicle={vehicle} />}
+        {tab === "deal"      && <DealFlowPanel vehicle={vehicle} />}
         {tab === "documents" && <DocumentsPanel vehicle={vehicle} onReload={load} />}
         {tab === "scan"      && <ScanInfoPanel vehicle={vehicle} onReload={load} />}
         {tab === "customer"  && <CustomerPanel vehicle={vehicle} />}
@@ -1078,8 +1078,8 @@ const DocumentsPanel = ({ vehicle, onReload }: { vehicle: VehicleRow; onReload: 
     ? [
         { type: "factory_sticker", label: "OEM window sticker (Monroney)", desc: "Original factory window sticker PDF, image, or link — shows to shoppers in the packet." },
         { type: "brochure", label: "Vehicle brochure", desc: "OEM or dealer brochure PDF / link — shows to shoppers in the packet's Documents page." },
-        { type: "buyers_guide", label: "FTC Buyers Guide (used)", desc: "Required used-car window form — As-Is vs warranty (16 CFR Part 455). Spanish where the sale is conducted in Spanish." },
-        { type: "safety_inspection", label: safety.label, desc: safety.desc },
+        { type: "buyers_guide", label: "FTC Buyers Guide (used)", desc: "The official As-Is / Implied form (EN/ES) is generated and signed in Deal Flow. Upload here only to attach an outside or wet-signed copy." },
+        { type: "safety_inspection", label: safety.label, desc: `${safety.desc} Generated and service-signed in Deal Flow; upload here only to attach an outside copy.` },
         { type: "emissions", label: "Emissions / smog certificate", desc: "State emissions certificate where required." },
         { type: "carfax", label: "Carfax / AutoCheck", desc: "Vehicle history report — attach for buyer review." },
         { type: "recon", label: "Inspection / MPI report", desc: "Multi-point reconditioning inspection report." },
@@ -1292,16 +1292,20 @@ const LabelsPanel = ({ vehicle }: { vehicle: VehicleRow }) => {
   const hasMileage = vehicle.mileage != null && vehicle.mileage > 0;
   const isCpo = vehicle.condition === "cpo";
 
-  type LabelLink = { path: string; label: string; desc: string; ready: boolean; note: string; disabled?: boolean };
+  type LabelLink = { path: string; label: string; desc: string; ready: boolean; note: string; disabled?: boolean; to?: string };
+  // The FTC Buyers Guide is generated as the EXACT official form (EN/ES, As-Is /
+  // Implied) in Deal Flow — the one canonical place — so it routes there instead
+  // of opening a separate generator.
+  const dealFlow = `/vehicle-file/${vehicle.id}?tab=deal`;
   const links: LabelLink[] = vehicle.condition === "new"
     ? [
         { path: "/new-car-sticker", label: "New-car Monroney + Addendum", desc: "Factory-style sticker with dealer-installed accessories and doc fee.", ready: hasCore, note: hasCore ? "Ready to generate" : "Decode VIN first" },
-        { path: "/buyers-guide",    label: "FTC Buyers Guide", desc: "Spanish version auto-toggles.", ready: hasCore, note: "Needs warranty selection" },
+        { path: "/buyers-guide",    label: "FTC Buyers Guide", desc: "Official As-Is / Implied form, English or Spanish — filled in Deal Flow.", ready: hasCore, note: "Managed in Deal Flow", to: dealFlow },
       ]
     : [
         { path: "/used-car-sticker", label: "Used-car Monroney + Addendum", desc: "Three layouts: full, equipment-only, accessories-only.", ready: hasCore && hasPrice, note: hasCore && hasPrice ? "Ready to generate" : !hasPrice ? "Price missing" : "Decode VIN first" },
         { path: "/cpo-sheet",        label: "CPO Sheet",  desc: "Certified Pre-Owned disclosure template.", ready: isCpo, note: isCpo ? "Ready to generate" : "Available for CPO vehicles only", disabled: !isCpo },
-        { path: "/buyers-guide",     label: "FTC Buyers Guide", desc: "Required; bilingual (en/es).", ready: hasCore, note: "Needs warranty selection" },
+        { path: "/buyers-guide",     label: "FTC Buyers Guide", desc: "Official As-Is / Implied form, English or Spanish — filled in Deal Flow.", ready: hasCore, note: "Managed in Deal Flow", to: dealFlow },
         { path: "/trade-up",         label: "Trade-Up Sticker", desc: "For demo / courtesy / trade-in display units.", ready: hasCore, note: hasCore ? "Ready to generate" : "Decode VIN first" },
       ];
   return (
@@ -1329,7 +1333,7 @@ const LabelsPanel = ({ vehicle }: { vehicle: VehicleRow }) => {
         {links.map((l) => (
           <button
             key={l.path}
-            onClick={() => !l.disabled && go(l.path)}
+            onClick={() => { if (l.disabled) return; l.to ? navigate(l.to) : go(l.path); }}
             disabled={l.disabled}
             className={`text-left rounded-xl border bg-card p-4 transition ${
               l.disabled
