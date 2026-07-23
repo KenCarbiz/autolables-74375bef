@@ -73,6 +73,7 @@ const GetReady = lazy(() => import("./pages/GetReady"));
 const ReconApproval = lazy(() => import("./pages/ReconApproval"));
 const ServiceDesk = lazy(() => import("./pages/ServiceDesk"));
 const ReadyBoard = lazy(() => import("./pages/ReadyBoard"));
+const PrintQueue = lazy(() => import("./pages/PrintQueue"));
 const K208Document = lazy(() => import("./pages/K208Document"));
 const CreateHub = lazy(() => import("./pages/CreateHub"));
 const SigningLookup = lazy(() => import("./pages/SigningLookup"));
@@ -293,6 +294,7 @@ const App = () => (
                         <Route path="/recon" element={<ReconBoard />} />
                         <Route path="/service" element={<ServiceDesk />} />
                         <Route path="/ready-board" element={<ReadyBoard />} />
+                        <Route path="/print-queue" element={<PrintQueue />} />
                         <Route path="/k208/:vin" element={<K208Document />} />
                         <Route path="/service-inspection" element={<ServiceInspection />} />
                         <Route path="/service-inspection/:qrToken" element={<ServiceInspection />} />

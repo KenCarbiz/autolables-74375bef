@@ -27,6 +27,7 @@ import {
   Store,
   CreditCard,
   Code,
+  Printer,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useEntitlements } from "@/hooks/useEntitlements";
@@ -211,6 +212,10 @@ const CommandPalette = ({ open, onOpenChange }: CommandPaletteProps) => {
           <CommandItem onSelect={() => go("/inventory")}>
             <Car className="w-4 h-4 mr-2" />
             Inventory
+          </CommandItem>
+          <CommandItem onSelect={() => go("/print-queue")}>
+            <Printer className="w-4 h-4 mr-2" />
+            Print Queue
           </CommandItem>
           <CommandItem onSelect={() => go("/saved")}>
             <FolderOpen className="w-4 h-4 mr-2" />
