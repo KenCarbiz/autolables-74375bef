@@ -134,9 +134,23 @@ export const useTenantIntegration = () => {
     detect();
   }, []);
 
-  // Listen for postMessage from parent
+  // Listen for postMessage from parent — only while genuinely embedded, and
+  // only from an allowlisted parent origin. Without this, any page that opens
+  // or embeds the app could inject fake tenant/user branding.
   useEffect(() => {
+    if (state.mode !== "embedded") return;
+
+    const ALLOWED_ORIGINS = new Set<string>([
+      "https://hartecash.com",
+      "https://www.hartecash.com",
+      "https://app.hartecash.com",
+      "https://autocurb.io",
+      "https://www.autocurb.io",
+      "https://app.autocurb.io",
+    ]);
+
     const handleMessage = (event: MessageEvent) => {
+      if (!ALLOWED_ORIGINS.has(event.origin)) return;
       const data = event.data;
       if (!data || typeof data !== "object") return;
 
@@ -152,14 +166,14 @@ export const useTenantIntegration = () => {
           ready: true,
         }));
 
-        // Persist mode marker so reloads stay embedded
         localStorage.setItem(STORAGE_KEY, "embedded");
       }
     };
 
     window.addEventListener("message", handleMessage);
     return () => window.removeEventListener("message", handleMessage);
-  }, []);
+  }, [state.mode]);
+
 
   // Send message back to parent
   const sendToParent = useCallback((type: string, payload?: unknown) => {
