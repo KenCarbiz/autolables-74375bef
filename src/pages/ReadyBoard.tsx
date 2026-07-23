@@ -319,8 +319,8 @@ export default function ReadyBoard() {
                           </button>
                         )}
                         {canAccept && bucketOf(r) === "acceptance" && (
-                          <button onClick={() => acceptAndDispatch(r)} disabled={accepting === r.vin} title="Accept addendum & send Get-Ready" className="h-7 px-2 rounded-md bg-emerald-600 text-white text-[11px] font-semibold inline-flex items-center gap-1 hover:bg-emerald-700 disabled:opacity-50">
-                            {accepting === r.vin ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <CheckCircle2 className="w-3.5 h-3.5" />} Accept
+                          <button onClick={() => acceptAndDispatch(r)} disabled={accepting === r.vin} title="Authorize & Dispatch — accept the addendum and send each department its get-ready work order" className="h-7 px-2 rounded-md bg-emerald-600 text-white text-[11px] font-semibold inline-flex items-center gap-1 hover:bg-emerald-700 disabled:opacity-50">
+                            {accepting === r.vin ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <CheckCircle2 className="w-3.5 h-3.5" />} Authorize &amp; Dispatch
                           </button>
                         )}
                         {bucketOf(r) === "ready" && (
@@ -358,7 +358,10 @@ export default function ReadyBoard() {
               <>
                 <div className="bg-white p-3 rounded-xl border border-border inline-block"><QRCodeSVG value={qrUrl} size={180} /></div>
                 <a href={qrUrl} target="_blank" rel="noreferrer" className="block text-xs text-primary break-all underline">{qrUrl}</a>
-                <button onClick={() => { navigator.clipboard.writeText(qrUrl); toast.success("Link copied"); }} className="h-9 px-3 rounded-md border border-border text-xs font-semibold">Copy link</button>
+                <div className="flex items-center justify-center gap-2">
+                  <button onClick={() => { navigator.clipboard.writeText(qrUrl); toast.success("Link copied"); }} className="h-9 px-3 rounded-md border border-border text-xs font-semibold">Copy link</button>
+                  <a href={`/print/vehicle-qr/${qrVin}`} target="_blank" rel="noreferrer" className="h-9 px-3 rounded-md bg-primary text-primary-foreground text-xs font-semibold inline-flex items-center gap-1.5"><Printer className="w-3.5 h-3.5" /> Print QR sheet</a>
+                </div>
               </>
             ) : <Loader2 className="w-6 h-6 animate-spin text-muted-foreground mx-auto" />}
           </div>
