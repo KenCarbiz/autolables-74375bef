@@ -244,9 +244,9 @@ export const useGetReady = (storeId: string) => {
     ymm: string;
     condition: "new" | "used";
     acquiredDate: string;
-    accessoriesToInstall: { productId: string; productName: string }[];
+    accessoriesToInstall: { productId: string; productName: string; department?: GetReadyDepartment; vendorName?: string; vendorEmail?: string }[];
     // Internal recon/service the store pays for — never billed to the customer.
-    serviceItems?: { label: string; cost?: number }[];
+    serviceItems?: { label: string; cost?: number; department?: GetReadyDepartment; vendorName?: string; vendorEmail?: string }[];
     inspectionRequired: boolean;
     inspectionFormType?: string;
     assignedTechnician?: string;
@@ -267,6 +267,9 @@ export const useGetReady = (storeId: string) => {
         category: "accessory",
         assignedTo: data.assignedTechnician || "",
         status: "pending",
+        department: acc.department || "detail",
+        vendorName: acc.vendorName,
+        vendorEmail: acc.vendorEmail,
       });
     });
     (data.serviceItems || []).forEach(s => {
@@ -279,6 +282,9 @@ export const useGetReady = (storeId: string) => {
         status: "pending",
         cost: s.cost,
         internal: true,
+        department: s.department || "service",
+        vendorName: s.vendorName,
+        vendorEmail: s.vendorEmail,
       });
     });
     if (data.inspectionRequired) {

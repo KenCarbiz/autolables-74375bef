@@ -17,14 +17,15 @@ const canonicalCondition = (label: string): "new" | "used" =>
 // vehicle by web link (scrape), manual entry, or a VIN you scanned, then
 // check the products being pre-installed. Each becomes a "pending" install
 // item that flips to installed when the installer completes the scan + photo.
+type Dept = "service" | "detail" | "vendor";
 interface CreateArgs {
   vin: string;
   stockNumber: string;
   ymm: string;
   condition: "new" | "used";
   acquiredDate: string;
-  accessoriesToInstall: { productId: string; productName: string }[];
-  serviceItems?: { label: string; cost?: number }[];
+  accessoriesToInstall: { productId: string; productName: string; department?: Dept; vendorName?: string; vendorEmail?: string }[];
+  serviceItems?: { label: string; cost?: number; department?: Dept; vendorName?: string; vendorEmail?: string }[];
   inspectionRequired: boolean;
   createdBy: string;
 }
@@ -55,7 +56,10 @@ export const StartGetReadyModal = ({ open, onClose, onCreate }: Props) => {
   const [stock, setStock] = useState("");
   const [condition, setCondition] = useState<string>(defaultCondition);
   const [selected, setSelected] = useState<Record<string, boolean>>({});
-  const [services, setServices] = useState<{ label: string; cost: string }[]>([]);
+  // Per-accessory routing: which department installs it (detail in-house, or a
+  // third-party vendor). Defaults to detail.
+  const [accRoute, setAccRoute] = useState<Record<string, { department: "detail" | "vendor"; vendorName: string; vendorEmail: string }>>({});
+  const [services, setServices] = useState<{ label: string; cost: string; department: Dept; vendorName: string; vendorEmail: string }[]>([]);
   const [invQuery, setInvQuery] = useState("");
   const [invHits, setInvHits] = useState<InventoryHit[]>([]);
   const [saving, setSaving] = useState(false);
@@ -64,7 +68,7 @@ export const StartGetReadyModal = ({ open, onClose, onCreate }: Props) => {
 
   const reset = () => {
     setUrl(""); setVin(""); setYmm(""); setStock(""); setCondition(defaultCondition);
-    setSelected({}); setServices([]); setInvQuery(""); setInvHits([]);
+    setSelected({}); setAccRoute({}); setServices([]); setInvQuery(""); setInvHits([]);
   };
 
   // Search current inventory (RLS-scoped) by VIN / stock / vehicle.
@@ -126,10 +130,13 @@ export const StartGetReadyModal = ({ open, onClose, onCreate }: Props) => {
     setSaving(true);
     const accessoriesToInstall = products
       .filter((p) => selected[p.id])
-      .map((p) => ({ productId: p.id, productName: p.name }));
+      .map((p) => {
+        const r = accRoute[p.id];
+        return { productId: p.id, productName: p.name, department: (r?.department || "detail") as Dept, vendorName: r?.vendorName || undefined, vendorEmail: r?.vendorEmail || undefined };
+      });
     const serviceItems = services
       .filter((s) => s.label.trim())
-      .map((s) => ({ label: s.label.trim(), cost: s.cost.trim() ? Number(s.cost.replace(/[^0-9.]/g, "")) : undefined }));
+      .map((s) => ({ label: s.label.trim(), cost: s.cost.trim() ? Number(s.cost.replace(/[^0-9.]/g, "")) : undefined, department: s.department, vendorName: s.vendorName || undefined, vendorEmail: s.vendorEmail || undefined }));
     const rec = await onCreate({
       vin: vin.trim().toUpperCase(),
       stockNumber: stock.trim(),
@@ -226,18 +233,39 @@ export const StartGetReadyModal = ({ open, onClose, onCreate }: Props) => {
               })}
             </div>
           )}
+          {/* Route each selected install to a department / vendor */}
+          {products.some((p) => selected[p.id]) && (
+            <div className="mt-3 rounded-xl border border-border bg-muted/20 p-3 space-y-2">
+              <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Route installs</p>
+              {products.filter((p) => selected[p.id]).map((p) => {
+                const r = accRoute[p.id] || { department: "detail" as const, vendorName: "", vendorEmail: "" };
+                return (
+                  <div key={p.id} className="flex flex-wrap items-center gap-2">
+                    <span className="text-sm text-foreground flex-1 min-w-[120px] truncate">{p.name}</span>
+                    <select value={r.department} onChange={(e) => setAccRoute((s) => ({ ...s, [p.id]: { ...r, department: e.target.value as "detail" | "vendor" } }))} className="h-9 px-2 rounded-lg border border-border bg-background text-sm cursor-pointer">
+                      <option value="detail">Detail (in-house)</option>
+                      <option value="vendor">Third-party vendor</option>
+                    </select>
+                    {r.department === "vendor" && (
+                      <input value={r.vendorEmail} onChange={(e) => setAccRoute((s) => ({ ...s, [p.id]: { ...r, vendorEmail: e.target.value } }))} placeholder="vendor email" className="h-9 px-2 rounded-lg border border-border bg-background text-sm w-44" />
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </div>
 
         {/* Internal (non-customer-cost) service items */}
         <div>
           <div className="flex items-center justify-between">
             <label className={label}>Internal service / recon (dealer cost — not billed to customer)</label>
-            <button type="button" onClick={() => setServices((s) => [...s, { label: "", cost: "" }])} className="inline-flex items-center gap-1 h-7 px-2 rounded-lg border border-border text-[11px] font-semibold hover:bg-muted"><Plus className="w-3 h-3" /> Add</button>
+            <button type="button" onClick={() => setServices((s) => [...s, { label: "", cost: "", department: "service", vendorName: "", vendorEmail: "" }])} className="inline-flex items-center gap-1 h-7 px-2 rounded-lg border border-border text-[11px] font-semibold hover:bg-muted"><Plus className="w-3 h-3" /> Add</button>
           </div>
           {catalog.length > 0 && (
             <div className="flex flex-wrap gap-1.5 mt-2">
               {catalog.map((c, i) => (
-                <button key={i} type="button" onClick={() => setServices((s) => [...s, { label: c.name, cost: c.cost || "" }])} className="inline-flex items-center gap-1 h-7 px-2.5 rounded-full border border-border text-[11px] font-semibold hover:bg-muted">
+                <button key={i} type="button" onClick={() => setServices((s) => [...s, { label: c.name, cost: c.cost || "", department: c.responsible_email ? "vendor" : "service", vendorName: c.responsible_name || "", vendorEmail: c.responsible_email || "" }])} className="inline-flex items-center gap-1 h-7 px-2.5 rounded-full border border-border text-[11px] font-semibold hover:bg-muted">
                   <Plus className="w-3 h-3" /> {c.name}{c.responsible_name ? ` · ${c.responsible_name}` : ""}
                 </button>
               ))}
@@ -246,9 +274,17 @@ export const StartGetReadyModal = ({ open, onClose, onCreate }: Props) => {
           {services.length > 0 && (
             <div className="space-y-2 mt-2">
               {services.map((s, i) => (
-                <div key={i} className="flex gap-2">
-                  <input value={s.label} onChange={(e) => setServices((p) => p.map((x, j) => j === i ? { ...x, label: e.target.value } : x))} placeholder="e.g. Brake rotors, alignment, key cut" className={`${input} flex-1`} />
-                  <input value={s.cost} onChange={(e) => setServices((p) => p.map((x, j) => j === i ? { ...x, cost: e.target.value } : x))} placeholder="$ cost" className={`${input} w-24`} />
+                <div key={i} className="flex flex-wrap gap-2">
+                  <input value={s.label} onChange={(e) => setServices((p) => p.map((x, j) => j === i ? { ...x, label: e.target.value } : x))} placeholder="e.g. Brake rotors, alignment, key cut" className={`${input} flex-1 min-w-[140px]`} />
+                  <input value={s.cost} onChange={(e) => setServices((p) => p.map((x, j) => j === i ? { ...x, cost: e.target.value } : x))} placeholder="$ cost" className={`${input} w-20`} />
+                  <select value={s.department} onChange={(e) => setServices((p) => p.map((x, j) => j === i ? { ...x, department: e.target.value as Dept } : x))} className={`${input} w-28 cursor-pointer`}>
+                    <option value="service">Service</option>
+                    <option value="detail">Detail</option>
+                    <option value="vendor">Vendor</option>
+                  </select>
+                  {s.department === "vendor" && (
+                    <input value={s.vendorEmail} onChange={(e) => setServices((p) => p.map((x, j) => j === i ? { ...x, vendorEmail: e.target.value } : x))} placeholder="vendor email" className={`${input} w-40`} />
+                  )}
                   <button type="button" onClick={() => setServices((p) => p.filter((_, j) => j !== i))} className="h-10 w-10 inline-flex items-center justify-center rounded-lg border border-border text-muted-foreground hover:text-destructive"><X className="w-4 h-4" /></button>
                 </div>
               ))}
