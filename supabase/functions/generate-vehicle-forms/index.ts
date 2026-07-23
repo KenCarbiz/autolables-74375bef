@@ -21,8 +21,24 @@ import { adminClient, isServiceOrCron } from "../_shared/supabase.ts";
 // Auth: service-role/cron OR a signed-in manager member of the tenant.
 // ──────────────────────────────────────────────────────────────────────
 
-const APP_BASE = Deno.env.get("APP_BASE_URL") || "https://autolabels.io";
 const BUCKET = "signed-archives";
+
+// Where the official PDF templates (/public/forms/*.pdf) are served from. These
+// are bundled with the app, so the app's OWN deployed origin serves them — not
+// the marketing site. Resolve it per request: the caller's app_base, else the
+// browser Origin header, else the APP_BASE_URL secret, else the app host. (The
+// old hard-coded "autolabels.io" default fetched from the marketing site, which
+// doesn't serve /forms, so every fill 500'd.)
+function resolveAppBase(req: Request, appBase?: string): string {
+  const isHttp = (u?: string | null): u is string => !!u && /^https?:\/\//i.test(u);
+  const clean = (u: string) => u.replace(/\/+$/, "");
+  if (isHttp(appBase)) return clean(appBase);
+  const origin = req.headers.get("origin");
+  if (isHttp(origin)) return clean(origin);
+  const env = Deno.env.get("APP_BASE_URL");
+  if (isHttp(env)) return clean(env);
+  return "https://app.autolabels.io";
+}
 
 const MANAGER_ROLES = new Set([
   "owner", "general_manager", "gsm", "admin", "manager",
@@ -49,9 +65,9 @@ async function sha256Hex(bytes: Uint8Array): Promise<string> {
   return Array.from(new Uint8Array(h)).map((b) => b.toString(16).padStart(2, "0")).join("");
 }
 
-async function loadTemplate(name: string): Promise<ArrayBuffer> {
-  const res = await fetch(`${APP_BASE}/forms/${name}`);
-  if (!res.ok) throw new Error(`template ${name} ${res.status}`);
+async function loadTemplate(base: string, name: string): Promise<ArrayBuffer> {
+  const res = await fetch(`${base}/forms/${name}`);
+  if (!res.ok) throw new Error(`template ${name} ${res.status} from ${base}`);
   return await res.arrayBuffer();
 }
 
@@ -77,8 +93,8 @@ const COVERED_SYSTEMS = [
   "Electrical — Alternator, voltage regulator, starter, ignition switch, and electronic ignition.",
 ];
 
-async function fillFtc(box: string, pct: number, days: number, miles: number, v: Vehicle, d: Dealer): Promise<Uint8Array> {
-  const pdf = await PDFDocument.load(await loadTemplate("ftc-buyers-guide-en.pdf"));
+async function fillFtc(base: string, box: string, pct: number, days: number, miles: number, v: Vehicle, d: Dealer): Promise<Uint8Array> {
+  const pdf = await PDFDocument.load(await loadTemplate(base, "ftc-buyers-guide-en.pdf"));
   const form = pdf.getForm();
   const implied = box === "implied";
   const sub = implied ? "topmostSubform[0].BG-Implied[0]" : "topmostSubform[0].BG-AsIs[0]";
@@ -119,8 +135,8 @@ async function fillFtc(box: string, pct: number, days: number, miles: number, v:
 // artwork at measured coordinates (validated against the rendered form). Only
 // the blanks are drawn; the form itself is never altered. Pages: 0 As-Is front,
 // 1 Implied front, 2 back. Coordinates are PDF points, origin bottom-left.
-async function fillFtcEs(box: string, pct: number, days: number, miles: number, v: Vehicle, d: Dealer): Promise<Uint8Array> {
-  const pdf = await PDFDocument.load(await loadTemplate("ftc-buyers-guide-es.pdf"));
+async function fillFtcEs(base: string, box: string, pct: number, days: number, miles: number, v: Vehicle, d: Dealer): Promise<Uint8Array> {
+  const pdf = await PDFDocument.load(await loadTemplate(base, "ftc-buyers-guide-es.pdf"));
   const font = await pdf.embedFont(StandardFonts.Helvetica);
   const bold = await pdf.embedFont(StandardFonts.HelveticaBold);
   const black = rgb(0, 0, 0);
@@ -163,8 +179,8 @@ async function fillFtcEs(box: string, pct: number, days: number, miles: number, 
   return await pdf.save();
 }
 
-async function fillK208(v: Vehicle, d: Dealer): Promise<Uint8Array> {
-  const pdf = await PDFDocument.load(await loadTemplate("k208-inspection.pdf"));
+async function fillK208(base: string, v: Vehicle, d: Dealer): Promise<Uint8Array> {
+  const pdf = await PDFDocument.load(await loadTemplate(base, "k208-inspection.pdf"));
   const form = pdf.getForm();
   setText(form, "FillText1", v.year);
   setText(form, "FillText6", v.make);
@@ -240,7 +256,8 @@ Deno.serve(async (req) => {
   if (pf) return pf;
   if (req.method !== "POST") return json(405, { error: "method not allowed" });
 
-  const body = await req.json().catch(() => ({})) as { tenant_id?: string; vin?: string; kinds?: string[]; box?: string; lang?: string };
+  const body = await req.json().catch(() => ({})) as { tenant_id?: string; vin?: string; kinds?: string[]; box?: string; lang?: string; app_base?: string };
+  const appBase = resolveAppBase(req, body.app_base);
   const tenantId = body.tenant_id;
   const vin = (body.vin || "").toUpperCase().trim();
   if (!tenantId || !vin) return json(400, { error: "tenant_id and vin required" });
@@ -290,12 +307,12 @@ Deno.serve(async (req) => {
       const effBox = boxOverride || snap.box || "as-is";
       const pct = Number(snap.min_pct) || 0, dd = Number(snap.min_duration_days) || 0, mi = Number(snap.min_miles) || 0;
       const bytes = lang === "es"
-        ? await fillFtcEs(effBox, pct, dd, mi, vehicle, dealer)
-        : await fillFtc(effBox, pct, dd, mi, vehicle, dealer);
+        ? await fillFtcEs(appBase, effBox, pct, dd, mi, vehicle, dealer)
+        : await fillFtc(appBase, effBox, pct, dd, mi, vehicle, dealer);
       out.buyers_guide = await fileForm(admin, tenantId, vin, listing.id as string, "buyers_guide", bytes, vehicle.year, { box: effBox, lang, template_version: "2026.07.1" });
     }
     if (kinds.includes("k208") && ["used", "cpo", "certified"].includes(String(listing.condition || "used").toLowerCase())) {
-      const bytes = await fillK208(vehicle, dealer);
+      const bytes = await fillK208(appBase, vehicle, dealer);
       out.k208 = await fileForm(admin, tenantId, vin, listing.id as string, "k208", bytes, vehicle.year, { template_version: "2026.07.1" });
     }
   } catch (e) {

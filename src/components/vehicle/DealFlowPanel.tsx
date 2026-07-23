@@ -153,7 +153,7 @@ export default function DealFlowPanel({ vehicle }: { vehicle: { id: string; vin:
     if (!tenant?.id) return;
     setGenForms(true);
     try {
-      const body: Record<string, unknown> = { tenant_id: tenant.id, vin: vehicle.vin, lang };
+      const body: Record<string, unknown> = { tenant_id: tenant.id, vin: vehicle.vin, lang, app_base: window.location.origin };
       if (kinds) body.kinds = kinds;
       if (record?.buyersGuide?.box) body.box = record.buyersGuide.box;
       const { data, error } = await (supabase as any).functions.invoke("generate-vehicle-forms", { body });
@@ -169,7 +169,7 @@ export default function DealFlowPanel({ vehicle }: { vehicle: { id: string; vin:
     if (!tenant?.id) return;
     setGenForms(true);
     try {
-      const body: Record<string, unknown> = { tenant_id: tenant.id, vin: vehicle.vin, kinds: [kind], lang };
+      const body: Record<string, unknown> = { tenant_id: tenant.id, vin: vehicle.vin, kinds: [kind], lang, app_base: window.location.origin };
       if (kind === "buyers_guide" && record?.buyersGuide?.box) body.box = record.buyersGuide.box;
       const { data, error } = await (supabase as any).functions.invoke("generate-vehicle-forms", { body });
       const url = data?.forms?.[kind];

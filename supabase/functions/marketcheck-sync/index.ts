@@ -128,6 +128,17 @@ async function ensureReadyToken(admin: any, tenantId: string, vin: string, ymm: 
   } catch { /* token preload best-effort */ }
 }
 
+// Ensure the compliance drafts (FTC Buyers Guide + CT K-208) exist for a used/
+// CPO vehicle on EVERY sync — not just the first insert. The draft RPCs are
+// VIN-idempotent and no-op for new cars, so re-syncs safely backfill drafts for
+// inventory that was ingested before the autogen flow existed. Without this,
+// only brand-new VINs ever got drafted and existing cars showed "not generated".
+// deno-lint-ignore no-explicit-any
+async function ensureComplianceDrafts(admin: any, tenantId: string, vin: string) {
+  try { await admin.rpc("create_draft_buyers_guide", { p_tenant_id: tenantId, p_vin: vin }); } catch { /* best-effort */ }
+  try { await admin.rpc("create_draft_safety_inspection", { p_tenant_id: tenantId, p_vin: vin }); } catch { /* best-effort */ }
+}
+
 // Auto-preload a brand-new vehicle the moment it's ingested: mint its permanent
 // Get-Ready hub token (so the windshield QR works immediately), draft the
 // addendum, and kick off a best-effort OEM window-sticker fetch. All isolated —
@@ -896,6 +907,8 @@ serve(async (req) => {
                 // feature or were first ingested by another path (autocurb-sync,
                 // manual add) so they never fall out of the get-ready flow.
                 await ensureReadyToken(admin, cfg.tenant_id, vin, ymm, vl.id);
+                // Backfill the compliance drafts for existing inventory (idempotent).
+                await ensureComplianceDrafts(admin, cfg.tenant_id, vin);
               } else if (!firstWriteErr) firstWriteErr = error.message;
             } else {
               const ins = await admin.from("vehicle_listings").insert({
