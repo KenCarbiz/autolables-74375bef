@@ -137,6 +137,9 @@ async function ensureReadyToken(admin: any, tenantId: string, vin: string, ymm: 
 async function ensureComplianceDrafts(admin: any, tenantId: string, vin: string) {
   try { await admin.rpc("create_draft_buyers_guide", { p_tenant_id: tenantId, p_vin: vin }); } catch { /* best-effort */ }
   try { await admin.rpc("create_draft_safety_inspection", { p_tenant_id: tenantId, p_vin: vin }); } catch { /* best-effort */ }
+  // Pre-start the Get-Ready record so the manager opens to a ready checklist
+  // (idempotent; backfills existing used inventory on re-sync).
+  try { await admin.rpc("create_draft_get_ready", { p_tenant_id: tenantId, p_vin: vin }); } catch { /* best-effort */ }
 }
 
 // Auto-preload a brand-new vehicle the moment it's ingested: mint its permanent
@@ -160,6 +163,11 @@ async function autoPreload(admin: any, supabaseUrl: string, serviceKey: string, 
     // year/mileage/value threshold), so service has it to complete + sign.
     await admin.rpc("create_draft_safety_inspection", { p_tenant_id: tenantId, p_vin: vin });
   } catch { /* k208 preload best-effort */ }
+  try {
+    // Pre-start the Get-Ready record (used/CPO) so the manager opens to a
+    // ready-to-compose checklist instead of an empty "Start Get-Ready".
+    await admin.rpc("create_draft_get_ready", { p_tenant_id: tenantId, p_vin: vin });
+  } catch { /* get-ready preload best-effort */ }
   try {
     // Fill the official FTC Buyers Guide + K-208 PDFs from the drafted data.
     // Fire-and-forget; runs after the drafts above so the warranty box is set.
