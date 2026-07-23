@@ -110,6 +110,7 @@ const StickerStudioGenerator = lazy(() => import("./pages/StickerStudioGenerator
 const StickerStudioCustomize = lazy(() => import("./pages/StickerStudioCustomize"));
 const StickerPrint = lazy(() => import("./pages/StickerPrint"));
 const VehicleQrPrint = lazy(() => import("./pages/VehicleQrPrint"));
+const PrintQrBatch = lazy(() => import("./pages/PrintQrBatch"));
 const StickerTestLabel = lazy(() => import("./pages/StickerTestLabel"));
 const DevHeroPreview = lazy(() => import("./pages/DevHeroPreview"));
 const DevSaturdayPreview = lazy(() => import("./pages/DevSaturdayPreview"));
@@ -239,6 +240,7 @@ const App = () => (
                       <Route path="/brand" element={<BrandGuide />} />
                       <Route path="/print/sticker/:templateId" element={<StickerPrint />} />
                       <Route path="/print/vehicle-qr/:vin" element={<VehicleQrPrint />} />
+                      <Route path="/print/qr-batch" element={<PrintQrBatch />} />
                       <Route path="/print/test-label" element={<StickerTestLabel />} />
                       <Route path="/dev/hero-preview" element={<DevHeroPreview />} />
                       <Route path="/dev/saturday-preview" element={<DevSaturdayPreview />} />

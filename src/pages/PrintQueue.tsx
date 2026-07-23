@@ -69,9 +69,12 @@ export default function PrintQueue() {
           <h1 className="text-[24px] font-black tracking-tight text-foreground inline-flex items-center gap-2"><Printer className="w-6 h-6 text-primary" /> Print Queue</h1>
           <p className="text-sm text-muted-foreground mt-1">Run a whole batch of one label type, or print a per-vehicle packet in load order.</p>
         </div>
-        <div className="inline-flex rounded-lg border border-border overflow-hidden">
-          <button onClick={() => setView("type")} className={`h-10 px-4 text-sm font-semibold inline-flex items-center gap-1.5 ${view === "type" ? "bg-primary text-primary-foreground" : "bg-background text-muted-foreground hover:bg-muted"}`}><Layers className="w-4 h-4" /> By type</button>
-          <button onClick={() => setView("vehicle")} className={`h-10 px-4 text-sm font-semibold inline-flex items-center gap-1.5 ${view === "vehicle" ? "bg-primary text-primary-foreground" : "bg-background text-muted-foreground hover:bg-muted"}`}><Car className="w-4 h-4" /> By vehicle</button>
+        <div className="flex items-center gap-2">
+          <a href="/print/qr-batch" target="_blank" rel="noreferrer" className="h-10 px-3 rounded-lg border border-border text-sm font-semibold inline-flex items-center gap-1.5 hover:bg-muted"><QrCode className="w-4 h-4" /> Batch QR sheet</a>
+          <div className="inline-flex rounded-lg border border-border overflow-hidden">
+            <button onClick={() => setView("type")} className={`h-10 px-4 text-sm font-semibold inline-flex items-center gap-1.5 ${view === "type" ? "bg-primary text-primary-foreground" : "bg-background text-muted-foreground hover:bg-muted"}`}><Layers className="w-4 h-4" /> By type</button>
+            <button onClick={() => setView("vehicle")} className={`h-10 px-4 text-sm font-semibold inline-flex items-center gap-1.5 ${view === "vehicle" ? "bg-primary text-primary-foreground" : "bg-background text-muted-foreground hover:bg-muted"}`}><Car className="w-4 h-4" /> By vehicle</button>
+          </div>
         </div>
       </div>
 
