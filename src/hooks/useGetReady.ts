@@ -324,6 +324,14 @@ export const useGetReady = (storeId: string) => {
       .select("*")
       .single();
     if (error || !row) return null;
+    // Auto-wire each accessory onto the vehicle's addendum as an installed
+    // (pending proof) line — no-op unless the dealer enabled getready_drives_addendum.
+    // Best-effort: never block get-ready creation on addendum sync.
+    for (const acc of data.accessoriesToInstall) {
+      try {
+        await (supabase as any).rpc("getready_upsert_addendum_line", { p_tenant_id: storeId, p_vin: data.vin, p_product_id: acc.productId });
+      } catch { /* addendum sync best-effort */ }
+    }
     await load();
     return fromDb(row as DbRow);
   };
