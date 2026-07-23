@@ -44,7 +44,7 @@ export function useVehicleEvidence(vehicleId?: string | null, vin?: string | nul
 
     const [docsRes, qrRes, addRes, listRes, auditRes] = await Promise.all([
       sb.from("generated_documents").select("id, document_type, document_status, version, created_at, approved_at, printed_at, published_at, rejected_at, reject_reason, label_mode, template_id").eq("vehicle_id", vehicleId).then((r: any) => r).catch(() => ({ data: null })),
-      sb.from("qr_scan_events").select("id, sticker_type, device_type, browser, scanned_at").eq("vehicle_id", vehicleId).order("scanned_at", { ascending: false }).limit(25).then((r: any) => r).catch(() => ({ data: null })),
+      sb.from("qr_scan_events").select("id, qr_code_id, user_agent, scanned_at").eq("vehicle_id", vehicleId).order("scanned_at", { ascending: false }).limit(25).then((r: any) => r).catch(() => ({ data: null })),
       vin ? sb.from("addendums").select("id, status, customer_signed_at, content_hash, customer_name, created_at, total_price").eq("vehicle_vin", vin).then((r: any) => r).catch(() => ({ data: null })) : Promise.resolve({ data: null }),
       sb.from("vehicle_listings").select("created_at, ymm").eq("id", vehicleId).maybeSingle().then((r: any) => r).catch(() => ({ data: null })),
       tenantId ? sb.from("audit_log").select("id, action, entity_type, entity_id, content_hash, user_email, ip_address, details, created_at").eq("store_id", tenantId).order("created_at", { ascending: false }).limit(400).then((r: any) => r).catch(() => ({ data: null })) : Promise.resolve({ data: null }),
@@ -65,9 +65,11 @@ export function useVehicleEvidence(vehicleId?: string | null, vin?: string | nul
       if (d.rejected_at) ev.push({ id: `${d.id}-rej`, at: d.rejected_at, category: "compliance", title: `${ty} v${d.version} rejected`, detail: d.reject_reason || undefined, raw: d });
     }
 
-    // QR scans.
+    // QR scans — derive device/browser from user_agent; sticker_type not stored here.
+    const uaDev = (ua?: string | null) => { const s = (ua || "").toLowerCase(); if (!s) return null; if (/ipad|tablet|playbook|silk|(android(?!.*mobile))/.test(s)) return "tablet"; if (/mobi|iphone|ipod|android/.test(s)) return "mobile"; return "desktop"; };
+    const uaBr = (ua?: string | null) => { const s = (ua || "").toLowerCase(); if (!s) return null; if (/edg\//.test(s)) return "Edge"; if (/firefox|fxios/.test(s)) return "Firefox"; if (/chrome|crios/.test(s)) return "Chrome"; if (/safari/.test(s)) return "Safari"; return null; };
     for (const s of (Array.isArray(qrRes?.data) ? qrRes.data : [])) {
-      ev.push({ id: `qr-${s.id}`, at: s.scanned_at, category: "qr", title: `QR scanned (${cap(s.sticker_type) || "sticker"})`, detail: [s.device_type, s.browser].filter(Boolean).join(" · "), raw: s });
+      ev.push({ id: `qr-${s.id}`, at: s.scanned_at, category: "qr", title: "QR scanned", detail: [uaDev(s.user_agent), uaBr(s.user_agent)].filter(Boolean).join(" · "), raw: s });
     }
 
     // Addendums / signing.
