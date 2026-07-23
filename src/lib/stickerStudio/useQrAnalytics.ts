@@ -37,13 +37,30 @@ export function useQrAnalytics(days = 30): QrAnalytics {
         // deno-lint-ignore no-explicit-any
         const { data, error } = await (supabase as any)
           .from("qr_scan_events")
-          .select("id, vehicle_id, sticker_type, device_type, browser, referrer, scanned_at")
+          .select("id, vehicle_id, qr_code_id, referrer, user_agent, scanned_at")
           .eq("tenant_id", tenantId)
           .gte("scanned_at", since)
           .order("scanned_at", { ascending: false });
         if (cancelled) return;
         if (error) { setState((s) => ({ ...s, available: false, loading: false })); return; }
-        const events: ScanEvent[] = data || [];
+        const rows: any[] = data || [];
+        // Resolve sticker_type from parent qr_codes rows (column doesn't exist on qr_scan_events).
+        const qrIds = Array.from(new Set(rows.map((r) => r.qr_code_id).filter(Boolean)));
+        let typeById: Record<string, string> = {};
+        if (qrIds.length) {
+          const { data: qrRows } = await (supabase as any)
+            .from("qr_codes").select("id, sticker_type").in("id", qrIds);
+          for (const q of (qrRows || [])) typeById[q.id] = q.sticker_type || "unknown";
+        }
+        const events: ScanEvent[] = rows.map((r) => ({
+          id: r.id,
+          vehicle_id: r.vehicle_id,
+          sticker_type: r.qr_code_id ? (typeById[r.qr_code_id] || "unknown") : "unknown",
+          device_type: uaDevice(r.user_agent),
+          browser: uaBrowser(r.user_agent),
+          referrer: r.referrer,
+          scanned_at: r.scanned_at,
+        }));
         const byType: Record<string, number> = {};
         const byVehicle: Record<string, number> = {};
         const byDayMap: Record<string, number> = {};
