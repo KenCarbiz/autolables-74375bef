@@ -64,7 +64,6 @@ const InventoryCommandCenterV2 = lazy(() => import("./pages/InventoryCommandCent
 const VehicleFile = lazy(() => import("./pages/VehicleFile"));
 const SavedAddendums = lazy(() => import("./pages/SavedAddendums"));
 const SignatureQueue = lazy(() => import("./pages/SignatureQueue"));
-const BuyersGuide = lazy(() => import("./pages/BuyersGuide"));
 const MobileSigning = lazy(() => import("./pages/MobileSigning"));
 const CustomerReview = lazy(() => import("./pages/CustomerReview"));
 const InstallerProof = lazy(() => import("./pages/InstallerProof"));
@@ -105,8 +104,6 @@ const PassportSectionRedirect = () => {
   return <Navigate to={`/v/${vehicleSlug || ""}/${section || ""}${search}`} replace />;
 };
 const UsedCarSticker = lazy(() => import("./pages/UsedCarSticker"));
-const UsedVehicleDocuments = lazy(() => import("./pages/UsedVehicleDocuments"));
-const UsedVehicleDocumentsPrint = lazy(() => import("./pages/UsedVehicleDocumentsPrint"));
 const StickerStudio = lazy(() => import("./pages/StickerStudio"));
 const StickerStudioGenerator = lazy(() => import("./pages/StickerStudioGenerator"));
 const StickerStudioCustomize = lazy(() => import("./pages/StickerStudioCustomize"));
@@ -240,7 +237,6 @@ const App = () => (
                       <Route path="/brand" element={<BrandGuide />} />
                       <Route path="/print/sticker/:templateId" element={<StickerPrint />} />
                       <Route path="/print/test-label" element={<StickerTestLabel />} />
-                      <Route path="/print/used-vehicle-documents" element={<UsedVehicleDocumentsPrint />} />
                       <Route path="/dev/hero-preview" element={<DevHeroPreview />} />
                       <Route path="/dev/saturday-preview" element={<DevSaturdayPreview />} />
                       <Route path="/dev/connecticut-smoke-test" element={<DevConnecticutSmokeTest />} />
@@ -278,8 +274,6 @@ const App = () => (
                         <Route path="/delivered" element={<SavedAddendums stage="delivered" />} />
                         <Route path="/returns" element={<SavedAddendums stage="returns" />} />
                         <Route path="/signatures" element={<SignatureQueue /> } />
-                        <Route path="/buyers-guide" element={<BuyersGuide />} />
-                        <Route path="/used-vehicle-documents" element={<UsedVehicleDocuments />} />
                         <Route path="/trade-up" element={<TradeUpSticker />} />
                         <Route path="/used-car-sticker" element={<UsedCarSticker />} />
                         <Route path="/sticker-studio" element={<StickerStudio />} />

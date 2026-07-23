@@ -32,8 +32,9 @@ interface CreateTool {
 
 const TOOLS: CreateTool[] = [
   { id: "new-addendum", title: "New Addendum", description: "Add-on products + disclosures for a deal.", category: "Compliance & Documents", iconKey: "new-addendum", iconCategory: "document", route: "/addendum", tags: ["addendum", "products", "disclosures", "deal", "compliance"], chip: "Most Used", isQuickStart: true },
-  { id: "buyers-guide", title: "Buyers Guide", description: "FTC Used Car Buyers Guide.", category: "Compliance & Documents", iconKey: "buyers-guide", iconCategory: "compliance", route: "/buyers-guide", tags: ["buyers guide", "ftc", "used", "compliance", "as-is", "warranty"], chip: "FTC Required", isQuickStart: true },
-  { id: "used-vehicle-docs", title: "Used Vehicle Docs", description: "Buyers Guide + K-208 packet.", category: "Compliance & Documents", iconKey: "used-vehicle-docs", iconCategory: "compliance", route: "/used-vehicle-documents", tags: ["docs", "documents", "packet", "k-208", "inspection", "compliance"], chip: "Compliance" },
+  // The FTC Buyers Guide + CT K-208 are generated per-vehicle in the Vehicle
+  // File's Deal Flow (off the vehicle's real data), so there are no standalone
+  // hub tiles for them anymore — open the vehicle and use Deal Flow.
   { id: "cpo-sheet", title: "CPO Info Sheet", description: "Certified Pre-Owned program sheet.", category: "Compliance & Documents", iconKey: "cpo-info-sheet", iconCategory: "document", route: "/cpo-sheet", tags: ["cpo", "certified", "program", "warranty"], chip: "Template" },
   { id: "used-car-sticker", title: "Used Car Sticker", description: "Window sticker for a used vehicle.", category: "Labels & Stickers", iconKey: "used-car-sticker", iconCategory: "sticker", route: "/used-car-sticker", tags: ["sticker", "label", "used", "window"], chip: "Most Used", isQuickStart: true },
   { id: "new-car-sticker", title: "New Car Sticker", description: "Monroney-style new-car window label.", category: "Labels & Stickers", iconKey: "new-car-sticker", iconCategory: "sticker", route: "/new-car-sticker", tags: ["sticker", "label", "new", "monroney", "window"], chip: "Sticker" },

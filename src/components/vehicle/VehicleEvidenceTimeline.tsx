@@ -30,12 +30,9 @@ export default function VehicleEvidenceTimeline({ vehicleId, vin, tenantId, vehi
 
   const filtered = useMemo(() => events.filter((e) => cat === "all" || e.category === cat), [events, cat]);
 
-  const launchUsedVehicleDocs = () => {
-    const query = new URLSearchParams();
-    query.set("vehicleId", vehicleId);
-    if (vin) query.set("vin", vin);
-    navigate(`/used-vehicle-documents?${query.toString()}`);
-  };
+  // The FTC Buyers Guide + CT K-208 are generated/filed in Deal Flow (the one
+  // canonical place); route there instead of the old client generator.
+  const launchUsedVehicleDocs = () => navigate(`/vehicle-file/${vehicleId}?tab=deal`);
 
   const exportPacket = () => {
     const packet = {
@@ -60,14 +57,14 @@ export default function VehicleEvidenceTimeline({ vehicleId, vin, tenantId, vehi
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <p className="text-sm font-black text-blue-950">Used vehicle compliance docs</p>
-            <p className="mt-1 text-xs text-blue-800">Generate and save FTC Buyers Guide + Connecticut K208 evidence for this vehicle.</p>
+            <p className="mt-1 text-xs text-blue-800">The official FTC Buyers Guide + Connecticut K-208 are generated and filed in Deal Flow.</p>
           </div>
           <button
             type="button"
             onClick={launchUsedVehicleDocs}
             className="inline-flex h-9 items-center justify-center gap-2 rounded-lg bg-blue-600 px-3 text-xs font-bold text-white hover:bg-blue-700"
           >
-            <ScrollText className="h-4 w-4" /> Generate FTC / K208
+            <ScrollText className="h-4 w-4" /> Open Deal Flow
           </button>
         </div>
       </div>

@@ -9,18 +9,15 @@ export type UsedVehicleDocsButtonProps = {
   className?: string;
 };
 
-const UsedVehicleDocsButton = ({ vehicleId, vin, condition, variant = "button", className = "" }: UsedVehicleDocsButtonProps) => {
+const UsedVehicleDocsButton = ({ vehicleId, condition, variant = "button", className = "" }: UsedVehicleDocsButtonProps) => {
   const navigate = useNavigate();
   const isUsedLike = condition === "used" || condition === "cpo" || !condition;
 
   if (!isUsedLike) return null;
 
-  const launch = () => {
-    const params = new URLSearchParams();
-    params.set("vehicleId", vehicleId);
-    if (vin) params.set("vin", vin);
-    navigate(`/used-vehicle-documents?${params.toString()}`);
-  };
+  // Shortcut to the vehicle's Deal Flow — the one place the official FTC Buyers
+  // Guide + CT K-208 are generated, filled, and filed.
+  const launch = () => navigate(`/vehicle-file/${vehicleId}?tab=deal`);
 
   if (variant === "menu") {
     return (

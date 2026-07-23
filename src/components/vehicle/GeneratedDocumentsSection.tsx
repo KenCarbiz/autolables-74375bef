@@ -101,10 +101,9 @@ export default function GeneratedDocumentsSection({ vehicleId }: { vehicleId: st
   const openDoc = (doc: GeneratedDocument) => {
     const url = doc.online_url || doc.pdf_url || doc.png_url;
     if (!url) {
-      // The auto-drafted Buyers Guide has no rendered file — open the Buyers
-      // Guide editor for this vehicle, where the manager confirms the warranty
-      // box and prints/publishes the FTC form.
-      if (doc.document_type === "buyers_guide") { navigate(`/buyers-guide?vehicleId=${vehicleId}`); return; }
+      // An auto-drafted compliance form (Buyers Guide / K-208) has no filled PDF
+      // yet — send the manager to Deal Flow, the one place it's filled + filed.
+      if (["buyers_guide", "k208"].includes(doc.document_type as string)) { navigate(`/vehicle-file/${vehicleId}?tab=deal`); return; }
       toast.error("No file URL on this document"); return;
     }
     window.open(url, "_blank", "noopener");

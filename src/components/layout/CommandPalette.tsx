@@ -14,7 +14,6 @@ import {
   Car,
   FileText,
   FolderOpen,
-  ScrollText,
   Award,
   TrendingUp,
   Sparkles,
@@ -187,10 +186,6 @@ const CommandPalette = ({ open, onOpenChange }: CommandPaletteProps) => {
           <CommandItem onSelect={() => go("/new-car-sticker")}>
             <FileText className="w-4 h-4 mr-2" />
             New Car Sticker
-          </CommandItem>
-          <CommandItem onSelect={() => go("/buyers-guide")}>
-            <ScrollText className="w-4 h-4 mr-2" />
-            New Buyers Guide
           </CommandItem>
           <CommandItem onSelect={() => go("/cpo-sheet")}>
             <Award className="w-4 h-4 mr-2" />

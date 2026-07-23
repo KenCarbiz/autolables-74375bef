@@ -328,7 +328,6 @@ export default function DealFlowPanel({ vehicle }: { vehicle: { id: string; vin:
       meta: record.buyersGuide
         ? [`v${record.buyersGuide.version ?? 1}`, record.buyersGuide.lang ? record.buyersGuide.lang.toUpperCase() : null, "confirm the box, then fill"].filter(Boolean).join(" · ")
         : "Not generated",
-      open: () => navigate(`/buyers-guide?vehicleId=${vehicle.id}`),
       show: record.isUsed,
     },
   ];

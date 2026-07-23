@@ -1300,12 +1300,12 @@ const LabelsPanel = ({ vehicle }: { vehicle: VehicleRow }) => {
   const links: LabelLink[] = vehicle.condition === "new"
     ? [
         { path: "/new-car-sticker", label: "New-car Monroney + Addendum", desc: "Factory-style sticker with dealer-installed accessories and doc fee.", ready: hasCore, note: hasCore ? "Ready to generate" : "Decode VIN first" },
-        { path: "/buyers-guide",    label: "FTC Buyers Guide", desc: "Official As-Is / Implied form, English or Spanish — filled in Deal Flow.", ready: hasCore, note: "Managed in Deal Flow", to: dealFlow },
+        { path: "ftc-buyers-guide",    label: "FTC Buyers Guide", desc: "Official As-Is / Implied form, English or Spanish — filled in Deal Flow.", ready: hasCore, note: "Managed in Deal Flow", to: dealFlow },
       ]
     : [
         { path: "/used-car-sticker", label: "Used-car Monroney + Addendum", desc: "Three layouts: full, equipment-only, accessories-only.", ready: hasCore && hasPrice, note: hasCore && hasPrice ? "Ready to generate" : !hasPrice ? "Price missing" : "Decode VIN first" },
         { path: "/cpo-sheet",        label: "CPO Sheet",  desc: "Certified Pre-Owned disclosure template.", ready: isCpo, note: isCpo ? "Ready to generate" : "Available for CPO vehicles only", disabled: !isCpo },
-        { path: "/buyers-guide",     label: "FTC Buyers Guide", desc: "Official As-Is / Implied form, English or Spanish — filled in Deal Flow.", ready: hasCore, note: "Managed in Deal Flow", to: dealFlow },
+        { path: "ftc-buyers-guide",     label: "FTC Buyers Guide", desc: "Official As-Is / Implied form, English or Spanish — filled in Deal Flow.", ready: hasCore, note: "Managed in Deal Flow", to: dealFlow },
         { path: "/trade-up",         label: "Trade-Up Sticker", desc: "For demo / courtesy / trade-in display units.", ready: hasCore, note: hasCore ? "Ready to generate" : "Decode VIN first" },
       ];
   return (
