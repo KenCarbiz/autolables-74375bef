@@ -120,12 +120,22 @@ export function useVehicleQrScans(vehicleId?: string | null) {
         // deno-lint-ignore no-explicit-any
         const { data } = await (supabase as any)
           .from("qr_scan_events")
-          .select("sticker_type, scanned_at")
+          .select("qr_code_id, scanned_at")
           .eq("vehicle_id", vehicleId)
           .order("scanned_at", { ascending: false });
         if (cancelled || !Array.isArray(data)) return;
+        const qrIds = Array.from(new Set(data.map((r: any) => r.qr_code_id).filter(Boolean)));
+        let typeById: Record<string, string> = {};
+        if (qrIds.length) {
+          const { data: qrRows } = await (supabase as any)
+            .from("qr_codes").select("id, sticker_type").in("id", qrIds);
+          for (const q of (qrRows || [])) typeById[q.id] = q.sticker_type || "unknown";
+        }
         const t: Record<string, number> = {};
-        for (const e of data) t[e.sticker_type || "unknown"] = (t[e.sticker_type || "unknown"] || 0) + 1;
+        for (const e of data) {
+          const ty = (e.qr_code_id && typeById[e.qr_code_id]) || "unknown";
+          t[ty] = (t[ty] || 0) + 1;
+        }
         setCount(data.length);
         setLast(data[0]?.scanned_at || null);
         setByType(t);
