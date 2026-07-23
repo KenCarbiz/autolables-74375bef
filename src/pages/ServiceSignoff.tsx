@@ -53,8 +53,25 @@ export default function ServiceSignoff() {
   const result: "pass" | "fail" = anyFail ? "fail" : "pass";
 
   // "Pass all" marks every line PASS; a car that doesn't all-pass is marked
-  // line by line, and each fail needs an explanation.
+  // line by line, and each fail needs an explanation. A single tap must never
+  // pass the whole safety inspection, so it goes through an explicit confirm.
   const passAll = () => { setMarks(Object.fromEntries(allItems.map((i) => [i.id, "pass" as Mark]))); setItemNotes({}); };
+  const [confirmPassAll, setConfirmPassAll] = useState(false);
+  const [showVin, setShowVin] = useState(false);
+  const passCount = allItems.filter((i) => marks[i.id] === "pass").length;
+  const failCount = allItems.filter((i) => marks[i.id] === "fail").length;
+
+  const badge = answered === 0 ? { label: "Inspection not started", cls: "bg-slate-200 text-slate-700" }
+    : anyFail ? { label: "Repairs required", cls: "bg-red-100 text-red-700" }
+    : !allAnswered ? { label: "Inspection in progress", cls: "bg-amber-100 text-amber-700" }
+    : { label: "Ready to submit", cls: "bg-emerald-100 text-emerald-700" };
+  const nextStep = answered === 0 ? "Start the inspection — mark each item Pass or Fail."
+    : !allAnswered ? `Mark the remaining ${allItems.length - answered} item${allItems.length - answered === 1 ? "" : "s"}.`
+    : !failsExplained ? "Explain each failed item before you submit."
+    : !inspectorName.trim() ? "Enter your name to sign."
+    : !signature.trim() ? "Sign to certify the inspection."
+    : !consent ? "Accept the certification statement."
+    : "Everything's complete — submit and sign.";
 
   const onFiles = async (files: FileList | null) => {
     if (!files || !files.length) return;
@@ -144,33 +161,61 @@ export default function ServiceSignoff() {
   }
 
   return (
-    <div className="min-h-screen bg-background pb-28">
+    <div className="min-h-screen bg-muted/20 pb-28">
+      {/* Header — vehicle + department + readiness badge */}
       <div className="sticky top-0 z-10 bg-primary text-primary-foreground px-4 py-3 shadow-sm">
-        <div className="flex items-center gap-2">
-          <ShieldCheck className="w-5 h-5" />
-          <div>
-            <div className="font-display font-bold leading-tight">Safety Inspection · CT K-208</div>
-            <div className="text-xs opacity-90">{ctx.ymm || "Vehicle"} · {ctx.vin}</div>
+        <div className="max-w-2xl mx-auto flex items-center justify-between gap-3">
+          <div className="min-w-0">
+            <div className="font-display font-bold leading-tight truncate">{ctx.ymm || "Vehicle"}</div>
+            <div className="text-xs opacity-90 flex items-center gap-1.5">
+              <span>VIN {showVin ? ctx.vin : `…${(ctx.vin || "").slice(-8)}`}</span>
+              <button onClick={() => setShowVin((v) => !v)} className="underline underline-offset-2 opacity-80">{showVin ? "hide" : "show"}</button>
+              {ctx.stock_number ? <span>· Stock {ctx.stock_number}</span> : null}
+            </div>
           </div>
+          <span className={`shrink-0 text-[11px] font-bold px-2.5 py-1 rounded-full ${badge.cls}`}>{badge.label}</span>
         </div>
       </div>
 
-      <div className="max-w-2xl mx-auto p-4 space-y-5">
+      <div className="max-w-2xl mx-auto p-4 space-y-4">
         <RecallOutcomeCard token={token} />
 
-        <div className="flex items-center justify-between gap-3">
-          <p className="text-sm text-muted-foreground">{answered} of {allItems.length} items marked</p>
-          <button onClick={passAll} className="h-9 px-3 rounded-md bg-emerald-600 text-white text-xs font-semibold">Pass all</button>
+        {/* Attention card — the single next action */}
+        <div className={`rounded-2xl border p-4 flex items-start gap-3 ${anyFail ? "border-red-200 bg-red-50" : "border-blue-200 bg-blue-50"}`}>
+          <span className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${anyFail ? "bg-red-100 text-red-700" : "bg-blue-100 text-blue-700"}`}>
+            {anyFail ? <ShieldAlert className="w-5 h-5" /> : <ShieldCheck className="w-5 h-5" />}
+          </span>
+          <div className="min-w-0">
+            <p className="text-sm font-bold text-foreground">Next: {nextStep}</p>
+            <p className="text-xs text-muted-foreground mt-0.5">CT K-208 safety inspection · Service department</p>
+          </div>
         </div>
 
-        {K208_INSPECTION_CATEGORIES.map((cat) => (
-          <div key={cat.category} className="rounded-2xl border border-border bg-card overflow-hidden">
-            <div className="px-4 py-2.5 bg-muted/50 text-xs font-bold uppercase tracking-wider text-foreground">{cat.category}</div>
-            <div className="divide-y divide-border/60">
-              {cat.items.map((item) => {
-                const failed = marks[item.id] === "fail";
-                return (
-                <div key={item.id} className="px-4 py-2.5">
+        {/* K-208 track — its own progress, never merged with reconditioning */}
+        <div className="rounded-2xl border border-border bg-card overflow-hidden">
+          <div className="px-4 py-3 border-b border-border flex items-center justify-between gap-3">
+            <div>
+              <p className="text-sm font-bold text-foreground">K-208 Safety Inspection</p>
+              <p className="text-xs text-muted-foreground mt-0.5">{answered} of {allItems.length} marked · {passCount} pass · {failCount} fail</p>
+            </div>
+            <button onClick={() => setConfirmPassAll(true)} className="h-9 px-3 rounded-md bg-emerald-600 text-white text-xs font-semibold shrink-0">Mark all passed</button>
+          </div>
+
+          {confirmPassAll && (
+            <div className="px-4 py-3 bg-amber-50 border-b border-amber-200 space-y-3">
+              <p className="text-[13px] text-amber-900"><span className="font-bold">Confirm full-pass inspection.</span> You are confirming that all {allItems.length} K-208 items were physically inspected and passed. This does not certify the form until an authorized licensee reviews and signs it.</p>
+              <div className="flex gap-2">
+                <button onClick={() => setConfirmPassAll(false)} className="h-11 px-4 rounded-md border border-border bg-card text-sm font-semibold text-foreground">Cancel</button>
+                <button onClick={() => { setConfirmPassAll(false); passAll(); }} className="h-11 px-4 rounded-md bg-emerald-600 text-white text-sm font-semibold">Yes — all {allItems.length} inspected &amp; passed</button>
+              </div>
+            </div>
+          )}
+
+          <div className="divide-y divide-border/60">
+            {allItems.map((item) => {
+              const failed = marks[item.id] === "fail";
+              return (
+                <div key={item.id} className={`px-4 py-2.5 ${failed ? "bg-red-50/60" : ""}`}>
                   <div className="flex items-center justify-between gap-3">
                     <span className="text-sm font-medium text-foreground flex-1">{item.label}</span>
                     <div className="flex gap-1.5 shrink-0">
@@ -190,14 +235,19 @@ export default function ServiceSignoff() {
                   {failed && (
                     <input autoFocus value={itemNotes[item.id] || ""} onChange={(e) => setItemNotes((s) => ({ ...s, [item.id]: e.target.value }))}
                       placeholder="Explanation of defects or repairs needed (required)"
-                      className="mt-2 w-full rounded-lg border border-red-300 bg-red-50/40 px-3 h-10 text-sm" />
+                      className="mt-2 w-full rounded-lg border border-red-300 bg-white px-3 h-10 text-sm" />
                   )}
                 </div>
-                );
-              })}
-            </div>
+              );
+            })}
           </div>
-        ))}
+        </div>
+
+        {/* Reconditioning is a separate track (detail / install), tracked on the
+            vehicle's Get-Ready record — never merged into the K-208 progress. */}
+        <div className="rounded-2xl border border-dashed border-border bg-card px-4 py-3 text-xs text-muted-foreground">
+          Reconditioning (detail &amp; installs) is signed off separately on the vehicle's Get-Ready record — it is not part of this safety inspection.
+        </div>
 
         <div className="rounded-2xl border border-border bg-card p-4 space-y-3">
           <label className="text-xs font-bold text-foreground uppercase tracking-wider">Documents & photos (optional)</label>
