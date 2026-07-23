@@ -13,7 +13,19 @@ import { SUPABASE_URL, SERVICE_KEY, adminClient, isServiceOrCron } from "../_sha
 // Auth: service-role / cron-secret (called by ingest-orchestrate).
 // ──────────────────────────────────────────────────────────────────────
 
-const APP_BASE = Deno.env.get("APP_BASE_URL") || "https://autolabels.io";
+// Resolve the app origin the emailed /ready link points at — the caller's
+// app_base, else the Origin header, else the secret, else the app host. (The old
+// autolabels.io default is the marketing site, whose /ready link 404s.)
+function resolveAppBase(req: Request, appBase?: string): string {
+  const isHttp = (u?: string | null): u is string => !!u && /^https?:\/\//i.test(u);
+  const clean = (u: string) => u.replace(/\/+$/, "");
+  if (isHttp(appBase)) return clean(appBase);
+  const origin = req.headers.get("origin");
+  if (isHttp(origin)) return clean(origin);
+  const env = Deno.env.get("APP_BASE_URL");
+  if (isHttp(env)) return clean(env);
+  return "https://app.autolabels.io";
+}
 
 // Roles that hold can_approve_print (mirrors dealerRoleCapabilities.ts). Keep in
 // sync with the accept_addendum SQL guard.
@@ -47,9 +59,16 @@ Deno.serve(async (req) => {
   if (pf) return pf;
   if (req.method !== "POST") return json(405, { error: "method not allowed" });
 
-  const body = await req.json().catch(() => ({})) as { tenant_id?: string; vin?: string; depts?: string[] };
+  const body = await req.json().catch(() => ({})) as { tenant_id?: string; vin?: string; depts?: string[]; app_base?: string; vendors?: { name?: string; email?: string }[] };
+  const appBase = resolveAppBase(req, body.app_base);
   const tenantId = body.tenant_id;
   const vin = (body.vin || "").toUpperCase().trim();
+  // Third-party vendors assigned to specific installs — each is emailed their
+  // own work order. Passed by the manager's Authorize & Dispatch (derived from
+  // get-ready items whose department is "vendor").
+  const vendors = (Array.isArray(body.vendors) ? body.vendors : [])
+    .map((v) => ({ name: String(v?.name || "Vendor").trim(), email: String(v?.email || "").trim() }))
+    .filter((v) => /.+@.+\..+/.test(v.email));
   // Which departments to dispatch. Manager acceptance requests both
   // (["detail","service"]); the auto-ingest path passes nothing and stays
   // detail-only, so a scrape never pings service before a car is accepted.
@@ -108,12 +127,20 @@ Deno.serve(async (req) => {
       recipients: fb.slice(0, 3), instructions: (settings.detail_default_instructions || "").trim(),
     });
   }
+  // Third-party vendor work orders — one per assigned vendor.
+  for (const v of vendors) {
+    targets.push({
+      dept: "vendor", subject: `Install work: ${ymm}`,
+      blurb: `You've been assigned installation work on this vehicle by the dealership. Please complete your install and submit proof (photo + signature) from your phone.`,
+      recipients: [v.email], instructions: v.name ? `Vendor: ${v.name}` : "",
+    });
+  }
   if (targets.length === 0) return json(200, { ok: false, error: "no_recipient" });
 
   let anySent = false;
   const dispatched: { dept: string; ok: boolean; recipients: number }[] = [];
   for (const t of targets) {
-    const readyUrl = `${APP_BASE}/ready/${tok.token}?dept=${t.dept}`;
+    const readyUrl = `${appBase}/ready/${tok.token}?dept=${t.dept}`;
     let qrImgUrl = "";
     try {
       const dataUrl = await qrcode(readyUrl, { size: 240 }) as string;

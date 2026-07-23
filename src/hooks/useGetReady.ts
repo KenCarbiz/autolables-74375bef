@@ -39,6 +39,11 @@ export interface CheckRequest {
   createdAt: string;
 }
 
+// Routing target for a get-ready work item. "vendor" = a third-party
+// aftermarket provider (door edge guards, tint, etc.); dispatch emails the
+// assigned vendor. Service = shop / K-208; Detail = in-house detail + installs.
+export type GetReadyDepartment = "service" | "detail" | "vendor";
+
 export interface GetReadyItem {
   id: string;
   label: string;
@@ -51,10 +56,57 @@ export interface GetReadyItem {
   installMethod?: InstallMethod;
   roNumber?: string;
   checkRequest?: CheckRequest;
+  // Which department this line routes to when the manager transmits the
+  // get-ready. Used by notify-getready to fan out only to depts with work.
+  department?: GetReadyDepartment;
+  // For department === "vendor": the assigned third-party provider notified on
+  // dispatch (a lightweight routing target; the CheckRequest carries PO/payment).
+  vendorName?: string;
+  vendorEmail?: string;
   // Internal (non-customer) recon/service line with its dealer cost. These
   // never appear on the customer addendum — they are the store's own cost.
   cost?: number;
   internal?: boolean;
+}
+
+// Default routing when an item has no explicit department (older records /
+// seeded lines): inspection + service → Service, everything else → Detail.
+export const defaultDepartmentFor = (category: GetReadyItem["category"]): GetReadyDepartment =>
+  category === "inspection" || category === "service" ? "service" : "detail";
+
+export const itemDepartment = (item: GetReadyItem): GetReadyDepartment =>
+  item.department ?? defaultDepartmentFor(item.category);
+
+// The set of departments that actually have pending work — drives the dispatch
+// fan-out so only those departments (and assigned vendors) are notified.
+export const departmentsWithWork = (items: GetReadyItem[]): GetReadyDepartment[] => {
+  const set = new Set<GetReadyDepartment>();
+  for (const it of items) if (it.status !== "complete") set.add(itemDepartment(it));
+  return Array.from(set);
+};
+
+// Derive the dispatch fan-out for a vehicle from its current get-ready items:
+// which departments have pending work, and the third-party vendors to notify.
+// Used by the manager's Authorize & Dispatch on addendum acceptance.
+export async function deriveGetReadyDispatch(
+  tenantId: string,
+  vin: string,
+): Promise<{ depts: GetReadyDepartment[]; vendors: { name: string; email: string }[] }> {
+  // deno-lint-ignore no-explicit-any
+  const { data } = await (supabase as any)
+    .from("get_ready_records")
+    .select("items")
+    .eq("tenant_id", tenantId).eq("vin", vin.toUpperCase())
+    .order("created_at", { ascending: false }).limit(1).maybeSingle();
+  const items = ((data?.items as GetReadyItem[]) || []).filter(Boolean);
+  const depts = departmentsWithWork(items);
+  const seen = new Set<string>();
+  const vendors = items
+    .filter((i) => i.status !== "complete" && itemDepartment(i) === "vendor" && i.vendorEmail)
+    .map((i) => ({ name: i.vendorName || "Vendor", email: (i.vendorEmail || "").trim() }))
+    .filter((v) => v.email && !seen.has(v.email) && seen.add(v.email));
+  // If there's no get-ready record yet, fall back to the legacy detail+service.
+  return { depts: depts.length ? depts : ["detail", "service"], vendors };
 }
 
 export interface AccessoryToInstall {

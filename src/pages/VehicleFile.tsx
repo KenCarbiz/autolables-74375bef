@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useNavigate, useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
+import { deriveGetReadyDispatch } from "@/hooks/useGetReady";
 import { useAuth } from "@/contexts/AuthContext";
 import { useTenant } from "@/contexts/TenantContext";
 import { useDealerSettings } from "@/contexts/DealerSettingsContext";
@@ -1951,8 +1952,9 @@ const AddendumPanel = ({ vehicle }: { vehicle: VehicleRow }) => {
       if (error || !data?.ok) { toast.error("Couldn't accept the addendum"); return; }
       toast.success("Addendum accepted");
       try {
+        const { depts, vendors } = await deriveGetReadyDispatch(data.tenant_id, data.vin);
         const res = await (supabase as any).functions.invoke("notify-getready", {
-          body: { tenant_id: data.tenant_id, vin: data.vin, depts: ["detail", "service"] },
+          body: { tenant_id: data.tenant_id, vin: data.vin, depts, vendors, app_base: window.location.origin },
         });
         if (res?.data?.ok) {
           await (supabase as any).rpc("mark_addendum_getready_dispatched", { _addendum_id: row.id });

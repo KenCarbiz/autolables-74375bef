@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { QRCodeSVG } from "qrcode.react";
 import { supabase } from "@/integrations/supabase/client";
+import { deriveGetReadyDispatch } from "@/hooks/useGetReady";
 import { useTenant } from "@/contexts/TenantContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { useEntitlements } from "@/hooks/useEntitlements";
@@ -134,7 +135,8 @@ export default function ReadyBoard() {
       if (error || !data?.ok) { toast.error("Couldn't accept the addendum"); return; }
       toast.success("Addendum accepted");
       try {
-        const res = await (supabase as any).functions.invoke("notify-getready", { body: { tenant_id: data.tenant_id, vin: data.vin, depts: ["detail", "service"] } });
+        const { depts, vendors } = await deriveGetReadyDispatch(data.tenant_id, data.vin);
+        const res = await (supabase as any).functions.invoke("notify-getready", { body: { tenant_id: data.tenant_id, vin: data.vin, depts, vendors, app_base: window.location.origin } });
         if (res?.data?.ok) {
           await (supabase as any).rpc("mark_addendum_getready_dispatched", { _addendum_id: a.id });
           toast.success("Get-Ready sent to the shop");
