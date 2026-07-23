@@ -6422,6 +6422,10 @@ export type Database = {
         Args: { p_tenant_id: string; p_vin: string }
         Returns: string
       }
+      create_draft_get_ready: {
+        Args: { p_tenant_id: string; p_vin: string }
+        Returns: string
+      }
       create_draft_safety_inspection: {
         Args: { p_tenant_id: string; p_vin: string }
         Returns: string
@@ -6764,6 +6768,10 @@ export type Database = {
         }
       }
       get_vehicle_ready: { Args: { _token: string }; Returns: Json }
+      getready_upsert_addendum_line: {
+        Args: { p_product_id: string; p_tenant_id: string; p_vin: string }
+        Returns: string
+      }
       has_app_access: { Args: { _app_slug: string }; Returns: boolean }
       has_role: {
         Args: {
@@ -7171,6 +7179,7 @@ export type Database = {
         }
         Returns: Json
       }
+      sweep_getready_install_safety_net: { Args: never; Returns: number }
       tenant_price_verification_on: {
         Args: { _tenant_id: string }
         Returns: boolean
