@@ -2,6 +2,27 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useTenant } from "@/contexts/TenantContext";
 
+// Derive coarse device/browser buckets from the raw user_agent — qr_scan_events
+// stores UA but has no pre-parsed columns.
+const uaDevice = (ua?: string | null): string | null => {
+  const s = (ua || "").toLowerCase();
+  if (!s) return null;
+  if (/ipad|tablet|playbook|silk|(android(?!.*mobile))/.test(s)) return "tablet";
+  if (/mobi|iphone|ipod|android|blackberry|iemobile|opera mini/.test(s)) return "mobile";
+  return "desktop";
+};
+const uaBrowser = (ua?: string | null): string | null => {
+  const s = (ua || "").toLowerCase();
+  if (!s) return null;
+  if (/edg\//.test(s)) return "Edge";
+  if (/opr\/|opera/.test(s)) return "Opera";
+  if (/samsungbrowser/.test(s)) return "Samsung Internet";
+  if (/firefox|fxios/.test(s)) return "Firefox";
+  if (/chrome|crios/.test(s)) return "Chrome";
+  if (/safari/.test(s)) return "Safari";
+  return null;
+};
+
 export interface ScanEvent {
   id: string;
   vehicle_id?: string | null;
