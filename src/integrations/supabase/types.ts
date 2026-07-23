@@ -4045,6 +4045,68 @@ export type Database = {
         }
         Relationships: []
       }
+      safety_inspection_revisions: {
+        Row: {
+          captured_at: string
+          checklist: Json | null
+          failure_notes: string | null
+          form_type: string | null
+          id: string
+          inspection_id: string
+          inspector_name: string | null
+          inspector_role: string | null
+          licensee_certified_at: string | null
+          licensee_name: string | null
+          result: string | null
+          result_initial: string | null
+          status: string | null
+          tenant_id: string
+          vin: string | null
+        }
+        Insert: {
+          captured_at?: string
+          checklist?: Json | null
+          failure_notes?: string | null
+          form_type?: string | null
+          id?: string
+          inspection_id: string
+          inspector_name?: string | null
+          inspector_role?: string | null
+          licensee_certified_at?: string | null
+          licensee_name?: string | null
+          result?: string | null
+          result_initial?: string | null
+          status?: string | null
+          tenant_id: string
+          vin?: string | null
+        }
+        Update: {
+          captured_at?: string
+          checklist?: Json | null
+          failure_notes?: string | null
+          form_type?: string | null
+          id?: string
+          inspection_id?: string
+          inspector_name?: string | null
+          inspector_role?: string | null
+          licensee_certified_at?: string | null
+          licensee_name?: string | null
+          result?: string | null
+          result_initial?: string | null
+          status?: string | null
+          tenant_id?: string
+          vin?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "safety_inspection_revisions_inspection_id_fkey"
+            columns: ["inspection_id"]
+            isOneToOne: false
+            referencedRelation: "safety_inspections"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       safety_inspections: {
         Row: {
           buyer_name: string | null
