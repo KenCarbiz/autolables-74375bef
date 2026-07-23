@@ -65,9 +65,11 @@ export function useVehicleEvidence(vehicleId?: string | null, vin?: string | nul
       if (d.rejected_at) ev.push({ id: `${d.id}-rej`, at: d.rejected_at, category: "compliance", title: `${ty} v${d.version} rejected`, detail: d.reject_reason || undefined, raw: d });
     }
 
-    // QR scans.
+    // QR scans — derive device/browser from user_agent; sticker_type not stored here.
+    const uaDev = (ua?: string | null) => { const s = (ua || "").toLowerCase(); if (!s) return null; if (/ipad|tablet|playbook|silk|(android(?!.*mobile))/.test(s)) return "tablet"; if (/mobi|iphone|ipod|android/.test(s)) return "mobile"; return "desktop"; };
+    const uaBr = (ua?: string | null) => { const s = (ua || "").toLowerCase(); if (!s) return null; if (/edg\//.test(s)) return "Edge"; if (/firefox|fxios/.test(s)) return "Firefox"; if (/chrome|crios/.test(s)) return "Chrome"; if (/safari/.test(s)) return "Safari"; return null; };
     for (const s of (Array.isArray(qrRes?.data) ? qrRes.data : [])) {
-      ev.push({ id: `qr-${s.id}`, at: s.scanned_at, category: "qr", title: `QR scanned (${cap(s.sticker_type) || "sticker"})`, detail: [s.device_type, s.browser].filter(Boolean).join(" · "), raw: s });
+      ev.push({ id: `qr-${s.id}`, at: s.scanned_at, category: "qr", title: "QR scanned", detail: [uaDev(s.user_agent), uaBr(s.user_agent)].filter(Boolean).join(" · "), raw: s });
     }
 
     // Addendums / signing.
