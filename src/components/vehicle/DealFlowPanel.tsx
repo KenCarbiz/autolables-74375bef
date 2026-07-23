@@ -325,7 +325,9 @@ export default function DealFlowPanel({ vehicle }: { vehicle: { id: string; vin:
       key: "buyersGuide", label: "FTC Buyers Guide", icon: BookOpen, official: true,
       status: s.buyersGuide ? "Published" : record.buyersGuide ? `Draft (${record.buyersGuide.box || "as-is"})` : "Not generated",
       done: s.buyersGuide,
-      meta: record.buyersGuide ? "Auto-drafted at ingest · confirm the warranty box, then fill" : "Not generated",
+      meta: record.buyersGuide
+        ? [`v${record.buyersGuide.version ?? 1}`, record.buyersGuide.lang ? record.buyersGuide.lang.toUpperCase() : null, "confirm the box, then fill"].filter(Boolean).join(" · ")
+        : "Not generated",
       open: () => navigate(`/buyers-guide?vehicleId=${vehicle.id}`),
       show: record.isUsed,
     },

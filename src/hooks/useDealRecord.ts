@@ -11,7 +11,7 @@ export interface DealRecord {
   addendum: { id: string; acceptedAt: string | null; sellingPrice: number | null; signed: boolean } | null;
   k208: { id: string; result: string | null; signedAt: string | null; certifiedAt: string | null; resultInitial: string | null } | null;
   getReady: { id: string; completeDate: string | null; detailSigned: boolean } | null;
-  buyersGuide: { id: string; status: string; box: string | null } | null;
+  buyersGuide: { id: string; status: string; box: string | null; lang: string | null; version: number | null } | null;
   processedAt: string | null;
   isUsed: boolean;
 }
@@ -35,7 +35,7 @@ export function useDealRecord(vin?: string | null, listingId?: string | null, te
       q.from("get_ready_records").select("id, get_ready_complete_date").eq("tenant_id", tenantId).eq("vin", v).limit(1).maybeSingle(),
       q.from("detail_signoffs").select("id").eq("tenant_id", tenantId).eq("vin", v).eq("status", "signed").limit(1).maybeSingle(),
       listingId
-        ? q.from("generated_documents").select("id, document_status, data_snapshot").eq("tenant_id", tenantId).eq("vehicle_id", listingId).eq("document_type", "buyers_guide").order("created_at", { ascending: false }).limit(1).maybeSingle()
+        ? q.from("generated_documents").select("id, document_status, data_snapshot, version").eq("tenant_id", tenantId).eq("vehicle_id", listingId).eq("document_type", "buyers_guide").order("created_at", { ascending: false }).limit(1).maybeSingle()
         : Promise.resolve({ data: null }),
     ]);
 
@@ -44,7 +44,7 @@ export function useDealRecord(vin?: string | null, listingId?: string | null, te
       addendum: add.data ? { id: add.data.id, acceptedAt: add.data.accepted_at ?? null, sellingPrice: add.data.selling_price ?? null, signed: add.data.status === "signed" || !!add.data.signed_at } : null,
       k208: k208.data ? { id: k208.data.id, result: k208.data.result ?? null, signedAt: k208.data.signed_at ?? null, certifiedAt: k208.data.licensee_certified_at ?? null, resultInitial: k208.data.result_initial ?? null } : null,
       getReady: gr.data ? { id: gr.data.id, completeDate: gr.data.get_ready_complete_date ?? null, detailSigned: !!detail.data?.id } : null,
-      buyersGuide: bg.data ? { id: bg.data.id, status: String(bg.data.document_status || ""), box: (bg.data.data_snapshot as { box?: string } | null)?.box ?? null } : null,
+      buyersGuide: bg.data ? { id: bg.data.id, status: String(bg.data.document_status || ""), box: (bg.data.data_snapshot as { box?: string } | null)?.box ?? null, lang: (bg.data.data_snapshot as { lang?: string } | null)?.lang ?? null, version: bg.data.version ?? null } : null,
       processedAt: listing.data?.deal_processed_at ?? null,
       isUsed: USED(cond),
     });
