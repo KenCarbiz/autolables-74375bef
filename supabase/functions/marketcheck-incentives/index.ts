@@ -112,6 +112,29 @@ serve(async (req) => {
     // Without this, a client-supplied tenant_id/vin would burn a metered
     // MarketCheck call and poison an arbitrary marketcheck_vehicle_cache row.
     if (!v) return json({ error: "not_found", incentives: [] }, 404);
+
+    // Cache gate — serve any recent cached result for this (tenant, vin, zip)
+    // before calling the paid MarketCheck API. Prevents unauthenticated callers
+    // from draining the tenant's quota by resubmitting the same VIN with many
+    // different ZIPs. TTL: 24h.
+    const CACHE_TTL_MS = 24 * 60 * 60 * 1000;
+    const { data: cached } = await admin
+      .from("marketcheck_vehicle_cache")
+      .select("incentives_customer_zip, incentives_customer_zip_code, incentives_customer_zip_pulled_at")
+      .eq("tenant_id", body.tenant_id)
+      .eq("vin", body.vin)
+      .maybeSingle();
+    if (
+      cached?.incentives_customer_zip_code === body.zip &&
+      cached?.incentives_customer_zip_pulled_at &&
+      Date.now() - new Date(cached.incentives_customer_zip_pulled_at as string).getTime() < CACHE_TTL_MS
+    ) {
+      const cachedList = Array.isArray(cached.incentives_customer_zip)
+        ? (cached.incentives_customer_zip as unknown as Incentive[])
+        : [];
+      return json({ incentives: cachedList, count: cachedList.length, cached: true });
+    }
+
     const ymm = parseYmm(v?.ymm);
     const { offers, error } = await fetchOffers({ zip: body.zip, make: ymm.make, model: ymm.model, year: ymm.year });
     if (error === "not_configured") return json({ error: "not_configured", incentives: [] });
@@ -133,6 +156,7 @@ serve(async (req) => {
     }, { onConflict: "tenant_id,vin" }).then(() => undefined, () => undefined);
     return json({ incentives, count: incentives.length });
   }
+
 
   // ── Nightly dealer-ZIP batch ─────────────────────────────────────
   if (body.batch) {
