@@ -194,6 +194,51 @@ export default function K208Document() {
 
         <div className="text-center text-[10px] font-bold mt-4 border border-black py-1">A COPY OF THIS DOCUMENT MUST BE PROVIDED TO THE BUYER</div>
       </div>
+
+      <div className="no-print max-w-[850px] mx-auto mt-4">
+        <K208History inspectionId={insp.id} />
+      </div>
+    </div>
+  );
+}
+
+interface Revision { id: string; result: string | null; result_initial: string | null; status: string | null; inspector_name: string | null; failure_notes: string | null; captured_at: string }
+
+// Repair / re-inspection history — every prior state of this K-208, preserved so
+// an original failure is never erased when an item is repaired and re-inspected.
+function K208History({ inspectionId }: { inspectionId: string }) {
+  const [revs, setRevs] = useState<Revision[] | null>(null);
+  useEffect(() => {
+    let off = false;
+    (async () => {
+      const { data } = await sb().from("safety_inspection_revisions")
+        .select("id, result, result_initial, status, inspector_name, failure_notes, captured_at")
+        .eq("inspection_id", inspectionId).order("captured_at", { ascending: false });
+      if (!off) setRevs((data || []) as Revision[]);
+    })();
+    return () => { off = true; };
+  }, [inspectionId]);
+
+  if (!revs || revs.length === 0) return null;
+  const failed = (r: Revision) => r.result === "fail";
+  return (
+    <div className="rounded-xl border border-border bg-card p-4">
+      <p className="text-sm font-semibold text-foreground mb-2">Repair &amp; re-inspection history</p>
+      <p className="text-xs text-muted-foreground mb-3">Prior states of this inspection, kept for the record — an original failure is never overwritten.</p>
+      <ul className="space-y-2">
+        {revs.map((r) => (
+          <li key={r.id} className="flex items-start gap-3 text-sm border-t border-border/60 pt-2 first:border-0 first:pt-0">
+            <span className={`mt-0.5 text-[10px] font-bold uppercase px-1.5 py-0.5 rounded ${failed(r) ? "bg-red-100 text-red-700" : "bg-emerald-100 text-emerald-700"}`}>{r.result || r.status || "—"}</span>
+            <div className="min-w-0 flex-1">
+              <p className="text-foreground">
+                {r.result_initial ? `Result ${r.result_initial} · ` : ""}{r.status || ""}{r.inspector_name ? ` · ${r.inspector_name}` : ""}
+              </p>
+              {r.failure_notes && <p className="text-xs text-muted-foreground truncate">{r.failure_notes}</p>}
+            </div>
+            <span className="text-[11px] text-muted-foreground whitespace-nowrap">{new Date(r.captured_at).toLocaleString(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}</span>
+          </li>
+        ))}
+      </ul>
     </div>
   );
 }
