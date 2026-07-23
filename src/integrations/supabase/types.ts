@@ -205,6 +205,7 @@ export type Database = {
       }
       addendums: {
         Row: {
+          accepted_at: string | null
           addendum_date: string | null
           cobuyer_name: string | null
           cobuyer_signature_data: string | null
@@ -271,6 +272,7 @@ export type Database = {
           warranty_ack: boolean | null
         }
         Insert: {
+          accepted_at?: string | null
           addendum_date?: string | null
           cobuyer_name?: string | null
           cobuyer_signature_data?: string | null
@@ -337,6 +339,7 @@ export type Database = {
           warranty_ack?: boolean | null
         }
         Update: {
+          accepted_at?: string | null
           addendum_date?: string | null
           cobuyer_name?: string | null
           cobuyer_signature_data?: string | null
@@ -5456,6 +5459,7 @@ export type Database = {
           condition: string | null
           created_at: string
           created_by: string | null
+          deal_processed_at: string | null
           dealer_discount: number | null
           dealer_snapshot: Json
           default_locale: string
@@ -5540,6 +5544,7 @@ export type Database = {
           condition?: string | null
           created_at?: string
           created_by?: string | null
+          deal_processed_at?: string | null
           dealer_discount?: number | null
           dealer_snapshot?: Json
           default_locale?: string
@@ -5624,6 +5629,7 @@ export type Database = {
           condition?: string | null
           created_at?: string
           created_by?: string | null
+          deal_processed_at?: string | null
           dealer_discount?: number | null
           dealer_snapshot?: Json
           default_locale?: string
@@ -6676,6 +6682,7 @@ export type Database = {
           condition: string | null
           created_at: string
           created_by: string | null
+          deal_processed_at: string | null
           dealer_discount: number | null
           dealer_snapshot: Json
           default_locale: string
