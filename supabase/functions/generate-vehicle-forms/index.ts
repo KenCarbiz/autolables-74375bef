@@ -205,9 +205,14 @@ async function fillK208(base: string, v: Vehicle, d: Dealer): Promise<Uint8Array
 async function fileForm(admin: any, tenantId: string, vin: string, vehicleId: string | null, docType: string, bytes: Uint8Array, year: string, snapExtra?: Record<string, unknown>): Promise<string> {
   const hash = await sha256Hex(bytes);
   const path = `${tenantId}/${docType}/${year || "na"}/${vin}-${hash.slice(0, 12)}.pdf`;
-  await admin.storage.from(BUCKET).upload(path, bytes, { contentType: "application/pdf", upsert: true });
-  const { data: signed } = await admin.storage.from(BUCKET).createSignedUrl(path, 60 * 60 * 24 * 7);
-  const url = signed?.signedUrl || "";
+  // Never swallow a storage failure: a missing bucket or denied upload used to
+  // fall through to an empty signed URL, which the caller happily filed as a
+  // "success" with no openable PDF. Surface it so the fill genuinely fails.
+  const { error: upErr } = await admin.storage.from(BUCKET).upload(path, bytes, { contentType: "application/pdf", upsert: true });
+  if (upErr) throw new Error(`storage upload failed (${BUCKET}/${path}): ${upErr.message}`);
+  const { data: signed, error: signErr } = await admin.storage.from(BUCKET).createSignedUrl(path, 60 * 60 * 24 * 7);
+  if (signErr || !signed?.signedUrl) throw new Error(`signed url failed (${BUCKET}/${path}): ${signErr?.message || "no url returned"}`);
+  const url = signed.signedUrl;
   try {
     await admin.from("signed_document_archive").insert({
       tenant_id: tenantId, doc_type: docType, entity_id: vehicleId || vin, vin,
