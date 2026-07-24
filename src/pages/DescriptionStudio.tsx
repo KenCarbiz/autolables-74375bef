@@ -522,8 +522,8 @@ const DescriptionStudio = () => {
             <div className="mt-4 flex flex-wrap gap-3">
               <Button onClick={copy} icon={copied ? CheckCircle2 : Copy} label={copied ? "Copied" : "Copy"} />
               <Button onClick={() => downloadText(description)} icon={Download} label="Download .txt" />
-              <Button onClick={() => toast.success("Saved to vehicle")} icon={Save} label="Save to Vehicle" />
-              <button onClick={() => toast.success("Pushed to inventory")} className="inline-flex h-11 items-center gap-2 rounded-xl bg-blue-600 px-4 text-sm font-black text-white"><Send className="h-4 w-4" /> Push to Inventory</button>
+              <Button onClick={() => toast.info("This manual studio does not save. Use Description Operations to persist and publish.")} icon={Save} label="Save to Vehicle" />
+              <button onClick={() => toast.info("This manual studio cannot publish. Use Description Operations to publish internally.")} className="inline-flex h-11 items-center gap-2 rounded-xl bg-blue-600 px-4 text-sm font-black text-white"><Send className="h-4 w-4" /> Push to Inventory</button>
             </div>
           </Card>
 

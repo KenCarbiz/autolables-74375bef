@@ -39,7 +39,7 @@ function StatCard({ label, value, tone, Icon, active, onClick }: {
 export default function DescriptionOperations() {
   const navigate = useNavigate();
   const perms = useDescriptionPermissions();
-  const { cases, vehicles, summary, error, reload, reconcile } = useDescriptionOperations();
+  const { cases, vehicles, channelCounts, summary, error, reload, reconcile } = useDescriptionOperations();
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [conditionFilter, setConditionFilter] = useState<string>("all");
@@ -60,7 +60,10 @@ export default function DescriptionOperations() {
     return cases.filter((c) => {
       const v = vehicles[c.vehicle_id] || {};
       if (statusFilter === "exceptions" && c.open_exception_count === 0) return false;
-      if (statusFilter !== "all" && statusFilter !== "exceptions" && c.status !== statusFilter) return false;
+      // these two cards count a family of states, so they must filter the same family
+      if (statusFilter === "FAILED_BLOCKED" && !["FAILED_BLOCKED", "FAILED_RETRYABLE"].includes(c.status)) return false;
+      if (statusFilter === "STALE" && !(c.status === "STALE" || c.potentially_stale)) return false;
+      if (!["all", "exceptions", "FAILED_BLOCKED", "STALE"].includes(statusFilter) && c.status !== statusFilter) return false;
       if (conditionFilter !== "all" && String(v.condition || "").toLowerCase() !== conditionFilter) return false;
       if (!q) return true;
       return [c.vin, v.ymm, v.trim, (v.mc_attributes || {}).stock_no]
@@ -204,7 +207,7 @@ export default function DescriptionOperations() {
                     const conf = factConfidenceLabel(c.fact_confidence);
                     const blocked = c.publication_eligibility === "blocked";
                     const needsReview = c.publication_eligibility === "review_required";
-                    const ready = CHANNEL_META.filter((ch) => ch.deliveryMode === "internal_projection").length;
+                    const cc = channelCounts[c.id];
                     return (
                       <tr key={c.id} className="hover:bg-primary/[0.025] transition-colors">
                         <td className="px-4 py-3">
@@ -227,7 +230,14 @@ export default function DescriptionOperations() {
                             ? <span className="text-[12px] font-semibold text-emerald-700">Published</span>
                             : <span className="text-[12px] text-muted-foreground">Not published</span>}
                         </td>
-                        <td className="px-3 py-3 text-[12px] text-muted-foreground">{ready} internal · {CHANNEL_META.length - ready} export</td>
+                        <td className="px-3 py-3 text-[12px]">
+                          {cc ? (
+                            <span className={cc.ready === cc.total ? "text-emerald-700 font-semibold"
+                              : cc.ready === 0 ? "text-red-600 font-semibold" : "text-amber-700 font-semibold"}>
+                              {cc.ready} / {cc.total}
+                            </span>
+                          ) : <span className="text-muted-foreground">Not generated</span>}
+                        </td>
                         <td className="px-3 py-3 text-[11.5px] text-muted-foreground whitespace-nowrap">
                           {c.updated_at ? new Date(c.updated_at).toLocaleDateString() : "—"}
                         </td>

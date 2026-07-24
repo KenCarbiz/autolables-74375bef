@@ -221,17 +221,17 @@ export default function DescriptionIntelligence() {
           {perms.canResolve && (
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 mt-3">
               <button disabled={busy}
-                onClick={() => act(() => resolveException(blockingException.id, "confirmed_included", true), "Resolved — regenerating")}
+                onClick={() => act(() => resolveException(blockingException.id, String(blockingException.details_json?.field || blockingException.exception_type), "include", true), "Resolved — regenerating")}
                 className="h-11 px-3 rounded-lg border border-emerald-300 bg-emerald-50 text-emerald-800 text-[12.5px] font-semibold text-left disabled:opacity-60">
                 Confirm included<span className="block text-[11px] font-normal opacity-80">Include in description</span>
               </button>
               <button disabled={busy}
-                onClick={() => act(() => resolveException(blockingException.id, "confirmed_not_included", true), "Resolved — regenerating")}
+                onClick={() => act(() => resolveException(blockingException.id, String(blockingException.details_json?.field || blockingException.exception_type), "exclude", true), "Resolved — regenerating")}
                 className="h-11 px-3 rounded-lg border border-rose-300 bg-rose-50 text-rose-800 text-[12.5px] font-semibold text-left disabled:opacity-60">
                 Confirm not included<span className="block text-[11px] font-normal opacity-80">Exclude from description</span>
               </button>
               <button disabled={busy}
-                onClick={() => act(() => resolveException(blockingException.id, "keep_excluded", false), "Kept excluded")}
+                onClick={() => act(() => resolveException(blockingException.id, String(blockingException.details_json?.field || blockingException.exception_type), "exclude", false), "Kept excluded")}
                 className="h-11 px-3 rounded-lg border border-border bg-card text-foreground text-[12.5px] font-semibold text-left disabled:opacity-60">
                 Keep excluded<span className="block text-[11px] font-normal opacity-80">Keep current exclusion</span>
               </button>

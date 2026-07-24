@@ -45,24 +45,36 @@ export function useDescriptionOperations() {
   const [cases, setCases] = useState<DescriptionCaseRow[] | null>(null);
   const [vehicles, setVehicles] = useState<Record<string, Row>>({});
   const [summary, setSummary] = useState<OpsSummary | null>(null);
+  const [channelCounts, setChannelCounts] = useState<Record<string, { total: number; ready: number }>>({});
   const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     if (!tenant?.id) return;
     setError(null);
     try {
-      const [caseRes, vehRes] = await Promise.all([
+      const [caseRes, vehRes, chanRes] = await Promise.all([
         (supabase as any).from("description_cases").select("*")
           .eq("tenant_id", tenant.id).is("archived_at", null)
           .order("updated_at", { ascending: false }).limit(500),
         (supabase as any).from("vehicle_listings")
           .select("id, vin, ymm, trim, condition, mileage, status, hero_image_url, mc_attributes")
           .eq("tenant_id", tenant.id).in("status", ["draft", "published"]).limit(1000),
+        (supabase as any).from("description_channel_versions")
+          .select("description_case_id, channel, validation_status").eq("tenant_id", tenant.id).limit(5000),
       ]);
       if (caseRes.error) throw caseRes.error;
       const rows = (caseRes.data || []) as DescriptionCaseRow[];
       const vmap: Record<string, Row> = {};
       for (const v of vehRes.data || []) vmap[v.id] = v;
+      // real per-case channel counts, so the table reports measurements
+      // rather than a constant derived from the static channel list
+      const cmap: Record<string, { total: number; ready: number }> = {};
+      for (const cv of chanRes.data || []) {
+        const e = (cmap[cv.description_case_id] ||= { total: 0, ready: 0 });
+        e.total += 1;
+        if (cv.validation_status === "passed" || cv.validation_status === "warning") e.ready += 1;
+      }
+      setChannelCounts(cmap);
       setCases(rows);
       setVehicles(vmap);
 
@@ -97,7 +109,7 @@ export function useDescriptionOperations() {
     return { ok: true, examined: (data as any)?.examined ?? 0 };
   }, [tenant?.id, load]);
 
-  return { tenantId: tenant?.id ?? null, cases, vehicles, summary, error, reload: load, reconcile };
+  return { tenantId: tenant?.id ?? null, cases, vehicles, channelCounts, summary, error, reload: load, reconcile };
 }
 
 export function useDescriptionCase(vehicleId: string | undefined) {
@@ -160,7 +172,8 @@ export function useDescriptionCase(vehicleId: string | undefined) {
     if (error) return { ok: false, error: error.message };
     if ((data as any)?.error) return { ok: false, error: String((data as any).error) };
     await load();
-    return { ok: true, result: data };
+    // the server tells us whether a version was actually produced
+    return { ok: true, generated: (data as any)?.generated !== false, result: data };
   }, [tenant?.id, vehicleId, load]);
 
   // Internal publication is a server RPC guarded by optimistic concurrency:
@@ -204,29 +217,63 @@ export function useDescriptionCase(vehicleId: string | undefined) {
   }, [record, tenant?.id, load]);
 
   const setChannelLock = useCallback(async (channelVersionId: string, locked: boolean, reason?: string) => {
-    const { data: userRes } = await supabase.auth.getUser();
-    const { error } = await (supabase as any).from("description_channel_versions").update({
-      locked, locked_by: locked ? userRes?.user?.id ?? null : null,
-      locked_at: locked ? new Date().toISOString() : null, lock_reason: locked ? reason ?? null : null,
-    }).eq("id", channelVersionId);
+    const caseRow = record?.caseRow;
+    if (!caseRow) return { ok: false, error: "no case" };
+    const { data, error } = await (supabase as any).rpc("set_description_lock", {
+      p_case_id: caseRow.id, p_scope: "channel", p_locked: locked,
+      p_channel_version_id: channelVersionId, p_reason: reason ?? null,
+    });
     if (error) return { ok: false, error: error.message };
+    if ((data as any)?.ok === false) return { ok: false, error: String((data as any).error) };
     await load();
     return { ok: true };
-  }, [load]);
+  }, [record?.caseRow, load]);
 
-  const resolveException = useCallback(async (exceptionId: string, resolution: string, regenerate: boolean) => {
-    const { data: userRes } = await supabase.auth.getUser();
+  const setMasterLock = useCallback(async (locked: boolean, reason?: string) => {
+    const caseRow = record?.caseRow;
+    if (!caseRow) return { ok: false, error: "no case" };
+    const { data, error } = await (supabase as any).rpc("set_description_lock", {
+      p_case_id: caseRow.id, p_scope: "master", p_locked: locked,
+      p_channel_version_id: null, p_reason: reason ?? null,
+    });
+    if (error) return { ok: false, error: error.message };
+    if ((data as any)?.ok === false) return { ok: false, error: String((data as any).error) };
+    await load();
+    return { ok: true };
+  }, [record?.caseRow, load]);
+
+  const approveVersion = useCallback(async (versionId: string, approve = true) => {
+    const caseRow = record?.caseRow;
+    if (!caseRow) return { ok: false, error: "no case" };
+    const { data, error } = await (supabase as any).rpc("approve_description_version", {
+      p_case_id: caseRow.id, p_version_id: versionId, p_approve: approve, p_note: null,
+    });
+    if (error) return { ok: false, error: error.message };
+    if ((data as any)?.ok === false) return { ok: false, error: String((data as any).error) };
+    await load();
+    return { ok: true };
+  }, [record?.caseRow, load]);
+
+  // The decision is persisted as a fact override, which the next snapshot
+  // honors — without it the same conflict is re-derived and blocks forever.
+  const resolveException = useCallback(async (
+    exceptionId: string, fieldKey: string, decision: "include" | "exclude", regenerate: boolean,
+  ) => {
+    const caseRow = record?.caseRow;
+    if (!caseRow) return { ok: false, error: "no case" };
     setBusy(true);
-    const { error } = await (supabase as any).from("description_exceptions").update({
-      status: "resolved", resolution, resolved_by: userRes?.user?.id ?? null,
-      resolved_at: new Date().toISOString(),
-    }).eq("id", exceptionId);
+    const { data, error } = await (supabase as any).rpc("resolve_description_conflict", {
+      p_case_id: caseRow.id, p_exception_id: exceptionId, p_field_key: fieldKey,
+      p_decision: decision, p_value: null, p_reason: decision,
+    });
     if (error) { setBusy(false); return { ok: false, error: error.message }; }
+    if ((data as any)?.ok === false) { setBusy(false); return { ok: false, error: String((data as any).error) }; }
     if (regenerate) { setBusy(false); return await generate("conflict_resolved"); }
     setBusy(false);
     await load();
     return { ok: true };
-  }, [generate, load]);
+  }, [record?.caseRow, generate, load]);
 
-  return { record, busy, error, reload: load, generate, publishInternally, saveManualVersion, setChannelLock, resolveException };
+  return { record, busy, error, reload: load, generate, publishInternally, saveManualVersion,
+           setChannelLock, setMasterLock, approveVersion, resolveException };
 }

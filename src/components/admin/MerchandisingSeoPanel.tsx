@@ -27,6 +27,35 @@ const CLASSES = [
 // deno-lint-ignore-file no-explicit-any
 type Settings = Record<string, any>;
 
+const input = "w-full h-10 rounded-lg border border-border bg-background px-3 text-sm";
+
+// Declared at module scope on purpose: defining these inside the component
+// gives them a new identity every render, which remounts each <input> and
+// drops the caret after a single keystroke.
+function Field({ label, help, children }: { label: string; help?: string; children: React.ReactNode }) {
+  return (
+    <label className="block">
+      <span className="text-[12px] font-bold text-foreground">{label}</span>
+      {help && <span className="block text-[11px] text-muted-foreground mb-1">{help}</span>}
+      <div className="mt-1">{children}</div>
+    </label>
+  );
+}
+
+function ToggleRow({ checked, onChange, label, help }: {
+  checked: boolean; onChange: (v: boolean) => void; label: string; help: string;
+}) {
+  return (
+    <label className="flex items-start gap-2.5 rounded-xl border border-border p-3 cursor-pointer">
+      <input type="checkbox" checked={checked} onChange={(e) => onChange(e.target.checked)} className="mt-0.5" />
+      <span className="min-w-0">
+        <span className="block text-[12.5px] font-semibold text-foreground">{label}</span>
+        <span className="block text-[11px] text-muted-foreground">{help}</span>
+      </span>
+    </label>
+  );
+}
+
 export default function MerchandisingSeoPanel() {
   const { tenant } = useTenant();
   const perms = useDescriptionPermissions();
@@ -54,10 +83,16 @@ export default function MerchandisingSeoPanel() {
   const save = async () => {
     if (!s || !tenant?.id) return;
     setSaving(true);
-    const { error } = await (supabase as any).from("description_settings")
-      .upsert({ ...s, tenant_id: tenant.id }, { onConflict: "tenant_id" });
+    const { data, error } = await (supabase as any).rpc("save_description_settings", {
+      p_tenant_id: tenant.id, p_settings: s,
+    });
     setSaving(false);
     if (error) { toast.error("Could not save settings"); return; }
+    if ((data as any)?.ok === false) {
+      toast.error((data as any).error === "insufficient_permission"
+        ? "You do not have permission to change these settings." : "Could not save settings");
+      return;
+    }
     toast.success("Merchandising & SEO settings saved");
   };
 
@@ -73,22 +108,8 @@ export default function MerchandisingSeoPanel() {
     );
   }
 
-  const Field = ({ label, help, children }: { label: string; help?: string; children: React.ReactNode }) => (
-    <label className="block">
-      <span className="text-[12px] font-bold text-foreground">{label}</span>
-      {help && <span className="block text-[11px] text-muted-foreground mb-1">{help}</span>}
-      <div className="mt-1">{children}</div>
-    </label>
-  );
-  const input = "w-full h-10 rounded-lg border border-border bg-background px-3 text-sm";
   const Toggle = ({ k, label, help }: { k: string; label: string; help: string }) => (
-    <label className="flex items-start gap-2.5 rounded-xl border border-border p-3 cursor-pointer">
-      <input type="checkbox" checked={!!s[k]} onChange={(e) => set(k, e.target.checked)} className="mt-0.5" />
-      <span className="min-w-0">
-        <span className="block text-[12.5px] font-semibold text-foreground">{label}</span>
-        <span className="block text-[11px] text-muted-foreground">{help}</span>
-      </span>
-    </label>
+    <ToggleRow checked={!!s[k]} onChange={(v) => set(k, v)} label={label} help={help} />
   );
 
   return (

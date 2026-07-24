@@ -16,7 +16,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 import {
   CHANNELS, channelByKey, buildFactSnapshot, buildMasterPrompt, buildChannelPrompt,
   computeSourceDataVersion, computeConfigVersion, validateContent, qualityScore,
-  decideEligibility, type FactSnapshot, type Finding,
+  decideEligibility, type FactSnapshot, type Finding, type FactOverride,
 } from "../_shared/description-core.ts";
 
 const cors = {
@@ -49,10 +49,12 @@ async function callGenerator(prompt: string): Promise<string> {
   });
   if (!res.ok) {
     const t = await res.text().catch(() => "");
-    throw Object.assign(new Error(`generator_failed:${res.status}`), {
-      code: res.status === 429 ? "RATE_LIMIT" : "PROVIDER_ERROR",
-      detail: t.slice(0, 400),
-    });
+    // 429 and 5xx are transient; any other 4xx is a deterministic input
+    // problem that would fail identically on every retry.
+    const code = res.status === 429 ? "RATE_LIMIT"
+      : res.status >= 500 ? "PROVIDER_ERROR"
+      : "INVALID_INPUT";
+    throw Object.assign(new Error(`generator_failed:${res.status}`), { code, detail: t.slice(0, 400) });
   }
   const body = await res.json();
   const text = String(body?.description || "").trim();
@@ -81,12 +83,15 @@ async function raiseException(
   type: string, severity: string, blocking: boolean, title: string, summary: string,
   details: Record<string, unknown> = {}, channel: string | null = null,
 ) {
-  // the partial-unique index keeps one open exception per (case, type, channel)
-  await admin.from("description_exceptions").upsert({
-    tenant_id: c.tenant_id, vehicle_id: c.vehicle_id, description_case_id: c.case_id,
-    exception_type: type, severity, blocking, title, summary, details_json: details,
-    channel, status: "open",
-  }, { onConflict: "description_case_id,exception_type,channel", ignoreDuplicates: true });
+  // Dedupe happens inside the RPC. A PostgREST upsert cannot target the
+  // partial expression index, and a swallowed failure here would leave the
+  // whole exception queue silently empty.
+  const { error } = await admin.rpc("raise_description_exception", {
+    p_tenant_id: c.tenant_id, p_vehicle_id: c.vehicle_id, p_case_id: c.case_id,
+    p_type: type, p_severity: severity, p_blocking: blocking,
+    p_title: title, p_summary: summary, p_details: details, p_channel: channel,
+  });
+  if (error) console.error("raise_description_exception failed", type, error.message);
 }
 
 async function audit(admin: any, tenantId: string, action: string, caseId: string, details: Record<string, unknown>) {
@@ -98,16 +103,24 @@ async function audit(admin: any, tenantId: string, action: string, caseId: strin
   } catch { /* audit must never break the pipeline */ }
 }
 
-async function setCase(admin: any, caseId: string, patch: Record<string, unknown>) {
+async function setCase(admin: any, caseId: string, patch: Record<string, unknown>, bump = false) {
+  // bump=true advances the optimistic-concurrency counter, so an approval
+  // issued against copy that has since been regenerated is rejected.
+  if (bump) {
+    const { data: cur } = await admin.from("description_cases").select("lock_version").eq("id", caseId).maybeSingle();
+    patch = { ...patch, lock_version: (cur?.lock_version ?? 0) + 1 };
+  }
   await admin.from("description_cases").update({ ...patch, updated_at: new Date().toISOString() }).eq("id", caseId);
 }
 
 // ── The pipeline for a single vehicle ────────────────────────────────
 async function orchestrateVehicle(
-  admin: any, tenantId: string, vehicleId: string, opts: { force?: boolean; reason?: string } = {},
+  admin: any, tenantId: string, vehicleId: string, opts: { force?: boolean; reason?: string; channels?: string[] } = {},
 ): Promise<Record<string, unknown>> {
   const { data: listing } = await admin.from("vehicle_listings").select("*").eq("id", vehicleId).maybeSingle();
   if (!listing) return { vehicle_id: vehicleId, skipped: "listing_not_found" };
+  // A NULL-tenant listing must never be adopted by whoever asks first.
+  if (listing.tenant_id !== tenantId) return { vehicle_id: vehicleId, skipped: "tenant_mismatch" };
   if (listing.status === "archived") return { vehicle_id: vehicleId, skipped: "archived" };
 
   const { data: caseId } = await admin.rpc("init_description_case", {
@@ -122,6 +135,14 @@ async function orchestrateVehicle(
   await setCase(admin, caseId, { current_source_data_version: sdv, configuration_version: configVersion });
 
   // Idempotency: identical inputs + identical config → nothing to do.
+  // Inputs changed under a locked or published case: flag it rather than
+  // silently overwriting a human's copy.
+  if (existing && existing.processed_source_data_version &&
+      existing.processed_source_data_version !== sdv &&
+      (existing.master_locked || existing.status === "PUBLISHED")) {
+    await admin.rpc("mark_description_stale", { p_case_id: caseId, p_reason: "source data changed" });
+  }
+
   if (!opts.force && existing?.processed_source_data_version === sdv &&
       ["READY", "PUBLISHED", "PARTIALLY_PUBLISHED", "REVIEW_REQUIRED"].includes(existing?.status)) {
     return { vehicle_id: vehicleId, case_id: caseId, skipped: "unchanged", source_data_version: sdv };
@@ -156,7 +177,12 @@ async function orchestrateVehicle(
     // 1 ── facts
     await setCase(admin, caseId, { status: "BUILDING_FACTS" });
     const { data: dealer } = await admin.from("dealer_profiles").select("*").eq("tenant_id", tenantId).maybeSingle();
-    const snap: FactSnapshot = buildFactSnapshot(listing, settings, dealer);
+    // Resolved conflicts are durable decisions — honor them so a vehicle a
+    // manager already ruled on never blocks on the same conflict again.
+    const { data: ovRows } = await admin.from("description_fact_overrides")
+      .select("field_key, decision, value").eq("description_case_id", caseId);
+    const overrides = (ovRows || []) as FactOverride[];
+    const snap: FactSnapshot = buildFactSnapshot(listing, settings, dealer, overrides);
 
     const { data: snapRow } = await admin.from("description_fact_snapshots").insert({
       tenant_id: tenantId, vehicle_id: vehicleId, description_case_id: caseId,
@@ -221,8 +247,14 @@ async function orchestrateVehicle(
       .update({ validation_status: masterStatus, quality_score: quality }).eq("id", version.id);
 
     // 4 ── channel variants
-    const enabled: string[] = Array.isArray(settings.enabled_channels) ? settings.enabled_channels : [];
+    const allEnabled: string[] = Array.isArray(settings.enabled_channels) ? settings.enabled_channels : [];
+    // Selective regeneration: when the caller names channels, only those are
+    // rebuilt; everything else keeps its existing variant.
+    const scoped = Array.isArray(opts.channels) && opts.channels.length
+      ? allEnabled.filter((k) => opts.channels!.includes(k)) : allEnabled;
+    const enabled = scoped;
     const channelRows: Array<Record<string, unknown>> = [];
+    const channelBlocking: Finding[] = [];
     for (const key of enabled) {
       const ch = channelByKey(key);
       if (!ch) continue;
@@ -276,6 +308,9 @@ async function orchestrateVehicle(
             cFindings.find((f) => f.validator_code === "CHANNEL_LENGTH_EXCEEDED")!.message, {}, key);
         }
         channelRows.push({ channel: key, status: cStatus });
+        // A channel variant that introduces an unsupported claim must not be
+        // exportable while the case reports "eligible".
+        if (cStatus === "blocked") channelBlocking.push(...cFindings.filter((f) => f.blocking));
       } catch (e) {
         await raiseException(admin, ctx, "CHANNEL_GENERATION_FAILED", "medium", false,
           `${ch.label} variant could not be generated`, String((e as Error).message).slice(0, 200), {}, key);
@@ -283,7 +318,7 @@ async function orchestrateVehicle(
     }
 
     // 5 ── eligibility + honest publication
-    const { eligibility, reason } = decideEligibility(findings, settings, listing.condition || "used");
+    const { eligibility, reason } = decideEligibility([...findings, ...channelBlocking], settings, listing.condition || "used");
     await audit(admin, tenantId, "description_validation_completed", caseId,
       { vin: listing.vin, version_id: version.id, findings: findings.length,
         blocking: findings.filter((f) => f.blocking).length, eligibility, quality });
@@ -307,12 +342,16 @@ async function orchestrateVehicle(
       fact_confidence: snap.fact_confidence, quality_score: quality,
       potentially_stale: false, last_orchestrated_at: new Date().toISOString(),
       last_success_at: new Date().toISOString(), last_error_message: null,
-    });
+    }, true);
 
     // Auto-publish only when eligible, permitted, and not manually locked.
     let published = false;
     const { data: caseNow } = await admin.from("description_cases").select("lock_version, master_locked").eq("id", caseId).maybeSingle();
-    if (eligibility === "eligible" && settings.internal_publication_enabled && !caseNow?.master_locked) {
+    const { data: gate } = await admin.rpc("description_publish_allowed", {
+      p_case_id: caseId, p_version_id: version.id,
+    });
+    const gateOk = (gate as any)?.ok !== false;
+    if (eligibility === "eligible" && settings.internal_publication_enabled && !caseNow?.master_locked && gateOk) {
       const { data: pub } = await admin.rpc("publish_description_internal", {
         p_case_id: caseId, p_version_id: version.id, p_expected_lock_version: caseNow?.lock_version ?? null,
       });
@@ -324,7 +363,7 @@ async function orchestrateVehicle(
     }
 
     // Record honest state for every external destination: modeled, never delivered.
-    for (const key of enabled) {
+    for (const key of allEnabled) {
       const ch = channelByKey(key);
       if (!ch || ch.deliveryMode === "internal_projection") continue;
       await admin.from("description_deliveries").upsert({
@@ -361,6 +400,7 @@ async function orchestrateVehicle(
   } catch (e) {
     const err = e as Error & { code?: string };
     const retryable = err.code === "RATE_LIMIT" || err.code === "PROVIDER_ERROR" || !err.code;
+    // INVALID_INPUT is deterministic — retrying only wastes the attempt budget.
     await failJob(err.code || "UNKNOWN", err.message || "unknown error", retryable);
     return { vehicle_id: vehicleId, case_id: caseId, error: err.code || "UNKNOWN", retryable };
   }
@@ -399,18 +439,66 @@ serve(async (req) => {
       const vehicleId = String(body.vehicle_id || "");
       if (!tenantId || !vehicleId) return json({ error: "tenant_id and vehicle_id required" }, 400);
       if (!allowed(tenantId)) return json({ error: "forbidden" }, 403);
-      const result = await orchestrateVehicle(admin, tenantId, vehicleId, {
+      const result: Record<string, unknown> = await orchestrateVehicle(admin, tenantId, vehicleId, {
         force: action === "regenerate" || !!body.force,
         reason: action === "regenerate" ? "manual_regenerate" : String(body.reason || "ingest"),
+        channels: Array.isArray(body.channels) ? body.channels.map(String) : undefined,
       });
-      return json({ success: !result.error, ...result });
+      // "skipped" is not success-with-a-new-version; say so plainly so the
+      // UI cannot claim work that did not happen.
+      return json({ success: !result.error, generated: !result.error && !result.skipped, ...result });
+    }
+
+    if (action === "validate") {
+      // A human edit must clear the same validators as generated copy before
+      // it can ever reach a shopper.
+      const tenantId = String(body.tenant_id || "");
+      const versionId = String(body.version_id || "");
+      if (!tenantId || !versionId) return json({ error: "tenant_id and version_id required" }, 400);
+      if (!allowed(tenantId)) return json({ error: "forbidden" }, 403);
+
+      const { data: ver } = await admin.from("description_versions").select("*").eq("id", versionId).maybeSingle();
+      if (!ver || ver.tenant_id !== tenantId) return json({ error: "version_not_found" }, 404);
+      const { data: listing } = await admin.from("vehicle_listings").select("*").eq("id", ver.vehicle_id).maybeSingle();
+      const { settings } = await loadSettings(admin, tenantId);
+      const { data: dealer } = await admin.from("dealer_profiles").select("*").eq("tenant_id", tenantId).maybeSingle();
+      const { data: ovRows } = await admin.from("description_fact_overrides")
+        .select("field_key, decision, value").eq("description_case_id", ver.description_case_id);
+      const snap = buildFactSnapshot(listing || {}, settings, dealer, (ovRows || []) as FactOverride[]);
+
+      const f = validateContent(ver.content, snap, settings);
+      const q = qualityScore(ver.content, snap, settings);
+      await admin.from("description_validation_results")
+        .delete().eq("version_id", versionId);
+      if (f.length) {
+        await admin.from("description_validation_results").insert(f.map((x) => ({
+          tenant_id: tenantId, description_case_id: ver.description_case_id, version_id: versionId,
+          validator_code: x.validator_code, severity: x.severity, message: x.message,
+          fact_path: x.fact_path ?? null, claim_text: x.claim_text ?? null,
+          source_reference: x.source_reference ?? null, blocking: x.blocking,
+        })));
+      }
+      const st = f.some((x) => x.blocking) ? "blocked" : f.some((x) => x.severity === "warning") ? "warning" : "passed";
+      await admin.from("description_versions")
+        .update({ validation_status: st, quality_score: q }).eq("id", versionId);
+
+      const { eligibility } = decideEligibility(f, settings, listing?.condition || "used");
+      await setCase(admin, ver.description_case_id, { publication_eligibility: eligibility, quality_score: q }, true);
+      await audit(admin, tenantId, "description_validation_completed", ver.description_case_id,
+        { version_id: versionId, findings: f.length, validation_status: st, manual: true });
+      return json({ success: true, validation_status: st, eligibility, findings: f.length });
     }
 
     if (action === "reconcile") {
       // Self-healing sweep: covers AutoCurb / DMS / CSV / manual VINs that
       // never pass through the MarketCheck post-ingest hook.
-      if (!isService && !isCron) return json({ error: "service role required" }, 403);
-      const tenantId = body.tenant_id ? String(body.tenant_id) : null;
+      // Interactive callers may reconcile their own tenant; cross-tenant
+      // sweeps stay service-role only.
+      const reqTenant = body.tenant_id ? String(body.tenant_id) : null;
+      if (!isService && !isCron) {
+        if (!reqTenant || !allowed(reqTenant)) return json({ error: "forbidden" }, 403);
+      }
+      const tenantId = reqTenant;
       const limit = Math.min(Number(body.limit) || 25, 100);
       const { data: batch } = await admin.rpc("next_description_reconcile_batch", {
         p_tenant_id: tenantId, p_limit: limit,

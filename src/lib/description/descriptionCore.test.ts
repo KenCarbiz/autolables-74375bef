@@ -172,11 +172,19 @@ describe("publication eligibility", () => {
     expect(r.eligibility).toBe("blocked");
   });
 
-  it("routes warnings to review in exception-review mode", () => {
+  it("routes FACT-level warnings to review in exception-review mode", () => {
     const r = decideEligibility(
-      [{ validator_code: "CTA_MISSING", severity: "warning", message: "", blocking: false }],
+      [{ validator_code: "LOW_FACT_CONFIDENCE", severity: "warning", message: "", blocking: false }],
       SETTINGS, "used");
     expect(r.eligibility).toBe("review_required");
+  });
+
+  it("does not escalate cosmetic warnings — otherwise everything reaches a person", () => {
+    const r = decideEligibility(
+      [{ validator_code: "CTA_MISSING", severity: "warning", message: "", blocking: false },
+       { validator_code: "LENGTH_BELOW_MINIMUM", severity: "warning", message: "", blocking: false }],
+      SETTINGS, "used");
+    expect(r.eligibility).toBe("eligible");
   });
 
   it("auto-publishes a clean vehicle in exception-review mode", () => {
@@ -215,5 +223,72 @@ describe("quality score", () => {
       "Heated Seats and Navigation come standard. Contact us to schedule a test drive today.";
     expect(qualityScore(text, snap, SETTINGS)).toBeGreaterThan(40);
     expect(validateContent(text, snap, SETTINGS).some((f) => f.blocking)).toBe(true);
+  });
+});
+
+describe("resolved conflicts (the review loop must terminate)", () => {
+  const conflicted = {
+    ...LISTING, features: ["Heated Seats"],
+    mc_attributes: { ...LISTING.mc_attributes, options: ["Heated Seats", "Bose Performance Series Audio"] },
+  };
+
+  it("blocks while the conflict is unresolved", () => {
+    const snap = buildFactSnapshot(conflicted, SETTINGS, null, []);
+    expect(snap.conflicts.some((c) => c.material)).toBe(true);
+    const f = validateContent("Clean copy. Contact us to schedule a test drive.", snap, SETTINGS);
+    expect(f.some((x) => x.validator_code === "SOURCE_CONFLICT_UNRESOLVED")).toBe(true);
+  });
+
+  it("stops blocking once a manager confirms the equipment IS present", () => {
+    const snap = buildFactSnapshot(conflicted, SETTINGS, null,
+      [{ field_key: "equipment:Bose Performance Series Audio", decision: "include" }]);
+    expect(snap.conflicts.some((c) => c.material)).toBe(false);
+    expect(String(snap.facts.equipment?.value)).toContain("Bose");
+  });
+
+  it("stops blocking once a manager confirms it is NOT present", () => {
+    const snap = buildFactSnapshot(conflicted, SETTINGS, null,
+      [{ field_key: "equipment:Bose Performance Series Audio", decision: "exclude" }]);
+    expect(snap.conflicts.some((c) => c.material)).toBe(false);
+    expect(String(snap.facts.equipment?.value ?? "")).not.toContain("Bose");
+    // still withheld from copy, so asserting it remains a blocking finding
+    const f = validateContent("Features Bose Performance Series Audio. Contact us.", snap, SETTINGS);
+    expect(f.some((x) => x.validator_code === "EXCLUDED_CLAIM_PRESENT")).toBe(true);
+  });
+});
+
+describe("fingerprint covers post-ingest facts", () => {
+  it("changes when a history report arrives", async () => {
+    const a = await computeSourceDataVersion(LISTING, "cfg_1", false);
+    const b = await computeSourceDataVersion({ ...LISTING, history_report_url: "https://carfax.com/x" }, "cfg_1", false);
+    expect(a).not.toBe(b);
+  });
+
+  it("changes when a CPO program is confirmed", async () => {
+    const a = await computeSourceDataVersion(LISTING, "cfg_1", false);
+    const b = await computeSourceDataVersion({ ...LISTING, certification: { program: "INFINITI CPO" } }, "cfg_1", false);
+    expect(a).not.toBe(b);
+  });
+
+  it("ignores a pure re-ordering of the same option list", async () => {
+    const a = await computeSourceDataVersion(LISTING, "cfg_1", false);
+    const b = await computeSourceDataVersion({
+      ...LISTING, mc_attributes: { ...LISTING.mc_attributes, options: ["Navigation", "Heated Seats"] },
+    }, "cfg_1", false);
+    expect(a).toBe(b);
+  });
+});
+
+describe("year validator does not fire on incidental years", () => {
+  const snap = buildFactSnapshot(LISTING, SETTINGS, null, []);
+  it("allows a dealer tagline containing another year", () => {
+    const f = validateContent(
+      "The 2025 INFINITI QX80 Sensory AWD is here. Serving Manchester since 1998. Contact us to schedule a test drive.",
+      snap, SETTINGS);
+    expect(f.some((x) => x.validator_code === "IDENTITY_YEAR_CONFLICT")).toBe(false);
+  });
+  it("still blocks a contradictory model year", () => {
+    const f = validateContent("This 2019 INFINITI QX80 is available. Contact us.", snap, SETTINGS);
+    expect(f.some((x) => x.validator_code === "IDENTITY_YEAR_CONFLICT")).toBe(true);
   });
 });

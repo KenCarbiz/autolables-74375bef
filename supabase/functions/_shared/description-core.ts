@@ -106,6 +106,12 @@ export const CONTROLLED_CLAIMS: Array<{ pattern: RegExp; code: string; requires:
   { pattern: /\brecall[s]?\s+(complete|completed|performed|done)\b/i, code: "RECALL_CLAIM", requires: "__never", label: "recall completion" },
 ];
 
+// Re-ordering the same option list must not look like a data change.
+const sortedList = (v: unknown): string[] =>
+  (Array.isArray(v) ? v : [])
+    .map((x: any) => (typeof x === "string" ? x : x?.name ?? ""))
+    .filter(Boolean).map((s: string) => s.trim().toLowerCase()).sort();
+
 const norm = (v: unknown): string => {
   if (v === null || v === undefined) return "";
   if (typeof v === "number") return String(v);
@@ -128,11 +134,16 @@ export async function computeSourceDataVersion(
     norm(mc.exterior_color ?? mc.base_ext_color), norm(mc.interior_color ?? mc.base_int_color),
     norm(mc.engine), norm(mc.transmission), norm(mc.drivetrain), norm(mc.fuel_type),
     norm(mc.body_type), norm(mc.seating ?? mc.std_seating),
-    norm(JSON.stringify(mc.options ?? [])), norm(JSON.stringify(mc.features ?? [])),
-    norm(JSON.stringify(listing.features ?? [])),
+    norm(JSON.stringify(sortedList(mc.options))), norm(JSON.stringify(sortedList(mc.features))),
+    norm(JSON.stringify(sortedList(listing.features))),
     norm(JSON.stringify((listing.certification || {})?.certified ?? "")),
     norm(JSON.stringify(listing.warranty_info ?? {})),
     norm(JSON.stringify(listing.available_accessories ?? [])),
+    // these arrive AFTER ingest and change what may be claimed, so they must
+    // move the fingerprint or the vehicle would never be reconsidered
+    norm(listing.history_report_url), norm(mc.carfax_1_owner), norm(mc.carfax_clean_title),
+    norm((listing.certification || {})?.program), norm((listing.certification || {})?.verified_at),
+    norm(listing.recall_status),
     priceMatters ? norm(listing.price) : "",
     configVersion,
   ];
@@ -158,11 +169,18 @@ export async function computeConfigVersion(settings: Record<string, any>): Promi
 }
 
 // ── Fact snapshot ────────────────────────────────────────────────────
+// A resolved conflict is a durable decision: `include` promotes the claim to a
+// dealer-confirmed fact, `exclude` keeps it out of copy. Either way the
+// conflict stops being material, so the vehicle stops being blocked forever.
+export interface FactOverride { field_key: string; decision: "include" | "exclude"; value?: string | null }
+
 export function buildFactSnapshot(
   listing: Record<string, any>,
   settings: Record<string, any>,
   dealer: Record<string, any> | null,
+  overrides: FactOverride[] = [],
 ): FactSnapshot {
+  const overrideBy = new Map(overrides.map((o) => [o.field_key, o]));
   const mc = (listing.mc_attributes || {}) as Record<string, any>;
   const facts: Record<string, Fact> = {};
   const conflicts: FactSnapshot["conflicts"] = [];
@@ -213,9 +231,17 @@ export function buildFactSnapshot(
   // Premium/named equipment claimed by exactly one source is material:
   // it is the "Bose" case — exclude until a human resolves it.
   const PREMIUM = /\b(bose|harman|burmester|mark levinson|bang\s*&\s*olufsen|premium audio|panoramic|head-?up|massage|nappa|adaptive cruise|night vision)\b/i;
+  const confirmedEquipment: string[] = [];
   for (const item of [...decodedOnly, ...feedOnly]) {
     if (!PREMIUM.test(item)) continue;
     const fromDecode = decodedOnly.includes(item);
+    const ov = overrideBy.get(`equipment:${item}`);
+    if (ov?.decision === "include") { confirmedEquipment.push(item); continue; }
+    if (ov?.decision === "exclude") {
+      // decided by a manager — still withheld from copy, but no longer blocking
+      excluded.push({ field: `equipment:${item}`, reason: "resolved_excluded", claim: item });
+      continue;
+    }
     conflicts.push({
       field: `equipment:${item}`,
       values: [
@@ -227,8 +253,9 @@ export function buildFactSnapshot(
     excluded.push({ field: `equipment:${item}`, reason: "equipment_conflict", claim: item });
   }
   const excludedNames = new Set(excluded.map((e) => (e.claim || "").toLowerCase()));
-  const safeEquipment = [...agreed, ...decodedOnly.filter((o) => !excludedNames.has(o.toLowerCase())),
-                         ...feedOnly.filter((o) => !excludedNames.has(o.toLowerCase()))];
+  const safeEquipment = [...agreed, ...confirmedEquipment,
+                         ...decodedOnly.filter((o) => !excludedNames.has(o.toLowerCase()) && !confirmedEquipment.includes(o)),
+                         ...feedOnly.filter((o) => !excludedNames.has(o.toLowerCase()) && !confirmedEquipment.includes(o))];
   if (safeEquipment.length) {
     facts.equipment = {
       field: "equipment", value: safeEquipment.slice(0, 40).join(", "),
@@ -377,11 +404,19 @@ ${settings.required_legal_text ? `- Include verbatim: ${settings.required_legal_
 Return ONLY the description text. No headings, no markdown, no preamble.`;
 }
 
+// The generator rejects a prompt_override over 4000 chars, and a full-length
+// master plus these instructions can exceed that — which would fail exactly
+// the equipment-rich vehicles that matter most. Trim the master to fit.
+const CHANNEL_PROMPT_BUDGET = 2600;
+
 export function buildChannelPrompt(master: string, ch: ChannelRule, snap: FactSnapshot, settings: Record<string, any>): string {
+  const body = master.length > CHANNEL_PROMPT_BUDGET
+    ? master.slice(0, CHANNEL_PROMPT_BUDGET).replace(/\s+\S*$/, "") + "…"
+    : master;
   return `Rewrite the master vehicle description below for ${ch.label}.
 
 MASTER DESCRIPTION:
-${master}
+${body}
 
 CHANNEL REQUIREMENTS
 - ${ch.instruction}
@@ -456,7 +491,11 @@ export function validateContent(
       out.push({ validator_code: "IDENTITY_YEAR_MISSING", severity: "warning", blocking: false,
         message: `Model year ${yr} is not mentioned.`, fact_path: "ymm" });
     }
-    const wrongYear = text.match(/\b(19|20)\d{2}\b/g)?.filter((y) => yr && y !== yr) ?? [];
+    // Only a year attached to the vehicle itself is a contradiction; a dealer
+    // tagline ("serving Dallas since 1998") or a coverage term is not.
+    const modelYearClaim = new RegExp(`\\b(19|20)\\d{2}\\s+${(snap.facts.ymm?.value ? String(snap.facts.ymm.value).split(/\s+/)[1] : "")}`, "i");
+    const claimed = text.match(modelYearClaim)?.[0]?.match(/\b(19|20)\d{2}\b/)?.[0];
+    const wrongYear = claimed && yr && claimed !== yr ? [claimed] : [];
     if (wrongYear.length) {
       out.push({ validator_code: "IDENTITY_YEAR_CONFLICT", severity: "blocking", blocking: true,
         message: `Description references year ${wrongYear[0]} but the vehicle is ${yr}.`,
@@ -558,9 +597,15 @@ export function decideEligibility(
   const mode = byClass[cls] || settings.review_mode || "EXCEPTION_REVIEW";
   if (mode === "DRAFT_ONLY") return { eligibility: "review_required", reason: "dealer is in draft-only mode" };
   if (mode === "REQUIRE_APPROVAL_ALL") return { eligibility: "review_required", reason: "approval required for all vehicles" };
-  const warnings = findings.filter((f) => f.severity === "warning").length;
-  if (mode === "EXCEPTION_REVIEW" && warnings > 0) {
-    return { eligibility: "review_required", reason: `${warnings} warning(s) need review` };
+  // Cosmetic warnings (missing CTA, short copy, formatting) should not drag a
+  // clean vehicle in front of a manager — only warnings about the facts do.
+  const MATERIAL = new Set([
+    "LOW_FACT_CONFIDENCE", "IDENTITY_YEAR_MISSING", "SOURCE_CONFLICT_UNRESOLVED",
+    "REQUIRED_DATA_MISSING", "DUPLICATE_CONTENT_RISK",
+  ]);
+  const material = findings.filter((f) => f.severity === "warning" && MATERIAL.has(f.validator_code)).length;
+  if (mode === "EXCEPTION_REVIEW" && material > 0) {
+    return { eligibility: "review_required", reason: `${material} finding(s) need review` };
   }
   return { eligibility: "eligible", reason: "all required checks passed" };
 }
