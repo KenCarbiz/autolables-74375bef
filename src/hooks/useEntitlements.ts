@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
+import { pickActiveTenantId } from "@/lib/tenant/activeTenant";
 
 // ──────────────────────────────────────────────────────────────
 // useEntitlements — single source of truth for:
@@ -166,14 +167,22 @@ export const useEntitlements = () => {
     // yet (un-applied migration, fresh project) become `error` not a
     // hung spinner.
     const cached = readCache(userId);
-    const fetchMembership = () =>
-      (supabase as any)
+    // A user can belong to several tenants; the active one must be chosen
+    // deterministically (a bare .limit(1) picks an arbitrary row and could
+    // land the dealer on an empty tenant). Fetch all accepted memberships,
+    // then resolve the active tenant the same way TenantContext does.
+    const fetchMembership = async () => {
+      const res = await (supabase as any)
         .from("tenant_members")
         .select("*")
         .eq("user_id", userId)
-        .not("accepted_at", "is", null)
-        .limit(1)
-        .maybeSingle();
+        .not("accepted_at", "is", null);
+      if (res.error) return { data: null, error: res.error };
+      const rows = (res.data as any[]) || [];
+      if (rows.length === 0) return { data: null, error: null };
+      const activeId = await pickActiveTenantId(rows.map((r) => r.tenant_id));
+      return { data: rows.find((r) => r.tenant_id === activeId) || rows[0], error: null };
+    };
 
     try {
       let { data: membership, error: memberErr } = await fetchMembership();

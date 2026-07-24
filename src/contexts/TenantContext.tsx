@@ -3,6 +3,7 @@ import type { Tenant, Store } from "@/types/tenant";
 import { useTenantIntegration, IntegrationMode } from "@/hooks/useTenantIntegration";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
+import { pickActiveTenantId } from "@/lib/tenant/activeTenant";
 
 // ──────────────────────────────────────────────────────────────
 // TenantContext — single source of truth for the CURRENT tenant
@@ -97,15 +98,18 @@ export const TenantProvider = ({ children }: { children: ReactNode }) => {
 
     setLoading(true);
     try {
-      const { data: membership } = await (supabase as any)
+      const { data: memberships } = await (supabase as any)
         .from("tenant_members")
         .select("tenant_id")
         .eq("user_id", userId)
-        .not("accepted_at", "is", null)
-        .limit(1)
-        .maybeSingle();
+        .not("accepted_at", "is", null);
 
-      if (!membership?.tenant_id) {
+      const tenantIds = ((memberships as Array<{ tenant_id: string }>) || [])
+        .map((m) => m.tenant_id)
+        .filter(Boolean);
+      const activeTenantId = await pickActiveTenantId(tenantIds);
+
+      if (!activeTenantId) {
         // Signed in but no tenant yet — keep the house tenant for chrome
         // but expose stores=[] so the wizard can run.
         setTenant(HOUSE_TENANT);
@@ -117,8 +121,8 @@ export const TenantProvider = ({ children }: { children: ReactNode }) => {
       }
 
       const [tenantRes, profileRes] = await Promise.all([
-        (supabase as any).from("tenants").select("*").eq("id", membership.tenant_id).maybeSingle(),
-        (supabase as any).from("onboarding_profiles").select("*").eq("tenant_id", membership.tenant_id).maybeSingle(),
+        (supabase as any).from("tenants").select("*").eq("id", activeTenantId).maybeSingle(),
+        (supabase as any).from("onboarding_profiles").select("*").eq("tenant_id", activeTenantId).maybeSingle(),
       ]);
 
       const t = tenantRes.data;
