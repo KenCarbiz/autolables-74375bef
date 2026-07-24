@@ -142,7 +142,26 @@ export const TenantProvider = ({ children }: { children: ReactNode }) => {
         : HOUSE_TENANT;
 
       const rawStores = Array.isArray(profile?.stores) ? profile.stores : [];
-      const mapped = profileStoresToStores(rawStores, nextTenant.id);
+      let mapped = profileStoresToStores(rawStores, nextTenant.id);
+      // A dealer with no configured store row (e.g. an Autocurb-synced tenant)
+      // still needs a working store context, or every store-scoped page (Prep,
+      // stickers, Get-Ready) dead-ends on "Select a store." Synthesize a default
+      // store from the tenant — the same tenant id the Service/Get-Ready surfaces
+      // already use as the store key.
+      if (mapped.length === 0) {
+        mapped = [{
+          id: nextTenant.id,
+          tenant_id: nextTenant.id,
+          name: nextTenant.name,
+          slug: nextTenant.slug,
+          address: "", city: "", state: "", zip: "", phone: "",
+          logo_url: nextTenant.logo_url || "",
+          tagline: "",
+          primary_color: nextTenant.primary_color || "",
+          created_at: nextTenant.created_at,
+          is_active: true,
+        }];
+      }
 
       setTenant(nextTenant);
       setTenantRowId(t?.id || null);

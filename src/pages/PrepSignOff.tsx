@@ -27,7 +27,10 @@ const PrepSignOff = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const view = (searchParams.get("view") || "list") as "list" | "new" | "detail" | "installs";
   const id = searchParams.get("id") || "";
-  const storeId = currentStore?.id || "";
+  // Single-store dealers (and Autocurb-synced tenants without a configured
+  // store row) have no currentStore — fall back to the tenant id, which is the
+  // store key the Get-Ready / Service surfaces already use.
+  const storeId = currentStore?.id || tenant?.id || "";
   const { signOffs, pending, ready, createSignOff, signOff, reject, override, isListingAllowed } = usePrepSignOff(storeId);
   const { records: getReadyRecords } = useGetReady(storeId);
 
@@ -84,11 +87,11 @@ const PrepSignOff = () => {
   const vinDeepLink = (searchParams.get("vin") || "").trim();
   if (vinDeepLink) return <Navigate to={`/prep/${vinDeepLink.toUpperCase()}`} replace />;
 
-  if (!currentStore)
+  if (!storeId)
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="rounded-2xl bg-card border border-border p-8 shadow-premium">
-          <p className="text-foreground">Select a store to continue.</p>
+          <p className="text-foreground">Sign in to a dealership to continue.</p>
         </div>
       </div>
     );
@@ -120,7 +123,7 @@ const PrepSignOff = () => {
       <div className="min-h-screen bg-background p-6">
         <div className="max-w-6xl mx-auto">
           {viewTabs}
-          <InstallProofView storeId={storeId} storeName={currentStore.name} />
+          <InstallProofView storeId={storeId} storeName={currentStore?.name || tenant?.name || "Your dealership"} />
         </div>
       </div>
     );
