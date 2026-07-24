@@ -74,11 +74,11 @@ const RECENT_ACTIONS: Record<string, { label: string; iconKey: AutoLabelsToolIco
 
 // Small status badge layered onto a recent-creation icon. Non-color cue via
 // the icon glyph itself so status is not conveyed by color alone.
-const STATUS_BADGE: Record<RecentStatus, { ring: string; dot: string }> = {
-  complete: { ring: "text-emerald-500", dot: "bg-emerald-500" },
-  processing: { ring: "text-blue-500", dot: "bg-blue-500" },
-  attention: { ring: "text-amber-500", dot: "bg-amber-500" },
-  failed: { ring: "text-red-500", dot: "bg-red-500" },
+const STATUS_BADGE: Record<RecentStatus, { ring: string; dot: string; label: string }> = {
+  complete: { ring: "text-emerald-500", dot: "bg-emerald-500", label: "Complete" },
+  processing: { ring: "text-blue-500", dot: "bg-blue-500", label: "Processing" },
+  attention: { ring: "text-amber-500", dot: "bg-amber-500", label: "Needs attention" },
+  failed: { ring: "text-red-500", dot: "bg-red-500", label: "Failed" },
 };
 
 const timeAgo = (iso: string): string => {
@@ -144,14 +144,14 @@ export default function CreateHub() {
 
   const quickCard = (t: CreateTool) => (
     <button key={t.id} onClick={() => open(t)}
-      className="group text-left rounded-2xl border border-border bg-card p-4 hover:border-primary hover:shadow-[0_8px_24px_-12px_rgba(37,99,235,0.25)] transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-primary">
+      className="group flex flex-col text-left rounded-2xl border border-border bg-card p-4 h-full hover:border-primary hover:shadow-[0_8px_24px_-12px_rgba(37,99,235,0.25)] transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-primary">
       <div className="flex items-start justify-between gap-2">
         <ToolIconBadge iconKey={t.iconKey} category={t.iconCategory} variant="quick" />
         {t.chip && <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${badgeCls(t.chip)}`}>{t.chip}</span>}
       </div>
       <p className="font-semibold text-foreground leading-tight mt-3">{t.title}</p>
       <p className="text-xs text-muted-foreground mt-1 leading-snug">{t.description}</p>
-      <span className="inline-flex items-center gap-1 text-[12px] font-semibold text-primary mt-2.5 opacity-0 group-hover:opacity-100 transition-opacity">Open <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition-transform" /></span>
+      <span className="inline-flex items-center gap-1 text-[12px] font-semibold text-primary mt-auto pt-3 opacity-0 group-hover:opacity-100 transition-opacity">Open <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition-transform" /></span>
     </button>
   );
 
@@ -253,10 +253,10 @@ export default function CreateHub() {
                     <li key={r.id} className="flex items-center gap-2.5 py-1.5">
                       <span className="relative shrink-0">
                         <ToolIconBadge iconKey={meta.iconKey} category={meta.category} variant="mini" />
-                        <span className="absolute -right-1 -bottom-1 grid place-items-center w-[15px] h-[15px] rounded-full bg-card">
+                        <span className="absolute -right-1 -bottom-1 grid place-items-center w-[15px] h-[15px] rounded-full bg-card" role="img" aria-label={badge.label}>
                           {meta.status === "complete"
-                            ? <CheckCircle2 className={`w-[15px] h-[15px] ${badge.ring}`} strokeWidth={2.25} />
-                            : <span className={`w-2 h-2 rounded-full ${badge.dot}`} />}
+                            ? <CheckCircle2 className={`w-[15px] h-[15px] ${badge.ring}`} strokeWidth={2.25} aria-hidden />
+                            : <span className={`w-2 h-2 rounded-full ${badge.dot}`} aria-hidden />}
                         </span>
                       </span>
                       <span className="min-w-0 flex-1">
