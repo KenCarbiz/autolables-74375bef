@@ -179,7 +179,14 @@ async function fillFtcEs(base: string, box: string, pct: number, days: number, m
   return await pdf.save();
 }
 
-async function fillK208(base: string, v: Vehicle, d: Dealer): Promise<Uint8Array> {
+// Derive "JS"-style initials from a licensee name for the A/B/C initial line.
+function initialsOf(name?: string | null): string {
+  const parts = String(name || "").trim().split(/\s+/).filter(Boolean);
+  if (!parts.length) return "";
+  return (parts[0][0] + (parts.length > 1 ? parts[parts.length - 1][0] : "")).toUpperCase();
+}
+
+async function fillK208(base: string, v: Vehicle, d: Dealer, opts?: { initial?: string; licenseeName?: string }): Promise<Uint8Array> {
   const pdf = await PDFDocument.load(await loadTemplate(base, "k208-inspection.pdf"));
   const form = pdf.getForm();
   setText(form, "FillText1", v.year);
@@ -197,6 +204,16 @@ async function fillK208(base: string, v: Vehicle, d: Dealer): Promise<Uint8Array
   setText(form, "Text6", d.zip);
   setText(form, "Text9", d.principal);
   setText(form, "Text10", d.license);
+  // The A/B/C statutory determination has NO AcroForm field, so mark the correct
+  // initial line by coordinate (letter-size, origin bottom-left; the blank sits
+  // left of each letter at x=177). A y=543, B y=501, C y=459 — render-validated.
+  const initial = String(opts?.initial || "").toUpperCase();
+  const initialY: Record<string, number> = { A: 543, B: 501, C: 459 };
+  if (initialY[initial]) {
+    const bold = await pdf.embedFont(StandardFonts.HelveticaBold);
+    const mark = initialsOf(opts?.licenseeName) || "X";
+    pdf.getPages()[0].drawText(mark, { x: 136, y: initialY[initial], size: 11, font: bold, color: rgb(0, 0, 0) });
+  }
   form.flatten();
   return await pdf.save();
 }
@@ -304,21 +321,34 @@ Deno.serve(async (req) => {
 
   const out: Record<string, string> = {};
   try {
+    // Resolve the warranty box ONCE — it drives both the Buyers Guide variant and
+    // the K-208 A/B/C statutory box, so the two forms can never disagree.
+    const { data: bgRow } = await admin.from("generated_documents").select("data_snapshot")
+      .eq("tenant_id", tenantId).eq("vehicle_id", listing.id).eq("document_type", "buyers_guide")
+      .order("created_at", { ascending: false }).limit(1).maybeSingle();
+    const snap = (bgRow?.data_snapshot || {}) as { box?: string; min_pct?: number; min_duration_days?: number; min_miles?: number };
+    const effBox = boxOverride || snap.box || "as-is";
+    const pct = Number(snap.min_pct) || 0, dd = Number(snap.min_duration_days) || 0, mi = Number(snap.min_miles) || 0;
+
     if (kinds.includes("buyers_guide")) {
-      const { data: bg } = await admin.from("generated_documents").select("data_snapshot")
-        .eq("tenant_id", tenantId).eq("vehicle_id", listing.id).eq("document_type", "buyers_guide")
-        .order("created_at", { ascending: false }).limit(1).maybeSingle();
-      const snap = (bg?.data_snapshot || {}) as { box?: string; min_pct?: number; min_duration_days?: number; min_miles?: number };
-      const effBox = boxOverride || snap.box || "as-is";
-      const pct = Number(snap.min_pct) || 0, dd = Number(snap.min_duration_days) || 0, mi = Number(snap.min_miles) || 0;
       const bytes = lang === "es"
         ? await fillFtcEs(appBase, effBox, pct, dd, mi, vehicle, dealer)
         : await fillFtc(appBase, effBox, pct, dd, mi, vehicle, dealer);
       out.buyers_guide = await fileForm(admin, tenantId, vin, listing.id as string, "buyers_guide", bytes, vehicle.year, { box: effBox, lang, template_version: "2026.07.1" });
     }
     if (kinds.includes("k208") && ["used", "cpo", "certified"].includes(String(listing.condition || "used").toLowerCase())) {
-      const bytes = await fillK208(appBase, vehicle, dealer);
-      out.k208 = await fileForm(admin, tenantId, vin, listing.id as string, "k208", bytes, vehicle.year, { template_version: "2026.07.1" });
+      // A/B/C: the licensee's certified result when present, else derive from the
+      // same warranty box — warranty/implied → A (roadworthy, covered by a
+      // warranty), as-is → B (roadworthy, sold As-Is under §42-224). Never
+      // auto-select C (not-roadworthy needs a human + noted defects).
+      const { data: si } = await admin.from("safety_inspections")
+        .select("result_initial, licensee_name")
+        .eq("tenant_id", tenantId).eq("vin", vin).eq("status", "signed")
+        .order("signed_at", { ascending: false }).limit(1).maybeSingle();
+      const certInitial = ["A", "B", "C"].includes(String(si?.result_initial)) ? String(si!.result_initial) : "";
+      const initial = certInitial || (effBox === "as-is" ? "B" : (effBox === "warranty" || effBox === "implied") ? "A" : "");
+      const bytes = await fillK208(appBase, vehicle, dealer, { initial, licenseeName: si?.licensee_name || "" });
+      out.k208 = await fileForm(admin, tenantId, vin, listing.id as string, "k208", bytes, vehicle.year, { template_version: "2026.07.1", result_initial: initial });
     }
   } catch (e) {
     return json(500, { ok: false, error: String((e as Error)?.message || e) });
