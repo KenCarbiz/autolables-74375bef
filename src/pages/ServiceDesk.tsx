@@ -12,6 +12,7 @@ import { Loader2, Search, QrCode, ShieldCheck, FileText, Upload, CheckCircle2, C
 import NextStepBanner from "@/components/workflow/NextStepBanner";
 import ServiceQueue from "@/components/service/ServiceQueue";
 import { RequestAdditionalWorkButton, ServiceApprovalsPanel } from "@/components/service/AdditionalWork";
+import ServiceStatusBanner from "@/components/service/ServiceStatusBanner";
 
 // /service — desktop hub for logged-in Service staff. For a chosen vehicle:
 //   1. Generate the no-login QR to hand to a tech (issue_dept_signoff_token)
@@ -77,8 +78,9 @@ export default function ServiceDesk() {
             </div>
             <RequestAdditionalWorkButton tenantId={tenantId} veh={veh} />
           </div>
+          <ServiceStatusBanner tenantId={tenantId} veh={veh} />
           <ServiceQrCard tenantId={tenantId} vin={veh.vin} />
-          <DesktopK208 tenantId={tenantId} veh={veh} />
+          <div id="k208-workspace"><DesktopK208 tenantId={tenantId} veh={veh} /></div>
           <TitleMcoUpload tenantId={tenantId} veh={veh} />
         </>
       ) : (

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useTenant } from "@/contexts/TenantContext";
 import { useVinScan } from "@/contexts/VinScanContext";
+import { deriveServiceStatus } from "@/lib/service/serviceStatus";
 import {
   ClipboardList, ShieldCheck, AlertTriangle, CheckCircle2, Clock, XCircle,
   Search, QrCode, ChevronRight, Loader2, CircleDot, Circle, Wrench,
@@ -40,47 +41,18 @@ const isToday = (iso?: string | null) => {
 
 // deno-lint-ignore no-explicit-any
 function derive(v: any, gr: any, si: any, awaiting: boolean): Row {
-  const items: { status?: string }[] = Array.isArray(gr?.items) ? gr.items : [];
-  const anyItems = items.length > 0;
-  const someComplete = items.some((i) => i.status === "complete");
-  const allComplete = anyItems && items.every((i) => i.status === "complete");
-  const grComplete = !!gr?.get_ready_complete_date || allComplete;
-  const recallBlocking = String(v.recall_status || "").toLowerCase().includes("do_not_drive")
-    || String(v.recall_status || "").toLowerCase().includes("do-not-drive");
-  const siPass = si && si.result === "pass";
-  const siFail = si && si.result === "fail";
+  const s = deriveServiceStatus(v, gr, si, awaiting);
   const certified = !!(si && si.licensee_certified_at);
-
-  const grState: Row["grState"] = siFail ? "failed"
-    : !gr ? "not_started"
-    : grComplete ? "complete"
-    : (someComplete || (gr.status && gr.status !== "pending")) ? "in_progress"
-    : "not_started";
-
-  const k208State: Row["k208State"] = (recallBlocking || siFail) ? "blocked"
-    : certified ? "executed"
-    : siPass ? "ready"
-    : "waiting";
-
-  const next: Row["next"] = awaiting ? { label: "Review request", tone: "primary" }
-    : k208State === "blocked" ? { label: "Resolve items", tone: "danger" }
-    : (k208State === "executed" && grComplete) ? { label: "View record", tone: "ghost" }
-    : k208State === "ready" ? { label: "Execute K-208", tone: "primary" }
-    : grState === "in_progress" ? { label: "Continue work", tone: "primary" }
-    : { label: "Start work", tone: "primary" };
-
-  const priority: Row["priority"] = (awaiting || k208State === "blocked") ? "High"
-    : (k208State === "executed" && grComplete) ? "Low" : "Medium";
-
-  const bucket: Row["bucket"] = k208State === "blocked" ? "failed"
-    : k208State === "ready" ? "ready_to_sign"
-    : grState === "complete" && k208State === "executed" ? "done"
-    : grState === "in_progress" ? "in_progress"
+  const grState = s.grState;
+  const k208State = s.k208State;
+  const next: Row["next"] = { label: s.nextLabel, tone: s.nextTone };
+  const priority = s.priority;
+  const bucket: Row["bucket"] = s.cleared ? "done"
+    : s.k208State === "blocked" ? "failed"
+    : s.k208State === "ready" ? "ready_to_sign"
+    : s.grState === "in_progress" ? "in_progress"
     : "get_ready";
-
-  const delivery = k208State === "blocked" ? "Delivery blocked"
-    : (k208State === "executed" && grComplete) ? "Cleared"
-    : v.status === "published" ? "In stock" : "Draft";
+  const delivery = s.blocked ? "Delivery blocked" : s.cleared ? "Cleared" : v.status === "published" ? "In stock" : "Draft";
 
   const ymm = String(v.ymm || "Vehicle");
   const parts = ymm.split(/\s+/);
