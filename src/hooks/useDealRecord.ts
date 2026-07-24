@@ -36,7 +36,7 @@ export function useDealRecord(vin?: string | null, listingId?: string | null, te
       q.from("get_ready_records").select("id, get_ready_complete_date").eq("tenant_id", tenantId).eq("vin", v).limit(1).maybeSingle(),
       q.from("detail_signoffs").select("id").eq("tenant_id", tenantId).eq("vin", v).eq("status", "signed").limit(1).maybeSingle(),
       listingId
-        ? q.from("generated_documents").select("id, document_status, data_snapshot, version").eq("tenant_id", tenantId).eq("vehicle_id", listingId).eq("document_type", "buyers_guide").order("created_at", { ascending: false }).limit(1).maybeSingle()
+        ? q.from("generated_documents").select("id, document_status, data_snapshot, version").eq("tenant_id", tenantId).eq("vehicle_id", listingId).eq("document_type", "buyers_guide").not("document_status", "in", "(superseded,archived,rejected)").order("version", { ascending: false }).limit(1).maybeSingle()
         : Promise.resolve({ data: null }),
     ]);
 

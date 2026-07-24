@@ -236,11 +236,11 @@ async function fileForm(admin: any, tenantId: string, vin: string, vehicleId: st
       storage_path: path, storage_bucket: BUCKET, content_hash: hash, byte_size: bytes.length,
     });
   } catch { /* archive best-effort */ }
-  // These are official compliance forms — never overwrite an existing version.
-  // If the fill is byte-identical to the current live version, just refresh its
-  // signed URL. If the content changed (warranty box, language, dealer data),
-  // mint a NEW immutable version and mark the prior version(s) superseded, so
-  // the full history is retained and auditable.
+  // Keyed upsert: ONE row per (tenant, vehicle, doc type) through the whole draft
+  // phase — overwrite it in place on every re-fill instead of minting a new
+  // version, so the K-208/FTC never pile up as v1/v2/v3 with dead duplicates.
+  // Only once a row is LOCKED (approved/printed/published) do we mint a new
+  // immutable version and supersede the old, preserving the signed history.
   if (vehicleId) {
     const snap = { source: "generate-vehicle-forms", storage_path: path, storage_bucket: BUCKET, content_hash: hash, ...(snapExtra || {}) };
     const { data: all } = await admin.from("generated_documents")
@@ -248,13 +248,33 @@ async function fileForm(admin: any, tenantId: string, vin: string, vehicleId: st
       .eq("tenant_id", tenantId).eq("vehicle_id", vehicleId).eq("document_type", docType)
       .order("version", { ascending: false });
     const rows = (all || []) as { id: string; version: number; document_status: string; data_snapshot: Record<string, unknown> | null }[];
-    const retired = new Set(["superseded", "archived", "rejected"]);
-    const liveRows = rows.filter((r) => !retired.has(r.document_status));
+    const RETIRED = new Set(["superseded", "archived", "rejected"]);
+    const MUTABLE = new Set(["draft", "pending_approval"]);
+    const liveRows = rows.filter((r) => !RETIRED.has(r.document_status));
     const current = liveRows[0];
+
+    // Editable draft → overwrite in place (no new version), and fold any stray
+    // extra live drafts (from a prior race) back into this single row.
+    if (current && MUTABLE.has(current.document_status)) {
+      await admin.from("generated_documents")
+        .update({ online_url: url, pdf_url: url, data_snapshot: snap, updated_at: new Date().toISOString() })
+        .eq("id", current.id);
+      const extras = liveRows.slice(1).map((r) => r.id);
+      if (extras.length) {
+        await admin.from("generated_documents")
+          .update({ document_status: "superseded", superseded_by: current.id, updated_at: new Date().toISOString() })
+          .in("id", extras);
+      }
+      return url;
+    }
+
+    // Locked + byte-identical → refresh the signed URL on the live row.
     if (current && (current.data_snapshot as { content_hash?: string } | null)?.content_hash === hash) {
       await admin.from("generated_documents").update({ online_url: url, pdf_url: url, updated_at: new Date().toISOString() }).eq("id", current.id);
       return url;
     }
+
+    // Locked + changed (or none yet) → mint a new immutable version.
     const nextVersion = rows.reduce((m, r) => Math.max(m, r.version || 0), 0) + 1;
     const { data: inserted } = await admin.from("generated_documents").insert({
       tenant_id: tenantId, vehicle_id: vehicleId, template_id: docType === "k208" ? "ct-k208" : "ftc-buyers-guide",
@@ -263,8 +283,6 @@ async function fileForm(admin: any, tenantId: string, vin: string, vehicleId: st
     }).select("id").maybeSingle();
     const newId = (inserted as { id?: string } | null)?.id;
     if (newId && liveRows.length) {
-      // Retire the prior live version(s); superseded/archived transitions are
-      // permitted even on signature-locked rows, so history is never lost.
       await admin.from("generated_documents")
         .update({ document_status: "superseded", superseded_by: newId, updated_at: new Date().toISOString() })
         .in("id", liveRows.map((r) => r.id));

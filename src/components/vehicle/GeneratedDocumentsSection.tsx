@@ -54,7 +54,10 @@ export default function GeneratedDocumentsSection({ vehicleId }: { vehicleId: st
   // used_car_manager / sales_manager (who holds can_approve_print) can verify.
   const manager = hasDealerCapability(member?.role, "can_approve_print", isAdmin);
   const rules = useDealerDocumentRules();
-  const { documents, loading, available, reload } = useVehicleDocuments(vehicleId);
+  const { documents: allDocuments, loading, available, reload } = useVehicleDocuments(vehicleId);
+  // Show only the ONE live doc per type — superseded / archived / rejected
+  // versions are history, not clutter for the deal jacket.
+  const documents = allDocuments.filter((d) => !["superseded", "archived", "rejected"].includes(d.document_status as string));
   const scans = useVehicleQrScans(vehicleId);
   const { tenant } = useTenant();
   const { flags: staleFlags, reload: reloadStale } = useVehicleStaleFlags(vehicleId);
