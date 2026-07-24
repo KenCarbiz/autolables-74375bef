@@ -8,8 +8,9 @@ import K208Checklist, { K208_ITEMS, k208Answered, k208Result, k208Checklist, typ
 import { K208_CERTIFICATION_TEXT } from "@/data/ctK208Form";
 import { buildConsentRecord, hashPayload, fetchClientIp } from "@/lib/esign";
 import { uploadPhoto } from "@/lib/storage";
-import { Loader2, Search, QrCode, ShieldCheck, FileText, Upload, CheckCircle2, Copy, X } from "lucide-react";
+import { Loader2, Search, QrCode, ShieldCheck, FileText, Upload, CheckCircle2, Copy, X, ArrowLeft } from "lucide-react";
 import NextStepBanner from "@/components/workflow/NextStepBanner";
+import ServiceQueue from "@/components/service/ServiceQueue";
 
 // /service — desktop hub for logged-in Service staff. For a chosen vehicle:
 //   1. Generate the no-login QR to hand to a tech (issue_dept_signoff_token)
@@ -49,31 +50,24 @@ export default function ServiceDesk() {
   if (!tenantId) return null;
 
   return (
-    <div className="max-w-3xl mx-auto p-4 md:p-6 space-y-6">
-      <div className="flex items-center gap-2">
-        <ShieldCheck className="w-5 h-5 text-primary" />
-        <h1 className="font-display text-2xl font-bold tracking-tight text-foreground">Service desk</h1>
-      </div>
-      <p className="text-sm text-muted-foreground -mt-3">Generate a Get-Ready QR for a car, complete the CT K-208 here, or upload the title / MCO.</p>
-
-      <NextStepBanner stage="service" />
-
-      <GateSettingCard tenantId={tenantId} />
-      <RoleAuthorityCard tenantId={tenantId} />
-
-      <div className="rounded-2xl border border-border bg-card p-4 flex items-end gap-3">
-        <div className="flex-1">
-          <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">VIN</label>
-          <input value={vinInput} onChange={(e) => setVinInput(e.target.value)} onKeyDown={(e) => e.key === "Enter" && loadVehicle()}
-            placeholder="Enter or scan a VIN" className="mt-1 w-full h-11 rounded-lg border border-border bg-background px-3 text-sm font-mono" />
+    <div className="max-w-[1200px] mx-auto p-4 md:p-6 space-y-6">
+      <div className="flex items-start justify-between gap-3 flex-wrap">
+        <div>
+          <div className="flex items-center gap-2">
+            <ShieldCheck className="w-5 h-5 text-primary" />
+            <h1 className="font-display text-2xl font-bold tracking-tight text-foreground">Service Desk</h1>
+          </div>
+          <p className="text-sm text-muted-foreground mt-0.5">Safety inspections, get-ready work, and K-208 execution.</p>
         </div>
-        <button onClick={loadVehicle} disabled={loadingVeh}
-          className="h-11 px-4 rounded-lg bg-primary text-primary-foreground text-sm font-semibold inline-flex items-center gap-2 disabled:opacity-50">
-          {loadingVeh ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />} Load
-        </button>
+        {veh && (
+          <button onClick={() => setVeh(null)} className="h-10 px-4 rounded-lg border border-border text-sm font-semibold inline-flex items-center gap-1.5 hover:bg-muted">
+            <ArrowLeft className="w-4 h-4" /> Back to queue
+          </button>
+        )}
       </div>
 
-      {veh && (
+      {veh ? (
+        // Per-vehicle service workspace — opened from the queue (or a Service QR).
         <>
           <div className="rounded-xl bg-muted/50 px-4 py-3">
             <div className="font-display font-bold text-foreground">{veh.ymm || "Vehicle"}</div>
@@ -82,6 +76,19 @@ export default function ServiceDesk() {
           <ServiceQrCard tenantId={tenantId} vin={veh.vin} />
           <DesktopK208 tenantId={tenantId} veh={veh} />
           <TitleMcoUpload tenantId={tenantId} veh={veh} />
+        </>
+      ) : (
+        // The queue — one landing for service writers/managers.
+        <>
+          <NextStepBanner stage="service" />
+          <ServiceQueue onOpen={(v) => setVeh({ id: v.id, vin: v.vin, ymm: v.ymm })} />
+          <details className="rounded-2xl border border-border bg-card">
+            <summary className="px-4 py-3 text-sm font-semibold text-foreground cursor-pointer">Service settings — publish gate &amp; K-208 authority</summary>
+            <div className="p-4 pt-0 space-y-4">
+              <GateSettingCard tenantId={tenantId} />
+              <RoleAuthorityCard tenantId={tenantId} />
+            </div>
+          </details>
         </>
       )}
     </div>
