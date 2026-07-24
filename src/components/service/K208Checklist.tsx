@@ -1,4 +1,5 @@
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
+import { Check, X, CheckCheck } from "lucide-react";
 import { K208_INSPECTION_CATEGORIES } from "@/data/ctK208Form";
 
 // Shared CT K-208 inspection checklist UI + helpers, used by both the no-login
@@ -23,6 +24,8 @@ interface Props {
   marks: Record<string, K208Mark>;
   onMark: (id: string, mark: K208Mark) => void;
   onPassAll: () => void;
+  // Optional one-tap undo for "Mark all passed" / clearing a mismark run.
+  onClearAll?: () => void;
   failureNotes: string;
   onFailureNotes: (v: string) => void;
   notes: string;
@@ -33,34 +36,29 @@ interface Props {
   onItemNote?: (id: string, v: string) => void;
 }
 
-export default function K208Checklist({ marks, onMark, onPassAll, failureNotes, onFailureNotes, notes, onNotes, itemNotes = {}, onItemNote }: Props) {
+export default function K208Checklist({ marks, onMark, onPassAll, onClearAll, failureNotes, onFailureNotes, notes, onNotes, itemNotes = {}, onItemNote }: Props) {
   const answered = useMemo(() => k208Answered(marks), [marks]);
-  const anyFail = Object.values(marks).some((m) => m === "fail");
-  // "Mark all passed" is a safety-inspection-wide action — a single accidental
-  // tap must never pass the whole K-208. Require an explicit second confirmation
-  // (CT DMV K-208, Section 4 Method A).
-  const [confirmingPassAll, setConfirmingPassAll] = useState(false);
+  const passCount = useMemo(() => K208_ITEMS.filter((i) => marks[i.id] === "pass").length, [marks]);
+  const failCount = useMemo(() => K208_ITEMS.filter((i) => marks[i.id] === "fail").length, [marks]);
+  const anyFail = failCount > 0;
 
   return (
     <div className="space-y-5">
-      <div className="flex items-center justify-between gap-3">
-        <p className="text-sm text-muted-foreground">{answered} of {K208_ITEMS.length} items marked</p>
-        <button onClick={() => setConfirmingPassAll(true)} className="h-9 px-3 rounded-md bg-emerald-600 text-white text-xs font-semibold">Mark all passed</button>
-      </div>
-
-      {confirmingPassAll && (
-        <div className="rounded-2xl border border-amber-300 bg-amber-50 p-4 space-y-3">
-          <p className="text-sm font-bold text-amber-900">Confirm full-pass inspection</p>
-          <p className="text-[13px] text-amber-800">
-            You are confirming that all {K208_ITEMS.length} K-208 inspection items were physically inspected and passed.
-            This does not certify the form until an authorized licensee reviews and signs it.
-          </p>
-          <div className="flex gap-2">
-            <button onClick={() => setConfirmingPassAll(false)} className="h-11 px-4 rounded-md border border-border bg-background text-sm font-semibold text-foreground">Cancel</button>
-            <button onClick={() => { setConfirmingPassAll(false); onPassAll(); }} className="h-11 px-4 rounded-md bg-emerald-600 text-white text-sm font-semibold">Yes — all {K208_ITEMS.length} inspected &amp; passed</button>
-          </div>
+      <div className="flex items-center justify-between gap-3 flex-wrap">
+        <p className="text-sm text-muted-foreground">
+          <span className="font-semibold text-foreground">{answered}</span> of {K208_ITEMS.length} marked
+          {answered > 0 && <> · {passCount} pass · {failCount} fail</>}
+        </p>
+        <div className="flex items-center gap-2">
+          {answered > 0 && onClearAll && (
+            <button onClick={onClearAll} className="h-9 px-3 rounded-md border border-border text-xs font-semibold text-muted-foreground hover:bg-muted">Clear all</button>
+          )}
+          {/* One tap passes every line (the "Clear all" beside it is the undo). */}
+          <button onClick={onPassAll} className="h-9 px-3 rounded-md bg-emerald-600 text-white text-xs font-semibold inline-flex items-center gap-1.5 hover:bg-emerald-700">
+            <CheckCheck className="w-3.5 h-3.5" /> Mark all passed
+          </button>
         </div>
-      )}
+      </div>
 
       {K208_INSPECTION_CATEGORIES.map((cat) => (
         <div key={cat.category} className="rounded-2xl border border-border bg-card overflow-hidden">
@@ -69,21 +67,34 @@ export default function K208Checklist({ marks, onMark, onPassAll, failureNotes, 
             {cat.items.map((item) => {
               const failed = marks[item.id] === "fail";
               return (
-                <div key={item.id} className="px-4 py-2.5">
+                <div key={item.id} className={`px-4 py-2.5 ${failed ? "bg-red-50/60" : ""}`}>
                   <div className="flex items-center justify-between gap-3">
                     <span className="text-sm font-medium text-foreground flex-1">{item.label}</span>
-                    <div className="flex gap-1.5 shrink-0">
-                      {(["pass", "fail"] as const).map((m) => (
-                        <button key={m} onClick={() => onMark(item.id, m)}
-                          className={`h-11 w-16 rounded-md text-[12px] font-semibold border transition-colors ${
-                            marks[item.id] === m
-                              ? m === "pass" ? "bg-emerald-600 text-white border-emerald-600"
-                                : "bg-red-600 text-white border-red-600"
-                              : "bg-background text-muted-foreground border-border hover:bg-muted"
-                          }`}>
-                          {m === "pass" ? "Pass" : "Fail"}
-                        </button>
-                      ))}
+                    {/* Pass / Fail are one exclusive choice per line — selecting one
+                        clears the other, and re-tapping the active one clears it so
+                        a mismark is easy to correct. A line can never be both. */}
+                    <div className="flex gap-1.5 shrink-0" role="group" aria-label={`${item.label} result`}>
+                      {(["pass", "fail"] as const).map((m) => {
+                        const active = marks[item.id] === m;
+                        const Icon = m === "pass" ? Check : X;
+                        const on = m === "pass"
+                          ? "bg-emerald-600 text-white border-emerald-600"
+                          : "bg-red-600 text-white border-red-600";
+                        const off = m === "pass"
+                          ? "bg-background text-emerald-700 border-emerald-300 hover:bg-emerald-50"
+                          : "bg-background text-red-700 border-red-300 hover:bg-red-50";
+                        return (
+                          <button
+                            key={m}
+                            type="button"
+                            aria-pressed={active}
+                            onClick={() => onMark(item.id, active ? "" : m)}
+                            className={`h-11 w-[76px] rounded-md text-[12px] font-bold border inline-flex items-center justify-center gap-1 transition-colors ${active ? on : off}`}
+                          >
+                            <Icon className="w-3.5 h-3.5" strokeWidth={3} /> {m === "pass" ? "Pass" : "Fail"}
+                          </button>
+                        );
+                      })}
                     </div>
                   </div>
                   {failed && onItemNote && (

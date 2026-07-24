@@ -307,6 +307,7 @@ function DesktopK208({ tenantId, veh }: { tenantId: string; veh: Veh }) {
     <div className="rounded-2xl border border-border bg-card p-5 space-y-4">
       <div className="flex items-center gap-2"><ShieldCheck className="w-4 h-4 text-primary" /><h2 className="font-bold text-foreground">Complete CT K-208 here</h2></div>
       <K208Checklist marks={marks} onMark={(id, m) => setMarks((s) => ({ ...s, [id]: m }))} onPassAll={passAll}
+        onClearAll={() => { setMarks({}); setItemNotes({}); }}
         failureNotes="" onFailureNotes={() => {}} notes={notes} onNotes={setNotes}
         itemNotes={itemNotes} onItemNote={(id, v) => setItemNotes((s) => ({ ...s, [id]: v }))} />
 
