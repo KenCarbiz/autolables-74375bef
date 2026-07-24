@@ -167,14 +167,20 @@ export default function DealFlowPanel({ vehicle }: { vehicle: { id: string; vin:
 
   const viewFilledForm = async (kind: "buyers_guide" | "k208") => {
     if (!tenant?.id) return;
+    // Open the tab synchronously inside the click gesture, then point it at the
+    // filled PDF once it's generated. Calling window.open AFTER the async fill
+    // gets blocked by the browser as an unrequested pop-up on the second form of
+    // a session — which is why the K-208 opened but the Buyers Guide silently
+    // did not.
+    const win = window.open("about:blank", "_blank");
     setGenForms(true);
     try {
       const body: Record<string, unknown> = { tenant_id: tenant.id, vin: vehicle.vin, kinds: [kind], lang, app_base: window.location.origin };
       if (kind === "buyers_guide" && record?.buyersGuide?.box) body.box = record.buyersGuide.box;
       const { data, error } = await (supabase as any).functions.invoke("generate-vehicle-forms", { body });
-      const url = data?.forms?.[kind];
-      if (error || !data?.ok || !url) { toast.error("Couldn't open the official form"); return; }
-      window.open(url, "_blank", "noopener");
+      const url = data?.forms?.[kind] as string | undefined;
+      if (error || !data?.ok || !url) { win?.close(); toast.error("Couldn't open the official form"); return; }
+      if (win) win.location.href = url; else window.open(url, "_blank", "noopener");
       await reload();
     } finally {
       setGenForms(false);
@@ -309,7 +315,10 @@ export default function DealFlowPanel({ vehicle }: { vehicle: { id: string; vin:
         : k208AwaitingCert
           ? `Technician signed ${fmt(record.k208!.signedAt)} · licensee must certify`
           : "Auto-generated at ingest · awaiting service sign-off",
-      open: () => navigate(`/k208/${vehicle.vin}`),
+      // The /k208 page is the SIGNED-inspection viewer — only useful once service
+      // has signed. Before that it shows "no completed K-208 yet", which reads as
+      // broken, so the single "Official PDF" button is the way to view the draft.
+      open: record.k208 ? () => navigate(`/k208/${vehicle.vin}`) : undefined,
       onCertify: canProcess && k208AwaitingCert ? () => setCertifyOpen(true) : undefined,
       show: record.isUsed,
     },
