@@ -41,6 +41,9 @@ export default function VehicleQrPrint() {
   }, [tenant?.id, vin]);
 
   const readyUrl = useMemo(() => token ? `${window.location.origin}/ready/${token}` : "", [token]);
+  // Same permanent token, deep-linked straight to the K-208 station so the
+  // service department scans and lands on the safety inspection.
+  const k208Url = useMemo(() => readyUrl ? `${readyUrl}?station=service` : "", [readyUrl]);
   const tail = vin.toUpperCase().slice(-8);
 
   if (loading) return <div className="min-h-screen grid place-items-center"><Loader2 className="w-6 h-6 animate-spin text-muted-foreground" /></div>;
@@ -74,6 +77,19 @@ export default function VehicleQrPrint() {
             <p className="text-2xl font-black leading-tight mt-1">Scan for Get-Ready</p>
             <p className="text-sm text-slate-600 mt-1">Service &amp; detail scan to open this vehicle's work order, complete the inspection / installs, and sign off.</p>
             <p className="text-xs text-slate-400 mt-3 font-mono break-all">{readyUrl}</p>
+          </div>
+        </div>
+
+        {/* Service · CT K-208 — deep-links straight to the safety inspection */}
+        <div className="border-2 border-dashed border-blue-300 rounded-2xl p-6 flex items-center gap-6">
+          <div className="shrink-0 border border-slate-200 rounded-xl p-3 bg-white">
+            <QRCodeSVG value={k208Url} size={200} level="M" />
+          </div>
+          <div className="min-w-0">
+            <p className="text-[11px] font-bold uppercase tracking-widest text-blue-700">Service department</p>
+            <p className="text-2xl font-black leading-tight mt-1">Scan for the CT K-208</p>
+            <p className="text-sm text-slate-600 mt-1">Opens the safety inspection directly — mark each item Pass or Fail, then sign. No login required.</p>
+            <p className="text-xs text-slate-400 mt-3 font-mono break-all">{k208Url}</p>
           </div>
         </div>
 

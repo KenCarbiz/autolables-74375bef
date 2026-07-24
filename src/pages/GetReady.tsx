@@ -109,11 +109,18 @@ export default function GetReady() {
   const dept = (searchParams.get("dept") || "").toLowerCase();
   const allowedStations = DEPT_STATIONS[dept] || null; // null = show all
   const canStation = (v: View) => !allowedStations || allowedStations.has(v);
+  // A QR can deep-link straight to a station (e.g. the service QR opening the
+  // K-208) via ?station=service | ?do=k208. Falls back to the hub when the
+  // station is unknown or the department scope hides it. The back arrow still
+  // returns to the hub, so other stations stay reachable.
+  const STATION_DEEPLINK: Record<string, View> = { service: "service", k208: "service", detail: "detail", recon: "recon", pdi: "pdi" };
+  const requestedStation = STATION_DEEPLINK[(searchParams.get("station") || searchParams.get("do") || "").toLowerCase()];
+  const initialView: View = requestedStation && canStation(requestedStation) ? requestedStation : "hub";
   const [ctx, setCtx] = useState<Ctx | null>(null);
   const [reconLines, setReconLines] = useState<ReconLine[]>([]);
   const [pdiDone, setPdiDone] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [view, setView] = useState<View>("hub");
+  const [view, setView] = useState<View>(initialView);
 
   const loadRecon = useCallback(async () => {
     const { data } = await (supabase as any).rpc("get_recon_for_token", { _token: token });
