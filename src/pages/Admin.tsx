@@ -20,6 +20,7 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { useVinScan } from "@/contexts/VinScanContext";
 import { toast } from "sonner";
 import DealerProgramsPanel from "@/components/admin/DealerProgramsPanel";
+import MerchandisingSeoPanel from "@/components/admin/MerchandisingSeoPanel";
 import InstallerInvoicesPanel from "@/components/admin/InstallerInvoicesPanel";
 import PassportPublishingCard from "@/components/admin/PassportPublishingCard";
 import PacketDefaultsPanel from "@/components/admin/PacketDefaultsPanel";
@@ -620,6 +621,7 @@ const Admin = () => {
     { id: "labels", label: "Label Templates" },
     { id: "programs", label: "Included with Sale & Warranties" },
     { id: "factory-warranty", label: "Factory Warranty & CPO" },
+    { id: "merchandising-seo", label: "Merchandising & SEO" },
     { id: "passport-ctas", label: "Passport Buttons" },
     { id: "passport-trust", label: "Why Buy From Us" },
     { id: "passport-routing", label: "Lead Routing" },
@@ -677,6 +679,7 @@ const Admin = () => {
             { id: "pricing", label: "Pricing", ids: ["incentives"] },
             { id: "products", label: "Products & Programs", ids: ["products", "rules", "programs", "factory-warranty"] },
             { id: "passport", label: "Customer Passport", ids: ["passport-ctas", "passport-trust", "passport-routing"] },
+            { id: "merchandising", label: "Merchandising & SEO", ids: ["merchandising-seo"] },
             { id: "printing", label: "Printing & Documents", ids: ["labels", "print-settings", "document-rules", "invoices"] },
             { id: "compliance", label: "Compliance", ids: ["audit", "files", "warranty"] },
           ];
@@ -1644,6 +1647,8 @@ const Admin = () => {
         {/* ─── Branding Tab ─── */}
         {tab === "programs" && <DealerProgramsPanel />}
         {tab === "factory-warranty" && <OemWarrantyPanel />}
+        {tab === "merchandising-seo" && <MerchandisingSeoPanel />}
+
         {tab === "passport-ctas" && (
           <div className="space-y-5">
             <PacketDefaultsPanel />

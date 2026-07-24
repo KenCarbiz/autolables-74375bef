@@ -30,6 +30,7 @@ export type AdminTab =
   | "document-rules"
   | "incentives"
   | "features"
+  | "merchandising-seo"
   | "passport-ctas"
   | "passport-trust"
   | "passport-routing";
@@ -44,6 +45,7 @@ export const TAB_CAPS: Record<AdminTab, DealerCapability[]> = {
   "document-rules": ["can_manage_settings"],
   features: ["can_manage_settings"],
   getready: ["can_manage_settings"],
+  "merchandising-seo": ["can_manage_settings"],
   "passport-ctas": ["can_manage_settings"],
   "passport-trust": ["can_manage_settings"],
   "passport-routing": ["can_manage_settings", "can_manage_deals"],

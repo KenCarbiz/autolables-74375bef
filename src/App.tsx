@@ -125,6 +125,8 @@ const DocumentReview = lazy(() => import("./pages/DocumentReview"));
 const NewCarSticker = lazy(() => import("./pages/NewCarSticker"));
 const CpoSheet = lazy(() => import("./pages/CpoSheet"));
 const DescriptionStudio = lazy(() => import("./pages/DescriptionStudio"));
+const DescriptionOperations = lazy(() => import("./pages/DescriptionOperations"));
+const DescriptionIntelligence = lazy(() => import("./pages/DescriptionIntelligence"));
 const SaveCarInventory = lazy(() => import("./pages/SaveCarInventory"));
 const DealSigning = lazy(() => import("./pages/DealSigning"));
 const PublicListing = lazy(() => import("./pages/PublicListing"));
@@ -288,8 +290,12 @@ const App = () => (
                         <Route path="/cpo-sheet" element={<CpoSheet />} />
                         <Route path="/compliance" element={<ComplianceCenter />} />
                         <Route path="/compliance-center" element={<ComplianceActionCenter />} />
+                        {/* Fleet operations is the primary description surface; the
+                            manual studio stays available as an authorized override. */}
+                        <Route path="/description-operations" element={<DescriptionOperations />} />
+                        <Route path="/description-intelligence/:vehicleId" element={<DescriptionIntelligence />} />
                         <Route path="/description-studio" element={<DescriptionStudio />} />
-                        <Route path="/description-writer" element={<DescriptionStudio />} />
+                        <Route path="/description-writer" element={<DescriptionOperations />} />
                         <Route path="/add-inventory" element={<SaveCarInventory />} />
                         <Route path="/prep" element={<PrepSignOff />} />
                         <Route path="/prep/:vin" element={<PrepMobile />} />

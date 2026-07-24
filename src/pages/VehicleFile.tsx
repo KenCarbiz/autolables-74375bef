@@ -29,6 +29,7 @@ import { hasDealerCapability } from "@/lib/permissions/dealerRoleCapabilities";
 import { resolveOperatingState } from "@/lib/dealerState";
 import { QRCodeSVG } from "qrcode.react";
 import GeneratedDocumentsSection from "@/components/vehicle/GeneratedDocumentsSection";
+import MerchandisingContentSection from "@/components/vehicle/MerchandisingContentSection";
 import DealFlowPanel from "@/components/vehicle/DealFlowPanel";
 import { useStickerCatalog } from "@/lib/stickerStudio/useStickerCatalog";
 import { useStickerPrefs } from "@/lib/stickerStudio/useStickerPrefs";
@@ -1569,6 +1570,11 @@ const ScanInfoPanel = ({ vehicle, onReload }: { vehicle: VehicleRow; onReload: (
           </button>
         }
       />
+
+      {/* Merchandising content — the same description case the Description
+          Operations Center uses. Read-only summary here; the full record and
+          every action live on the Description Intelligence screen. */}
+      <MerchandisingContentSection vehicleId={vehicle.id} />
 
       {/* Passport experience version — per-vehicle override. Defaults to
           "current" (existing /v/:slug). "V3 (governed)" opts this vehicle

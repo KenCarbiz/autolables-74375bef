@@ -196,8 +196,9 @@ const AppShell = ({ children }: AppShellProps) => {
     "/used-car-sticker": { title: "Used Car Sticker", subtitle: "Generate used vehicle buyer-facing labels." },
     "/sticker-studio": { title: "Sticker Studio", subtitle: "Build and customize label templates." },
     "/compliance": { title: "Compliance", subtitle: "Track dealership forms, rules, and audit items." },
-    "/description-studio": { title: "SEO Description Studio", subtitle: "AI-powered vehicle descriptions that sell more and rank higher." },
-    "/description-writer": { title: "SEO Description Studio", subtitle: "AI-powered vehicle descriptions that sell more and rank higher." },
+    "/description-studio": { title: "Manual Description", subtitle: "Authorized override for vehicles outside automatic generation." },
+    "/description-writer": { title: "Description Operations", subtitle: "Automated merchandising intelligence across every vehicle." },
+    "/description-operations": { title: "Description Operations", subtitle: "Automated merchandising intelligence across every vehicle." },
   };
   const pageMeta = pageTitles[location.pathname] || { title: activeItem?.label || "Dashboard", subtitle: "AutoLabels admin workspace." };
   const companyName = currentStore?.name || tenant?.name || (settings.dealer_name && settings.dealer_name !== "Your Dealership" ? settings.dealer_name : "Select store");
@@ -649,7 +650,10 @@ const AppShell = ({ children }: AppShellProps) => {
 
             <div className="flex shrink-0 items-center gap-2 ml-auto">
               {(() => {
-                const isDescriptionRoute = location.pathname === "/description-writer" || location.pathname === "/description-studio";
+                const isDescriptionRoute = location.pathname === "/description-writer"
+                  || location.pathname === "/description-studio"
+                  || location.pathname === "/description-operations"
+                  || location.pathname.startsWith("/description-intelligence");
                 if (isDescriptionRoute) {
                   return (
                     <div className="hidden xl:flex items-center gap-2">

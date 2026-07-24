@@ -43,7 +43,7 @@ const TOOLS: CreateTool[] = [
   { id: "new-car-sticker", title: "New Car Sticker", description: "Monroney-style new-car window label.", category: "Labels & Stickers", iconKey: "new-car-sticker", iconCategory: "sticker", route: "/new-car-sticker", tags: ["sticker", "label", "new", "monroney", "window"], chip: "Sticker" },
   { id: "trade-up-sticker", title: "Trade-Up Sticker", description: "Promotional trade-up sticker.", category: "Labels & Stickers", iconKey: "trade-up-sticker", iconCategory: "sticker", route: "/trade-up", tags: ["sticker", "trade", "trade-up", "promo"], chip: "Template" },
   { id: "sticker-studio", title: "Sticker Studio", description: "Choose a style & create a sticker template.", category: "Labels & Stickers", iconKey: "sticker-studio", iconCategory: "sticker", route: "/sticker-studio", tags: ["sticker", "studio", "template", "style", "label"], chip: "Template" },
-  { id: "description-writer", title: "Description Writer", description: "AI listing copy per marketplace.", category: "AI & Merchandising", iconKey: "description-writer", iconCategory: "ai", route: "/description-writer", tags: ["ai", "description", "copy", "listing", "marketplace", "merchandising"], chip: "AI Tool", isQuickStart: true },
+  { id: "description-writer", title: "Description Operations", description: "Automated listing copy — review only the exceptions.", category: "AI & Merchandising", iconKey: "description-writer", iconCategory: "ai", route: "/description-operations", tags: ["ai", "description", "copy", "listing", "marketplace", "merchandising", "seo", "operations"], chip: "AI Tool", isQuickStart: true },
 ];
 
 const CATEGORIES: { name: CreateTool["category"]; sub: string }[] = [

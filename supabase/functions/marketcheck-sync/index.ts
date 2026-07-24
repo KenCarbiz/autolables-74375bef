@@ -211,6 +211,22 @@ async function autoPreload(admin: any, supabaseUrl: string, serviceKey: string, 
       }).catch(() => { /* best-effort */ });
     } catch { /* orchestration best-effort */ }
   }
+  // Description Intelligence: initialize the merchandising case for this VIN.
+  // Fire-and-forget by design — a description failure must never block or slow
+  // inventory ingestion. The orchestrator is idempotent on
+  // (tenant, vehicle, source_data_version, config_version), so a re-sync with
+  // unchanged data does no work, and anything missed here is picked up by the
+  // description-orchestrate reconcile sweep.
+  if (listingId) {
+    try {
+      fetch(`${supabaseUrl}/functions/v1/description-orchestrate`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${serviceKey}` },
+        body: JSON.stringify({ action: "orchestrate", tenant_id: tenantId, vehicle_id: listingId, reason: "ingest" }),
+        signal: AbortSignal.timeout(20000),
+      }).catch(() => { /* best-effort */ });
+    } catch { /* description best-effort */ }
+  }
 }
 
 // One page of a rooftop's inventory from the syndication feed. owned=true drops

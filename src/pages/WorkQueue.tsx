@@ -73,11 +73,31 @@ const WorkQueue = () => {
       .order("created_at", { ascending: false })
       .limit(250);
 
+    // Open description exceptions are real work: surface them here alongside
+    // the vehicle tasks rather than hiding them inside the description tool.
+    const { data: descExc } = await (supabase as any)
+      .from("description_exceptions")
+      .select("id, vehicle_id, exception_type, severity, blocking, title, summary, created_at, description_case_id")
+      .eq("tenant_id", tenant.id).in("status", ["open", "in_progress"])
+      .order("created_at", { ascending: false }).limit(100);
+    const descItems: WorkItem[] = ((descExc || []) as any[]).map((e) => ({
+      id: `desc-exc-${e.id}`,
+      vehicle_id: e.vehicle_id,
+      work_type: "description_exception",
+      title: e.title || "Description exception",
+      description: e.summary || "A vehicle description needs review before it can publish.",
+      status: "open",
+      priority: e.blocking ? "high" : e.severity === "critical" ? "urgent" : "normal",
+      department: "passport",
+      created_at: e.created_at,
+      metadata: { deep_link: `/description-intelligence/${e.vehicle_id}`, exception_type: e.exception_type },
+    }));
+
     if (error) {
       toast.error("Could not load Work Queue. The newest migration may still be deploying.");
-      setItems([]);
+      setItems(descItems);
     } else {
-      setItems((data || []) as WorkItem[]);
+      setItems([...(data || []), ...descItems] as WorkItem[]);
     }
     setLoading(false);
   };
@@ -106,6 +126,12 @@ const WorkQueue = () => {
   }), [items]);
 
   const updateStatus = async (item: WorkItem, nextStatus: string) => {
+    // Description exceptions are not dealer_work_items rows — they can only be
+    // resolved on the description record, where the decision is audited.
+    if (item.work_type === "description_exception") {
+      toast.info("Open the description record to resolve this exception.");
+      return;
+    }
     const patch: Record<string, unknown> = { status: nextStatus, updated_at: new Date().toISOString() };
     if (nextStatus === "completed") patch.completed_at = new Date().toISOString();
     const { error } = await (supabase as any).from("dealer_work_items").update(patch).eq("id", item.id);
@@ -265,6 +291,14 @@ const WorkQueue = () => {
                     )}
                   </div>
                 </div>
+                {/* Description exceptions deep-link straight to the record that
+                    can actually resolve them. */}
+                {typeof item.metadata?.deep_link === "string" && (
+                  <a href={item.metadata.deep_link as string}
+                    className="inline-flex h-9 items-center gap-1 self-start rounded-xl border border-blue-200 bg-blue-50 px-3 text-[12px] font-bold text-blue-700 hover:bg-blue-100 lg:order-2">
+                    Open record
+                  </a>
+                )}
                 <div className="flex flex-wrap justify-start gap-2 lg:justify-end">
                   {item.vehicle_id && <button onClick={() => navigate(`/vehicle-file/${item.vehicle_id}`)} className="h-10 rounded-xl border border-slate-200 px-3 text-sm font-black text-slate-700 hover:bg-slate-50">Open vehicle</button>}
                   {item.status !== "in_progress" && item.status !== "completed" && <button onClick={() => updateStatus(item, "in_progress")} className="h-10 rounded-xl border border-blue-200 bg-blue-50 px-3 text-sm font-black text-blue-800">Start</button>}
