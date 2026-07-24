@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { isPublicDoc, type DocumentStatus } from "@/lib/stickerStudio/documentWorkflow";
 
 // useDealRecord — assembles a vehicle's deal record live by tenant_id + vin:
 // the accepted addendum, the K-208 safety inspection, the Get-Ready record, and
@@ -61,7 +62,9 @@ export function dealDocStatus(r: DealRecord) {
   const addendum = !!r.addendum?.acceptedAt;
   const k208 = !!r.k208;
   const getReady = !!r.getReady && (!!r.getReady.completeDate || r.getReady.detailSigned);
-  const buyersGuide = !!r.buyersGuide && ["approved", "printed", "published"].includes(r.buyersGuide.status);
+  // "Done" for an official doc = the one canonical customer-visible status set
+  // (documentWorkflow.PUBLIC_STATUSES), so every surface agrees on completeness.
+  const buyersGuide = !!r.buyersGuide && isPublicDoc(r.buyersGuide.status as DocumentStatus);
   // Buyers Guide + K-208 only apply to used/CPO vehicles.
   const required = r.isUsed ? { addendum, k208, getReady, buyersGuide } : { addendum, getReady };
   const complete = Object.values(required).every(Boolean);

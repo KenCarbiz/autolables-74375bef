@@ -36,7 +36,6 @@ import {
   LABEL_BUILDERS, slotFor, conditionOf, resolveLabelDefault, labelRefPath,
   type LabelKind,
 } from "@/lib/labelDefaults";
-import UsedCarDocPack from "@/components/vehicle/UsedCarDocPack";
 import DeliverySignoffs from "@/components/vehicle/DeliverySignoffs";
 import TitleMcoPanel from "@/components/vehicle/TitleMcoPanel";
 import TitleVerificationPanel from "@/components/vehicle/TitleVerificationPanel";
@@ -353,7 +352,7 @@ const VehicleFile = () => {
     { id: "overview",  label: "Overview",  icon: Car },
     { id: "deal",      label: "Deal Flow", icon: FolderCheck },
     { id: "documents", label: "Documents", icon: FileUp, count: vehicle.documents?.length || undefined },
-    { id: "scan",      label: "Scan Info", icon: QrCode },
+    { id: "scan",      label: "Shopper Passport", icon: QrCode },
     { id: "customer",  label: "Customer",  icon: UserRound },
     { id: "addendum",  label: "Addendum",  icon: FileText },
     { id: "prep",      label: "Prep & Install", icon: Wrench },
@@ -578,7 +577,7 @@ const VehicleFile = () => {
 
       {/* Panels */}
       <div className="pt-2">
-        {tab === "overview"  && <OverviewPanel vehicle={vehicle} onTab={setTab} recall={recall} />}
+        {tab === "overview"  && <OverviewPanel vehicle={vehicle} onTab={setTab} recall={recall} onPublish={publish} publishing={publishing} />}
         {tab === "deal"      && <DealFlowPanel vehicle={vehicle} />}
         {tab === "documents" && <DocumentsPanel vehicle={vehicle} onReload={load} />}
         {tab === "scan"      && <ScanInfoPanel vehicle={vehicle} onReload={load} />}
@@ -627,11 +626,14 @@ const VehicleFile = () => {
               Generate Sticker
             </button>
             <button
-              onClick={() => setTab("labels")}
-              className="w-full h-11 rounded-xl border border-border bg-background text-foreground text-sm font-semibold inline-flex items-center justify-center gap-1.5"
+              onClick={publish}
+              disabled={publishing}
+              className="w-full h-11 rounded-xl border border-border bg-background text-foreground text-sm font-semibold inline-flex items-center justify-center gap-1.5 disabled:opacity-60"
             >
-              <Globe className="w-4 h-4" />
-              Publish to Shopper Portal
+              {publishing
+                ? <div className="w-4 h-4 rounded-full border-2 border-current border-t-transparent animate-spin" />
+                : <Globe className="w-4 h-4" />}
+              {publishing ? "Publishing…" : "Publish to Shopper Portal"}
             </button>
           </>
         )}
@@ -685,7 +687,7 @@ const StatRow = ({ label, value, tone }: { label: string; value: React.ReactNode
 const snapBtn = "h-9 rounded-lg border border-border bg-card hover:bg-muted text-foreground text-xs font-semibold inline-flex items-center justify-center gap-1.5 transition-colors disabled:opacity-50";
 const snapBtnPrimary = "h-9 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold inline-flex items-center justify-center gap-1.5 transition-colors disabled:opacity-50";
 
-const OverviewPanel = ({ vehicle, onTab, recall }: { vehicle: VehicleRow; onTab: (t: TabId) => void; recall: ReturnType<typeof useRecallTask> }) => {
+const OverviewPanel = ({ vehicle, onTab, recall, onPublish, publishing }: { vehicle: VehicleRow; onTab: (t: TabId) => void; recall: ReturnType<typeof useRecallTask>; onPublish: () => void; publishing: boolean }) => {
   const [events, setEvents] = useState<AuditEvent[]>([]);
   const [loadingEvents, setLoadingEvents] = useState(true);
 
@@ -747,7 +749,7 @@ const OverviewPanel = ({ vehicle, onTab, recall }: { vehicle: VehicleRow; onTab:
       case "Recall checked": return () => setRecallReviewOpen(true);
       case "Documents attached": return () => onTab("documents");
       case "Prep & install signed off": return () => onTab("prep");
-      case "Published to shopper portal": return () => onTab("labels");
+      case "Published to shopper portal": return onPublish;
       case "Service history":
       case "Remaining warranty":
       case "Available accessories": return () => onTab("scan");
@@ -774,7 +776,7 @@ const OverviewPanel = ({ vehicle, onTab, recall }: { vehicle: VehicleRow; onTab:
     // publish flow instead of a blank page.
     published
       ? { label: "Open Shopper Portal", icon: ExternalLink, tone: "bg-blue-50 text-blue-600", onClick: () => window.open(viewUrl, "_blank", "noopener") }
-      : { label: "Publish to Go Live", icon: Globe, tone: "bg-blue-50 text-blue-600", onClick: () => onTab("labels") },
+      : { label: publishing ? "Publishing…" : "Publish to Go Live", icon: Globe, tone: "bg-blue-50 text-blue-600", onClick: onPublish },
   ];
 
   // Compact reference pairs for the Vehicle Information card.
@@ -859,7 +861,7 @@ const OverviewPanel = ({ vehicle, onTab, recall }: { vehicle: VehicleRow; onTab:
           <div className="grid grid-cols-2 gap-2 mt-auto pt-1">
             {published
               ? <a href={viewUrl} target="_blank" rel="noreferrer" className={snapBtn}><ExternalLink className="w-3.5 h-3.5" /> View shopper page</a>
-              : <button onClick={() => onTab("labels")} className={snapBtnPrimary}><Globe className="w-3.5 h-3.5" /> Publish vehicle</button>}
+              : <button onClick={onPublish} disabled={publishing} className={snapBtnPrimary}><Globe className="w-3.5 h-3.5" /> {publishing ? "Publishing…" : "Publish vehicle"}</button>}
             <button onClick={copyPortalLink} className={snapBtn}><Copy className="w-3.5 h-3.5" /> Copy link</button>
           </div>
         </Card>
@@ -1079,13 +1081,14 @@ const DocumentsPanel = ({ vehicle, onReload }: { vehicle: VehicleRow; onReload: 
     ? [
         { type: "factory_sticker", label: "OEM window sticker (Monroney)", desc: "Original factory window sticker PDF, image, or link — shows to shoppers in the packet." },
         { type: "brochure", label: "Vehicle brochure", desc: "OEM or dealer brochure PDF / link — shows to shoppers in the packet's Documents page." },
-        { type: "buyers_guide", label: "FTC Buyers Guide (used)", desc: "The official As-Is / Implied form (EN/ES) is generated and signed in Deal Flow. Upload here only to attach an outside or wet-signed copy." },
-        { type: "safety_inspection", label: safety.label, desc: `${safety.desc} Generated and service-signed in Deal Flow; upload here only to attach an outside copy.` },
+        // FTC Buyers Guide + the state safety inspection (K-208) are generated,
+        // signed, and filed in Deal Flow — the single canonical home. The title
+        // lives in the Vehicle Title block below. They are intentionally NOT
+        // upload slots here, so a divergent second copy can't be created.
         { type: "emissions", label: "Emissions / smog certificate", desc: "State emissions certificate where required." },
         { type: "carfax", label: "Carfax / AutoCheck", desc: "Vehicle history report — attach for buyer review." },
         { type: "recon", label: "Inspection / MPI report", desc: "Multi-point reconditioning inspection report." },
         { type: "odometer", label: "Odometer disclosure", desc: "Federal odometer disclosure statement." },
-        { type: "title", label: "Title / application", desc: "Title, reassignment, or title application." },
         { type: "warranty", label: "Warranty / service contract", desc: "Limited warranty, service contract (VSC), or GAP documents." },
         { type: "we_owe", label: "\"We owe\" / Due bill", desc: "Items the dealership agreed to deliver post-sale (e.g. pending install)." },
         { type: "other", label: "Other", desc: "Anything else relevant to the deal jacket." },
@@ -1204,7 +1207,6 @@ const DocumentsPanel = ({ vehicle, onReload }: { vehicle: VehicleRow; onReload: 
       ))}
         </div>
       </div>
-      <UsedCarDocPack vehicleId={vehicle.id} vin={vehicle.vin} condition={vehicle.condition} />
       <TitleMcoPanel vin={vehicle.vin} tenantId={vehicle.tenant_id} condition={vehicle.condition} />
       <TitleVerificationPanel listingId={vehicle.id} vin={vehicle.vin} tenantId={vehicle.tenant_id} condition={vehicle.condition} titleVerification={vehicle.title_verification} enabled={titleVerifyEnabled} onUpdated={onReload} />
       <div className="rounded-2xl border border-border bg-card shadow-[0_1px_3px_rgba(0,0,0,0.05)] p-5">
