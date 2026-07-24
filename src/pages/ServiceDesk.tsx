@@ -11,6 +11,7 @@ import { uploadPhoto } from "@/lib/storage";
 import { Loader2, Search, QrCode, ShieldCheck, FileText, Upload, CheckCircle2, Copy, X, ArrowLeft } from "lucide-react";
 import NextStepBanner from "@/components/workflow/NextStepBanner";
 import ServiceQueue from "@/components/service/ServiceQueue";
+import { RequestAdditionalWorkButton, ServiceApprovalsPanel } from "@/components/service/AdditionalWork";
 
 // /service — desktop hub for logged-in Service staff. For a chosen vehicle:
 //   1. Generate the no-login QR to hand to a tech (issue_dept_signoff_token)
@@ -69,9 +70,12 @@ export default function ServiceDesk() {
       {veh ? (
         // Per-vehicle service workspace — opened from the queue (or a Service QR).
         <>
-          <div className="rounded-xl bg-muted/50 px-4 py-3">
-            <div className="font-display font-bold text-foreground">{veh.ymm || "Vehicle"}</div>
-            <div className="font-mono text-xs text-muted-foreground">{veh.vin}</div>
+          <div className="rounded-xl bg-muted/50 px-4 py-3 flex items-center justify-between gap-3 flex-wrap">
+            <div>
+              <div className="font-display font-bold text-foreground">{veh.ymm || "Vehicle"}</div>
+              <div className="font-mono text-xs text-muted-foreground">{veh.vin}</div>
+            </div>
+            <RequestAdditionalWorkButton tenantId={tenantId} veh={veh} />
           </div>
           <ServiceQrCard tenantId={tenantId} vin={veh.vin} />
           <DesktopK208 tenantId={tenantId} veh={veh} />
@@ -81,6 +85,7 @@ export default function ServiceDesk() {
         // The queue — one landing for service writers/managers.
         <>
           <NextStepBanner stage="service" />
+          <ServiceApprovalsPanel tenantId={tenantId} />
           <ServiceQueue onOpen={(v) => setVeh({ id: v.id, vin: v.vin, ymm: v.ymm })} />
           <details className="rounded-2xl border border-border bg-card">
             <summary className="px-4 py-3 text-sm font-semibold text-foreground cursor-pointer">Service settings — publish gate &amp; K-208 authority</summary>

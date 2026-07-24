@@ -29,6 +29,7 @@ interface Row {
   priority: "High" | "Medium" | "Low";
   bucket: "get_ready" | "in_progress" | "failed" | "ready_to_sign" | "done";
   completedToday: boolean;
+  awaiting: boolean;
 }
 
 const isToday = (iso?: string | null) => {
@@ -38,7 +39,7 @@ const isToday = (iso?: string | null) => {
 };
 
 // deno-lint-ignore no-explicit-any
-function derive(v: any, gr: any, si: any): Row {
+function derive(v: any, gr: any, si: any, awaiting: boolean): Row {
   const items: { status?: string }[] = Array.isArray(gr?.items) ? gr.items : [];
   const anyItems = items.length > 0;
   const someComplete = items.some((i) => i.status === "complete");
@@ -61,13 +62,14 @@ function derive(v: any, gr: any, si: any): Row {
     : siPass ? "ready"
     : "waiting";
 
-  const next: Row["next"] = k208State === "blocked" ? { label: "Resolve items", tone: "danger" }
+  const next: Row["next"] = awaiting ? { label: "Review request", tone: "primary" }
+    : k208State === "blocked" ? { label: "Resolve items", tone: "danger" }
     : (k208State === "executed" && grComplete) ? { label: "View record", tone: "ghost" }
     : k208State === "ready" ? { label: "Execute K-208", tone: "primary" }
     : grState === "in_progress" ? { label: "Continue work", tone: "primary" }
     : { label: "Start work", tone: "primary" };
 
-  const priority: Row["priority"] = k208State === "blocked" ? "High"
+  const priority: Row["priority"] = (awaiting || k208State === "blocked") ? "High"
     : (k208State === "executed" && grComplete) ? "Low" : "Medium";
 
   const bucket: Row["bucket"] = k208State === "blocked" ? "failed"
@@ -87,7 +89,7 @@ function derive(v: any, gr: any, si: any): Row {
     stock: (v.mc_attributes?.stock_no as string) || "",
     photo: (v.hero_image_url as string) || (Array.isArray(v.mc_attributes?.photo_links) ? v.mc_attributes.photo_links[0] : "") || "",
     condition: String(v.condition || "used").toUpperCase(),
-    grState, k208State, delivery, next, priority, bucket,
+    grState, k208State, delivery, next, priority, bucket, awaiting,
     completedToday: certified && isToday(si?.licensee_certified_at),
   };
 }
@@ -134,16 +136,18 @@ export default function ServiceQueue({ onOpen }: { onOpen: (v: QueueVeh) => void
         .limit(300);
       const vs = (vehicles as any[]) || [];
       const vins = vs.map((v) => v.vin).filter(Boolean);
-      const [grRes, siRes] = await Promise.all([
+      const [grRes, siRes, srRes] = await Promise.all([
         vins.length ? (supabase as any).from("get_ready_records").select("vin, status, items, get_ready_complete_date").eq("tenant_id", tenant.id).in("vin", vins) : Promise.resolve({ data: [] }),
         vins.length ? (supabase as any).from("safety_inspections").select("vin, status, result, licensee_certified_at, signed_at").eq("tenant_id", tenant.id).eq("status", "signed").in("vin", vins).order("signed_at", { ascending: false }) : Promise.resolve({ data: [] }),
+        vins.length ? (supabase as any).from("service_requests").select("vin").eq("tenant_id", tenant.id).eq("status", "pending").in("vin", vins) : Promise.resolve({ data: [] }),
       ]);
       const grByVin = new Map<string, any>();
       for (const g of ((grRes.data as any[]) || [])) if (!grByVin.has(g.vin)) grByVin.set(g.vin, g);
       const siByVin = new Map<string, any>();
       for (const s of ((siRes.data as any[]) || [])) if (!siByVin.has(s.vin)) siByVin.set(s.vin, s); // first = latest signed
+      const awaitingVins = new Set<string>(((srRes.data as any[]) || []).map((r) => r.vin));
       if (off) return;
-      setRows(vs.map((v) => derive(v, grByVin.get(v.vin), siByVin.get(v.vin))));
+      setRows(vs.map((v) => derive(v, grByVin.get(v.vin), siByVin.get(v.vin), awaitingVins.has(v.vin))));
       setLoading(false);
     })();
     return () => { off = true; };
@@ -248,7 +252,9 @@ export default function ServiceQueue({ onOpen }: { onOpen: (v: QueueVeh) => void
                     </td>
                     <td className="px-4 py-2.5"><div className="flex items-center gap-2.5 min-w-0"><VehThumb r={r} /><div className="min-w-0"><p className="font-semibold text-foreground truncate">{r.ymm}</p><p className="text-[11px] text-muted-foreground">{r.condition}{r.trim ? ` · ${r.trim}` : ""}</p></div></div></td>
                     <td className="px-4 py-2.5"><p className="font-mono text-[12px] text-foreground">{r.stock || "—"}</p><p className="font-mono text-[11px] text-muted-foreground">…{r.vin.slice(-6)}</p></td>
-                    <td className="px-4 py-2.5"><span className={`inline-flex items-center gap-1.5 text-xs font-semibold ${G.cls}`}><G.Icon className="w-3.5 h-3.5" /> {G.label}</span></td>
+                    <td className="px-4 py-2.5">{r.awaiting
+                      ? <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-amber-600"><AlertTriangle className="w-3.5 h-3.5" /> Awaiting approval</span>
+                      : <span className={`inline-flex items-center gap-1.5 text-xs font-semibold ${G.cls}`}><G.Icon className="w-3.5 h-3.5" /> {G.label}</span>}</td>
                     <td className="px-4 py-2.5"><span className={`inline-flex items-center gap-1.5 text-xs font-semibold ${K.cls}`}><K.Icon className="w-3.5 h-3.5" /> {K.label}</span></td>
                     <td className="px-4 py-2.5"><span className={`text-xs font-medium ${r.delivery === "Delivery blocked" ? "text-red-600" : r.delivery === "Cleared" ? "text-emerald-600" : "text-muted-foreground"}`}>{r.delivery}</span></td>
                     <td className="px-4 py-2.5 text-right">
