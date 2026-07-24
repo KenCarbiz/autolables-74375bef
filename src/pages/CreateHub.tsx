@@ -1,9 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
-  FileText, Plus, Search, ChevronRight, Clock, Lightbulb, ArrowRight,
+  Search, ChevronRight, Lightbulb, ArrowRight, CheckCircle2,
 } from "lucide-react";
-import { ToolIconBadge, type AutoLabelsToolIconKey, type ToolCategory } from "@/components/icons/AutoLabelsToolIcons";
+import {
+  ToolIconBadge, toolIcon,
+  type AutoLabelsToolIconKey, type ToolCategory,
+} from "@/components/icons/AutoLabelsToolIcons";
 import { supabase } from "@/integrations/supabase/client";
 
 // /create — the AutoLabels creation hub. One data-driven launchpad for the
@@ -44,9 +47,9 @@ const TOOLS: CreateTool[] = [
 ];
 
 const CATEGORIES: { name: CreateTool["category"]; sub: string }[] = [
-  { name: "Compliance & Documents", sub: "Programs, disclosures, and compliance documents." },
-  { name: "Labels & Stickers", sub: "Window stickers, tags, and promotional labels." },
-  { name: "AI & Merchandising", sub: "AI-powered content to help you sell." },
+  { name: "Compliance & Documents", sub: "Required programs, disclosures, and vehicle documentation." },
+  { name: "Labels & Stickers", sub: "Window labels, promotional stickers, and custom templates." },
+  { name: "AI & Merchandising", sub: "Verified AI-assisted content for dealership listings." },
 ];
 
 const badgeCls = (b: ChipLabel) =>
@@ -57,14 +60,25 @@ const badgeCls = (b: ChipLabel) =>
   : b === "Sticker" ? "bg-[#EDF7FF] text-[#0077C8] border-[#cfe7f7]"
   : "bg-slate-100 text-slate-600 border-slate-200";
 
-// Creation-shaped audit actions → recent list rows, using the branded
-// registry: signed/completed states render in the service-green family.
-const RECENT_ACTIONS: Record<string, { label: string; iconKey: AutoLabelsToolIconKey; category: ToolCategory }> = {
-  listing_published: { label: "Published to shopper portal", iconKey: "used-car-sticker", category: "service" },
-  addendum_signed: { label: "Addendum signed", iconKey: "new-addendum", category: "service" },
-  deal_signed: { label: "Deal jacket signed", iconKey: "deals", category: "service" },
-  document_archived: { label: "Signed document archived", iconKey: "used-vehicle-docs", category: "document" },
-  prep_sign_off_signed: { label: "Prep sign-off completed", iconKey: "prep-install", category: "service" },
+// Creation-shaped audit actions → recent list rows. The tool keeps its own
+// category-tinted icon; a separate status badge (never category color) is
+// layered on top. `status` drives that badge — completions read green.
+type RecentStatus = "complete" | "processing" | "attention" | "failed";
+const RECENT_ACTIONS: Record<string, { label: string; iconKey: AutoLabelsToolIconKey; category: ToolCategory; status: RecentStatus }> = {
+  listing_published: { label: "Published to shopper portal", iconKey: "used-car-sticker", category: "sticker", status: "complete" },
+  addendum_signed: { label: "Addendum signed", iconKey: "new-addendum", category: "document", status: "complete" },
+  deal_signed: { label: "Deal jacket signed", iconKey: "deals", category: "document", status: "complete" },
+  document_archived: { label: "Signed document archived", iconKey: "used-vehicle-docs", category: "compliance", status: "complete" },
+  prep_sign_off_signed: { label: "Prep sign-off completed", iconKey: "prep-install", category: "service", status: "complete" },
+};
+
+// Small status badge layered onto a recent-creation icon. Non-color cue via
+// the icon glyph itself so status is not conveyed by color alone.
+const STATUS_BADGE: Record<RecentStatus, { ring: string; dot: string }> = {
+  complete: { ring: "text-emerald-500", dot: "bg-emerald-500" },
+  processing: { ring: "text-blue-500", dot: "bg-blue-500" },
+  attention: { ring: "text-amber-500", dot: "bg-amber-500" },
+  failed: { ring: "text-red-500", dot: "bg-red-500" },
 };
 
 const timeAgo = (iso: string): string => {
@@ -84,6 +98,8 @@ const WORKFLOW: { title: string; sub: string }[] = [
   { title: "Create Labels", sub: "Produce stickers and tags for the vehicle." },
   { title: "Market & Sell", sub: "Use AI tools to create listings that convert." },
 ];
+
+const InventoryGlyph = toolIcon("inventory");
 
 export default function CreateHub() {
   const navigate = useNavigate();
@@ -141,7 +157,7 @@ export default function CreateHub() {
 
   const rowCard = (t: CreateTool) => (
     <button key={t.id} onClick={() => open(t)}
-      className="group w-full text-left rounded-2xl border border-border bg-card px-4 py-3.5 hover:border-primary hover:bg-muted/30 transition-colors flex items-center gap-3 min-h-[84px] focus:outline-none focus-visible:ring-2 focus-visible:ring-primary">
+      className="group w-full text-left rounded-2xl border border-border bg-card px-4 py-3.5 hover:border-primary/50 hover:bg-primary/[0.035] transition-colors flex items-center gap-3.5 min-h-[76px] focus:outline-none focus-visible:ring-2 focus-visible:ring-primary">
       <ToolIconBadge iconKey={t.iconKey} category={t.iconCategory} variant="row" />
       <span className="min-w-0 flex-1">
         <span className="block font-semibold text-foreground leading-tight">{t.title}</span>
@@ -155,20 +171,17 @@ export default function CreateHub() {
   return (
     <div className="max-w-[1280px] mx-auto p-4 sm:p-6">
       {/* Header + search */}
-      <div className="flex items-center gap-2.5 mb-1">
-        <span className="grid place-items-center w-9 h-9 rounded-xl bg-primary/10 text-primary"><Plus className="w-5 h-5" /></span>
-        <h1 className="font-display text-[26px] font-bold tracking-tight text-foreground">Create</h1>
-      </div>
-      <p className="text-sm text-muted-foreground mb-4">Start a new document, label, or shopper asset.</p>
+      <h1 className="font-display text-[28px] sm:text-[30px] font-bold tracking-tight text-foreground leading-none">Create</h1>
+      <p className="text-sm text-muted-foreground mt-2 mb-4">Generate documents, vehicle labels, and merchandising assets.</p>
       <div className="relative max-w-[720px]">
-        <Search className="w-4 h-4 text-muted-foreground absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+        <Search className="w-4 h-4 text-muted-foreground absolute left-4 top-1/2 -translate-y-1/2 pointer-events-none" />
         <input
           ref={searchRef}
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           onKeyDown={(e) => { if (e.key === "Enter" && q && matches.length) open(matches[0]); }}
-          placeholder="What would you like to create?"
-          className="w-full h-11 pl-10 pr-16 rounded-xl border border-border bg-card text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+          placeholder="Search documents, labels, stickers, and AI tools…"
+          className="w-full h-[46px] pl-11 pr-16 rounded-xl border border-border bg-card text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary transition-shadow"
         />
         <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[11px] font-semibold text-muted-foreground border border-border rounded-md px-1.5 py-0.5 bg-muted/40">{isMac ? "⌘ K" : "Ctrl K"}</span>
       </div>
@@ -189,7 +202,7 @@ export default function CreateHub() {
             <>
               <section>
                 <h2 className="text-[17px] font-bold text-foreground">Quick Start</h2>
-                <p className="text-xs text-muted-foreground mt-0.5">Jump into your most used creations.</p>
+                <p className="text-xs text-muted-foreground mt-0.5">Jump into your most-used tools.</p>
                 <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3 mt-3">
                   {visible.filter((t) => t.isQuickStart).map(quickCard)}
                 </div>
@@ -235,9 +248,17 @@ export default function CreateHub() {
                 {recent.map((r) => {
                   const meta = RECENT_ACTIONS[r.action];
                   const detail = (r.details?.ymm as string) || (r.details?.vin as string) || null;
+                  const badge = STATUS_BADGE[meta.status];
                   return (
                     <li key={r.id} className="flex items-center gap-2.5 py-1.5">
-                      <span className="scale-[0.72] origin-left -mr-2"><ToolIconBadge iconKey={meta.iconKey} category={meta.category} variant="row" /></span>
+                      <span className="relative shrink-0">
+                        <ToolIconBadge iconKey={meta.iconKey} category={meta.category} variant="mini" />
+                        <span className="absolute -right-1 -bottom-1 grid place-items-center w-[15px] h-[15px] rounded-full bg-card">
+                          {meta.status === "complete"
+                            ? <CheckCircle2 className={`w-[15px] h-[15px] ${badge.ring}`} strokeWidth={2.25} />
+                            : <span className={`w-2 h-2 rounded-full ${badge.dot}`} />}
+                        </span>
+                      </span>
                       <span className="min-w-0 flex-1">
                         <span className="block text-[12px] font-semibold text-foreground leading-tight truncate">{meta.label}</span>
                         {detail && <span className="block text-[10.5px] text-muted-foreground truncate">{detail}</span>}
@@ -253,9 +274,11 @@ export default function CreateHub() {
           <div className="rounded-2xl border border-border bg-card p-4">
             <h3 className="text-sm font-bold text-foreground mb-3">Recommended workflow</h3>
             <ol className="space-y-3.5 relative">
+              {/* subtle connector spine linking the numbered steps */}
+              <span aria-hidden className="absolute left-3 top-3 bottom-3 w-px bg-border -translate-x-1/2" />
               {WORKFLOW.map((w, i) => (
-                <li key={w.title} className="flex items-start gap-3">
-                  <span className="grid place-items-center w-6 h-6 rounded-full bg-primary/10 text-primary text-[11px] font-bold shrink-0 mt-0.5">{i + 1}</span>
+                <li key={w.title} className="flex items-start gap-3 relative">
+                  <span className="grid place-items-center w-6 h-6 rounded-full bg-primary/10 text-primary text-[11px] font-bold shrink-0 mt-0.5 ring-2 ring-card z-10">{i + 1}</span>
                   <span className="min-w-0">
                     <span className="block text-[12.5px] font-semibold text-foreground leading-tight">{w.title}</span>
                     <span className="block text-[11px] text-muted-foreground mt-0.5">{w.sub}</span>
@@ -263,14 +286,17 @@ export default function CreateHub() {
                 </li>
               ))}
             </ol>
-            <button onClick={() => navigate("/inventory")} className="mt-3.5 w-full h-9 rounded-xl border border-border text-[12px] font-semibold text-foreground hover:border-primary inline-flex items-center justify-center gap-1.5 transition-colors">
-              <Clock className="w-3.5 h-3.5 text-primary" /> Start with your inventory
+            <button onClick={() => navigate("/inventory")} className="mt-3.5 w-full h-9 rounded-xl border border-border text-[12px] font-semibold text-foreground hover:border-primary hover:bg-primary/[0.035] inline-flex items-center justify-center gap-1.5 transition-colors">
+              <InventoryGlyph width={15} height={15} className="text-primary" /> Start with your inventory
             </button>
           </div>
 
-          <div className="rounded-2xl border border-border bg-card p-4">
-            <h3 className="text-sm font-bold text-foreground inline-flex items-center gap-1.5"><Lightbulb className="w-4 h-4 text-amber-500" /> Pro tip</h3>
-            <p className="text-[11.5px] text-muted-foreground mt-1.5 leading-relaxed">Use Quick Start or {isMac ? "⌘ K" : "Ctrl K"} to create faster and stay productive.</p>
+          <div className="rounded-2xl border border-amber-200/70 bg-amber-50/40 p-4">
+            <h3 className="text-sm font-bold text-foreground inline-flex items-center gap-2">
+              <span className="grid place-items-center w-6 h-6 rounded-lg bg-amber-100 text-amber-600 shrink-0"><Lightbulb className="w-3.5 h-3.5" /></span>
+              Pro tip
+            </h3>
+            <p className="text-[11.5px] text-muted-foreground mt-2 leading-relaxed">Use Quick Start or press {isMac ? "⌘ K" : "Ctrl K"} to open any creation tool faster.</p>
           </div>
         </div>
       </div>

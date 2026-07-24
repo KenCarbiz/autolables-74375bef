@@ -19,14 +19,19 @@ export type AutoLabelsToolIconKey =
 
 export type ToolCategory = "document" | "compliance" | "sticker" | "ai" | "service" | "warning";
 
-// Category color system — badge background, accent stroke, primary stroke.
-export const TOOL_CATEGORY_STYLES: Record<ToolCategory, { bg: string; fg: string; stroke: string }> = {
-  document:   { bg: "#EAF4FF", fg: "#0B6FEA", stroke: "#12324A" },
-  compliance: { bg: "#EEF6FF", fg: "#0F5E8C", stroke: "#0D1B2A" },
-  sticker:    { bg: "#EDF7FF", fg: "#0077C8", stroke: "#12324A" },
-  ai:         { bg: "#F1EEFF", fg: "#6D5DF6", stroke: "#251A55" },
-  service:    { bg: "#EAF6EF", fg: "#1F7A4D", stroke: "#123524" },
-  warning:    { bg: "#FFF7E6", fg: "#F59E0B", stroke: "#5F4300" },
+// Category color system — one cohesive family. Each tool icon renders in a
+// single category stroke color inside a category-tinted container with a
+// matching 1px border. `stroke` = icon color, `fg` = accent var (same hue so
+// composite sub-marks stay in-family), `border` = container hairline.
+// Compliance/document = AutoLabels blue, sticker = teal, AI = violet. Service
+// and warning are reserved for STATUS only (never category identity).
+export const TOOL_CATEGORY_STYLES: Record<ToolCategory, { bg: string; fg: string; stroke: string; border: string }> = {
+  document:   { bg: "#EFF6FF", fg: "#155EEF", stroke: "#155EEF", border: "#D8E8FF" },
+  compliance: { bg: "#EFF6FF", fg: "#155EEF", stroke: "#155EEF", border: "#D8E8FF" },
+  sticker:    { bg: "#ECF8FC", fg: "#087EA4", stroke: "#087EA4", border: "#CDEBF4" },
+  ai:         { bg: "#F4F0FF", fg: "#6941C6", stroke: "#6941C6", border: "#E4DAFF" },
+  service:    { bg: "#ECFDF3", fg: "#039855", stroke: "#039855", border: "#CAF3DC" },
+  warning:    { bg: "#FFFAEB", fg: "#DC6803", stroke: "#DC6803", border: "#FEDF89" },
 };
 
 type IconProps = SVGProps<SVGSVGElement>;
@@ -38,13 +43,14 @@ const Svg = ({ children, ...props }: IconProps & { children: ReactNode }) => (
 
 // ── Documents & Compliance ────────────────────────────────────────────
 
-// 01 — narrow addendum label + product tag + add mark
+// 01 — pricing/disclosure document with folded corner + circular add badge
 const NewAddendumIcon = (p: IconProps) => (
   <Svg {...p}>
-    <rect x="5" y="2.75" width="9" height="15.5" rx="1.5" />
-    <path d="M8 7h3M8 10.5h3M8 14h2" />
-    <rect x="14.5" y="14.5" width="6.5" height="6.5" rx="1.75" stroke={ACCENT} />
-    <path d="M17.75 16.5v2.5M16.5 17.75H19" stroke={ACCENT} />
+    <path d="M13.25 3H6.5A1.5 1.5 0 0 0 5 4.5v14A1.5 1.5 0 0 0 6.5 20H16a1.5 1.5 0 0 0 1.5-1.5V7.25Z" />
+    <path d="M13.25 3v3.25a1 1 0 0 0 1 1H17.5" />
+    <path d="M8 10.75h6M8 13.75h6M8 16.5h3.25" stroke={ACCENT} strokeWidth={1.75} />
+    <circle cx="17.9" cy="17.9" r="4" fill="var(--al-badge-bg, #fff)" stroke={ACCENT} />
+    <path d="M17.9 16v3.8M16 17.9h3.8" stroke={ACCENT} />
   </Svg>
 );
 
@@ -69,12 +75,14 @@ const UsedVehicleDocsIcon = (p: IconProps) => (
   </Svg>
 );
 
-// 04 — certified shield + ribbon tails
+// 04 — information document behind a certification shield with a check
 const CpoInfoSheetIcon = (p: IconProps) => (
   <Svg {...p}>
-    <path d="M12 2.75 18.25 5v4.75c0 3.9-2.4 6.3-6.25 7.75-3.85-1.45-6.25-3.85-6.25-7.75V5Z" />
-    <path d="M9.5 9.75l1.9 1.9 3.4-3.4" stroke={ACCENT} />
-    <path d="m9 17.75-1.25 3.5M15 17.75l1.25 3.5" stroke={ACCENT} />
+    <path d="M15 3.5H7A1.5 1.5 0 0 0 5.5 5v14A1.5 1.5 0 0 0 7 20.5h10A1.5 1.5 0 0 0 18.5 19V7Z" />
+    <path d="M15 3.5V7h3.5" />
+    <path d="M9 9.75h5M9 12.5h3.5" stroke={ACCENT} strokeWidth={1.75} />
+    <path d="M16.25 11.75 20.5 13.3v2.9c0 2.5-1.65 4-4.25 4.85-2.6-.85-4.25-2.35-4.25-4.85V13.3Z" fill="var(--al-badge-bg, #fff)" stroke={ACCENT} />
+    <path d="m14.4 16.35 1.45 1.45 2.55-2.75" stroke={ACCENT} />
   </Svg>
 );
 
@@ -142,13 +150,15 @@ const TradeUpStickerIcon = (p: IconProps) => (
   </Svg>
 );
 
-// 11 — template grid + edit pencil + spark
+// 11 — four-tile template grid with one selected tile + edit pencil
 const StickerStudioIcon = (p: IconProps) => (
   <Svg {...p}>
-    <rect x="3.5" y="3.5" width="7" height="7" rx="1.25" />
-    <rect x="3.5" y="13.5" width="7" height="7" rx="1.25" />
-    <rect x="13.5" y="13.5" width="7" height="7" rx="1.25" />
-    <path d="m14.5 9 4.75-4.75 2 2L16.5 11l-2.6.6Z" stroke={ACCENT} />
+    <rect x="3.25" y="3.25" width="7" height="7" rx="1.5" />
+    <rect x="13.75" y="3.25" width="7" height="7" rx="1.5" stroke={ACCENT} />
+    <rect x="3.25" y="13.75" width="7" height="7" rx="1.5" />
+    <rect x="13.75" y="13.75" width="7" height="7" rx="1.5" />
+    <path d="M17.6 15.2 19.8 17.4l-4 4-2.9.7.7-2.9Z" fill="var(--al-badge-bg, #fff)" stroke={ACCENT} />
+    <path d="m14.55 18.55 2.9 2.9" stroke={ACCENT} strokeWidth={1.5} />
   </Svg>
 );
 
@@ -298,29 +308,32 @@ export const AUTOLABELS_TOOL_ICONS: Record<AutoLabelsToolIconKey, RegistryEntry>
 // expected (sidebar nav config, list rows). Monochrome: inherits currentColor.
 export const toolIcon = (key: AutoLabelsToolIconKey) => AUTOLABELS_TOOL_ICONS[key].icon;
 
-const BADGE_SIZE: Record<"quick" | "default" | "row", { box: number; radius: number; icon: number }> = {
-  quick: { box: 48, radius: 16, icon: 26 },
-  default: { box: 44, radius: 14, icon: 24 },
-  row: { box: 40, radius: 12, icon: 22 },
+const BADGE_SIZE: Record<"quick" | "default" | "row" | "mini", { box: number; radius: number; icon: number }> = {
+  quick: { box: 46, radius: 12, icon: 27 },
+  default: { box: 44, radius: 12, icon: 26 },
+  row: { box: 40, radius: 12, icon: 23 },
+  mini: { box: 34, radius: 10, icon: 19 },
 };
 
-// Branded badge: category-tinted container, navy primary strokes, category
-// accent strokes via the CSS variable.
+// Branded badge: category-tinted 12px container with a matching hairline
+// border, icon in the single category stroke color. `--al-badge-bg` lets
+// composite glyphs (add badge, shield, pencil) knock out overlapped strokes
+// against the container fill so they read cleanly.
 export const ToolIconBadge = ({ iconKey, variant = "default", category }: {
   iconKey: AutoLabelsToolIconKey;
-  variant?: "quick" | "default" | "row";
+  variant?: "quick" | "default" | "row" | "mini";
   category?: ToolCategory;
 }) => {
   const entry = AUTOLABELS_TOOL_ICONS[iconKey];
   const cat = TOOL_CATEGORY_STYLES[category ?? entry.category];
   const s = BADGE_SIZE[variant];
   const Icon = entry.icon;
-  const style: CSSProperties & { "--al-icon-accent": string } = {
+  const style: CSSProperties & { "--al-icon-accent": string; "--al-badge-bg": string } = {
     width: s.box, height: s.box, borderRadius: s.radius,
     backgroundColor: cat.bg, color: cat.stroke,
-    border: "1px solid rgba(13, 27, 42, 0.08)",
-    boxShadow: "inset 0 1px 0 rgba(255,255,255,0.65)",
+    border: `1px solid ${cat.border}`,
     "--al-icon-accent": cat.fg,
+    "--al-badge-bg": cat.bg,
   };
   return (
     <span className="grid place-items-center shrink-0" style={style}>
