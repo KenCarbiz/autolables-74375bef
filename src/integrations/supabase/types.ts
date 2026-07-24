@@ -4243,6 +4243,90 @@ export type Database = {
           },
         ]
       }
+      service_requests: {
+        Row: {
+          created_at: string
+          decided_at: string | null
+          decided_by: string | null
+          decided_by_name: string | null
+          delivery_impact: string | null
+          est_labor: number | null
+          est_parts: number | null
+          est_total: number | null
+          id: string
+          is_safety: boolean
+          manager_note: string | null
+          message: string | null
+          photos: Json
+          reason: string | null
+          requested_by: string | null
+          requested_by_name: string | null
+          ro_number: string | null
+          spend_limit: number | null
+          status: string
+          tenant_id: string
+          updated_at: string
+          vehicle_listing_id: string | null
+          vin: string
+          work_requested: string
+          ymm: string | null
+        }
+        Insert: {
+          created_at?: string
+          decided_at?: string | null
+          decided_by?: string | null
+          decided_by_name?: string | null
+          delivery_impact?: string | null
+          est_labor?: number | null
+          est_parts?: number | null
+          est_total?: number | null
+          id?: string
+          is_safety?: boolean
+          manager_note?: string | null
+          message?: string | null
+          photos?: Json
+          reason?: string | null
+          requested_by?: string | null
+          requested_by_name?: string | null
+          ro_number?: string | null
+          spend_limit?: number | null
+          status?: string
+          tenant_id: string
+          updated_at?: string
+          vehicle_listing_id?: string | null
+          vin: string
+          work_requested: string
+          ymm?: string | null
+        }
+        Update: {
+          created_at?: string
+          decided_at?: string | null
+          decided_by?: string | null
+          decided_by_name?: string | null
+          delivery_impact?: string | null
+          est_labor?: number | null
+          est_parts?: number | null
+          est_total?: number | null
+          id?: string
+          is_safety?: boolean
+          manager_note?: string | null
+          message?: string | null
+          photos?: Json
+          reason?: string | null
+          requested_by?: string | null
+          requested_by_name?: string | null
+          ro_number?: string | null
+          spend_limit?: number | null
+          status?: string
+          tenant_id?: string
+          updated_at?: string
+          vehicle_listing_id?: string | null
+          vin?: string
+          work_requested?: string
+          ymm?: string | null
+        }
+        Relationships: []
+      }
       signature_evidence: {
         Row: {
           consent_text: string | null
