@@ -9,6 +9,7 @@ import type { GetReadyItem } from "./useGetReady";
 // and authorization is one-shot, so the send could never be retried.
 
 let items: GetReadyItem[] = [];
+let vinFilter: string[] = [];
 
 vi.mock("@/integrations/supabase/client", () => ({
   supabase: {
@@ -16,6 +17,7 @@ vi.mock("@/integrations/supabase/client", () => ({
       const chain = {
         select: () => chain,
         eq: () => chain,
+        in: (col: string, values: string[]) => { if (col === "vin") vinFilter = values; return chain; },
         order: () => chain,
         limit: () => chain,
         maybeSingle: async () => ({ data: { items }, error: null }),
@@ -39,7 +41,31 @@ const derive = async () => {
   return deriveGetReadyDispatch("tenant-1", "1hgcv1f3xra000000");
 };
 
-beforeEach(() => { items = []; });
+beforeEach(() => { items = []; vinFilter = []; });
+
+// W2: every command-surface read keys on vinKeys(vin) — BOTH spellings, because
+// dms-webhook (:245) and autocurb-sync (:205) store the provider's VIN verbatim
+// in vehicle_listings and InventoryModern's "Send to Get-Ready" (:95) passed
+// that string straight through, while StartGetReadyModal and
+// create_draft_get_ready uppercase. This side keyed on .eq(vin.toUpperCase()),
+// so on a lowercase record the screen showed three populated columns while the
+// dispatch matched no row, fell back to ["detail","service"] with no vendors,
+// dropped every vendor email — and still returned a green success toast that
+// could never be retried.
+describe("deriveGetReadyDispatch VIN key", () => {
+  it("asks for the same spellings the screen read", async () => {
+    items = [item({ vendorName: "Tint Pros", vendorEmail: "shop@tintpros.test" })];
+    await derive();
+    expect(vinFilter).toContain("1hgcv1f3xra000000");
+    expect(vinFilter).toContain("1HGCV1F3XRA000000");
+  });
+
+  it("finds the vendors on a record stored with the provider's own casing", async () => {
+    items = [item({ vendorEmail: "shop@tintpros.test", department: "vendor" })];
+    const { vendors } = await derive();
+    expect(vendors.map((v) => v.email)).toEqual(["shop@tintpros.test"]);
+  });
+});
 
 describe("deriveGetReadyDispatch vendors", () => {
   it("emails a vendor-assigned accessory that carries no explicit department", async () => {

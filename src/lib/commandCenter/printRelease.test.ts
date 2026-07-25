@@ -4,6 +4,7 @@ import {
   printBlockedReason,
   printReleasable,
   printReleaseState,
+  printSheetIncludes,
   PRINT_STATE_PILL,
   type PrintableDocument,
 } from "./printRelease";
@@ -19,6 +20,7 @@ describe("printReleaseState", () => {
   it("releases an approved document that holds a file", () => {
     expect(printReleaseState(doc())).toBe("releasable");
     expect(printReleasable(doc())).toBe(true);
+    expect(printSheetIncludes(doc())).toBe(true);
   });
 
   it("accepts a png-only document", () => {
@@ -29,29 +31,63 @@ describe("printReleaseState", () => {
     expect(printReleaseState(doc({ pdf_url: null, png_url: null }))).toBe("no_file");
   });
 
+  // P4: a published `passport` document holds only an online_url. Calling that
+  // "no file" put a red Blocked pill and a +1 on the Blocked stat card on the
+  // row whose Internal Status read Published and whose Passport Visibility read
+  // Customer Visible — three answers to one question in one row.
+  it("calls an online-only document Digital, not Blocked", () => {
+    const online = doc({ document_type: "passport", document_status: "published", pdf_url: null, png_url: null, online_url: "https://dealer.test/v/qx80" });
+    expect(printReleaseState(online)).toBe("digital");
+    expect(PRINT_STATE_PILL[printReleaseState(online)].label).toBe("Digital");
+    expect(printSheetIncludes(online)).toBe(false);
+  });
+
   it("never re-releases a document that was already printed", () => {
     expect(printReleaseState(doc({ document_status: "printed" }))).toBe("already_printed");
     expect(printReleaseState(doc({ printed_at: "2026-07-01T00:00:00Z" }))).toBe("already_printed");
     expect(printReleaseState(doc({ print_count: 2 }))).toBe("already_printed");
-  });
-
-  it("holds a published document off the bundle so it stays on the Passport", () => {
-    expect(printReleaseState(doc({ document_status: "published" }))).toBe("live_publication");
-    expect(printReleasable(doc({ document_status: "published" }))).toBe(false);
+    expect(printSheetIncludes(doc({ print_count: 2 }))).toBe(false);
   });
 
   it("excludes states with no mark_printed transition", () => {
     for (const s of ["draft", "pending_approval", "rejected", "superseded", "archived"]) {
       expect(printReleaseState(doc({ document_status: s }))).toBe("not_printable");
+      expect(printSheetIncludes(doc({ document_status: s }))).toBe(false);
     }
   });
 
-  it("gives every state a pill, and only releasable ones read Ready", () => {
-    expect(PRINT_STATE_PILL.releasable.label).toBe("Ready");
+  // W5: "can this go on paper" and "is mark_printed a legal transition" are two
+  // questions. Conflating them excluded the signed K-208 — the single most
+  // legally required sheet on a used car — from the packet of every used car.
+  it("puts a published document on the paper without stamping it", () => {
+    const published = doc({ document_status: "published" });
+    expect(printReleaseState(published)).toBe("live_publication");
+    expect(printSheetIncludes(published)).toBe(true);
+    expect(printReleasable(published)).toBe(false);
+  });
+
+  it("keeps the stamp set a strict subset of the sheet set", () => {
+    const all = [
+      doc(), doc({ document_status: "published" }), doc({ document_status: "printed" }),
+      doc({ document_status: "draft" }), doc({ pdf_url: null, png_url: null }),
+      doc({ pdf_url: null, png_url: null, online_url: "https://dealer.test/v/x" }),
+    ];
+    for (const d of all) {
+      if (printReleasable(d)) expect(printSheetIncludes(d)).toBe(true);
+    }
+  });
+
+  it("gives every state a pill, and Ready is exactly the sheet set", () => {
+    const all: PrintableDocument[] = [
+      doc(), doc({ document_status: "published" }), doc({ document_status: "printed" }),
+      doc({ document_status: "draft" }), doc({ pdf_url: null, png_url: null }),
+      doc({ pdf_url: null, png_url: null, online_url: "https://dealer.test/v/x" }),
+    ];
+    for (const d of all) {
+      expect(PRINT_STATE_PILL[printReleaseState(d)].label === "Ready").toBe(printSheetIncludes(d));
+    }
     expect(PRINT_STATE_PILL.no_file.label).toBe("Blocked");
     expect(PRINT_STATE_PILL.not_printable.label).toBe("Blocked");
-    expect(PRINT_STATE_PILL.already_printed.label).not.toBe("Ready");
-    expect(PRINT_STATE_PILL.live_publication.label).not.toBe("Ready");
   });
 });
 
@@ -61,19 +97,13 @@ describe("printReleaseState", () => {
 describe("the signed K-208", () => {
   const k208Published = doc({ document_type: "k208", document_status: "published" });
 
-  it("is not releasable once the trigger has published it", () => {
+  it("is on the paper once the trigger has published it, and is not stamped", () => {
+    expect(printSheetIncludes(k208Published)).toBe(true);
     expect(printReleasable(k208Published)).toBe(false);
   });
 
-  it("explains itself in the bundle note instead of silently vanishing", () => {
-    const note = bundleNoteFor({ used: true, signedInspection: true, k208Docs: [k208Published] });
-    expect(note).toMatch(/Passport/);
-    expect(note).not.toBe("K-208 excluded until executed and signed.");
-  });
-
-  it("does not tell the employee the packet already printed", () => {
-    expect(printBlockedReason([k208Published])).not.toMatch(/already been released/);
-    expect(printBlockedReason([k208Published])).toMatch(/Passport/);
+  it("no longer needs excusing in the bundle note, because it is in the bundle", () => {
+    expect(bundleNoteFor({ used: true, signedInspection: true, k208Docs: [k208Published] })).toBeNull();
   });
 
   it("still counts in the bundle when the doc is approved and unprinted", () => {
@@ -85,8 +115,6 @@ describe("the signed K-208", () => {
 
 describe("bundleNoteFor", () => {
   it("says nothing on a new car", () => {
-    expect(bundleNoteFor({ used: true, signedInspection: false, k208Docs: [] }))
-      .toBe("K-208 excluded until executed and signed.");
     expect(bundleNoteFor({ used: false, signedInspection: false, k208Docs: [] })).toBeNull();
   });
 
@@ -126,6 +154,11 @@ describe("printBlockedReason", () => {
 
   it("asks for a regenerate when the file is missing", () => {
     expect(printBlockedReason([doc({ pdf_url: null, png_url: null })])).toMatch(/print-ready file/);
+  });
+
+  it("explains an online-only package rather than calling it unapproved", () => {
+    expect(printBlockedReason([doc({ pdf_url: null, png_url: null, online_url: "https://dealer.test/v/x" })]))
+      .toMatch(/online links/);
   });
 
   it("asks for approval when nothing is approved", () => {

@@ -1,18 +1,24 @@
 // ──────────────────────────────────────────────────────────────────────
-// One derivation of the CT K-208 for every command surface.
+// One derivation of the CT K-208, and one definition of "signed and not
+// failed", for every command surface.
 //
 // Re-inspections are first class (20260723020000_safety_inspection_revisions),
-// so a vehicle carries several safety_inspections rows. The VIN Command Center
-// used to read "newest by created_at" and the Print Center "newest signed by
-// signed_at": a pending re-inspection masked the signed original on one screen
-// and not the other, and the bundle note contradicted the package row.
+// safety_inspections carries no unique key on VIN (20260629000000:53),
+// ServiceDesk.tsx:296 inserts a new signed row per inspection and
+// 20260722180000:60 inserts prefilled `pending` rows — so a vehicle routinely
+// holds several rows in several statuses.
+//
+// The failure test therefore has to be asked of the newest SIGNED row, not the
+// newest row of any status. Asking it of "newest row" meant a signed pass in
+// January + a signed FAILURE in February + a prefilled revision in March
+// resolved to the January pass: the screen read "Ready · Signed Jan 12" and
+// counted the item as finished over a failed inspection.
 //
 // Order of truth:
-//   1. a SIGNED failure is the newest word on the car and blocks it, even if an
-//      earlier pass exists — that is what a re-inspection failing means;
-//   2. otherwise any signed non-failing inspection is the executed K-208;
-//   3. otherwise an existing row is prefilled work awaiting the inspector;
-//   4. otherwise nothing has started.
+//   1. the newest signed row wins outright — a signed failure is the newest
+//      word on the car and blocks it, even if an earlier pass exists;
+//   2. otherwise an existing row is prefilled work awaiting the inspector;
+//   3. otherwise nothing has started.
 // ──────────────────────────────────────────────────────────────────────
 
 export interface SafetyInspectionRow {
@@ -26,22 +32,35 @@ export interface SafetyInspectionRow {
 export type K208State = "signed" | "failed" | "prefilled" | "not_started";
 
 export interface K208Sources {
-  /** Newest row with status 'signed' whose result is not 'fail'. */
-  signed: SafetyInspectionRow | null;
+  /** Newest row with status 'signed', WHATEVER its result. */
+  latestSigned: SafetyInspectionRow | null;
   /** Newest non-voided row of any status. */
   latest: SafetyInspectionRow | null;
 }
+
+/**
+ * The one definition of "a sign-off that stands". `result` is nullable on both
+ * safety_inspections and pdi_signoffs (20260629013549:12), so a legacy signed
+ * row with no recorded result counts; only an explicit 'fail' does not. The
+ * PDI side used to require result === 'pass' and silently dropped those legacy
+ * rows — same fact, two rules.
+ */
+export const isExecutedSignoff = (r: SafetyInspectionRow | null | undefined): boolean =>
+  !!r && String(r.status || "") === "signed" && String(r.result || "") !== "fail";
 
 /** A result only fails the car once an inspector has signed it. */
 export const isFailedInspection = (r: SafetyInspectionRow | null | undefined): boolean =>
   !!r && String(r.status || "") === "signed" && String(r.result || "") === "fail";
 
-export const isExecutedInspection = (r: SafetyInspectionRow | null | undefined): boolean =>
-  !!r && String(r.status || "") === "signed" && String(r.result || "") !== "fail";
+export const isExecutedInspection = isExecutedSignoff;
 
-export function k208State({ signed, latest }: K208Sources): { state: K208State; at: string | null } {
-  if (isFailedInspection(latest)) return { state: "failed", at: latest?.signed_at || latest?.created_at || null };
-  if (isExecutedInspection(signed)) return { state: "signed", at: signed?.signed_at || signed?.created_at || null };
+export function k208State({ latestSigned, latest }: K208Sources): { state: K208State; at: string | null } {
+  if (isFailedInspection(latestSigned)) {
+    return { state: "failed", at: latestSigned?.signed_at || latestSigned?.created_at || null };
+  }
+  if (isExecutedSignoff(latestSigned)) {
+    return { state: "signed", at: latestSigned?.signed_at || latestSigned?.created_at || null };
+  }
   if (latest) return { state: "prefilled", at: latest.created_at || null };
   return { state: "not_started", at: null };
 }

@@ -1,4 +1,10 @@
-import { isThirdPartyItem, itemDepartment, type GetReadyItem } from "@/hooks/useGetReady";
+import {
+  isThirdPartyItem,
+  itemDepartment,
+  vendorsFor,
+  type GetReadyItem,
+  type GetReadyVendor,
+} from "@/hooks/useGetReady";
 
 // Which department column a get-ready line is displayed under. Vendor first
 // (explicit department or accessory category), then service, then prep.
@@ -17,6 +23,13 @@ export function columnFor(item: GetReadyItem): "service" | "prep" | "vendor" {
 // GetReadyItem so the dispatch path and the display path cannot drift apart
 // again; re-exported here because the column model is where callers look for it.
 export { isThirdPartyItem };
+
+// The vendor LIST is one function too, for the same reason and defined in the
+// same place: Vendor Assignments on screen 2 and deriveGetReadyDispatch's
+// recipient set are the same set of vendors, narrowed by name (`.pending` +
+// an email) rather than re-derived from a different field.
+export { vendorsFor };
+export type { GetReadyVendor };
 
 // One rule for every dealer-cost figure on the screen, so the per-column
 // "Estimated Cost" lines and the rail's "Estimated Total Cost" cannot disagree.

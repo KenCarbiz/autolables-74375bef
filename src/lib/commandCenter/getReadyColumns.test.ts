@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { columnFor, getReadyStep, isThirdPartyItem, sumItemCosts } from "./getReadyColumns";
+import { columnFor, getReadyStep, isThirdPartyItem, sumItemCosts, vendorsFor } from "./getReadyColumns";
 import type { GetReadyItem } from "@/hooks/useGetReady";
 
 const item = (over: Partial<GetReadyItem> = {}): GetReadyItem => ({
@@ -67,6 +67,68 @@ describe("isThirdPartyItem", () => {
     expect(assigned.department).toBeUndefined();
     expect(columnFor(assigned)).toBe("vendor");
     expect(isThirdPartyItem(assigned)).toBe(true);
+  });
+});
+
+// The VENDOR LIST, not the item predicate. The previous round fixed
+// isThirdPartyItem on both sides and left the two vendor lists keyed on
+// different fields — display on vendorName, dispatch on vendorEmail — so a
+// vendor with an email and no name was printed nowhere and emailed anyway.
+describe("vendorsFor", () => {
+  // StartGetReadyModal renders a department select and a vendor EMAIL input and
+  // NO vendorName field for accessories (:241-251), so this is the shape the
+  // real writer produces.
+  const emailOnly = item({ id: "a", vendorEmail: "shop@tintpros.test", department: "vendor" });
+
+  it("lists a vendor that has an email and no name — the shape the modal writes", () => {
+    const vendors = vendorsFor([emailOnly]);
+    expect(vendors).toHaveLength(1);
+    expect(vendors[0].email).toBe("shop@tintpros.test");
+    expect(vendors[0].name).toBe("Vendor");
+  });
+
+  it("is the SAME list the dispatcher narrows, so displayed can never be 0 while emailed is 1", () => {
+    const items = [emailOnly, item({ id: "b", category: "detail" })];
+    const displayed = vendorsFor(items);
+    const dispatched = vendorsFor(items).filter((v) => v.pending && !!v.email);
+    expect(displayed.map((v) => v.email)).toEqual(dispatched.map((v) => v.email));
+  });
+
+  it("keys one vendor once, whichever field identifies them", () => {
+    const vendors = vendorsFor([
+      item({ id: "a", vendorName: "Tint Pros", vendorEmail: "shop@tintpros.test" }),
+      item({ id: "b", vendorName: "Tint Pros", vendorEmail: "shop@tintpros.test", label: "Window tint" }),
+    ]);
+    expect(vendors).toHaveLength(1);
+  });
+
+  it("does not merge two unidentified vendors into one row", () => {
+    expect(vendorsFor([
+      item({ id: "a", department: "vendor" }),
+      item({ id: "b", department: "vendor" }),
+    ])).toHaveLength(2);
+  });
+
+  it("excludes in-house work, using the same third-party predicate as the item rows", () => {
+    const inHouse = item({ id: "a", installMethod: "internal_ro", department: "vendor" });
+    expect(columnFor(inHouse)).toBe("vendor");
+    expect(isThirdPartyItem(inHouse)).toBe(false);
+    expect(vendorsFor([inHouse])).toHaveLength(0);
+  });
+
+  it("keeps a vendor pending while any one of their lines is outstanding", () => {
+    const vendors = vendorsFor([
+      item({ id: "a", vendorEmail: "shop@tintpros.test", status: "complete" }),
+      item({ id: "b", vendorEmail: "shop@tintpros.test", status: "pending", label: "Window tint" }),
+    ]);
+    expect(vendors).toHaveLength(1);
+    expect(vendors[0].pending).toBe(true);
+  });
+
+  it("drops a vendor from the dispatch narrowing once all their work is complete", () => {
+    const done = [item({ id: "a", vendorEmail: "shop@tintpros.test", status: "complete" })];
+    expect(vendorsFor(done)).toHaveLength(1);
+    expect(vendorsFor(done).filter((v) => v.pending && !!v.email)).toHaveLength(0);
   });
 });
 

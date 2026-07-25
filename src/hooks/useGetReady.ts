@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { vinKey, vinKeys } from "@/lib/vinKeys";
 
 // ──────────────────────────────────────────────────────────────
 // useGetReady — Supabase-backed (Wave 13a).
@@ -105,6 +106,49 @@ export const departmentsWithWork = (items: GetReadyItem[]): GetReadyDepartment[]
   return Array.from(set);
 };
 
+export interface GetReadyVendor {
+  /** vendorName when the row carries one; every vendor still gets a name. */
+  name: string;
+  /** The raw GetReadyItem category; callers humanize it for display. */
+  category: GetReadyItem["category"];
+  email: string | null;
+  /** At least one of this vendor's lines is still outstanding. */
+  pending: boolean;
+}
+
+// THE vendor list for a get-ready, for the screen that DISPLAYS the assignments
+// and the dispatcher that EMAILS them alike.
+//
+// They used to be two rules keyed on two different fields: the display required
+// `vendorName.trim()`, the dispatch required `vendorEmail`. StartGetReadyModal
+// renders a department select and a vendor EMAIL input and no vendorName field
+// at all for accessories (:241-251), so routing an accessory to "Third-party
+// vendor" printed "No vendors assigned to this vehicle" on the screen while
+// authorizeAndDispatch emailed that address — displayed 0, emailed 1, and the
+// authorization is one-shot so it could never be re-sent.
+//
+// One key (email, else name, else the row itself, so two unassigned lines are
+// not silently merged) and one membership test, narrowed by name at the call
+// site: dispatch takes `.pending` lines that carry an email.
+export function vendorsFor(items: GetReadyItem[]): GetReadyVendor[] {
+  const out = new Map<string, GetReadyVendor>();
+  for (const i of items) {
+    if (!isThirdPartyItem(i)) continue;
+    const name = (i.vendorName || "").trim();
+    const email = (i.vendorEmail || "").trim();
+    const key = email.toLowerCase() || name.toLowerCase() || `item:${i.id}`;
+    const pending = i.status !== "complete";
+    const existing = out.get(key);
+    if (existing) {
+      existing.pending = existing.pending || pending;
+      if (!existing.email && email) existing.email = email;
+      continue;
+    }
+    out.set(key, { name: name || "Vendor", category: i.category, email: email || null, pending });
+  }
+  return Array.from(out.values());
+}
+
 // Derive the dispatch fan-out for a vehicle from its current get-ready items:
 // which departments have pending work, and the third-party vendors to notify.
 // Used by the manager's Authorize & Dispatch on addendum acceptance.
@@ -112,19 +156,20 @@ export async function deriveGetReadyDispatch(
   tenantId: string,
   vin: string,
 ): Promise<{ depts: GetReadyDepartment[]; vendors: { name: string; email: string }[] }> {
+  // Both spellings: the command surfaces read with vinKeys(), and a dispatch
+  // that matched no row fell back to ["detail","service"] with no vendors,
+  // dropped every vendor email, and still returned a green success toast.
   // deno-lint-ignore no-explicit-any
   const { data } = await (supabase as any)
     .from("get_ready_records")
     .select("items")
-    .eq("tenant_id", tenantId).eq("vin", vin.toUpperCase())
+    .eq("tenant_id", tenantId).in("vin", vinKeys(vin))
     .order("created_at", { ascending: false }).limit(1).maybeSingle();
   const items = ((data?.items as GetReadyItem[]) || []).filter(Boolean);
   const depts = departmentsWithWork(items);
-  const seen = new Set<string>();
-  const vendors = items
-    .filter((i) => i.status !== "complete" && isThirdPartyItem(i) && i.vendorEmail)
-    .map((i) => ({ name: i.vendorName || "Vendor", email: (i.vendorEmail || "").trim() }))
-    .filter((v) => v.email && !seen.has(v.email) && seen.add(v.email));
+  const vendors = vendorsFor(items)
+    .filter((v) => v.pending && !!v.email)
+    .map((v) => ({ name: v.name, email: v.email as string }));
   // If there's no get-ready record yet, fall back to the legacy detail+service.
   return { depts: depts.length ? depts : ["detail", "service"], vendors };
 }
@@ -331,7 +376,12 @@ export const useGetReady = (storeId: string) => {
       .from("get_ready_records")
       .insert({
         store_id: storeId || null,
-        vin: data.vin,
+        // Normalised at the writer. InventoryModern's "Send to Get-Ready"
+        // (:95) passes vehicle_listings.vin verbatim, and dms-webhook /
+        // autocurb-sync store whatever spelling the provider sent — so this was
+        // the one path that could put a non-uppercase VIN in the table, while
+        // StartGetReadyModal and create_draft_get_ready both uppercase.
+        vin: vinKey(data.vin),
         stock_number: data.stockNumber,
         ymm: data.ymm,
         condition: data.condition,
@@ -355,7 +405,7 @@ export const useGetReady = (storeId: string) => {
     // Best-effort: never block get-ready creation on addendum sync.
     for (const acc of data.accessoriesToInstall) {
       try {
-        await (supabase as any).rpc("getready_upsert_addendum_line", { p_tenant_id: storeId, p_vin: data.vin, p_product_id: acc.productId });
+        await (supabase as any).rpc("getready_upsert_addendum_line", { p_tenant_id: storeId, p_vin: vinKey(data.vin), p_product_id: acc.productId });
       } catch { /* addendum sync best-effort */ }
     }
     await load();
@@ -555,8 +605,10 @@ export const useGetReady = (storeId: string) => {
     await load();
   };
 
-  const getByVin = (vin: string): GetReadyRecord | null =>
-    records.find(r => r.vin === vin) || null;
+  const getByVin = (vin: string): GetReadyRecord | null => {
+    const want = vinKey(vin);
+    return records.find(r => vinKey(r.vin || "") === want) || null;
+  };
 
   const getPending = (): GetReadyRecord[] =>
     records.filter(r => r.status !== "inventory");

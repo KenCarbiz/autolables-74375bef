@@ -13,13 +13,15 @@ import {
   type DocumentStatus,
   type GeneratedDocument,
 } from "@/lib/stickerStudio/documentWorkflow";
-import { packetVisible } from "@/lib/packetModules";
 import { realTenantId } from "@/lib/tenant/realTenantId";
+import { vinKey, vinKeys } from "@/lib/vinKeys";
+import { documentLabel, fmtDate, humanize } from "@/lib/commandCenter/format";
 import {
   bundleNoteFor,
   printBlockedReason,
   printReleasable,
   printReleaseState,
+  printSheetIncludes,
   PRINT_STATE_PILL,
 } from "@/lib/commandCenter/printRelease";
 import {
@@ -27,19 +29,23 @@ import {
   getReadyStep,
   isThirdPartyItem,
   sumItemCosts,
+  vendorsFor,
 } from "@/lib/commandCenter/getReadyColumns";
 import {
-  PASSPORT_VISIBILITY_PILL,
-  passportModuleFor,
+  isCustomerVisible,
+  passportHrefFor,
+  passportServesVehicle,
   passportVisibilityState,
+  PASSPORT_VISIBILITY_PILL,
+  type PassportVisibilityState,
 } from "@/lib/commandCenter/passportVisibility";
 import {
-  currentDocumentOfType,
   currentVersionByType,
-  isRetiredDocument,
   liveDocuments,
 } from "@/lib/commandCenter/documentSet";
-import { k208State, type SafetyInspectionRow } from "@/lib/commandCenter/inspectionState";
+import { isExecutedSignoff, k208State, type SafetyInspectionRow } from "@/lib/commandCenter/inspectionState";
+import { keyTagInBundle } from "@/lib/commandCenter/labelJobs";
+import { buildVinPackageItems, type PackageItem } from "@/lib/commandCenter/vinPackage";
 import {
   countExceptions,
   countFinished,
@@ -96,12 +102,7 @@ export interface Result<T> {
   reload: () => Promise<void>;
 }
 
-export type { PackageItemStatus };
-
-export interface PackageItem {
-  key: string; label: string; status: PackageItemStatus;
-  detail: string; href?: string; docId?: string;
-}
+export type { PackageItemStatus, PackageItem };
 
 export interface CommandVehicle {
   id: string; vin: string; ymm: string; trim: string | null;
@@ -197,18 +198,6 @@ export interface PrintCenterData {
 
 const sb = () => supabase as any;
 
-// VIN case is not guaranteed at rest: dms-webhook and autocurb-sync write the
-// provider's string verbatim into vehicle_listings, while every in-app writer
-// (StartGetReadyModal, the addendum vehicle strip, useWorkEvents) uppercases.
-// Keying VIN-scoped reads off the raw listing value therefore missed the very
-// get-ready / inspection / addendum rows the screen is about. Only the query key
-// is normalised; the displayed VIN stays exactly as the vehicle stores it.
-const vinKey = (vin: string): string => vin.trim().toUpperCase();
-
-// Both spellings, for the tables whose writer is not under our control.
-const vinKeys = (vin: string): string[] =>
-  Array.from(new Set([vin, vinKey(vin)].filter(Boolean)));
-
 // Raw Postgres / PostgREST text is never shown to a dealer. It is mapped to a
 // sentence they can act on; the original travels alongside in `errorDetail`.
 function humanizeLoadError(raw: string): string {
@@ -289,13 +278,6 @@ async function getReadyAuthorization(r: SourceReader, tenantId: string, vehicleI
     at: (authorized?.occurred_at as string) || dispatched || (addendumStamp?.getready_dispatched_at as string) || null,
     failures,
   };
-}
-
-function fmtDate(v: string | null | undefined): string {
-  if (!v) return "";
-  const d = new Date(v);
-  if (Number.isNaN(d.getTime())) return "";
-  return d.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
 }
 
 function useLoader<T>(
@@ -415,38 +397,6 @@ function toCommandVehicle(v: Row): CommandVehicle {
 
 const isUsed = (condition: string | null) => (condition || "used") !== "new";
 
-const DOC_TYPE_LABEL: Record<string, string> = {
-  window: "Window Sticker",
-  addendum: "Addendum",
-  passport: "Vehicle Passport",
-  cpo_sheet: "CPO Sheet",
-  buyers_guide: "FTC Buyers Guide",
-  // generated_documents accepts 'k208' since 20260722180000_k208_ingest_forms_flow.
-  k208: "CT K-208 Safety Inspection",
-};
-
-const humanize = (s: string) =>
-  s.replace(/[_-]+/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()).trim();
-
-// generated_documents lifecycle → package-item status. Nothing here invents a
-// state: an absent row is "pending / Not started".
-function docPackageStatus(d: Row | null): { status: PackageItemStatus; detail: string } {
-  if (!d) return { status: "pending", detail: "Not started" };
-  const s = String(d.document_status || "");
-  const v = `v${d.version ?? 1}`;
-  switch (s) {
-    case "published": return { status: "published", detail: `${v} published ${fmtDate(d.published_at)}`.trim() };
-    case "printed": return { status: "ready", detail: `${v} printed ${fmtDate(d.printed_at)}`.trim() };
-    case "approved": return { status: "ready", detail: `${v} approved` };
-    case "pending_approval": return { status: "created", detail: `${v} awaiting approval` };
-    case "draft": return { status: "draft_created", detail: `${v} draft created` };
-    case "rejected": return { status: "retry_required", detail: d.rejection_reason ? `Rejected: ${d.rejection_reason}` : `${v} rejected — regenerate` };
-    case "superseded": return { status: "pending", detail: `${v} superseded` };
-    case "archived": return { status: "pending", detail: `${v} archived` };
-    default: return { status: "pending", detail: s ? humanize(s) : "Not started" };
-  }
-}
-
 // Human titles for the audit actions that land on a vehicle.
 const AUDIT_TITLES: Record<string, string> = {
   getready_dispatched: "Get Ready dispatched to the shop",
@@ -487,14 +437,15 @@ async function loadVinCommand(r: SourceReader, tenantId: string, vehicleId: stri
         .eq("tenant_id", tenantId).in("vin", vk)
         .neq("status", "voided")
         .order("created_at", { ascending: false }).limit(1), "safety_inspections"),
-      // The executed K-208 is asked for by its own bounded query, not found by
-      // paging recent rows: re-inspections are first class, so the newest row is
-      // routinely a pending revision that used to mask the signed original.
+      // The newest SIGNED row, whatever its result. Filtering `result != fail`
+      // here asked the failure question of the wrong row: a signed pass in
+      // January, a signed failure in February and a prefilled revision in March
+      // resolved to the January pass and rendered "Ready · Signed Jan 12" over a
+      // failed inspection. k208State decides; the query only supplies the rows.
       r.rows(sb().from("safety_inspections")
         .select("id, status, result, signed_at, created_at")
         .eq("tenant_id", tenantId).in("vin", vk)
         .eq("status", "signed")
-        .or("result.is.null,result.neq.fail")
         .order("signed_at", { ascending: false, nullsFirst: false })
         .limit(1), "safety_inspections(signed)"),
       // An archived addendum is retired paper. Reading the newest row without
@@ -546,128 +497,37 @@ async function loadVinCommand(r: SourceReader, tenantId: string, vehicleId: stri
   // VIN screen a superseded row — a dead link and a status the Print Center
   // (which filters) contradicted.
   const docs = liveDocuments(allDocs);
-  const latestOfType = (type: string): Row | null => currentDocumentOfType(docs, type);
 
   const grRecord = grRecords[0] || null;
   const grItems: GetReadyItem[] = ((grRecord?.items as GetReadyItem[]) || []).filter(Boolean);
   const authorizedAt = authorization.at;
   const dispatched = !!authorizedAt;
 
-  const items: PackageItem[] = [];
-
-  // K-208 and the FTC Buyers Guide are used-car artifacts; including them for a
-  // new car would report a permanently incomplete automation total.
-  if (used) {
-    const k208 = k208State({
-      signed: (signedInspections[0] as SafetyInspectionRow | undefined) || null,
-      latest: (inspections[0] as SafetyInspectionRow | undefined) || null,
-    });
-    const k208Item: { status: PackageItemStatus; detail: string } =
-      k208.state === "failed" ? { status: "blocked", detail: "Inspection failed — vehicle cannot be listed" }
-      : k208.state === "signed" ? { status: "ready", detail: `Signed ${fmtDate(k208.at)}`.trim() }
-      : k208.state === "prefilled" ? { status: "prefilled", detail: "Prefilled, awaiting inspection" }
-      : { status: "pending", detail: "Not started" };
-    items.push({ key: "k208", label: "K-208", ...k208Item, href: vin ? `/k208/${vinKey(vin)}` : undefined });
-
-    const bg = latestOfType("buyers_guide");
-    const bgState = docPackageStatus(bg);
-    items.push({
-      key: "buyers_guide", label: "FTC Buyers Guide", ...bgState,
-      href: bg?.pdf_url || `/vehicle-file/${vehicleId}?tab=documents`,
-      docId: bg?.id,
-    });
-  }
-
-  const add = addendums[0] || null;
-  let addState: { status: PackageItemStatus; detail: string };
-  if (!add) addState = { status: "pending", detail: "Not started" };
-  else if (add.customer_signed_at) addState = { status: "published", detail: `Signed ${fmtDate(add.customer_signed_at)}` };
-  else if (add.accepted_at) addState = { status: "ready", detail: `Accepted ${fmtDate(add.accepted_at)}` };
-  else if (add.ready_at) addState = { status: "created", detail: `Ready ${fmtDate(add.ready_at)}` };
-  else addState = { status: "draft_created", detail: `Draft created ${fmtDate(add.created_at)}` };
-  items.push({
-    key: "addendum", label: used ? "Used Addendum" : "Addendum", ...addState,
-    href: `/vehicle-file/${vehicleId}?tab=addendum`, docId: add?.id,
-  });
-
-  const win = latestOfType("window");
-  items.push({
-    key: "window_sticker", label: used ? "Used-Car Sticker" : "Window Sticker",
-    ...docPackageStatus(win),
-    href: win?.pdf_url || `${used ? "/used-car-sticker" : "/new-car-sticker"}?vehicleId=${vehicleId}`,
-    docId: win?.id,
-  });
-
   const rc = (v.recall_check || {}) as Row;
-  const recallCheckedAt: string | null = v.recall_checked_at || rc.checked_at || null;
-  const openRecalls: number =
-    typeof v.open_recall_count === "number" ? v.open_recall_count
-    : typeof rc.open_recall_count === "number" ? rc.open_recall_count
-    : Array.isArray(rc.recalls) ? rc.recalls.length : 0;
-  const resolvedRecall = recallTasks.some((t) => t.status === "resolved");
-  let recallState: { status: PackageItemStatus; detail: string };
-  if (!recallCheckedAt) recallState = { status: "pending", detail: "Not started" };
-  else if (rc.do_not_drive) recallState = { status: "blocked", detail: "Do-not-drive campaign open — publishing is blocked" };
-  else if (openRecalls > 0 && !resolvedRecall) recallState = { status: "retry_required", detail: `${openRecalls} open recall${openRecalls === 1 ? "" : "s"} — service review required` };
-  else if (openRecalls > 0) recallState = { status: "ready", detail: `Resolved by service ${fmtDate(recallTasks[0]?.completed_at)}`.trim() };
-  else recallState = { status: "ready", detail: `Checked ${fmtDate(recallCheckedAt)} · no open recalls` };
-  items.push({ key: "recall", label: "Recall Lookup", ...recallState, href: `/vehicle-file/${vehicleId}?tab=overview` });
-
-  const activeQr = qrCodes.find((q) => q.is_active !== false) || qrCodes[0] || null;
-  items.push({
-    key: "service_qr", label: "Rear Service QR",
-    status: activeQr ? "created" : "pending",
-    detail: activeQr
-      ? `Tracking QR active${activeQr.surface || activeQr.sticker_type ? ` · ${humanize(String(activeQr.surface || activeQr.sticker_type))}` : ""}`
-      : "Not started",
-    href: vin ? `/print/vehicle-qr/${vinKey(vin)}` : undefined,
+  // Every package row is derived by one pure builder, so "Ready to Market" is a
+  // claim about rows that were measured and can be exercised without a browser.
+  const items = buildVinPackageItems({
+    vehicleId, vin, used, dispatched,
+    liveDocs: docs,
+    inspection: {
+      latestSigned: (signedInspections[0] as SafetyInspectionRow | undefined) || null,
+      latest: (inspections[0] as SafetyInspectionRow | undefined) || null,
+    },
+    addendum: addendums[0] || null,
+    recall: {
+      checkedAt: v.recall_checked_at || rc.checked_at || null,
+      doNotDrive: !!rc.do_not_drive,
+      openCount:
+        typeof v.open_recall_count === "number" ? v.open_recall_count
+        : typeof rc.open_recall_count === "number" ? rc.open_recall_count
+        : Array.isArray(rc.recalls) ? rc.recalls.length : 0,
+      tasks: recallTasks,
+    },
+    qrCodes,
+    zebraJobs,
+    getReady: { record: grRecord, items: grItems },
+    description: { row: descCase, channelCount: descChannelCount },
   });
-
-  const keyTagJobs = zebraJobs.filter((j) => j.label_type === "key_tag");
-  const keyTagPrinted = keyTagJobs.find((j) => j.status === "printed");
-  items.push({
-    key: "key_tag_qr", label: "Key-Tag QR",
-    status: keyTagJobs.length === 0 ? "pending" : keyTagPrinted ? "ready" : "created",
-    detail: keyTagJobs.length === 0
-      ? "Not started"
-      : keyTagPrinted ? `Printed ${fmtDate(keyTagPrinted.created_at)}` : `Queued ${fmtDate(keyTagJobs[0].created_at)}`,
-    href: vin ? `/print/vehicle-qr/${vinKey(vin)}` : undefined,
-  });
-
-  const svcItems = grItems.filter((i) => columnFor(i) === "service");
-  const prepItems = grItems.filter((i) => columnFor(i) !== "service");
-  const countDone = (list: GetReadyItem[]) => list.filter((i) => i.status === "complete").length;
-  const grItemState = (list: GetReadyItem[], noneDetail: string): { status: PackageItemStatus; detail: string } => {
-    if (!grRecord) return { status: "pending", detail: "Not started" };
-    // A record with no line in this half has no outstanding work in it. Calling
-    // that "pending" left a vehicle whose get-ready is all service work unable
-    // to ever reach 100% or "Ready to Market".
-    if (list.length === 0) return { status: "ready", detail: noneDetail };
-    const done = countDone(list);
-    if (done === list.length) return { status: "ready", detail: `${done} of ${list.length} complete` };
-    return { status: dispatched ? "created" : "prefilled", detail: `${done} of ${list.length} complete` };
-  };
-  items.push({ key: "get_ready_service", label: "Service Get Ready", ...grItemState(svcItems, "No service work items"), href: `/get-ready-command/${vehicleId}` });
-  items.push({ key: "get_ready_prep", label: "Prep & Vendors", ...grItemState(prepItems, "No prep or vendor work items"), href: `/get-ready-command/${vehicleId}` });
-
-  let descState: { status: PackageItemStatus; detail: string };
-  if (!descCase) descState = { status: "pending", detail: "Not started" };
-  else {
-    const s = String(descCase.status || "");
-    const sectionDetail = descChannelCount > 0 ? `${descChannelCount} section${descChannelCount === 1 ? "" : "s"} generated` : "No sections generated yet";
-    if (s === "PUBLISHED") descState = { status: "published", detail: sectionDetail };
-    else if (s === "READY") descState = { status: "ready", detail: sectionDetail };
-    else if (s === "REVIEW_REQUIRED") descState = { status: "retry_required", detail: `Review required · ${descCase.open_exception_count || 0} open exception${(descCase.open_exception_count || 0) === 1 ? "" : "s"}` };
-    else if (s === "FAILED_BLOCKED") descState = { status: "blocked", detail: descCase.last_error_message ? String(descCase.last_error_message) : "Generation blocked" };
-    else if (s === "FAILED_RETRYABLE") descState = { status: "retry_required", detail: "Generation failed — retry" };
-    else if (s === "STALE") descState = { status: "retry_required", detail: "Source data changed — regenerate" };
-    // ARCHIVED is a real CHECK value (20260725000000:67) and means the case was
-    // retired — the else-branch below was counting it as an artifact that exists.
-    else if (s === "ARCHIVED") descState = { status: "pending", detail: "Archived — no live description" };
-    else if (s === "PARTIALLY_PUBLISHED") descState = { status: "created", detail: `Partially published · ${sectionDetail}` };
-    else descState = { status: descChannelCount > 0 ? "created" : "pending", detail: descChannelCount > 0 ? sectionDetail : humanize(s || "not started") };
-  }
-  items.push({ key: "description", label: "Description", ...descState, href: `/description-intelligence/${vehicleId}` });
 
   // "Automation Complete" counts artifacts that are FINISHED. A draft sticker
   // and a prefilled K-208 exist, but neither is work anyone can stop doing.
@@ -677,8 +537,12 @@ async function loadVinCommand(r: SourceReader, tenantId: string, vehicleId: stri
   const pendingGrItems = grItems.filter((i) => i.status !== "complete").length;
   const awaitingAuthorization = grRecord && !dispatched && pendingGrItems > 0 ? pendingGrItems : null;
 
-  const publishedPassportDocs = docs.filter((d) => d.document_type === "passport" && d.document_status === "published").length;
-  const passportPublished = publishedPassportDocs || (v.status === "published" && v.slug ? 1 : 0);
+  // The passport is "Published" when a shopper can reach it, which is the one
+  // fact the Print Center's Open Passport link is built from too. A published
+  // `passport` document on a draft listing is served to nobody, so counting it
+  // here made this card say Published while the same vehicle's Print Center
+  // footer read "This vehicle has no published Passport yet".
+  const passportPublished = passportServesVehicle(v) ? 1 : 0;
 
   const blockedItem = items.find((i) => i.status === "blocked") || null;
   const retryItem = items.find((i) => i.status === "retry_required") || null;
@@ -861,7 +725,13 @@ async function loadGetReadyCommand(r: SourceReader, tenantId: string, vehicleId:
     if (key && !(key in checks)) checks[key] = meta.done === true;
   }
 
-  const proofClock = authorizedAt || grRecord?.get_ready_start_date || null;
+  // The five-business-day proof clock runs from the vendor's assignment, and a
+  // vendor is assigned when the dispatch emails them — which only
+  // authorizeAndDispatch does. Falling back to get_ready_start_date ran a due
+  // date against a vendor who had not been contacted, so a car that started
+  // ten business days ago and was never authorized read "Pending Proof ·
+  // Overdue" for work nobody had asked anyone to do.
+  const proofClock = authorizedAt;
   // Proof is per vendor: one vendor uploading photos says nothing about the
   // others, so match each line against the companies that actually signed off.
   const provenVendors = new Set<string>();
@@ -902,17 +772,22 @@ async function loadGetReadyCommand(r: SourceReader, tenantId: string, vehicleId:
 
     const estimatedCost = sumItemCosts(list);
 
-    const vendorMap = new Map<string, { name: string; category: string; email?: string | null }>();
-    if (key === "vendor") {
-      for (const i of list) {
-        const name = (i.vendorName || "").trim();
-        if (!name || !isThirdPartyItem(i)) continue;
-        if (!vendorMap.has(name)) vendorMap.set(name, { name, category: humanize(i.category), email: i.vendorEmail || null });
-      }
+    // Vendor Assignments and the dispatch recipient list are ONE set, produced
+    // by vendorsFor(). This screen shows all of them; deriveGetReadyDispatch
+    // narrows the same list to the pending ones that carry an email. Requiring
+    // vendorName here — a field StartGetReadyModal never collects for an
+    // accessory — printed "No vendors assigned to this vehicle" over an address
+    // the authorization was about to email.
+    const vendorRows = key === "vendor"
+      ? vendorsFor(list).map((vd) => ({ name: vd.name, category: humanize(vd.category), email: vd.email }))
+      : undefined;
+    if (vendorRows) {
+      const seen = new Set(vendorRows.map((vd) => vd.name.trim().toLowerCase()));
       for (const s of detailSignoffs) {
         const name = String(s.provider_company || "").trim();
-        if (s.is_third_party && name && !vendorMap.has(name)) {
-          vendorMap.set(name, { name, category: "Third-party detail", email: null });
+        if (s.is_third_party && name && !seen.has(name.toLowerCase())) {
+          seen.add(name.toLowerCase());
+          vendorRows.push({ name, category: "Third-party detail", email: null });
         }
       }
     }
@@ -932,7 +807,7 @@ async function loadGetReadyCommand(r: SourceReader, tenantId: string, vehicleId:
       tone: (total > 0 && completed === total ? "emerald" : total === 0 ? "slate" : "amber") as Tone,
       headline,
       items: mapped,
-      vendors: key === "vendor" ? Array.from(vendorMap.values()) : undefined,
+      vendors: vendorRows,
       estimatedCost,
       reportHref,
       managerNote: notes[key] ?? "",
@@ -971,10 +846,11 @@ async function loadGetReadyCommand(r: SourceReader, tenantId: string, vehicleId:
   // pdi_signoffs is read so a signed PDI counts toward the service column's
   // completion signal even when the record's own line was never ticked.
   //
-  // signed_at is NOT NULL DEFAULT now() (20260629130000:28), so `|| !!signed_at`
-  // re-admitted every row the status test had just excluded — including a PDI
-  // whose result is 'fail'. A failed pre-delivery inspection is not a sign-off.
-  const pdiSigned = pdiSignoffs.some((p) => p.status === "signed" && p.result === "pass");
+  // "Signed and not failed" is ONE predicate, shared with the K-208. Spelling it
+  // `result === 'pass'` here and `result !== 'fail'` there meant a legacy signed
+  // PDI with a NULL result (the column is nullable — 20260629013549:12) was
+  // silently dropped on one screen and honoured on the other.
+  const pdiSigned = pdiSignoffs.some((p) => isExecutedSignoff(p as SafetyInspectionRow));
   if (pdiSigned) {
     const svc = columns.find((c) => c.key === "service");
     if (svc && svc.total > 0 && svc.completed === 0) {
@@ -1097,7 +973,16 @@ export function useGetReadyCommand(vehicleId?: string): Result<GetReadyCommandDa
       });
       const payload = (res?.data || {}) as Row;
       if (res?.error && !payload.ok) {
-        return { ok: false, error: "Could not reach the Get-Ready dispatcher. Nothing was sent." };
+        // notify-getready sends per target INSIDE its loop and only then
+        // returns 502/200 (index.ts:165-199), so a transport failure after a
+        // partial send makes "Nothing was sent" a claim this side cannot make.
+        // What IS known: the authorization was not recorded here, and every
+        // work order that did go out wrote its own audit_log row (:176), which
+        // the pre-dispatch re-check above reads before allowing a retry.
+        return {
+          ok: false,
+          error: "Could not confirm the dispatch with the Get-Ready service. Some work orders may already have gone out — check the VIN timeline before authorizing again.",
+        };
       }
       if (!payload.ok) {
         if (payload.error === "no_recipient") {
@@ -1116,12 +1001,31 @@ export function useGetReadyCommand(vehicleId?: string): Result<GetReadyCommandDa
       const dispatchedTargets = Array.isArray(payload.dispatched)
         ? (payload.dispatched as Row[])
         : [];
-      const failedTargets = dispatchedTargets.filter((t) => t.ok !== true).map((t) => String(t.dept || "recipient"));
+      // notify-getready labels EVERY vendor target `dept:"vendor"` (index.ts:131)
+      // and carries no other identity, so "vendor was not reached" left a manager
+      // with three vendors no way to learn which one. The function pushes one
+      // vendor target per entry of `vendors`, in order (:130-138, :179), so the
+      // nth vendor result is the nth vendor we sent — but only claim that when
+      // the counts line up.
+      const vendorResults = dispatchedTargets.filter((t) => String(t.dept || "") === "vendor");
+      const canNameVendors = vendorResults.length === vendors.length;
+      let vendorIdx = 0;
+      const failedTargets: string[] = [];
+      for (const t of dispatchedTargets) {
+        const isVendor = String(t.dept || "") === "vendor";
+        const named = isVendor && canNameVendors
+          ? (vendors[vendorIdx]?.name || vendors[vendorIdx]?.email || "vendor")
+          : String(t.dept || "recipient");
+        if (isVendor) vendorIdx += 1;
+        if (t.ok !== true) failedTargets.push(named);
+      }
       // A department with no email configured never becomes a target at all, so
       // it is absent from `dispatched` rather than present-and-failed.
       const attempted = new Set(dispatchedTargets.map((t) => String(t.dept || "")));
-      const neverAttempted = depts.filter((d) => !attempted.has(d));
-      if (vendors.length > 0 && !attempted.has("vendor")) neverAttempted.push("vendor");
+      const neverAttempted: string[] = depts.filter((d) => !attempted.has(d));
+      if (vendors.length > 0 && vendorResults.length === 0) {
+        for (const vd of vendors) neverAttempted.push(vd.name || vd.email);
+      }
       const failures = Array.from(new Set([...failedTargets, ...neverAttempted]));
 
       // The dispatch is the authorization: record it only after the server
@@ -1139,18 +1043,30 @@ export function useGetReadyCommand(vehicleId?: string): Result<GetReadyCommandDa
       // clicks Accept & Dispatch there and every work order and vendor email
       // goes out a second time. Swallowing it caused the exact outcome the stamp
       // exists to prevent.
-      const addn = await reader.oneRow(sb().from("addendums")
+      //
+      // The LOOKUP that feeds the stamp is read directly, not through the source
+      // reader: that helper degrades any driver error to null, which read as
+      // "there is no addendum to stamp" — so a denied or dropped SELECT skipped
+      // the RPC, reported ok:true, and left both other screens still offering
+      // Accept & Dispatch. A8 was fixed for the RPC and left open for its input.
+      let stampError: string | null = null;
+      const { data: addnRows, error: addnErr } = await sb().from("addendums")
         .select("id")
         .eq("tenant_id", tenantId).in("vehicle_vin", vinKeys(vin))
         .neq("lifecycle_status", "archived")
         .is("getready_dispatched_at", null)
-        .order("created_at", { ascending: false }).limit(1), "addendums(dispatch stamp)");
-      let stampError: string | null = null;
-      if (addn?.id) {
-        const { error: stampErr } = await sb().rpc("mark_addendum_getready_dispatched", { _addendum_id: addn.id });
-        if (stampErr) {
-          stampError = stampErr.message || String(stampErr);
-          console.error("[useCommandCenter] dispatch stamp failed:", stampError);
+        .order("created_at", { ascending: false }).limit(1);
+      if (addnErr) {
+        stampError = addnErr.message || String(addnErr);
+        console.error("[useCommandCenter] dispatch stamp lookup failed:", stampError);
+      } else {
+        const addn = ((addnRows as Row[] | null) || [])[0] || null;
+        if (addn?.id) {
+          const { error: stampErr } = await sb().rpc("mark_addendum_getready_dispatched", { _addendum_id: addn.id });
+          if (stampErr) {
+            stampError = stampErr.message || String(stampErr);
+            console.error("[useCommandCenter] dispatch stamp failed:", stampError);
+          }
         }
       }
       await reload();
@@ -1198,7 +1114,7 @@ async function loadPrintCenter(r: SourceReader, tenantId: string, vehicleId: str
   const vin = vehicle.vin;
   const vk = vinKeys(vin);
 
-  const [allDocs, qrCodes, zebraJobs, signedInspections, latestInspections, dealerProfile] = await Promise.all([
+  const [allDocs, qrCodes, zebraJobs, signedInspections, latestInspections] = await Promise.all([
     r.rows(sb().from("generated_documents")
       .select("id, tenant_id, vehicle_id, template_id, document_type, document_status, version, pdf_url, png_url, online_url, print_count, printed_at, published_at, created_at")
       .eq("tenant_id", tenantId).eq("vehicle_id", vehicleId)
@@ -1213,7 +1129,6 @@ async function loadPrintCenter(r: SourceReader, tenantId: string, vehicleId: str
       .select("id, status, result, signed_at, created_at")
       .eq("tenant_id", tenantId).in("vin", vk)
       .eq("status", "signed")
-      .or("result.is.null,result.neq.fail")
       .order("signed_at", { ascending: false, nullsFirst: false })
       .limit(1), "safety_inspections(signed)"),
     r.rows(sb().from("safety_inspections")
@@ -1221,12 +1136,6 @@ async function loadPrintCenter(r: SourceReader, tenantId: string, vehicleId: str
       .eq("tenant_id", tenantId).in("vin", vk)
       .neq("status", "voided")
       .order("created_at", { ascending: false }).limit(1), "safety_inspections"),
-    // The store-wide packet template is half of packetVisible()'s answer.
-    // Passing only the per-vehicle overrides reported a module the dealer had
-    // switched off store-wide as "Customer Visible" on this screen while the
-    // Passport itself hid it.
-    r.oneRow(sb().from("dealer_profiles")
-      .select("settings").eq("tenant_id", tenantId).limit(1), "dealer_profiles"),
   ]);
 
   // Superseded and archived rows are retired paper, not part of the package.
@@ -1236,90 +1145,100 @@ async function loadPrintCenter(r: SourceReader, tenantId: string, vehicleId: str
   const docs = liveDocuments(allDocs);
 
   const k208 = k208State({
-    signed: (signedInspections[0] as SafetyInspectionRow | undefined) || null,
+    latestSigned: (signedInspections[0] as SafetyInspectionRow | undefined) || null,
     latest: (latestInspections[0] as SafetyInspectionRow | undefined) || null,
   });
-
-  const packetSource = {
-    packet_modules: (v.packet_modules || null) as Record<string, boolean> | null,
-    packet_defaults: ((dealerProfile?.settings as Row | null)?.packet_module_defaults || null) as Record<string, boolean> | null,
-  };
 
   // "Current" is the highest live version within each document type.
   const currentByType = currentVersionByType(allDocs);
 
-  const documents: DocRow[] = [];
+  // Every row carries the state its pills were derived from, so the stat cards,
+  // the Passport Preview and the packet button are counted from the states
+  // rather than re-matched against the display strings.
+  const rows: { row: DocRow; visibility: PassportVisibilityState; onPaper: boolean; blocked: boolean }[] = [];
 
   for (const d of docs) {
     const status = String(d.document_status) as DocumentStatus;
     const meta = STATUS_META[status] || { label: humanize(String(d.document_status)), tone: "slate" as const };
-    // Customer visibility is the document's own lifecycle AND the vehicle's
-    // packet-module curation; a served doc inside a hidden module is "Hidden".
-    const moduleOn = packetVisible(packetSource, passportModuleFor(d.document_type as string | null));
-    const passportVisibility = PASSPORT_VISIBILITY_PILL[passportVisibilityState(d, moduleOn)];
-    // The Print Status pill, the Ready/Blocked stat cards and the packet button
-    // all read the same predicate, so the rail cannot promise a sheet the
-    // button refuses to release.
-    const printStatus = PRINT_STATE_PILL[printReleaseState(d)];
+    // Customer visibility is the document's lifecycle AND the vehicle's own —
+    // there is no shopper for a car whose listing is not published.
+    const visibility = passportVisibilityState(d, v);
+    // The Print Status pill, the Ready/Blocked stat cards, the bundle lines and
+    // the packet button all read the same predicate, so the rail cannot promise
+    // a sheet the button does not put on paper.
+    const printState = printReleaseState(d);
 
-    documents.push({
-      id: String(d.id),
-      label: DOC_TYPE_LABEL[String(d.document_type)] || humanize(String(d.document_type)),
-      kind: "doc",
-      version: `v${d.version ?? 1}`,
-      isCurrent: currentByType.get(String(d.document_type)) === Number(d.version ?? 1),
-      internalStatus: { label: meta.label, tone: toneFromMeta(meta.tone) },
-      passportVisibility,
-      printStatus,
-      href: d.pdf_url || d.online_url || undefined,
+    rows.push({
+      visibility,
+      onPaper: printSheetIncludes(d),
+      blocked: PRINT_STATE_PILL[printState].label === "Blocked",
+      row: {
+        id: String(d.id),
+        label: documentLabel(d.document_type as string | null),
+        kind: "doc",
+        version: `v${d.version ?? 1}`,
+        isCurrent: currentByType.get(String(d.document_type)) === Number(d.version ?? 1),
+        internalStatus: { label: meta.label, tone: toneFromMeta(meta.tone) },
+        passportVisibility: PASSPORT_VISIBILITY_PILL[visibility],
+        printStatus: PRINT_STATE_PILL[printState],
+        href: d.pdf_url || d.online_url || undefined,
+      },
     });
   }
 
-  // A QR cling points the customer at the packet, so it follows the same
-  // visibility rule as every other row: live AND its packet module enabled.
-  const qrModuleOn = packetVisible(packetSource, "documents");
+  // A QR cling is media pointing AT the packet, not a document served IN it:
+  // get_published_documents_public reads generated_documents only, so no QR row
+  // is ever on a Passport. Giving them a visibility pill counted physical media
+  // as customer-visible documents and listed them in Passport Preview, and
+  // "Published" is a generated_documents word qr_codes has no state for.
   for (const q of qrCodes) {
     const active = q.is_active !== false;
     const surface = String(q.surface || q.sticker_type || "");
-    const passportVisibility =
-      PASSPORT_VISIBILITY_PILL[active ? (qrModuleOn ? "customer_visible" : "hidden") : "internal_only"];
-    documents.push({
-      id: String(q.id),
-      label: q.label ? String(q.label) : surface ? `${humanize(surface)} QR` : "Vehicle QR",
-      kind: "qr",
-      version: "v1",
-      isCurrent: active,
-      internalStatus: active ? { label: "Published", tone: "violet" } : { label: "Archived", tone: "slate" },
-      passportVisibility,
-      printStatus: { label: "Digital", tone: "blue" },
-      href: q.target_url || q.destination_url || (q.token ? `/q/${q.token}` : undefined),
+    rows.push({
+      visibility: "not_in_passport",
+      onPaper: false,
+      blocked: false,
+      row: {
+        id: String(q.id),
+        label: q.label ? String(q.label) : surface ? `${humanize(surface)} QR` : "Vehicle QR",
+        kind: "qr",
+        version: "v1",
+        isCurrent: active,
+        internalStatus: active ? { label: "Active", tone: "emerald" } : { label: "Archived", tone: "slate" },
+        passportVisibility: PASSPORT_VISIBILITY_PILL.not_in_passport,
+        printStatus: { label: "Digital", tone: "blue" },
+        href: q.target_url || q.destination_url || (q.token ? `/q/${q.token}` : undefined),
+      },
     });
   }
 
+  const documents = rows.map((x) => x.row);
+
   const counts = {
-    ready: documents.filter((d) => d.printStatus.label === "Ready").length,
-    blocked: documents.filter((d) => d.printStatus.label === "Blocked").length,
-    customerVisible: documents.filter((d) => d.passportVisibility.label === "Customer Visible").length,
-    internalOnly: documents.filter((d) => d.passportVisibility.label === "Internal Only").length,
+    ready: rows.filter((x) => x.onPaper).length,
+    blocked: rows.filter((x) => x.blocked).length,
+    customerVisible: rows.filter((x) => isCustomerVisible(x.visibility)).length,
+    // Every generated document no shopper can currently open: the ones that are
+    // not published, and the ones that are published behind an unpublished
+    // vehicle. QR rows belong to neither count.
+    internalOnly: rows.filter((x) => x.row.kind === "doc" && !isCustomerVisible(x.visibility)).length,
   };
 
-  // The three PAPER lines partition the documents the packet button will move,
-  // counted with the same predicate the button filters on, so their sum is
-  // exactly counts.ready. The old set left releasable `passport` sheets out of
-  // every line while still counting them Ready, and the comment here claimed
-  // each line was what the button moves — which the QR cling and key tag never
-  // were: they live in qr_codes and zebra_print_jobs and printCompletePacket
-  // does not touch either. Those two are now flagged as media the packet does
-  // not release rather than silently added to the same list.
-  const releasableDocs = docs.filter(printReleasable);
-  const windowDocs = releasableDocs.filter((d) => String(d.document_type) === "window").length;
-  const addendumDocs = releasableDocs.filter((d) => String(d.document_type) === "addendum").length;
-  const letterDocs = releasableDocs.length - windowDocs - addendumDocs;
+  // The three PAPER lines partition the documents the packet button puts on
+  // paper, counted with the same predicate the button filters on, so their sum
+  // is exactly counts.ready. The QR cling and the key tag are physical media
+  // printCompletePacket never touches — they live in qr_codes and
+  // zebra_print_jobs — so they are flagged rather than added to that sum.
+  const sheetDocs = docs.filter(printSheetIncludes);
+  const windowDocs = sheetDocs.filter((d) => String(d.document_type) === "window").length;
+  const addendumDocs = sheetDocs.filter((d) => String(d.document_type) === "addendum").length;
+  const letterDocs = sheetDocs.length - windowDocs - addendumDocs;
   const k208Docs = docs.filter((d) => String(d.document_type) === "k208");
   const activeQrCount = qrCodes.filter((q) => q.is_active !== false).length;
-  // One key tag per vehicle. Counting every queued job made a label reprinted
-  // three times read as three tags in the packet.
-  const keyTagCount = zebraJobs.some((j) => j.label_type === "key_tag" && j.status !== "failed") ? 1 : 0;
+  // One key tag per vehicle, read by the same function the VIN screen prints the
+  // Key-Tag QR row from — so a failed job cannot be an exception on one screen
+  // and an item in the bundle on the other.
+  const keyTagCount = keyTagInBundle(zebraJobs) ? 1 : 0;
   const bundle = [
     { label: "Letter Paper", count: letterDocs, unit: letterDocs === 1 ? "doc" : "docs", releasedByPacket: true },
     { label: "Window Sticker Stock", count: windowDocs, unit: windowDocs === 1 ? "doc" : "docs", releasedByPacket: true },
@@ -1332,15 +1251,16 @@ async function loadPrintCenter(r: SourceReader, tenantId: string, vehicleId: str
     signedInspection: k208.state === "signed",
     k208Docs,
   });
-  const packetBlockedReason = releasableDocs.length === 0 ? printBlockedReason(docs) : null;
+  const packetBlockedReason = sheetDocs.length === 0 ? printBlockedReason(docs) : null;
 
-  const passportPreview = documents
-    .filter((d) => d.passportVisibility.label === "Customer Visible")
-    .map((d) => ({ label: d.label, version: d.version }));
+  const passportPreview = rows
+    .filter((x) => isCustomerVisible(x.visibility))
+    .map((x) => ({ label: x.row.label, version: x.row.version }));
 
-  const passportHref = v.slug && v.status === "published" ? `/v/${v.slug}` : null;
-
-  return { vehicle, counts, documents, bundle, bundleNote, packetBlockedReason, passportPreview, passportHref };
+  return {
+    vehicle, counts, documents, bundle, bundleNote, packetBlockedReason, passportPreview,
+    passportHref: passportHrefFor(v),
+  };
 }
 
 export function usePrintCenter(vehicleId?: string): Result<PrintCenterData> & {
@@ -1350,16 +1270,20 @@ export function usePrintCenter(vehicleId?: string): Result<PrintCenterData> & {
   const { data, dataRef, loading, error, errorDetail, notFound, noTenant, degraded, reload, tenantId, actorId } =
     useLoader<PrintCenterData>(vehicleId, loadPrintCenter);
 
-  // Puts the packet on paper, then records that it went. The eligible set is
-  // printReleasable() — the same predicate the bundle counts, the Print Status
-  // pills and the Ready stat card are built from.
+  // Puts the packet on paper, then records that it went.
+  //
+  // Two different sets, on purpose. What goes ON THE SHEET is
+  // printSheetIncludes() — the same predicate the bundle counts, the Print
+  // Status pills and the Ready stat card are built from — which includes the
+  // published K-208 that 20260724010000 auto-publishes on every used car.
+  // What gets STAMPED is printReleasable(), a strict subset: mark_printed from
+  // `published` would rewrite the status and pull the document off the Passport.
   //
   // The lifecycle stamp is NOT the print. printed_at / print_count are the
   // evidence a regulator reads as what was posted on the car, and `printed` has
-  // no mark_printed transition, so stamping them without producing paper filed
-  // that evidence for documents nobody could ever print afterwards. The
-  // documents are handed to the browser's print path first; if that handoff does
-  // not happen, nothing is stamped.
+  // no mark_printed transition, so a false stamp is permanent. Opening a window
+  // is not printing: nothing is stamped until a human confirms in the sheet that
+  // the packet is on paper.
   const printing = useRef(false);
   const printCompletePacket = useCallback(async (): Promise<{ ok: boolean; error?: string }> => {
     if (!tenantId || !vehicleId) return { ok: false, error: "No dealership or vehicle in context." };
@@ -1381,30 +1305,41 @@ export function usePrintCenter(vehicleId?: string): Result<PrintCenterData> & {
         return abandon({ ok: false, error: "Could not read this vehicle's documents, so nothing was printed. Retry in a moment." });
       }
       const docs = liveDocuments((docRows as Row[]) || []);
-      const eligible = docs.filter(printReleasable);
-      if (eligible.length === 0) return abandon({ ok: false, error: printBlockedReason(docs) });
+      const onSheet = docs.filter(printSheetIncludes);
+      if (onSheet.length === 0) return abandon({ ok: false, error: printBlockedReason(docs) });
 
       const current = dataRef.current;
-      const handedOff = openPacketPrintSheet(
+      const handle = openPacketPrintSheet(
         sheet,
         {
           ymm: current?.vehicle.ymm || "",
           vin: current?.vehicle.vin || "",
           stockNumber: current?.vehicle.stockNumber ?? null,
         },
-        eligible.map((d) => ({
-          label: DOC_TYPE_LABEL[String(d.document_type)] || humanize(String(d.document_type)),
+        onSheet.map((d) => ({
+          label: documentLabel(d.document_type as string | null),
           version: `v${d.version ?? 1}`,
           url: String(d.pdf_url || d.png_url || d.online_url || ""),
-        })).filter((d) => !!d.url),
+        })),
       );
-      if (!handedOff) {
+      if (!handle) {
         return abandon({
           ok: false,
           error: "The print window could not be opened, so nothing was marked printed. Allow pop-ups for this site, then release the packet again.",
         });
       }
 
+      // Nothing is filed until the sheet reports back. Closing the tab resolves
+      // false, and that has to leave the documents exactly as they were: a
+      // reprint is impossible once print_count is stamped.
+      const reallyPrinted = await handle.printed;
+      if (!reallyPrinted) {
+        return { ok: false, error: "The packet was not confirmed as printed, so no print record was filed. Nothing changed." };
+      }
+
+      // Only the documents mark_printed is a legal transition for. The rest are
+      // on the paper and stay live on the customer Passport.
+      const eligible = onSheet.filter(printReleasable);
       const releasedIds: string[] = [];
       const failures: string[] = [];
       for (const d of eligible) {
@@ -1417,9 +1352,9 @@ export function usePrintCenter(vehicleId?: string): Result<PrintCenterData> & {
         if (res.ok) releasedIds.push(String(d.id));
         else failures.push(res.error || "transition_failed");
       }
-      if (releasedIds.length === 0) {
+      if (eligible.length > 0 && releasedIds.length === 0) {
         console.error("[useCommandCenter] packet release failed:", failures[0]);
-        return { ok: false, error: "Could not release the packet. No document was marked printed — retry in a moment." };
+        return { ok: false, error: "The packet printed, but no document could be marked printed. Retry, then check the document list." };
       }
       // The ledger records only the documents that actually moved: listing the
       // whole eligible set would file a print record for sheets nobody released.
@@ -1428,7 +1363,10 @@ export function usePrintCenter(vehicleId?: string): Result<PrintCenterData> & {
         vin: current?.vehicle.vin || null, stock: current?.vehicle.stockNumber || null,
         event_type: EVT_PACKET_PRINTED, occurred_at: new Date().toISOString(),
         actor_id: actorId, source: "documents-print-center",
-        metadata: { document_ids: releasedIds, released: releasedIds.length, failed: failures.length },
+        metadata: {
+          document_ids: releasedIds, released: releasedIds.length, failed: failures.length,
+          on_sheet: onSheet.length,
+        },
       });
       await reload();
       if (failures.length) {
