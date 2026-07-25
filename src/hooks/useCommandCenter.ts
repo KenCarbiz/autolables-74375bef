@@ -34,6 +34,8 @@ export interface Result<T> {
   data: T | null;
   loading: boolean;
   error: string | null;
+  /** A vehicle that does not exist in this tenant is its own state, not an error. */
+  notFound: boolean;
   reload: () => Promise<void>;
 }
 
@@ -142,32 +144,45 @@ function useLoader<T>(
   vehicleId: string | undefined,
   run: (tenantId: string, vehicleId: string, actorId: string | null) => Promise<T>,
 ) {
-  const { tenant } = useTenant();
+  const { tenant, loading: tenantLoading } = useTenant();
   const { user } = useAuth();
   const [data, setData] = useState<T | null>(null);
-  const [loading, setLoading] = useState(false);
+  // Starts true whenever there is work to do. Starting false meant the first
+  // commit had loading=false, data=null, error=null — which every consumer
+  // reads as "vehicle not found", so the wrong state painted on every load.
+  const [loading, setLoading] = useState(!!vehicleId);
   const [error, setError] = useState<string | null>(null);
+  // A missing vehicle is not a failure — it is its own state. Collapsing it into
+  // `error` made all three screens show a red "Something went wrong" card with a
+  // Retry that could only re-fail, and left their not-found empty states dead.
+  const [notFound, setNotFound] = useState(false);
   const runRef = useRef(run);
   runRef.current = run;
   const actorId = user?.id ?? null;
 
   const reload = useCallback(async () => {
-    if (!tenant?.id || !vehicleId) { setData(null); setError(null); setLoading(false); return; }
+    if (!vehicleId) { setData(null); setError(null); setNotFound(false); setLoading(false); return; }
+    // The tenant resolves independently of entitlements, so hold the loading
+    // state rather than reporting a false miss while it is still settling.
+    if (!tenant?.id) { setData(null); setError(null); setNotFound(false); setLoading(tenantLoading); return; }
     setLoading(true);
     setError(null);
+    setNotFound(false);
     try {
       setData(await runRef.current(tenant.id, vehicleId, actorId));
     } catch (e) {
-      setError((e as Error).message || "Could not load this vehicle");
+      const msg = (e as Error).message || "Could not load this vehicle";
+      if (/^vehicle not found/i.test(msg)) setNotFound(true);
+      else setError(msg);
       setData(null);
     } finally {
       setLoading(false);
     }
-  }, [tenant?.id, vehicleId, actorId]);
+  }, [tenant?.id, tenantLoading, vehicleId, actorId]);
 
   useEffect(() => { reload(); }, [reload]);
 
-  return { data, loading, error, reload, tenantId: tenant?.id ?? null, actorId };
+  return { data, loading, error, notFound, reload, tenantId: tenant?.id ?? null, actorId };
 }
 
 const VEHICLE_COLUMNS =
@@ -332,7 +347,7 @@ async function loadVinCommand(tenantId: string, vehicleId: string): Promise<VinC
     else if (insp.result === "fail") k208 = { status: "blocked", detail: "Inspection failed — vehicle cannot be listed" };
     else if (insp.status === "signed") k208 = { status: "ready", detail: `Signed ${fmtDate(insp.signed_at || insp.created_at)}` };
     else k208 = { status: "prefilled", detail: "Prefilled, awaiting inspection" };
-    items.push({ key: "k208", label: "CT K-208 Safety Inspection", ...k208, href: vin ? `/k208/${vin}` : undefined });
+    items.push({ key: "k208", label: "K-208", ...k208, href: vin ? `/k208/${vin}` : undefined });
 
     const bg = latestOfType("buyers_guide");
     const bgState = docPackageStatus(bg);
@@ -497,8 +512,8 @@ async function loadVinCommand(tenantId: string, vehicleId: string): Promise<VinC
 }
 
 export function useVinCommand(vehicleId?: string): Result<VinCommand> {
-  const { data, loading, error, reload } = useLoader<VinCommand>(vehicleId, loadVinCommand);
-  return { data, loading, error, reload };
+  const { data, loading, error, notFound, reload } = useLoader<VinCommand>(vehicleId, loadVinCommand);
+  return { data, loading, error, notFound, reload };
 }
 
 // ── screen 2: Get Ready Command ──────────────────────────────────────
@@ -735,7 +750,7 @@ export function useGetReadyCommand(vehicleId?: string): Result<GetReadyCommandDa
   toggleChecklist(key: string, done: boolean): Promise<{ ok: boolean; error?: string }>;
   authorizeAndDispatch(): Promise<{ ok: boolean; error?: string }>;
 } {
-  const { data, loading, error, reload, tenantId, actorId } =
+  const { data, loading, error, notFound, reload, tenantId, actorId } =
     useLoader<GetReadyCommandData>(vehicleId, loadGetReadyCommand);
 
   const writeEvent = useCallback(async (eventType: string, metadata: Row) => {
@@ -806,7 +821,7 @@ export function useGetReadyCommand(vehicleId?: string): Result<GetReadyCommandDa
     }
   }, [tenantId, vehicleId, data?.vehicle.vin, data?.canAuthorize, writeEvent, reload]);
 
-  return { data, loading, error, reload, saveManagerNote, toggleChecklist, authorizeAndDispatch };
+  return { data, loading, error, notFound, reload, saveManagerNote, toggleChecklist, authorizeAndDispatch };
 }
 
 // ── screen 3: Documents & Print Center ───────────────────────────────
@@ -907,7 +922,7 @@ async function loadPrintCenter(tenantId: string, vehicleId: string): Promise<Pri
     { label: "Letter Paper", count: letterDocs, unit: letterDocs === 1 ? "doc" : "docs" },
     { label: "Window Sticker Stock", count: docs.filter((d) => d.document_type === "window").length, unit: "docs" },
     { label: "Addendum Label", count: docs.filter((d) => d.document_type === "addendum").length, unit: "docs" },
-    { label: "4x4 QR Cling", count: qrCodes.length, unit: qrCodes.length === 1 ? "item" : "items" },
+    { label: "4×4 QR Cling", count: qrCodes.length, unit: qrCodes.length === 1 ? "item" : "items" },
     { label: "Key Tag", count: keyTagCount, unit: keyTagCount === 1 ? "item" : "items" },
   ];
   const bundleNote =
@@ -928,7 +943,7 @@ export function usePrintCenter(vehicleId?: string): Result<PrintCenterData> & {
   printCompletePacket(): Promise<{ ok: boolean; error?: string }>;
   printByStock(): Promise<{ ok: boolean; error?: string }>;
 } {
-  const { data, loading, error, reload, tenantId, actorId } =
+  const { data, loading, error, notFound, reload, tenantId, actorId } =
     useLoader<PrintCenterData>(vehicleId, loadPrintCenter);
 
   // Releases the packet through the existing generated-document lifecycle
@@ -999,5 +1014,5 @@ export function usePrintCenter(vehicleId?: string): Result<PrintCenterData> & {
     return { ok: true };
   }, [tenantId, data, reload]);
 
-  return { data, loading, error, reload, printCompletePacket, printByStock };
+  return { data, loading, error, notFound, reload, printCompletePacket, printByStock };
 }

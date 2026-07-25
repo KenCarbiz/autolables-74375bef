@@ -3,7 +3,7 @@
 // page-level agents import these and must not redefine them.
 
 import * as React from "react";
-import { AlertTriangle, Copy, RefreshCw, type LucideIcon } from "lucide-react";
+import { AlertTriangle, ChevronRight, Copy, RefreshCw, type LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { TONE_CLASS, type Tone as DescriptionTone } from "@/lib/description/model";
 
@@ -23,7 +23,19 @@ const TONE_ACCENT: Record<Tone, string> = {
 const CARD = "rounded-2xl border border-border bg-card";
 const BTN_BASE =
   "inline-flex items-center justify-center gap-2 rounded-xl min-h-[44px] px-4 text-[13px] font-semibold transition-colors disabled:opacity-50 disabled:pointer-events-none";
-const BTN_SECONDARY = cn(BTN_BASE, "border border-border bg-card text-foreground hover:bg-muted");
+// Exported so the page agents share one recipe. Keeping these private is what
+// let three parallel builders drift into three different button treatments.
+export const BTN_PRIMARY = cn(BTN_BASE, "bg-primary text-primary-foreground hover:opacity-90");
+export const BTN_SECONDARY = cn(BTN_BASE, "border border-border bg-card text-foreground hover:border-primary hover:bg-muted");
+
+// One vehicle-condition casing rule for every surface, so the same car cannot
+// read "Used" on one screen and "used" on the next.
+export function conditionLabel(raw: string | null | undefined): string | null {
+  const v = String(raw ?? "").trim();
+  if (!v) return null;
+  if (/^cpo$/i.test(v)) return "CPO";
+  return v.charAt(0).toUpperCase() + v.slice(1).toLowerCase();
+}
 
 /* ------------------------------------------------------------------ StatusPill */
 
@@ -198,11 +210,7 @@ export function CommandStepper({
                 </span>
               </div>
               {i < steps.length - 1 ? (
-                <span className="text-muted-foreground/60 shrink-0" aria-hidden="true">
-                  <svg viewBox="0 0 24 24" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="m9 18 6-6-6-6" />
-                  </svg>
-                </span>
+                <ChevronRight className="w-4 h-4 text-muted-foreground/60 shrink-0" aria-hidden="true" />
               ) : null}
             </li>
           );
@@ -264,7 +272,7 @@ export function VehicleIdentityStrip({
   trim,
   stockNumber,
   vin,
-  conditionLabel,
+  conditionLabel: conditionRaw,
   meta,
   action,
   onCopyVin,
@@ -279,6 +287,9 @@ export function VehicleIdentityStrip({
   action?: React.ReactNode;
   onCopyVin?: () => void;
 }) {
+  // Callers pass the raw vehicle_listings.condition, so normalize here rather
+  // than trusting each page to remember.
+  const condition = conditionLabel(conditionRaw);
   return (
     <section className={cn(CARD, "p-5")}>
       <div className="flex flex-col lg:flex-row lg:items-start gap-4">
@@ -322,7 +333,7 @@ export function VehicleIdentityStrip({
                 </button>
               ) : null}
             </span>
-            {conditionLabel ? <StatusPill tone="emerald">{conditionLabel}</StatusPill> : null}
+            {condition ? <StatusPill tone="emerald">{condition}</StatusPill> : null}
           </div>
         </div>
 
@@ -389,7 +400,7 @@ export function LoadingCard({ rows = 3 }: { rows?: number }) {
 
 export function ErrorCard({ message, onRetry }: { message: string; onRetry?: () => void }) {
   return (
-    <div className={cn("rounded-2xl border border-red-200 bg-red-50 p-4")} role="alert">
+    <div className={cn("rounded-2xl border p-4", TONE_CLASS.red)} role="alert">
       <div className="flex items-start gap-3">
         <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0 text-red-700" aria-hidden="true" />
         <div className="min-w-0 flex-1">

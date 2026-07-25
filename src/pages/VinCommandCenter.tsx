@@ -112,6 +112,17 @@ export default function VinCommandCenter() {
     };
   }, [menu]);
 
+  // TimelineRail prints `at` verbatim, so the raw ISO string from audit_log has
+  // to be humanized here or the rail reads 2026-07-25T13:45:12.482Z.
+  const fmtAt = (iso: string | null) => {
+    if (!iso) return null;
+    const d = new Date(iso);
+    if (Number.isNaN(d.getTime())) return null;
+    return d.toLocaleString(undefined, {
+      month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit",
+    });
+  };
+
   const items = useMemo(
     () => (data ? [...data.packageItems].sort((a, b) => orderRank(a) - orderRank(b)) : []),
     [data],
@@ -144,7 +155,7 @@ export default function VinCommandCenter() {
             Everything created automatically. Review exceptions and authorize the next step.
           </p>
         </div>
-        <div className="flex items-center gap-2 flex-wrap">
+        <div className="flex items-center gap-2 flex-wrap ml-auto">
           <button
             onClick={() => setShowHowItWorks((v) => !v)}
             aria-expanded={showHowItWorks}
@@ -192,7 +203,7 @@ export default function VinCommandCenter() {
       {header}
       {children}
       <p className="mt-4 flex items-center justify-center gap-1.5 text-[11.5px] text-muted-foreground">
-        <Lock className="w-3.5 h-3.5" /> AI-generated content. Always review for accuracy.
+        <Lock className="w-4 h-4" /> AI-generated content. Always review for accuracy.
       </p>
     </div>
   );
@@ -321,14 +332,14 @@ export default function VinCommandCenter() {
           Icon={AlertTriangle}
           tone="amber"
           value={counts.exceptions}
-          sub={counts.exceptions > 0 ? "Needs attention" : "None open"}
+          sub={counts.exceptions > 0 ? "Needs attention" : undefined}
         />
         <CommandStatCard
           label="Passport"
           Icon={Globe}
           tone="emerald"
           value={counts.passportPublished}
-          sub={counts.passportPublished > 0 ? "Published" : "Not published"}
+          sub={counts.passportPublished > 0 ? "Published" : undefined}
         />
       </div>
 
@@ -380,7 +391,13 @@ export default function VinCommandCenter() {
                                     View
                                   </button>
                                 ) : (
-                                  <span className="px-2 text-[12.5px] text-muted-foreground" title="Nothing to open yet">—</span>
+                                  <button
+                                    disabled
+                                    aria-disabled="true"
+                                    title="Nothing to open for this item yet"
+                                    className="min-h-[44px] px-2 text-[12.5px] font-semibold text-muted-foreground opacity-50">
+                                    View
+                                  </button>
                                 )}
                                 <button
                                   aria-label={`More actions for ${item.label}`}
@@ -440,15 +457,13 @@ export default function VinCommandCenter() {
                       <p className="text-[11.5px] text-amber-800 mt-0.5">{readiness.blocking.detail}</p>
                     </div>
                   </div>
-                  {readiness.blocking.href && (
-                    <div className="flex justify-end">
+                  <div className="flex justify-end">
                       <button
-                        onClick={() => openHref(readiness.blocking!.href as string)}
+                        onClick={() => openHref(readiness.blocking!.href ?? `/vehicle-file/${vehicleId}`)}
                         className="min-h-[44px] px-1 text-[12px] font-semibold text-amber-900 hover:underline">
                         View Details
                       </button>
-                    </div>
-                  )}
+                  </div>
                 </div>
               </>
             )}
@@ -468,17 +483,7 @@ export default function VinCommandCenter() {
                 detail="Every automated and manual step on this VIN is logged here."
               />
             ) : (
-              <>
-                <TimelineRail entries={shownTimeline} />
-                {timeline.length > 6 && (
-                  <button
-                    onClick={() => setShowAllHistory((v) => !v)}
-                    aria-expanded={showAllHistory}
-                    className="mt-2 min-h-[44px] text-[12.5px] font-semibold text-blue-700 hover:underline">
-                    {showAllHistory ? "Show recent activity" : `Show all ${timeline.length} events`}
-                  </button>
-                )}
-              </>
+              <TimelineRail entries={shownTimeline.map((e) => ({ ...e, at: fmtAt(e.at) }))} />
             )}
           </CommandCard>
         </div>
