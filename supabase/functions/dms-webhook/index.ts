@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
+import { autoPreload } from "../_shared/intake-autoprovision.ts";
 
 // ──────────────────────────────────────────────────────────────
 // dms-webhook
@@ -223,8 +224,18 @@ serve(async (req) => {
       phone: profile?.phone || null,
     };
 
+    // Title/MCO intake email opt-out lives in dealer settings (default on),
+    // mirroring the marketcheck-sync intake path.
+    const { data: dprof } = await admin
+      .from("dealer_profiles")
+      .select("settings")
+      .eq("tenant_id", tenant.id)
+      .maybeSingle();
+    const emailTitle =
+      String((dprof?.settings as Record<string, unknown> | null)?.title_email_on_intake) !== "false";
+
     const errors: Array<{ vin: string; error: string }> = [];
-    const touchedIds: string[] = [];
+    const updatedIds: string[] = [];
     let upserted = 0;
 
     for (const v of vehicles) {
@@ -260,7 +271,7 @@ serve(async (req) => {
           .update(patch)
           .eq("id", existing.id);
         if (error) errors.push({ vin: v.vin, error: error.message });
-        else { upserted++; touchedIds.push(existing.id); }
+        else { upserted++; updatedIds.push(existing.id); }
       } else {
         const slug = makeSlug(v.vin, v.ymm);
         const { data: inserted, error } = await admin.from("vehicle_listings").insert({
@@ -270,16 +281,25 @@ serve(async (req) => {
           sticker_snapshot: {},
         }).select("id").single();
         if (error) errors.push({ vin: v.vin, error: error.message });
-        else { upserted++; if (inserted?.id) touchedIds.push(inserted.id); }
+        else {
+          upserted++;
+          // New VIN → shared intake auto-provisioning (hub token, draft docs,
+          // orchestration, description). Never throws back into this loop;
+          // failures land in vehicle_exceptions.
+          await autoPreload(admin, supabaseUrl, serviceKey, {
+            tenantId: tenant.id, vin: v.vin, ymm: v.ymm || null,
+            listingId: inserted?.id ?? null, emailTitle,
+          });
+        }
       }
     }
 
-    // Description Intelligence: initialize the merchandising case for each VIN
-    // this push touched. Fire-and-forget by design — a description failure must
+    // Description Intelligence for UPDATED vehicles (new inserts are covered by
+    // autoPreload above). Fire-and-forget by design — a description failure must
     // never block or slow inventory ingestion. The orchestrator is idempotent
     // on (tenant, vehicle, source_data_version, config_version), and anything
     // missed here is picked up by the nightly reconcile sweep.
-    for (const vehicleId of touchedIds.slice(0, 200)) {
+    for (const vehicleId of updatedIds.slice(0, 200)) {
       try {
         fetch(`${supabaseUrl}/functions/v1/description-orchestrate`, {
           method: "POST",

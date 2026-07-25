@@ -8,7 +8,11 @@ export default defineConfig({
     environment: "jsdom",
     globals: true,
     setupFiles: ["./src/test/setup.ts"],
-    include: ["src/**/*.{test,spec}.{ts,tsx}"],
+    include: [
+      "src/**/*.{test,spec}.{ts,tsx}",
+      // Deno-free shared edge-function modules are unit-tested here too.
+      "supabase/functions/_shared/**/*.{test,spec}.ts",
+    ],
   },
   resolve: {
     alias: {

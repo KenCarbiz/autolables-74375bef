@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
+import { autoPreload, ensureComplianceDrafts, ensureReadyToken } from "../_shared/intake-autoprovision.ts";
 
 // ──────────────────────────────────────────────────────────────
 // marketcheck-sync
@@ -103,131 +104,9 @@ async function mcFetch(base: string, query: string): Promise<{ listings: MCListi
   }
 }
 
-const hex16 = () => {
-  const a = new Uint8Array(16);
-  crypto.getRandomValues(a);
-  return Array.from(a).map((b) => b.toString(16).padStart(2, "0")).join("");
-};
-
-// Mint the permanent Get-Ready hub token if this vehicle doesn't already have a
-// live one. Cheap + idempotent, so it can run on every sync pass to back-fill
-// pre-existing inventory and cars first ingested by other paths — without the
-// addendum/sticker work that only makes sense once, at first ingest.
-// deno-lint-ignore no-explicit-any
-async function ensureReadyToken(admin: any, tenantId: string, vin: string, ymm: string | null, listingId: string | null) {
-  try {
-    const { data: tok } = await admin.from("dept_signoff_tokens").select("id")
-      .eq("tenant_id", tenantId).eq("vin", vin).eq("department", "vehicle").eq("status", "pending").maybeSingle();
-    if (!tok) {
-      await admin.from("dept_signoff_tokens").insert({
-        tenant_id: tenantId, vehicle_listing_id: listingId, vin, ymm,
-        department: "vehicle", purpose: "get_ready", token: hex16(),
-        expires_at: new Date(Date.now() + 365 * 864e5).toISOString(),
-      });
-    }
-  } catch { /* token preload best-effort */ }
-}
-
-// Ensure the compliance drafts (FTC Buyers Guide + CT K-208) exist for a used/
-// CPO vehicle on EVERY sync — not just the first insert. The draft RPCs are
-// VIN-idempotent and no-op for new cars, so re-syncs safely backfill drafts for
-// inventory that was ingested before the autogen flow existed. Without this,
-// only brand-new VINs ever got drafted and existing cars showed "not generated".
-// deno-lint-ignore no-explicit-any
-async function ensureComplianceDrafts(admin: any, tenantId: string, vin: string) {
-  try { await admin.rpc("create_draft_buyers_guide", { p_tenant_id: tenantId, p_vin: vin }); } catch { /* best-effort */ }
-  try { await admin.rpc("create_draft_safety_inspection", { p_tenant_id: tenantId, p_vin: vin }); } catch { /* best-effort */ }
-  // Pre-start the Get-Ready record so the manager opens to a ready checklist
-  // (idempotent; backfills existing used inventory on re-sync).
-  try { await admin.rpc("create_draft_get_ready", { p_tenant_id: tenantId, p_vin: vin }); } catch { /* best-effort */ }
-}
-
-// Auto-preload a brand-new vehicle the moment it's ingested: mint its permanent
-// Get-Ready hub token (so the windshield QR works immediately), draft the
-// addendum, and kick off a best-effort OEM window-sticker fetch. All isolated —
-// never throws back into the sync loop. Runs only on genuinely new listings.
-// deno-lint-ignore no-explicit-any
-async function autoPreload(admin: any, supabaseUrl: string, serviceKey: string, tenantId: string, vin: string, ymm: string | null, listingId: string | null, emailTitle = false) {
-  await ensureReadyToken(admin, tenantId, vin, ymm, listingId);
-  try {
-    // Draft addendum from the dealer's product rules (skips if none match).
-    await admin.rpc("create_draft_addendum", { p_tenant_id: tenantId, p_vin: vin });
-  } catch { /* addendum preload best-effort */ }
-  try {
-    // Draft the FTC Buyers Guide for used/CPO cars (skips new cars + is
-    // idempotent). Lands as a draft for the manager to confirm and publish.
-    await admin.rpc("create_draft_buyers_guide", { p_tenant_id: tenantId, p_vin: vin });
-  } catch { /* buyers-guide preload best-effort */ }
-  try {
-    // Pre-create the CT K-208 safety inspection for every used/CPO car (no
-    // year/mileage/value threshold), so service has it to complete + sign.
-    await admin.rpc("create_draft_safety_inspection", { p_tenant_id: tenantId, p_vin: vin });
-  } catch { /* k208 preload best-effort */ }
-  try {
-    // Pre-start the Get-Ready record (used/CPO) so the manager opens to a
-    // ready-to-compose checklist instead of an empty "Start Get-Ready".
-    await admin.rpc("create_draft_get_ready", { p_tenant_id: tenantId, p_vin: vin });
-  } catch { /* get-ready preload best-effort */ }
-  try {
-    // Fill the official FTC Buyers Guide + K-208 PDFs from the drafted data.
-    // Fire-and-forget; runs after the drafts above so the warranty box is set.
-    fetch(`${supabaseUrl}/functions/v1/generate-vehicle-forms`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", Authorization: `Bearer ${serviceKey}` },
-      body: JSON.stringify({ tenant_id: tenantId, vin }),
-      signal: AbortSignal.timeout(25000),
-    }).catch(() => { /* best-effort */ });
-  } catch { /* forms preload best-effort */ }
-  try {
-    // Fire-and-forget; no-op if no window-sticker API key is configured.
-    fetch(`${supabaseUrl}/functions/v1/oem-window-sticker`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", Authorization: `Bearer ${serviceKey}` },
-      body: JSON.stringify({ vin, tenant_id: tenantId }),
-      signal: AbortSignal.timeout(20000),
-    }).catch(() => { /* best-effort */ });
-  } catch { /* sticker preload best-effort */ }
-  // Email the office the per-vehicle title/MCO upload link on intake (opt-in).
-  if (emailTitle) {
-    try {
-      fetch(`${supabaseUrl}/functions/v1/email-title-request`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${serviceKey}` },
-        body: JSON.stringify({ tenant_id: tenantId, vin }),
-        signal: AbortSignal.timeout(20000),
-      }).catch(() => { /* best-effort */ });
-    } catch { /* title email best-effort */ }
-  }
-  // Fire-once recon orchestration: seed the intake estimate and (in auto mode)
-  // route over-threshold lines to the used-car manager. Idempotent server-side,
-  // so a re-sync never double-dispatches; fully isolated from the sync loop.
-  if (listingId) {
-    try {
-      fetch(`${supabaseUrl}/functions/v1/ingest-orchestrate`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${serviceKey}` },
-        body: JSON.stringify({ tenant_id: tenantId, vin, listing_id: listingId, ymm }),
-        signal: AbortSignal.timeout(20000),
-      }).catch(() => { /* best-effort */ });
-    } catch { /* orchestration best-effort */ }
-  }
-  // Description Intelligence: initialize the merchandising case for this VIN.
-  // Fire-and-forget by design — a description failure must never block or slow
-  // inventory ingestion. The orchestrator is idempotent on
-  // (tenant, vehicle, source_data_version, config_version), so a re-sync with
-  // unchanged data does no work, and anything missed here is picked up by the
-  // description-orchestrate reconcile sweep.
-  if (listingId) {
-    try {
-      fetch(`${supabaseUrl}/functions/v1/description-orchestrate`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${serviceKey}` },
-        body: JSON.stringify({ action: "orchestrate", tenant_id: tenantId, vehicle_id: listingId, reason: "ingest" }),
-        signal: AbortSignal.timeout(20000),
-      }).catch(() => { /* best-effort */ });
-    } catch { /* description best-effort */ }
-  }
-}
+// Intake auto-provisioning (hub token + draft docs + fire-and-forget renders)
+// is shared across every ingest path; failures are recorded to
+// vehicle_exceptions, never swallowed, and never block the sync loop.
 
 // One page of a rooftop's inventory from the syndication feed. owned=true drops
 // the duplicate non-owned copies that have no price/stock, but it's only honored
@@ -941,7 +820,10 @@ serve(async (req) => {
               if (!ins.error) {
                 listingsUpserted++;
                 // New car → auto-preload its Get-Ready QR + OEM window sticker.
-                await autoPreload(admin, supabaseUrl, serviceKey, cfg.tenant_id, vin, ymm, ins.data?.id ?? null, String(pset.title_email_on_intake) !== "false");
+                await autoPreload(admin, supabaseUrl, serviceKey, {
+                  tenantId: cfg.tenant_id, vin, ymm, listingId: ins.data?.id ?? null,
+                  emailTitle: String(pset.title_email_on_intake) !== "false",
+                });
               } else if (!firstWriteErr) firstWriteErr = ins.error.message;
             }
 
