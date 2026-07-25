@@ -4,7 +4,7 @@ import { columnFor } from "./getReadyColumns";
 import { currentDocumentOfType } from "./documentSet";
 import { fmtDate, humanize } from "./format";
 import { k208State, type SafetyInspectionRow } from "./inspectionState";
-import { keyTagState } from "./labelJobs";
+import { vehicleQrPackageState } from "./vehicleQrToken";
 import type { PackageItemStatus } from "./packageState";
 import type { ReaderRow } from "./sourceReader";
 
@@ -47,8 +47,12 @@ export interface VinPackageSources {
     /** recall_service_tasks for this vehicle, newest first. */
     tasks: ReaderRow[];
   };
-  qrCodes: ReaderRow[];
-  zebraJobs: ReaderRow[];
+  /**
+   * dept_signoff_tokens for this vehicle (department 'vehicle', purpose
+   * 'get_ready') — the artifact /print/vehicle-qr mints, and the ONLY thing
+   * either QR row is measured from. See vehicleQrToken.ts.
+   */
+  qrTokens: ReaderRow[];
   getReady: { record: ReaderRow | null; items: GetReadyItem[] };
   description: { row: ReaderRow | null; channelCount: number };
 }
@@ -117,26 +121,6 @@ export function recallPackageState(r: VinPackageSources["recall"]): ItemState {
     return { status: "retry_required", detail: `${plural(r.openCount)} — service review required` };
   }
   return { status: "ready", detail: `Checked ${fmtDate(r.checkedAt)} · no open recalls` };
-}
-
-/**
- * The Rear Service QR has no approval, publish or print step: an ACTIVE
- * qr_codes row is the whole finished artifact. Emitting only `created` for it
- * put a row in the denominator that could never satisfy countFinished, which
- * made "Automation Complete" unable to reach 100% and "Ready to Market" a dead
- * branch for every vehicle in the dealership.
- */
-export function serviceQrPackageState(qrCodes: ReaderRow[]): ItemState {
-  const active = qrCodes.find((q) => q.is_active !== false) || null;
-  if (active) {
-    const surface = active.surface || active.sticker_type;
-    return {
-      status: "ready",
-      detail: `Tracking QR active${surface ? ` · ${humanize(String(surface))}` : ""}`,
-    };
-  }
-  if (qrCodes.length > 0) return { status: "created", detail: "QR deactivated — no active tracking QR" };
-  return { status: "pending", detail: "Not started" };
 }
 
 export function getReadyHalfState(args: {
@@ -221,13 +205,18 @@ export function buildVinPackageItems(s: VinPackageSources): PackageItem[] {
     href: `/vehicle-file/${vehicleId}?tab=overview`,
   });
 
+  // Both rows link to /print/vehicle-qr and both are now measured from what that
+  // page mints, so a row's link and a row's status can no longer describe
+  // different artifacts.
   items.push({
-    key: "service_qr", label: "Rear Service QR", ...serviceQrPackageState(s.qrCodes),
+    key: "service_qr", label: "Rear Service QR",
+    ...vehicleQrPackageState(s.qrTokens, "Rear-glass cling"),
     href: vin ? `/print/vehicle-qr/${vinKey(vin)}` : undefined,
   });
 
   items.push({
-    key: "key_tag_qr", label: "Key-Tag QR", ...keyTagState(s.zebraJobs),
+    key: "key_tag_qr", label: "Key-Tag QR",
+    ...vehicleQrPackageState(s.qrTokens, "Key-fob tag"),
     href: vin ? `/print/vehicle-qr/${vinKey(vin)}` : undefined,
   });
 

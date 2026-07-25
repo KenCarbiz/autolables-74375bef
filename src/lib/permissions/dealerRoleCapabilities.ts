@@ -258,11 +258,29 @@ const ROLE_HOME: Record<string, string> = {
   compliance: "/compliance",
   biller: "/dashboard",
   readonly: "/dashboard",
+  // third_party_vendor holds neither can_view_dashboard nor can_view_inventory;
+  // the work queue is the only listed screen its capability set admits.
+  third_party_vendor: "/queue",
 };
+
+// Fallback for a role with no ROLE_HOME entry — an unrecognised DB value, or a
+// role added to the capability map before this one. "/dashboard" was returned
+// unconditionally, which sent any role lacking can_view_dashboard to a screen it
+// cannot load: RouteCapabilityGuard redirects there, and the three command
+// surfaces offer it as the one control on their permission-denied card. The
+// fallback is now chosen by capability, so the destination is always reachable.
+const HOME_FALLBACK: { path: string; capability: DealerCapability }[] = [
+  { path: "/dashboard", capability: "can_view_dashboard" },
+  { path: "/inventory", capability: "can_view_inventory" },
+  { path: "/queue", capability: "can_view_work_queue" },
+];
 
 export const dealerRoleHome = (role: DealerRole, isPlatformAdmin = false): string => {
   if (isPlatformAdmin) return "/dashboard";
-  return ROLE_HOME[`${role || ""}`.trim().toLowerCase()] || "/dashboard";
+  const mapped = ROLE_HOME[`${role || ""}`.trim().toLowerCase()];
+  if (mapped) return mapped;
+  const allowed = new Set(getDealerCapabilities(role, isPlatformAdmin));
+  return HOME_FALLBACK.find((f) => allowed.has(f.capability))?.path ?? "/dashboard";
 };
 
 // The job roles a tenant admin can assign in the Team panel, grouped for the

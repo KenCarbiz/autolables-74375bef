@@ -1,4 +1,5 @@
 import { allowedActions, type DocumentStatus } from "@/lib/stickerStudio/documentWorkflow";
+import { safeDocumentUrl } from "./packetPrintSheet";
 import type { Tone } from "@/components/command/CommandPrimitives";
 
 // ──────────────────────────────────────────────────────────────────────
@@ -49,9 +50,17 @@ export interface PrintableDocument {
   print_count?: number | null;
 }
 
+// "Has a printable file" is ONE question, answered by the allowlist the sheet
+// itself applies. Accepting any non-empty pdf_url put a green `Ready` pill and a
+// Ready count on rows the sheet drops — a relative storage path such as
+// "vehicle-docs/abc.pdf" cannot resolve in the about:blank window the packet is
+// written into — so the rail promised a sheet the button could not deliver.
+const hasPrintableFile = (d: PrintableDocument): boolean =>
+  !!safeDocumentUrl(String(d.pdf_url || "")) || !!safeDocumentUrl(String(d.png_url || ""));
+
 export function printReleaseState(d: PrintableDocument): PrintReleaseState {
   const status = String(d.document_status || "") as DocumentStatus;
-  const hasFile = !!(d.pdf_url || d.png_url);
+  const hasFile = hasPrintableFile(d);
   const printed = status === "printed" || !!d.printed_at || Number(d.print_count || 0) > 0;
   if (printed) return "already_printed";
   if (!hasFile) return d.online_url ? "digital" : "no_file";
@@ -89,7 +98,10 @@ export function printBlockedReason(docs: PrintableDocument[]): string {
   if (docs.length === 0) return "No documents have been generated for this vehicle yet.";
   const states = docs.map(printReleaseState);
   const printed = states.filter((s) => s === "already_printed").length;
-  if (printed > 0) {
+  // "Every packet document" has to mean every one of them. It used to fire
+  // whenever ANY document was already printed, so a set of one printed sticker
+  // and three documents with no file at all was reported as a completed packet.
+  if (printed > 0 && printed === states.length) {
     return `Every packet document has already been released to the printer (${printed} document${printed === 1 ? "" : "s"}). Reprinting is not available from this screen — open the document and print the copy you need.`;
   }
   if (states.includes("digital")) {
@@ -110,8 +122,15 @@ export function bundleNoteFor(args: {
 }): string | null {
   const { used, signedInspection, k208Docs } = args;
   if (!used) return null;
-  if (!signedInspection) return "K-208 excluded until executed and signed.";
+  // Presence on the sheet is decided FIRST, because it is the only thing this
+  // note is about. 20260724010000 publishes the K-208 on any signed row without
+  // consulting `result`, so a signed-but-FAILED inspection leaves
+  // signedInspection false while a published K-208 with a pdf_url is on the
+  // paper — the card said "excluded" while Letter Paper counted it, counts.ready
+  // counted it and the button printed it. signedInspection only ever EXPLAINS an
+  // absence.
   if (k208Docs.some(printSheetIncludes)) return null;
+  if (!signedInspection) return "K-208 excluded until executed and signed.";
   if (k208Docs.length === 0) {
     return "The signed K-208 has no generated document yet, so it is not in this bundle.";
   }

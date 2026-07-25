@@ -8,8 +8,8 @@ import {
 
 const vehicle = { ymm: "2025 INFINITI QX80", vin: "JN8AZ2NE0P9300001", stockNumber: "H12345" };
 const docs = [
-  { label: "FTC Buyers Guide", version: "v2", url: "https://files.test/bg.pdf" },
-  { label: "Used-Car Sticker", version: "v3", url: "https://files.test/win.pdf" },
+  { id: "d-bg", label: "FTC Buyers Guide", version: "v2", url: "https://files.test/bg.pdf" },
+  { id: "d-win", label: "Used-Car Sticker", version: "v3", url: "https://files.test/win.pdf" },
 ];
 
 describe("safeDocumentUrl", () => {
@@ -20,8 +20,13 @@ describe("safeDocumentUrl", () => {
   it("allows ordinary web URLs and inline PDFs/images", () => {
     expect(safeDocumentUrl("https://files.test/a.pdf")).toBe("https://files.test/a.pdf");
     expect(safeDocumentUrl("http://files.test/a.png")).toBe("http://files.test/a.png");
-    expect(safeDocumentUrl("data:application/pdf;base64,AAAA")).toMatch(/^data:application\/pdf/);
-    expect(safeDocumentUrl("data:image/png;base64,AAAA")).toMatch(/^data:image\/png/);
+  });
+
+  // M8: isSafeCommandHref rejects data:, safeDocumentUrl accepted
+  // data:application/pdf. One fact, two rules — so this side now rejects it too.
+  it("rejects data: URLs, the same answer isSafeCommandHref gives", () => {
+    expect(safeDocumentUrl("data:application/pdf;base64,AAAA")).toBeNull();
+    expect(safeDocumentUrl("data:image/png;base64,AAAA")).toBeNull();
   });
 
   it("rejects every scheme that can execute in the app origin", () => {
@@ -72,7 +77,7 @@ describe("renderPacketPrintSheet", () => {
 
   it("escapes label text rather than emitting it as markup", () => {
     const html = renderPacketPrintSheet(vehicle, [
-      { label: '<img src=x onerror="alert(1)">', version: "v1", url: "https://files.test/a.pdf" },
+      { id: "d1", label: '<img src=x onerror="alert(1)">', version: "v1", url: "https://files.test/a.pdf" },
     ]);
     expect(html).not.toContain("<img src=x");
     expect(html).toContain("&lt;img src=x");
@@ -99,66 +104,85 @@ describe("openPacketPrintSheet", () => {
     };
   };
 
+  const opened = (win: Window | null, list = docs, timeout?: number) => {
+    const res = openPacketPrintSheet(win, vehicle, list, timeout);
+    if (!res.ok) throw new Error(`expected an open sheet, got ${res.reason}`);
+    return res.handle;
+  };
+
   it("writes the sheet into the opened window", () => {
     const { win, written } = fakeWindow();
-    const handle = openPacketPrintSheet(win, vehicle, docs);
-    expect(handle).not.toBeNull();
+    const handle = opened(win);
     expect(written.join("")).toContain("FTC Buyers Guide");
-    expect(handle?.documents).toHaveLength(2);
+    expect(handle.documents).toHaveLength(2);
   });
 
-  // A blocked pop-up is the caller's signal to stamp nothing: printed_at and
-  // print_count are the evidence of what was posted on the car.
-  it("reports failure when the browser blocked the window", () => {
-    expect(openPacketPrintSheet(null, vehicle, docs)).toBeNull();
+  // D11: three causes used to be one null, and all three were reported to the
+  // employee as "Allow pop-ups for this site" — advice for exactly one of them.
+  it("names a blocked pop-up", () => {
+    expect(openPacketPrintSheet(null, vehicle, docs)).toEqual({ ok: false, reason: "window_blocked" });
   });
 
-  it("reports failure when there is nothing to print", () => {
+  it("names an empty packet separately from a blocked window", () => {
     const { win } = fakeWindow();
-    expect(openPacketPrintSheet(win, vehicle, [])).toBeNull();
+    expect(openPacketPrintSheet(win, vehicle, [])).toEqual({ ok: false, reason: "no_printable_url" });
   });
 
-  it("reports failure when every URL fails the scheme allowlist", () => {
+  it("names a packet whose every URL failed the scheme allowlist", () => {
     const { win } = fakeWindow();
     expect(openPacketPrintSheet(win, vehicle, [
-      { label: "Hostile", version: "v1", url: "javascript:alert(1)" },
-    ])).toBeNull();
+      { id: "d1", label: "Hostile", version: "v1", url: "javascript:alert(1)" },
+    ])).toEqual({ ok: false, reason: "no_printable_url" });
+  });
+
+  it("names a window that could not be written to", () => {
+    const hostile = { document: { open: () => { throw new Error("blocked"); } } } as unknown as Window;
+    expect(openPacketPrintSheet(hostile, vehicle, docs)).toEqual({ ok: false, reason: "window_unwritable" });
   });
 
   it("drops an unsafe document rather than rendering it beside safe ones", () => {
     const { win, written } = fakeWindow();
-    const handle = openPacketPrintSheet(win, vehicle, [
+    const handle = opened(win, [
       ...docs,
-      { label: "Hostile", version: "v1", url: "javascript:alert(1)" },
+      { id: "hostile", label: "Hostile", version: "v1", url: "javascript:alert(1)" },
     ]);
-    expect(handle?.documents).toHaveLength(2);
+    expect(handle.documents.map((d) => d.id)).toEqual(["d-bg", "d-win"]);
     expect(written.join("")).not.toContain("javascript:alert(1)");
   });
 
-  it("reports failure when the window cannot be written to", () => {
-    const hostile = { document: { open: () => { throw new Error("blocked"); } } } as unknown as Window;
-    expect(openPacketPrintSheet(hostile, vehicle, docs)).toBeNull();
-  });
-
-  it("resolves false when the employee closes the tab without confirming", async () => {
+  it("resolves closed when the employee closes the tab without confirming", async () => {
     const { win } = fakeWindow();
-    const handle = openPacketPrintSheet(win, vehicle, docs);
+    const handle = opened(win);
     (win as unknown as { closed: boolean }).closed = true;
-    await expect(handle?.printed).resolves.toBe(false);
+    await expect(handle.printed).resolves.toBe("closed");
   });
 
-  it("resolves true when the sheet reports the packet printed", async () => {
+  it("resolves printed when the sheet reports the packet printed", async () => {
     const { win } = fakeWindow();
-    const handle = openPacketPrintSheet(win, vehicle, docs);
+    const handle = opened(win);
     window.dispatchEvent(messageFrom(win, { type: PACKET_PRINTED_MESSAGE }));
-    await expect(handle?.printed).resolves.toBe(true);
+    await expect(handle.printed).resolves.toBe("printed");
   });
 
   it("ignores a printed message from any other window", async () => {
     const { win } = fakeWindow();
-    const handle = openPacketPrintSheet(win, vehicle, docs);
+    const handle = opened(win);
     window.dispatchEvent(messageFrom({} as Window, { type: PACKET_PRINTED_MESSAGE }));
     (win as unknown as { closed: boolean }).closed = true;
-    await expect(handle?.printed).resolves.toBe(false);
+    await expect(handle.printed).resolves.toBe("closed");
+  });
+
+  // D9: a sheet left open in a background tab used to hold the caller's guard
+  // for the rest of the session.
+  it("gives up on a sheet nobody confirms or closes", async () => {
+    const { win } = fakeWindow();
+    await expect(opened(win, docs, 5).printed).resolves.toBe("abandoned");
+  });
+
+  it("can be cancelled by a caller that is going away", async () => {
+    const { win } = fakeWindow();
+    const handle = opened(win);
+    handle.cancel();
+    await expect(handle.printed).resolves.toBe("cancelled");
   });
 });

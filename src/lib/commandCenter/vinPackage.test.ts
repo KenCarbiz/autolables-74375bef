@@ -2,7 +2,8 @@ import { describe, it, expect } from "vitest";
 import type { GetReadyItem } from "@/hooks/useGetReady";
 import { getReadyStep } from "./getReadyColumns";
 import { countExceptions, countFinished, isReadyToMarket } from "./packageState";
-import { buildVinPackageItems, recallPackageState, serviceQrPackageState, type VinPackageSources } from "./vinPackage";
+import { buildVinPackageItems, recallPackageState, type VinPackageSources } from "./vinPackage";
+import { vehicleQrPackageState } from "./vehicleQrToken";
 
 const grItem = (over: Partial<GetReadyItem> = {}): GetReadyItem => ({
   id: "g1", label: "Detail — interior", category: "detail",
@@ -27,8 +28,12 @@ const finishedUsedCar = (): VinPackageSources => ({
   },
   addendum: { id: "a1", customer_signed_at: "2026-07-03T00:00:00Z" },
   recall: { checkedAt: "2026-07-04T00:00:00Z", doNotDrive: false, openCount: 0, tasks: [] },
-  qrCodes: [{ id: "q1", is_active: true, surface: "rear_glass" }],
-  zebraJobs: [{ id: "z1", label_type: "key_tag", status: "printed", created_at: "2026-07-05T00:00:00Z" }],
+  // The shape issue_vehicle_ready_token writes (20260629010000:80-81). Nothing
+  // here is hand-shaped to satisfy a predicate: it is what the RPC inserts.
+  qrTokens: [{
+    id: "dst1", department: "vehicle", purpose: "get_ready", status: "pending",
+    expires_at: "2027-07-05T00:00:00Z", created_at: "2026-07-05T00:00:00Z",
+  }],
   getReady: {
     record: { id: "gr1" },
     items: [grItem(), grItem({ id: "g2", category: "service" })],
@@ -100,19 +105,23 @@ describe("buildVinPackageItems", () => {
   });
 });
 
-describe("serviceQrPackageState", () => {
-  it("an active QR is the whole finished artifact — there is no publish step", () => {
-    expect(serviceQrPackageState([{ is_active: true, surface: "rear_glass" }])).toEqual({
-      status: "ready", detail: "Tracking QR active · Rear Glass",
-    });
+describe("vehicleQrPackageState", () => {
+  const live = {
+    id: "dst1", department: "vehicle", purpose: "get_ready", status: "pending",
+    expires_at: "2027-07-05T00:00:00Z", created_at: "2026-07-05T00:00:00Z",
+  };
+
+  it("a live token is the whole finished artifact — there is no publish step", () => {
+    expect(vehicleQrPackageState([live], "Rear-glass cling").status).toBe("ready");
   });
 
-  it("a deactivated QR is produced work that is not finished", () => {
-    expect(serviceQrPackageState([{ is_active: false }]).status).toBe("created");
+  it("an expired token is an exception the manager can clear by reprinting", () => {
+    expect(vehicleQrPackageState([{ ...live, expires_at: "2020-01-01T00:00:00Z" }], "Key-fob tag"))
+      .toEqual({ status: "retry_required", detail: "Service code expired — reprint the QR sheet to re-issue it" });
   });
 
-  it("no QR at all is not started", () => {
-    expect(serviceQrPackageState([]).status).toBe("pending");
+  it("no token at all is not started", () => {
+    expect(vehicleQrPackageState([], "Rear-glass cling").status).toBe("pending");
   });
 });
 

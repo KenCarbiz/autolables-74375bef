@@ -87,11 +87,19 @@ describe("vendorsFor", () => {
     expect(vendors[0].name).toBe("Vendor");
   });
 
-  it("is the SAME list the dispatcher narrows, so displayed can never be 0 while emailed is 1", () => {
-    const items = [emailOnly, item({ id: "b", category: "detail" })];
-    const displayed = vendorsFor(items);
-    const dispatched = vendorsFor(items).filter((v) => v.pending && !!v.email);
-    expect(displayed.map((v) => v.email)).toEqual(dispatched.map((v) => v.email));
+  // This used to assert "displayed === dispatched" by passing the SAME array to
+  // vendorsFor twice, which is a tautology: the real consumers pass DIFFERENT
+  // arrays. It would have passed with the defect live. The invariant is proved
+  // where the two real entry points meet, in useCommandCenter.vendorSet.test.ts.
+  // What belongs here is the fact that made the tautology dangerous.
+  it("is not co-extensive with the column a line is displayed in", () => {
+    // Reachable in StartGetReadyModal: pick a vendor, then switch the
+    // department select back to service. The email input hides; the value stays.
+    const retained = item({ id: "svc", category: "service", department: "service", vendorEmail: "a@glass.test" });
+    expect(columnFor(retained)).toBe("service");
+    expect(isThirdPartyItem(retained)).toBe(true);
+    expect(vendorsFor([retained])).toHaveLength(1);
+    expect(vendorsFor([retained].filter((i) => columnFor(i) === "vendor"))).toHaveLength(0);
   });
 
   it("keys one vendor once, whichever field identifies them", () => {

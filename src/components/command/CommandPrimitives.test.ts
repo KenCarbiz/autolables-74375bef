@@ -1,13 +1,17 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import {
   capabilityForHref,
+  commandRowMenuItems,
   conditionLabel,
   formatCommandDate,
   formatCommandDateTime,
   isSafeCommandHref,
   resolveCommandHref,
 } from "./CommandPrimitives";
-import { getDealerCapabilities, type DealerCapability } from "@/lib/permissions/dealerRoleCapabilities";
+import {
+  dealerRoleCapabilityMap, dealerRoleHome, getDealerCapabilities,
+  hasDealerCapability, type DealerCapability,
+} from "@/lib/permissions/dealerRoleCapabilities";
 
 // Every href useCommandCenter can emit, plus the two the pages emit themselves.
 // A destination missing from the capability map is not "unrestricted", it is a
@@ -81,6 +85,83 @@ describe("capabilityForHref", () => {
     expect(caps.has(capabilityForHref("/vin-command/x") as DealerCapability)).toBe(true);
     expect(caps.has(capabilityForHref("/get-ready-command/x") as DealerCapability)).toBe(false);
     expect(caps.has(capabilityForHref("/print-center/x") as DealerCapability)).toBe(false);
+  });
+});
+
+// C2: the row link and the row kebab must gate on the same fact. The test calls
+// what the PAGES call — `commandRowMenuItems` for the menu, `capabilityForHref`
+// for the link — rather than asserting the shared helper against itself.
+describe("commandRowMenuItems", () => {
+  const build = (href?: string | null) =>
+    commandRowMenuItems({ href, vin: "1N4AL3AP8JC123456", go: vi.fn() });
+
+  it("gates Open on the capability the row's View link resolves, for every emitted href", () => {
+    for (const href of EMITTED_HREFS) {
+      const open = build(href).find((i) => i.label === "Open");
+      expect(open, href).toBeDefined();
+      expect(open?.capability, href).toBe(capabilityForHref(href));
+    }
+  });
+
+  it("agrees with the row link for every role in the capability map", () => {
+    for (const role of Object.keys(dealerRoleCapabilityMap)) {
+      for (const href of EMITTED_HREFS) {
+        const open = build(href).find((i) => i.label === "Open");
+        const linkCap = capabilityForHref(href);
+        const linkLive = !linkCap || hasDealerCapability(role, linkCap);
+        const menuLive = !open?.capability || hasDealerCapability(role, open.capability);
+        expect(menuLive, `${role} → ${href}`).toBe(linkLive);
+      }
+    }
+  });
+
+  // The reported case: on the VIN table's Description row a service_manager saw
+  // "View" disabled and the kebab's "Open" live, navigating into a denial card.
+  it("blocks Open for a service_manager on the row whose View link is blocked", () => {
+    const href = "/description-intelligence/veh-1";
+    const open = build(href).find((i) => i.label === "Open");
+    expect(hasDealerCapability("service_manager", open?.capability as DealerCapability)).toBe(false);
+    expect(hasDealerCapability("service_manager", capabilityForHref(href) as DealerCapability)).toBe(false);
+  });
+
+  it("refuses an unfollowable link with the same sentence the row link states", () => {
+    const open = build("javascript:alert(1)").find((i) => i.label === "Open");
+    expect(open?.disabledReason).toBe("This item's link is not a web address this app can open.");
+  });
+
+  it("offers only Copy VIN when the row has no destination", () => {
+    expect(build(undefined).map((i) => i.label)).toEqual(["Copy VIN"]);
+  });
+});
+
+// C3: "Back to Home" is the one control on all three permission-denied cards,
+// and RouteCapabilityGuard sends every denied deep link to the same place. A
+// role whose home it cannot load has no way out.
+describe("dealerRoleHome", () => {
+  // What each home destination demands — RouteCapabilityGuard's RULES for the
+  // gated ones, the sidebar's capability for the rest.
+  const HOME_REQUIREMENT: Record<string, DealerCapability | null> = {
+    "/dashboard": "can_view_dashboard",
+    "/inventory": "can_view_inventory",
+    "/queue": "can_view_work_queue",
+    "/saved": "can_view_deals",
+    "/ready-board": "can_view_get_ready",
+    "/service": "can_view_get_ready",
+    "/titles": "can_view_compliance",
+    "/compliance": "can_view_compliance",
+  };
+
+  it("sends every role somewhere that role can actually load", () => {
+    for (const role of [...Object.keys(dealerRoleCapabilityMap), "some_unmapped_role", "", null]) {
+      const home = dealerRoleHome(role);
+      const need = HOME_REQUIREMENT[home];
+      expect(need, `${role} → ${home} is not a known home destination`).not.toBeUndefined();
+      if (need) expect(hasDealerCapability(role, need), `${role} → ${home}`).toBe(true);
+    }
+  });
+
+  it("keeps the platform admin on the dashboard", () => {
+    expect(dealerRoleHome("third_party_vendor", true)).toBe("/dashboard");
   });
 });
 

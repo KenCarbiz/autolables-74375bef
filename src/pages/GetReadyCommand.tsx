@@ -2,20 +2,20 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
 import {
   AlertTriangle, ArrowRight, Building2, Calendar, Car, CheckCircle2, ClipboardList, Clock,
-  DollarSign, ExternalLink, Info, Loader2, Lock, Mail, Rocket, Users, type LucideIcon,
+  DollarSign, Gauge, Info, Loader2, Lock, Mail, Printer, Users, type LucideIcon,
 } from "lucide-react";
 import { toast } from "sonner";
 import {
   capabilityDenialReason, capabilityForHref, CommandAction,
-  CommandCallout, CommandCapabilityProvider, CommandCard, CommandStepper, copyWithToast,
-  DegradedNotice, EmptyState, ErrorCard, formatCommandDate, formatCommandDateTime, LoadingCard,
-  StatusPill, TONE_FILL, TONE_TEXT, useDisabledReason, VehicleIdentityStrip,
+  CommandCallout, CommandCapabilityProvider, CommandCard, CommandIconTile, CommandStepper,
+  copyWithToast, DegradedNotice, EM_DASH, EmptyState, ErrorCard, formatCommandDate,
+  formatCommandDateTime, LoadingCard, StatusPill, TONE_FILL, TONE_TEXT, useDisabledReason,
+  VehicleIdentityStrip, type Tone,
 } from "@/components/command/CommandPrimitives";
 import { useGetReadyCommand, type GetReadyColumn } from "@/hooks/useCommandCenter";
 import { useAuth } from "@/contexts/AuthContext";
 import { useEntitlements } from "@/hooks/useEntitlements";
 import { dealerRoleHome, hasDealerCapability } from "@/lib/permissions/dealerRoleCapabilities";
-import { TONE_CLASS, type Tone } from "@/lib/description/model";
 import { cn } from "@/lib/utils";
 
 // /get-ready-command/:vehicleId — the manager's single authorization surface.
@@ -39,8 +39,15 @@ const REPORT_LABEL: Record<GetReadyColumn["key"], string> = {
 // hardcoded en-US. Dates themselves come from formatCommandDate — this page used
 // to keep its own copy that printed the raw ISO string on an unparseable stamp.
 const money = (n: number | null | undefined) =>
-  n == null ? "—" : new Intl.NumberFormat(undefined, { style: "currency", currency: "USD", maximumFractionDigits: 0 }).format(n);
+  n == null ? EM_DASH : new Intl.NumberFormat(undefined, { style: "currency", currency: "USD", maximumFractionDigits: 0 }).format(n);
 
+// §4 asks for an amber dot + "High" here, but no schema column feeds
+// GetReadyCommandData.priority yet, so the loader returns null unconditionally
+// and this map is statically live / dynamically unreachable today. It is kept
+// deliberately: priority is a declared §2 contract field, and the page must
+// already render it the moment a source is wired. Until then the labelled field
+// renders the em dash, which is what §0 prescribes for an unavailable value.
+// Same for deliveryTarget below.
 const PRIORITY_TONE: Record<string, Tone> = {
   high: "amber",
   normal: "blue",
@@ -65,9 +72,7 @@ function SummaryRow({ Icon, value, label, tone }: {
 }) {
   return (
     <div className="flex items-center gap-3 py-2">
-      <span className={cn("grid place-items-center w-9 h-9 rounded-lg border shrink-0", TONE_CLASS[tone])}>
-        <Icon className="w-5 h-5" aria-hidden="true" />
-      </span>
+      <CommandIconTile Icon={Icon} tone={tone} />
       <span className="min-w-0">
         <span className="block text-[22px] font-bold text-foreground leading-none">{value}</span>
         <span className="block text-[11.5px] text-muted-foreground mt-1 leading-tight">{label}</span>
@@ -196,16 +201,18 @@ function DepartmentColumn({ column, onSaveNote }: {
       <div className="mt-auto pt-3 border-t border-border flex items-center justify-between gap-2 flex-wrap">
         <span className="min-w-0">
           <span className="block text-[11.5px] text-muted-foreground">Estimated Cost</span>
-          <span className="block text-[13px] font-bold text-foreground leading-tight">{money(column.estimatedCost)}</span>
+          {/* Body weight, not the card-title token: this is a data value, and
+              text-[13px] font-bold is reserved for a card heading. */}
+          <span className="block text-[12.5px] font-bold text-foreground leading-tight">{money(column.estimatedCost)}</span>
         </span>
         {/* The three report destinations are in-app routes (useCommandCenter
             emits only /k208 and /vehicle-file), so they change the route rather
-            than reloading the SPA into a new tab. */}
+            than reloading the SPA into a new tab — and therefore wear no
+            ExternalLink; CommandAction adds that only for a real new tab. */}
         <CommandAction
           href={column.reportHref}
           capability={capabilityForHref(column.reportHref)}
-          disabledReason={column.reportHref ? null : "No report has been generated for this department yet."}
-          TrailingIcon={ExternalLink}>
+          disabledReason={column.reportHref ? null : "No report has been generated for this department yet."}>
           {REPORT_LABEL[column.key]}
         </CommandAction>
       </div>
@@ -223,30 +230,35 @@ function ChecklistRow({ label, checked, busy, onToggle }: {
 }) {
   const { describedBy, title, reasonNode } = useDisabledReason(busy ? "This checklist item is saving." : null);
   return (
-    <label
-      title={title}
-      className={cn(
-        "flex items-center gap-2.5 min-h-[44px] px-1 rounded-lg hover:bg-muted/40",
-        busy ? "cursor-progress" : "cursor-pointer",
-      )}>
-      <input
-        type="checkbox"
-        className="peer sr-only"
-        checked={checked}
-        aria-disabled={busy || undefined}
-        aria-describedby={describedBy}
-        onChange={(e) => { if (!busy) onToggle(e.target.checked); }} />
-      <span className={cn(
-        "grid place-items-center w-5 h-5 rounded border shrink-0 peer-focus-visible:ring-2 peer-focus-visible:ring-primary",
-        checked ? "bg-blue-600 border-blue-600 text-white" : "border-border bg-background text-transparent",
-      )}>
-        {busy
-          ? <Loader2 className={cn("w-3.5 h-3.5 animate-spin", checked ? "text-white" : "text-muted-foreground")} aria-hidden="true" />
-          : <CheckCircle2 className="w-3.5 h-3.5" aria-hidden="true" />}
-      </span>
-      <span className="text-[12.5px] text-foreground leading-tight">{label}</span>
+    // reasonNode sits OUTSIDE the label. Inside it, the sr-only sentence became
+    // part of the checkbox's accessible NAME as well as its description, so a
+    // screen reader read "…saving" twice on one control.
+    <div>
+      <label
+        title={title}
+        className={cn(
+          "flex items-center gap-2.5 min-h-[44px] px-1 rounded-lg hover:bg-muted/40",
+          busy ? "cursor-progress" : "cursor-pointer",
+        )}>
+        <input
+          type="checkbox"
+          className="peer sr-only"
+          checked={checked}
+          aria-disabled={busy || undefined}
+          aria-describedby={describedBy}
+          onChange={(e) => { if (!busy) onToggle(e.target.checked); }} />
+        <span className={cn(
+          "grid place-items-center w-5 h-5 rounded border shrink-0 peer-focus-visible:ring-2 peer-focus-visible:ring-primary",
+          checked ? cn(TONE_FILL.blue, "border-transparent text-white") : "border-border bg-background text-transparent",
+        )}>
+          {busy
+            ? <Loader2 className={cn("w-4 h-4 animate-spin", checked ? "text-white" : "text-muted-foreground")} aria-hidden="true" />
+            : <CheckCircle2 className="w-4 h-4" aria-hidden="true" />}
+        </span>
+        <span className="text-[12.5px] text-foreground leading-tight">{label}</span>
+      </label>
       {reasonNode}
-    </label>
+    </div>
   );
 }
 
@@ -288,7 +300,7 @@ export default function GetReadyCommand() {
     const res = await toggleChecklist(key, next);
     clear();
     setBusyKey(null);
-    if (!res.ok) toast.error(res.error || "The checklist could not be updated");
+    if (!res.ok) toast.error(res.error || "Checklist could not be updated");
   }, [toggleChecklist]);
 
   const onAuthorize = useCallback(async () => {
@@ -398,7 +410,7 @@ export default function GetReadyCommand() {
   if (!data) {
     return shell(
       <EmptyState Icon={Building2} title="Select a dealership to view this vehicle"
-        detail="Get Ready Command reads records for the dealership you are working in. Choose one to continue."
+        detail="The Get Ready Command reads records for the dealership you are working in. Choose one to continue."
         action={homeAction} />,
     );
   }
@@ -455,35 +467,36 @@ export default function GetReadyCommand() {
           onCopyVin={copyVin}
           facts={[{
             label: "Priority",
-            value: (
+            // No fallback string: the strip owns the null rule and renders the
+            // em dash. See the dead-branch note on PRIORITY_TONE above.
+            value: priority ? (
               <span className="inline-flex items-center gap-1.5">
-                <span className={cn("w-2 h-2 rounded-full", TONE_FILL[priority ? PRIORITY_TONE[priority] : "slate"])} aria-hidden="true" />
-                {priority ? priority.charAt(0).toUpperCase() + priority.slice(1) : "Not set"}
+                <span className={cn("w-2 h-2 rounded-full", TONE_FILL[PRIORITY_TONE[priority]])} aria-hidden="true" />
+                {priority.charAt(0).toUpperCase() + priority.slice(1)}
               </span>
-            ),
+            ) : null,
           }]}
-          footer={
-            <>
-              <p className="text-[11px] text-muted-foreground">Delivery Target</p>
-              <p className="text-[12.5px] font-medium text-foreground inline-flex items-center gap-1.5 mt-0.5">
-                <Calendar className="w-4 h-4 text-muted-foreground" aria-hidden="true" /> {delivery || "Not scheduled"}
-              </p>
-            </>
-          }
+          footer={{ label: "Delivery Target", Icon: Calendar, value: delivery }}
           action={
             <>
-              {/* The three command surfaces are one set. VIN Command Center has
-                  no nav row by §6, so its two siblings carry the door back to
-                  it — without this the set is one-way. */}
+              {/* The three command surfaces are one set, and each carries a door
+                  to both siblings — VIN Command Center has no nav row by §6, and
+                  Get Ready to Print for the same vehicle used to cost two hops
+                  through it. */}
               <CommandAction
-                Icon={Rocket}
+                Icon={Gauge}
                 capability="can_view_inventory"
                 href={`/vin-command/${vehicle.id}`}>
                 VIN Command Center
               </CommandAction>
               <CommandAction
+                Icon={Printer}
+                capability="can_view_print_queue"
+                href={`/print-center/${vehicle.id}`}>
+                Print Center
+              </CommandAction>
+              <CommandAction
                 capability="can_view_inventory"
-                TrailingIcon={ExternalLink}
                 href={`/vehicle-file/${vehicle.id}`}>
                 View Vehicle Details
               </CommandAction>
@@ -529,7 +542,9 @@ export default function GetReadyCommand() {
             </div>
           </CommandCard>
 
-          <div aria-busy={authorizing || undefined}>
+          {/* CommandAction publishes aria-busy and the live region itself, so
+              this is a layout wrapper only. */}
+          <div>
             <CommandAction
               variant="primary"
               Icon={Lock}

@@ -95,10 +95,24 @@ export interface TransitionArgs {
   action: DocumentAction;
   actorId?: string | null;
   reason?: string;
+  /**
+   * Optional compare-and-set. When set, the row is written only while it is
+   * still in this status, and the call reports `stale_status` instead if it has
+   * moved. Additive: a caller that omits it gets exactly the unconditional
+   * update it always got.
+   *
+   * Needed wherever a read is separated from its write by an unbounded human
+   * wait — the packet print sheet reads the documents, waits for an employee to
+   * confirm the paper, then stamps. A manager regenerating in the meantime
+   * supersedes the row (supersedePriorLive), and an unconditional write put the
+   * superseded version back to `printed`, where it re-entered the live package
+   * and competed with the new one.
+   */
+  expectedStatus?: DocumentStatus;
 }
 
 // Apply one lifecycle transition with the right side-effects + audit row.
-export async function transitionDocument({ doc, action, actorId, reason }: TransitionArgs): Promise<{ ok: boolean; error?: string }> {
+export async function transitionDocument({ doc, action, actorId, reason, expectedStatus }: TransitionArgs): Promise<{ ok: boolean; error?: string }> {
   const to = nextStatus[action];
   const now = new Date().toISOString();
   // deno-lint-ignore no-explicit-any
@@ -110,8 +124,16 @@ export async function transitionDocument({ doc, action, actorId, reason }: Trans
   if (action === "unpublish") patch.published_at = null;
 
   try {
-    const { error } = await sb().from("generated_documents").update(patch).eq("id", doc.id);
-    if (error) return { ok: false, error: error.message };
+    let q = sb().from("generated_documents").update(patch).eq("id", doc.id);
+    if (expectedStatus) {
+      q = q.eq("document_status", expectedStatus).select("id");
+      const { data, error } = await q;
+      if (error) return { ok: false, error: error.message };
+      if (!Array.isArray(data) || data.length === 0) return { ok: false, error: "stale_status" };
+    } else {
+      const { error } = await q;
+      if (error) return { ok: false, error: error.message };
+    }
     await logStickerAudit("document_status_change", {
       tenantId: doc.tenant_id, entityType: doc.document_type, entityId: doc.id,
       details: { action, from: doc.document_status, to, vehicle_id: doc.vehicle_id, version: doc.version, reason: reason || null },

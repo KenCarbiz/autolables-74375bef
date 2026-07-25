@@ -6,11 +6,11 @@ import {
 } from "lucide-react";
 import { useVinCommand, type PackageItem } from "@/hooks/useCommandCenter";
 import {
-  BTN_SECONDARY, capabilityDenialReason, capabilityForHref, CommandAction,
-  CommandCallout, CommandCapabilityProvider, CommandCard, CommandKebab, CommandMenu, CommandStatCard,
-  copyWithToast, DegradedNotice, EmptyState, ErrorCard, formatCommandDate, formatCommandDateTime,
-  formatCommandTime, LoadingCard, resolveCommandHref, StatusPill, TimelineRail, TONE_TEXT,
-  useCommandNavigate, VehicleIdentityStrip,
+  ACTION_GROUP, capabilityDenialReason, capabilityForHref, CommandAction,
+  CommandCallout, CommandCapabilityProvider, CommandCard, commandRowMenuItems, CommandKebab,
+  CommandMenu, CommandStatCard, copyWithToast, DegradedNotice, EmptyState, ErrorCard,
+  formatCommandDate, formatCommandDateTime, formatCommandTime, LoadingCard, StatusPill,
+  TimelineRail, TONE_TEXT, useCommandNavigate, VehicleIdentityStrip,
 } from "@/components/command/CommandPrimitives";
 import {
   Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle,
@@ -113,14 +113,13 @@ export default function VinCommandCenter() {
   // title-only headers in those states; this one now does too.
   const headerActions = (
     <>
-      <button
-        type="button"
-        onClick={() => setShowHowItWorks(true)}
-        aria-haspopup="dialog"
-        aria-expanded={showHowItWorks}
-        className={BTN_SECONDARY}>
-        <PlayCircle className="w-4 h-4" aria-hidden="true" /> How it works
-      </button>
+      <CommandAction
+        Icon={PlayCircle}
+        hasPopup="dialog"
+        expanded={showHowItWorks}
+        onClick={() => setShowHowItWorks(true)}>
+        How it works
+      </CommandAction>
       {/* The rail is capped at six entries, so this only has work to do when
           there are more than six; with fewer it says so instead of
           toggling nothing. */}
@@ -159,32 +158,45 @@ export default function VinCommandCenter() {
     </>
   );
 
+  // The title block is the same mobile-only convention the two siblings use, and
+  // the actions row is its own row rather than the title's flex partner — as a
+  // partner it rendered an empty `mb-4` strip on desktop in every state that has
+  // no actions. The AI-generated-content footer is NOT here: it describes the
+  // package table, and the shell also renders the denial card, the "pick a
+  // vehicle" card and the skeleton, none of which show generated content.
   const shell = (children: React.ReactNode, actions?: React.ReactNode) => (
     <CommandCapabilityProvider role={member?.role} isAdmin={isAdmin}>
       <div className="max-w-[1480px] mx-auto p-4 sm:p-6">
-        <div className="flex flex-wrap items-start justify-between gap-3 mb-4">
-          {/* AppShell renders the title in the desktop chrome, so the in-content
-              copy is mobile-only — same convention as DescriptionOperations. */}
-          <div className="min-w-0 lg:hidden">
-            <h1 className="font-display text-[26px] font-bold tracking-tight text-foreground leading-none">
-              VIN Command Center
-            </h1>
-            <p className="text-sm text-muted-foreground mt-1">
-              Everything created automatically. Review exceptions and authorize the next step.
-            </p>
-          </div>
-          {actions ? <div className="flex items-center gap-2 flex-wrap ml-auto">{actions}</div> : null}
+        <div className="min-w-0 lg:hidden mb-4">
+          <h1 className="font-display text-[26px] font-bold tracking-tight text-foreground leading-none">
+            VIN Command Center
+          </h1>
+          <p className="text-sm text-muted-foreground mt-1">
+            Everything created automatically. Review exceptions and authorize the next step.
+          </p>
         </div>
+        {actions ? <div className={cn(ACTION_GROUP, "justify-end mb-4")}>{actions}</div> : null}
         {children}
-        <p className="mt-4 flex items-center justify-center gap-1.5 text-[11.5px] text-muted-foreground">
-          <Lock className="w-4 h-4" aria-hidden="true" /> AI-generated content. Always review for accuracy.
-        </p>
       </div>
     </CommandCapabilityProvider>
   );
 
+  const contentFooter = (
+    <p className="mt-4 flex items-center justify-center gap-1.5 text-[11.5px] text-muted-foreground">
+      <Lock className="w-4 h-4" aria-hidden="true" /> AI-generated content. Always review for accuracy.
+    </p>
+  );
+
   // The skeleton mirrors the served layout at every breakpoint so the swap to
-  // real content never shifts the page.
+  // real content never shifts the page — including the header-actions row, which
+  // otherwise appeared with the data and pushed everything below it down.
+  const skeletonActions = (
+    <>
+      <div className="h-11 w-36 rounded-xl bg-muted animate-pulse" aria-hidden="true" />
+      <div className="h-11 w-28 rounded-xl bg-muted animate-pulse" aria-hidden="true" />
+    </>
+  );
+
   const skeleton = (
     <>
       <div className="mb-4"><LoadingCard rows={2} /></div>
@@ -239,7 +251,7 @@ export default function VinCommandCenter() {
   }
 
   if (entLoading) {
-    return shell(skeleton);
+    return shell(skeleton, skeletonActions);
   }
 
   if (!vehicleId) {
@@ -258,7 +270,7 @@ export default function VinCommandCenter() {
   }
 
   if (loading) {
-    return shell(skeleton);
+    return shell(skeleton, skeletonActions);
   }
 
   // A vehicle that is not in this tenant is its own state — never the red error card.
@@ -289,8 +301,11 @@ export default function VinCommandCenter() {
   const automationPct = counts.automationTotal > 0
     ? `${Math.round((counts.automationDone / counts.automationTotal) * 100)}%`
     : undefined;
-  // Produced-but-unfinished rows are the whole reason done < total. Naming them
-  // beside the percentage is what makes the muted checks in the table legible.
+  // RECORDED DEVIATION from §3, which specifies a bare "92%" here. Produced-but-
+  // unfinished rows are the whole reason done < total, and they are exactly what
+  // X1's third visual tier draws as a muted check; without this line the header
+  // reads "8 / 10 · 80%" over nine checks with nothing saying why. The deviation
+  // exists to disclose X1, and is dropped whenever produced === done.
   const automationSub = automationPct == null
     ? undefined
     : counts.automationProduced > counts.automationDone
@@ -311,8 +326,8 @@ export default function VinCommandCenter() {
           conditionLabel={vehicle.condition}
           meta={[{
             label: "Intake Completed",
-            value: intakeDate ?? "Not recorded",
-            sub: formatCommandTime(vehicle.intakeCompletedAt) ?? undefined,
+            value: intakeDate,
+            sub: formatCommandTime(vehicle.intakeCompletedAt),
           }]}
           onCopyVin={() => copyWithToast(vehicle.vin, "VIN")}
         />
@@ -360,66 +375,64 @@ export default function VinCommandCenter() {
           <CommandCard title="Automated Intake Package">
             {/* buildVinPackageItems emits a fixed 8 rows (10 for used), so there
                 is no empty case to render here. */}
-            <>
-                <div className="overflow-x-auto">
-                  <table className="w-full text-left border-collapse min-w-[720px]">
-                    <thead>
-                      <tr className="text-[11.5px] font-semibold text-muted-foreground border-b border-border">
-                        <th scope="col" className="px-3 py-2.5">Item</th>
-                        <th scope="col" className="px-3 py-2.5">Status</th>
-                        <th scope="col" className="px-3 py-2.5">Details</th>
-                        <th scope="col" className="px-3 py-2.5 text-right"><span className="sr-only">Actions</span></th>
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse min-w-[720px]">
+                <thead>
+                  <tr className="text-[11.5px] font-semibold text-muted-foreground border-b border-border">
+                    <th scope="col" className="px-3 py-2.5">Item</th>
+                    <th scope="col" className="px-3 py-2.5">Status</th>
+                    <th scope="col" className="px-3 py-2.5">Details</th>
+                    <th scope="col" className="px-3 py-2.5 text-right"><span className="sr-only">Actions</span></th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border">
+                  {items.map((item) => {
+                    const ItemIcon = isQrItem(item) ? QrCode : FileText;
+                    return (
+                      <tr key={item.key} className="hover:bg-primary/[0.025] transition-colors">
+                        <td className="px-3 py-3">
+                          <span className="inline-flex items-center gap-2 min-w-0">
+                            <ItemIcon className="w-4 h-4 text-muted-foreground shrink-0" aria-hidden="true" />
+                            <span className="text-[12.5px] font-semibold text-foreground">{item.label}</span>
+                          </span>
+                        </td>
+                        <td className="px-3 py-3">
+                          <StatusCell status={item.status} label={STATUS_LABEL[item.status] ?? item.status} />
+                        </td>
+                        <td className="px-3 py-3">
+                          <span className="text-[12.5px] text-muted-foreground">{item.detail}</span>
+                        </td>
+                        <td className="px-3 py-3 text-right">
+                          <span className="inline-flex items-center gap-1 justify-end">
+                            <CommandAction
+                              variant="link"
+                              href={item.href}
+                              capability={capabilityForHref(item.href)}
+                              disabledReason={item.href ? null : "There is nothing to open for this item yet."}>
+                              View
+                            </CommandAction>
+                            <CommandKebab
+                              label={`More actions for ${item.label}`}
+                              expanded={menu?.key === item.key}
+                              onOpen={(trigger) =>
+                                setMenu((m) => (m?.key === item.key ? null : { key: item.key, item, trigger }))
+                              }
+                            />
+                          </span>
+                        </td>
                       </tr>
-                    </thead>
-                    <tbody className="divide-y divide-border">
-                      {items.map((item) => {
-                        const ItemIcon = isQrItem(item) ? QrCode : FileText;
-                        return (
-                          <tr key={item.key} className="hover:bg-primary/[0.025] transition-colors">
-                            <td className="px-3 py-3">
-                              <span className="inline-flex items-center gap-2 min-w-0">
-                                <ItemIcon className="w-4 h-4 text-muted-foreground shrink-0" aria-hidden="true" />
-                                <span className="text-[12.5px] font-semibold text-foreground">{item.label}</span>
-                              </span>
-                            </td>
-                            <td className="px-3 py-3">
-                              <StatusCell status={item.status} label={STATUS_LABEL[item.status] ?? item.status} />
-                            </td>
-                            <td className="px-3 py-3">
-                              <span className="text-[12.5px] text-muted-foreground">{item.detail}</span>
-                            </td>
-                            <td className="px-3 py-3 text-right">
-                              <span className="inline-flex items-center gap-1 justify-end">
-                                <CommandAction
-                                  variant="link"
-                                  href={item.href}
-                                  capability={capabilityForHref(item.href)}
-                                  disabledReason={item.href ? null : "There is nothing to open for this item yet."}>
-                                  View
-                                </CommandAction>
-                                <CommandKebab
-                                  label={`More actions for ${item.label}`}
-                                  expanded={menu?.key === item.key}
-                                  onOpen={(trigger) =>
-                                    setMenu((m) => (m?.key === item.key ? null : { key: item.key, item, trigger }))
-                                  }
-                                />
-                              </span>
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-                <div className="mt-3">
-                  <CommandAction
-                    capability="can_view_print_queue"
-                    href={`/print-center/${vehicleId}`}>
-                    View Full Package
-                  </CommandAction>
-                </div>
-              </>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+            <div className="mt-3">
+              <CommandAction
+                capability="can_view_print_queue"
+                href={`/print-center/${vehicleId}`}>
+                View Full Package
+              </CommandAction>
+            </div>
           </CommandCard>
         </div>
 
@@ -482,20 +495,10 @@ export default function VinCommandCenter() {
           trigger={menu.trigger}
           label={`Actions for ${menu.item.label}`}
           onClose={() => setMenu(null)}
-          items={[
-            ...(menu.item.href
-              ? [
-                  { label: "Open", onSelect: () => go(menu.item.href as string) },
-                  {
-                    label: "Copy Link",
-                    onSelect: () => copyWithToast(resolveCommandHref(menu.item.href as string), "Link"),
-                  },
-                ]
-              : []),
-            { label: "Copy VIN", onSelect: () => copyWithToast(vehicle.vin, "VIN") },
-          ]}
+          items={commandRowMenuItems({ href: menu.item.href, vin: vehicle.vin, go })}
         />
       )}
+      {contentFooter}
     </>,
     headerActions,
   );

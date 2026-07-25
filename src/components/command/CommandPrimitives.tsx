@@ -4,7 +4,9 @@
 
 import * as React from "react";
 import { useNavigate } from "react-router-dom";
-import { AlertTriangle, ChevronRight, Copy, Loader2, MoreVertical, RefreshCw, type LucideIcon } from "lucide-react";
+import {
+  AlertTriangle, ChevronRight, Copy, ExternalLink, Loader2, MoreVertical, RefreshCw, type LucideIcon,
+} from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { TONE_CLASS, type Tone as DescriptionTone } from "@/lib/description/model";
@@ -59,6 +61,28 @@ export const BTN_SECONDARY = cn(BTN_BASE, "border border-border bg-card text-for
 // so a dead link never invents its own opacity.
 export const BTN_LINK =
   "inline-flex items-center justify-center gap-1.5 min-h-[44px] px-2 text-[12.5px] font-semibold text-blue-700 hover:underline aria-disabled:opacity-50 aria-disabled:no-underline";
+
+// One action-group recipe for every place these surfaces put buttons side by
+// side — card headers, the identity strip, empty states, page headers. It wraps:
+// two 44px buttons in a strip that could not wrap compressed below 375px, and
+// the pages had four spellings of this row, two of which wrapped.
+export const ACTION_GROUP = "flex flex-wrap items-center gap-2";
+
+// The em dash a LABELLED field shows when its value is missing. Exported so the
+// three pages spell "no value" the same way in the few places they format one
+// themselves (money, counts) as they do in the identity strip.
+export const EM_DASH = "—";
+
+/**
+ * The null-field rule, in the one place every labelled field passes through: the
+ * field always renders, and an absent value is an em dash. Callers hand over the
+ * value they have — or null — and cannot disagree about how "missing" is spelled.
+ * Four callers previously each supplied their own ("Not recorded", "Not set",
+ * "Not scheduled", "—") while the primitive documented this rule and obeyed it
+ * only for its own two fields.
+ */
+const fieldValue = (v: React.ReactNode | null | undefined): React.ReactNode =>
+  v === null || v === undefined || v === "" ? EM_DASH : v;
 
 // One vehicle-condition casing rule for every surface, so the same car cannot
 // read "Used" on one screen and "used" on the next.
@@ -182,10 +206,17 @@ export function useDisabledReason(reason?: string | null): DisabledReasonParts {
 // as text and wired to the control with aria-describedby.
 export function DisabledReason({
   reason,
+  busyLabel,
   className,
   children,
 }: {
   reason?: string | null;
+  /**
+   * Pass a string (empty when idle) for a control that can be busy — the live
+   * region is then always in the DOM, which is what lets a screen reader
+   * announce the change. Leave undefined for a control that never goes busy.
+   */
+  busyLabel?: string;
   className?: string;
   children: React.ReactNode;
 }) {
@@ -200,6 +231,9 @@ export function DisabledReason({
     <span title={title} className={cn("inline-flex", className)}>
       {described}
       {reasonNode}
+      {busyLabel !== undefined ? (
+        <span role="status" aria-live="polite" className="sr-only">{busyLabel}</span>
+      ) : null}
     </span>
   );
 }
@@ -293,6 +327,7 @@ export function CommandAction({
   TrailingIcon,
   busy,
   expanded,
+  hasPopup,
   className,
   wrapperClassName,
   children,
@@ -304,9 +339,11 @@ export function CommandAction({
   newTab?: boolean;
   variant?: "primary" | "secondary" | "link";
   Icon?: LucideIcon;
+  /** In-app affordance only. A control that opens a tab gets ExternalLink here automatically. */
   TrailingIcon?: LucideIcon;
   busy?: boolean;
   expanded?: boolean;
+  hasPopup?: "dialog" | "menu";
   className?: string;
   wrapperClassName?: string;
   children: React.ReactNode;
@@ -327,13 +364,6 @@ export function CommandAction({
 
   const base = variant === "primary" ? BTN_PRIMARY : variant === "link" ? BTN_LINK : BTN_SECONDARY;
   const cls = cn(base, blocked && "opacity-50 cursor-not-allowed", className);
-  const body = (
-    <>
-      {busy ? <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" /> : Icon ? <Icon className="w-4 h-4" aria-hidden="true" /> : null}
-      {children}
-      {TrailingIcon ? <TrailingIcon className="w-4 h-4" aria-hidden="true" /> : null}
-    </>
-  );
 
   // A destination is a real <a>, so it keeps link semantics (middle-click, copy
   // link address, status bar) — but an in-app route is intercepted and handed to
@@ -342,6 +372,20 @@ export function CommandAction({
   // changes the route in place.
   const external = safeHref ? opensExternally(safeHref) : false;
   const inNewTab = safeHref ? (HTTP_SCHEME.test(safeHref) || (!external && newTab === true)) : false;
+
+  // ExternalLink means exactly one thing on these surfaces: this control leaves
+  // the page for a new tab. It is derived from the destination rather than
+  // passed, so a caller cannot spend it on an in-app route — §4's column footers
+  // and "View Vehicle Details" wore it while changing the route in place, and
+  // §5's genuine new tab wore the same icon.
+  const Trailing = inNewTab ? ExternalLink : TrailingIcon;
+  const body = (
+    <>
+      {busy ? <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" /> : Icon ? <Icon className="w-4 h-4" aria-hidden="true" /> : null}
+      {children}
+      {Trailing ? <Trailing className="w-4 h-4" aria-hidden="true" /> : null}
+    </>
+  );
 
   // `aria-disabled` rather than `disabled`: a disabled button is not focusable,
   // and an unfocusable control cannot announce why it is dead.
@@ -364,7 +408,9 @@ export function CommandAction({
       <button
         type="button"
         aria-disabled={blocked || undefined}
+        aria-busy={busy || undefined}
         aria-expanded={expanded}
+        aria-haspopup={hasPopup}
         onClick={() => {
           if (blocked) return;
           if (safeHref) go(safeHref, newTab);
@@ -376,8 +422,14 @@ export function CommandAction({
       </button>
     );
 
+  // Any control that can run announces that it is running, on every surface. The
+  // sentence is the same one the disabled reason states, so the spinner, the
+  // tooltip and the announcement cannot describe three different things.
   return (
-    <DisabledReason reason={reason} className={wrapperClassName}>
+    <DisabledReason
+      reason={reason}
+      busyLabel={busy === undefined ? undefined : busy ? reason ?? "" : ""}
+      className={wrapperClassName}>
       {control}
     </DisabledReason>
   );
@@ -496,7 +548,78 @@ export function CommandKebab({
 export interface CommandMenuItem {
   label: string;
   onSelect: () => void;
+  /** Same gate a CommandAction takes, so a menu item and a row link agree. */
+  capability?: DealerCapability;
+  disabledReason?: string | null;
 }
+
+/**
+ * The row kebab both tables render, built here rather than per page. On the VIN
+ * table the same row gated "View" through `capabilityForHref` and left the
+ * kebab's "Open" live, so a service_manager saw a disabled link beside a menu
+ * item that navigated into a denial card. One builder means the two cannot
+ * disagree — the menu's Open resolves its capability from the same href the row
+ * link does, and an unfollowable href is refused with the same sentence.
+ */
+export function commandRowMenuItems({
+  href,
+  vin,
+  go,
+}: {
+  href?: string | null;
+  vin: string;
+  go: (href: string) => void;
+}): CommandMenuItem[] {
+  const given = (href ?? "").trim();
+  const safe = isSafeCommandHref(given) ? given : undefined;
+  return [
+    ...(given
+      ? [
+          {
+            label: "Open",
+            capability: safe ? capabilityForHref(safe) : undefined,
+            disabledReason: safe ? null : "This item's link is not a web address this app can open.",
+            onSelect: () => { if (safe) go(safe); },
+          },
+          {
+            label: "Copy Link",
+            disabledReason: safe ? null : "This item's link is not a web address this app can open.",
+            onSelect: () => { if (safe) void copyWithToast(resolveCommandHref(safe), "Link"); },
+          },
+        ]
+      : []),
+    { label: "Copy VIN", onSelect: () => { void copyWithToast(vin, "VIN"); } },
+  ];
+}
+
+// A blocked menu item stays a focusable menuitem — arrow navigation must still
+// reach it, and an unfocusable item cannot announce why it is dead. Same
+// aria-disabled + aria-describedby anatomy CommandAction uses.
+const MenuItemButton = React.forwardRef<
+  HTMLButtonElement,
+  { label: string; reason: string | null; onSelect: () => void }
+>(function MenuItemButton({ label, reason, onSelect }, ref) {
+  const { describedBy, title, reasonNode } = useDisabledReason(reason);
+  return (
+    <button
+      ref={ref}
+      type="button"
+      role="menuitem"
+      tabIndex={-1}
+      title={title}
+      aria-disabled={reason ? true : undefined}
+      aria-describedby={describedBy}
+      onClick={onSelect}
+      className={cn(
+        "w-full text-left min-h-[44px] px-3 rounded-lg text-[12.5px] font-medium text-foreground focus-visible:outline-none",
+        reason ? "opacity-50 cursor-not-allowed" : "hover:bg-muted/60 focus-visible:bg-muted/60",
+      )}
+    >
+      {label}
+      {reasonNode}
+    </button>
+  );
+});
 
 // The kebab menu for both tables. It implements the APG menu-button keyboard
 // model — focus moves in on open, arrows/Home/End move between items, Escape
@@ -513,6 +636,7 @@ export function CommandMenu({
   label: string;
   onClose: () => void;
 }) {
+  const can = React.useContext(CommandCapabilityContext);
   const ref = React.useRef<HTMLDivElement | null>(null);
   const itemRefs = React.useRef<(HTMLButtonElement | null)[]>([]);
   const [pos, setPos] = React.useState<{ top: number; left: number } | null>(null);
@@ -538,10 +662,26 @@ export function CommandMenu({
   // resize and overlay paths left focus on <body>, so the next Tab restarted at
   // the top of the document — the menu had already moved focus in on open.
   // preventScroll: the scroll path must not scroll the page back.
+  //
+  // A SELECTION, though, may take the trigger with it: an in-app "Open" changes
+  // the route and unmounts the row, and focusing a detached node silently drops
+  // focus on <body>. So the target is checked, and when it is gone focus goes to
+  // the app's scroll region — the new page — instead of nowhere.
+  const returnFocus = React.useCallback(() => {
+    if (trigger?.isConnected) {
+      trigger.focus({ preventScroll: true });
+      return;
+    }
+    const main = document.querySelector<HTMLElement>("main");
+    if (!main) return;
+    main.setAttribute("tabindex", "-1");
+    main.focus({ preventScroll: true });
+  }, [trigger]);
+
   const closeToTrigger = React.useCallback(() => {
-    trigger?.focus({ preventScroll: true });
+    returnFocus();
     onClose();
-  }, [trigger, onClose]);
+  }, [returnFocus, onClose]);
 
   React.useEffect(() => {
     window.addEventListener("scroll", closeToTrigger, true);
@@ -585,22 +725,27 @@ export function CommandMenu({
         style={{ top: pos?.top ?? 0, left: pos?.left ?? 0, visibility: pos ? "visible" : "hidden" }}
         className="fixed z-40 w-52 rounded-xl border border-border bg-card shadow-lg p-1"
       >
-        {items.map((item, i) => (
-          <button
-            key={item.label}
-            ref={(n) => { itemRefs.current[i] = n; }}
-            type="button"
-            role="menuitem"
-            tabIndex={-1}
-            onClick={() => {
-              item.onSelect();
-              closeToTrigger();
-            }}
-            className="w-full text-left min-h-[44px] px-3 rounded-lg text-[12.5px] font-medium text-foreground hover:bg-muted/60 focus-visible:bg-muted/60 focus-visible:outline-none"
-          >
-            {item.label}
-          </button>
-        ))}
+        {items.map((item, i) => {
+          const reason = item.capability && !can(item.capability)
+            ? capabilityDenialReason(item.capability)
+            : item.disabledReason ?? null;
+          return (
+            <MenuItemButton
+              key={item.label}
+              ref={(n) => { itemRefs.current[i] = n; }}
+              label={item.label}
+              reason={reason}
+              onSelect={() => {
+                if (reason) return;
+                item.onSelect();
+                onClose();
+                // The selection may have changed the route, so the focus target
+                // is only known after React commits it.
+                requestAnimationFrame(returnFocus);
+              }}
+            />
+          );
+        })}
       </div>
     </>
   );
@@ -626,6 +771,24 @@ export function StatusPill({
     >
       {Icon ? <Icon className="w-4 h-4 shrink-0" aria-hidden="true" /> : null}
       {children}
+    </span>
+  );
+}
+
+/* -------------------------------------------------------------- CommandIconTile */
+
+// The tinted 36px icon tile. Screen 2's summary rail re-implemented this
+// verbatim beside the stat card that owns it, so the same tile could drift into
+// two sizes and two border treatments.
+export function CommandIconTile({ Icon, tone }: { Icon: LucideIcon; tone: Tone }) {
+  return (
+    <span
+      className={cn(
+        "inline-flex items-center justify-center rounded-lg border w-9 h-9 shrink-0",
+        TONE_CLASS[tone],
+      )}
+    >
+      <Icon className="w-5 h-5" aria-hidden="true" />
     </span>
   );
 }
@@ -660,7 +823,7 @@ export function CommandCard({
               {subtitle ? <p className="text-[11.5px] text-muted-foreground mt-0.5">{subtitle}</p> : null}
             </div>
           </div>
-          {action ? <div className="shrink-0 flex items-center gap-2">{action}</div> : null}
+          {action ? <div className={cn("shrink-0", ACTION_GROUP)}>{action}</div> : null}
         </div>
       ) : null}
       {children}
@@ -690,16 +853,7 @@ export function CommandStatCard({
   const interactive = typeof onClick === "function";
   const Tag = (interactive ? "button" : "div") as React.ElementType;
 
-  const iconTile = (
-    <span
-      className={cn(
-        "inline-flex items-center justify-center rounded-lg border w-9 h-9 shrink-0",
-        TONE_CLASS[tone],
-      )}
-    >
-      <Icon className="w-5 h-5" aria-hidden="true" />
-    </span>
-  );
+  const iconTile = <CommandIconTile Icon={Icon} tone={tone} />;
 
   return (
     <Tag
@@ -870,22 +1024,24 @@ export function VehicleIdentityStrip({
    * When set, the identity facts render as a labeled grid — VIN, Stock #, then
    * these — instead of the inline row. Screen 2's 3-up meta.
    */
-  facts?: { label: string; value: React.ReactNode }[];
-  /** Block beneath the identity facts, above the fold of the card. */
-  footer?: React.ReactNode;
-  meta?: { label: string; value: string; sub?: string }[];
+  facts?: { label: string; value: React.ReactNode | null }[];
+  /** Labelled field beneath the identity facts. Screen 2's Delivery Target. */
+  footer?: { label: string; Icon?: LucideIcon; value: React.ReactNode | null };
+  meta?: { label: string; value: React.ReactNode | null; sub?: string | null }[];
   action?: React.ReactNode;
   onCopyVin?: () => void;
 }) {
   // Callers pass the raw vehicle_listings.condition, so normalize here rather
   // than trusting each page to remember.
   //
-  // Null-field rule, one for both branches: a LABELLED field always renders and
-  // shows an em dash when empty (the field exists, its value is missing); an
-  // UNLABELLED field — the trim beside or under the ymm, the condition pill — is
-  // omitted when empty, because there is nothing to say it is missing FROM. The
-  // two branches used to disagree on both.
+  // Null-field rule, applied HERE for every labelled field the callers pass —
+  // meta, facts and the footer, not just VIN and Stock #: a LABELLED field
+  // always renders and shows an em dash when empty (the field exists, its value
+  // is missing); an UNLABELLED field — the trim beside or under the ymm, the
+  // condition pill — is omitted when empty, because there is nothing to say it
+  // is missing FROM. Callers pass values or null and never a fallback string.
   const condition = conditionLabel(conditionRaw);
+  const FooterIcon = footer?.Icon;
   const copyVinButton = onCopyVin ? (
     <button
       type="button"
@@ -935,12 +1091,12 @@ export function VehicleIdentityStrip({
               </div>
               <div className="min-w-0">
                 <p className="text-[11px] text-muted-foreground">Stock #</p>
-                <p className="text-[12.5px] font-medium text-foreground truncate">{stockNumber || "—"}</p>
+                <p className="text-[12.5px] font-medium text-foreground truncate">{fieldValue(stockNumber)}</p>
               </div>
               {facts.map((f) => (
                 <div key={f.label} className="min-w-0">
                   <p className="text-[11px] text-muted-foreground">{f.label}</p>
-                  <p className="text-[12.5px] font-medium text-foreground">{f.value}</p>
+                  <p className="text-[12.5px] font-medium text-foreground">{fieldValue(f.value)}</p>
                 </div>
               ))}
             </div>
@@ -948,7 +1104,7 @@ export function VehicleIdentityStrip({
             <div className="flex flex-wrap items-center gap-x-5 gap-y-1.5 mt-2">
               <span className="text-[12.5px] whitespace-nowrap">
                 <span className="text-muted-foreground">Stock #</span>{" "}
-                <span className="font-semibold text-foreground">{stockNumber || "—"}</span>
+                <span className="font-semibold text-foreground">{fieldValue(stockNumber)}</span>
               </span>
               <span className="text-[12.5px] flex items-center gap-1 min-w-0">
                 <span className="text-muted-foreground">VIN</span>{" "}
@@ -959,7 +1115,15 @@ export function VehicleIdentityStrip({
             </div>
           )}
 
-          {footer ? <div className="mt-3 pt-3 border-t border-border">{footer}</div> : null}
+          {footer ? (
+            <div className="mt-3 pt-3 border-t border-border">
+              <p className="text-[11px] text-muted-foreground">{footer.label}</p>
+              <p className="text-[12.5px] font-medium text-foreground inline-flex items-center gap-1.5 mt-0.5">
+                {FooterIcon ? <FooterIcon className="w-4 h-4 text-muted-foreground" aria-hidden="true" /> : null}
+                {fieldValue(footer.value)}
+              </p>
+            </div>
+          ) : null}
         </div>
 
         {meta && meta.length > 0 ? (
@@ -967,14 +1131,14 @@ export function VehicleIdentityStrip({
             {meta.map((m) => (
               <div key={m.label}>
                 <div className="text-[11px] text-muted-foreground">{m.label}</div>
-                <div className="text-[12.5px] font-semibold text-foreground">{m.value}</div>
+                <div className="text-[12.5px] font-semibold text-foreground">{fieldValue(m.value)}</div>
                 {m.sub ? <div className="text-[11px] text-muted-foreground">{m.sub}</div> : null}
               </div>
             ))}
           </div>
         ) : null}
 
-        {action ? <div className="shrink-0 flex items-center gap-2">{action}</div> : null}
+        {action ? <div className={cn("shrink-0", ACTION_GROUP)}>{action}</div> : null}
       </div>
     </section>
   );
@@ -1002,7 +1166,7 @@ export function EmptyState({
           h1 -> h3 jump is a heading-order violation. */}
       <h2 className="text-[13px] font-bold text-foreground mt-1">{title}</h2>
       {detail ? <p className="text-[11.5px] text-muted-foreground max-w-sm">{detail}</p> : null}
-      {action ? <div className="mt-2 flex flex-wrap items-center justify-center gap-2">{action}</div> : null}
+      {action ? <div className={cn("mt-2 justify-center", ACTION_GROUP)}>{action}</div> : null}
     </div>
   );
 }

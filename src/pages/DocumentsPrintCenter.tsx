@@ -1,8 +1,8 @@
 import { useState } from "react";
 import { useParams } from "react-router-dom";
 import {
-  AlertTriangle, ArrowRight, Building2, Car, ExternalLink, FileCheck, FileLock, FileSearch,
-  FileText, FileX, KeyRound, Layers, Lock, Package, Printer, QrCode, Rocket, Tag,
+  AlertTriangle, ArrowRight, Building2, Car, FileCheck, FileLock, FileSearch,
+  FileText, FileX, Gauge, KeyRound, Layers, Lock, Package, Printer, QrCode, Rocket, Tag,
 } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
@@ -11,8 +11,8 @@ import { dealerRoleHome, hasDealerCapability } from "@/lib/permissions/dealerRol
 import { usePrintCenter, type DocRow } from "@/hooks/useCommandCenter";
 import {
   capabilityDenialReason, CommandAction, CommandCallout,
-  CommandCapabilityProvider, CommandCard, CommandKebab, CommandMenu, CommandStatCard, copyWithToast,
-  DegradedNotice, EmptyState, ErrorCard, LoadingCard, resolveCommandHref, StatusPill,
+  CommandCapabilityProvider, CommandCard, CommandKebab, CommandMenu, commandRowMenuItems,
+  CommandStatCard, copyWithToast, DegradedNotice, EmptyState, ErrorCard, LoadingCard, StatusPill,
   useCommandNavigate, VehicleIdentityStrip,
 } from "@/components/command/CommandPrimitives";
 
@@ -136,7 +136,7 @@ export default function DocumentsPrintCenter() {
     return shell(
       <EmptyState
         Icon={Lock}
-        title="You do not have access to the Documents and Print Center"
+        title="You do not have access to the Documents & Print Center"
         detail={capabilityDenialReason("can_view_print_queue")}
         action={homeAction}
       />,
@@ -181,7 +181,7 @@ export default function DocumentsPrintCenter() {
       <EmptyState
         Icon={Building2}
         title="Select a dealership to view this vehicle"
-        detail="The Documents and Print Center reads records for the dealership you are working in. Choose one to continue."
+        detail="The Documents & Print Center reads records for the dealership you are working in. Choose one to continue."
         action={homeAction}
       />,
     );
@@ -226,18 +226,28 @@ export default function DocumentsPrintCenter() {
           conditionLabel={vehicle.condition}
           meta={[{
             label: "Mileage",
-            value: vehicle.mileage != null ? `${vehicle.mileage.toLocaleString()} mi` : "—",
+            value: vehicle.mileage != null ? `${vehicle.mileage.toLocaleString()} mi` : null,
           }]}
           onCopyVin={() => copyWithToast(vehicle.vin, "VIN")}
           action={
-            /* The VIN Command Center has no nav row by §6, so its two siblings
-               carry the door back to it. */
-            <CommandAction
-              Icon={Rocket}
-              capability="can_view_inventory"
-              href={`/vin-command/${vehicle.id}`}>
-              VIN Command Center
-            </CommandAction>
+            /* The three command surfaces are one set, and each carries a door
+               to both siblings — VIN Command Center has no nav row by §6, and
+               Print to Get Ready for the same vehicle used to cost two hops
+               through it. */
+            <>
+              <CommandAction
+                Icon={Gauge}
+                capability="can_view_inventory"
+                href={`/vin-command/${vehicle.id}`}>
+                VIN Command Center
+              </CommandAction>
+              <CommandAction
+                Icon={Rocket}
+                capability="can_view_get_ready"
+                href={`/get-ready-command/${vehicle.id}`}>
+                Get Ready Command
+              </CommandAction>
+            </>
           }
         />
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
@@ -249,15 +259,16 @@ export default function DocumentsPrintCenter() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_320px] gap-4 items-start">
-        {/* Documents table */}
-        <CommandCard title="Documents">
-          {docCount === 0 ? (
-            <EmptyState
-              Icon={FileText}
-              title="No documents have been generated yet"
-              detail="Window stickers, addendums, guides, and QR items appear here as they are generated for this vehicle."
-            />
-          ) : (
+        {/* Documents table. With no rows the EmptyState IS the card — nested
+            inside CommandCard it drew a bordered card inside a bordered card. */}
+        {docCount === 0 ? (
+          <EmptyState
+            Icon={FileText}
+            title="No documents have been generated yet"
+            detail="Window stickers, addendums, guides, and QR items appear here as they are generated for this vehicle."
+          />
+        ) : (
+          <CommandCard title="Documents">
             <>
               <div className="overflow-x-auto">
                 <table className="w-full text-left border-collapse min-w-[860px]">
@@ -321,8 +332,8 @@ export default function DocumentsPrintCenter() {
                 Showing 1 to {docCount} of {docCount} documents
               </p>
             </>
-          )}
-        </CommandCard>
+          </CommandCard>
+        )}
 
         {/* Right rail */}
         <div className="w-full min-w-0 lg:w-[320px] space-y-4">
@@ -362,11 +373,9 @@ export default function DocumentsPrintCenter() {
               </CommandCallout>
             )}
 
-            <div className="mt-3 space-y-2" aria-busy={busy !== null || undefined}>
-              <p role="status" className="sr-only">
-                {busy === "packet" ? "Releasing the complete vehicle packet."
-                  : busy === "stock" ? "Queueing the stock label." : ""}
-              </p>
+            {/* CommandAction publishes aria-busy and its own live region, and
+                announces the same sentence it states as the disabled reason. */}
+            <div className="mt-3 space-y-2">
               <CommandAction
                 variant="primary"
                 capability="can_print"
@@ -414,7 +423,6 @@ export default function DocumentsPrintCenter() {
                 newTab
                 href={passportHref ?? undefined}
                 disabledReason={passportHref ? null : "This vehicle has no published Passport yet."}
-                TrailingIcon={ExternalLink}
                 className="w-full"
                 wrapperClassName="flex w-full">
                 Open Passport View
@@ -429,18 +437,7 @@ export default function DocumentsPrintCenter() {
           trigger={menu.trigger}
           label={`Actions for ${menu.row.label}`}
           onClose={() => setMenu(null)}
-          items={[
-            ...(menu.row.href
-              ? [
-                  { label: "Open", onSelect: () => go(menu.row.href as string) },
-                  {
-                    label: "Copy Link",
-                    onSelect: () => copyWithToast(resolveCommandHref(menu.row.href as string), "Link"),
-                  },
-                ]
-              : []),
-            { label: "Copy VIN", onSelect: () => copyWithToast(vehicle.vin, "VIN") },
-          ]}
+          items={commandRowMenuItems({ href: menu.row.href, vin: vehicle.vin, go })}
         />
       )}
     </>,

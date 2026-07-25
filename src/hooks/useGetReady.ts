@@ -127,6 +127,13 @@ export interface GetReadyVendor {
 // authorizeAndDispatch emailed that address — displayed 0, emailed 1, and the
 // authorization is one-shot so it could never be re-sent.
 //
+// The display name given to a vendor the record identifies only by email —
+// StartGetReadyModal collects no vendorName for accessories or services. Named
+// here rather than spelled as a literal on each side, because the command
+// surface has to know that this string is a placeholder and not a company
+// anyone can be matched by.
+export const VENDOR_PLACEHOLDER_NAME = "Vendor";
+
 // One key (email, else name, else the row itself, so two unassigned lines are
 // not silently merged) and one membership test, narrowed by name at the call
 // site: dispatch takes `.pending` lines that carry an email.
@@ -144,7 +151,7 @@ export function vendorsFor(items: GetReadyItem[]): GetReadyVendor[] {
       if (!existing.email && email) existing.email = email;
       continue;
     }
-    out.set(key, { name: name || "Vendor", category: i.category, email: email || null, pending });
+    out.set(key, { name: name || VENDOR_PLACEHOLDER_NAME, category: i.category, email: email || null, pending });
   }
   return Array.from(out.values());
 }
