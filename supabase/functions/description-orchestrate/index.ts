@@ -444,30 +444,35 @@ serve(async (req) => {
 
     // Interactive callers must be an accepted member of the tenant.
     let callerTenants: string[] | null = null;
+    const callerRoles = new Map<string, string>();
     if (!isService && !isCron) {
       if (!jwt) return json({ error: "missing bearer token" }, 401);
       const { data: userRes, error } = await admin.auth.getUser(jwt);
       if (error || !userRes?.user) return json({ error: "invalid token" }, 401);
       const { data: mems } = await admin.from("tenant_members")
-        .select("tenant_id").eq("user_id", userRes.user.id).not("accepted_at", "is", null);
+        .select("tenant_id, role").eq("user_id", userRes.user.id).not("accepted_at", "is", null);
       callerTenants = (mems || []).map((m: any) => m.tenant_id);
+      for (const m of mems || []) callerRoles.set(m.tenant_id, String(m.role || ""));
       if (!callerTenants.length) return json({ error: "no tenant membership" }, 403);
     }
     const allowed = (t: string) => !callerTenants || callerTenants.includes(t);
     // Generation spends provider credits, so an interactive caller needs the
     // same authority the UI claims to require — membership alone is not enough.
-    const authorized = async (t: string) => {
-      if (!callerTenants) return true;
-      const { data } = await admin.rpc("has_description_authority", { p_tenant_id: t, p_level: "approve" });
-      return data === true;
-    };
+    // The role is read from the membership row we already loaded: calling the
+    // SQL helper over the service-role client would evaluate auth.uid() as
+    // NULL and deny everyone.
+    const APPROVER_ROLES = new Set([
+      "owner", "general_manager", "gsm", "admin", "manager",
+      "sales_manager", "used_car_manager", "inventory_manager", "service_manager",
+    ]);
+    const authorized = (t: string) => !callerTenants || APPROVER_ROLES.has(callerRoles.get(t) || "");
 
     if (action === "orchestrate" || action === "regenerate") {
       const tenantId = String(body.tenant_id || "");
       const vehicleId = String(body.vehicle_id || "");
       if (!tenantId || !vehicleId) return json({ error: "tenant_id and vehicle_id required" }, 400);
       if (!allowed(tenantId)) return json({ error: "forbidden" }, 403);
-      if (action === "regenerate" && !(await authorized(tenantId))) {
+      if (action === "regenerate" && !authorized(tenantId)) {
         return json({ error: "insufficient_permission" }, 403);
       }
       const result: Record<string, unknown> = await orchestrateVehicle(admin, tenantId, vehicleId, {
@@ -529,7 +534,7 @@ serve(async (req) => {
       const reqTenant = body.tenant_id ? String(body.tenant_id) : null;
       if (!isService && !isCron) {
         if (!reqTenant || !allowed(reqTenant)) return json({ error: "forbidden" }, 403);
-        if (!(await authorized(reqTenant))) return json({ error: "insufficient_permission" }, 403);
+        if (!authorized(reqTenant)) return json({ error: "insufficient_permission" }, 403);
       }
       const tenantId = reqTenant;
       const limit = Math.min(Number(body.limit) || 25, 12); // each vehicle is up to 8 sequential LLM calls

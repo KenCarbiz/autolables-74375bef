@@ -72,7 +72,7 @@ export default function DescriptionOperations() {
   const [page, setPage] = useState(0);
   const [pageSize, setPageSize] = useState(25);
   const [syncing, setSyncing] = useState(false);
-  const [menuFor, setMenuFor] = useState<string | null>(null);
+  const [menu, setMenu] = useState<{ id: string; x: number; y: number; caseRow: any } | null>(null);
 
   const runReconcile = async () => {
     setSyncing(true);
@@ -374,28 +374,15 @@ export default function DescriptionOperations() {
                             {c.open_exception_count > 0 ? "Review Issue" : "Open Record"}
                           </button>
                           <button aria-label={`More actions for ${v.ymm || c.vin}`}
-                            onClick={() => setMenuFor(menuFor === c.id ? null : c.id)}
+                            aria-haspopup="menu" aria-expanded={menu?.id === c.id}
+                            onClick={(e) => {
+                              const r = (e.currentTarget as HTMLElement).getBoundingClientRect();
+                              setMenu(menu?.id === c.id ? null : { id: c.id, x: r.right, y: r.bottom, caseRow: c });
+                            }}
                             className="w-11 h-11 grid place-items-center rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted/50">
                             <MoreVertical className="w-4 h-4" />
                           </button>
                           </span>
-                          {menuFor === c.id && (
-                            <div className="relative">
-                              <div className="absolute right-0 z-20 mt-1 w-52 rounded-xl border border-border bg-card shadow-lg p-1 text-left">
-                                {[["Open record", () => navigate(`/description-intelligence/${c.vehicle_id}`)],
-                                  ["Open vehicle file", () => navigate(`/vehicle-file/${c.vehicle_id}`)],
-                                  ["Copy VIN", () => { navigator.clipboard.writeText(c.vin).then(
-                                      () => toast.success("VIN copied"), () => toast.error("Clipboard unavailable")); }],
-                                 ].map(([label, fn]) => (
-                                  <button key={label as string}
-                                    onClick={() => { (fn as () => void)(); setMenuFor(null); }}
-                                    className="w-full text-left min-h-[44px] px-3 rounded-lg text-[12.5px] font-medium text-foreground hover:bg-muted/60">
-                                    {label as string}
-                                  </button>
-                                ))}
-                              </div>
-                            </div>
-                          )}
                         </td>
                       </tr>
                     );
@@ -443,6 +430,26 @@ export default function DescriptionOperations() {
           </>
         )}
       </div>
+
+      {menu && (
+        <>
+          <div className="fixed inset-0 z-30" onClick={() => setMenu(null)} aria-hidden />
+          <div role="menu" style={{ top: menu.y + 4, left: Math.max(8, menu.x - 208) }}
+            className="fixed z-40 w-52 rounded-xl border border-border bg-card shadow-lg p-1">
+            {[["Open Record", () => navigate(`/description-intelligence/${menu.caseRow.vehicle_id}`)],
+              ["Open Vehicle File", () => navigate(`/vehicle-file/${menu.caseRow.vehicle_id}`)],
+              ["Copy VIN", () => navigator.clipboard.writeText(menu.caseRow.vin)
+                .then(() => toast.success("VIN copied"), () => toast.error("Clipboard unavailable"))],
+            ].map(([label, fn]) => (
+              <button key={label as string} role="menuitem"
+                onClick={() => { (fn as () => void)(); setMenu(null); }}
+                className="w-full text-left min-h-[44px] px-3 rounded-lg text-[12.5px] font-medium text-foreground hover:bg-muted/60">
+                {label as string}
+              </button>
+            ))}
+          </div>
+        </>
+      )}
 
       <p className="text-[11.5px] text-muted-foreground mt-3 inline-flex items-center gap-1.5">
         <Sparkles className="w-3.5 h-3.5 text-violet-500" />
