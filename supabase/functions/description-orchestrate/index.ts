@@ -110,7 +110,20 @@ async function setCase(admin: any, caseId: string, patch: Record<string, unknown
     const { data: cur } = await admin.from("description_cases").select("lock_version").eq("id", caseId).maybeSingle();
     patch = { ...patch, lock_version: (cur?.lock_version ?? 0) + 1 };
   }
-  await admin.from("description_cases").update({ ...patch, updated_at: new Date().toISOString() }).eq("id", caseId);
+  const { error } = await admin.from("description_cases")
+    .update({ ...patch, updated_at: new Date().toISOString() }).eq("id", caseId);
+  if (error) {
+    console.error("setCase rejected", caseId, Object.keys(patch).join(","), error.message);
+    // Retry without the status so the rest of the patch (version pointer,
+    // processed fingerprint, scores) is never lost to a transition guard.
+    if ("status" in patch) {
+      const { status: _drop, ...rest } = patch as Record<string, unknown>;
+      if (Object.keys(rest).length) {
+        await admin.from("description_cases")
+          .update({ ...rest, updated_at: new Date().toISOString() }).eq("id", caseId);
+      }
+    }
+  }
 }
 
 // ── The pipeline for a single vehicle ────────────────────────────────
@@ -148,11 +161,13 @@ async function orchestrateVehicle(
     return { vehicle_id: vehicleId, case_id: caseId, skipped: "unchanged", source_data_version: sdv };
   }
 
-  const jobKey = `${tenantId}:${vehicleId}:${sdv}:${configVersion}:full_generation`;
+  const scopedRun = Array.isArray(opts.channels) && opts.channels.length > 0;
+  const jobKey = `${tenantId}:${vehicleId}:${sdv}:${configVersion}:${scopedRun ? "channels:" + [...opts.channels!].sort().join("+") : "full_generation"}`;
   const { data: jobId } = await admin.rpc("claim_description_job", {
     p_tenant_id: tenantId, p_vehicle_id: vehicleId, p_case_id: caseId,
     p_job_type: "full_generation", p_idempotency_key: jobKey,
     p_payload: { reason: opts.reason || "ingest" },
+    p_allow_completed: !!opts.force,
   });
   if (!jobId) return { vehicle_id: vehicleId, case_id: caseId, skipped: "already_claimed" };
 
@@ -227,6 +242,9 @@ async function orchestrateVehicle(
       prompt_version: settings.prompt_version, configuration_version: configVersion,
       source_data_version: sdv, created_by_type: "automation",
     }).select("*").single();
+    if (!version?.id) {
+      throw Object.assign(new Error("version_insert_failed"), { code: "DB_CONFLICT" });
+    }
 
     // 3 ── validate master
     await setCase(admin, caseId, { status: "VALIDATING" });
@@ -337,7 +355,10 @@ async function orchestrateVehicle(
     }
 
     await setCase(admin, caseId, {
-      status: finalStatus, current_master_version_id: version.id,
+      status: finalStatus,
+      // a manually locked master stays the current version; automation may
+      // produce a newer one but must not silently take its place
+      ...(existing?.master_locked ? {} : { current_master_version_id: version.id }),
       processed_source_data_version: sdv, publication_eligibility: eligibility,
       fact_confidence: snap.fact_confidence, quality_score: quality,
       potentially_stale: false, last_orchestrated_at: new Date().toISOString(),
@@ -399,7 +420,7 @@ async function orchestrateVehicle(
     };
   } catch (e) {
     const err = e as Error & { code?: string };
-    const retryable = err.code === "RATE_LIMIT" || err.code === "PROVIDER_ERROR" || !err.code;
+    const retryable = err.code === "RATE_LIMIT" || err.code === "PROVIDER_ERROR" || err.code === "DB_CONFLICT" || !err.code;
     // INVALID_INPUT is deterministic — retrying only wastes the attempt budget.
     await failJob(err.code || "UNKNOWN", err.message || "unknown error", retryable);
     return { vehicle_id: vehicleId, case_id: caseId, error: err.code || "UNKNOWN", retryable };
@@ -433,12 +454,22 @@ serve(async (req) => {
       if (!callerTenants.length) return json({ error: "no tenant membership" }, 403);
     }
     const allowed = (t: string) => !callerTenants || callerTenants.includes(t);
+    // Generation spends provider credits, so an interactive caller needs the
+    // same authority the UI claims to require — membership alone is not enough.
+    const authorized = async (t: string) => {
+      if (!callerTenants) return true;
+      const { data } = await admin.rpc("has_description_authority", { p_tenant_id: t, p_level: "approve" });
+      return data === true;
+    };
 
     if (action === "orchestrate" || action === "regenerate") {
       const tenantId = String(body.tenant_id || "");
       const vehicleId = String(body.vehicle_id || "");
       if (!tenantId || !vehicleId) return json({ error: "tenant_id and vehicle_id required" }, 400);
       if (!allowed(tenantId)) return json({ error: "forbidden" }, 403);
+      if (action === "regenerate" && !(await authorized(tenantId))) {
+        return json({ error: "insufficient_permission" }, 403);
+      }
       const result: Record<string, unknown> = await orchestrateVehicle(admin, tenantId, vehicleId, {
         force: action === "regenerate" || !!body.force,
         reason: action === "regenerate" ? "manual_regenerate" : String(body.reason || "ingest"),
@@ -468,8 +499,9 @@ serve(async (req) => {
 
       const f = validateContent(ver.content, snap, settings);
       const q = qualityScore(ver.content, snap, settings);
+      // master-scoped only; channel findings belong to their channel rows
       await admin.from("description_validation_results")
-        .delete().eq("version_id", versionId);
+        .delete().eq("version_id", versionId).is("channel_version_id", null);
       if (f.length) {
         await admin.from("description_validation_results").insert(f.map((x) => ({
           tenant_id: tenantId, description_case_id: ver.description_case_id, version_id: versionId,
@@ -497,9 +529,10 @@ serve(async (req) => {
       const reqTenant = body.tenant_id ? String(body.tenant_id) : null;
       if (!isService && !isCron) {
         if (!reqTenant || !allowed(reqTenant)) return json({ error: "forbidden" }, 403);
+        if (!(await authorized(reqTenant))) return json({ error: "insufficient_permission" }, 403);
       }
       const tenantId = reqTenant;
-      const limit = Math.min(Number(body.limit) || 25, 100);
+      const limit = Math.min(Number(body.limit) || 25, 12); // each vehicle is up to 8 sequential LLM calls
       const { data: batch } = await admin.rpc("next_description_reconcile_batch", {
         p_tenant_id: tenantId, p_limit: limit,
       });

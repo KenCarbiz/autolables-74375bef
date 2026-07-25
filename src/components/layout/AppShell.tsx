@@ -199,8 +199,11 @@ const AppShell = ({ children }: AppShellProps) => {
     "/description-studio": { title: "Manual Description", subtitle: "Authorized override for vehicles outside automatic generation." },
     "/description-writer": { title: "Description Operations", subtitle: "Automated merchandising intelligence across every vehicle." },
     "/description-operations": { title: "Description Operations", subtitle: "Automated merchandising intelligence across every vehicle." },
+    "/description-intelligence": { title: "Description Intelligence", subtitle: "Verified merchandising content for one vehicle." },
   };
-  const pageMeta = pageTitles[location.pathname] || { title: activeItem?.label || "Dashboard", subtitle: "AutoLabels admin workspace." };
+  const prefixMeta = Object.entries(pageTitles).find(([k]) => k !== "/" && location.pathname.startsWith(k + "/"))?.[1];
+  const pageMeta = pageTitles[location.pathname] || prefixMeta
+    || { title: activeItem?.label || "Dashboard", subtitle: "AutoLabels admin workspace." };
   const companyName = currentStore?.name || tenant?.name || (settings.dealer_name && settings.dealer_name !== "Your Dealership" ? settings.dealer_name : "Select store");
   const dealerLocation = [currentStore?.city || (settings as any)?.dealer_city, currentStore?.state || (settings as any)?.dealer_state].filter(Boolean).join(", ") || "Manchester, CT";
   const unreadAudit = entries.filter((entry) => entry.action === "compliance_block" || entry.action === "price_integrity_block").length;

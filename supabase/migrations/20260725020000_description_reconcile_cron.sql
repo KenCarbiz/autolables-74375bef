@@ -226,3 +226,268 @@ BEGIN
   END IF;
   RETURN NEW;
 END $$;
+
+-- ─────────────────────────────────────────────────────────────────────
+-- Critical fixes found in adversarial re-review.
+-- ─────────────────────────────────────────────────────────────────────
+
+-- C-1: after any completed run the job row was 'succeeded', so a later
+-- regenerate could never re-claim it and returned "already_claimed". A
+-- resolved conflict therefore never regenerated and the vehicle stayed
+-- blocked forever. Allow an explicit, human-initiated run to re-claim a
+-- finished job; automated ingest still gets exactly-once behaviour.
+CREATE OR REPLACE FUNCTION public.claim_description_job(
+  p_tenant_id uuid, p_vehicle_id uuid, p_case_id uuid,
+  p_job_type text, p_idempotency_key text, p_payload jsonb DEFAULT '{}'::jsonb,
+  p_allow_completed boolean DEFAULT false)
+RETURNS uuid
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = public
+AS $$
+DECLARE v_id uuid;
+BEGIN
+  INSERT INTO public.description_jobs
+    (tenant_id, vehicle_id, description_case_id, job_type, idempotency_key, payload_json,
+     status, attempt_count, started_at)
+  VALUES (p_tenant_id, p_vehicle_id, p_case_id, p_job_type, p_idempotency_key, p_payload,
+     'running', 1, now())
+  ON CONFLICT (idempotency_key) DO NOTHING
+  RETURNING id INTO v_id;
+  IF v_id IS NOT NULL THEN RETURN v_id; END IF;
+
+  IF p_allow_completed THEN
+    UPDATE public.description_jobs
+       SET status='running', attempt_count = attempt_count + 1, started_at = now(),
+           max_attempts = GREATEST(max_attempts, attempt_count + 1), updated_at = now()
+     WHERE idempotency_key = p_idempotency_key
+       AND status IN ('succeeded','failed_blocked','failed_retryable','cancelled')
+    RETURNING id INTO v_id;
+    IF v_id IS NOT NULL THEN RETURN v_id; END IF;
+  END IF;
+
+  UPDATE public.description_jobs
+     SET status='running', attempt_count = attempt_count + 1, started_at = now(), updated_at = now()
+   WHERE idempotency_key = p_idempotency_key
+     AND status = 'failed_retryable' AND attempt_count < max_attempts
+  RETURNING id INTO v_id;
+  IF v_id IS NOT NULL THEN RETURN v_id; END IF;
+
+  UPDATE public.description_jobs
+     SET attempt_count = attempt_count + 1, started_at = now(), updated_at = now()
+   WHERE idempotency_key = p_idempotency_key
+     AND status = 'running' AND started_at < now() - interval '15 minutes'
+     AND attempt_count < max_attempts
+  RETURNING id INTO v_id;
+  IF v_id IS NOT NULL THEN RETURN v_id; END IF;
+
+  UPDATE public.description_jobs
+     SET status='failed_blocked', failed_at = now(), updated_at = now(),
+         last_error_code = COALESCE(last_error_code,'ATTEMPTS_EXHAUSTED')
+   WHERE idempotency_key = p_idempotency_key
+     AND status IN ('failed_retryable','running') AND attempt_count >= max_attempts;
+  RETURN NULL;
+END $$;
+
+-- C-1b: resolving a conflict must make the case eligible for another run.
+CREATE OR REPLACE FUNCTION public.resolve_description_conflict(
+  p_case_id uuid, p_exception_id uuid, p_field_key text,
+  p_decision text, p_value text DEFAULT NULL, p_reason text DEFAULT NULL)
+RETURNS jsonb
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = public
+AS $$
+DECLARE v_case public.description_cases%ROWTYPE; v_uid uuid := (SELECT auth.uid());
+BEGIN
+  SELECT * INTO v_case FROM public.description_cases WHERE id = p_case_id;
+  IF v_case.id IS NULL THEN RETURN jsonb_build_object('ok',false,'error','case_not_found'); END IF;
+  IF NOT public.has_description_authority(v_case.tenant_id, 'approve') THEN
+    RETURN jsonb_build_object('ok',false,'error','insufficient_permission');
+  END IF;
+  IF p_decision NOT IN ('include','exclude') THEN
+    RETURN jsonb_build_object('ok',false,'error','invalid_decision');
+  END IF;
+
+  INSERT INTO public.description_fact_overrides
+    (tenant_id, vehicle_id, description_case_id, field_key, decision, value, reason, decided_by)
+  VALUES (v_case.tenant_id, v_case.vehicle_id, p_case_id, p_field_key, p_decision, p_value, p_reason, v_uid)
+  ON CONFLICT (description_case_id, field_key) DO UPDATE
+    SET decision = EXCLUDED.decision, value = EXCLUDED.value, reason = EXCLUDED.reason,
+        decided_by = EXCLUDED.decided_by, decided_at = now(), updated_at = now();
+
+  IF p_exception_id IS NOT NULL THEN
+    UPDATE public.description_exceptions
+       SET status='resolved', resolution = p_decision, resolved_by = v_uid, resolved_at = now()
+     WHERE id = p_exception_id AND description_case_id = p_case_id;
+  END IF;
+
+  -- a resolution invalidates the previous run's conclusion
+  UPDATE public.description_cases
+     SET open_exception_count = (
+           SELECT count(*) FROM public.description_exceptions
+            WHERE description_case_id = p_case_id AND status IN ('open','in_progress')),
+         processed_source_data_version = NULL,
+         lock_version = lock_version + 1, updated_at = now()
+   WHERE id = p_case_id;
+
+  INSERT INTO public.audit_log (action, entity_type, entity_id, store_id, user_id, details)
+  VALUES ('description_conflict_resolved','description_case', p_case_id::text, v_case.tenant_id::text, v_uid,
+          jsonb_build_object('vin', v_case.vin, 'field', p_field_key, 'decision', p_decision, 'reason', p_reason));
+
+  RETURN jsonb_build_object('ok',true,'field',p_field_key,'decision',p_decision);
+END $$;
+
+-- C-4: review mode was advisory on the interactive path — the UI's Publish
+-- button bypassed DRAFT_ONLY and REQUIRE_APPROVAL_ALL entirely.
+CREATE OR REPLACE FUNCTION public.publish_description_internal(
+  p_case_id uuid, p_version_id uuid, p_expected_lock_version integer)
+RETURNS jsonb
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = public
+AS $$
+DECLARE
+  v_case public.description_cases%ROWTYPE;
+  v_ver  public.description_versions%ROWTYPE;
+  v_pub  public.description_versions%ROWTYPE;
+  v_uid  uuid := (SELECT auth.uid());
+  v_key  text; v_enabled boolean; v_gate jsonb;
+BEGIN
+  SELECT * INTO v_case FROM public.description_cases WHERE id = p_case_id FOR UPDATE;
+  IF v_case.id IS NULL THEN RETURN jsonb_build_object('ok',false,'error','case_not_found'); END IF;
+
+  IF v_uid IS NOT NULL AND NOT public.has_description_authority(v_case.tenant_id, 'approve') THEN
+    RETURN jsonb_build_object('ok',false,'error','insufficient_permission');
+  END IF;
+  IF v_case.archived_at IS NOT NULL THEN
+    RETURN jsonb_build_object('ok',false,'error','case_archived');
+  END IF;
+
+  SELECT internal_publication_enabled INTO v_enabled
+    FROM public.description_settings WHERE tenant_id = v_case.tenant_id;
+  IF v_enabled IS NOT NULL AND v_enabled = false THEN
+    RETURN jsonb_build_object('ok',false,'error','internal_publication_disabled');
+  END IF;
+
+  -- the dealer's review mode governs BOTH the automated and the manual path
+  v_gate := public.description_publish_allowed(p_case_id, p_version_id);
+  IF (v_gate->>'ok')::boolean IS DISTINCT FROM true THEN
+    RETURN jsonb_build_object('ok',false,'error', COALESCE(v_gate->>'error','review_mode_blocked'));
+  END IF;
+
+  IF p_expected_lock_version IS NOT NULL AND v_case.lock_version <> p_expected_lock_version THEN
+    RETURN jsonb_build_object('ok',false,'error','stale_version','current_lock_version',v_case.lock_version);
+  END IF;
+
+  SELECT * INTO v_ver FROM public.description_versions WHERE id = p_version_id;
+  IF v_ver.id IS NULL OR v_ver.description_case_id <> p_case_id THEN
+    RETURN jsonb_build_object('ok',false,'error','version_not_found');
+  END IF;
+  IF v_ver.validation_status IN ('blocked','pending') THEN
+    RETURN jsonb_build_object('ok',false,'error','validation_not_passed','validation_status',v_ver.validation_status);
+  END IF;
+
+  IF v_case.published_master_version_id IS NOT NULL THEN
+    SELECT * INTO v_pub FROM public.description_versions WHERE id = v_case.published_master_version_id;
+    IF v_pub.id IS NOT NULL AND v_ver.version_number < v_pub.version_number THEN
+      RETURN jsonb_build_object('ok',false,'error','older_than_published');
+    END IF;
+  END IF;
+
+  UPDATE public.vehicle_listings SET description = v_ver.content WHERE id = v_case.vehicle_id;
+
+  UPDATE public.description_cases
+     SET published_master_version_id = p_version_id,
+         current_master_version_id  = p_version_id,
+         status = 'PUBLISHED', publication_eligibility = 'eligible',
+         potentially_stale = false, last_success_at = now(),
+         lock_version = lock_version + 1, updated_at = now()
+   WHERE id = p_case_id;
+
+  v_key := p_case_id::text || ':' || p_version_id::text || ':vehicle_passport';
+  INSERT INTO public.description_deliveries
+    (tenant_id, vehicle_id, description_case_id, version_id, destination, delivery_mode,
+     connector_status, status, idempotency_key, attempt_count, published_at)
+  VALUES (v_case.tenant_id, v_case.vehicle_id, p_case_id, p_version_id, 'vehicle_passport',
+     'internal_projection','available','delivered', v_key, 1, now())
+  ON CONFLICT (idempotency_key) DO UPDATE
+    SET status='delivered', published_at=now(), attempt_count = public.description_deliveries.attempt_count + 1;
+
+  INSERT INTO public.audit_log (action, entity_type, entity_id, store_id, user_id, details)
+  VALUES ('description_published_internal','description_case', p_case_id::text,
+          v_case.tenant_id::text, v_uid,
+          jsonb_build_object('vin', v_case.vin, 'version_id', p_version_id,
+                             'version_number', v_ver.version_number, 'destination','vehicle_passport'));
+
+  RETURN jsonb_build_object('ok',true,'case_id',p_case_id,'version_id',p_version_id,
+                            'lock_version', v_case.lock_version + 1);
+END $$;
+
+-- H-1: the C3 auth check also blocked the archive TRIGGER, because
+-- auth.uid() is still the caller's inside SECURITY DEFINER. A salesperson
+-- archiving a sold unit left the description case live and republishing.
+CREATE OR REPLACE FUNCTION public.archive_description_case(
+  p_case_id uuid, p_reason text DEFAULT NULL, p_system boolean DEFAULT false)
+RETURNS boolean
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = public
+AS $$
+DECLARE v_tenant uuid; v_vin text; v_uid uuid := (SELECT auth.uid());
+BEGIN
+  SELECT tenant_id, vin INTO v_tenant, v_vin FROM public.description_cases WHERE id = p_case_id;
+  IF v_tenant IS NULL THEN RETURN false; END IF;
+
+  -- p_system is only ever passed by the listing trigger, which has already
+  -- established that the vehicle left the lot.
+  IF NOT p_system AND v_uid IS NOT NULL
+     AND NOT public.has_description_authority(v_tenant, 'approve') THEN
+    RETURN false;
+  END IF;
+
+  UPDATE public.description_cases
+     SET status='ARCHIVED', archived_at = now(), publication_eligibility='blocked',
+         open_exception_count = 0, lock_version = lock_version + 1, updated_at = now()
+   WHERE id = p_case_id;
+  UPDATE public.description_exceptions
+     SET status='dismissed', resolution = COALESCE(p_reason,'vehicle archived'), resolved_at = now()
+   WHERE description_case_id = p_case_id AND status IN ('open','in_progress');
+  UPDATE public.description_jobs SET status='cancelled', updated_at = now()
+   WHERE description_case_id = p_case_id AND status IN ('queued','running');
+
+  INSERT INTO public.audit_log (action, entity_type, entity_id, store_id, user_id, details)
+  VALUES ('description_archived','description_case', p_case_id::text, v_tenant::text, v_uid,
+          jsonb_build_object('vin', v_vin, 'reason', p_reason, 'system', p_system));
+  RETURN true;
+END $$;
+
+CREATE OR REPLACE FUNCTION public.description_case_follow_listing_status()
+RETURNS trigger
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = public
+AS $$
+BEGIN
+  BEGIN
+    IF NEW.status = 'archived' AND COALESCE(OLD.status,'') <> 'archived' THEN
+      PERFORM public.archive_description_case(dc.id, 'listing archived', true)
+        FROM public.description_cases dc
+       WHERE dc.vehicle_id = NEW.id AND dc.archived_at IS NULL;
+    END IF;
+  EXCEPTION WHEN OTHERS THEN NULL;
+  END;
+  RETURN NEW;
+END $$;
+
+-- M-4: only re-enqueue when the configuration fingerprint actually moved.
+CREATE OR REPLACE FUNCTION public.enqueue_description_config_change(p_tenant_id uuid)
+RETURNS integer
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = public
+AS $$
+DECLARE v_count integer;
+BEGIN
+  UPDATE public.description_cases
+     SET processed_source_data_version = NULL, updated_at = now()
+   WHERE tenant_id = p_tenant_id AND archived_at IS NULL
+     AND master_locked = false AND status NOT IN ('ARCHIVED');
+  GET DIAGNOSTICS v_count = ROW_COUNT;
+
+  UPDATE public.description_cases
+     SET potentially_stale = true, updated_at = now()
+   WHERE tenant_id = p_tenant_id AND archived_at IS NULL AND master_locked = true;
+  RETURN v_count;
+END $$;
+
+GRANT EXECUTE ON FUNCTION public.claim_description_job(uuid, uuid, uuid, text, text, jsonb, boolean) TO service_role;
+GRANT EXECUTE ON FUNCTION public.archive_description_case(uuid, text, boolean) TO authenticated, service_role;

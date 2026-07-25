@@ -32,7 +32,7 @@ const FILTERS = (
     options: [["passed", "Passed"], ["review", "Review Required"], ["blocked", "Blocked"]] },
   { value: channel, set: setChannel, label: "Filter by channel readiness", allLabel: "All Channels",
     options: [["complete", "All Ready"], ["incomplete", "Partially Ready"], ["none", "Not Generated"]] },
-  { value: condition, set: setCondition, label: "Filter by inventory type", allLabel: "All Inventory",
+  { value: condition, set: setCondition, label: "Filter by location or inventory type", allLabel: "All Locations",
     options: [["new", "New"], ["used", "Used"], ["cpo", "CPO"]] },
 ];
 
@@ -128,7 +128,7 @@ export default function DescriptionOperations() {
 
   const SortHead = ({ k, children }: { k: SortKey; children: React.ReactNode }) => (
     <th className="px-3 py-2.5">
-      <button onClick={() => toggleSort(k)} className="inline-flex items-center gap-1 hover:text-foreground">
+      <button onClick={() => toggleSort(k)} className="inline-flex items-center gap-1 hover:text-foreground min-h-[44px]">
         {children}
         {sort.key === k && (sort.dir === "desc" ? <ChevronDown className="w-3 h-3" /> : <ChevronUp className="w-3 h-3" />)}
       </button>
@@ -148,8 +148,10 @@ export default function DescriptionOperations() {
     <div className="max-w-[1480px] mx-auto p-4 sm:p-6">
       {/* Header */}
       <div className="flex flex-wrap items-start justify-between gap-3 mb-5">
-        <div className="min-w-0">
-          <h1 className="font-display text-[26px] sm:text-[28px] font-bold tracking-tight text-foreground leading-none">Description Operations</h1>
+        {/* The app chrome carries this title on desktop; repeating it there
+            would show it twice, so the in-content copy is mobile-only. */}
+        <div className="min-w-0 lg:hidden">
+          <h1 className="font-display text-[26px] font-bold tracking-tight text-foreground leading-none">Description Operations</h1>
           <p className="text-sm text-muted-foreground mt-2">Automated merchandising intelligence across every vehicle.</p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
@@ -236,7 +238,7 @@ export default function DescriptionOperations() {
         ))}
         <button onClick={() => { setStatusFilter("all"); setValidationFilter("all"); setChannelFilter("all"); setConditionFilter("all"); setQuery(""); setPage(0); }}
           className="min-h-[44px] px-3.5 rounded-xl border border-border bg-card text-[13px] font-semibold text-foreground inline-flex items-center gap-1.5">
-          <SlidersHorizontal className="w-4 h-4" /> Reset
+          <SlidersHorizontal className="w-4 h-4" /> Filters
         </button>
       </div>
 
@@ -351,9 +353,10 @@ export default function DescriptionOperations() {
                           {cc ? (
                             <span className={`font-semibold ${cc.ready === cc.total ? "text-emerald-700"
                               : cc.ready === 0 ? "text-red-600" : "text-amber-700"}`}>
-                              {cc.ready === cc.total ? "All Ready · " : ""}{cc.ready} / {cc.total}
+                              {cc.ready === cc.total && <span className="block">All Ready</span>}
+                              <span className="block">{cc.ready} / {cc.total}</span>
                             </span>
-                          ) : <span className="text-muted-foreground">Not generated</span>}
+                          ) : <span className="text-muted-foreground">Not Generated</span>}
                         </td>
                         <td className="px-3 py-3 whitespace-nowrap">
                           <span className="block text-[11.5px] text-foreground">
@@ -365,8 +368,8 @@ export default function DescriptionOperations() {
                         </td>
                         <td className="px-3 py-3 text-right">
                           <button onClick={() => navigate(`/description-intelligence/${c.vehicle_id}`)}
-                            className="min-h-[44px] px-3 rounded-lg border border-border text-[12px] font-semibold text-foreground hover:border-primary hover:text-primary inline-flex items-center gap-1">
-                            {c.open_exception_count > 0 ? "Review Issue" : "Open Record"} <ChevronRight className="w-3.5 h-3.5" />
+                            className="min-h-[44px] px-3 rounded-lg border border-blue-200 bg-blue-50 text-[12px] font-semibold text-blue-700 hover:bg-blue-100 inline-flex items-center gap-1">
+                            {c.open_exception_count > 0 ? "Review Issue" : "Open Record"}
                           </button>
                         </td>
                       </tr>
@@ -384,7 +387,7 @@ export default function DescriptionOperations() {
                 <div className="flex items-center gap-1">
                   <button onClick={() => setPage((p) => Math.max(0, p - 1))} disabled={page === 0}
                     aria-label="Previous page"
-                    className="w-9 h-9 grid place-items-center rounded-lg border border-border disabled:opacity-40">
+                    className="w-11 h-11 grid place-items-center rounded-lg border border-border disabled:opacity-40">
                     <ChevronRight className="w-4 h-4 rotate-180" />
                   </button>
                   {pageNumbers.map((n, i) => n === "…" ? (
@@ -392,21 +395,21 @@ export default function DescriptionOperations() {
                   ) : (
                     <button key={n} onClick={() => setPage(n)}
                       aria-current={n === page ? "page" : undefined}
-                      className={`min-w-[36px] h-9 px-2 rounded-lg text-[12px] font-semibold ${
+                      className={`min-w-[44px] h-11 px-2 rounded-lg text-[12px] font-semibold ${
                         n === page ? "bg-primary text-primary-foreground" : "border border-border text-foreground"}`}>
                       {n + 1}
                     </button>
                   ))}
                   <button onClick={() => setPage((p) => Math.min(pageCount - 1, p + 1))} disabled={page >= pageCount - 1}
                     aria-label="Next page"
-                    className="w-9 h-9 grid place-items-center rounded-lg border border-border disabled:opacity-40">
+                    className="w-11 h-11 grid place-items-center rounded-lg border border-border disabled:opacity-40">
                     <ChevronRight className="w-4 h-4" />
                   </button>
                 </div>
                 <label className="inline-flex items-center gap-1.5 text-[12px] text-muted-foreground">
                   Rows per page
                   <select value={pageSize} onChange={(e) => { setPageSize(Number(e.target.value)); setPage(0); }}
-                    className="h-9 px-2 rounded-lg border border-border bg-card text-[12px] font-medium">
+                    className="h-11 px-2 rounded-lg border border-border bg-card text-[12px] font-medium">
                     {PAGE_SIZES.map((n) => <option key={n} value={n}>{n}</option>)}
                   </select>
                 </label>

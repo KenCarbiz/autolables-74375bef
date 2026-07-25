@@ -196,24 +196,25 @@ export function useDescriptionCase(vehicleId: string | undefined) {
   const saveManualVersion = useCallback(async (content: string, reason: string) => {
     const caseRow = record?.caseRow;
     if (!caseRow || !tenant?.id) return { ok: false, error: "no case" };
-    const { data: userRes } = await supabase.auth.getUser();
-    const latest = record?.versions?.[0];
     setBusy(true);
-    // A manual edit never rewrites history — it always creates a new version.
-    const { error } = await (supabase as any).from("description_versions").insert({
-      tenant_id: tenant.id, vehicle_id: caseRow.vehicle_id, description_case_id: caseRow.id,
-      parent_version_id: latest?.id || null, fact_snapshot_id: latest?.fact_snapshot_id || null,
-      version_number: (latest?.version_number || 0) + 1, version_type: "manual",
-      content, word_count: content.split(/\s+/).filter(Boolean).length,
-      character_count: content.length, configuration_version: caseRow.configuration_version,
-      source_data_version: caseRow.current_source_data_version,
-      created_by_type: "user", created_by_user_id: userRes?.user?.id ?? null,
-      manual_edit: true, edit_reason: reason, validation_status: "pending",
+    // Clients hold no write grant on description_versions — the RPC is the only
+    // path, and it creates a new immutable version rather than rewriting one.
+    const { data, error } = await (supabase as any).rpc("save_description_manual_version", {
+      p_case_id: caseRow.id, p_content: content, p_reason: reason,
+    });
+    if (error) { setBusy(false); return { ok: false, error: error.message }; }
+    if ((data as any)?.ok === false) { setBusy(false); return { ok: false, error: String((data as any).error) }; }
+
+    // A human edit must clear the same validators as generated copy before it
+    // can publish, so validate it server-side immediately.
+    const versionId = (data as any)?.version_id;
+    const { data: vres, error: verr } = await supabase.functions.invoke("description-orchestrate", {
+      body: { action: "validate", tenant_id: tenant.id, vehicle_id: caseRow.vehicle_id, version_id: versionId },
     });
     setBusy(false);
-    if (error) return { ok: false, error: error.message };
     await load();
-    return { ok: true };
+    if (verr) return { ok: true, warning: "Saved, but validation could not run yet." };
+    return { ok: true, validation: (vres as any)?.validation_status };
   }, [record, tenant?.id, load]);
 
   const setChannelLock = useCallback(async (channelVersionId: string, locked: boolean, reason?: string) => {

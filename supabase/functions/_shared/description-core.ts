@@ -29,7 +29,7 @@ export interface Fact {
 export interface FactSnapshot {
   facts: Record<string, Fact>;
   lineage: Record<string, { source: string; status: FactStatus; observed_at: string | null }>;
-  conflicts: Array<{ field: string; values: Array<{ value: unknown; source: string }>; material: boolean }>;
+  conflicts: Array<{ field: string; values: Array<{ value: unknown; source: string; observed_at?: string | null }>; material: boolean }>;
   excluded_claims: Array<{ field: string; reason: string; claim?: string }>;
   market_context: Record<string, unknown>;
   fact_confidence: number;
@@ -248,8 +248,10 @@ export function buildFactSnapshot(
     conflicts.push({
       field: `equipment:${item}`,
       values: [
-        { value: fromDecode ? "not listed" : item, source: "marketcheck_feed" },
-        { value: fromDecode ? item : "not listed", source: "vin_decode" },
+        { value: fromDecode ? "not listed" : item, source: "marketcheck_feed",
+          observed_at: listing.scrape_last_synced_at || now },
+        { value: fromDecode ? item : "not listed", source: "vin_decode",
+          observed_at: mc.specs_decoded_at || listing.enriched_at || now },
       ],
       material: true,
     });
@@ -276,7 +278,10 @@ export function buildFactSnapshot(
   if (feedSaysCpo && !cpoConfirmed) {
     conflicts.push({
       field: "cpo_status",
-      values: [{ value: "CPO", source: "marketcheck_feed" }, { value: "unconfirmed", source: "cpo_program_source" }],
+      values: [
+        { value: "CPO", source: "marketcheck_feed", observed_at: listing.scrape_last_synced_at || now },
+        { value: "unconfirmed", source: "cpo_program_source", observed_at: null },
+      ],
       material: true,
     });
     excluded.push({ field: "cpo_status", reason: "cpo_unconfirmed", claim: "certified" });

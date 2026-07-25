@@ -4,6 +4,7 @@
 // and mobile drawer all read this same config). Icons are lucide-react only.
 
 import {
+  Sparkles,
   BadgeCheck,
   BadgeDollarSign,
   BarChart3,
@@ -98,6 +99,10 @@ export function buildAdminNavSections({ badges, anyAdminTab }: BuildNavOptions):
       defaultOpen: true,
       items: [
         { label: "Create", path: "/create", icon: FilePlus2, capability: "can_create_documents", match: underSegment("/create") },
+        // Description work is exception-driven and visited daily, so it earns a
+        // row of its own rather than living only behind the Create hub.
+        { label: "Description Operations", path: "/description-operations", icon: Sparkles, capability: "can_create_documents",
+          match: (p: string) => p.startsWith("/description-operations") || p.startsWith("/description-intelligence") || p.startsWith("/description-writer") || p.startsWith("/description-studio") },
       ],
     },
     {

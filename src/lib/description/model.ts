@@ -10,15 +10,15 @@ export type DescriptionStatus =
 export type Tone = "slate" | "blue" | "amber" | "red" | "emerald" | "violet";
 
 export const STATUS_META: Record<DescriptionStatus, { label: string; tone: Tone; help: string }> = {
-  UNINITIALIZED:       { label: "Not started",    tone: "slate",   help: "No description case has been created yet." },
+  UNINITIALIZED:       { label: "Not Started",    tone: "slate",   help: "No description case has been created yet." },
   QUEUED:              { label: "Queued",         tone: "blue",    help: "Waiting for the generator." },
-  BUILDING_FACTS:      { label: "Building facts", tone: "blue",    help: "Assembling the trusted fact snapshot." },
+  BUILDING_FACTS:      { label: "Building Facts", tone: "blue",    help: "Assembling the trusted fact snapshot." },
   GENERATING:          { label: "Generating",     tone: "blue",    help: "Writing the canonical master description." },
   VALIDATING:          { label: "Validating",     tone: "blue",    help: "Checking every factual claim." },
-  REVIEW_REQUIRED:     { label: "Review required",tone: "amber",   help: "A manager must review before publication." },
+  REVIEW_REQUIRED:     { label: "Review Required",tone: "amber",   help: "A manager must review before publication." },
   READY:               { label: "Ready",          tone: "emerald", help: "Validated and eligible for internal publication." },
   PUBLISHING:          { label: "Publishing",     tone: "blue",    help: "Publication in progress." },
-  PARTIALLY_PUBLISHED: { label: "Partially published", tone: "amber", help: "Some destinations succeeded; others did not." },
+  PARTIALLY_PUBLISHED: { label: "Partially Published", tone: "amber", help: "Some destinations succeeded; others did not." },
   PUBLISHED:           { label: "Published",      tone: "emerald", help: "Published internally to the shopper listing." },
   STALE:               { label: "Stale",          tone: "amber",   help: "Vehicle data changed after this copy was written." },
   FAILED_RETRYABLE:    { label: "Failed",         tone: "red",     help: "Generation failed and can be retried." },
@@ -45,10 +45,10 @@ export interface ChannelMeta {
 
 // Mirrors supabase/functions/_shared/description-core.ts CHANNELS. Display only.
 export const CHANNEL_META: ChannelMeta[] = [
-  { key: "vehicle_passport", label: "Vehicle Passport",     characterLimit: 2400, deliveryMode: "internal_projection", connectorStatus: "available" },
   { key: "dealer_website",   label: "Dealer Website",       characterLimit: 2400, deliveryMode: "export_only",         connectorStatus: "export_only" },
+  { key: "vehicle_passport", label: "Vehicle Passport",     characterLimit: 2400, deliveryMode: "internal_projection", connectorStatus: "available" },
   { key: "autotrader",       label: "AutoTrader",           characterLimit: 1500, deliveryMode: "export_only",         connectorStatus: "export_only" },
-  { key: "cars_com",         label: "Cars.com",             characterLimit: 1500, deliveryMode: "connector",           connectorStatus: "not_configured" },
+  { key: "cars_com",         label: "Cars.com Connector",   characterLimit: 1500, deliveryMode: "connector",           connectorStatus: "not_configured" },
   { key: "cargurus",         label: "CarGurus",             characterLimit: 1200, deliveryMode: "export_only",         connectorStatus: "export_only" },
   { key: "facebook",         label: "Facebook Marketplace", characterLimit: 900,  deliveryMode: "export_only",         connectorStatus: "export_only" },
   { key: "google_seo",       label: "Google Vehicle Ads",   characterLimit: 900,  deliveryMode: "export_only",         connectorStatus: "export_only" },
@@ -61,29 +61,29 @@ export const channelMeta = (k: string) => CHANNEL_META.find((c) => c.key === k);
 export const connectorLabel = (c: ChannelMeta | undefined): { label: string; tone: Tone } => {
   if (!c) return { label: "Unknown", tone: "slate" };
   if (c.deliveryMode === "internal_projection") return { label: "Ready", tone: "emerald" };
-  if (c.connectorStatus === "not_configured") return { label: "Not configured", tone: "slate" };
-  return { label: "Export only", tone: "amber" };
+  if (c.connectorStatus === "not_configured") return { label: "Not Configured", tone: "slate" };
+  return { label: "Export Only", tone: "amber" };
 };
 
 export const ELIGIBILITY_META: Record<string, { label: string; tone: Tone }> = {
-  eligible:        { label: "Eligible",        tone: "emerald" },
+  eligible:        { label: "Eligible",         tone: "emerald" },
   blocked:         { label: "Blocked",         tone: "red" },
-  review_required: { label: "Review required", tone: "amber" },
-  unknown:         { label: "Not evaluated",   tone: "slate" },
+  review_required: { label: "Review Required", tone: "amber" },
+  unknown:         { label: "Not Evaluated",   tone: "slate" },
 };
 
 export const EXCEPTION_LABELS: Record<string, string> = {
-  EQUIPMENT_CONFLICT: "Equipment conflict",
-  CPO_STATUS_CONFLICT: "CPO status conflict",
-  VALIDATION_FAILED: "Validation failed",
-  REVIEW_REQUIRED: "Review required",
-  GENERATION_FAILED: "Generation failed",
-  GENERATION_BLOCKED: "Generation blocked",
-  CHANNEL_GENERATION_FAILED: "Channel generation failed",
-  CHANNEL_LENGTH_EXCEEDED: "Channel length exceeded",
-  MANUAL_CONTENT_STALE: "Locked copy may be stale",
-  INTERNAL_PUBLICATION_FAILED: "Publication failed",
-  REQUIRED_DATA_MISSING: "Missing required data",
+  EQUIPMENT_CONFLICT: "Equipment Source Conflict",
+  CPO_STATUS_CONFLICT: "CPO Status Conflict",
+  VALIDATION_FAILED: "Validation Failed",
+  REVIEW_REQUIRED: "Review Required",
+  GENERATION_FAILED: "Generation Failed",
+  GENERATION_BLOCKED: "Generation Blocked",
+  CHANNEL_GENERATION_FAILED: "Channel Generation Failed",
+  CHANNEL_LENGTH_EXCEEDED: "Channel Length Exceeded",
+  MANUAL_CONTENT_STALE: "Locked Copy May Be Stale",
+  INTERNAL_PUBLICATION_FAILED: "Publication Failed",
+  REQUIRED_DATA_MISSING: "Missing Required Data",
 };
 
 export const factConfidenceLabel = (n: number | null | undefined): { label: string; tone: Tone } => {
@@ -97,7 +97,7 @@ export const factConfidenceLabel = (n: number | null | undefined): { label: stri
 // deliberately "calculated", never "verified".
 export const FACT_STATUS_META: Record<string, { label: string; tone: Tone }> = {
   verified:       { label: "Verified",      tone: "emerald" },
-  dealer_entered: { label: "Dealer stated", tone: "blue" },
+  dealer_entered: { label: "Dealer Stated", tone: "blue" },
   feed_provided:  { label: "Feed",          tone: "blue" },
   calculated:     { label: "Calculated",    tone: "amber" },
   inferred:       { label: "Inferred",      tone: "amber" },

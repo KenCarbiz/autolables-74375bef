@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import {
   AlertTriangle, ArrowLeft, CheckCircle2, ChevronDown, ChevronRight, Clock, Copy, Download,
-  Loader2, Lock, LockOpen, RefreshCw, ShieldCheck, XCircle, History, Save, Link2, HelpCircle,
+  Loader2, Lock, LockOpen, RefreshCw, ShieldCheck, XCircle, History, Save, Link2,
 } from "lucide-react";
 import { useDescriptionCase, useDescriptionPermissions } from "@/hooks/useDescriptionOps";
 import {
@@ -65,7 +65,15 @@ export default function DescriptionIntelligence() {
   const blockingFindings = findings.filter((f) => f.blocking);
   const warnings = findings.filter((f) => f.severity === "warning");
   const exceptions = record?.exceptions ?? [];
-  const blockingException = exceptions.find((e) => e.blocking);
+  // Prefer a TYPED conflict (one that names the disputed field) over the
+  // generic VALIDATION_FAILED that is raised alongside it. Picking by recency
+  // would target the generic one, whose details carry no field — the override
+  // would be written under a key nothing reads and the real conflict would
+  // stay open forever.
+  const blockingException =
+    exceptions.find((e) => e.blocking && e.details_json?.field)
+    ?? exceptions.find((e) => e.blocking && Array.isArray(e.details_json?.values))
+    ?? exceptions.find((e) => e.blocking);
 
   const status = (caseRow?.status ?? "UNINITIALIZED") as DescriptionStatus;
   const meta = STATUS_META[status] ?? STATUS_META.UNINITIALIZED;
@@ -274,10 +282,10 @@ export default function DescriptionIntelligence() {
         <AlertTriangle className="w-3.5 h-3.5 shrink-0" /> Claim excluded from customer description until resolved.
       </p>
 
-      <h3 className="text-[13px] font-bold text-foreground mt-4">Choose Resolution</h3>
+      <h3 className="text-[13px] font-bold text-foreground mt-4 pt-4 border-t border-border">Choose Resolution</h3>
       <p className="text-[12px] text-muted-foreground mt-0.5 mb-2">How would you like to resolve this source conflict?</p>
       {perms.canResolve ? (
-        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-2">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2">
           {([
             ["Confirm Included", "Include in description", "emerald",
               () => resolveException(blockingException.id, conflictField, "include", true), "Resolved — regenerating"],
@@ -381,7 +389,7 @@ export default function DescriptionIntelligence() {
             <span className="text-[11px] font-semibold text-muted-foreground">Version</span>
             <select value={current?.id ?? ""} onChange={(e) => { setSelectedVersionId(e.target.value); setDraft(null); }}
               aria-label="Select version"
-              className="min-h-[36px] px-2.5 rounded-lg border border-border bg-card text-[12.5px] font-medium">
+              className="min-h-[44px] px-2.5 rounded-lg border border-border bg-card text-[12.5px] font-medium">
               {versions.map((v, i) => (
                 <option key={v.id} value={v.id}>{v.version_number}{i === 0 ? " (Latest)" : ""}</option>
               ))}
@@ -722,11 +730,11 @@ export default function DescriptionIntelligence() {
   return (
     <div className="max-w-[1480px] mx-auto p-4 sm:p-6 pb-24 lg:pb-6">
       <button onClick={() => navigate("/description-operations")}
-        className="text-[12.5px] font-semibold text-muted-foreground hover:text-foreground inline-flex items-center gap-1.5 mb-3 min-h-[44px]">
+        className="hidden lg:inline-flex text-[12.5px] font-semibold text-muted-foreground hover:text-foreground items-center gap-1.5 mb-3 min-h-[44px]">
         <ArrowLeft className="w-4 h-4" /> Back to Operations
       </button>
 
-      <div className="flex flex-wrap items-center justify-between gap-2 mb-4">
+      <div className="hidden lg:flex flex-wrap items-center justify-between gap-2 mb-4">
         <div className="min-w-0">
           <h1 className="font-display text-[22px] sm:text-[24px] font-bold tracking-tight text-foreground leading-tight">
             {vehicle?.ymm || "Vehicle"} <span className="text-muted-foreground font-medium">{vehicle?.trim || ""}</span>
@@ -772,8 +780,9 @@ export default function DescriptionIntelligence() {
           </p>
           <ol className="flex items-center justify-between gap-1 mt-3">
             {["Data Sync", "Validate", "Generate", "Review", "Publish"].map((s, i) => (
-              <li key={s} className="flex flex-col items-center gap-1 flex-1 min-w-0">
-                <span className={`w-5 h-5 rounded-full grid place-items-center text-[10px] font-bold ${
+              <li key={s} className="flex flex-col items-center gap-1 flex-1 min-w-0 relative">
+                {i > 0 && <span aria-hidden className={`absolute top-[10px] right-1/2 w-full h-0.5 ${i <= stepIdx ? "bg-emerald-500" : "bg-border"}`} />}
+                <span className={`w-7 h-7 rounded-full grid place-items-center text-[11px] font-bold relative z-10 ${
                   i <= stepIdx ? "bg-emerald-500 text-white" : "bg-white/70 text-muted-foreground border border-border"}`}>
                   {i <= stepIdx ? "✓" : i + 1}
                 </span>
@@ -835,7 +844,7 @@ export default function DescriptionIntelligence() {
               aria-expanded={mobileSection === key}
               className="w-full min-h-[52px] px-4 flex items-center justify-between gap-2">
               <span className="text-[13px] font-bold text-foreground inline-flex items-center gap-1.5">
-                {key === "facts" && conf.tone === "emerald" && <CheckCircle2 className="w-4 h-4 text-emerald-500" />}
+                {(key === "facts" || key === "readiness") && <CheckCircle2 className="w-4 h-4 text-emerald-500" />}
                 {label as string}
               </span>
               <ChevronDown className={`w-4 h-4 text-muted-foreground transition-transform ${mobileSection === key ? "rotate-180" : ""}`} />
