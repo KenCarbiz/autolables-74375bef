@@ -16,16 +16,12 @@ BEGIN
       FROM pg_proc p
       JOIN pg_namespace n ON n.oid = p.pronamespace
      WHERE n.nspname = 'public'
-       AND p.proname IN (
-         'init_description_case','claim_description_job','publish_description_internal',
-         'archive_description_case','next_description_reconcile_batch','has_description_authority',
-         'resolve_description_conflict','save_description_manual_version','set_description_lock',
-         'save_description_settings','approve_description_version','description_publish_allowed',
-         'raise_description_exception','mark_description_stale',
-         'close_resolved_description_exceptions','enqueue_description_config_change',
-         'schedule_description_reconcile','unschedule_description_reconcile',
-         'description_case_transition_guard','description_version_immutable',
-         'description_case_follow_listing_status')
+       -- Pattern, not a hand-maintained list: the first version of this
+       -- migration spelled description_versions_immutable in the singular and
+       -- silently skipped it. Every function in this schema whose name contains
+       -- "description" belongs to this feature, and matching the same predicate
+       -- the verification query uses means the two can never disagree.
+       AND p.proname LIKE '%description%'
   LOOP
     EXECUTE format('REVOKE ALL ON FUNCTION %s FROM PUBLIC, anon, authenticated', r.sig);
     EXECUTE format('GRANT EXECUTE ON FUNCTION %s TO service_role', r.sig);
@@ -44,8 +40,8 @@ BEGIN
      WHERE n.nspname = 'public'
        AND p.proname IN (
          'publish_description_internal','description_publish_allowed','resolve_description_conflict',
-         'save_description_manual_version','set_description_lock','save_description_settings',
-         'approve_description_version','has_description_authority')
+         'save_description_manual_version','save_description_channel_version','set_description_lock',
+         'save_description_settings','approve_description_version','has_description_authority')
   LOOP
     EXECUTE format('GRANT EXECUTE ON FUNCTION %s TO authenticated', r.sig);
   END LOOP;
