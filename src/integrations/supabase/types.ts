@@ -2015,6 +2015,7 @@ export type Database = {
           description_case_id: string
           details_json: Json
           exception_type: string
+          field_key: string | null
           id: string
           resolution: string | null
           resolved_at: string | null
@@ -2035,6 +2036,7 @@ export type Database = {
           description_case_id: string
           details_json?: Json
           exception_type: string
+          field_key?: string | null
           id?: string
           resolution?: string | null
           resolved_at?: string | null
@@ -2055,6 +2057,7 @@ export type Database = {
           description_case_id?: string
           details_json?: Json
           exception_type?: string
+          field_key?: string | null
           id?: string
           resolution?: string | null
           resolved_at?: string | null
@@ -7414,10 +7417,6 @@ export type Database = {
         }
         Returns: Json
       }
-      archive_description_case: {
-        Args: { p_case_id: string; p_reason?: string }
-        Returns: boolean
-      }
       attach_title_document: {
         Args: {
           _doc_type: string
@@ -7466,22 +7465,15 @@ export type Database = {
         }
         Returns: string
       }
-      claim_description_job: {
-        Args: {
-          p_case_id: string
-          p_idempotency_key: string
-          p_job_type: string
-          p_payload?: Json
-          p_tenant_id: string
-          p_vehicle_id: string
-        }
-        Returns: string
-      }
       claim_listing_orchestration: {
         Args: { _listing_id: string }
         Returns: boolean
       }
       claim_platform: { Args: never; Returns: Json }
+      close_resolved_description_exceptions: {
+        Args: { p_case_id: string; p_keep_types?: string[] }
+        Returns: number
+      }
       create_draft_addendum: {
         Args: { p_tenant_id: string; p_vin: string }
         Returns: string
@@ -7522,6 +7514,10 @@ export type Database = {
       description_publish_allowed: {
         Args: { p_case_id: string; p_version_id: string }
         Returns: Json
+      }
+      enqueue_description_config_change: {
+        Args: { p_tenant_id: string }
+        Returns: number
       }
       find_abandoned_signings: {
         Args: {
@@ -7958,7 +7954,7 @@ export type Database = {
         Returns: string
       }
       next_description_reconcile_batch: {
-        Args: { p_limit?: number; p_tenant_id?: string }
+        Args: { p_limit?: number; p_sweep_start?: string; p_tenant_id?: string }
         Returns: {
           case_id: string
           reason: string
@@ -7988,6 +7984,7 @@ export type Database = {
           p_case_id: string
           p_channel?: string
           p_details?: Json
+          p_field_key?: string
           p_severity: string
           p_summary: string
           p_tenant_id: string
