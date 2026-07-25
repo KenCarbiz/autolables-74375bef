@@ -358,19 +358,9 @@ export default function VinCommandCenter() {
         {/* Main column */}
         <div className="order-2 lg:order-1 min-w-0">
           <CommandCard title="Automated Intake Package">
-            {/* Empty-section rule: a TABLE with no rows gets the EmptyState card,
-                a list or rail gets the one-line muted form. The package is built
-                by unconditional pushes today, so this branch is inert — it is
-                kept because the row set is data-driven by contract and the data
-                owner is actively deciding which rows a vehicle can carry. */}
-            {items.length === 0 ? (
-              <EmptyState
-                Icon={FileText}
-                title="Nothing has been created for this VIN yet"
-                detail="Documents, labels and QR tags appear here as automation completes."
-              />
-            ) : (
-              <>
+            {/* buildVinPackageItems emits a fixed 8 rows (10 for used), so there
+                is no empty case to render here. */}
+            <>
                 <div className="overflow-x-auto">
                   <table className="w-full text-left border-collapse min-w-[720px]">
                     <thead>
@@ -430,7 +420,6 @@ export default function VinCommandCenter() {
                   </CommandAction>
                 </div>
               </>
-            )}
           </CommandCard>
         </div>
 

@@ -55,10 +55,10 @@ export default function DocumentsPrintCenter() {
       const res = which === "packet" ? await printCompletePacket() : await printByStock();
       // Never claim a print job that the hook did not confirm.
       if (!res.ok) { toast.error(res.error || "Print job could not be created"); return; }
-      // The packet action transitions the eligible documents to printed and logs
-      // the release; it does not enqueue a printer job, so it must not say so.
+      // The packet opens a print sheet and only files the print record once the
+      // employee confirms in that tab, so the past tense here is earned.
       toast.success(which === "packet"
-        ? "Packet released — its print-ready documents are marked as printed"
+        ? "Packet confirmed as printed — its documents are marked as printed"
         : "Stock label queued for printing");
     } finally {
       setBusy(null);
@@ -194,7 +194,13 @@ export default function DocumentsPrintCenter() {
   // already printed, live on the Passport, no print-ready file, not approved.
   // Substituting one sentence for all four told a vehicle whose packet had
   // already been released that its documents were never produced.
-  const packetReason = busy ? "A print job is already running." : packetBlockedReason;
+  // The packet resolves only when the employee confirms in the print tab (or
+  // closes it), so "busy" here can last as long as they take.
+  const packetReason = busy === "packet"
+    ? "Waiting for the print confirmation in the packet tab."
+    : busy
+      ? "A print job is already running."
+      : packetBlockedReason;
   // The two conditions printByStock itself refuses on, quoted from the same
   // guards, so the button is dead here instead of returning a red toast.
   const stockReason = busy
