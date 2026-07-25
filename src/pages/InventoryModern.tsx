@@ -17,7 +17,7 @@ import {
   X, CheckCircle2, AlertTriangle, RefreshCw, MoreVertical, Building2,
   ShieldCheck, ClipboardList, ExternalLink, Trash2, Wrench,
   ChevronLeft, ChevronRight, Eye, CircleDollarSign, FileSignature, Tag,
-  AlertCircle, ShieldAlert, TrendingUp,
+  AlertCircle, ShieldAlert, TrendingUp, Rocket,
 } from "lucide-react";
 import SharedEmptyState from "@/components/ui/empty-state";
 import { AdvertisedPriceBand } from "@/components/inventory/AdvertisedPriceBand";
@@ -429,6 +429,9 @@ const InventoryModern = () => {
 
   const rowActions = (r: VehicleRow): KebabItem[] => [
     { label: "Open Vehicle", icon: ExternalLink, onClick: () => navigate(`/vehicle-file/${r.id}`) },
+    // The only door to /vin-command in the app: §6 gives it no nav row because
+    // it is reached per vehicle, and the vehicle row is where that happens.
+    { label: "VIN Command Center", icon: Rocket, onClick: () => navigate(`/vin-command/${r.id}`) },
     { label: r.condition === "new" ? "New-Car Sticker" : "Used-Car Sticker", icon: Printer, onClick: () => navigate(`${r.condition === "new" ? "/new-car-sticker" : "/used-car-sticker"}?vehicleId=${r.id}`) },
     { label: "Make Sticker", icon: Printer, onClick: () => navigate(`/vehicle-file/${r.id}?tab=labels`) },
     { label: "Send to Get-Ready", icon: Wrench, onClick: () => sendToGetReady(r) },

@@ -1,19 +1,20 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useParams } from "react-router-dom";
 import {
   AlertTriangle, ArrowRight, Building2, Calendar, Car, CheckCircle2, ClipboardList, Clock,
-  DollarSign, ExternalLink, Info, Loader2, Lock, Mail, Users, type LucideIcon,
+  DollarSign, ExternalLink, Info, Loader2, Lock, Mail, Rocket, Users, type LucideIcon,
 } from "lucide-react";
 import { toast } from "sonner";
 import {
-  BTN_PRIMARY, BTN_SECONDARY, capabilityDenialReason, capabilityForHref, CommandAction,
-  CommandCallout, CommandCapabilityProvider, CommandCard, CommandStepper, copyWithToast, EmptyState, ErrorCard,
-  LoadingCard, StatusPill, VehicleIdentityStrip,
+  capabilityDenialReason, capabilityForHref, CommandAction,
+  CommandCallout, CommandCapabilityProvider, CommandCard, CommandStepper, copyWithToast,
+  DegradedNotice, EmptyState, ErrorCard, formatCommandDate, formatCommandDateTime, LoadingCard,
+  StatusPill, TONE_FILL, TONE_TEXT, useDisabledReason, VehicleIdentityStrip,
 } from "@/components/command/CommandPrimitives";
 import { useGetReadyCommand, type GetReadyColumn } from "@/hooks/useCommandCenter";
 import { useAuth } from "@/contexts/AuthContext";
 import { useEntitlements } from "@/hooks/useEntitlements";
-import { hasDealerCapability } from "@/lib/permissions/dealerRoleCapabilities";
+import { dealerRoleHome, hasDealerCapability } from "@/lib/permissions/dealerRoleCapabilities";
 import { TONE_CLASS, type Tone } from "@/lib/description/model";
 import { cn } from "@/lib/utils";
 
@@ -35,22 +36,29 @@ const REPORT_LABEL: Record<GetReadyColumn["key"], string> = {
 };
 
 // Same locale policy as every date on the three surfaces: the reader's, not a
-// hardcoded en-US.
+// hardcoded en-US. Dates themselves come from formatCommandDate — this page used
+// to keep its own copy that printed the raw ISO string on an unparseable stamp.
 const money = (n: number | null | undefined) =>
   n == null ? "—" : new Intl.NumberFormat(undefined, { style: "currency", currency: "USD", maximumFractionDigits: 0 }).format(n);
 
-const dateLabel = (iso: string | null) => {
-  if (!iso) return null;
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return iso;
-  return d.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
+const PRIORITY_TONE: Record<string, Tone> = {
+  high: "amber",
+  normal: "blue",
+  low: "slate",
 };
 
-const PRIORITY_DOT: Record<string, string> = {
-  high: "bg-amber-500",
-  normal: "bg-blue-500",
-  low: "bg-slate-400",
+// notify-getready labels every target by department, so the failure list arrives
+// as dept keys. It cannot name WHICH vendor of several was missed (see W10) —
+// so this says what is known and no more.
+const DEPT_LABEL: Record<string, string> = {
+  service: "Service",
+  detail: "Detail",
+  prep: "Prep",
+  vendor: "The third-party vendors",
 };
+
+const deptLabel = (d: string) =>
+  DEPT_LABEL[d] ?? d.replace(/[_-]+/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
 
 function SummaryRow({ Icon, value, label, tone }: {
   Icon: LucideIcon; value: React.ReactNode; label: string; tone: Tone;
@@ -105,8 +113,8 @@ function DepartmentColumn({ column, onSaveNote }: {
       subtitle={column.headline}
       leading={
         <span className={cn(
-          "grid place-items-center w-9 h-9 rounded-full shrink-0",
-          empty ? "bg-slate-200 text-slate-600" : complete ? "bg-emerald-600 text-white" : "bg-amber-500 text-white",
+          "grid place-items-center w-9 h-9 rounded-full shrink-0 text-white",
+          TONE_FILL[empty ? "slate" : complete ? "emerald" : "amber"],
         )}>
           <HeadIcon className="w-5 h-5" aria-hidden="true" />
         </span>
@@ -119,8 +127,8 @@ function DepartmentColumn({ column, onSaveNote }: {
           return (
             <div key={item.id} className="flex items-start gap-2.5 py-2.5">
               {done
-                ? <CheckCircle2 className="w-4 h-4 text-emerald-600 mt-0.5 shrink-0" aria-hidden="true" />
-                : <Clock className="w-4 h-4 text-amber-600 mt-0.5 shrink-0" aria-hidden="true" />}
+                ? <CheckCircle2 className={cn("w-4 h-4 mt-0.5 shrink-0", TONE_TEXT.emerald)} aria-hidden="true" />
+                : <Clock className={cn("w-4 h-4 mt-0.5 shrink-0", TONE_TEXT.amber)} aria-hidden="true" />}
               <div className="min-w-0 flex-1">
                 <p className="text-[12.5px] font-medium text-foreground leading-tight">{item.label}</p>
                 {item.sublabel && <p className="text-[11.5px] text-muted-foreground mt-0.5">{item.sublabel}</p>}
@@ -175,7 +183,7 @@ function DepartmentColumn({ column, onSaveNote }: {
                     Icon={Mail}
                     wrapperClassName="shrink-0"
                     href={v.email ? `mailto:${v.email}` : undefined}
-                    disabledReason={v.email ? null : "No email on file for this vendor"}>
+                    disabledReason={v.email ? null : "No email is on file for this vendor."}>
                     Contact
                   </CommandAction>
                 </div>
@@ -190,11 +198,13 @@ function DepartmentColumn({ column, onSaveNote }: {
           <span className="block text-[11.5px] text-muted-foreground">Estimated Cost</span>
           <span className="block text-[13px] font-bold text-foreground leading-tight">{money(column.estimatedCost)}</span>
         </span>
+        {/* The three report destinations are in-app routes (useCommandCenter
+            emits only /k208 and /vehicle-file), so they change the route rather
+            than reloading the SPA into a new tab. */}
         <CommandAction
-          newTab
           href={column.reportHref}
           capability={capabilityForHref(column.reportHref)}
-          disabledReason={column.reportHref ? null : "No report has been generated for this department yet"}
+          disabledReason={column.reportHref ? null : "No report has been generated for this department yet."}
           TrailingIcon={ExternalLink}>
           {REPORT_LABEL[column.key]}
         </CommandAction>
@@ -203,9 +213,45 @@ function DepartmentColumn({ column, onSaveNote }: {
   );
 }
 
+// The one blocked control on the three surfaces that cannot be wrapped in
+// DisabledReason: Tailwind's `peer-*` styling requires the input to stay a direct
+// sibling of the box it paints. `disabled` also made it unfocusable, so the
+// browser blurred it mid-save and published no reason. aria-disabled keeps it
+// focusable and the reason reaches a screen reader and a mouse alike.
+function ChecklistRow({ label, checked, busy, onToggle }: {
+  label: string; checked: boolean; busy: boolean; onToggle: (next: boolean) => void;
+}) {
+  const { describedBy, title, reasonNode } = useDisabledReason(busy ? "This checklist item is saving." : null);
+  return (
+    <label
+      title={title}
+      className={cn(
+        "flex items-center gap-2.5 min-h-[44px] px-1 rounded-lg hover:bg-muted/40",
+        busy ? "cursor-progress" : "cursor-pointer",
+      )}>
+      <input
+        type="checkbox"
+        className="peer sr-only"
+        checked={checked}
+        aria-disabled={busy || undefined}
+        aria-describedby={describedBy}
+        onChange={(e) => { if (!busy) onToggle(e.target.checked); }} />
+      <span className={cn(
+        "grid place-items-center w-5 h-5 rounded border shrink-0 peer-focus-visible:ring-2 peer-focus-visible:ring-primary",
+        checked ? "bg-blue-600 border-blue-600 text-white" : "border-border bg-background text-transparent",
+      )}>
+        {busy
+          ? <Loader2 className={cn("w-3.5 h-3.5 animate-spin", checked ? "text-white" : "text-muted-foreground")} aria-hidden="true" />
+          : <CheckCircle2 className="w-3.5 h-3.5" aria-hidden="true" />}
+      </span>
+      <span className="text-[12.5px] text-foreground leading-tight">{label}</span>
+      {reasonNode}
+    </label>
+  );
+}
+
 export default function GetReadyCommand() {
   const { vehicleId } = useParams<{ vehicleId: string }>();
-  const navigate = useNavigate();
   const { isAdmin } = useAuth();
   const { member, loading: entLoading } = useEntitlements();
   const canView = hasDealerCapability(member?.role, "can_view_get_ready", isAdmin);
@@ -213,7 +259,7 @@ export default function GetReadyCommand() {
   // Keep the vehicle in scope while entitlements settle: withholding it until
   // `canView` flips would hand the loader a fresh id after its first commit,
   // and that commit reads as "vehicle not found" for one frame.
-  const { data, loading, error, errorDetail, notFound, reload, saveManagerNote, toggleChecklist, authorizeAndDispatch } =
+  const { data, loading, error, errorDetail, notFound, degraded, reload, saveManagerNote, toggleChecklist, authorizeAndDispatch } =
     useGetReadyCommand(entLoading || canView ? vehicleId : undefined);
 
   const [checkOverride, setCheckOverride] = useState<Record<string, boolean>>({});
@@ -242,7 +288,7 @@ export default function GetReadyCommand() {
     const res = await toggleChecklist(key, next);
     clear();
     setBusyKey(null);
-    if (!res.ok) toast.error(res.error || "Could not update the checklist");
+    if (!res.ok) toast.error(res.error || "The checklist could not be updated");
   }, [toggleChecklist]);
 
   const onAuthorize = useCallback(async () => {
@@ -286,16 +332,26 @@ export default function GetReadyCommand() {
     </>
   );
 
-  const inventoryAction = (
-    <button type="button" onClick={() => navigate("/inventory")} className={BTN_PRIMARY}>
-      Go to Inventory <ArrowRight className="w-4 h-4" aria-hidden="true" />
-    </button>
+  // Empty-state buttons are cross-page CTAs like any other, so they route
+  // through CommandAction and are disabled with the same stated reason when the
+  // role cannot follow them — a service_advisor holds can_view_get_ready but not
+  // can_view_inventory, and reached a live "Go to Inventory" here. "Back to Home"
+  // targets the role's OWN home, so the card is never all dead controls.
+  const homeAction = (
+    <CommandAction href={dealerRoleHome(member?.role, isAdmin)}>Back to Home</CommandAction>
   );
 
-  const homeAction = (
-    <button type="button" onClick={() => navigate("/dashboard")} className={BTN_SECONDARY}>
-      Back to Home
-    </button>
+  const pickVehicleAction = (
+    <>
+      <CommandAction
+        variant="primary"
+        capability="can_view_inventory"
+        href="/inventory"
+        TrailingIcon={ArrowRight}>
+        Go to Inventory
+      </CommandAction>
+      {homeAction}
+    </>
   );
 
   // One guard order across all three command surfaces: permission ->
@@ -318,7 +374,7 @@ export default function GetReadyCommand() {
     return shell(
       <EmptyState Icon={Car} title="Pick a vehicle to open its get ready command"
         detail="Get Ready Command opens per vehicle. Choose one from Inventory to review and authorize its get-ready."
-        action={inventoryAction} />,
+        action={pickVehicleAction} />,
     );
   }
 
@@ -335,7 +391,7 @@ export default function GetReadyCommand() {
     return shell(
       <EmptyState Icon={Car} title="Vehicle not found"
         detail="This vehicle is not in your inventory, or it was removed. Pick another vehicle from Inventory."
-        action={inventoryAction} />,
+        action={pickVehicleAction} />,
     );
   }
 
@@ -348,16 +404,44 @@ export default function GetReadyCommand() {
   }
 
   const { vehicle, columns, summary, checklist, canAuthorize, authorizeBlockedReason,
-    priority, deliveryTarget } = data;
-  const delivery = dateLabel(deliveryTarget);
+    priority, deliveryTarget, dispatchFailures, authorizedAt } = data;
+  const delivery = formatCommandDate(deliveryTarget);
+  const authorizedLabel = formatCommandDateTime(authorizedAt);
 
   return shell(
     <>
+      <DegradedNotice degraded={degraded} className="mb-4" />
+
       {/* CommandStepper scrolls inside itself; this only bounds it so a 375px
           viewport never scrolls the page. */}
       <div className="min-w-0 mb-4">
         <CommandStepper steps={STEPS} current={data.currentStep} />
       </div>
+
+      {/* The authorization is one-shot: a recipient the dispatcher never reached
+          can never be re-sent from here, so it has to stay on the page after the
+          toast is gone. A manager who reloads had no surface saying service was
+          never told to start. */}
+      {dispatchFailures.length > 0 && (
+        <CommandCallout
+          tone="red"
+          Icon={AlertTriangle}
+          className="mb-4"
+          title="Some work orders were never sent"
+          action={
+            <CommandAction
+              variant="link"
+              href="/ready-board"
+              capability={capabilityForHref("/ready-board")}>
+              Open Ready Board
+            </CommandAction>
+          }>
+          {dispatchFailures.map(deptLabel).join(" and ")}{" "}
+          {dispatchFailures.length === 1 ? "was" : "were"} not reached when Get Ready was authorized
+          {authorizedLabel ? ` on ${authorizedLabel}` : ""}. The authorization is recorded and cannot
+          be repeated — send those work orders from the Ready Board.
+        </CommandCallout>
+      )}
 
       <div className="mb-4">
         <VehicleIdentityStrip
@@ -373,7 +457,7 @@ export default function GetReadyCommand() {
             label: "Priority",
             value: (
               <span className="inline-flex items-center gap-1.5">
-                <span className={cn("w-2 h-2 rounded-full", priority ? PRIORITY_DOT[priority] : "bg-slate-300")} aria-hidden="true" />
+                <span className={cn("w-2 h-2 rounded-full", TONE_FILL[priority ? PRIORITY_TONE[priority] : "slate"])} aria-hidden="true" />
                 {priority ? priority.charAt(0).toUpperCase() + priority.slice(1) : "Not set"}
               </span>
             ),
@@ -387,12 +471,23 @@ export default function GetReadyCommand() {
             </>
           }
           action={
-            <CommandAction
-              capability="can_view_inventory"
-              TrailingIcon={ExternalLink}
-              onClick={() => navigate(`/vehicle-file/${vehicle.id}`)}>
-              View Vehicle Details
-            </CommandAction>
+            <>
+              {/* The three command surfaces are one set. VIN Command Center has
+                  no nav row by §6, so its two siblings carry the door back to
+                  it — without this the set is one-way. */}
+              <CommandAction
+                Icon={Rocket}
+                capability="can_view_inventory"
+                href={`/vin-command/${vehicle.id}`}>
+                VIN Command Center
+              </CommandAction>
+              <CommandAction
+                capability="can_view_inventory"
+                TrailingIcon={ExternalLink}
+                href={`/vehicle-file/${vehicle.id}`}>
+                View Vehicle Details
+              </CommandAction>
+            </>
           }
         />
       </div>
@@ -418,42 +513,30 @@ export default function GetReadyCommand() {
             </div>
           </CommandCard>
 
+          {/* CHECKLIST_ITEMS is a fixed five-element literal mapped 1:1, so the
+              "no items" branch that used to sit here could not execute. */}
           <CommandCard title="Authorization Checklist">
-            {checklist.length === 0 ? (
-              <p className="text-[11.5px] text-muted-foreground py-2">No checklist items are configured for this vehicle.</p>
-            ) : (
-              <div className="space-y-0.5">
-                {checklist.map((c) => {
-                  const checked = checkOverride[c.key] ?? c.done;
-                  return (
-                    <label key={c.key}
-                      className="flex items-center gap-2.5 min-h-[44px] px-1 rounded-lg cursor-pointer hover:bg-muted/40">
-                      <input type="checkbox" className="peer sr-only" checked={checked} disabled={busyKey === c.key}
-                        onChange={(e) => onToggle(c.key, e.target.checked)} />
-                      <span className={cn(
-                        "grid place-items-center w-5 h-5 rounded border shrink-0 peer-focus-visible:ring-2 peer-focus-visible:ring-primary",
-                        checked ? "bg-blue-600 border-blue-600 text-white" : "border-border bg-background text-transparent",
-                      )}>
-                        {busyKey === c.key
-                          ? <Loader2 className={cn("w-3.5 h-3.5 animate-spin", checked ? "text-white" : "text-muted-foreground")} aria-hidden="true" />
-                          : <CheckCircle2 className="w-3.5 h-3.5" aria-hidden="true" />}
-                      </span>
-                      <span className="text-[12.5px] text-foreground leading-tight">{c.label}</span>
-                    </label>
-                  );
-                })}
-              </div>
-            )}
+            <div className="space-y-0.5">
+              {checklist.map((c) => (
+                <ChecklistRow
+                  key={c.key}
+                  label={c.label}
+                  checked={checkOverride[c.key] ?? c.done}
+                  busy={busyKey === c.key}
+                  onToggle={(next) => onToggle(c.key, next)}
+                />
+              ))}
+            </div>
           </CommandCard>
 
-          <div>
+          <div aria-busy={authorizing || undefined}>
             <CommandAction
               variant="primary"
               Icon={Lock}
               busy={authorizing}
               className="w-full"
               wrapperClassName="flex w-full"
-              disabledReason={authorizing ? "Authorization is already running" : canAuthorize ? null : authorizeBlockedReason}
+              disabledReason={authorizing ? "Authorization is already running." : canAuthorize ? null : authorizeBlockedReason}
               onClick={onAuthorize}>
               Authorize Get Ready &amp; Dispatch
             </CommandAction>

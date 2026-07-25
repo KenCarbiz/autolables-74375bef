@@ -28,6 +28,17 @@ const RULES: { prefix: string; cap: DealerCapability }[] = [
   { prefix: "/titles", cap: "can_view_compliance" },
 ];
 
+// The other half of the same decision, stated rather than left as an omission.
+// These screens render their own permission-denied card: it names the missing
+// capability, quotes the same sentence the disabled cross-page buttons quote,
+// and offers the role's own home — none of which a redirect-plus-toast can do,
+// and §7 requires that state on all three. A prefix listed here is never
+// redirected even if a RULES entry would otherwise match it.
+const SELF_GUARDED = ["/vin-command", "/get-ready-command", "/print-center"];
+
+const underPrefix = (prefix: string, path: string) =>
+  path === prefix || path.startsWith(`${prefix}/`);
+
 export default function RouteCapabilityGuard({ children }: { children: ReactNode }) {
   const { isAdmin } = useAuth();
   const { member, loading } = useEntitlements();
@@ -36,6 +47,8 @@ export default function RouteCapabilityGuard({ children }: { children: ReactNode
   if (loading || isAdmin) return <>{children}</>;
 
   const path = location.pathname;
+
+  if (SELF_GUARDED.some((prefix) => underPrefix(prefix, path))) return <>{children}</>;
 
   // /admin is gated per ?tab= so roles with a partial admin surface (leads,
   // audit, queue, ...) can reach their tabs without holding can_manage_settings.
