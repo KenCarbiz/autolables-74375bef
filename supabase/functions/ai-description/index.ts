@@ -7,6 +7,14 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+// Only ids we have actually validated — an arbitrary string from settings must
+// never be forwarded to the provider.
+const MODEL_IDS: Record<string, string> = {
+  "claude-haiku-4-5": "claude-haiku-4-5-20251001",
+  "claude-sonnet-5": "claude-sonnet-5",
+  "claude-opus-5": "claude-opus-5",
+};
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -87,7 +95,9 @@ Write the description now:`;
         "anthropic-version": "2023-06-01",
       },
       body: JSON.stringify({
-        model: "claude-haiku-4-5-20251001",
+        // The dealer's configured generation_model reaches us on the
+        // description-orchestrate path; everything else keeps the default.
+        model: MODEL_IDS[String(vehicle.model_key || "")] ?? "claude-haiku-4-5-20251001",
         max_tokens: vehicle.prompt_override ? 1500 : 300,
         messages: [{ role: "user", content: prompt }],
       }),

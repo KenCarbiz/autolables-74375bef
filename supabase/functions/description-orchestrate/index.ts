@@ -43,11 +43,11 @@ const DEFAULT_SETTINGS = {
   generation_model: "claude-haiku-4-5", prompt_version: "v1",
 };
 
-async function callGenerator(prompt: string): Promise<string> {
+async function callGenerator(prompt: string, modelKey?: string): Promise<string> {
   const res = await fetch(`${SUPABASE_URL}/functions/v1/ai-description`, {
     method: "POST",
     headers: { Authorization: `Bearer ${SERVICE_KEY}`, "Content-Type": "application/json" },
-    body: JSON.stringify({ vehicle: { prompt_override: prompt } }),
+    body: JSON.stringify({ vehicle: { prompt_override: prompt, model_key: modelKey } }),
   });
   if (!res.ok) {
     const t = await res.text().catch(() => "");
@@ -253,7 +253,7 @@ async function orchestrateVehicle(
     // 2 ── master
     await setCase(admin, caseId, { status: "GENERATING" });
     await audit(admin, tenantId, "description_generation_started", caseId, { vin: listing.vin });
-    const masterText = await callGenerator(buildMasterPrompt(snap, settings));
+    const masterText = await callGenerator(buildMasterPrompt(snap, settings), settings.generation_model);
 
     const { data: lastVer } = await admin.from("description_versions")
       .select("id, version_number").eq("description_case_id", caseId)
@@ -317,7 +317,7 @@ async function orchestrateVehicle(
         continue;
       }
       try {
-        const raw = await callGenerator(buildChannelPrompt(masterText, ch, snap, settings));
+        const raw = await callGenerator(buildChannelPrompt(masterText, ch, snap, settings), settings.generation_model);
         let content = raw, seoTitle: string | null = null, metaDesc: string | null = null;
         if (ch.seoFields) {
           try {
@@ -401,14 +401,31 @@ async function orchestrateVehicle(
     });
     const gateOk = (gate as any)?.ok !== false;
     if (eligibility === "eligible" && settings.internal_publication_enabled && !caseNow?.master_locked && gateOk) {
+      // PUBLISHING is a real observable state: publication is several round
+      // trips, and a crash mid-flight must leave a status the reconcile sweep
+      // recognizes as stalled rather than a silent "READY".
+      await setCase(admin, caseId, { status: "PUBLISHING" });
       const { data: pub } = await admin.rpc("publish_description_internal", {
         p_case_id: caseId, p_version_id: version.id, p_expected_lock_version: caseNow?.lock_version ?? null,
       });
       published = !!(pub as any)?.ok;
-      if (!published) {
+      if (published) {
+        finalStatus = "PUBLISHED";
+      } else {
+        await setCase(admin, caseId, { status: finalStatus });
         await raiseException(admin, ctx, "INTERNAL_PUBLICATION_FAILED", "high", false,
           "Internal publication did not complete", String((pub as any)?.error || "unknown"), { result: pub });
       }
+    }
+
+    // Published internally, but one or more enabled channels did not produce a
+    // usable variant — the vehicle is live on the shopper page while an export
+    // is missing. That is PARTIALLY_PUBLISHED, not PUBLISHED.
+    const expectedChannels = allEnabled.filter((k) => channelByKey(k)).length;
+    const usableChannels = channelRows.filter((r) => r.status !== "blocked").length;
+    if (published && expectedChannels > 0 && !scopedRun && usableChannels < expectedChannels) {
+      await setCase(admin, caseId, { status: "PARTIALLY_PUBLISHED" });
+      finalStatus = "PARTIALLY_PUBLISHED";
     }
 
     // Live copy that stays live must not be reported as unpublished. When a new
@@ -459,7 +476,7 @@ async function orchestrateVehicle(
 
     return {
       vehicle_id: vehicleId, case_id: caseId, version_id: version.id, version_number: nextNumber,
-      status: published ? "PUBLISHED" : finalStatus, eligibility, quality,
+      status: finalStatus, eligibility, quality,
       fact_confidence: snap.fact_confidence, channels: channelRows.length,
       conflicts: snap.conflicts.length, published,
     };
@@ -636,6 +653,7 @@ serve(async (req) => {
       }
 
       let chained = false;
+      let pendingCount = 0;
       if (depth < RECONCILE_MAX_DEPTH) {
         const { data: more } = await admin.rpc("next_description_reconcile_batch", {
           p_tenant_id: tenantId, p_limit: 20, p_sweep_start: sweepStart,
@@ -644,7 +662,11 @@ serve(async (req) => {
         // cannot leave the cursor would otherwise chain 80 hops deep.
         const pending = ((more || []) as Array<{ vehicle_id: string }>)
           .filter((r) => !seenThisHop.has(r.vehicle_id));
+        pendingCount = pending.length;
         if (pending.length > 0) {
+          // The hop is REQUESTED, not confirmed: the call is fire-and-forget and
+          // the child may cold-start-fail. Reporting "chained" as if the backlog
+          // were draining would hide a sweep that never resumed.
           chained = true;
           await fetch(`${SUPABASE_URL}/functions/v1/description-orchestrate`, {
             method: "POST",
@@ -656,7 +678,7 @@ serve(async (req) => {
           }).catch(() => { /* best-effort; the next nightly sweep retries */ });
         }
       }
-      return json({ success: true, examined, depth, chained, sweep_start: sweepStart, results });
+      return json({ success: true, examined, depth, chain_requested: chained, remaining_at_exit: pendingCount, sweep_start: sweepStart, results });
     }
 
     return json({ error: `unknown action: ${action}` }, 400);

@@ -59,10 +59,10 @@ export default function DescriptionIntelligence() {
   const perms = useDescriptionPermissions();
   const {
     record, busy, error, generate, publishInternally, saveManualVersion,
-    setChannelLock, setMasterLock, approveVersion, resolveException,
+    saveChannelVersion, setChannelLock, setMasterLock, approveVersion, resolveException,
   } = useDescriptionCase(vehicleId);
 
-  const [tab, setTab] = useState<"master" | "channels" | "history">("master");
+  const [tab, setTab] = useState<"master" | "history">("master");
   const [selectedVersionId, setSelectedVersionId] = useState<string | null>(null);
   const [draft, setDraft] = useState<string | null>(null);
   const [openChannel, setOpenChannel] = useState<string | null>(null);
@@ -71,6 +71,7 @@ export default function DescriptionIntelligence() {
   const [showLineage, setShowLineage] = useState(false);
   const [showFindings, setShowFindings] = useState(false);
   const [expanded, setExpanded] = useState(false);
+  const [channelDraft, setChannelDraft] = useState<{ id: string; text: string } | null>(null);
 
   const caseRow = record?.caseRow;
   const vehicle = record?.vehicle;
@@ -249,12 +250,19 @@ export default function DescriptionIntelligence() {
               {Object.values(facts).slice(0, 12).map((f: any) => {
                 const fm = FACT_STATUS_META[f.status] ?? FACT_STATUS_META.pending;
                 return (
-                  <li key={f.field} className="flex items-center justify-between gap-2 text-[12px]">
-                    <span className="text-foreground capitalize truncate inline-flex items-center gap-1.5 min-w-0">
+                  <li key={f.field} className="flex items-start justify-between gap-2 text-[12px]">
+                    <span className="text-foreground truncate inline-flex items-start gap-1.5 min-w-0">
                       {f.status === "verified"
-                        ? <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
-                        : <Clock className="w-3.5 h-3.5 text-muted-foreground shrink-0" />}
-                      <span className="truncate">{factLabel(f.field)}</span>
+                        ? <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 shrink-0 mt-0.5" />
+                        : <Clock className="w-3.5 h-3.5 text-muted-foreground shrink-0 mt-0.5" />}
+                      {/* source AND status, per the spec — source was only
+                          visible after opening the lineage panel */}
+                      <span className="min-w-0">
+                        <span className="block truncate">{factLabel(f.field)}</span>
+                        <span className="block text-[10.5px] text-muted-foreground truncate">
+                          {String(f.source || "").replace(/_/g, " ")}
+                        </span>
+                      </span>
                     </span>
                     <span className={`text-[12px] font-semibold shrink-0 ${
                       fm.tone === "emerald" ? "text-emerald-600" : fm.tone === "amber" ? "text-amber-700"
@@ -480,7 +488,7 @@ export default function DescriptionIntelligence() {
 
       <div className="rounded-2xl border border-border bg-card overflow-hidden">
         <div className="flex items-center gap-1 border-b border-border px-2 overflow-x-auto" role="tablist">
-          {([["master", "Master Description"], ["channels", "Channel Variants"], ["history", "Version History"]] as const).map(([k, label]) => (
+          {([["master", "Master Description"], ["history", "Version History"]] as const).map(([k, label]) => (
             <button key={k} role="tab" aria-selected={tab === k} onClick={() => setTab(k)}
               className={`min-h-[44px] px-3.5 text-[13px] font-semibold border-b-2 -mb-px transition-colors whitespace-nowrap ${
                 tab === k ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground"}`}>
@@ -519,7 +527,7 @@ export default function DescriptionIntelligence() {
                     <button key={a.label} type="button" title={a.title} aria-label={a.title}
                       disabled={!perms.canEdit}
                       onClick={() => setDraft((cur) => a.apply(cur ?? current.content))}
-                      className="w-9 h-9 grid place-items-center rounded-md text-muted-foreground hover:bg-card hover:text-foreground disabled:opacity-40">
+                      className="w-11 h-11 grid place-items-center rounded-md text-muted-foreground hover:bg-card hover:text-foreground disabled:opacity-40">
                       <a.Icon className="w-4 h-4" />
                     </button>
                   ))}
@@ -563,62 +571,6 @@ export default function DescriptionIntelligence() {
             )
           )}
 
-          {tab === "channels" && (
-            record.channels.length === 0 ? (
-              <p className="text-[12.5px] text-muted-foreground py-6 text-center">No channel variants yet.</p>
-            ) : (
-              <div className="space-y-2">
-                {record.channels.map((cv) => {
-                  const cm = channelMeta(cv.channel);
-                  const conn = connectorLabel(cm);
-                  const open = openChannel === cv.id;
-                  return (
-                    <div key={cv.id} className="rounded-xl border border-border">
-                      <button onClick={() => setOpenChannel(open ? null : cv.id)} aria-expanded={open}
-                        className="w-full flex items-center gap-2.5 p-3 text-left min-h-[52px]">
-                        <ChevronDown className={`w-4 h-4 text-muted-foreground transition-transform ${open ? "rotate-180" : ""}`} />
-                        <span className="text-[13px] font-semibold text-foreground flex-1 min-w-0 truncate">{cm?.label || cv.channel}</span>
-                        {cv.locked && <Pill tone="amber"><Lock className="w-3 h-3" /> Locked</Pill>}
-                        {cv.potentially_stale && <Pill tone="amber">Stale</Pill>}
-                        <span className="text-[11px] text-muted-foreground whitespace-nowrap">{cv.character_count}/{cv.character_limit}</span>
-                        <Pill tone={conn.tone}>{conn.label}</Pill>
-                      </button>
-                      {open && (
-                        <div className="px-3 pb-3 border-t border-border pt-3">
-                          {cv.seo_title && <p className="text-[12px] mb-1"><b>SEO title:</b> {cv.seo_title}</p>}
-                          {cv.meta_description && <p className="text-[12px] mb-2"><b>Meta:</b> {cv.meta_description}</p>}
-                          <p className="text-[13px] text-foreground whitespace-pre-wrap leading-relaxed">{cv.content}</p>
-                          {cm?.deliveryMode !== "internal_projection" && (
-                            <p className="text-[11.5px] text-amber-800 bg-amber-50 border border-amber-200 rounded-lg p-2 mt-2.5">
-                              {cm?.connectorStatus === "not_configured"
-                                ? "No connector is configured for this destination. AutoLabels cannot deliver here — copy or download the text to publish it manually."
-                                : "Export only. AutoLabels does not deliver to this destination automatically."}
-                            </p>
-                          )}
-                          <div className="flex items-center gap-2 mt-2.5 flex-wrap">
-                            <button onClick={() => copyText(cv.content, cm?.label || cv.channel)}
-                              className="min-h-[44px] px-3 rounded-lg border border-border text-[12px] font-semibold inline-flex items-center gap-1.5">
-                              <Copy className="w-3.5 h-3.5" /> Copy
-                            </button>
-                            <button onClick={() => downloadText(cv.content, cm?.label || cv.channel)}
-                              className="min-h-[44px] px-3 rounded-lg border border-border text-[12px] font-semibold inline-flex items-center gap-1.5">
-                              <Download className="w-3.5 h-3.5" /> Download
-                            </button>
-                            {perms.canLock && (
-                              <button onClick={() => act(() => setChannelLock(cv.id, !cv.locked, "manual edit protected"), cv.locked ? "Channel unlocked" : "Channel locked")}
-                                className="min-h-[44px] px-3 rounded-lg border border-border text-[12px] font-semibold inline-flex items-center gap-1.5">
-                                {cv.locked ? <><LockOpen className="w-3.5 h-3.5" /> Unlock</> : <><Lock className="w-3.5 h-3.5" /> Lock</>}
-                              </button>
-                            )}
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            )
-          )}
 
           {tab === "history" && (
             versions.length === 0 ? (
@@ -743,6 +695,153 @@ export default function DescriptionIntelligence() {
       </Card>
   );
 
+  // Shared lifecycle rail — the mockup places this in the desktop right column
+  // and again in the mobile hero, so it is defined once.
+  const lifecycleRail = (
+    <ol className="space-y-2.5">
+      {LIFECYCLE_STEPS.map((s, i) => (
+        <li key={s} className="flex items-start gap-2.5">
+          <span className="relative flex flex-col items-center shrink-0">
+            <span className={`w-6 h-6 rounded-full grid place-items-center text-[10.5px] font-bold ${
+              i <= stepIdx ? "bg-emerald-500 text-white" : "bg-muted text-muted-foreground border border-border"}`}>
+              {i <= stepIdx ? "✓" : i + 1}
+            </span>
+            {i < LIFECYCLE_STEPS.length - 1 && (
+              <span aria-hidden className={`w-0.5 h-5 ${i < stepIdx ? "bg-emerald-500" : "bg-border"}`} />
+            )}
+          </span>
+          <span className={`text-[12px] leading-6 ${i <= stepIdx ? "text-foreground font-medium" : "text-muted-foreground"}`}>
+            {s}
+          </span>
+        </li>
+      ))}
+    </ol>
+  );
+
+  // Publication truth read from stored delivery rows rather than the static
+  // channel table, so the rail reports what the server actually recorded.
+  const deliveries = record?.deliveries ?? [];
+  const deliveryLog = deliveries.length > 0 && (
+    <Card title="Delivery Log">
+      <ul className="space-y-2">
+        {deliveries.slice(0, 8).map((d) => {
+          const cm = channelMeta(d.destination);
+          const delivered = d.status === "delivered";
+          return (
+            <li key={d.id} className="flex items-start justify-between gap-2">
+              <div className="min-w-0">
+                <p className="text-[12px] font-semibold text-foreground truncate">{cm?.label ?? d.destination}</p>
+                <p className="text-[11px] text-muted-foreground">
+                  {delivered ? `Published ${fmt(d.published_at)}`
+                    : String(d.response_metadata?.note || "Not delivered by AutoLabels.")}
+                </p>
+              </div>
+              <Pill tone={delivered ? "emerald" : d.status === "unavailable" ? "slate" : "amber"}>
+                {delivered ? "Delivered" : d.status === "unavailable" ? "No Connector" : "Export Only"}
+              </Pill>
+            </li>
+          );
+        })}
+      </ul>
+    </Card>
+  );
+
+  // The mockup shows variants beside the master, not behind a tab — you cannot
+  // compare master copy to its channel output when only one is visible.
+  const channelVariantsCard = record && (
+    <Card title="Channel Variants">
+      record.channels.length === 0 ? (
+            <p className="text-[12.5px] text-muted-foreground py-6 text-center">No channel variants yet.</p>
+          ) : (
+            <div className="space-y-2">
+              {record.channels.map((cv) => {
+                const cm = channelMeta(cv.channel);
+                const conn = connectorLabel(cm);
+                const open = openChannel === cv.id;
+                const draft = channelDraft && channelDraft.id === cv.id ? channelDraft : null;
+                return (
+                  <div key={cv.id} className="rounded-xl border border-border">
+                    <button onClick={() => setOpenChannel(open ? null : cv.id)} aria-expanded={open}
+                      className="w-full flex items-center gap-2.5 p-3 text-left min-h-[52px]">
+                      <ChevronDown className={`w-4 h-4 text-muted-foreground transition-transform ${open ? "rotate-180" : ""}`} />
+                      <span className="text-[13px] font-semibold text-foreground flex-1 min-w-0 truncate">{cm?.label || cv.channel}</span>
+                      {cv.locked && <Pill tone="amber"><Lock className="w-3 h-3" /> Locked</Pill>}
+                      {cv.potentially_stale && <Pill tone="amber">Stale</Pill>}
+                      <span className="text-[11px] text-muted-foreground whitespace-nowrap">{cv.character_count}/{cv.character_limit}</span>
+                      <Pill tone={conn.tone}>{conn.label}</Pill>
+                    </button>
+                    {open && (
+                      <div className="px-3 pb-3 border-t border-border pt-3">
+                        {cv.seo_title && <p className="text-[12px] mb-1"><b>SEO title:</b> {cv.seo_title}</p>}
+                        {cv.meta_description && <p className="text-[12px] mb-2"><b>Meta:</b> {cv.meta_description}</p>}
+                        {perms.canEdit && draft ? (
+                          <textarea value={draft.text}
+                            onChange={(e) => setChannelDraft({ id: cv.id, text: e.target.value })}
+                            aria-label={`${cm?.label || cv.channel} copy`}
+                            className="w-full min-h-[160px] rounded-xl border border-border bg-background p-3 text-[13px] leading-relaxed focus:outline-none focus:ring-2 focus:ring-primary" />
+                        ) : (
+                          <p className="text-[13px] text-foreground whitespace-pre-wrap leading-relaxed">{cv.content}</p>
+                        )}
+                        {cm?.deliveryMode !== "internal_projection" && (
+                          <p className="text-[11.5px] text-amber-800 bg-amber-50 border border-amber-200 rounded-lg p-2 mt-2.5">
+                            {cm?.connectorStatus === "not_configured"
+                              ? "No connector is configured for this destination. AutoLabels cannot deliver here — copy or download the text to publish it manually."
+                              : "Export only. AutoLabels does not deliver to this destination automatically."}
+                          </p>
+                        )}
+                        <div className="flex items-center gap-2 mt-2.5 flex-wrap">
+                          <button onClick={() => copyText(cv.content, cm?.label || cv.channel)}
+                            className="min-h-[44px] px-3 rounded-lg border border-border text-[12px] font-semibold inline-flex items-center gap-1.5">
+                            <Copy className="w-3.5 h-3.5" /> Copy
+                          </button>
+                          <button onClick={() => downloadText(cv.content, cm?.label || cv.channel)}
+                            className="min-h-[44px] px-3 rounded-lg border border-border text-[12px] font-semibold inline-flex items-center gap-1.5">
+                            <Download className="w-3.5 h-3.5" /> Download
+                          </button>
+                          {/* A channel lock protects a manual edit, so the edit
+                              has to be possible. Saving locks the variant so
+                              automation will not overwrite it. */}
+                          {perms.canEdit && (draft ? (
+                            <>
+                              <button
+                                onClick={async () => {
+                                  const ok = await act(
+                                    () => saveChannelVersion(cv.channel, draft.text, "manual channel edit"),
+                                    "Channel copy saved and locked");
+                                  if (ok) setChannelDraft(null);
+                                }}
+                                disabled={busy || draft.text.trim() === cv.content.trim()}
+                                className="min-h-[44px] px-3 rounded-lg bg-primary text-primary-foreground text-[12px] font-semibold inline-flex items-center gap-1.5 disabled:opacity-50">
+                                <Save className="w-3.5 h-3.5" /> Save Channel Copy
+                              </button>
+                              <button onClick={() => setChannelDraft(null)}
+                                className="min-h-[44px] px-3 rounded-lg border border-border text-[12px] font-semibold">
+                                Cancel
+                              </button>
+                            </>
+                          ) : (
+                            <button onClick={() => setChannelDraft({ id: cv.id, text: cv.content })}
+                              className="min-h-[44px] px-3 rounded-lg border border-border text-[12px] font-semibold inline-flex items-center gap-1.5">
+                              <Type className="w-3.5 h-3.5" /> Edit
+                            </button>
+                          ))}
+                          {perms.canLock && (
+                            <button onClick={() => act(() => setChannelLock(cv.id, !cv.locked, "manual edit protected"), cv.locked ? "Channel unlocked" : "Channel locked")}
+                              className="min-h-[44px] px-3 rounded-lg border border-border text-[12px] font-semibold inline-flex items-center gap-1.5">
+                              {cv.locked ? <><LockOpen className="w-3.5 h-3.5" /> Unlock</> : <><Lock className="w-3.5 h-3.5" /> Lock</>}
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )
+    </Card>
+  );
+
   // ── Right rail (normal state) ──────────────────────────────────────
   const rail = (
     <div className="space-y-4">
@@ -779,7 +878,38 @@ export default function DescriptionIntelligence() {
         </dl>
       </Card>
 
+      <Card title="Progress">{lifecycleRail}</Card>
+
+      <Card title="Current Version">
+        <p className="text-[13px] font-bold text-foreground">v{current?.version_number ?? "—"}</p>
+        <p className="text-[11.5px] text-muted-foreground">
+          {current?.version_type === "manual_edit" ? "Manually edited" : "Generated"} · {fmt(current?.created_at)}
+        </p>
+        {isPublished && <p className="text-[11.5px] text-emerald-700 font-semibold mt-1">This is the live version.</p>}
+      </Card>
+
       {channelReadinessCard}
+
+      {deliveryLog}
+
+      <Card title="Audit Timeline">
+        <ol className="space-y-2.5">
+          {([["Facts snapshotted", snapshot?.created_at],
+             ["Description generated", current?.created_at],
+             ["Last validated", caseRow?.last_success_at],
+             ["Published internally", isPublished ? caseRow?.last_success_at : null]] as Array<[string, string | null | undefined]>)
+            .filter(([, when]) => !!when)
+            .map(([label, when]) => (
+              <li key={label} className="flex items-start gap-2.5">
+                <span className="w-1.5 h-1.5 rounded-full bg-primary mt-1.5 shrink-0" />
+                <div className="min-w-0">
+                  <p className="text-[12px] text-foreground">{label}</p>
+                  <p className="text-[11px] text-muted-foreground">{fmt(when)}</p>
+                </div>
+              </li>
+            ))}
+        </ol>
+      </Card>
 
       {exceptions.length > 0 && (
         <Card title={`Exceptions (${exceptions.length})`}>
@@ -856,6 +986,7 @@ export default function DescriptionIntelligence() {
           {exceptionBanner}
           {conflictCard}
           {workspace}
+          {!blockingException && channelVariantsCard}
         </div>
         {activeRail}
       </div>
@@ -954,6 +1085,7 @@ export default function DescriptionIntelligence() {
 
         {[["facts", "Trusted Facts", trustedFactsCard],
           ["readiness", "Channel Readiness", channelReadinessCard],
+          ["variants", "Channel Variants", channelVariantsCard],
           ["history", "Version History", (
             <ul className="space-y-2">
               {versions.map((v) => (

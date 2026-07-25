@@ -365,6 +365,30 @@ export function useDescriptionCase(vehicleId: string | undefined) {
     return { ok: true };
   }, [record?.caseRow, generate, load]);
 
+  // A channel lock protects a manual edit, so there has to be a way to make
+  // one. Server-side RPC + server-side validation, exactly like the master.
+  const saveChannelVersion = useCallback(async (
+    channel: string, content: string, reason: string,
+  ) => {
+    const caseRow = record?.caseRow;
+    if (!caseRow || !tenant?.id) return { ok: false, error: "no case" };
+    setBusy(true);
+    const { data, error } = await (supabase as any).rpc("save_description_channel_version", {
+      p_case_id: caseRow.id, p_channel: channel, p_content: content, p_reason: reason,
+    });
+    setBusy(false);
+    if (error) return { ok: false, error: error.message };
+    const res = data as any;
+    if (res?.ok === false) {
+      if (res.error === "over_channel_limit") {
+        return { ok: false, error: `Too long for this destination: ${res.length} of ${res.limit} characters.` };
+      }
+      return { ok: false, error: String(res.error) };
+    }
+    await load();
+    return { ok: true, warning: "Saved and locked. It stays 'pending' until the next validation run." };
+  }, [record?.caseRow, tenant?.id, load]);
+
   return { record, busy, error, reload: load, generate, publishInternally, saveManualVersion,
-           setChannelLock, setMasterLock, approveVersion, resolveException };
+           saveChannelVersion, setChannelLock, setMasterLock, approveVersion, resolveException };
 }
