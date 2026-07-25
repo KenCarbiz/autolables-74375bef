@@ -111,7 +111,10 @@ export function buildAdminNavSections({ badges, anyAdminTab }: BuildNavOptions):
         // row of its own rather than living only behind the Create hub.
         { label: "Description Operations", path: "/description-operations", icon: Sparkles, capability: "can_create_documents",
           match: (p: string) => p.startsWith("/description-operations") || p.startsWith("/description-intelligence") || p.startsWith("/description-writer") || p.startsWith("/description-studio") },
-        { label: "Print Center", path: "/print-center", icon: Printer, capability: "can_print", match: underSegment("/print-center") },
+        // Gate on the same capability the page itself checks. Every role that
+        // holds can_print also holds can_view_print_queue, so this only widens
+        // the row to the read-only roles the page already admits.
+        { label: "Print Center", path: "/print-center", icon: Printer, capability: "can_view_print_queue", match: underSegment("/print-center") },
       ],
     },
     {

@@ -10,8 +10,8 @@ import { useEntitlements } from "@/hooks/useEntitlements";
 import { hasDealerCapability } from "@/lib/permissions/dealerRoleCapabilities";
 import { usePrintCenter, type DocRow } from "@/hooks/useCommandCenter";
 import {
-  BTN_PRIMARY, BTN_SECONDARY, CommandCard, CommandStatCard, EmptyState, ErrorCard, LoadingCard,
-  StatusPill, VehicleIdentityStrip,
+  BTN_PRIMARY, BTN_SECONDARY, CommandCard, CommandStatCard, DisabledReason, EmptyState, ErrorCard,
+  LoadingCard, StatusPill, VehicleIdentityStrip,
 } from "@/components/command/CommandPrimitives";
 import { cn } from "@/lib/utils";
 
@@ -40,8 +40,12 @@ export default function DocumentsPrintCenter() {
     || hasDealerCapability(role, "can_print", isAdmin);
   const canPrint = hasDealerCapability(role, "can_print", isAdmin);
 
+  // Nothing is fetched for a role that cannot see the print queue — the gate is
+  // the query, not just the render. The id stays in scope while entitlements
+  // settle so the loader is not handed a fresh id after its first commit, which
+  // would read as "vehicle not found" for one frame.
   const { data, loading, error, notFound, reload, printCompletePacket, printByStock } = usePrintCenter(
-    canView ? vehicleId : undefined,
+    entLoading || canView ? vehicleId : undefined,
   );
 
   const [busy, setBusy] = useState<"packet" | "stock" | null>(null);
@@ -88,7 +92,7 @@ export default function DocumentsPrintCenter() {
 
   // AppShell renders the title in the desktop chrome, so the in-content copy is
   // mobile-only — same convention as DescriptionOperations.
-  const Header = (
+  const header = (
     <div className="mb-4 lg:hidden">
       <h1 className="font-display text-[26px] font-bold tracking-tight text-foreground leading-none">
         Documents &amp; Print Center
@@ -101,24 +105,54 @@ export default function DocumentsPrintCenter() {
 
   const shell = (children: React.ReactNode) => (
     <div className="max-w-[1480px] mx-auto p-4 sm:p-6">
-      {Header}
+      {header}
       {children}
     </div>
   );
 
-  // The role only arrives once entitlements resolve, so gating before that would
-  // flash "no access" at every authorized user on first paint.
+  // The skeleton mirrors the served layout at every breakpoint so the swap to
+  // real content never shifts the page.
+  const skeleton = (
+    <>
+      <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_minmax(320px,560px)] gap-3 items-start mb-4">
+        <LoadingCard rows={2} />
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+          {[0, 1, 2, 3].map((i) => <LoadingCard key={i} rows={1} />)}
+        </div>
+      </div>
+      <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_320px] gap-4 items-start">
+        <div className="min-w-0"><LoadingCard rows={8} /></div>
+        <div className="w-full min-w-0 lg:w-[320px] space-y-4">
+          <LoadingCard rows={6} />
+          <LoadingCard rows={4} />
+        </div>
+      </div>
+    </>
+  );
+
+  const inventoryAction = (
+    <button type="button" onClick={() => navigate("/inventory")} className={BTN_PRIMARY}>
+      Go to Inventory <ArrowRight className="w-4 h-4" aria-hidden="true" />
+    </button>
+  );
+
+  const homeAction = (
+    <button type="button" onClick={() => navigate("/dashboard")} className={BTN_SECONDARY}>
+      Back to Home
+    </button>
+  );
+
+  // One guard order across all three command surfaces:
+  // permission -> no vehicleId -> error -> loading -> not found -> no tenant.
+  // Permission waits on `entLoading` so an authorized user is never shown the
+  // denial card, and "not found" waits on `loading` so it is never shown early.
   if (!entLoading && !canView) {
     return shell(
       <EmptyState
         Icon={Lock}
         title="You do not have access to the Print Center"
-        detail="Printing and document packages require the print capability. Ask a manager to update your role."
-        action={
-          <button onClick={() => navigate("/dashboard")} className={BTN_SECONDARY}>
-            Back to Home
-          </button>
-        }
+        detail="Your role cannot view the print queue. Ask an owner or manager to grant print access."
+        action={homeAction}
       />,
     );
   }
@@ -129,43 +163,25 @@ export default function DocumentsPrintCenter() {
         Icon={Car}
         title="Pick a vehicle to open its print center"
         detail="Documents, print bundles, and Passport visibility are tracked per vehicle. Choose one from Inventory."
-        action={
-          <button onClick={() => navigate("/inventory")} className={BTN_PRIMARY}>
-            Go to Inventory <ArrowRight className="w-4 h-4" />
-          </button>
-        }
+        action={inventoryAction}
       />,
     );
   }
 
   if (error) return shell(<ErrorCard message={error} onRetry={reload} />);
 
-  if (loading || (!data && entLoading)) {
-    return shell(
-      <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_320px] gap-4 items-start">
-        <div className="min-w-0 space-y-3">
-          <LoadingCard rows={3} />
-          <LoadingCard rows={8} />
-        </div>
-        <div className="w-full min-w-0 lg:w-[320px] space-y-4">
-          <LoadingCard rows={6} />
-          <LoadingCard rows={4} />
-        </div>
-      </div>,
-    );
+  if (entLoading || loading) {
+    return shell(skeleton);
   }
 
+  // A vehicle that is not in this tenant is its own state — never the red error card.
   if (notFound) {
     return shell(
       <EmptyState
         Icon={Car}
         title="Vehicle not found"
         detail="This vehicle is not in your inventory, or it was removed. Pick another vehicle from Inventory."
-        action={
-          <button onClick={() => navigate("/inventory")} className={BTN_PRIMARY}>
-            Go to Inventory <ArrowRight className="w-4 h-4" />
-          </button>
-        }
+        action={inventoryAction}
       />,
     );
   }
@@ -175,28 +191,24 @@ export default function DocumentsPrintCenter() {
       <EmptyState
         Icon={Building2}
         title="Select a dealership to view this vehicle"
-        detail="The print center reads documents for the dealership you are working in. Choose one to continue."
-        action={
-          <button onClick={() => navigate("/dashboard")} className={BTN_SECONDARY}>
-            Back to Home
-          </button>
-        }
+        detail="The Print Center reads records for the dealership you are working in. Choose one to continue."
+        action={homeAction}
       />,
     );
   }
 
   const { vehicle, counts, documents, bundle, bundleNote, passportPreview, passportHref } = data;
   const docCount = documents.length;
-  const printBlockedReason = !canPrint
-    ? "Your role cannot send print jobs. Ask a manager for the print capability."
-    : bundle.length === 0
+  const printReason = canPrint
+    ? null
+    : "Your role cannot send print jobs. Ask an owner or manager to grant print access.";
+  const packetReason = printReason
+    ?? (bundle.length === 0
       ? "Nothing is in this vehicle's print bundle yet, so the complete packet cannot be released."
-      : null;
+      : null);
 
-  return (
-    <div className="max-w-[1480px] mx-auto p-4 sm:p-6">
-      {Header}
-
+  return shell(
+    <>
       {/* Vehicle identity + the four accent-topped counters, one row on desktop */}
       <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_minmax(320px,560px)] gap-3 items-start mb-4">
         <VehicleIdentityStrip
@@ -226,7 +238,7 @@ export default function DocumentsPrintCenter() {
           {docCount === 0 ? (
             <EmptyState
               Icon={FileText}
-              title="No documents yet"
+              title="No documents have been generated yet"
               detail="Window stickers, addendums, guides, and QR items appear here as they are generated for this vehicle."
             />
           ) : (
@@ -255,7 +267,7 @@ export default function DocumentsPrintCenter() {
                         <tr key={d.id} className="hover:bg-primary/[0.025] transition-colors">
                           <td className="px-3 py-3">
                             <span className="inline-flex items-center gap-2 min-w-0">
-                              <RowIcon className="w-4 h-4 text-muted-foreground shrink-0" />
+                              <RowIcon className="w-4 h-4 text-muted-foreground shrink-0" aria-hidden="true" />
                               <span className="text-[12.5px] font-semibold text-foreground truncate">{d.label}</span>
                             </span>
                           </td>
@@ -275,12 +287,13 @@ export default function DocumentsPrintCenter() {
                             <StatusPill tone={d.printStatus.tone}>{d.printStatus.label}</StatusPill>
                           </td>
                           <td className="px-3 py-3 text-right">
+                            <DisabledReason reason={d.href ? null : "No file available for this document yet"}>
                             <button
+                              type="button"
                               aria-label={`More actions for ${d.label}`}
                               aria-haspopup="menu"
                               aria-expanded={menu?.id === d.id}
                               disabled={!d.href}
-                              title={d.href ? undefined : "No file available for this document yet"}
                               onClick={(e) => {
                                 const r = (e.currentTarget as HTMLElement).getBoundingClientRect();
                                 const MENU_H = 108;
@@ -292,8 +305,9 @@ export default function DocumentsPrintCenter() {
                                 });
                               }}
                               className="w-11 h-11 grid place-items-center rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted/50 disabled:opacity-40 disabled:hover:bg-transparent">
-                              <MoreVertical className="w-4 h-4" />
+                              <MoreVertical className="w-4 h-4" aria-hidden="true" />
                             </button>
+                            </DisabledReason>
                           </td>
                         </tr>
                       );
@@ -323,7 +337,7 @@ export default function DocumentsPrintCenter() {
                   const Icon = BUNDLE_ICON(b.label);
                   return (
                     <li key={b.label} className="flex items-center gap-2.5 py-2.5">
-                      <Icon className="w-4 h-4 text-muted-foreground shrink-0" />
+                      <Icon className="w-4 h-4 text-muted-foreground shrink-0" aria-hidden="true" />
                       <span className="text-[12.5px] text-foreground flex-1 min-w-0 truncate">{b.label}</span>
                       <span className="text-[11.5px] text-muted-foreground whitespace-nowrap">
                         {b.count} {b.unit}
@@ -336,34 +350,36 @@ export default function DocumentsPrintCenter() {
 
             {bundleNote && (
               <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 mt-3 flex items-start gap-2">
-                <AlertTriangle className="w-4 h-4 text-amber-700 shrink-0 mt-0.5" />
+                <AlertTriangle className="w-4 h-4 text-amber-700 shrink-0 mt-0.5" aria-hidden="true" />
                 <p className="text-[11.5px] text-amber-900">{bundleNote}</p>
               </div>
             )}
 
             <div className="mt-3 space-y-2">
-              <button
-                onClick={() => runPrint("packet")}
-                disabled={!canPrint || busy !== null || bundle.length === 0}
-                title={!canPrint ? "Your role cannot send print jobs"
-                  : bundle.length === 0 ? "Nothing in this vehicle's print bundle yet" : undefined}
-                className={cn(BTN_PRIMARY, "w-full")}>
-                {busy === "packet" ? <Loader2 className="w-4 h-4 animate-spin" /> : <Printer className="w-4 h-4" />}
-                Print Complete Vehicle Packet
-              </button>
-              <button
-                onClick={() => runPrint("stock")}
-                disabled={!canPrint || busy !== null}
-                title={!canPrint ? "Your role cannot send print jobs" : undefined}
-                className={cn(BTN_SECONDARY, "w-full")}>
-                {busy === "stock" ? <Loader2 className="w-4 h-4 animate-spin" /> : <Printer className="w-4 h-4" />}
-                Print by Stock
-              </button>
-              {/* The shared button recipe disables pointer events, so a disabled
-                  reason has to be stated in the layout rather than a tooltip. */}
-              {printBlockedReason ? (
-                <p className="text-[11px] text-muted-foreground">{printBlockedReason}</p>
-              ) : null}
+              <DisabledReason className="flex w-full" reason={packetReason}>
+                <button
+                  type="button"
+                  onClick={() => runPrint("packet")}
+                  disabled={!canPrint || busy !== null || bundle.length === 0}
+                  className={cn(BTN_PRIMARY, "w-full")}>
+                  {busy === "packet"
+                    ? <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" />
+                    : <Printer className="w-4 h-4" aria-hidden="true" />}
+                  Print Complete Vehicle Packet
+                </button>
+              </DisabledReason>
+              <DisabledReason className="flex w-full" reason={printReason}>
+                <button
+                  type="button"
+                  onClick={() => runPrint("stock")}
+                  disabled={!canPrint || busy !== null}
+                  className={cn(BTN_SECONDARY, "w-full")}>
+                  {busy === "stock"
+                    ? <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" />
+                    : <Printer className="w-4 h-4" aria-hidden="true" />}
+                  Print by Stock
+                </button>
+              </DisabledReason>
             </div>
           </CommandCard>
 
@@ -378,7 +394,7 @@ export default function DocumentsPrintCenter() {
               <ul className="divide-y divide-border/70">
                 {passportPreview.map((p) => (
                   <li key={`${p.label}-${p.version}`} className="flex items-center gap-2.5 py-2.5">
-                    <FileText className="w-4 h-4 text-muted-foreground shrink-0" />
+                    <FileText className="w-4 h-4 text-muted-foreground shrink-0" aria-hidden="true" />
                     <span className="text-[12.5px] text-foreground flex-1 min-w-0 truncate">{p.label}</span>
                     <span className="text-[11.5px] text-muted-foreground whitespace-nowrap">{p.version}</span>
                   </li>
@@ -386,18 +402,17 @@ export default function DocumentsPrintCenter() {
               </ul>
             )}
             <div className="mt-3 pt-3 border-t border-border">
-              <button
-                onClick={openPassport}
-                disabled={!passportHref}
-                title={passportHref ? undefined : "This vehicle has no published Passport yet"}
-                className="w-full min-h-[44px] px-3 rounded-xl text-[12.5px] font-semibold text-blue-600 inline-flex items-center justify-center gap-1.5 hover:bg-muted/50 disabled:opacity-50 disabled:hover:bg-transparent">
-                Open Passport View <ExternalLink className="w-4 h-4" />
-              </button>
-              {!passportHref ? (
-                <p className="text-[11px] text-muted-foreground text-center mt-1">
-                  This vehicle has no published Passport yet.
-                </p>
-              ) : null}
+              <DisabledReason
+                className="flex w-full"
+                reason={passportHref ? null : "This vehicle has no published Passport yet"}>
+                <button
+                  type="button"
+                  onClick={openPassport}
+                  disabled={!passportHref}
+                  className="w-full min-h-[44px] px-3 rounded-xl text-[12.5px] font-semibold text-blue-600 inline-flex items-center justify-center gap-2 hover:bg-muted/50 disabled:opacity-50 disabled:hover:bg-transparent">
+                  Open Passport View <ExternalLink className="w-4 h-4" aria-hidden="true" />
+                </button>
+              </DisabledReason>
             </div>
           </CommandCard>
         </div>
@@ -408,12 +423,12 @@ export default function DocumentsPrintCenter() {
           <div className="fixed inset-0 z-30" onClick={() => setMenu(null)} aria-hidden />
           <div role="menu" style={{ top: menu.y, left: Math.max(8, menu.x - 208) }}
             className="fixed z-40 w-52 rounded-xl border border-border bg-card shadow-lg p-1">
-            <button role="menuitem"
+            <button type="button" role="menuitem"
               onClick={() => { window.open(menu.row.href, "_blank", "noopener,noreferrer"); setMenu(null); }}
               className="w-full text-left min-h-[44px] px-3 rounded-lg text-[12.5px] font-medium text-foreground hover:bg-muted/60">
               Open Document
             </button>
-            <button role="menuitem"
+            <button type="button" role="menuitem"
               onClick={() => {
                 const href = menu.row.href;
                 setMenu(null);
@@ -427,6 +442,6 @@ export default function DocumentsPrintCenter() {
           </div>
         </>
       )}
-    </div>
+    </>,
   );
 }

@@ -1,13 +1,13 @@
 import { useCallback, useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import {
-  AlertTriangle, ArrowRight, Calendar, Car, CheckCircle2, ClipboardList, Clock, Copy,
-  DollarSign, ExternalLink, Info, Loader2, Lock, Mail, Users,
+  AlertTriangle, ArrowRight, Building2, Calendar, Car, CheckCircle2, ClipboardList, Clock, Copy,
+  DollarSign, ExternalLink, Info, Loader2, Lock, Mail, Users, type LucideIcon,
 } from "lucide-react";
 import { toast } from "sonner";
 import {
-  BTN_PRIMARY, BTN_SECONDARY, CommandCard, CommandStepper, conditionLabel, EmptyState,
-  ErrorCard, LoadingCard, StatusPill,
+  BTN_PRIMARY, BTN_SECONDARY, CommandCard, CommandStepper, conditionLabel, DisabledReason,
+  EmptyState, ErrorCard, LoadingCard, StatusPill,
 } from "@/components/command/CommandPrimitives";
 import { useGetReadyCommand, type GetReadyColumn } from "@/hooks/useCommandCenter";
 import { useAuth } from "@/contexts/AuthContext";
@@ -50,12 +50,12 @@ const PRIORITY_DOT: Record<string, string> = {
 };
 
 function SummaryRow({ Icon, value, label, tone }: {
-  Icon: typeof Users; value: React.ReactNode; label: string; tone: Tone;
+  Icon: LucideIcon; value: React.ReactNode; label: string; tone: Tone;
 }) {
   return (
     <div className="flex items-center gap-3 py-2">
-      <span className={cn("grid place-items-center w-10 h-10 rounded-xl border shrink-0", TONE_CLASS[tone])}>
-        <Icon className="w-5 h-5" />
+      <span className={cn("grid place-items-center w-9 h-9 rounded-lg border shrink-0", TONE_CLASS[tone])}>
+        <Icon className="w-5 h-5" aria-hidden="true" />
       </span>
       <span className="min-w-0">
         <span className="block text-[22px] font-bold text-foreground leading-none">{value}</span>
@@ -96,24 +96,24 @@ function DepartmentColumn({ column, onSaveNote }: {
           "grid place-items-center w-9 h-9 rounded-full shrink-0",
           empty ? "bg-slate-200 text-slate-600" : complete ? "bg-emerald-600 text-white" : "bg-amber-500 text-white",
         )}>
-          <HeadIcon className="w-5 h-5" />
+          <HeadIcon className="w-5 h-5" aria-hidden="true" />
         </span>
-        <span className="min-w-0">
-          <span className="block text-[13px] font-bold text-foreground leading-tight">{column.title}</span>
-          <span className="block text-[11.5px] text-muted-foreground mt-0.5">{column.headline}</span>
-        </span>
+        <div className="min-w-0">
+          <h2 className="text-[13px] font-bold text-foreground leading-tight">{column.title}</h2>
+          <p className="text-[11.5px] text-muted-foreground mt-0.5">{column.headline}</p>
+        </div>
       </div>
 
       <div className="mt-3 divide-y divide-border/70">
         {column.items.length === 0 ? (
-          <p className="text-[12px] text-muted-foreground py-3">No work items assigned to this department.</p>
+          <p className="text-[11.5px] text-muted-foreground py-2">No work items assigned to this department.</p>
         ) : column.items.map((item) => {
           const done = item.status === "complete";
           return (
             <div key={item.id} className="flex items-start gap-2.5 py-2.5">
               {done
-                ? <CheckCircle2 className="w-4 h-4 text-emerald-600 mt-0.5 shrink-0" />
-                : <Clock className="w-4 h-4 text-amber-600 mt-0.5 shrink-0" />}
+                ? <CheckCircle2 className="w-4 h-4 text-emerald-600 mt-0.5 shrink-0" aria-hidden="true" />
+                : <Clock className="w-4 h-4 text-amber-600 mt-0.5 shrink-0" aria-hidden="true" />}
               <div className="min-w-0 flex-1">
                 <p className="text-[12.5px] font-medium text-foreground leading-tight">{item.label}</p>
                 {item.sublabel && <p className="text-[11.5px] text-muted-foreground mt-0.5">{item.sublabel}</p>}
@@ -145,7 +145,7 @@ function DepartmentColumn({ column, onSaveNote }: {
             className="w-full min-h-[92px] rounded-xl border border-border bg-background p-3 text-[12.5px] focus:outline-none focus:ring-2 focus:ring-primary" />
           {saving && (
             <p className="text-[10.5px] text-muted-foreground mt-1 inline-flex items-center gap-1">
-              <Loader2 className="w-3 h-3 animate-spin" /> Saving note…
+              <Loader2 className="w-3 h-3 animate-spin" aria-hidden="true" /> Saving note…
             </p>
           )}
         </div>
@@ -155,7 +155,7 @@ function DepartmentColumn({ column, onSaveNote }: {
         <div className="mt-3 pt-3 border-t border-border">
           <p className="text-[11.5px] font-semibold text-foreground mb-1.5">Vendor Assignments</p>
           {!column.vendors || column.vendors.length === 0 ? (
-            <p className="text-[12px] text-muted-foreground">No vendors assigned to this vehicle.</p>
+            <p className="text-[11.5px] text-muted-foreground py-2">No vendors assigned to this vehicle.</p>
           ) : (
             <div className="divide-y divide-border/70">
               {column.vendors.map((v, i) => (
@@ -166,13 +166,15 @@ function DepartmentColumn({ column, onSaveNote }: {
                   </span>
                   {v.email ? (
                     <a href={`mailto:${v.email}`} className={cn(BTN_SECONDARY, "shrink-0")}>
-                      <Mail className="w-4 h-4" /> Contact
+                      <Mail className="w-4 h-4" aria-hidden="true" /> Contact
                     </a>
                   ) : (
-                    <button type="button" disabled title="No email on file for this vendor"
-                      className={cn(BTN_SECONDARY, "shrink-0 text-muted-foreground")}>
-                      <Mail className="w-4 h-4" /> Contact
-                    </button>
+                    <DisabledReason reason="No email on file for this vendor" className="shrink-0">
+                      <button type="button" disabled
+                        className={cn(BTN_SECONDARY, "text-muted-foreground")}>
+                        <Mail className="w-4 h-4" aria-hidden="true" /> Contact
+                      </button>
+                    </DisabledReason>
                   )}
                 </div>
               ))}
@@ -188,13 +190,14 @@ function DepartmentColumn({ column, onSaveNote }: {
         </span>
         {column.reportHref ? (
           <a href={column.reportHref} target="_blank" rel="noreferrer" className={BTN_SECONDARY}>
-            {REPORT_LABEL[column.key]} <ExternalLink className="w-4 h-4" />
+            {REPORT_LABEL[column.key]} <ExternalLink className="w-4 h-4" aria-hidden="true" />
           </a>
         ) : (
-          <button type="button" disabled title="No report has been generated for this department yet"
-            className={cn(BTN_SECONDARY, "text-muted-foreground")}>
-            {REPORT_LABEL[column.key]} <ExternalLink className="w-4 h-4" />
-          </button>
+          <DisabledReason reason="No report has been generated for this department yet">
+            <button type="button" disabled className={cn(BTN_SECONDARY, "text-muted-foreground")}>
+              {REPORT_LABEL[column.key]} <ExternalLink className="w-4 h-4" aria-hidden="true" />
+            </button>
+          </DisabledReason>
         )}
       </div>
     </CommandCard>
@@ -225,7 +228,7 @@ export default function GetReadyCommand() {
       await navigator.clipboard.writeText(vin);
       toast.success("VIN copied");
     } catch {
-      toast.error("Could not copy the VIN");
+      toast.error("Clipboard unavailable");
     }
   }, [vin]);
 
@@ -259,74 +262,91 @@ export default function GetReadyCommand() {
     toast.success("Get Ready authorized and dispatched");
   }, [authorizeAndDispatch]);
 
-  const Header = (
+  // AppShell renders the title in the desktop chrome, so the in-content copy is
+  // mobile-only — same convention as DescriptionOperations.
+  const header = (
     <div className="min-w-0 lg:hidden mb-4">
       <h1 className="font-display text-[26px] font-bold tracking-tight text-foreground leading-none">Get Ready Command</h1>
       <p className="text-sm text-muted-foreground mt-1">Review the work AutoLabels prepared, then authorize once.</p>
     </div>
   );
 
-  const Frame = ({ children }: { children: React.ReactNode }) => (
-    <div className="max-w-[1480px] mx-auto p-4 sm:p-6">{Header}{children}</div>
+  const shell = (children: React.ReactNode) => (
+    <div className="max-w-[1480px] mx-auto p-4 sm:p-6">{header}{children}</div>
   );
 
-  const Skeleton = (
-    <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_300px] gap-4 items-start">
-      <div className="min-w-0 space-y-4">
-        <LoadingCard rows={3} />
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+  // The skeleton mirrors the served layout at every breakpoint so the swap to
+  // real content never shifts the page.
+  const skeleton = (
+    <>
+      <div className="min-w-0 mb-4"><LoadingCard rows={1} /></div>
+      <div className="mb-4"><LoadingCard rows={2} /></div>
+      <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_300px] gap-4 items-start">
+        <div className="min-w-0 grid grid-cols-1 lg:grid-cols-3 gap-4">
           {[0, 1, 2].map((i) => <LoadingCard key={i} rows={5} />)}
         </div>
+        <div className="lg:w-[300px] w-full space-y-4">
+          <LoadingCard rows={4} />
+          <LoadingCard rows={5} />
+        </div>
       </div>
-      <div className="lg:w-[300px] w-full space-y-4"><LoadingCard rows={4} /><LoadingCard rows={5} /></div>
-    </div>
+    </>
   );
 
-  const inventoryButton = (
-    <button onClick={() => navigate("/inventory")} className={cn(BTN_PRIMARY, "gap-1.5")}>
-      Go to Inventory <ArrowRight className="w-4 h-4" />
+  const inventoryAction = (
+    <button type="button" onClick={() => navigate("/inventory")} className={BTN_PRIMARY}>
+      Go to Inventory <ArrowRight className="w-4 h-4" aria-hidden="true" />
     </button>
   );
 
-  if (entLoading) return <Frame>{Skeleton}</Frame>;
+  const homeAction = (
+    <button type="button" onClick={() => navigate("/dashboard")} className={BTN_SECONDARY}>
+      Back to Home
+    </button>
+  );
 
-  if (!canView) {
-    return (
-      <Frame>
-        <EmptyState Icon={Lock} title="You do not have access to Get Ready"
-          detail="Ask an owner or manager to grant your role get-ready access."
-          action={
-            <button onClick={() => navigate("/")} className={BTN_SECONDARY}>
-              Back to Home
-            </button>
-          } />
-      </Frame>
+  // One guard order across all three command surfaces:
+  // permission -> no vehicleId -> error -> loading -> not found -> no tenant.
+  // Permission waits on `entLoading` so an authorized user is never shown the
+  // denial card, and "not found" waits on `loading` so it is never shown early.
+  if (!entLoading && !canView) {
+    return shell(
+      <EmptyState Icon={Lock} title="You do not have access to Get Ready"
+        detail="Your role cannot view get ready. Ask an owner or manager to grant get-ready access."
+        action={homeAction} />,
     );
   }
 
   if (!vehicleId) {
-    return (
-      <Frame>
-        <EmptyState Icon={Car} title="Pick a vehicle to review"
-          detail="Get Ready Command opens per vehicle. Choose one from Inventory to review and authorize its get-ready."
-          action={inventoryButton} />
-      </Frame>
+    return shell(
+      <EmptyState Icon={Car} title="Pick a vehicle to review"
+        detail="Get Ready Command opens per vehicle. Choose one from Inventory to review and authorize its get-ready."
+        action={inventoryAction} />,
     );
   }
 
   if (error) {
-    return <Frame><ErrorCard message={error} onRetry={reload} /></Frame>;
+    return shell(<ErrorCard message={error} onRetry={reload} />);
   }
 
-  if (loading) return <Frame>{Skeleton}</Frame>;
+  if (entLoading || loading) {
+    return shell(skeleton);
+  }
 
-  if (notFound || !data) {
-    return (
-      <Frame>
-        <EmptyState Icon={Car} title="Vehicle not found"
-          detail="This vehicle is not in your inventory, or it was removed."
-          action={inventoryButton} />
-      </Frame>
+  // A vehicle that is not in this tenant is its own state — never the red error card.
+  if (notFound) {
+    return shell(
+      <EmptyState Icon={Car} title="Vehicle not found"
+        detail="This vehicle is not in your inventory, or it was removed. Pick another vehicle from Inventory."
+        action={inventoryAction} />,
+    );
+  }
+
+  if (!data) {
+    return shell(
+      <EmptyState Icon={Building2} title="Select a dealership to view this vehicle"
+        detail="Get Ready Command reads records for the dealership you are working in. Choose one to continue."
+        action={homeAction} />,
     );
   }
 
@@ -334,10 +354,8 @@ export default function GetReadyCommand() {
   const delivery = dateLabel(deliveryTarget);
   const condition = conditionLabel(vehicle.condition);
 
-  return (
-    <div className="max-w-[1480px] mx-auto p-4 sm:p-6">
-      {Header}
-
+  return shell(
+    <>
       {/* CommandStepper scrolls inside itself; this only bounds it so a 375px
           viewport never scrolls the page. */}
       <div className="min-w-0 mb-4">
@@ -383,7 +401,7 @@ export default function GetReadyCommand() {
               <div className="min-w-0">
                 <p className="text-[11px] text-muted-foreground">Priority</p>
                 <p className="text-[12.5px] font-medium text-foreground inline-flex items-center gap-1.5">
-                  <span className={`w-2 h-2 rounded-full ${priority ? PRIORITY_DOT[priority] : "bg-slate-300"}`} />
+                  <span className={cn("w-2 h-2 rounded-full", priority ? PRIORITY_DOT[priority] : "bg-slate-300")} aria-hidden="true" />
                   {priority ? priority.charAt(0).toUpperCase() + priority.slice(1) : "Not set"}
                 </p>
               </div>
@@ -392,13 +410,14 @@ export default function GetReadyCommand() {
             <div className="mt-3 pt-3 border-t border-border">
               <p className="text-[11px] text-muted-foreground">Delivery Target</p>
               <p className="text-[12.5px] font-medium text-foreground inline-flex items-center gap-1.5 mt-0.5">
-                <Calendar className="w-4 h-4 text-muted-foreground" /> {delivery || "Not scheduled"}
+                <Calendar className="w-4 h-4 text-muted-foreground" aria-hidden="true" /> {delivery || "Not scheduled"}
               </p>
             </div>
           </div>
 
-          <button onClick={() => navigate(`/vehicle-file/${vehicle.id}`)} className={cn(BTN_SECONDARY, "shrink-0")}>
-            View Vehicle Details <ExternalLink className="w-4 h-4" />
+          <button type="button" onClick={() => navigate(`/vehicle-file/${vehicle.id}`)}
+            className={cn(BTN_SECONDARY, "shrink-0")}>
+            View Vehicle Details <ExternalLink className="w-4 h-4" aria-hidden="true" />
           </button>
         </div>
       </div>
@@ -429,7 +448,7 @@ export default function GetReadyCommand() {
 
           <CommandCard title="Authorization Checklist">
             {checklist.length === 0 ? (
-              <p className="text-[12px] text-muted-foreground">No checklist items are configured for this vehicle.</p>
+              <p className="text-[11.5px] text-muted-foreground py-2">No checklist items are configured for this vehicle.</p>
             ) : (
               <div className="space-y-0.5">
                 {checklist.map((c) => {
@@ -444,8 +463,8 @@ export default function GetReadyCommand() {
                         checked ? "bg-blue-600 border-blue-600 text-white" : "border-border bg-background text-transparent",
                       )}>
                         {busyKey === c.key
-                          ? <Loader2 className={`w-3.5 h-3.5 animate-spin ${checked ? "text-white" : "text-muted-foreground"}`} />
-                          : <CheckCircle2 className="w-3.5 h-3.5" />}
+                          ? <Loader2 className={cn("w-3.5 h-3.5 animate-spin", checked ? "text-white" : "text-muted-foreground")} aria-hidden="true" />
+                          : <CheckCircle2 className="w-3.5 h-3.5" aria-hidden="true" />}
                       </span>
                       <span className="text-[12.5px] text-foreground leading-tight">{c.label}</span>
                     </label>
@@ -456,12 +475,17 @@ export default function GetReadyCommand() {
           </CommandCard>
 
           <div>
-            <button onClick={onAuthorize} disabled={!canAuthorize || authorizing}
-              title={canAuthorize ? undefined : "Complete the authorization checklist to enable dispatch"}
-              className={cn(BTN_PRIMARY, "w-full gap-1.5")}>
-              {authorizing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Lock className="w-4 h-4" />}
-              Authorize Get Ready &amp; Dispatch
-            </button>
+            <DisabledReason
+              className="flex w-full"
+              reason={canAuthorize ? null : "Complete the authorization checklist to enable dispatch"}>
+              <button type="button" onClick={onAuthorize} disabled={!canAuthorize || authorizing}
+                className={cn(BTN_PRIMARY, "w-full")}>
+                {authorizing
+                  ? <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" />
+                  : <Lock className="w-4 h-4" aria-hidden="true" />}
+                Authorize Get Ready &amp; Dispatch
+              </button>
+            </DisabledReason>
             <p className="text-[11px] text-muted-foreground text-center mt-2">
               Creates immutable instructions, sends assignments, and releases eligible print jobs.
             </p>
@@ -471,10 +495,10 @@ export default function GetReadyCommand() {
 
       <div className="rounded-2xl border border-blue-200 bg-blue-50/70 p-3 mt-4">
         <p className="text-[12.5px] text-blue-900 inline-flex items-start gap-2">
-          <Info className="w-4 h-4 shrink-0 mt-0.5" />
+          <Info className="w-4 h-4 shrink-0 mt-0.5" aria-hidden="true" />
           <span>Third-party items show "Pending Proof" until vendors upload completion proof. Items are due within five (5) business days.</span>
         </p>
       </div>
-    </div>
+    </>,
   );
 }

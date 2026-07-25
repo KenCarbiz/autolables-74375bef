@@ -37,6 +37,27 @@ export function conditionLabel(raw: string | null | undefined): string | null {
   return v.charAt(0).toUpperCase() + v.slice(1).toLowerCase();
 }
 
+/* -------------------------------------------------------------- DisabledReason */
+
+// BTN_BASE sets `disabled:pointer-events-none`, so a `title` on a disabled
+// button is never hit-tested and the operator never learns why it is dead. The
+// title has to ride on a wrapper that still receives pointer events.
+export function DisabledReason({
+  reason,
+  className,
+  children,
+}: {
+  reason?: string | null;
+  className?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <span title={reason ?? undefined} className={cn("inline-flex", className)}>
+      {children}
+    </span>
+  );
+}
+
 /* ------------------------------------------------------------------ StatusPill */
 
 export function StatusPill({
