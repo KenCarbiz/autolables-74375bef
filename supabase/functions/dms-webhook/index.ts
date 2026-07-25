@@ -224,6 +224,7 @@ serve(async (req) => {
     };
 
     const errors: Array<{ vin: string; error: string }> = [];
+    const touchedIds: string[] = [];
     let upserted = 0;
 
     for (const v of vehicles) {
@@ -259,18 +260,34 @@ serve(async (req) => {
           .update(patch)
           .eq("id", existing.id);
         if (error) errors.push({ vin: v.vin, error: error.message });
-        else upserted++;
+        else { upserted++; touchedIds.push(existing.id); }
       } else {
         const slug = makeSlug(v.vin, v.ymm);
-        const { error } = await admin.from("vehicle_listings").insert({
+        const { data: inserted, error } = await admin.from("vehicle_listings").insert({
           ...patch,
           slug,
           status: "draft",
           sticker_snapshot: {},
-        });
+        }).select("id").single();
         if (error) errors.push({ vin: v.vin, error: error.message });
-        else upserted++;
+        else { upserted++; if (inserted?.id) touchedIds.push(inserted.id); }
       }
+    }
+
+    // Description Intelligence: initialize the merchandising case for each VIN
+    // this push touched. Fire-and-forget by design — a description failure must
+    // never block or slow inventory ingestion. The orchestrator is idempotent
+    // on (tenant, vehicle, source_data_version, config_version), and anything
+    // missed here is picked up by the nightly reconcile sweep.
+    for (const vehicleId of touchedIds.slice(0, 200)) {
+      try {
+        fetch(`${supabaseUrl}/functions/v1/description-orchestrate`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${serviceKey}` },
+          body: JSON.stringify({ action: "orchestrate", tenant_id: tenant.id, vehicle_id: vehicleId, reason: "ingest" }),
+          signal: AbortSignal.timeout(20000),
+        }).catch(() => { /* best-effort */ });
+      } catch { /* description best-effort */ }
     }
 
     await admin.from("audit_log").insert({

@@ -363,7 +363,8 @@ async function orchestrateVehicle(
     }
 
     // 5 ── eligibility + honest publication
-    const { eligibility, reason } = decideEligibility([...findings, ...channelBlocking], settings, listing.condition || "used");
+    const { eligibility, reason } = decideEligibility(
+      [...findings, ...channelBlocking], settings, listing.condition || "used", quality);
     await audit(admin, tenantId, "description_validation_completed", caseId,
       { vin: listing.vin, version_id: version.id, findings: findings.length,
         blocking: findings.filter((f) => f.blocking).length, eligibility, quality });
@@ -527,7 +528,9 @@ serve(async (req) => {
       const vehicleId = String(body.vehicle_id || "");
       if (!tenantId || !vehicleId) return json({ error: "tenant_id and vehicle_id required" }, 400);
       if (!allowed(tenantId)) return json({ error: "forbidden" }, 403);
-      if (action === "regenerate" && !authorized(tenantId)) {
+      // Any run that spends provider credits needs authority, not just
+      // membership — a forced "orchestrate" is a regeneration by another name.
+      if ((action === "regenerate" || body.force) && !authorized(tenantId)) {
         return json({ error: "insufficient_permission" }, 403);
       }
       const result: Record<string, unknown> = await orchestrateVehicle(admin, tenantId, vehicleId, {
@@ -547,6 +550,9 @@ serve(async (req) => {
       const versionId = String(body.version_id || "");
       if (!tenantId || !versionId) return json({ error: "tenant_id and version_id required" }, 400);
       if (!allowed(tenantId)) return json({ error: "forbidden" }, 403);
+      // Validation rewrites validation_status and publication_eligibility, so
+      // it is a mutation and needs the same authority as generation.
+      if (!authorized(tenantId)) return json({ error: "insufficient_permission" }, 403);
 
       const { data: ver } = await admin.from("description_versions").select("*").eq("id", versionId).maybeSingle();
       if (!ver || ver.tenant_id !== tenantId) return json({ error: "version_not_found" }, 404);

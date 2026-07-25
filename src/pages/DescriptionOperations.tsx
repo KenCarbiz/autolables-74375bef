@@ -21,19 +21,19 @@ interface FilterDef { value: string; set: (v: string) => void; label: string; al
 
 const FILTERS = (
   status: string, setStatus: (v: string) => void,
+  condition: string, setCondition: (v: string) => void,
   validation: string, setValidation: (v: string) => void,
   channel: string, setChannel: (v: string) => void,
-  condition: string, setCondition: (v: string) => void,
 ): FilterDef[] => [
   { value: status, set: setStatus, label: "Filter by status", allLabel: "All Statuses",
     options: [["exceptions", "Has Exceptions"],
       ...Object.keys(STATUS_META).map((s) => [s, STATUS_META[s as DescriptionStatus].label] as [string, string])] },
+  { value: condition, set: setCondition, label: "Filter by condition", allLabel: "All Conditions",
+    options: [["new", "New"], ["used", "Used"], ["cpo", "CPO"]] },
   { value: validation, set: setValidation, label: "Filter by validation", allLabel: "All Validations",
     options: [["passed", "Passed"], ["review", "Review Required"], ["blocked", "Blocked"]] },
   { value: channel, set: setChannel, label: "Filter by channel readiness", allLabel: "All Channels",
     options: [["complete", "All Ready"], ["incomplete", "Partially Ready"], ["none", "Not Generated"]] },
-  { value: condition, set: setCondition, label: "Filter by location or inventory type", allLabel: "All Locations",
-    options: [["new", "New"], ["used", "Used"], ["cpo", "CPO"]] },
 ];
 
 const Pill = ({ tone, children }: { tone: keyof typeof TONE_CLASS; children: React.ReactNode }) => (
@@ -140,7 +140,7 @@ export default function DescriptionOperations() {
     setSort((cur) => ({ key, dir: cur.key === key && cur.dir === "desc" ? "asc" : "desc" }));
 
   const SortHead = ({ k, children }: { k: SortKey; children: React.ReactNode }) => (
-    <th className="px-3 py-2.5">
+    <th className="px-4 py-2.5">
       <button onClick={() => toggleSort(k)} className="inline-flex items-center gap-1 hover:text-foreground min-h-[44px]">
         {children}
         {sort.key === k && (sort.dir === "desc" ? <ChevronDown className="w-3 h-3" /> : <ChevronUp className="w-3 h-3" />)}
@@ -167,7 +167,7 @@ export default function DescriptionOperations() {
           <h1 className="font-display text-[26px] font-bold tracking-tight text-foreground leading-none">Description Operations</h1>
           <p className="text-sm text-muted-foreground mt-2">Automated merchandising intelligence across every vehicle.</p>
         </div>
-        <div className="flex items-center gap-2 flex-wrap">
+        <div className="flex items-center gap-2 flex-wrap ml-auto">
           {perms.canGenerate && (
             <button onClick={runReconcile} disabled={syncing}
               className="min-h-[44px] px-3.5 rounded-xl border border-border bg-card text-[13px] font-semibold text-foreground hover:border-primary inline-flex items-center gap-1.5 disabled:opacity-60">
@@ -190,7 +190,7 @@ export default function DescriptionOperations() {
 
       {/* Summary band */}
       {summary ? (
-        <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-6 gap-2.5 mb-3">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2.5 mb-3">
           <StatCard label="Active Inventory" value={summary.activeInventory} tone="blue" Icon={FileText} active={statusFilter === "all"} onClick={() => setFilter("all")} />
           <StatCard label="Published" value={summary.published} tone="emerald" Icon={ShieldCheck} active={statusFilter === "PUBLISHED"} onClick={() => setFilter("PUBLISHED")} />
           <StatCard label="Ready" value={summary.ready} tone="emerald" Icon={CheckCircle2} active={statusFilter === "READY"} onClick={() => setFilter("READY")} />
@@ -199,7 +199,7 @@ export default function DescriptionOperations() {
           <StatCard label="Stale" value={summary.stale} tone="amber" Icon={Clock} active={statusFilter === "STALE"} onClick={() => setFilter("STALE")} />
         </div>
       ) : (
-        <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-6 gap-2.5 mb-3">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2.5 mb-3">
           {Array.from({ length: 6 }).map((_, i) => <div key={i} className="h-[76px] rounded-2xl border border-border bg-card animate-pulse" />)}
         </div>
       )}
@@ -228,10 +228,14 @@ export default function DescriptionOperations() {
                 {exceptionCount > 0 ? ` · ${exceptionCount} need attention` : " · none need attention"}
               </span>
             </p>
-            <button onClick={() => navigate("/admin?tab=audit")}
-              className="text-[12.5px] font-semibold text-emerald-800 hover:underline shrink-0 min-h-[44px]">
-              View Sync History
-            </button>
+            {/* the audit tab needs settings or compliance access — offering the
+                link to a role that will be bounced loses their filter state */}
+            {perms.canConfigure && (
+              <button onClick={() => navigate("/admin?tab=audit")}
+                className="text-[12.5px] font-semibold text-emerald-800 hover:underline shrink-0 min-h-[44px]">
+                View Sync History
+              </button>
+            )}
           </div>
         )
       )}
@@ -244,8 +248,8 @@ export default function DescriptionOperations() {
             placeholder="Search by make, model, stock # or VIN…" aria-label="Search vehicles"
             className="w-full min-h-[44px] pl-10 pr-3 rounded-xl border border-border bg-card text-sm focus:outline-none focus:ring-2 focus:ring-primary" />
         </div>
-        {(FILTERS(statusFilter, setStatusFilter, validationFilter, setValidationFilter,
-                  channelFilter, setChannelFilter, conditionFilter, setConditionFilter)).map((f) => (
+        {(FILTERS(statusFilter, setStatusFilter, conditionFilter, setConditionFilter,
+                  validationFilter, setValidationFilter, channelFilter, setChannelFilter)).map((f) => (
           <select key={f.label} value={f.value} onChange={(e) => { f.set(e.target.value); setPage(0); }}
             aria-label={f.label}
             className="min-h-[44px] px-3 rounded-xl border border-border bg-card text-[13px] font-medium">
@@ -255,7 +259,7 @@ export default function DescriptionOperations() {
         ))}
         <button onClick={() => { setStatusFilter("all"); setValidationFilter("all"); setChannelFilter("all"); setConditionFilter("all"); setQuery(""); setPage(0); }}
           className="min-h-[44px] px-3.5 rounded-xl border border-border bg-card text-[13px] font-semibold text-foreground inline-flex items-center gap-1.5">
-          <SlidersHorizontal className="w-4 h-4" /> Filters
+          <SlidersHorizontal className="w-4 h-4" /> Reset
         </button>
       </div>
 
@@ -291,7 +295,7 @@ export default function DescriptionOperations() {
                 <thead>
                   <tr className="text-[11.5px] font-semibold text-muted-foreground border-b border-border">
                     <SortHead k="vehicle">Vehicle</SortHead>
-                    <th className="px-3 py-2.5">Stock / VIN</th>
+                    <th className="px-4 py-2.5">Stock / VIN</th>
                     <SortHead k="status">Description Status</SortHead>
                     <SortHead k="confidence">Fact Confidence</SortHead>
                     <th className="px-3 py-2.5">Validation</th>
@@ -350,9 +354,15 @@ export default function DescriptionOperations() {
                             <span className="text-[12px] font-semibold text-amber-700 inline-flex items-center gap-1">
                               <AlertTriangle className="w-3.5 h-3.5" /> {c.open_exception_count || 1} Conflict{(c.open_exception_count || 1) === 1 ? "" : "s"}
                             </span>
-                          ) : (
+                          ) : c.publication_eligibility === "eligible" ? (
                             <span className="text-[12px] font-semibold text-emerald-700 inline-flex items-center gap-1">
                               <CheckCircle2 className="w-3.5 h-3.5" /> Passed
+                            </span>
+                          ) : (
+                            // 'unknown' is the column default — a case that has
+                            // never been validated must never read as passed.
+                            <span className="text-[12px] font-medium text-muted-foreground inline-flex items-center gap-1">
+                              <Clock className="w-3.5 h-3.5" /> Not Evaluated
                             </span>
                           )}
                         </td>
@@ -367,10 +377,12 @@ export default function DescriptionOperations() {
                           ) : <span className="text-[12px] text-muted-foreground">Not Published</span>}
                         </td>
                         <td className="px-3 py-3 text-[12px]">
-                          {cc ? (
+                          {cc && cc.total > 0 ? (
                             <span className={`font-semibold ${cc.ready === cc.total ? "text-emerald-700"
                               : cc.ready === 0 ? "text-red-600" : "text-amber-700"}`}>
-                              {cc.ready === cc.total && <span className="block">All Ready</span>}
+                              <span className="block">
+                                {cc.ready === cc.total ? "All Ready" : cc.ready === 0 ? "Not Ready" : "Partial"}
+                              </span>
                               <span className="block">{cc.ready} / {cc.total}</span>
                             </span>
                           ) : <span className="text-muted-foreground">Not Generated</span>}

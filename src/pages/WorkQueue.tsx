@@ -294,16 +294,23 @@ const WorkQueue = () => {
                 {/* Description exceptions deep-link straight to the record that
                     can actually resolve them. */}
                 {typeof item.metadata?.deep_link === "string" && (
-                  <a href={item.metadata.deep_link as string}
+                  <button onClick={() => navigate(item.metadata!.deep_link as string)}
                     className="inline-flex h-9 items-center gap-1 self-start rounded-xl border border-blue-200 bg-blue-50 px-3 text-[12px] font-bold text-blue-700 hover:bg-blue-100 lg:order-2">
                     Open record
-                  </a>
+                  </button>
                 )}
                 <div className="flex flex-wrap justify-start gap-2 lg:justify-end">
                   {item.vehicle_id && <button onClick={() => navigate(`/vehicle-file/${item.vehicle_id}`)} className="h-10 rounded-xl border border-slate-200 px-3 text-sm font-black text-slate-700 hover:bg-slate-50">Open vehicle</button>}
-                  {item.status !== "in_progress" && item.status !== "completed" && <button onClick={() => updateStatus(item, "in_progress")} className="h-10 rounded-xl border border-blue-200 bg-blue-50 px-3 text-sm font-black text-blue-800">Start</button>}
-                  {item.department === "print" && <button onClick={() => updateStatus(item, "completed")} className="h-10 rounded-xl bg-slate-950 px-3 text-sm font-black text-white"><Printer className="mr-1 inline h-4 w-4" /> Approve done</button>}
-                  {item.status !== "completed" && item.department !== "print" && <button onClick={() => updateStatus(item, "completed")} className="h-10 rounded-xl bg-emerald-600 px-3 text-sm font-black text-white">Mark done</button>}
+                  {/* A description exception is not a dealer_work_items row, so
+                      Start / Mark done cannot act on it — rendering them enabled
+                      made the primary button on the card a permanent no-op. */}
+                  {item.work_type !== "description_exception" && (
+                    <>
+                      {item.status !== "in_progress" && item.status !== "completed" && <button onClick={() => updateStatus(item, "in_progress")} className="h-10 rounded-xl border border-blue-200 bg-blue-50 px-3 text-sm font-black text-blue-800">Start</button>}
+                      {item.department === "print" && <button onClick={() => updateStatus(item, "completed")} className="h-10 rounded-xl bg-slate-950 px-3 text-sm font-black text-white"><Printer className="mr-1 inline h-4 w-4" /> Approve done</button>}
+                      {item.status !== "completed" && item.department !== "print" && <button onClick={() => updateStatus(item, "completed")} className="h-10 rounded-xl bg-emerald-600 px-3 text-sm font-black text-white">Mark done</button>}
+                    </>
+                  )}
                 </div>
               </div>
             </article>

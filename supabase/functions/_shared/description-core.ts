@@ -183,7 +183,10 @@ export function buildFactSnapshot(
   dealer: Record<string, any> | null,
   overrides: FactOverride[] = [],
 ): FactSnapshot {
-  const overrideBy = new Map(overrides.map((o) => [o.field_key, o]));
+  // Conflict detection compares equipment names case-insensitively, so the
+  // override lookup must too — otherwise the feed switching "Bose" to "BOSE"
+  // re-raises a conflict the manager already answered.
+  const overrideBy = new Map(overrides.map((o) => [String(o.field_key || "").toLowerCase().trim(), o]));
   const mc = (listing.mc_attributes || {}) as Record<string, any>;
   const facts: Record<string, Fact> = {};
   const conflicts: FactSnapshot["conflicts"] = [];
@@ -238,7 +241,7 @@ export function buildFactSnapshot(
   for (const item of [...decodedOnly, ...feedOnly]) {
     if (!PREMIUM.test(item)) continue;
     const fromDecode = decodedOnly.includes(item);
-    const ov = overrideBy.get(`equipment:${item}`);
+    const ov = overrideBy.get(`equipment:${item}`.toLowerCase().trim());
     if (ov?.decision === "include") { confirmedEquipment.push(item); continue; }
     if (ov?.decision === "exclude") {
       // decided by a manager — still withheld from copy, but no longer blocking
@@ -390,6 +393,18 @@ export function buildFactSnapshot(
 
 // ── Prompt construction ──────────────────────────────────────────────
 export function buildMasterPrompt(snap: FactSnapshot, settings: Record<string, any>): string {
+  // Per-class rules are dealer copy policy for new / used / CPO inventory.
+  // They were fingerprinted (so editing them forced a regeneration) but never
+  // reached the model, which made the setting look active while doing nothing.
+  const vehicleClass = String(snap.facts.condition?.value || "used").toLowerCase();
+  const classRules = (settings.class_rules || {}) as Record<string, unknown>;
+  const rule = classRules[vehicleClass] ?? classRules[vehicleClass.toUpperCase()];
+  const ruleText = Array.isArray(rule) ? rule.filter(Boolean).join("\n- ")
+    : typeof rule === "string" ? rule
+    : rule && typeof rule === "object" ? JSON.stringify(rule) : "";
+  const classLine = ruleText
+    ? `\nDEALER RULES FOR ${vehicleClass.toUpperCase()} INVENTORY (follow these in addition to the rules below):\n- ${ruleText}`
+    : "";
   const usable = Object.values(snap.facts).filter((f) => f.usable_in_copy);
   const factLines = usable.map((f) => `- ${f.field}: ${f.value}  [source: ${f.source}; status: ${f.status}]`).join("\n");
   const banned = [
@@ -404,7 +419,7 @@ export function buildMasterPrompt(snap: FactSnapshot, settings: Record<string, a
 
 VERIFIED FACTS — these are the ONLY vehicle facts you may state:
 ${factLines}
-${marketLine}
+${marketLine}${classLine}
 
 ABSOLUTE RULES
 - Never state a fact that is not in the verified list above. If something is missing, omit it entirely.
@@ -493,9 +508,19 @@ export function validateContent(
   }
 
   // 2. Nothing excluded by a conflict may appear in the copy.
+  // The dealer's own required legal text is mandated verbatim elsewhere in this
+  // validator, so a generic exclusion word that only occurs inside it ("see
+  // dealer for complete warranty details") must not be read as a claim —
+  // otherwise the vehicle is blocked for including it AND for omitting it.
+  const legal = String(settings.required_legal_text || "").toLowerCase();
+  const withoutLegal = legal ? lc.split(legal).join(" ") : lc;
   for (const ex of snap.excluded_claims) {
     if (!ex.claim) continue;
-    if (lc.includes(String(ex.claim).toLowerCase())) {
+    const claim = String(ex.claim).toLowerCase();
+    // whole-word match: "certified" must not fire on "certifiedxyz"
+    const hit = new RegExp(`(^|[^a-z0-9])${claim.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}([^a-z0-9]|$)`, "i")
+      .test(withoutLegal);
+    if (hit) {
       out.push({
         validator_code: "EXCLUDED_CLAIM_PRESENT", severity: "blocking", blocking: true,
         message: `"${ex.claim}" is excluded (${ex.reason}) but appears in the description.`,
@@ -542,7 +567,10 @@ export function validateContent(
   const limit = ch?.characterLimit ?? settings.max_length ?? 2400;
   const min = ch?.minLength ?? settings.min_length ?? 400;
   if (text.length > limit) {
-    out.push({ validator_code: "CHANNEL_LENGTH_EXCEEDED", severity: "blocking", blocking: true,
+    // Overshooting a marketplace's character cap is a formatting problem with
+    // that one export, not a factual defect. Marking it blocking made a single
+    // long Facebook variant refuse publication of a clean master description.
+    out.push({ validator_code: "CHANNEL_LENGTH_EXCEEDED", severity: "warning", blocking: false,
       message: `${ch ? ch.label : "Master"} limit exceeded by ${text.length - limit} characters (${text.length}/${limit}).` });
   } else if (text.length < min) {
     out.push({ validator_code: "LENGTH_BELOW_MINIMUM", severity: "warning", blocking: false,
@@ -608,10 +636,16 @@ export function qualityScore(text: string, snap: FactSnapshot, settings: Record<
 }
 
 export function decideEligibility(
-  findings: Finding[], settings: Record<string, any>, condition: string,
+  findings: Finding[], settings: Record<string, any>, condition: string, quality?: number,
 ): { eligibility: "eligible" | "blocked" | "review_required"; reason: string } {
   if (findings.some((f) => f.blocking)) {
     return { eligibility: "blocked", reason: `${findings.filter((f) => f.blocking).length} blocking finding(s)` };
+  }
+  // The dealer's quality bar is a review gate, never an auto-publish gate:
+  // thin copy goes to a human rather than straight to a shopper.
+  const threshold = Number(settings.quality_threshold);
+  if (Number.isFinite(threshold) && typeof quality === "number" && quality < threshold) {
+    return { eligibility: "review_required", reason: `quality ${quality} is below the dealer threshold of ${threshold}` };
   }
   const cls = String(condition || "used").toLowerCase();
   const byClass = (settings.review_mode_by_class || {}) as Record<string, string>;

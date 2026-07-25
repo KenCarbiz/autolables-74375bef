@@ -9,8 +9,19 @@ import { STATUS_META, TONE_CLASS, ELIGIBILITY_META, factConfidenceLabel, type De
 
 export default function MerchandisingContentSection({ vehicleId }: { vehicleId: string }) {
   const navigate = useNavigate();
-  const { record } = useDescriptionCase(vehicleId);
+  const { record, error } = useDescriptionCase(vehicleId);
 
+  // A load failure left `record` null forever, so the panel pulsed as a skeleton
+  // with no message and no retry. Say what went wrong instead.
+  if (error) {
+    return (
+      <div className="rounded-2xl border border-border bg-card p-4">
+        <p className="text-[12.5px] text-red-600 inline-flex items-center gap-1.5">
+          <XCircle className="w-4 h-4 shrink-0" /> Merchandising content could not be loaded: {error}
+        </p>
+      </div>
+    );
+  }
   if (!record) return <div className="h-32 rounded-2xl border border-border bg-card animate-pulse" />;
 
   const c = record.caseRow;

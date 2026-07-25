@@ -8,7 +8,7 @@ import {
 import { useDescriptionCase, useDescriptionPermissions } from "@/hooks/useDescriptionOps";
 import {
   STATUS_META, TONE_CLASS, CHANNEL_META, channelMeta, connectorLabel, ELIGIBILITY_META,
-  EXCEPTION_LABELS, FACT_STATUS_META, factConfidenceLabel, lifecycleIndex,
+  EXCEPTION_LABELS, FACT_STATUS_META, factConfidenceLabel, lifecycleIndex, LIFECYCLE_STEPS,
   type DescriptionStatus,
 } from "@/lib/description/model";
 import { toast } from "sonner";
@@ -69,7 +69,7 @@ export default function DescriptionIntelligence() {
   const [mobileSection, setMobileSection] = useState<string | null>("master");
   const [regenChannels, setRegenChannels] = useState<string[]>([]);
   const [showLineage, setShowLineage] = useState(false);
-  const [showFindings, setShowFindings] = useState(true);
+  const [showFindings, setShowFindings] = useState(false);
   const [expanded, setExpanded] = useState(false);
 
   const caseRow = record?.caseRow;
@@ -101,16 +101,28 @@ export default function DescriptionIntelligence() {
 
   const status = (caseRow?.status ?? "UNINITIALIZED") as DescriptionStatus;
   const meta = STATUS_META[status] ?? STATUS_META.UNINITIALIZED;
-  const elig = ELIGIBILITY_META[caseRow?.publication_eligibility ?? "unknown"] ?? ELIGIBILITY_META.unknown;
+  const eligibility: string = caseRow?.publication_eligibility ?? "unknown";
+  const elig = ELIGIBILITY_META[eligibility] ?? ELIGIBILITY_META.unknown;
   const conf = factConfidenceLabel(caseRow?.fact_confidence);
+  // Green checks on the mobile accordions are claims about the data inside, so
+  // they are measured rather than hardcoded.
+  const factValues = Object.values(facts) as Array<{ status?: string }>;
+  const factsAllVerified = factValues.length > 0
+    && factValues.every((f) => f.status === "verified" || f.status === "dealer_entered");
+  const channelsAllReady = (record?.channels?.length ?? 0) > 0
+    && record!.channels.every((c) => c.validation_status === "passed" || c.validation_status === "warning");
   const stepIdx = lifecycleIndex(status);
   const isPublished = caseRow?.published_master_version_id === current?.id;
   const isApproved = current?.approval_status === "approved";
 
-  const act = async (fn: () => Promise<{ ok: boolean; error?: string }>, okMsg: string) => {
+  const act = async (
+    fn: () => Promise<{ ok: boolean; error?: string; warning?: string }>, okMsg: string,
+  ) => {
     const res = await fn();
     if (!res.ok) { toast.error(res.error || "Action failed"); return false; }
-    toast.success(okMsg);
+    // A partial success must not be reported as a clean one.
+    if (res.warning) toast.warning(res.warning);
+    else toast.success(okMsg);
     return true;
   };
 
@@ -130,8 +142,20 @@ export default function DescriptionIntelligence() {
   const doSave = async () => {
     if (draft == null) return;
     const reason = window.prompt("Reason for this edit (recorded in history)") || "manual edit";
-    const ok = await act(() => saveManualVersion(draft, reason), "Saved as a new version and validated");
-    if (ok) setDraft(null);
+    const res = await saveManualVersion(draft, reason);
+    if (!res.ok) { toast.error(res.error || "Action failed"); return; }
+    setDraft(null);
+    // The save always succeeds; the VALIDATION is what decides whether this copy
+    // can ever reach a shopper. Reporting "validated" regardless would hide a
+    // blocked edit behind a green toast.
+    if (res.warning) toast.warning(res.warning);
+    else if (res.validation === "blocked") {
+      toast.error("Saved as a new version, but validation BLOCKED it. Review the findings below.");
+    } else if (res.validation === "warning") {
+      toast.warning("Saved as a new version with validation warnings. Review the findings below.");
+    } else {
+      toast.success("Saved as a new version and validated");
+    }
   };
 
   const copyText = async (content: string, label: string) => {
@@ -339,16 +363,22 @@ export default function DescriptionIntelligence() {
               <span className="block text-[11px] opacity-80 mt-0.5">{sub}</span>
             </button>
           ))}
+          {/* There is no verification queue to submit to, so this copies the
+              request rather than claiming to have filed one. It must report a
+              clipboard failure honestly instead of always showing success. */}
           <button disabled={busy}
-            onClick={() => act(async () => {
-              await navigator.clipboard.writeText(
-                `Verify ${conflictLabel} on VIN ${vehicle?.vin} (stock ${(vehicle?.mc_attributes || {}).stock_no || "—"}).`,
-              ).catch(() => undefined);
-              return { ok: true };
-            }, "Verification request copied for the data team")}
+            onClick={async () => {
+              const text = `Verify ${conflictLabel} on VIN ${vehicle?.vin} (stock ${(vehicle?.mc_attributes || {}).stock_no || "—"}).`;
+              try {
+                await navigator.clipboard.writeText(text);
+                toast.success("Verification request copied — send it to your data team");
+              } catch {
+                toast.error("Clipboard unavailable. Copy this manually: " + text);
+              }
+            }}
             className="min-h-[72px] px-3 py-2 rounded-xl border border-blue-300 bg-blue-50 text-blue-800 text-center disabled:opacity-60">
-            <span className="block text-[12.5px] font-semibold">Request Verification</span>
-            <span className="block text-[11px] opacity-80 mt-0.5">Open with data team</span>
+            <span className="block text-[12.5px] font-semibold">Copy Verification Request</span>
+            <span className="block text-[11px] opacity-80 mt-0.5">Send to your data team</span>
           </button>
         </div>
       ) : (
@@ -721,9 +751,15 @@ export default function DescriptionIntelligence() {
           elig.tone === "emerald" ? "text-emerald-600" : elig.tone === "red" ? "text-red-600" : "text-amber-600"}`}>
           {elig.label}
         </p>
+        {/* The headline is the server's eligibility; the sub-line must agree
+            with it. Deriving the sub-line from findings alone printed "Meets all
+            requirements" directly under a "Blocked" or "Not Evaluated" headline. */}
         <p className="text-[11.5px] text-muted-foreground mt-1">
           {blockingFindings.length > 0
             ? `${blockingFindings.length} blocking finding${blockingFindings.length === 1 ? "" : "s"} must be resolved.`
+            : eligibility === "blocked" ? "Blocked from publication. Resolve the open exception to continue."
+            : eligibility === "review_required" ? "A manager must approve this vehicle before it publishes."
+            : eligibility === "unknown" ? "This vehicle has not been validated yet."
             : warnings.length > 0 ? `${warnings.length} warning${warnings.length === 1 ? "" : "s"} to review.`
             : "Meets all requirements for internal publication."}
         </p>
@@ -794,7 +830,7 @@ export default function DescriptionIntelligence() {
   const activeRail = blockingException ? exceptionRail : rail;
 
   return (
-    <div className="max-w-[1480px] mx-auto p-4 sm:p-6 pb-24 lg:pb-6">
+    <div className="max-w-[1480px] mx-auto p-4 sm:p-6 pb-6">
       <button onClick={() => navigate("/description-operations")}
         className="hidden lg:inline-flex text-[12.5px] font-semibold text-muted-foreground hover:text-foreground items-center gap-1.5 mb-3 min-h-[44px]">
         <ArrowLeft className="w-4 h-4" /> Back to Operations
@@ -847,26 +883,49 @@ export default function DescriptionIntelligence() {
           </p>
         </div>
         <ol className="flex items-center justify-between gap-1 rounded-2xl border border-border bg-card p-3">
-            {["Data Sync", "Validate", "Generate", "Review", "Publish"].map((s, i) => (
+            {LIFECYCLE_STEPS.map((s, i) => (
               <li key={s} className="flex flex-col items-center gap-1 flex-1 min-w-0 relative">
-                {i > 0 && <span aria-hidden className={`absolute top-[10px] right-1/2 w-full h-0.5 ${i <= stepIdx ? "bg-emerald-500" : "bg-border"}`} />}
+                {i > 0 && <span aria-hidden className={`absolute top-[13px] right-1/2 w-full h-0.5 ${i <= stepIdx ? "bg-emerald-500" : "bg-border"}`} />}
                 <span className={`w-7 h-7 rounded-full grid place-items-center text-[11px] font-bold relative z-10 ${
                   i <= stepIdx ? "bg-emerald-500 text-white" : "bg-white/70 text-muted-foreground border border-border"}`}>
                   {i <= stepIdx ? "✓" : i + 1}
                 </span>
-                <span className="text-[9.5px] text-center leading-tight truncate w-full">{s}</span>
+                <span className="text-[9.5px] text-center leading-tight w-full">{s}</span>
               </li>
             ))}
         </ol>
 
         {blockingException ? (
           <>{exceptionBanner}{conflictCard}</>
-        ) : (
+        ) : eligibility === "blocked" || blockingFindings.length ? (
+          // Closing an exception does not clear the validation findings behind
+          // it. Keying only on the exception row let a hard-blocked vehicle
+          // read "No blocking issues" on a phone.
+          <div className="rounded-2xl border border-red-200 bg-red-50 p-3">
+            <span className="text-[13px] font-semibold text-red-800 inline-flex items-center gap-1.5">
+              <XCircle className="w-4 h-4" />
+              {blockingFindings.length
+                ? `${blockingFindings.length} blocking finding${blockingFindings.length === 1 ? "" : "s"}`
+                : "Blocked from publication"}
+            </span>
+            <ul className="mt-1.5 space-y-1">
+              {blockingFindings.slice(0, 4).map((f) => (
+                <li key={f.id} className="text-[12px] text-red-900 leading-snug">{f.message}</li>
+              ))}
+            </ul>
+          </div>
+        ) : eligibility === "eligible" ? (
           <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-3 flex items-center justify-between gap-2">
             <span className="text-[13px] font-semibold text-emerald-800 inline-flex items-center gap-1.5">
               <CheckCircle2 className="w-4 h-4" /> No blocking issues
             </span>
             <ChevronRight className="w-4 h-4 text-emerald-700" />
+          </div>
+        ) : (
+          <div className="rounded-2xl border border-amber-200 bg-amber-50 p-3">
+            <span className="text-[13px] font-semibold text-amber-900 inline-flex items-center gap-1.5">
+              <AlertTriangle className="w-4 h-4" /> {ELIGIBILITY_META[eligibility]?.label || "Not Evaluated"}
+            </span>
           </div>
         )}
 
@@ -911,7 +970,10 @@ export default function DescriptionIntelligence() {
               aria-expanded={mobileSection === key}
               className="w-full min-h-[52px] px-4 flex items-center justify-between gap-2">
               <span className="text-[13px] font-bold text-foreground inline-flex items-center gap-1.5">
-                {(key === "facts" || key === "readiness") && <CheckCircle2 className="w-4 h-4 text-emerald-500" />}
+                {/* measured, never decorative: a green check here is a claim
+                    about the data inside, so it must be earned */}
+                {key === "facts" && factsAllVerified && <CheckCircle2 className="w-4 h-4 text-emerald-500" />}
+                {key === "readiness" && channelsAllReady && <CheckCircle2 className="w-4 h-4 text-emerald-500" />}
                 {label as string}
               </span>
               <ChevronDown className={`w-4 h-4 text-muted-foreground transition-transform ${mobileSection === key ? "rotate-180" : ""}`} />
@@ -921,14 +983,33 @@ export default function DescriptionIntelligence() {
         ))}
       </div>
 
-      {/* Sticky mobile action — only when exactly one action is valid */}
-      {perms.canPublish && current && !isPublished && !blockingException
-        && caseRow?.publication_eligibility === "eligible" && (
-        <div className="lg:hidden fixed left-0 right-0 bottom-[calc(env(safe-area-inset-bottom)+76px)] px-3 z-40">
-          <button onClick={doPublish} disabled={busy}
-            className="w-full min-h-[48px] rounded-xl bg-primary text-primary-foreground text-[14px] font-semibold inline-flex items-center justify-center gap-2 disabled:opacity-60 shadow-lg">
-            {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <ShieldCheck className="w-4 h-4" />} Publish Internally
-          </button>
+      {/* Sticky mobile action. The offset clears BOTH the fixed tab bar and the
+          raised Scan circle that protrudes ~16px above it. The states this
+          screen exists to handle (blocked, review-required) still get a primary
+          action rather than no CTA at all. */}
+      {current && (
+        <div className="lg:hidden fixed left-0 right-0 bottom-[calc(env(safe-area-inset-bottom)+104px)] px-3 z-40">
+          {blockingException ? (
+            <button onClick={() => setMobileSection("master")}
+              className="w-full min-h-[48px] rounded-xl bg-red-600 text-white text-[14px] font-semibold inline-flex items-center justify-center gap-2 shadow-lg">
+              <AlertTriangle className="w-4 h-4" /> Resolve Conflict
+            </button>
+          ) : perms.canPublish && !isPublished && eligibility === "eligible" ? (
+            <button onClick={doPublish} disabled={busy}
+              className="w-full min-h-[48px] rounded-xl bg-primary text-primary-foreground text-[14px] font-semibold inline-flex items-center justify-center gap-2 disabled:opacity-60 shadow-lg">
+              {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <ShieldCheck className="w-4 h-4" />} Publish Internally
+            </button>
+          ) : isPublished ? (
+            <button onClick={() => navigate("/description-operations")}
+              className="w-full min-h-[48px] rounded-xl border border-border bg-card text-[14px] font-semibold text-foreground inline-flex items-center justify-center gap-2 shadow-lg">
+              <ArrowLeft className="w-4 h-4" /> Back to Operations
+            </button>
+          ) : (
+            <button disabled
+              className="w-full min-h-[48px] rounded-xl bg-muted text-muted-foreground text-[14px] font-semibold inline-flex items-center justify-center gap-2 shadow-lg">
+              {eligibility === "review_required" ? "Awaiting manager approval" : "Not ready to publish"}
+            </button>
+          )}
         </div>
       )}
     </div>

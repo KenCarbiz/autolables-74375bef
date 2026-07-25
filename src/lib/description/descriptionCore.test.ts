@@ -149,10 +149,21 @@ describe("validation engine", () => {
     expect(f.some((x) => x.validator_code === "PROHIBITED_PHRASE" && x.blocking)).toBe(true);
   });
 
-  it("blocks channel copy over the destination limit", () => {
+  // Overshooting one marketplace's cap is an export formatting problem, not a
+  // factual defect — it must be reported without blocking the master.
+  it("flags channel copy over the destination limit without blocking it", () => {
     const fb = channelByKey("facebook")!;
     const f = validateContent("x".repeat(fb.characterLimit + 200), snap, SETTINGS, fb);
-    expect(f.some((x) => x.validator_code === "CHANNEL_LENGTH_EXCEEDED" && x.blocking)).toBe(true);
+    const hit = f.find((x) => x.validator_code === "CHANNEL_LENGTH_EXCEEDED");
+    expect(hit).toBeDefined();
+    expect(hit!.blocking).toBe(false);
+  });
+
+  it("does not block the master when only a channel variant is too long", () => {
+    const fb = channelByKey("facebook")!;
+    const channelFindings = validateContent("x".repeat(fb.characterLimit + 200), snap, SETTINGS, fb);
+    const { eligibility } = decideEligibility(channelFindings.filter((f) => f.blocking), SETTINGS, "used");
+    expect(eligibility).not.toBe("blocked");
   });
 
   it("passes clean copy with no blocking findings", () => {

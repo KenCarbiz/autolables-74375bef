@@ -18,7 +18,7 @@ export const STATUS_META: Record<DescriptionStatus, { label: string; tone: Tone;
   REVIEW_REQUIRED:     { label: "Review Required",tone: "amber",   help: "A manager must review before publication." },
   READY:               { label: "Ready",          tone: "emerald", help: "Validated and eligible for internal publication." },
   PUBLISHING:          { label: "Publishing",     tone: "blue",    help: "Publication in progress." },
-  PARTIALLY_PUBLISHED: { label: "Partially Published", tone: "amber", help: "Some destinations succeeded; others did not." },
+  PARTIALLY_PUBLISHED: { label: "Partially Published", tone: "amber", help: "Published internally; one or more exports are still outstanding." },
   PUBLISHED:           { label: "Published",      tone: "emerald", help: "Published internally to the shopper listing." },
   STALE:               { label: "Stale",          tone: "amber",   help: "Vehicle data changed after this copy was written." },
   FAILED_RETRYABLE:    { label: "Failed",         tone: "red",     help: "Generation failed and can be retried." },

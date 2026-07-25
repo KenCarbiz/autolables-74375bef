@@ -77,16 +77,20 @@ export function useDescriptionOperations() {
     if (!tenant?.id) return;
     setError(null);
     try {
-      const [caseRes, vehRes] = await Promise.all([
+      const [caseRes, vehRes, settingsRes] = await Promise.all([
         (supabase as any).from("description_cases").select("*")
           .eq("tenant_id", tenant.id).is("archived_at", null)
           .order("updated_at", { ascending: false }).limit(500),
         (supabase as any).from("vehicle_listings")
           .select("id, vin, ymm, trim, condition, mileage, status, hero_image_url, mc_attributes")
           .eq("tenant_id", tenant.id).in("status", ["draft", "published"]).limit(1000),
+        (supabase as any).from("description_settings")
+          .select("enabled_channels").eq("tenant_id", tenant.id).maybeSingle(),
       ]);
       if (caseRes.error) throw caseRes.error;
       const rows = (caseRes.data || []) as DescriptionCaseRow[];
+      const enabledChannels: string[] = Array.isArray(settingsRes?.data?.enabled_channels)
+        ? settingsRes.data.enabled_channels : [];
       const vmap: Record<string, Row> = {};
       for (const v of vehRes.data || []) vmap[v.id] = v;
 
@@ -109,30 +113,55 @@ export function useDescriptionOperations() {
       const { data: lockedRows } = await (supabase as any).from("description_channel_versions")
         .select("description_case_id, channel, validation_status, created_at")
         .eq("tenant_id", tenant.id).eq("locked", true).limit(2000);
+      // The denominator is how many channels the dealer ENABLED, not how many
+      // rows happen to exist. Selective regeneration mints a new master and
+      // writes rows for only the scoped channels, so a row-derived denominator
+      // shrinks with the numerator and reports "1 / 1 · All Ready" for a
+      // vehicle whose other six variants are stranded on the previous master.
       const seen = new Set<string>();
       const cmap: Record<string, { total: number; ready: number }> = {};
+      for (const r of rows) cmap[r.id] = { total: enabledChannels.length, ready: 0 };
       for (const cv of [...(lockedRows || []), ...chanRows]) {
         const key = `${cv.description_case_id}:${cv.channel}`;
         if (seen.has(key)) continue;
         seen.add(key);
-        const e = (cmap[cv.description_case_id] ||= { total: 0, ready: 0 });
-        e.total += 1;
+        if (enabledChannels.length && !enabledChannels.includes(cv.channel)) continue;
+        const e = (cmap[cv.description_case_id] ||= { total: enabledChannels.length, ready: 0 });
+        if (!enabledChannels.length) e.total += 1;
         if (cv.validation_status === "passed" || cv.validation_status === "warning") e.ready += 1;
       }
       setChannelCounts(cmap);
       setCases(rows);
       setVehicles(vmap);
 
-      const activeInventory = (vehRes.data || []).length;
-      const withCase = new Set(rows.map((r) => r.vehicle_id));
+      // Counts come from the server, not from the capped page of rows above.
+      // Deriving them client-side made a 700-vehicle store report "200 never
+      // initialized" when every vehicle had a case — the 500-row cap was being
+      // read as a measurement.
+      const countCases = async (build: (q: any) => any) => {
+        const base = (supabase as any).from("description_cases")
+          .select("id", { count: "exact", head: true })
+          .eq("tenant_id", tenant.id).is("archived_at", null);
+        const { count } = await build(base);
+        return count || 0;
+      };
+      const [activeInventory, published, ready, reviewRequired, failed, staleStatus, stalePending, totalCases] =
+        await Promise.all([
+          (supabase as any).from("vehicle_listings").select("id", { count: "exact", head: true })
+            .eq("tenant_id", tenant.id).in("status", ["draft", "published"]).then((r: any) => r.count || 0),
+          countCases((q) => q.eq("status", "PUBLISHED")),
+          countCases((q) => q.eq("status", "READY")),
+          countCases((q) => q.eq("status", "REVIEW_REQUIRED")),
+          countCases((q) => q.in("status", ["FAILED_RETRYABLE", "FAILED_BLOCKED"])),
+          countCases((q) => q.eq("status", "STALE")),
+          countCases((q) => q.eq("potentially_stale", true).neq("status", "STALE")),
+          countCases((q) => q),
+        ]);
       setSummary({
         activeInventory,
-        published: rows.filter((r) => r.status === "PUBLISHED").length,
-        ready: rows.filter((r) => r.status === "READY").length,
-        reviewRequired: rows.filter((r) => r.status === "REVIEW_REQUIRED").length,
-        failed: rows.filter((r) => r.status === "FAILED_RETRYABLE" || r.status === "FAILED_BLOCKED").length,
-        stale: rows.filter((r) => r.status === "STALE" || r.potentially_stale).length,
-        missing: (vehRes.data || []).filter((v: Row) => !withCase.has(v.id)).length,
+        published, ready, reviewRequired, failed,
+        stale: staleStatus + stalePending,
+        missing: Math.max(0, activeInventory - totalCases),
       });
     } catch (e) {
       setError((e as Error).message || "Could not load description operations");
@@ -319,8 +348,19 @@ export function useDescriptionCase(vehicleId: string | undefined) {
     });
     if (error) { setBusy(false); return { ok: false, error: error.message }; }
     if ((data as any)?.ok === false) { setBusy(false); return { ok: false, error: String((data as any).error) }; }
-    if (regenerate) { setBusy(false); return await generate("conflict_resolved"); }
     setBusy(false);
+    // The override IS written at this point. If the follow-up regeneration is
+    // refused (a Service Manager may resolve but not generate), the resolution
+    // still stands — reload and say so rather than reporting the whole action
+    // as failed and leaving the closed exception on screen.
+    if (regenerate) {
+      const gen = await generate("conflict_resolved");
+      await load();
+      if (!gen.ok) {
+        return { ok: true, warning: `Conflict resolved, but regeneration did not run: ${gen.error}` };
+      }
+      return { ok: true };
+    }
     await load();
     return { ok: true };
   }, [record?.caseRow, generate, load]);
