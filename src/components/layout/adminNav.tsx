@@ -18,6 +18,8 @@ import {
   History,
   LayoutDashboard,
   ListChecks,
+  Printer,
+  Rocket,
   ScrollText,
   Settings,
   ShieldCheck,
@@ -88,7 +90,13 @@ export function buildAdminNavSections({ badges, anyAdminTab }: BuildNavOptions):
           capability: "can_view_inventory",
           // The vehicle detail page lives outside /inventory in the route model
           // but is reached from Inventory, so it keeps the parent lit.
-          match: (p) => underSegment("/inventory")(p) || p === "/inventory-v2" || p.startsWith("/vehicle-file/"),
+          // VIN Command Center is per-vehicle and has no top-level row, so it
+          // keeps Inventory lit the same way the vehicle file does.
+          match: (p) =>
+            underSegment("/inventory")(p) ||
+            p === "/inventory-v2" ||
+            p.startsWith("/vehicle-file/") ||
+            underSegment("/vin-command")(p),
         },
         { label: "Deals", path: "/saved", icon: Handshake, capability: "can_view_deals", badge: badgeOrUndefined(badges.returns), match: underSegment("/saved") },
       ],
@@ -103,6 +111,7 @@ export function buildAdminNavSections({ badges, anyAdminTab }: BuildNavOptions):
         // row of its own rather than living only behind the Create hub.
         { label: "Description Operations", path: "/description-operations", icon: Sparkles, capability: "can_create_documents",
           match: (p: string) => p.startsWith("/description-operations") || p.startsWith("/description-intelligence") || p.startsWith("/description-writer") || p.startsWith("/description-studio") },
+        { label: "Print Center", path: "/print-center", icon: Printer, capability: "can_print", match: underSegment("/print-center") },
       ],
     },
     {
@@ -123,6 +132,7 @@ export function buildAdminNavSections({ badges, anyAdminTab }: BuildNavOptions):
         { label: "Prep & Install", path: "/prep", icon: Wrench, capability: "can_view_get_ready", match: underSegment("/prep") },
         { label: "Service Desk", path: "/service", icon: Headset, capability: "can_view_get_ready", match: underSegment("/service") },
         { label: "Ready Board", path: "/ready-board", icon: Columns3, capability: "can_view_get_ready", match: underSegment("/ready-board") },
+        { label: "Get Ready Command", path: "/get-ready-command", icon: Rocket, capability: "can_view_get_ready", match: underSegment("/get-ready-command") },
       ],
     },
     {

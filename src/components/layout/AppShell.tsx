@@ -200,6 +200,9 @@ const AppShell = ({ children }: AppShellProps) => {
     "/description-writer": { title: "Description Operations", subtitle: "Automated merchandising intelligence across every vehicle." },
     "/description-operations": { title: "Description Operations", subtitle: "Automated merchandising intelligence across every vehicle." },
     "/description-intelligence": { title: "Description Intelligence", subtitle: "Verified merchandising content for one vehicle." },
+    "/vin-command": { title: "VIN Command Center", subtitle: "Everything created automatically. Review exceptions and authorize the next step." },
+    "/get-ready-command": { title: "Get Ready Command", subtitle: "Review the work AutoLabels prepared, then authorize once." },
+    "/print-center": { title: "Documents & Print Center", subtitle: "One versioned document package for the vehicle, printer, and customer Passport." },
   };
   const prefixMeta = Object.entries(pageTitles).find(([k]) => k !== "/" && location.pathname.startsWith(k + "/"))?.[1];
   const pageMeta = pageTitles[location.pathname] || prefixMeta

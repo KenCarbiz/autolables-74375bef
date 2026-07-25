@@ -12,6 +12,8 @@ import {
   History,
   LayoutDashboard,
   ListChecks,
+  Printer,
+  Rocket,
   ScrollText,
   Settings,
   ShieldCheck,
@@ -85,7 +87,13 @@ describe("buildAdminNavSections — structure preserved", () => {
     const sections = build();
     const get = (key: string) => sections.find((s) => s.key === key)!.items.map((i) => i.label);
     expect(get("main")).toEqual(["Home", "Inventory", "Deals"]);
-    expect(get("getready")).toEqual(["Recon Approvals", "Prep & Install", "Service Desk", "Ready Board"]);
+    expect(get("getready")).toEqual([
+      "Recon Approvals",
+      "Prep & Install",
+      "Service Desk",
+      "Ready Board",
+      "Get Ready Command",
+    ]);
     expect(get("compliance")).toEqual([
       "Compliance Center",
       "Compliance Tasks",
@@ -113,6 +121,8 @@ describe("icon mapping (lucide-react, one distinct icon per destination)", () =>
     "Prep & Install": Wrench,
     "Service Desk": Headset,
     "Ready Board": Columns3,
+    "Get Ready Command": Rocket,
+    "Print Center": Printer,
     "Compliance Center": ShieldCheck,
     "Compliance Tasks": ListChecks,
     "Price Change Review": BadgeDollarSign,
@@ -144,6 +154,15 @@ describe("active-route matching", () => {
     expect(activeLabel("/inventory/123")).toBe("Inventory");
     expect(activeLabel("/inventory-v2")).toBe("Inventory");
     expect(activeLabel("/vehicle-file/abc-123")).toBe("Inventory");
+    // VIN Command Center has no row of its own; it lights Inventory.
+    expect(activeLabel("/vin-command/abc-123")).toBe("Inventory");
+  });
+
+  it("matches the command surfaces to their own rows", () => {
+    expect(activeLabel("/get-ready-command")).toBe("Get Ready Command");
+    expect(activeLabel("/get-ready-command/abc-123")).toBe("Get Ready Command");
+    expect(activeLabel("/print-center")).toBe("Print Center");
+    expect(activeLabel("/print-center/abc-123")).toBe("Print Center");
   });
 
   it("matches a lead detail route to Leads", () => {

@@ -126,6 +126,9 @@ const NewCarSticker = lazy(() => import("./pages/NewCarSticker"));
 const CpoSheet = lazy(() => import("./pages/CpoSheet"));
 const DescriptionStudio = lazy(() => import("./pages/DescriptionStudio"));
 const DescriptionOperations = lazy(() => import("./pages/DescriptionOperations"));
+const VinCommandCenter = lazy(() => import("./pages/VinCommandCenter"));
+const GetReadyCommand = lazy(() => import("./pages/GetReadyCommand"));
+const DocumentsPrintCenter = lazy(() => import("./pages/DocumentsPrintCenter"));
 const DescriptionIntelligence = lazy(() => import("./pages/DescriptionIntelligence"));
 const SaveCarInventory = lazy(() => import("./pages/SaveCarInventory"));
 const DealSigning = lazy(() => import("./pages/DealSigning"));
@@ -296,6 +299,14 @@ const App = () => (
                         <Route path="/description-intelligence/:vehicleId" element={<DescriptionIntelligence />} />
                         <Route path="/description-studio" element={<DescriptionStudio />} />
                         <Route path="/description-writer" element={<Navigate to="/description-operations" replace />} />
+                        {/* Per-vehicle command surfaces. Each renders a
+                            pick-a-vehicle empty state when reached bare. */}
+                        <Route path="/vin-command" element={<VinCommandCenter />} />
+                        <Route path="/vin-command/:vehicleId" element={<VinCommandCenter />} />
+                        <Route path="/get-ready-command" element={<GetReadyCommand />} />
+                        <Route path="/get-ready-command/:vehicleId" element={<GetReadyCommand />} />
+                        <Route path="/print-center" element={<DocumentsPrintCenter />} />
+                        <Route path="/print-center/:vehicleId" element={<DocumentsPrintCenter />} />
                         <Route path="/add-inventory" element={<SaveCarInventory />} />
                         <Route path="/prep" element={<PrepSignOff />} />
                         <Route path="/prep/:vin" element={<PrepMobile />} />
