@@ -134,7 +134,9 @@ export default function VinCommandCenter() {
   const header = (
     <>
       <div className="flex flex-wrap items-start justify-between gap-3 mb-4">
-        <div className="min-w-0">
+        {/* AppShell renders the title in the desktop chrome, so the in-content
+            copy is mobile-only — same convention as DescriptionOperations. */}
+        <div className="min-w-0 lg:hidden">
           <h1 className="font-display text-[26px] font-bold tracking-tight text-foreground leading-none">
             VIN Command Center
           </h1>

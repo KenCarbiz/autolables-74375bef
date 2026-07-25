@@ -82,8 +82,10 @@ export default function DocumentsPrintCenter() {
       .then(() => toast.success("VIN copied"), () => toast.error("Clipboard unavailable"));
   };
 
+  // AppShell renders the title in the desktop chrome, so the in-content copy is
+  // mobile-only — same convention as DescriptionOperations.
   const Header = (
-    <div className="mb-5">
+    <div className="mb-5 lg:hidden">
       <h1 className="font-display text-[26px] font-bold tracking-tight text-foreground leading-none">
         Documents &amp; Print Center
       </h1>

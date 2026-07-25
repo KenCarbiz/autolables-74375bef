@@ -285,7 +285,7 @@ async function loadVinCommand(tenantId: string, vehicleId: string): Promise<VinC
         .eq("tenant_id", tenantId).eq("vin", vin)
         .order("created_at", { ascending: false }).limit(1)),
       oneRow(sb().from("description_cases")
-        .select("id, status, current_master_version_id, published_master_version_id, open_exception_count")
+        .select("id, status, current_master_version_id, published_master_version_id, open_exception_count, last_error_message")
         .eq("tenant_id", tenantId).eq("vehicle_id", vehicleId).limit(1)),
       rows(sb().from("qr_codes").select("*").eq("tenant_id", tenantId).eq("vehicle_id", vehicleId)),
       rows(sb().from("zebra_print_jobs")
