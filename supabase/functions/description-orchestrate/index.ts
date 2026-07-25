@@ -29,6 +29,8 @@ const json = (b: unknown, status = 200) =>
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") || "";
 const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
 const CRON_SECRET = Deno.env.get("MARKETCHECK_CRON_SECRET") || "";
+const RECONCILE_BUDGET_MS = 100_000;
+const RECONCILE_MAX_DEPTH = 80; // backstop against runaway chaining
 
 const DEFAULT_SETTINGS = {
   review_mode: "EXCEPTION_REVIEW", review_mode_by_class: {},
@@ -79,9 +81,10 @@ async function loadSettings(admin: any, tenantId: string) {
 }
 
 async function raiseException(
-  admin: any, c: { tenant_id: string; vehicle_id: string; case_id: string },
+  admin: any, c: { tenant_id: string; vehicle_id: string; case_id: string; raised?: Set<string> },
   type: string, severity: string, blocking: boolean, title: string, summary: string,
   details: Record<string, unknown> = {}, channel: string | null = null,
+  fieldKey: string | null = null,
 ) {
   // Dedupe happens inside the RPC. A PostgREST upsert cannot target the
   // partial expression index, and a swallowed failure here would leave the
@@ -90,7 +93,9 @@ async function raiseException(
     p_tenant_id: c.tenant_id, p_vehicle_id: c.vehicle_id, p_case_id: c.case_id,
     p_type: type, p_severity: severity, p_blocking: blocking,
     p_title: title, p_summary: summary, p_details: details, p_channel: channel,
+    p_field_key: fieldKey ?? (typeof details.field === "string" ? details.field : null),
   });
+  c.raised?.add(type);
   if (error) console.error("raise_description_exception failed", type, error.message);
 }
 
@@ -105,25 +110,40 @@ async function audit(admin: any, tenantId: string, action: string, caseId: strin
 
 async function setCase(admin: any, caseId: string, patch: Record<string, unknown>, bump = false) {
   // bump=true advances the optimistic-concurrency counter, so an approval
-  // issued against copy that has since been regenerated is rejected.
-  if (bump) {
-    const { data: cur } = await admin.from("description_cases").select("lock_version").eq("id", caseId).maybeSingle();
-    patch = { ...patch, lock_version: (cur?.lock_version ?? 0) + 1 };
-  }
-  const { error } = await admin.from("description_cases")
-    .update({ ...patch, updated_at: new Date().toISOString() }).eq("id", caseId);
-  if (error) {
-    console.error("setCase rejected", caseId, Object.keys(patch).join(","), error.message);
-    // Retry without the status so the rest of the patch (version pointer,
-    // processed fingerprint, scores) is never lost to a transition guard.
-    if ("status" in patch) {
-      const { status: _drop, ...rest } = patch as Record<string, unknown>;
-      if (Object.keys(rest).length) {
-        await admin.from("description_cases")
-          .update({ ...rest, updated_at: new Date().toISOString() }).eq("id", caseId);
-      }
+  // issued against copy that has since been regenerated is rejected. Writing
+  // read+1 unconditionally would move the counter BACKWARDS whenever a
+  // concurrent RPC bumped it in between, silently validating a stale actor —
+  // so the write is a compare-and-set on the value we read.
+  for (let attempt = 0; attempt < 3; attempt++) {
+    let body = { ...patch, updated_at: new Date().toISOString() };
+    let guard: number | null = null;
+    if (bump) {
+      const { data: cur } = await admin.from("description_cases")
+        .select("lock_version").eq("id", caseId).maybeSingle();
+      guard = cur?.lock_version ?? 0;
+      body = { ...body, lock_version: guard + 1 };
     }
+    let q = admin.from("description_cases").update(body).eq("id", caseId);
+    if (guard !== null) q = q.eq("lock_version", guard);
+    const { data, error } = await q.select("id");
+
+    if (!error && (data?.length || !bump)) return;
+    if (error) {
+      console.error("setCase rejected", caseId, Object.keys(patch).join(","), error.message);
+      // Retry without the status so the rest of the patch (version pointer,
+      // processed fingerprint, scores) is never lost to a transition guard.
+      if ("status" in patch) {
+        const { status: _drop, ...rest } = patch as Record<string, unknown>;
+        if (Object.keys(rest).length) {
+          await admin.from("description_cases")
+            .update({ ...rest, updated_at: new Date().toISOString() }).eq("id", caseId);
+        }
+      }
+      return;
+    }
+    // compare-and-set lost the race — re-read and try again
   }
+  console.error("setCase gave up after lock contention", caseId);
 }
 
 // ── The pipeline for a single vehicle ────────────────────────────────
@@ -171,7 +191,8 @@ async function orchestrateVehicle(
   });
   if (!jobId) return { vehicle_id: vehicleId, case_id: caseId, skipped: "already_claimed" };
 
-  const ctx = { tenant_id: tenantId, vehicle_id: vehicleId, case_id: caseId };
+  const raisedTypes = new Set<string>();
+  const ctx = { tenant_id: tenantId, vehicle_id: vehicleId, case_id: caseId, raised: raisedTypes };
   const failJob = async (code: string, msg: string, retryable: boolean) => {
     await admin.from("description_jobs").update({
       status: retryable ? "failed_retryable" : "failed_blocked",
@@ -209,18 +230,24 @@ async function orchestrateVehicle(
     await audit(admin, tenantId, "description_fact_snapshot_created", caseId,
       { vin: listing.vin, source_data_version: sdv, fact_confidence: snap.fact_confidence });
 
-    for (const c of snap.conflicts.filter((x) => x.material)) {
+    const materialConflicts = snap.conflicts.filter((x) => x.material);
+    for (const c of materialConflicts.filter((x) => x.field !== "cpo_status")) {
       await raiseException(admin, ctx, "EQUIPMENT_CONFLICT", "high", true,
         `Source conflict: ${c.field.replace("equipment:", "")}`,
         "Trusted sources disagree. The claim is excluded from customer-facing copy until resolved.",
         { field: c.field, values: c.values });
       await audit(admin, tenantId, "description_source_conflict_detected", caseId, { vin: listing.vin, field: c.field });
     }
-    if (snap.excluded_claims.some((e) => e.reason === "cpo_unconfirmed")) {
+    const cpoConflict = materialConflicts.find((x) => x.field === "cpo_status");
+    if (cpoConflict) {
+      // field + values must be present: the resolution UI writes the manager's
+      // decision back keyed on `field`, so an exception without it is unresolvable.
       await raiseException(admin, ctx, "CPO_STATUS_CONFLICT", "high", true,
         "CPO status is not confirmed by an approved source",
         "The feed reports CPO but no approved CPO program source confirms it. CPO language is blocked.",
-        { excluded: snap.excluded_claims.filter((e) => e.reason === "cpo_unconfirmed") });
+        { field: "cpo_status", values: cpoConflict.values });
+      await audit(admin, tenantId, "description_source_conflict_detected", caseId,
+        { vin: listing.vin, field: "cpo_status" });
     }
 
     // 2 ── master
@@ -383,6 +410,14 @@ async function orchestrateVehicle(
       }
     }
 
+    // Live copy that stays live must not be reported as unpublished. When a new
+    // version is held back (publication disabled, locked, gate refused) the
+    // previously published copy is still what the customer sees.
+    if (!published && finalStatus === "READY" && existing?.published_master_version_id) {
+      await setCase(admin, caseId, { status: "PUBLISHED", potentially_stale: true });
+      finalStatus = "PUBLISHED";
+    }
+
     // Record honest state for every external destination: modeled, never delivered.
     for (const key of allEnabled) {
       const ch = channelByKey(key);
@@ -397,6 +432,15 @@ async function orchestrateVehicle(
           ? "No connector configured for this destination."
           : "Export only — content is generated and downloadable; no automated delivery exists." },
       }, { onConflict: "idempotency_key", ignoreDuplicates: true });
+    }
+
+    // A condition that no longer reproduces is resolved. Without this a vehicle
+    // that was repaired and cleanly regenerated reads as "Blocked" forever.
+    // Scoped runs only touch the channels they rebuilt, so they never sweep.
+    if (!scopedRun) {
+      await admin.rpc("close_resolved_description_exceptions", {
+        p_case_id: caseId, p_keep_types: [...raisedTypes],
+      });
     }
 
     const { count: openExc } = await admin.from("description_exceptions")
@@ -444,6 +488,7 @@ serve(async (req) => {
 
     // Interactive callers must be an accepted member of the tenant.
     let callerTenants: string[] | null = null;
+    let callerIsPlatformAdmin = false;
     const callerRoles = new Map<string, string>();
     if (!isService && !isCron) {
       if (!jwt) return json({ error: "missing bearer token" }, 401);
@@ -453,19 +498,29 @@ serve(async (req) => {
         .select("tenant_id, role").eq("user_id", userRes.user.id).not("accepted_at", "is", null);
       callerTenants = (mems || []).map((m: any) => m.tenant_id);
       for (const m of mems || []) callerRoles.set(m.tenant_id, String(m.role || ""));
-      if (!callerTenants.length) return json({ error: "no tenant membership" }, 403);
+      const { data: pa } = await admin.from("user_roles")
+        .select("role").eq("user_id", userRes.user.id).eq("role", "admin").maybeSingle();
+      callerIsPlatformAdmin = !!pa;
+      if (!callerTenants.length && !callerIsPlatformAdmin) {
+        return json({ error: "no tenant membership" }, 403);
+      }
     }
-    const allowed = (t: string) => !callerTenants || callerTenants.includes(t);
+    const allowed = (t: string) => !callerTenants || callerIsPlatformAdmin || callerTenants.includes(t);
     // Generation spends provider credits, so an interactive caller needs the
     // same authority the UI claims to require — membership alone is not enough.
+    // This set mirrors `can_create_documents` in dealerRoleCapabilities.ts
+    // exactly; any divergence 403s a button the UI has already enabled.
     // The role is read from the membership row we already loaded: calling the
     // SQL helper over the service-role client would evaluate auth.uid() as
     // NULL and deny everyone.
-    const APPROVER_ROLES = new Set([
+    const GENERATE_ROLES = new Set([
       "owner", "general_manager", "gsm", "admin", "manager",
-      "sales_manager", "used_car_manager", "inventory_manager", "service_manager",
+      "sales_manager", "salesperson", "sales", "staff",
+      "used_car_manager", "inventory_manager",
+      "office", "finance", "compliance",
     ]);
-    const authorized = (t: string) => !callerTenants || APPROVER_ROLES.has(callerRoles.get(t) || "");
+    const authorized = (t: string) =>
+      !callerTenants || callerIsPlatformAdmin || GENERATE_ROLES.has((callerRoles.get(t) || "").trim().toLowerCase());
 
     if (action === "orchestrate" || action === "regenerate") {
       const tenantId = String(body.tenant_id || "");
@@ -537,18 +592,56 @@ serve(async (req) => {
         if (!authorized(reqTenant)) return json({ error: "insufficient_permission" }, 403);
       }
       const tenantId = reqTenant;
-      const limit = Math.min(Number(body.limit) || 25, 12); // each vehicle is up to 8 sequential LLM calls
-      const { data: batch } = await admin.rpc("next_description_reconcile_batch", {
-        p_tenant_id: tenantId, p_limit: limit,
-      });
-      const rows = (batch || []) as Array<{ tenant_id: string; vehicle_id: string; reason: string }>;
+      // One hop works a wall-clock budget, then re-invokes itself with the same
+      // sweep cursor. A single 12-vehicle batch could never drain a real
+      // inventory; without chaining the backlog simply never reconciled.
+      const sweepStart = typeof body.sweep_start === "string" ? body.sweep_start : new Date().toISOString();
+      const depth = Number(body.depth) || 0;
+      const deadline = Date.now() + RECONCILE_BUDGET_MS;
       const results: unknown[] = [];
-      for (const r of rows) {
-        results.push(await orchestrateVehicle(admin, r.tenant_id, r.vehicle_id, {
-          force: r.reason === "stalled" || r.reason === "retryable", reason: `reconcile:${r.reason}`,
-        }));
+      let examined = 0;
+      while (Date.now() < deadline) {
+        const { data: batch } = await admin.rpc("next_description_reconcile_batch", {
+          p_tenant_id: tenantId, p_limit: 5, p_sweep_start: sweepStart,
+        });
+        const rows = (batch || []) as Array<{ tenant_id: string; vehicle_id: string; reason: string }>;
+        if (!rows.length) break;
+        for (const r of rows) {
+          if (Date.now() >= deadline) break;
+          examined++;
+          const out = await orchestrateVehicle(admin, r.tenant_id, r.vehicle_id, {
+            force: r.reason === "stalled" || r.reason === "retryable", reason: `reconcile:${r.reason}`,
+          });
+          if (results.length < 50) results.push(out);
+          // Liveness: a vehicle the pipeline declined (archived, tenant
+          // mismatch, no case) must still leave this sweep's cursor, or the
+          // chain re-selects it forever.
+          if ((out as { skipped?: string }).skipped) {
+            await admin.from("description_cases")
+              .update({ last_orchestrated_at: new Date().toISOString() })
+              .eq("tenant_id", r.tenant_id).eq("vehicle_id", r.vehicle_id);
+          }
+        }
       }
-      return json({ success: true, examined: rows.length, results });
+
+      let chained = false;
+      if (depth < RECONCILE_MAX_DEPTH) {
+        const { data: more } = await admin.rpc("next_description_reconcile_batch", {
+          p_tenant_id: tenantId, p_limit: 1, p_sweep_start: sweepStart,
+        });
+        if (((more as unknown[]) || []).length > 0) {
+          chained = true;
+          await fetch(`${SUPABASE_URL}/functions/v1/description-orchestrate`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json", Authorization: `Bearer ${SERVICE_KEY}`,
+                       "x-cron-secret": CRON_SECRET },
+            body: JSON.stringify({ action: "reconcile", tenant_id: tenantId,
+                                   sweep_start: sweepStart, depth: depth + 1 }),
+            signal: AbortSignal.timeout(15000),
+          }).catch(() => { /* best-effort; the next nightly sweep retries */ });
+        }
+      }
+      return json({ success: true, examined, depth, chained, sweep_start: sweepStart, results });
     }
 
     return json({ error: `unknown action: ${action}` }, 400);

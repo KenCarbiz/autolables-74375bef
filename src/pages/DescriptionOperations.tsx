@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   AlertTriangle, Car, CheckCircle2, ChevronDown, ChevronRight, ChevronUp, Clock, Loader2,
@@ -73,6 +73,18 @@ export default function DescriptionOperations() {
   const [pageSize, setPageSize] = useState(25);
   const [syncing, setSyncing] = useState(false);
   const [menu, setMenu] = useState<{ id: string; x: number; y: number; caseRow: any } | null>(null);
+
+  useEffect(() => {
+    if (!menu) return;
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setMenu(null); };
+    const onScroll = () => setMenu(null);
+    window.addEventListener("keydown", onKey);
+    window.addEventListener("scroll", onScroll, true);
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      window.removeEventListener("scroll", onScroll, true);
+    };
+  }, [menu]);
 
   const runReconcile = async () => {
     setSyncing(true);
@@ -156,10 +168,12 @@ export default function DescriptionOperations() {
           <p className="text-sm text-muted-foreground mt-2">Automated merchandising intelligence across every vehicle.</p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
-          <button onClick={runReconcile} disabled={syncing}
-            className="min-h-[44px] px-3.5 rounded-xl border border-border bg-card text-[13px] font-semibold text-foreground hover:border-primary inline-flex items-center gap-1.5 disabled:opacity-60">
-            {syncing ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />} Run Reconciliation
-          </button>
+          {perms.canGenerate && (
+            <button onClick={runReconcile} disabled={syncing}
+              className="min-h-[44px] px-3.5 rounded-xl border border-border bg-card text-[13px] font-semibold text-foreground hover:border-primary inline-flex items-center gap-1.5 disabled:opacity-60">
+              {syncing ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />} Run Reconciliation
+            </button>
+          )}
           {perms.canConfigure && (
             <button onClick={() => navigate("/admin?tab=merchandising-seo")}
               className="min-h-[44px] px-3.5 rounded-xl border border-border bg-card text-[13px] font-semibold text-foreground hover:border-primary inline-flex items-center gap-1.5">
@@ -198,10 +212,12 @@ export default function DescriptionOperations() {
               <AlertTriangle className="w-4 h-4 shrink-0" />
               <span><b>{summary.missing}</b> active vehicle{summary.missing === 1 ? "" : "s"} never initialized a description. Vehicles added outside the inventory feed are picked up by reconciliation.</span>
             </p>
-            <button onClick={runReconcile} disabled={syncing}
-              className="min-h-[44px] px-3.5 rounded-lg bg-amber-600 text-white text-[12.5px] font-semibold inline-flex items-center gap-1.5 disabled:opacity-60 shrink-0">
-              {syncing ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />} Initialize Now
-            </button>
+            {perms.canGenerate && (
+              <button onClick={runReconcile} disabled={syncing}
+                className="min-h-[44px] px-3.5 rounded-lg bg-amber-600 text-white text-[12.5px] font-semibold inline-flex items-center gap-1.5 disabled:opacity-60 shrink-0">
+                {syncing ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />} Initialize Now
+              </button>
+            )}
           </div>
         ) : (
           <div className="rounded-2xl border border-emerald-200 bg-emerald-50/70 p-3 mb-3 flex items-center justify-between gap-3 flex-wrap">
@@ -377,7 +393,15 @@ export default function DescriptionOperations() {
                             aria-haspopup="menu" aria-expanded={menu?.id === c.id}
                             onClick={(e) => {
                               const r = (e.currentTarget as HTMLElement).getBoundingClientRect();
-                              setMenu(menu?.id === c.id ? null : { id: c.id, x: r.right, y: r.bottom, caseRow: c });
+                              // Flip above the trigger when the menu would run
+                              // off the bottom of the viewport.
+                              const MENU_H = 156;
+                              const below = window.innerHeight - r.bottom > MENU_H + 12;
+                              setMenu(menu?.id === c.id ? null : {
+                                id: c.id, x: r.right,
+                                y: below ? r.bottom + 4 : Math.max(8, r.top - MENU_H - 4),
+                                caseRow: c,
+                              });
                             }}
                             className="w-11 h-11 grid place-items-center rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted/50">
                             <MoreVertical className="w-4 h-4" />
@@ -434,7 +458,7 @@ export default function DescriptionOperations() {
       {menu && (
         <>
           <div className="fixed inset-0 z-30" onClick={() => setMenu(null)} aria-hidden />
-          <div role="menu" style={{ top: menu.y + 4, left: Math.max(8, menu.x - 208) }}
+          <div role="menu" style={{ top: menu.y, left: Math.max(8, menu.x - 208) }}
             className="fixed z-40 w-52 rounded-xl border border-border bg-card shadow-lg p-1">
             {[["Open Record", () => navigate(`/description-intelligence/${menu.caseRow.vehicle_id}`)],
               ["Open Vehicle File", () => navigate(`/vehicle-file/${menu.caseRow.vehicle_id}`)],

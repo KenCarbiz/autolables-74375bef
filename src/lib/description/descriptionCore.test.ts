@@ -256,6 +256,34 @@ describe("resolved conflicts (the review loop must terminate)", () => {
     const f = validateContent("Features Bose Performance Series Audio. Contact us.", snap, SETTINGS);
     expect(f.some((x) => x.validator_code === "EXCLUDED_CLAIM_PRESENT")).toBe(true);
   });
+
+  // The CPO conflict used the same review UI but ignored the override, so the
+  // manager's decision never landed and the vehicle blocked forever.
+  const cpoListing = { ...LISTING, condition: "cpo" };
+
+  it("stops blocking once a manager rules the vehicle is NOT certified", () => {
+    const snap = buildFactSnapshot(cpoListing, SETTINGS, null,
+      [{ field_key: "cpo_status", decision: "exclude" }]);
+    expect(snap.conflicts.some((c) => c.field === "cpo_status")).toBe(false);
+    expect(snap.excluded_claims.some((e) => e.field === "cpo_status" && e.reason === "resolved_excluded")).toBe(true);
+    expect(snap.facts.cpo_status).toBeUndefined();
+  });
+
+  it("claims CPO once a manager confirms it and the dealer allows the language", () => {
+    const snap = buildFactSnapshot(cpoListing, { ...SETTINGS, cpo_language_allowed: true }, null,
+      [{ field_key: "cpo_status", decision: "include" }]);
+    expect(snap.conflicts.some((c) => c.field === "cpo_status")).toBe(false);
+    expect(snap.facts.cpo_status?.value).toBe("Certified Pre-Owned");
+  });
+
+  it("never claims CPO on a manager override while the dealer disallows the language", () => {
+    const snap = buildFactSnapshot(cpoListing, SETTINGS, null,
+      [{ field_key: "cpo_status", decision: "include" }]);
+    expect(snap.facts.cpo_status).toBeUndefined();
+    // and it must not re-raise the conflict the manager already answered
+    expect(snap.conflicts.some((c) => c.field === "cpo_status")).toBe(false);
+    expect(snap.excluded_claims.some((e) => e.reason === "cpo_language_disabled")).toBe(true);
+  });
 });
 
 describe("fingerprint covers post-ingest facts", () => {

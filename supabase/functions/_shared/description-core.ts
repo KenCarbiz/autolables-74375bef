@@ -275,7 +275,20 @@ export function buildFactSnapshot(
   const certification = (listing.certification || {}) as Record<string, any>;
   const feedSaysCpo = String(listing.condition || "").toLowerCase() === "cpo" || certification?.certified === true;
   const cpoConfirmed = !!(certification?.program || certification?.verified_at || certification?.source);
-  if (feedSaysCpo && !cpoConfirmed) {
+  // A manager decision on CPO is durable: once ruled on, the conflict never
+  // re-raises, or the vehicle blocks on the same question every night.
+  const cpoOverride = overrideBy.get("cpo_status");
+  if (feedSaysCpo && !cpoConfirmed && cpoOverride?.decision) {
+    if (cpoOverride.decision === "include" && settings.cpo_language_allowed) {
+      put("cpo_status", "Certified Pre-Owned", "manager_resolution", "dealer_entered");
+    } else {
+      excluded.push({
+        field: "cpo_status",
+        reason: cpoOverride.decision === "include" ? "cpo_language_disabled" : "resolved_excluded",
+        claim: "certified",
+      });
+    }
+  } else if (feedSaysCpo && !cpoConfirmed) {
     conflicts.push({
       field: "cpo_status",
       values: [

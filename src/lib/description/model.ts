@@ -105,7 +105,7 @@ export const FACT_STATUS_META: Record<string, { label: string; tone: Tone }> = {
   pending:        { label: "Pending",       tone: "slate" },
 };
 
-export const LIFECYCLE_STEPS = ["Data verified", "Master generated", "Channels generated", "Validation passed", "Published"] as const;
+export const LIFECYCLE_STEPS = ["Data Verified", "Master Generated", "Channels Generated", "Validation Passed", "Published"] as const;
 
 export function lifecycleIndex(status: DescriptionStatus): number {
   switch (status) {

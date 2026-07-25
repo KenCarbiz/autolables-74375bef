@@ -12,6 +12,31 @@ import { hasDealerCapability } from "@/lib/permissions/dealerRoleCapabilities";
 // deno-lint-ignore-file no-explicit-any
 type Row = Record<string, any>;
 
+// supabase-js collapses every non-2xx into "Edge Function returned a non-2xx
+// status code", which tells an operator nothing. The real reason is in the
+// attached Response body, so read it before surfacing anything.
+const FALLBACK_FN_ERROR = "Edge Function returned a non-2xx status code";
+const FN_ERROR_COPY: Record<string, string> = {
+  forbidden: "You do not have access to this dealership's descriptions.",
+  insufficient_permission: "Your role cannot run description generation. Ask a manager or admin.",
+  "no tenant membership": "Your account is not a member of this dealership yet.",
+  "invalid token": "Your session expired. Sign in again and retry.",
+  "missing bearer token": "Your session expired. Sign in again and retry.",
+};
+async function fnErrorMessage(error: any): Promise<string> {
+  const raw = String(error?.message || "request failed");
+  let detail = "";
+  try {
+    const ctx = error?.context;
+    if (ctx && typeof ctx.json === "function") {
+      const body = await ctx.clone().json();
+      detail = String(body?.error || body?.message || "");
+    }
+  } catch { /* body already consumed or not JSON — fall through */ }
+  if (!detail) return raw;
+  return FN_ERROR_COPY[detail] || (raw === FALLBACK_FN_ERROR ? detail : `${raw}: ${detail}`);
+}
+
 export interface DescriptionCaseRow extends Row {
   id: string; vehicle_id: string; vin: string; status: string;
   publication_eligibility: string; fact_confidence: number | null;
@@ -52,24 +77,44 @@ export function useDescriptionOperations() {
     if (!tenant?.id) return;
     setError(null);
     try {
-      const [caseRes, vehRes, chanRes] = await Promise.all([
+      const [caseRes, vehRes] = await Promise.all([
         (supabase as any).from("description_cases").select("*")
           .eq("tenant_id", tenant.id).is("archived_at", null)
           .order("updated_at", { ascending: false }).limit(500),
         (supabase as any).from("vehicle_listings")
           .select("id, vin, ymm, trim, condition, mileage, status, hero_image_url, mc_attributes")
           .eq("tenant_id", tenant.id).in("status", ["draft", "published"]).limit(1000),
-        (supabase as any).from("description_channel_versions")
-          .select("description_case_id, channel, validation_status").eq("tenant_id", tenant.id).limit(5000),
       ]);
       if (caseRes.error) throw caseRes.error;
       const rows = (caseRes.data || []) as DescriptionCaseRow[];
       const vmap: Record<string, Row> = {};
       for (const v of vehRes.data || []) vmap[v.id] = v;
-      // real per-case channel counts, so the table reports measurements
-      // rather than a constant derived from the static channel list
+
+      // Real per-case channel counts, so the table reports measurements rather
+      // than a constant derived from the static channel list. Every
+      // regeneration writes a fresh row per channel against a NEW master
+      // version, so an unfiltered read counts every historical variant and
+      // reports "21/7 channels". Scope the read to each case's current master.
+      const masterIds = rows.map((r) => r.current_master_version_id).filter(Boolean) as string[];
+      const chanRows: Row[] = [];
+      for (let i = 0; i < masterIds.length; i += 100) {
+        const { data } = await (supabase as any).from("description_channel_versions")
+          .select("description_case_id, channel, validation_status, created_at")
+          .eq("tenant_id", tenant.id).in("master_version_id", masterIds.slice(i, i + 100));
+        if (data) chanRows.push(...data);
+      }
+      // A locked channel keeps its manual copy attached to the older master it
+      // was written against, so it must be counted even though the current
+      // master never regenerated it.
+      const { data: lockedRows } = await (supabase as any).from("description_channel_versions")
+        .select("description_case_id, channel, validation_status, created_at")
+        .eq("tenant_id", tenant.id).eq("locked", true).limit(2000);
+      const seen = new Set<string>();
       const cmap: Record<string, { total: number; ready: number }> = {};
-      for (const cv of chanRes.data || []) {
+      for (const cv of [...(lockedRows || []), ...chanRows]) {
+        const key = `${cv.description_case_id}:${cv.channel}`;
+        if (seen.has(key)) continue;
+        seen.add(key);
         const e = (cmap[cv.description_case_id] ||= { total: 0, ready: 0 });
         e.total += 1;
         if (cv.validation_status === "passed" || cv.validation_status === "warning") e.ready += 1;
@@ -104,7 +149,7 @@ export function useDescriptionOperations() {
     const { data, error } = await supabase.functions.invoke("description-orchestrate", {
       body: { action: "reconcile", tenant_id: tenant.id, limit },
     });
-    if (error) return { ok: false, error: error.message };
+    if (error) return { ok: false, error: await fnErrorMessage(error) };
     await load();
     return { ok: true, examined: (data as any)?.examined ?? 0 };
   }, [tenant?.id, load]);
@@ -139,7 +184,8 @@ export function useDescriptionCase(vehicleId: string | undefined) {
         (supabase as any).from("description_versions").select("*")
           .eq("description_case_id", caseRow.id).order("version_number", { ascending: false }),
         (supabase as any).from("description_channel_versions").select("*")
-          .eq("description_case_id", caseRow.id).order("channel"),
+          .eq("description_case_id", caseRow.id)
+          .order("channel").order("created_at", { ascending: false }),
         (supabase as any).from("description_validation_results").select("*")
           .eq("description_case_id", caseRow.id).eq("status", "open"),
         (supabase as any).from("description_exceptions").select("*")
@@ -150,9 +196,13 @@ export function useDescriptionCase(vehicleId: string | undefined) {
         (supabase as any).from("description_deliveries").select("*")
           .eq("description_case_id", caseRow.id).order("created_at", { ascending: false }),
       ]);
+      // One row per channel: regeneration writes a new row against a new master
+      // version, so the raw list holds every historical variant.
+      const byChannel = new Map<string, Row>();
+      for (const cv of chans.data || []) if (!byChannel.has(cv.channel)) byChannel.set(cv.channel, cv);
       setRecord({
         caseRow, vehicle: veh,
-        versions: vers.data || [], channels: chans.data || [], findings: finds.data || [],
+        versions: vers.data || [], channels: [...byChannel.values()], findings: finds.data || [],
         exceptions: excs.data || [], snapshot: (snaps.data || [])[0] || null, deliveries: dels.data || [],
       });
     } catch (e) {
@@ -169,7 +219,7 @@ export function useDescriptionCase(vehicleId: string | undefined) {
       body: { action: "regenerate", tenant_id: tenant.id, vehicle_id: vehicleId, reason, channels },
     });
     setBusy(false);
-    if (error) return { ok: false, error: error.message };
+    if (error) return { ok: false, error: await fnErrorMessage(error) };
     if ((data as any)?.error) return { ok: false, error: String((data as any).error) };
     await load();
     // the server tells us whether a version was actually produced

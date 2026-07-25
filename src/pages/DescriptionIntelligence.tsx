@@ -3,12 +3,12 @@ import { useNavigate, useParams } from "react-router-dom";
 import {
   AlertTriangle, ArrowLeft, CheckCircle2, ChevronDown, ChevronRight, Clock, Copy, Download,
   Loader2, Lock, LockOpen, RefreshCw, ShieldCheck, XCircle, History, Save, Link2,
-  Pilcrow, List, Type, AlignLeft, MessageSquare, MoreVertical,
+  Pilcrow, List, Type, AlignLeft, MessageSquare,
 } from "lucide-react";
 import { useDescriptionCase, useDescriptionPermissions } from "@/hooks/useDescriptionOps";
 import {
   STATUS_META, TONE_CLASS, CHANNEL_META, channelMeta, connectorLabel, ELIGIBILITY_META,
-  EXCEPTION_LABELS, FACT_STATUS_META, factConfidenceLabel, LIFECYCLE_STEPS, lifecycleIndex,
+  EXCEPTION_LABELS, FACT_STATUS_META, factConfidenceLabel, lifecycleIndex,
   type DescriptionStatus,
 } from "@/lib/description/model";
 import { toast } from "sonner";
@@ -81,7 +81,11 @@ export default function DescriptionIntelligence() {
   );
   const snapshot = record?.snapshot;
   const facts = (snapshot?.facts_json ?? {}) as Record<string, any>;
-  const findings = (record?.findings ?? []).filter((f) => !current || f.version_id === current.id);
+  // Master findings only: a channel variant's findings carry a channel_version_id
+  // and belong to that channel's card, not the master validation summary.
+  const findings = (record?.findings ?? [])
+    .filter((f) => !f.channel_version_id)
+    .filter((f) => !current || f.version_id === current.id);
   const blockingFindings = findings.filter((f) => f.blocking);
   const warnings = findings.filter((f) => f.severity === "warning");
   const exceptions = record?.exceptions ?? [];
@@ -168,9 +172,11 @@ export default function DescriptionIntelligence() {
   }
 
   const conflictField = blockingException
-    ? String(blockingException.details_json?.field || blockingException.exception_type)
+    ? String(blockingException.field_key || blockingException.details_json?.field || blockingException.exception_type)
     : "";
-  const conflictLabel = conflictField.replace(/^equipment:/, "");
+  const conflictLabel = conflictField === "cpo_status"
+    ? "Certified Pre-Owned"
+    : conflictField.replace(/^equipment:/, "");
   const conflictValues: Array<any> = Array.isArray(blockingException?.details_json?.values)
     ? blockingException!.details_json.values : [];
   const affectedSentence = (current?.content || "")
@@ -178,8 +184,7 @@ export default function DescriptionIntelligence() {
     .find((s: string) => conflictLabel && s.toLowerCase().includes(conflictLabel.toLowerCase()));
 
   // ── Vehicle identity + trusted facts (left) ────────────────────────
-  const identity = (
-    <div className="space-y-4">
+  const identityCard = (
       <Card title="Vehicle Identity">
         {vehicle?.hero_image_url && (
           <img src={vehicle.hero_image_url} alt="" className="w-full aspect-[16/10] object-cover rounded-xl border border-border mb-3" />
@@ -208,6 +213,9 @@ export default function DescriptionIntelligence() {
         </dl>
       </Card>
 
+  );
+
+  const trustedFactsCard = (
       <Card title="Trusted Vehicle Facts">
         {Object.keys(facts).length === 0 ? (
           <p className="text-[12px] text-muted-foreground">No fact snapshot yet. Generate a description to build one.</p>
@@ -224,7 +232,9 @@ export default function DescriptionIntelligence() {
                         : <Clock className="w-3.5 h-3.5 text-muted-foreground shrink-0" />}
                       <span className="truncate">{factLabel(f.field)}</span>
                     </span>
-                    <Pill tone={fm.tone}>{fm.label}</Pill>
+                    <span className={`text-[12px] font-semibold shrink-0 ${
+                      fm.tone === "emerald" ? "text-emerald-600" : fm.tone === "amber" ? "text-amber-700"
+                      : fm.tone === "red" ? "text-red-600" : "text-muted-foreground"}`}>{fm.label}</span>
                   </li>
                 );
               })}
@@ -254,8 +264,11 @@ export default function DescriptionIntelligence() {
           </p>
         )}
       </Card>
-    </div>
   );
+
+  // Composed for the desktop column; the mobile accordions mount the two
+  // cards separately so neither re-renders the other's content.
+  const identity = <div className="space-y-4">{identityCard}{trustedFactsCard}</div>;
 
   // ── Exception review (mockup screen 03) ────────────────────────────
   const exceptionBanner = blockingException && (
@@ -275,7 +288,9 @@ export default function DescriptionIntelligence() {
   const conflictCard = blockingException && (
     <Card>
       <h2 className="text-[14px] font-bold text-foreground">Source Conflict: {conflictLabel}</h2>
-      <p className="text-[12px] text-muted-foreground mt-0.5 mb-3">The following sources disagree on this claim.</p>
+      <p className="text-[12px] text-muted-foreground mt-0.5 mb-3">
+        The following sources disagree on this {conflictField === "cpo_status" ? "certification" : "equipment"} claim.
+      </p>
 
       {conflictValues.length > 0 && (
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
@@ -292,7 +307,7 @@ export default function DescriptionIntelligence() {
                 <p className="text-[11px] text-muted-foreground">Source</p>
                 <p className="text-[12px] text-foreground mb-1.5 capitalize">{String(v.source).replace(/_/g, " ")}</p>
                 <p className="text-[11px] text-muted-foreground">Last Updated</p>
-                <p className="text-[12px] text-foreground">{fmt(snapshot?.created_at)}</p>
+                <p className="text-[12px] text-foreground">{fmt(v.observed_at ?? snapshot?.created_at)}</p>
               </div>
             );
           })}
@@ -670,6 +685,34 @@ export default function DescriptionIntelligence() {
     </div>
   );
 
+  const channelReadinessCard = (
+      <Card title="Channel Readiness">
+        <ul className="space-y-1.5">
+          {CHANNEL_META.map((cm) => {
+            const conn = connectorLabel(cm);
+            const cv = record.channels.find((c) => c.channel === cm.key);
+            return (
+              <li key={cm.key} className="flex items-center justify-between gap-2 text-[12px]">
+                <span className="text-foreground truncate inline-flex items-center gap-1.5 min-w-0">
+                  {cm.deliveryMode === "internal_projection"
+                    ? <ShieldCheck className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
+                    : <Download className="w-3.5 h-3.5 text-muted-foreground shrink-0" />}
+                  <span className="truncate">{cm.label}</span>
+                </span>
+                <span className="inline-flex items-center gap-1 shrink-0">
+                  {cv && conn.tone === "emerald" && <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />}
+                  <Pill tone={cv ? conn.tone : "slate"}>{cv ? conn.label : "Not Generated"}</Pill>
+                </span>
+              </li>
+            );
+          })}
+        </ul>
+        <p className="text-[11px] text-muted-foreground mt-3 pt-3 border-t border-border">
+          Only the Vehicle Passport is published by AutoLabels. Every other destination is export-only until a connector is configured.
+        </p>
+      </Card>
+  );
+
   // ── Right rail (normal state) ──────────────────────────────────────
   const rail = (
     <div className="space-y-4">
@@ -700,31 +743,7 @@ export default function DescriptionIntelligence() {
         </dl>
       </Card>
 
-      <Card title="Channel Readiness">
-        <ul className="space-y-1.5">
-          {CHANNEL_META.map((cm) => {
-            const conn = connectorLabel(cm);
-            const cv = record.channels.find((c) => c.channel === cm.key);
-            return (
-              <li key={cm.key} className="flex items-center justify-between gap-2 text-[12px]">
-                <span className="text-foreground truncate inline-flex items-center gap-1.5 min-w-0">
-                  {cm.deliveryMode === "internal_projection"
-                    ? <ShieldCheck className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
-                    : <Download className="w-3.5 h-3.5 text-muted-foreground shrink-0" />}
-                  <span className="truncate">{cm.label}</span>
-                </span>
-                <span className="inline-flex items-center gap-1 shrink-0">
-                  {cv && conn.tone === "emerald" && <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />}
-                  <Pill tone={cv ? conn.tone : "slate"}>{cv ? conn.label : "Not Generated"}</Pill>
-                </span>
-              </li>
-            );
-          })}
-        </ul>
-        <p className="text-[11px] text-muted-foreground mt-3 pt-3 border-t border-border">
-          Only the Vehicle Passport is published by AutoLabels. Every other destination is export-only until a connector is configured.
-        </p>
-      </Card>
+      {channelReadinessCard}
 
       {exceptions.length > 0 && (
         <Card title={`Exceptions (${exceptions.length})`}>
@@ -794,8 +813,9 @@ export default function DescriptionIntelligence() {
       </div>
 
       {/* Desktop three-column */}
-      <div className="hidden lg:grid grid-cols-[300px_minmax(0,1fr)_320px] gap-4 items-start">
-        {identity}
+      <div className={`hidden lg:grid gap-4 items-start ${
+        blockingException ? "grid-cols-[minmax(0,1fr)_340px]" : "grid-cols-[300px_minmax(0,1fr)_320px]"}`}>
+        {!blockingException && identity}
         <div className="space-y-4 min-w-0">
           {exceptionBanner}
           {conflictCard}
@@ -825,7 +845,8 @@ export default function DescriptionIntelligence() {
           <p className="text-[12px] mt-0.5 opacity-90">
             {status === "READY" ? "Eligible for internal publication." : meta.help}
           </p>
-          <ol className="flex items-center justify-between gap-1 mt-3">
+        </div>
+        <ol className="flex items-center justify-between gap-1 rounded-2xl border border-border bg-card p-3">
             {["Data Sync", "Validate", "Generate", "Review", "Publish"].map((s, i) => (
               <li key={s} className="flex flex-col items-center gap-1 flex-1 min-w-0 relative">
                 {i > 0 && <span aria-hidden className={`absolute top-[10px] right-1/2 w-full h-0.5 ${i <= stepIdx ? "bg-emerald-500" : "bg-border"}`} />}
@@ -836,8 +857,7 @@ export default function DescriptionIntelligence() {
                 <span className="text-[9.5px] text-center leading-tight truncate w-full">{s}</span>
               </li>
             ))}
-          </ol>
-        </div>
+        </ol>
 
         {blockingException ? (
           <>{exceptionBanner}{conflictCard}</>
@@ -873,8 +893,8 @@ export default function DescriptionIntelligence() {
           </div>
         )}
 
-        {[["facts", "Trusted Facts", identity],
-          ["readiness", "Channel Readiness", activeRail],
+        {[["facts", "Trusted Facts", trustedFactsCard],
+          ["readiness", "Channel Readiness", channelReadinessCard],
           ["history", "Version History", (
             <ul className="space-y-2">
               {versions.map((v) => (
@@ -904,9 +924,9 @@ export default function DescriptionIntelligence() {
       {/* Sticky mobile action — only when exactly one action is valid */}
       {perms.canPublish && current && !isPublished && !blockingException
         && caseRow?.publication_eligibility === "eligible" && (
-        <div className="lg:hidden fixed bottom-0 left-0 right-0 p-3 bg-card border-t border-border z-40">
+        <div className="lg:hidden fixed left-0 right-0 bottom-[calc(env(safe-area-inset-bottom)+76px)] px-3 z-40">
           <button onClick={doPublish} disabled={busy}
-            className="w-full min-h-[48px] rounded-xl bg-primary text-primary-foreground text-[14px] font-semibold inline-flex items-center justify-center gap-2 disabled:opacity-60">
+            className="w-full min-h-[48px] rounded-xl bg-primary text-primary-foreground text-[14px] font-semibold inline-flex items-center justify-center gap-2 disabled:opacity-60 shadow-lg">
             {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <ShieldCheck className="w-4 h-4" />} Publish Internally
           </button>
         </div>
