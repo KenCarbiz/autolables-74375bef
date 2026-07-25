@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   AlertTriangle, Car, CheckCircle2, ChevronDown, ChevronRight, ChevronUp, Clock, Loader2,
-  RefreshCw, Search, ShieldCheck, Sparkles, XCircle, Settings2, FileText, SlidersHorizontal,
+  RefreshCw, Search, ShieldCheck, Sparkles, XCircle, Settings2, FileText, SlidersHorizontal, MoreVertical,
 } from "lucide-react";
 import { useDescriptionOperations, useDescriptionPermissions } from "@/hooks/useDescriptionOps";
 import {
@@ -72,6 +72,7 @@ export default function DescriptionOperations() {
   const [page, setPage] = useState(0);
   const [pageSize, setPageSize] = useState(25);
   const [syncing, setSyncing] = useState(false);
+  const [menuFor, setMenuFor] = useState<string | null>(null);
 
   const runReconcile = async () => {
     setSyncing(true);
@@ -367,10 +368,34 @@ export default function DescriptionOperations() {
                           </span>
                         </td>
                         <td className="px-3 py-3 text-right">
+                          <span className="inline-flex items-center gap-1 justify-end">
                           <button onClick={() => navigate(`/description-intelligence/${c.vehicle_id}`)}
                             className="min-h-[44px] px-3 rounded-lg border border-blue-200 bg-blue-50 text-[12px] font-semibold text-blue-700 hover:bg-blue-100 inline-flex items-center gap-1">
                             {c.open_exception_count > 0 ? "Review Issue" : "Open Record"}
                           </button>
+                          <button aria-label={`More actions for ${v.ymm || c.vin}`}
+                            onClick={() => setMenuFor(menuFor === c.id ? null : c.id)}
+                            className="w-11 h-11 grid place-items-center rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted/50">
+                            <MoreVertical className="w-4 h-4" />
+                          </button>
+                          </span>
+                          {menuFor === c.id && (
+                            <div className="relative">
+                              <div className="absolute right-0 z-20 mt-1 w-52 rounded-xl border border-border bg-card shadow-lg p-1 text-left">
+                                {[["Open record", () => navigate(`/description-intelligence/${c.vehicle_id}`)],
+                                  ["Open vehicle file", () => navigate(`/vehicle-file/${c.vehicle_id}`)],
+                                  ["Copy VIN", () => { navigator.clipboard.writeText(c.vin).then(
+                                      () => toast.success("VIN copied"), () => toast.error("Clipboard unavailable")); }],
+                                 ].map(([label, fn]) => (
+                                  <button key={label as string}
+                                    onClick={() => { (fn as () => void)(); setMenuFor(null); }}
+                                    className="w-full text-left min-h-[44px] px-3 rounded-lg text-[12.5px] font-medium text-foreground hover:bg-muted/60">
+                                    {label as string}
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
+                          )}
                         </td>
                       </tr>
                     );

@@ -3,6 +3,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import {
   AlertTriangle, ArrowLeft, CheckCircle2, ChevronDown, ChevronRight, Clock, Copy, Download,
   Loader2, Lock, LockOpen, RefreshCw, ShieldCheck, XCircle, History, Save, Link2,
+  Pilcrow, List, Type, AlignLeft, MessageSquare, MoreVertical,
 } from "lucide-react";
 import { useDescriptionCase, useDescriptionPermissions } from "@/hooks/useDescriptionOps";
 import {
@@ -34,6 +35,24 @@ const Card = ({ title, children, action }: { title?: string; children: React.Rea
 
 const fmt = (d: string | null | undefined) => (d ? new Date(d).toLocaleString() : "—");
 
+// Marketplace copy is validated against markdown and HTML, so the editor
+// deliberately offers only plain-text-safe structure actions.
+const ACRONYM: Record<string, string> = { vin: "VIN", cpo: "CPO", ymm: "Year / Make / Model", seo: "SEO", mpg: "MPG" };
+const factLabel = (field: string) =>
+  String(field).split("_").map((w) => ACRONYM[w] ?? (w.charAt(0).toUpperCase() + w.slice(1))).join(" ");
+
+const EDITOR_ACTIONS: Array<{ label: string; title: string; Icon: typeof Type; apply: (t: string) => string }> = [
+  { label: "para", title: "New paragraph", Icon: Pilcrow, apply: (t) => t.replace(/\s*$/, "") + "\n\n" },
+  { label: "bullet", title: "Add bullet line", Icon: List, apply: (t) => t.replace(/\s*$/, "") + "\n• " },
+  { label: "sentence", title: "Sentence case", Icon: Type,
+    apply: (t) => t.replace(/([.!?]\s+|^)([a-z])/g, (_m, p, c) => p + c.toUpperCase()) },
+  { label: "trim", title: "Collapse extra spacing", Icon: AlignLeft,
+    apply: (t) => t.replace(/[ \t]+/g, " ").replace(/\n{3,}/g, "\n\n").trim() },
+  { label: "cta", title: "Append call to action", Icon: MessageSquare,
+    apply: (t) => /contact|call|visit|schedule|test drive/i.test(t) ? t
+      : t.replace(/\s*$/, "") + "\n\nContact us to schedule a test drive." },
+];
+
 export default function DescriptionIntelligence() {
   const { vehicleId } = useParams<{ vehicleId: string }>();
   const navigate = useNavigate();
@@ -50,6 +69,7 @@ export default function DescriptionIntelligence() {
   const [mobileSection, setMobileSection] = useState<string | null>("master");
   const [regenChannels, setRegenChannels] = useState<string[]>([]);
   const [showLineage, setShowLineage] = useState(false);
+  const [showFindings, setShowFindings] = useState(true);
   const [expanded, setExpanded] = useState(false);
 
   const caseRow = record?.caseRow;
@@ -170,6 +190,7 @@ export default function DescriptionIntelligence() {
           {[["Stock #", (vehicle?.mc_attributes || {}).stock_no || "—"],
             ["VIN", vehicle?.vin || "—"],
             ["Mileage", vehicle?.mileage ? `${Number(vehicle.mileage).toLocaleString()} mi` : "—"],
+            ["Location", String(facts.dealer_name?.value || vehicle?.dealer_name || "—")],
             ["Condition", String(vehicle?.condition || "—").toUpperCase()],
           ].map(([k, v]) => (
             <div key={k as string} className="flex items-start justify-between gap-2">
@@ -201,7 +222,7 @@ export default function DescriptionIntelligence() {
                       {f.status === "verified"
                         ? <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
                         : <Clock className="w-3.5 h-3.5 text-muted-foreground shrink-0" />}
-                      <span className="truncate">{String(f.field).replace(/_/g, " ")}</span>
+                      <span className="truncate">{factLabel(f.field)}</span>
                     </span>
                     <Pill tone={fm.tone}>{fm.label}</Pill>
                   </li>
@@ -354,17 +375,14 @@ export default function DescriptionIntelligence() {
       )}
 
       <Card title="Audit Timeline">
-        <ol className="space-y-2.5 relative">
-          <span aria-hidden className="absolute left-[3px] top-2 bottom-2 w-px bg-border" />
+        <ol className="space-y-2.5">
           {[["Conflict detected", snapshot?.created_at],
             ["AutoLabels validation", current?.created_at],
             ["Review required", blockingException.created_at]].map(([label, when]) => (
-            <li key={label as string} className="flex items-start gap-2.5 relative">
-              <span className="w-[7px] h-[7px] rounded-full bg-amber-500 mt-1.5 shrink-0 ring-2 ring-card z-10" />
-              <span className="min-w-0 flex-1">
-                <span className="block text-[12px] font-semibold text-foreground">{label as string}</span>
-                <span className="block text-[11px] text-muted-foreground">{fmt(when as string)}</span>
-              </span>
+            <li key={label as string} className="flex items-center gap-2.5">
+              <span className="w-[7px] h-[7px] rounded-full bg-amber-500 shrink-0" />
+              <span className="text-[12px] font-semibold text-foreground flex-1 min-w-0 truncate">{label as string}</span>
+              <span className="text-[11px] text-muted-foreground whitespace-nowrap">{fmt(when as string)}</span>
             </li>
           ))}
         </ol>
@@ -451,12 +469,25 @@ export default function DescriptionIntelligence() {
                 <p className="text-[11.5px] text-muted-foreground mb-2">
                   v{current.version_number} · {current.character_count} chars · {current.created_by_type === "user" ? "manual edit" : "generated"} · {fmt(current.created_at)}
                 </p>
+                <div className="flex items-center gap-0.5 flex-wrap rounded-t-xl border border-b-0 border-border bg-muted/40 px-1.5 py-1">
+                  {EDITOR_ACTIONS.map((a) => (
+                    <button key={a.label} type="button" title={a.title} aria-label={a.title}
+                      disabled={!perms.canEdit}
+                      onClick={() => setDraft((cur) => a.apply(cur ?? current.content))}
+                      className="w-9 h-9 grid place-items-center rounded-md text-muted-foreground hover:bg-card hover:text-foreground disabled:opacity-40">
+                      <a.Icon className="w-4 h-4" />
+                    </button>
+                  ))}
+                  <span className="ml-auto text-[11px] text-muted-foreground px-1.5">
+                    {(draft ?? current.content).length} chars
+                  </span>
+                </div>
                 <textarea
                   value={draft ?? current.content}
                   onChange={(e) => setDraft(e.target.value)}
                   readOnly={!perms.canEdit}
                   aria-label="Master description"
-                  className="w-full min-h-[240px] rounded-xl border border-border bg-background p-3 text-[13.5px] leading-relaxed focus:outline-none focus:ring-2 focus:ring-primary"
+                  className="w-full min-h-[240px] rounded-b-xl border border-border bg-background p-3 text-[13.5px] leading-relaxed focus:outline-none focus:ring-2 focus:ring-primary"
                 />
                 <div className="flex items-center gap-2 mt-3 flex-wrap">
                   {perms.canEdit && draft != null && draft !== current.content && (
@@ -576,18 +607,26 @@ export default function DescriptionIntelligence() {
         </div>
       </div>
 
-      <Card title="Validation Findings" action={
-        findings.length > 0 ? (
-          <span className="text-[12px] font-semibold text-muted-foreground">
-            {blockingFindings.length} blocking · {warnings.length} warning
+      <Card title="Validation Findings">
+        <div className="flex items-center gap-4 flex-wrap mb-2">
+          <span className={`text-[12.5px] font-semibold inline-flex items-center gap-1.5 ${
+            blockingFindings.length ? "text-red-600" : "text-emerald-700"}`}>
+            {blockingFindings.length
+              ? <><XCircle className="w-4 h-4" /> {blockingFindings.length} Blocking</>
+              : <><CheckCircle2 className="w-4 h-4" /> No blocking issues</>}
           </span>
-        ) : undefined
-      }>
-        {findings.length === 0 ? (
-          <p className="text-[12.5px] text-emerald-700 inline-flex items-center gap-1.5">
-            <CheckCircle2 className="w-4 h-4" /> No blocking issues.
-          </p>
-        ) : (
+          <span className={`text-[12.5px] font-semibold inline-flex items-center gap-1.5 ${
+            warnings.length ? "text-amber-700" : "text-muted-foreground"}`}>
+            <AlertTriangle className="w-4 h-4" /> {warnings.length} Warning{warnings.length === 1 ? "" : "s"}
+          </span>
+          {findings.length > 0 && (
+            <button onClick={() => setShowFindings((v) => !v)}
+              className="ml-auto text-[12.5px] font-semibold text-primary min-h-[44px]">
+              {showFindings ? "Hide Details" : "View Details"}
+            </button>
+          )}
+        </div>
+        {findings.length === 0 || !showFindings ? null : (
           <ul className="space-y-2">
             {findings.map((f) => (
               <li key={f.id} className="flex items-start gap-2.5">
@@ -668,8 +707,16 @@ export default function DescriptionIntelligence() {
             const cv = record.channels.find((c) => c.channel === cm.key);
             return (
               <li key={cm.key} className="flex items-center justify-between gap-2 text-[12px]">
-                <span className="text-foreground truncate">{cm.label}</span>
-                <Pill tone={cv ? conn.tone : "slate"}>{cv ? conn.label : "Not generated"}</Pill>
+                <span className="text-foreground truncate inline-flex items-center gap-1.5 min-w-0">
+                  {cm.deliveryMode === "internal_projection"
+                    ? <ShieldCheck className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
+                    : <Download className="w-3.5 h-3.5 text-muted-foreground shrink-0" />}
+                  <span className="truncate">{cm.label}</span>
+                </span>
+                <span className="inline-flex items-center gap-1 shrink-0">
+                  {cv && conn.tone === "emerald" && <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />}
+                  <Pill tone={cv ? conn.tone : "slate"}>{cv ? conn.label : "Not Generated"}</Pill>
+                </span>
               </li>
             );
           })}
