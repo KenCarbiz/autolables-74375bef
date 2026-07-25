@@ -771,7 +771,8 @@ export async function loadGetReadyCommand(r: SourceReader, tenantId: string, veh
       // Third-party lines stay "Pending Proof" until THAT vendor uploads proof.
       // Derived from the row, never from the column it is displayed in.
       const isThirdParty = isThirdPartyItem(i);
-      const proven = assignmentForItem(vendorAssignments, i)?.proven === true;
+      const assignment = assignmentForItem(vendorAssignments, i);
+      const proven = assignment?.proven === true;
       const status: "complete" | "pending" | "pending_proof" =
         i.status === "complete" ? "complete"
         : isThirdParty && !proven ? "pending_proof"
@@ -779,7 +780,9 @@ export async function loadGetReadyCommand(r: SourceReader, tenantId: string, veh
       return {
         id: i.id,
         label: i.label,
-        sublabel: i.vendorName || undefined,
+        // The name the Vendor Assignments row shows, so one vendor reads the
+        // same on the line and in the list.
+        sublabel: assignment?.name || i.vendorName || undefined,
         status,
         dueLabel: status === "pending_proof" ? proofDueLabel(proofClock) : undefined,
       };

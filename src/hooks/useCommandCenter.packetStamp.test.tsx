@@ -148,6 +148,42 @@ describe("T3/D7 — only what reached the sheet is stamped", () => {
   });
 });
 
+// M1: counts.internalOnly counted every non-customer-visible document,
+// including the ones wearing the amber "Vehicle Not Published" pill — so the
+// violet "Internal Only" card could read 1 with no row carrying that pill.
+// D6: "4x4 QR Cling" counted every active qr_codes row, so three sticker
+// tracking codes read as three sheets of physical cling for one vehicle.
+describe("BUCKET M — the Print Center's counts match its own pills", () => {
+  it("counts Internal Only as exactly the rows wearing that pill", async () => {
+    seed([
+      doc({ id: "published-visible", document_status: "published", published_at: "2026-07-06T00:00:00Z" }),
+      doc({ id: "approved-internal", document_status: "approved" }),
+    ]);
+    const view = await mountPrintCenter();
+    const data = view.result.current.data;
+    const wearingPill = data?.documents.filter((d) => d.passportVisibility.label === "Internal Only").length;
+    expect(data?.counts.internalOnly).toBe(wearingPill);
+    expect(data?.counts.internalOnly).toBe(1);
+  });
+
+  it("counts one QR cling and one key tag per vehicle, from the token that prints them", async () => {
+    seed([doc({ id: "d1" })]);
+    for (const t of ["window", "addendum", "passport"]) {
+      db.rows("qr_codes").push({ id: `q-${t}`, tenant_id: TENANT, vehicle_id: VEHICLE_ID, is_active: true, sticker_type: t });
+    }
+    const noSheet = await mountPrintCenter();
+    const before = noSheet.result.current.data?.bundle ?? [];
+    expect(before.find((b) => b.label === "4×4 QR Cling")?.count).toBe(0);
+    expect(before.find((b) => b.label === "Key Tag")?.count).toBe(0);
+
+    await db.rpc("issue_vehicle_ready_token", { p_tenant_id: TENANT, p_vin: VIN });
+    const withSheet = await mountPrintCenter();
+    const after = withSheet.result.current.data?.bundle ?? [];
+    expect(after.find((b) => b.label === "4×4 QR Cling")?.count).toBe(1);
+    expect(after.find((b) => b.label === "Key Tag")?.count).toBe(1);
+  });
+});
+
 // D8. The sheet used to say "Print record filed. You can close this tab." on
 // click, unconditionally, never waiting for an ack — and `window.opener &&`
 // swallowed a null opener entirely.

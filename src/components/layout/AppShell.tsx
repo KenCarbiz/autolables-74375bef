@@ -115,6 +115,11 @@ const FAMILY_APPS: FamilyApp[] = [
 const AppShell = ({ children }: AppShellProps) => {
   const { user, isAdmin, signOut } = useAuth();
   const { tenant, currentStore, stores, setCurrentStore } = useTenant();
+  // The rail signs the workspace with the dealer GROUP, while the header
+  // switcher names the store — the two are different facts and must not be
+  // sourced from the same field. The house sentinel is not a real dealer.
+  const dealerGroupName = tenant && tenant.id !== "house" ? (tenant.name || "").trim() : "";
+  const tenantTagline = (currentStore?.tagline || "").trim();
   const { settings } = useDealerSettings();
   const { member } = useEntitlements();
   const { entries } = useAudit();
@@ -157,16 +162,11 @@ const AppShell = ({ children }: AppShellProps) => {
     });
   };
 
-  const [openSections, setOpenSections] = useState<Record<string, boolean>>({
-    main: true,
-    create: true,
-    work: true,
-    getready: true,
-    compliance: true,
-    office: false,
-    settings: true,
-    platform: true,
-  });
+  // Only the sections the operator has actually toggled live here; everything
+  // else falls back to the section's own defaultOpen. Seeding a key for every
+  // section made `defaultOpen` unfalsifiable, so an open-by-default section
+  // could never be collapsed.
+  const [openSections, setOpenSections] = useState<Record<string, boolean>>({});
 
   // Worklist counts on the nav rows that represent queues; 0 renders no badge.
   const badges = useNavBadges();
@@ -430,7 +430,7 @@ const AppShell = ({ children }: AppShellProps) => {
     return () => clearTimeout(timer);
   }, [user, tenant?.id, location.pathname, navigate]);
 
-  const toggleSection = (key: string) => setOpenSections((prev) => ({ ...prev, [key]: !prev[key] }));
+  const toggleSection = (key: string, current: boolean) => setOpenSections((prev) => ({ ...prev, [key]: !current }));
 
   const handleSignOut = async () => {
     await signOut();
@@ -498,14 +498,14 @@ const AppShell = ({ children }: AppShellProps) => {
           <TooltipProvider delayDuration={200}>
             <nav className="flex-1 overflow-y-auto p-3 space-y-1" aria-label="Primary">
               {visibleSections.map((section) => {
-                const open = section.defaultOpen || openSections[section.key];
+                const open = openSections[section.key] ?? section.defaultOpen;
                 const panelId = `nav-section-${section.key}`;
                 const showItems = open || collapsed || !section.title;
                 return (
                   <div key={section.key} className="mb-2">
                     {section.title && !collapsed && (
                       <button
-                        onClick={() => toggleSection(section.key)}
+                        onClick={() => toggleSection(section.key, open)}
                         aria-expanded={open}
                         aria-controls={panelId}
                         className="w-full flex items-center justify-between rounded-md px-2.5 py-2 text-[10px] font-bold uppercase tracking-[0.08em] text-[#64748b] transition-colors hover:text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#1267e8]"
@@ -571,9 +571,22 @@ const AppShell = ({ children }: AppShellProps) => {
               <Search className="h-4 w-4" />
               {!collapsed && <span>Search</span>}
             </button>
-            <button onClick={toggleCollapsed} className="hidden lg:flex w-full items-center justify-center px-3 py-1.5 rounded-lg text-muted-foreground hover:bg-muted" title={collapsed ? "Expand sidebar" : "Collapse sidebar"}>
+            <button onClick={toggleCollapsed} className={`hidden lg:flex w-full items-center gap-3 px-3 py-1.5 rounded-lg text-sm text-muted-foreground hover:text-foreground hover:bg-muted ${collapsed ? "lg:justify-center" : ""}`} title={collapsed ? "Expand sidebar" : "Collapse sidebar"}>
               {collapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
+              {!collapsed && <span>Collapse sidebar</span>}
             </button>
+            {/* The dealer group signs the workspace: the operator always knows
+                whose records they are looking at, even deep in a vehicle. */}
+            {!collapsed && (dealerGroupName || tenantTagline) && (
+              <div className="pt-2 text-center">
+                {dealerGroupName && (
+                  <p className="text-[11px] font-bold tracking-wide text-foreground/70 uppercase">{dealerGroupName}</p>
+                )}
+                {tenantTagline && (
+                  <p className="text-[9.5px] tracking-[0.14em] text-muted-foreground uppercase mt-0.5">{tenantTagline}</p>
+                )}
+              </div>
+            )}
           </div>
         </aside>
 

@@ -91,7 +91,7 @@ describe("AppShell sidebar rendering", () => {
   it("uses a collapsible section heading button (aria-expanded toggles)", () => {
     renderShell("/dashboard");
     const nav = primaryNav();
-    const heading = within(nav).getByRole("button", { name: "COMPLIANCE" });
+    const heading = within(nav).getByRole("button", { name: "COMPLIANCE CENTER" });
     expect(heading).toHaveAttribute("aria-expanded", "true");
     expect(within(nav).getByRole("link", { name: "Compliance Center" })).toBeInTheDocument();
     fireEvent.click(heading);

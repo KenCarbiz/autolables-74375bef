@@ -106,24 +106,17 @@ export function buildAdminNavSections({ badges, anyAdminTab }: BuildNavOptions):
       title: "CREATE",
       defaultOpen: true,
       items: [
+        { label: "Work Queue", path: "/queue", icon: ClipboardList, capability: "can_view_work_queue", badge: badgeOrUndefined(badges.workQueue), match: underSegment("/queue") },
+        // Gate on the same capability the page itself checks. Every role that
+        // holds can_print also holds can_view_print_queue, so this only widens
+        // the row to the read-only roles the page already admits.
+        { label: "Print Center", path: "/print-center", icon: Printer, capability: "can_view_print_queue", match: underSegment("/print-center") },
+        { label: "Leads", path: "/leads", icon: Users, capability: "can_view_leads", featureKey: "feature_lead_capture", badge: badgeOrUndefined(badges.leads), match: underSegment("/leads") },
         { label: "Create", path: "/create", icon: FilePlus2, capability: "can_create_documents", match: underSegment("/create") },
         // Description work is exception-driven and visited daily, so it earns a
         // row of its own rather than living only behind the Create hub.
         { label: "Description Operations", path: "/description-operations", icon: Sparkles, capability: "can_create_documents",
           match: (p: string) => p.startsWith("/description-operations") || p.startsWith("/description-intelligence") || p.startsWith("/description-writer") || p.startsWith("/description-studio") },
-        // Gate on the same capability the page itself checks. Every role that
-        // holds can_print also holds can_view_print_queue, so this only widens
-        // the row to the read-only roles the page already admits.
-        { label: "Print Center", path: "/print-center", icon: Printer, capability: "can_view_print_queue", match: underSegment("/print-center") },
-      ],
-    },
-    {
-      key: "work",
-      title: "WORK",
-      defaultOpen: true,
-      items: [
-        { label: "Work Queue", path: "/queue", icon: ClipboardList, capability: "can_view_work_queue", badge: badgeOrUndefined(badges.workQueue), match: underSegment("/queue") },
-        { label: "Leads", path: "/leads", icon: Users, capability: "can_view_leads", featureKey: "feature_lead_capture", badge: badgeOrUndefined(badges.leads), match: underSegment("/leads") },
       ],
     },
     {
@@ -131,17 +124,17 @@ export function buildAdminNavSections({ badges, anyAdminTab }: BuildNavOptions):
       title: "GET READY",
       defaultOpen: true,
       items: [
-        { label: "Recon Approvals", path: "/recon", icon: BadgeCheck, capability: "can_view_get_ready", badge: badgeOrUndefined(badges.reconApprovals), match: underSegment("/recon") },
-        { label: "Prep & Install", path: "/prep", icon: Wrench, capability: "can_view_get_ready", match: underSegment("/prep") },
-        { label: "Service Desk", path: "/service", icon: Headset, capability: "can_view_get_ready", match: underSegment("/service") },
-        { label: "Ready Board", path: "/ready-board", icon: Columns3, capability: "can_view_get_ready", match: underSegment("/ready-board") },
         { label: "Get Ready Command", path: "/get-ready-command", icon: Rocket, capability: "can_view_get_ready", match: underSegment("/get-ready-command") },
+        { label: "Service Desk", path: "/service", icon: Headset, capability: "can_view_get_ready", match: underSegment("/service") },
+        { label: "Prep & Vendors", path: "/prep", icon: Wrench, capability: "can_view_get_ready", match: underSegment("/prep") },
+        { label: "Ready Board", path: "/ready-board", icon: Columns3, capability: "can_view_get_ready", match: underSegment("/ready-board") },
+        { label: "Recon Approvals", path: "/recon", icon: BadgeCheck, capability: "can_view_get_ready", badge: badgeOrUndefined(badges.reconApprovals), match: underSegment("/recon") },
       ],
     },
     {
       key: "compliance",
-      title: "COMPLIANCE",
-      defaultOpen: false,
+      title: "COMPLIANCE CENTER",
+      defaultOpen: true,
       items: [
         { label: "Compliance Center", path: "/compliance", icon: ShieldCheck, capability: "can_view_compliance", match: underSegment("/compliance") },
         { label: "Compliance Tasks", path: "/compliance-center", icon: ListChecks, capability: "can_manage_compliance", badge: badgeOrUndefined(badges.complianceTasks), match: underSegment("/compliance-center") },
@@ -151,8 +144,8 @@ export function buildAdminNavSections({ badges, anyAdminTab }: BuildNavOptions):
     },
     {
       key: "office",
-      title: "OFFICE",
-      defaultOpen: false,
+      title: "TITLES & INVOICES",
+      defaultOpen: true,
       items: [
         { label: "Titles", path: "/titles", icon: FileText, capability: "can_view_compliance", match: underSegment("/titles") },
         { label: "Invoices", path: "/admin?tab=invoices", icon: ScrollText, capability: "can_manage_invoices" },
@@ -161,7 +154,7 @@ export function buildAdminNavSections({ badges, anyAdminTab }: BuildNavOptions):
     {
       key: "settings",
       title: "SETTINGS",
-      defaultOpen: false,
+      defaultOpen: true,
       items: [
         // Settings is the /admin hub for every tab except the two broken out
         // into their own rows (Audit Log, Invoices), which win those tabs.

@@ -64,7 +64,6 @@ describe("buildAdminNavSections — structure preserved", () => {
     expect(sections.map((s) => s.key)).toEqual([
       "main",
       "create",
-      "work",
       "getready",
       "compliance",
       "office",
@@ -74,10 +73,9 @@ describe("buildAdminNavSections — structure preserved", () => {
     expect(sections.map((s) => s.title)).toEqual([
       "",
       "CREATE",
-      "WORK",
       "GET READY",
-      "COMPLIANCE",
-      "OFFICE",
+      "COMPLIANCE CENTER",
+      "TITLES & INVOICES",
       "SETTINGS",
       "PLATFORM",
     ]);
@@ -87,12 +85,21 @@ describe("buildAdminNavSections — structure preserved", () => {
     const sections = build();
     const get = (key: string) => sections.find((s) => s.key === key)!.items.map((i) => i.label);
     expect(get("main")).toEqual(["Home", "Inventory", "Deals"]);
+    // The comps lead each section with the surface the operator opens most:
+    // Work Queue in CREATE, Get Ready Command in GET READY.
+    expect(get("create")).toEqual([
+      "Work Queue",
+      "Print Center",
+      "Leads",
+      "Create",
+      "Description Operations",
+    ]);
     expect(get("getready")).toEqual([
-      "Recon Approvals",
-      "Prep & Install",
-      "Service Desk",
-      "Ready Board",
       "Get Ready Command",
+      "Service Desk",
+      "Prep & Vendors",
+      "Ready Board",
+      "Recon Approvals",
     ]);
     expect(get("compliance")).toEqual([
       "Compliance Center",
@@ -118,7 +125,7 @@ describe("icon mapping (lucide-react, one distinct icon per destination)", () =>
     "Work Queue": ClipboardList,
     Leads: Users,
     "Recon Approvals": BadgeCheck,
-    "Prep & Install": Wrench,
+    "Prep & Vendors": Wrench,
     "Service Desk": Headset,
     "Ready Board": Columns3,
     "Get Ready Command": Rocket,

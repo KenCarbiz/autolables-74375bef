@@ -141,6 +141,17 @@ describe("bundleNoteFor", () => {
       k208Docs: [doc({ document_type: "k208", pdf_url: null, png_url: null })],
     })).toMatch(/no print-ready file/);
   });
+
+  // M2: 20260724010000 publishes the K-208 on `status = signed` without ever
+  // consulting `result`, so a signed FAILED inspection leaves signedInspection
+  // false (k208State -> failed) while a published K-208 with a pdf_url is on the
+  // sheet. The card said "excluded" while Letter Paper counted it, counts.ready
+  // counted it, and the button printed it.
+  it("does not claim the K-208 is excluded when it is on the sheet", () => {
+    const published = doc({ document_type: "k208", document_status: "published" });
+    expect(printSheetIncludes(published)).toBe(true);
+    expect(bundleNoteFor({ used: true, signedInspection: false, k208Docs: [published] })).toBeNull();
+  });
 });
 
 describe("printBlockedReason", () => {
@@ -150,6 +161,25 @@ describe("printBlockedReason", () => {
 
   it("reports a genuine reprint truthfully", () => {
     expect(printBlockedReason([doc({ document_status: "printed" })])).toMatch(/already been released/);
+  });
+
+  // M3: "Every packet document has already been released" used to fire whenever
+  // ANY document was printed, so a set of one printed sticker and one document
+  // with no file at all was reported as a completed packet.
+  it("does not call a mixed set a completed packet", () => {
+    const reason = printBlockedReason([
+      doc({ document_status: "printed" }),
+      doc({ pdf_url: null, png_url: null }),
+    ]);
+    expect(reason).not.toMatch(/already been released/);
+    expect(reason).toMatch(/print-ready file/);
+  });
+
+  // D11/M8: a relative storage path is a real file the sheet cannot open, so it
+  // is Blocked here for the same reason it never reaches the paper.
+  it("treats a file the print sheet cannot open as no file at all", () => {
+    expect(printReleaseState(doc({ pdf_url: "vehicle-docs/abc.pdf" }))).toBe("no_file");
+    expect(printSheetIncludes(doc({ pdf_url: "vehicle-docs/abc.pdf" }))).toBe(false);
   });
 
   it("asks for a regenerate when the file is missing", () => {
