@@ -599,23 +599,28 @@ serve(async (req) => {
       const depth = Number(body.depth) || 0;
       const deadline = Date.now() + RECONCILE_BUDGET_MS;
       const results: unknown[] = [];
+      const seenThisHop = new Set<string>();
       let examined = 0;
       while (Date.now() < deadline) {
         const { data: batch } = await admin.rpc("next_description_reconcile_batch", {
           p_tenant_id: tenantId, p_limit: 5, p_sweep_start: sweepStart,
         });
-        const rows = (batch || []) as Array<{ tenant_id: string; vehicle_id: string; reason: string }>;
+        const rows = ((batch || []) as Array<{ tenant_id: string; vehicle_id: string; reason: string }>)
+          // A vehicle the pipeline declined may have no case row to stamp
+          // (missing_case + init refused), so the cursor cannot drop it. Without
+          // this guard the hop re-selects the same vehicle until the budget dies.
+          .filter((r) => !seenThisHop.has(r.vehicle_id));
         if (!rows.length) break;
         for (const r of rows) {
           if (Date.now() >= deadline) break;
+          seenThisHop.add(r.vehicle_id);
           examined++;
           const out = await orchestrateVehicle(admin, r.tenant_id, r.vehicle_id, {
             force: r.reason === "stalled" || r.reason === "retryable", reason: `reconcile:${r.reason}`,
           });
           if (results.length < 50) results.push(out);
-          // Liveness: a vehicle the pipeline declined (archived, tenant
-          // mismatch, no case) must still leave this sweep's cursor, or the
-          // chain re-selects it forever.
+          // Liveness: a vehicle that produced no new version must still leave
+          // this sweep's cursor so the NEXT hop does not re-select it either.
           if ((out as { skipped?: string }).skipped) {
             await admin.from("description_cases")
               .update({ last_orchestrated_at: new Date().toISOString() })
@@ -627,9 +632,13 @@ serve(async (req) => {
       let chained = false;
       if (depth < RECONCILE_MAX_DEPTH) {
         const { data: more } = await admin.rpc("next_description_reconcile_batch", {
-          p_tenant_id: tenantId, p_limit: 1, p_sweep_start: sweepStart,
+          p_tenant_id: tenantId, p_limit: 20, p_sweep_start: sweepStart,
         });
-        if (((more as unknown[]) || []).length > 0) {
+        // Chain only for work this hop did not already attempt — a vehicle that
+        // cannot leave the cursor would otherwise chain 80 hops deep.
+        const pending = ((more || []) as Array<{ vehicle_id: string }>)
+          .filter((r) => !seenThisHop.has(r.vehicle_id));
+        if (pending.length > 0) {
           chained = true;
           await fetch(`${SUPABASE_URL}/functions/v1/description-orchestrate`, {
             method: "POST",
