@@ -1,13 +1,14 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import {
-  AlertTriangle, ArrowRight, Building2, Calendar, Car, CheckCircle2, ClipboardList, Clock, Copy,
+  AlertTriangle, ArrowRight, Building2, Calendar, Car, CheckCircle2, ClipboardList, Clock,
   DollarSign, ExternalLink, Info, Loader2, Lock, Mail, Users, type LucideIcon,
 } from "lucide-react";
 import { toast } from "sonner";
 import {
-  BTN_PRIMARY, BTN_SECONDARY, CommandCard, CommandStepper, conditionLabel, DisabledReason,
-  EmptyState, ErrorCard, LoadingCard, StatusPill,
+  BTN_PRIMARY, BTN_SECONDARY, capabilityDenialReason, capabilityForHref, CommandAction,
+  CommandCallout, CommandCapabilityProvider, CommandCard, CommandStepper, copyWithToast, EmptyState, ErrorCard,
+  LoadingCard, StatusPill, VehicleIdentityStrip,
 } from "@/components/command/CommandPrimitives";
 import { useGetReadyCommand, type GetReadyColumn } from "@/hooks/useCommandCenter";
 import { useAuth } from "@/contexts/AuthContext";
@@ -33,8 +34,10 @@ const REPORT_LABEL: Record<GetReadyColumn["key"], string> = {
   vendor: "View Vendor Plan",
 };
 
+// Same locale policy as every date on the three surfaces: the reader's, not a
+// hardcoded en-US.
 const money = (n: number | null | undefined) =>
-  n == null ? "—" : new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 }).format(n);
+  n == null ? "—" : new Intl.NumberFormat(undefined, { style: "currency", currency: "USD", maximumFractionDigits: 0 }).format(n);
 
 const dateLabel = (iso: string | null) => {
   if (!iso) return null;
@@ -78,9 +81,15 @@ function DepartmentColumn({ column, onSaveNote }: {
   const complete = !empty && column.tone === "emerald";
   const HeadIcon = empty ? ClipboardList : complete ? CheckCircle2 : AlertTriangle;
 
-  // A reload after an unrelated write must not clobber what the manager is
-  // still typing, so only adopt the server value when it actually changed.
-  useEffect(() => { setNote(column.managerNote); }, [column.managerNote]);
+  // The reload that follows our own save re-delivers the value the manager has
+  // already typed past, so adopt the server note only while the textarea is
+  // still showing the last value we saw from the server. Anything else is an
+  // edit in progress and outranks the refetch.
+  const serverNote = useRef(column.managerNote);
+  useEffect(() => {
+    setNote((local) => (local === serverNote.current ? column.managerNote : local));
+    serverNote.current = column.managerNote;
+  }, [column.managerNote]);
 
   const blur = async () => {
     if (note === column.managerNote) return;
@@ -90,21 +99,19 @@ function DepartmentColumn({ column, onSaveNote }: {
   };
 
   return (
-    <CommandCard className="flex flex-col">
-      <div className="flex items-start gap-2.5">
+    <CommandCard
+      className="flex flex-col"
+      title={column.title}
+      subtitle={column.headline}
+      leading={
         <span className={cn(
           "grid place-items-center w-9 h-9 rounded-full shrink-0",
           empty ? "bg-slate-200 text-slate-600" : complete ? "bg-emerald-600 text-white" : "bg-amber-500 text-white",
         )}>
           <HeadIcon className="w-5 h-5" aria-hidden="true" />
         </span>
-        <div className="min-w-0">
-          <h2 className="text-[13px] font-bold text-foreground leading-tight">{column.title}</h2>
-          <p className="text-[11.5px] text-muted-foreground mt-0.5">{column.headline}</p>
-        </div>
-      </div>
-
-      <div className="mt-3 divide-y divide-border/70">
+      }>
+      <div className="divide-y divide-border/70">
         {column.items.length === 0 ? (
           <p className="text-[11.5px] text-muted-foreground py-2">No work items assigned to this department.</p>
         ) : column.items.map((item) => {
@@ -145,7 +152,7 @@ function DepartmentColumn({ column, onSaveNote }: {
             className="w-full min-h-[92px] rounded-xl border border-border bg-background p-3 text-[12.5px] focus:outline-none focus:ring-2 focus:ring-primary" />
           {saving && (
             <p className="text-[10.5px] text-muted-foreground mt-1 inline-flex items-center gap-1">
-              <Loader2 className="w-3 h-3 animate-spin" aria-hidden="true" /> Saving note…
+              <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" /> Saving note…
             </p>
           )}
         </div>
@@ -164,18 +171,13 @@ function DepartmentColumn({ column, onSaveNote }: {
                     <span className="block text-[12.5px] font-bold text-foreground leading-tight truncate">{v.name}</span>
                     <span className="block text-[11.5px] text-muted-foreground truncate">{v.category}</span>
                   </span>
-                  {v.email ? (
-                    <a href={`mailto:${v.email}`} className={cn(BTN_SECONDARY, "shrink-0")}>
-                      <Mail className="w-4 h-4" aria-hidden="true" /> Contact
-                    </a>
-                  ) : (
-                    <DisabledReason reason="No email on file for this vendor" className="shrink-0">
-                      <button type="button" disabled
-                        className={cn(BTN_SECONDARY, "text-muted-foreground")}>
-                        <Mail className="w-4 h-4" aria-hidden="true" /> Contact
-                      </button>
-                    </DisabledReason>
-                  )}
+                  <CommandAction
+                    Icon={Mail}
+                    wrapperClassName="shrink-0"
+                    href={v.email ? `mailto:${v.email}` : undefined}
+                    disabledReason={v.email ? null : "No email on file for this vendor"}>
+                    Contact
+                  </CommandAction>
                 </div>
               ))}
             </div>
@@ -186,19 +188,16 @@ function DepartmentColumn({ column, onSaveNote }: {
       <div className="mt-auto pt-3 border-t border-border flex items-center justify-between gap-2 flex-wrap">
         <span className="min-w-0">
           <span className="block text-[11.5px] text-muted-foreground">Estimated Cost</span>
-          <span className="block text-[15px] font-bold text-foreground leading-tight">{money(column.estimatedCost)}</span>
+          <span className="block text-[13px] font-bold text-foreground leading-tight">{money(column.estimatedCost)}</span>
         </span>
-        {column.reportHref ? (
-          <a href={column.reportHref} target="_blank" rel="noreferrer" className={BTN_SECONDARY}>
-            {REPORT_LABEL[column.key]} <ExternalLink className="w-4 h-4" aria-hidden="true" />
-          </a>
-        ) : (
-          <DisabledReason reason="No report has been generated for this department yet">
-            <button type="button" disabled className={cn(BTN_SECONDARY, "text-muted-foreground")}>
-              {REPORT_LABEL[column.key]} <ExternalLink className="w-4 h-4" aria-hidden="true" />
-            </button>
-          </DisabledReason>
-        )}
+        <CommandAction
+          newTab
+          href={column.reportHref}
+          capability={capabilityForHref(column.reportHref)}
+          disabledReason={column.reportHref ? null : "No report has been generated for this department yet"}
+          TrailingIcon={ExternalLink}>
+          {REPORT_LABEL[column.key]}
+        </CommandAction>
       </div>
     </CommandCard>
   );
@@ -222,15 +221,7 @@ export default function GetReadyCommand() {
   const [authorizing, setAuthorizing] = useState(false);
 
   const vin = data?.vehicle.vin ?? null;
-  const copyVin = useCallback(async () => {
-    if (!vin) return;
-    try {
-      await navigator.clipboard.writeText(vin);
-      toast.success("VIN copied");
-    } catch {
-      toast.error("Clipboard unavailable");
-    }
-  }, [vin]);
+  const copyVin = useCallback(() => { if (vin) void copyWithToast(vin, "VIN"); }, [vin]);
 
   // The hook already reloads itself after every successful write, so the page
   // must not fire a second refetch on top of it.
@@ -272,7 +263,9 @@ export default function GetReadyCommand() {
   );
 
   const shell = (children: React.ReactNode) => (
-    <div className="max-w-[1480px] mx-auto p-4 sm:p-6">{header}{children}</div>
+    <CommandCapabilityProvider role={member?.role} isAdmin={isAdmin}>
+      <div className="max-w-[1480px] mx-auto p-4 sm:p-6">{header}{children}</div>
+    </CommandCapabilityProvider>
   );
 
   // The skeleton mirrors the served layout at every breakpoint so the swap to
@@ -285,7 +278,7 @@ export default function GetReadyCommand() {
         <div className="min-w-0 grid grid-cols-1 lg:grid-cols-3 gap-4">
           {[0, 1, 2].map((i) => <LoadingCard key={i} rows={5} />)}
         </div>
-        <div className="lg:w-[300px] w-full space-y-4">
+        <div className="w-full min-w-0 lg:w-[300px] space-y-4">
           <LoadingCard rows={4} />
           <LoadingCard rows={5} />
         </div>
@@ -305,21 +298,25 @@ export default function GetReadyCommand() {
     </button>
   );
 
-  // One guard order across all three command surfaces:
-  // permission -> no vehicleId -> error -> loading -> not found -> no tenant.
-  // Permission waits on `entLoading` so an authorized user is never shown the
-  // denial card, and "not found" waits on `loading` so it is never shown early.
+  // One guard order across all three command surfaces: permission ->
+  // entitlements loading -> no vehicleId -> error -> loading -> not found ->
+  // no tenant. Everything after the permission check waits on `entLoading`, so
+  // no state is ever shown and then swapped for the denial card.
   if (!entLoading && !canView) {
     return shell(
-      <EmptyState Icon={Lock} title="You do not have access to Get Ready"
-        detail="Your role cannot view get ready. Ask an owner or manager to grant get-ready access."
+      <EmptyState Icon={Lock} title="You do not have access to the Get Ready Command"
+        detail={capabilityDenialReason("can_view_get_ready")}
         action={homeAction} />,
     );
   }
 
+  if (entLoading) {
+    return shell(skeleton);
+  }
+
   if (!vehicleId) {
     return shell(
-      <EmptyState Icon={Car} title="Pick a vehicle to review"
+      <EmptyState Icon={Car} title="Pick a vehicle to open its get ready command"
         detail="Get Ready Command opens per vehicle. Choose one from Inventory to review and authorize its get-ready."
         action={inventoryAction} />,
     );
@@ -329,7 +326,7 @@ export default function GetReadyCommand() {
     return shell(<ErrorCard message={error} detail={errorDetail} onRetry={reload} />);
   }
 
-  if (entLoading || loading) {
+  if (loading) {
     return shell(skeleton);
   }
 
@@ -353,7 +350,6 @@ export default function GetReadyCommand() {
   const { vehicle, columns, summary, checklist, canAuthorize, authorizeBlockedReason,
     priority, deliveryTarget } = data;
   const delivery = dateLabel(deliveryTarget);
-  const condition = conditionLabel(vehicle.condition);
 
   return shell(
     <>
@@ -363,81 +359,56 @@ export default function GetReadyCommand() {
         <CommandStepper steps={STEPS} current={data.currentStep} />
       </div>
 
-      {/* Vehicle card — the shared strip cannot express this screen's trim-beneath
-          + 3-up meta + delivery-target layout, so it is built inline against the
-          same visual recipe. */}
-      <div className="rounded-2xl border border-border bg-card p-5 mb-4">
-        <div className="flex flex-col lg:flex-row lg:items-start gap-4">
-          {vehicle.heroImageUrl ? (
-            <img src={vehicle.heroImageUrl} alt={vehicle.ymm} loading="lazy"
-              className="w-full lg:w-[200px] shrink-0 aspect-[16/10] object-cover rounded-xl bg-muted" />
-          ) : (
-            <div className="w-full lg:w-[200px] shrink-0 aspect-[16/10] rounded-xl bg-muted flex items-center justify-center text-[11px] text-muted-foreground">
-              No photo
-            </div>
-          )}
-
-          <div className="min-w-0 flex-1">
-            <div className="flex flex-wrap items-center gap-2">
-              <h2 className="text-[20px] font-bold text-foreground leading-tight min-w-0 truncate">{vehicle.ymm}</h2>
-              {condition ? <StatusPill tone="emerald">{condition}</StatusPill> : null}
-            </div>
-            <p className="text-[12.5px] text-muted-foreground mt-0.5">{vehicle.trim || "—"}</p>
-
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-3 max-w-[560px]">
-              <div className="min-w-0">
-                <p className="text-[11px] text-muted-foreground">VIN</p>
-                <p className="text-[12.5px] font-mono text-foreground flex items-center gap-1 min-w-0">
-                  <span className="truncate">{vehicle.vin}</span>
-                  <button type="button" onClick={copyVin} aria-label="Copy VIN"
-                    className="shrink-0 inline-flex items-center justify-center min-h-[44px] min-w-[44px] -my-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors">
-                    <Copy className="w-4 h-4" aria-hidden="true" />
-                  </button>
-                </p>
-              </div>
-              <div className="min-w-0">
-                <p className="text-[11px] text-muted-foreground">Stock #</p>
-                <p className="text-[12.5px] font-medium text-foreground truncate">{vehicle.stockNumber || "—"}</p>
-              </div>
-              <div className="min-w-0">
-                <p className="text-[11px] text-muted-foreground">Priority</p>
-                <p className="text-[12.5px] font-medium text-foreground inline-flex items-center gap-1.5">
-                  <span className={cn("w-2 h-2 rounded-full", priority ? PRIORITY_DOT[priority] : "bg-slate-300")} aria-hidden="true" />
-                  {priority ? priority.charAt(0).toUpperCase() + priority.slice(1) : "Not set"}
-                </p>
-              </div>
-            </div>
-
-            <div className="mt-3 pt-3 border-t border-border">
+      <div className="mb-4">
+        <VehicleIdentityStrip
+          imageUrl={vehicle.heroImageUrl}
+          ymm={vehicle.ymm}
+          trim={vehicle.trim}
+          trimBelow
+          stockNumber={vehicle.stockNumber}
+          vin={vehicle.vin}
+          conditionLabel={vehicle.condition}
+          onCopyVin={copyVin}
+          facts={[{
+            label: "Priority",
+            value: (
+              <span className="inline-flex items-center gap-1.5">
+                <span className={cn("w-2 h-2 rounded-full", priority ? PRIORITY_DOT[priority] : "bg-slate-300")} aria-hidden="true" />
+                {priority ? priority.charAt(0).toUpperCase() + priority.slice(1) : "Not set"}
+              </span>
+            ),
+          }]}
+          footer={
+            <>
               <p className="text-[11px] text-muted-foreground">Delivery Target</p>
               <p className="text-[12.5px] font-medium text-foreground inline-flex items-center gap-1.5 mt-0.5">
                 <Calendar className="w-4 h-4 text-muted-foreground" aria-hidden="true" /> {delivery || "Not scheduled"}
               </p>
-            </div>
-          </div>
-
-          <button type="button" onClick={() => navigate(`/vehicle-file/${vehicle.id}`)}
-            className={cn(BTN_SECONDARY, "shrink-0")}>
-            View Vehicle Details <ExternalLink className="w-4 h-4" aria-hidden="true" />
-          </button>
-        </div>
+            </>
+          }
+          action={
+            <CommandAction
+              capability="can_view_inventory"
+              TrailingIcon={ExternalLink}
+              onClick={() => navigate(`/vehicle-file/${vehicle.id}`)}>
+              View Vehicle Details
+            </CommandAction>
+          }
+        />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_300px] gap-4 items-start">
-        {/* Three department columns */}
+        {/* Three department columns. The hook always emits the three §4
+            departments, so the empty state that matters is the per-column one
+            inside each card, not a page-level one that could never render. */}
         <div className="min-w-0">
-          {columns.length === 0 ? (
-            <EmptyState Icon={ClipboardList} title="No get-ready work has been prepared yet"
-              detail="Work items appear here once the vehicle is intaken and its departments are assigned." />
-          ) : (
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-              {columns.map((c) => <DepartmentColumn key={c.key} column={c} onSaveNote={onSaveNote} />)}
-            </div>
-          )}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+            {columns.map((c) => <DepartmentColumn key={c.key} column={c} onSaveNote={onSaveNote} />)}
+          </div>
         </div>
 
         {/* Right rail */}
-        <div className="lg:w-[300px] w-full min-w-0 space-y-4">
+        <div className="w-full min-w-0 lg:w-[300px] space-y-4">
           <CommandCard title="Get Ready Summary">
             <div className="divide-y divide-border/70">
               <SummaryRow Icon={ClipboardList} value={summary.workItems} label="Work Items" tone="blue" />
@@ -476,17 +447,16 @@ export default function GetReadyCommand() {
           </CommandCard>
 
           <div>
-            <DisabledReason
-              className="flex w-full"
-              reason={canAuthorize ? null : authorizeBlockedReason}>
-              <button type="button" onClick={onAuthorize} disabled={!canAuthorize || authorizing}
-                className={cn(BTN_PRIMARY, "w-full")}>
-                {authorizing
-                  ? <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" />
-                  : <Lock className="w-4 h-4" aria-hidden="true" />}
-                Authorize Get Ready &amp; Dispatch
-              </button>
-            </DisabledReason>
+            <CommandAction
+              variant="primary"
+              Icon={Lock}
+              busy={authorizing}
+              className="w-full"
+              wrapperClassName="flex w-full"
+              disabledReason={authorizing ? "Authorization is already running" : canAuthorize ? null : authorizeBlockedReason}
+              onClick={onAuthorize}>
+              Authorize Get Ready &amp; Dispatch
+            </CommandAction>
             <p className="text-[11px] text-muted-foreground text-center mt-2">
               Creates immutable instructions, sends assignments, and releases eligible print jobs.
             </p>
@@ -494,12 +464,10 @@ export default function GetReadyCommand() {
         </div>
       </div>
 
-      <div className="rounded-2xl border border-blue-200 bg-blue-50/70 p-3 mt-4">
-        <p className="text-[12.5px] text-blue-900 inline-flex items-start gap-2">
-          <Info className="w-4 h-4 shrink-0 mt-0.5" aria-hidden="true" />
-          <span>Third-party items show "Pending Proof" until vendors upload completion proof. Items are due within five (5) business days.</span>
-        </p>
-      </div>
+      <CommandCallout tone="blue" Icon={Info} className="rounded-2xl mt-4">
+        Third-party items show "Pending Proof" until vendors upload completion proof. Items are
+        due within five (5) business days.
+      </CommandCallout>
     </>,
   );
 }

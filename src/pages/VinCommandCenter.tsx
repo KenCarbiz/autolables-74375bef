@@ -1,19 +1,19 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import {
   AlertTriangle, ArrowRight, Building2, Car, CheckCircle2, Clock, FileText, Globe, History,
   Lock, MoreVertical, PlayCircle, QrCode, XCircle,
 } from "lucide-react";
-import { toast } from "sonner";
 import { useVinCommand, type PackageItem } from "@/hooks/useCommandCenter";
 import {
-  BTN_PRIMARY, BTN_SECONDARY, CommandCard, CommandStatCard, DisabledReason, EmptyState,
+  BTN_PRIMARY, BTN_SECONDARY, capabilityDenialReason, capabilityForHref, CommandAction,
+  CommandCallout, CommandCapabilityProvider, CommandCard, CommandMenu, CommandStatCard, copyWithToast,
+  EmptyState,
   ErrorCard, LoadingCard, StatusPill, TimelineRail, VehicleIdentityStrip,
 } from "@/components/command/CommandPrimitives";
 import {
   Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog";
-import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
 import { useEntitlements } from "@/hooks/useEntitlements";
 import { hasDealerCapability } from "@/lib/permissions/dealerRoleCapabilities";
@@ -33,19 +33,10 @@ const STATUS_LABEL: Record<PackageItem["status"], string> = {
   pending: "Pending",
 };
 
-// The comp fixes the reading order of the package. The hook owns the contents,
-// so unrecognized rows keep their own order and are appended rather than lost.
-const ITEM_ORDER = [
-  "k-208", "ftc buyers guide", "buyers guide", "used addendum", "addendum",
-  "used-car sticker", "used car sticker", "recall", "rear service qr",
-  "key-tag qr", "key tag qr", "service get ready", "prep & vendors", "description",
-];
-
-const orderRank = (item: PackageItem) => {
-  const hay = `${item.key} ${item.label}`.toLowerCase();
-  const i = ITEM_ORDER.findIndex((k) => hay.includes(k));
-  return i === -1 ? ITEM_ORDER.length : i;
-};
+// The comp's reading order is the order the hook emits, so the rows are
+// rendered as given. A local re-sort could only damage it: it matched on
+// label text and dropped a new car's "Window Sticker" to the bottom.
+const COLLAPSED_TIMELINE = 6;
 
 const isQrItem = (item: PackageItem) => /qr|key.?tag/i.test(`${item.key} ${item.label}`);
 
@@ -100,20 +91,8 @@ export default function VinCommandCenter() {
 
   const [showHowItWorks, setShowHowItWorks] = useState(false);
   const [showAllHistory, setShowAllHistory] = useState(false);
-  const [menu, setMenu] = useState<{ key: string; x: number; y: number; item: PackageItem } | null>(null);
+  const [menu, setMenu] = useState<{ key: string; item: PackageItem; trigger: HTMLElement } | null>(null);
   const railRef = useRef<HTMLDivElement | null>(null);
-
-  useEffect(() => {
-    if (!menu) return;
-    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setMenu(null); };
-    const onScroll = () => setMenu(null);
-    window.addEventListener("keydown", onKey);
-    window.addEventListener("scroll", onScroll, true);
-    return () => {
-      window.removeEventListener("keydown", onKey);
-      window.removeEventListener("scroll", onScroll, true);
-    };
-  }, [menu]);
 
   // TimelineRail prints `at` verbatim, so the raw ISO string from audit_log has
   // to be humanized here or the rail reads 2026-07-25T13:45:12.482Z.
@@ -127,22 +106,17 @@ export default function VinCommandCenter() {
   };
 
   const timeline = data?.timeline ?? [];
-
-  const items = useMemo(
-    () => (data ? [...data.packageItems].sort((a, b) => orderRank(a) - orderRank(b)) : []),
-    [data],
-  );
-
-  const shownTimeline = showAllHistory ? timeline : timeline.slice(0, 6);
+  const items = data?.packageItems ?? [];
+  const canExpandTimeline = timeline.length > COLLAPSED_TIMELINE;
+  const shownTimeline = showAllHistory ? timeline : timeline.slice(0, COLLAPSED_TIMELINE);
+  const toggleHistory = () => {
+    setShowAllHistory((v) => !v);
+    railRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  };
 
   const openHref = (href: string) => {
     if (/^https?:\/\//i.test(href)) window.open(href, "_blank", "noopener,noreferrer");
     else navigate(href);
-  };
-
-  const copyText = async (value: string, label: string) => {
-    try { await navigator.clipboard.writeText(value); toast.success(`${label} copied`); }
-    catch { toast.error("Clipboard unavailable"); }
   };
 
   const header = (
@@ -167,20 +141,16 @@ export default function VinCommandCenter() {
             className={BTN_SECONDARY}>
             <PlayCircle className="w-4 h-4" aria-hidden="true" /> How it works
           </button>
-          <DisabledReason
-            reason={timeline.length === 0 ? "No activity has been recorded for this VIN yet" : null}>
-            <button
-              type="button"
-              onClick={() => {
-                setShowAllHistory((v) => !v);
-                railRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
-              }}
-              disabled={timeline.length === 0}
-              aria-expanded={showAllHistory}
-              className={BTN_SECONDARY}>
-              <History className="w-4 h-4" aria-hidden="true" /> History
-            </button>
-          </DisabledReason>
+          {/* The rail is capped at six entries, so this only has work to do when
+              there are more than six; with fewer it says so instead of
+              toggling nothing. */}
+          <CommandAction
+            Icon={History}
+            expanded={showAllHistory}
+            disabledReason={canExpandTimeline ? null : "All recorded activity for this VIN is already shown"}
+            onClick={toggleHistory}>
+            History
+          </CommandAction>
         </div>
       </div>
 
@@ -212,26 +182,28 @@ export default function VinCommandCenter() {
   );
 
   const shell = (children: React.ReactNode) => (
-    <div className="max-w-[1480px] mx-auto p-4 sm:p-6">
-      {header}
-      {children}
-      <p className="mt-4 flex items-center justify-center gap-1.5 text-[11.5px] text-muted-foreground">
-        <Lock className="w-4 h-4" aria-hidden="true" /> AI-generated content. Always review for accuracy.
-      </p>
-    </div>
+    <CommandCapabilityProvider role={member?.role} isAdmin={isAdmin}>
+      <div className="max-w-[1480px] mx-auto p-4 sm:p-6">
+        {header}
+        {children}
+        <p className="mt-4 flex items-center justify-center gap-1.5 text-[11.5px] text-muted-foreground">
+          <Lock className="w-4 h-4" aria-hidden="true" /> AI-generated content. Always review for accuracy.
+        </p>
+      </div>
+    </CommandCapabilityProvider>
   );
 
   // The skeleton mirrors the served layout at every breakpoint so the swap to
   // real content never shifts the page.
   const skeleton = (
     <>
-      <div className="mb-3"><LoadingCard rows={2} /></div>
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-3">
+      <div className="mb-4"><LoadingCard rows={2} /></div>
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
         {[0, 1, 2, 3].map((i) => <LoadingCard key={i} rows={1} />)}
       </div>
       <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_360px] gap-4 items-start">
         <div className="order-2 lg:order-1 min-w-0"><LoadingCard rows={8} /></div>
-        <div className="order-1 lg:order-2 lg:w-[360px] space-y-4">
+        <div className="order-1 lg:order-2 w-full min-w-0 lg:w-[360px] space-y-4">
           <LoadingCard rows={3} />
           <LoadingCard rows={5} />
         </div>
@@ -251,19 +223,23 @@ export default function VinCommandCenter() {
     </button>
   );
 
-  // One guard order across all three command surfaces:
-  // permission -> no vehicleId -> error -> loading -> not found -> no tenant.
-  // Permission waits on `entLoading` so an authorized user is never shown the
-  // denial card, and "not found" waits on `loading` so it is never shown early.
+  // One guard order across all three command surfaces: permission ->
+  // entitlements loading -> no vehicleId -> error -> loading -> not found ->
+  // no tenant. Everything after the permission check waits on `entLoading`, so
+  // no state is ever shown and then swapped for the denial card.
   if (!entLoading && !canView) {
     return shell(
       <EmptyState
         Icon={Lock}
-        title="You do not have access to this vehicle's command center"
-        detail="Your role cannot view inventory. Ask an owner or manager to grant inventory access."
+        title="You do not have access to the VIN Command Center"
+        detail={capabilityDenialReason("can_view_inventory")}
         action={homeAction}
       />,
     );
+  }
+
+  if (entLoading) {
+    return shell(skeleton);
   }
 
   if (!vehicleId) {
@@ -281,7 +257,7 @@ export default function VinCommandCenter() {
     return shell(<ErrorCard message={error} detail={errorDetail} onRetry={reload} />);
   }
 
-  if (entLoading || loading) {
+  if (loading) {
     return shell(skeleton);
   }
 
@@ -316,7 +292,7 @@ export default function VinCommandCenter() {
 
   return shell(
     <>
-      <div className="mb-3">
+      <div className="mb-4">
         <VehicleIdentityStrip
           imageUrl={vehicle.heroImageUrl}
           ymm={vehicle.ymm}
@@ -333,11 +309,11 @@ export default function VinCommandCenter() {
               ? intakeAt.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" })
               : undefined,
           }]}
-          onCopyVin={() => copyText(vehicle.vin, "VIN")}
+          onCopyVin={() => copyWithToast(vehicle.vin, "VIN")}
         />
       </div>
 
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-3">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
         <CommandStatCard
           label="Automation Complete"
           Icon={CheckCircle2}
@@ -345,7 +321,7 @@ export default function VinCommandCenter() {
           value={
             <>
               {counts.automationDone}
-              <span className="text-[15px] font-semibold text-muted-foreground"> / {counts.automationTotal}</span>
+              <span className="text-[12.5px] font-semibold text-muted-foreground"> / {counts.automationTotal}</span>
             </>
           }
           sub={automationPct}
@@ -414,39 +390,21 @@ export default function VinCommandCenter() {
                             </td>
                             <td className="px-3 py-3 text-right">
                               <span className="inline-flex items-center gap-1 justify-end">
-                                {item.href ? (
-                                  <button
-                                    type="button"
-                                    onClick={() => openHref(item.href as string)}
-                                    className="min-h-[44px] px-2 text-[12.5px] font-semibold text-blue-700 hover:underline">
-                                    View
-                                  </button>
-                                ) : (
-                                  <DisabledReason reason="Nothing to open for this item yet">
-                                    <button
-                                      type="button"
-                                      disabled
-                                      className="min-h-[44px] px-2 text-[12.5px] font-semibold text-muted-foreground opacity-50">
-                                      View
-                                    </button>
-                                  </DisabledReason>
-                                )}
+                                <CommandAction
+                                  variant="link"
+                                  capability={capabilityForHref(item.href)}
+                                  disabledReason={item.href ? null : "Nothing to open for this item yet"}
+                                  onClick={() => openHref(item.href as string)}>
+                                  View
+                                </CommandAction>
                                 <button
                                   type="button"
                                   aria-label={`More actions for ${item.label}`}
                                   aria-haspopup="menu"
                                   aria-expanded={menu?.key === item.key}
                                   onClick={(e) => {
-                                    const r = (e.currentTarget as HTMLElement).getBoundingClientRect();
-                                    // Flip above the trigger when the menu would run off
-                                    // the bottom of the viewport.
-                                    const MENU_H = 156;
-                                    const below = window.innerHeight - r.bottom > MENU_H + 12;
-                                    setMenu(menu?.key === item.key ? null : {
-                                      key: item.key, x: r.right,
-                                      y: below ? r.bottom + 4 : Math.max(8, r.top - MENU_H - 4),
-                                      item,
-                                    });
+                                    const trigger = e.currentTarget;
+                                    setMenu((m) => (m?.key === item.key ? null : { key: item.key, item, trigger }));
                                   }}
                                   className="w-11 h-11 grid place-items-center rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted/50">
                                   <MoreVertical className="w-4 h-4" aria-hidden="true" />
@@ -460,12 +418,11 @@ export default function VinCommandCenter() {
                   </table>
                 </div>
                 <div className="mt-3">
-                  <button
-                    type="button"
-                    onClick={() => navigate(`/print-center/${vehicleId}`)}
-                    className={BTN_SECONDARY}>
+                  <CommandAction
+                    capability="can_view_print_queue"
+                    onClick={() => navigate(`/print-center/${vehicleId}`)}>
                     View Full Package
-                  </button>
+                  </CommandAction>
                 </div>
               </>
             )}
@@ -473,7 +430,7 @@ export default function VinCommandCenter() {
         </div>
 
         {/* Right rail */}
-        <div ref={railRef} className="order-1 lg:order-2 lg:w-[360px] space-y-4">
+        <div ref={railRef} className="order-1 lg:order-2 w-full min-w-0 lg:w-[360px] space-y-4">
           <CommandCard title="Current Readiness">
             <div className="flex items-center justify-between gap-2">
               <span className="text-[12.5px] text-muted-foreground">State</span>
@@ -483,69 +440,72 @@ export default function VinCommandCenter() {
             {readiness.blocking && (
               <>
                 <p className="text-[11.5px] font-semibold text-muted-foreground mt-3 mb-1.5">Blocking Issue</p>
-                <div className="rounded-xl border border-amber-200 bg-amber-50 p-3">
-                  <div className="flex items-start gap-2">
-                    <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" aria-hidden="true" />
-                    <div className="min-w-0">
-                      <p className="text-[12.5px] font-bold text-amber-900">{readiness.blocking.title}</p>
-                      <p className="text-[11.5px] text-amber-800 mt-0.5">{readiness.blocking.detail}</p>
-                    </div>
-                  </div>
-                  <div className="flex justify-end">
-                    <button
-                      type="button"
-                      onClick={() => openHref(readiness.blocking!.href ?? `/vehicle-file/${vehicleId}`)}
-                      className="min-h-[44px] px-1 text-[12px] font-semibold text-amber-900 hover:underline">
+                <CommandCallout
+                  tone="amber"
+                  Icon={AlertTriangle}
+                  title={readiness.blocking.title}
+                  action={
+                    <CommandAction
+                      variant="link"
+                      capability={capabilityForHref(readiness.blocking.href)}
+                      onClick={() => openHref(readiness.blocking?.href ?? `/vehicle-file/${vehicleId}`)}>
                       View Details
-                    </button>
-                  </div>
-                </div>
+                    </CommandAction>
+                  }>
+                  {readiness.blocking.detail}
+                </CommandCallout>
               </>
             )}
 
-            <button
-              type="button"
-              onClick={() => navigate(`/get-ready-command/${vehicleId}`)}
-              className={cn(BTN_PRIMARY, "mt-3 w-full")}>
-              Review &amp; Authorize Get Ready <ArrowRight className="w-4 h-4" aria-hidden="true" />
-            </button>
+            <CommandAction
+              variant="primary"
+              capability="can_view_get_ready"
+              className="mt-3 w-full"
+              wrapperClassName="flex w-full"
+              TrailingIcon={ArrowRight}
+              onClick={() => navigate(`/get-ready-command/${vehicleId}`)}>
+              Review &amp; Authorize Get Ready
+            </CommandAction>
           </CommandCard>
 
           <CommandCard title="VIN Timeline">
             {/* TimelineRail renders the rail's own empty line, which is the
                 right-rail empty-section convention on all three surfaces. */}
             <TimelineRail entries={shownTimeline.map((e) => ({ ...e, at: fmtAt(e.at) }))} />
+            {canExpandTimeline && (
+              <div className="mt-3 flex justify-center">
+                <CommandAction variant="link" expanded={showAllHistory} onClick={toggleHistory}>
+                  {showAllHistory ? "Show less" : `Show all ${timeline.length} events`}
+                </CommandAction>
+              </div>
+            )}
           </CommandCard>
         </div>
       </div>
 
       {menu && (
-        <>
-          <div className="fixed inset-0 z-30" onClick={() => setMenu(null)} aria-hidden />
-          <div role="menu" style={{ top: menu.y, left: Math.max(8, menu.x - 208) }}
-            className="fixed z-40 w-52 rounded-xl border border-border bg-card shadow-lg p-1">
-            {[
-              ...(menu.item.href
-                ? [
-                    ["Open", () => openHref(menu.item.href as string)] as const,
-                    ["Copy Link", () => copyText(
+        <CommandMenu
+          trigger={menu.trigger}
+          label={`Actions for ${menu.item.label}`}
+          onClose={() => setMenu(null)}
+          items={[
+            ...(menu.item.href
+              ? [
+                  { label: "Open", onSelect: () => openHref(menu.item.href as string) },
+                  {
+                    label: "Copy Link",
+                    onSelect: () => copyWithToast(
                       /^https?:\/\//i.test(menu.item.href as string)
                         ? (menu.item.href as string)
                         : `${window.location.origin}${menu.item.href}`,
                       "Link",
-                    )] as const,
-                  ]
-                : []),
-              ["Copy VIN", () => copyText(vehicle.vin, "VIN")] as const,
-            ].map(([label, fn]) => (
-              <button key={label} type="button" role="menuitem"
-                onClick={() => { fn(); setMenu(null); }}
-                className="w-full text-left min-h-[44px] px-3 rounded-lg text-[12.5px] font-medium text-foreground hover:bg-muted/60">
-                {label}
-              </button>
-            ))}
-          </div>
-        </>
+                    ),
+                  },
+                ]
+              : []),
+            { label: "Copy VIN", onSelect: () => copyWithToast(vehicle.vin, "VIN") },
+          ]}
+        />
       )}
     </>,
   );
