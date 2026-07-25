@@ -44,7 +44,7 @@ export default function DocumentsPrintCenter() {
   // the query, not just the render. The id stays in scope while entitlements
   // settle so the loader is not handed a fresh id after its first commit, which
   // would read as "vehicle not found" for one frame.
-  const { data, loading, error, notFound, reload, printCompletePacket, printByStock } = usePrintCenter(
+  const { data, loading, error, errorDetail, notFound, reload, printCompletePacket, printByStock } = usePrintCenter(
     entLoading || canView ? vehicleId : undefined,
   );
 
@@ -168,7 +168,7 @@ export default function DocumentsPrintCenter() {
     );
   }
 
-  if (error) return shell(<ErrorCard message={error} onRetry={reload} />);
+  if (error) return shell(<ErrorCard message={error} detail={errorDetail} onRetry={reload} />);
 
   if (entLoading || loading) {
     return shell(skeleton);

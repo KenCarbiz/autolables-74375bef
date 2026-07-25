@@ -94,7 +94,7 @@ export default function VinCommandCenter() {
   // query, not just the render. The id stays in scope while entitlements settle
   // so the loader is not handed a fresh id after its first commit, which would
   // read as "vehicle not found" for one frame.
-  const { data, loading, error, notFound, reload } = useVinCommand(
+  const { data, loading, error, errorDetail, notFound, reload } = useVinCommand(
     entLoading || canView ? vehicleId : undefined,
   );
 
@@ -278,7 +278,7 @@ export default function VinCommandCenter() {
   }
 
   if (error) {
-    return shell(<ErrorCard message={error} onRetry={reload} />);
+    return shell(<ErrorCard message={error} detail={errorDetail} onRetry={reload} />);
   }
 
   if (entLoading || loading) {

@@ -214,7 +214,7 @@ export default function GetReadyCommand() {
   // Keep the vehicle in scope while entitlements settle: withholding it until
   // `canView` flips would hand the loader a fresh id after its first commit,
   // and that commit reads as "vehicle not found" for one frame.
-  const { data, loading, error, notFound, reload, saveManagerNote, toggleChecklist, authorizeAndDispatch } =
+  const { data, loading, error, errorDetail, notFound, reload, saveManagerNote, toggleChecklist, authorizeAndDispatch } =
     useGetReadyCommand(entLoading || canView ? vehicleId : undefined);
 
   const [checkOverride, setCheckOverride] = useState<Record<string, boolean>>({});
@@ -326,7 +326,7 @@ export default function GetReadyCommand() {
   }
 
   if (error) {
-    return shell(<ErrorCard message={error} onRetry={reload} />);
+    return shell(<ErrorCard message={error} detail={errorDetail} onRetry={reload} />);
   }
 
   if (entLoading || loading) {
@@ -350,7 +350,8 @@ export default function GetReadyCommand() {
     );
   }
 
-  const { vehicle, columns, summary, checklist, canAuthorize, priority, deliveryTarget } = data;
+  const { vehicle, columns, summary, checklist, canAuthorize, authorizeBlockedReason,
+    priority, deliveryTarget } = data;
   const delivery = dateLabel(deliveryTarget);
   const condition = conditionLabel(vehicle.condition);
 
@@ -477,7 +478,7 @@ export default function GetReadyCommand() {
           <div>
             <DisabledReason
               className="flex w-full"
-              reason={canAuthorize ? null : "Complete the authorization checklist to enable dispatch"}>
+              reason={canAuthorize ? null : authorizeBlockedReason}>
               <button type="button" onClick={onAuthorize} disabled={!canAuthorize || authorizing}
                 className={cn(BTN_PRIMARY, "w-full")}>
                 {authorizing

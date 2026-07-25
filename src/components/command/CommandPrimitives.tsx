@@ -419,7 +419,9 @@ export function LoadingCard({ rows = 3 }: { rows?: number }) {
 
 /* ------------------------------------------------------------------- ErrorCard */
 
-export function ErrorCard({ message, onRetry }: { message: string; onRetry?: () => void }) {
+export function ErrorCard({
+  message, detail, onRetry,
+}: { message: string; detail?: string | null; onRetry?: () => void }) {
   return (
     <div className={cn("rounded-2xl border p-4", TONE_CLASS.red)} role="alert">
       <div className="flex items-start gap-3">
@@ -427,6 +429,14 @@ export function ErrorCard({ message, onRetry }: { message: string; onRetry?: () 
         <div className="min-w-0 flex-1">
           <p className="text-[13px] font-bold text-red-800">Something went wrong</p>
           <p className="text-[12.5px] text-red-700 mt-0.5 break-words">{message}</p>
+          {detail ? (
+            <details className="mt-2">
+              <summary className="text-[11.5px] text-red-700/80 cursor-pointer">
+                Details for support
+              </summary>
+              <p className="text-[11.5px] text-red-700/80 mt-1 break-words font-mono">{detail}</p>
+            </details>
+          ) : null}
         </div>
       </div>
       {onRetry ? (
