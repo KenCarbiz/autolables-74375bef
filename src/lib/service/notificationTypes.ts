@@ -31,6 +31,25 @@ export const notificationDedupeKey = (
   qualifier?: string,
 ): string => `${type}:${subject.toUpperCase()}${qualifier ? `:${qualifier}` : ""}`;
 
+/** Plain-language bell renderings; the type stays the stored vocabulary. */
+export const SERVICE_NOTIFICATION_LABELS: Record<ServiceNotificationType, string> = {
+  service_task_created: "New service task",
+  inspection_overdue: "Inspection overdue",
+  sold_still_blocked: "Sold vehicle still blocked",
+  failure_entered: "Failed item recorded",
+  ready_for_reinspection: "Ready for reinspection",
+  k208_ready: "K-208 ready to execute",
+  k208_executed: "K-208 executed",
+  k208_unsigned_past_threshold: "K-208 unsigned past threshold",
+  service_request_decision: "Additional-work decision",
+  storage_failure: "Document storage failure",
+  delivery_compliance_conflict: "Delivery compliance conflict",
+};
+
+export const serviceNotificationLabel = (type: string): string =>
+  SERVICE_NOTIFICATION_LABELS[type as ServiceNotificationType]
+    ?? type.replace(/_/g, " ").replace(/\b\w/, (c) => c.toUpperCase());
+
 export interface UserNotificationRow {
   id: string;
   tenant_id: string;

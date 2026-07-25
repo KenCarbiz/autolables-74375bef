@@ -68,6 +68,8 @@ export interface GetReadyItem {
   // never appear on the customer addendum — they are the store's own cost.
   cost?: number;
   internal?: boolean;
+  // Evidence photos attached from the service workspace (public storage URLs).
+  photos?: string[];
 }
 
 // Default routing when an item has no explicit department (older records /

@@ -72,6 +72,9 @@ const TitleUpload = lazy(() => import("./pages/TitleUpload"));
 const GetReady = lazy(() => import("./pages/GetReady"));
 const ReconApproval = lazy(() => import("./pages/ReconApproval"));
 const ServiceDesk = lazy(() => import("./pages/ServiceDesk"));
+const ServiceVehicleWorkspace = lazy(() => import("./pages/ServiceVehicleWorkspace"));
+const ServiceScan = lazy(() => import("./pages/ServiceScan"));
+const ServiceSettings = lazy(() => import("./pages/ServiceSettings"));
 const ReadyBoard = lazy(() => import("./pages/ReadyBoard"));
 const PrintQueue = lazy(() => import("./pages/PrintQueue"));
 const K208Document = lazy(() => import("./pages/K208Document"));
@@ -312,6 +315,11 @@ const App = () => (
                         <Route path="/prep/:vin" element={<PrepMobile />} />
                         <Route path="/recon" element={<ReconBoard />} />
                         <Route path="/service" element={<ServiceDesk />} />
+                        {/* The ONE shared vehicle workspace; the Service QR
+                            resolves through /service/scan to the same screen. */}
+                        <Route path="/service/vehicle/:vin" element={<ServiceVehicleWorkspace />} />
+                        <Route path="/service/scan/:token" element={<ServiceScan />} />
+                        <Route path="/service/settings" element={<ServiceSettings />} />
                         <Route path="/ready-board" element={<ReadyBoard />} />
                         <Route path="/print-queue" element={<PrintQueue />} />
                         <Route path="/k208/:vin" element={<K208Document />} />

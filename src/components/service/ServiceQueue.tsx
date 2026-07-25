@@ -1,36 +1,60 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useTenant } from "@/contexts/TenantContext";
 import { useVinScan } from "@/contexts/VinScanContext";
+import { useDealerSettings } from "@/contexts/DealerSettingsContext";
 import { deriveServiceStatus } from "@/lib/service/serviceStatus";
+import { deriveServicePriority, compareServicePriority, type ServicePriority } from "@/lib/service/priority";
+import { clearanceReasonLabel } from "@/lib/service/workspaceStatus";
+import { isFailureResolved } from "@/lib/service/transitions";
+import {
+  CommandStatCard, EmptyState, ErrorCard, LoadingCard, StatusPill,
+  BTN_PRIMARY, BTN_SECONDARY, formatCommandDateTime,
+} from "@/components/command/CommandPrimitives";
 import {
   ClipboardList, ShieldCheck, AlertTriangle, CheckCircle2, Clock, XCircle,
-  Search, QrCode, ChevronRight, Loader2, CircleDot, Circle, Wrench,
+  Search, QrCode, ChevronRight, CircleDot, Circle, Wrench, ArrowUp, ArrowDown, Minus, FileText, X,
 } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 // ──────────────────────────────────────────────────────────────
-// Service Desk queue — the ONE landing for service writers/managers.
-//
-// Phase 1 of the unified Service Desk: one row per used/CPO vehicle with a
-// derived service status and a single clear next action, computed from the data
-// we already keep (get_ready_records + safety_inspections + recall) — no new
-// table. Clicking a row (or its Next Action) opens that exact vehicle's service
-// workspace. Additional-work approval + manager messaging land in later phases.
+// Service Desk queue — "Vehicles Requiring Service Action" (desktop comp).
+// One row per used/CPO vehicle: deterministic priority with a stored-style
+// reason code rendered in plain language, labeled Age, Assigned To, station
+// chips, delivery clearance, and ONE next action that opens the shared
+// workspace at /service/vehicle/:vin. Row click opens the preview drawer —
+// never the inspection form.
 // ──────────────────────────────────────────────────────────────
 
-export interface QueueVeh { id: string; vin: string; ymm: string | null; }
+// deno-lint-ignore no-explicit-any
+const sb = () => supabase as any;
+
+interface MemberRow { user_id: string | null; email: string | null; role: string; accepted_at: string | null; }
 
 interface Row {
   id: string; vin: string; ymm: string; trim: string; stock: string; photo: string;
   condition: string;
   grState: "not_started" | "in_progress" | "complete" | "failed";
   k208State: "waiting" | "ready" | "executed" | "blocked";
+  inspectionState: string | null;
   delivery: string;
+  deliveryTarget: string | null;
+  clearanceState: string | null;
+  clearanceReasons: string[];
   next: { label: string; tone: "primary" | "danger" | "ghost" };
-  priority: "High" | "Medium" | "Low";
-  bucket: "get_ready" | "in_progress" | "failed" | "ready_to_sign" | "done";
+  priority: ServicePriority;
+  bucket: "get_ready" | "in_progress" | "failed" | "reinspect" | "ready_to_sign" | "done";
+  overdue: boolean;
   completedToday: boolean;
   awaiting: boolean;
+  cleared: boolean;
+  sold: boolean;
+  assignedTo: string | null;
+  assignedName: string | null;
+  ageHours: number;
+  openFailures: number;
+  readySince: string | null;
 }
 
 const isToday = (iso?: string | null) => {
@@ -39,45 +63,25 @@ const isToday = (iso?: string | null) => {
   return d.getFullYear() === n.getFullYear() && d.getMonth() === n.getMonth() && d.getDate() === n.getDate();
 };
 
-// deno-lint-ignore no-explicit-any
-function derive(v: any, gr: any, si: any, awaiting: boolean): Row {
-  const s = deriveServiceStatus(v, gr, si, awaiting);
-  const certified = !!(si && si.licensee_certified_at);
-  const grState = s.grState;
-  const k208State = s.k208State;
-  const next: Row["next"] = { label: s.nextLabel, tone: s.nextTone };
-  const priority = s.priority;
-  const bucket: Row["bucket"] = s.cleared ? "done"
-    : s.k208State === "blocked" ? "failed"
-    : s.k208State === "ready" ? "ready_to_sign"
-    : s.grState === "in_progress" ? "in_progress"
-    : "get_ready";
-  const delivery = s.blocked ? "Delivery blocked" : s.cleared ? "Cleared" : v.status === "published" ? "In stock" : "Draft";
+const ageLabel = (hours: number): string => {
+  if (hours < 24) return `${Math.max(0, Math.round(hours))}h`;
+  return `${Math.floor(hours / 24)}d ${Math.round(hours % 24)}h`;
+};
 
-  const ymm = String(v.ymm || "Vehicle");
-  const parts = ymm.split(/\s+/);
-  return {
-    id: v.id, vin: (v.vin || "").toUpperCase(), ymm, trim: parts.slice(3).join(" "),
-    stock: (v.mc_attributes?.stock_no as string) || "",
-    photo: (v.hero_image_url as string) || (Array.isArray(v.mc_attributes?.photo_links) ? v.mc_attributes.photo_links[0] : "") || "",
-    condition: String(v.condition || "used").toUpperCase(),
-    grState, k208State, delivery, next, priority, bucket, awaiting,
-    completedToday: certified && isToday(si?.licensee_certified_at),
-  };
-}
-
-const FILTERS: { key: string; label: string }[] = [
+const TABS: { key: string; label: string }[] = [
   { key: "all", label: "All" },
   { key: "get_ready", label: "Get Ready" },
   { key: "in_progress", label: "In Progress" },
   { key: "failed", label: "Failed" },
+  { key: "reinspect", label: "Reinspect" },
   { key: "ready_to_sign", label: "Ready to Sign" },
+  { key: "overdue", label: "Overdue" },
   { key: "done", label: "Completed" },
 ];
 
 const GR_CHIP: Record<Row["grState"], { label: string; cls: string; Icon: typeof Circle }> = {
   not_started: { label: "Not started", cls: "text-slate-500", Icon: Circle },
-  in_progress: { label: "In progress", cls: "text-amber-600", Icon: CircleDot },
+  in_progress: { label: "In progress", cls: "text-blue-600", Icon: CircleDot },
   complete: { label: "Work complete", cls: "text-emerald-600", Icon: CheckCircle2 },
   failed: { label: "Failed items", cls: "text-red-600", Icon: XCircle },
 };
@@ -88,87 +92,233 @@ const K208_CHIP: Record<Row["k208State"], { label: string; cls: string; Icon: ty
   executed: { label: "Executed", cls: "text-emerald-600", Icon: CheckCircle2 },
 };
 
-export default function ServiceQueue({ onOpen }: { onOpen: (v: QueueVeh) => void }) {
+const PRIORITY_ICON = { High: ArrowUp, Medium: Minus, Low: ArrowDown } as const;
+const PRIORITY_CLS = { High: "text-red-600", Medium: "text-amber-600", Low: "text-slate-400" } as const;
+
+export default function ServiceQueue() {
   const { tenant } = useTenant();
   const { openScan } = useVinScan();
+  const { settings } = useDealerSettings();
+  const navigate = useNavigate();
   const [rows, setRows] = useState<Row[]>([]);
   const [loading, setLoading] = useState(true);
-  const [filter, setFilter] = useState("all");
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [tab, setTab] = useState("all");
   const [q, setQ] = useState("");
+  const [techFilter, setTechFilter] = useState("any");
+  const [urgencyFilter, setUrgencyFilter] = useState("any");
+  const [drawer, setDrawer] = useState<Row | null>(null);
+  const overdueHours = settings.service_overdue_hours || 24;
 
-  useEffect(() => {
-    let off = false;
-    (async () => {
-      if (!tenant?.id) { setLoading(false); return; }
-      const { data: vehicles } = await (supabase as any).from("vehicle_listings")
-        .select("id, vin, ymm, condition, status, mc_attributes")
+  const load = useCallback(async () => {
+    if (!tenant?.id) { setLoading(false); return; }
+    setLoading(true);
+    setLoadError(null);
+    try {
+      const { data: vehicles, error: vehErr } = await sb().from("vehicle_listings")
+        .select("id, vin, ymm, condition, status, mc_attributes, hero_image_url, recall_status, created_at, deal_processed_at")
         .eq("tenant_id", tenant.id)
         .in("condition", ["used", "cpo", "certified"])
         .order("created_at", { ascending: false })
         .limit(300);
+      if (vehErr) throw new Error(vehErr.message);
+      // deno-lint-ignore no-explicit-any
       const vs = (vehicles as any[]) || [];
       const vins = vs.map((v) => v.vin).filter(Boolean);
-      const [grRes, siRes, srRes] = await Promise.all([
-        vins.length ? (supabase as any).from("get_ready_records").select("vin, status, items, get_ready_complete_date").eq("tenant_id", tenant.id).in("vin", vins) : Promise.resolve({ data: [] }),
-        vins.length ? (supabase as any).from("safety_inspections").select("vin, status, result, licensee_certified_at, signed_at").eq("tenant_id", tenant.id).eq("status", "signed").in("vin", vins).order("signed_at", { ascending: false }) : Promise.resolve({ data: [] }),
-        vins.length ? (supabase as any).from("service_requests").select("vin").eq("tenant_id", tenant.id).eq("status", "pending").in("vin", vins) : Promise.resolve({ data: [] }),
+      const empty = Promise.resolve({ data: [] });
+      const [grRes, siRes, srRes, failRes, clrRes, memRes] = await Promise.all([
+        vins.length ? sb().from("get_ready_records").select("vin, status, items, get_ready_complete_date, delivery_target").eq("tenant_id", tenant.id).in("vin", vins) : empty,
+        vins.length ? sb().from("safety_inspections").select("vin, status, result, inspection_state, assigned_to, licensee_certified_at, signed_at, created_at").eq("tenant_id", tenant.id).in("vin", vins).order("created_at", { ascending: false }) : empty,
+        vins.length ? sb().from("service_requests").select("vin").eq("tenant_id", tenant.id).eq("status", "pending").in("vin", vins) : empty,
+        vins.length ? sb().from("safety_inspection_item_failures").select("vin, repair_state").eq("tenant_id", tenant.id).in("vin", vins) : empty,
+        vins.length ? sb().from("vehicle_delivery_clearance").select("vin, state, reason_codes").eq("tenant_id", tenant.id).in("vin", vins) : empty,
+        sb().rpc("list_tenant_members", { p_tenant_id: tenant.id }),
       ]);
+
+      // deno-lint-ignore no-explicit-any
       const grByVin = new Map<string, any>();
+      // deno-lint-ignore no-explicit-any
       for (const g of ((grRes.data as any[]) || [])) if (!grByVin.has(g.vin)) grByVin.set(g.vin, g);
-      const siByVin = new Map<string, any>();
-      for (const s of ((siRes.data as any[]) || [])) if (!siByVin.has(s.vin)) siByVin.set(s.vin, s); // first = latest signed
-      const awaitingVins = new Set<string>(((srRes.data as any[]) || []).map((r) => r.vin));
-      if (off) return;
-      setRows(vs.map((v) => derive(v, grByVin.get(v.vin), siByVin.get(v.vin), awaitingVins.has(v.vin))));
-      setLoading(false);
-    })();
-    return () => { off = true; };
-  }, [tenant?.id]);
 
-  const stats = useMemo(() => ({
-    pending: rows.filter((r) => r.grState === "not_started" || r.grState === "in_progress").length,
-    ready: rows.filter((r) => r.k208State === "ready").length,
-    blocked: rows.filter((r) => r.k208State === "blocked").length,
-    doneToday: rows.filter((r) => r.completedToday).length,
-  }), [rows]);
+      // Newest SIGNED row (by signed_at) and newest non-voided row per VIN.
+      // deno-lint-ignore no-explicit-any
+      const signedByVin = new Map<string, any>();
+      // deno-lint-ignore no-explicit-any
+      const activeByVin = new Map<string, any>();
+      // deno-lint-ignore no-explicit-any
+      for (const s of ((siRes.data as any[]) || [])) {
+        if (s.status !== "voided" && !activeByVin.has(s.vin)) activeByVin.set(s.vin, s);
+        if (s.status === "signed") {
+          const prev = signedByVin.get(s.vin);
+          if (!prev || String(s.signed_at || "") > String(prev.signed_at || "")) signedByVin.set(s.vin, s);
+        }
+      }
 
-  const attention = useMemo(() =>
-    rows.filter((r) => r.k208State === "blocked" || (r.grState === "not_started")).slice(0, 2), [rows]);
+      const awaitingVins = new Set<string>(((srRes.data as { vin: string }[]) || []).map((r) => r.vin));
+      const failuresByVin = new Map<string, { open: number; ready: number }>();
+      for (const f of ((failRes.data as { vin: string; repair_state: string }[]) || [])) {
+        const cur = failuresByVin.get(f.vin) || { open: 0, ready: 0 };
+        if (!isFailureResolved(f.repair_state)) {
+          cur.open += 1;
+          if (f.repair_state === "ready_for_reinspection") cur.ready += 1;
+        }
+        failuresByVin.set(f.vin, cur);
+      }
+      const clrByVin = new Map<string, { state: string; reason_codes: string[] }>();
+      for (const c of ((clrRes.data as { vin: string; state: string; reason_codes: string[] }[]) || [])) clrByVin.set(c.vin, c);
+      const memberById = new Map<string, string>();
+      for (const m of ((memRes.data as MemberRow[]) || [])) {
+        if (m.user_id && m.email) memberById.set(m.user_id, m.email.split("@")[0]);
+      }
+
+      const now = Date.now();
+      const out: Row[] = vs.map((v) => {
+        const vin = String(v.vin || "").toUpperCase();
+        const gr = grByVin.get(v.vin);
+        const signed = signedByVin.get(v.vin);
+        const active = activeByVin.get(v.vin);
+        const awaiting = awaitingVins.has(v.vin);
+        const s = deriveServiceStatus(v, gr, signed, awaiting);
+        const fails = failuresByVin.get(v.vin) || { open: 0, ready: 0 };
+        const clr = clrByVin.get(v.vin) || null;
+        const ageHours = v.created_at ? (now - new Date(v.created_at).getTime()) / 36e5 : 0;
+        const sold = !!v.deal_processed_at || String(v.status || "") === "sold";
+        const inspectionState = (active?.inspection_state as string) || null;
+        const awaitingReinspection = inspectionState === "ready_for_reinspection"
+          || (fails.open > 0 && fails.ready === fails.open);
+        const overdue = !s.cleared && s.k208State !== "executed" && ageHours > overdueHours;
+        const priority = deriveServicePriority({
+          sold,
+          deliveryToday: isToday(gr?.delivery_target),
+          blocked: !!clr && clr.state !== "cleared_for_delivery",
+          failedItemsOpen: s.grState === "failed" || fails.open > 0,
+          awaitingReinspection,
+          readyForK208: s.k208State === "ready",
+          inspectionStarted: inspectionState != null && inspectionState !== "not_started",
+          overdue,
+          assigned: !!active?.assigned_to,
+          ageHours,
+          cleared: s.cleared,
+        });
+        const bucket: Row["bucket"] = s.cleared ? "done"
+          : awaitingReinspection ? "reinspect"
+          : s.k208State === "blocked" ? "failed"
+          : s.k208State === "ready" ? "ready_to_sign"
+          : s.grState === "in_progress" ? "in_progress"
+          : "get_ready";
+        const ymm = String(v.ymm || "Vehicle");
+        const parts = ymm.split(/\s+/);
+        return {
+          id: v.id, vin, ymm, trim: parts.slice(3).join(" "),
+          stock: (v.mc_attributes?.stock_no as string) || "",
+          photo: (v.hero_image_url as string) || (Array.isArray(v.mc_attributes?.photo_links) ? v.mc_attributes.photo_links[0] : "") || "",
+          condition: String(v.condition || "used").toUpperCase(),
+          grState: s.grState, k208State: s.k208State, inspectionState,
+          delivery: s.blocked ? "Delivery blocked" : s.cleared ? "Cleared" : v.status === "published" ? "In stock" : "Draft",
+          deliveryTarget: (gr?.delivery_target as string) || null,
+          clearanceState: clr?.state ?? null,
+          clearanceReasons: clr?.reason_codes ?? [],
+          next: { label: s.nextLabel, tone: s.nextTone },
+          priority, bucket, overdue,
+          completedToday: !!signed?.licensee_certified_at && isToday(signed.licensee_certified_at),
+          awaiting, cleared: s.cleared, sold,
+          assignedTo: (active?.assigned_to as string) || null,
+          assignedName: active?.assigned_to ? memberById.get(active.assigned_to) ?? null : null,
+          ageHours,
+          openFailures: fails.open,
+          readySince: s.k208State === "ready" ? ((signed?.signed_at as string) || null) : null,
+        };
+      });
+      out.sort(compareServicePriority);
+      setRows(out);
+    } catch (e) {
+      setLoadError(e instanceof Error ? e.message : "Unknown error");
+    }
+    setLoading(false);
+  }, [tenant?.id, overdueHours]);
+
+  useEffect(() => { void load(); }, [load]);
+
+  const openWorkspace = useCallback((r: Row) => navigate(`/service/vehicle/${r.vin}`), [navigate]);
+
+  // KPI sublabels are measured, never invented.
+  const stats = useMemo(() => {
+    const pending = rows.filter((r) => !r.cleared && r.k208State !== "executed");
+    const unassigned = pending.filter((r) => !r.assignedTo).length;
+    const ready = rows.filter((r) => r.k208State === "ready");
+    const oldestReadyH = ready.length
+      ? Math.max(...ready.map((r) => (r.readySince ? (Date.now() - new Date(r.readySince).getTime()) / 36e5 : 0)))
+      : 0;
+    const blocked = rows.filter((r) => r.k208State === "blocked" || r.awaiting);
+    const soldBlocked = blocked.filter((r) => r.sold).length;
+    const doneToday = rows.filter((r) => r.completedToday).length;
+    return {
+      pending: pending.length,
+      pendingSub: `${unassigned} have not been assigned`,
+      ready: ready.length,
+      readySub: ready.length ? `Oldest waiting ${ageLabel(oldestReadyH)}` : "None waiting",
+      blocked: blocked.length,
+      blockedSub: soldBlocked ? `${soldBlocked} sold and still blocked` : "None sold",
+      doneToday,
+      doneSub: `of ${rows.length} vehicles`,
+    };
+  }, [rows]);
+
+  // Needs Attention: true exceptions only.
+  const attention = useMemo(() => rows.filter((r) => {
+    if (r.cleared) return false;
+    if (r.sold && isToday(r.deliveryTarget) && r.inspectionState == null) return true;
+    if (r.openFailures > 0 || r.grState === "failed") return true;
+    if (r.k208State === "ready" && r.readySince && (Date.now() - new Date(r.readySince).getTime()) / 36e5 >= 18) return true;
+    if (r.sold && r.clearanceState && r.clearanceState !== "cleared_for_delivery") return true;
+    return false;
+  }).slice(0, 4), [rows]);
+
+  const technicians = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const r of rows) if (r.assignedTo) map.set(r.assignedTo, r.assignedName || "Member");
+    return Array.from(map.entries());
+  }, [rows]);
 
   const visible = useMemo(() => {
     const term = q.trim().toLowerCase();
     return rows.filter((r) => {
-      if (filter !== "all" && r.bucket !== filter) return false;
+      if (tab === "overdue") { if (!r.overdue) return false; }
+      else if (tab !== "all" && r.bucket !== tab) return false;
+      if (techFilter === "unassigned" && r.assignedTo) return false;
+      if (techFilter !== "any" && techFilter !== "unassigned" && r.assignedTo !== techFilter) return false;
+      if (urgencyFilter === "today" && !isToday(r.deliveryTarget)) return false;
+      if (urgencyFilter === "scheduled" && !r.deliveryTarget) return false;
+      if (urgencyFilter === "unscheduled" && r.deliveryTarget) return false;
       if (term && !(`${r.ymm} ${r.vin} ${r.stock}`.toLowerCase().includes(term))) return false;
       return true;
     });
-  }, [rows, filter, q]);
+  }, [rows, tab, q, techFilter, urgencyFilter]);
 
-  if (loading) return <div className="p-10 grid place-items-center"><Loader2 className="w-6 h-6 animate-spin text-muted-foreground" /></div>;
-
-  const Tile = ({ icon: Icon, label, n, tone }: { icon: typeof ClipboardList; label: string; n: number; tone: string }) => (
-    <div className="rounded-2xl border border-border bg-card p-4 flex items-center gap-3">
-      <span className={`w-11 h-11 rounded-xl grid place-items-center ${tone}`}><Icon className="w-5 h-5" /></span>
-      <div><p className="text-[26px] font-black leading-none tabular-nums text-foreground">{n}</p><p className="text-xs text-muted-foreground mt-1">{label}</p></div>
-    </div>
-  );
+  if (loading) return <div className="space-y-4"><LoadingCard rows={2} /><LoadingCard rows={6} /></div>;
+  if (loadError) {
+    return <ErrorCard message="We could not load the Service Desk. Your existing inspection work has not been changed." detail={loadError} onRetry={() => void load()} />;
+  }
 
   return (
     <div className="space-y-5">
       <div className="flex items-center gap-2 flex-wrap">
         <div className="relative flex-1 min-w-[220px]">
-          <Search className="w-4 h-4 text-muted-foreground absolute left-3 top-1/2 -translate-y-1/2" />
+          <Search className="w-4 h-4 text-muted-foreground absolute left-3 top-1/2 -translate-y-1/2" aria-hidden="true" />
           <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search VIN or stock #"
+            aria-label="Search VIN or stock number"
             className="w-full h-11 pl-9 pr-3 rounded-lg border border-border bg-background text-sm" />
         </div>
-        <button onClick={openScan} className="h-11 px-4 rounded-lg border border-border text-sm font-semibold inline-flex items-center gap-2 hover:bg-muted"><QrCode className="w-4 h-4" /> Scan Service QR</button>
+        <button onClick={openScan} className="h-11 px-4 rounded-lg border border-border text-sm font-semibold inline-flex items-center gap-2 hover:bg-muted">
+          <QrCode className="w-4 h-4" aria-hidden="true" /> Scan Service QR
+        </button>
       </div>
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        <Tile icon={ClipboardList} label="Pending work" n={stats.pending} tone="bg-blue-50 text-blue-600" />
-        <Tile icon={ShieldCheck} label="K-208 ready" n={stats.ready} tone="bg-emerald-50 text-emerald-600" />
-        <Tile icon={AlertTriangle} label="Blocked / exceptions" n={stats.blocked} tone="bg-red-50 text-red-600" />
-        <Tile icon={CheckCircle2} label="Completed today" n={stats.doneToday} tone="bg-slate-100 text-slate-600" />
+        <CommandStatCard label="Pending work" value={stats.pending} sub={stats.pendingSub} Icon={ClipboardList} tone="blue" onClick={() => setTab("all")} />
+        <CommandStatCard label="K-208 ready" value={stats.ready} sub={stats.readySub} Icon={ShieldCheck} tone="emerald" onClick={() => setTab("ready_to_sign")} />
+        <CommandStatCard label="Blocked / exceptions" value={stats.blocked} sub={stats.blockedSub} Icon={AlertTriangle} tone="red" onClick={() => setTab("failed")} />
+        <CommandStatCard label="Completed today" value={stats.doneToday} sub={stats.doneSub} Icon={CheckCircle2} tone="slate" onClick={() => setTab("done")} />
       </div>
 
       {attention.length > 0 && (
@@ -180,11 +330,11 @@ export default function ServiceQueue({ onOpen }: { onOpen: (v: QueueVeh) => void
                 <VehThumb r={r} />
                 <div className="min-w-0 flex-1">
                   <p className="text-sm font-bold text-foreground truncate">{r.ymm}</p>
-                  <p className={`text-xs font-semibold ${r.k208State === "blocked" ? "text-red-600" : "text-amber-600"}`}>
-                    {r.k208State === "blocked" ? "Delivery blocked — needs repair" : "Inspection not started"}
-                  </p>
+                  <p className="text-xs font-semibold text-red-600">{r.priority.label}</p>
                 </div>
-                <button onClick={() => onOpen(r)} className="h-9 px-3 rounded-lg bg-primary text-primary-foreground text-xs font-semibold shrink-0">{r.next.label}</button>
+                <button onClick={() => openWorkspace(r)} className="min-h-[44px] px-3 rounded-lg bg-primary text-primary-foreground text-xs font-semibold shrink-0">
+                  {r.next.label}
+                </button>
               </div>
             ))}
           </div>
@@ -194,63 +344,174 @@ export default function ServiceQueue({ onOpen }: { onOpen: (v: QueueVeh) => void
       <div className="rounded-2xl border border-border bg-card overflow-hidden">
         <div className="px-4 pt-4 flex items-center justify-between gap-3 flex-wrap">
           <h2 className="text-body font-bold text-foreground">Vehicles requiring service action</h2>
+          <div className="flex items-center gap-2 flex-wrap">
+            <select value={techFilter} onChange={(e) => setTechFilter(e.target.value)} aria-label="Filter by technician"
+              className="h-9 rounded-lg border border-border bg-background px-2 text-xs">
+              <option value="any">Technician: any</option>
+              <option value="unassigned">Unassigned</option>
+              {technicians.map(([id, name]) => <option key={id} value={id}>{name}</option>)}
+            </select>
+            <select value={urgencyFilter} onChange={(e) => setUrgencyFilter(e.target.value)} aria-label="Filter by delivery urgency"
+              className="h-9 rounded-lg border border-border bg-background px-2 text-xs">
+              <option value="any">Delivery: any</option>
+              <option value="today">Delivery today</option>
+              <option value="scheduled">Delivery scheduled</option>
+              <option value="unscheduled">No delivery scheduled</option>
+            </select>
+          </div>
         </div>
         <div className="px-4 pt-3 flex items-center gap-1.5 overflow-x-auto">
-          {FILTERS.map((f) => (
-            <button key={f.key} onClick={() => setFilter(f.key)}
-              className={`h-8 px-3 rounded-full text-xs font-semibold whitespace-nowrap ${filter === f.key ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted"}`}>{f.label}</button>
+          {TABS.map((f) => (
+            <button key={f.key} onClick={() => setTab(f.key)} aria-pressed={tab === f.key}
+              className={cn("h-9 px-3 rounded-full text-xs font-semibold whitespace-nowrap",
+                tab === f.key ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted")}>
+              {f.label}
+            </button>
           ))}
         </div>
-        <div className="mt-3 overflow-x-auto">
-          <table className="w-full text-sm min-w-[820px]">
+        <div className="mt-3 overflow-auto max-h-[600px]">
+          <table className="w-full text-sm min-w-[1020px]">
             <thead>
               <tr className="text-[11px] uppercase tracking-wide text-muted-foreground border-b border-border">
-                <th className="text-left font-semibold px-4 py-2.5">Priority</th>
-                <th className="text-left font-semibold px-4 py-2.5">Vehicle</th>
-                <th className="text-left font-semibold px-4 py-2.5">Stock / VIN</th>
-                <th className="text-left font-semibold px-4 py-2.5">Get Ready</th>
-                <th className="text-left font-semibold px-4 py-2.5">K-208</th>
-                <th className="text-left font-semibold px-4 py-2.5">Delivery</th>
-                <th className="text-right font-semibold px-4 py-2.5">Next action</th>
+                {["Priority", "Vehicle", "Stock / VIN", "Age (since intake)", "Assigned to", "Get Ready", "K-208", "Delivery"].map((h) => (
+                  <th key={h} className="text-left font-semibold px-4 py-2.5 sticky top-0 bg-card z-10">{h}</th>
+                ))}
+                <th className="text-right font-semibold px-4 py-2.5 sticky top-0 bg-card z-10">Next action</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border/60">
               {visible.map((r) => {
                 const G = GR_CHIP[r.grState]; const K = K208_CHIP[r.k208State];
+                const P = PRIORITY_ICON[r.priority.level];
                 return (
-                  <tr key={r.id} className="hover:bg-muted/40 cursor-pointer" onClick={() => onOpen(r)}>
+                  <tr key={r.id} className="hover:bg-muted/40 cursor-pointer" onClick={() => setDrawer(r)}>
                     <td className="px-4 py-2.5">
-                      <span className={`text-xs font-bold ${r.priority === "High" ? "text-red-600" : r.priority === "Medium" ? "text-amber-600" : "text-slate-400"}`}>{r.priority}</span>
+                      <span className={cn("inline-flex items-center gap-1 text-xs font-bold", PRIORITY_CLS[r.priority.level])}>
+                        <P className="w-3.5 h-3.5" aria-hidden="true" /> {r.priority.level}
+                      </span>
+                      <p className="text-[10.5px] text-muted-foreground">{r.priority.label}</p>
                     </td>
                     <td className="px-4 py-2.5"><div className="flex items-center gap-2.5 min-w-0"><VehThumb r={r} /><div className="min-w-0"><p className="font-semibold text-foreground truncate">{r.ymm}</p><p className="text-[11px] text-muted-foreground">{r.condition}{r.trim ? ` · ${r.trim}` : ""}</p></div></div></td>
                     <td className="px-4 py-2.5"><p className="font-mono text-[12px] text-foreground">{r.stock || "—"}</p><p className="font-mono text-[11px] text-muted-foreground">…{r.vin.slice(-6)}</p></td>
+                    <td className="px-4 py-2.5">
+                      <span className={cn("text-xs font-semibold tabular-nums", r.overdue ? "text-red-600" : "text-foreground")}>{ageLabel(r.ageHours)}</span>
+                      {r.overdue && <p className="text-[10px] text-red-600">Overdue</p>}
+                    </td>
+                    <td className="px-4 py-2.5">
+                      {r.assignedName ? (
+                        <span className="inline-flex items-center gap-1.5 text-xs text-foreground">
+                          <span className="w-6 h-6 rounded-full bg-primary/10 text-primary grid place-items-center text-[10px] font-black">{r.assignedName.slice(0, 2).toUpperCase()}</span>
+                          {r.assignedName}
+                        </span>
+                      ) : <span className="text-xs text-muted-foreground">Unassigned</span>}
+                    </td>
                     <td className="px-4 py-2.5">{r.awaiting
-                      ? <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-amber-600"><AlertTriangle className="w-3.5 h-3.5" /> Awaiting approval</span>
-                      : <span className={`inline-flex items-center gap-1.5 text-xs font-semibold ${G.cls}`}><G.Icon className="w-3.5 h-3.5" /> {G.label}</span>}</td>
-                    <td className="px-4 py-2.5"><span className={`inline-flex items-center gap-1.5 text-xs font-semibold ${K.cls}`}><K.Icon className="w-3.5 h-3.5" /> {K.label}</span></td>
-                    <td className="px-4 py-2.5"><span className={`text-xs font-medium ${r.delivery === "Delivery blocked" ? "text-red-600" : r.delivery === "Cleared" ? "text-emerald-600" : "text-muted-foreground"}`}>{r.delivery}</span></td>
+                      ? <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-amber-600"><AlertTriangle className="w-3.5 h-3.5" aria-hidden="true" /> Awaiting approval</span>
+                      : <span className={cn("inline-flex items-center gap-1.5 text-xs font-semibold", G.cls)}><G.Icon className="w-3.5 h-3.5" aria-hidden="true" /> {G.label}{r.openFailures > 0 ? ` (${r.openFailures})` : ""}</span>}</td>
+                    <td className="px-4 py-2.5"><span className={cn("inline-flex items-center gap-1.5 text-xs font-semibold", K.cls)}><K.Icon className="w-3.5 h-3.5" aria-hidden="true" /> {K.label}</span></td>
+                    <td className="px-4 py-2.5">
+                      <span className={cn("text-xs font-medium", r.delivery === "Delivery blocked" ? "text-red-600" : r.delivery === "Cleared" ? "text-emerald-600" : "text-muted-foreground")}>{r.delivery}</span>
+                      {r.deliveryTarget && <p className="text-[10px] text-muted-foreground">{formatCommandDateTime(r.deliveryTarget)}</p>}
+                    </td>
                     <td className="px-4 py-2.5 text-right">
-                      <button onClick={(e) => { e.stopPropagation(); onOpen(r); }}
-                        className={`h-8 px-3 rounded-lg text-xs font-semibold inline-flex items-center gap-1 ${r.next.tone === "danger" ? "bg-red-600 text-white" : r.next.tone === "ghost" ? "border border-border text-foreground hover:bg-muted" : "bg-primary text-primary-foreground"}`}>
-                        {r.next.tone === "ghost" ? null : <Wrench className="w-3.5 h-3.5" />} {r.next.label} <ChevronRight className="w-3.5 h-3.5" />
+                      <button onClick={(e) => { e.stopPropagation(); openWorkspace(r); }}
+                        className={cn("min-h-[40px] px-3 rounded-lg text-xs font-semibold inline-flex items-center gap-1",
+                          r.next.tone === "danger" ? "bg-red-600 text-white" : r.next.tone === "ghost" ? "border border-border text-foreground hover:bg-muted" : "bg-primary text-primary-foreground")}>
+                        {r.next.tone === "ghost" ? null : <Wrench className="w-3.5 h-3.5" aria-hidden="true" />} {r.next.label} <ChevronRight className="w-3.5 h-3.5" aria-hidden="true" />
                       </button>
                     </td>
                   </tr>
                 );
               })}
               {visible.length === 0 && (
-                <tr><td colSpan={7} className="px-4 py-10 text-center text-sm text-muted-foreground">No vehicles in this view.</td></tr>
+                <tr><td colSpan={9} className="px-4 py-6">
+                  <EmptyState Icon={CheckCircle2} title="All caught up"
+                    detail="No vehicles in this view. Change the filters, scan a Service QR, or search a VIN." />
+                </td></tr>
               )}
             </tbody>
           </table>
         </div>
       </div>
+
+      {drawer && <RowDrawer r={drawer} onClose={() => setDrawer(null)} onOpenWorkspace={() => { openWorkspace(drawer); setDrawer(null); }} />}
     </div>
   );
 }
 
-function VehThumb({ r }: { r: Row }) {
+/** Preview drawer — identity, status, blocker, K-208 state, primary action.
+ *  A preview, NOT the inspection form. */
+function RowDrawer({ r, onClose, onOpenWorkspace }: { r: Row; onClose: () => void; onOpenWorkspace: () => void }) {
+  const navigate = useNavigate();
+  const G = GR_CHIP[r.grState]; const K = K208_CHIP[r.k208State];
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+  return (
+    <>
+      <div className="fixed inset-0 z-40 bg-black/30" onClick={onClose} aria-hidden />
+      <aside role="dialog" aria-modal="true" aria-label={`${r.ymm} service preview`}
+        className="fixed right-0 top-0 bottom-0 z-50 w-full max-w-[400px] bg-card border-l border-border shadow-xl overflow-y-auto">
+        <div className="flex items-center justify-between p-4 border-b border-border sticky top-0 bg-card z-10">
+          <h3 className="text-sm font-bold text-foreground">Service preview</h3>
+          <button onClick={onClose} aria-label="Close preview" className="w-11 h-11 grid place-items-center text-muted-foreground hover:text-foreground"><X className="w-4 h-4" /></button>
+        </div>
+        <div className="p-4 space-y-4">
+          <div className="flex items-center gap-3">
+            <VehThumb r={r} />
+            <div className="min-w-0">
+              <p className="font-bold text-foreground truncate">{r.ymm}</p>
+              <p className="font-mono text-[11px] text-muted-foreground">Stock {r.stock || "—"} · …{r.vin.slice(-6)}</p>
+            </div>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <StatusPill tone={r.priority.level === "High" ? "red" : r.priority.level === "Medium" ? "amber" : "slate"}>{r.priority.label}</StatusPill>
+            {r.overdue && <StatusPill tone="red">Overdue</StatusPill>}
+            {r.sold && <StatusPill tone="blue">Sold</StatusPill>}
+          </div>
+          <dl className="space-y-1.5 text-[12.5px]">
+            <DrawerRow label="Get Ready" value={<span className={cn("inline-flex items-center gap-1 font-semibold", G.cls)}><G.Icon className="w-3.5 h-3.5" aria-hidden="true" /> {G.label}</span>} />
+            <DrawerRow label="K-208" value={<span className={cn("inline-flex items-center gap-1 font-semibold", K.cls)}><K.Icon className="w-3.5 h-3.5" aria-hidden="true" /> {K.label}</span>} />
+            <DrawerRow label="Failed items open" value={<span className={r.openFailures ? "text-red-700 font-semibold" : ""}>{r.openFailures}</span>} />
+            <DrawerRow label="Assigned to" value={r.assignedName ?? "Unassigned"} />
+            <DrawerRow label="Age since intake" value={ageLabel(r.ageHours)} />
+            <DrawerRow label="Delivery target" value={r.deliveryTarget ? formatCommandDateTime(r.deliveryTarget) : "Not scheduled"} />
+          </dl>
+          {r.clearanceReasons.length > 0 && (
+            <div className="rounded-xl border border-red-200 bg-red-50 p-3">
+              <p className="text-[11px] font-bold text-red-800 uppercase tracking-wide mb-1">Delivery blockers</p>
+              <ul className="text-[11.5px] text-red-700 list-disc pl-4 space-y-0.5">
+                {r.clearanceReasons.map((code) => <li key={code}>{clearanceReasonLabel(code)}</li>)}
+              </ul>
+            </div>
+          )}
+          <div className="space-y-2">
+            <button onClick={onOpenWorkspace} className={cn(BTN_PRIMARY, "w-full")}>
+              {r.next.label} <ChevronRight className="w-4 h-4" aria-hidden="true" />
+            </button>
+            <button onClick={() => navigate(`/vehicle-file/${r.id}`)} className={cn(BTN_SECONDARY, "w-full")}>
+              <FileText className="w-4 h-4" aria-hidden="true" /> Vehicle File
+            </button>
+          </div>
+        </div>
+      </aside>
+    </>
+  );
+}
+
+function DrawerRow({ label, value }: { label: string; value: React.ReactNode }) {
+  return (
+    <div className="flex items-center justify-between gap-2">
+      <dt className="text-muted-foreground">{label}</dt>
+      <dd className="text-foreground">{value}</dd>
+    </div>
+  );
+}
+
+function VehThumb({ r }: { r: Pick<Row, "photo"> }) {
   return r.photo
     ? <img src={r.photo} alt="" className="w-12 h-9 rounded-md object-cover border border-border shrink-0" />
-    : <span className="w-12 h-9 rounded-md bg-muted grid place-items-center text-muted-foreground shrink-0"><Wrench className="w-4 h-4" /></span>;
+    : <span className="w-12 h-9 rounded-md bg-muted grid place-items-center text-muted-foreground shrink-0"><Wrench className="w-4 h-4" aria-hidden="true" /></span>;
 }

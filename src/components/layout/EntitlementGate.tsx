@@ -1,5 +1,5 @@
 import { ReactNode, useEffect, useRef, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { consumeSessionExpired } from "@/lib/auth/sessionExpiry";
 import { useEntitlements, type AppSlug } from "@/hooks/useEntitlements";
@@ -41,6 +41,7 @@ interface Props {
 
 const EntitlementGate = ({ app, children }: Props) => {
   const navigate = useNavigate();
+  const location = useLocation();
   const { user, isAdmin, loading: authLoading, signOut } = useAuth();
   const { loading, tenant, hasApp, needsOnboarding, entitlementFor, activateApp, reload } =
     useEntitlements();
@@ -167,8 +168,16 @@ const EntitlementGate = ({ app, children }: Props) => {
 
   if (!user) {
     // A lapsed (vs never-signed-in) session surfaces the "session expired" banner.
-    const expired = consumeSessionExpired() ? "?expired=1" : "";
-    setTimeout(() => navigate(`/login${expired}`), 0);
+    const params = new URLSearchParams();
+    if (consumeSessionExpired()) params.set("expired", "1");
+    // Service QR scans must return DIRECTLY to the scanned vehicle after login
+    // (Login.tsx safeNext honors same-origin ?next=). Only this path opts in —
+    // every other route keeps the historic bare /login redirect.
+    if (location.pathname.startsWith("/service/scan/")) {
+      params.set("next", location.pathname + location.search);
+    }
+    const qs = params.toString();
+    setTimeout(() => navigate(`/login${qs ? `?${qs}` : ""}`), 0);
     return null;
   }
 

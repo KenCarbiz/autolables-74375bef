@@ -34,9 +34,12 @@ interface Props {
   // column). When provided, a fail reveals an inline explanation field per item.
   itemNotes?: Record<string, string>;
   onItemNote?: (id: string, v: string) => void;
+  // The workspace's onPassAll fills only unmarked lines, so it renames the
+  // button to say exactly that; the QR flow keeps the historic label.
+  passAllLabel?: string;
 }
 
-export default function K208Checklist({ marks, onMark, onPassAll, onClearAll, failureNotes, onFailureNotes, notes, onNotes, itemNotes = {}, onItemNote }: Props) {
+export default function K208Checklist({ marks, onMark, onPassAll, onClearAll, failureNotes, onFailureNotes, notes, onNotes, itemNotes = {}, onItemNote, passAllLabel }: Props) {
   const answered = useMemo(() => k208Answered(marks), [marks]);
   const passCount = useMemo(() => K208_ITEMS.filter((i) => marks[i.id] === "pass").length, [marks]);
   const failCount = useMemo(() => K208_ITEMS.filter((i) => marks[i.id] === "fail").length, [marks]);
@@ -55,7 +58,7 @@ export default function K208Checklist({ marks, onMark, onPassAll, onClearAll, fa
           )}
           {/* One tap passes every line (the "Clear all" beside it is the undo). */}
           <button onClick={onPassAll} className="h-9 px-3 rounded-md bg-emerald-600 text-white text-xs font-semibold inline-flex items-center gap-1.5 hover:bg-emerald-700">
-            <CheckCheck className="w-3.5 h-3.5" /> Mark all passed
+            <CheckCheck className="w-3.5 h-3.5" /> {passAllLabel || "Mark all passed"}
           </button>
         </div>
       </div>

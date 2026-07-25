@@ -47,7 +47,12 @@ export interface AuditLogEntry {
     | "prep_sign_off_rejected" | "prep_sign_off_overridden"
     | "work_event_submitted" | "prep_vehicle_approved"
     | "listing_published" | "listing_viewed" | "listing_archived"
-    | "compliance_block" | "price_integrity_block";
+    | "compliance_block" | "price_integrity_block"
+    // Service Desk (SERVICE_DESK_SPEC audit events)
+    | "service_policy_changed" | "service_tech_assigned"
+    | "safety_inspection_signed" | "safety_reinspection_signed" | "k208_executed"
+    | "failure_repair_state_changed" | "failure_assignee_changed"
+    | "failure_ro_changed" | "failure_photo_added" | "failure_passed_on_reinspection";
   entity_type: string;           // "addendum", "product", "rule", etc.
   entity_id: string;
   details: Record<string, any>;  // JSON payload of what changed

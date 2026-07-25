@@ -1521,6 +1521,13 @@ const Admin = () => {
                     </div>
                   </div>
                 )}
+                <button
+                  type="button"
+                  onClick={() => navigate("/service/settings")}
+                  className="text-xs font-semibold text-primary hover:underline text-left"
+                >
+                  Full K-208 policy (per-user signer grants, overdue threshold, inspection rules) lives in Service Desk → Settings
+                </button>
                 <div className="flex items-center justify-between">
                   <div className="pr-3">
                     <span className="text-sm font-semibold text-foreground">Require install verification before finalizing</span>

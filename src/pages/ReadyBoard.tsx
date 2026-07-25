@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { QRCodeSVG } from "qrcode.react";
 import { supabase } from "@/integrations/supabase/client";
 import { deriveGetReadyDispatch } from "@/hooks/useGetReady";
+import { executedVinSet } from "@/lib/commandCenter/inspectionState";
 import { useTenant } from "@/contexts/TenantContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { useEntitlements } from "@/hooks/useEntitlements";
@@ -58,7 +59,10 @@ export default function ReadyBoard() {
     setLoading(true);
     const [list, si, ds, ps, rr, re, prof] = await Promise.all([
       (supabase as any).from("vehicle_listings").select("id, vin, ymm, condition, status, recall_check, orchestrated_at, deal_processed_at").eq("tenant_id", tenantId).limit(500),
-      (supabase as any).from("safety_inspections").select("vin").eq("tenant_id", tenantId).eq("status", "signed"),
+      // All signed rows, reduced through the ONE executed predicate — a signed
+      // FAIL (or a stale pass behind a newer signed failure) must not read as
+      // station-complete on the board.
+      (supabase as any).from("safety_inspections").select("vin, status, result, signed_at, created_at").eq("tenant_id", tenantId).eq("status", "signed"),
       (supabase as any).from("detail_signoffs").select("vin").eq("tenant_id", tenantId).eq("status", "signed"),
       (supabase as any).from("prep_sign_offs").select("vin").eq("tenant_id", tenantId).eq("listing_unlocked", true),
       (supabase as any).from("recall_service_tasks").select("vin").eq("tenant_id", tenantId).eq("status", "open_review"),
@@ -66,7 +70,7 @@ export default function ReadyBoard() {
       (supabase as any).from("dealer_profiles").select("settings").eq("tenant_id", tenantId).maybeSingle(),
     ]);
     setRows((list.data as Row[]) || []);
-    setService(new Set(((si.data as { vin: string }[]) || []).map((r) => r.vin)));
+    setService(executedVinSet((si.data as { vin: string; status: string; result: string | null; signed_at: string | null; created_at: string | null }[]) || []));
     setDetail(new Set(((ds.data as { vin: string }[]) || []).map((r) => r.vin)));
     setPrep(new Set(((ps.data as { vin: string }[]) || []).map((r) => r.vin)));
     setRecallReview(new Set(((rr.data as { vin: string }[]) || []).map((r) => r.vin)));

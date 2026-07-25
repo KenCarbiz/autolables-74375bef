@@ -261,6 +261,12 @@ export interface DealerSettings {
   require_k208_licensee_certification: boolean;// finalize gate: signed K-208 must also be licensee-certified
   install_safety_net_days: number;             // days after dispatch before an un-proven installed add-on flips to optional
   k208_authority_roles: string[];              // roles whose signed K-208 satisfies the gate ([]=any)
+  // ── Service Desk / K-208 policy (read by k208_signer_allowed server-side) ──
+  k208_authorized_users: string[];             // explicit per-user signer grants (auth user ids)
+  service_overdue_hours: number;               // queue Overdue threshold, hours since intake
+  service_pass_all_enabled: boolean;           // allow Pass All Eligible Items in the inspection workspace
+  service_failure_photo_required: boolean;     // a failed item needs a photo before the inspection submits
+  service_reinspection_managers_only: boolean; // restrict passed-on-reinspection to approve-authority roles
   require_install_verification: boolean;       // finalize gate: all preinstalls verified before signing
   ingest_recon_dispatch: "manual" | "auto";   // recon estimate → UCM queue
   ingest_detail_dispatch: "manual" | "auto";  // get-ready → detail shop
@@ -446,6 +452,11 @@ export const DEFAULT_SETTINGS: DealerSettings = {
   require_k208_licensee_certification: false,
   install_safety_net_days: 3,
   k208_authority_roles: [],
+  k208_authorized_users: [],
+  service_overdue_hours: 24,
+  service_pass_all_enabled: true,
+  service_failure_photo_required: false,
+  service_reinspection_managers_only: false,
   require_install_verification: false,
   ingest_recon_dispatch: "manual",
   ingest_detail_dispatch: "manual",

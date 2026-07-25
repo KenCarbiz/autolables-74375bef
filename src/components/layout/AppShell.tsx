@@ -57,6 +57,7 @@ import {
 import { QRCodeSVG } from "qrcode.react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useTenant } from "@/contexts/TenantContext";
+import { serviceNotificationLabel, isUnread, type UserNotificationRow } from "@/lib/service/notificationTypes";
 import { useDealerSettings } from "@/contexts/DealerSettingsContext";
 import { useEntitlements } from "@/hooks/useEntitlements";
 import { useNavBadges } from "@/hooks/useNavBadges";
@@ -200,6 +201,9 @@ const AppShell = ({ children }: AppShellProps) => {
     "/description-writer": { title: "Description Operations", subtitle: "Automated merchandising intelligence across every vehicle." },
     "/description-operations": { title: "Description Operations", subtitle: "Automated merchandising intelligence across every vehicle." },
     "/description-intelligence": { title: "Description Intelligence", subtitle: "Verified merchandising content for one vehicle." },
+    "/service/vehicle": { title: "Vehicle Service Workspace", subtitle: "One shared task from inspection to K-208 execution and delivery clearance." },
+    "/service/settings": { title: "K-208 Policy", subtitle: "Signer authority, gates, and Service Desk rules." },
+    "/service": { title: "Service Desk", subtitle: "Safety inspections, get-ready work, and K-208 execution." },
     "/vin-command": { title: "VIN Command Center", subtitle: "Everything created automatically. Review exceptions and authorize the next step." },
     "/get-ready-command": { title: "Get Ready Command", subtitle: "Review the work AutoLabels prepared, then authorize once." },
     "/print-center": { title: "Documents & Print Center", subtitle: "One versioned document package for the vehicle, printer, and customer Passport." },
@@ -210,6 +214,43 @@ const AppShell = ({ children }: AppShellProps) => {
   const companyName = currentStore?.name || tenant?.name || (settings.dealer_name && settings.dealer_name !== "Your Dealership" ? settings.dealer_name : "Select store");
   const dealerLocation = [currentStore?.city || (settings as any)?.dealer_city, currentStore?.state || (settings as any)?.dealer_state].filter(Boolean).join(", ") || "Manchester, CT";
   const unreadAudit = entries.filter((entry) => entry.action === "compliance_block" || entry.action === "price_integrity_block").length;
+
+  // Personal bell items (user_notifications, 20260726106000) — ADDITIVE to the
+  // audit activity feed below: the same dropdown lists "For you" first, then
+  // recent activity. RLS scopes the query to the signed-in user's own rows.
+  const [serviceNotifs, setServiceNotifs] = useState<UserNotificationRow[]>([]);
+  const loadServiceNotifs = useCallback(async () => {
+    if (!user?.id) { setServiceNotifs([]); return; }
+    try {
+      const { data, error } = await (supabase as any)
+        .from("user_notifications")
+        .select("id, tenant_id, user_id, type, dedupe_key, vin, payload, read_at, created_at")
+        .eq("user_id", user.id)
+        .order("created_at", { ascending: false })
+        .limit(20);
+      if (!error) setServiceNotifs((data as UserNotificationRow[]) || []);
+    } catch { /* table not yet migrated in this environment: bell stays audit-only */ }
+  }, [user?.id]);
+  useEffect(() => {
+    loadServiceNotifs();
+    const onFocus = () => loadServiceNotifs();
+    window.addEventListener("focus", onFocus);
+    const poll = window.setInterval(loadServiceNotifs, 60_000);
+    return () => { window.removeEventListener("focus", onFocus); window.clearInterval(poll); };
+  }, [loadServiceNotifs]);
+  const unreadNotifs = serviceNotifs.filter(isUnread).length;
+  const unreadBell = unreadAudit + unreadNotifs;
+  const markNotifRead = useCallback(async (n: UserNotificationRow) => {
+    setServiceNotifs((prev) => prev.map((x) => (x.id === n.id ? { ...x, read_at: new Date().toISOString() } : x)));
+    await (supabase as any).from("user_notifications").update({ read_at: new Date().toISOString() }).eq("id", n.id);
+  }, []);
+  const markAllNotifsRead = useCallback(async () => {
+    if (!user?.id) return;
+    const now = new Date().toISOString();
+    setServiceNotifs((prev) => prev.map((x) => (x.read_at ? x : { ...x, read_at: now })));
+    await (supabase as any).from("user_notifications").update({ read_at: now }).eq("user_id", user.id).is("read_at", null);
+  }, [user?.id]);
+
   const recentActivity = useMemo(
     () =>
       [...entries]
@@ -268,6 +309,44 @@ const AppShell = ({ children }: AppShellProps) => {
     if (!idTag && vin) idTag = `#${vin.slice(-6)}`;
     return [subject, idTag].filter(Boolean).join(" · ");
   };
+  const renderServiceNotifs = () => (
+    serviceNotifs.length === 0 ? null : (
+      <div className="border-b border-border">
+        <div className="flex items-center justify-between px-3 py-1.5">
+          <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">For you</span>
+          {unreadNotifs > 0 && (
+            <button onClick={() => void markAllNotifsRead()} className="text-[10px] font-semibold text-primary hover:underline">
+              Mark all read
+            </button>
+          )}
+        </div>
+        <div className="max-h-[220px] overflow-y-auto pb-1">
+          {serviceNotifs.map((n) => (
+            <button
+              key={n.id}
+              onClick={() => {
+                void markNotifRead(n);
+                navigate(n.vin ? `/service/vehicle/${n.vin.toUpperCase()}` : "/service");
+              }}
+              className="w-full flex items-start gap-2.5 px-3 py-2 text-left hover:bg-muted/60"
+            >
+              <span className={`mt-1.5 h-2 w-2 rounded-full shrink-0 ${n.read_at ? "bg-slate-300" : "bg-blue-600"}`} />
+              <span className="min-w-0 flex-1 leading-tight">
+                <span className={`block text-[13px] truncate ${n.read_at ? "font-medium text-muted-foreground" : "font-semibold text-foreground"}`}>
+                  {serviceNotificationLabel(n.type)}
+                </span>
+                {n.vin && <span className="block text-[11px] text-muted-foreground font-mono">VIN …{n.vin.slice(-6)}</span>}
+              </span>
+              <span className="text-[10px] text-muted-foreground tabular-nums shrink-0 mt-0.5">
+                {formatActivityWhen(n.created_at)}
+              </span>
+            </button>
+          ))}
+        </div>
+      </div>
+    )
+  );
+
   const renderNotificationsList = () => (
     recentActivity.length === 0 ? (
       <div className="px-4 py-8 text-center text-xs text-muted-foreground">
@@ -635,7 +714,7 @@ const AppShell = ({ children }: AppShellProps) => {
                   <DropdownMenuTrigger asChild>
                     <button className="relative mt-1 flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl text-slate-950 active:bg-slate-100" aria-label="Recent activity">
                       <Bell className="h-7 w-7" />
-                      {unreadAudit > 0 && <span className="absolute -right-0.5 -top-1 flex h-6 min-w-6 items-center justify-center rounded-full bg-rose-500 px-1.5 text-xs font-black text-white">{unreadAudit}</span>}
+                      {unreadBell > 0 && <span className="absolute -right-0.5 -top-1 flex h-6 min-w-6 items-center justify-center rounded-full bg-rose-500 px-1.5 text-xs font-black text-white">{unreadBell}</span>}
                     </button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end" className="w-[340px] bg-card p-0">
@@ -643,6 +722,7 @@ const AppShell = ({ children }: AppShellProps) => {
                       <span className="text-sm font-bold text-foreground">Recent activity</span>
                       <span className="text-[10px] text-muted-foreground">{recentActivity.length} events</span>
                     </div>
+                    {renderServiceNotifs()}
                     {renderNotificationsList()}
                     <DropdownMenuSeparator className="my-0" />
                     <DropdownMenuItem onClick={() => navigate("/admin?tab=audit")} className="cursor-pointer justify-center py-2 text-xs font-semibold">
@@ -794,7 +874,7 @@ const AppShell = ({ children }: AppShellProps) => {
                 <DropdownMenuTrigger asChild>
                   <button className="relative h-10 w-10 inline-flex items-center justify-center rounded-xl text-muted-foreground hover:bg-muted hover:text-foreground" title="Recent activity">
                     <Bell className="h-5 w-5" />
-                    {unreadAudit > 0 && <span className="absolute -top-0.5 -right-0.5 h-4 min-w-4 px-1 rounded-full bg-rose-500 text-white text-[10px] font-bold flex items-center justify-center">{unreadAudit}</span>}
+                    {unreadBell > 0 && <span className="absolute -top-0.5 -right-0.5 h-4 min-w-4 px-1 rounded-full bg-rose-500 text-white text-[10px] font-bold flex items-center justify-center">{unreadBell}</span>}
                   </button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-[360px] bg-card p-0">
@@ -802,6 +882,7 @@ const AppShell = ({ children }: AppShellProps) => {
                     <span className="text-sm font-bold text-foreground">Recent activity</span>
                     <span className="text-[10px] text-muted-foreground">{recentActivity.length} events</span>
                   </div>
+                  {renderServiceNotifs()}
                   {renderNotificationsList()}
                   <DropdownMenuSeparator className="my-0" />
                   <DropdownMenuItem onClick={() => navigate("/admin?tab=audit")} className="cursor-pointer justify-center py-2 text-xs font-semibold">
