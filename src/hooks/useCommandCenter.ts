@@ -17,6 +17,7 @@ import {
   type GeneratedDocument,
 } from "@/lib/stickerStudio/documentWorkflow";
 import { packetVisible } from "@/lib/packetModules";
+import type { Tone } from "@/components/command/CommandPrimitives";
 
 // Data layer for the three command surfaces (VIN Command Center, Get Ready
 // Command, Documents & Print Center). Every read is tenant-scoped through
@@ -25,10 +26,11 @@ import { packetVisible } from "@/lib/packetModules";
 // rather than assumed complete, and every mutation either performs a real
 // write or returns { ok: false, error } naming the reason it could not.
 
-// deno-lint-ignore-file no-explicit-any
 type Row = Record<string, any>;
 
-export type Tone = "slate" | "blue" | "amber" | "red" | "emerald" | "violet";
+// Re-exported so consumers can name the tone of a value this module returns
+// without also importing the primitives module. It is the same type.
+export type { Tone };
 
 export interface Result<T> {
   data: T | null;
@@ -133,6 +135,43 @@ async function oneRow(query: any): Promise<Row | null> {
   return r[0] || null;
 }
 
+// Existence of a marker event must be answered by the database, not by
+// scanning a capped page of recent activity: passport views and inquiries
+// accumulate on any published vehicle, so a windowed .some() eventually
+// stops seeing the dispatch marker and re-offers an authorization that
+// already happened (a second round of work orders and vendor emails).
+async function latestAuditAt(tenantId: string, action: string, entityIds: string[]): Promise<string | null> {
+  if (entityIds.length === 0) return null;
+  const r = await oneRow(sb().from("audit_log")
+    .select("created_at")
+    .eq("store_id", tenantId)
+    .eq("action", action)
+    .in("entity_id", entityIds)
+    .order("created_at", { ascending: false })
+    .limit(1));
+  return (r?.created_at as string) || null;
+}
+
+async function latestLifecycleAt(tenantId: string, vehicleId: string, eventType: string): Promise<string | null> {
+  const r = await oneRow(sb().from("document_lifecycle_events")
+    .select("occurred_at")
+    .eq("tenant_id", tenantId)
+    .eq("vehicle_id", vehicleId)
+    .eq("event_type", eventType)
+    .order("occurred_at", { ascending: false })
+    .limit(1));
+  return (r?.occurred_at as string) || null;
+}
+
+// When Get Ready was authorized for this vehicle, or null if it never was.
+async function getReadyAuthorizedAt(tenantId: string, vehicleId: string, vin: string): Promise<string | null> {
+  const [authorized, dispatched] = await Promise.all([
+    latestLifecycleAt(tenantId, vehicleId, EVT_AUTHORIZED),
+    latestAuditAt(tenantId, "getready_dispatched", [vehicleId, vin].filter(Boolean)),
+  ]);
+  return authorized || dispatched || null;
+}
+
 function fmtDate(v: string | null | undefined): string {
   if (!v) return "";
   const d = new Date(v);
@@ -223,6 +262,8 @@ const DOC_TYPE_LABEL: Record<string, string> = {
   passport: "Vehicle Passport",
   cpo_sheet: "CPO Sheet",
   buyers_guide: "FTC Buyers Guide",
+  // generated_documents accepts 'k208' since 20260722180000_k208_ingest_forms_flow.
+  k208: "CT K-208 Safety Inspection",
 };
 
 const humanize = (s: string) =>
@@ -281,7 +322,7 @@ async function loadVinCommand(tenantId: string, vehicleId: string): Promise<VinC
   const vin = vehicle.vin;
   const used = isUsed(vehicle.condition);
 
-  const [docs, inspections, addendums, grRecords, descCase, qrCodes, zebraJobs, recallTasks, auditRows, lifecycle] =
+  const [docs, inspections, addendums, grRecords, descCase, qrCodes, zebraJobs, recallTasks, auditRows, authorizedAt] =
     await Promise.all([
       rows(sb().from("generated_documents")
         .select("id, document_type, document_status, version, pdf_url, png_url, online_url, printed_at, published_at, print_count, rejection_reason, tenant_id, vehicle_id, template_id, created_at")
@@ -315,10 +356,7 @@ async function loadVinCommand(tenantId: string, vehicleId: string): Promise<VinC
         .select("action, entity_type, entity_id, created_at, details")
         .eq("store_id", tenantId).in("entity_id", [vehicleId, vin].filter(Boolean))
         .order("created_at", { ascending: false }).limit(40)),
-      rows(sb().from("document_lifecycle_events")
-        .select("event_type, metadata, occurred_at")
-        .eq("tenant_id", tenantId).eq("vehicle_id", vehicleId)
-        .order("occurred_at", { ascending: false }).limit(100)),
+      getReadyAuthorizedAt(tenantId, vehicleId, vin),
     ]);
 
   const descChannelCount = descCase?.current_master_version_id
@@ -332,9 +370,7 @@ async function loadVinCommand(tenantId: string, vehicleId: string): Promise<VinC
 
   const grRecord = grRecords[0] || null;
   const grItems: GetReadyItem[] = ((grRecord?.items as GetReadyItem[]) || []).filter(Boolean);
-  const dispatched =
-    auditRows.some((a) => a.action === "getready_dispatched") ||
-    lifecycle.some((e) => e.event_type === EVT_AUTHORIZED);
+  const dispatched = !!authorizedAt;
 
   const items: PackageItem[] = [];
 
@@ -582,7 +618,10 @@ async function loadGetReadyCommand(tenantId: string, vehicleId: string): Promise
   const vehicle = toCommandVehicle(v);
   const vin = vehicle.vin;
 
-  const [grRecords, lifecycle, auditRows, detailSignoffs, pdiSignoffs] = await Promise.all([
+  // Notes and the checklist are read on their own event_type filters so that
+  // neither can crowd the other out of a shared page, and the authorization
+  // marker is a separate bounded existence check (see getReadyAuthorizedAt).
+  const [grRecords, noteEvents, checklistEvents, authorizedAt, detailSignoffs, pdiSignoffs] = await Promise.all([
     rows(sb().from("get_ready_records")
       .select("id, items, status, get_ready_start_date, get_ready_complete_date, inspection_complete, assigned_technician, ro_number")
       .eq("tenant_id", tenantId).eq("vin", vin)
@@ -590,16 +629,19 @@ async function loadGetReadyCommand(tenantId: string, vehicleId: string): Promise
     rows(sb().from("document_lifecycle_events")
       .select("event_type, metadata, occurred_at")
       .eq("tenant_id", tenantId).eq("vehicle_id", vehicleId)
-      .in("event_type", [EVT_NOTE, EVT_CHECKLIST, EVT_AUTHORIZED])
-      .order("occurred_at", { ascending: false }).limit(200)),
-    rows(sb().from("audit_log")
-      .select("action, created_at")
-      .eq("store_id", tenantId).in("entity_id", [vehicleId, vin].filter(Boolean))
-      .order("created_at", { ascending: false }).limit(40)),
+      .eq("event_type", EVT_NOTE)
+      .order("occurred_at", { ascending: false }).limit(60)),
+    rows(sb().from("document_lifecycle_events")
+      .select("event_type, metadata, occurred_at")
+      .eq("tenant_id", tenantId).eq("vehicle_id", vehicleId)
+      .eq("event_type", EVT_CHECKLIST)
+      .order("occurred_at", { ascending: false }).limit(60)),
+    getReadyAuthorizedAt(tenantId, vehicleId, vin),
     rows(sb().from("detail_signoffs")
       .select("id, is_third_party, provider_company, photos, status, signed_at")
       .eq("tenant_id", tenantId).eq("vin", vin)
-      .order("created_at", { ascending: false }).limit(10)),
+      .eq("is_third_party", true)
+      .order("created_at", { ascending: false }).limit(50)),
     rows(sb().from("pdi_signoffs")
       .select("id, result, status, signed_at")
       .eq("tenant_id", tenantId).eq("vin", vin)
@@ -609,45 +651,52 @@ async function loadGetReadyCommand(tenantId: string, vehicleId: string): Promise
   const grRecord = grRecords[0] || null;
   const grItems: GetReadyItem[] = ((grRecord?.items as GetReadyItem[]) || []).filter(Boolean);
 
-  const invoice = grRecord
-    ? await oneRow(sb().from("get_ready_invoices")
-        .select("total, line_items, status")
-        .eq("tenant_id", tenantId).eq("get_ready_record_id", grRecord.id).limit(1))
-    : null;
+  // Every invoice raised against the record counts: the manager authorizes
+  // against the whole bill, and reading a single arbitrary row understated a
+  // vehicle that carries both a service and a vendor invoice.
+  const invoices = grRecord
+    ? await rows(sb().from("get_ready_invoices")
+        .select("total, line_items, status, invoiced_at")
+        .eq("tenant_id", tenantId).eq("get_ready_record_id", grRecord.id)
+        .order("invoiced_at", { ascending: false }))
+    : [];
 
-  const authorizedAt =
-    lifecycle.find((e) => e.event_type === EVT_AUTHORIZED)?.occurred_at ||
-    auditRows.find((a) => a.action === "getready_dispatched")?.created_at ||
-    null;
   const dispatched = !!authorizedAt;
 
   // Latest event wins per key; the table is append-only by convention.
   const notes: Record<string, string> = {};
   const checks: Record<string, boolean> = {};
-  for (const e of lifecycle) {
+  for (const e of noteEvents) {
     const meta = (e.metadata || {}) as Row;
-    if (e.event_type === EVT_NOTE) {
-      const col = String(meta.column || "");
-      if (col && !(col in notes)) notes[col] = String(meta.note ?? "");
-    } else if (e.event_type === EVT_CHECKLIST) {
-      const key = String(meta.key || "");
-      if (key && !(key in checks)) checks[key] = meta.done === true;
-    }
+    const col = String(meta.column || "");
+    if (col && !(col in notes)) notes[col] = String(meta.note ?? "");
+  }
+  for (const e of checklistEvents) {
+    const meta = (e.metadata || {}) as Row;
+    const key = String(meta.key || "");
+    if (key && !(key in checks)) checks[key] = meta.done === true;
   }
 
   const proofClock = authorizedAt || grRecord?.get_ready_start_date || null;
-  const thirdPartyProven = detailSignoffs.some(
-    (s) => s.is_third_party && s.status === "signed" && Array.isArray(s.photos) && s.photos.length > 0,
-  );
+  // Proof is per vendor: one vendor uploading photos says nothing about the
+  // others, so match each line against the companies that actually signed off.
+  const provenVendors = new Set<string>();
+  for (const s of detailSignoffs) {
+    const name = String(s.provider_company || "").trim().toLowerCase();
+    if (!name) continue;
+    if (s.status === "signed" && Array.isArray(s.photos) && s.photos.length > 0) provenVendors.add(name);
+  }
 
   const columns: GetReadyColumn[] = (["service", "prep", "vendor"] as const).map((key) => {
     const list = grItems.filter((i) => columnFor(i) === key);
     const mapped = list.map((i) => {
-      // Third-party lines stay "Pending Proof" until the vendor uploads proof.
+      // Third-party lines stay "Pending Proof" until THAT vendor uploads proof.
       const isThirdParty = key === "vendor" || itemDepartment(i) === "vendor";
+      const vendorKey = (i.vendorName || "").trim().toLowerCase();
+      const proven = !!vendorKey && provenVendors.has(vendorKey);
       const status: "complete" | "pending" | "pending_proof" =
         i.status === "complete" ? "complete"
-        : isThirdParty && !thirdPartyProven ? "pending_proof"
+        : isThirdParty && !proven ? "pending_proof"
         : "pending";
       return {
         id: i.id,
@@ -704,9 +753,14 @@ async function loadGetReadyCommand(tenantId: string, vehicleId: string): Promise
   const itemCostTotal = grItems
     .filter((i) => typeof i.cost === "number")
     .reduce((s, i) => s + (i.cost || 0), 0);
-  const invoiceTotal = invoice && invoice.total != null ? Number(invoice.total) : null;
+  const invoicedTotals = invoices
+    .map((inv) => Number(inv.total))
+    .filter((n) => Number.isFinite(n));
+  const invoiceTotal = invoicedTotals.length
+    ? invoicedTotals.reduce((s, n) => s + n, 0)
+    : null;
   const estimatedTotal =
-    invoiceTotal != null && !Number.isNaN(invoiceTotal) ? invoiceTotal
+    invoiceTotal != null ? invoiceTotal
     : itemCostTotal > 0 ? itemCostTotal
     : null;
 
@@ -770,17 +824,25 @@ export function useGetReadyCommand(vehicleId?: string): Result<GetReadyCommandDa
     return { ok: true };
   }, [tenantId, vehicleId, actorId, data?.vehicle.vin, data?.vehicle.stockNumber]);
 
+  // document_lifecycle_events is append-only, so an unchanged value must not be
+  // rewritten: a note textarea blurs on every tab-out and a checkbox can be
+  // clicked back and forth, and each identical row buries the events that
+  // matter (authorization, packet release) deeper in the log.
   const saveManagerNote = useCallback(async (columnKey: string, note: string) => {
+    const column = data?.columns.find((c) => c.key === columnKey);
+    if (column && column.managerNote === note) return { ok: true };
     const res = await writeEvent(EVT_NOTE, { column: columnKey, note });
     if (res.ok) await reload();
     return res;
-  }, [writeEvent, reload]);
+  }, [writeEvent, reload, data?.columns]);
 
   const toggleChecklist = useCallback(async (key: string, done: boolean) => {
+    const current = data?.checklist.find((c) => c.key === key);
+    if (current && current.done === done) return { ok: true };
     const res = await writeEvent(EVT_CHECKLIST, { key, done });
     if (res.ok) await reload();
     return res;
-  }, [writeEvent, reload]);
+  }, [writeEvent, reload, data?.checklist]);
 
   // Reuses the existing dispatch path (deriveGetReadyDispatch → notify-getready),
   // the same one ReadyBoard and the Vehicle File call on addendum acceptance.
@@ -812,9 +874,17 @@ export function useGetReadyCommand(vehicleId?: string): Result<GetReadyCommandDa
         return { ok: false, error: String(payload.error || "Dispatch was rejected.") };
       }
       // The dispatch is the authorization: record it only after the server
-      // confirmed at least one work order actually went out.
-      await writeEvent(EVT_AUTHORIZED, { dispatched: payload.dispatched ?? null, depts, vendors: vendors.length });
+      // confirmed at least one work order actually went out. If that record
+      // fails the work orders are already out, so the caller must be told —
+      // authorizing a second time would send them all again.
+      const recorded = await writeEvent(EVT_AUTHORIZED, { dispatched: payload.dispatched ?? null, depts, vendors: vendors.length });
       await reload();
+      if (!recorded.ok) {
+        return {
+          ok: false,
+          error: `Work orders were dispatched, but the authorization could not be recorded: ${recorded.error || "unknown error"}. Do not authorize again — check the VIN timeline.`,
+        };
+      }
       return { ok: true };
     } catch (e) {
       return { ok: false, error: (e as Error).message || "Dispatch failed." };
@@ -828,12 +898,33 @@ export function useGetReadyCommand(vehicleId?: string): Result<GetReadyCommandDa
 
 const toneFromMeta = (tone: string): Tone => (tone === "rose" ? "red" : (tone as Tone));
 
+// The single predicate that decides whether "Print Complete Vehicle Packet"
+// releases a generated document. `published` is excluded even though
+// allowedActions() permits mark_printed from it: rewriting a live,
+// customer-facing document back to `printed` regresses its lifecycle and
+// stamps printed_at / print_count — the fields a regulator reads as evidence
+// of what was physically posted on the car — on a click that produced no new
+// paper. The print-bundle counts are computed from this same predicate so the
+// rail never promises more sheets than the button will release.
+function printReleasable(d: Row): boolean {
+  const status = String(d.document_status) as DocumentStatus;
+  if (status === "published") return false;
+  if (!allowedActions(status, true).includes("mark_printed")) return false;
+  return !!(d.pdf_url || d.png_url);
+}
+
+// Already released, so a second press is a reprint rather than a first print.
+function printAlreadyReleased(d: Row): boolean {
+  const status = String(d.document_status);
+  return (status === "printed" || status === "published") && !!(d.pdf_url || d.png_url);
+}
+
 async function loadPrintCenter(tenantId: string, vehicleId: string): Promise<PrintCenterData> {
   const v = await fetchVehicleRow(tenantId, vehicleId);
   const vehicle = toCommandVehicle(v);
   const vin = vehicle.vin;
 
-  const [docs, qrCodes, zebraJobs, inspections] = await Promise.all([
+  const [docs, qrCodes, zebraJobs, signedInspection] = await Promise.all([
     rows(sb().from("generated_documents")
       .select("id, tenant_id, vehicle_id, template_id, document_type, document_status, version, pdf_url, png_url, online_url, print_count, printed_at, published_at, created_at")
       .eq("tenant_id", tenantId).eq("vehicle_id", vehicleId)
@@ -842,10 +933,16 @@ async function loadPrintCenter(tenantId: string, vehicleId: string): Promise<Pri
     rows(sb().from("zebra_print_jobs")
       .select("id, label_type, status, created_at")
       .eq("tenant_id", tenantId).eq("vin", vin)),
-    rows(sb().from("safety_inspections")
+    // Ask the database for a signed, non-failed inspection rather than paging
+    // recent rows: revisions are a first-class flow, so a vehicle with several
+    // inspection rows would otherwise report a signed K-208 as missing.
+    oneRow(sb().from("safety_inspections")
       .select("id, status, result, signed_at")
       .eq("tenant_id", tenantId).eq("vin", vin)
-      .order("created_at", { ascending: false }).limit(5)),
+      .eq("status", "signed")
+      .or("result.is.null,result.neq.fail")
+      .order("signed_at", { ascending: false, nullsFirst: false })
+      .limit(1)),
   ]);
 
   // "Current" is the highest live version within each document type.
@@ -891,9 +988,19 @@ async function loadPrintCenter(tenantId: string, vehicleId: string): Promise<Pri
     });
   }
 
+  // A QR cling points the customer at the packet, so it follows the same
+  // visibility rule as every other row: live AND its packet module enabled.
+  const qrModuleOn = packetVisible(
+    { packet_modules: (v.packet_modules || null) as Record<string, boolean> | null },
+    "documents",
+  );
   for (const q of qrCodes) {
     const active = q.is_active !== false;
     const surface = String(q.surface || q.sticker_type || "");
+    const passportVisibility: { label: string; tone: Tone } =
+      active && qrModuleOn ? { label: "Customer Visible", tone: "blue" }
+      : active ? { label: "Hidden", tone: "slate" }
+      : { label: "Internal Only", tone: "violet" };
     documents.push({
       id: String(q.id),
       label: q.label ? String(q.label) : surface ? `${humanize(surface)} QR` : "Vehicle QR",
@@ -901,7 +1008,7 @@ async function loadPrintCenter(tenantId: string, vehicleId: string): Promise<Pri
       version: "v1",
       isCurrent: active,
       internalStatus: active ? { label: "Published", tone: "violet" } : { label: "Archived", tone: "slate" },
-      passportVisibility: { label: "Customer Visible", tone: "blue" },
+      passportVisibility,
       printStatus: { label: "Digital", tone: "blue" },
       href: q.target_url || q.destination_url || (q.token ? `/q/${q.token}` : undefined),
     });
@@ -914,15 +1021,25 @@ async function loadPrintCenter(tenantId: string, vehicleId: string): Promise<Pri
     internalOnly: documents.filter((d) => d.passportVisibility.label === "Internal Only").length,
   };
 
-  const signedInspection = inspections.find((i) => i.status === "signed" && i.result !== "fail") || null;
-  const letterDocs = docs.filter((d) => d.document_type === "buyers_guide" || d.document_type === "cpo_sheet").length
-    + (signedInspection ? 1 : 0);
+  // Bundle counts are what the packet button will actually release, so they
+  // run through printReleasable() — superseded, archived and already-published
+  // versions are not sheets anybody is going to get out of the printer.
+  const releasable = docs.filter(printReleasable);
+  const countOfType = (...types: string[]) =>
+    releasable.filter((d) => types.includes(String(d.document_type))).length;
+  // The K-208 is one sheet whether it reaches print as a generated document
+  // row or straight off the signed inspection, so it is never counted twice.
+  const k208Sheets = Math.max(countOfType("k208"), signedInspection ? 1 : 0);
+  const letterDocs = countOfType("buyers_guide", "cpo_sheet") + k208Sheets;
+  const windowDocs = countOfType("window");
+  const addendumDocs = countOfType("addendum");
+  const activeQrCount = qrCodes.filter((q) => q.is_active !== false).length;
   const keyTagCount = zebraJobs.filter((j) => j.label_type === "key_tag").length;
   const bundle = [
     { label: "Letter Paper", count: letterDocs, unit: letterDocs === 1 ? "doc" : "docs" },
-    { label: "Window Sticker Stock", count: docs.filter((d) => d.document_type === "window").length, unit: "docs" },
-    { label: "Addendum Label", count: docs.filter((d) => d.document_type === "addendum").length, unit: "docs" },
-    { label: "4×4 QR Cling", count: qrCodes.length, unit: qrCodes.length === 1 ? "item" : "items" },
+    { label: "Window Sticker Stock", count: windowDocs, unit: windowDocs === 1 ? "doc" : "docs" },
+    { label: "Addendum Label", count: addendumDocs, unit: addendumDocs === 1 ? "doc" : "docs" },
+    { label: "4×4 QR Cling", count: activeQrCount, unit: activeQrCount === 1 ? "item" : "items" },
     { label: "Key Tag", count: keyTagCount, unit: keyTagCount === 1 ? "item" : "items" },
   ];
   const bundleNote =
@@ -951,19 +1068,33 @@ export function usePrintCenter(vehicleId?: string): Result<PrintCenterData> & {
   // documents that hold a real file and are legally in the printable state move.
   const printCompletePacket = useCallback(async (): Promise<{ ok: boolean; error?: string }> => {
     if (!tenantId || !vehicleId) return { ok: false, error: "No dealership or vehicle in context." };
-    const docs = await rows(sb().from("generated_documents")
+    // Read directly rather than through rows(): that helper swallows the error
+    // and returns [], which would tell the employee no document exists when the
+    // truth is that the read was denied or the network dropped.
+    const { data: docRows, error: readErr } = await sb().from("generated_documents")
       .select("id, tenant_id, vehicle_id, template_id, document_type, document_status, version, pdf_url, png_url, online_url, print_count")
-      .eq("tenant_id", tenantId).eq("vehicle_id", vehicleId));
-    const eligible = docs.filter((d) =>
-      allowedActions(String(d.document_status) as DocumentStatus, true).includes("mark_printed")
-      && (d.pdf_url || d.png_url));
+      .eq("tenant_id", tenantId).eq("vehicle_id", vehicleId);
+    if (readErr) {
+      return { ok: false, error: `Could not read this vehicle's documents: ${readErr.message || "read failed"}. Nothing was printed.` };
+    }
+    const docs = (docRows as Row[]) || [];
+    const eligible = docs.filter(printReleasable);
     if (eligible.length === 0) {
-      return {
-        ok: false,
-        error: docs.length === 0
-          ? "No documents have been generated for this vehicle yet."
-          : "No approved document has a print-ready file. Approve the packet documents first.",
-      };
+      const released = docs.filter(printAlreadyReleased).length;
+      let reason: string;
+      if (docs.length === 0) {
+        reason = "No documents have been generated for this vehicle yet.";
+      } else if (released > 0) {
+        // Reprint is deliberately unsupported here: re-running mark_printed
+        // would re-stamp printed_at / print_count (and drag a published
+        // document back to `printed`) without producing a sheet.
+        reason = `Every packet document has already been released to the printer (${released} document${released === 1 ? "" : "s"}). Reprinting is not available from this screen — open the document and print the copy you need.`;
+      } else if (docs.some((d) => allowedActions(String(d.document_status) as DocumentStatus, true).includes("mark_printed"))) {
+        reason = "No approved document has a print-ready file yet. Regenerate the packet documents, then print.";
+      } else {
+        reason = "No document is approved for printing. Approve the packet documents first.";
+      }
+      return { ok: false, error: reason };
     }
     const failures: string[] = [];
     for (const d of eligible) {
@@ -978,7 +1109,7 @@ export function usePrintCenter(vehicleId?: string): Result<PrintCenterData> & {
     if (failures.length === eligible.length) {
       return { ok: false, error: `Could not release the packet: ${failures[0]}` };
     }
-    await sb().from("document_lifecycle_events").insert({
+    const { error: ledgerErr } = await sb().from("document_lifecycle_events").insert({
       tenant_id: tenantId, vehicle_id: vehicleId,
       vin: data?.vehicle.vin || null, stock: data?.vehicle.stockNumber || null,
       event_type: EVT_PACKET_PRINTED, occurred_at: new Date().toISOString(),
@@ -988,6 +1119,12 @@ export function usePrintCenter(vehicleId?: string): Result<PrintCenterData> & {
     await reload();
     if (failures.length) {
       return { ok: false, error: `${failures.length} of ${eligible.length} documents could not be released: ${failures[0]}` };
+    }
+    if (ledgerErr) {
+      return {
+        ok: false,
+        error: `The documents were released, but the print record could not be saved: ${ledgerErr.message || "insert failed"}.`,
+      };
     }
     return { ok: true };
   }, [tenantId, vehicleId, actorId, data?.vehicle.vin, data?.vehicle.stockNumber, reload]);

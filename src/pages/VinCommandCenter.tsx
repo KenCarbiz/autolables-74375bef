@@ -7,9 +7,13 @@ import {
 import { toast } from "sonner";
 import { useVinCommand, type PackageItem } from "@/hooks/useCommandCenter";
 import {
-  CommandCard, CommandStatCard, EmptyState, ErrorCard, LoadingCard, StatusPill,
-  TimelineRail, VehicleIdentityStrip,
+  BTN_PRIMARY, BTN_SECONDARY, CommandCard, CommandStatCard, conditionLabel, EmptyState,
+  ErrorCard, LoadingCard, StatusPill, TimelineRail, VehicleIdentityStrip,
 } from "@/components/command/CommandPrimitives";
+import {
+  Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle,
+} from "@/components/ui/dialog";
+import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
 import { useEntitlements } from "@/hooks/useEntitlements";
 import { hasDealerCapability } from "@/lib/permissions/dealerRoleCapabilities";
@@ -45,19 +49,11 @@ const orderRank = (item: PackageItem) => {
 
 const isQrItem = (item: PackageItem) => /qr|key.?tag/i.test(`${item.key} ${item.label}`);
 
-const conditionLabel = (raw: string | null) => {
-  if (!raw) return null;
-  const v = String(raw).trim();
-  if (!v) return null;
-  if (/^cpo$/i.test(v)) return "CPO";
-  return v.charAt(0).toUpperCase() + v.slice(1).toLowerCase();
-};
-
-const errorText = (e: unknown) => {
-  if (typeof e === "string" && e) return e;
-  if (e instanceof Error && e.message) return e.message;
-  return "This vehicle's command center could not be loaded.";
-};
+const HOW_IT_WORKS_STEPS = [
+  "At intake, AutoLabels builds the document package for the VIN — disclosures, stickers, QR tags and the description.",
+  "This page lists what was produced and flags anything that needs a person. Green rows need no action.",
+  "Authorize Get Ready once to release work assignments, then print the package and publish the customer Passport.",
+];
 
 const StatusCell = ({ status, label }: { status: PackageItem["status"]; label: string }) => {
   if (status === "blocked") {
@@ -93,7 +89,10 @@ export default function VinCommandCenter() {
   const navigate = useNavigate();
   const { isAdmin } = useAuth();
   const { member, loading: entLoading } = useEntitlements();
-  const { data, loading, error, reload } = useVinCommand(vehicleId);
+  const canView = hasDealerCapability(member?.role, "can_view_inventory", isAdmin);
+  // Nothing is fetched for a role that cannot see inventory — the gate is the
+  // query, not just the render.
+  const { data, loading, error, notFound, reload } = useVinCommand(canView ? vehicleId : undefined);
 
   const [showHowItWorks, setShowHowItWorks] = useState(false);
   const [showAllHistory, setShowAllHistory] = useState(false);
@@ -128,7 +127,6 @@ export default function VinCommandCenter() {
     [data],
   );
 
-  const canView = hasDealerCapability(member?.role, "can_view_inventory", isAdmin);
   const timeline = data?.timeline ?? [];
   const shownTimeline = showAllHistory ? timeline : timeline.slice(0, 6);
 
@@ -157,9 +155,10 @@ export default function VinCommandCenter() {
         </div>
         <div className="flex items-center gap-2 flex-wrap ml-auto">
           <button
-            onClick={() => setShowHowItWorks((v) => !v)}
+            onClick={() => setShowHowItWorks(true)}
+            aria-haspopup="dialog"
             aria-expanded={showHowItWorks}
-            className="min-h-[44px] px-4 rounded-xl border border-border bg-card text-[13px] font-semibold text-foreground hover:border-primary inline-flex items-center gap-1.5">
+            className={cn(BTN_SECONDARY, "gap-1.5")}>
             <PlayCircle className="w-4 h-4" /> How it works
           </button>
           <button
@@ -170,22 +169,27 @@ export default function VinCommandCenter() {
             disabled={timeline.length === 0}
             aria-expanded={showAllHistory}
             title={timeline.length === 0 ? "No activity has been recorded for this VIN yet" : undefined}
-            className="min-h-[44px] px-4 rounded-xl border border-border bg-card text-[13px] font-semibold text-foreground hover:border-primary inline-flex items-center gap-1.5 disabled:opacity-50 disabled:hover:border-border">
+            className={cn(BTN_SECONDARY, "gap-1.5")}>
             <History className="w-4 h-4" /> History
           </button>
         </div>
       </div>
 
-      {showHowItWorks && (
-        <div className="rounded-2xl border border-border bg-card p-4 mb-3">
-          <h2 className="text-[13px] font-bold text-foreground mb-2">How this vehicle gets to market</h2>
-          <ol className="space-y-1.5">
-            {[
-              "At intake, AutoLabels builds the document package for the VIN — disclosures, stickers, QR tags and the description.",
-              "This page lists what was produced and flags anything that needs a person. Green rows need no action.",
-              "Authorize Get Ready once to release work assignments, then print the package and publish the customer Passport.",
-            ].map((line, i) => (
-              <li key={i} className="flex gap-2 text-[12.5px] text-muted-foreground">
+      {/* Overlay, not an inline panel: the explainer must never displace the
+          vehicle strip or the stat cards below it. */}
+      <Dialog open={showHowItWorks} onOpenChange={setShowHowItWorks}>
+        <DialogContent className="rounded-2xl">
+          <DialogHeader>
+            <DialogTitle className="text-[13px] font-bold text-foreground">
+              How this vehicle gets to market
+            </DialogTitle>
+            <DialogDescription className="text-[11.5px] text-muted-foreground">
+              What AutoLabels does automatically, and where you step in.
+            </DialogDescription>
+          </DialogHeader>
+          <ol className="space-y-2">
+            {HOW_IT_WORKS_STEPS.map((line, i) => (
+              <li key={line} className="flex gap-2 text-[12.5px] text-muted-foreground">
                 <span className="w-5 h-5 shrink-0 grid place-items-center rounded-full border border-border text-[10.5px] font-bold text-foreground">
                   {i + 1}
                 </span>
@@ -193,8 +197,8 @@ export default function VinCommandCenter() {
               </li>
             ))}
           </ol>
-        </div>
-      )}
+        </DialogContent>
+      </Dialog>
     </>
   );
 
@@ -208,19 +212,19 @@ export default function VinCommandCenter() {
     </div>
   );
 
+  const inventoryAction = (
+    <button onClick={() => navigate("/inventory")} className={cn(BTN_PRIMARY, "gap-1.5")}>
+      Go to Inventory <ArrowRight className="w-4 h-4" />
+    </button>
+  );
+
   if (!vehicleId) {
     return shell(
       <EmptyState
         Icon={Car}
-        title="Pick a vehicle to open its command center."
+        title="Pick a vehicle to open its command center"
         detail="The VIN Command Center covers one vehicle at a time. Choose one from Inventory to see its automated package."
-        action={
-          <button
-            onClick={() => navigate("/inventory")}
-            className="min-h-[44px] px-4 rounded-xl bg-primary text-primary-foreground text-[13px] font-semibold inline-flex items-center gap-1.5">
-            Go to Inventory <ArrowRight className="w-4 h-4" />
-          </button>
-        }
+        action={inventoryAction}
       />,
     );
   }
@@ -229,12 +233,10 @@ export default function VinCommandCenter() {
     return shell(
       <EmptyState
         Icon={Lock}
-        title="You do not have access to this vehicle's command center."
+        title="You do not have access to this vehicle's command center"
         detail="Your role cannot view inventory records. Ask an owner or manager to grant inventory access."
         action={
-          <button
-            onClick={() => navigate("/dashboard")}
-            className="min-h-[44px] px-4 rounded-xl border border-border bg-card text-[13px] font-semibold text-foreground">
+          <button onClick={() => navigate("/dashboard")} className={BTN_SECONDARY}>
             Back to Home
           </button>
         }
@@ -243,38 +245,33 @@ export default function VinCommandCenter() {
   }
 
   if (error) {
-    return shell(<ErrorCard message={errorText(error)} onRetry={reload} />);
+    return shell(<ErrorCard message={error} onRetry={reload} />);
   }
 
-  if (loading || (!data && entLoading)) {
+  // A vehicle that is not in this tenant is its own state — never the red error card.
+  if (notFound) {
+    return shell(
+      <EmptyState
+        Icon={Car}
+        title="Vehicle not found"
+        detail="This vehicle is not in your inventory, or it was removed. Pick another vehicle from Inventory."
+        action={inventoryAction}
+      />,
+    );
+  }
+
+  if (loading || !data) {
     return shell(
       <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_360px] gap-4 items-start">
-        <div className="order-2 lg:order-1 min-w-0 space-y-3">
+        <div className="order-2 lg:order-1 min-w-0 space-y-4">
           <LoadingCard rows={3} />
           <LoadingCard rows={8} />
         </div>
-        <div className="order-1 lg:order-2 lg:w-[360px] space-y-3">
+        <div className="order-1 lg:order-2 lg:w-[360px] space-y-4">
           <LoadingCard rows={4} />
           <LoadingCard rows={5} />
         </div>
       </div>,
-    );
-  }
-
-  if (!data) {
-    return shell(
-      <EmptyState
-        Icon={Car}
-        title="Vehicle not found."
-        detail="This vehicle is not in your inventory, or it was removed. Pick another vehicle from Inventory."
-        action={
-          <button
-            onClick={() => navigate("/inventory")}
-            className="min-h-[44px] px-4 rounded-xl bg-primary text-primary-foreground text-[13px] font-semibold inline-flex items-center gap-1.5">
-            Go to Inventory <ArrowRight className="w-4 h-4" />
-          </button>
-        }
-      />,
     );
   }
 
@@ -350,7 +347,7 @@ export default function VinCommandCenter() {
             {items.length === 0 ? (
               <EmptyState
                 Icon={FileText}
-                title="Nothing has been created for this VIN yet."
+                title="Nothing has been created for this VIN yet"
                 detail="Documents, labels and QR tags appear here as automation completes."
               />
             ) : (
@@ -429,8 +426,8 @@ export default function VinCommandCenter() {
                 <div className="mt-3">
                   <button
                     onClick={() => navigate(`/print-center/${vehicleId}`)}
-                    className="min-h-[44px] px-4 rounded-xl border border-border bg-card text-[13px] font-semibold text-foreground hover:border-primary inline-flex items-center gap-1.5">
-                    <FileText className="w-4 h-4" /> View Full Package
+                    className={BTN_SECONDARY}>
+                    View Full Package
                   </button>
                 </div>
               </>
@@ -439,7 +436,7 @@ export default function VinCommandCenter() {
         </div>
 
         {/* Right rail */}
-        <div ref={railRef} className="order-1 lg:order-2 lg:w-[360px] space-y-3">
+        <div ref={railRef} className="order-1 lg:order-2 lg:w-[360px] space-y-4">
           <CommandCard title="Current Readiness">
             <div className="flex items-center justify-between gap-2">
               <span className="text-[12.5px] text-muted-foreground">State</span>
@@ -470,7 +467,7 @@ export default function VinCommandCenter() {
 
             <button
               onClick={() => navigate(`/get-ready-command/${vehicleId}`)}
-              className="mt-3 w-full min-h-[44px] px-4 rounded-xl bg-primary text-primary-foreground text-[13px] font-semibold inline-flex items-center justify-center gap-1.5">
+              className={cn(BTN_PRIMARY, "gap-1.5 mt-3 w-full")}>
               Review &amp; Authorize Get Ready <ArrowRight className="w-4 h-4" />
             </button>
           </CommandCard>
@@ -479,7 +476,7 @@ export default function VinCommandCenter() {
             {timeline.length === 0 ? (
               <EmptyState
                 Icon={History}
-                title="No activity recorded yet."
+                title="No activity recorded yet"
                 detail="Every automated and manual step on this VIN is logged here."
               />
             ) : (
@@ -493,7 +490,7 @@ export default function VinCommandCenter() {
         <>
           <div className="fixed inset-0 z-30" onClick={() => setMenu(null)} aria-hidden />
           <div role="menu" style={{ top: menu.y, left: Math.max(8, menu.x - 208) }}
-            className="fixed z-40 w-52 rounded-xl border border-border bg-card shadow-lg p-1">
+            className="fixed z-40 w-52 rounded-xl border border-border bg-card p-1">
             {[
               ...(menu.item.href
                 ? [
