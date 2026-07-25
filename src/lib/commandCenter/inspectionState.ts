@@ -54,6 +54,27 @@ export const isFailedInspection = (r: SafetyInspectionRow | null | undefined): b
 
 export const isExecutedInspection = isExecutedSignoff;
 
+/**
+ * Reduce a signed-rows query (any order, many rows per VIN) to the set of VINs
+ * whose NEWEST signed row is an executed sign-off. Set-style consumers
+ * (NextStepBanner, Ready Board) previously counted ANY signed row, so a signed
+ * FAIL — or a stale pass behind a newer signed failure — read as done.
+ */
+export function executedVinSet(rows: (SafetyInspectionRow & { vin?: string | null })[]): Set<string> {
+  const newestByVin = new Map<string, SafetyInspectionRow>();
+  for (const r of rows) {
+    const vin = String(r.vin || "");
+    if (!vin || String(r.status || "") !== "signed") continue;
+    const prev = newestByVin.get(vin);
+    const at = r.signed_at || r.created_at || "";
+    const prevAt = prev ? prev.signed_at || prev.created_at || "" : "";
+    if (!prev || at >= prevAt) newestByVin.set(vin, r);
+  }
+  const out = new Set<string>();
+  for (const [vin, row] of newestByVin) if (isExecutedSignoff(row)) out.add(vin);
+  return out;
+}
+
 export function k208State({ latestSigned, latest }: K208Sources): { state: K208State; at: string | null } {
   if (isFailedInspection(latestSigned)) {
     return { state: "failed", at: latestSigned?.signed_at || latestSigned?.created_at || null };

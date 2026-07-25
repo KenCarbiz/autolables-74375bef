@@ -4,13 +4,17 @@
 // (get_ready_records items + the signed safety_inspection + a pending
 // service_request), no new "task" table.
 
+import { isExecutedSignoff, isFailedInspection } from "@/lib/commandCenter/inspectionState";
+
 export type GRState = "not_started" | "in_progress" | "complete" | "failed";
-export type K208State = "waiting" | "ready" | "executed" | "blocked";
+// Renamed from K208State: inspectionState.ts exports the row-level K208State
+// ("signed"/"failed"/…); this is the workflow stage the queue chips render.
+export type K208Stage = "waiting" | "ready" | "executed" | "blocked";
 export type Tone = "slate" | "amber" | "red" | "blue" | "emerald";
 
 export interface ServiceStatus {
   grState: GRState;
-  k208State: K208State;
+  k208State: K208Stage;
   awaiting: boolean;   // an additional-work request is pending a manager decision
   blocked: boolean;    // delivery blocked (failed safety / recall)
   cleared: boolean;    // all get-ready complete + K-208 executed
@@ -31,8 +35,13 @@ export function deriveServiceStatus(v: any, gr: any, si: any, awaiting: boolean)
   const grComplete = !!gr?.get_ready_complete_date || allComplete;
   const rs = String(v?.recall_status || "").toLowerCase();
   const recallBlocking = rs.includes("do_not_drive") || rs.includes("do-not-drive");
-  const siPass = si && si.result === "pass";
-  const siFail = si && si.result === "fail";
+  // Both callers query .eq("status","signed") (the banner's select even omits
+  // the status column), so `si` IS the newest signed row — normalize it and let
+  // the ONE predicate decide. A legacy signed row with a NULL result counts;
+  // spelling this `result === 'pass'` silently dropped those rows to "waiting".
+  const signedRow = si ? { status: "signed", result: (si.result ?? null) as string | null } : null;
+  const siPass = isExecutedSignoff(signedRow);
+  const siFail = isFailedInspection(signedRow);
   const certified = !!(si && si.licensee_certified_at);
 
   const grState: GRState = siFail ? "failed"
@@ -41,7 +50,7 @@ export function deriveServiceStatus(v: any, gr: any, si: any, awaiting: boolean)
     : (someComplete || (gr.status && gr.status !== "pending")) ? "in_progress"
     : "not_started";
 
-  const k208State: K208State = (recallBlocking || siFail) ? "blocked"
+  const k208State: K208Stage = (recallBlocking || siFail) ? "blocked"
     : certified ? "executed"
     : siPass ? "ready"
     : "waiting";

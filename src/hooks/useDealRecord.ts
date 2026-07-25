@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { isPublicDoc, type DocumentStatus } from "@/lib/stickerStudio/documentWorkflow";
+import { isExecutedSignoff } from "@/lib/commandCenter/inspectionState";
 
 // useDealRecord — assembles a vehicle's deal record live by tenant_id + vin:
 // the accepted addendum, the K-208 safety inspection, the Get-Ready record, and
@@ -60,7 +61,9 @@ export function useDealRecord(vin?: string | null, listingId?: string | null, te
 // Which documents count as done for a completed deal.
 export function dealDocStatus(r: DealRecord) {
   const addendum = !!r.addendum?.acceptedAt;
-  const k208 = !!r.k208;
+  // r.k208 is the newest SIGNED row; the ONE executed-sign-off predicate
+  // decides — a signed FAIL must never count the K-208 stage as done.
+  const k208 = isExecutedSignoff(r.k208 ? { status: "signed", result: r.k208.result } : null);
   const getReady = !!r.getReady && (!!r.getReady.completeDate || r.getReady.detailSigned);
   // "Done" for an official doc = the one canonical customer-visible status set
   // (documentWorkflow.PUBLIC_STATUSES), so every surface agrees on completeness.

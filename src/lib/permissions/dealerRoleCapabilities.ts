@@ -52,7 +52,13 @@ export type DealerCapability =
   | "can_view_platform_admin"
   | "can_manage_automation"
   | "manage_source_authority"
-  | "resolve_exceptions";
+  | "resolve_exceptions"
+  | "can_conduct_inspection"
+  | "can_assign_service_work"
+  | "can_approve_service_work"
+  | "can_execute_k208"
+  | "can_void_inspection"
+  | "can_manage_service_settings";
 
 const allDealerCapabilities: DealerCapability[] = [
   "can_view_dashboard",
@@ -85,6 +91,15 @@ const allDealerCapabilities: DealerCapability[] = [
   "can_manage_automation",
   "manage_source_authority",
   "resolve_exceptions",
+  // can_execute_k208 is deliberately ABSENT: signing the K-208 is an explicit,
+  // per-dealer grant (settings k208_authority_roles / k208_authorized_users,
+  // enforced by public.k208_signer_allowed), never job-title-derived — so not
+  // even the all-capability roles carry it by default.
+  "can_conduct_inspection",
+  "can_assign_service_work",
+  "can_approve_service_work",
+  "can_void_inspection",
+  "can_manage_service_settings",
 ];
 
 const salesBase: DealerCapability[] = [
@@ -116,6 +131,8 @@ const serviceBase: DealerCapability[] = [
   "can_view_get_ready",
   "can_complete_get_ready",
   "can_upload_service_proof",
+  "can_conduct_inspection",
+  "can_assign_service_work",
 ];
 
 const complianceBase: DealerCapability[] = [
@@ -151,6 +168,7 @@ const usedCarManagerCapabilities: DealerCapability[] = [
   "can_manage_addons",
   "can_view_compliance",
   "can_view_reports",
+  "can_approve_service_work",
 ];
 
 export const dealerRoleCapabilityMap: Record<string, DealerCapability[]> = {
@@ -171,6 +189,7 @@ export const dealerRoleCapabilityMap: Record<string, DealerCapability[]> = {
     "can_manage_addons",
     "can_view_compliance",
     "can_view_reports",
+    "can_approve_service_work",
   ],
   salesperson: salesBase,
   used_car_manager: usedCarManagerCapabilities,
@@ -189,9 +208,13 @@ export const dealerRoleCapabilityMap: Record<string, DealerCapability[]> = {
     "can_view_inventory",
     "can_view_compliance",
     "can_view_reports",
+    "can_approve_service_work",
+    "can_void_inspection",
+    "can_manage_service_settings",
   ],
   service_advisor: serviceBase,
-  detail: ["can_view_dashboard", "can_view_work_queue", "can_view_get_ready", "can_complete_get_ready", "can_upload_service_proof"],
+  // The technician job maps onto detail/service_advisor in this role system.
+  detail: ["can_view_dashboard", "can_view_work_queue", "can_view_get_ready", "can_complete_get_ready", "can_upload_service_proof", "can_conduct_inspection"],
   third_party_vendor: ["can_view_work_queue", "can_complete_get_ready", "can_upload_service_proof"],
   office: [...complianceBase, "can_manage_invoices"],
   finance: [

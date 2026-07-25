@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { isExecutedSignoff, isFailedInspection } from "@/lib/commandCenter/inspectionState";
 import { CheckCircle2, Circle, ShieldCheck, Wrench, Sparkles, ImageIcon, Building2, ClipboardCheck } from "lucide-react";
 
 // ──────────────────────────────────────────────────────────────────────
@@ -45,8 +46,16 @@ export const DeliverySignoffs = ({ vin, tenantId, condition }: Props) => {
       sb.from("recall_service_tasks").select("status").eq("vin", v).eq("tenant_id", tenantId),
     ]);
 
-    const inspRows = (insp.data || []) as { status: string; documents: unknown[] | null }[];
-    const inspSigned = inspRows.find((r) => r.status === "signed");
+    const inspRows = (insp.data || []) as { status: string; result: string | null; signed_at: string | null; documents: unknown[] | null }[];
+    // Newest signed row through the ONE executed predicate — a signed FAIL is
+    // an open failure, not a completed sign-off.
+    const newestSigned = inspRows
+      .filter((r) => r.status === "signed")
+      .sort((a, b) => String(b.signed_at || "").localeCompare(String(a.signed_at || "")))[0];
+    const inspSigned = isExecutedSignoff(newestSigned ? { status: "signed", result: newestSigned.result } : null)
+      ? newestSigned
+      : undefined;
+    const inspFailed = !inspSigned && isFailedInspection(newestSigned ? { status: "signed", result: newestSigned.result } : null);
     const prepRows = (prep.data || []) as { listing_unlocked: boolean; foreman_name: string | null; install_photos: unknown[] | null }[];
     const prepDone = prepRows.find((r) => r.listing_unlocked);
     const detailRows = (detail.data || []) as { status: string; is_third_party: boolean; provider_company: string | null; performer_role: string | null; photos: unknown[] | null }[];
@@ -67,7 +76,7 @@ export const DeliverySignoffs = ({ vin, tenantId, condition }: Props) => {
       {
         key: "inspection",
         title: isNew ? "Pre-delivery inspection (PDI) sign-off" : "Safety inspection sign-off (K-208)",
-        sub: inspSigned ? "Service department signed off" : "Awaiting service sign-off",
+        sub: inspSigned ? "Service department signed off" : inspFailed ? "Failed — repairs and re-inspection required" : "Awaiting service sign-off",
         icon: ClipboardCheck,
         done: !!inspSigned,
         photos: ((inspSigned?.documents as unknown[]) || []).length || undefined,

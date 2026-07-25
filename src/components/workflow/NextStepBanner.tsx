@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useTenant } from "@/contexts/TenantContext";
+import { executedVinSet } from "@/lib/commandCenter/inspectionState";
 import { ArrowRight, CheckCircle2, Printer, Globe } from "lucide-react";
 
 // Chains the used-car-manager loop across the lifecycle screens. Reads the
@@ -34,13 +35,15 @@ export default function NextStepBanner({ stage }: { stage: LifecycleStage }) {
     const [list, ps, si, docs, re] = await Promise.all([
       (supabase as any).from("vehicle_listings").select("id, vin, ymm, condition").eq("tenant_id", tenantId).limit(500),
       (supabase as any).from("prep_sign_offs").select("vin").eq("tenant_id", tenantId).eq("listing_unlocked", true),
-      (supabase as any).from("safety_inspections").select("vin").eq("tenant_id", tenantId).eq("status", "signed"),
+      (supabase as any).from("safety_inspections").select("vin, status, result, signed_at, created_at").eq("tenant_id", tenantId).eq("status", "signed"),
       (supabase as any).from("vehicle_documents").select("vin").eq("tenant_id", tenantId).in("doc_type", ["title_front", "mco_front"]),
       (supabase as any).from("recon_estimates").select("vin").eq("tenant_id", tenantId).in("status", ["approved", "partially_approved"]),
     ]);
     setVehicles((list.data as VehicleRow[]) || []);
     setPrepDone(new Set(((ps.data as { vin: string }[]) || []).map((r) => r.vin)));
-    setK208Done(new Set(((si.data as { vin: string }[]) || []).map((r) => r.vin)));
+    // Newest signed row per VIN through the ONE executed predicate — a signed
+    // FAIL (or a stale pass behind a newer failure) must not read as done.
+    setK208Done(executedVinSet((si.data as { vin: string; status: string; result: string | null; signed_at: string | null; created_at: string | null }[]) || []));
     setTitleDone(new Set(((docs.data as { vin: string }[]) || []).map((r) => r.vin)));
     setReconApproved(new Set(((re.data as { vin: string }[]) || []).map((r) => r.vin)));
     setLoaded(true);
