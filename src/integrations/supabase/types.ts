@@ -8140,6 +8140,17 @@ export type Database = {
         }
         Returns: undefined
       }
+      save_description_channel_version: {
+        Args: {
+          p_case_id: string
+          p_channel: string
+          p_content: string
+          p_meta_description?: string
+          p_reason?: string
+          p_seo_title?: string
+        }
+        Returns: Json
+      }
       save_description_manual_version: {
         Args: { p_case_id: string; p_content: string; p_reason?: string }
         Returns: Json
