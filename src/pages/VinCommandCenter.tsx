@@ -161,6 +161,9 @@ export default function VinCommandCenter() {
             className={cn(BTN_SECONDARY, "gap-1.5")}>
             <PlayCircle className="w-4 h-4" /> How it works
           </button>
+          {/* The title rides on the wrapper: a disabled button suppresses hover
+              hit-testing, so the reason would never reach the operator. */}
+          <span title={timeline.length === 0 ? "No activity has been recorded for this VIN yet" : undefined}>
           <button
             onClick={() => {
               setShowAllHistory((v) => !v);
@@ -168,17 +171,17 @@ export default function VinCommandCenter() {
             }}
             disabled={timeline.length === 0}
             aria-expanded={showAllHistory}
-            title={timeline.length === 0 ? "No activity has been recorded for this VIN yet" : undefined}
             className={cn(BTN_SECONDARY, "gap-1.5")}>
             <History className="w-4 h-4" /> History
           </button>
+          </span>
         </div>
       </div>
 
       {/* Overlay, not an inline panel: the explainer must never displace the
           vehicle strip or the stat cards below it. */}
       <Dialog open={showHowItWorks} onOpenChange={setShowHowItWorks}>
-        <DialogContent className="rounded-2xl">
+        <DialogContent className="rounded-2xl sm:rounded-2xl shadow-none [&>button]:min-h-[44px] [&>button]:min-w-[44px] [&>button]:grid [&>button]:place-items-center [&>button]:rounded-lg [&>button]:right-3 [&>button]:top-3">
           <DialogHeader>
             <DialogTitle className="text-[13px] font-bold text-foreground">
               How this vehicle gets to market
@@ -322,7 +325,7 @@ export default function VinCommandCenter() {
           Icon={Clock}
           tone="blue"
           value={counts.awaitingAuthorization == null ? "—" : counts.awaitingAuthorization}
-          sub="Ready to review"
+          sub={counts.awaitingAuthorization == null ? undefined : "Ready to review"}
         />
         <CommandStatCard
           label="Exceptions"
