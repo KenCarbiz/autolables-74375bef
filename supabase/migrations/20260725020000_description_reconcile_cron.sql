@@ -152,3 +152,77 @@ EXCEPTION WHEN OTHERS THEN
 END $$;
 
 GRANT EXECUTE ON FUNCTION public.enqueue_description_config_change(uuid) TO authenticated, service_role;
+
+-- ── Re-listed vehicles must be able to resume ────────────────────────
+-- ARCHIVED is a terminal state in the transition guard, so a case archived
+-- when a vehicle sold would silently refuse every later transition if that
+-- VIN came back on the lot. Reactivate it instead of stranding it.
+CREATE OR REPLACE FUNCTION public.init_description_case(p_tenant_id uuid, p_vehicle_id uuid)
+RETURNS uuid
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = public
+AS $$
+DECLARE v_id uuid; v_vin text; v_status text; v_case_status text; v_archived timestamptz;
+BEGIN
+  SELECT vin, status INTO v_vin, v_status FROM public.vehicle_listings
+   WHERE id = p_vehicle_id AND (tenant_id = p_tenant_id OR tenant_id IS NULL);
+  IF v_vin IS NULL THEN RETURN NULL; END IF;
+  IF v_status = 'archived' THEN RETURN NULL; END IF;
+
+  SELECT id, status, archived_at INTO v_id, v_case_status, v_archived
+    FROM public.description_cases
+   WHERE tenant_id = p_tenant_id AND vehicle_id = p_vehicle_id;
+
+  IF v_id IS NOT NULL THEN
+    IF v_archived IS NOT NULL OR v_case_status = 'ARCHIVED' THEN
+      -- clear the terminal state first so the guard permits the restart
+      UPDATE public.description_cases
+         SET archived_at = NULL, status = 'QUEUED', publication_eligibility = 'unknown',
+             processed_source_data_version = NULL, lock_version = lock_version + 1, updated_at = now()
+       WHERE id = v_id;
+      INSERT INTO public.audit_log (action, entity_type, entity_id, store_id, details)
+      VALUES ('description_case_reactivated','description_case', v_id::text, p_tenant_id::text,
+              jsonb_build_object('vin', v_vin));
+    END IF;
+    RETURN v_id;
+  END IF;
+
+  INSERT INTO public.description_cases (tenant_id, vehicle_id, vin, status)
+  VALUES (p_tenant_id, p_vehicle_id, v_vin, 'QUEUED')
+  ON CONFLICT (tenant_id, vehicle_id) DO UPDATE SET updated_at = now()
+  RETURNING id INTO v_id;
+  RETURN v_id;
+END $$;
+
+-- The guard must allow that restart explicitly.
+CREATE OR REPLACE FUNCTION public.description_case_transition_guard()
+RETURNS trigger
+LANGUAGE plpgsql SET search_path = public
+AS $$
+DECLARE allowed text[];
+BEGIN
+  IF NEW.status = OLD.status THEN RETURN NEW; END IF;
+
+  allowed := CASE OLD.status
+    WHEN 'UNINITIALIZED'       THEN ARRAY['QUEUED','ARCHIVED']
+    WHEN 'QUEUED'              THEN ARRAY['BUILDING_FACTS','FAILED_RETRYABLE','FAILED_BLOCKED','ARCHIVED']
+    WHEN 'BUILDING_FACTS'      THEN ARRAY['GENERATING','REVIEW_REQUIRED','FAILED_RETRYABLE','FAILED_BLOCKED','ARCHIVED']
+    WHEN 'GENERATING'          THEN ARRAY['VALIDATING','FAILED_RETRYABLE','FAILED_BLOCKED','ARCHIVED']
+    WHEN 'VALIDATING'          THEN ARRAY['READY','REVIEW_REQUIRED','FAILED_BLOCKED','FAILED_RETRYABLE','ARCHIVED']
+    WHEN 'REVIEW_REQUIRED'     THEN ARRAY['READY','PUBLISHING','PUBLISHED','QUEUED','BUILDING_FACTS','STALE','FAILED_BLOCKED','FAILED_RETRYABLE','ARCHIVED']
+    WHEN 'READY'               THEN ARRAY['PUBLISHING','PUBLISHED','REVIEW_REQUIRED','STALE','QUEUED','BUILDING_FACTS','FAILED_BLOCKED','FAILED_RETRYABLE','ARCHIVED']
+    WHEN 'PUBLISHING'          THEN ARRAY['PUBLISHED','PARTIALLY_PUBLISHED','FAILED_RETRYABLE','FAILED_BLOCKED','ARCHIVED']
+    WHEN 'PARTIALLY_PUBLISHED' THEN ARRAY['PUBLISHED','STALE','QUEUED','BUILDING_FACTS','REVIEW_REQUIRED','FAILED_RETRYABLE','ARCHIVED']
+    WHEN 'PUBLISHED'           THEN ARRAY['STALE','QUEUED','BUILDING_FACTS','GENERATING','VALIDATING','READY','REVIEW_REQUIRED','PARTIALLY_PUBLISHED','FAILED_RETRYABLE','FAILED_BLOCKED','ARCHIVED']
+    WHEN 'STALE'               THEN ARRAY['QUEUED','BUILDING_FACTS','GENERATING','VALIDATING','READY','REVIEW_REQUIRED','PUBLISHED','FAILED_RETRYABLE','FAILED_BLOCKED','ARCHIVED']
+    WHEN 'FAILED_RETRYABLE'    THEN ARRAY['QUEUED','BUILDING_FACTS','GENERATING','VALIDATING','READY','REVIEW_REQUIRED','FAILED_BLOCKED','ARCHIVED']
+    WHEN 'FAILED_BLOCKED'      THEN ARRAY['QUEUED','BUILDING_FACTS','GENERATING','VALIDATING','READY','REVIEW_REQUIRED','ARCHIVED']
+    -- terminal, except an explicit reactivation back to QUEUED
+    WHEN 'ARCHIVED'            THEN ARRAY['QUEUED']
+    ELSE ARRAY[]::text[]
+  END;
+
+  IF NOT (NEW.status = ANY(allowed)) THEN
+    RAISE EXCEPTION 'illegal description lifecycle transition: % -> %', OLD.status, NEW.status;
+  END IF;
+  RETURN NEW;
+END $$;

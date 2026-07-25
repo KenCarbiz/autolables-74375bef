@@ -108,10 +108,6 @@ export default function MerchandisingSeoPanel() {
     );
   }
 
-  const Toggle = ({ k, label, help }: { k: string; label: string; help: string }) => (
-    <ToggleRow checked={!!s[k]} onChange={(v) => set(k, v)} label={label} help={help} />
-  );
-
   return (
     <div className="space-y-4 max-w-[900px]">
       <div className="rounded-2xl border border-border bg-card p-4">
@@ -169,7 +165,7 @@ export default function MerchandisingSeoPanel() {
           })}
         </div>
         <div className="mt-3">
-          <Toggle k="internal_publication_enabled" label="Allow internal publication"
+          <ToggleRow checked={!!s.internal_publication_enabled} onChange={(v) => set("internal_publication_enabled", v)} label="Allow internal publication"
             help="When off, nothing is ever written to the shopper listing automatically." />
         </div>
       </div>
@@ -203,11 +199,11 @@ export default function MerchandisingSeoPanel() {
           Each of these stays off until the dealership confirms it can support the claim. Verified source data is still required — these switches only grant permission, never truth.
         </p>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-          <Toggle k="cpo_language_allowed" label="Allow CPO language" help="Only when an approved CPO source confirms the program." />
-          <Toggle k="warranty_language_allowed" label="Allow warranty language" help="Only with verified remaining coverage." />
-          <Toggle k="accessory_language_allowed" label="Allow accessory language" help="Only accessories with verified installation proof." />
-          <Toggle k="price_in_description" label="Allow price in description" help="Adds the governed advertised price to the copy." />
-          <Toggle k="market_context_allowed" label="Allow market context wording"
+          <ToggleRow checked={!!s.cpo_language_allowed} onChange={(v) => set("cpo_language_allowed", v)} label="Allow CPO language" help="Only when an approved CPO source confirms the program." />
+          <ToggleRow checked={!!s.warranty_language_allowed} onChange={(v) => set("warranty_language_allowed", v)} label="Allow warranty language" help="Only with verified remaining coverage." />
+          <ToggleRow checked={!!s.accessory_language_allowed} onChange={(v) => set("accessory_language_allowed", v)} label="Allow accessory language" help="Only accessories with verified installation proof." />
+          <ToggleRow checked={!!s.price_in_description} onChange={(v) => set("price_in_description", v)} label="Allow price in description" help="Adds the governed advertised price to the copy." />
+          <ToggleRow checked={!!s.market_context_allowed} onChange={(v) => set("market_context_allowed", v)} label="Allow market context wording"
             help="Permits market analysis to shape emphasis. It is never stated as a verified vehicle fact." />
         </div>
       </div>
