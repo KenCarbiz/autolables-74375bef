@@ -59,7 +59,10 @@ export const CHANNELS: ChannelRule[] = [
   },
   {
     key: "dealer_website", label: "Dealer Website", characterLimit: 2400, minLength: 400,
-    deliveryMode: "internal_projection", connectorStatus: "available", seoFields: true,
+    // The shopper listing IS the published surface; a separately-hosted dealer
+    // site has no connector, so this stays export-only rather than claiming a
+    // delivery we never perform.
+    deliveryMode: "export_only", connectorStatus: "export_only", seoFields: true,
     instruction: "Polished website merchandising copy with natural local SEO. Never keyword-stuff.",
   },
   {

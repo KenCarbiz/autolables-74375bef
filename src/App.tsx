@@ -295,7 +295,7 @@ const App = () => (
                         <Route path="/description-operations" element={<DescriptionOperations />} />
                         <Route path="/description-intelligence/:vehicleId" element={<DescriptionIntelligence />} />
                         <Route path="/description-studio" element={<DescriptionStudio />} />
-                        <Route path="/description-writer" element={<DescriptionOperations />} />
+                        <Route path="/description-writer" element={<Navigate to="/description-operations" replace />} />
                         <Route path="/add-inventory" element={<SaveCarInventory />} />
                         <Route path="/prep" element={<PrepSignOff />} />
                         <Route path="/prep/:vin" element={<PrepMobile />} />

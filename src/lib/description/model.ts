@@ -46,7 +46,7 @@ export interface ChannelMeta {
 // Mirrors supabase/functions/_shared/description-core.ts CHANNELS. Display only.
 export const CHANNEL_META: ChannelMeta[] = [
   { key: "vehicle_passport", label: "Vehicle Passport",     characterLimit: 2400, deliveryMode: "internal_projection", connectorStatus: "available" },
-  { key: "dealer_website",   label: "Dealer Website",       characterLimit: 2400, deliveryMode: "internal_projection", connectorStatus: "available" },
+  { key: "dealer_website",   label: "Dealer Website",       characterLimit: 2400, deliveryMode: "export_only",         connectorStatus: "export_only" },
   { key: "autotrader",       label: "AutoTrader",           characterLimit: 1500, deliveryMode: "export_only",         connectorStatus: "export_only" },
   { key: "cars_com",         label: "Cars.com",             characterLimit: 1500, deliveryMode: "connector",           connectorStatus: "not_configured" },
   { key: "cargurus",         label: "CarGurus",             characterLimit: 1200, deliveryMode: "export_only",         connectorStatus: "export_only" },

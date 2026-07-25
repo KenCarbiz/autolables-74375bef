@@ -208,7 +208,8 @@ describe("publication eligibility", () => {
 describe("channel registry", () => {
   it("marks only internal destinations as deliverable", () => {
     const internal = CHANNELS.filter((c) => c.deliveryMode === "internal_projection").map((c) => c.key);
-    expect(internal).toEqual(["vehicle_passport", "dealer_website"]);
+    // only the shopper listing is genuinely written by AutoLabels
+    expect(internal).toEqual(["vehicle_passport"]);
     for (const c of CHANNELS.filter((x) => x.deliveryMode !== "internal_projection")) {
       expect(["not_configured", "export_only"]).toContain(c.connectorStatus);
     }

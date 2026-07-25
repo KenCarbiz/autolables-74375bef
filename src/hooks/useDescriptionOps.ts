@@ -162,11 +162,11 @@ export function useDescriptionCase(vehicleId: string | undefined) {
 
   useEffect(() => { load(); }, [load]);
 
-  const generate = useCallback(async (reason = "manual") => {
+  const generate = useCallback(async (reason = "manual", channels?: string[]) => {
     if (!tenant?.id || !vehicleId) return { ok: false, error: "missing context" };
     setBusy(true);
     const { data, error } = await supabase.functions.invoke("description-orchestrate", {
-      body: { action: "regenerate", tenant_id: tenant.id, vehicle_id: vehicleId, reason },
+      body: { action: "regenerate", tenant_id: tenant.id, vehicle_id: vehicleId, reason, channels },
     });
     setBusy(false);
     if (error) return { ok: false, error: error.message };
